@@ -14,3 +14,57 @@ typedef uint64_t uint64;
 
 typedef float float32;
 typedef double float64;
+
+
+#include <stdexcept>
+#include <cstddef>
+#include <type_traits>
+
+#include <Core/FxPanic.hpp>
+
+template <typename ValueType>
+class Optional {
+public:
+    Optional(ValueType &value)
+        : mHasValue(true),
+          mData()
+    {
+    }
+
+    Optional(std::nullptr_t)
+        : mHasValue(false),
+          mData()
+    {
+    }
+
+    bool HasValue() const { return mHasValue; }
+
+    void Clear()
+    {
+        mHasValue = false;
+    }
+
+    ValueType *GetPtr()
+    {
+        if (!HasValue()) {
+            return nullptr;
+        }
+
+        return reinterpret_cast<ValueType *>(&mData);
+    }
+
+    ValueType &operator *() const
+    {
+        if (!HasValue()) {
+            FxPanic_("Optional", "Could not retrieve undefined value", 0);
+        }
+
+        return *reinterpret_cast<ValueType *>(&mData);
+    }
+
+    ValueType &Get() const { return *this; }
+
+private:
+    bool mHasValue = false;
+    std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
+};

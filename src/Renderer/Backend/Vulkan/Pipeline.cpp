@@ -15,15 +15,17 @@ namespace vulkan {
 AR_SET_MODULE_NAME("Pipeline")
 
 VertexInfo GraphicsPipeline::MakeVertexInfo() {
+    using VertexType = FxVertex<FxVertexPosition | FxVertexNormal>;
+
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
-        .stride = sizeof(Vertex),
+        .stride = sizeof(VertexType),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
 
     StaticArray<VkVertexInputAttributeDescription> attribs = {
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
-        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, Normal) },
+        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
     };
 
     Log::Debug("Amount of attributes: %d", attribs.Size);
@@ -32,7 +34,7 @@ VertexInfo GraphicsPipeline::MakeVertexInfo() {
 }
 
 void GraphicsPipeline::Create(ShaderList shader_list) {
-    this->mDevice = RendererVulkan->GetDevice();
+    mDevice = RendererVulkan->GetDevice();
 
     VkSpecializationInfo specialization_info = {
         .mapEntryCount = 0,
@@ -148,8 +150,8 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
     };
 
 
-    this->CreateLayout();
-    this->RenderPass.Create(*this->mDevice, RendererVulkan->Swapchain);
+    CreateLayout();
+    RenderPass.Create(*mDevice, RendererVulkan->Swapchain);
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -166,13 +168,13 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
 
         .pDynamicState = &dynamic_state_info,
 
-        .layout = this->Layout,
+        .layout = Layout,
 
-        .renderPass = this->RenderPass.RenderPass,
+        .renderPass = RenderPass.RenderPass,
         .subpass = 0,
     };
 
-    const VkResult status = vkCreateGraphicsPipelines(this->mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &this->Pipeline);
+    const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
 
     if (status != VK_SUCCESS) {
         FxPanic("Could not create graphics pipeline", status);
@@ -180,21 +182,21 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
 }
 
 void GraphicsPipeline::Bind(CommandBuffer &command_buffer) {
-    vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, this->Pipeline);
+    vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }
 
 void GraphicsPipeline::Destroy()
 {
-    this->mDevice->WaitForIdle();
+    mDevice->WaitForIdle();
 
     if (Pipeline) {
-        vkDestroyPipeline(this->mDevice->Device, this->Pipeline, nullptr);
+        vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);
     }
     if (Layout) {
-        vkDestroyPipelineLayout(this->mDevice->Device, this->Layout, nullptr);
+        vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
     }
 
-    RenderPass.Destroy(*this->mDevice);
+    RenderPass.Destroy(*mDevice);
 }
 
 void GraphicsPipeline::CreateLayout() {
@@ -204,7 +206,7 @@ void GraphicsPipeline::CreateLayout() {
         .pushConstantRangeCount = 0,
     };
 
-    const VkResult status = vkCreatePipelineLayout(this->mDevice->Device, &create_info, nullptr, &this->Layout);
+    const VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);
 
     if (status != VK_SUCCESS) {
         FxPanic("Failed to create pipeline layout", status);

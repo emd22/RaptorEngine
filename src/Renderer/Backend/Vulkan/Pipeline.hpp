@@ -10,11 +10,27 @@
 
 namespace vulkan {
 
-struct Vertex
+enum FxVertexFlags : int8
+{
+    FxVertexPosition = 0x01,
+    FxVertexNormal = 0x02,
+};
+
+template <int8 Flags>
+struct FxVertex;
+
+template <>
+struct FxVertex<FxVertexPosition>
+{
+    float32 Position[3];
+} __attribute__((packed));
+
+template <>
+struct FxVertex<FxVertexPosition | FxVertexNormal>
 {
     float32 Position[3];
     float32 Normal[3];
-};
+} __attribute__((packed));
 
 struct VertexInfo
 {
@@ -33,7 +49,7 @@ public:
 
     ~GraphicsPipeline()
     {
-        this->Destroy();
+        Destroy();
     }
 
 private:

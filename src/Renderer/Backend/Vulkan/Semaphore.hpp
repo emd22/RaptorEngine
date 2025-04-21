@@ -18,9 +18,9 @@ public:
             .pNext = nullptr,
         };
 
-        this->mDevice = device;
+        mDevice = device;
 
-        const VkResult status = vkCreateSemaphore(device->Device, &create_info, nullptr, &this->Semaphore);
+        const VkResult status = vkCreateSemaphore(device->Device, &create_info, nullptr, &Semaphore);
 
         if (status != VK_SUCCESS) {
             FxPanic_("Semaphore", "Could not create semaphore", status);
@@ -29,7 +29,7 @@ public:
 
     void Destroy()
     {
-        vkDestroySemaphore(this->mDevice->Device, this->Semaphore, nullptr);
+        vkDestroySemaphore(mDevice->Device, Semaphore, nullptr);
     }
 
 public:

@@ -18,37 +18,37 @@ void Swapchain::Init(Vec2i size, VkSurfaceKHR &surface, GPUDevice *device)
 {
     AssertRendererExists();
 
-    this->mDevice = device;
+    mDevice = device;
 
-    this->CreateSwapchain(size, surface);
-    this->CreateSwapchainImages();
-    this->CreateImageViews();
+    CreateSwapchain(size, surface);
+    CreateSwapchainImages();
+    CreateImageViews();
 
-    this->Initialized = true;
+    Initialized = true;
 }
 
 void Swapchain::CreateSwapchainImages()
 {
     uint32 image_count;
 
-    vkGetSwapchainImagesKHR(this->mDevice->Device, this->mSwapchain, &image_count, nullptr);
+    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
 
-    this->Images.InitSize(image_count);
-    vkGetSwapchainImagesKHR(this->mDevice->Device, this->mSwapchain, &image_count, this->Images.Data);
+    Images.InitSize(image_count);
+    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, Images.Data);
 }
 
 void Swapchain::CreateImageViews()
 {
-    const uint64 images_size = this->Images.Size;
+    const uint64 images_size = Images.Size;
 
-    this->ImageViews.InitSize(images_size);
+    ImageViews.InitSize(images_size);
 
     for (int32 i = 0; i < images_size; i++) {
         const VkImageViewCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = this->Images[i],
+            .image = Images[i],
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = this->SurfaceFormat.format,
+            .format = SurfaceFormat.format,
             .components = {
                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
                 .g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -64,7 +64,7 @@ void Swapchain::CreateImageViews()
             }
         };
 
-        const VkResult status = vkCreateImageView(this->mDevice->Device, &create_info, nullptr, &this->ImageViews[i]);
+        const VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &ImageViews[i]);
         if (status != VK_SUCCESS) {
             FxPanic("Could not create swapchain image view", status);
         }
@@ -73,10 +73,10 @@ void Swapchain::CreateImageViews()
 
 void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
 {
-    this->Extent = size;
+    Extent = size;
 
     VkSurfaceCapabilitiesKHR capabilities;
-    const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(this->mDevice->Physical, surface, &capabilities);
+    const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mDevice->Physical, surface, &capabilities);
 
     if (result != VK_SUCCESS) {
         FxPanic("Error retrieving surface capabilities", result);
@@ -95,7 +95,7 @@ void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
 
     Log::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount, image_count);
 
-    this->SurfaceFormat = this->mDevice->GetBestSurfaceFormat();
+    SurfaceFormat = mDevice->GetBestSurfaceFormat();
 
     const VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
@@ -105,8 +105,8 @@ void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
 
         .minImageCount = image_count,
 
-        .imageFormat = this->SurfaceFormat.format,
-        .imageColorSpace = this->SurfaceFormat.colorSpace,
+        .imageFormat = SurfaceFormat.format,
+        .imageColorSpace = SurfaceFormat.colorSpace,
 
         .imageExtent = extent,
         .imageArrayLayers = 1,
@@ -118,10 +118,10 @@ void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .clipped = VK_TRUE,
         // mSwapchain is null if not initialized
-        .oldSwapchain = this->mSwapchain,
+        .oldSwapchain = mSwapchain,
     };
 
-    if (this->mDevice->mQueueFamilies.IsGraphicsAlsoPresent()) {
+    if (mDevice->mQueueFamilies.IsGraphicsAlsoPresent()) {
         create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         create_info.queueFamilyIndexCount = 0;
         create_info.pQueueFamilyIndices = nullptr;
@@ -130,11 +130,11 @@ void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
         create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = 2;
 
-        const auto indices = this->mDevice->mQueueFamilies.GetQueueIndexList();
+        const auto indices = mDevice->mQueueFamilies.GetQueueIndexList();
         create_info.pQueueFamilyIndices = indices.data();
     }
 
-    const VkResult status = vkCreateSwapchainKHR(this->mDevice->Device, &create_info, nullptr, &this->mSwapchain);
+    const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
 
     if (status != VK_SUCCESS) {
         FxPanic("Could not create swapchain", status);
@@ -143,52 +143,52 @@ void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
 
 void Swapchain::CreateSwapchainFramebuffers(GraphicsPipeline *pipeline)
 {
-    Log::Debug("Image view count: %d", this->ImageViews.Size);
-    this->Framebuffers.Free();
-    this->Framebuffers.InitSize(this->ImageViews.Size);
+    Log::Debug("Image view count: %d", ImageViews.Size);
+    Framebuffers.Free();
+    Framebuffers.InitSize(ImageViews.Size);
 
     StaticArray<VkImageView> temp_views;
     temp_views.InitSize(1);
 
-    for (int i = 0; i < this->ImageViews.Size; i++) {
-        temp_views[0] = this->ImageViews[i];
+    for (int i = 0; i < ImageViews.Size; i++) {
+        temp_views[0] = ImageViews[i];
 
-        this->Framebuffers[i].Create(temp_views, *pipeline, this->Extent);
+        Framebuffers[i].Create(temp_views, *pipeline, Extent);
     }
 
     Log::Debug("Create framebuffers", 0);
 
-    this->mPipeline = pipeline;
+    mPipeline = pipeline;
 }
 
 void Swapchain::DestroyFramebuffersAndImageViews()
 {
-    for (int i = 0; i < this->ImageViews.Size; i++) {
-        this->Framebuffers[i].Destroy();
-        vkDestroyImageView(this->mDevice->Device, this->ImageViews[i], nullptr);
+    for (int i = 0; i < ImageViews.Size; i++) {
+        Framebuffers[i].Destroy();
+        vkDestroyImageView(mDevice->Device, ImageViews[i], nullptr);
     }
 
-    this->Framebuffers.Free();
-    this->ImageViews.Free();
+    Framebuffers.Free();
+    ImageViews.Free();
 }
 
 void Swapchain::DestroyInternalSwapchain()
 {
-    vkDestroySwapchainKHR(this->mDevice->Device, this->mSwapchain, nullptr);
+    vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr);
 }
 
 void Swapchain::Destroy()
 {
-    this->DestroyFramebuffersAndImageViews();
-    this->Images.Free();
-    this->DestroyInternalSwapchain();
+    DestroyFramebuffersAndImageViews();
+    Images.Free();
+    DestroyInternalSwapchain();
 
-    this->Initialized = false;
+    Initialized = false;
 }
 
 Swapchain::~Swapchain()
 {
-    this->Images.Free();
+    Images.Free();
 }
 
 } // namespace vulkan

@@ -38,15 +38,15 @@ AR_SET_MODULE_NAME("Vulkan")
 
 ExtensionNames FxRenderBackendVulkan::CheckExtensionsAvailable(ExtensionNames &requested_extensions)
 {
-    if (this->mAvailableExtensions.IsEmpty()) {
-        this->QueryInstanceExtensions();
+    if (mAvailableExtensions.IsEmpty()) {
+        QueryInstanceExtensions();
     }
 
     std::vector<const char *> missing_extensions;
 
     for (const char *requested_name : requested_extensions) {
         bool found_extension = false;
-        for (const auto &extension : this->mAvailableExtensions) {
+        for (const auto &extension : mAvailableExtensions) {
             if (!strncmp(extension.extensionName, requested_name, 256)) {
                 found_extension = true;
                 break;
@@ -78,45 +78,45 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
 
 void FxRenderBackendVulkan::Init(Vec2i window_size)
 {
-    this->InitVulkan();
-    this->CreateSurfaceFromWindow();
+    InitVulkan();
+    CreateSurfaceFromWindow();
 
-    this->mDevice.Create(this->mInstance, this->mWindowSurface);
+    mDevice.Create(mInstance, mWindowSurface);
 
-    this->InitGPUAllocator();
-    this->Swapchain.Init(window_size, this->mWindowSurface, &this->mDevice);
+    InitGPUAllocator();
+    Swapchain.Init(window_size, mWindowSurface, &mDevice);
 
-    this->InitFrames();
+    InitFrames();
 
-    this->Initialized = true;
+    Initialized = true;
 }
 
 void FxRenderBackendVulkan::InitFrames()
 {
-    this->Frames.InitSize(this->FramesInFlight);
+    Frames.InitSize(FramesInFlight);
 
-    const uint32 graphics_family = this->GetDevice()->mQueueFamilies.GetGraphicsFamily();
+    const uint32 graphics_family = GetDevice()->mQueueFamilies.GetGraphicsFamily();
 
-    GPUDevice *device = this->GetDevice();
+    GPUDevice *device = GetDevice();
 
-    for (int i = 0; i < this->Frames.Size; i++) {
-        this->Frames.Data[i].CommandPool.Create(device, graphics_family);
-        this->Frames.Data[i].CommandBuffer.Create(&this->Frames.Data[i].CommandPool);
+    for (int i = 0; i < Frames.Size; i++) {
+        Frames.Data[i].CommandPool.Create(device, graphics_family);
+        Frames.Data[i].CommandBuffer.Create(&Frames.Data[i].CommandPool);
 
-        this->Frames.Data[i].Create(device);
+        Frames.Data[i].Create(device);
     }
 }
 
 void FxRenderBackendVulkan::DestroyFrames()
 {
-    for (auto &frame : this->Frames) {
+    for (auto &frame : Frames) {
         frame.CommandBuffer.Destroy();
         frame.CommandPool.Destroy();
 
         frame.Destroy();
     }
 
-    this->Frames.Free();
+    Frames.Free();
 }
 
 void FxRenderBackendVulkan::InitVulkan()
@@ -191,7 +191,7 @@ void FxRenderBackendVulkan::InitVulkan()
     }
 #endif
 
-    this->Initialized = true;
+    Initialized = true;
 }
 
 uint32 DebugMessageCallback(
@@ -290,15 +290,15 @@ void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messeng
 
 void FxRenderBackendVulkan::InitGPUAllocator()
 {
-    const GPUDevice *device = this->GetDevice();
+    const GPUDevice *device = GetDevice();
 
     const VmaAllocatorCreateInfo create_info = {
         .physicalDevice = device->Physical,
         .device = device->Device,
-        .instance = this->mInstance
+        .instance = mInstance
     };
 
-    const VkResult status = vmaCreateAllocator(&create_info, &this->GPUAllocator);
+    const VkResult status = vmaCreateAllocator(&create_info, &GPUAllocator);
     if (status != VK_SUCCESS) {
         FxPanic("Could not create VMA allocator!", status);
     }
@@ -306,7 +306,7 @@ void FxRenderBackendVulkan::InitGPUAllocator()
 
 void FxRenderBackendVulkan::DestroyGPUAllocator()
 {
-    vmaDestroyAllocator(this->GPUAllocator);
+    vmaDestroyAllocator(GPUAllocator);
 }
 
 ExtensionNames FxRenderBackendVulkan::MakeInstanceExtensionList(ExtensionNames &user_requested_extensions)
@@ -335,12 +335,12 @@ ExtensionList &FxRenderBackendVulkan::QueryInstanceExtensions(bool invalidate_pr
     Log::Debug("Query Extensions", 0);
 
 
-    if (this->mAvailableExtensions.IsNotEmpty()) {
+    if (mAvailableExtensions.IsNotEmpty()) {
         if (invalidate_previous) {
-            this->mAvailableExtensions.Free();
+            mAvailableExtensions.Free();
         }
         else {
-            return this->mAvailableExtensions;
+            return mAvailableExtensions;
         }
     }
 
@@ -355,10 +355,10 @@ ExtensionList &FxRenderBackendVulkan::QueryInstanceExtensions(bool invalidate_pr
     std::cout << "Ext count: " << extension_count << "\n";
 
     // resize to create the items in the vector
-    this->mAvailableExtensions.InitSize(extension_count);
+    mAvailableExtensions.InitSize(extension_count);
 
     // Get the available instance extensions
-    result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, this->mAvailableExtensions.Data);
+    result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, mAvailableExtensions.Data);
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Could not query instance extensions!");
     }
@@ -370,16 +370,16 @@ ExtensionList &FxRenderBackendVulkan::QueryInstanceExtensions(bool invalidate_pr
         std::cout << extension.extensionName << " : " << extension.specVersion << "\n";
     }
 
-    return this->mAvailableExtensions;
+    return mAvailableExtensions;
 }
 
 FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline)
 {
-    FrameData *frame = this->GetFrame();
+    FrameData *frame = GetFrame();
 
     frame->InFlight.WaitFor();
 
-    FrameResult result = this->GetNextSwapchainImage(frame);
+    FrameResult result = GetNextSwapchainImage(frame);
     if (result != FrameResult::Success) {
         return result;
     }
@@ -392,8 +392,8 @@ FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline)
     pipeline.RenderPass.Begin();
     pipeline.Bind(frame->CommandBuffer);
 
-    const int32 width = this->Swapchain.Extent.Width();
-    const int32 height = this->Swapchain.Extent.Height();
+    const int32 width = Swapchain.Extent.Width();
+    const int32 height = Swapchain.Extent.Height();
 
     const VkViewport viewport = {
         .x = 0, .y = 0,
@@ -417,7 +417,7 @@ FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline)
 
 void FxRenderBackendVulkan::SubmitFrame()
 {
-    FrameData *frame = this->GetFrame();
+    FrameData *frame = GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -437,21 +437,21 @@ void FxRenderBackendVulkan::SubmitFrame()
     };
 
     VkTry(
-        vkQueueSubmit(this->GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
+        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
         "Error submitting draw buffer"
     );
 }
 
 void FxRenderBackendVulkan::PresentFrame()
 {
-    FrameData *frame = this->GetFrame();
+    FrameData *frame = GetFrame();
 
-    if (this->Swapchain.Initialized != true) {
+    if (Swapchain.Initialized != true) {
         FxPanic("Swapchain not initialized!", 0);
     }
 
     const VkSwapchainKHR swapchains[] = {
-        this->Swapchain.GetSwapchain(),
+        Swapchain.GetSwapchain(),
     };
 
     const VkPresentInfoKHR present_info = {
@@ -462,12 +462,12 @@ void FxRenderBackendVulkan::PresentFrame()
         .swapchainCount = 1,
         .pSwapchains = swapchains,
 
-        .pImageIndices = &this->mImageIndex,
+        .pImageIndices = &mImageIndex,
 
         .pResults = nullptr,
     };
 
-    const VkResult status = vkQueuePresentKHR(this->GetDevice()->PresentQueue, &present_info);
+    const VkResult status = vkQueuePresentKHR(GetDevice()->PresentQueue, &present_info);
 
     if (status == VK_SUCCESS) { }
     else if (status == VK_ERROR_OUT_OF_DATE_KHR || status == VK_SUBOPTIMAL_KHR) {
@@ -482,17 +482,17 @@ void FxRenderBackendVulkan::FinishFrame(GraphicsPipeline &pipeline)
 {
     pipeline.RenderPass.End();
 
-    this->GetFrame()->CommandBuffer.End();
+    GetFrame()->CommandBuffer.End();
 
-    this->SubmitFrame();
-    this->PresentFrame();
+    SubmitFrame();
+    PresentFrame();
 
-    this->ProcessDeletionQueue();
+    ProcessDeletionQueue();
 
-    this->mInternalFrameCounter++;
+    mInternalFrameCounter++;
 
     // better to do one division per frame as opposed to one every GetFrameNumber()
-    this->mFrameNumber = (mInternalFrameCounter) % this->FramesInFlight;
+    mFrameNumber = (mInternalFrameCounter) % FramesInFlight;
 }
 
 FrameResult FxRenderBackendVulkan::GetNextSwapchainImage(FrameData *frame)
@@ -500,12 +500,12 @@ FrameResult FxRenderBackendVulkan::GetNextSwapchainImage(FrameData *frame)
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
     const VkResult result = vkAcquireNextImageKHR(
-        this->GetDevice()->Device,
-        this->Swapchain.GetSwapchain(),
+        GetDevice()->Device,
+        Swapchain.GetSwapchain(),
         timeout,
         frame->ImageAvailable.Semaphore,
         nullptr,
-        &this->mImageIndex
+        &mImageIndex
     );
 
     if (result == VK_SUCCESS) {
@@ -524,11 +524,11 @@ FrameResult FxRenderBackendVulkan::GetNextSwapchainImage(FrameData *frame)
 
 void FxRenderBackendVulkan::CreateSurfaceFromWindow()
 {
-    if (this->mWindow == nullptr) {
+    if (mWindow == nullptr) {
         FxPanic("No window attached! use FxRenderBackendVulkan::SelectWindow()", 0);
     }
 
-    bool success = SDL_Vulkan_CreateSurface(this->mWindow->GetWindow(), this->mInstance, nullptr, &this->mWindowSurface);
+    bool success = SDL_Vulkan_CreateSurface(mWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
 
     if (!success) {
         FxPanic("Could not attach Vulkan instance to window! (SDL err: %s)", SDL_GetError());
@@ -537,36 +537,36 @@ void FxRenderBackendVulkan::CreateSurfaceFromWindow()
 
 void FxRenderBackendVulkan::Destroy()
 {
-    this->GetDevice()->WaitForIdle();
+    GetDevice()->WaitForIdle();
 
-    while (!this->mDeletionQueue.empty()) {
-        this->ProcessDeletionQueue(true);
+    while (!mDeletionQueue.empty()) {
+        ProcessDeletionQueue(true);
         // insert a small delay to avoid the processor spinning out while
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
-    this->DestroyGPUAllocator();
+    DestroyGPUAllocator();
 
-    this->Swapchain.Destroy();
-    this->DestroyFrames();
+    Swapchain.Destroy();
+    DestroyFrames();
 
-    if (this->mWindowSurface) {
-        vkDestroySurfaceKHR(this->mInstance, this->mWindowSurface, nullptr);
+    if (mWindowSurface) {
+        vkDestroySurfaceKHR(mInstance, mWindowSurface, nullptr);
     }
 
-    this->GetDevice()->Destroy();
+    GetDevice()->Destroy();
 
-    DestroyDebugMessenger(this->mInstance, this->mDebugMessenger);
+    DestroyDebugMessenger(mInstance, mDebugMessenger);
 
-    vkDestroyInstance(this->mInstance, nullptr);
+    vkDestroyInstance(mInstance, nullptr);
 
-    this->Initialized = false;
+    Initialized = false;
 }
 
 FrameData *FxRenderBackendVulkan::GetFrame()
 {
-    return &this->Frames[this->GetFrameNumber()];
+    return &Frames[GetFrameNumber()];
 }
 
 }; // namespace vulkan

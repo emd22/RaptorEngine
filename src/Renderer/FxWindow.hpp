@@ -12,14 +12,14 @@ public:
 
     FxWindow(const char *title, int32 width, int32 height)
     {
-        this->Create(title, width, height);
+        Create(title, width, height);
     }
 
     void Create(const char *title, int32 width, int32 height)
     {
         const uint64 window_flags = SDL_WINDOW_VULKAN;
 
-        this->mWindow = SDL_CreateWindow(title, width, height, window_flags);
+        mWindow = SDL_CreateWindow(title, width, height, window_flags);
 
         if (mWindow == nullptr) {
             FxPanic_("Window", "Could not create SDL window (SDL err: %s)", SDL_GetError());
@@ -31,7 +31,7 @@ public:
         return std::shared_ptr<FxWindow>(new FxWindow(title, width, height));
     }
 
-    SDL_Window *GetWindow() { return this->mWindow; }
+    SDL_Window *GetWindow() { return mWindow; }
 
     ~FxWindow()
     {

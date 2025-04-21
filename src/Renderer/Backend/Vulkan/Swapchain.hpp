@@ -21,7 +21,7 @@ public:
     void Init(Vec2i size, VkSurfaceKHR &surface, GPUDevice *device);
     void CreateSwapchainFramebuffers(GraphicsPipeline *pipeline);
 
-    VkSwapchainKHR GetSwapchain() { return this->mSwapchain; }
+    VkSwapchainKHR GetSwapchain() { return mSwapchain; }
 
     void Destroy();
 

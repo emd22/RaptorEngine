@@ -59,14 +59,14 @@ void RenderPass::Create(GPUDevice &device, Swapchain &swapchain) {
         .pDependencies = &subpassDependency,
     };
 
-    const VkResult status = vkCreateRenderPass(device.Device, &create_info, nullptr, &this->RenderPass);
+    const VkResult status = vkCreateRenderPass(device.Device, &create_info, nullptr, &RenderPass);
     if (status != VK_SUCCESS) {
         FxPanic("Failed to create render pass", status);
     }
 }
 
 void RenderPass::Begin() {
-    if (this->RenderPass == nullptr) {
+    if (RenderPass == nullptr) {
         FxPanic("Render pass has not been previously created", 0);
     }
 
@@ -80,7 +80,7 @@ void RenderPass::Begin() {
 
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = this->RenderPass,
+        .renderPass = RenderPass,
         .framebuffer = RendererVulkan->Swapchain.Framebuffers[RendererVulkan->GetImageIndex()].Framebuffer,
         .renderArea.offset = {0, 0},
         .renderArea.extent = {(uint32)extent.Width(), (uint32)extent.Height()},
@@ -89,21 +89,21 @@ void RenderPass::Begin() {
     };
 
 
-    this->CommandBuffer = &frame->CommandBuffer;
-    vkCmdBeginRenderPass(this->CommandBuffer->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    CommandBuffer = &frame->CommandBuffer;
+    vkCmdBeginRenderPass(CommandBuffer->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void RenderPass::End() {
-    if (this->CommandBuffer == VK_NULL_HANDLE) {
+    if (CommandBuffer == VK_NULL_HANDLE) {
         throw std::runtime_error("Command buffer is null when ending render pass!");
     }
 
-    vkCmdEndRenderPass(this->CommandBuffer->CommandBuffer);
+    vkCmdEndRenderPass(CommandBuffer->CommandBuffer);
 }
 
 void RenderPass::Destroy(GPUDevice &device) {
     if (RenderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(device.Device, this->RenderPass, nullptr);
+        vkDestroyRenderPass(device.Device, RenderPass, nullptr);
     }
 }
 

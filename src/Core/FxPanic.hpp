@@ -7,6 +7,8 @@
 
 #include <vulkan/vulkan.h>
 
+#define FX_BREAKPOINT __builtin_trap()
+
 template <typename T, typename... Types>
 void FxPanic_(const char * const module, const char *fmt, T first, Types... items)
 {
@@ -39,5 +41,11 @@ void FxPanic_(const char *module, const char *fmt, VkResult result, Types... ite
     std::terminate();
 }
 
+
 #define FxPanic(...) \
     FxPanic_(ArModuleName__, __VA_ARGS__)
+
+#define FxAssert(cond) \
+    if (!cond) { \
+        FxPanic_(__func__, "Assertion failed! (%s)", #cond); \
+    }

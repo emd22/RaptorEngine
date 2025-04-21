@@ -23,14 +23,14 @@ void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfac
     uint32 family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, nullptr);
 
-    this->RawFamilies.InitSize(family_count);
-    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, this->RawFamilies.Data);
+    RawFamilies.InitSize(family_count);
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, RawFamilies.Data);
 
     Log::Info("Amount of queue families: %d", family_count);
 
     uint32 index = 0;
-    for (const auto &family : this->RawFamilies) {
-        if (this->mPresentIndex != UINT_MAX && this->mGraphicsIndex != UINT_MAX) {
+    for (const auto &family : RawFamilies) {
+        if (mPresentIndex != UINT_MAX && mGraphicsIndex != UINT_MAX) {
             break;
         }
 
@@ -40,7 +40,7 @@ void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfac
         // check for a graphics family
         {
             if ((family.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                this->mGraphicsIndex = index;
+                mGraphicsIndex = index;
             }
         }
 
@@ -56,7 +56,7 @@ void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfac
 
             Log::Info("Present support: %d\n", present_support);
             if (present_support > 0) {
-                this->mPresentIndex = index;
+                mPresentIndex = index;
             }
         }
 
@@ -75,7 +75,7 @@ bool GPUDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
     VkPhysicalDeviceFeatures features;
 
     QueueFamilies new_families;
-    new_families.FindQueueFamilies(physical, this->mSurface);
+    new_families.FindQueueFamilies(physical, mSurface);
 
     vkGetPhysicalDeviceFeatures(physical, &features);
     vkGetPhysicalDeviceProperties(physical, &properties);
@@ -99,27 +99,27 @@ bool GPUDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
 
 void GPUDevice::QueryQueues()
 {
-    const auto indices = this->mQueueFamilies.GetQueueIndexList();
+    const auto indices = mQueueFamilies.GetQueueIndexList();
 
     if (indices.size() < 2) {
         FxPanic("Not enough queue families", 0);
     }
 
-    vkGetDeviceQueue(this->Device, indices[0], 0, &this->GraphicsQueue);
-    vkGetDeviceQueue(this->Device, indices[1], 0, &this->PresentQueue);
+    vkGetDeviceQueue(Device, indices[0], 0, &GraphicsQueue);
+    vkGetDeviceQueue(Device, indices[1], 0, &PresentQueue);
 }
 
 void GPUDevice::CreateLogicalDevice()
 {
-    if (this->Physical == nullptr) {
-        this->PickPhysicalDevice();
+    if (Physical == nullptr) {
+        PickPhysicalDevice();
     }
 
-    if (!this->mQueueFamilies.IsComplete()) {
-        this->mQueueFamilies.FindQueueFamilies(this->Physical, this->mSurface);
+    if (!mQueueFamilies.IsComplete()) {
+        mQueueFamilies.FindQueueFamilies(Physical, mSurface);
     }
 
-    const auto queue_family_indices = this->mQueueFamilies.GetQueueIndexList();
+    const auto queue_family_indices = mQueueFamilies.GetQueueIndexList();
 
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     queue_create_infos.reserve(queue_family_indices.size());
@@ -175,39 +175,39 @@ void GPUDevice::CreateLogicalDevice()
         .ppEnabledLayerNames = nullptr,
     };
 
-    const VkResult status = vkCreateDevice(this->Physical, &create_info, nullptr, &this->Device);
+    const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);
 
     if (status != VK_SUCCESS) {
         FxPanic("Could not create logical device", status);
     }
 
-    this->QueryQueues();
+    QueryQueues();
 }
 
 void GPUDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 {
-    this->mInstance = instance;
-    this->mSurface = surface;
+    mInstance = instance;
+    mSurface = surface;
 
-    this->PickPhysicalDevice();
+    PickPhysicalDevice();
 
-    this->mQueueFamilies.FindQueueFamilies(this->Physical, surface);
+    mQueueFamilies.FindQueueFamilies(Physical, surface);
 
-    this->CreateLogicalDevice();
+    CreateLogicalDevice();
 }
 
 void GPUDevice::Destroy()
 {
-    vkDestroyDevice(this->Device, nullptr);
+    vkDestroyDevice(Device, nullptr);
 }
 
 VkSurfaceFormatKHR GPUDevice::GetBestSurfaceFormat()
 {
     uint32 format_count;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(this->Physical, this->mSurface, &format_count, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, nullptr);
 
     std::vector<VkSurfaceFormatKHR> surface_formats(format_count);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(this->Physical, this->mSurface, &format_count, surface_formats.data());
+    vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, surface_formats.data());
 
     for (const auto &format : surface_formats) {
         if (format.format == VK_FORMAT_B8G8R8_SRGB) {
@@ -225,7 +225,7 @@ void GPUDevice::PickPhysicalDevice()
     const char * enum_err = "Could not enumerate physical devices";
 
     uint32 device_count;
-    VkTry(vkEnumeratePhysicalDevices(this->mInstance, &device_count, nullptr), enum_err);
+    VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, nullptr), enum_err);
 
 
     if (device_count == 0) {
@@ -235,22 +235,22 @@ void GPUDevice::PickPhysicalDevice()
     StaticArray<VkPhysicalDevice> physical_devices(device_count);
     physical_devices.InitSize();
 
-    VkTry(vkEnumeratePhysicalDevices(this->mInstance, &device_count, physical_devices.Data), enum_err);
+    VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.Data), enum_err);
 
     for (VkPhysicalDevice &device : physical_devices) {
         if (IsPhysicalDeviceSuitable(device)) {
-            this->Physical = device;
+            Physical = device;
             break;
         }
     }
-    if (this->Physical == nullptr) {
+    if (Physical == nullptr) {
         FxPanic("Could not find a suitable physical device!", 0);
     }
 }
 
 void GPUDevice::WaitForIdle()
 {
-    vkDeviceWaitIdle(this->Device);
+    vkDeviceWaitIdle(Device);
 }
 
 }; // namespace vulkan

@@ -13,7 +13,11 @@ set(COMPILE_FLAGS "-g -Wall")
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 
-add_definitions(-DAR_USE_NEON ${COMPILE_FLAGS})
+add_definitions(
+    -DAR_USE_NEON
+    # -DFX_DEBUG_STATIC_ARRAY
+    ${COMPILE_FLAGS}
+)
 include_directories(
     ./
     ${Vulkan_INCLUDE_DIRS}

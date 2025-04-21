@@ -11,7 +11,7 @@ AR_SET_MODULE_NAME("CommandBuffer")
 
 void CommandBuffer::Create(CommandPool *pool)
 {
-    this->mCommandPool = pool;
+    mCommandPool = pool;
 
     const VkCommandBufferAllocateInfo buffer_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -20,27 +20,27 @@ void CommandBuffer::Create(CommandPool *pool)
         .commandBufferCount = 1,
     };
 
-    this->mDevice = RendererVulkan->GetDevice();
+    mDevice = RendererVulkan->GetDevice();
 
-    const VkResult status = vkAllocateCommandBuffers(this->mDevice->Device, &buffer_info, &this->CommandBuffer);
+    const VkResult status = vkAllocateCommandBuffers(mDevice->Device, &buffer_info, &CommandBuffer);
     if (status != VK_SUCCESS) {
         FxPanic("Could not allocate command buffer", status);
     }
 
 
-    this->mInitialized = true;
+    mInitialized = true;
 }
 
 inline void CommandBuffer::CheckInitialized() const
 {
-    if (!this->IsInitialized()) {
+    if (!IsInitialized()) {
         FxPanic("Command buffer has not been initialized!", 0);
     }
 }
 
 void CommandBuffer::Record()
 {
-    this->CheckInitialized();
+    CheckInitialized();
 
     const VkCommandBufferBeginInfo begin_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -48,7 +48,7 @@ void CommandBuffer::Record()
         .pInheritanceInfo = nullptr
     };
 
-    const VkResult status = vkBeginCommandBuffer(this->CommandBuffer, &begin_info);
+    const VkResult status = vkBeginCommandBuffer(CommandBuffer, &begin_info);
     if (status != VK_SUCCESS) {
         FxPanic("Failed to begin recording command buffer", status);
     }
@@ -56,16 +56,16 @@ void CommandBuffer::Record()
 
 void CommandBuffer::Reset()
 {
-    this->CheckInitialized();
+    CheckInitialized();
 
-    vkResetCommandBuffer(this->CommandBuffer, 0);
+    vkResetCommandBuffer(CommandBuffer, 0);
 }
 
 void CommandBuffer::End()
 {
-    this->CheckInitialized();
+    CheckInitialized();
 
-    const VkResult status = vkEndCommandBuffer(this->CommandBuffer);
+    const VkResult status = vkEndCommandBuffer(CommandBuffer);
     if (status != VK_SUCCESS) {
         FxPanic("Failed to create command buffer!", status);
     }
@@ -73,7 +73,7 @@ void CommandBuffer::End()
 
 void CommandBuffer::Destroy()
 {
-    vkFreeCommandBuffers(this->mDevice->Device, this->mCommandPool->CommandPool, 1, &this->CommandBuffer);
+    vkFreeCommandBuffers(mDevice->Device, mCommandPool->CommandPool, 1, &CommandBuffer);
 }
 
 

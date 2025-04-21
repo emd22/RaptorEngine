@@ -1,10 +1,9 @@
 #pragma once
 
-#include <cstddef>
+#include <stddef.h>
 #include <stdexcept>
+#include <stdio.h>
 #include <initializer_list>
-
-#include <cstdio>
 
 static inline void NoMemError()
 {
@@ -25,24 +24,24 @@ public:
 
         Iterator &operator++()
         {
-            this->mIndex++;
+            mIndex++;
             return *this;
         }
 
         Iterator &operator++(int value) {
             Iterator before = *this;
-            this->mIndex++;
+            mIndex++;
             return before;
         }
 
         ElementType &operator * () const
         {
-            return this->mPtr[this->mIndex];
+            return mPtr[mIndex];
         }
 
         bool operator==(const Iterator &b) const
         {
-            return this->mPtr == b.mPtr && this->mIndex == b.mIndex;
+            return mPtr == b.mPtr && mIndex == b.mIndex;
         }
 
     private:
@@ -51,7 +50,7 @@ public:
     };
 
     StaticArray(ElementType *ptr, size_t size)
-        : Data(ptr), Size()
+        : Data(ptr), Size(size)
     {
     }
 
@@ -59,7 +58,10 @@ public:
         : Capacity(element_count)
     {
         try {
-            this->Data = new ElementType[element_count];
+    #ifdef FX_STATIC_ARRAY_DEBUG
+            Log::Debug("Allocating StaticArray of capacity %lu (type: %s)\n", Capacity, typeid(ElementType).name());
+    #endif
+            Data = new ElementType[element_count];
         }
         catch (std::bad_alloc &e) {
             NoMemError();
@@ -68,114 +70,114 @@ public:
 
     StaticArray(std::initializer_list<ElementType> list)
     {
-        this->InitSize(list.size());
+        InitSize(list.size());
 
         int index = 0;
         for (const ElementType obj : list) {
-            this->Data[index] = obj;
+            Data[index] = obj;
             index++;
         }
     }
 
     StaticArray(StaticArray<ElementType> &&other)
     {
-        this->Data = std::move(other.Data);
+        Data = std::move(other.Data);
         other.Data = nullptr;
 
-        this->Capacity = other.Capacity;
-        this->Size = other.Size;
+        Capacity = other.Capacity;
+        Size = other.Size;
     }
 
     StaticArray() = default;
 
     ~StaticArray()
     {
-        this->Free();
+        Free();
     }
 
-    void Free()
+    virtual void Free()
     {
-        if (this->Data != nullptr) {
-            printf("Freeing StaticArray of size %lu (type: %s)\n", this->Size, typeid(ElementType).name());
-            delete this->Data;
+        if (Data != nullptr) {
+    #ifdef FX_DEBUG_STATIC_ARRAY
+            Log::Debug("Freeing StaticArray of size %lu (type: %s)\n", Size, typeid(ElementType).name());
+    #endif
+            delete Data;
 
-            this->Data = nullptr;
+            Data = nullptr;
         }
     }
 
     Iterator begin()
     {
-        return Iterator(this->Data, 0);
+        return Iterator(Data, 0);
     }
 
     Iterator end()
     {
-        return Iterator(this->Data, this->Size);
+        return Iterator(Data, Size);
     }
 
     operator ElementType *() const
     {
-        return this->Data;
+        return Data;
     }
 
     operator ElementType &() const
     {
-        return *this->Data;
+        return *Data;
     }
 
     const ElementType &operator[] (size_t index) const
     {
-        if (index > this->Capacity) {
+        if (index > Capacity) {
             throw std::out_of_range("StaticArray access out of range");
         }
-        return this->Data[index];
+        return Data[index];
     }
 
     ElementType &operator[] (size_t index)
     {
-        if (index > this->Capacity) {
+        if (index > Capacity) {
             throw std::out_of_range("StaticArray access out of range");
         }
-        return this->Data[index];
+        return Data[index];
     }
 
     StaticArray<ElementType> operator=(StaticArray<ElementType> &&other)
     {
-        this->Data = std::move(other.Data);
+        Data = std::move(other.Data);
         other.Data = nullptr;
 
-        this->Size = other.Size;
-        this->Capacity = other.Capacity;
+        Size = other.Size;
+        Capacity = other.Capacity;
 
         return *this;
     }
 
-    void Clear() { this->Size = 0; }
-    bool IsEmpty() { return this->Size == 0; }
-    bool IsNotEmpty() { return !this->IsEmpty(); }
+    void Clear() { Size = 0; }
+    bool IsEmpty() { return Size == 0; }
+    bool IsNotEmpty() { return !IsEmpty(); }
 
-    void Insert(ElementType object)
+    void Insert(const ElementType &object)
     {
-        if (this->Size + 1 > this->Capacity) {
+        if (Size + 1 > Capacity) {
+            printf("New Size(%lu) > Capacity(%lu)!\n", Size + 1, Capacity);
             throw std::out_of_range("StaticArray insert is larger than the capacity!");
         }
-        this->Data[this->Size++] = object;
+
+        memcpy(&Data[Size++], &object, sizeof(ElementType));
+        // Data[Size++] = object;
     }
 
     void InitCapacity(size_t element_count)
     {
-        if (this->Data != nullptr) {
+        if (Data != nullptr) {
             throw std::runtime_error("StaticArray has already been previously initialized, cannot InitCapacity!");
         }
 
-        try {
-            this->Data = new ElementType[element_count];
-        }
-        catch (std::bad_alloc &e) {
-            NoMemError();
-        }
+        InternalAllocateArray(element_count);
 
-        this->Capacity = element_count;
+        Capacity = element_count;
     }
 
     /**
@@ -191,20 +193,34 @@ public:
      */
     void InitSize(size_t element_count)
     {
-        if (this->Capacity == 0) {
-            this->InitCapacity(element_count);
+        if (Capacity == 0) {
+            InitCapacity(element_count);
         }
 
-        this->Size = this->Capacity;
+        Size = Capacity;
     }
 
     void InitSize()
     {
-        if (this->Capacity == 0) {
+        if (Capacity == 0) {
             throw std::runtime_error("Static array capacity has not been set!");
         }
 
-        this->Size = this->Capacity;
+        Size = Capacity;
+    }
+
+protected:
+    virtual void InternalAllocateArray(size_t element_count)
+    {
+        try {
+    #ifdef FX_DEBUG_STATIC_ARRAY
+            Log::Debug("Allocating StaticArray of capacity %lu (type: %s)\n", element_count, typeid(ElementType).name());
+    #endif
+            Data = new ElementType[element_count];
+        }
+        catch (std::bad_alloc &e) {
+            NoMemError();
+        }
     }
 
 public:

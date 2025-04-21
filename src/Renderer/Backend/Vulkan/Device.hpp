@@ -20,33 +20,33 @@ public:
     /// Checks if the main graphics and presentation queues have been queried
     bool IsComplete()
     {
-        return (this->mGraphicsIndex != QueueNull
-             && this->mPresentIndex != QueueNull);
+        return (mGraphicsIndex != QueueNull
+             && mPresentIndex != QueueNull);
     }
 
     /// Retrieves the available queue indices
     std::vector<uint32> GetQueueIndexList() const
     {
         return std::vector<uint32>({
-            this->mGraphicsIndex,
-            this->mPresentIndex,
+            mGraphicsIndex,
+            mPresentIndex,
         });
     }
 
     /// Checks if the graphics queue is also the presentation queue
     bool IsGraphicsAlsoPresent() const
     {
-        return (this->mGraphicsIndex == this->mPresentIndex);
+        return (mGraphicsIndex == mPresentIndex);
     }
 
     uint32 GetGraphicsFamily()
     {
-        return this->mGraphicsIndex;
+        return mGraphicsIndex;
     }
 
     uint32 GetPresentFamily()
     {
-        return this->mPresentIndex;
+        return mPresentIndex;
     }
 
 public:
@@ -61,7 +61,7 @@ public:
     GPUDevice() = default;
     GPUDevice(VkInstance instance, VkSurfaceKHR surface)
     {
-        this->Create(instance, surface);
+        Create(instance, surface);
     }
 
     void Create(VkInstance instance, VkSurfaceKHR surface);

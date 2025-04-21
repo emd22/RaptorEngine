@@ -46,15 +46,15 @@ public:
 
     virtual void AddToDeletionQueue(FxDeletionObject::FuncType &func)
     {
-        Log::Info("Adding object to deletion queue at frame %d", this->mInternalFrameCounter);
+        Log::Info("Adding object to deletion queue at frame %d", mInternalFrameCounter);
 
-        this->mDeletionQueue.push_back(FxDeletionObject {
-            .DeletionFrameNumber = this->mInternalFrameCounter,
+        mDeletionQueue.push_back(FxDeletionObject {
+            .DeletionFrameNumber = mInternalFrameCounter,
             .Func = func,
         });
     }
 
-    uint32 GetFrameNumber() { return this->mFrameNumber; }
+    uint32 GetFrameNumber() { return mFrameNumber; }
 
 protected:
     virtual void ProcessDeletionQueue(bool ignore_frame_spacing = false)
@@ -67,7 +67,7 @@ protected:
         const uint32 FrameSpacing = 3;
         Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
 
-        const bool is_frame_spaced = (this->mInternalFrameCounter - object.DeletionFrameNumber) > FrameSpacing;
+        const bool is_frame_spaced = (mInternalFrameCounter - object.DeletionFrameNumber) > FrameSpacing;
 
         if (ignore_frame_spacing || is_frame_spaced) {
             object.Func();

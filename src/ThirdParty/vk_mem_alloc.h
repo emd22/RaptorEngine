@@ -3916,13 +3916,13 @@ VmaBufferImageUsage::VmaBufferImageUsage(const VkBufferCreateInfo &createInfo,
             VmaPnextChainFind<VkBufferUsageFlags2CreateInfoKHR>(&createInfo, VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR);
         if(usageFlags2)
         {
-            this->Value = usageFlags2->usage;
+            Value = usageFlags2->usage;
             return;
         }
     }
 #endif
 
-    this->Value = (BaseType)createInfo.usage;
+    Value = (BaseType)createInfo.usage;
 }
 
 VmaBufferImageUsage::VmaBufferImageUsage(const VkImageCreateInfo &createInfo)
@@ -3930,7 +3930,7 @@ VmaBufferImageUsage::VmaBufferImageUsage(const VkImageCreateInfo &createInfo)
     // Maybe in the future there will be VK_KHR_maintenanceN extension with structure
     // VkImageUsageFlags2CreateInfoKHR, like the one for buffers...
 
-    this->Value = (BaseType)createInfo.usage;
+    Value = (BaseType)createInfo.usage;
 }
 
 // This is the main algorithm that guides the selection of a memory type best for an allocation -

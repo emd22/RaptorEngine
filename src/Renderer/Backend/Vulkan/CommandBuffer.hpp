@@ -18,7 +18,7 @@ public:
 
     bool IsInitialized() const
     {
-        return this->mInitialized;
+        return mInitialized;
     }
 
 private:

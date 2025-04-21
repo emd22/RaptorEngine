@@ -1,5 +1,6 @@
 
 
+#include "Asset/Loader/FxGltfLoader.hpp"
 #include "Core/Defines.hpp"
 #include "Renderer/Backend/FxRenderBackendVulkan.hpp"
 #include "Renderer/Backend/Vulkan/Shader.hpp"
@@ -14,9 +15,10 @@
 #include <Core/Types.hpp>
 
 #include <Renderer/Renderer.hpp>
-
 #include <Renderer/FxWindow.hpp>
 #include <Renderer/FxMesh.hpp>
+
+#include <Asset/FxAssetManager.hpp>
 
 static bool Running = true;
 
@@ -35,10 +37,19 @@ inline void ProcessEvents() {
     }
 }
 
+#include <csignal>
+
 int main() {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }
+
+    // catch sigabrt to avoid macOS showing "report" popup
+    signal(SIGABRT, [](int signum) {
+        Log::Error("Aborted!");
+
+        exit(1);
+    });
 
     auto window = FxWindow::New("Foxtrot Engine", 1024, 720);
 
@@ -64,13 +75,27 @@ int main() {
         RendererVulkan->Swapchain.CreateSwapchainFramebuffers(&pipeline);
     }
 
-    StaticArray<Vertex> test_mesh_verts = {
-        Vertex{ .Position = { -1,  1, 0 } },
-        Vertex{ .Position = {  1,  1, 0 } },
-        Vertex{ .Position = {  0,  -1, 0 } },
+    auto &asset_manager = FxAssetManager::GetInstance();
+    asset_manager.Start(2);
+
+    FxGltfLoader loader;
+
+    FxModel *model = new FxModel;
+    loader.LoadFromFile(model, "../models/Box.glb");
+
+    // FxModel *test_model = FxAssetManager::LoadModel("../models/Cube.glb");
+    // test_model->OnLoaded =
+    //     [](FxBaseAsset *model) {
+    //         Log::Info("This was loaded!", 0);
+    //     };
+
+    StaticArray<FxVertex<FxVertexPosition | FxVertexNormal>> test_mesh_verts = {
+        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = { -1,  1, 0 } },
+        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  1,  1, 0 } },
+        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  0,  -1, 0 } },
     };
 
-    FxMesh test_mesh(test_mesh_verts);
+    // FxMesh test_mesh(test_mesh_verts);
 
     while (Running) {
         ProcessEvents();
@@ -79,10 +104,17 @@ int main() {
             continue;
         }
 
-        test_mesh.Render();
+        // test_mesh.Render();
+        // test_model->Render();
+        //
+        model->Render();
 
         Renderer->FinishFrame(pipeline);
     }
+
+    // test_model->Meshes.Free();
+
+    asset_manager.ShutDown();
 
     return 0;
 }

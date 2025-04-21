@@ -4,18 +4,18 @@ namespace vulkan {
 
 void FrameData::Create(GPUDevice *device)
 {
-    this->ImageAvailable.Create(device);
-    this->RenderFinished.Create(device);
+    ImageAvailable.Create(device);
+    RenderFinished.Create(device);
 
-    this->InFlight.Create(device);
+    InFlight.Create(device);
 }
 
 void FrameData::Destroy()
 {
-    this->ImageAvailable.Destroy();
-    this->RenderFinished.Destroy();
+    ImageAvailable.Destroy();
+    RenderFinished.Destroy();
 
-    this->InFlight.Destroy();
+    InFlight.Destroy();
 
 };
 

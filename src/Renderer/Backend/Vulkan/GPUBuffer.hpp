@@ -24,33 +24,33 @@ public:
     FxGPUBufferMapContext(FxGPUBuffer<ElementType> *buffer)
         : mGPUBuffer(buffer)
     {
-        this->Map();
+        Map();
     }
 
     operator void *() const
     {
-        return this->MappedBuffer;
+        return MappedBuffer;
     }
 
     void UnMap()
     {
-        if (this->MappedBuffer != nullptr) {
-            vmaUnmapMemory(RendererVulkan->GPUAllocator, this->mGPUBuffer->Allocation);
+        if (MappedBuffer != nullptr) {
+            vmaUnmapMemory(RendererVulkan->GPUAllocator, mGPUBuffer->Allocation);
         }
     }
 
     ~FxGPUBufferMapContext()
     {
-        this->UnMap();
+        UnMap();
     }
 
 private:
     void Map()
     {
-        const VkResult status = vmaMapMemory(RendererVulkan->GPUAllocator, this->mGPUBuffer->Allocation, &this->MappedBuffer);
+        const VkResult status = vmaMapMemory(RendererVulkan->GPUAllocator, mGPUBuffer->Allocation, &MappedBuffer);
 
         if (status != VK_SUCCESS) {
-            Log::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", EnumToInt(this->mGPUBuffer->Usage));
+            Log::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", EnumToInt(mGPUBuffer->Usage));
             return;
         }
     }
@@ -66,20 +66,61 @@ private:
 template <typename ElementType>
 class FxGPUBuffer
 {
+
 public:
     enum class UsageType {
         Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
     };
 
-    const size_t ElementSize = sizeof(ElementType);
 
     FxGPUBuffer() = default;
 
+    // FxGPUBuffer& operator=(const FxGPUBuffer& other)
+    // {
+    //     Buffer = other.Buffer;
+    //     Allocation = other.Allocation;
+    //     Usage = other.Usage;
+    //     Size = other.Size;
+
+    //     Initialized = other.Initialized.load();
+
+    //     return *this;
+    // }
+
+    // FxGPUBuffer(FxGPUBuffer &&other)
+    // {
+    //     Buffer = other.Buffer;
+    //     Allocation = other.Allocation;
+    //     Usage = other.Usage;
+    //     Size = other.Size;
+    //     Initialized = other.Initialized.load();
+
+    //     other.Initialized = false;
+
+    //     other.Buffer = nullptr;
+    //     other.Allocation = nullptr;
+    // }
+
+    // FxGPUBuffer &operator = (FxGPUBuffer &&other)
+    // {
+    //     Buffer = other.Buffer;
+    //     Allocation = other.Allocation;
+    //     Usage = other.Usage;
+    //     Size = other.Size;
+    //     Initialized = other.Initialized.load();
+
+    //     other.Initialized = false;
+    //     other.Buffer = nullptr;
+    //     other.Allocation = nullptr;
+
+    //     return *this;
+    // }
+
     void Create(UsageType usage, uint64 element_count)
     {
-        this->Size = element_count;
-        this->Usage = usage;
+        Size = element_count;
+        Usage = usage;
 
         const uint64 buffer_size = ElementSize * element_count;
 
@@ -98,8 +139,8 @@ public:
             RendererVulkan->GPUAllocator,
             &create_info,
             &alloc_create_info,
-            &this->Buffer,
-            &this->Allocation,
+            &Buffer,
+            &Allocation,
             nullptr
         );
 
@@ -107,7 +148,7 @@ public:
             FxPanic_("GPUBuffer", "Error allocating GPU buffer!", status);
         }
 
-        this->Initialized = true;
+        Initialized.store(true);
     }
 
     /**
@@ -126,13 +167,13 @@ public:
      */
     void Upload(StaticArray<ElementType> &data)
     {
-        if (!this->Initialized) {
+        if (!Initialized) {
             FxPanic_("GPUBuffer", "Buffer not previously initialized on Upload()", 0);
         }
 
-        const size_t data_size = this->ElementSize * data.Size;
+        const size_t data_size = ElementSize * data.Size;
 
-        const size_t buffer_size = this->ElementSize * this->Size;
+        const size_t buffer_size = ElementSize * Size;
 
         if (data_size > buffer_size) {
             Log::Error("Upload size is larger than GPU buffer allocation size", 0);
@@ -140,28 +181,31 @@ public:
         }
 
         {
-            auto value = this->MappedContext();
+            auto value = MappedContext();
             memcpy(value, data.Data, data_size);
         }
     }
 
     void Destroy()
     {
+        if (!Initialized.load()) {
+            Initialized.wait(true);
+        }
+
         Renderer->AddToDeletionQueue([this]() {
-            if (!this->Initialized) {
+            if (!Initialized || Buffer == nullptr || Allocation == nullptr) {
                 return;
             }
-            Log::Debug("Called Destroy for this!", 0);
 
-            vmaDestroyBuffer(RendererVulkan->GPUAllocator, this->Buffer, this->Allocation);
+            vmaDestroyBuffer(RendererVulkan->GPUAllocator, Buffer, Allocation);
 
-            this->Initialized = false;
+            Initialized = false;
         });
     }
 
     ~FxGPUBuffer()
     {
-        this->Destroy();
+        Destroy();
     }
 
 public:
@@ -172,8 +216,9 @@ public:
 
     UsageType Usage;
 
-    bool Initialized = false;
+    std::atomic_bool Initialized = false;
 private:
+    size_t ElementSize = sizeof(ElementType);
 };
 
 }; // namespace vulkan
