@@ -14,3 +14,88 @@ typedef uint64_t uint64;
 
 typedef float float32;
 typedef double float64;
+
+#include <cstddef>
+#include <type_traits>
+
+#include <Core/FxPanic.hpp>
+
+template <typename ValueType>
+class Optional {
+public:
+    Optional(ValueType &value)
+        : mHasValue(true),
+          mData()
+    {
+    }
+
+    Optional(std::nullptr_t)
+        : mHasValue(false),
+          mData()
+    {
+    }
+
+    bool HasValue() const { return mHasValue; }
+
+    void Clear()
+    {
+        mHasValue = false;
+    }
+
+    ValueType &operator *() const
+    {
+        if (!HasValue()) {
+            FxPanic_("Optional", "Could not retrieve undefined value", 0);
+        }
+
+        return *reinterpret_cast<ValueType *>(&mData);
+    }
+
+    ValueType &Get() const { return *this; }
+
+private:
+    bool mHasValue = false;
+    std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
+};
+
+template <typename T>
+class PtrContainer {
+public:
+    PtrContainer(T *ptr)
+        : mPtr(ptr)
+    {
+    }
+
+    ~PtrContainer()
+    {
+        delete mPtr;
+        // mPtr->Destroy();
+    }
+
+    PtrContainer(PtrContainer &&other)
+        : mPtr(other.mPtr)
+    {
+        other.mPtr = nullptr;
+    }
+
+    PtrContainer<T> &&operator = (PtrContainer<T> &&other)
+    {
+        delete mPtr;
+        mPtr = other.mPtr;
+        other.mPtr = nullptr;
+        return std::move(*this);
+    }
+
+    PtrContainer(const PtrContainer<T> &other) = delete;
+    PtrContainer(PtrContainer<T> &other) = delete;
+    PtrContainer<T> &operator = (PtrContainer<T> &other) = delete;
+    PtrContainer<T> &operator = (const PtrContainer<T> &other) = delete;
+
+    T *Get() const { return mPtr; }
+
+    T *operator ->() const { return mPtr; }
+    T &operator *() const { return *mPtr; }
+
+private:
+    T *mPtr;
+};

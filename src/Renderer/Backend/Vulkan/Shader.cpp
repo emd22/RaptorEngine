@@ -16,7 +16,7 @@ namespace vulkan {
 
 void Shader::Load(const char *path, ShaderType type)
 {
-    this->Type = type;
+    Type = type;
 
     // TODO: add to asset loading thread
 
@@ -42,19 +42,19 @@ void Shader::Load(const char *path, ShaderType type)
     file.read(file_buffer, file_size);
     file.close();
 
-    this->CreateShaderModule(file_size, (uint32 *)file_buffer);
+    CreateShaderModule(file_size, (uint32 *)file_buffer);
 
     delete[] file_buffer;
 }
 
 void Shader::Destroy()
 {
-    if (this->ShaderModule == nullptr) {
+    if (ShaderModule == nullptr) {
         return;
     }
 
     vulkan::GPUDevice *device = RendererVulkan->GetDevice();
-    vkDestroyShaderModule(device->Device, this->ShaderModule, nullptr);
+    vkDestroyShaderModule(device->Device, ShaderModule, nullptr);
 }
 
 void Shader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data)
@@ -67,7 +67,7 @@ void Shader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_dat
 
     vulkan::GPUDevice *device = RendererVulkan->GetDevice();
 
-    const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &this->ShaderModule);
+    const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &ShaderModule);
 
     if (status != VK_SUCCESS) {
         Log::Error("Could not create vulkan shader module...");

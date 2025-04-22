@@ -18,7 +18,7 @@ public:
     Shader(const char *path, ShaderType type)
         : Type(type)
     {
-        this->Load(path, type);
+        Load(path, type);
     }
 
     void Load(const char *path, ShaderType type);
@@ -26,7 +26,7 @@ public:
 
     ~Shader()
     {
-        this->Destroy();
+        Destroy();
     }
 
 private:
@@ -45,17 +45,17 @@ public:
 //     FxVulkanShader() = default;
 //     FxVulkanShader(FxShader::Type type, std::string &path)
 //     {
-//         this->Load(type, path);
+//         Load(type, path);
 //     }
 
 //     void Load(FxShader::Type, std::string &path) override;
 //     void Destroy() override;
 
-//     Type GetType() { return this->mType; }
+//     Type GetType() { return mType; }
 
 //     ~FxVulkanShader()
 //     {
-//         this->Destroy();
+//         Destroy();
 //     }
 
 // };

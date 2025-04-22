@@ -35,30 +35,30 @@ public:
 
     Vec2Base &operator += (const Vec2Base &other)
     {
-        this->mX += other.mX;
-        this->mY += other.mY;
+        mX += other.mX;
+        mY += other.mY;
     }
 
     Vec2Base &operator -= (const Vec2Base &other)
     {
-        this->mX -= other.mX;
-        this->mY -= other.mY;
+        mX -= other.mX;
+        mY -= other.mY;
     }
 
     Vec2Base &operator *= (const Vec2Base &other)
     {
-        this->mX *= other.mX;
-        this->mY *= other.mY;
+        mX *= other.mX;
+        mY *= other.mY;
     }
 
-    Type GetX() const { return this->mX; }
-    Type GetY() const { return this->mY; }
+    Type GetX() const { return mX; }
+    Type GetY() const { return mY; }
 
-    Type X() const { return this->GetX(); }
-    Type Y() const { return this->GetY(); }
+    Type X() const { return GetX(); }
+    Type Y() const { return GetY(); }
 
-    Type Width() const { return this->GetX(); }
-    Type Height() const { return this->GetY(); }
+    Type Width() const { return GetX(); }
+    Type Height() const { return GetY(); }
 
     static const Vec2Base<Type> Zero()
     {

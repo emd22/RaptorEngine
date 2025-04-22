@@ -19,9 +19,9 @@ public:
             .pNext = nullptr
         };
 
-        this->mDevice = device;
+        mDevice = device;
 
-        const VkResult status = vkCreateFence(this->mDevice->Device, &create_info, nullptr, &this->Fence);
+        const VkResult status = vkCreateFence(mDevice->Device, &create_info, nullptr, &Fence);
         if (status != VK_SUCCESS) {
             FxPanic_("Fence", "Could not create fence", status);
         }
@@ -34,7 +34,7 @@ public:
 
     void WaitFor(WaitOptions wait_options = {.Timeout = UINT64_MAX}) const
     {
-        const VkResult status = vkWaitForFences(this->mDevice->Device, 1, &this->Fence, true, wait_options.Timeout);
+        const VkResult status = vkWaitForFences(mDevice->Device, 1, &Fence, true, wait_options.Timeout);
 
         if (status != VK_SUCCESS) {
             FxPanic_("Fence", "Could not create fence", status);
@@ -43,7 +43,7 @@ public:
 
     void Reset()
     {
-        const VkResult status = vkResetFences(this->mDevice->Device, 1, &this->Fence);
+        const VkResult status = vkResetFences(mDevice->Device, 1, &Fence);
 
         if (status != VK_SUCCESS) {
             FxPanic_("Fence", "Could not reset fence", status);
@@ -52,7 +52,7 @@ public:
 
     void Destroy()
     {
-        vkDestroyFence(this->mDevice->Device, this->Fence, nullptr);
+        vkDestroyFence(mDevice->Device, Fence, nullptr);
     }
 
 public:

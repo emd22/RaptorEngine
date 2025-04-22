@@ -24,9 +24,9 @@ void Framebuffer::Create(StaticArray<VkImageView> &image_views, GraphicsPipeline
         .layers = 1,
     };
 
-    this->mDevice = RendererVulkan->GetDevice();
+    mDevice = RendererVulkan->GetDevice();
 
-    const VkResult status = vkCreateFramebuffer(this->mDevice->Device, &create_info, nullptr, &this->Framebuffer);
+    const VkResult status = vkCreateFramebuffer(mDevice->Device, &create_info, nullptr, &Framebuffer);
 
     if (status != VK_SUCCESS) {
         FxPanic("Failed to create framebuffer", status);
@@ -35,7 +35,7 @@ void Framebuffer::Create(StaticArray<VkImageView> &image_views, GraphicsPipeline
 
 void Framebuffer::Destroy()
 {
-    vkDestroyFramebuffer(this->mDevice->Device, this->Framebuffer, nullptr);
+    vkDestroyFramebuffer(mDevice->Device, Framebuffer, nullptr);
 }
 
 

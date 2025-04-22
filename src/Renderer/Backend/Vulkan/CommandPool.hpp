@@ -21,9 +21,9 @@ public:
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         };
 
-        this->mDevice = device;
+        mDevice = device;
 
-        const VkResult status = vkCreateCommandPool(this->mDevice->Device, &create_info, nullptr, &this->CommandPool);
+        const VkResult status = vkCreateCommandPool(mDevice->Device, &create_info, nullptr, &CommandPool);
 
         if (status != VK_SUCCESS) {
             FxPanic_("CommandPool", "Error creating command pool", 0);
@@ -32,7 +32,7 @@ public:
 
     void Destroy()
     {
-        vkDestroyCommandPool(this->mDevice->Device, this->CommandPool, nullptr);
+        vkDestroyCommandPool(mDevice->Device, CommandPool, nullptr);
     }
 
 public:

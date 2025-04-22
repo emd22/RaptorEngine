@@ -15,6 +15,8 @@
 #include <functional>
 #include <memory>
 
+#include <vma/vk_mem_alloc.h>
+
 using namespace vulkan;
 
 enum class FrameResult
@@ -26,7 +28,10 @@ enum class FrameResult
 
 struct FxDeletionObject
 {
-    using FuncType = const std::function<void ()>;
+    using FuncType = void (*)(FxDeletionObject *object);
+
+    VkBuffer Buffer = VK_NULL_HANDLE;
+    VmaAllocation Allocation = VK_NULL_HANDLE;
 
     uint32 DeletionFrameNumber = 0;
     FuncType Func;
@@ -44,17 +49,29 @@ public:
     virtual FrameResult BeginFrame(GraphicsPipeline &pipeline) = 0;
     virtual void FinishFrame(GraphicsPipeline &pipeline) = 0;
 
-    virtual void AddToDeletionQueue(FxDeletionObject::FuncType &func)
+    virtual void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
-        Log::Info("Adding object to deletion queue at frame %d", this->mInternalFrameCounter);
+        Log::Info("Adding object to deletion queue at frame %d", mInternalFrameCounter);
 
-        this->mDeletionQueue.push_back(FxDeletionObject {
-            .DeletionFrameNumber = this->mInternalFrameCounter,
+        mDeletionQueue.push_back(FxDeletionObject {
+            .DeletionFrameNumber = mInternalFrameCounter,
             .Func = func,
         });
     }
 
-    uint32 GetFrameNumber() { return this->mFrameNumber; }
+    virtual void AddGPUBufferToDeletionQueue(FxDeletionObject::FuncType func, VkBuffer buffer, VmaAllocation allocation)
+    {
+        Log::Info("Adding GPUBuffer to deletion queue at frame %d", mInternalFrameCounter);
+
+        mDeletionQueue.push_back(FxDeletionObject {
+            .DeletionFrameNumber = mInternalFrameCounter,
+            .Func = func,
+            .Allocation = allocation,
+            .Buffer = buffer,
+        });
+    }
+
+    uint32 GetFrameNumber() { return mFrameNumber; }
 
 protected:
     virtual void ProcessDeletionQueue(bool ignore_frame_spacing = false)
@@ -67,10 +84,10 @@ protected:
         const uint32 FrameSpacing = 3;
         Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
 
-        const bool is_frame_spaced = (this->mInternalFrameCounter - object.DeletionFrameNumber) > FrameSpacing;
+        const bool is_frame_spaced = (mInternalFrameCounter - object.DeletionFrameNumber) > FrameSpacing;
 
         if (ignore_frame_spacing || is_frame_spaced) {
-            object.Func();
+            object.Func(&object);
 
             mDeletionQueue.pop_front();
         }

@@ -39,7 +39,7 @@ public:
 
     operator float32x4_t() const
     {
-        return this->mIntrin;
+        return mIntrin;
     }
 #endif
 

@@ -17,10 +17,10 @@ inline Vec4f Vec4f::operator + (const Vec4f &other) const
 {
     Vec4f result;
 
-    result.mX = this->mX + other.mX;
-    result.mY = this->mY + other.mY;
-    result.mZ = this->mZ + other.mZ;
-    result.mW = this->mW + other.mW;
+    result.mX = mX + other.mX;
+    result.mY = mY + other.mY;
+    result.mZ = mZ + other.mZ;
+    result.mW = mW + other.mW;
 
     return result;
 }
@@ -29,40 +29,40 @@ inline Vec4f Vec4f::operator * (const Vec4f &other) const
 {
     Vec4f result;
 
-    result.mX = this->mX * other.mX;
-    result.mY = this->mY * other.mY;
-    result.mZ = this->mZ * other.mZ;
-    result.mW = this->mW * other.mW;
+    result.mX = mX * other.mX;
+    result.mY = mY * other.mY;
+    result.mZ = mZ * other.mZ;
+    result.mW = mW * other.mW;
 
     return result;
 }
 
 inline Vec4f &Vec4f::operator += (const Vec4f &other)
 {
-    this->mX += other.mX;
-    this->mY += other.mY;
-    this->mZ += other.mZ;
-    this->mW += other.mW;
+    mX += other.mX;
+    mY += other.mY;
+    mZ += other.mZ;
+    mW += other.mW;
 
     return *this;
 }
 
 inline Vec4f &Vec4f::operator -= (const Vec4f &other)
 {
-    this->mX -= other.mX;
-    this->mY -= other.mY;
-    this->mZ -= other.mZ;
-    this->mW -= other.mW;
+    mX -= other.mX;
+    mY -= other.mY;
+    mZ -= other.mZ;
+    mW -= other.mW;
 
     return *this;
 }
 
 inline Vec4f &Vec4f::operator *= (const Vec4f &other)
 {
-    this->mX *= other.mX;
-    this->mY *= other.mY;
-    this->mZ *= other.mZ;
-    this->mW *= other.mW;
+    mX *= other.mX;
+    mY *= other.mY;
+    mZ *= other.mZ;
+    mW *= other.mW;
 
     return *this;
 }
@@ -76,22 +76,22 @@ inline Vec4f Vec4f::MulAdd(const Vec4f &add_value, const Vec4f &mul_a, const Vec
 
 inline float32 Vec4f::GetX() const
 {
-    return this->mX;
+    return mX;
 }
 
 inline float32 Vec4f::GetY() const
 {
-    return this->mY;
+    return mY;
 }
 
 inline float32 Vec4f::GetZ() const
 {
-    return this->mZ;
+    return mZ;
 }
 
 inline float32 Vec4f::GetW() const
 {
-    return this->mW;
+    return mW;
 }
 
 #endif // #ifdef AR_NO_SIMD

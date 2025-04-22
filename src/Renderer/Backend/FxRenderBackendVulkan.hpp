@@ -34,22 +34,22 @@ public:
 
     void SelectWindow(std::shared_ptr<FxWindow> window) override
     {
-        this->mWindow = window;
+        mWindow = window;
     }
 
     vulkan::GPUDevice *GetDevice()
     {
-        return &this->mDevice;
+        return &mDevice;
     }
 
     FrameData *GetFrame();
 
-    uint32 GetImageIndex() { return this->mImageIndex; }
-    VmaAllocator *GetGPUAllocator() { return &this->GPUAllocator; }
+    uint32 GetImageIndex() { return mImageIndex; }
+    VmaAllocator *GetGPUAllocator() { return &GPUAllocator; }
 
     ~FxRenderBackendVulkan()
     {
-        this->Destroy();
+        Destroy();
     }
 
 private:

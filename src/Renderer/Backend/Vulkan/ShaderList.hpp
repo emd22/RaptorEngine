@@ -27,7 +27,7 @@ public:
 
     VkShaderStageFlagBits GetStageBit()
     {
-        switch (this->mShaderType) {
+        switch (mShaderType) {
             case ShaderType::Unknown:
                 FxPanic_("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!", 0);
             case ShaderType::Vertex:
@@ -51,11 +51,13 @@ public:
     {
         StaticArray<ShaderInfo> shader_stages(2);
 
-        if (this->Vertex != nullptr) {
-            shader_stages.Insert(ShaderInfo(ShaderType::Vertex, this->Vertex));
+        if (Vertex != nullptr) {
+            ShaderInfo info = ShaderInfo(ShaderType::Vertex, Vertex);
+            shader_stages.Insert(info);
         }
-        if (this->Fragment != nullptr) {
-            shader_stages.Insert(ShaderInfo(ShaderType::Fragment, this->Fragment));
+        if (Fragment != nullptr) {
+            ShaderInfo info = ShaderInfo(ShaderType::Fragment, Fragment);
+            shader_stages.Insert(info);
         }
 
         return shader_stages;
