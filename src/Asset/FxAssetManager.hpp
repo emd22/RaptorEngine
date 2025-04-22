@@ -19,6 +19,7 @@ public:
 
     static FxAssetManager &GetInstance();
     static FxModel *LoadModel(std::string path);
+    static void LoadToModel(FxModel *model, std::string path);
 
     ~FxAssetManager()
     {

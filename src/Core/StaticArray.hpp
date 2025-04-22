@@ -209,6 +209,16 @@ public:
         Size = Capacity;
     }
 
+    size_t GetSizeInBytes() const
+    {
+        return Size * sizeof(ElementType);
+    }
+
+    size_t GetCapacityInBytes() const
+    {
+        return Capacity * sizeof(ElementType);
+    }
+
 protected:
     virtual void InternalAllocateArray(size_t element_count)
     {

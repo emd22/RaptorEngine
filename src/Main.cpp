@@ -6,6 +6,8 @@
 #include "Renderer/Backend/Vulkan/Shader.hpp"
 #include "Renderer/Backend/Vulkan/Shader.hpp"
 #include "Renderer/Backend/Vulkan/ShaderList.hpp"
+#include "sdl3/3.2.8/include/SDL3/SDL_events.h"
+#include "sdl3/3.2.8/include/SDL3/SDL_scancode.h"
 
 #define SDL_DISABLE_OLD_NAMES
 #include <SDL3/SDL.h>
@@ -20,18 +22,32 @@
 
 #include <Asset/FxAssetManager.hpp>
 
+#include "FxControls.hpp"
+
 static bool Running = true;
+
+FxModel *test_model = nullptr;
 
 AR_SET_MODULE_NAME("Main")
 
 inline void ProcessEvents() {
     SDL_Event event;
 
+    FxControlManager::UpdateControlManager();
+
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_EVENT_QUIT:
                 Running = false;
                 break;
+
+            // Keyboard events
+
+            case SDL_EVENT_KEY_DOWN: // fallthrough
+            case SDL_EVENT_KEY_UP:
+                FxControlManager::UpdateFromKeyboardEvent(&event);
+                break;
+
             default:;
         }
     }
@@ -78,21 +94,21 @@ int main() {
     auto &asset_manager = FxAssetManager::GetInstance();
     asset_manager.Start(2);
 
-    FxGltfLoader loader;
+    // FxModel *model = new FxModel;
+    // loader.LoadFromFile(model, "../models/Box.glb");
 
-    FxModel *model = new FxModel;
-    loader.LoadFromFile(model, "../models/Box.glb");
+    // FxModel *test_model = FxAssetManager::LoadModel("../models/Box.glb");
+    test_model = new FxModel;
 
-    // FxModel *test_model = FxAssetManager::LoadModel("../models/Cube.glb");
-    // test_model->OnLoaded =
-    //     [](FxBaseAsset *model) {
-    //         Log::Info("This was loaded!", 0);
-    //     };
+    test_model->OnLoaded =
+        [](FxBaseAsset *model) {
+            Log::Info("This was loaded!", 0);
+        };
 
     StaticArray<FxVertex<FxVertexPosition | FxVertexNormal>> test_mesh_verts = {
-        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = { -1,  1, 0 } },
-        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  1,  1, 0 } },
-        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  0,  -1, 0 } },
+        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = { -1,   1,  0 } },
+        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  1,   1,  0 } },
+        FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  0,  -1,  0 } },
     };
 
     // FxMesh test_mesh(test_mesh_verts);
@@ -104,10 +120,14 @@ int main() {
             continue;
         }
 
+        if (FxControlManager::IsKeyPressed(SDL_SCANCODE_R)) {
+            Log::Info("R is down!");
+        }
+
         // test_mesh.Render();
         // test_model->Render();
-        //
-        model->Render();
+
+        test_model->Render();
 
         Renderer->FinishFrame(pipeline);
     }

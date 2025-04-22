@@ -15,8 +15,6 @@ typedef uint64_t uint64;
 typedef float float32;
 typedef double float64;
 
-
-#include <stdexcept>
 #include <cstddef>
 #include <type_traits>
 
@@ -42,15 +40,6 @@ public:
     void Clear()
     {
         mHasValue = false;
-    }
-
-    ValueType *GetPtr()
-    {
-        if (!HasValue()) {
-            return nullptr;
-        }
-
-        return reinterpret_cast<ValueType *>(&mData);
     }
 
     ValueType &operator *() const

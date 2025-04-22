@@ -6,6 +6,7 @@
 
 #include <Core/StaticPtrArray.hpp>
 
+
 class FxModel : public FxBaseAsset
 {
 protected:

@@ -43,7 +43,13 @@ void FxAssetManager::ShutDown()
 FxModel *FxAssetManager::LoadModel(std::string path)
 {
     FxModel *model = new FxModel;
+    LoadToModel(model, path);
 
+    return model;
+}
+
+void FxAssetManager::LoadToModel(FxModel *model, std::string path)
+{
     FxAssetQueueItem queue_item;
 
     queue_item.Asset = model;
@@ -52,8 +58,6 @@ FxModel *FxAssetManager::LoadModel(std::string path)
     queue_item.Path = path;
 
     AssetManager.mLoadQueue.Push(std::move(queue_item));
-
-    return model;
 }
 
 void FxAssetManager::ThreadUpdate()
