@@ -57,3 +57,45 @@ private:
     bool mHasValue = false;
     std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
 };
+
+template <typename T>
+class PtrContainer {
+public:
+    PtrContainer(T *ptr)
+        : mPtr(ptr)
+    {
+    }
+
+    ~PtrContainer()
+    {
+        delete mPtr;
+        // mPtr->Destroy();
+    }
+
+    PtrContainer(PtrContainer &&other)
+        : mPtr(other.mPtr)
+    {
+        other.mPtr = nullptr;
+    }
+
+    PtrContainer<T> &&operator = (PtrContainer<T> &&other)
+    {
+        delete mPtr;
+        mPtr = other.mPtr;
+        other.mPtr = nullptr;
+        return std::move(*this);
+    }
+
+    PtrContainer(const PtrContainer<T> &other) = delete;
+    PtrContainer(PtrContainer<T> &other) = delete;
+    PtrContainer<T> &operator = (PtrContainer<T> &other) = delete;
+    PtrContainer<T> &operator = (const PtrContainer<T> &other) = delete;
+
+    T *Get() const { return mPtr; }
+
+    T *operator ->() const { return mPtr; }
+    T &operator *() const { return *mPtr; }
+
+private:
+    T *mPtr;
+};

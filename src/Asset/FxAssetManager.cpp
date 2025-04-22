@@ -40,19 +40,25 @@ void FxAssetManager::ShutDown()
     }
 }
 
-FxModel *FxAssetManager::LoadModel(std::string path)
+PtrContainer<FxModel> FxAssetManager::NewModel()
 {
     FxModel *model = new FxModel;
-    LoadToModel(model, path);
+    return PtrContainer<FxModel>(model);
+}
+
+PtrContainer<FxModel> FxAssetManager::LoadModel(std::string path)
+{
+    PtrContainer<FxModel> model = NewModel();
+    LoadModel(model, path);
 
     return model;
 }
 
-void FxAssetManager::LoadToModel(FxModel *model, std::string path)
+void FxAssetManager::LoadModel(PtrContainer<FxModel> &model, std::string path)
 {
     FxAssetQueueItem queue_item;
 
-    queue_item.Asset = model;
+    queue_item.Asset = model.Get();
     queue_item.Loader = std::make_unique<FxGltfLoader>();
     queue_item.AssetType = FxAssetType::Model;
     queue_item.Path = path;

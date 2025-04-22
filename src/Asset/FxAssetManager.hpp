@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Types.hpp"
 #include "FxAssetQueueItem.hpp"
 
 #include "FxModel.hpp"
@@ -18,8 +19,10 @@ public:
     void ThreadUpdate();
 
     static FxAssetManager &GetInstance();
-    static FxModel *LoadModel(std::string path);
-    static void LoadToModel(FxModel *model, std::string path);
+
+    static PtrContainer<FxModel> NewModel();
+    static PtrContainer<FxModel> LoadModel(std::string path);
+    static void LoadModel(PtrContainer<FxModel> &model, std::string path);
 
     ~FxAssetManager()
     {

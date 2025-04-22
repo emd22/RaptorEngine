@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Util.hpp"
+#include "Renderer/FxRenderBackend.hpp"
 #include "Renderer/Renderer.hpp"
 #include "vulkan/vulkan_core.h"
 #include <ThirdParty/vk_mem_alloc.h>
@@ -148,7 +149,8 @@ public:
             FxPanic_("GPUBuffer", "Error allocating GPU buffer!", status);
         }
 
-        Initialized.store(true);
+        RendererVulkan->GetDevice()->WaitForIdle(); // XXX: REMOVE
+        Initialized = true;
     }
 
     /**
@@ -188,19 +190,24 @@ public:
 
     void Destroy()
     {
-        if (!Initialized.load()) {
+        if (!Initialized) {
             Initialized.wait(true);
         }
 
-        Renderer->AddToDeletionQueue([this]() {
-            if (!Initialized || Buffer == nullptr || Allocation == nullptr) {
-                return;
-            }
+        Log::Debug("Freeing GPU Buffer of size %lu", Size);
 
-            vmaDestroyBuffer(RendererVulkan->GPUAllocator, Buffer, Allocation);
+        Renderer->AddGPUBufferToDeletionQueue([](FxDeletionObject *object) {
+            // if (!Initialized || Buffer == nullptr || Allocation == nullptr) {
+            //     return;
+            // }
 
-            Initialized = false;
-        });
+            vmaDestroyBuffer(RendererVulkan->GPUAllocator, object->Buffer, object->Allocation);
+            Log::Debug("Deleted VMA buffer");
+
+            // Initialized = false;
+        }, Buffer, Allocation);
+
+        Initialized = false;
     }
 
     ~FxGPUBuffer()

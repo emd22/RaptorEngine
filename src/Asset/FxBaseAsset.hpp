@@ -15,6 +15,11 @@ protected:
     {
     }
 
+    virtual void Destroy() = 0;
+    virtual ~FxBaseAsset()
+    {
+    }
+
 public:
 
     using OnLoadFunc = void (*)(FxBaseAsset *asset);

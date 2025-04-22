@@ -4,6 +4,7 @@
 #include "Renderer/Renderer.hpp"
 #include "vulkan/vulkan_core.h"
 #include <Renderer/Backend/Vulkan/GPUBuffer.hpp>
+#include <atomic>
 
 // TEMP
 using namespace vulkan;
@@ -112,7 +113,7 @@ public:
         return vertices;
     }
 
-    bool IsReady()
+    bool IsWritable()
     {
         return (mVertexBuffer.Initialized && mIndexBuffer.Initialized);
     }
@@ -132,6 +133,18 @@ public:
         // vkCmdDraw(frame->CommandBuffer.CommandBuffer, mVertexBuffer.Size, 1, 0, 0);
     }
 
+    void Destroy()
+    {
+        // mVertexBuffer.Destroy();
+        // mIndexBuffer.Destroy();
+    }
+
+    ~FxMesh()
+    {
+        Destroy();
+    }
+
+    std::atomic_bool IsReady = std::atomic_bool(false);
 protected:
     FxGPUBuffer<VertexType> mVertexBuffer;
     FxGPUBuffer<uint32> mIndexBuffer;

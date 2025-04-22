@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <initializer_list>
 
+#include <Core/Log.hpp>
+
 static inline void NoMemError()
 {
     puts("StaticArray: out of memory");
@@ -59,7 +61,7 @@ public:
     {
         try {
     #ifdef FX_STATIC_ARRAY_DEBUG
-            Log::Debug("Allocating StaticArray of capacity %lu (type: %s)\n", Capacity, typeid(ElementType).name());
+            Log::Debug("Allocating StaticArray of capacity %lu (type: %s)", Capacity, typeid(ElementType).name());
     #endif
             Data = new ElementType[element_count];
         }
@@ -99,7 +101,7 @@ public:
     {
         if (Data != nullptr) {
     #ifdef FX_DEBUG_STATIC_ARRAY
-            Log::Debug("Freeing StaticArray of size %lu (type: %s)\n", Size, typeid(ElementType).name());
+            Log::Debug("Freeing StaticArray of size %lu (type: %s)", Size, typeid(ElementType).name());
     #endif
             delete Data;
 
@@ -224,7 +226,7 @@ protected:
     {
         try {
     #ifdef FX_DEBUG_STATIC_ARRAY
-            Log::Debug("Allocating StaticArray of capacity %lu (type: %s)\n", element_count, typeid(ElementType).name());
+            Log::Debug("Allocating StaticArray of capacity %lu (type: %s)", element_count, typeid(ElementType).name());
     #endif
             Data = new ElementType[element_count];
         }

@@ -15,6 +15,8 @@
 #include <functional>
 #include <memory>
 
+#include <vma/vk_mem_alloc.h>
+
 using namespace vulkan;
 
 enum class FrameResult
@@ -26,7 +28,10 @@ enum class FrameResult
 
 struct FxDeletionObject
 {
-    using FuncType = const std::function<void ()>;
+    using FuncType = void (*)(FxDeletionObject *object);
+
+    VkBuffer Buffer = VK_NULL_HANDLE;
+    VmaAllocation Allocation = VK_NULL_HANDLE;
 
     uint32 DeletionFrameNumber = 0;
     FuncType Func;
@@ -44,13 +49,25 @@ public:
     virtual FrameResult BeginFrame(GraphicsPipeline &pipeline) = 0;
     virtual void FinishFrame(GraphicsPipeline &pipeline) = 0;
 
-    virtual void AddToDeletionQueue(FxDeletionObject::FuncType &func)
+    virtual void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
         Log::Info("Adding object to deletion queue at frame %d", mInternalFrameCounter);
 
         mDeletionQueue.push_back(FxDeletionObject {
             .DeletionFrameNumber = mInternalFrameCounter,
             .Func = func,
+        });
+    }
+
+    virtual void AddGPUBufferToDeletionQueue(FxDeletionObject::FuncType func, VkBuffer buffer, VmaAllocation allocation)
+    {
+        Log::Info("Adding GPUBuffer to deletion queue at frame %d", mInternalFrameCounter);
+
+        mDeletionQueue.push_back(FxDeletionObject {
+            .DeletionFrameNumber = mInternalFrameCounter,
+            .Func = func,
+            .Allocation = allocation,
+            .Buffer = buffer,
         });
     }
 
@@ -70,7 +87,7 @@ protected:
         const bool is_frame_spaced = (mInternalFrameCounter - object.DeletionFrameNumber) > FrameSpacing;
 
         if (ignore_frame_spacing || is_frame_spaced) {
-            object.Func();
+            object.Func(&object);
 
             mDeletionQueue.pop_front();
         }

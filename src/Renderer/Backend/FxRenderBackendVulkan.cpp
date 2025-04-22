@@ -546,6 +546,8 @@ void FxRenderBackendVulkan::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
+    GetDevice()->WaitForIdle();
+
     DestroyGPUAllocator();
 
     Swapchain.Destroy();

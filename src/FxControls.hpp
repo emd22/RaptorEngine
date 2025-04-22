@@ -73,12 +73,12 @@ private:
     friend void FxControlManager::UpdateFromKeyboardEvent(SDL_Event *control);
 
 public:
-    enum StateFlag : uint8 {
-        NoState = (0),
-        ContinuedPress = (1 << 0),
-        KeyDown = (1 << 1),
-        FrameBit = (1 << 2), /* Flag for if this is the current frame or the previous frame. */
-    };
+    // enum StateFlag : uint8 {
+    //     NoState = (0),
+    //     ContinuedPress = (1 << 0),
+    //     KeyDown = (1 << 1),
+    //     FrameBit = (1 << 2), /* Flag for if this is the current frame or the previous frame. */
+    // };
 
     enum Flag : uint8 {
         NoFlag = (0),
@@ -120,5 +120,5 @@ private:
 
     uint8 mContinuedPress : 1 = 0;
     uint8 mKeyDown : 1 = 0;
-    uint8 mFrameBit : 1 = 0;
+    uint8 mTickBit : 1 = 0;
 };

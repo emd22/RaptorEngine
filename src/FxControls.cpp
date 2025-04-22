@@ -44,7 +44,7 @@ FxControl *FxControlManager::GetKey(int32 scancode)
 
 inline void CheckKeyForContinuedPress(FxControl *key)
 {
-    // When a key is pressed, we set the `FrameBit` in `mCurrentState` (inside the FxControl)
+    // When a key is pressed, we set the `mTickBit` inside the FxControl
     // to the current value of `mThisTick`. When a function is called that checks  the
     // key is pressed, such as`IsKeyDown`, `IsKeyPressed`, etc., then we call this function to check
     // if we are on the same frame that the event occurred. If not, then we know that this
@@ -56,7 +56,7 @@ inline void CheckKeyForContinuedPress(FxControl *key)
     }
 
     // Get the value of the "off" frame.
-    const bool key_next_frame = !key->mFrameBit;
+    const bool key_next_frame = !key->mTickBit;
 
     // If we are currently on the "off" frame, then we know this is continued.
     if (key_next_frame == ControlManager.mThisTick) {
@@ -107,7 +107,7 @@ void FxControlManager::UpdateFromKeyboardEvent(SDL_Event *event)
     if (event->key.down && !key->IsKeyDown()) {
         // key->CurrentState |= (FxControl::StateFlag::KeyDown);
         // key->CurrentState = (key->CurrentState & ~((uint8)1 << 2)) | (((uint8)ControlManager.mThisTick) << 2);
-        key->mFrameBit = ControlManager.mThisTick;
+        key->mTickBit = ControlManager.mThisTick;
         key->mKeyDown = true;
     }
     else if (!event->key.down && key->IsKeyDown()) {

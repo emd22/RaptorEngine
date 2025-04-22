@@ -1,15 +1,19 @@
 #include "FxModel.hpp"
 
-bool FxModel::IsReady()
+bool FxModel::CheckIfReady()
 {
-    if (mModelReady) {
-        return mModelReady;
-    }
+    // if (mModelReady) {
+    //     return mModelReady;
+    // }
 
     for (FxMesh *mesh : Meshes) {
-        if (!mesh->IsReady()) {
-            return false;
+        if (mesh->IsReady == false) {
+            return (mModelReady = false);
         }
+    }
+
+    if (Meshes.IsEmpty()) {
+        return (mModelReady = false);
     }
 
     return (mModelReady = true);
@@ -17,14 +21,17 @@ bool FxModel::IsReady()
 
 void FxModel::Render()
 {
-    mModelReady = IsReady();
+    if (!CheckIfReady()) {
+        return;
+    }
+
 
     for (FxMesh *mesh : Meshes) {
-        // if we know the model is not fully loaded, check for each
-        // individual mesh.
-        if (!mModelReady && !mesh->IsReady()) {
-            continue;
-        }
+        // if we know the model is not fully loaded, check each
+        // individual mesh to see if they're ready.
+        // if (!mModelReady && !mesh->IsReady) {
+        //     continue;
+        // }
 
         mesh->Render();
     }

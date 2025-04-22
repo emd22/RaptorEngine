@@ -43,6 +43,7 @@ void UnpackAttributes(FxMesh *mesh, cgltf_primitive *primitive)
     auto combined_vertices = FxMesh::MakeCombinedVertexBuffer(positions, normals);
 
     mesh->SetVertices(combined_vertices);
+    mesh->IsReady = true;
 }
 
 void UnpackMesh(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)

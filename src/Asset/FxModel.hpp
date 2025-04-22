@@ -19,7 +19,25 @@ public:
 
 public:
     void Render();
-    bool IsReady();
+    bool CheckIfReady();
+
+    ~FxModel() override
+    {
+        Destroy();
+    }
+
+// private:
+    void Destroy() override
+    {
+        Log::Info("Destroy FxModel (%lu meshes)", Meshes.Size);
+        for (FxMesh *mesh : Meshes)
+        {
+            Log::Info("Destroy mesh");
+            mesh->Destroy();
+        }
+
+        // Meshes.Free();
+    }
 
 public:
     // StaticArray<float> Positions;

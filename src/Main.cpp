@@ -26,8 +26,6 @@
 
 static bool Running = true;
 
-FxModel *test_model = nullptr;
-
 AR_SET_MODULE_NAME("Main")
 
 inline void ProcessEvents() {
@@ -55,7 +53,8 @@ inline void ProcessEvents() {
 
 #include <csignal>
 
-int main() {
+int main()
+{
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }
@@ -98,7 +97,7 @@ int main() {
     // loader.LoadFromFile(model, "../models/Box.glb");
 
     // FxModel *test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    test_model = new FxModel;
+    PtrContainer<FxModel> test_model = FxAssetManager::NewModel();
 
     test_model->OnLoaded =
         [](FxBaseAsset *model) {
@@ -120,8 +119,12 @@ int main() {
             continue;
         }
 
-        if (FxControlManager::IsKeyPressed(SDL_SCANCODE_R)) {
-            Log::Info("R is down!");
+        if (FxControlManager::IsKeyPressed(SDL_SCANCODE_R) && !test_model->IsLoaded) {
+            FxAssetManager::LoadModel(test_model, "../models/Box.glb");
+        }
+
+        if (FxControlManager::IsKeyPressed(SDL_SCANCODE_Q)) {
+            Running = false;
         }
 
         // test_mesh.Render();
@@ -131,8 +134,6 @@ int main() {
 
         Renderer->FinishFrame(pipeline);
     }
-
-    // test_model->Meshes.Free();
 
     asset_manager.ShutDown();
 
