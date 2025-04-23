@@ -11,7 +11,7 @@ namespace vulkan {
 
 #include <Core/FxPanic.hpp>
 
-AR_SET_MODULE_NAME("Device")
+FX_SET_MODULE_NAME("Device")
 
 ///////////////////////////////
 // Queue Families

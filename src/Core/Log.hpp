@@ -68,7 +68,7 @@ public:
     {
         const auto severity_info = GetSeverityInfo<Severity>();
 
-    #ifndef AR_DISABLE_LOG_COLOR
+    #ifndef FX_DISABLE_LOG_COLOR
         // print error/warning/info prefix with color
         printf("\x1b[%s%dm[%s]\x1b[0m ",
             std::get<2>(severity_info) ? "1;" : "", // is bold?

@@ -1,9 +1,9 @@
-#ifdef AR_NO_SIMD
+#ifdef FX_NO_SIMD
 
 #include <Core/Defines.hpp>
 #include <Math/Vec4.hpp>
 
-inline Vec4f::Vec4f(float32 x, float32 y, float32 z, float32 w)
+Vec4f::Vec4f(float32 x, float32 y, float32 z, float32 w)
     : mX(x), mY(y), mZ(z), mW(w)
 {
 }
@@ -67,6 +67,16 @@ inline Vec4f &Vec4f::operator *= (const Vec4f &other)
     return *this;
 }
 
+Vec4f &Vec4f::operator = (const Vec4f &other)
+{
+    mX = other.mX;
+    mY = other.mY;
+    mZ = other.mZ;
+    mW = other.mW;
+
+    return *this;
+}
+
 inline Vec4f Vec4f::MulAdd(const Vec4f &add_value, const Vec4f &mul_a, const Vec4f &mul_b)
 {
     Vec4f result;
@@ -94,4 +104,26 @@ inline float32 Vec4f::GetW() const
     return mW;
 }
 
-#endif // #ifdef AR_NO_SIMD
+
+inline void Vec4f::Load4(float32 x, float32 y, float32 z, float32 w) noexcept
+{
+    mX = x;
+    mY = y;
+    mZ = z;
+    mW = w;
+}
+
+inline void Vec4f::Load4_Ptr(float32 *values)
+{
+    mX = values[0];
+    mY = values[1];
+    mZ = values[2];
+    mW = values[3];
+}
+
+inline void Vec4f::Load1(float32 scalar) noexcept
+{
+    mX = mY = mZ = mW = scalar;
+}
+
+#endif // #ifdef FX_NO_SIMD

@@ -12,7 +12,7 @@
 
 namespace vulkan {
 
-AR_SET_MODULE_NAME("Pipeline")
+FX_SET_MODULE_NAME("Pipeline")
 
 VertexInfo GraphicsPipeline::MakeVertexInfo() {
     using VertexType = FxVertex<FxVertexPosition | FxVertexNormal>;

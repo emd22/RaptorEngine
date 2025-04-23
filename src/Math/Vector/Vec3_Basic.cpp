@@ -1,4 +1,4 @@
-#ifdef AR_NO_SIMD
+#ifdef FX_NO_SIMD
 
 #include <Core/Defines.hpp>
 #include <Math/Vec3.hpp>
@@ -84,4 +84,4 @@ inline float32 Vec3f::GetZ() const
     return mZ;
 }
 
-#endif // #ifdef AR_NO_SIMD
+#endif // #ifdef FX_NO_SIMD

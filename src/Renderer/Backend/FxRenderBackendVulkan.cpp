@@ -27,14 +27,14 @@
 #include <SDL3/SDL_vulkan.h>
 #include <SDL3/SDL.h>
 
-#define AR_VULKAN_DEBUG 1
+#define FX_VULKAN_DEBUG 1
 
 namespace vulkan {
 
 using ExtensionNames = FxRenderBackendVulkan::ExtensionNames;
 using ExtensionList = FxRenderBackendVulkan::ExtensionList;
 
-AR_SET_MODULE_NAME("Vulkan")
+FX_SET_MODULE_NAME("Vulkan")
 
 ExtensionNames FxRenderBackendVulkan::CheckExtensionsAvailable(ExtensionNames &requested_extensions)
 {
@@ -134,7 +134,7 @@ void FxRenderBackendVulkan::InitVulkan()
 
     ExtensionNames all_extensions = MakeInstanceExtensionList(requested_extensions);
 
-#ifdef AR_VULKAN_DEBUG
+#ifdef FX_VULKAN_DEBUG
     all_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     all_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
@@ -184,7 +184,7 @@ void FxRenderBackendVulkan::InitVulkan()
         FxPanic("Could not create vulkan instance!", result);
     }
 
-#ifdef AR_VULKAN_DEBUG
+#ifdef FX_VULKAN_DEBUG
     mDebugMessenger = CreateDebugMessenger(mInstance);
     if (!mDebugMessenger) {
         FxPanic("Could not create debug messenger", 0);
