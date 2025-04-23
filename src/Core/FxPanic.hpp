@@ -43,7 +43,7 @@ void FxPanic_(const char *module, const char *fmt, VkResult result, Types... ite
 
 
 #define FxPanic(...) \
-    FxPanic_(ArModuleName__, __VA_ARGS__)
+    FxPanic_(FxModuleName__, __VA_ARGS__)
 
 #define FxAssert(cond) \
     if (!cond) { \

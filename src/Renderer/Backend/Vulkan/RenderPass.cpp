@@ -12,7 +12,7 @@
 
 namespace vulkan {
 
-AR_SET_MODULE_NAME("RenderPass")
+FX_SET_MODULE_NAME("RenderPass")
 
 void RenderPass::Create(GPUDevice &device, Swapchain &swapchain) {
     VkAttachmentDescription color_attachment = {

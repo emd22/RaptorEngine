@@ -7,7 +7,7 @@
 
 namespace vulkan {
 
-AR_SET_MODULE_NAME("CommandBuffer")
+FX_SET_MODULE_NAME("CommandBuffer")
 
 void CommandBuffer::Create(CommandPool *pool)
 {

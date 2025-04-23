@@ -2,7 +2,7 @@
 
 #include <Core/Types.hpp>
 
-#ifdef AR_USE_NEON
+#ifdef FX_USE_NEON
 #include <arm_neon.h>
 #endif
 
@@ -30,7 +30,7 @@ public:
         return Vec3f(0.0f, 0.0f, 0.0f);
     };
 
-#ifdef AR_USE_NEON
+#ifdef FX_USE_NEON
     explicit Vec3f(float32x4_t intrin)
         : mIntrin(intrin)
     {
@@ -43,7 +43,7 @@ public:
 #endif
 
 private:
-#if defined(AR_USE_NEON)
+#if defined(FX_USE_NEON)
     union alignas(16) {
         float32x4_t mIntrin;
         float mData[4];

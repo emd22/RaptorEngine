@@ -4,7 +4,7 @@
 #include <Renderer/FxRenderBackend.hpp>
 #include <Core/FxPanic.hpp>
 
-AR_SET_MODULE_NAME("Renderer")
+FX_SET_MODULE_NAME("Renderer")
 
 FxRenderBackend *Renderer;
 FxRenderBackendVulkan *RendererVulkan;

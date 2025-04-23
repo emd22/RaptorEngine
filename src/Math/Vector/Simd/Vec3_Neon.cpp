@@ -1,4 +1,4 @@
-#ifdef AR_USE_NEON
+#ifdef FX_USE_NEON
 
 #include <Math/Vec3.hpp>
 #include <arm_neon.h>

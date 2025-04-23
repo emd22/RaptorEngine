@@ -10,7 +10,7 @@
 
 #include <vulkan/vulkan.h>
 
-AR_SET_MODULE_NAME("Swapchain")
+FX_SET_MODULE_NAME("Swapchain")
 
 namespace vulkan {
 

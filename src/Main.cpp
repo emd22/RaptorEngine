@@ -26,7 +26,7 @@
 
 static bool Running = true;
 
-AR_SET_MODULE_NAME("Main")
+FX_SET_MODULE_NAME("Main")
 
 inline void ProcessEvents() {
     SDL_Event event;
@@ -53,8 +53,53 @@ inline void ProcessEvents() {
 
 #include <csignal>
 
+#include <Math/Mat4.hpp>
+
+void TestMat4Multiply()
+{
+    Mat4f mat1((Vec4f [4]){
+        (Vec4f){1.0, 2.0, 3.0, 4.0},
+        (Vec4f){2.0, 3.0, 4.0, 1.0},
+        (Vec4f){3.0, 4.0, 1.0, 2.0},
+        (Vec4f){4.0, 1.0, 2.0, 3.0}
+    });
+
+    Mat4f mat2((Vec4f [4]){
+        (Vec4f){1.0, 2.0, 3.0, 4.0},
+        (Vec4f){2.0, 3.0, 4.0, 1.0},
+        (Vec4f){3.0, 4.0, 1.0, 2.0},
+        (Vec4f){4.0, 1.0, 2.0, 3.0}
+    });
+
+    Mat4f result = mat1.Multiply(mat2);
+    result.Print();
+}
+
+/*
+// Matrix A
+{
+    (Vec4f){2.0f, 3.0f, 1.0f, 4.0f},
+    (Vec4f){1.0f, 2.0f, 3.0f, 1.0f},
+    (Vec4f){3.0f, 1.0f, 2.0f, 2.0f},
+    (Vec4f){2.0f, 4.0f, 1.0f, 3.0f}
+}
+
+// Matrix B
+{
+    (Vec4f){1.0f, 2.0f, 3.0f, 1.0f},
+    (Vec4f){2.0f, 1.0f, 2.0f, 3.0f},
+    (Vec4f){3.0f, 2.0f, 1.0f, 2.0f},
+    (Vec4f){1.0f, 3.0f, 2.0f, 1.0f}
+}
+
+*/
+
 int main()
 {
+    TestMat4Multiply();
+    return 0;
+
+
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }

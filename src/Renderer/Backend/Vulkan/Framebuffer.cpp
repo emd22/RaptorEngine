@@ -8,7 +8,7 @@
 
 namespace vulkan {
 
-AR_SET_MODULE_NAME("Framebuffer")
+FX_SET_MODULE_NAME("Framebuffer")
 
 void Framebuffer::Create(StaticArray<VkImageView> &image_views, GraphicsPipeline &pipeline, Vec2i size)
 {

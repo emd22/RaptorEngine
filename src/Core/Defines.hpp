@@ -1,12 +1,12 @@
 #pragma once
 
-#ifdef __ARM_NEON__
-#define AR_USE_NEON 1
+#ifdef FX_NO_SIMD
+    // FX_NO_SIMD defined
+#elif defined(__ARM_NEON__)
+    #define FX_USE_NEON 1
+#else
+    #define FX_NO_SIMD 1
 #endif
 
-#if !defined(AR_USE_NEON) && !defined(AR_USE_SSE)
-#define AR_NO_SIMD 1
-#endif
-
-#define AR_SET_MODULE_NAME(str) \
-    static const char *ArModuleName__ = str;
+#define FX_SET_MODULE_NAME(str) \
+    static const char *FxModuleName__ = str;

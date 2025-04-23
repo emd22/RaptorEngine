@@ -14,7 +14,7 @@ find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 
 add_definitions(
-    -DAR_USE_NEON
+    -DFX_USE_NEON
     -DFX_DEBUG_STATIC_ARRAY
     ${COMPILE_FLAGS}
 )
