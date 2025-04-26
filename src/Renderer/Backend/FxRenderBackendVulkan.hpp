@@ -37,6 +37,11 @@ public:
         mWindow = window;
     }
 
+    std::shared_ptr<FxWindow> GetWindow() override
+    {
+        return mWindow;
+    }
+
     vulkan::GPUDevice *GetDevice()
     {
         return &mDevice;

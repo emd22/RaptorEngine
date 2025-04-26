@@ -6,7 +6,8 @@
 #include <arm_neon.h>
 #endif
 
-class Vec4f {
+class Vec4f
+{
 public:
     friend class Mat4f;
 
@@ -30,8 +31,24 @@ public:
     float32 GetZ() const;
     float32 GetW() const;
 
-    void Load4(float32 x, float32 y, float32 z, float32 w) noexcept;
+    void SetX(float32 x);
+    void SetY(float32 y);
+    void SetZ(float32 z);
+    void SetW(float32 w);
+
+    /**
+     * Loads 4 values into the vector.
+     */
+    void Load4(float32 x, float32 y, float32 z, float32 w);
+
+    /**
+     * Loads 4 values into the vector from a pointer.
+     */
     void Load4Ptr(float32 *values);
+
+    /**
+     * Loads a single value into the vector to all components.
+     */
     void Load1(float32 scalar) noexcept;
 
     static const Vec4f Zero()

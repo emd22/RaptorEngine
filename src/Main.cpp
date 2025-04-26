@@ -6,6 +6,7 @@
 #include "Renderer/Backend/Vulkan/Shader.hpp"
 #include "Renderer/Backend/Vulkan/Shader.hpp"
 #include "Renderer/Backend/Vulkan/ShaderList.hpp"
+#include "Renderer/FxCamera.hpp"
 #include "sdl3/3.2.8/include/SDL3/SDL_events.h"
 #include "sdl3/3.2.8/include/SDL3/SDL_scancode.h"
 
@@ -46,6 +47,11 @@ inline void ProcessEvents() {
                 FxControlManager::UpdateFromKeyboardEvent(&event);
                 break;
 
+            case SDL_EVENT_MOUSE_BUTTON_DOWN: // fallthrough
+            case SDL_EVENT_MOUSE_BUTTON_UP:
+                FxControlManager::UpdateFromMouseButtonEvent(&event);
+                break;
+
             default:;
         }
     }
@@ -75,31 +81,18 @@ void TestMat4Multiply()
     result.Print();
 }
 
-/*
-// Matrix A
+void CheckGeneralControls()
 {
-    (Vec4f){2.0f, 3.0f, 1.0f, 4.0f},
-    (Vec4f){1.0f, 2.0f, 3.0f, 1.0f},
-    (Vec4f){3.0f, 1.0f, 2.0f, 2.0f},
-    (Vec4f){2.0f, 4.0f, 1.0f, 3.0f}
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Q)) {
+        Running = false;
+    }
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_ESCAPE)) {
+        FxControlManager::ReleaseMouse();
+    }
 }
-
-// Matrix B
-{
-    (Vec4f){1.0f, 2.0f, 3.0f, 1.0f},
-    (Vec4f){2.0f, 1.0f, 2.0f, 3.0f},
-    (Vec4f){3.0f, 2.0f, 1.0f, 2.0f},
-    (Vec4f){1.0f, 3.0f, 2.0f, 1.0f}
-}
-
-*/
 
 int main()
 {
-    TestMat4Multiply();
-    return 0;
-
-
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }
@@ -111,13 +104,16 @@ int main()
         exit(1);
     });
 
-    auto window = FxWindow::New("Foxtrot Engine", 1024, 720);
+    const int window_width = 1024;
+    const int window_height = 720;
+
+    auto window = FxWindow::New("Foxtrot Engine", window_width, window_height);
 
     vulkan::FxRenderBackendVulkan renderer_state;
     SetRendererBackend(&renderer_state);
 
     Renderer->SelectWindow(window);
-    Renderer->Init(Vec2i(1024, 720));
+    Renderer->Init(Vec2i(window_width, window_height));
 
     vulkan::GraphicsPipeline pipeline;
 
@@ -155,21 +151,34 @@ int main()
         FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  0,  -1,  0 } },
     };
 
+    FxPerspectiveCamera camera;
+
+    camera.SetAspectRatio(((float32)window_width) / window_height);
+
+
     // FxMesh test_mesh(test_mesh_verts);
 
     while (Running) {
         ProcessEvents();
 
+        camera.Update();
+
         if (Renderer->BeginFrame(pipeline) != FrameResult::Success) {
             continue;
         }
 
-        if (FxControlManager::IsKeyPressed(SDL_SCANCODE_R) && !test_model->IsLoaded) {
+        CheckGeneralControls();
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R) && !test_model->IsLoaded) {
             FxAssetManager::LoadModel(test_model, "../models/Box.glb");
         }
 
-        if (FxControlManager::IsKeyPressed(SDL_SCANCODE_Q)) {
-            Running = false;
+        if (FxControlManager::IsComboPressed(FxKey::FX_KEY_F, FxKey::FX_KEY_LSHIFT)) {
+            Log::Info("Combination pressed");
+        }
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT_BUTTON)) {
+            Log::Info("Mouse pressed!");
         }
 
         // test_mesh.Render();
@@ -178,6 +187,7 @@ int main()
         test_model->Render();
 
         Renderer->FinishFrame(pipeline);
+
     }
 
     asset_manager.ShutDown();

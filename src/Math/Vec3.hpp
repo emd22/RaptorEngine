@@ -12,7 +12,10 @@ public:
     Vec3f(float32 x, float32 y, float32 z);
     explicit Vec3f(float32 scalar);
 
+    void Set(float32 x, float32 y, float32 z);
+
     Vec3f operator + (const Vec3f &other) const;
+    Vec3f operator - (const Vec3f &other) const;
     Vec3f operator * (const Vec3f &other) const;
 
     Vec3f &operator += (const Vec3f &other);
@@ -20,6 +23,12 @@ public:
     Vec3f &operator *= (const Vec3f &other);
 
     static Vec3f MulAdd(const Vec3f &add_value, const Vec3f &mul_a, const Vec3f &mul_b);
+
+    Vec3f Normalize() const;
+    float32 Length() const;
+    Vec3f Cross(const Vec3f &other) const;
+
+    float32 Dot(const Vec3f &other) const;
 
     float32 GetX() const;
     float32 GetY() const;

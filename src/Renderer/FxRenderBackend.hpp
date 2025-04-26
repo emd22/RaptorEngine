@@ -45,6 +45,7 @@ public:
     virtual void Destroy() = 0;
 
     virtual void SelectWindow(std::shared_ptr<FxWindow> window) = 0;
+    virtual std::shared_ptr<FxWindow> GetWindow() = 0;
 
     virtual FrameResult BeginFrame(GraphicsPipeline &pipeline) = 0;
     virtual void FinishFrame(GraphicsPipeline &pipeline) = 0;

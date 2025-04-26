@@ -1,4 +1,5 @@
 
+#include <arm_neon.h>
 #ifdef FX_USE_NEON
 
 #include <Math/Mat4.hpp>
@@ -70,6 +71,23 @@ Mat4f Mat4f::Multiply(Mat4f &other)
     MAT_COL_FMA(3, b3);
 
     return result;
+}
+
+void Mat4f::LookAt(Vec3f position, Vec3f target, Vec3f up)
+{
+    const Vec3f a = (position - target).Normalize();
+
+    const Vec3f b = up.Cross(a).Normalize();
+    const Vec3f c = a.Cross(b);
+
+    const float32 dot_a = -a.Dot(position);
+    const float32 dot_b = -b.Dot(position);
+    const float32 dot_c = -c.Dot(position);
+
+    Data[0].Load4(b.GetX(), c.GetX(), a.GetX(),   0);
+    Data[1].Load4(b.GetY(), c.GetY(), a.GetY(),   0);
+    Data[2].Load4(b.GetZ(), c.GetZ(), a.GetZ(),   0);
+    Data[3].Load4(dot_b,    dot_c,    dot_a,    1.0);
 }
 
 // Mat4f Mat4f::Multiply(Mat4f &other)
