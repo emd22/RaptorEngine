@@ -4,12 +4,12 @@
 #include <Math/Vec4.hpp>
 
 Vec4f::Vec4f(float32 x, float32 y, float32 z, float32 w)
-    : mX(x), mY(y), mZ(z), mW(w)
+    : X(x), Y(y), Z(z), W(w)
 {
 }
 
 inline Vec4f::Vec4f(float32 scalar)
-    : mX(scalar), mY(scalar), mZ(scalar), mW(scalar)
+    : X(scalar), Y(scalar), Z(scalar), W(scalar)
 {
 }
 
@@ -17,10 +17,10 @@ inline Vec4f Vec4f::operator + (const Vec4f &other) const
 {
     Vec4f result;
 
-    result.mX = mX + other.mX;
-    result.mY = mY + other.mY;
-    result.mZ = mZ + other.mZ;
-    result.mW = mW + other.mW;
+    result.X = X + other.X;
+    result.Y = Y + other.Y;
+    result.Z = Z + other.Z;
+    result.W = W + other.W;
 
     return result;
 }
@@ -29,50 +29,50 @@ inline Vec4f Vec4f::operator * (const Vec4f &other) const
 {
     Vec4f result;
 
-    result.mX = mX * other.mX;
-    result.mY = mY * other.mY;
-    result.mZ = mZ * other.mZ;
-    result.mW = mW * other.mW;
+    result.X = X * other.X;
+    result.Y = Y * other.Y;
+    result.Z = Z * other.Z;
+    result.W = W * other.W;
 
     return result;
 }
 
 inline Vec4f &Vec4f::operator += (const Vec4f &other)
 {
-    mX += other.mX;
-    mY += other.mY;
-    mZ += other.mZ;
-    mW += other.mW;
+    X += other.X;
+    Y += other.Y;
+    Z += other.Z;
+    W += other.W;
 
     return *this;
 }
 
 inline Vec4f &Vec4f::operator -= (const Vec4f &other)
 {
-    mX -= other.mX;
-    mY -= other.mY;
-    mZ -= other.mZ;
-    mW -= other.mW;
+    X -= other.X;
+    Y -= other.Y;
+    Z -= other.Z;
+    W -= other.W;
 
     return *this;
 }
 
 inline Vec4f &Vec4f::operator *= (const Vec4f &other)
 {
-    mX *= other.mX;
-    mY *= other.mY;
-    mZ *= other.mZ;
-    mW *= other.mW;
+    X *= other.X;
+    Y *= other.Y;
+    Z *= other.Z;
+    W *= other.W;
 
     return *this;
 }
 
 Vec4f &Vec4f::operator = (const Vec4f &other)
 {
-    mX = other.mX;
-    mY = other.mY;
-    mZ = other.mZ;
-    mW = other.mW;
+    X = other.X;
+    Y = other.Y;
+    Z = other.Z;
+    W = other.W;
 
     return *this;
 }
@@ -86,44 +86,44 @@ inline Vec4f Vec4f::MulAdd(const Vec4f &add_value, const Vec4f &mul_a, const Vec
 
 inline float32 Vec4f::GetX() const
 {
-    return mX;
+    return X;
 }
 
 inline float32 Vec4f::GetY() const
 {
-    return mY;
+    return Y;
 }
 
 inline float32 Vec4f::GetZ() const
 {
-    return mZ;
+    return Z;
 }
 
 inline float32 Vec4f::GetW() const
 {
-    return mW;
+    return W;
 }
 
 
 inline void Vec4f::Load4(float32 x, float32 y, float32 z, float32 w) noexcept
 {
-    mX = x;
-    mY = y;
-    mZ = z;
-    mW = w;
+    X = x;
+    Y = y;
+    Z = z;
+    W = w;
 }
 
 inline void Vec4f::Load4_Ptr(float32 *values)
 {
-    mX = values[0];
-    mY = values[1];
-    mZ = values[2];
-    mW = values[3];
+    X = values[0];
+    Y = values[1];
+    Z = values[2];
+    W = values[3];
 }
 
 inline void Vec4f::Load1(float32 scalar) noexcept
 {
-    mX = mY = mZ = mW = scalar;
+    X = Y = Z = W = scalar;
 }
 
 #endif // #ifdef FX_NO_SIMD

@@ -6,7 +6,7 @@
 #include <arm_neon.h>
 #endif
 
-class Vec4f
+class alignas(16) Vec4f
 {
 public:
     friend class Mat4f;
@@ -62,20 +62,27 @@ public:
     {
     }
 
+    Vec4f &operator = (const float32x4_t &other)
+    {
+        mIntrin = other;
+        return *this;
+    }
+
     operator float32x4_t() const
     {
         return mIntrin;
     }
 #endif
 
-private:
+public:
 #if defined(FX_USE_NEON)
     union alignas(16) {
         float32x4_t mIntrin;
         float32 mData[4];
+        struct { float32 X, Y, Z, W; };
     };
 
 #else
-    float32 mX, mY, mZ, mW;
+    float32 X, Y, Z, W;
 #endif
 };

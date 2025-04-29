@@ -46,7 +46,7 @@ void FxPerspectiveCamera::Update()
 
     const Vec3f target = Position + Direction;
 
-    ViewMatrix.LookAt(Position, target, Vec3f(0, 1, 0));
+    ViewMatrix.LookAt(Position, target, Vec3f::Up);
 
     mRequiresUpdate = false;
 }

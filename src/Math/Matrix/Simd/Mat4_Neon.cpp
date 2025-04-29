@@ -4,6 +4,15 @@
 
 #include <Math/Mat4.hpp>
 
+const Mat4f Mat4f::Identity = Mat4f(
+    (float32 [16]){
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    }
+);
+
 float32x4_t Mat4f::MultiplyVec4f_Neon(Vec4f &vec)
 {
     float32x4_t result = vmovq_n_f32(0);

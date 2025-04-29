@@ -4,12 +4,12 @@
 #include <Math/Vec3.hpp>
 
 inline Vec3f::Vec3f(float32 x, float32 y, float32 z)
-    : mX(x), mY(y), mZ(z)
+    : X(x), Y(y), Z(z)
 {
 }
 
 inline Vec3f::Vec3f(float32 scalar)
-    : mX(scalar), mY(scalar), mZ(scalar)
+    : X(scalar), Y(scalar), Z(scalar)
 {
 }
 
@@ -17,9 +17,9 @@ inline Vec3f Vec3f::operator + (const Vec3f &other) const
 {
     Vec3f result;
 
-    result.mX = mX + other.mX;
-    result.mY = mY + other.mY;
-    result.mZ = mZ + other.mZ;
+    result.X = X + other.X;
+    result.Y = Y + other.Y;
+    result.Z = Z + other.Z;
 
     return result;
 }
@@ -28,36 +28,36 @@ inline Vec3f Vec3f::operator * (const Vec3f &other) const
 {
     Vec3f result;
 
-    result.mX = mX * other.mX;
-    result.mY = mY * other.mY;
-    result.mZ = mZ * other.mZ;
+    result.X = X * other.X;
+    result.Y = Y * other.Y;
+    result.Z = Z * other.Z;
 
     return result;
 }
 
 inline Vec3f &Vec3f::operator += (const Vec3f &other)
 {
-    mX += other.mX;
-    mY += other.mY;
-    mZ += other.mZ;
+    X += other.X;
+    Y += other.Y;
+    Z += other.Z;
 
     return *this;
 }
 
 inline Vec3f &Vec3f::operator -= (const Vec3f &other)
 {
-    mX -= other.mX;
-    mY -= other.mY;
-    mZ -= other.mZ;
+    X -= other.X;
+    Y -= other.Y;
+    Z -= other.Z;
 
     return *this;
 }
 
 inline Vec3f &Vec3f::operator *= (const Vec3f &other)
 {
-    mX *= other.mX;
-    mY *= other.mY;
-    mZ *= other.mZ;
+    X *= other.X;
+    Y *= other.Y;
+    Z *= other.Z;
 
     return *this;
 }
@@ -71,17 +71,17 @@ inline Vec3f Vec3f::MulAdd(const Vec3f &add_value, const Vec3f &mul_a, const Vec
 
 inline float32 Vec3f::GetX() const
 {
-    return mX;
+    return X;
 }
 
 inline float32 Vec3f::GetY() const
 {
-    return mY;
+    return Y;
 }
 
 inline float32 Vec3f::GetZ() const
 {
-    return mZ;
+    return Z;
 }
 
 #endif // #ifdef FX_NO_SIMD

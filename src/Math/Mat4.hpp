@@ -42,17 +42,7 @@ public:
         );
     }
 
-    static Mat4f Identity()
-    {
-        return Mat4f(
-            (float32 [16]){
-                1, 0, 0, 0,
-                0, 1, 0, 0,
-                0, 0, 1, 0,
-                0, 0, 0, 1
-            }
-        );
-    }
+    static const Mat4f Identity;
 
     static Mat4f AsTranslation(Vec3f position)
     {

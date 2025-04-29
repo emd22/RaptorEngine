@@ -181,13 +181,25 @@ int main()
             VPMatrix.Print();
         }
 
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            camera.Position.Z -= 0.01f * DeltaTime;
-            camera.RequireUpdate();
-        }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            camera.Position.Z += 0.01f * DeltaTime;
-            camera.RequireUpdate();
+            // camera.Position.Z += 0.01f * DeltaTime;
+            // camera.RequireUpdate();
+            camera.Move(Vec3f(0.0f, 0.0f, 0.01f * DeltaTime));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
+            // camera.Position.Z -= 0.01f * DeltaTime;
+            // camera.RequireUpdate();
+            camera.Move(Vec3f(0.0f, 0.0f, -0.01f * DeltaTime));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
+            // camera.Position.Z += 0.01f * DeltaTime;
+            // camera.RequireUpdate();
+            camera.Move(Vec3f(0.01f * DeltaTime, 0.0f, 0.0f));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
+            // camera.Position.Z += 0.01f * DeltaTime;
+            // camera.RequireUpdate();
+            camera.Move(Vec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
         CheckGeneralControls();

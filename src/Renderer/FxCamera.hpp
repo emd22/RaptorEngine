@@ -15,8 +15,8 @@ public:
 public:
     Vec3f Position = Vec3f(0.0f);
 
-    Mat4f ViewMatrix = Mat4f::Identity();
-    Mat4f ProjectionMatrix = Mat4f::Identity();
+    Mat4f ViewMatrix = Mat4f::Identity;
+    Mat4f ProjectionMatrix = Mat4f::Identity;
 };
 
 class FxPerspectiveCamera : public FxCamera
@@ -53,6 +53,21 @@ public:
         mAngleY += angle_y;
 
         RequireUpdate();
+    }
+
+    inline void Translate(const Vec3f &offset)
+    {
+        Position += Vec3f(offset.X, offset.Y, offset.Z);
+
+        RequireUpdate();
+    }
+
+    inline void Move(const Vec3f &offset)
+    {
+        const Vec3f forward = Direction * -offset.Z;
+        const Vec3f right = Direction.Cross(Vec3f::Up) * offset.X;
+
+        Translate(forward + right);
     }
 
     inline void SetAspectRatio(float32 aspect_ratio)

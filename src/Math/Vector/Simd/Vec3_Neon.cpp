@@ -3,6 +3,9 @@
 #include <Math/Vec3.hpp>
 #include <arm_neon.h>
 
+const Vec3f Vec3f::Up = Vec3f(0.0f, 1.0f, 0.0f);
+const Vec3f Vec3f::Zero = Vec3f(0.0f, 0.0f, 0.0f);
+
 Vec3f::Vec3f(float32 x, float32 y, float32 z)
 {
     const float32 values[4] = {x, y, z, 0};
@@ -68,7 +71,7 @@ Vec3f Vec3f::Cross(const Vec3f &other) const
 
     return Vec3f(
         ay * bz - by * az,
-        -(ax * bz - bx * az),
+        az * bx - bz * ax,
         ax * by - bx * ay
     );
 }
@@ -101,19 +104,31 @@ Vec3f Vec3f::operator * (const Vec3f &other) const
     return Vec3f(result);
 }
 
+Vec3f Vec3f::operator * (float32 scalar) const
+{
+    float32x4_t result = vmulq_n_f32(mIntrin, scalar);
+    return Vec3f(result);
+}
+
+Vec3f Vec3f::operator - () const
+{
+    float32x4_t result = vnegq_f32(mIntrin);
+    return Vec3f(result);
+}
+
 Vec3f &Vec3f::operator += (const Vec3f &other)
 {
     mIntrin = vaddq_f32(mIntrin, other);
     return *this;
 }
 
-inline Vec3f &Vec3f::operator -= (const Vec3f &other)
+Vec3f &Vec3f::operator -= (const Vec3f &other)
 {
     mIntrin = vsubq_f32(mIntrin, other);
     return *this;
 }
 
-inline Vec3f &Vec3f::operator *= (const Vec3f &other)
+Vec3f &Vec3f::operator *= (const Vec3f &other)
 {
     mIntrin = vmulq_f32(mIntrin, other);
     return *this;
