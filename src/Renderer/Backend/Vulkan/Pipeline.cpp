@@ -200,10 +200,18 @@ void GraphicsPipeline::Destroy()
 }
 
 void GraphicsPipeline::CreateLayout() {
+    VkPushConstantRange buffer_range{};
+    buffer_range.offset = 0;
+    buffer_range.size = sizeof(DrawPushConstants);
+    buffer_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+
     VkPipelineLayoutCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 0,
-        .pushConstantRangeCount = 0,
+
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &buffer_range,
     };
 
     const VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);

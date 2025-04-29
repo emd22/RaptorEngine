@@ -51,14 +51,21 @@ public:
     }
 #endif
 
-private:
+public:
 #if defined(FX_USE_NEON)
     union alignas(16) {
         float32x4_t mIntrin;
         float mData[4];
+        struct {
+            float32 X, Y, Z, mPadding0;
+        };
     };
 
 #else
-    float32 mX, mY, mZ;
+    union {
+        struct { float32 mX, mY, mZ; };
+        struct { float32 X, Y, Z; };
+    };
+
 #endif
 };

@@ -373,7 +373,7 @@ ExtensionList &FxRenderBackendVulkan::QueryInstanceExtensions(bool invalidate_pr
     return mAvailableExtensions;
 }
 
-FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline)
+FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix)
 {
     FrameData *frame = GetFrame();
 
@@ -411,6 +411,13 @@ FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline)
     };
 
     vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
+
+
+    DrawPushConstants push_constants{};
+
+    memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
+
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 
     return FrameResult::Success;
 }

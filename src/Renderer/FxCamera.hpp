@@ -58,6 +58,7 @@ public:
     inline void SetAspectRatio(float32 aspect_ratio)
     {
         mAspectRatio = aspect_ratio;
+
         UpdateProjectionMatrix();
     }
 
@@ -74,9 +75,9 @@ private:
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
 
-    float32 mFovRad = FxDegToRad(85.0f);
+    float32 mFovRad = FxDegToRad(80.0f);
 
     float32 mAspectRatio = 1.0f;
     float32 mNearPlane = 0.01f;
-    float32 mFarPlane = 1000.0f;
+    float32 mFarPlane = 100.0f;
 };

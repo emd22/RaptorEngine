@@ -49,7 +49,7 @@ public:
     /**
      * Loads a single value into the vector to all components.
      */
-    void Load1(float32 scalar) noexcept;
+    void Load1(float32 scalar);
 
     static const Vec4f Zero()
     {

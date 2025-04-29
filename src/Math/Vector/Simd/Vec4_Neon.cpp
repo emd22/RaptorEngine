@@ -8,6 +8,11 @@ void Vec4f::Load4Ptr(float32 *values)
     this->mIntrin = vld1q_f32(values);
 }
 
+void Vec4f::Load1(float32 value)
+{
+    this->mIntrin = vdupq_n_f32(value);
+}
+
 void Vec4f::Load4(float32 x, float32 y, float32 z, float32 w)
 {
     const float32 values[4] = {x, y, z, w};

@@ -3,6 +3,8 @@
 #include <Core/StaticArray.hpp>
 #include <Core/Types.hpp>
 
+#include <Math/Vec2.hpp>
+
 #include <Util/FxKey.hpp>
 
 #include <cstring>
@@ -28,6 +30,9 @@ public:
 
     static void CaptureMouse();
     static void ReleaseMouse();
+    static bool IsMouseLocked();
+
+    static Vec2f &GetMouseDelta();
 
     /**
      * Check if a key is currently pressed.
@@ -48,9 +53,11 @@ public:
      *
      * - Any occurances of this function called during the frame will return true.
      *
-     * *NOTE:* When not calling this function every tick, make sure that
-     * `UpdateControlManager()` is called before using this function. This function
-     * relies on the current tick of the control manager.
+     * *NOTE:* The current "scope" for currently pressed keys is reset or begun on
+     * a call to `FxControlManager::Update`. As well, if this function
+     * is not called within the bounds of *every* `::Update` call, then
+     * the bit that determines if the key is on tbe next frame returns false positives.
+     * This *ONLY* pertains to if the key is held down.
      */
     static bool IsKeyPressed(FxKey scancode);
 
@@ -95,18 +102,27 @@ public:
     // Update functions
     ////////////////////////////////
 
-    static void UpdateFromKeyboardEvent(SDL_Event *event);
-    static void UpdateFromMouseButtonEvent(SDL_Event *event);
-
-
-    static void UpdateControlManager();
+    static void Update();
 
 private:
+    static void UpdateFromKeyboardEvent(SDL_Event *event);
+    static void UpdateFromMouseButtonEvent(SDL_Event *event);
+    static void UpdateFromMouseMoveEvent(SDL_Event *event);
+
+    // General, used by UpdateFromKeyboardEvent and UpdateFromMouseButtonEvent
     static void UpdateButtonFromEvent(FxKey key_id, SDL_Event *event);
+
+public:
+    using WindowEventFunc = void (*)();
+
+    WindowEventFunc OnQuit;
 
 private:
     StaticArray<FxControl> mKeyMap;
     bool mMouseCaptured = false;
+
+    Vec2f mMouseDelta = Vec2f::Zero();
+    Vec2f mCapturedMousePos = Vec2f::Zero();
 
     uint8 mThisTick : 1 = 0;
 };

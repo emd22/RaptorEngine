@@ -29,7 +29,7 @@ public:
     void Init(Vec2i window_size) override;
     void Destroy() override;
 
-    FrameResult BeginFrame(GraphicsPipeline &pipeline) override;
+    FrameResult BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix) override;
     void FinishFrame(GraphicsPipeline &pipeline) override;
 
     void SelectWindow(std::shared_ptr<FxWindow> window) override

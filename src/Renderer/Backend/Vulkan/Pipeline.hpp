@@ -8,6 +8,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Math/Mat4.hpp>
+
 namespace vulkan {
 
 enum FxVertexFlags : int8
@@ -36,6 +38,12 @@ struct VertexInfo
 {
     VkVertexInputBindingDescription binding;
     StaticArray<VkVertexInputAttributeDescription> attributes;
+};
+
+
+struct DrawPushConstants
+{
+    float32 MVPMatrix[16];
 };
 
 

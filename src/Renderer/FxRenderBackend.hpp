@@ -12,7 +12,6 @@
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include <deque>
-#include <functional>
 #include <memory>
 
 #include <vma/vk_mem_alloc.h>
@@ -47,7 +46,7 @@ public:
     virtual void SelectWindow(std::shared_ptr<FxWindow> window) = 0;
     virtual std::shared_ptr<FxWindow> GetWindow() = 0;
 
-    virtual FrameResult BeginFrame(GraphicsPipeline &pipeline) = 0;
+    virtual FrameResult BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix) = 0;
     virtual void FinishFrame(GraphicsPipeline &pipeline) = 0;
 
     virtual void AddToDeletionQueue(FxDeletionObject::FuncType func)

@@ -37,25 +37,44 @@ public:
     {
         mX += other.mX;
         mY += other.mY;
+
+        return *this;
     }
 
     Vec2Base &operator -= (const Vec2Base &other)
     {
         mX -= other.mX;
         mY -= other.mY;
+
+        return *this;
     }
 
     Vec2Base &operator *= (const Vec2Base &other)
     {
         mX *= other.mX;
         mY *= other.mY;
+
+        return *this;
     }
+
+    Vec2Base operator * (float scalar) const
+    {
+        Vec2Base result = *this;
+        result.mX *= scalar;
+        result.mY *= scalar;
+        return result;
+    }
+
+    void Set(Type x, Type y) { mX = x; mY = y; }
 
     Type GetX() const { return mX; }
     Type GetY() const { return mY; }
 
     Type X() const { return GetX(); }
     Type Y() const { return GetY(); }
+
+    void SetX(Type x) { mX = x; }
+    void SetY(Type y) { mY = y; }
 
     Type Width() const { return GetX(); }
     Type Height() const { return GetY(); }
