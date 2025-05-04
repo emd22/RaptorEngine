@@ -195,6 +195,9 @@ void GraphicsPipeline::Destroy()
     if (Layout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
     }
+    if (DescriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(mDevice->Device, DescriptorSetLayout, nullptr);
+    }
 
     RenderPass.Destroy(*mDevice);
 }
@@ -206,15 +209,40 @@ void GraphicsPipeline::CreateLayout() {
     buffer_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 
+    // TODO: move descriptor set layout creation out of here
+    VkDescriptorSetLayoutBinding ubo_layout_binding {
+        .binding = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    VkDescriptorSetLayoutCreateInfo descriptor_set_layout_info {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &ubo_layout_binding,
+    };
+
+    VkResult status;
+
+    status = vkCreateDescriptorSetLayout(mDevice->Device, &descriptor_set_layout_info, nullptr, &DescriptorSetLayout);
+    if (status != VK_SUCCESS) {
+        FxPanic("Failed to create pipeline descriptor set layout", status);
+    }
+
+
     VkPipelineLayoutCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 0,
+        .setLayoutCount = 1,
+        .pSetLayouts = &DescriptorSetLayout,
 
         .pushConstantRangeCount = 1,
         .pPushConstantRanges = &buffer_range,
+
     };
 
-    const VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);
+    status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);
 
     if (status != VK_SUCCESS) {
         FxPanic("Failed to create pipeline layout", status);

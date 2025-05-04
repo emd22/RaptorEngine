@@ -2,21 +2,19 @@
 
 #include <Renderer/FxRenderBackend.hpp>
 
+#include <memory>
+
 #include "ThirdParty/vk_mem_alloc.h"
-#include "vulkan/vulkan_core.h"
+#include <vulkan/vulkan.h>
 
 #include "Vulkan/Swapchain.hpp"
 #include "Vulkan/Device.hpp"
 #include "Vulkan/FrameData.hpp"
+#include "Vulkan/FxCommandBuffer.hpp"
 
 #include <Renderer/FxWindow.hpp>
 
-#include <Renderer/Backend/Vulkan/FxCommandBuffer.hpp>
-#include <memory>
-#include <vulkan/vulkan.hpp>
-
 #include <Renderer/Backend/Vulkan/Fence.hpp>
-
 
 struct SDL_Window;
 
@@ -89,12 +87,18 @@ public:
 
         FxDeletionObject &object = mDeletionQueue.front();
 
-        Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
+        // Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
 
         const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
 
         if (immediate || is_frame_spaced) {
-            object.Func(&object);
+            if (object.IsGpuBuffer) {
+                vmaDestroyBuffer(GPUAllocator, object.Buffer, object.Allocation);
+            }
+            else {
+                object.Func(&object);
+            }
+
             mDeletionQueue.pop_front();
         }
 

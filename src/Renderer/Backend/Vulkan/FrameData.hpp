@@ -6,7 +6,15 @@
 #include "FxCommandPool.hpp"
 #include "FxCommandBuffer.hpp"
 
+#include "FxGpuBuffer.hpp"
+#include <Math/Mat4.hpp>
+
 namespace vulkan {
+
+struct UniformBufferObject
+{
+    Mat4f MvpMatrix;
+};
 
 class FrameData
 {
@@ -16,6 +24,8 @@ public:
 public:
     FxCommandPool CommandPool;
     FxCommandBuffer CommandBuffer;
+
+    FxRawGpuBuffer<UniformBufferObject> UniformBuffer;
 
     Semaphore ImageAvailable;
     Semaphore RenderFinished;

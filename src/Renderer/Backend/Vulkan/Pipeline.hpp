@@ -65,6 +65,7 @@ private:
     void CreateLayout();
 
 public:
+    VkDescriptorSetLayout DescriptorSetLayout = nullptr;
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;
 

@@ -69,7 +69,6 @@ public:
     ~PtrContainer()
     {
         delete mPtr;
-        // mPtr->Destroy();
     }
 
     PtrContainer(PtrContainer &&other)
@@ -84,6 +83,11 @@ public:
         mPtr = other.mPtr;
         other.mPtr = nullptr;
         return std::move(*this);
+    }
+
+    static PtrContainer<T> Create()
+    {
+        return PtrContainer<T>(new T());
     }
 
     PtrContainer(const PtrContainer<T> &other) = delete;

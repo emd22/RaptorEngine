@@ -7,33 +7,22 @@
 // TODO: make base versions of these components
 #include <Renderer/Backend/Vulkan/Pipeline.hpp>
 #include <Renderer/Backend/Vulkan/Swapchain.hpp>
-#include <Renderer/Backend/Vulkan/FrameData.hpp>
 
 #include <ThirdParty/vk_mem_alloc.h>
+#include <Renderer/Backend/Vulkan/FxDeletionObject.hpp>
 
 #include <deque>
 #include <memory>
 
 #include <vma/vk_mem_alloc.h>
 
-using namespace vulkan;
+// using namespace vulkan;
 
 enum class FrameResult
 {
     Success,
     GraphicsOutOfDate,
     RenderError,
-};
-
-struct FxDeletionObject
-{
-    using FuncType = void (*)(FxDeletionObject *object);
-
-    VkBuffer Buffer = VK_NULL_HANDLE;
-    VmaAllocation Allocation = VK_NULL_HANDLE;
-
-    uint32 DeletionFrameNumber = 0;
-    FuncType Func;
 };
 
 class FxRenderBackend {
@@ -48,8 +37,8 @@ public:
     virtual void SelectWindow(std::shared_ptr<FxWindow> window) = 0;
     virtual std::shared_ptr<FxWindow> GetWindow() = 0;
 
-    virtual FrameResult BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix) = 0;
-    virtual void FinishFrame(GraphicsPipeline &pipeline) = 0;
+    virtual FrameResult BeginFrame(vulkan::GraphicsPipeline &pipeline, Mat4f &MVPMatrix) = 0;
+    virtual void FinishFrame(vulkan::GraphicsPipeline &pipeline) = 0;
 
     virtual void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
@@ -61,7 +50,7 @@ public:
         });
     }
 
-    virtual void AddGPUBufferToDeletionQueue(FxDeletionObject::FuncType func, VkBuffer buffer, VmaAllocation allocation)
+    virtual void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
         Log::Info("Adding GPUBuffer to deletion queue at frame %d", mInternalFrameCounter);
 
@@ -73,7 +62,7 @@ public:
 
         mDeletionQueue.push_back(FxDeletionObject {
             .DeletionFrameNumber = mInternalFrameCounter + DeletionFrameSpacing,
-            .Func = func,
+            .IsGpuBuffer = true,
             .Allocation = allocation,
             .Buffer = buffer,
         });

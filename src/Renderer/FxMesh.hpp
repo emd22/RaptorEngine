@@ -10,7 +10,6 @@
 using namespace vulkan;
 
 
-
 class FxMesh
 {
 public:

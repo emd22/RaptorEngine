@@ -1,12 +1,8 @@
 #pragma once
 
 #include "Core/Types.hpp"
-#include "FxAssetQueueItem.hpp"
-
 #include "FxModel.hpp"
 #include "Asset/FxAssetQueue.hpp"
-
-
 
 #include <thread>
 
@@ -15,7 +11,7 @@ class FxAssetManager
 {
 public:
     void Start(int32 thread_count);
-    void ShutDown();
+    void Shutdown();
     void ThreadUpdate();
 
     static FxAssetManager &GetInstance();
@@ -26,11 +22,11 @@ public:
 
     ~FxAssetManager()
     {
-        ShutDown();
+        Shutdown();
     }
 
 private:
-    void NotifyAssetOnLoaded(FxAssetQueueItem &item);
+    // void NotifyAssetOnLoad(FxAssetQueueItem &item);
 
 private:
     FxAssetQueue mLoadQueue;

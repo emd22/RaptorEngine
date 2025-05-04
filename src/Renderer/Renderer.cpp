@@ -1,18 +1,17 @@
 #include "Renderer.hpp"
 #include "Core/Defines.hpp"
 
-#include <Renderer/FxRenderBackend.hpp>
 #include <Core/FxPanic.hpp>
 
 FX_SET_MODULE_NAME("Renderer")
 
 FxRenderBackend *Renderer;
-FxRenderBackendVulkan *RendererVulkan;
+vulkan::FxRenderBackendVulkan *RendererVulkan;
 
 void SetRendererBackend(FxRenderBackend *backend)
 {
     Renderer = backend;
-    RendererVulkan = static_cast<FxRenderBackendVulkan *>(Renderer);
+    RendererVulkan = static_cast<vulkan::FxRenderBackendVulkan *>(Renderer);
 }
 
 void AssertRendererExists()

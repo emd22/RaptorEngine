@@ -1,8 +1,7 @@
 #include "Core/Defines.hpp"
-#include "Renderer/Backend/FxRenderBackendVulkan.hpp"
-#include "Renderer/Backend/Vulkan/Shader.hpp"
-#include "Renderer/Backend/Vulkan/Shader.hpp"
+#include "Renderer/Renderer.hpp"
 #include "Renderer/Backend/Vulkan/ShaderList.hpp"
+#include <Renderer/Backend/Vulkan/Shader.hpp>
 #include "Renderer/FxCamera.hpp"
 
 #define SDL_DISABLE_OLD_NAMES
@@ -93,13 +92,7 @@ int main()
     asset_manager.Start(2);
 
     // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    PtrContainer<FxModel> new_model = FxAssetManager::NewModel();
-
-    new_model->OnLoaded =
-        [](FxBaseAsset *model) {
-            Log::Info("This was loaded!", 0);
-        };
-
+    PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
     FxPerspectiveCamera camera;
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
@@ -161,7 +154,7 @@ int main()
         LastTick = CurrentTick;
     }
 
-    asset_manager.ShutDown();
+    asset_manager.Shutdown();
 
     return 0;
 }

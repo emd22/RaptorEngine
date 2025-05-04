@@ -25,7 +25,7 @@ void FxAssetManager::Start(int32 thread_count)
     }
 }
 
-void FxAssetManager::ShutDown()
+void FxAssetManager::Shutdown()
 {
     if (mActive == false) {
         return;
@@ -42,8 +42,7 @@ void FxAssetManager::ShutDown()
 
 PtrContainer<FxModel> FxAssetManager::NewModel()
 {
-    FxModel *model = new FxModel;
-    return PtrContainer<FxModel>(model);
+    return PtrContainer<FxModel>::Create();
 }
 
 PtrContainer<FxModel> FxAssetManager::LoadModel(std::string path)

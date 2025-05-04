@@ -1,16 +1,14 @@
 #pragma once
 
 #include "Core/Util.hpp"
-#include "Renderer/FxRenderBackend.hpp"
-#include "Renderer/Renderer.hpp"
-#include "vulkan/vulkan_core.h"
-#include <ThirdParty/vk_mem_alloc.h>
 #include <Core/Types.hpp>
-#include <cstring>
-#include <vulkan/vulkan.h>
-
 #include <Core/FxPanic.hpp>
 
+#include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
+#include "Fwd/Fwd_AddToDeletionQueue.hpp"
+#include "Fwd/Fwd_GetGpuAllocator.hpp"
+
+#include <cstring>
 #include <memory.h>
 
 namespace vulkan {
@@ -31,70 +29,43 @@ class FxGpuBufferMapContext
 {
 public:
 
-    FxGpuBufferMapContext(FxGpuBuffer<ElementType> *buffer)
+    FxGpuBufferMapContext(FxRawGpuBuffer<ElementType> *buffer)
         : mGpuBuffer(buffer)
     {
-        Map();
+        mGpuBuffer->Map();
     }
 
-    FxGpuBufferMapContext(FxRawGpuBuffer<ElementType> *buffer)
-        : mRawGpuBuffer(buffer)
+    /** Returns the raw pointer representation of the mapped data. */
+    operator void *()
     {
-        Map();
-    }
-
-    operator void *() const
-    {
-        return MappedBuffer;
-    }
-
-    void UnMap()
-    {
-        VmaAllocation allocation = GetAllocation();
-
-        if (MappedBuffer != nullptr) {
-            vmaUnmapMemory(RendererVulkan->GPUAllocator, allocation);
+        if (!mGpuBuffer->MappedBuffer) {
+            return nullptr;
         }
-        MappedBuffer = nullptr;
+
+        return mGpuBuffer->MappedBuffer;
+    }
+
+    /** Returns the pointer representation of the mapped data. */
+    ElementType *GetPtr() const
+    {
+        return static_cast<ElementType *>(this);
     }
 
     ~FxGpuBufferMapContext()
     {
-        UnMap();
+        mGpuBuffer->UnMap();
+    }
+
+    /**
+     * Manually unmaps the buffer.
+     */
+    void UnMap() const
+    {
+        mGpuBuffer->UnMap();
     }
 
 private:
-    VmaAllocation GetAllocation()
-    {
-        if (mGpuBuffer != nullptr) {
-            return mGpuBuffer->Allocation;
-        }
-        else if (mRawGpuBuffer != nullptr) {
-            return mRawGpuBuffer->Allocation;
-        }
-
-        FxPanic_("GPUBuffer", "No GPU buffer or raw GPU buffer available to map!", 0);
-        return nullptr;
-    }
-
-    void Map()
-    {
-        VmaAllocation allocation = GetAllocation();
-
-        const VkResult status = vmaMapMemory(RendererVulkan->GPUAllocator, allocation, &MappedBuffer);
-
-        if (status != VK_SUCCESS) {
-            Log::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", EnumToInt(mGpuBuffer->Usage));
-            return;
-        }
-    }
-
-public:
-    void *MappedBuffer = nullptr;
-
-private:
-    FxGpuBuffer<ElementType> *mGpuBuffer = nullptr;
-    FxRawGpuBuffer<ElementType> *mRawGpuBuffer = nullptr;
+    FxRawGpuBuffer<ElementType> *mGpuBuffer = nullptr;
 };
 
 
@@ -117,12 +88,14 @@ public:
     void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage)
     {
         Size = element_count;
-        const uint64 buffer_size = ElementSize * element_count;
+        mUsageFlags = buffer_usage;
+
+        const uint64 buffer_size = ElementSize * Size;
 
         const VkBufferCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = buffer_size,
-            .usage = buffer_usage,
+            .usage = mUsageFlags,
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .flags = 0
         };
@@ -132,7 +105,7 @@ public:
         };
 
         const VkResult status = vmaCreateBuffer(
-            RendererVulkan->GPUAllocator,
+            Fx_Fwd_GetGpuAllocator(),
             &create_info,
             &alloc_create_info,
             &Buffer,
@@ -159,18 +132,52 @@ public:
         return FxGpuBufferMapContext<ElementType>(this);
     }
 
-    void Destroy()
+    void Map()
     {
-        if (!Initialized || Allocation == nullptr || Buffer == nullptr) {
+        if (IsMapped()) {
+            Log::Warning("Buffer %p is already mapped!", Buffer);
             return;
         }
 
-        Renderer->AddGPUBufferToDeletionQueue([](FxDeletionObject *object) {
-            vmaDestroyBuffer(RendererVulkan->GPUAllocator, object->Buffer, object->Allocation);
-            Log::Debug("Deleted Raw VMA buffer");
-        }, this->Buffer, this->Allocation);
+        const VkResult status = vmaMapMemory(Fx_Fwd_GetGpuAllocator(), Allocation, &MappedBuffer);
 
-        Initialized = false;
+        if (status != VK_SUCCESS) {
+            Log::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", mUsageFlags);
+            return;
+        }
+    }
+
+    bool IsMapped() const
+    {
+        return MappedBuffer != nullptr;
+    }
+
+    void UnMap()
+    {
+        if (!IsMapped()) {
+            return;
+        }
+
+        vmaUnmapMemory(Fx_Fwd_GetGpuAllocator(), Allocation);
+        MappedBuffer = nullptr;
+    }
+
+    void Upload(StaticArray<ElementType> &data)
+    {
+        auto buffer = GetMappedContext();
+        memcpy(buffer, data.Data, data.GetSizeInBytes());
+    }
+
+    void Destroy()
+    {
+        if (!(Initialized.load()) || Allocation == nullptr || Buffer == nullptr) {
+            return;
+        }
+
+        Fx_Fwd_AddGpuBufferToDeletionQueue(this->Buffer, this->Allocation);
+
+        Initialized.store(false);
+        Size = 0;
     }
 
     ~FxRawGpuBuffer()
@@ -182,10 +189,14 @@ public:
     VkBuffer Buffer = nullptr;
     VmaAllocation Allocation = nullptr;
 
-    std::atomic_bool Initialized = false;
+    void *MappedBuffer = nullptr;
 
+    std::atomic_bool Initialized = false;
     uint64 Size = 0;
+private:
+    VkBufferUsageFlags mUsageFlags = 0;
 };
+
 
 /**
  * A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
@@ -208,19 +219,12 @@ public:
 
         FxRawGpuBuffer<ElementType> staging_buffer;
         staging_buffer.Create(this->Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        {
-            auto context = staging_buffer.GetMappedContext();
-            memcpy(context, data.Data, buffer_size);
-        }
+        // Upload the data to the staging buffer
+        staging_buffer.Upload(data);
 
         this->Create(this->Size, EnumToInt(Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-        Log::Debug(
-            "thread: %lu",
-            std::this_thread::get_id()
-        );
-        RendererVulkan->SubmitUploadCmd([&](FxCommandBuffer &cmd) {
+        Fx_Fwd_SubmitUploadCmd([&](FxCommandBuffer &cmd) {
             VkBufferCopy copy = {
                 .dstOffset = 0,
                 .srcOffset = 0,

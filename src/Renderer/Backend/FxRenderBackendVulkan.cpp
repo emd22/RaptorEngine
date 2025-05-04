@@ -597,15 +597,15 @@ void FxRenderBackendVulkan::Destroy()
 {
     GetDevice()->WaitForIdle();
 
+    DestroyUploadContext();
+    DestroyFrames();
+
     while (!mDeletionQueue.empty()) {
         ProcessDeletionQueue(true);
         // insert a small delay to avoid the processor spinning out while
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
-
-    DestroyUploadContext();
-    DestroyFrames();
 
     GetDevice()->WaitForIdle();
 

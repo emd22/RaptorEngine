@@ -1,6 +1,5 @@
 #include "FxGltfLoader.hpp"
 #include "Asset/FxBaseAsset.hpp"
-#include "Core/FxPanic.hpp"
 #include "Renderer/FxMesh.hpp"
 
 #include <ThirdParty/cgltf.h>
