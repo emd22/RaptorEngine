@@ -29,8 +29,8 @@ public:
 // private:
     void Destroy() override
     {
-        FxBaseAsset::Destroy();
         Log::Info("Destroy FxModel (%lu meshes)", Meshes.Size);
+
         for (FxMesh *mesh : Meshes)
         {
             mesh->Destroy();
@@ -39,6 +39,7 @@ public:
         Meshes.Free();
 
         mModelReady = false;
+        IsLoaded = false;
     }
 
 public:

@@ -14,13 +14,10 @@ protected:
     {
     }
 
-    virtual void Destroy()
-    {
-        IsLoaded = false;
-    }
+    virtual void Destroy() = 0;
+
     virtual ~FxBaseAsset()
     {
-        Destroy();
     }
 
 public:

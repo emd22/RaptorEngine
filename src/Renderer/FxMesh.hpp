@@ -3,7 +3,7 @@
 #include "Renderer/Backend/Vulkan/FrameData.hpp"
 #include "Renderer/Renderer.hpp"
 #include "vulkan/vulkan_core.h"
-#include <Renderer/Backend/Vulkan/GPUBuffer.hpp>
+#include <Renderer/Backend/Vulkan/FxGpuBuffer.hpp>
 #include <atomic>
 
 // TEMP
@@ -114,8 +114,8 @@ public:
         return (mVertexBuffer.Initialized && mIndexBuffer.Initialized);
     }
 
-    FxStagedGPUBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
-    FxStagedGPUBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
+    FxGpuBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
+    FxGpuBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
 
     void Render()
     {
@@ -148,6 +148,6 @@ public:
     std::atomic_bool IsReady = std::atomic_bool(false);
 
 protected:
-    FxStagedGPUBuffer<VertexType> mVertexBuffer;
-    FxStagedGPUBuffer<uint32> mIndexBuffer;
+    FxGpuBuffer<VertexType> mVertexBuffer;
+    FxGpuBuffer<uint32> mIndexBuffer;
 };

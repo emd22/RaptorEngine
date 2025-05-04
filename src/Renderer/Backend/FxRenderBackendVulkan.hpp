@@ -99,7 +99,6 @@ public:
         }
 
         mInDeletionQueue.store(false);
-        mInDeletionQueue.notify_one();
     }
 
 private:

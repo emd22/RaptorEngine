@@ -15,12 +15,11 @@
 
 namespace vulkan {
 
+template <typename ElementType>
+class FxRawGpuBuffer;
 
 template <typename ElementType>
-class FxRawGPUBuffer;
-
-template <typename ElementType>
-class FxStagedGPUBuffer;
+class FxGpuBuffer;
 
 enum class FxBufferUsageType {
     Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -28,18 +27,18 @@ enum class FxBufferUsageType {
 };
 
 template <typename ElementType>
-class FxGPUBufferMapContext
+class FxGpuBufferMapContext
 {
 public:
 
-    FxGPUBufferMapContext(FxStagedGPUBuffer<ElementType> *buffer)
-        : mGPUBuffer(buffer)
+    FxGpuBufferMapContext(FxGpuBuffer<ElementType> *buffer)
+        : mGpuBuffer(buffer)
     {
         Map();
     }
 
-    FxGPUBufferMapContext(FxRawGPUBuffer<ElementType> *buffer)
-        : mRawGPUBuffer(buffer)
+    FxGpuBufferMapContext(FxRawGpuBuffer<ElementType> *buffer)
+        : mRawGpuBuffer(buffer)
     {
         Map();
     }
@@ -59,7 +58,7 @@ public:
         MappedBuffer = nullptr;
     }
 
-    ~FxGPUBufferMapContext()
+    ~FxGpuBufferMapContext()
     {
         UnMap();
     }
@@ -67,11 +66,11 @@ public:
 private:
     VmaAllocation GetAllocation()
     {
-        if (mGPUBuffer != nullptr) {
-            return mGPUBuffer->Allocation;
+        if (mGpuBuffer != nullptr) {
+            return mGpuBuffer->Allocation;
         }
-        else if (mRawGPUBuffer != nullptr) {
-            return mRawGPUBuffer->Allocation;
+        else if (mRawGpuBuffer != nullptr) {
+            return mRawGpuBuffer->Allocation;
         }
 
         FxPanic_("GPUBuffer", "No GPU buffer or raw GPU buffer available to map!", 0);
@@ -85,7 +84,7 @@ private:
         const VkResult status = vmaMapMemory(RendererVulkan->GPUAllocator, allocation, &MappedBuffer);
 
         if (status != VK_SUCCESS) {
-            Log::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", EnumToInt(mGPUBuffer->Usage));
+            Log::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", EnumToInt(mGpuBuffer->Usage));
             return;
         }
     }
@@ -94,23 +93,26 @@ public:
     void *MappedBuffer = nullptr;
 
 private:
-    FxStagedGPUBuffer<ElementType> *mGPUBuffer = nullptr;
-    FxRawGPUBuffer<ElementType> *mRawGPUBuffer = nullptr;
+    FxGpuBuffer<ElementType> *mGpuBuffer = nullptr;
+    FxRawGpuBuffer<ElementType> *mRawGpuBuffer = nullptr;
 };
 
 
+/**
+ * Provides a GPU buffer that can be created with more complex parameters without staging.
+ */
 template <typename ElementType>
-class FxRawGPUBuffer
+class FxRawGpuBuffer
 {
 public:
     const int32 ElementSize = sizeof(ElementType);
 
 public:
-    FxRawGPUBuffer() = default;
+    FxRawGpuBuffer() = default;
 
-    FxRawGPUBuffer(FxRawGPUBuffer<ElementType> &other) = delete;
+    FxRawGpuBuffer(FxRawGpuBuffer<ElementType> &other) = delete;
 
-    FxRawGPUBuffer operator = (FxRawGPUBuffer<ElementType> &other) = delete;
+    FxRawGpuBuffer operator = (FxRawGpuBuffer<ElementType> &other) = delete;
 
     void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage)
     {
@@ -152,9 +154,9 @@ public:
      *
      * To get the mapped buffer, either use `value.MappedBuffer`, or `value` when using the value as a pointer.
      */
-    FxGPUBufferMapContext<ElementType> GetMappedContext()
+    FxGpuBufferMapContext<ElementType> GetMappedContext()
     {
-        return FxGPUBufferMapContext<ElementType>(this);
+        return FxGpuBufferMapContext<ElementType>(this);
     }
 
     void Destroy()
@@ -171,7 +173,7 @@ public:
         Initialized = false;
     }
 
-    ~FxRawGPUBuffer()
+    ~FxRawGpuBuffer()
     {
         Destroy();
     }
@@ -185,13 +187,17 @@ public:
     uint64 Size = 0;
 };
 
+/**
+ * A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
+ * buffer type.
+ */
 template <typename ElementType>
-class FxStagedGPUBuffer : public FxRawGPUBuffer<ElementType>
+class FxGpuBuffer : public FxRawGpuBuffer<ElementType>
 {
 private:
-    using FxRawGPUBuffer<ElementType>::Create;
+    using FxRawGpuBuffer<ElementType>::Create;
 public:
-    FxStagedGPUBuffer() = default;
+    FxGpuBuffer() = default;
 
     void Create(FxBufferUsageType usage, StaticArray<ElementType> &data)
     {
@@ -200,7 +206,7 @@ public:
 
         const uint64_t buffer_size = data.Size * sizeof(ElementType);
 
-        FxRawGPUBuffer<ElementType> staging_buffer;
+        FxRawGpuBuffer<ElementType> staging_buffer;
         staging_buffer.Create(this->Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         {
@@ -222,6 +228,8 @@ public:
             };
             vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
         });
+
+        staging_buffer.Destroy();
     }
 public:
     FxBufferUsageType Usage;
