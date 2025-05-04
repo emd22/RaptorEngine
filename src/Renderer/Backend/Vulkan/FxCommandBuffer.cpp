@@ -1,4 +1,4 @@
-#include "CommandBuffer.hpp"
+#include "FxCommandBuffer.hpp"
 #include <Core/FxPanic.hpp>
 
 #include "Device.hpp"
@@ -9,7 +9,7 @@ namespace vulkan {
 
 FX_SET_MODULE_NAME("CommandBuffer")
 
-void CommandBuffer::Create(CommandPool *pool)
+void FxCommandBuffer::Create(FxCommandPool *pool)
 {
     mCommandPool = pool;
 
@@ -27,18 +27,19 @@ void CommandBuffer::Create(CommandPool *pool)
         FxPanic("Could not allocate command buffer", status);
     }
 
+    Log::Debug("Creating Command buffer 0x%llx from queue family %d", CommandBuffer, pool->QueueFamilyIndex);
 
     mInitialized = true;
 }
 
-inline void CommandBuffer::CheckInitialized() const
+inline void FxCommandBuffer::CheckInitialized() const
 {
     if (!IsInitialized()) {
         FxPanic("Command buffer has not been initialized!", 0);
     }
 }
 
-void CommandBuffer::Record()
+void FxCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
 {
     CheckInitialized();
 
@@ -54,14 +55,14 @@ void CommandBuffer::Record()
     }
 }
 
-void CommandBuffer::Reset()
+void FxCommandBuffer::Reset()
 {
     CheckInitialized();
 
     vkResetCommandBuffer(CommandBuffer, 0);
 }
 
-void CommandBuffer::End()
+void FxCommandBuffer::End()
 {
     CheckInitialized();
 
@@ -71,7 +72,7 @@ void CommandBuffer::End()
     }
 }
 
-void CommandBuffer::Destroy()
+void FxCommandBuffer::Destroy()
 {
     vkFreeCommandBuffers(mDevice->Device, mCommandPool->CommandPool, 1, &CommandBuffer);
 }

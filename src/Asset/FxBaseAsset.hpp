@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <atomic>
 
 /**
@@ -15,9 +14,13 @@ protected:
     {
     }
 
-    virtual void Destroy() = 0;
+    virtual void Destroy()
+    {
+        IsLoaded = false;
+    }
     virtual ~FxBaseAsset()
     {
+        Destroy();
     }
 
 public:

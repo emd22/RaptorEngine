@@ -121,18 +121,9 @@ void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
         .oldSwapchain = mSwapchain,
     };
 
-    if (mDevice->mQueueFamilies.IsGraphicsAlsoPresent()) {
-        create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        create_info.queueFamilyIndexCount = 0;
-        create_info.pQueueFamilyIndices = nullptr;
-    }
-    else {
-        create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        create_info.queueFamilyIndexCount = 2;
-
-        const auto indices = mDevice->mQueueFamilies.GetQueueIndexList();
-        create_info.pQueueFamilyIndices = indices.data();
-    }
+    create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info.queueFamilyIndexCount = 0;
+    create_info.pQueueFamilyIndices = nullptr;
 
     const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
 

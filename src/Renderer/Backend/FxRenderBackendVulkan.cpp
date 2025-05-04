@@ -8,8 +8,8 @@
 #include "Renderer/Backend/Vulkan/Fence.hpp"
 #include "Renderer/Backend/Vulkan/Pipeline.hpp"
 #include "Renderer/Backend/Vulkan/Semaphore.hpp"
-#include "Vulkan/CommandPool.hpp"
-#include "Vulkan/CommandBuffer.hpp"
+#include "Vulkan/FxCommandPool.hpp"
+#include "Vulkan/FxCommandBuffer.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -87,8 +87,25 @@ void FxRenderBackendVulkan::Init(Vec2i window_size)
     Swapchain.Init(window_size, mWindowSurface, &mDevice);
 
     InitFrames();
+    InitUploadContext();
 
     Initialized = true;
+}
+
+void FxRenderBackendVulkan::InitUploadContext()
+{
+    UploadContext.CommandPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
+    UploadContext.CommandBuffer.Create(&UploadContext.CommandPool);
+
+    UploadContext.UploadFence.Create(GetDevice());
+    UploadContext.UploadFence.Reset();
+}
+
+void FxRenderBackendVulkan::DestroyUploadContext()
+{
+    UploadContext.UploadFence.Destroy();
+    UploadContext.CommandBuffer.Destroy();
+    UploadContext.CommandPool.Destroy();
 }
 
 void FxRenderBackendVulkan::InitFrames()
@@ -109,6 +126,8 @@ void FxRenderBackendVulkan::InitFrames()
 
 void FxRenderBackendVulkan::DestroyFrames()
 {
+    vkQueueWaitIdle(GetDevice()->GraphicsQueue);
+
     for (auto &frame : Frames) {
         frame.CommandBuffer.Destroy();
         frame.CommandPool.Destroy();
@@ -159,10 +178,10 @@ void FxRenderBackendVulkan::InitVulkan()
         FxPanic("Missing required instance extensions", 0);
     }
 
-    auto validation_layers = GetAvailableValidationLayers();
-    for (auto &layer : validation_layers) {
-        Log::Debug("Layer: %s", layer.layerName);
-    }
+    // auto validation_layers = GetAvailableValidationLayers();
+    // for (auto &layer : validation_layers) {
+    //     Log::Debug("Layer: %s", layer.layerName);
+    // }
 
     std::vector<const char*> requested_validation_layers = {
         "VK_LAYER_KHRONOS_validation",
@@ -209,7 +228,7 @@ uint32 DebugMessageCallback(
         Log::Warning(fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
-        Log::Info(fmt, message);
+        // Log::Info(fmt, message);
     }
     else {
         Log::Debug(fmt, message);
@@ -344,7 +363,6 @@ ExtensionList &FxRenderBackendVulkan::QueryInstanceExtensions(bool invalidate_pr
         }
     }
 
-
     // Get the count of the current extensions
     uint32_t extension_count = 0;
     VkResult result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
@@ -363,14 +381,47 @@ ExtensionList &FxRenderBackendVulkan::QueryInstanceExtensions(bool invalidate_pr
         throw std::runtime_error("Could not query instance extensions!");
     }
 
-    std::cout << "=== Available Instance Extensions (" << extension_count << ") ===\n";
+    // std::cout << "=== Available Instance Extensions (" << extension_count << ") ===\n";
 
-    for (uint32_t i = 0; i < extension_count; ++i) {
-        const VkExtensionProperties& extension = mAvailableExtensions[i];
-        std::cout << extension.extensionName << " : " << extension.specVersion << "\n";
-    }
+    // for (uint32_t i = 0; i < extension_count; ++i) {
+    //     const VkExtensionProperties& extension = mAvailableExtensions[i];
+    //     std::cout << extension.extensionName << " : " << extension.specVersion << "\n";
+    // }
 
     return mAvailableExtensions;
+}
+
+void FxRenderBackendVulkan::SubmitUploadCmd(FxRenderBackendVulkan::UploadFunc upload_func)
+{
+    FxCommandBuffer &cmd = UploadContext.CommandBuffer;
+
+    cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+    upload_func(cmd);
+
+    cmd.End();
+
+    const VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+
+        .commandBufferCount = 1,
+        .pCommandBuffers = &cmd.CommandBuffer,
+    };
+
+    Log::Debug(
+        "cmd thread: %lu",
+        std::this_thread::get_id()
+    );
+
+    VkTry(
+        vkQueueSubmit(GetDevice()->TransferQueue, 1, &submit_info, UploadContext.UploadFence.Fence),
+        "Error submitting upload buffer"
+    );
+
+    UploadContext.UploadFence.WaitFor();
+    UploadContext.UploadFence.Reset();
+
+    UploadContext.CommandPool.Reset();
 }
 
 FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix)
@@ -546,28 +597,29 @@ void FxRenderBackendVulkan::Destroy()
 {
     GetDevice()->WaitForIdle();
 
+    DestroyUploadContext();
+    DestroyFrames();
+
+    mInDeletionQueue.store(true);
     while (!mDeletionQueue.empty()) {
         ProcessDeletionQueue(true);
         // insert a small delay to avoid the processor spinning out while
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
+    mInDeletionQueue.store(false);
 
     GetDevice()->WaitForIdle();
 
-    DestroyGPUAllocator();
-
     Swapchain.Destroy();
-    DestroyFrames();
+    DestroyGPUAllocator();
 
     if (mWindowSurface) {
         vkDestroySurfaceKHR(mInstance, mWindowSurface, nullptr);
     }
 
     GetDevice()->Destroy();
-
     DestroyDebugMessenger(mInstance, mDebugMessenger);
-
     vkDestroyInstance(mInstance, nullptr);
 
     Initialized = false;

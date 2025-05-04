@@ -1,6 +1,5 @@
 #include "FxControls.hpp"
 #include "Util/FxKey.hpp"
-#include "sdl3/3.2.8/include/SDL3/SDL_mouse.h"
 
 #include <Renderer/Renderer.hpp>
 

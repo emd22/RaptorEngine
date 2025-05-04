@@ -36,6 +36,7 @@ Vec4f Mat4f::MultiplyVec4f(Vec4f &vec)
     return Vec4f(MultiplyVec4f_Neon(vec));
 }
 
+
 #define MulVecFma(creg_, breg_) \
     creg_ = vfmaq_laneq_f32(creg_, a0, breg_, 0); \
     creg_ = vfmaq_laneq_f32(creg_, a1, breg_, 1); \
@@ -43,7 +44,7 @@ Vec4f Mat4f::MultiplyVec4f(Vec4f &vec)
     creg_ = vfmaq_laneq_f32(creg_, a3, breg_, 3);
 
 
-Mat4f Mat4f::Multiply(Mat4f &other)
+Mat4f Mat4f::operator *(const Mat4f &other)
 {
     // Since we will be reusing a[0-3] a lot, this ensures the values
     // are loaded into the q registers.

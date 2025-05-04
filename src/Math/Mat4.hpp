@@ -48,10 +48,10 @@ public:
     {
         return Mat4f(
             (float32 [16]){
-                1, 0, 0, position.GetX(),
-                0, 1, 0, position.GetY(),
-                0, 0, 1, position.GetZ(),
-                0, 0, 0, 1
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                position.X, position.Y, position.Z, 1
             }
         );
     }
@@ -98,6 +98,8 @@ public:
         Columns[3].Load4Ptr(data + 12);
     }
 
+    Mat4f operator * (const Mat4f &other);
+
     void Print()
     {
         printf("\t=== Matrix ===\n");
@@ -108,7 +110,7 @@ public:
         }
     }
 
-    Mat4f Multiply(Mat4f &other);
+    // Mat4f Multiply(const Mat4f &other);
     Vec4f MultiplyVec4f(Vec4f &vec);
 
 private:

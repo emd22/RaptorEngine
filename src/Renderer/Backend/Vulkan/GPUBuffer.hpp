@@ -15,15 +15,31 @@
 
 namespace vulkan {
 
+
 template <typename ElementType>
-class FxGPUBuffer;
+class FxRawGPUBuffer;
+
+template <typename ElementType>
+class FxStagedGPUBuffer;
+
+enum class FxBufferUsageType {
+    Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+    Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+};
 
 template <typename ElementType>
 class FxGPUBufferMapContext
 {
 public:
-    FxGPUBufferMapContext(FxGPUBuffer<ElementType> *buffer)
+
+    FxGPUBufferMapContext(FxStagedGPUBuffer<ElementType> *buffer)
         : mGPUBuffer(buffer)
+    {
+        Map();
+    }
+
+    FxGPUBufferMapContext(FxRawGPUBuffer<ElementType> *buffer)
+        : mRawGPUBuffer(buffer)
     {
         Map();
     }
@@ -35,9 +51,12 @@ public:
 
     void UnMap()
     {
+        VmaAllocation allocation = GetAllocation();
+
         if (MappedBuffer != nullptr) {
-            vmaUnmapMemory(RendererVulkan->GPUAllocator, mGPUBuffer->Allocation);
+            vmaUnmapMemory(RendererVulkan->GPUAllocator, allocation);
         }
+        MappedBuffer = nullptr;
     }
 
     ~FxGPUBufferMapContext()
@@ -46,9 +65,24 @@ public:
     }
 
 private:
+    VmaAllocation GetAllocation()
+    {
+        if (mGPUBuffer != nullptr) {
+            return mGPUBuffer->Allocation;
+        }
+        else if (mRawGPUBuffer != nullptr) {
+            return mRawGPUBuffer->Allocation;
+        }
+
+        FxPanic_("GPUBuffer", "No GPU buffer or raw GPU buffer available to map!", 0);
+        return nullptr;
+    }
+
     void Map()
     {
-        const VkResult status = vmaMapMemory(RendererVulkan->GPUAllocator, mGPUBuffer->Allocation, &MappedBuffer);
+        VmaAllocation allocation = GetAllocation();
+
+        const VkResult status = vmaMapMemory(RendererVulkan->GPUAllocator, allocation, &MappedBuffer);
 
         if (status != VK_SUCCESS) {
             Log::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", EnumToInt(mGPUBuffer->Usage));
@@ -60,80 +94,39 @@ public:
     void *MappedBuffer = nullptr;
 
 private:
-    FxGPUBuffer<ElementType> *mGPUBuffer = nullptr;
+    FxStagedGPUBuffer<ElementType> *mGPUBuffer = nullptr;
+    FxRawGPUBuffer<ElementType> *mRawGPUBuffer = nullptr;
 };
 
 
 template <typename ElementType>
-class FxGPUBuffer
+class FxRawGPUBuffer
 {
+public:
+    const int32 ElementSize = sizeof(ElementType);
 
 public:
-    enum class UsageType {
-        Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-    };
+    FxRawGPUBuffer() = default;
 
+    FxRawGPUBuffer(FxRawGPUBuffer<ElementType> &other) = delete;
 
-    FxGPUBuffer() = default;
+    FxRawGPUBuffer operator = (FxRawGPUBuffer<ElementType> &other) = delete;
 
-    // FxGPUBuffer& operator=(const FxGPUBuffer& other)
-    // {
-    //     Buffer = other.Buffer;
-    //     Allocation = other.Allocation;
-    //     Usage = other.Usage;
-    //     Size = other.Size;
-
-    //     Initialized = other.Initialized.load();
-
-    //     return *this;
-    // }
-
-    // FxGPUBuffer(FxGPUBuffer &&other)
-    // {
-    //     Buffer = other.Buffer;
-    //     Allocation = other.Allocation;
-    //     Usage = other.Usage;
-    //     Size = other.Size;
-    //     Initialized = other.Initialized.load();
-
-    //     other.Initialized = false;
-
-    //     other.Buffer = nullptr;
-    //     other.Allocation = nullptr;
-    // }
-
-    // FxGPUBuffer &operator = (FxGPUBuffer &&other)
-    // {
-    //     Buffer = other.Buffer;
-    //     Allocation = other.Allocation;
-    //     Usage = other.Usage;
-    //     Size = other.Size;
-    //     Initialized = other.Initialized.load();
-
-    //     other.Initialized = false;
-    //     other.Buffer = nullptr;
-    //     other.Allocation = nullptr;
-
-    //     return *this;
-    // }
-
-    void Create(UsageType usage, uint64 element_count)
+    void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage)
     {
         Size = element_count;
-        Usage = usage;
-
         const uint64 buffer_size = ElementSize * element_count;
 
         const VkBufferCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = buffer_size,
-            .usage = (VkBufferUsageFlags)EnumToInt(usage),
+            .usage = buffer_usage,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .flags = 0
         };
 
         const VmaAllocationCreateInfo alloc_create_info = {
-            .usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+            .usage = memory_usage,
         };
 
         const VkResult status = vmaCreateBuffer(
@@ -146,12 +139,12 @@ public:
         );
 
         if (status != VK_SUCCESS) {
-            FxPanic_("GPUBuffer", "Error allocating GPU buffer!", status);
+            FxPanic_("GPUBuffer", "Error allocating staging buffer!", status);
         }
 
-        RendererVulkan->GetDevice()->WaitForIdle(); // XXX: REMOVE
         Initialized = true;
     }
+
 
     /**
      * Creates a new context that automatically maps and unmaps memory at the
@@ -159,58 +152,26 @@ public:
      *
      * To get the mapped buffer, either use `value.MappedBuffer`, or `value` when using the value as a pointer.
      */
-    auto MappedContext() -> FxGPUBufferMapContext<ElementType>
+    FxGPUBufferMapContext<ElementType> GetMappedContext()
     {
         return FxGPUBufferMapContext<ElementType>(this);
     }
 
-    /**
-     * Uploads data from system memory to GPU memory.
-     */
-    void Upload(StaticArray<ElementType> &data)
+    void Destroy()
     {
-        if (!Initialized) {
-            FxPanic_("GPUBuffer", "Buffer not previously initialized on Upload()", 0);
-        }
-
-        const size_t data_size = ElementSize * data.Size;
-
-        const size_t buffer_size = ElementSize * Size;
-
-        if (data_size > buffer_size) {
-            Log::Error("Upload size is larger than GPU buffer allocation size", 0);
+        if (!Initialized || Allocation == nullptr || Buffer == nullptr) {
             return;
         }
 
-        {
-            auto value = MappedContext();
-            memcpy(value, data.Data, data_size);
-        }
-    }
-
-    void Destroy()
-    {
-        if (!Initialized) {
-            Initialized.wait(true);
-        }
-
-        Log::Debug("Freeing GPU Buffer of size %lu", Size);
-
         Renderer->AddGPUBufferToDeletionQueue([](FxDeletionObject *object) {
-            // if (!Initialized || Buffer == nullptr || Allocation == nullptr) {
-            //     return;
-            // }
-
             vmaDestroyBuffer(RendererVulkan->GPUAllocator, object->Buffer, object->Allocation);
-            Log::Debug("Deleted VMA buffer");
-
-            // Initialized = false;
-        }, Buffer, Allocation);
+            Log::Debug("Deleted Raw VMA buffer");
+        }, this->Buffer, this->Allocation);
 
         Initialized = false;
     }
 
-    ~FxGPUBuffer()
+    ~FxRawGPUBuffer()
     {
         Destroy();
     }
@@ -219,11 +180,51 @@ public:
     VkBuffer Buffer = nullptr;
     VmaAllocation Allocation = nullptr;
 
-    uint64 Size = 0;
-
-    UsageType Usage;
-
     std::atomic_bool Initialized = false;
+
+    uint64 Size = 0;
+};
+
+template <typename ElementType>
+class FxStagedGPUBuffer : public FxRawGPUBuffer<ElementType>
+{
+private:
+    using FxRawGPUBuffer<ElementType>::Create;
+public:
+    FxStagedGPUBuffer() = default;
+
+    void Create(FxBufferUsageType usage, StaticArray<ElementType> &data)
+    {
+        this->Size = data.Size;
+        Usage = usage;
+
+        const uint64_t buffer_size = data.Size * sizeof(ElementType);
+
+        FxRawGPUBuffer<ElementType> staging_buffer;
+        staging_buffer.Create(this->Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        {
+            auto context = staging_buffer.GetMappedContext();
+            memcpy(context, data.Data, buffer_size);
+        }
+
+        this->Create(this->Size, EnumToInt(Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+
+        Log::Debug(
+            "thread: %lu",
+            std::this_thread::get_id()
+        );
+        RendererVulkan->SubmitUploadCmd([&](FxCommandBuffer &cmd) {
+            VkBufferCopy copy = {
+                .dstOffset = 0,
+                .srcOffset = 0,
+                .size = buffer_size
+            };
+            vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
+        });
+    }
+public:
+    FxBufferUsageType Usage;
 private:
     size_t ElementSize = sizeof(ElementType);
 };

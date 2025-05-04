@@ -6,7 +6,7 @@ namespace vulkan {
 
 class Swapchain;
 class GPUDevice;
-class CommandBuffer;
+class FxCommandBuffer;
 
 class RenderPass
 {
@@ -20,7 +20,7 @@ public:
 
 public:
     VkRenderPass RenderPass = nullptr;
-    CommandBuffer *CommandBuffer = nullptr;
+    FxCommandBuffer *CommandBuffer = nullptr;
 };
 
 }; // namespace vulkan

@@ -17,6 +17,45 @@ FX_SET_MODULE_NAME("Device")
 // Queue Families
 ///////////////////////////////
 
+void QueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
+{
+    for (int32 index = 0; index < RawFamilies.Size; index++) {
+        VkQueueFamilyProperties &family_props = RawFamilies[index];
+
+        // Presentation families will usually always have graphics support. Best to choose the most
+        // capable here as our main family.
+        if ((family_props.queueFlags & VK_QUEUE_GRAPHICS_BIT) && FamilyHasPresentSupport(device, surface, index)) {
+            mGraphicsIndex = index;
+            mPresentIndex = index;
+        }
+    }
+}
+
+void QueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
+{
+    for (int32 index = 0; index < RawFamilies.Size; index++) {
+        VkQueueFamilyProperties &family_props = RawFamilies[index];
+
+        // We want a separate queue here for
+        if ((family_props.queueFlags & VK_QUEUE_TRANSFER_BIT) && index != mGraphicsIndex) {
+            mTransferIndex = index;
+        }
+    }
+}
+
+bool QueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index)
+{
+    uint32 support = 0;
+
+    VkResult status = vkGetPhysicalDeviceSurfaceSupportKHR(device, family_index, surface, &support);
+
+    if (status != VK_SUCCESS) {
+        Log::Error("Could not query present support for family at index %d", family_index);
+        return false;
+    }
+
+    return support > 0;
+}
 
 void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
@@ -28,40 +67,47 @@ void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfac
 
     Log::Info("Amount of queue families: %d", family_count);
 
-    uint32 index = 0;
-    for (const auto &family : RawFamilies) {
-        if (mPresentIndex != UINT_MAX && mGraphicsIndex != UINT_MAX) {
-            break;
-        }
 
-        if (family.queueCount == 0)
-            continue;
+    FindGraphicsFamily(physical_device, surface);
+    FindTransferFamily(physical_device, surface);
+    // uint32 index = 0;
+    // for (const auto &family : RawFamilies) {
+    //     if (mPresentIndex != QueueNull && mGraphicsIndex != QueueNull && mTransferIndex != QueueNull) {
+    //         break;
+    //     }
 
-        // check for a graphics family
-        {
-            if ((family.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                mGraphicsIndex = index;
-            }
-        }
+    //     if (family.queueCount == 0)
+    //         continue;
 
-        // check for a present family
-        {
-            uint32 present_support = 0;
+    //     // check for a graphics family
+    //     {
+    //         if ((family.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+    //             mGraphicsIndex = index;
+    //         }
+    //     }
 
-            VkResult status = vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, index, surface, &present_support);
-            if (status != VK_SUCCESS) {
-                Log::Error("Could not retrieve physical device surface support", status);
-                continue;
-            }
+    //     // check for a present family
+    //     {
+    //         uint32 present_support = 0;
 
-            Log::Info("Present support: %d\n", present_support);
-            if (present_support > 0) {
-                mPresentIndex = index;
-            }
-        }
+    //         VkResult status = vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, index, surface, &present_support);
+    //         if (status != VK_SUCCESS) {
+    //             Log::Error("Could not retrieve physical device surface support", status);
+    //             continue;
+    //         }
 
-        index++;
-    }
+    //         Log::Info("Present support: %d\n", present_support);
+    //         if (present_support > 0) {
+    //             mPresentIndex = index;
+    //         }
+    //     }
+
+    //     if (mPresentIndex != QueueNull && mGraphicsIndex != QueueNull && mTransferIndex == QueueNull && (family.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+    //         mTransferIndex = index;
+    //     }
+
+    //     index++;
+    // }
 }
 
 
@@ -86,12 +132,14 @@ bool GPUDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
         return true;
     }
 
-    Log::Info("Device not suitable: (Vk: %d.%d.%d), Graphics?: %s, Present?: %s, IsComplete?: %s",
+    Log::Info("Device not suitable: (Vk: %d.%d.%d), Graphics?: %s, Present?: %s, Xfer?: %s, IsComplete?: %s",
         VK_VERSION_MAJOR(version),
         VK_VERSION_MINOR(version),
         VK_VERSION_PATCH(version),
         Log::YesNo(new_families.GetGraphicsFamily() != QueueFamilies::QueueNull),
-        Log::YesNo(new_families.GetPresentFamily() != QueueFamilies::QueueNull)
+        Log::YesNo(new_families.GetPresentFamily() != QueueFamilies::QueueNull),
+        Log::YesNo(new_families.GetTransferFamily() != QueueFamilies::QueueNull),
+        Log::YesNo(new_families.IsComplete())
     );
 
     return false;
@@ -99,14 +147,10 @@ bool GPUDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
 
 void GPUDevice::QueryQueues()
 {
-    const auto indices = mQueueFamilies.GetQueueIndexList();
+    vkGetDeviceQueue(Device, mQueueFamilies.GetGraphicsFamily(), 0, &GraphicsQueue);
+    vkGetDeviceQueue(Device, mQueueFamilies.GetPresentFamily(), 0, &PresentQueue);
 
-    if (indices.size() < 2) {
-        FxPanic("Not enough queue families", 0);
-    }
-
-    vkGetDeviceQueue(Device, indices[0], 0, &GraphicsQueue);
-    vkGetDeviceQueue(Device, indices[1], 0, &PresentQueue);
+    vkGetDeviceQueue(Device, mQueueFamilies.GetTransferFamily(), 0, &TransferQueue);
 }
 
 void GPUDevice::CreateLogicalDevice()
@@ -124,34 +168,51 @@ void GPUDevice::CreateLogicalDevice()
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     queue_create_infos.reserve(queue_family_indices.size());
 
-    const float queue_priority = 1.0f;
+    // float queue_priorities[] = { 1.0f };
 
-    int index = 0;
+    // int index = 0;
 
-    for (const auto family_index : queue_family_indices) {
-        if (family_index == QueueFamilies::QueueNull) {
-            continue;
-        }
+    // for (const auto family_index : queue_family_indices) {
+    //     if (family_index == QueueFamilies::QueueNull) {
+    //         continue;
+    //     }
 
-        queue_create_infos.push_back(VkDeviceQueueCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = family_index,
-            .queueCount = 1,
-            .pQueuePriorities = &queue_priority
-        });
+    //     queue_create_infos.push_back(VkDeviceQueueCreateInfo{
+    //         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+    //         .queueFamilyIndex = family_index,
+    //         .queueCount = 1,
+    //         .pQueuePriorities = queue_priorities
+    //     });
 
-        // check if our queue family index's are the same
-        {
-            const uint32 next_index = index + 1;
-            // if the next queue family (presentation) is the same as the current one, return as we
-            // do not need to create a new queue family
-            if (next_index < queue_family_indices.size() && family_index == queue_family_indices[next_index]) {
-                break;
-            }
-        }
+    //     // check if our queue family index's are the same
+    //     {
+    //         const uint32 next_index = index + 1;
+    //         // if the next queue family (presentation) is the same as the current one, return as we
+    //         // do not need to create a new queue family
+    //         if (next_index < queue_family_indices.size() && family_index == queue_family_indices[next_index]) {
+    //             break;
+    //         }
+    //     }
 
-        index++;
-    }
+    //     index++;
+    // }
+
+    const float graphics_priorities[] = { 1.0f };
+    float transfer_priorities[] = { 1.0f };
+
+    queue_create_infos.push_back(VkDeviceQueueCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = mQueueFamilies.GetGraphicsFamily(),
+        .queueCount = 1,
+        .pQueuePriorities = graphics_priorities,
+    });
+
+    queue_create_infos.push_back(VkDeviceQueueCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = mQueueFamilies.GetTransferFamily(),
+        .queueCount = 1,
+        .pQueuePriorities = transfer_priorities,
+    });
 
     const VkPhysicalDeviceFeatures device_features{};
     const char *device_extensions[] = {
@@ -194,6 +255,9 @@ void GPUDevice::Create(VkInstance instance, VkSurfaceKHR surface)
     mQueueFamilies.FindQueueFamilies(Physical, surface);
 
     CreateLogicalDevice();
+
+    Log::Info("Device Queue Families: \n\tPresent: %d\n\tGraphics: %d\n\tTransfer: %d",
+        mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(), mQueueFamilies.GetTransferFamily());
 }
 
 void GPUDevice::Destroy()
@@ -226,7 +290,6 @@ void GPUDevice::PickPhysicalDevice()
 
     uint32 device_count;
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, nullptr), enum_err);
-
 
     if (device_count == 0) {
         FxPanic("No usable physical devices found (no vulkan support!)", 0);

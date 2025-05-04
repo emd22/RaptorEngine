@@ -2,12 +2,12 @@
 
 bool FxModel::CheckIfReady()
 {
-    // if (mModelReady) {
-    //     return mModelReady;
-    // }
+    if (mModelReady) {
+        return mModelReady;
+    }
 
     for (FxMesh *mesh : Meshes) {
-        if (mesh->IsReady == false) {
+        if (mesh->IsReady.load() == false) {
             return (mModelReady = false);
         }
     }
@@ -25,13 +25,12 @@ void FxModel::Render()
         return;
     }
 
-
     for (FxMesh *mesh : Meshes) {
         // if we know the model is not fully loaded, check each
         // individual mesh to see if they're ready.
-        // if (!mModelReady && !mesh->IsReady) {
-        //     continue;
-        // }
+        if (!mModelReady && !mesh->IsReady) {
+            continue;
+        }
 
         mesh->Render();
     }

@@ -9,12 +9,14 @@
 
 namespace vulkan {
 
-class CommandPool
+class FxCommandPool
 {
 public:
 
     void Create(GPUDevice *device, uint32 queue_family)
     {
+        QueueFamilyIndex = queue_family;
+
         const VkCommandPoolCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .queueFamilyIndex = queue_family,
@@ -26,8 +28,13 @@ public:
         const VkResult status = vkCreateCommandPool(mDevice->Device, &create_info, nullptr, &CommandPool);
 
         if (status != VK_SUCCESS) {
-            FxPanic_("CommandPool", "Error creating command pool", 0);
+            FxPanic_("FxCommandPool", "Error creating command pool", 0);
         }
+    }
+
+    void Reset()
+    {
+        vkResetCommandPool(mDevice->Device, CommandPool, 0);
     }
 
     void Destroy()
@@ -37,6 +44,7 @@ public:
 
 public:
     VkCommandPool CommandPool = nullptr;
+    uint32 QueueFamilyIndex = 0;
 private:
     GPUDevice *mDevice = nullptr;
 };

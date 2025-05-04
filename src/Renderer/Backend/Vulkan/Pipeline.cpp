@@ -1,7 +1,7 @@
 
 #include "Pipeline.hpp"
 #include "Core/Defines.hpp"
-#include "Renderer/Backend/Vulkan/CommandBuffer.hpp"
+#include "Renderer/Backend/Vulkan/FxCommandBuffer.hpp"
 #include "vulkan/vulkan_core.h"
 
 #include <Core/Log.hpp>
@@ -181,7 +181,7 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
     }
 }
 
-void GraphicsPipeline::Bind(CommandBuffer &command_buffer) {
+void GraphicsPipeline::Bind(FxCommandBuffer &command_buffer) {
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }
 

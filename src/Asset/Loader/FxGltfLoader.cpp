@@ -25,9 +25,9 @@ void UnpackAttributes(FxMesh *mesh, cgltf_primitive *primitive)
             cgltf_accessor_unpack_floats(attribute->data, positions.Data, data_size);
 
             printf("loaded vertices %lu:\n", data_size);
-            for (int j = 0; j < data_size; j += 3) {
-                printf("Vertex %d: (%f, %f, %f)\n", j / 3, positions.Data[j], positions.Data[j + 1], positions.Data[j + 2]);
-            }
+            // for (int j = 0; j < data_size; j += 3) {
+            //     printf("Vertex %d: (%f, %f, %f)\n", j / 3, positions.Data[j], positions.Data[j + 1], positions.Data[j + 2]);
+            // }
         }
         else if (attribute->type == cgltf_attribute_type_normal) {
             printf("Attribute -> Normal Buffer\n");

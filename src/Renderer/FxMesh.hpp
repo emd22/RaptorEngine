@@ -48,14 +48,12 @@ public:
 
     void SetVertices(StaticArray<VertexType> &vertices)
     {
-        mVertexBuffer.Create(FxGPUBuffer<VertexType>::UsageType::Vertices, vertices.Size);
-        mVertexBuffer.Upload(vertices);
+        mVertexBuffer.Create(FxBufferUsageType::Vertices, vertices);
     }
 
     void SetIndices(StaticArray<uint32> &indices)
     {
-        mIndexBuffer.Create(FxGPUBuffer<uint32>::UsageType::Indices, indices.Size);
-        mIndexBuffer.Upload(indices);
+        mIndexBuffer.Create(FxBufferUsageType::Indices, indices);
     }
 
     // FxMesh(FxMesh &&other)
@@ -105,8 +103,6 @@ public:
             memcpy(&vertex.Position, &positions.Data[i * 3], sizeof(float32) * 3);
             memcpy(&vertex.Normal, &normals.Data[i * 3], sizeof(float32) * 3);
 
-            Log::Info("Vertex %i: [%f %f %f]", i, vertex.Position[0], vertex.Position[1], vertex.Position[2]);
-
             vertices.Insert(vertex);
         }
 
@@ -118,8 +114,8 @@ public:
         return (mVertexBuffer.Initialized && mIndexBuffer.Initialized);
     }
 
-    FxGPUBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
-    FxGPUBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
+    FxStagedGPUBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
+    FxStagedGPUBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
 
     void Render()
     {
@@ -135,8 +131,13 @@ public:
 
     void Destroy()
     {
-        // mVertexBuffer.Destroy();
-        // mIndexBuffer.Destroy();
+        if (IsReady == false) {
+            return;
+        }
+        IsReady = false;
+
+        mVertexBuffer.Destroy();
+        mIndexBuffer.Destroy();
     }
 
     ~FxMesh()
@@ -145,7 +146,8 @@ public:
     }
 
     std::atomic_bool IsReady = std::atomic_bool(false);
+
 protected:
-    FxGPUBuffer<VertexType> mVertexBuffer;
-    FxGPUBuffer<uint32> mIndexBuffer;
+    FxStagedGPUBuffer<VertexType> mVertexBuffer;
+    FxStagedGPUBuffer<uint32> mIndexBuffer;
 };

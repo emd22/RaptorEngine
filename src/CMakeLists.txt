@@ -15,7 +15,7 @@ find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
 
 add_definitions(
     -DFX_USE_NEON
-    -DFX_DEBUG_STATIC_ARRAY
+    # -DFX_DEBUG_STATIC_ARRAY
     ${COMPILE_FLAGS}
 )
 include_directories(

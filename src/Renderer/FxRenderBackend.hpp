@@ -37,6 +37,8 @@ struct FxDeletionObject
 };
 
 class FxRenderBackend {
+    const uint32 DeletionFrameSpacing = 3;
+
 public:
     const uint32_t FramesInFlight = 2;
 
@@ -63,35 +65,26 @@ public:
     {
         Log::Info("Adding GPUBuffer to deletion queue at frame %d", mInternalFrameCounter);
 
+        if (mInDeletionQueue) {
+            mInDeletionQueue.wait(false);
+        }
+
+        mInDeletionQueue.store(true);
+
         mDeletionQueue.push_back(FxDeletionObject {
-            .DeletionFrameNumber = mInternalFrameCounter,
+            .DeletionFrameNumber = mInternalFrameCounter + DeletionFrameSpacing,
             .Func = func,
             .Allocation = allocation,
             .Buffer = buffer,
         });
+
+        mInDeletionQueue.store(false);
     }
 
     uint32 GetFrameNumber() { return mFrameNumber; }
 
 protected:
-    virtual void ProcessDeletionQueue(bool ignore_frame_spacing = false)
-    {
-        if (mDeletionQueue.empty()) {
-            return;
-        }
-
-        FxDeletionObject &object = mDeletionQueue.front();
-        const uint32 FrameSpacing = 3;
-        Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
-
-        const bool is_frame_spaced = (mInternalFrameCounter - object.DeletionFrameNumber) > FrameSpacing;
-
-        if (ignore_frame_spacing || is_frame_spaced) {
-            object.Func(&object);
-
-            mDeletionQueue.pop_front();
-        }
-    }
+    // virtual
 
 public:
     bool Initialized = false;
@@ -100,5 +93,6 @@ protected:
     uint32 mFrameNumber = 0;
     uint32 mInternalFrameCounter = 0;
 
+    std::atomic_bool mInDeletionQueue = false;
     std::deque<FxDeletionObject> mDeletionQueue;
 };

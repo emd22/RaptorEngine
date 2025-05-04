@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Renderer/Backend/Vulkan/CommandBuffer.hpp"
 #include "ShaderList.hpp"
 #include "RenderPass.hpp"
 
@@ -9,6 +8,8 @@
 #include <vulkan/vulkan.h>
 
 #include <Math/Mat4.hpp>
+
+class FxCommandBuffer;
 
 namespace vulkan {
 
@@ -46,14 +47,13 @@ struct DrawPushConstants
     float32 MVPMatrix[16];
 };
 
-
 class GraphicsPipeline
 {
 public:
     void Create(ShaderList shader_list);
     void Destroy();
 
-    void Bind(CommandBuffer &command_buffer);
+    void Bind(FxCommandBuffer &command_buffer);
 
     ~GraphicsPipeline()
     {

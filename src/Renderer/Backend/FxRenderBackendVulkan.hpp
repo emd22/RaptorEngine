@@ -11,15 +11,28 @@
 
 #include <Renderer/FxWindow.hpp>
 
+#include <Renderer/Backend/Vulkan/FxCommandBuffer.hpp>
 #include <memory>
 #include <vulkan/vulkan.hpp>
+
+#include <Renderer/Backend/Vulkan/Fence.hpp>
 
 
 struct SDL_Window;
 
 namespace vulkan {
 
+struct FxGpuUploadContext
+{
+    FxCommandPool CommandPool;
+    FxCommandBuffer CommandBuffer;
+
+    Fence UploadFence;
+};
+
 class FxRenderBackendVulkan final : public FxRenderBackend {
+public:
+    using UploadFunc = std::function<void(FxCommandBuffer &cmd)>;
 public:
     FxRenderBackendVulkan() = default;
 
@@ -52,9 +65,41 @@ public:
     uint32 GetImageIndex() { return mImageIndex; }
     VmaAllocator *GetGPUAllocator() { return &GPUAllocator; }
 
+    void SubmitUploadCmd(UploadFunc func);
+
     ~FxRenderBackendVulkan()
     {
         Destroy();
+    }
+
+    void ProcessDeletionQueue(bool immediate = false)
+    {
+        if (mDeletionQueue.empty()) {
+            return;
+        }
+
+        if (immediate && mInDeletionQueue) {
+            mInDeletionQueue.wait(false);
+        }
+        if (mInDeletionQueue) {
+            return;
+        }
+
+        mInDeletionQueue.store(true);
+
+        FxDeletionObject &object = mDeletionQueue.front();
+
+        Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
+
+        const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
+
+        if (immediate || is_frame_spaced) {
+            object.Func(&object);
+            mDeletionQueue.pop_front();
+        }
+
+        mInDeletionQueue.store(false);
+        mInDeletionQueue.notify_one();
     }
 
 private:
@@ -63,6 +108,9 @@ private:
 
     void InitGPUAllocator();
     void DestroyGPUAllocator();
+
+    void InitUploadContext();
+    void DestroyUploadContext();
 
     void SubmitFrame();
     void PresentFrame();
@@ -83,6 +131,8 @@ public:
     StaticArray<FrameData> Frames;
 
     VmaAllocator GPUAllocator = nullptr;
+
+    FxGpuUploadContext UploadContext;
 private:
 
     VkInstance mInstance = nullptr;

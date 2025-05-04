@@ -29,23 +29,21 @@ public:
 // private:
     void Destroy() override
     {
+        FxBaseAsset::Destroy();
         Log::Info("Destroy FxModel (%lu meshes)", Meshes.Size);
         for (FxMesh *mesh : Meshes)
         {
-            Log::Info("Destroy mesh");
             mesh->Destroy();
         }
 
-        // Meshes.Free();
+        Meshes.Free();
+
+        mModelReady = false;
     }
 
 public:
-    // StaticArray<float> Positions;
-    // StaticArray<float> Normals;
-
     StaticPtrArray<FxMesh> Meshes;
 
 private:
     bool mModelReady = false;
-    // FxMesh *mMesh = nullptr;
 };

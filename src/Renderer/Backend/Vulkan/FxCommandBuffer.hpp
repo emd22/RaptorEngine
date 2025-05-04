@@ -2,17 +2,18 @@
 
 #include <vulkan/vulkan.h>
 
-#include "CommandPool.hpp"
+#include "FxCommandPool.hpp"
 
 namespace vulkan {
 
-class CommandBuffer
+class FxCommandBuffer
 {
 public:
-    void Create(CommandPool *pool);
+    void Create(FxCommandPool *pool);
     void Destroy();
 
-    void Record();
+    void Record(VkCommandBufferUsageFlags usage_flags = 0);
+
     void Reset();
     void End();
 
@@ -28,7 +29,7 @@ public:
     VkCommandBuffer CommandBuffer = nullptr;
 private:
     bool mInitialized = false;
-    CommandPool *mCommandPool = nullptr;
+    FxCommandPool *mCommandPool = nullptr;
     GPUDevice *mDevice = nullptr;
 };
 

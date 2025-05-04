@@ -3,8 +3,8 @@
 #include "Semaphore.hpp"
 #include "Fence.hpp"
 
-#include "CommandPool.hpp"
-#include "CommandBuffer.hpp"
+#include "FxCommandPool.hpp"
+#include "FxCommandBuffer.hpp"
 
 namespace vulkan {
 
@@ -14,8 +14,8 @@ public:
     void Create(GPUDevice *device);
     void Destroy();
 public:
-    CommandPool CommandPool;
-    CommandBuffer CommandBuffer;
+    FxCommandPool CommandPool;
+    FxCommandBuffer CommandBuffer;
 
     Semaphore ImageAvailable;
     Semaphore RenderFinished;

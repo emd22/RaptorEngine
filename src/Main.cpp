@@ -4,7 +4,6 @@
 #include "Renderer/Backend/Vulkan/Shader.hpp"
 #include "Renderer/Backend/Vulkan/ShaderList.hpp"
 #include "Renderer/FxCamera.hpp"
-#include "sdl3/3.2.8/include/SDL3/SDL_timer.h"
 
 #define SDL_DISABLE_OLD_NAMES
 #include <SDL3/SDL.h>
@@ -32,26 +31,6 @@ FX_SET_MODULE_NAME("Main")
 static uint64 LastTick = 0;
 static float DeltaTime = 1.0f;
 
-void TestMat4Multiply()
-{
-    Mat4f mat1((Vec4f [4]){
-        (Vec4f){1.0, 2.0, 3.0, 4.0},
-        (Vec4f){2.0, 3.0, 4.0, 1.0},
-        (Vec4f){3.0, 4.0, 1.0, 2.0},
-        (Vec4f){4.0, 1.0, 2.0, 3.0}
-    });
-
-    Mat4f mat2((Vec4f [4]){
-        (Vec4f){1.0, 2.0, 3.0, 4.0},
-        (Vec4f){2.0, 3.0, 4.0, 1.0},
-        (Vec4f){3.0, 4.0, 1.0, 2.0},
-        (Vec4f){4.0, 1.0, 2.0, 3.0}
-    });
-
-    Mat4f result = mat1.Multiply(mat2);
-    result.Print();
-}
-
 void CheckGeneralControls()
 {
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Q)) {
@@ -70,9 +49,6 @@ void CheckGeneralControls()
 
 int main()
 {
-
-    // TestMat4Multiply();
-    // return 0;
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
@@ -116,22 +92,13 @@ int main()
     auto &asset_manager = FxAssetManager::GetInstance();
     asset_manager.Start(2);
 
-    // FxModel *model = new FxModel;
-    // loader.LoadFromFile(model, "../models/Box.glb");
+    // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
+    PtrContainer<FxModel> new_model = FxAssetManager::NewModel();
 
-    // FxModel *test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
-
-    test_model->OnLoaded =
+    new_model->OnLoaded =
         [](FxBaseAsset *model) {
             Log::Info("This was loaded!", 0);
         };
-
-    // StaticArray<FxVertex<FxVertexPosition | FxVertexNormal>> test_mesh_verts = {
-    //     FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = { -1,   1,  0 } },
-    //     FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  1,   1,  0 } },
-    //     FxVertex<FxVertexPosition | FxVertexNormal>{ .Position = {  0,  -1,  0 } },
-    // };
 
     FxPerspectiveCamera camera;
 
@@ -139,12 +106,8 @@ int main()
 
     camera.Position.Z += 5.0f;
 
-    // FxMesh test_mesh(test_mesh_verts);
-    //
-    //
-    Mat4f model_matrix = Mat4f::AsTranslation(Vec3f(0, 0, -5));
+    Mat4f model_matrix = Mat4f::AsTranslation(Vec3f(0, 0, 0));
 
-    // model_matrix.Columns[3].Load4(0, 0, -5, 1);
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -161,54 +124,38 @@ int main()
             camera.Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         }
 
-        camera.Update();
-
-
-        // Mat4f VPMatrix = camera.ProjectionMatrix.Multiply(camera.ViewMatrix);
-        Mat4f VPMatrix = camera.ViewMatrix.Multiply(camera.ProjectionMatrix);
-        // Mat4f MVPMatrix = model_matrix.Multiply(VPMatrix);
-
-        if (Renderer->BeginFrame(pipeline, VPMatrix) != FrameResult::Success) {
-            continue;
-        }
-
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
-            Log::Info("View Matrix: ");
-            camera.ViewMatrix.Print();
-            Log::Info("Projection Matrix: ");
-            camera.ProjectionMatrix.Print();
-            Log::Info("VP Matrix: ");
-            VPMatrix.Print();
-        }
-
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            // camera.Position.Z += 0.01f * DeltaTime;
-            // camera.RequireUpdate();
             camera.Move(Vec3f(0.0f, 0.0f, 0.01f * DeltaTime));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            // camera.Position.Z -= 0.01f * DeltaTime;
-            // camera.RequireUpdate();
             camera.Move(Vec3f(0.0f, 0.0f, -0.01f * DeltaTime));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-            // camera.Position.Z += 0.01f * DeltaTime;
-            // camera.RequireUpdate();
             camera.Move(Vec3f(0.01f * DeltaTime, 0.0f, 0.0f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-            // camera.Position.Z += 0.01f * DeltaTime;
-            // camera.RequireUpdate();
             camera.Move(Vec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
+        }
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !new_model->IsLoaded) {
+            FxAssetManager::LoadModel(new_model, "../models/DamagedHelmet.glb");
+        }
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && new_model->IsLoaded) {
+            new_model->Destroy();
+        }
+
+        camera.Update();
+
+        Mat4f VPMatrix = camera.ViewMatrix * camera.ProjectionMatrix;
+        Mat4f MVPMatrix = model_matrix * VPMatrix;
+
+        if (Renderer->BeginFrame(pipeline, MVPMatrix) != FrameResult::Success) {
+            continue;
         }
 
         CheckGeneralControls();
 
-        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R) && !test_model->IsLoaded) {
-        //     FxAssetManager::LoadModel(test_model, "../models/Box.glb");
-        // }
-
-        test_model->Render();
+        new_model->Render();
         Renderer->FinishFrame(pipeline);
 
         LastTick = CurrentTick;

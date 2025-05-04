@@ -21,7 +21,8 @@ public:
     bool IsComplete()
     {
         return (mGraphicsIndex != QueueNull
-             && mPresentIndex != QueueNull);
+             && mPresentIndex != QueueNull
+             && mTransferIndex != QueueNull);
     }
 
     /// Retrieves the available queue indices
@@ -30,30 +31,27 @@ public:
         return std::vector<uint32>({
             mGraphicsIndex,
             mPresentIndex,
+
+            mTransferIndex,
         });
     }
 
-    /// Checks if the graphics queue is also the presentation queue
-    bool IsGraphicsAlsoPresent() const
-    {
-        return (mGraphicsIndex == mPresentIndex);
-    }
+    uint32 GetGraphicsFamily() { return mGraphicsIndex; }
+    uint32 GetPresentFamily() { return mPresentIndex; }
+    uint32 GetTransferFamily() { return mTransferIndex; }
 
-    uint32 GetGraphicsFamily()
-    {
-        return mGraphicsIndex;
-    }
+private:
+    void FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
+    void FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-    uint32 GetPresentFamily()
-    {
-        return mPresentIndex;
-    }
+    bool FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index);
 
 public:
     StaticArray<VkQueueFamilyProperties> RawFamilies;
 private:
     uint32 mGraphicsIndex = QueueNull;
     uint32 mPresentIndex = QueueNull;
+    uint32 mTransferIndex = QueueNull;
 };
 
 class GPUDevice {
@@ -85,6 +83,7 @@ public:
     QueueFamilies mQueueFamilies;
 
     VkQueue GraphicsQueue = nullptr;
+    VkQueue TransferQueue = nullptr;
     VkQueue PresentQueue = nullptr;
 
 private:

@@ -37,6 +37,8 @@ public:
 
             this->Data = nullptr;
         }
+        this->Size = 0;
+        this->Capacity = 0;
     }
 
     ~StaticPtrArray()
