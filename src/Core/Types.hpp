@@ -61,9 +61,18 @@ private:
 template <typename T>
 class PtrContainer {
 public:
+    PtrContainer()
+        : mPtr(nullptr)
+    {
+    }
     PtrContainer(T *ptr)
         : mPtr(ptr)
     {
+    }
+
+    PtrContainer(T &&val)
+    {
+        mPtr = new T(std::move(val));
     }
 
     ~PtrContainer()
@@ -77,7 +86,14 @@ public:
         other.mPtr = nullptr;
     }
 
-    PtrContainer<T> &&operator = (PtrContainer<T> &&other)
+    PtrContainer<T> operator = (T &&value)
+    {
+        delete mPtr;
+        mPtr = new T(std::move(value));
+        return std::move(*this);
+    }
+
+    PtrContainer<T> operator = (PtrContainer<T> &&other)
     {
         delete mPtr;
         mPtr = other.mPtr;
@@ -85,7 +101,7 @@ public:
         return std::move(*this);
     }
 
-    static PtrContainer<T> Create()
+    static PtrContainer<T> New()
     {
         return PtrContainer<T>(new T());
     }
@@ -101,5 +117,5 @@ public:
     T &operator *() const { return *mPtr; }
 
 private:
-    T *mPtr;
+    T *mPtr = nullptr;
 };

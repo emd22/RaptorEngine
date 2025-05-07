@@ -29,8 +29,6 @@ class FxRenderBackend {
     const uint32 DeletionFrameSpacing = 3;
 
 public:
-    const uint32_t FramesInFlight = 2;
-
     virtual void Init(Vec2i window_size) = 0;
     virtual void Destroy() = 0;
 
@@ -52,8 +50,7 @@ public:
 
     virtual void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
-        Log::Info("Adding GPUBuffer to deletion queue at frame %d", mInternalFrameCounter);
-
+        // Log::Info("Adding GPUBuffer to deletion queue at frame %d", mInternalFrameCounter);
         if (mInDeletionQueue) {
             mInDeletionQueue.wait(false);
         }

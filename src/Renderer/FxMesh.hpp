@@ -73,7 +73,7 @@ public:
     {
         StaticArray<VertexType> vertices(positions.Size / 3);
 
-        Log::Info("Creating combined vertex buffer (Contains:Position) (s: %d)", vertices.Capacity);
+        // Log::Info("Creating combined vertex buffer (Contains:Position) (s: %d)", vertices.Capacity);
 
         for (int i = 0; i < vertices.Capacity; i++) {
             VertexType vertex;
@@ -93,7 +93,7 @@ public:
 
         StaticArray<VertexType> vertices(positions.Size / 3);
 
-        Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
+        // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
 
         for (int i = 0; i < vertices.Capacity; i++) {
             // make a combined vertex + normal + other a

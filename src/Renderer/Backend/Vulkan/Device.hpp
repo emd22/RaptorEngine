@@ -72,6 +72,9 @@ public:
 
     VkSurfaceFormatKHR GetBestSurfaceFormat();
 
+    operator VkDevice() const { return Device; }
+    operator VkPhysicalDevice() const { return Physical; }
+
 private:
     bool IsPhysicalDeviceSuitable(VkPhysicalDevice &device);
     void QueryQueues();

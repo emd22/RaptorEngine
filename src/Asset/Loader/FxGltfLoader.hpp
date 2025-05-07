@@ -4,6 +4,8 @@
 
 #include <string>
 
+struct cgltf_data;
+
 class FxGltfLoader : public FxBaseLoader
 {
 public:
@@ -15,4 +17,10 @@ public:
     void Destroy(FxBaseAsset *asset) override;
 
     ~FxGltfLoader() = default;
+
+protected:
+    void CreateGpuResource(FxBaseAsset *asset) override;
+
+private:
+    cgltf_data *mGltfData = nullptr;
 };

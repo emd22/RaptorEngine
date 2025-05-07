@@ -12,17 +12,54 @@
 
 static FxAssetManager AssetManager;
 
+////////////////////////////////////
+// Asset Worker
+////////////////////////////////////
+
+void FxAssetWorker::Create()
+{
+    Thread = std::thread([this]() { FxAssetWorker::Update(); });
+    Running.store(true);
+}
+
+void FxAssetWorker::Update()
+{
+    while (Running.load()) {
+        ItemReady.WaitForData();
+
+        if (Running.load() == false) {
+            break;
+        }
+
+        LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
+
+        ItemReady.Reset();
+
+        AssetManager.DataLoaded.SignalDataWritten();
+    }
+}
+
+
+////////////////////////////////////
+// Asset Manager
+////////////////////////////////////
+
+
 void FxAssetManager::Start(int32 thread_count)
 {
     mThreadCount = thread_count;
     mActive = true;
 
-    mThreads.InitCapacity(thread_count);
+    mWorkerThreads.InitCapacity(thread_count);
 
     for (int32 i = 0; i < thread_count; i++) {
-        std::thread *thread = new std::thread([this]() { FxAssetManager::ThreadUpdate(); });
-        mThreads.Insert(thread);
+        FxAssetWorker *worker = mWorkerThreads.Insert();
+        worker->Create();
+
     }
+
+    std::thread *thread = new std::thread([this]() { FxAssetManager::AssetThreadUpdate(); });
+    mAssetThread = thread;
 }
 
 void FxAssetManager::Shutdown()
@@ -32,17 +69,26 @@ void FxAssetManager::Shutdown()
     }
 
     mActive = false;
+    DataAvailable.SignalDataWritten();
 
-    for (std::thread *thread : mThreads) {
-        thread->join();
-
-        delete thread;
+    // for (std::thread *thread : mWorkerThreads) {
+    //     thread->join();
+    //     delete thread;
+    // }
+    //
+    for (auto &worker : mWorkerThreads) {
+        worker.Running.store(false);
+        worker.ItemReady.SignalDataWritten();
+        worker.Thread.join();
     }
+
+    mAssetThread->join();
+    delete mAssetThread;
 }
 
 PtrContainer<FxModel> FxAssetManager::NewModel()
 {
-    return PtrContainer<FxModel>::Create();
+    return PtrContainer<FxModel>::New();
 }
 
 PtrContainer<FxModel> FxAssetManager::LoadModel(std::string path)
@@ -62,35 +108,90 @@ void FxAssetManager::LoadModel(PtrContainer<FxModel> &model, std::string path)
     queue_item.AssetType = FxAssetType::Model;
     queue_item.Path = path;
 
-    AssetManager.mLoadQueue.Push(std::move(queue_item));
+    AssetManager.mLoadQueue.Push(queue_item);
+
+    AssetManager.DataAvailable.SignalDataWritten();
 }
 
-void FxAssetManager::ThreadUpdate()
+void FxAssetManager::AssetThreadUpdate()
 {
     while (mActive) {
+        DataAvailable.WaitForData();
+        if (!mActive) {
+            break;
+        }
+
         FxAssetQueueItem item;
 
         if (!mLoadQueue.PopIfAvailable(&item)) {
-            std::this_thread::sleep_for(std::chrono::nanoseconds(1000));
             continue;
         }
 
-        FxBaseLoader::Status status = item.Loader->LoadFromFile(item.Asset, item.Path);
+        FxAssetWorker &worker = FindWorkerThread();
+        worker.Item = std::move(item);
+        worker.ItemReady.SignalDataWritten();
 
-        if (!item.Asset->IsLoaded) {
-            item.Asset->IsLoaded.wait(true);
-        }
+        DataLoaded.WaitForData();
 
-        if (status == FxBaseLoader::Status::Success) {
-            if (item.Asset->OnLoaded) {
-                item.Asset->OnLoaded(item.Asset);
+        auto &loaded_item = worker.Item;
+
+        if (worker.LoadStatus == FxBaseLoader::Status::Success) {
+            // Load the resouce into GPU memory
+            loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
+
+            if (!loaded_item.Asset->IsLoaded) {
+                loaded_item.Asset->IsLoaded.wait(true);
+            }
+
+            if (loaded_item.Asset->OnLoaded) {
+                loaded_item.Asset->OnLoaded(loaded_item.Asset);
             }
         }
         else {
-            if (item.Asset->OnError) {
-                item.Asset->OnError(item.Asset);
+            if (loaded_item.Asset->OnError) {
+                loaded_item.Asset->OnError(loaded_item.Asset);
             }
         }
+
+        DataAvailable.Reset();
+        DataLoaded.Reset();
+
+        // FxBaseLoader::Status status = item.Loader->LoadFromFile(item.Asset, item.Path);
+
+        // if (!item.Asset->IsLoaded) {
+        //     item.Asset->IsLoaded.wait(true);
+        //     // continue;
+        // }
+
+        // if (status == FxBaseLoader::Status::Success) {
+        //     if (item.Asset->OnLoaded) {
+        //         item.Asset->OnLoaded(item.Asset);
+        //     }
+        // }
+        // else {
+        //     if (item.Asset->OnError) {
+        //         item.Asset->OnError(item.Asset);
+        //     }
+        // }
+    }
+}
+
+FxAssetWorker &FxAssetManager::FindWorkerThread()
+{
+    // TODO: find the best worker based on items available
+    for (FxAssetWorker &worker : mWorkerThreads) {
+        if (!worker.IsBusy) {
+            return worker;
+        }
+    }
+    return mWorkerThreads[0];
+}
+
+
+void FxAssetManager::WorkerUpdate()
+{
+    while (mActive) {
+
     }
 }
 

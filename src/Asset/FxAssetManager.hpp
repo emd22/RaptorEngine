@@ -1,18 +1,57 @@
 #pragma once
 
+#include "Asset/FxAssetQueueItem.hpp"
 #include "Core/Types.hpp"
 #include "FxModel.hpp"
 #include "Asset/FxAssetQueue.hpp"
 
+#include <condition_variable>
 #include <thread>
 
+#include <Core/FxDataNotifier.hpp>
+
+/**
+ * Worker thread that waits and processes individual asset loading.
+ */
+class FxAssetWorker
+{
+public:
+    FxAssetWorker()
+    {
+
+    }
+
+    void Create();
+
+    void DispatchAsset(FxAssetQueueItem &item)
+    {
+        IsBusy = true;
+        Item = std::move(item);
+    }
+
+    void Update();
+
+public:
+    FxAssetQueueItem Item;
+    FxBaseLoader::Status LoadStatus;
+    FxDataNotifier ItemReady;
+
+    std::atomic_bool Running = false;
+
+    std::atomic_bool IsBusy = false;
+
+    // FxDataProcessor Processor;
+    std::thread Thread;
+};
 
 class FxAssetManager
 {
 public:
     void Start(int32 thread_count);
     void Shutdown();
-    void ThreadUpdate();
+
+    void WorkerUpdate();
+    void AssetThreadUpdate();
 
     static FxAssetManager &GetInstance();
 
@@ -27,14 +66,21 @@ public:
 
 private:
     // void NotifyAssetOnLoad(FxAssetQueueItem &item);
+    FxAssetWorker &FindWorkerThread();
 
+public:
+    FxDataNotifier DataLoaded;
 private:
     FxAssetQueue mLoadQueue;
 
     std::atomic_bool mActive = false;
+    FxDataNotifier DataAvailable;
+
 
     int32 mThreadCount = 2;
-    StaticArray<std::thread *> mThreads;
+    // StaticArray<std::thread *> mWorkerThreads;
+    StaticArray<FxAssetWorker> mWorkerThreads;
+    std::thread *mAssetThread;
 };
 
 

@@ -23,7 +23,7 @@ void UnpackAttributes(FxMesh *mesh, cgltf_primitive *primitive)
             positions.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, positions.Data, data_size);
 
-            printf("loaded vertices %lu:\n", data_size);
+            // printf("loaded vertices %lu:\n", data_size);
             // for (int j = 0; j < data_size; j += 3) {
             //     printf("Vertex %d: (%f, %f, %f)\n", j / 3, positions.Data[j], positions.Data[j + 1], positions.Data[j + 2]);
             // }
@@ -79,38 +79,44 @@ void UnpackMesh(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
 FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxBaseAsset *asset, std::string path)
 {
     cgltf_options options{};
-    cgltf_data *data = nullptr;
 
-    cgltf_result status = cgltf_parse_file(&options, path.c_str(), &data);
+    cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
     if (status != cgltf_result_success) {
         Log::Error("Error parsing GLTF file! (path: %s)", path.c_str());
         return FxGltfLoader::Status::Error;
     }
 
-    status = cgltf_load_buffers(&options, data, path.c_str());
+    status = cgltf_load_buffers(&options, mGltfData, path.c_str());
     if (status != cgltf_result_success) {
         Log::Error("Error loading buffers from GLTF file! (path: %s)", path.c_str());
 
         return FxGltfLoader::Status::Error;
     }
 
-    FxModel *model = static_cast<FxModel *>(asset);
-    model->Meshes.InitSize(data->meshes_count);
+    return FxGltfLoader::Status::Success;
+}
 
-    for (int i = 0; i < data->meshes_count; i++) {
-        auto *mesh = &data->meshes[i];
+void FxGltfLoader::CreateGpuResource(FxBaseAsset *asset)
+{
+    FxModel *model = static_cast<FxModel *>(asset);
+    model->Meshes.InitSize(mGltfData->meshes_count);
+
+    for (int i = 0; i < mGltfData->meshes_count; i++) {
+        auto *mesh = &mGltfData->meshes[i];
 
         UnpackMesh(model, mesh, i);
     }
 
-    cgltf_free(data);
+    cgltf_free(mGltfData);
+    mGltfData = nullptr;
 
     model->IsLoaded = true;
-
-    return FxGltfLoader::Status::Success;
 }
 
 void FxGltfLoader::Destroy(FxBaseAsset *asset)
 {
-    (void)asset;
+    if (mGltfData) {
+        cgltf_free(mGltfData);
+        mGltfData = nullptr;
+    }
 }

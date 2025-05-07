@@ -24,6 +24,8 @@
 
 #include <ThirdParty/vk_mem_alloc.h>
 
+#include <Renderer/Constants.hpp>
+
 #include <SDL3/SDL_vulkan.h>
 #include <SDL3/SDL.h>
 
@@ -110,7 +112,7 @@ void FxRenderBackendVulkan::DestroyUploadContext()
 
 void FxRenderBackendVulkan::InitFrames()
 {
-    Frames.InitSize(FramesInFlight);
+    Frames.InitSize(RendererFramesInFlight);
 
     const uint32 graphics_family = GetDevice()->mQueueFamilies.GetGraphicsFamily();
 
@@ -408,10 +410,10 @@ void FxRenderBackendVulkan::SubmitUploadCmd(FxRenderBackendVulkan::UploadFunc up
         .pCommandBuffers = &cmd.CommandBuffer,
     };
 
-    Log::Debug(
-        "cmd thread: %lu",
-        std::this_thread::get_id()
-    );
+    // Log::Debug(
+    //     "cmd thread: %lu",
+    //     std::this_thread::get_id()
+    // );
 
     VkTry(
         vkQueueSubmit(GetDevice()->TransferQueue, 1, &submit_info, UploadContext.UploadFence.Fence),
@@ -550,7 +552,7 @@ void FxRenderBackendVulkan::FinishFrame(GraphicsPipeline &pipeline)
     mInternalFrameCounter++;
 
     // better to do one division per frame as opposed to one every GetFrameNumber()
-    mFrameNumber = (mInternalFrameCounter) % FramesInFlight;
+    mFrameNumber = (mInternalFrameCounter) % RendererFramesInFlight;
 }
 
 FrameResult FxRenderBackendVulkan::GetNextSwapchainImage(FrameData *frame)
