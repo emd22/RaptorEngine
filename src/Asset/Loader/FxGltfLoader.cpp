@@ -6,7 +6,7 @@
 
 #include <Asset/FxModel.hpp>
 
-void UnpackAttributes(FxMesh *mesh, cgltf_primitive *primitive)
+void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
 {
     StaticArray<float32> positions;
     StaticArray<float32> normals;
@@ -20,32 +20,29 @@ void UnpackAttributes(FxMesh *mesh, cgltf_primitive *primitive)
 
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
+            // Create our vertex position buffer
             positions.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, positions.Data, data_size);
-
-            // printf("loaded vertices %lu:\n", data_size);
-            // for (int j = 0; j < data_size; j += 3) {
-            //     printf("Vertex %d: (%f, %f, %f)\n", j / 3, positions.Data[j], positions.Data[j + 1], positions.Data[j + 2]);
-            // }
         }
         else if (attribute->type == cgltf_attribute_type_normal) {
             printf("Attribute -> Normal Buffer\n");
 
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
+            // Create our vertex normal buffer
             normals.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, normals.Data, data_size);
         }
-        // printf("Attribute %d: %lu floats\n", i, data_size);
     }
 
     auto combined_vertices = FxMesh::MakeCombinedVertexBuffer(positions, normals);
 
-    mesh->SetVertices(combined_vertices);
+    // Set the combined vertices to the mesh
+    mesh->UploadVertices(combined_vertices);
     mesh->IsReady = true;
 }
 
-void UnpackMesh(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
+void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
 {
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
         auto *primitive = &gltf_mesh->primitives[i];
@@ -65,10 +62,11 @@ void UnpackMesh(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
                 primitive->indices->count
             );
 
-            mesh->SetIndices(indices);
+            // Set the mesh indices
+            mesh->UploadIndices(indices);
         }
 
-        UnpackAttributes(mesh, primitive);
+        UnpackMeshAttributes(mesh, primitive);
 
         model->Meshes.Data[i] = mesh;
     }
@@ -104,13 +102,13 @@ void FxGltfLoader::CreateGpuResource(FxBaseAsset *asset)
     for (int i = 0; i < mGltfData->meshes_count; i++) {
         auto *mesh = &mGltfData->meshes[i];
 
-        UnpackMesh(model, mesh, i);
+        UploadMeshToGpu(model, mesh, i);
     }
 
     cgltf_free(mGltfData);
     mGltfData = nullptr;
 
-    model->IsLoaded = true;
+    model->IsUploadedToGpu = true;
 }
 
 void FxGltfLoader::Destroy(FxBaseAsset *asset)

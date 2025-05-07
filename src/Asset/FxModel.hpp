@@ -39,7 +39,7 @@ public:
         Meshes.Free();
 
         mModelReady = false;
-        IsLoaded = false;
+        IsUploadedToGpu = false;
     }
 
 public:

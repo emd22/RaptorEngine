@@ -4,6 +4,7 @@
 
 #include "FxModel.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <thread>
@@ -19,23 +20,28 @@ static FxAssetManager AssetManager;
 void FxAssetWorker::Create()
 {
     Thread = std::thread([this]() { FxAssetWorker::Update(); });
-    Running.store(true);
+    while (Running.test_and_set(std::memory_order_acquire)) {
+        Running.wait(true, std::memory_order_relaxed);
+    }
 }
 
 void FxAssetWorker::Update()
 {
-    while (Running.load()) {
+    while (Running.test()) {
         ItemReady.WaitForData();
 
-        if (Running.load() == false) {
+        if (!Running.test()) {
             break;
         }
 
+        // Call our specialized loader
         LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
 
-        ItemReady.Reset();
-
+        // Signal the main asset thread that we are done
         AssetManager.DataLoaded.SignalDataWritten();
+
+        // IsBusy.clear();
+        DataPendingUpload.test_and_set();
     }
 }
 
@@ -48,14 +54,13 @@ void FxAssetWorker::Update()
 void FxAssetManager::Start(int32 thread_count)
 {
     mThreadCount = thread_count;
-    mActive = true;
+    mActive.test_and_set();
 
     mWorkerThreads.InitCapacity(thread_count);
 
     for (int32 i = 0; i < thread_count; i++) {
         FxAssetWorker *worker = mWorkerThreads.Insert();
         worker->Create();
-
     }
 
     std::thread *thread = new std::thread([this]() { FxAssetManager::AssetThreadUpdate(); });
@@ -64,21 +69,20 @@ void FxAssetManager::Start(int32 thread_count)
 
 void FxAssetManager::Shutdown()
 {
-    if (mActive == false) {
+    if (!mActive.test()) {
         return;
     }
 
-    mActive = false;
-    DataAvailable.SignalDataWritten();
+    mActive.clear();
+    ItemsEnqueuedNotifier.Kill();
 
-    // for (std::thread *thread : mWorkerThreads) {
-    //     thread->join();
-    //     delete thread;
-    // }
-    //
     for (auto &worker : mWorkerThreads) {
-        worker.Running.store(false);
-        worker.ItemReady.SignalDataWritten();
+        worker.Running.clear();
+        worker.Running.notify_one();
+
+        // The worker waits on ItemReady, so we kill the notifier
+        worker.ItemReady.Kill();
+
         worker.Thread.join();
     }
 
@@ -109,29 +113,20 @@ void FxAssetManager::LoadModel(PtrContainer<FxModel> &model, std::string path)
     queue_item.Path = path;
 
     AssetManager.mLoadQueue.Push(queue_item);
+    while (AssetManager.ItemsEnqueued.test_and_set()) {
+        AssetManager.ItemsEnqueued.wait(true, std::memory_order_relaxed);
+    }
 
-    AssetManager.DataAvailable.SignalDataWritten();
+    AssetManager.ItemsEnqueuedNotifier.SignalDataWritten();
 }
 
-void FxAssetManager::AssetThreadUpdate()
+void FxAssetManager::CheckForUploadableData()
 {
-    while (mActive) {
-        DataAvailable.WaitForData();
-        if (!mActive) {
-            break;
-        }
-
-        FxAssetQueueItem item;
-
-        if (!mLoadQueue.PopIfAvailable(&item)) {
+    for (auto &worker : mWorkerThreads) {
+        // If there are no uploads pending, skip the worker
+        if (!worker.DataPendingUpload.test()) {
             continue;
         }
-
-        FxAssetWorker &worker = FindWorkerThread();
-        worker.Item = std::move(item);
-        worker.ItemReady.SignalDataWritten();
-
-        DataLoaded.WaitForData();
 
         auto &loaded_item = worker.Item;
 
@@ -139,8 +134,8 @@ void FxAssetManager::AssetThreadUpdate()
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
 
-            if (!loaded_item.Asset->IsLoaded) {
-                loaded_item.Asset->IsLoaded.wait(true);
+            if (!loaded_item.Asset->IsUploadedToGpu) {
+                loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
 
             if (loaded_item.Asset->OnLoaded) {
@@ -153,46 +148,80 @@ void FxAssetManager::AssetThreadUpdate()
             }
         }
 
-        DataAvailable.Reset();
-        DataLoaded.Reset();
-
-        // FxBaseLoader::Status status = item.Loader->LoadFromFile(item.Asset, item.Path);
-
-        // if (!item.Asset->IsLoaded) {
-        //     item.Asset->IsLoaded.wait(true);
-        //     // continue;
-        // }
-
-        // if (status == FxBaseLoader::Status::Success) {
-        //     if (item.Asset->OnLoaded) {
-        //         item.Asset->OnLoaded(item.Asset);
-        //     }
-        // }
-        // else {
-        //     if (item.Asset->OnError) {
-        //         item.Asset->OnError(item.Asset);
-        //     }
-        // }
+        ItemsEnqueued.clear();
+        worker.IsBusy.clear();
     }
 }
 
-FxAssetWorker &FxAssetManager::FindWorkerThread()
+bool FxAssetManager::CheckWorkersBusy()
 {
-    // TODO: find the best worker based on items available
-    for (FxAssetWorker &worker : mWorkerThreads) {
-        if (!worker.IsBusy) {
-            return worker;
+    for (auto &worker : mWorkerThreads) {
+        if (worker.IsBusy.test()) {
+            return true;
         }
     }
-    return mWorkerThreads[0];
+    return false;
 }
 
-
-void FxAssetManager::WorkerUpdate()
+void FxAssetManager::CheckForItemsToLoad()
 {
-    while (mActive) {
-
+    FxAssetQueueItem item;
+    if (!mLoadQueue.PopIfAvailable(&item)) {
+        return;
     }
+
+    // Find a worker thread
+    FxAssetWorker *worker = FindWorkerThread();
+
+    // No workers available, poll until one becomes available
+    while (worker == nullptr) {
+        Log::Debug("No workers available; Polling for worker thread...");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        worker = FindWorkerThread();
+    }
+
+    // Submit the item we want to load
+    worker->SubmitItemToLoad(item);
+}
+
+void FxAssetManager::AssetThreadUpdate()
+{
+    while (mActive.test()) {
+        bool is_busy = CheckWorkersBusy();
+
+        // If any of the workers are still marked as busy, there is data
+        // either to be uploaded or is currently being loaded.
+        if (is_busy) {
+            // Loop while we are busy to check for when we are pending upload, as well
+            // as check for new arrivals.
+            while (CheckWorkersBusy()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                CheckForUploadableData();
+                CheckForItemsToLoad();
+            }
+        }
+
+        // Wait for items to be submitted
+        ItemsEnqueuedNotifier.WaitForData();
+
+        if (!mActive.test()) {
+            break;
+        }
+
+        CheckForItemsToLoad();
+    }
+}
+
+FxAssetWorker *FxAssetManager::FindWorkerThread()
+{
+    for (FxAssetWorker &worker : mWorkerThreads) {
+        if (!worker.IsBusy.test()) {
+            return &worker;
+        }
+    }
+    return nullptr;
 }
 
 FxAssetManager &FxAssetManager::GetInstance()

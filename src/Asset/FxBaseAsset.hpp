@@ -33,6 +33,6 @@ public:
     OnLoadFunc OnLoaded = nullptr;
     OnErrorFunc OnError = nullptr;
 
-    std::atomic_bool IsLoaded = false;
+    std::atomic_bool IsUploadedToGpu = false;
 // private:
 };

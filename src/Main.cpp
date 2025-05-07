@@ -130,10 +130,10 @@ int main()
             camera.Move(Vec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !new_model->IsLoaded) {
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !new_model->IsUploadedToGpu) {
             FxAssetManager::LoadModel(new_model, "../models/DamagedHelmet.glb");
         }
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && new_model->IsLoaded) {
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && new_model->IsUploadedToGpu) {
             new_model->Destroy();
         }
 

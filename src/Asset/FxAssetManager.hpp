@@ -5,6 +5,7 @@
 #include "FxModel.hpp"
 #include "Asset/FxAssetQueue.hpp"
 
+#include <atomic>
 #include <condition_variable>
 #include <thread>
 
@@ -23,10 +24,13 @@ public:
 
     void Create();
 
-    void DispatchAsset(FxAssetQueueItem &item)
+    void SubmitItemToLoad(FxAssetQueueItem &item)
     {
-        IsBusy = true;
+        while (IsBusy.test_and_set())
+            IsBusy.wait(true, std::memory_order_relaxed);
+
         Item = std::move(item);
+        ItemReady.SignalDataWritten();
     }
 
     void Update();
@@ -34,13 +38,14 @@ public:
 public:
     FxAssetQueueItem Item;
     FxBaseLoader::Status LoadStatus;
+
     FxDataNotifier ItemReady;
 
-    std::atomic_bool Running = false;
+    std::atomic_flag Running;
+    std::atomic_flag IsBusy;
 
-    std::atomic_bool IsBusy = false;
+    std::atomic_flag DataPendingUpload;
 
-    // FxDataProcessor Processor;
     std::thread Thread;
 };
 
@@ -66,16 +71,21 @@ public:
 
 private:
     // void NotifyAssetOnLoad(FxAssetQueueItem &item);
-    FxAssetWorker &FindWorkerThread();
+    FxAssetWorker *FindWorkerThread();
+    void CheckForUploadableData();
+    void CheckForItemsToLoad();
+
+    bool CheckWorkersBusy();
 
 public:
     FxDataNotifier DataLoaded;
 private:
     FxAssetQueue mLoadQueue;
 
-    std::atomic_bool mActive = false;
-    FxDataNotifier DataAvailable;
+    std::atomic_flag mActive;
 
+    FxDataNotifier ItemsEnqueuedNotifier;
+    std::atomic_flag ItemsEnqueued;
 
     int32 mThreadCount = 2;
     // StaticArray<std::thread *> mWorkerThreads;
