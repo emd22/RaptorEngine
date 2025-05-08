@@ -5,9 +5,7 @@
 namespace vulkan {
 
 #include "vulkan/vulkan_core.h"
-
 #include <Core/Log.hpp>
-#include <climits>
 
 #include <Core/FxPanic.hpp>
 
@@ -216,8 +214,9 @@ void GPUDevice::CreateLogicalDevice()
 
     const VkPhysicalDeviceFeatures device_features{};
     const char *device_extensions[] = {
-        // TODO: ifdef macOS/__APPLE__ here
+    #ifdef FX_PLATFORM_MACOS
         "VK_KHR_portability_subset",
+    #endif
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 

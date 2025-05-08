@@ -18,7 +18,7 @@ public:
     friend class FxAssetManager;
 
 public:
-    void Render();
+    void Render(GraphicsPipeline &pipeline);
     bool CheckIfReady();
 
     ~FxModel() override

@@ -1,8 +1,10 @@
 #include "Core/Defines.hpp"
+#include "Renderer/Constants.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Renderer/Backend/Vulkan/ShaderList.hpp"
 #include <Renderer/Backend/Vulkan/Shader.hpp>
 #include "Renderer/FxCamera.hpp"
+#include "vulkan/vulkan_core.h"
 
 #define SDL_DISABLE_OLD_NAMES
 #include <SDL3/SDL.h>
@@ -88,6 +90,14 @@ int main()
         RendererVulkan->Swapchain.CreateSwapchainFramebuffers(&pipeline);
     }
 
+    RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
+    RendererVulkan->DescriptorPool.Create(RendererVulkan->GetDevice(), RendererFramesInFlight);
+
+    for (FrameData &frame : RendererVulkan->Frames) {
+        frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.DescriptorSetLayout);
+        frame.DescriptorSet.SetBuffer(frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    }
+
     auto &asset_manager = FxAssetManager::GetInstance();
     asset_manager.Start(2);
 
@@ -151,8 +161,9 @@ int main()
 
         CheckGeneralControls();
 
-        new_model->Render();
-        other_model->Render();
+        new_model->Render(pipeline);
+        other_model->Render(pipeline);
+
         Renderer->FinishFrame(pipeline);
 
         LastTick = CurrentTick;

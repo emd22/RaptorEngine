@@ -6,7 +6,6 @@
 #include "Asset/FxAssetQueue.hpp"
 
 #include <atomic>
-#include <condition_variable>
 #include <thread>
 
 #include <Core/FxDataNotifier.hpp>

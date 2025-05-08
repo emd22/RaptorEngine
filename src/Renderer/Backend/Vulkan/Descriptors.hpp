@@ -9,6 +9,9 @@
 #include <Core/StaticArray.hpp>
 #include <vector>
 
+#include <Renderer/Backend/Vulkan/FxGpuBuffer.hpp>
+#include <Renderer/Backend/Vulkan/Pipeline.hpp>
+
 namespace vulkan {
 
 class DescriptorPool
@@ -41,6 +44,11 @@ public:
         vkDestroyDescriptorPool(mDevice->Device, Pool, nullptr);
     }
 
+    // ~DescriptorPool()
+    // {
+    //     Destroy();
+    // }
+
 public:
     VkDescriptorPool Pool = nullptr;
     std::vector<VkDescriptorPoolSize> PoolSizes;
@@ -68,16 +76,49 @@ public:
         }
     }
 
-    operator VkDescriptorSet() const { return Set; }
+    template <typename T>
+    void SetBuffer(FxRawGpuBuffer<T> &buffer, VkDescriptorType type)
+    {
+        VkDescriptorBufferInfo info{
+            .buffer = buffer.Buffer,
+            .offset = 0,
+            .range = sizeof(T)
+        };
+
+        VkWriteDescriptorSet desc_write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = type,
+            .descriptorCount = 1,
+            .dstSet = Set,
+            .dstBinding = BindingDest,
+            .dstArrayElement = 0,
+            .pBufferInfo = &info,
+        };
+
+        vkUpdateDescriptorSets(mDevice->Device, 1, &desc_write, 0, nullptr);
+    }
+
+    void Bind(FxCommandBuffer &cmd, VkPipelineBindPoint bind_point, GraphicsPipeline &pipeline) const
+    {
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);
+    }
+
+    operator VkDescriptorSet() { return Set; }
 
     void Destroy()
     {
         vkDestroyDescriptorSetLayout(mDevice->Device, Layout, nullptr);
     }
 
+    // ~DescriptorSet()
+    // {
+    //     Destroy();
+    // }
+
 public:
     VkDescriptorSet Set = nullptr;
     VkDescriptorSetLayout Layout = nullptr;
+    uint32 BindingDest = 0;
 private:
     GPUDevice *mDevice = nullptr;
 };

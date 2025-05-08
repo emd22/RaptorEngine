@@ -131,6 +131,8 @@ void FxRenderBackendVulkan::DestroyFrames()
     vkQueueWaitIdle(GetDevice()->GraphicsQueue);
 
     for (auto &frame : Frames) {
+        frame.DescriptorSet.Destroy();
+
         frame.CommandBuffer.Destroy();
         frame.CommandPool.Destroy();
 
@@ -426,9 +428,14 @@ void FxRenderBackendVulkan::SubmitUploadCmd(FxRenderBackendVulkan::UploadFunc up
     UploadContext.CommandPool.Reset();
 }
 
+
+static UniformBufferObject ubo;
+
 FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix)
 {
     FrameData *frame = GetFrame();
+
+    memcpy(ubo.MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
     frame->InFlight.WaitFor();
 
@@ -482,6 +489,8 @@ void FxRenderBackendVulkan::SubmitFrame()
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
+
+    frame->SubmitUbo(&ubo);
 
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -609,6 +618,8 @@ void FxRenderBackendVulkan::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
+    DescriptorPool.Destroy();
+
     GetDevice()->WaitForIdle();
 
     Swapchain.Destroy();
@@ -619,6 +630,7 @@ void FxRenderBackendVulkan::Destroy()
     }
 
     GetDevice()->Destroy();
+
     DestroyDebugMessenger(mInstance, mDebugMessenger);
     vkDestroyInstance(mInstance, nullptr);
 

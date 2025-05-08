@@ -19,7 +19,7 @@ bool FxModel::CheckIfReady()
     return (mModelReady = true);
 }
 
-void FxModel::Render()
+void FxModel::Render(GraphicsPipeline &pipeline)
 {
     if (!CheckIfReady()) {
         return;
@@ -32,6 +32,6 @@ void FxModel::Render()
             continue;
         }
 
-        mesh->Render();
+        mesh->Render(pipeline);
     }
 }

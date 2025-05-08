@@ -116,13 +116,15 @@ public:
     FxGpuBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
     FxGpuBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
 
-    void Render()
+    void Render(GraphicsPipeline &pipeline)
     {
         const VkDeviceSize offset = 0;
-        const FrameData *frame = RendererVulkan->GetFrame();
+        FrameData *frame = RendererVulkan->GetFrame();
 
         vkCmdBindVertexBuffers(frame->CommandBuffer.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        frame->DescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
         vkCmdDrawIndexed(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Size, 1, 0, 0, 0);
         // vkCmdDraw(frame->CommandBuffer.CommandBuffer, mVertexBuffer.Size, 1, 0, 0);

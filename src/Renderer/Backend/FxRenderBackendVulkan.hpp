@@ -12,6 +12,8 @@
 #include "Vulkan/FrameData.hpp"
 #include "Vulkan/FxCommandBuffer.hpp"
 
+#include "Vulkan/Descriptors.hpp"
+
 #include <Renderer/FxWindow.hpp>
 
 #include <Renderer/Backend/Vulkan/Fence.hpp>
@@ -134,6 +136,9 @@ public:
     StaticArray<FrameData> Frames;
 
     VmaAllocator GPUAllocator = nullptr;
+
+    // XXX: temporary
+    DescriptorPool DescriptorPool;
 
     FxGpuUploadContext UploadContext;
 private:
