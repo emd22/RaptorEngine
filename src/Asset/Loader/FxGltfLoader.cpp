@@ -109,6 +109,7 @@ void FxGltfLoader::CreateGpuResource(FxBaseAsset *asset)
     mGltfData = nullptr;
 
     model->IsUploadedToGpu = true;
+    model->IsUploadedToGpu.notify_all();
 }
 
 void FxGltfLoader::Destroy(FxBaseAsset *asset)

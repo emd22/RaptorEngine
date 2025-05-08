@@ -17,10 +17,7 @@
 class FxAssetWorker
 {
 public:
-    FxAssetWorker()
-    {
-
-    }
+    FxAssetWorker() = default;
 
     void Create();
 
@@ -56,7 +53,6 @@ public:
     void Shutdown();
 
     void WorkerUpdate();
-    void AssetThreadUpdate();
 
     static FxAssetManager &GetInstance();
 
@@ -70,12 +66,14 @@ public:
     }
 
 private:
-    // void NotifyAssetOnLoad(FxAssetQueueItem &item);
     FxAssetWorker *FindWorkerThread();
+
     void CheckForUploadableData();
     void CheckForItemsToLoad();
 
     bool CheckWorkersBusy();
+
+    void AssetManagerUpdate();
 
 public:
     FxDataNotifier DataLoaded;
@@ -90,7 +88,7 @@ private:
     int32 mThreadCount = 2;
     // StaticArray<std::thread *> mWorkerThreads;
     StaticArray<FxAssetWorker> mWorkerThreads;
-    std::thread *mAssetThread;
+    std::thread *mAssetManagerThread;
 };
 
 

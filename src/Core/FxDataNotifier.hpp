@@ -37,6 +37,12 @@ public:
         mDone = false;
     }
 
+    bool IsKilled()
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        return mKilled;
+    }
+
     void Kill()
     {
         std::lock_guard<std::mutex> lock(mMutex);

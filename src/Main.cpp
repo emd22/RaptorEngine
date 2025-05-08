@@ -92,8 +92,10 @@ int main()
     asset_manager.Start(2);
 
     // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
+    PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
+
+    PtrContainer<FxModel> other_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
@@ -130,11 +132,12 @@ int main()
             camera.Move(Vec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !new_model->IsUploadedToGpu) {
-            FxAssetManager::LoadModel(new_model, "../models/DamagedHelmet.glb");
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !other_model->IsUploadedToGpu) {
+            // FxAssetManager::LoadModel(new_model, "../models/DamagedHelmet.glb");
+            FxAssetManager::LoadModel(other_model, "../models/DamagedHelmet.glb");
         }
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && new_model->IsUploadedToGpu) {
-            new_model->Destroy();
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && other_model->IsUploadedToGpu) {
+            other_model->Destroy();
         }
 
         camera.Update();
@@ -149,6 +152,7 @@ int main()
         CheckGeneralControls();
 
         new_model->Render();
+        other_model->Render();
         Renderer->FinishFrame(pipeline);
 
         LastTick = CurrentTick;
