@@ -8,5 +8,13 @@
     #define FX_NO_SIMD 1
 #endif
 
+#ifdef __APPLE__
+    #define FX_PLATFORM_MACOS 1
+#elif _WIN64
+    #define FX_PLATFORM_WINDOWS 1
+#else
+    #error "Unsupported platform"
+#endif
+
 #define FX_SET_MODULE_NAME(str) \
     static const char *FxModuleName__ = str;

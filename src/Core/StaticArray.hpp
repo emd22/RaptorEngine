@@ -171,6 +171,19 @@ public:
         // Data[Size++] = object;
     }
 
+    /** Inserts a new empty element into the array and returns a pointer to the element */
+    ElementType *Insert()
+    {
+        if (Size + 1 > Capacity) {
+            printf("New Size(%lu) > Capacity(%lu)!\n", Size + 1, Capacity);
+            throw std::out_of_range("StaticArray insert is larger than the capacity!");
+        }
+
+        ElementType *element = &Data[Size++];
+
+        return element;
+    }
+
     void InitCapacity(size_t element_count)
     {
         if (Data != nullptr) {

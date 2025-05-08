@@ -23,4 +23,8 @@ public:
     virtual ~FxBaseLoader()
     {
     }
+
+    virtual void CreateGpuResource(FxBaseAsset *asset) = 0;
+protected:
+    friend class FxAssetManager;
 };

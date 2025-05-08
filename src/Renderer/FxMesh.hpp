@@ -19,7 +19,7 @@ public:
 
     FxMesh(StaticArray<VertexType> &vertices)
     {
-        SetVertices(vertices);
+        UploadVertices(vertices);
     }
 
     FxMesh(StaticArray<VertexType> &vertices, StaticArray<uint32> &indices)
@@ -41,16 +41,16 @@ public:
 
     void CreateFromData(StaticArray<VertexType> &vertices, StaticArray<uint32> &indices)
     {
-        SetVertices(vertices);
-        SetIndices(indices);
+        UploadVertices(vertices);
+        UploadIndices(indices);
     }
 
-    void SetVertices(StaticArray<VertexType> &vertices)
+    void UploadVertices(StaticArray<VertexType> &vertices)
     {
         mVertexBuffer.Create(FxBufferUsageType::Vertices, vertices);
     }
 
-    void SetIndices(StaticArray<uint32> &indices)
+    void UploadIndices(StaticArray<uint32> &indices)
     {
         mIndexBuffer.Create(FxBufferUsageType::Indices, indices);
     }
@@ -73,7 +73,7 @@ public:
     {
         StaticArray<VertexType> vertices(positions.Size / 3);
 
-        Log::Info("Creating combined vertex buffer (Contains:Position) (s: %d)", vertices.Capacity);
+        // Log::Info("Creating combined vertex buffer (Contains:Position) (s: %d)", vertices.Capacity);
 
         for (int i = 0; i < vertices.Capacity; i++) {
             VertexType vertex;
@@ -93,7 +93,7 @@ public:
 
         StaticArray<VertexType> vertices(positions.Size / 3);
 
-        Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
+        // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
 
         for (int i = 0; i < vertices.Capacity; i++) {
             // make a combined vertex + normal + other a
