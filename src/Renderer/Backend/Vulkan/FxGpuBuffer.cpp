@@ -4,7 +4,7 @@
 
 namespace vulkan {
 
-void FxGpuBufferSubmitUploadCmd(std::function<void(FxCommandBuffer &)> func)
+void FxGpuBufferSubmitUploadCmd(std::function<void(RvkCommandBuffer &)> func)
 {
     RendererVulkan->SubmitUploadCmd(func);
 }

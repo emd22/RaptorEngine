@@ -17,7 +17,7 @@ namespace vulkan {
 class DescriptorPool
 {
 public:
-    void Create(GPUDevice *device, uint32 max_sets = 10)
+    void Create(RvkGpuDevice *device, uint32 max_sets = 10)
     {
         mDevice = device;
 
@@ -55,7 +55,7 @@ public:
 private:
     friend class DescriptorSet;
 
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
 };
 
 class DescriptorSet
@@ -98,7 +98,7 @@ public:
         vkUpdateDescriptorSets(mDevice->Device, 1, &desc_write, 0, nullptr);
     }
 
-    void Bind(FxCommandBuffer &cmd, VkPipelineBindPoint bind_point, GraphicsPipeline &pipeline) const
+    void Bind(RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, GraphicsPipeline &pipeline) const
     {
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);
     }
@@ -120,7 +120,7 @@ public:
     VkDescriptorSetLayout Layout = nullptr;
     uint32 BindingDest = 0;
 private:
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
 };
 
 

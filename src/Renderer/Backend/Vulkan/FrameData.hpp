@@ -6,6 +6,7 @@
 #include "FxCommandPool.hpp"
 #include "FxCommandBuffer.hpp"
 #include "Descriptors.hpp"
+#include "RvkImage.hpp"
 
 #include "FxGpuBuffer.hpp"
 #include <Math/Mat4.hpp>
@@ -13,24 +14,27 @@
 
 namespace vulkan {
 
-struct UniformBufferObject
+struct alignas(16) UniformBufferObject
 {
     Mat4f MvpMatrix;
 };
 
-class FrameData
+struct FrameData
 {
 public:
-    void Create(GPUDevice *device);
+    void Create(RvkGpuDevice *device);
     void SubmitUbo(UniformBufferObject *ubo);
     void Destroy();
 public:
     FxCommandPool CommandPool;
-    FxCommandBuffer CommandBuffer;
+    RvkCommandBuffer CommandBuffer;
 
     DescriptorSet DescriptorSet;
 
     FxRawGpuBuffer<UniformBufferObject> UniformBuffer;
+
+    // BLEH
+    RvkImage DepthTexture;
 
     Semaphore ImageAvailable;
     Semaphore RenderFinished;

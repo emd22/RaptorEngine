@@ -4,5 +4,5 @@
 
 VmaAllocator Fx_Fwd_GetGpuAllocator()
 {
-    return RendererVulkan->GPUAllocator;
+    return RendererVulkan->GpuAllocator;
 }

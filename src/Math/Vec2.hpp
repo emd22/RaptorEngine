@@ -8,51 +8,56 @@ public:
     Vec2Base() = default;
 
     Vec2Base(Type x, Type y)
-        : mX(x), mY(y)
+        : X(x), Y(y)
     {
     }
 
     explicit Vec2Base(Type scalar)
-        : mX(scalar), mY(scalar)
+        : X(scalar), Y(scalar)
     {
     }
 
     Vec2Base operator + (const Vec2Base &other) const
     {
         Vec2Base result = *this;
-        result.mX += other.mX;
-        result.mY += other.mY;
+        result += other;
+        return result;
+    }
+
+    Vec2Base operator - (const Vec2Base &other) const
+    {
+        Vec2Base result = *this;
+        result -= other;
         return result;
     }
 
     Vec2Base operator * (const Vec2Base &other) const
     {
         Vec2Base result = *this;
-        result.mX *= other.mX;
-        result.mY *= other.mY;
+        result *= other;
         return result;
     }
 
     Vec2Base &operator += (const Vec2Base &other)
     {
-        mX += other.mX;
-        mY += other.mY;
+        X += other.X;
+        Y += other.Y;
 
         return *this;
     }
 
     Vec2Base &operator -= (const Vec2Base &other)
     {
-        mX -= other.mX;
-        mY -= other.mY;
+        X -= other.X;
+        Y -= other.Y;
 
         return *this;
     }
 
     Vec2Base &operator *= (const Vec2Base &other)
     {
-        mX *= other.mX;
-        mY *= other.mY;
+        X *= other.X;
+        Y *= other.Y;
 
         return *this;
     }
@@ -60,38 +65,42 @@ public:
     Vec2Base operator * (float scalar) const
     {
         Vec2Base result = *this;
-        result.mX *= scalar;
-        result.mY *= scalar;
+        result.X *= scalar;
+        result.Y *= scalar;
         return result;
     }
 
-    void Set(Type x, Type y) { mX = x; mY = y; }
+    Vec2Base<Type> &operator = (const Vec2Base<Type> &other)
+    {
+        X = other.X;
+        Y = other.Y;
+        return *this;
+    }
 
-    Type GetX() const { return mX; }
-    Type GetY() const { return mY; }
+    void Set(Type x, Type y) { X = x; Y = y; }
 
-    Type X() const { return GetX(); }
-    Type Y() const { return GetY(); }
+    Type GetX() const { return X; }
+    Type GetY() const { return Y; }
 
-    void SetX(Type x) { mX = x; }
-    void SetY(Type y) { mY = y; }
+    void SetX(Type x) { X = x; }
+    void SetY(Type y) { Y = y; }
 
     Type Width() const { return GetX(); }
     Type Height() const { return GetY(); }
 
-    static const Vec2Base<Type> Zero()
-    {
-        return Vec2Base<Type>(0, 0);
-    };
+    static const Vec2Base<Type> Zero;
 
-private:
-    Type mX;
-    Type mY;
+public:
+    Type X;
+    Type Y;
 };
+
+// Declaration of Vec2::Zero
+template <typename Type>
+const Vec2Base<Type> Vec2Base<Type>::Zero = Vec2Base<Type>(0, 0);
 
 using Vec2f = Vec2Base<float32>;
 using Vec2d = Vec2Base<float64>;
-
 
 using Vec2i = Vec2Base<int32>;
 using Vec2u = Vec2Base<uint32>;

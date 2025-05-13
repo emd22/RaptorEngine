@@ -87,7 +87,7 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
         .primitiveRestartEnable = VK_FALSE,
     };
 
-    const Vec2i extent = RendererVulkan->Swapchain.Extent;
+    const Vec2u extent = RendererVulkan->Swapchain.Extent;
 
     VkViewport viewport = {
         .x = 0.0f,
@@ -126,14 +126,23 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
     };
 
 
-    VkPipelineMultisampleStateCreateInfo multisampling_info = {
+    VkPipelineMultisampleStateCreateInfo multisampling_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .sampleShadingEnable = VK_FALSE,
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
     };
 
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable = VK_FALSE,
+    };
 
-    VkPipelineColorBlendAttachmentState color_blend_attachment = {
+
+    VkPipelineColorBlendAttachmentState color_blend_attachment {
         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
                         | VK_COLOR_COMPONENT_G_BIT
                         | VK_COLOR_COMPONENT_B_BIT
@@ -142,7 +151,7 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
     };
 
 
-    VkPipelineColorBlendStateCreateInfo color_blend_info = {
+    VkPipelineColorBlendStateCreateInfo color_blend_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE,
         .attachmentCount = 1,
@@ -165,6 +174,7 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
         .pRasterizationState = &rasterizer_info,
         .pMultisampleState = &multisampling_info,
         .pColorBlendState = &color_blend_info,
+        .pDepthStencilState = &depth_stencil_info,
 
         .pDynamicState = &dynamic_state_info,
 
@@ -181,7 +191,7 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
     }
 }
 
-void GraphicsPipeline::Bind(FxCommandBuffer &command_buffer) {
+void GraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }
 

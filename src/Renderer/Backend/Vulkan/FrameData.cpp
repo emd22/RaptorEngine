@@ -7,7 +7,7 @@
 
 namespace vulkan {
 
-void FrameData::Create(GPUDevice *device)
+void FrameData::Create(RvkGpuDevice *device)
 {
     ImageAvailable.Create(device);
     RenderFinished.Create(device);

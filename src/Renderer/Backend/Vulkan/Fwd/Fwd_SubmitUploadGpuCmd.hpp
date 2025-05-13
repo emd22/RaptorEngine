@@ -5,6 +5,6 @@
 
 namespace vulkan {
 
-void Fx_Fwd_SubmitUploadCmd(std::function<void (FxCommandBuffer &)> func);
+void Fx_Fwd_SubmitUploadCmd(std::function<void (RvkCommandBuffer &)> func);
 
 }

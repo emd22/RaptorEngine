@@ -54,10 +54,10 @@ private:
     uint32 mTransferIndex = QueueNull;
 };
 
-class GPUDevice {
+class RvkGpuDevice {
 public:
-    GPUDevice() = default;
-    GPUDevice(VkInstance instance, VkSurfaceKHR surface)
+    RvkGpuDevice() = default;
+    RvkGpuDevice(VkInstance instance, VkSurfaceKHR surface)
     {
         Create(instance, surface);
     }

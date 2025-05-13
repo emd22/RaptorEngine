@@ -9,7 +9,7 @@ namespace vulkan {
 
 FX_SET_MODULE_NAME("CommandBuffer")
 
-void FxCommandBuffer::Create(FxCommandPool *pool)
+void RvkCommandBuffer::Create(FxCommandPool *pool)
 {
     mCommandPool = pool;
 
@@ -32,14 +32,14 @@ void FxCommandBuffer::Create(FxCommandPool *pool)
     mInitialized = true;
 }
 
-inline void FxCommandBuffer::CheckInitialized() const
+inline void RvkCommandBuffer::CheckInitialized() const
 {
     if (!IsInitialized()) {
         FxPanic("Command buffer has not been initialized!", 0);
     }
 }
 
-void FxCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
+void RvkCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
 {
     CheckInitialized();
 
@@ -55,14 +55,14 @@ void FxCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
     }
 }
 
-void FxCommandBuffer::Reset()
+void RvkCommandBuffer::Reset()
 {
     CheckInitialized();
 
     vkResetCommandBuffer(CommandBuffer, 0);
 }
 
-void FxCommandBuffer::End()
+void RvkCommandBuffer::End()
 {
     CheckInitialized();
 
@@ -72,7 +72,7 @@ void FxCommandBuffer::End()
     }
 }
 
-void FxCommandBuffer::Destroy()
+void RvkCommandBuffer::Destroy()
 {
     vkFreeCommandBuffers(mDevice->Device, mCommandPool->CommandPool, 1, &CommandBuffer);
 }

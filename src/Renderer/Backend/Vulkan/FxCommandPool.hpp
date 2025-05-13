@@ -13,7 +13,7 @@ class FxCommandPool
 {
 public:
 
-    void Create(GPUDevice *device, uint32 queue_family)
+    void Create(RvkGpuDevice *device, uint32 queue_family)
     {
         QueueFamilyIndex = queue_family;
 
@@ -46,7 +46,7 @@ public:
     VkCommandPool CommandPool = nullptr;
     uint32 QueueFamilyIndex = 0;
 private:
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
 };
 
 

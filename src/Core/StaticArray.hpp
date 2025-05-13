@@ -72,14 +72,14 @@ public:
 
     StaticArray(std::initializer_list<ElementType> list)
     {
-        InitSize(list.size());
+        InitCapacity(list.size());
 
-        int index = 0;
-        for (const ElementType obj : list) {
-            Data[index] = obj;
-            index++;
+        for (const ElementType &obj : list) {
+            Insert(obj);
         }
     }
+
+
 
     StaticArray(StaticArray<ElementType> &&other)
     {
@@ -106,6 +106,8 @@ public:
             delete Data;
 
             Data = nullptr;
+            Capacity = 0;
+            Size = 0;
         }
     }
 
@@ -145,7 +147,24 @@ public:
         return Data[index];
     }
 
-    StaticArray<ElementType> operator=(StaticArray<ElementType> &&other)
+    StaticArray<ElementType> operator = (std::initializer_list<ElementType> &list)
+    {
+        const size_t list_size = list.size();
+        if (list_size > Capacity) {
+            Free();
+            InitCapacity(list.size());
+        }
+
+        Clear();
+
+        for (const ElementType &obj : list) {
+            Insert(obj);
+        }
+
+        return *this;
+    }
+
+    StaticArray<ElementType> operator = (StaticArray<ElementType> &&other)
     {
         Data = std::move(other.Data);
         other.Data = nullptr;
@@ -162,20 +181,19 @@ public:
 
     void Insert(const ElementType &object)
     {
-        if (Size + 1 > Capacity) {
-            printf("New Size(%lu) > Capacity(%lu)!\n", Size + 1, Capacity);
+        if (Size > Capacity) {
+            printf("New Size(%lu) > Capacity(%lu)!\n", Size, Capacity);
             throw std::out_of_range("StaticArray insert is larger than the capacity!");
         }
 
         memcpy(&Data[Size++], &object, sizeof(ElementType));
-        // Data[Size++] = object;
     }
 
     /** Inserts a new empty element into the array and returns a pointer to the element */
     ElementType *Insert()
     {
-        if (Size + 1 > Capacity) {
-            printf("New Size(%lu) > Capacity(%lu)!\n", Size + 1, Capacity);
+        if (Size > Capacity) {
+            printf("New Size(%lu) > Capacity(%lu)!\n", Size, Capacity);
             throw std::out_of_range("StaticArray insert is larger than the capacity!");
         }
 

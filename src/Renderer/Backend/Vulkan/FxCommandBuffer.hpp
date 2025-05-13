@@ -6,7 +6,7 @@
 
 namespace vulkan {
 
-class FxCommandBuffer
+class RvkCommandBuffer
 {
 public:
     void Create(FxCommandPool *pool);
@@ -32,7 +32,7 @@ public:
 private:
     bool mInitialized = false;
     FxCommandPool *mCommandPool = nullptr;
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
 };
 
 }; // namespace vulkan

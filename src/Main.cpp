@@ -21,13 +21,13 @@
 
 #include "FxControls.hpp"
 
-static bool Running = true;
-
 FX_SET_MODULE_NAME("Main")
 
 #include <csignal>
 
 #include <Math/Mat4.hpp>
+
+static bool Running = true;
 
 static uint64 LastTick = 0;
 static float DeltaTime = 1.0f;
@@ -63,8 +63,8 @@ int main()
         exit(1);
     });
 
-    const int window_width = 1024;
-    const int window_height = 720;
+    const uint32 window_width = 1024;
+    const uint32 window_height = 720;
 
     auto window = FxWindow::New("Foxtrot Engine", window_width, window_height);
 
@@ -72,7 +72,7 @@ int main()
     SetRendererBackend(&renderer_state);
 
     Renderer->SelectWindow(window);
-    Renderer->Init(Vec2i(window_width, window_height));
+    Renderer->Init(Vec2u(window_width, window_height));
 
     vulkan::GraphicsPipeline pipeline;
 

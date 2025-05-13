@@ -10,7 +10,7 @@ namespace vulkan {
 class Semaphore
 {
 public:
-    void Create(GPUDevice *device)
+    void Create(RvkGpuDevice *device)
     {
         const VkSemaphoreCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -35,7 +35,7 @@ public:
 public:
     VkSemaphore Semaphore;
 private:
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
 };
 
 };

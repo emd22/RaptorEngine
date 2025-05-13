@@ -11,7 +11,7 @@ namespace vulkan {
 class Fence
 {
 public:
-    void Create(GPUDevice *device)
+    void Create(RvkGpuDevice *device)
     {
         const VkFenceCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -58,7 +58,7 @@ public:
 public:
     VkFence Fence;
 private:
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
 };
 
 

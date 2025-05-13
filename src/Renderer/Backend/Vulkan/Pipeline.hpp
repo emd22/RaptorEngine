@@ -42,9 +42,9 @@ struct VertexInfo
 };
 
 
-struct DrawPushConstants
+struct alignas(16) DrawPushConstants
 {
-    float32 MVPMatrix[16];
+    // float32 MVPMatrix[16];
 };
 
 class GraphicsPipeline
@@ -53,7 +53,7 @@ public:
     void Create(ShaderList shader_list);
     void Destroy();
 
-    void Bind(FxCommandBuffer &command_buffer);
+    void Bind(RvkCommandBuffer &command_buffer);
 
     ~GraphicsPipeline()
     {
@@ -71,7 +71,7 @@ public:
 
     vulkan::RenderPass RenderPass;
 private:
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
     ShaderList mShaders;
 };
 

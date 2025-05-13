@@ -10,17 +10,17 @@ namespace vulkan {
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void Framebuffer::Create(StaticArray<VkImageView> &image_views, GraphicsPipeline &pipeline, Vec2i size)
+void Framebuffer::Create(StaticArray<VkImageView> &image_views, GraphicsPipeline &pipeline, Vec2u size)
 {
     AssertRendererExists();
 
-    const VkFramebufferCreateInfo create_info = {
+    const VkFramebufferCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
         .renderPass = pipeline.RenderPass.RenderPass,
         .attachmentCount = (uint32)image_views.Size,
         .pAttachments = image_views.Data,
-        .width = (uint32)size.Width(),
-        .height = (uint32)size.Height(),
+        .width = size.X,
+        .height = size.Y,
         .layers = 1,
     };
 

@@ -78,7 +78,7 @@ StaticArray<VkLayerProperties> FxRenderBackendVulkan::GetAvailableValidationLaye
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
 
-void FxRenderBackendVulkan::Init(Vec2i window_size)
+void FxRenderBackendVulkan::Init(Vec2u window_size)
 {
     InitVulkan();
     CreateSurfaceFromWindow();
@@ -116,7 +116,7 @@ void FxRenderBackendVulkan::InitFrames()
 
     const uint32 graphics_family = GetDevice()->mQueueFamilies.GetGraphicsFamily();
 
-    GPUDevice *device = GetDevice();
+    RvkGpuDevice *device = GetDevice();
 
     for (int i = 0; i < Frames.Size; i++) {
         Frames.Data[i].CommandPool.Create(device, graphics_family);
@@ -313,7 +313,7 @@ void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messeng
 
 void FxRenderBackendVulkan::InitGPUAllocator()
 {
-    const GPUDevice *device = GetDevice();
+    const RvkGpuDevice *device = GetDevice();
 
     const VmaAllocatorCreateInfo create_info = {
         .physicalDevice = device->Physical,
@@ -321,7 +321,7 @@ void FxRenderBackendVulkan::InitGPUAllocator()
         .instance = mInstance
     };
 
-    const VkResult status = vmaCreateAllocator(&create_info, &GPUAllocator);
+    const VkResult status = vmaCreateAllocator(&create_info, &GpuAllocator);
     if (status != VK_SUCCESS) {
         FxPanic("Could not create VMA allocator!", status);
     }
@@ -329,7 +329,7 @@ void FxRenderBackendVulkan::InitGPUAllocator()
 
 void FxRenderBackendVulkan::DestroyGPUAllocator()
 {
-    vmaDestroyAllocator(GPUAllocator);
+    vmaDestroyAllocator(GpuAllocator);
 }
 
 ExtensionNames FxRenderBackendVulkan::MakeInstanceExtensionList(ExtensionNames &user_requested_extensions)
@@ -395,14 +395,12 @@ ExtensionList &FxRenderBackendVulkan::QueryInstanceExtensions(bool invalidate_pr
     return mAvailableExtensions;
 }
 
-void FxRenderBackendVulkan::SubmitUploadCmd(FxRenderBackendVulkan::UploadFunc upload_func)
+void FxRenderBackendVulkan::SubmitUploadCmd(FxRenderBackendVulkan::SubmitFunc upload_func)
 {
-    FxCommandBuffer &cmd = UploadContext.CommandBuffer;
+    RvkCommandBuffer &cmd = UploadContext.CommandBuffer;
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
     upload_func(cmd);
-
     cmd.End();
 
     const VkSubmitInfo submit_info = {
@@ -426,6 +424,34 @@ void FxRenderBackendVulkan::SubmitUploadCmd(FxRenderBackendVulkan::UploadFunc up
     UploadContext.UploadFence.Reset();
 
     UploadContext.CommandPool.Reset();
+}
+
+
+void FxRenderBackendVulkan::SubmitOneTimeCmd(FxRenderBackendVulkan::SubmitFunc submit_func)
+{
+    RvkCommandBuffer cmd;
+    cmd.Create(&GetFrame()->CommandPool);
+
+    cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    submit_func(cmd);
+    cmd.End();
+
+    const VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+
+        .commandBufferCount = 1,
+        .pCommandBuffers = &cmd.CommandBuffer,
+    };
+
+    VkTry(
+        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, nullptr),
+        "Error submitting upload buffer"
+    );
+
+    vkQueueWaitIdle(GetDevice()->GraphicsQueue);
+
+    cmd.Reset();
+    cmd.Destroy();
 }
 
 
@@ -474,8 +500,7 @@ FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline, Mat4f 
 
 
     DrawPushConstants push_constants{};
-
-    memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
+    // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 

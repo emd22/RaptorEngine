@@ -6,7 +6,7 @@
 
 // TODO: make base versions of these components
 #include <Renderer/Backend/Vulkan/Pipeline.hpp>
-#include <Renderer/Backend/Vulkan/Swapchain.hpp>
+#include <Renderer/Backend/Vulkan/RvkSwapchain.hpp>
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <Renderer/Backend/Vulkan/FxDeletionObject.hpp>
@@ -29,7 +29,7 @@ class FxRenderBackend {
     const uint32 DeletionFrameSpacing = 3;
 
 public:
-    virtual void Init(Vec2i window_size) = 0;
+    virtual void Init(Vec2u window_size) = 0;
     virtual void Destroy() = 0;
 
     virtual void SelectWindow(std::shared_ptr<FxWindow> window) = 0;

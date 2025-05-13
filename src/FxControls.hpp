@@ -121,8 +121,8 @@ private:
     StaticArray<FxControl> mKeyMap;
     bool mMouseCaptured = false;
 
-    Vec2f mMouseDelta = Vec2f::Zero();
-    Vec2f mCapturedMousePos = Vec2f::Zero();
+    Vec2f mMouseDelta = Vec2f::Zero;
+    Vec2f mCapturedMousePos = Vec2f::Zero;
 
     uint8 mThisTick : 1 = 0;
 };

@@ -4,23 +4,23 @@
 
 namespace vulkan {
 
-class Swapchain;
-class GPUDevice;
-class FxCommandBuffer;
+class RvkSwapchain;
+class RvkGpuDevice;
+class RvkCommandBuffer;
 
 class RenderPass
 {
 public:
-    void Create(GPUDevice &device, Swapchain &swapchain);
+    void Create(RvkGpuDevice &device, RvkSwapchain &swapchain);
 
     void Begin();
     void End();
 
-    void Destroy(GPUDevice &device);
+    void Destroy(RvkGpuDevice &device);
 
 public:
     VkRenderPass RenderPass = nullptr;
-    FxCommandBuffer *CommandBuffer = nullptr;
+    RvkCommandBuffer *CommandBuffer = nullptr;
 };
 
 }; // namespace vulkan

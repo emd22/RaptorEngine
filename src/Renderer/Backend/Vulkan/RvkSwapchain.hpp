@@ -4,6 +4,8 @@
 #include "Renderer/Backend/Vulkan/Pipeline.hpp"
 #include <vulkan/vulkan.h>
 
+#include "RvkImage.hpp"
+
 #include "Framebuffer.hpp"
 
 #include <Core/StaticArray.hpp>
@@ -13,12 +15,12 @@ class GPUDevice;
 
 namespace vulkan {
 
-class Swapchain {
+class RvkSwapchain {
 public:
-    Swapchain() = default;
-    ~Swapchain();
+    RvkSwapchain() = default;
+    ~RvkSwapchain();
 
-    void Init(Vec2i size, VkSurfaceKHR &surface, GPUDevice *device);
+    void Init(Vec2u size, VkSurfaceKHR &surface, RvkGpuDevice *device);
     void CreateSwapchainFramebuffers(GraphicsPipeline *pipeline);
 
     VkSwapchainKHR GetSwapchain() { return mSwapchain; }
@@ -26,7 +28,7 @@ public:
     void Destroy();
 
 private:
-    void CreateSwapchain(Vec2i size, VkSurfaceKHR &surface);
+    void CreateSwapchain(Vec2u size, VkSurfaceKHR &surface);
     void CreateSwapchainImages();
     void CreateImageViews();
 
@@ -36,16 +38,19 @@ private:
 public:
     StaticArray<VkImageView> ImageViews;
     StaticArray<VkImage> Images;
+
+    StaticArray<RvkImage> DepthImages;
+
     StaticArray<Framebuffer> Framebuffers;
 
-    Vec2i Extent = Vec2i::Zero();
+    Vec2u Extent = Vec2u::Zero;
 
     VkSurfaceFormatKHR SurfaceFormat;
 
     bool Initialized = false;
 
 private:
-    GPUDevice *mDevice = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
     GraphicsPipeline *mPipeline = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;
 };

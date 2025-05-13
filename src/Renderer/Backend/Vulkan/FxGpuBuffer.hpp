@@ -224,7 +224,7 @@ public:
 
         this->Create(this->Size, EnumToInt(Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-        Fx_Fwd_SubmitUploadCmd([&](FxCommandBuffer &cmd) {
+        Fx_Fwd_SubmitUploadCmd([&](RvkCommandBuffer &cmd) {
             VkBufferCopy copy = {
                 .dstOffset = 0,
                 .srcOffset = 0,

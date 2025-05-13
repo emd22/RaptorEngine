@@ -170,7 +170,7 @@ bool FxControlManager::IsKeyUp(FxKey scancode)
 
 void FxControlManager::Update()
 {
-    ControlManager.mMouseDelta = Vec2f::Zero();
+    ControlManager.mMouseDelta = Vec2f::Zero;
 
     ControlManager.mThisTick++;
 

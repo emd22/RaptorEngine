@@ -7,7 +7,7 @@
 #include "ThirdParty/vk_mem_alloc.h"
 #include <vulkan/vulkan.h>
 
-#include "Vulkan/Swapchain.hpp"
+#include "Vulkan/RvkSwapchain.hpp"
 #include "Vulkan/Device.hpp"
 #include "Vulkan/FrameData.hpp"
 #include "Vulkan/FxCommandBuffer.hpp"
@@ -25,21 +25,21 @@ namespace vulkan {
 struct FxGpuUploadContext
 {
     FxCommandPool CommandPool;
-    FxCommandBuffer CommandBuffer;
+    RvkCommandBuffer CommandBuffer;
 
     Fence UploadFence;
 };
 
 class FxRenderBackendVulkan final : public FxRenderBackend {
 public:
-    using UploadFunc = std::function<void(FxCommandBuffer &cmd)>;
+    using SubmitFunc = std::function<void(RvkCommandBuffer &cmd)>;
 public:
     FxRenderBackendVulkan() = default;
 
     using ExtensionList = StaticArray<VkExtensionProperties>;
     using ExtensionNames = std::vector<const char *>;
 
-    void Init(Vec2i window_size) override;
+    void Init(Vec2u window_size) override;
     void Destroy() override;
 
     FrameResult BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix) override;
@@ -55,7 +55,7 @@ public:
         return mWindow;
     }
 
-    vulkan::GPUDevice *GetDevice()
+    vulkan::RvkGpuDevice *GetDevice()
     {
         return &mDevice;
     }
@@ -63,9 +63,10 @@ public:
     FrameData *GetFrame();
 
     uint32 GetImageIndex() { return mImageIndex; }
-    VmaAllocator *GetGPUAllocator() { return &GPUAllocator; }
+    VmaAllocator *GetGPUAllocator() { return &GpuAllocator; }
 
-    void SubmitUploadCmd(UploadFunc func);
+    void SubmitUploadCmd(SubmitFunc func);
+    void SubmitOneTimeCmd(SubmitFunc func);
 
     ~FxRenderBackendVulkan()
     {
@@ -95,7 +96,7 @@ public:
 
         if (immediate || is_frame_spaced) {
             if (object.IsGpuBuffer) {
-                vmaDestroyBuffer(GPUAllocator, object.Buffer, object.Allocation);
+                vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
             }
             else {
                 object.Func(&object);
@@ -132,10 +133,10 @@ private:
     StaticArray<VkLayerProperties> GetAvailableValidationLayers();
 
 public:
-    vulkan::Swapchain Swapchain;
+    vulkan::RvkSwapchain Swapchain;
     StaticArray<FrameData> Frames;
 
-    VmaAllocator GPUAllocator = nullptr;
+    VmaAllocator GpuAllocator = nullptr;
 
     // XXX: temporary
     DescriptorPool DescriptorPool;
@@ -147,7 +148,7 @@ private:
     VkSurfaceKHR mWindowSurface = nullptr;
 
     std::shared_ptr<FxWindow> mWindow = nullptr;
-    vulkan::GPUDevice mDevice;
+    vulkan::RvkGpuDevice mDevice;
 
     VkDebugUtilsMessengerEXT mDebugMessenger;
 

@@ -1,4 +1,4 @@
-#include "Swapchain.hpp"
+#include "RvkSwapchain.hpp"
 #include "Core/Defines.hpp"
 #include "Device.hpp"
 
@@ -10,11 +10,11 @@
 
 #include <vulkan/vulkan.h>
 
-FX_SET_MODULE_NAME("Swapchain")
+FX_SET_MODULE_NAME("RvkSwapchain")
 
 namespace vulkan {
 
-void Swapchain::Init(Vec2i size, VkSurfaceKHR &surface, GPUDevice *device)
+void RvkSwapchain::Init(Vec2u size, VkSurfaceKHR &surface, RvkGpuDevice *device)
 {
     AssertRendererExists();
 
@@ -27,7 +27,7 @@ void Swapchain::Init(Vec2i size, VkSurfaceKHR &surface, GPUDevice *device)
     Initialized = true;
 }
 
-void Swapchain::CreateSwapchainImages()
+void RvkSwapchain::CreateSwapchainImages()
 {
     uint32 image_count;
 
@@ -35,9 +35,11 @@ void Swapchain::CreateSwapchainImages()
 
     Images.InitSize(image_count);
     vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, Images.Data);
+
+    DepthImages.InitSize(image_count);
 }
 
-void Swapchain::CreateImageViews()
+void RvkSwapchain::CreateImageViews()
 {
     const uint64 images_size = Images.Size;
 
@@ -64,14 +66,24 @@ void Swapchain::CreateImageViews()
             }
         };
 
-        const VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &ImageViews[i]);
+        VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &ImageViews[i]);
         if (status != VK_SUCCESS) {
             FxPanic("Could not create swapchain image view", status);
         }
+
+        RvkImage &depth_image = DepthImages[i];
+
+        depth_image.Create(
+            Extent,
+            VK_FORMAT_D16_UNORM,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            VK_IMAGE_ASPECT_DEPTH_BIT
+        );
     }
 }
 
-void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
+void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
 {
     Extent = size;
 
@@ -132,17 +144,18 @@ void Swapchain::CreateSwapchain(Vec2i size, VkSurfaceKHR &surface)
     }
 }
 
-void Swapchain::CreateSwapchainFramebuffers(GraphicsPipeline *pipeline)
+void RvkSwapchain::CreateSwapchainFramebuffers(GraphicsPipeline *pipeline)
 {
     Log::Debug("Image view count: %d", ImageViews.Size);
     Framebuffers.Free();
     Framebuffers.InitSize(ImageViews.Size);
 
     StaticArray<VkImageView> temp_views;
-    temp_views.InitSize(1);
+    temp_views.InitSize(2);
 
     for (int i = 0; i < ImageViews.Size; i++) {
         temp_views[0] = ImageViews[i];
+        temp_views[1] = DepthImages[i].View;
 
         Framebuffers[i].Create(temp_views, *pipeline, Extent);
     }
@@ -152,8 +165,14 @@ void Swapchain::CreateSwapchainFramebuffers(GraphicsPipeline *pipeline)
     mPipeline = pipeline;
 }
 
-void Swapchain::DestroyFramebuffersAndImageViews()
+void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
+    // Destroy and free depth images
+    for (RvkImage &depth_image : DepthImages) {
+        depth_image.Destroy();
+    }
+    DepthImages.Free();
+
     for (int i = 0; i < ImageViews.Size; i++) {
         Framebuffers[i].Destroy();
         vkDestroyImageView(mDevice->Device, ImageViews[i], nullptr);
@@ -163,12 +182,12 @@ void Swapchain::DestroyFramebuffersAndImageViews()
     ImageViews.Free();
 }
 
-void Swapchain::DestroyInternalSwapchain()
+void RvkSwapchain::DestroyInternalSwapchain()
 {
     vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr);
 }
 
-void Swapchain::Destroy()
+void RvkSwapchain::Destroy()
 {
     DestroyFramebuffersAndImageViews();
     Images.Free();
@@ -177,7 +196,7 @@ void Swapchain::Destroy()
     Initialized = false;
 }
 
-Swapchain::~Swapchain()
+RvkSwapchain::~RvkSwapchain()
 {
     Images.Free();
 }

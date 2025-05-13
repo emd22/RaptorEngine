@@ -1,0 +1,132 @@
+
+#include "RvkImage.hpp"
+#include <Core/FxPanic.hpp>
+#include "Core/Defines.hpp"
+
+#include "Renderer/FxRenderBackend.hpp"
+#include "Renderer/Renderer.hpp"
+#include "vulkan/vulkan_core.h"
+
+FX_SET_MODULE_NAME("RvkImage")
+
+namespace vulkan {
+
+void RvkImage::Create(
+    Vec2u size,
+    VkFormat format,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkImageAspectFlagBits aspect_flags
+)
+{
+    Size = size;
+    Format = format;
+    mDevice = RendererVulkan->GetDevice();
+
+    // Create the vulkan image
+    VkImageCreateInfo image_info{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+
+        // Dimensions
+        .extent.width = size.Width(),
+        .extent.height = size.Height(),
+        .extent.depth = 1,
+
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .format = format,
+        .tiling = tiling,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .usage = usage,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+
+    VmaAllocationCreateInfo create_info{
+        .usage = VMA_MEMORY_USAGE_AUTO,
+        .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+        .priority = 1.0f,
+    };
+
+    VkResult status = vmaCreateImage(RendererVulkan->GpuAllocator, &image_info, &create_info, &Image, &Allocation, nullptr);
+    if (status != VK_SUCCESS) {
+        FxPanic("Could not create vulkan image", status);
+    }
+
+    const VkImageViewCreateInfo view_create_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = Image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = format,
+        .components = {
+            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+        },
+        .subresourceRange = {
+            .aspectMask = aspect_flags,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        }
+    };
+
+    status = vkCreateImageView(mDevice->Device, &view_create_info, nullptr, &View);
+    if (status != VK_SUCCESS) {
+        FxPanic("Could not create swapchain image view", status);
+    }
+}
+
+void RvkImage::TransitionLayout(VkImageLayout new_layout)
+{
+    VkImageMemoryBarrier barrier{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .oldLayout = ImageLayout,
+        .newLayout = new_layout,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = Image,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        }
+    };
+
+    VkPipelineStageFlags src_stage;
+    VkPipelineStageFlags dest_stage;
+
+    if (ImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        dest_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (ImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+
+    RendererVulkan->SubmitOneTimeCmd([&](RvkCommandBuffer &cmd) {
+        vkCmdPipelineBarrier(cmd, src_stage, dest_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    });
+
+    ImageLayout = new_layout;
+}
+
+void RvkImage::Destroy()
+{
+    vkDestroyImageView(mDevice->Device, View, nullptr);
+    vmaDestroyImage(RendererVulkan->GpuAllocator, Image, Allocation);
+}
+
+}; // namespace vulkan
