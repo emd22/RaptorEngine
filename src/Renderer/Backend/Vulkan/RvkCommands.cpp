@@ -1,15 +1,15 @@
-#include "FxCommandBuffer.hpp"
+#include "RvkCommands.hpp"
 #include <Core/FxPanic.hpp>
 
-#include "Device.hpp"
+#include "RvkDevice.hpp"
 #include "Renderer/Renderer.hpp"
 #include "vulkan/vulkan_core.h"
 
 namespace vulkan {
 
-FX_SET_MODULE_NAME("CommandBuffer")
+FX_SET_MODULE_NAME("RvkCommandBuffer")
 
-void RvkCommandBuffer::Create(FxCommandPool *pool)
+void RvkCommandBuffer::Create(RvkCommandPool *pool)
 {
     mCommandPool = pool;
 

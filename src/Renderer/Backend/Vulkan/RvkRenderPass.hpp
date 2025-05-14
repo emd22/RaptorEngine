@@ -8,7 +8,7 @@ class RvkSwapchain;
 class RvkGpuDevice;
 class RvkCommandBuffer;
 
-class RenderPass
+class RvkRenderPass
 {
 public:
     void Create(RvkGpuDevice &device, RvkSwapchain &swapchain);

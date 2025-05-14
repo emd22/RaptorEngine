@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ShaderList.hpp"
-#include "RenderPass.hpp"
+#include "RvkRenderPass.hpp"
 
 #include <Core/StaticArray.hpp>
 
@@ -9,7 +9,7 @@
 
 #include <Math/Mat4.hpp>
 
-class FxCommandBuffer;
+class RvkCommandBuffer;
 
 namespace vulkan {
 
@@ -20,16 +20,16 @@ enum FxVertexFlags : int8
 };
 
 template <int8 Flags>
-struct FxVertex;
+struct RvkVertex;
 
 template <>
-struct FxVertex<FxVertexPosition>
+struct RvkVertex<FxVertexPosition>
 {
     float32 Position[3];
 } __attribute__((packed));
 
 template <>
-struct FxVertex<FxVertexPosition | FxVertexNormal>
+struct RvkVertex<FxVertexPosition | FxVertexNormal>
 {
     float32 Position[3];
     float32 Normal[3];
@@ -47,7 +47,7 @@ struct alignas(16) DrawPushConstants
     // float32 MVPMatrix[16];
 };
 
-class GraphicsPipeline
+class RvkGraphicsPipeline
 {
 public:
     void Create(ShaderList shader_list);
@@ -55,7 +55,7 @@ public:
 
     void Bind(RvkCommandBuffer &command_buffer);
 
-    ~GraphicsPipeline()
+    ~RvkGraphicsPipeline()
     {
         Destroy();
     }
@@ -69,7 +69,7 @@ public:
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;
 
-    vulkan::RenderPass RenderPass;
+    vulkan::RvkRenderPass RenderPass;
 private:
     RvkGpuDevice *mDevice = nullptr;
     ShaderList mShaders;

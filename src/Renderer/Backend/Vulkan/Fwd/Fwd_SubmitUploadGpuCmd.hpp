@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include "../FxCommandBuffer.hpp"
+#include "../RvkCommands.hpp"
 
 namespace vulkan {
 

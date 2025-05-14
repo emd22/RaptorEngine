@@ -1,4 +1,4 @@
-#include "Shader.hpp"
+#include "RvkShader.hpp"
 
 #include <fstream>
 #include <ios>
@@ -14,7 +14,7 @@
 
 namespace vulkan {
 
-void Shader::Load(const char *path, ShaderType type)
+void RvkShader::Load(const char *path, RvkShaderType type)
 {
     Type = type;
 
@@ -47,7 +47,7 @@ void Shader::Load(const char *path, ShaderType type)
     delete[] file_buffer;
 }
 
-void Shader::Destroy()
+void RvkShader::Destroy()
 {
     if (ShaderModule == nullptr) {
         return;
@@ -57,7 +57,7 @@ void Shader::Destroy()
     vkDestroyShaderModule(device->Device, ShaderModule, nullptr);
 }
 
-void Shader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data)
+void RvkShader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data)
 {
     const VkShaderModuleCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,

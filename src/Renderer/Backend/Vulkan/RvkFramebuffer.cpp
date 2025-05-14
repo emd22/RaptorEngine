@@ -1,7 +1,7 @@
-#include "Framebuffer.hpp"
+#include "RvkFramebuffer.hpp"
 #include "Core/Defines.hpp"
 #include <Core/FxPanic.hpp>
-#include "Renderer/Backend/Vulkan/Device.hpp"
+#include "Renderer/Backend/Vulkan/RvkDevice.hpp"
 #include "Renderer/Renderer.hpp"
 #include <Core/Types.hpp>
 #include "vulkan/vulkan_core.h"
@@ -10,7 +10,7 @@ namespace vulkan {
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void Framebuffer::Create(StaticArray<VkImageView> &image_views, GraphicsPipeline &pipeline, Vec2u size)
+void RvkFramebuffer::Create(StaticArray<VkImageView> &image_views, RvkGraphicsPipeline &pipeline, Vec2u size)
 {
     AssertRendererExists();
 
@@ -33,7 +33,7 @@ void Framebuffer::Create(StaticArray<VkImageView> &image_views, GraphicsPipeline
     }
 }
 
-void Framebuffer::Destroy()
+void RvkFramebuffer::Destroy()
 {
     vkDestroyFramebuffer(mDevice->Device, Framebuffer, nullptr);
 }

@@ -5,11 +5,9 @@
 
 #include <Core/Log.hpp>
 
-#include "Renderer/Backend/Vulkan/Fence.hpp"
-#include "Renderer/Backend/Vulkan/Pipeline.hpp"
-#include "Renderer/Backend/Vulkan/Semaphore.hpp"
-#include "Vulkan/FxCommandPool.hpp"
-#include "Vulkan/FxCommandBuffer.hpp"
+#include "Renderer/Backend/Vulkan/RvkSynchro.hpp"
+#include "Renderer/Backend/Vulkan/RvkPipeline.hpp"
+#include "Vulkan/RvkCommands.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -455,11 +453,11 @@ void FxRenderBackendVulkan::SubmitOneTimeCmd(FxRenderBackendVulkan::SubmitFunc s
 }
 
 
-static UniformBufferObject ubo;
+static RvkUniformBufferObject ubo;
 
-FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix)
+FrameResult FxRenderBackendVulkan::BeginFrame(RvkGraphicsPipeline &pipeline, Mat4f &MVPMatrix)
 {
-    FrameData *frame = GetFrame();
+    RvkFrameData *frame = GetFrame();
 
     memcpy(ubo.MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -509,7 +507,7 @@ FrameResult FxRenderBackendVulkan::BeginFrame(GraphicsPipeline &pipeline, Mat4f 
 
 void FxRenderBackendVulkan::SubmitFrame()
 {
-    FrameData *frame = GetFrame();
+    RvkFrameData *frame = GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -538,7 +536,7 @@ void FxRenderBackendVulkan::SubmitFrame()
 
 void FxRenderBackendVulkan::PresentFrame()
 {
-    FrameData *frame = GetFrame();
+    RvkFrameData *frame = GetFrame();
 
     if (Swapchain.Initialized != true) {
         FxPanic("Swapchain not initialized!", 0);
@@ -572,7 +570,7 @@ void FxRenderBackendVulkan::PresentFrame()
     }
 }
 
-void FxRenderBackendVulkan::FinishFrame(GraphicsPipeline &pipeline)
+void FxRenderBackendVulkan::FinishFrame(RvkGraphicsPipeline &pipeline)
 {
     pipeline.RenderPass.End();
 
@@ -589,7 +587,7 @@ void FxRenderBackendVulkan::FinishFrame(GraphicsPipeline &pipeline)
     mFrameNumber = (mInternalFrameCounter) % RendererFramesInFlight;
 }
 
-FrameResult FxRenderBackendVulkan::GetNextSwapchainImage(FrameData *frame)
+FrameResult FxRenderBackendVulkan::GetNextSwapchainImage(RvkFrameData *frame)
 {
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
@@ -662,7 +660,7 @@ void FxRenderBackendVulkan::Destroy()
     Initialized = false;
 }
 
-FrameData *FxRenderBackendVulkan::GetFrame()
+RvkFrameData *FxRenderBackendVulkan::GetFrame()
 {
     return &Frames[GetFrameNumber()];
 }

@@ -3,18 +3,18 @@
 #include "vulkan/vulkan_core.h"
 #include <vulkan/vulkan.h>
 
-#include <Renderer/Backend/Vulkan/Device.hpp>
+#include <Renderer/Backend/Vulkan/RvkDevice.hpp>
 
 #include <Core/FxPanic.hpp>
 #include <Core/StaticArray.hpp>
 #include <vector>
 
-#include <Renderer/Backend/Vulkan/FxGpuBuffer.hpp>
-#include <Renderer/Backend/Vulkan/Pipeline.hpp>
+#include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>
+#include <Renderer/Backend/Vulkan/RvkPipeline.hpp>
 
 namespace vulkan {
 
-class DescriptorPool
+class RvkDescriptorPool
 {
 public:
     void Create(RvkGpuDevice *device, uint32 max_sets = 10)
@@ -53,15 +53,15 @@ public:
     VkDescriptorPool Pool = nullptr;
     std::vector<VkDescriptorPoolSize> PoolSizes;
 private:
-    friend class DescriptorSet;
+    friend class RvkDescriptorSet;
 
     RvkGpuDevice *mDevice = nullptr;
 };
 
-class DescriptorSet
+class RvkDescriptorSet
 {
 public:
-    void Create(DescriptorPool &pool, VkDescriptorSetLayout layout)
+    void Create(RvkDescriptorPool &pool, VkDescriptorSetLayout layout)
     {
         mDevice = pool.mDevice;
 
@@ -77,7 +77,7 @@ public:
     }
 
     template <typename T>
-    void SetBuffer(FxRawGpuBuffer<T> &buffer, VkDescriptorType type)
+    void SetBuffer(RvkRawGpuBuffer<T> &buffer, VkDescriptorType type)
     {
         VkDescriptorBufferInfo info{
             .buffer = buffer.Buffer,
@@ -98,7 +98,7 @@ public:
         vkUpdateDescriptorSets(mDevice->Device, 1, &desc_write, 0, nullptr);
     }
 
-    void Bind(RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, GraphicsPipeline &pipeline) const
+    void Bind(RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, RvkGraphicsPipeline &pipeline) const
     {
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);
     }

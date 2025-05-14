@@ -11,7 +11,7 @@
 
 namespace vulkan {
 
-class QueueFamilies {
+class RvkQueueFamilies {
 public:
     static const uint32 QueueNull = UINT32_MAX;
 
@@ -83,7 +83,7 @@ public:
     VkPhysicalDevice Physical = nullptr;
     VkDevice Device = nullptr;
 
-    QueueFamilies mQueueFamilies;
+    RvkQueueFamilies mQueueFamilies;
 
     VkQueue GraphicsQueue = nullptr;
     VkQueue TransferQueue = nullptr;

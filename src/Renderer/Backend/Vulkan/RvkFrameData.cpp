@@ -1,4 +1,4 @@
-#include "FrameData.hpp"
+#include "RvkFrameData.hpp"
 
 #include <vulkan/vulkan.h>
 #include <vma/vk_mem_alloc.h>
@@ -7,7 +7,7 @@
 
 namespace vulkan {
 
-void FrameData::Create(RvkGpuDevice *device)
+void RvkFrameData::Create(RvkGpuDevice *device)
 {
     ImageAvailable.Create(device);
     RenderFinished.Create(device);
@@ -18,12 +18,12 @@ void FrameData::Create(RvkGpuDevice *device)
     UniformBuffer.Map();
 }
 
-void FrameData::SubmitUbo(UniformBufferObject *ubo)
+void RvkFrameData::SubmitUbo(RvkUniformBufferObject *ubo)
 {
-    memcpy(UniformBuffer.MappedBuffer, ubo, sizeof(UniformBufferObject));
+    memcpy(UniformBuffer.MappedBuffer, ubo, sizeof(RvkUniformBufferObject));
 }
 
-void FrameData::Destroy()
+void RvkFrameData::Destroy()
 {
     ImageAvailable.Destroy();
     RenderFinished.Destroy();

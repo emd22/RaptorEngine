@@ -8,7 +8,7 @@
 #include <Core/Log.hpp>
 #include <vulkan/vulkan.h>
 
-enum class ShaderType
+enum class RvkShaderType
 {
     Unknown,
     Vertex,
@@ -20,7 +20,7 @@ class ShaderInfo
 public:
     ShaderInfo() = default;
 
-    ShaderInfo(ShaderType type, VkShaderModule module)
+    ShaderInfo(RvkShaderType type, VkShaderModule module)
         : ShaderModule(module), mShaderType(type)
     {
     }
@@ -28,11 +28,11 @@ public:
     VkShaderStageFlagBits GetStageBit()
     {
         switch (mShaderType) {
-            case ShaderType::Unknown:
+            case RvkShaderType::Unknown:
                 FxPanic_("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!", 0);
-            case ShaderType::Vertex:
+            case RvkShaderType::Vertex:
                 return VK_SHADER_STAGE_VERTEX_BIT;
-            case ShaderType::Fragment:
+            case RvkShaderType::Fragment:
                 return VK_SHADER_STAGE_FRAGMENT_BIT;
         }
     }
@@ -41,7 +41,7 @@ public:
     VkShaderModule ShaderModule = nullptr;
 
 private:
-    ShaderType mShaderType;
+    RvkShaderType mShaderType;
 };
 
 class ShaderList
@@ -52,11 +52,11 @@ public:
         StaticArray<ShaderInfo> shader_stages(2);
 
         if (Vertex != nullptr) {
-            ShaderInfo info = ShaderInfo(ShaderType::Vertex, Vertex);
+            ShaderInfo info = ShaderInfo(RvkShaderType::Vertex, Vertex);
             shader_stages.Insert(info);
         }
         if (Fragment != nullptr) {
-            ShaderInfo info = ShaderInfo(ShaderType::Fragment, Fragment);
+            ShaderInfo info = ShaderInfo(RvkShaderType::Fragment, Fragment);
             shader_stages.Insert(info);
         }
 

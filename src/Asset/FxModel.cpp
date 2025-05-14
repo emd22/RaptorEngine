@@ -19,7 +19,7 @@ bool FxModel::CheckIfReady()
     return (mModelReady = true);
 }
 
-void FxModel::Render(GraphicsPipeline &pipeline)
+void FxModel::Render(RvkGraphicsPipeline &pipeline)
 {
     if (!CheckIfReady()) {
         return;

@@ -2,7 +2,7 @@
 #include "Renderer/Constants.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Renderer/Backend/Vulkan/ShaderList.hpp"
-#include <Renderer/Backend/Vulkan/Shader.hpp>
+#include <Renderer/Backend/Vulkan/RvkShader.hpp>
 #include "Renderer/FxCamera.hpp"
 #include "vulkan/vulkan_core.h"
 
@@ -74,13 +74,13 @@ int main()
     Renderer->SelectWindow(window);
     Renderer->Init(Vec2u(window_width, window_height));
 
-    vulkan::GraphicsPipeline pipeline;
+    vulkan::RvkGraphicsPipeline pipeline;
 
     {
         ShaderList shader_list;
 
-        vulkan::Shader vertex_shader("../shaders/main.vert.spv", ShaderType::Vertex);
-        vulkan::Shader fragment_shader("../shaders/main.frag.spv", ShaderType::Fragment);
+        vulkan::RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
+        vulkan::RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
 
         shader_list.Vertex = vertex_shader.ShaderModule;
         shader_list.Fragment = fragment_shader.ShaderModule;
@@ -93,7 +93,7 @@ int main()
     RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
     RendererVulkan->DescriptorPool.Create(RendererVulkan->GetDevice(), RendererFramesInFlight);
 
-    for (FrameData &frame : RendererVulkan->Frames) {
+    for (RvkFrameData &frame : RendererVulkan->Frames) {
         frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.DescriptorSetLayout);
         frame.DescriptorSet.SetBuffer(frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     }

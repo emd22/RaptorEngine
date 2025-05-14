@@ -1,7 +1,7 @@
 
-#include "Pipeline.hpp"
+#include "RvkPipeline.hpp"
 #include "Core/Defines.hpp"
-#include "Renderer/Backend/Vulkan/FxCommandBuffer.hpp"
+#include "Renderer/Backend/Vulkan/RvkCommands.hpp"
 #include "vulkan/vulkan_core.h"
 
 #include <Core/Log.hpp>
@@ -14,8 +14,8 @@ namespace vulkan {
 
 FX_SET_MODULE_NAME("Pipeline")
 
-VertexInfo GraphicsPipeline::MakeVertexInfo() {
-    using VertexType = FxVertex<FxVertexPosition | FxVertexNormal>;
+VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
+    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal>;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
@@ -33,7 +33,7 @@ VertexInfo GraphicsPipeline::MakeVertexInfo() {
     return { binding_desc, std::move(attribs) };
 }
 
-void GraphicsPipeline::Create(ShaderList shader_list) {
+void RvkGraphicsPipeline::Create(ShaderList shader_list) {
     mDevice = RendererVulkan->GetDevice();
 
     VkSpecializationInfo specialization_info = {
@@ -191,11 +191,11 @@ void GraphicsPipeline::Create(ShaderList shader_list) {
     }
 }
 
-void GraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
+void RvkGraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }
 
-void GraphicsPipeline::Destroy()
+void RvkGraphicsPipeline::Destroy()
 {
     mDevice->WaitForIdle();
 
@@ -212,7 +212,7 @@ void GraphicsPipeline::Destroy()
     RenderPass.Destroy(*mDevice);
 }
 
-void GraphicsPipeline::CreateLayout() {
+void RvkGraphicsPipeline::CreateLayout() {
     VkPushConstantRange buffer_range{};
     buffer_range.offset = 0;
     buffer_range.size = sizeof(DrawPushConstants);

@@ -3,8 +3,8 @@
 
 #include <Renderer/Renderer.hpp>
 
-#include "Device.hpp"
-#include "RenderPass.hpp"
+#include "RvkDevice.hpp"
+#include "RvkRenderPass.hpp"
 
 #include "RvkSwapchain.hpp"
 #include "vulkan/vulkan_core.h"
@@ -13,9 +13,9 @@
 
 namespace vulkan {
 
-FX_SET_MODULE_NAME("RenderPass")
+FX_SET_MODULE_NAME("RvkRenderPass")
 
-void RenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain) {
+void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain) {
     VkAttachmentDescription color_attachment {
         .format = swapchain.SurfaceFormat.format,
         .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -89,12 +89,12 @@ void RenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain) {
     }
 }
 
-void RenderPass::Begin() {
+void RvkRenderPass::Begin() {
     if (RenderPass == nullptr) {
         FxPanic("Render pass has not been previously created", 0);
     }
 
-    FrameData *frame = RendererVulkan->GetFrame();
+    RvkFrameData *frame = RendererVulkan->GetFrame();
     const auto extent = RendererVulkan->Swapchain.Extent;
 
     //Log::Debug("Amount of framebuffers: %d", renderer->Swapchain.Framebuffers.Size);
@@ -122,7 +122,7 @@ void RenderPass::Begin() {
     vkCmdBeginRenderPass(CommandBuffer->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void RenderPass::End() {
+void RvkRenderPass::End() {
     if (CommandBuffer == VK_NULL_HANDLE) {
         throw std::runtime_error("Command buffer is null when ending render pass!");
     }
@@ -130,7 +130,7 @@ void RenderPass::End() {
     vkCmdEndRenderPass(CommandBuffer->CommandBuffer);
 }
 
-void RenderPass::Destroy(RvkGpuDevice &device) {
+void RvkRenderPass::Destroy(RvkGpuDevice &device) {
     if (RenderPass != VK_NULL_HANDLE) {
         vkDestroyRenderPass(device.Device, RenderPass, nullptr);
     }

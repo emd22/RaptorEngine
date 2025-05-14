@@ -9,22 +9,22 @@
 
 namespace vulkan {
 
-class Shader
+class RvkShader
 {
 public:
 
-    Shader() = default;
+    RvkShader() = default;
 
-    Shader(const char *path, ShaderType type)
+    RvkShader(const char *path, RvkShaderType type)
         : Type(type)
     {
         Load(path, type);
     }
 
-    void Load(const char *path, ShaderType type);
+    void Load(const char *path, RvkShaderType type);
     void Destroy();
 
-    ~Shader()
+    ~RvkShader()
     {
         Destroy();
     }
@@ -34,7 +34,7 @@ private:
 
 public:
     VkShaderModule ShaderModule = nullptr;
-    ShaderType Type = ShaderType::Unknown;
+    RvkShaderType Type = RvkShaderType::Unknown;
 };
 
 // #include <Renderer/FxShader.hpp>

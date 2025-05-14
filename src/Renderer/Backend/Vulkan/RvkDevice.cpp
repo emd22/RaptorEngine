@@ -1,4 +1,4 @@
-#include "Device.hpp"
+#include "RvkDevice.hpp"
 #include "Core/Defines.hpp"
 #include "Core/StaticArray.hpp"
 
@@ -15,7 +15,7 @@ FX_SET_MODULE_NAME("Device")
 // Queue Families
 ///////////////////////////////
 
-void QueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
+void RvkQueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
     for (int32 index = 0; index < RawFamilies.Size; index++) {
         VkQueueFamilyProperties &family_props = RawFamilies[index];
@@ -29,7 +29,7 @@ void QueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR sur
     }
 }
 
-void QueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
+void RvkQueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
     for (int32 index = 0; index < RawFamilies.Size; index++) {
         VkQueueFamilyProperties &family_props = RawFamilies[index];
@@ -41,7 +41,7 @@ void QueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR sur
     }
 }
 
-bool QueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index)
+bool RvkQueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index)
 {
     uint32 support = 0;
 
@@ -55,7 +55,7 @@ bool QueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKH
     return support > 0;
 }
 
-void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
+void RvkQueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
     uint32 family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, nullptr);
@@ -118,7 +118,7 @@ bool RvkGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
     VkPhysicalDeviceProperties properties;
     VkPhysicalDeviceFeatures features;
 
-    QueueFamilies new_families;
+    RvkQueueFamilies new_families;
     new_families.FindQueueFamilies(physical, mSurface);
 
     vkGetPhysicalDeviceFeatures(physical, &features);
@@ -134,9 +134,9 @@ bool RvkGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
         VK_VERSION_MAJOR(version),
         VK_VERSION_MINOR(version),
         VK_VERSION_PATCH(version),
-        Log::YesNo(new_families.GetGraphicsFamily() != QueueFamilies::QueueNull),
-        Log::YesNo(new_families.GetPresentFamily() != QueueFamilies::QueueNull),
-        Log::YesNo(new_families.GetTransferFamily() != QueueFamilies::QueueNull),
+        Log::YesNo(new_families.GetGraphicsFamily() != RvkQueueFamilies::QueueNull),
+        Log::YesNo(new_families.GetPresentFamily() != RvkQueueFamilies::QueueNull),
+        Log::YesNo(new_families.GetTransferFamily() != RvkQueueFamilies::QueueNull),
         Log::YesNo(new_families.IsComplete())
     );
 

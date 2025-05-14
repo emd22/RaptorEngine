@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Renderer/Backend/Vulkan/Pipeline.hpp"
-#include "Renderer/Backend/Vulkan/Pipeline.hpp"
+#include "Renderer/Backend/Vulkan/RvkPipeline.hpp"
+#include "Renderer/Backend/Vulkan/RvkPipeline.hpp"
 #include <vulkan/vulkan.h>
 
 #include "RvkImage.hpp"
 
-#include "Framebuffer.hpp"
+#include "RvkFramebuffer.hpp"
 
 #include <Core/StaticArray.hpp>
 #include <Math/Vector.hpp>
@@ -21,7 +21,7 @@ public:
     ~RvkSwapchain();
 
     void Init(Vec2u size, VkSurfaceKHR &surface, RvkGpuDevice *device);
-    void CreateSwapchainFramebuffers(GraphicsPipeline *pipeline);
+    void CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline);
 
     VkSwapchainKHR GetSwapchain() { return mSwapchain; }
 
@@ -41,7 +41,7 @@ public:
 
     StaticArray<RvkImage> DepthImages;
 
-    StaticArray<Framebuffer> Framebuffers;
+    StaticArray<RvkFramebuffer> Framebuffers;
 
     Vec2u Extent = Vec2u::Zero;
 
@@ -51,7 +51,7 @@ public:
 
 private:
     RvkGpuDevice *mDevice = nullptr;
-    GraphicsPipeline *mPipeline = nullptr;
+    RvkGraphicsPipeline *mPipeline = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;
 };
 

@@ -1,10 +1,10 @@
-#include "FxGpuBuffer.hpp"
+#include "RvkGpuBuffer.hpp"
 
 #include <Renderer/Renderer.hpp>
 
 namespace vulkan {
 
-void FxGpuBufferSubmitUploadCmd(std::function<void(RvkCommandBuffer &)> func)
+void RvkGpuBufferSubmitUploadCmd(std::function<void(RvkCommandBuffer &)> func)
 {
     RendererVulkan->SubmitUploadCmd(func);
 }

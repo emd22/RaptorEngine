@@ -5,7 +5,7 @@
 #include <Renderer/FxWindow.hpp>
 
 // TODO: make base versions of these components
-#include <Renderer/Backend/Vulkan/Pipeline.hpp>
+#include <Renderer/Backend/Vulkan/RvkPipeline.hpp>
 #include <Renderer/Backend/Vulkan/RvkSwapchain.hpp>
 
 #include <ThirdParty/vk_mem_alloc.h>
@@ -35,8 +35,8 @@ public:
     virtual void SelectWindow(std::shared_ptr<FxWindow> window) = 0;
     virtual std::shared_ptr<FxWindow> GetWindow() = 0;
 
-    virtual FrameResult BeginFrame(vulkan::GraphicsPipeline &pipeline, Mat4f &MVPMatrix) = 0;
-    virtual void FinishFrame(vulkan::GraphicsPipeline &pipeline) = 0;
+    virtual FrameResult BeginFrame(vulkan::RvkGraphicsPipeline &pipeline, Mat4f &MVPMatrix) = 0;
+    virtual void FinishFrame(vulkan::RvkGraphicsPipeline &pipeline) = 0;
 
     virtual void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {

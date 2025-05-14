@@ -8,15 +8,15 @@
 #include <vulkan/vulkan.h>
 
 #include "Vulkan/RvkSwapchain.hpp"
-#include "Vulkan/Device.hpp"
-#include "Vulkan/FrameData.hpp"
-#include "Vulkan/FxCommandBuffer.hpp"
+#include "Vulkan/RvkDevice.hpp"
+#include "Vulkan/RvkFrameData.hpp"
+#include "Vulkan/RvkCommands.hpp"
 
-#include "Vulkan/Descriptors.hpp"
+#include "Vulkan/RvkDescriptors.hpp"
 
 #include <Renderer/FxWindow.hpp>
 
-#include <Renderer/Backend/Vulkan/Fence.hpp>
+#include <Renderer/Backend/Vulkan/RvkSynchro.hpp>
 
 struct SDL_Window;
 
@@ -24,10 +24,10 @@ namespace vulkan {
 
 struct FxGpuUploadContext
 {
-    FxCommandPool CommandPool;
+    RvkCommandPool CommandPool;
     RvkCommandBuffer CommandBuffer;
 
-    Fence UploadFence;
+    RvkFence UploadFence;
 };
 
 class FxRenderBackendVulkan final : public FxRenderBackend {
@@ -42,8 +42,8 @@ public:
     void Init(Vec2u window_size) override;
     void Destroy() override;
 
-    FrameResult BeginFrame(GraphicsPipeline &pipeline, Mat4f &MVPMatrix) override;
-    void FinishFrame(GraphicsPipeline &pipeline) override;
+    FrameResult BeginFrame(RvkGraphicsPipeline &pipeline, Mat4f &MVPMatrix) override;
+    void FinishFrame(RvkGraphicsPipeline &pipeline) override;
 
     void SelectWindow(std::shared_ptr<FxWindow> window) override
     {
@@ -60,7 +60,7 @@ public:
         return &mDevice;
     }
 
-    FrameData *GetFrame();
+    RvkFrameData *GetFrame();
 
     uint32 GetImageIndex() { return mImageIndex; }
     VmaAllocator *GetGPUAllocator() { return &GpuAllocator; }
@@ -124,7 +124,7 @@ private:
     void InitFrames();
     void DestroyFrames();
 
-    FrameResult GetNextSwapchainImage(FrameData *frame);
+    FrameResult GetNextSwapchainImage(RvkFrameData *frame);
 
     ExtensionList &QueryInstanceExtensions(bool invalidate_previous = false);
     ExtensionNames MakeInstanceExtensionList(ExtensionNames &user_requested_extensions);
@@ -134,12 +134,12 @@ private:
 
 public:
     vulkan::RvkSwapchain Swapchain;
-    StaticArray<FrameData> Frames;
+    StaticArray<RvkFrameData> Frames;
 
     VmaAllocator GpuAllocator = nullptr;
 
     // XXX: temporary
-    DescriptorPool DescriptorPool;
+    RvkDescriptorPool DescriptorPool;
 
     FxGpuUploadContext UploadContext;
 private:

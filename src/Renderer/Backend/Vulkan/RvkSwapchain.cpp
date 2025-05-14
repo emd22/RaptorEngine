@@ -1,10 +1,10 @@
 #include "RvkSwapchain.hpp"
 #include "Core/Defines.hpp"
-#include "Device.hpp"
+#include "RvkDevice.hpp"
 
 #include <Core/FxPanic.hpp>
 
-#include "Renderer/Backend/Vulkan/Pipeline.hpp"
+#include "Renderer/Backend/Vulkan/RvkPipeline.hpp"
 #include "Renderer/Renderer.hpp"
 #include "vulkan/vulkan_core.h"
 
@@ -144,7 +144,7 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
     }
 }
 
-void RvkSwapchain::CreateSwapchainFramebuffers(GraphicsPipeline *pipeline)
+void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline)
 {
     Log::Debug("Image view count: %d", ImageViews.Size);
     Framebuffers.Free();

@@ -1,14 +1,14 @@
 #pragma once
 
 #include <Core/FxPanic.hpp>
-#include "Device.hpp"
+#include "RvkDevice.hpp"
 
 #include <vulkan/vulkan.h>
 #include <cstdint>
 
 namespace vulkan {
 
-class Fence
+class RvkFence
 {
 public:
     void Create(RvkGpuDevice *device)
@@ -61,5 +61,36 @@ private:
     RvkGpuDevice *mDevice = nullptr;
 };
 
+
+class RvkSemaphore
+{
+public:
+    void Create(RvkGpuDevice *device)
+    {
+        const VkSemaphoreCreateInfo create_info {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+            .flags = 0,
+            .pNext = nullptr,
+        };
+
+        mDevice = device;
+
+        const VkResult status = vkCreateSemaphore(device->Device, &create_info, nullptr, &Semaphore);
+
+        if (status != VK_SUCCESS) {
+            FxPanic_("Semaphore", "Could not create semaphore", status);
+        }
+    }
+
+    void Destroy()
+    {
+        vkDestroySemaphore(mDevice->Device, Semaphore, nullptr);
+    }
+
+public:
+    VkSemaphore Semaphore;
+private:
+    RvkGpuDevice *mDevice = nullptr;
+};
 
 }; // namespace vulkan

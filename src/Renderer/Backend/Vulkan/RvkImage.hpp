@@ -3,7 +3,7 @@
 #include <vma/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
-#include <Renderer/Backend/Vulkan/Device.hpp>
+#include <Renderer/Backend/Vulkan/RvkDevice.hpp>
 #include <Math/Vec2.hpp>
 
 namespace vulkan {

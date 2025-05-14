@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Renderer/Backend/Vulkan/FrameData.hpp"
+#include "Renderer/Backend/Vulkan/RvkFrameData.hpp"
 #include "Renderer/Renderer.hpp"
 #include "vulkan/vulkan_core.h"
-#include <Renderer/Backend/Vulkan/FxGpuBuffer.hpp>
+#include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>
 #include <atomic>
 
 // TEMP
@@ -15,7 +15,7 @@ class FxMesh
 public:
     FxMesh() = default;
 
-    using VertexType = FxVertex<FxVertexPosition | FxVertexNormal>;
+    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal>;
 
     FxMesh(StaticArray<VertexType> &vertices)
     {
@@ -47,12 +47,12 @@ public:
 
     void UploadVertices(StaticArray<VertexType> &vertices)
     {
-        mVertexBuffer.Create(FxBufferUsageType::Vertices, vertices);
+        mVertexBuffer.Create(RvkBufferUsageType::Vertices, vertices);
     }
 
     void UploadIndices(StaticArray<uint32> &indices)
     {
-        mIndexBuffer.Create(FxBufferUsageType::Indices, indices);
+        mIndexBuffer.Create(RvkBufferUsageType::Indices, indices);
     }
 
     // FxMesh(FxMesh &&other)
@@ -113,13 +113,13 @@ public:
         return (mVertexBuffer.Initialized && mIndexBuffer.Initialized);
     }
 
-    FxGpuBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
-    FxGpuBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
+    RvkGpuBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
+    RvkGpuBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
 
-    void Render(GraphicsPipeline &pipeline)
+    void Render(RvkGraphicsPipeline &pipeline)
     {
         const VkDeviceSize offset = 0;
-        FrameData *frame = RendererVulkan->GetFrame();
+        RvkFrameData *frame = RendererVulkan->GetFrame();
 
         vkCmdBindVertexBuffers(frame->CommandBuffer.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
@@ -149,6 +149,6 @@ public:
     std::atomic_bool IsReady = std::atomic_bool(false);
 
 protected:
-    FxGpuBuffer<VertexType> mVertexBuffer;
-    FxGpuBuffer<uint32> mIndexBuffer;
+    RvkGpuBuffer<VertexType> mVertexBuffer;
+    RvkGpuBuffer<uint32> mIndexBuffer;
 };

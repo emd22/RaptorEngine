@@ -2,14 +2,12 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/Types.hpp>
-#include <Core/FxPanic.hpp>
-
-#include "Device.hpp"
+#include "RvkDevice.hpp"
 
 namespace vulkan {
 
-class FxCommandPool
+
+class RvkCommandPool
 {
 public:
 
@@ -49,5 +47,33 @@ private:
     RvkGpuDevice *mDevice = nullptr;
 };
 
+class RvkCommandBuffer
+{
+public:
+    void Create(RvkCommandPool *pool);
+    void Destroy();
+
+    void Record(VkCommandBufferUsageFlags usage_flags = 0);
+
+    void Reset();
+    void End();
+
+    operator VkCommandBuffer() { return CommandBuffer; }
+
+    bool IsInitialized() const
+    {
+        return mInitialized;
+    }
+
+private:
+    void CheckInitialized() const;
+
+public:
+    VkCommandBuffer CommandBuffer = nullptr;
+private:
+    bool mInitialized = false;
+    RvkCommandPool *mCommandPool = nullptr;
+    RvkGpuDevice *mDevice = nullptr;
+};
 
 }; // namespace vulkan
