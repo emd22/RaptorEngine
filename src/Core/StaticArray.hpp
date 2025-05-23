@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdexcept>
 #include <stdio.h>
+#include <cstdlib>
 #include <initializer_list>
 
 #include <Core/Log.hpp>
@@ -63,7 +64,8 @@ public:
     #ifdef FX_STATIC_ARRAY_DEBUG
             Log::Debug("Allocating StaticArray of capacity %lu (type: %s)", Capacity, typeid(ElementType).name());
     #endif
-            Data = new ElementType[element_count];
+            // Data = new ElementType[element_count];
+            Data = std::malloc(sizeof(ElementType) * element_count);
         }
         catch (std::bad_alloc &e) {
             NoMemError();
@@ -79,8 +81,6 @@ public:
         }
     }
 
-
-
     StaticArray(StaticArray<ElementType> &&other)
     {
         Data = std::move(other.Data);
@@ -94,7 +94,7 @@ public:
 
     ~StaticArray()
     {
-        Free();
+        StaticArray::Free();
     }
 
     virtual void Free()
@@ -103,7 +103,8 @@ public:
     #ifdef FX_DEBUG_STATIC_ARRAY
             Log::Debug("Freeing StaticArray of size %lu (type: %s)", Size, typeid(ElementType).name());
     #endif
-            delete Data;
+            // delete[] Data;
+            std::free(Data);
 
             Data = nullptr;
             Capacity = 0;
@@ -213,6 +214,16 @@ public:
         Capacity = element_count;
     }
 
+    void Resize(size_t element_count)
+    {
+        Data = std::realloc(Data, sizeof(ElementType) * element_count);
+        if (!Data) {
+            NoMemError();
+        }
+
+        Capacity = element_count;
+    }
+
     /**
      *   Initializes an array to contain `element_count` elements, which can be modified externally.
      *
@@ -259,7 +270,8 @@ protected:
     #ifdef FX_DEBUG_STATIC_ARRAY
             Log::Debug("Allocating StaticArray of capacity %lu (type: %s)", element_count, typeid(ElementType).name());
     #endif
-            Data = new ElementType[element_count];
+            // Data = new ElementType[element_count];
+            Data = std::malloc(sizeof(ElementType) * element_count);
         }
         catch (std::bad_alloc &e) {
             NoMemError();

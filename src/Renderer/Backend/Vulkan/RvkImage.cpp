@@ -1,11 +1,12 @@
 
 #include "RvkImage.hpp"
-#include <Core/FxPanic.hpp>
-#include "Core/Defines.hpp"
-
-#include "Renderer/FxRenderBackend.hpp"
-#include "Renderer/Renderer.hpp"
 #include "vulkan/vulkan_core.h"
+
+#include <Core/FxPanic.hpp>
+#include <Core/Defines.hpp>
+
+#include <Renderer/Renderer.hpp>
+#include <Renderer/Backend/FxRenderBackendVulkan.hpp>
 
 FX_SET_MODULE_NAME("RvkImage")
 
@@ -80,7 +81,7 @@ void RvkImage::Create(
     }
 }
 
-void RvkImage::TransitionLayout(VkImageLayout new_layout)
+void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
 {
     VkImageMemoryBarrier barrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -98,8 +99,8 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout)
         }
     };
 
-    VkPipelineStageFlags src_stage;
-    VkPipelineStageFlags dest_stage;
+    VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 
     if (ImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = 0;
@@ -116,9 +117,7 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout)
         dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
 
-    RendererVulkan->SubmitOneTimeCmd([&](RvkCommandBuffer &cmd) {
-        vkCmdPipelineBarrier(cmd, src_stage, dest_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-    });
+    vkCmdPipelineBarrier(cmd, src_stage, dest_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
     ImageLayout = new_layout;
 }

@@ -33,7 +33,7 @@ public:
             for (int i = 0; i < this->Capacity; i++) {
                 delete this->Data[i];
             }
-            delete this->Data;
+            delete[] this->Data;
 
             this->Data = nullptr;
         }
@@ -43,6 +43,6 @@ public:
 
     ~StaticPtrArray()
     {
-        Free();
+        StaticPtrArray::Free();
     }
 };

@@ -3,7 +3,9 @@
 #include <vma/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
-#include <Renderer/Backend/Vulkan/RvkDevice.hpp>
+#include "RvkDevice.hpp"
+#include "RvkCommands.hpp"
+
 #include <Math/Vec2.hpp>
 
 namespace vulkan {
@@ -19,7 +21,7 @@ public:
         VkImageAspectFlagBits aspect_flags
     );
 
-    void TransitionLayout(VkImageLayout new_layout);
+    void TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd);
 
     void Destroy();
 

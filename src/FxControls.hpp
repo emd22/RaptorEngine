@@ -56,7 +56,7 @@ public:
      * *NOTE:* The current "scope" for currently pressed keys is reset or begun on
      * a call to `FxControlManager::Update`. As well, if this function
      * is not called within the bounds of *every* `::Update` call, then
-     * the bit that determines if the key is on tbe next frame returns false positives.
+     * the bit that determines if the key is on the next frame returns false positives.
      * This *ONLY* pertains to if the key is held down.
      */
     static bool IsKeyPressed(FxKey scancode);
