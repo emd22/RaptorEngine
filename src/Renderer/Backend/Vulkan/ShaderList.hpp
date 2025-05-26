@@ -3,7 +3,7 @@
 #include <Core/FxPanic.hpp>
 #include "vulkan/vulkan_core.h"
 #include <Core/Types.hpp>
-#include <Core/StaticArray.hpp>
+#include <Core/FxStaticArray.hpp>
 
 #include <Core/Log.hpp>
 #include <vulkan/vulkan.h>
@@ -47,9 +47,9 @@ private:
 class ShaderList
 {
 public:
-    StaticArray<ShaderInfo> GetShaderStages()
+    FxStaticArray<ShaderInfo> GetShaderStages()
     {
-        StaticArray<ShaderInfo> shader_stages(2);
+        FxStaticArray<ShaderInfo> shader_stages(2);
 
         if (Vertex != nullptr) {
             ShaderInfo info = ShaderInfo(RvkShaderType::Vertex, Vertex);

@@ -65,7 +65,7 @@ void FxConfig::ParseConfig()
         }
 
 
-        Log::Info("Entry name: %s", entry_name);
+        Log::Info("Entry name: %s", entry_name.c_str());
     }
 
 }

@@ -1,109 +1,196 @@
-#pragma once
+// #pragma once
 
-#include <Core/Types.hpp>
+// #include "Types.hpp"
 
-#include <Core/StaticArray.hpp>
+// #include "FxStaticArray.hpp"
 
-template <typename ElementType>
-class FxLinkedList
-{
-public:
+// template <typename ElementType>
+// class FxLinkedList
+// {
+// public:
 
-    struct Node
-    {
-        Node *Next = nullptr;
-        Node *Prev = nullptr;
-        ElementType Data;
+//     struct Node
+//     {
+//     public:
+//         Node* Next = nullptr;
+//         Node* Prev = nullptr;
+//         ElementType Data;
 
-        ElementType &InsertNodeAfter(Node *other)
-        {
-            Prev = other;
-            Next = other->Next;
+//         uint32 PoolIndex = 0;
 
-            other->Next = this;
+//     private:
+//         friend class FxLinkedList;
+//         ElementType& InsertAfterNode(Node* other)
+//         {
+//             Prev = other;
+//             Next = other->Next;
 
-            return Data;
-        }
+//             other->Next = this;
 
-        ElementType &InsertNodeBefore(Node *other)
-        {
-            Prev = other->Prev;
-            Next = other;
+//             return Data;
+//         }
 
-            other->Prev = this;
-            return Data;
-        }
-    };
+//         ElementType& InsertBeforeNode(Node* other)
+//         {
+//             Prev = other->Prev;
+//             Next = other;
 
-public:
-    FxLinkedList() = default;
+//             other->Prev = this;
+//             return Data;
+//         }
+//     };
 
-    FxLinkedList(int32 initial_pool_size)
-    {
-        Create(initial_pool_size);
-    }
+// public:
+//     FxLinkedList() = default;
 
-    void Create(int32 initial_pool_size = 32)
-    {
-        mNodePool.InitCapacity(initial_pool_size);
-    }
+//     FxLinkedList(uint32 initial_pool_size)
+//     {
+//         Create(initial_pool_size);
+//     }
 
-    Node *NewNode(const ElementType &data)
-    {
-        if (mNodePool.Size >= mNodePool.Capacity) {
-            mNodePool.Resize(mNodePool.Capacity * 2);
-        }
+//     void Create(uint32 initial_pool_size = 32)
+//     {
+//         mNodePool.InitCapacity(initial_pool_size);
+//         mFreedNodes.InitCapacity(initial_pool_size / 2);
+//     }
 
-        Node *node = mNodePool.Insert();
-        node->Data = data;
+//     Node* NewNode(const ElementType& data)
+//     {
+//         Node* node = nullptr;
 
-        return node;
-    }
+//         // Check if there are available spaces that have been freed
+//         if (mFreedNodes.Size > 0) {
+//             uint32 pool_index = mFreedNodes[mFreedNodes.Size - 1];
+//             Log::Debug("Reusing pool index %u", pool_index);
 
-    void InsertLast(const ElementType &element)
-    {
-        Node *node = NewNode(element);
+//             // 'remove' the node from the freed nodes list, treating it like queue
+//             mFreedNodes.Size--;
 
-        // If there is a tail, insert the element after
-        if (Tail != nullptr) {
-            node->InsertNodeAfter(Tail);
-            Tail = node;
-        }
-        // If there is no tail, insert this element as the tail.
-        else {
-            Tail == node;
-        }
+//             // Get the ptr for the available node
+//             node = &mNodePool[pool_index];
+//             node->PoolIndex = pool_index;
 
-        // This the first node in the list, set the head and tail to be equal
-        if (Head == nullptr) {
-            Head = Tail;
-        }
-    }
+//             Log::Debug("Reusing node!");
+//         }
 
-    void InsertFirst(const ElementType &element)
-    {
-        Node *node = NewNode(element);
+//         if (mNodePool.Size >= mNodePool.Capacity) {
+//             mNodePool.Resize(mNodePool.Capacity * 2);
+//         }
 
-        if (Head != nullptr) {
-            node->InsertNodeBefore(Head);
-        }
-        else {
-            Head = node;
-        }
+//         // No nodes can be recycled, insert a new one
+//         if (node == nullptr) {
+//             node = mNodePool.Insert();
+//             node->PoolIndex = static_cast<uint32>(mNodePool.Size) - 1;
+//         }
 
-        if (Tail == nullptr) {
-            Tail = Head;
-        }
-    }
+//         Log::Debug("New node at %u | %p)", node->PoolIndex, node);
 
-    ~FxLinkedList()
-    {
-    }
+//         node->Data = data;
+//         node->Prev = nullptr;
+//         node->Next = nullptr;
 
-public:
-    Node *Head = nullptr;
-    Node *Tail = nullptr;
+//         return node;
+//     }
 
-private:
-    StaticArray<Node> mNodePool;
-};
+//     void DeleteNode(Node* node)
+//     {
+//         if (mFreedNodes.Size >= mFreedNodes.Capacity) {
+//             mFreedNodes.Resize(mFreedNodes.Capacity * 2);
+//             Log::Debug("Resizing linked list FreedNodes pool to %llu", mFreedNodes.Capacity);
+//         }
+
+//         Log::Debug("Freeing node at %u | (%p - %p - %p)", node->PoolIndex, node->Prev, node, node->Next);
+
+//         mFreedNodes.Insert(node->PoolIndex);
+
+//         // Since the node will be removed, make the previous and next nodes point to each other
+//         if (node->Prev != nullptr) {
+//             node->Prev->Next = node->Next;
+//         }
+//         if (node->Next != nullptr) {
+//             node->Next->Prev = node->Prev;
+//         }
+
+//         node->Next = nullptr;
+//         node->Prev = nullptr;
+//     }
+
+//     Node* InsertLast(const ElementType& element)
+//     {
+//         Node* node = NewNode(element);
+
+//         // If there is a tail, insert the element after
+//         if (Tail != nullptr) {
+//             node->InsertAfterNode(Tail);
+//             Tail = node;
+//         }
+//         // If there is no tail, insert this element as the tail.
+//         else {
+//             Tail = node;
+//         }
+
+//         // This the first node in the list, set the head and tail to be equal
+//         if (Head == nullptr) {
+//             Head = Tail;
+//         }
+
+//         return node;
+//     }
+
+//     Node* InsertFirst(const ElementType& element)
+//     {
+//         Node* node = NewNode(element);
+
+//         if (Head != nullptr) {
+//             node->InsertBeforeNode(Head);
+//             Head = node;
+//         }
+//         else {
+//             Head = node;
+//         }
+
+//         if (Tail == nullptr) {
+//             Tail = Head;
+//         }
+//         return node;
+//     }
+
+//     Node* InsertAfterNode(const ElementType& element, Node* other)
+//     {
+//         // If there is no tail or the node to insert after is the tail, insert last
+//         if (Tail == nullptr || other == Tail) {
+//             return InsertLast(element);
+//         }
+
+//         Node* node = NewNode(element);
+//         node->InsertAfterNode(other);
+
+//         return node;
+//     }
+
+//     Node* InsertBeforeNode(const ElementType& element, Node* other)
+//     {
+//         // If there is no head or the node to insert before is the head, insert first
+//         if (Head == nullptr || other == Head) {
+//             return InsertFirst(element);
+//         }
+
+//         Node* node = NewNode(element);
+//         node->InsertBeforeNode(other);
+
+//         return node;
+//     }
+
+
+//     ~FxLinkedList()
+//     {
+//     }
+
+// public:
+//     Node* Head = nullptr;
+//     Node* Tail = nullptr;
+
+// private:
+//     FxStaticArray<Node> mNodePool;
+//     FxStaticArray<uint32> mFreedNodes;
+// };

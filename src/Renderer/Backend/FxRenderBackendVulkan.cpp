@@ -61,12 +61,12 @@ ExtensionNames FxRenderBackendVulkan::CheckExtensionsAvailable(ExtensionNames &r
     return missing_extensions;
 }
 
-StaticArray<VkLayerProperties> FxRenderBackendVulkan::GetAvailableValidationLayers()
+FxStaticArray<VkLayerProperties> FxRenderBackendVulkan::GetAvailableValidationLayers()
 {
     uint32 layer_count;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-    StaticArray<VkLayerProperties> validation_layers;
+    FxStaticArray<VkLayerProperties> validation_layers;
     validation_layers.InitSize(layer_count);
 
     vkEnumerateInstanceLayerProperties(&layer_count, validation_layers.Data);

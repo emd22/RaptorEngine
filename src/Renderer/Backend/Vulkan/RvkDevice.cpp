@@ -1,6 +1,6 @@
 #include "RvkDevice.hpp"
 #include "Core/Defines.hpp"
-#include "Core/StaticArray.hpp"
+#include "Core/FxStaticArray.hpp"
 
 namespace vulkan {
 
@@ -292,7 +292,7 @@ void RvkGpuDevice::PickPhysicalDevice()
         FxPanic("No usable physical devices found (no vulkan support!)", 0);
     }
 
-    StaticArray<VkPhysicalDevice> physical_devices(device_count);
+    FxStaticArray<VkPhysicalDevice> physical_devices(device_count);
     physical_devices.InitSize();
 
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.Data), "Could not enumerate physical devices");

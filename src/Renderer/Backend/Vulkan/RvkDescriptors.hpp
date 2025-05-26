@@ -6,7 +6,7 @@
 #include <Renderer/Backend/Vulkan/RvkDevice.hpp>
 
 #include <Core/FxPanic.hpp>
-#include <Core/StaticArray.hpp>
+#include <Core/FxStaticArray.hpp>
 #include <vector>
 
 #include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>

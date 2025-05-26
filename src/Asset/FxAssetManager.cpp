@@ -1,6 +1,6 @@
 #include "FxAssetManager.hpp"
 #include "Asset/Loader/FxGltfLoader.hpp"
-#include "Core/StaticArray.hpp"
+#include "Core/FxStaticArray.hpp"
 
 #include "FxModel.hpp"
 

@@ -17,12 +17,12 @@ public:
 
     using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal>;
 
-    FxMesh(StaticArray<VertexType> &vertices)
+    FxMesh(FxStaticArray<VertexType> &vertices)
     {
         UploadVertices(vertices);
     }
 
-    FxMesh(StaticArray<VertexType> &vertices, StaticArray<uint32> &indices)
+    FxMesh(FxStaticArray<VertexType> &vertices, FxStaticArray<uint32> &indices)
     {
         CreateFromData(vertices, indices);
     }
@@ -39,18 +39,18 @@ public:
     //     return *this;
     // }
 
-    void CreateFromData(StaticArray<VertexType> &vertices, StaticArray<uint32> &indices)
+    void CreateFromData(FxStaticArray<VertexType> &vertices, FxStaticArray<uint32> &indices)
     {
         UploadVertices(vertices);
         UploadIndices(indices);
     }
 
-    void UploadVertices(StaticArray<VertexType> &vertices)
+    void UploadVertices(FxStaticArray<VertexType> &vertices)
     {
         mVertexBuffer.Create(RvkBufferUsageType::Vertices, vertices);
     }
 
-    void UploadIndices(StaticArray<uint32> &indices)
+    void UploadIndices(FxStaticArray<uint32> &indices)
     {
         mIndexBuffer.Create(RvkBufferUsageType::Indices, indices);
     }
@@ -69,9 +69,9 @@ public:
     //     return *this;
     // }
 
-    static StaticArray<VertexType> MakeCombinedVertexBuffer(StaticArray<float32> &positions)
+    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(FxStaticArray<float32> &positions)
     {
-        StaticArray<VertexType> vertices(positions.Size / 3);
+        FxStaticArray<VertexType> vertices(positions.Size / 3);
 
         // Log::Info("Creating combined vertex buffer (Contains:Position) (s: %d)", vertices.Capacity);
 
@@ -87,11 +87,11 @@ public:
         return vertices;
     }
 
-    static StaticArray<VertexType> MakeCombinedVertexBuffer(StaticArray<float32> &positions, StaticArray<float32> &normals)
+    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(FxStaticArray<float32> &positions, FxStaticArray<float32> &normals)
     {
         FxAssert((normals.Size == positions.Size));
 
-        StaticArray<VertexType> vertices(positions.Size / 3);
+        FxStaticArray<VertexType> vertices(positions.Size / 3);
 
         // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
 

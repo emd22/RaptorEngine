@@ -23,7 +23,7 @@ VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
 
-    StaticArray<VkVertexInputAttributeDescription> attribs = {
+    FxStaticArray<VkVertexInputAttributeDescription> attribs = {
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
         { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
     };
@@ -43,8 +43,8 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list) {
         .pData = nullptr,
     };
 
-    StaticArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
-    StaticArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
+    FxStaticArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
+    FxStaticArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
 
     for (ShaderInfo stage : shader_stages) {
         const VkPipelineShaderStageCreateInfo create_info = {
@@ -60,7 +60,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list) {
         shader_create_info.Insert(create_info);
     }
 
-    StaticArray<VkDynamicState> dynamic_states = {
+    FxStaticArray<VkDynamicState> dynamic_states = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
     };

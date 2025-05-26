@@ -68,7 +68,7 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain) {
                 | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     };
 
-    StaticArray attachments = {
+    FxStaticArray attachments = {
         color_attachment,
         depth_attachment
     };
@@ -99,7 +99,7 @@ void RvkRenderPass::Begin() {
 
     //Log::Debug("Amount of framebuffers: %d", renderer->Swapchain.Framebuffers.Size);
 
-    const StaticArray<VkClearValue> clear_values = {
+    const FxStaticArray<VkClearValue> clear_values = {
         VkClearValue {
             .color = {{1.0f, 1.0f, 1.0f, 1.0f}}
         },
