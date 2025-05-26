@@ -53,7 +53,7 @@ public:
     };
 
     FxStaticArray(ElementType* ptr, size_t size)
-        : Data(ptr), Size(size)
+        : Data(ptr), Size(size), Capacity(size)
     {
     }
 
@@ -63,14 +63,16 @@ public:
 #ifdef FX_STATIC_ARRAY_DEBUG
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
 #endif
-        void* allocated_ptr = std::malloc(sizeof(ElementType) * (element_count + 1));
+        void* allocated_ptr = std::malloc(sizeof(ElementType) * element_count);
 
         if (allocated_ptr == nullptr) {
             NoMemError();
         }
 
         Data = static_cast<ElementType*>(allocated_ptr);
-
+        for (size_t i = 0; i < element_count; i++) {
+            new(Data + i) ElementType;
+        }
     }
 
     FxStaticArray(std::initializer_list<ElementType> list)
@@ -100,16 +102,23 @@ public:
 
     virtual void Free()
     {
-        if (Data != nullptr) {
-#ifdef FX_DEBUG_STATIC_ARRAY
-            Log::Debug("Freeing FxStaticArray of size %zu (type: %s)", Size, typeid(ElementType).name());
-#endif
-            std::free(Data);
-
-            Data = nullptr;
-            Capacity = 0;
-            Size = 0;
+        if (Data == nullptr) {
+            return;
         }
+
+#ifdef FX_DEBUG_STATIC_ARRAY
+        Log::Debug("Freeing FxStaticArray of size %zu (type: %s)", Size, typeid(ElementType).name());
+#endif
+        for (size_t i = 0; i < Size; i++) {
+            ElementType &element = Data[i];
+            element.~ElementType();
+        }
+
+        std::free(Data);
+
+        Data = nullptr;
+        Capacity = 0;
+        Size = 0;
     }
 
     Iterator begin()
@@ -167,7 +176,7 @@ public:
 
     FxStaticArray<ElementType> operator = (FxStaticArray<ElementType>&& other)
     {
-        Data = std::move(other.Data);
+        Data = other.Data;
         other.Data = nullptr;
 
         Size = other.Size;
@@ -212,18 +221,6 @@ public:
         InternalAllocateArray(element_count);
 
         Capacity = element_count;
-    }
-
-    void Resize(size_t element_count)
-    {
-        Capacity = element_count;
-
-        void *reallocated_ptr = std::realloc(Data, sizeof(ElementType) * (Capacity + 1));
-        if (reallocated_ptr == nullptr) {
-            NoMemError();
-        }
-
-        Data = static_cast<ElementType*>(reallocated_ptr);
     }
 
     /**
@@ -272,13 +269,19 @@ protected:
 #ifdef FX_DEBUG_STATIC_ARRAY
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
 #endif
-        void* allocated_ptr = std::malloc(sizeof(ElementType) * (element_count + 1));
+        void* allocated_ptr = std::malloc(sizeof(ElementType) * element_count);
 
         if (allocated_ptr == nullptr) {
             NoMemError();
         }
 
         Data = static_cast<ElementType*>(allocated_ptr);
+        for (size_t i = 0; i < element_count; i++) {
+            new(Data + i) ElementType;
+        }
+
+
+        Capacity = element_count;
     }
 
 public:

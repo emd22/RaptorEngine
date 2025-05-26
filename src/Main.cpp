@@ -50,7 +50,6 @@ void CheckGeneralControls()
 
 int main()
 {
-
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }
