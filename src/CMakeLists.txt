@@ -12,6 +12,7 @@ set(COMPILE_FLAGS "-g -Wall")
 
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+find_package(JPEG REQUIRED)
 
 add_definitions(
     -DFX_USE_NEON
@@ -21,9 +22,10 @@ add_definitions(
 include_directories(
     ./
     ${Vulkan_INCLUDE_DIRS}
+    JPEG::JPEG
     # ${SDL3_INCLUDE_DIRS}
 )
 
 add_executable(cr ${SOURCES} ${HEADERS})
 
-target_link_libraries(cr ${Vulkan_LIBRARIES} ${SDL3_LIBRARIES})
+target_link_libraries(cr ${Vulkan_LIBRARIES} ${SDL3_LIBRARIES} JPEG::JPEG)

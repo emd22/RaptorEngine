@@ -187,7 +187,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list) {
     const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
 
     if (status != VK_SUCCESS) {
-        FxPanic("Could not create graphics pipeline", status);
+        FxModulePanic("Could not create graphics pipeline", status);
     }
 }
 
@@ -238,7 +238,7 @@ void RvkGraphicsPipeline::CreateLayout() {
 
     status = vkCreateDescriptorSetLayout(mDevice->Device, &descriptor_set_layout_info, nullptr, &DescriptorSetLayout);
     if (status != VK_SUCCESS) {
-        FxPanic("Failed to create pipeline descriptor set layout", status);
+        FxModulePanic("Failed to create pipeline descriptor set layout", status);
     }
 
 
@@ -255,7 +255,7 @@ void RvkGraphicsPipeline::CreateLayout() {
     status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);
 
     if (status != VK_SUCCESS) {
-        FxPanic("Failed to create pipeline layout", status);
+        FxModulePanic("Failed to create pipeline layout", status);
     }
 }
 

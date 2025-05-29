@@ -23,7 +23,7 @@ public:
 
         const VkResult status = vkCreateFence(mDevice->Device, &create_info, nullptr, &Fence);
         if (status != VK_SUCCESS) {
-            FxPanic_("Fence", "Could not create fence", status);
+            FxPanic("Fence", "Could not create fence", status);
         }
     }
 
@@ -37,7 +37,7 @@ public:
         const VkResult status = vkWaitForFences(mDevice->Device, 1, &Fence, true, wait_options.Timeout);
 
         if (status != VK_SUCCESS) {
-            FxPanic_("Fence", "Could not create fence", status);
+            FxPanic("Fence", "Could not create fence", status);
         }
     }
 
@@ -46,7 +46,7 @@ public:
         const VkResult status = vkResetFences(mDevice->Device, 1, &Fence);
 
         if (status != VK_SUCCESS) {
-            FxPanic_("Fence", "Could not reset fence", status);
+            FxPanic("Fence", "Could not reset fence", status);
         }
     }
 
@@ -78,7 +78,7 @@ public:
         const VkResult status = vkCreateSemaphore(device->Device, &create_info, nullptr, &Semaphore);
 
         if (status != VK_SUCCESS) {
-            FxPanic_("Semaphore", "Could not create semaphore", status);
+            FxPanic("Semaphore", "Could not create semaphore", status);
         }
     }
 

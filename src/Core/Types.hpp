@@ -45,7 +45,7 @@ public:
     ValueType &operator *() const
     {
         if (!HasValue()) {
-            FxPanic_("Optional", "Could not retrieve undefined value", 0);
+            FxPanic("Optional", "Could not retrieve undefined value", 0);
         }
 
         return *reinterpret_cast<ValueType *>(&mData);

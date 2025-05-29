@@ -26,7 +26,7 @@ public:
         const VkResult status = vkCreateCommandPool(mDevice->Device, &create_info, nullptr, &CommandPool);
 
         if (status != VK_SUCCESS) {
-            FxPanic_("FxCommandPool", "Error creating command pool", 0);
+            FxPanic("FxCommandPool", "Error creating command pool", 0);
         }
     }
 

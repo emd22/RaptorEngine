@@ -6,6 +6,8 @@
 #include "Renderer/FxCamera.hpp"
 #include "vulkan/vulkan_core.h"
 
+#include <Core/FxLinkedList.hpp>
+
 #define SDL_DISABLE_OLD_NAMES
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_revision.h>
@@ -50,8 +52,10 @@ void CheckGeneralControls()
 
 int main()
 {
+    return 0;
+
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
+        FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }
 
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };

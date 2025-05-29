@@ -29,7 +29,7 @@ public:
     {
         switch (mShaderType) {
             case RvkShaderType::Unknown:
-                FxPanic_("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!", 0);
+                FxPanic("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!", 0);
             case RvkShaderType::Vertex:
                 return VK_SHADER_STAGE_VERTEX_BIT;
             case RvkShaderType::Fragment:

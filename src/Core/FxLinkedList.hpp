@@ -1,20 +1,20 @@
 #pragma once
 
-#include "Types.hpp"
+#include <Core/Types.hpp>
+#include "FxPagedArray.hpp"
+
+#include <cstdlib>
 
 template <typename ElementType>
 class FxLinkedList
 {
 public:
-
     struct Node
     {
     public:
         Node* Next = nullptr;
         Node* Prev = nullptr;
         ElementType Data;
-
-        uint32 PoolIndex = 0;
 
     private:
         friend class FxLinkedList;
@@ -23,6 +23,9 @@ public:
             Prev = other;
             Next = other->Next;
 
+            if (other->Next) {
+                other->Next->Prev = this;
+            }
             other->Next = this;
 
             return Data;
@@ -33,7 +36,11 @@ public:
             Prev = other->Prev;
             Next = other;
 
+            if (other->Prev) {
+                other->Prev->Next = this;
+            }
             other->Prev = this;
+
             return Data;
         }
     };
@@ -48,41 +55,31 @@ public:
 
     void Create(uint32 initial_pool_size = 32)
     {
-        // mNodePool.InitCapacity(initial_pool_size);
-        // mFreedNodes.InitCapacity(initial_pool_size / 2);
+        mNodePool.Create(initial_pool_size);
+        mFreedNodes.Create(initial_pool_size);
     }
 
     Node* NewNode(const ElementType& data)
     {
-        // Node* node = nullptr;
+        Node* node = nullptr;
 
-        // // Check if there are available spaces that have been freed
-        // if (mFreedNodes.Size > 0) {
-        //     uint32 pool_index = mFreedNodes[mFreedNodes.Size - 1];
-        //     Log::Debug("Reusing pool index %u", pool_index);
+        // Check if there are available spaces that have been freed recently
+        if (!mFreedNodes.IsEmpty()) {
+            // Set the node to use as the last node that was freed
+            node = mFreedNodes.GetLast();
 
-        //     // 'remove' the node from the freed nodes list, treating it like queue
-        //     mFreedNodes.Size--;
+            // Remove the node from the freed list
+            mFreedNodes.RemoveLast();
 
-        //     // Get the ptr for the available node
-        //     node = &mNodePool[pool_index];
-        //     node->PoolIndex = pool_index;
-
-        //     Log::Debug("Reusing node!");
-        // }
-
-        // if (mNodePool.Size >= mNodePool.Capacity) {
-        //     mNodePool.Resize(mNodePool.Capacity * 2);
-        // }
+            Log::Debug("Reusing node!");
+        }
 
         // No nodes can be recycled, insert a new one
-        // if (node == nullptr) {
-            // node = mNodePool.Insert();
-            // node->PoolIndex = static_cast<uint32>(mNodePool.Size) - 1;
-        // }
-        Node* node = new Node;
+        if (node == nullptr) {
+            node = mNodePool.Insert();
+        }
 
-        Log::Debug("New node at %u | %p)", node->PoolIndex, node);
+        Log::Debug("New node at %p)", node);
 
         node->Data = data;
         node->Prev = nullptr;
@@ -93,14 +90,13 @@ public:
 
     void DeleteNode(Node* node)
     {
-        // if (mFreedNodes.Size >= mFreedNodes.Capacity) {
-        //     mFreedNodes.Resize(mFreedNodes.Capacity * 2);
-        //     Log::Debug("Resizing linked list FreedNodes pool to %llu", mFreedNodes.Capacity);
-        // }
+        Log::Debug("Freeing node at | (%p - %p - %p)", node->Prev, node, node->Next);
 
-        Log::Debug("Freeing node at %u | (%p - %p - %p)", node->PoolIndex, node->Prev, node, node->Next);
-
-        // mFreedNodes.Insert(node->PoolIndex);
+        // Insert the node into the freed list. This allocated node will be reused when needed.
+        {
+            auto* element = mFreedNodes.Insert();
+            (*element) = node;
+        }
 
         // Since the node will be removed, make the previous and next nodes point to each other
         if (node->Prev != nullptr) {
@@ -112,10 +108,11 @@ public:
 
         node->Next = nullptr;
         node->Prev = nullptr;
-
-        delete node;
     }
 
+    /**
+     * Inserts a value at the end of a list.
+     */
     Node* InsertLast(const ElementType& element)
     {
         Node* node = NewNode(element);
@@ -138,6 +135,9 @@ public:
         return node;
     }
 
+    /**
+     * Inserts a value at the start of the list.
+     */
     Node* InsertFirst(const ElementType& element)
     {
         Node* node = NewNode(element);
@@ -156,6 +156,9 @@ public:
         return node;
     }
 
+    /**
+     * Inserts a value after a particular node.
+     */
     Node* InsertAfterNode(const ElementType& element, Node* other)
     {
         // If there is no tail or the node to insert after is the tail, insert last
@@ -169,6 +172,9 @@ public:
         return node;
     }
 
+    /**
+     * Inserts a value before a particular node.
+     */
     Node* InsertBeforeNode(const ElementType& element, Node* other)
     {
         // If there is no head or the node to insert before is the head, insert first
@@ -185,6 +191,8 @@ public:
 
     ~FxLinkedList()
     {
+        // Since the linked list is allocated by the NodeBuffers, they are destroyed automatically at
+        // the time of this destructor call.
     }
 
 public:
@@ -192,6 +200,6 @@ public:
     Node* Tail = nullptr;
 
 private:
-    // FxStaticArray<Node> mNodePool;
-    // FxStaticArray<uint32> mFreedNodes;
+    FxPagedArray<Node> mNodePool;
+    FxPagedArray<Node*> mFreedNodes;
 };

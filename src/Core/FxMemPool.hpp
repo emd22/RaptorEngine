@@ -1,67 +1,7 @@
 #pragma once
 
 #include "Types.hpp"
-#include "FxStaticArray.hpp"
 #include "FxLinkedList.hpp"
-
-#include <vector>
-
-
-// class FxMemPool
-// {
-// public:
-//     struct BlockEntry
-//     {
-//         uint8 *Ptr = nullptr;
-//         uint32 Size = 0;
-//         BlockEntry *NextBlock = nullptr;
-//     };
-
-//     struct MemPage
-//     {
-
-//         uint8 *Start = nullptr;
-//         std::vector<BlockEntry> BlockEntries;
-
-//         bool Used : 1 = false;
-//         bool Full : 1 = false;
-
-//         BlockEntry *PushEntry(const BlockEntry &entry)
-//         {
-//             if (!Used) {
-//                 Used = true;
-//             }
-
-//             BlockEntries.push_back(entry);
-//             // std::sort(BlockEntries.begin(), BlockEntries.end(), [](BlockEntry &a, BlockEntry &b){ return a.Ptr < b.Ptr; });
-
-//             return &BlockEntries[BlockEntries.size() - 1];
-//         }
-//     };
-
-// public:
-//     FxMemPool();
-//     void Init(uint32 page_size, uint32 num_pages);
-
-//     void *Alloc(uint64 size);
-
-//     void Destroy();
-//     ~FxMemPool()
-//     {
-//         Destroy();
-//     }
-
-// private:
-//     BlockEntry *FindFreeBlockInPage(MemPage &page, uint32 size);
-//     void InitPages();
-
-// private:
-//     uint32 mPageSize = 0;
-
-//     uint8 *mMem = nullptr;
-//     FxStaticArray<MemPage> mMemPages;
-// };
-
 
 class FxMemPool
 {
@@ -69,25 +9,39 @@ private:
     struct MemBlock
     {
         uint64 Size = 0;
-        uint8 *Start = nullptr;
+        uint8* Start = nullptr;
     };
 
 public:
     FxMemPool() = default;
 
-    void Create(uint64 size);
-    void *Alloc(uint64 size);
+    void Create(uint32 size_kb);
 
-    void Free(void *ptr);
+    template <typename ElementType>
+    ElementType* Alloc(uint32 size)
+    {
+        MemBlock& block = AllocateMemory(size)->Data;
 
-    void Destroy();
+        return reinterpret_cast<ElementType*>(block.Start);
+    }
+
+    template <typename ElementType>
+    void Free(ElementType* ptr)
+    {
+        auto* node = GetNodeFromPtr(reinterpret_cast<void*>(ptr));
+        mMemBlocks.DeleteNode(node);
+    }
+
+    //void Destroy();
 
 private:
-    MemBlock &FindNextFreeBlock(uint64 requested_size);
+    auto AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPool::MemBlock>::Node*;
+    auto GetNodeFromPtr(void* ptr) -> FxLinkedList<FxMemPool::MemBlock>::Node*;
 
 private:
+
     uint64 mSize = 0;
-    uint8 *mMem = nullptr;
+    uint8* mMem = nullptr;
 
     FxLinkedList<MemBlock> mMemBlocks;
 };

@@ -52,7 +52,7 @@ void RvkImage::Create(
 
     VkResult status = vmaCreateImage(RendererVulkan->GpuAllocator, &image_info, &create_info, &Image, &Allocation, nullptr);
     if (status != VK_SUCCESS) {
-        FxPanic("Could not create vulkan image", status);
+        FxModulePanic("Could not create vulkan image", status);
     }
 
     const VkImageViewCreateInfo view_create_info = {
@@ -77,7 +77,7 @@ void RvkImage::Create(
 
     status = vkCreateImageView(mDevice->Device, &view_create_info, nullptr, &View);
     if (status != VK_SUCCESS) {
-        FxPanic("Could not create swapchain image view", status);
+        FxModulePanic("Could not create swapchain image view", status);
     }
 }
 

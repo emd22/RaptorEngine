@@ -114,7 +114,7 @@ public:
         );
 
         if (status != VK_SUCCESS) {
-            FxPanic_("GPUBuffer", "Error allocating staging buffer!", status);
+            FxPanic("GPUBuffer", "Error allocating staging buffer!", status);
         }
 
         Initialized = true;

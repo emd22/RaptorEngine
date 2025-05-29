@@ -238,7 +238,7 @@ void RvkGpuDevice::CreateLogicalDevice()
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);
 
     if (status != VK_SUCCESS) {
-        FxPanic("Could not create logical device", status);
+        FxModulePanic("Could not create logical device", status);
     }
 
     QueryQueues();
@@ -289,7 +289,7 @@ void RvkGpuDevice::PickPhysicalDevice()
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, nullptr), "Could not enumerate physical devices");
 
     if (device_count == 0) {
-        FxPanic("No usable physical devices found (no vulkan support!)", 0);
+        FxModulePanic("No usable physical devices found (no vulkan support!)", 0);
     }
 
     FxStaticArray<VkPhysicalDevice> physical_devices(device_count);
@@ -304,7 +304,7 @@ void RvkGpuDevice::PickPhysicalDevice()
         }
     }
     if (Physical == nullptr) {
-        FxPanic("Could not find a suitable physical device!", 0);
+        FxModulePanic("Could not find a suitable physical device!", 0);
     }
 }
 

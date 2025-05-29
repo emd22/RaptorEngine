@@ -29,7 +29,7 @@ void RvkFramebuffer::Create(FxStaticArray<VkImageView> &image_views, RvkGraphics
     const VkResult status = vkCreateFramebuffer(mDevice->Device, &create_info, nullptr, &Framebuffer);
 
     if (status != VK_SUCCESS) {
-        FxPanic("Failed to create framebuffer", status);
+        FxModulePanic("Failed to create framebuffer", status);
     }
 }
 

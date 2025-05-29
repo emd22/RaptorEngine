@@ -28,7 +28,7 @@ public:
         pool_info.pPoolSizes = PoolSizes.data();
 
         if (vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool) != VK_SUCCESS) {
-            FxPanic_("DescriptorPool", "Failed to create descriptor pool!", 0);
+            FxPanic("DescriptorPool", "Failed to create descriptor pool!", 0);
         }
     }
 
@@ -72,7 +72,7 @@ public:
         alloc_info.pSetLayouts = &layout;
 
         if (vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set) != VK_SUCCESS) {
-            FxPanic_("DescriptorSet", "Failed to allocate descriptor set!", 0);
+            FxPanic("DescriptorSet", "Failed to allocate descriptor set!", 0);
         }
     }
 
