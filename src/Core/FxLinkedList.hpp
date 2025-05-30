@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/Types.hpp>
+#include "Types.hpp"
 #include "FxPagedArray.hpp"
 
 #include <cstdlib>
@@ -79,7 +79,7 @@ public:
             node = mNodePool.Insert();
         }
 
-        Log::Debug("New node at %p)", node);
+        Log::Debug("New node at %p", node);
 
         node->Data = data;
         node->Prev = nullptr;
@@ -90,12 +90,27 @@ public:
 
     void DeleteNode(Node* node)
     {
+        // Node has previously been removed or not integrated, ignore.
+        if (node->Next == nullptr && node->Prev == nullptr) {
+            return;
+        }
+
         Log::Debug("Freeing node at | (%p - %p - %p)", node->Prev, node, node->Next);
 
         // Insert the node into the freed list. This allocated node will be reused when needed.
         {
             auto* element = mFreedNodes.Insert();
             (*element) = node;
+        }
+
+        // If the current node is the head of the list, set the head to be the next node.
+        // This means that if there is no node next, the head will be set to null.
+        if (node == Head) {
+            Head = node->Next;
+        }
+        // If the current node is the tail, set the tail to be the node behind the current one.
+        if (node == Tail) {
+            Tail = node->Prev;
         }
 
         // Since the node will be removed, make the previous and next nodes point to each other

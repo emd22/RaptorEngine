@@ -20,6 +20,7 @@
 #include <Renderer/FxMesh.hpp>
 
 #include <Asset/FxAssetManager.hpp>
+#include <Core/FxMemPool.hpp>
 
 #include "FxControls.hpp"
 
@@ -52,7 +53,7 @@ void CheckGeneralControls()
 
 int main()
 {
-    return 0;
+    FxMemPool::GetGlobalPool().Create(10000);
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
@@ -143,6 +144,10 @@ int main()
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
             camera.Move(Vec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
+        }
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
+            FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !other_model->IsUploadedToGpu) {

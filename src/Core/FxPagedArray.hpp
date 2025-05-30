@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Core/Types.hpp>
-#include <Core/FxPanic.hpp>
+#include "Types.hpp"
+#include "FxPanic.hpp"
 
 template <typename ElementType>
 class FxPagedArray
@@ -36,6 +36,7 @@ public:
 
     ElementType* Insert()
     {
+
         // There are no elements left in the page, allocate a new page.
         if (CurrentPage->Size >= PageNodeCapacity) {
             Page* new_page = AllocateNewPage(CurrentPage, nullptr);
@@ -84,19 +85,19 @@ public:
 
         ElementType* element = &GetLast();
 
-        if (CurrentPage->Size <= 1) {
+        if (CurrentPage->Size == 0 && CurrentPage->Prev) {
             Page* current_page = CurrentPage;
 
             CurrentPage = current_page->Prev;
-            // If there is no pages left, set the first page to null to show that it is empty.
-            if (current_page->Prev == nullptr) {
-                FirstPage = nullptr;
-            }
 
             std::free(current_page->Data);
             std::free(current_page);
 
             return element;
+        }
+
+        if (CurrentPage->Size == 0 && CurrentPage->Prev == nullptr) {
+            return nullptr;
         }
 
         CurrentPage->Size--;
@@ -125,13 +126,14 @@ public:
         Page* current_page = FirstPage;
 
         while (current_page != nullptr) {
-            Page* this_page = current_page;
-            current_page = current_page->Next;
+            Page* next_page = current_page->Next;
 
-            if (this_page->Data) {
-                std::free(static_cast<void*>(this_page->Data));
+            if (current_page->Data) {
+                std::free(static_cast<void*>(current_page->Data));
             }
-            std::free(static_cast<void*>(this_page));
+
+            std::free(static_cast<void*>(current_page));
+            current_page = next_page;
         }
 
         FirstPage = nullptr;

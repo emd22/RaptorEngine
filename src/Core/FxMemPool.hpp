@@ -1,7 +1,9 @@
 #pragma once
 
-#include "Types.hpp"
-#include "FxLinkedList.hpp"
+#include <Core/Types.hpp>
+#include <Core/FxLinkedList.hpp>
+
+#include <mutex>
 
 class FxMemPool
 {
@@ -17,31 +19,65 @@ public:
 
     void Create(uint32 size_kb);
 
-    template <typename ElementType>
-    ElementType* Alloc(uint32 size)
+    static FxMemPool& GetGlobalPool();
+
+    /** Allocates a block of memory */
+    template <typename PtrType> requires std::is_pointer_v<PtrType>
+    PtrType Alloc(uint32 size)
     {
         MemBlock& block = AllocateMemory(size)->Data;
 
-        return reinterpret_cast<ElementType*>(block.Start);
+        return reinterpret_cast<PtrType>(block.Start);
     }
+    /** Allocates memory on the global memory pool */
+    static void* Alloc(uint32 size);
 
+    /** Frees an allocated pointer */
     template <typename ElementType>
     void Free(ElementType* ptr)
     {
-        auto* node = GetNodeFromPtr(reinterpret_cast<void*>(ptr));
+        if (ptr == nullptr) {
+            return;
+        }
+        std::lock_guard<std::mutex> guard(mMemMutex);
+
+        auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         mMemBlocks.DeleteNode(node);
     }
 
-    //void Destroy();
+    /** Frees an allocated pointer on the global memory pool */
+    static void Free(void* ptr);
+
+    void PrintAllocations() const;
+
+    void Destroy();
+    // ~FxMemPool()
+    // {
+    //     Destroy();
+    // }
+
+    inline bool IsInited() const
+    {
+        return (mMem != nullptr && mSize > 0);
+    }
 
 private:
     auto AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPool::MemBlock>::Node*;
-    auto GetNodeFromPtr(void* ptr) -> FxLinkedList<FxMemPool::MemBlock>::Node*;
+    auto GetNodeFromPtr(void* ptr) const -> FxLinkedList<FxMemPool::MemBlock>::Node*;
+
+    inline void CheckInited()
+    {
+        if (!IsInited()) {
+            Create(64);
+        }
+    }
 
 private:
 
     uint64 mSize = 0;
     uint8* mMem = nullptr;
+
+    std::mutex mMemMutex;
 
     FxLinkedList<MemBlock> mMemBlocks;
 };

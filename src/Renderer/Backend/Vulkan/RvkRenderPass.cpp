@@ -99,7 +99,7 @@ void RvkRenderPass::Begin() {
 
     //Log::Debug("Amount of framebuffers: %d", renderer->Swapchain.Framebuffers.Size);
 
-    const FxStaticArray<VkClearValue> clear_values = {
+    const VkClearValue clear_values[] = {
         VkClearValue {
             .color = {{1.0f, 1.0f, 1.0f, 1.0f}}
         },
@@ -113,7 +113,7 @@ void RvkRenderPass::Begin() {
         .framebuffer = RendererVulkan->Swapchain.Framebuffers[RendererVulkan->GetImageIndex()].Framebuffer,
         .renderArea.offset = {0, 0},
         .renderArea.extent = {(uint32)extent.Width(), (uint32)extent.Height()},
-        .clearValueCount = static_cast<uint32>(clear_values.Size),
+        .clearValueCount = sizeof(clear_values) / sizeof(VkClearValue),
         .pClearValues = clear_values,
     };
 

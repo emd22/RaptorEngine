@@ -6,7 +6,9 @@
 #include <cstdlib>
 #include <initializer_list>
 
-#include <Core/Log.hpp>
+#include "Log.hpp"
+
+#include "FxMemPool.hpp"
 
 static inline void NoMemError()
 {
@@ -63,7 +65,7 @@ public:
 #ifdef FX_STATIC_ARRAY_DEBUG
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
 #endif
-        void* allocated_ptr = std::malloc(sizeof(ElementType) * element_count);
+        void* allocated_ptr = FxMemPool::Alloc(sizeof(ElementType) * element_count);
 
         if (allocated_ptr == nullptr) {
             NoMemError();
@@ -110,11 +112,11 @@ public:
         Log::Debug("Freeing FxStaticArray of size %zu (type: %s)", Size, typeid(ElementType).name());
 #endif
         for (size_t i = 0; i < Size; i++) {
-            ElementType &element = Data[i];
+            ElementType& element = Data[i];
             element.~ElementType();
         }
 
-        std::free(Data);
+        FxMemPool::Free(static_cast<void*>(Data));
 
         Data = nullptr;
         Capacity = 0;
@@ -269,7 +271,7 @@ protected:
 #ifdef FX_DEBUG_STATIC_ARRAY
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
 #endif
-        void* allocated_ptr = std::malloc(sizeof(ElementType) * element_count);
+        void* allocated_ptr = FxMemPool::Alloc(sizeof(ElementType) * element_count);
 
         if (allocated_ptr == nullptr) {
             NoMemError();
