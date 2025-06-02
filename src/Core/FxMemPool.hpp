@@ -51,10 +51,10 @@ public:
     void PrintAllocations() const;
 
     void Destroy();
-    // ~FxMemPool()
-    // {
-    //     Destroy();
-    // }
+    ~FxMemPool()
+    {
+        Destroy();
+    }
 
     inline bool IsInited() const
     {
