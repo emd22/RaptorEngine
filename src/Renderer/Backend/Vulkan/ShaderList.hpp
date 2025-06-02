@@ -3,7 +3,7 @@
 #include <Core/FxPanic.hpp>
 #include "vulkan/vulkan_core.h"
 #include <Core/Types.hpp>
-#include <Core/StaticArray.hpp>
+#include <Core/FxStaticArray.hpp>
 
 #include <Core/Log.hpp>
 #include <vulkan/vulkan.h>
@@ -29,7 +29,7 @@ public:
     {
         switch (mShaderType) {
             case RvkShaderType::Unknown:
-                FxPanic_("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!", 0);
+                FxPanic("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!", 0);
             case RvkShaderType::Vertex:
                 return VK_SHADER_STAGE_VERTEX_BIT;
             case RvkShaderType::Fragment:
@@ -47,9 +47,9 @@ private:
 class ShaderList
 {
 public:
-    StaticArray<ShaderInfo> GetShaderStages()
+    FxStaticArray<ShaderInfo> GetShaderStages()
     {
-        StaticArray<ShaderInfo> shader_stages(2);
+        FxStaticArray<ShaderInfo> shader_stages(2);
 
         if (Vertex != nullptr) {
             ShaderInfo info = ShaderInfo(RvkShaderType::Vertex, Vertex);

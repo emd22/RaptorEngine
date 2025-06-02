@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/StaticArray.hpp"
+#include "Core/FxStaticArray.hpp"
 #include "vulkan/vulkan_core.h"
 #include <Core/Types.hpp>
 
@@ -47,7 +47,7 @@ private:
     bool FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index);
 
 public:
-    StaticArray<VkQueueFamilyProperties> RawFamilies;
+    FxStaticArray<VkQueueFamilyProperties> RawFamilies;
 private:
     uint32 mGraphicsIndex = QueueNull;
     uint32 mPresentIndex = QueueNull;

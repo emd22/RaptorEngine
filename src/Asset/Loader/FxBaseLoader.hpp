@@ -9,6 +9,7 @@ class FxBaseLoader
 public:
     enum class Status
     {
+        None,
         Success,
         Error,
     };

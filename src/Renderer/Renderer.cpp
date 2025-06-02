@@ -17,6 +17,6 @@ void SetRendererBackend(FxRenderBackend *backend)
 void AssertRendererExists()
 {
     if (!Renderer->Initialized) {
-        FxPanic("Renderer not initialized!", 0);
+        FxModulePanic("Renderer not initialized!", 0);
     }
 }

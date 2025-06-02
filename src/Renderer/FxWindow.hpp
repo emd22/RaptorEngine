@@ -22,7 +22,7 @@ public:
         mWindow = SDL_CreateWindow(title, width, height, window_flags);
 
         if (mWindow == nullptr) {
-            FxPanic_("Window", "Could not create SDL window (SDL err: %s)", SDL_GetError());
+            FxPanic("Window", "Could not create SDL window (SDL err: %s)", SDL_GetError());
         }
     }
 

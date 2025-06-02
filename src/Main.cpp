@@ -6,6 +6,10 @@
 #include "Renderer/FxCamera.hpp"
 #include "vulkan/vulkan_core.h"
 
+#include <Core/FxMemPool.hpp>
+
+#include <Core/FxLinkedList.hpp>
+
 #define SDL_DISABLE_OLD_NAMES
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_revision.h>
@@ -50,11 +54,13 @@ void CheckGeneralControls()
 
 int main()
 {
+    FxMemPool::GetGlobalPool().Create(100000);
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        FxPanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
+        FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }
 
+    FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };
 
     // catch sigabrt to avoid macOS showing "report" popup
@@ -93,19 +99,21 @@ int main()
     RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
     RendererVulkan->DescriptorPool.Create(RendererVulkan->GetDevice(), RendererFramesInFlight);
 
-    for (RvkFrameData &frame : RendererVulkan->Frames) {
+    for (RvkFrameData& frame : RendererVulkan->Frames) {
         frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.DescriptorSetLayout);
         frame.DescriptorSet.SetBuffer(frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     }
 
-    auto &asset_manager = FxAssetManager::GetInstance();
+    FxAssetManager& asset_manager = FxAssetManager::GetInstance();
+
     asset_manager.Start(2);
 
     // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
+    // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
 
     PtrContainer<FxModel> other_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
+    // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
@@ -142,13 +150,17 @@ int main()
             camera.Move(Vec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !other_model->IsUploadedToGpu) {
-            // FxAssetManager::LoadModel(new_model, "../models/DamagedHelmet.glb");
-            FxAssetManager::LoadModel(other_model, "../models/DamagedHelmet.glb");
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
+            FxMemPool::GetGlobalPool().PrintAllocations();
         }
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && other_model->IsUploadedToGpu) {
-            other_model->Destroy();
-        }
+
+        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !other_model->IsUploadedToGpu) {
+        //     FxAssetManager::LoadModel(new_model, "../models/DamagedHelmet.glb");
+        //     FxAssetManager::LoadModel(other_model, "../models/DamagedHelmet.glb");
+        // }
+        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && other_model->IsUploadedToGpu) {
+        //     other_model->Destroy();
+        // }
 
         camera.Update();
 
@@ -161,7 +173,7 @@ int main()
 
         CheckGeneralControls();
 
-        new_model->Render(pipeline);
+        // new_model->Render(pipeline);
         other_model->Render(pipeline);
 
         Renderer->FinishFrame(pipeline);
@@ -170,6 +182,8 @@ int main()
     }
 
     asset_manager.Shutdown();
+
+    // FxMemPool::GetGlobalPool().Destroy();
 
     return 0;
 }

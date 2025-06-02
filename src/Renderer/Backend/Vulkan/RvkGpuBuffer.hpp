@@ -114,7 +114,7 @@ public:
         );
 
         if (status != VK_SUCCESS) {
-            FxPanic_("GPUBuffer", "Error allocating staging buffer!", status);
+            FxPanic("GPUBuffer", "Error allocating staging buffer!", status);
         }
 
         Initialized = true;
@@ -162,7 +162,7 @@ public:
         MappedBuffer = nullptr;
     }
 
-    void Upload(StaticArray<ElementType> &data)
+    void Upload(FxStaticArray<ElementType> &data)
     {
         auto buffer = GetMappedContext();
         memcpy(buffer, data.Data, data.GetSizeInBytes());
@@ -210,7 +210,7 @@ private:
 public:
     RvkGpuBuffer() = default;
 
-    void Create(RvkBufferUsageType usage, StaticArray<ElementType> &data)
+    void Create(RvkBufferUsageType usage, FxStaticArray<ElementType> &data)
     {
         this->Size = data.Size;
         Usage = usage;

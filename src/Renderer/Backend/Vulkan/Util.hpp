@@ -9,7 +9,7 @@
     {                                             \
         const VkResult result__ = (func_result);  \
         if (result__ != VK_SUCCESS) {             \
-            FxPanic((message), result__);           \
+            FxModulePanic((message), result__);           \
         }                                         \
     }
 

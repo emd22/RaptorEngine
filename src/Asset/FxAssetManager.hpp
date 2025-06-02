@@ -33,14 +33,14 @@ public:
 
 public:
     FxAssetQueueItem Item;
-    FxBaseLoader::Status LoadStatus;
+    FxBaseLoader::Status LoadStatus = FxBaseLoader::Status::None;
 
     FxDataNotifier ItemReady;
 
-    std::atomic_flag Running;
-    std::atomic_flag IsBusy;
+    std::atomic_flag Running = ATOMIC_FLAG_INIT;
+    std::atomic_flag IsBusy = ATOMIC_FLAG_INIT;
 
-    std::atomic_flag DataPendingUpload;
+    std::atomic_flag DataPendingUpload = ATOMIC_FLAG_INIT;
 
     std::thread Thread;
 };
@@ -48,6 +48,8 @@ public:
 class FxAssetManager
 {
 public:
+    FxAssetManager() = default;
+
     void Start(int32 thread_count);
     void Shutdown();
 
@@ -85,7 +87,7 @@ private:
     std::atomic_flag ItemsEnqueued;
 
     int32 mThreadCount = 2;
-    // StaticArray<std::thread *> mWorkerThreads;
-    StaticArray<FxAssetWorker> mWorkerThreads;
+    // FxStaticArray<std::thread *> mWorkerThreads;
+    FxStaticArray<FxAssetWorker> mWorkerThreads;
     std::thread *mAssetManagerThread;
 };

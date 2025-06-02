@@ -10,7 +10,7 @@
 #define FX_BREAKPOINT __builtin_trap()
 
 template <typename T, typename... Types>
-void FxPanic_(const char * const module, const char *fmt, T first, Types... items)
+void FxPanic(const char* const module, const char* fmt, T first, Types... items)
 {
     Log::LogSeverityText<Log::Severity::Fatal>();
 
@@ -25,7 +25,7 @@ void FxPanic_(const char * const module, const char *fmt, T first, Types... item
 }
 
 template <typename... Types>
-void FxPanic_(const char *module, const char *fmt, VkResult result, Types... items)
+void FxPanic(const char* module, const char* fmt, VkResult result, Types... items)
 {
     Log::LogSeverityText<Log::Severity::Fatal>();
 
@@ -42,10 +42,10 @@ void FxPanic_(const char *module, const char *fmt, VkResult result, Types... ite
 }
 
 
-#define FxPanic(...) \
-    FxPanic_(FxModuleName__, __VA_ARGS__)
+#define FxModulePanic(...) \
+    FxPanic(FxModuleName__, __VA_ARGS__)
 
 #define FxAssert(cond) \
     if (!cond) { \
-        FxPanic_(__func__, "Assertion failed! (%s)", #cond); \
+        FxPanic(__func__, "Assertion failed! (%s)", #cond); \
     }

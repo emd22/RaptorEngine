@@ -1,6 +1,6 @@
 #include "RvkDevice.hpp"
 #include "Core/Defines.hpp"
-#include "Core/StaticArray.hpp"
+#include "Core/FxStaticArray.hpp"
 
 namespace vulkan {
 
@@ -238,7 +238,7 @@ void RvkGpuDevice::CreateLogicalDevice()
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);
 
     if (status != VK_SUCCESS) {
-        FxPanic("Could not create logical device", status);
+        FxModulePanic("Could not create logical device", status);
     }
 
     QueryQueues();
@@ -289,11 +289,11 @@ void RvkGpuDevice::PickPhysicalDevice()
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, nullptr), "Could not enumerate physical devices");
 
     if (device_count == 0) {
-        FxPanic("No usable physical devices found (no vulkan support!)", 0);
+        FxModulePanic("No usable physical devices found (no vulkan support!)", 0);
     }
 
-    StaticArray<VkPhysicalDevice> physical_devices(device_count);
-    physical_devices.InitSize();
+    FxStaticArray<VkPhysicalDevice> physical_devices;
+    physical_devices.InitSize(device_count);
 
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.Data), "Could not enumerate physical devices");
 
@@ -304,7 +304,7 @@ void RvkGpuDevice::PickPhysicalDevice()
         }
     }
     if (Physical == nullptr) {
-        FxPanic("Could not find a suitable physical device!", 0);
+        FxModulePanic("Could not find a suitable physical device!", 0);
     }
 }
 

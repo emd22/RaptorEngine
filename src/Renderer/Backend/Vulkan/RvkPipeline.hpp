@@ -3,7 +3,7 @@
 #include "ShaderList.hpp"
 #include "RvkRenderPass.hpp"
 
-#include <Core/StaticArray.hpp>
+#include <Core/FxStaticArray.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -38,7 +38,7 @@ struct RvkVertex<FxVertexPosition | FxVertexNormal>
 struct VertexInfo
 {
     VkVertexInputBindingDescription binding;
-    StaticArray<VkVertexInputAttributeDescription> attributes;
+    FxStaticArray<VkVertexInputAttributeDescription> attributes;
 };
 
 

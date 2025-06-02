@@ -68,7 +68,7 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain) {
                 | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     };
 
-    StaticArray attachments = {
+    FxStaticArray attachments = {
         color_attachment,
         depth_attachment
     };
@@ -85,13 +85,13 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain) {
 
     const VkResult status = vkCreateRenderPass(device.Device, &create_info, nullptr, &RenderPass);
     if (status != VK_SUCCESS) {
-        FxPanic("Failed to create render pass", status);
+        FxModulePanic("Failed to create render pass", status);
     }
 }
 
 void RvkRenderPass::Begin() {
     if (RenderPass == nullptr) {
-        FxPanic("Render pass has not been previously created", 0);
+        FxModulePanic("Render pass has not been previously created", 0);
     }
 
     RvkFrameData *frame = RendererVulkan->GetFrame();
@@ -99,7 +99,7 @@ void RvkRenderPass::Begin() {
 
     //Log::Debug("Amount of framebuffers: %d", renderer->Swapchain.Framebuffers.Size);
 
-    const StaticArray<VkClearValue> clear_values = {
+    const VkClearValue clear_values[] = {
         VkClearValue {
             .color = {{1.0f, 1.0f, 1.0f, 1.0f}}
         },
@@ -113,7 +113,7 @@ void RvkRenderPass::Begin() {
         .framebuffer = RendererVulkan->Swapchain.Framebuffers[RendererVulkan->GetImageIndex()].Framebuffer,
         .renderArea.offset = {0, 0},
         .renderArea.extent = {(uint32)extent.Width(), (uint32)extent.Height()},
-        .clearValueCount = static_cast<uint32>(clear_values.Size),
+        .clearValueCount = sizeof(clear_values) / sizeof(VkClearValue),
         .pClearValues = clear_values,
     };
 

@@ -5,8 +5,6 @@
 
 #include <SDL3/SDL.h>
 
-static FxControlManager ControlManager;
-
 /** Converts an SDL scancode to its corresponding FxKey ID. */
 static inline FxKey ConvertScancodeToFxKey(int32 sdl_scancode)
 {
@@ -36,32 +34,48 @@ static inline FxKey ConvertMouseButtonToFxKey(int32 mouse_button)
     return static_cast<FxKey>(FxKey::FX_MOUSE_BUTTONS_START + mouse_button);
 }
 
-FxControlManager &FxControlManager::GetInstance()
+void FxControlManager::Init()
 {
+    FxMemPool::GetGlobalPool().PrintAllocations();
+
+    FxControlManager& inst = GetInstance();
+
+    inst.mKeyMap.InitSize(MaxKeys);
+    memset(inst.mKeyMap.Data, 0, inst.mKeyMap.GetSizeInBytes());
+}
+
+FxControlManager& FxControlManager::GetInstance()
+{
+    static FxControlManager ControlManager;
+
     return ControlManager;
 }
 
 void FxControlManager::CaptureMouse()
 {
+    FxControlManager& inst = GetInstance();
+
     // Get the position of the mouse on capture
     float32 x, y;
     SDL_GetMouseState(&x, &y);
-    ControlManager.mCapturedMousePos.Set(x, y);
+    inst.mCapturedMousePos.Set(x, y);
 
     SDL_SetWindowRelativeMouseMode(
         Renderer->GetWindow()->GetWindow(),
-        (ControlManager.mMouseCaptured = true)
+        (inst.mMouseCaptured = true)
     );
 }
 
 bool FxControlManager::IsMouseLocked()
 {
-    return ControlManager.mMouseCaptured;
+    return GetInstance().mMouseCaptured;
 }
 
 void FxControlManager::ReleaseMouse()
 {
-    Vec2f *pos = &ControlManager.mCapturedMousePos;
+    FxControlManager& inst = GetInstance();
+
+    Vec2f *pos = &inst.mCapturedMousePos;
     SDL_Window *window = Renderer->GetWindow()->GetWindow();
 
     // Warp back to the original position
@@ -69,13 +83,13 @@ void FxControlManager::ReleaseMouse()
 
     SDL_SetWindowRelativeMouseMode(
         window,
-        (ControlManager.mMouseCaptured = false)
+        (inst.mMouseCaptured = false)
     );
 }
 
 Vec2f &FxControlManager::GetMouseDelta()
 {
-    return ControlManager.mMouseDelta;
+    return GetInstance().mMouseDelta;
 }
 
 static inline bool IsKeyInRange(FxKey key_id)
@@ -97,7 +111,7 @@ FxControl *FxControlManager::GetKey(FxKey key_id)
         return nullptr;
     }
 
-    FxControl *key = &ControlManager.mKeyMap[key_id];
+    FxControl *key = &GetInstance().mKeyMap[key_id];
 
     return key;
 }
@@ -123,14 +137,14 @@ inline void CheckKeyForContinuedPress(FxControl *key)
     const bool key_next_frame = !key->mTickBit;
 
     // If we are currently on the "off" frame, then we know this is continued.
-    if (key_next_frame == ControlManager.mThisTick) {
+    if (key_next_frame == FxControlManager::GetInstance().mThisTick) {
         key->mContinuedPress = true;
     }
 }
 
 bool FxControlManager::IsKeyDown(FxKey scancode)
 {
-    FxControl *key = ControlManager.GetKey(scancode);
+    FxControl *key = GetInstance().GetKey(scancode);
     if (!key) {
         return false;
     }
@@ -142,7 +156,7 @@ bool FxControlManager::IsKeyDown(FxKey scancode)
 
 bool FxControlManager::IsKeyPressed(FxKey scancode)
 {
-    FxControl *key = ControlManager.GetKey(scancode);
+    FxControl *key = GetInstance().GetKey(scancode);
     if (!key) {
         return false;
     }
@@ -154,7 +168,7 @@ bool FxControlManager::IsKeyPressed(FxKey scancode)
 
 bool FxControlManager::IsKeyUp(FxKey scancode)
 {
-    FxControl *key = ControlManager.GetKey(scancode);
+    FxControl *key = GetInstance().GetKey(scancode);
     if (!key) {
         return false;
     }
@@ -170,30 +184,31 @@ bool FxControlManager::IsKeyUp(FxKey scancode)
 
 void FxControlManager::Update()
 {
-    ControlManager.mMouseDelta = Vec2f::Zero;
+    FxControlManager& inst = GetInstance();
 
-    ControlManager.mThisTick++;
+    inst.mMouseDelta = Vec2f::Zero;
+    inst.mThisTick++;
 
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_EVENT_QUIT:
-                ControlManager.OnQuit();
+                inst.OnQuit();
                 break;
 
             // Keyboard events
             case SDL_EVENT_KEY_DOWN: // fallthrough
             case SDL_EVENT_KEY_UP:
-                ControlManager.UpdateFromKeyboardEvent(&event);
+                inst.UpdateFromKeyboardEvent(&event);
                 break;
             case SDL_EVENT_MOUSE_BUTTON_DOWN: // fallthrough
             case SDL_EVENT_MOUSE_BUTTON_UP:
-                ControlManager.UpdateFromMouseButtonEvent(&event);
+                inst.UpdateFromMouseButtonEvent(&event);
                 break;
 
             case SDL_EVENT_MOUSE_MOTION:
-                ControlManager.UpdateFromMouseMoveEvent(&event);
+                inst.UpdateFromMouseMoveEvent(&event);
                 break;
 
             default:;
@@ -203,13 +218,13 @@ void FxControlManager::Update()
 
 void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event *event)
 {
-    FxControl *button = ControlManager.GetKey(key_id);
+    FxControl *button = GetInstance().GetKey(key_id);
     if (!button) {
         return;
     }
 
     if (event->key.down && !button->IsKeyDown()) {
-        button->mTickBit = ControlManager.mThisTick;
+        button->mTickBit = GetInstance().mThisTick;
         button->mKeyDown = true;
     }
     else if (!event->key.down && button->IsKeyDown()) {
@@ -231,7 +246,7 @@ void FxControlManager::UpdateFromKeyboardEvent(SDL_Event *event)
 
 void FxControlManager::UpdateFromMouseMoveEvent(SDL_Event *event)
 {
-    ControlManager.mMouseDelta += { event->motion.xrel, event->motion.yrel };
+    GetInstance().mMouseDelta += { event->motion.xrel, event->motion.yrel };
 }
 
 void FxControlManager::UpdateFromMouseButtonEvent(SDL_Event *event)

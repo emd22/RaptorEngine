@@ -34,7 +34,7 @@ namespace vulkan {
 using ExtensionNames = FxRenderBackendVulkan::ExtensionNames;
 using ExtensionList = FxRenderBackendVulkan::ExtensionList;
 
-FX_SET_MODULE_NAME("Vulkan")
+FX_SET_MODULE_NAME("RendererVk")
 
 ExtensionNames FxRenderBackendVulkan::CheckExtensionsAvailable(ExtensionNames &requested_extensions)
 {
@@ -61,12 +61,12 @@ ExtensionNames FxRenderBackendVulkan::CheckExtensionsAvailable(ExtensionNames &r
     return missing_extensions;
 }
 
-StaticArray<VkLayerProperties> FxRenderBackendVulkan::GetAvailableValidationLayers()
+FxStaticArray<VkLayerProperties> FxRenderBackendVulkan::GetAvailableValidationLayers()
 {
     uint32 layer_count;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-    StaticArray<VkLayerProperties> validation_layers;
+    FxStaticArray<VkLayerProperties> validation_layers;
     validation_layers.InitSize(layer_count);
 
     vkEnumerateInstanceLayerProperties(&layer_count, validation_layers.Data);
@@ -177,7 +177,7 @@ void FxRenderBackendVulkan::InitVulkan()
             }
         }
 
-        FxPanic("Missing required instance extensions", 0);
+        FxModulePanic("Missing required instance extensions", 0);
     }
 
     // auto validation_layers = GetAvailableValidationLayers();
@@ -202,13 +202,13 @@ void FxRenderBackendVulkan::InitVulkan()
     VkResult result = vkCreateInstance(&instance_info, nullptr, &mInstance);
 
     if (result != VK_SUCCESS) {
-        FxPanic("Could not create vulkan instance!", result);
+        FxModulePanic("Could not create vulkan instance!", result);
     }
 
 #ifdef FX_VULKAN_DEBUG
     mDebugMessenger = CreateDebugMessenger(mInstance);
     if (!mDebugMessenger) {
-        FxPanic("Could not create debug messenger", 0);
+        FxModulePanic("Could not create debug messenger", 0);
     }
 #endif
 
@@ -321,7 +321,7 @@ void FxRenderBackendVulkan::InitGPUAllocator()
 
     const VkResult status = vmaCreateAllocator(&create_info, &GpuAllocator);
     if (status != VK_SUCCESS) {
-        FxPanic("Could not create VMA allocator!", status);
+        FxModulePanic("Could not create VMA allocator!", status);
     }
 }
 
@@ -539,7 +539,7 @@ void FxRenderBackendVulkan::PresentFrame()
     RvkFrameData *frame = GetFrame();
 
     if (Swapchain.Initialized != true) {
-        FxPanic("Swapchain not initialized!", 0);
+        FxModulePanic("Swapchain not initialized!", 0);
     }
 
     const VkSwapchainKHR swapchains[] = {
@@ -617,13 +617,13 @@ FrameResult FxRenderBackendVulkan::GetNextSwapchainImage(RvkFrameData *frame)
 void FxRenderBackendVulkan::CreateSurfaceFromWindow()
 {
     if (mWindow == nullptr) {
-        FxPanic("No window attached! use FxRenderBackendVulkan::SelectWindow()", 0);
+        FxModulePanic("No window attached! use FxRenderBackendVulkan::SelectWindow()", 0);
     }
 
     bool success = SDL_Vulkan_CreateSurface(mWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
 
     if (!success) {
-        FxPanic("Could not attach Vulkan instance to window! (SDL err: %s)", SDL_GetError());
+        FxModulePanic("Could not attach Vulkan instance to window! (SDL err: %s)", SDL_GetError());
     }
 }
 

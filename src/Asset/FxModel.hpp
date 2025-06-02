@@ -4,7 +4,7 @@
 
 #include <Renderer/FxMesh.hpp>
 
-#include <Core/StaticPtrArray.hpp>
+#include <Core/FxStaticPtrArray.hpp>
 
 
 class FxModel : public FxBaseAsset
@@ -43,7 +43,7 @@ public:
     }
 
 public:
-    StaticPtrArray<FxMesh> Meshes;
+    FxStaticPtrArray<FxMesh> Meshes;
 
 private:
     bool mModelReady = false;

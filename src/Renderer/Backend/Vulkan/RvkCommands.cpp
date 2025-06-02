@@ -24,7 +24,7 @@ void RvkCommandBuffer::Create(RvkCommandPool *pool)
 
     const VkResult status = vkAllocateCommandBuffers(mDevice->Device, &buffer_info, &CommandBuffer);
     if (status != VK_SUCCESS) {
-        FxPanic("Could not allocate command buffer", status);
+        FxModulePanic("Could not allocate command buffer", status);
     }
 
     Log::Debug("Creating Command buffer 0x%llx from queue family %d", CommandBuffer, pool->QueueFamilyIndex);
@@ -35,7 +35,7 @@ void RvkCommandBuffer::Create(RvkCommandPool *pool)
 inline void RvkCommandBuffer::CheckInitialized() const
 {
     if (!IsInitialized()) {
-        FxPanic("Command buffer has not been initialized!", 0);
+        FxModulePanic("Command buffer has not been initialized!", 0);
     }
 }
 
@@ -51,7 +51,7 @@ void RvkCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
 
     const VkResult status = vkBeginCommandBuffer(CommandBuffer, &begin_info);
     if (status != VK_SUCCESS) {
-        FxPanic("Failed to begin recording command buffer", status);
+        FxModulePanic("Failed to begin recording command buffer", status);
     }
 }
 
@@ -68,7 +68,7 @@ void RvkCommandBuffer::End()
 
     const VkResult status = vkEndCommandBuffer(CommandBuffer);
     if (status != VK_SUCCESS) {
-        FxPanic("Failed to create command buffer!", status);
+        FxModulePanic("Failed to create command buffer!", status);
     }
 }
 

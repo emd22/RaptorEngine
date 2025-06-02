@@ -68,7 +68,7 @@ void RvkSwapchain::CreateImageViews()
 
         VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &ImageViews[i]);
         if (status != VK_SUCCESS) {
-            FxPanic("Could not create swapchain image view", status);
+            FxModulePanic("Could not create swapchain image view", status);
         }
 
         RvkImage &depth_image = DepthImages[i];
@@ -91,7 +91,7 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
     const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mDevice->Physical, surface, &capabilities);
 
     if (result != VK_SUCCESS) {
-        FxPanic("Error retrieving surface capabilities", result);
+        FxModulePanic("Error retrieving surface capabilities", result);
     }
 
     const VkExtent2D extent = {
@@ -140,7 +140,7 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
     const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
 
     if (status != VK_SUCCESS) {
-        FxPanic("Could not create swapchain", status);
+        FxModulePanic("Could not create swapchain", status);
     }
 }
 
@@ -150,7 +150,7 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline)
     Framebuffers.Free();
     Framebuffers.InitSize(ImageViews.Size);
 
-    StaticArray<VkImageView> temp_views;
+    FxStaticArray<VkImageView> temp_views;
     temp_views.InitSize(2);
 
     for (int i = 0; i < ImageViews.Size; i++) {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/StaticArray.hpp>
+#include <Core/FxStaticArray.hpp>
 #include <Core/Types.hpp>
 
 #include <Math/Vec2.hpp>
@@ -20,13 +20,11 @@ private:
 public:
     static const int MaxKeys = FxKey::FX_KEY_MAX;
 
-    FxControlManager()
-    {
-        mKeyMap.InitSize(MaxKeys);
-        memset(mKeyMap.Data, 0, mKeyMap.GetSizeInBytes());
-    }
+    FxControlManager() = default;
 
-    static FxControlManager &GetInstance();
+    static void Init();
+
+    static FxControlManager& GetInstance();
 
     static void CaptureMouse();
     static void ReleaseMouse();
@@ -56,7 +54,7 @@ public:
      * *NOTE:* The current "scope" for currently pressed keys is reset or begun on
      * a call to `FxControlManager::Update`. As well, if this function
      * is not called within the bounds of *every* `::Update` call, then
-     * the bit that determines if the key is on tbe next frame returns false positives.
+     * the bit that determines if the key is on the next frame returns false positives.
      * This *ONLY* pertains to if the key is held down.
      */
     static bool IsKeyPressed(FxKey scancode);
@@ -118,7 +116,7 @@ public:
     WindowEventFunc OnQuit;
 
 private:
-    StaticArray<FxControl> mKeyMap;
+    FxStaticArray<FxControl> mKeyMap;
     bool mMouseCaptured = false;
 
     Vec2f mMouseDelta = Vec2f::Zero;

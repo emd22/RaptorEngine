@@ -45,7 +45,7 @@ public:
     ValueType &operator *() const
     {
         if (!HasValue()) {
-            FxPanic_("Optional", "Could not retrieve undefined value", 0);
+            FxPanic("Optional", "Could not retrieve undefined value", 0);
         }
 
         return *reinterpret_cast<ValueType *>(&mData);
@@ -86,19 +86,19 @@ public:
         other.mPtr = nullptr;
     }
 
-    PtrContainer<T> operator = (T &&value)
+    PtrContainer<T> &operator = (T &&value)
     {
         delete mPtr;
         mPtr = new T(std::move(value));
-        return std::move(*this);
+        return *this;
     }
 
-    PtrContainer<T> operator = (PtrContainer<T> &&other)
+    PtrContainer<T> &operator = (PtrContainer<T> &&other)
     {
         delete mPtr;
         mPtr = other.mPtr;
         other.mPtr = nullptr;
-        return std::move(*this);
+        return *this;
     }
 
     static PtrContainer<T> New()
