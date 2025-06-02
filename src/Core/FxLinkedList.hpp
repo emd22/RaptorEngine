@@ -70,16 +70,12 @@ public:
 
             // Remove the node from the freed list
             mFreedNodes.RemoveLast();
-
-            Log::Debug("Reusing node!");
         }
 
         // No nodes can be recycled, insert a new one
         if (node == nullptr) {
             node = mNodePool.Insert();
         }
-
-        Log::Debug("New node at %p", node);
 
         node->Data = data;
         node->Prev = nullptr;
@@ -94,8 +90,6 @@ public:
         if (node->Next == nullptr && node->Prev == nullptr) {
             return;
         }
-
-        Log::Debug("Freeing node at | (%p - %p - %p)", node->Prev, node, node->Next);
 
         // Insert the node into the freed list. This allocated node will be reused when needed.
         {

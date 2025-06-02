@@ -28,9 +28,7 @@ find_package(JPEG REQUIRED)
 
 add_definitions(
     -DFX_USE_NEON
-    -DFX_DEBUG_STATIC_ARRAY
-
-
+    # -DFX_DEBUG_STATIC_ARRAY
 )
 
 add_compile_options(

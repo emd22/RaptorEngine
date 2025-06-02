@@ -8,11 +8,7 @@
 class FxDataNotifier
 {
 public:
-    FxDataNotifier()
-    {
-        printf("Construct %p\n", this);
-
-    }
+    FxDataNotifier() = default;
 
     void SignalDataWritten()
     {
@@ -63,10 +59,7 @@ public:
         mCV.notify_one();
     }
 
-    ~FxDataNotifier()
-    {
-        printf("Destruct %p\n", this);
-    }
+
 
 private:
     bool mDone = false;

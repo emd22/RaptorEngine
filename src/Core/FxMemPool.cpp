@@ -52,7 +52,6 @@ static inline uint8* GetAlignedPtr(uint8* ptr)
 
 auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPool::MemBlock>::Node*
 {
-    printf("*** requesting size %llu\n", requested_size);
     std::lock_guard guard(mMemMutex);
 
     auto* node = mMemBlocks.Head;
@@ -66,8 +65,6 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPool:
                 .Size = GetAlignedValue(requested_size),
                 .Start = mMem
             };
-
-            printf("Allocating (reusing from start) memory block at %p (size: %llu)\n", new_block.Start, new_block.Size);
 
             return mMemBlocks.InsertFirst(new_block);
         }
@@ -94,8 +91,6 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPool:
                 .Size = GetAlignedValue(requested_size),
                 .Start = GetAlignedPtr(current_block_end)
             };
-
-            printf("Allocating (reusing) memory block at %p (size: %llu)\n", new_block.Start, new_block.Size);
 
             // Track that the block is now allocated
             return mMemBlocks.InsertAfterNode(new_block, node);
@@ -126,8 +121,6 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPool:
         .Size = GetAlignedValue(requested_size),
         .Start = GetAlignedPtr(new_block_ptr)
     };
-
-    printf("Allocating end memory block at %p (size: %llu)\n", new_block.Start, new_block.Size);
 
     auto* new_node = mMemBlocks.InsertLast(new_block);
 
@@ -191,8 +184,6 @@ void FxMemPool::PrintAllocations() const
 
             uint8* current_block_end = block.Start + block.Size;
             const uint64 gap_size = next_block.Start - current_block_end;
-
-            printf("current block start: %p, block size: %llu, next block start: %p\n", block.Start, block.Size, next_block.Start);
 
             if (gap_size) {
                 Log::Debug("MemGap  [size=%llu, ptr=%p]", gap_size, current_block_end);

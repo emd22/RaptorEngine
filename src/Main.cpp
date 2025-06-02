@@ -106,8 +106,6 @@ int main()
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
 
-    FxMemPool::GetGlobalPool().PrintAllocations();
-
     asset_manager.Start(2);
 
     // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
