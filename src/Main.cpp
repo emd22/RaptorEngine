@@ -114,8 +114,8 @@ int main()
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
 
-    // PtrContainer<FxModel> other_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
-    PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
+    PtrContainer<FxModel> other_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
+    // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
