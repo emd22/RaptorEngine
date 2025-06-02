@@ -39,7 +39,7 @@ public:
         if (ptr == nullptr) {
             return;
         }
-        std::lock_guard<std::mutex> guard(mMemMutex);
+        std::lock_guard guard(mMemMutex);
 
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         mMemBlocks.DeleteNode(node);

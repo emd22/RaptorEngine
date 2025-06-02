@@ -20,13 +20,11 @@ private:
 public:
     static const int MaxKeys = FxKey::FX_KEY_MAX;
 
-    FxControlManager()
-    {
-        mKeyMap.InitSize(MaxKeys);
-        memset(mKeyMap.Data, 0, mKeyMap.GetSizeInBytes());
-    }
+    FxControlManager() = default;
 
-    static FxControlManager &GetInstance();
+    static void Init();
+
+    static FxControlManager& GetInstance();
 
     static void CaptureMouse();
     static void ReleaseMouse();

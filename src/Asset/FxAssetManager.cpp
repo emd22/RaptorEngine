@@ -1,5 +1,6 @@
 #include "FxAssetManager.hpp"
 #include "Asset/Loader/FxGltfLoader.hpp"
+#include "Core/FxPanic.hpp"
 #include "Core/FxStaticArray.hpp"
 
 #include "FxModel.hpp"
@@ -11,7 +12,6 @@
 
 #include <Core/Types.hpp>
 
-static FxAssetManager AssetManager;
 
 ////////////////////////////////////
 // Asset Worker
@@ -19,14 +19,18 @@ static FxAssetManager AssetManager;
 
 void FxAssetWorker::Create()
 {
-    Thread = std::thread([this]() { FxAssetWorker::Update(); });
     while (Running.test_and_set(std::memory_order_acquire)) {
         Running.wait(true, std::memory_order_relaxed);
     }
+
+    Thread = std::thread([this]() { this->Update(); });
+
 }
 
 void FxAssetWorker::Update()
 {
+    FxAssetManager& manager = FxAssetManager::GetInstance();
+
     while (Running.test()) {
         ItemReady.WaitForData();
 
@@ -41,7 +45,7 @@ void FxAssetWorker::Update()
         DataPendingUpload.test_and_set();
 
         // Signal the main asset thread that we are done
-        AssetManager.DataLoaded.SignalDataWritten();
+        manager.DataLoaded.SignalDataWritten();
     }
 }
 
@@ -61,13 +65,13 @@ void FxAssetManager::Start(int32 thread_count)
 
     for (int32 i = 0; i < thread_count; i++) {
         // 'Insert' a new worker and get its pointer
-        FxAssetWorker *worker = mWorkerThreads.Insert();
+        FxAssetWorker* worker = mWorkerThreads.Insert();
 
         // Create the worker from the newly inserted pointer
         worker->Create();
     }
 
-    std::thread *thread = new std::thread([this]() { FxAssetManager::AssetManagerUpdate(); });
+    std::thread* thread = new std::thread([this]() { FxAssetManager::AssetManagerUpdate(); });
     mAssetManagerThread = thread;
 }
 
@@ -80,7 +84,7 @@ void FxAssetManager::Shutdown()
     mActive.clear();
     ItemsEnqueuedNotifier.Kill();
 
-    for (auto &worker : mWorkerThreads) {
+    for (auto& worker : mWorkerThreads) {
         worker.Running.clear();
         worker.Running.notify_one();
 
@@ -116,15 +120,17 @@ void FxAssetManager::LoadModel(PtrContainer<FxModel> &model, std::string path)
     queue_item.AssetType = FxAssetType::Model;
     queue_item.Path = path;
 
-    AssetManager.mLoadQueue.Push(queue_item);
+    FxAssetManager& manager = GetInstance();
 
-    AssetManager.ItemsEnqueued.test_and_set();
-    AssetManager.ItemsEnqueuedNotifier.SignalDataWritten();
+    manager.mLoadQueue.Push(queue_item);
+
+    manager.ItemsEnqueued.test_and_set();
+    manager.ItemsEnqueuedNotifier.SignalDataWritten();
 }
 
 void FxAssetManager::CheckForUploadableData()
 {
-    for (auto &worker : mWorkerThreads) {
+    for (auto& worker : mWorkerThreads) {
         // If there are no uploads pending, skip the worker
         if (!worker.DataPendingUpload.test()) {
             continue;
@@ -145,11 +151,14 @@ void FxAssetManager::CheckForUploadableData()
                 loaded_item.Asset->OnLoaded(loaded_item.Asset);
             }
         }
-        else {
+        else if (worker.LoadStatus == FxBaseLoader::Status::Success) {
             // There was an error, call the OnError callback if it was registered.
             if (loaded_item.Asset->OnError) {
                 loaded_item.Asset->OnError(loaded_item.Asset);
             }
+        }
+        else if (worker.LoadStatus == FxBaseLoader::Status::None) {
+            FxPanic("FxAssetManager", "Worker status is none!", 0);
         }
 
         ItemsEnqueued.clear();
@@ -159,7 +168,7 @@ void FxAssetManager::CheckForUploadableData()
 
 bool FxAssetManager::CheckWorkersBusy()
 {
-    for (auto &worker : mWorkerThreads) {
+    for (auto& worker : mWorkerThreads) {
         if (worker.IsBusy.test()) {
             return true;
         }
@@ -218,9 +227,9 @@ void FxAssetManager::AssetManagerUpdate()
     }
 }
 
-FxAssetWorker *FxAssetManager::FindWorkerThread()
+FxAssetWorker* FxAssetManager::FindWorkerThread()
 {
-    for (FxAssetWorker &worker : mWorkerThreads) {
+    for (FxAssetWorker& worker : mWorkerThreads) {
         if (!worker.IsBusy.test()) {
             return &worker;
         }
@@ -228,7 +237,9 @@ FxAssetWorker *FxAssetManager::FindWorkerThread()
     return nullptr;
 }
 
-FxAssetManager &FxAssetManager::GetInstance()
+FxAssetManager& FxAssetManager::GetInstance()
 {
+    static FxAssetManager AssetManager;
+
     return AssetManager;
 }

@@ -55,29 +55,31 @@ public:
 
     void Create(uint32 initial_pool_size = 32)
     {
-        mNodePool.Create(initial_pool_size);
-        mFreedNodes.Create(initial_pool_size);
+        // mNodePool.Create(initial_pool_size);
+        // mFreedNodes.Create(initial_pool_size);
     }
 
     Node* NewNode(const ElementType& data)
     {
         Node* node = nullptr;
 
-        // Check if there are available spaces that have been freed recently
-        if (!mFreedNodes.IsEmpty()) {
-            // Set the node to use as the last node that was freed
-            node = mFreedNodes.GetLast();
+        node = new Node;
 
-            // Remove the node from the freed list
-            mFreedNodes.RemoveLast();
+        // // Check if there are available spaces that have been freed recently
+        // if (!mFreedNodes.IsEmpty()) {
+        //     // Set the node to use as the last node that was freed
+        //     node = mFreedNodes.GetLast();
 
-            Log::Debug("Reusing node!");
-        }
+        //     // Remove the node from the freed list
+        //     mFreedNodes.RemoveLast();
 
-        // No nodes can be recycled, insert a new one
-        if (node == nullptr) {
-            node = mNodePool.Insert();
-        }
+        //     Log::Debug("Reusing node!");
+        // }
+
+        // // No nodes can be recycled, insert a new one
+        // if (node == nullptr) {
+        //     node = mNodePool.Insert();
+        // }
 
         Log::Debug("New node at %p", node);
 
@@ -95,13 +97,13 @@ public:
             return;
         }
 
-        Log::Debug("Freeing node at | (%p - %p - %p)", node->Prev, node, node->Next);
+        // Log::Debug("Freeing node at | (%p - %p - %p)", node->Prev, node, node->Next);
 
         // Insert the node into the freed list. This allocated node will be reused when needed.
-        {
-            auto* element = mFreedNodes.Insert();
-            (*element) = node;
-        }
+        // {
+        //     auto* element = mFreedNodes.Insert();
+        //     (*element) = node;
+        // }
 
         // If the current node is the head of the list, set the head to be the next node.
         // This means that if there is no node next, the head will be set to null.
@@ -123,6 +125,8 @@ public:
 
         node->Next = nullptr;
         node->Prev = nullptr;
+
+        delete node;
     }
 
     /**
@@ -206,6 +210,13 @@ public:
 
     ~FxLinkedList()
     {
+        Node* node = Head;
+
+        while (node != nullptr) {
+            Node* cur_node = node;
+            node = node->Next;
+            delete cur_node;
+        }
         // Since the linked list is allocated by the NodeBuffers, they are destroyed automatically at
         // the time of this destructor call.
     }
@@ -215,6 +226,6 @@ public:
     Node* Tail = nullptr;
 
 private:
-    FxPagedArray<Node> mNodePool;
-    FxPagedArray<Node*> mFreedNodes;
+    // FxPagedArray<Node> mNodePool;
+    // FxPagedArray<Node*> mFreedNodes;
 };

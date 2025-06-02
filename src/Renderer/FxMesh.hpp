@@ -126,7 +126,7 @@ public:
 
         frame->DescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-        vkCmdDrawIndexed(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Size, 1, 0, 0, 0);
+        vkCmdDrawIndexed(frame->CommandBuffer.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
         // vkCmdDraw(frame->CommandBuffer.CommandBuffer, mVertexBuffer.Size, 1, 0, 0);
     }
 

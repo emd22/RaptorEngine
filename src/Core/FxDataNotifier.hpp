@@ -8,9 +8,15 @@
 class FxDataNotifier
 {
 public:
+    FxDataNotifier()
+    {
+        printf("Construct %p\n", this);
+
+    }
+
     void SignalDataWritten()
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        std::unique_lock<std::mutex> lock(mMutex);
 
         if (mKilled) {
             return;
@@ -18,6 +24,7 @@ public:
 
         mDone = true;
 
+        lock.unlock();
         // Notify the other thread
         mCV.notify_one();
     }
@@ -32,24 +39,33 @@ public:
 
     void Reset()
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        std::unique_lock<std::mutex> lock(mMutex);
+
         mKilled = false;
         mDone = false;
     }
 
     bool IsKilled()
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        std::unique_lock<std::mutex> lock(mMutex);
+
         return mKilled;
     }
 
     void Kill()
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        std::unique_lock<std::mutex> lock(mMutex);
+
         mKilled = true;
         mDone = true;
 
+        lock.unlock();
         mCV.notify_one();
+    }
+
+    ~FxDataNotifier()
+    {
+        printf("Destruct %p\n", this);
     }
 
 private:

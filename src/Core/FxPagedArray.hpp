@@ -49,6 +49,8 @@ public:
 
         ElementType* element = &CurrentPage->Data[CurrentPage->Size++];
 
+        new (element) ElementType;
+
         return element;
     }
 
@@ -129,10 +131,13 @@ public:
             Page* next_page = current_page->Next;
 
             if (current_page->Data) {
-                std::free(static_cast<void*>(current_page->Data));
+                // std::free(static_cast<void*>(current_page->Data));
+                delete[] current_page->Data;
             }
 
-            std::free(static_cast<void*>(current_page));
+            // std::free(static_cast<void*>(current_page));
+            delete current_page;
+
             current_page = next_page;
         }
 
@@ -149,25 +154,29 @@ private:
     Page* AllocateNewPage(Page* prev, Page* next)
     {
         // Allocate and initialize the page object
-        void* allocated_page = std::malloc(sizeof(Page));
-        if (allocated_page == nullptr) {
-            FxPanic("FxPagedArray", "Memory error allocating page", 0);
-            return nullptr; // for msvc
-        }
+        // void* allocated_page = std::malloc(sizeof(Page));
+        // if (allocated_page == nullptr) {
+        //     FxPanic("FxPagedArray", "Memory error allocating page", 0);
+        //     return nullptr; // for msvc
+        // }
 
-        Page* page = static_cast<Page*>(allocated_page);
+        // Page* page = static_cast<Page*>(allocated_page);
+        Page *page = new Page;
         page->Size = 0;
         page->Next = next;
         page->Prev = prev;
 
         // Allocate the buffer of nodes in the page
-        void* allocated_nodes = std::malloc(sizeof(ElementType) * PageNodeCapacity);
-        if (allocated_nodes == nullptr) {
-            FxPanic("FxPagedArray", "Memory error allocating page data", 0);
-            return nullptr; // for msvc
-        }
+        // void* allocated_nodes = std::malloc(sizeof(ElementType) * PageNodeCapacity);
 
-        page->Data = static_cast<ElementType*>(allocated_nodes);
+        // if (allocated_nodes == nullptr) {
+        //     FxPanic("FxPagedArray", "Memory error allocating page data", 0);
+        //     return nullptr; // for msvc
+        // }
+
+        // page->Data = static_cast<ElementType*>(allocated_nodes);
+        //
+        page->Data = new ElementType[PageNodeCapacity];
 
         return page;
     }

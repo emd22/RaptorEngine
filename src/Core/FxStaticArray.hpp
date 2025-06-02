@@ -65,16 +65,19 @@ public:
 #ifdef FX_STATIC_ARRAY_DEBUG
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
 #endif
-        void* allocated_ptr = FxMemPool::Alloc(sizeof(ElementType) * element_count);
+        void* allocated_ptr = FxMemPool::Alloc(static_cast<uint32>(sizeof(ElementType)) * element_count);
 
         if (allocated_ptr == nullptr) {
             NoMemError();
         }
 
         Data = static_cast<ElementType*>(allocated_ptr);
-        for (size_t i = 0; i < element_count; i++) {
-            new(Data + i) ElementType;
-        }
+
+        Size = 0;
+
+        // for (size_t i = 0; i < element_count; i++) {
+        //     new(Data + i) ElementType;
+        // }
     }
 
     FxStaticArray(std::initializer_list<ElementType> list)
@@ -93,6 +96,9 @@ public:
 
         Capacity = other.Capacity;
         Size = other.Size;
+
+        other.Size = 0;
+        other.Capacity = 0;
     }
 
     FxStaticArray() = default;
@@ -117,6 +123,11 @@ public:
         }
 
         FxMemPool::Free(static_cast<void*>(Data));
+        //
+        // delete[] Data;
+        //
+        // std::free(Data);
+
 
         Data = nullptr;
         Capacity = 0;
@@ -145,7 +156,7 @@ public:
 
     const ElementType& operator[] (size_t index) const
     {
-        if (index > Capacity) {
+        if (index >= Size) {
             throw std::out_of_range("FxStaticArray access out of range");
         }
         return Data[index];
@@ -153,7 +164,7 @@ public:
 
     ElementType& operator[] (size_t index)
     {
-        if (index > Capacity) {
+        if (index >= Size) {
             throw std::out_of_range("FxStaticArray access out of range");
         }
         return Data[index];
@@ -178,11 +189,18 @@ public:
 
     FxStaticArray<ElementType> operator = (FxStaticArray<ElementType>&& other)
     {
+        if (Data) {
+            Free();
+        }
+
         Data = other.Data;
         other.Data = nullptr;
 
         Size = other.Size;
         Capacity = other.Capacity;
+
+        other.Size = 0;
+        other.Capacity = 0;
 
         return *this;
     }
@@ -198,7 +216,8 @@ public:
             throw std::out_of_range("FxStaticArray insert is larger than the capacity!");
         }
 
-        memcpy(&Data[Size++], &object, sizeof(ElementType));
+        ElementType* element = &Data[Size++];
+        new (element) ElementType (object);
     }
 
     /** Inserts a new empty element into the array and returns a pointer to the element */
@@ -210,6 +229,8 @@ public:
         }
 
         ElementType* element = &Data[Size++];
+
+        new (element) ElementType;
 
         return element;
     }
@@ -244,16 +265,20 @@ public:
         }
 
         Size = Capacity;
-    }
 
-    void InitSize()
-    {
-        if (Capacity == 0) {
-            throw std::runtime_error("Static array capacity has not been set!");
+        for (uint64 i = 0; i < Size; i++) {
+            new (&Data[i]) ElementType;
         }
-
-        Size = Capacity;
     }
+
+    // void InitSize()
+    // {
+    //     if (Capacity == 0) {
+    //         throw std::runtime_error("Static array capacity has not been set!");
+    //     }
+
+    //     Size = Capacity;
+    // }
 
     size_t GetSizeInBytes() const
     {
@@ -278,10 +303,9 @@ protected:
         }
 
         Data = static_cast<ElementType*>(allocated_ptr);
-        for (size_t i = 0; i < element_count; i++) {
-            new(Data + i) ElementType;
-        }
 
+
+        // Data = new ElementType[element_count];
 
         Capacity = element_count;
     }

@@ -292,8 +292,8 @@ void RvkGpuDevice::PickPhysicalDevice()
         FxModulePanic("No usable physical devices found (no vulkan support!)", 0);
     }
 
-    FxStaticArray<VkPhysicalDevice> physical_devices(device_count);
-    physical_devices.InitSize();
+    FxStaticArray<VkPhysicalDevice> physical_devices;
+    physical_devices.InitSize(device_count);
 
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.Data), "Could not enumerate physical devices");
 
