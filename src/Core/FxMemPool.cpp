@@ -33,11 +33,11 @@ FxMemPool& FxMemPool::GetGlobalPool()
 static inline uint64 GetAlignedValue(uint64 value)
 {
     // Get if the value is aligned per 8 bytes
-    uint64 align_value = (value % 16);
+    uint64 align_value = (value % 8);
 
     // If the value is not aligned, offset our value
     if (align_value) {
-        value += (16 - align_value);
+        value += (8 - align_value);
     }
 
     return value;

@@ -9,6 +9,7 @@
 #include <Core/FxMemPool.hpp>
 
 #include <Core/FxLinkedList.hpp>
+#include <cstddef>
 
 #define SDL_DISABLE_OLD_NAMES
 #include <SDL3/SDL.h>
@@ -112,7 +113,13 @@ int main()
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
 
-    PtrContainer<FxModel> other_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
+    PtrContainer<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
+    PtrContainer<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/DamagedHelmet.glb");
+
+    test_image->OnLoaded = [](FxBaseAsset* asset) {
+        printf("Loaded image!\n");
+    };
+
     // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);

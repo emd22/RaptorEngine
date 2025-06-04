@@ -1,9 +1,13 @@
 #include "FxAssetManager.hpp"
-#include "Asset/Loader/FxGltfLoader.hpp"
 #include "Core/FxPanic.hpp"
 #include "Core/FxStaticArray.hpp"
 
 #include "FxModel.hpp"
+#include "FxImage.hpp"
+
+#include "Loader/FxGltfLoader.hpp"
+#include "Loader/FxJpegLoader.hpp"
+
 
 #include <atomic>
 #include <chrono>
@@ -98,24 +102,12 @@ void FxAssetManager::Shutdown()
     delete mAssetManagerThread;
 }
 
-PtrContainer<FxModel> FxAssetManager::NewModel()
-{
-    return PtrContainer<FxModel>::New();
-}
-
-PtrContainer<FxModel> FxAssetManager::LoadModel(std::string path)
-{
-    PtrContainer<FxModel> model = NewModel();
-    LoadModel(model, path);
-
-    return model;
-}
-
-void FxAssetManager::LoadModel(PtrContainer<FxModel> &model, std::string path)
+template<>
+void FxAssetManager::LoadAsset<FxModel>(PtrContainer<FxModel>& asset, const std::string& path)
 {
     FxAssetQueueItem queue_item;
 
-    queue_item.Asset = model.Get();
+    queue_item.Asset = asset.Get();
     queue_item.Loader = std::make_unique<FxGltfLoader>();
     queue_item.AssetType = FxAssetType::Model;
     queue_item.Path = path;
@@ -127,6 +119,25 @@ void FxAssetManager::LoadModel(PtrContainer<FxModel> &model, std::string path)
     manager.ItemsEnqueued.test_and_set();
     manager.ItemsEnqueuedNotifier.SignalDataWritten();
 }
+
+template<>
+void FxAssetManager::LoadAsset<FxImage>(PtrContainer<FxImage>& asset, const std::string& path)
+{
+    FxAssetQueueItem queue_item;
+
+    queue_item.Asset = asset.Get();
+    queue_item.Loader = std::make_unique<FxJpegLoader>();
+    queue_item.AssetType = FxAssetType::Model;
+    queue_item.Path = path;
+
+    FxAssetManager& manager = GetInstance();
+
+    manager.mLoadQueue.Push(queue_item);
+
+    manager.ItemsEnqueued.test_and_set();
+    manager.ItemsEnqueuedNotifier.SignalDataWritten();
+}
+
 
 void FxAssetManager::CheckForUploadableData()
 {

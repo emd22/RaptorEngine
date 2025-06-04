@@ -1,9 +1,12 @@
 #pragma once
 
 #include "Asset/FxAssetQueueItem.hpp"
-#include "Core/Types.hpp"
-#include "FxModel.hpp"
 #include "Asset/FxAssetQueue.hpp"
+#include "Core/Types.hpp"
+
+#include "FxModel.hpp"
+#include "FxImage.hpp"
+
 
 #include <atomic>
 #include <thread>
@@ -57,9 +60,29 @@ public:
 
     static FxAssetManager &GetInstance();
 
-    static PtrContainer<FxModel> NewModel();
-    static PtrContainer<FxModel> LoadModel(std::string path);
-    static void LoadModel(PtrContainer<FxModel> &model, std::string path);
+    template <typename T>
+    static PtrContainer<T> NewAsset()
+    {
+        return PtrContainer<T>::New();
+    }
+
+    template <typename T>
+    static PtrContainer<T> LoadAsset(const std::string& path)
+    {
+        PtrContainer<T> asset = NewAsset<T>();
+        LoadAsset<T>(asset, path);
+
+        return asset;
+    }
+
+    // Specializations in cpp file
+    template <typename T>
+    static void LoadAsset(PtrContainer<T>& asset, const std::string& path)
+    {
+        if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
+            static_assert(0, "Asset type is not implemented!");
+        }
+    }
 
     ~FxAssetManager()
     {
