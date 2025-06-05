@@ -23,18 +23,24 @@ public:
 
     /** Allocates a block of memory */
     template <typename PtrType> requires std::is_pointer_v<PtrType>
-    PtrType Alloc(uint32 size)
+    PtrType AllocInPool(uint32 size)
     {
         MemBlock& block = AllocateMemory(size)->Data;
 
-        return reinterpret_cast<PtrType>(block.Start);
+        return static_cast<PtrType>(block.Start);
     }
     /** Allocates memory on the global memory pool */
     static void* Alloc(uint32 size);
 
+    template <typename T>
+    static T* Alloc(uint32 size)
+    {
+        return static_cast<T*>(Alloc(size));
+    }
+
     /** Frees an allocated pointer */
     template <typename ElementType>
-    void Free(ElementType* ptr)
+    void FreeInPool(ElementType* ptr)
     {
         if (ptr == nullptr) {
             return;
@@ -47,6 +53,12 @@ public:
 
     /** Frees an allocated pointer on the global memory pool */
     static void Free(void* ptr);
+
+    template <typename T>
+    static void Free(T* ptr)
+    {
+        Free(static_cast<T*>(ptr));
+    }
 
     void PrintAllocations() const;
 

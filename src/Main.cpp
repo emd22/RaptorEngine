@@ -32,6 +32,8 @@ FX_SET_MODULE_NAME("Main")
 
 #include <Math/Mat4.hpp>
 
+#include <Asset/FxConfigFile.hpp>
+
 static bool Running = true;
 
 static uint64 LastTick = 0;
@@ -57,6 +59,9 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(100000);
 
+    FxConfigFile config;
+    config.Load("../Config/Main.conf");
+
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
     }
@@ -70,10 +75,10 @@ int main()
         exit(1);
     });
 
-    const uint32 window_width = 1024;
-    const uint32 window_height = 720;
+    const uint32 window_width = config.GetValue<uint32>("Width");
+    const uint32 window_height = config.GetValue<uint32>("Height");
 
-    auto window = FxWindow::New("Foxtrot Engine", window_width, window_height);
+    auto window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
 
     vulkan::FxRenderBackendVulkan renderer_state;
     SetRendererBackend(&renderer_state);
