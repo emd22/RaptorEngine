@@ -26,6 +26,8 @@
 
 #include "FxControls.hpp"
 
+#include <Renderer/Backend/Vulkan/RvkTexture.hpp>
+
 FX_SET_MODULE_NAME("Main")
 
 #include <csignal>
@@ -103,11 +105,22 @@ int main()
     }
 
     RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
+    // RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     RendererVulkan->DescriptorPool.Create(RendererVulkan->GetDevice(), RendererFramesInFlight);
 
     for (RvkFrameData& frame : RendererVulkan->Frames) {
         frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.DescriptorSetLayout);
-        frame.DescriptorSet.SetBuffer(frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+        frame.DescriptorSet.WriteBuffer(0, frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        // frame.DescriptorSet.WriteImage(
+        //     1,
+        //     test_image->Texture.Image,
+        //     test_image->Texture.Sampler,
+        //     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+        // );
+
+        // frame.DescriptorSet.SubmitWrites();
     }
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
@@ -118,12 +131,11 @@ int main()
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
 
+    PtrContainer<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
     PtrContainer<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
-    PtrContainer<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/DamagedHelmet.glb");
 
-    test_image->OnLoaded = [](FxBaseAsset* asset) {
-        printf("Loaded image!\n");
-    };
+    test_image->WaitUntilLoaded();
+
 
     // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
 

@@ -20,17 +20,27 @@ public:
 
         mDone = true;
 
-        lock.unlock();
         // Notify the other thread
         mCV.notify_one();
+
     }
 
-    void WaitForData()
+    void WaitForData(bool pass_if_already_done=false)
     {
         std::unique_lock<std::mutex> lock(mMutex);
-        mCV.wait(lock, [this] { return mDone; });
 
-        mDone = false;
+        if (pass_if_already_done && mDone) {
+            return;
+        }
+
+
+        mCV.wait(lock, [this] { return mDone; });
+    }
+
+    bool IsDone()
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        return mDone;
     }
 
     void Reset()
@@ -50,12 +60,12 @@ public:
 
     void Kill()
     {
+
         std::unique_lock<std::mutex> lock(mMutex);
 
         mKilled = true;
         mDone = true;
 
-        lock.unlock();
         mCV.notify_one();
     }
 

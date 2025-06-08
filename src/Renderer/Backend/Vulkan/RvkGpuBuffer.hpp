@@ -7,6 +7,7 @@
 #include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
 #include "Fwd/Fwd_AddToDeletionQueue.hpp"
 #include "Fwd/Fwd_GetGpuAllocator.hpp"
+#include "vulkan/vulkan_core.h"
 
 #include <cstring>
 #include <memory.h>
@@ -162,7 +163,7 @@ public:
         MappedBuffer = nullptr;
     }
 
-    void Upload(FxStaticArray<ElementType> &data)
+    void Upload(const FxStaticArray<ElementType> &data)
     {
         auto buffer = GetMappedContext();
         memcpy(buffer, data.Data, data.GetSizeInBytes());

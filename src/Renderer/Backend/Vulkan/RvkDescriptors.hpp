@@ -12,6 +12,10 @@
 #include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>
 #include <Renderer/Backend/Vulkan/RvkPipeline.hpp>
 
+#include "RvkImage.hpp"
+
+#include <Renderer/Constants.hpp>
+
 namespace vulkan {
 
 class RvkDescriptorPool
@@ -64,6 +68,7 @@ public:
     void Create(RvkDescriptorPool &pool, VkDescriptorSetLayout layout)
     {
         mDevice = pool.mDevice;
+        // mDescriptorWrites.clear();
 
         VkDescriptorSetAllocateInfo alloc_info{};
         alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -77,7 +82,7 @@ public:
     }
 
     template <typename T>
-    void SetBuffer(RvkRawGpuBuffer<T> &buffer, VkDescriptorType type)
+    void WriteBuffer(uint32 bind_dest, RvkRawGpuBuffer<T> &buffer, VkDescriptorType type)
     {
         VkDescriptorBufferInfo info{
             .buffer = buffer.Buffer,
@@ -85,17 +90,46 @@ public:
             .range = sizeof(T)
         };
 
-        VkWriteDescriptorSet desc_write{
+        VkWriteDescriptorSet write{
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = type,
             .descriptorCount = 1,
             .dstSet = Set,
-            .dstBinding = BindingDest,
+            .dstBinding = bind_dest,
             .dstArrayElement = 0,
             .pBufferInfo = &info,
         };
 
-        vkUpdateDescriptorSets(mDevice->Device, 1, &desc_write, 0, nullptr);
+        vkUpdateDescriptorSets(mDevice->Device, 1, &write, 0, nullptr);
+        // mDescriptorWrites.push_back(write);
+    }
+
+    void WriteImage(uint32 bind_dst, RvkImage& image, VkSampler& sampler, VkImageLayout layout, VkDescriptorType type)
+    {
+
+        VkDescriptorImageInfo image_info{
+            .imageLayout = layout,
+            .imageView = image.View,
+            .sampler = sampler
+        };
+
+        VkWriteDescriptorSet write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = type,
+            .descriptorCount = 1,
+            .dstSet = Set,
+            .dstBinding = bind_dst,
+            .dstArrayElement = 0,
+            .pImageInfo = &image_info,
+        };
+
+        mDescriptorWrites.push_back(write);
+    }
+
+    void SubmitWrites()
+    {
+        vkUpdateDescriptorSets(mDevice->Device, mDescriptorWrites.size(), mDescriptorWrites.data(), 0, nullptr);
+        mDescriptorWrites.clear();
     }
 
     void Bind(RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, RvkGraphicsPipeline &pipeline) const
@@ -118,9 +152,10 @@ public:
 public:
     VkDescriptorSet Set = nullptr;
     VkDescriptorSetLayout Layout = nullptr;
-    uint32 BindingDest = 0;
 private:
     RvkGpuDevice *mDevice = nullptr;
+
+    std::vector<VkWriteDescriptorSet> mDescriptorWrites;
 };
 
 

@@ -1,5 +1,6 @@
 #include "FxJpegLoader.hpp"
 #include "Asset/FxBaseAsset.hpp"
+#include <Asset/FxImage.hpp>
 
 #include <Core/Log.hpp>
 #include <jpeglib.h>
@@ -29,15 +30,15 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxBaseAsset *asset, std::string 
 
     printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
 
-    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * mJpegInfo.num_components;
-    mImageData = static_cast<uint8*>(FxMemPool::Alloc(data_size));
+    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * 4;
+    mImageData.InitSize(data_size);
 
-    const uint32 row_stride = mJpegInfo.num_components * mJpegInfo.output_width;
+    const uint32 row_stride = 4 * mJpegInfo.output_width;
 
     uint8* ptr_list[1];
 
     while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
-        ptr_list[0] = (mImageData + row_stride * mJpegInfo.output_scanline);
+        ptr_list[0] = (mImageData.Data + row_stride * mJpegInfo.output_scanline);
         jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
     }
 
@@ -50,6 +51,10 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxBaseAsset *asset, std::string 
 
 void FxJpegLoader::CreateGpuResource(FxBaseAsset *asset)
 {
+    FxImage* image = static_cast<FxImage*>(asset);
+
+    image->Texture.Create(mImageData, Vec2u(mJpegInfo.output_width, mJpegInfo.output_height), 4);
+
     asset->IsUploadedToGpu = true;
     asset->IsUploadedToGpu.notify_all();
 }
@@ -57,5 +62,4 @@ void FxJpegLoader::CreateGpuResource(FxBaseAsset *asset)
 void FxJpegLoader::Destroy(FxBaseAsset *asset)
 {
     jpeg_destroy_decompress(&mJpegInfo);
-    FxMemPool::Free(mImageData);
 }

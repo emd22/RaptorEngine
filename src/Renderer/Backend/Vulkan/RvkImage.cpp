@@ -124,8 +124,15 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
 
 void RvkImage::Destroy()
 {
+    if (Image == nullptr || Allocation == nullptr) {
+        return;
+    }
+
     vkDestroyImageView(mDevice->Device, View, nullptr);
     vmaDestroyImage(RendererVulkan->GpuAllocator, Image, Allocation);
+
+    Image = nullptr;
+    Allocation = nullptr;
 }
 
 }; // namespace vulkan

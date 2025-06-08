@@ -37,6 +37,7 @@ void FxAssetWorker::Update()
 
     while (Running.test()) {
         ItemReady.WaitForData();
+        ItemReady.Reset();
 
         if (!Running.test()) {
             break;
@@ -157,18 +158,24 @@ void FxAssetManager::CheckForUploadableData()
                 loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
 
-            // Call the OnLoaded callback if it was registered.
-            if (loaded_item.Asset->OnLoaded) {
-                loaded_item.Asset->OnLoaded(loaded_item.Asset);
+            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+
+            // Call the OnLoaded callback if it was registered
+            if (loaded_item.Asset->mOnLoadedCallback) {
+                loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
             }
         }
-        else if (worker.LoadStatus == FxBaseLoader::Status::Success) {
-            // There was an error, call the OnError callback if it was registered.
-            if (loaded_item.Asset->OnError) {
-                loaded_item.Asset->OnError(loaded_item.Asset);
+        else if (worker.LoadStatus == FxBaseLoader::Status::Error) {
+            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+
+            // There was an error, call the OnError callback if it was registered
+            if (loaded_item.Asset->mOnErrorCallback) {
+                loaded_item.Asset->mOnErrorCallback(loaded_item.Asset);
             }
         }
         else if (worker.LoadStatus == FxBaseLoader::Status::None) {
+            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+
             FxPanic("FxAssetManager", "Worker status is none!", 0);
         }
 
@@ -230,6 +237,7 @@ void FxAssetManager::AssetManagerUpdate()
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
         ItemsEnqueuedNotifier.WaitForData();
+        ItemsEnqueuedNotifier.Reset();
         if (!mActive.test()) {
             break;
         }

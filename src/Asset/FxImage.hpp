@@ -2,7 +2,7 @@
 
 #include "FxBaseAsset.hpp"
 
-#include <Renderer/FxMesh.hpp>
+#include <Renderer/Backend/Vulkan/RvkTexture.hpp>
 
 #include <Core/FxStaticPtrArray.hpp>
 
@@ -32,7 +32,7 @@ public:
     }
 
 public:
-
+    vulkan::RvkTexture Texture;
 
 private:
     bool mImageReady = false;

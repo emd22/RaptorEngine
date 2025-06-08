@@ -25,6 +25,11 @@ public:
 
     void Destroy();
 
+    ~RvkImage()
+    {
+        Destroy();
+    }
+
 public:
     Vec2u Size = Vec2u::Zero;
 

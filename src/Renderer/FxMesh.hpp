@@ -15,7 +15,7 @@ class FxMesh
 public:
     FxMesh() = default;
 
-    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal>;
+    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
 
     FxMesh(FxStaticArray<VertexType> &vertices)
     {
@@ -69,31 +69,18 @@ public:
     //     return *this;
     // }
 
-    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(FxStaticArray<float32> &positions)
-    {
-        FxStaticArray<VertexType> vertices(positions.Size / 3);
-
-        // Log::Info("Creating combined vertex buffer (Contains:Position) (s: %d)", vertices.Capacity);
-
-        for (int i = 0; i < vertices.Capacity; i++) {
-            VertexType vertex;
-
-            memcpy(&vertex.Position, &positions.Data[i], sizeof(float32) * 3);
-            memset(&vertex.Normal, 0, sizeof(vertex.Normal));
-
-            vertices.Insert(vertex);
-        }
-
-        return vertices;
-    }
-
-    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(FxStaticArray<float32> &positions, FxStaticArray<float32> &normals)
+    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(const FxStaticArray<float32>& positions, const FxStaticArray<float32>& normals, const FxStaticArray<float32>& uvs)
     {
         FxAssert((normals.Size == positions.Size));
 
         FxStaticArray<VertexType> vertices(positions.Size / 3);
 
         // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
+        const bool has_texcoords = uvs.Size > 0;
+
+        if (!has_texcoords) {
+            Log::Info("Model does not have texture coordinates!", 0);
+        }
 
         for (int i = 0; i < vertices.Capacity; i++) {
             // make a combined vertex + normal + other a
@@ -101,6 +88,13 @@ public:
 
             memcpy(&vertex.Position, &positions.Data[i * 3], sizeof(float32) * 3);
             memcpy(&vertex.Normal, &normals.Data[i * 3], sizeof(float32) * 3);
+
+            if (has_texcoords) {
+                memcpy(&vertex.UV, &uvs.Data[i * 2], sizeof(float32) * 2);
+            }
+            else {
+                memset(&vertex.UV, 0, sizeof(float32) * 2);
+            }
 
             vertices.Insert(vertex);
         }

@@ -125,7 +125,7 @@ public:
 	}
 
 	template <typename T>
-	T GetValue(const char* entry_name) const
+	constexpr T GetValue(const char* entry_name) const
 	{
 	    return GetValue<T>(FxHashStr(entry_name));
 	}

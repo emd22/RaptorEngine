@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Renderer/Backend/Vulkan/RvkPipeline.hpp"
-#include "Renderer/Backend/Vulkan/RvkPipeline.hpp"
 #include <vulkan/vulkan.h>
 
 #include "RvkImage.hpp"
@@ -11,7 +10,7 @@
 #include <Core/FxStaticArray.hpp>
 #include <Math/Vector.hpp>
 
-class GPUDevice;
+class RvkGpuDevice;
 
 namespace vulkan {
 

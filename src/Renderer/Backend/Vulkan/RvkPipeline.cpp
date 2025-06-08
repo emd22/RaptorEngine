@@ -15,7 +15,7 @@ namespace vulkan {
 FX_SET_MODULE_NAME("Pipeline")
 
 VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
-    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal>;
+    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
@@ -26,6 +26,7 @@ VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
     FxStaticArray<VkVertexInputAttributeDescription> attribs = {
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
         { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
+        { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
     };
 
     Log::Debug("Amount of attributes: %d", attribs.Size);
@@ -222,16 +223,28 @@ void RvkGraphicsPipeline::CreateLayout() {
     // TODO: move descriptor set layout creation out of here
     VkDescriptorSetLayoutBinding ubo_layout_binding {
         .binding = 0,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
         .pImmutableSamplers = nullptr,
     };
 
+    // VkDescriptorSetLayoutBinding sampler_layout_binding {
+    //     .binding = 1,
+    //     .descriptorCount = 1,
+    //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    //     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+    //     .pImmutableSamplers = nullptr,
+    // };
+
+    VkDescriptorSetLayoutBinding bindings[] = {
+        ubo_layout_binding, //sampler_layout_binding,
+    };
+
     VkDescriptorSetLayoutCreateInfo descriptor_set_layout_info {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindings = &ubo_layout_binding,
+        .bindingCount = sizeof(bindings) / sizeof(bindings[0]),
+        .pBindings = bindings,
     };
 
     VkResult status;

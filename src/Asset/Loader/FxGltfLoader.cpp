@@ -10,6 +10,7 @@ void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
 {
     FxStaticArray<float32> positions;
     FxStaticArray<float32> normals;
+    FxStaticArray<float32> uvs;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto *attribute = &primitive->attributes[i];
@@ -33,9 +34,18 @@ void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
             normals.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, normals.Data, data_size);
         }
+        else if (attribute->type == cgltf_attribute_type_texcoord) {
+            printf("Attribute -> UV Buffer\n");
+
+            cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
+
+            // Create our vertex normal buffer
+            uvs.InitSize(data_size);
+            cgltf_accessor_unpack_floats(attribute->data, uvs.Data, data_size);
+        }
     }
 
-    auto combined_vertices = FxMesh::MakeCombinedVertexBuffer(positions, normals);
+    auto combined_vertices = FxMesh::MakeCombinedVertexBuffer(positions, normals, uvs);
 
     // Set the combined vertices to the mesh
     mesh->UploadVertices(combined_vertices);
