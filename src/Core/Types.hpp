@@ -58,64 +58,72 @@ private:
     std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
 };
 
-template <typename T>
-class PtrContainer {
-public:
-    PtrContainer()
-        : mPtr(nullptr)
-    {
-    }
-    PtrContainer(T *ptr)
-        : mPtr(ptr)
-    {
-    }
+#define PtrContainer std::unique_ptr
 
-    PtrContainer(T &&val)
-    {
-        mPtr = new T(std::move(val));
-    }
+// template <typename T>
+// class PtrContainer {
+// public:
+//     PtrContainer()
+//         : mPtr(nullptr)
+//     {
+//     }
+//     PtrContainer(T *ptr)
+//         : mPtr(ptr)
+//     {
+//     }
 
-    ~PtrContainer()
-    {
-        delete mPtr;
-    }
+//     PtrContainer(T &&val)
+//     {
+//         mPtr = new T(std::move(val));
+//     }
 
-    PtrContainer(PtrContainer &&other)
-        : mPtr(other.mPtr)
-    {
-        other.mPtr = nullptr;
-    }
+//     ~PtrContainer()
+//     {
+//         if (KeepAlive) {
+//             return;
+//         }
+//         delete mPtr;
+//     }
 
-    PtrContainer<T> &operator = (T &&value)
-    {
-        delete mPtr;
-        mPtr = new T(std::move(value));
-        return *this;
-    }
+//     PtrContainer(PtrContainer &&other)
+//         : mPtr(other.mPtr)
+//     {
+//         other.mPtr = nullptr;
+//     }
 
-    PtrContainer<T> &operator = (PtrContainer<T> &&other)
-    {
-        delete mPtr;
-        mPtr = other.mPtr;
-        other.mPtr = nullptr;
-        return *this;
-    }
+//     PtrContainer<T> &operator = (T &&value)
+//     {
+//         delete mPtr;
+//         mPtr = new T(std::move(value));
+//         return *this;
+//     }
 
-    static PtrContainer<T> New()
-    {
-        return PtrContainer<T>(new T());
-    }
+//     PtrContainer<T> &operator = (PtrContainer<T> &&other)
+//     {
+//         delete mPtr;
+//         mPtr = other.mPtr;
+//         other.mPtr = nullptr;
+//         return *this;
+//     }
 
-    PtrContainer(const PtrContainer<T> &other) = delete;
-    PtrContainer(PtrContainer<T> &other) = delete;
-    PtrContainer<T> &operator = (PtrContainer<T> &other) = delete;
-    PtrContainer<T> &operator = (const PtrContainer<T> &other) = delete;
+//     static PtrContainer<T> New()
+//     {
+//         return PtrContainer<T>(new T());
+//     }
 
-    T *Get() const { return mPtr; }
+//     PtrContainer(const PtrContainer<T> &other) = delete;
+//     PtrContainer(PtrContainer<T> &other) = delete;
+//     PtrContainer<T> &operator = (PtrContainer<T> &other) = delete;
+//     PtrContainer<T> &operator = (const PtrContainer<T> &other) = delete;
 
-    T *operator ->() const { return mPtr; }
-    T &operator *() const { return *mPtr; }
+//     T *Get() const { return mPtr; }
 
-private:
-    T *mPtr = nullptr;
-};
+//     T *operator ->() const { return mPtr; }
+//     T &operator *() const { return *mPtr; }
+
+// public:
+//     bool KeepAlive = false;
+
+// private:
+//     T *mPtr = nullptr;
+// };

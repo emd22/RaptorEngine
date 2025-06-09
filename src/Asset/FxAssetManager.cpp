@@ -104,11 +104,11 @@ void FxAssetManager::Shutdown()
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxModel>(PtrContainer<FxModel>& asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxModel>(const std::unique_ptr<FxModel>& asset, const std::string& path)
 {
     FxAssetQueueItem queue_item;
 
-    queue_item.Asset = asset.Get();
+    queue_item.Asset = asset.get();
     queue_item.Loader = std::make_unique<FxGltfLoader>();
     queue_item.AssetType = FxAssetType::Model;
     queue_item.Path = path;
@@ -122,11 +122,11 @@ void FxAssetManager::LoadAsset<FxModel>(PtrContainer<FxModel>& asset, const std:
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxImage>(PtrContainer<FxImage>& asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxImage>(const std::unique_ptr<FxImage>& asset, const std::string& path)
 {
     FxAssetQueueItem queue_item;
 
-    queue_item.Asset = asset.Get();
+    queue_item.Asset = asset.get();
     queue_item.Loader = std::make_unique<FxJpegLoader>();
     queue_item.AssetType = FxAssetType::Model;
     queue_item.Path = path;

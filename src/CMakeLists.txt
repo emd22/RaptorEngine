@@ -7,6 +7,12 @@ project(ThirdPartyLib)
 # add third party sources to static library
 file (GLOB_RECURSE THIRD_PARTY_SOURCES "ThirdParty/*.cpp" "ThirdParty/*.h" "ThirdParty/*.hpp")
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
+target_compile_definitions(
+    ThirdPartyLib
+    PRIVATE
+    -DVMA_RECORDING_ENABLED=1
+    -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
+)
 target_compile_options(ThirdPartyLib PRIVATE -Wno-nullability-extension)
 
 
@@ -28,6 +34,8 @@ find_package(JPEG REQUIRED)
 
 add_definitions(
     -DFX_USE_NEON
+    -DVMA_RECORDING_ENABLED=1
+    -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
     # -DFX_DEBUG_STATIC_ARRAY
 )
 

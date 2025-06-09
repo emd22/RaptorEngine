@@ -229,6 +229,14 @@ void RvkGraphicsPipeline::CreateLayout() {
         .pImmutableSamplers = nullptr,
     };
 
+    VkDescriptorSetLayoutBinding image_layout_binding {
+        .binding = 1,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
     // VkDescriptorSetLayoutBinding sampler_layout_binding {
     //     .binding = 1,
     //     .descriptorCount = 1,
@@ -239,6 +247,7 @@ void RvkGraphicsPipeline::CreateLayout() {
 
     VkDescriptorSetLayoutBinding bindings[] = {
         ubo_layout_binding, //sampler_layout_binding,
+        image_layout_binding
     };
 
     VkDescriptorSetLayoutCreateInfo descriptor_set_layout_info {

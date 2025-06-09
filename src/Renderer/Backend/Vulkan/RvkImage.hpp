@@ -1,7 +1,11 @@
 #pragma once
 
-#include <vma/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
+
+#define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
+
+#include <ThirdParty/vk_mem_alloc.h>
+
 
 #include "RvkDevice.hpp"
 #include "RvkCommands.hpp"

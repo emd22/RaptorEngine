@@ -8,6 +8,9 @@
 #include <Renderer/Backend/Vulkan/RvkPipeline.hpp>
 #include <Renderer/Backend/Vulkan/RvkSwapchain.hpp>
 
+#define VMA_DEBUG_LOG_FORMAT(str, ...) \
+    Log::Warning(str, __VA_ARGS__);
+
 #include <ThirdParty/vk_mem_alloc.h>
 #include <Renderer/Backend/Vulkan/FxDeletionObject.hpp>
 

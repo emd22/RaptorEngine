@@ -4,12 +4,12 @@
 
 namespace vulkan {
 
-void Fx_Fwd_AddToDeletionQueue(FxDeletionObject::FuncType func)
+void Fx_Fwd_AddToDeletionQueue(const FxDeletionObject::FuncType& func)
 {
     Renderer->AddToDeletionQueue(func);
 }
 
-void Fx_Fwd_AddGpuBufferToDeletionQueue(VkBuffer &buffer, VmaAllocation &allocation)
+void Fx_Fwd_AddGpuBufferToDeletionQueue(const VkBuffer& buffer, const VmaAllocation& allocation)
 {
     Renderer->AddGpuBufferToDeletionQueue(buffer, allocation);
 }

@@ -128,11 +128,30 @@ void RvkImage::Destroy()
         return;
     }
 
-    vkDestroyImageView(mDevice->Device, View, nullptr);
-    vmaDestroyImage(RendererVulkan->GpuAllocator, Image, Allocation);
+    if (this->Image == nullptr || this->Allocation == nullptr) {
+        return;
+    }
 
-    Image = nullptr;
-    Allocation = nullptr;
+
+    vkDestroyImageView(this->mDevice->Device, this->View, nullptr);
+    vmaDestroyImage(RendererVulkan->GpuAllocator, this->Image, this->Allocation);
+
+    this->Image = nullptr;
+    this->Allocation = nullptr;
+
+    // Fx_Fwd_AddToDeletionQueue([this](FxDeletionObject* obj) {
+    //     if (this->Image == nullptr || this->Allocation == nullptr) {
+    //         return;
+    //     }
+
+    //     printf("Destroy image!!\n");
+
+    //     vkDestroyImageView(this->mDevice->Device, this->View, nullptr);
+    //     vmaDestroyImage(RendererVulkan->GpuAllocator, this->Image, this->Allocation);
+
+    //     this->Image = nullptr;
+    //     this->Allocation = nullptr;
+    // });
 }
 
 }; // namespace vulkan

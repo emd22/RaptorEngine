@@ -4,6 +4,9 @@
 
 #include <memory>
 
+#define VMA_DEBUG_LOG_FORMAT(str, ...) \
+    Log::Warning(str, __VA_ARGS__);
+
 #include "ThirdParty/vk_mem_alloc.h"
 #include <vulkan/vulkan.h>
 

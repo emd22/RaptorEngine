@@ -26,14 +26,22 @@ public:
 // private:
     void Destroy() override
     {
+        if (!IsUploadedToGpu.load()) {
+            return;
+        }
 
-        mImageReady = false;
+        Texture.Destroy();
+
+        // mImageReady = false;
         IsUploadedToGpu = false;
     }
 
 public:
     vulkan::RvkTexture Texture;
 
+    uint32 NumComponents = 3;
+    Vec2u Size = Vec2u::Zero;
+
 private:
-    bool mImageReady = false;
+    // bool mImageReady = false;
 };

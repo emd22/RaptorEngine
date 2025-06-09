@@ -1,4 +1,10 @@
+
+#define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
+
+#include <ThirdParty/vk_mem_alloc.h>
+
 #include "Core/Defines.hpp"
+#include "Renderer/Backend/Vulkan/RvkFrameData.hpp"
 #include "Renderer/Constants.hpp"
 #include "Renderer/Renderer.hpp"
 #include "Renderer/Backend/Vulkan/ShaderList.hpp"
@@ -105,13 +111,64 @@ int main()
     }
 
     RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
-    // RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     RendererVulkan->DescriptorPool.Create(RendererVulkan->GetDevice(), RendererFramesInFlight);
+
+
+    FxAssetManager& asset_manager = FxAssetManager::GetInstance();
+
+    asset_manager.Start(2);
+
+    // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
+    // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
+    FxPerspectiveCamera camera;
+
+    std::unique_ptr<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/DamagedHelmet.glb");
+    std::unique_ptr<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
+
+    test_image->WaitUntilLoaded();
+
 
     for (RvkFrameData& frame : RendererVulkan->Frames) {
         frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.DescriptorSetLayout);
 
-        frame.DescriptorSet.WriteBuffer(0, frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        VkDescriptorBufferInfo ubo_info{
+            .buffer = frame.UniformBuffer.Buffer,
+            .offset = 0,
+            .range = sizeof(RvkUniformBufferObject)
+        };
+
+        VkWriteDescriptorSet ubo_write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .dstSet = frame.DescriptorSet,
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .pBufferInfo = &ubo_info,
+        };
+
+        VkDescriptorImageInfo image_info{
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .imageView = test_image->Texture.Image.View,
+            .sampler = test_image->Texture.Sampler
+        };
+
+        VkWriteDescriptorSet image_write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .dstSet = frame.DescriptorSet,
+            .dstBinding = 1,
+            .dstArrayElement = 0,
+            .pImageInfo = &image_info,
+        };
+
+        VkWriteDescriptorSet writes[] = { ubo_write, image_write };
+
+        vkUpdateDescriptorSets(RendererVulkan->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
+
+        // frame.DescriptorSet.WriteBuffer(0, frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         // frame.DescriptorSet.WriteImage(
         //     1,
         //     test_image->Texture.Image,
@@ -122,19 +179,6 @@ int main()
 
         // frame.DescriptorSet.SubmitWrites();
     }
-
-    FxAssetManager& asset_manager = FxAssetManager::GetInstance();
-
-    asset_manager.Start(2);
-
-    // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
-    FxPerspectiveCamera camera;
-
-    PtrContainer<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
-    PtrContainer<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
-
-    test_image->WaitUntilLoaded();
 
 
     // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
@@ -205,7 +249,12 @@ int main()
         LastTick = CurrentTick;
     }
 
+    RendererVulkan->GetDevice()->WaitForIdle();
+
+    test_image->Destroy();
+
     asset_manager.Shutdown();
+
 
     // FxMemPool::GetGlobalPool().Destroy();
 

@@ -1,13 +1,15 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <vma/vk_mem_alloc.h>
 
 #include <Core/Types.hpp>
 
+#include <functional>
+
 struct FxDeletionObject
 {
-    using FuncType = void (*)(FxDeletionObject *object);
+    using FuncType = std::function<void (FxDeletionObject*)>;
+    // using FuncType = void (*)(FxDeletionObject *object);
 
     VkBuffer Buffer = VK_NULL_HANDLE;
     VmaAllocation Allocation = VK_NULL_HANDLE;

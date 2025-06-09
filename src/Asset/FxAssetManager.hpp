@@ -61,15 +61,16 @@ public:
     static FxAssetManager &GetInstance();
 
     template <typename T>
-    static PtrContainer<T> NewAsset()
+    static std::unique_ptr<T> NewAsset()
     {
-        return PtrContainer<T>::New();
+        // return PtrContainer<T>::New();
+        return std::make_unique<T>();
     }
 
     template <typename T>
-    static PtrContainer<T> LoadAsset(const std::string& path)
+    static std::unique_ptr<T> LoadAsset(const std::string& path)
     {
-        PtrContainer<T> asset = NewAsset<T>();
+        std::unique_ptr<T> asset = NewAsset<T>();
         LoadAsset<T>(asset, path);
 
         return asset;
@@ -77,7 +78,7 @@ public:
 
     // Specializations in cpp file
     template <typename T>
-    static void LoadAsset(PtrContainer<T>& asset, const std::string& path)
+    static void LoadAsset(const std::unique_ptr<T>& asset, const std::string& path)
     {
         if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
             static_assert(0, "Asset type is not implemented!");

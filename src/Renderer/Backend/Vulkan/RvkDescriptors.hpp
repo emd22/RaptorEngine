@@ -82,7 +82,7 @@ public:
     }
 
     template <typename T>
-    void WriteBuffer(uint32 bind_dest, RvkRawGpuBuffer<T> &buffer, VkDescriptorType type)
+    void WriteBuffer(uint32 bind_dest, const RvkRawGpuBuffer<T> &buffer, VkDescriptorType type)
     {
         VkDescriptorBufferInfo info{
             .buffer = buffer.Buffer,
@@ -128,8 +128,8 @@ public:
 
     void SubmitWrites()
     {
-        vkUpdateDescriptorSets(mDevice->Device, mDescriptorWrites.size(), mDescriptorWrites.data(), 0, nullptr);
-        mDescriptorWrites.clear();
+        // vkUpdateDescriptorSets(mDevice->Device, mDescriptorWrites.size(), mDescriptorWrites.data(), 0, nullptr);
+        // mDescriptorWrites.clear();
     }
 
     void Bind(RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, RvkGraphicsPipeline &pipeline) const
@@ -141,7 +141,6 @@ public:
 
     void Destroy()
     {
-        vkDestroyDescriptorSetLayout(mDevice->Device, Layout, nullptr);
     }
 
     // ~DescriptorSet()
@@ -151,7 +150,6 @@ public:
 
 public:
     VkDescriptorSet Set = nullptr;
-    VkDescriptorSetLayout Layout = nullptr;
 private:
     RvkGpuDevice *mDevice = nullptr;
 

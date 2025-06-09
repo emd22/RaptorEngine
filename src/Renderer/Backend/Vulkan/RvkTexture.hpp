@@ -3,6 +3,7 @@
 #include <Core/FxStaticArray.hpp>
 #include "RvkGpuBuffer.hpp"
 #include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
+#include "Fwd/Fwd_AddToDeletionQueue.hpp"
 #include "Fwd/Fwd_GetDevice.hpp"
 
 #include <Math/Vec2.hpp>
@@ -95,17 +96,29 @@ public:
 
     void Destroy()
     {
-        if (Sampler == nullptr) {
-            return;
+        if (this->Sampler != nullptr) {
+            vkDestroySampler(this->mDevice->Device, this->Sampler, nullptr);
+            this->Sampler = nullptr;
         }
 
-        vkDestroySampler(mDevice->Device, Sampler, nullptr);
-        Sampler = nullptr;
+        this->Image.Destroy();
+        // Fx_Fwd_AddToDeletionQueue([this](FxDeletionObject* obj) {
+        //     if (this->Sampler != nullptr) {
+        //         printf("Destroy sampler!!\n");
+
+        //         vkDestroySampler(this->mDevice->Device, this->Sampler, nullptr);
+        //         this->Sampler = nullptr;
+        //     }
+
+        //     printf("Destroy image!!\n");
+
+        //     this->Image.Destroy();
+        // });
     }
 
     ~RvkTexture()
     {
-        Destroy();
+        this->Destroy();
     }
 
 public:
