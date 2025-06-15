@@ -2,11 +2,12 @@
 
 #include "Asset/FxAssetQueueItem.hpp"
 #include "Asset/FxAssetQueue.hpp"
-#include "Core/Types.hpp"
 
 #include "FxModel.hpp"
 #include "FxImage.hpp"
 
+#include <Core/Types.hpp>
+#include <Core/FxRef.hpp>
 
 #include <atomic>
 #include <thread>
@@ -61,16 +62,17 @@ public:
     static FxAssetManager &GetInstance();
 
     template <typename T>
-    static std::unique_ptr<T> NewAsset()
+    static FxRef<T> NewAsset()
     {
         // return PtrContainer<T>::New();
-        return std::make_unique<T>();
+        printf("Creating new ass\n");
+        return FxRef<T>::New();
     }
 
     template <typename T>
-    static std::unique_ptr<T> LoadAsset(const std::string& path)
+    static FxRef<T> LoadAsset(const std::string& path)
     {
-        std::unique_ptr<T> asset = NewAsset<T>();
+        FxRef<T> asset = NewAsset<T>();
         LoadAsset<T>(asset, path);
 
         return asset;
@@ -78,7 +80,7 @@ public:
 
     // Specializations in cpp file
     template <typename T>
-    static void LoadAsset(const std::unique_ptr<T>& asset, const std::string& path)
+    static void LoadAsset(FxRef<T> asset, const std::string& path)
     {
         if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
             static_assert(0, "Asset type is not implemented!");

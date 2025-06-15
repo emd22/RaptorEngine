@@ -34,6 +34,11 @@ public:
         CurrentPage = FirstPage;
     }
 
+    bool IsInited() const
+    {
+        return (FirstPage != nullptr && CurrentPage != nullptr);
+    }
+
     ElementType* Insert()
     {
 
@@ -74,8 +79,6 @@ public:
     {
         return CurrentPage->Data[CurrentPage->Size - 1];
     }
-
-
 
     ElementType* RemoveLast()
     {

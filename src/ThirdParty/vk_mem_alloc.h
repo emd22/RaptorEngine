@@ -23,6 +23,11 @@
 #ifndef AMD_VULKAN_MEMORY_ALLOCATOR_H
 #define AMD_VULKAN_MEMORY_ALLOCATOR_H
 
+#define VMA_LEAK_LOG_FORMAT(format, ...) do { \
+        printf((format), __VA_ARGS__); \
+        printf("\n"); \
+    } while(false)
+
 /** \mainpage Vulkan Memory Allocator
 
 <b>Version 3.2.1</b>

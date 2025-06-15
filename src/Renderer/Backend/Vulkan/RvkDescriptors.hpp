@@ -12,7 +12,7 @@
 #include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>
 #include <Renderer/Backend/Vulkan/RvkPipeline.hpp>
 
-#include "RvkImage.hpp"
+#include "RvkTexture.hpp"
 
 #include <Renderer/Constants.hpp>
 
@@ -21,20 +21,7 @@ namespace vulkan {
 class RvkDescriptorPool
 {
 public:
-    void Create(RvkGpuDevice *device, uint32 max_sets = 10)
-    {
-        mDevice = device;
-
-        VkDescriptorPoolCreateInfo pool_info{};
-        pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pool_info.maxSets = max_sets;
-        pool_info.poolSizeCount = PoolSizes.size();
-        pool_info.pPoolSizes = PoolSizes.data();
-
-        if (vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool) != VK_SUCCESS) {
-            FxPanic("DescriptorPool", "Failed to create descriptor pool!", 0);
-        }
-    }
+    void Create(RvkGpuDevice* device, uint32 max_sets = 10);
 
     void AddPoolSize(VkDescriptorType type, uint32_t count)
     {
@@ -48,11 +35,6 @@ public:
         vkDestroyDescriptorPool(mDevice->Device, Pool, nullptr);
     }
 
-    // ~DescriptorPool()
-    // {
-    //     Destroy();
-    // }
-
 public:
     VkDescriptorPool Pool = nullptr;
     std::vector<VkDescriptorPoolSize> PoolSizes;
@@ -65,24 +47,16 @@ private:
 class RvkDescriptorSet
 {
 public:
-    void Create(RvkDescriptorPool &pool, VkDescriptorSetLayout layout)
-    {
-        mDevice = pool.mDevice;
-        // mDescriptorWrites.clear();
+    void Create(RvkDescriptorPool &pool, VkDescriptorSetLayout layout, int32 number_of_writes);
 
-        VkDescriptorSetAllocateInfo alloc_info{};
-        alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        alloc_info.descriptorPool = pool.Pool;
-        alloc_info.descriptorSetCount = 1;
-        alloc_info.pSetLayouts = &layout;
+    // template <typename T>
+    // void WriteBuffer(VkBuffer& buffer)
+    // {
 
-        if (vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set) != VK_SUCCESS) {
-            FxPanic("DescriptorSet", "Failed to allocate descriptor set!", 0);
-        }
-    }
+    // }
 
     template <typename T>
-    void WriteBuffer(uint32 bind_dest, const RvkRawGpuBuffer<T> &buffer, VkDescriptorType type)
+    VkWriteDescriptorSet GetBufferWriteDescriptor(uint32 bind_dest, const RvkRawGpuBuffer<T>& buffer, VkDescriptorType type)
     {
         VkDescriptorBufferInfo info{
             .buffer = buffer.Buffer,
@@ -100,36 +74,15 @@ public:
             .pBufferInfo = &info,
         };
 
-        vkUpdateDescriptorSets(mDevice->Device, 1, &write, 0, nullptr);
-        // mDescriptorWrites.push_back(write);
+        return write;
     }
 
-    void WriteImage(uint32 bind_dst, RvkImage& image, VkSampler& sampler, VkImageLayout layout, VkDescriptorType type)
+    VkWriteDescriptorSet GetImageWriteDescriptor(uint32 bind_dest, const RvkTexture& texture, VkImageLayout layout, VkDescriptorType type);
+
+    void SubmitWrites(FxStaticArray<VkWriteDescriptorSet>& to_write)
     {
-
-        VkDescriptorImageInfo image_info{
-            .imageLayout = layout,
-            .imageView = image.View,
-            .sampler = sampler
-        };
-
-        VkWriteDescriptorSet write{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = type,
-            .descriptorCount = 1,
-            .dstSet = Set,
-            .dstBinding = bind_dst,
-            .dstArrayElement = 0,
-            .pImageInfo = &image_info,
-        };
-
-        mDescriptorWrites.push_back(write);
-    }
-
-    void SubmitWrites()
-    {
-        // vkUpdateDescriptorSets(mDevice->Device, mDescriptorWrites.size(), mDescriptorWrites.data(), 0, nullptr);
-        // mDescriptorWrites.clear();
+        vkUpdateDescriptorSets(mDevice->Device, to_write.Size, to_write.Data, 0, nullptr);
+        // mDescriptorWrites.Clear();
     }
 
     void Bind(RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, RvkGraphicsPipeline &pipeline) const
@@ -152,8 +105,6 @@ public:
     VkDescriptorSet Set = nullptr;
 private:
     RvkGpuDevice *mDevice = nullptr;
-
-    std::vector<VkWriteDescriptorSet> mDescriptorWrites;
 };
 
 

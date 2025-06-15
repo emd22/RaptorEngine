@@ -46,6 +46,6 @@ void FxPanic(const char* module, const char* fmt, VkResult result, Types... item
     FxPanic(FxModuleName__, __VA_ARGS__)
 
 #define FxAssert(cond) \
-    if (!cond) { \
-        FxPanic(__func__, "Assertion failed! (%s)", #cond); \
+    if (!(cond)) { \
+        FxPanic(__func__, "Assertion failed! (%s)", (#cond)); \
     }

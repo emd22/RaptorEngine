@@ -15,13 +15,13 @@ public:
 
     FxJpegLoader() = default;
 
-    Status LoadFromFile(FxBaseAsset *asset, std::string path) override;
-    void Destroy(FxBaseAsset *asset) override;
+    Status LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path) override;
+    void Destroy(FxRef<FxBaseAsset>& asset) override;
 
     ~FxJpegLoader() = default;
 
 protected:
-    void CreateGpuResource(FxBaseAsset *asset) override;
+    void CreateGpuResource(FxRef<FxBaseAsset>& asset) override;
 
 private:
     struct jpeg_decompress_struct mJpegInfo;

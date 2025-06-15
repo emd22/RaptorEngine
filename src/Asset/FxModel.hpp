@@ -23,6 +23,7 @@ public:
 
     ~FxModel() override
     {
+        puts("WHERE ME?????");
         Destroy();
     }
 
@@ -31,8 +32,7 @@ public:
     {
         Log::Info("Destroy FxModel (%lu meshes)", Meshes.Size);
 
-        for (FxMesh *mesh : Meshes)
-        {
+        for (FxMesh *mesh : Meshes) {
             mesh->Destroy();
         }
 

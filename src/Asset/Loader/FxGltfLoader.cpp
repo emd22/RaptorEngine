@@ -6,6 +6,8 @@
 
 #include <Asset/FxModel.hpp>
 
+#include <Core/FxRef.hpp>
+
 void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
 {
     FxStaticArray<float32> positions;
@@ -84,8 +86,10 @@ void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
 
 }
 
-FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxBaseAsset *asset, std::string path)
+FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
 {
+    (void)asset;
+
     cgltf_options options{};
 
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
@@ -104,9 +108,9 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxBaseAsset *asset, std::string 
     return FxGltfLoader::Status::Success;
 }
 
-void FxGltfLoader::CreateGpuResource(FxBaseAsset *asset)
+void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
-    FxModel *model = static_cast<FxModel *>(asset);
+    FxModel *model = static_cast<FxModel *>(asset.Get());
     model->Meshes.InitSize(mGltfData->meshes_count);
 
     for (int i = 0; i < mGltfData->meshes_count; i++) {
@@ -122,8 +126,10 @@ void FxGltfLoader::CreateGpuResource(FxBaseAsset *asset)
     model->IsUploadedToGpu.notify_all();
 }
 
-void FxGltfLoader::Destroy(FxBaseAsset *asset)
+void FxGltfLoader::Destroy(FxRef<FxBaseAsset>& asset)
 {
+    (void)asset;
+
     if (mGltfData) {
         cgltf_free(mGltfData);
         mGltfData = nullptr;

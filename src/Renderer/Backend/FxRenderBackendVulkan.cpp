@@ -634,6 +634,7 @@ void FxRenderBackendVulkan::Destroy()
     DestroyUploadContext();
     DestroyFrames();
 
+
     while (!mDeletionQueue.empty()) {
         ProcessDeletionQueue(true);
         // insert a small delay to avoid the processor spinning out while
@@ -646,6 +647,8 @@ void FxRenderBackendVulkan::Destroy()
     GetDevice()->WaitForIdle();
 
     Swapchain.Destroy();
+    // FX_BREAKPOINT;
+
     DestroyGPUAllocator();
 
     if (mWindowSurface) {

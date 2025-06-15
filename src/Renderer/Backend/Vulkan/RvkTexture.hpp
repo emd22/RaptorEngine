@@ -96,6 +96,7 @@ public:
 
     void Destroy()
     {
+
         if (this->Sampler != nullptr) {
             vkDestroySampler(this->mDevice->Device, this->Sampler, nullptr);
             this->Sampler = nullptr;

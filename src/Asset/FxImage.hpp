@@ -27,8 +27,11 @@ public:
     void Destroy() override
     {
         if (!IsUploadedToGpu.load()) {
+            printf("Not uploaded to GPU!\n");
             return;
         }
+
+        puts("destroy me cuzzo");
 
         Texture.Destroy();
 

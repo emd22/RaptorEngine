@@ -4,6 +4,8 @@
 
 #include <Core/FxDataNotifier.hpp>
 
+#include <Core/FxRef.hpp>
+
 /**
  * An asset base class for other assets to be derived from.
  *
@@ -22,10 +24,13 @@ protected:
     {
     }
 
+    template <typename T>
+    friend class FxRef;
+
 public:
 
-    using OnLoadFunc = void (*)(FxBaseAsset *asset);
-    using OnErrorFunc = void (*)(FxBaseAsset *asset);
+    using OnLoadFunc = void (*)(const FxRef<FxBaseAsset>& asset);
+    using OnErrorFunc = void (*)(const FxRef<FxBaseAsset>& asset);
 
     virtual void WaitUntilLoaded()
     {

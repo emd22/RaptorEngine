@@ -13,7 +13,7 @@ public:
 
 
 public:
-    Vec3f Position = Vec3f(0.0f);
+    FxVec3f Position = FxVec3f(0.0f);
 
     Mat4f ViewMatrix = Mat4f::Identity;
     Mat4f ProjectionMatrix = Mat4f::Identity;
@@ -55,17 +55,17 @@ public:
         RequireUpdate();
     }
 
-    inline void Translate(const Vec3f &offset)
+    inline void Translate(const FxVec3f &offset)
     {
-        Position += Vec3f(offset.X, offset.Y, offset.Z);
+        Position += FxVec3f(offset.X, offset.Y, offset.Z);
 
         RequireUpdate();
     }
 
-    inline void Move(const Vec3f &offset)
+    inline void Move(const FxVec3f &offset)
     {
-        const Vec3f forward = Direction * -offset.Z;
-        const Vec3f right = Direction.Cross(Vec3f::Up) * offset.X;
+        const FxVec3f forward = Direction * -offset.Z;
+        const FxVec3f right = Direction.Cross(FxVec3f::Up) * offset.X;
 
         Translate(forward + right);
     }
@@ -82,7 +82,7 @@ public:
     inline void RequireUpdate() { mRequiresUpdate = true; }
 
 public:
-    Vec3f Direction = Vec3f(0.0f);
+    FxVec3f Direction = FxVec3f(0.0f);
 
 private:
     bool mRequiresUpdate = true;

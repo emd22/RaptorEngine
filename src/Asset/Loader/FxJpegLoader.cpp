@@ -7,9 +7,11 @@
 
 #include <Core/FxMemPool.hpp>
 
-FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxBaseAsset* asset, std::string path)
+#include <Core/FxRef.hpp>
+
+FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
 {
-    FxImage* image = static_cast<FxImage*>(asset);
+    FxImage* image = static_cast<FxImage*>(asset.Get());
 
     const char* c_path = path.c_str();
 
@@ -57,9 +59,9 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxBaseAsset* asset, std::string 
     return Status::Success;
 }
 
-void FxJpegLoader::CreateGpuResource(FxBaseAsset *asset)
+void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
-    FxImage* image = static_cast<FxImage*>(asset);
+    FxImage* image = static_cast<FxImage*>(asset.Get());
 
     image->Texture.Create(mImageData, image->Size, image->NumComponents);
 
@@ -67,7 +69,9 @@ void FxJpegLoader::CreateGpuResource(FxBaseAsset *asset)
     asset->IsUploadedToGpu.notify_all();
 }
 
-void FxJpegLoader::Destroy(FxBaseAsset *asset)
+void FxJpegLoader::Destroy(FxRef<FxBaseAsset>& asset)
 {
+    (void)asset;
+
     jpeg_destroy_decompress(&mJpegInfo);
 }

@@ -11,10 +11,11 @@
 
 #include <atomic>
 #include <chrono>
-#include <memory>
 #include <thread>
 
 #include <Core/Types.hpp>
+
+#include <Core/Defines.hpp>
 
 
 ////////////////////////////////////
@@ -99,44 +100,56 @@ void FxAssetManager::Shutdown()
         worker.Thread.join();
     }
 
+
     mAssetManagerThread->join();
     delete mAssetManagerThread;
+
+    // Free the workers thread array here---
+    // this calls the destructors for each worker thread,
+    // which frees the `FxRef`'s to the data
+    mWorkerThreads.Free();
+
+    mLoadQueue.Destroy();
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxModel>(const std::unique_ptr<FxModel>& asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string& path)
 {
-    FxAssetQueueItem queue_item;
+    auto loader = FxRef<FxGltfLoader>::New();
 
-    queue_item.Asset = asset.get();
-    queue_item.Loader = std::make_unique<FxGltfLoader>();
-    queue_item.AssetType = FxAssetType::Model;
-    queue_item.Path = path;
+    FxAssetQueueItem queue_item(
+        loader,
+        asset,
+        FxAssetType::Model,
+        path
+    );
 
-    FxAssetManager& manager = GetInstance();
+    FxAssetManager& mgr = GetInstance();
 
-    manager.mLoadQueue.Push(queue_item);
+    mgr.mLoadQueue.Push(std::move(queue_item));
 
-    manager.ItemsEnqueued.test_and_set();
-    manager.ItemsEnqueuedNotifier.SignalDataWritten();
+    mgr.ItemsEnqueued.test_and_set();
+    mgr.ItemsEnqueuedNotifier.SignalDataWritten();
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxImage>(const std::unique_ptr<FxImage>& asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string& path)
 {
-    FxAssetQueueItem queue_item;
+    auto loader = FxRef<FxJpegLoader>::New();
 
-    queue_item.Asset = asset.get();
-    queue_item.Loader = std::make_unique<FxJpegLoader>();
-    queue_item.AssetType = FxAssetType::Model;
-    queue_item.Path = path;
+    FxAssetQueueItem queue_item(
+        loader,
+        asset,
+        FxAssetType::Image,
+        path
+    );
 
-    FxAssetManager& manager = GetInstance();
+    FxAssetManager& mgr = GetInstance();
 
-    manager.mLoadQueue.Push(queue_item);
+    mgr.mLoadQueue.Push(std::move(queue_item));
 
-    manager.ItemsEnqueued.test_and_set();
-    manager.ItemsEnqueuedNotifier.SignalDataWritten();
+    mgr.ItemsEnqueued.test_and_set();
+    mgr.ItemsEnqueuedNotifier.SignalDataWritten();
 }
 
 
@@ -148,7 +161,7 @@ void FxAssetManager::CheckForUploadableData()
             continue;
         }
 
-        auto &loaded_item = worker.Item;
+        auto& loaded_item = worker.Item;
 
         // The asset was successfully loaded, upload to GPU
         if (worker.LoadStatus == FxBaseLoader::Status::Success) {

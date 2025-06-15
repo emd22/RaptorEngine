@@ -128,11 +128,6 @@ void RvkImage::Destroy()
         return;
     }
 
-    if (this->Image == nullptr || this->Allocation == nullptr) {
-        return;
-    }
-
-
     vkDestroyImageView(this->mDevice->Device, this->View, nullptr);
     vmaDestroyImage(RendererVulkan->GpuAllocator, this->Image, this->Allocation);
 
