@@ -222,7 +222,7 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
-            FxMemPool::GetGlobalPool().PrintAllocations();
+            // FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
         // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !other_model->IsUploadedToGpu) {

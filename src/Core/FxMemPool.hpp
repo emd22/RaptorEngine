@@ -3,7 +3,20 @@
 #include <Core/Types.hpp>
 #include <Core/FxLinkedList.hpp>
 
-#include <mutex>
+// This should be stable enough, but keeping the old mempool implementation for now just in case.
+#define FX_EXPERIMENTAL_PAGED_MEMPOOL 1
+
+#ifdef FX_EXPERIMENTAL_PAGED_MEMPOOL
+
+#include "Experimental/FxMemPool.hpp"
+
+using experimental::FxMemPool;
+using experimental::FxMemPoolPage;
+
+#endif
+
+
+#ifndef FX_EXPERIMENTAL_PAGED_MEMPOOL
 
 class FxMemPool
 {
@@ -93,3 +106,4 @@ private:
 
     FxLinkedList<MemBlock> mMemBlocks;
 };
+#endif

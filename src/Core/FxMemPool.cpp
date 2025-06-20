@@ -1,4 +1,7 @@
 #include "FxMemPool.hpp"
+
+#ifndef FX_EXPERIMENTAL_PAGED_MEMPOOL
+
 #include "FxPanic.hpp"
 #include <mutex>
 
@@ -213,3 +216,4 @@ void FxMemPool::Destroy()
     std::free(mMem);
     mSize = 0;
 }
+#endif // FX_EXPERIMENTAL_PAGED_MEMPOOL

@@ -36,7 +36,7 @@ static inline FxKey ConvertMouseButtonToFxKey(int32 mouse_button)
 
 void FxControlManager::Init()
 {
-    FxMemPool::GetGlobalPool().PrintAllocations();
+    // FxMemPool::GetGlobalPool().PrintAllocations();
 
     FxControlManager& inst = GetInstance();
 
