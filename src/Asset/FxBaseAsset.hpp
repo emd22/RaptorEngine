@@ -4,7 +4,7 @@
 
 #include <Core/FxDataNotifier.hpp>
 
-#include <Core/FxRef.hpp>
+// #include <Core/FxRef.hpp>
 
 /**
  * An asset base class for other assets to be derived from.
@@ -24,13 +24,13 @@ protected:
     {
     }
 
-    template <typename T>
-    friend class FxRef;
+    // template <typename T>
+    // friend class FxRef;
 
 public:
 
-    using OnLoadFunc = void (*)(const FxRef<FxBaseAsset>& asset);
-    using OnErrorFunc = void (*)(const FxRef<FxBaseAsset>& asset);
+    using OnLoadFunc = void (*)(const std::shared_ptr<FxBaseAsset> asset);
+    using OnErrorFunc = void (*)(const std::shared_ptr<FxBaseAsset> asset);
 
     virtual void WaitUntilLoaded()
     {
@@ -52,7 +52,7 @@ public:
     {
         // If the asset has already been loaded, call the callback immediately.
         if (IsFinishedNotifier.IsDone()) {
-            on_loaded_callback(this);
+            // on_loaded_callback(this);
 
             return;
         }
@@ -63,7 +63,7 @@ public:
     void OnError(const OnErrorFunc& on_error_callback)
     {
         if (IsFinishedNotifier.IsDone()) {
-            on_error_callback(this);
+            // on_error_callback(this);
             return;
         }
 

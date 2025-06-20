@@ -10,6 +10,9 @@
 
 #include "FxMemPool.hpp"
 
+#define FX_STATIC_ARRAY_DEBUG 1
+#define FX_STATIC_ARRAY_NO_MEMPOOL 1
+
 static inline void NoMemError()
 {
     puts("FxStaticArray: out of memory");
@@ -62,10 +65,15 @@ public:
     FxStaticArray(size_t element_count)
         : Capacity(element_count)
     {
-#ifdef FX_STATIC_ARRAY_DEBUG
+    #ifdef FX_STATIC_ARRAY_DEBUG
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
-#endif
+    #endif
+
+    #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
         void* allocated_ptr = FxMemPool::Alloc(static_cast<uint32>(sizeof(ElementType)) * element_count);
+    #else
+        void* allocated_ptr = static_cast<void*>(new ElementType[element_count]);
+    #endif
 
         if (allocated_ptr == nullptr) {
             NoMemError();
@@ -114,15 +122,22 @@ public:
             return;
         }
 
-#ifdef FX_DEBUG_STATIC_ARRAY
-        Log::Debug("Freeing FxStaticArray of size %zu (type: %s)", Size, typeid(ElementType).name());
-#endif
+    #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
         for (size_t i = 0; i < Size; i++) {
             ElementType& element = Data[i];
             element.~ElementType();
         }
 
         FxMemPool::Free(static_cast<void*>(Data));
+    #else
+        delete[] Data;
+    #endif
+
+
+    #ifdef FX_STATIC_ARRAY_DEBUG
+        Log::Debug("Freeing FxStaticArray of size %zu (type: %s)", Size, typeid(ElementType).name());
+    #endif
+
         //
         // delete[] Data;
         //
@@ -217,7 +232,12 @@ public:
         }
 
         ElementType* element = &Data[Size++];
+
+    // #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
         new (element) ElementType (object);
+    // #else
+    //     (void)element;
+    // #endif
     }
 
     /** Inserts a new empty element into the array and returns a pointer to the element */
@@ -266,9 +286,11 @@ public:
 
         Size = Capacity;
 
+    #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
         for (uint64 i = 0; i < Size; i++) {
             new (&Data[i]) ElementType;
         }
+    #endif
     }
 
     // void InitSize()
@@ -293,17 +315,20 @@ public:
 protected:
     virtual void InternalAllocateArray(size_t element_count)
     {
-#ifdef FX_DEBUG_STATIC_ARRAY
+    #ifdef FX_DEBUG_STATIC_ARRAY
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
-#endif
+    #endif
+    #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
         void* allocated_ptr = FxMemPool::Alloc(sizeof(ElementType) * element_count);
+    #else
+        void* allocated_ptr = static_cast<void*>(new ElementType[element_count]);
+    #endif
 
         if (allocated_ptr == nullptr) {
             NoMemError();
         }
 
         Data = static_cast<ElementType*>(allocated_ptr);
-
 
         // Data = new ElementType[element_count];
 

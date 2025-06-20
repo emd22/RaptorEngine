@@ -142,7 +142,7 @@ void FxRenderBackendVulkan::DestroyFrames()
 
 void FxRenderBackendVulkan::InitVulkan()
 {
-    const char* app_name = "Rocket";
+    const char* app_name = "Foxtrot";
     VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = app_name;
@@ -647,7 +647,6 @@ void FxRenderBackendVulkan::Destroy()
     GetDevice()->WaitForIdle();
 
     Swapchain.Destroy();
-    // FX_BREAKPOINT;
 
     DestroyGPUAllocator();
 

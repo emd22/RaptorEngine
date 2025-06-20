@@ -31,8 +31,6 @@ public:
             return;
         }
 
-        puts("destroy me cuzzo");
-
         Texture.Destroy();
 
         // mImageReady = false;

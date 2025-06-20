@@ -10,19 +10,19 @@ class FxAssetQueue
 public:
     FxAssetQueue() = default;
 
-    // void Push(FxAssetQueueItem &value)
-    // {
-    //     std::lock_guard<std::mutex> lock(mMutex);
-
-    //     mQueue.push_back(value);
-    // }
-
-    void Push(FxAssetQueueItem &&value)
+    void Push(FxAssetQueueItem &value)
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        mQueue.push_back(std::move(value));
+        mQueue.push_back(value);
     }
+
+    // void Push(FxAssetQueueItem &&value)
+    // {
+    //     std::lock_guard<std::mutex> lock(mMutex);
+
+    //     mQueue.push_back(std::move(value));
+    // }
 
     // void Push(FxAssetQueueItem value)
     // {

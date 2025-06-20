@@ -13,13 +13,13 @@ public:
 
     FxGltfLoader() = default;
 
-    Status LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path) override;
-    void Destroy(FxRef<FxBaseAsset>& asset) override;
+    Status LoadFromFile(std::shared_ptr<FxBaseAsset>& asset, const std::string& path) override;
+    void Destroy(std::shared_ptr<FxBaseAsset>& asset) override;
 
     ~FxGltfLoader() = default;
 
 protected:
-    void CreateGpuResource(FxRef<FxBaseAsset>& asset) override;
+    void CreateGpuResource(std::shared_ptr<FxBaseAsset>& asset) override;
 
 private:
     cgltf_data *mGltfData = nullptr;

@@ -1,8 +1,9 @@
 #pragma once
 
-#include <__thread/id.h>
 #include <atomic>
 #include <cstddef>
+
+// #include <Asset/FxModel.hpp>
 
 // #include "FxMemPool.hpp"
 #include "FxPanic.hpp"
@@ -15,7 +16,8 @@
 #include <mutex>
 #include <map>
 
-#define FX_REF_USE_MUTEX 1
+
+// #define FX_REF_USE_MUTEX 1
 
 struct FxRefInfoBlock
 {
@@ -24,34 +26,33 @@ struct FxRefInfoBlock
     std::atomic_uint32_t Ref = 1;
 
     void IncRef() {
-        std::cout << "++ INC FxRef " << std::this_thread::get_id()
-            << '(' << Ref + 1  << ')'
-            << '{' << this  <<  "}"
-            << std::endl;
+        // std::cout << "++ INC FxRef " << std::this_thread::get_id()
+        //     << '(' << Ref + 1  << ')'
+        //     << '{' << this  <<  "}"
+        //     << std::endl;
 
-        fflush(stdout);
+        // fflush(stdout);
 
-        Ref++;
-        IncDecMap[std::this_thread::get_id()].push_back(reinterpret_cast<uintptr_t>(this));
+        ++Ref;
+        // IncDecMap[std::this_thread::get_id()].push_back(reinterpret_cast<uintptr_t>(this));
     }
 
     uint32 DecRef() {
-        std::cout << "-- DEC FxRef " << std::this_thread::get_id()
-            << '(' << Ref - 1  << ')'
-            << '{' << this  <<  "}"
-            << std::endl;
+        // std::cout << "-- DEC FxRef " << std::this_thread::get_id()
+        //     << '(' << Ref - 1  << ')'
+        //     << '{' << this  <<  "}"
+        //     << std::endl;
 
-        fflush(stdout);
+        // fflush(stdout);
 
-
-        uintptr_t ptr = reinterpret_cast<uintptr_t>(this);
-        auto& vec = IncDecMap[std::this_thread::get_id()];
-        for (int32 i = 0; i < vec.size(); i++) {
-            if (vec[i] == ptr) {
-                vec.erase(vec.begin() + i);
-                break;
-            }
-        }
+        // uintptr_t ptr = reinterpret_cast<uintptr_t>(this);
+        // auto& vec = IncDecMap[std::this_thread::get_id()];
+        // for (int32 i = 0; i < vec.size(); i++) {
+        //     if (vec[i] == ptr) {
+        //         vec.erase(vec.begin() + i);
+        //         break;
+        //     }
+        // }
 
         return (--Ref);
     }
@@ -71,36 +72,34 @@ private:
 
         mInfo = info_block;
         mPtr = ptr;
-
-        std::cout << "CR new FxRef " << std::this_thread::get_id() << std::endl;
     }
 
 public:
     FxRef(nullptr_t np)
-        : mInfo(nullptr), mPtr(nullptr)
+        : FxRef(nullptr, nullptr)
     {
     }
 
     FxRef(T* ptr)
     {
-        this->New(ptr);
+        this->FromPtr(ptr);
     }
 
-    void PrintMap()
-    {
-        for (auto v : mInfo->IncDecMap) {
-            std::cout << "Thread: " << v.first << " ; ";
-            for (uintptr_t value : v.second) {
-                std::cout << value << " ";
-            }
-            std::cout << std::endl;
-        }
-    }
+    // void PrintMap()
+    // {
+    //     for (auto v : mInfo->IncDecMap) {
+    //         std::cout << "Thread: " << v.first << " ; ";
+    //         for (uintptr_t value : v.second) {
+    //             std::cout << value << " ";
+    //         }
+    //         std::cout << std::endl;
+    //     }
+    // }
 
-    FxRef(const FxRef& other)
+    FxRef(FxRef& other)
     {
     #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(other.mMutex);
+        std::lock_guard guard(other.mMutex);
     #endif
 
         mInfo = other.mInfo;
@@ -149,28 +148,30 @@ public:
             return;
         }
 
-        mInfo->DecRef();
-        if (GetRefCount() == 0) {
-            std::cout << "DEL FxRef " << std::this_thread::get_id()  << std::endl;
+        printf("Clearing ref to %s\n", typeid(T).name());
+
+        if (mInfo->DecRef() == 0) {
+
+//            FX_BREAKPOINT;
+            std::cout << "DIS THREAD {" << std::this_thread::get_id() << "}" << std::endl;
+
+            std::cout << "DEL FxRef " << this << " (" << typeid(T).name() << ")" << std::endl;
 
             delete mPtr;
             delete mInfo;
         }
     }
 
-    static FxRef<T> New()
-    {
-        // return FxRef(FxMemPool::Alloc<T>(sizeof(T)));
-        return FxRef(new T);
-    }
 
-    void New(T* ptr)
+    void FromPtr(T* ptr)
     {
     #ifdef FX_REF_USE_MUTEX
         std::lock_guard<std::mutex> guard(mMutex);
     #endif
 
         // mInfo = FxMemPool::Alloc<FxRefInfoBlock>(sizeof(FxRefInfoBlock));
+        std::cout << "CR new FxRef " << this << std::endl;
+
         mInfo = new FxRefInfoBlock;
         mPtr = ptr;
     }
@@ -192,6 +193,26 @@ public:
         return 0;
     }
 
+    FxRef& operator = (const FxRef& other)
+    {
+    #ifdef FX_REF_USE_MUTEX
+        std::lock_guard<std::mutex> guard(mMutex);
+    #endif
+
+        printf("Inheriting %s\n", typeid(T).name());
+
+
+
+        mPtr = other.mPtr;
+        mInfo = other.mInfo;
+
+        if (mInfo) {
+            mInfo->IncRef();
+        }
+
+        return *this;
+    }
+
     FxRef& operator = (FxRef& other)
     {
     #ifdef FX_REF_USE_MUTEX
@@ -200,6 +221,9 @@ public:
 
         mPtr = other.mPtr;
         mInfo = other.mInfo;
+
+        printf("Inheriting %s\n", typeid(T).name());
+
 
         if (mInfo) {
             mInfo->IncRef();

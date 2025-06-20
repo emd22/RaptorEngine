@@ -109,16 +109,16 @@ void FxAssetManager::Shutdown()
     // which frees the `FxRef`'s to the data
     mWorkerThreads.Free();
 
-    mLoadQueue.Destroy();
+    // mLoadQueue.Destroy();
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxModel>(std::shared_ptr<FxModel> asset, const std::string& path)
 {
-    auto loader = FxRef<FxGltfLoader>::New();
+    auto loader = std::make_shared<FxGltfLoader>();
 
     FxAssetQueueItem queue_item(
-        loader,
+        (loader),
         asset,
         FxAssetType::Model,
         path
@@ -126,19 +126,19 @@ void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string&
 
     FxAssetManager& mgr = GetInstance();
 
-    mgr.mLoadQueue.Push(std::move(queue_item));
+    mgr.mLoadQueue.Push((queue_item));
 
     mgr.ItemsEnqueued.test_and_set();
     mgr.ItemsEnqueuedNotifier.SignalDataWritten();
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxImage>(std::shared_ptr<FxImage> asset, const std::string& path)
 {
-    auto loader = FxRef<FxJpegLoader>::New();
+    auto loader = std::shared_ptr<FxJpegLoader>(new FxJpegLoader);
 
     FxAssetQueueItem queue_item(
-        loader,
+        (loader),
         asset,
         FxAssetType::Image,
         path
@@ -146,7 +146,7 @@ void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string&
 
     FxAssetManager& mgr = GetInstance();
 
-    mgr.mLoadQueue.Push(std::move(queue_item));
+    mgr.mLoadQueue.Push(queue_item);
 
     mgr.ItemsEnqueued.test_and_set();
     mgr.ItemsEnqueuedNotifier.SignalDataWritten();
@@ -215,7 +215,7 @@ void FxAssetManager::CheckForItemsToLoad()
         return;
     }
 
-    FxAssetWorker *worker = FindWorkerThread();
+    FxAssetWorker* worker = FindWorkerThread();
 
     // No workers available, poll until one becomes available
     while (worker == nullptr) {

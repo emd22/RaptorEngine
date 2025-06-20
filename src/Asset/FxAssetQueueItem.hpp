@@ -21,8 +21,8 @@ struct FxAssetQueueItem
 
     template <typename LoaderType, typename AssetType>
     FxAssetQueueItem(
-        FxRef<LoaderType> loader,
-        FxRef<AssetType> asset,
+        std::shared_ptr<LoaderType> loader,
+        std::shared_ptr<AssetType> asset,
         FxAssetType type,
         const std::string& path
     )
@@ -31,7 +31,7 @@ struct FxAssetQueueItem
     }
 
     // FxAssetQueueItem() = default;
-    FxAssetQueueItem(FxAssetQueueItem &&other)
+    FxAssetQueueItem(FxAssetQueueItem&& other)
         : Path(other.Path),
           Loader(std::move(other.Loader)),
           Asset(std::move(other.Asset)),
@@ -39,7 +39,24 @@ struct FxAssetQueueItem
     {
     }
 
-    FxAssetQueueItem &operator = (FxAssetQueueItem &&other)
+    FxAssetQueueItem(const FxAssetQueueItem& other)
+    {
+        Path = other.Path;
+        Loader = other.Loader;
+        Asset = other.Asset;
+        AssetType = other.AssetType;
+    }
+
+    FxAssetQueueItem& operator = (FxAssetQueueItem&& other)
+    {
+        Path = other.Path;
+        Loader = other.Loader;
+        Asset = other.Asset;
+        AssetType = other.AssetType;
+        return *this;
+    }
+
+    FxAssetQueueItem& operator = (FxAssetQueueItem& other)
     {
         Path = other.Path;
         Loader = other.Loader;
@@ -50,8 +67,8 @@ struct FxAssetQueueItem
 
     std::string Path;
 
-    FxRef<FxBaseLoader> Loader{nullptr};
-    FxRef<FxBaseAsset> Asset{nullptr};
+    std::shared_ptr<FxBaseLoader> Loader{nullptr};
+    std::shared_ptr<FxBaseAsset> Asset{nullptr};
 
     FxAssetType AssetType;
 };

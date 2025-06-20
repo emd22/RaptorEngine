@@ -56,6 +56,18 @@ void CheckGeneralControls()
     }
 }
 
+void SecondTestFunc(std::shared_ptr<int> test_num)
+{
+    (*test_num) += 30;
+    printf("Final number: %d\n", *test_num);
+}
+
+void FirstTestFunc(std::shared_ptr<int> test_num)
+{
+    (*test_num) = 20;
+    SecondTestFunc(test_num);
+}
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100000);
@@ -116,8 +128,8 @@ int main()
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
 
-    FxRef<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
-    FxRef<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
+    std::shared_ptr<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
+    std::shared_ptr<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
 
     test_image->WaitUntilLoaded();
 
@@ -242,7 +254,7 @@ int main()
 
     RendererVulkan->GetDevice()->WaitForIdle();
 
-    // test_image->Destroy();
+    test_image->Destroy();
 
     asset_manager.Shutdown();
 

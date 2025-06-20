@@ -9,9 +9,9 @@
 
 #include <Core/FxRef.hpp>
 
-FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
+FxJpegLoader::Status FxJpegLoader::LoadFromFile(std::shared_ptr<FxBaseAsset>& asset, const std::string& path)
 {
-    FxImage* image = static_cast<FxImage*>(asset.Get());
+    FxImage* image = static_cast<FxImage*>(asset.get());
 
     const char* c_path = path.c_str();
 
@@ -59,9 +59,9 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const
     return Status::Success;
 }
 
-void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
+void FxJpegLoader::CreateGpuResource(std::shared_ptr<FxBaseAsset>& asset)
 {
-    FxImage* image = static_cast<FxImage*>(asset.Get());
+    FxImage* image = static_cast<FxImage*>(asset.get());
 
     image->Texture.Create(mImageData, image->Size, image->NumComponents);
 
@@ -69,7 +69,7 @@ void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
     asset->IsUploadedToGpu.notify_all();
 }
 
-void FxJpegLoader::Destroy(FxRef<FxBaseAsset>& asset)
+void FxJpegLoader::Destroy(std::shared_ptr<FxBaseAsset>& asset)
 {
     (void)asset;
 

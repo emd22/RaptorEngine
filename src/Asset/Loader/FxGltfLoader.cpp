@@ -86,7 +86,7 @@ void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
 
 }
 
-FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
+FxGltfLoader::Status FxGltfLoader::LoadFromFile(std::shared_ptr<FxBaseAsset>& asset, const std::string& path)
 {
     (void)asset;
 
@@ -108,9 +108,9 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const
     return FxGltfLoader::Status::Success;
 }
 
-void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
+void FxGltfLoader::CreateGpuResource(std::shared_ptr<FxBaseAsset>& asset)
 {
-    FxModel *model = static_cast<FxModel *>(asset.Get());
+    FxModel *model = static_cast<FxModel *>(asset.get());
     model->Meshes.InitSize(mGltfData->meshes_count);
 
     for (int i = 0; i < mGltfData->meshes_count; i++) {
@@ -126,7 +126,7 @@ void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
     model->IsUploadedToGpu.notify_all();
 }
 
-void FxGltfLoader::Destroy(FxRef<FxBaseAsset>& asset)
+void FxGltfLoader::Destroy(std::shared_ptr<FxBaseAsset>& asset)
 {
     (void)asset;
 
