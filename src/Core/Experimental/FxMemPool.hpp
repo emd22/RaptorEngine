@@ -4,6 +4,7 @@
 
 #include "../FxLinkedList.hpp"
 
+#include <type_traits>
 #include <vector>
 
 namespace experimental {
@@ -34,14 +35,13 @@ public:
     void Create(uint64 size);
 
     /** Allocates a block of memory */
-    template <typename PtrType>
-    PtrType* Alloc(uint32 size)
+    template <typename ElementType, typename... Args>
+    ElementType* Alloc(uint32 size, Args... args)
     {
         MemBlock& block = AllocateMemory(size)->Data;
 
-        return static_cast<PtrType*>(block.Start);
+        return static_cast<ElementType*>(block.Start);
     }
-
 
     void* Realloc(void* ptr, uint32 new_size);
 
@@ -58,7 +58,6 @@ public:
         if (ptr == nullptr) {
             return;
         }
-        //std::lock_guard guard(mMemMutex);
 
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         mMemBlocks.DeleteNode(node);
@@ -103,6 +102,10 @@ public:
 
     static FxMemPool& GetGlobalPool();
 
+    /**
+     * Creates a new memory pool with paging.
+     * @param page_size_kb The size of each page in kilobytes.
+     */
     void Create(uint32 page_size_kb)
     {
         mPageSize = static_cast<uint64>(page_size_kb) * page_size_kb;
@@ -110,13 +113,45 @@ public:
         AllocateNewPage();
     }
 
-    /** Allocates memory on either this memory pool or the global pool if `pool` is null. */
-    static void* Alloc(uint32 size, FxMemPool* pool = nullptr);
+    /**
+     * Allocates a raw memory block on a memory pool.
+     * @param pool The memory pool to allocate the memory block from. If nullptr, the global pool is used.
+     */
+    static void* AllocRaw(uint32 size, FxMemPool* pool = nullptr);
 
-    template <typename Type>
-    static Type* Alloc(uint32 size, FxMemPool* pool = nullptr)
+    /**
+     * Allocates a memory block on the global memory pool.
+     * @param args The arguments to construct the object with.
+     */
+    template <typename Type, typename... Args>
+    static Type* Alloc(uint32 size, Args&&... args)
     {
-        return static_cast<Type*>(Alloc(size, pool));
+        Type* ptr = static_cast<Type*>(AllocRaw(size, nullptr));
+
+        // Use a placement new if the object is constructable with the provided arguments
+        if constexpr (std::is_constructible_v<Type*, Args...>) {
+            new (ptr) Type(std::forward<Args>(args)...);
+        }
+
+        return ptr;
+    }
+
+    /**
+     * Allocates memory on a given memory pool.
+     * @param pool The memory pool to allocate the memory block from.
+     * @param args The arguments to construct the object with.
+     */
+    template <typename Type, typename... Args>
+    static Type* AllocInPool(uint32 size, FxMemPool* pool, Args&&... args)
+    {
+        Type* ptr = static_cast<Type*>(AllocRaw(size, pool));
+
+        // Use a placement new if the object is constructable with the provided arguments
+        if constexpr (std::is_constructible_v<Type*, Args...>) {
+            new (ptr) Type(std::forward<Args>(args)...);
+        }
+
+        return ptr;
     }
 
     /** Frees an allocated pointer on the global memory pool */
@@ -125,6 +160,10 @@ public:
     template <typename Type>
     static void Free(Type* ptr, FxMemPool* pool = nullptr)
     {
+        if constexpr (std::is_destructible_v<Type*>) {
+            ptr->~Type();
+        }
+
         Free(static_cast<void*>(ptr), pool);
     }
 

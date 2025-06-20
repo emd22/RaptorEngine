@@ -100,9 +100,7 @@ public:
     template<typename... Args>
     static FxRef<T> New(Args... args)
     {
-        T* ptr = FxMemPool::Alloc<T>(sizeof(T));
-        new (ptr) T(std::forward<Args>(args)...);
-
+        T* ptr = FxMemPool::Alloc<T>(sizeof(T), std::forward<Args>(args)...);
         return FxRef<T>(ptr);
     }
 
@@ -165,9 +163,7 @@ private:
 
 
         if (mRefCnt->Dec() == 0) {
-            mPtr->~T();
             FxMemPool::Free<T>(mPtr);
-
             FxMemPool::Free<FxRefCount>(mRefCnt);
 
             mPtr = nullptr;

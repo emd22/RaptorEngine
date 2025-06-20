@@ -245,7 +245,7 @@ void FxMemPoolPage::Destroy()
 
 
 
-void* FxMemPool::Alloc(uint32 size, FxMemPool* pool)
+void* FxMemPool::AllocRaw(uint32 size, FxMemPool* pool)
 {
     if (pool == nullptr) {
         pool = &GetGlobalPool();

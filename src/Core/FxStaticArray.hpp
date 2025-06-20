@@ -70,16 +70,19 @@ public:
     #endif
 
     #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
-        void* allocated_ptr = FxMemPool::Alloc(static_cast<uint32>(sizeof(ElementType)) * element_count);
+        Data = FxMemPool::Alloc<ElementType>(static_cast<uint32>(sizeof(ElementType)) * element_count);
+        if (Data == nullptr) {
+            NoMemError();
+        }
     #else
-        void* allocated_ptr = static_cast<void*>(new ElementType[element_count]);
-    #endif
-
-        if (allocated_ptr == nullptr) {
+        try {
+            ElementType* allocated_ptr = new ElementType[element_count];
+        } catch (const std::bad_alloc& e) {
             NoMemError();
         }
 
         Data = static_cast<ElementType*>(allocated_ptr);
+    #endif
 
         Size = 0;
 
@@ -319,16 +322,19 @@ protected:
         Log::Debug("Allocating FxStaticArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
     #endif
     #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
-        void* allocated_ptr = FxMemPool::Alloc(sizeof(ElementType) * element_count);
+        Data = FxMemPool::Alloc<ElementType>(sizeof(ElementType) * element_count);
+        if (Data == nullptr) {
+            NoMemError();
+        }
     #else
-        void* allocated_ptr = static_cast<void*>(new ElementType[element_count]);
-    #endif
-
-        if (allocated_ptr == nullptr) {
+        try {
+            Data = new ElementType[element_count];
+        }
+        catch (const std::bad_alloc& e) {
             NoMemError();
         }
 
-        Data = static_cast<ElementType*>(allocated_ptr);
+    #endif
 
         // Data = new ElementType[element_count];
 
