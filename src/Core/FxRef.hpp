@@ -19,235 +19,179 @@
 
 // #define FX_REF_USE_MUTEX 1
 
-struct FxRefInfoBlock
+
+struct FxRefCount
 {
+    std::atomic_uint32_t Count = 1;
 
-    std::map<std::__thread_id, std::vector<uintptr_t>> IncDecMap;
-    std::atomic_uint32_t Ref = 1;
-
-    void IncRef() {
-        // std::cout << "++ INC FxRef " << std::this_thread::get_id()
-        //     << '(' << Ref + 1  << ')'
-        //     << '{' << this  <<  "}"
-        //     << std::endl;
-
-        // fflush(stdout);
-
-        ++Ref;
-        // IncDecMap[std::this_thread::get_id()].push_back(reinterpret_cast<uintptr_t>(this));
+    uint32 GetCount()
+    {
+        return Count.load();
     }
 
-    uint32 DecRef() {
-        // std::cout << "-- DEC FxRef " << std::this_thread::get_id()
-        //     << '(' << Ref - 1  << ')'
-        //     << '{' << this  <<  "}"
-        //     << std::endl;
+    void Inc() {
+        ++Count;
+    }
 
-        // fflush(stdout);
-
-        // uintptr_t ptr = reinterpret_cast<uintptr_t>(this);
-        // auto& vec = IncDecMap[std::this_thread::get_id()];
-        // for (int32 i = 0; i < vec.size(); i++) {
-        //     if (vec[i] == ptr) {
-        //         vec.erase(vec.begin() + i);
-        //         break;
-        //     }
-        // }
-
-        return (--Ref);
+    uint32 Dec() {
+        return (--Count);
     }
 };
-
-
 
 template <typename T>
 class FxRef
 {
-private:
-    FxRef(FxRefInfoBlock* info_block, T* ptr)
+public:
+    FxRef(nullptr_t np)
+        : mRefCnt(nullptr), mPtr(nullptr)
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(mMutex);
-    #endif
+    }
 
-        mInfo = info_block;
+    /**
+     * Constructs a new FxRef from a pointer.
+     */
+    FxRef(T* ptr)
+    {
+        mRefCnt = new FxRefCount;
         mPtr = ptr;
     }
 
-public:
-    FxRef(nullptr_t np)
-        : FxRef(nullptr, nullptr)
+    /**
+     * Inherits from another FxRef that has a type that is convertible to T.
+     *
+     * @tparam U The type of the other FxRef
+     */
+    template <typename U> requires std::is_base_of_v<T, U>
+    FxRef(const FxRef<U>& other)
     {
-    }
 
-    FxRef(T* ptr)
-    {
-        this->FromPtr(ptr);
-    }
-
-    // void PrintMap()
-    // {
-    //     for (auto v : mInfo->IncDecMap) {
-    //         std::cout << "Thread: " << v.first << " ; ";
-    //         for (uintptr_t value : v.second) {
-    //             std::cout << value << " ";
-    //         }
-    //         std::cout << std::endl;
-    //     }
-    // }
-
-    FxRef(FxRef& other)
-    {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard guard(other.mMutex);
-    #endif
-
-        mInfo = other.mInfo;
+        mRefCnt = other.mRefCnt;
         mPtr = other.mPtr;
 
-        if (mInfo) {
-            mInfo->IncRef();
+        if (mRefCnt) {
+            mRefCnt->Inc();
         }
     }
 
-    template <typename U>
-    FxRef(FxRef<U>& other)
+
+    /**
+     * Inherits from another FxRef that contains the same type.
+     */
+    FxRef(const FxRef& other)
+        : mRefCnt(other.mRefCnt), mPtr(other.mPtr)
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(other.mMutex);
-    #endif
-
-        mInfo = other.mInfo;
-        mPtr = other.mPtr;
-
-        if (mInfo) {
-            mInfo->IncRef();
+        if (mRefCnt) {
+            mRefCnt->Inc();
         }
     }
 
     FxRef(FxRef&& other)
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(other.mMutex);
-    #endif
-
-        mInfo = other.mInfo;
-        mPtr = other.mPtr;
+        mRefCnt = std::move(other.mRefCnt);
+        mPtr = std::move(other.mPtr);
 
         other.mPtr = nullptr;
-        other.mInfo = nullptr;
+        other.mRefCnt = nullptr;
     }
 
     ~FxRef()
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(mMutex);
-    #endif
-
-        if (!mInfo) {
-            return;
-        }
-
-        printf("Clearing ref to %s\n", typeid(T).name());
-
-        if (mInfo->DecRef() == 0) {
-
-//            FX_BREAKPOINT;
-            std::cout << "DIS THREAD {" << std::this_thread::get_id() << "}" << std::endl;
-
-            std::cout << "DEL FxRef " << this << " (" << typeid(T).name() << ")" << std::endl;
-
-            delete mPtr;
-            delete mInfo;
-        }
+        DecRef();
     }
 
-
-    void FromPtr(T* ptr)
+    /**
+     * Constructs a new FxRef for the given type using the provided arguments.
+     *
+     * @param args The arguments to be forwarded to the constructor of T.
+     */
+    template<typename... Args>
+    static FxRef<T> New(Args... args)
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(mMutex);
-    #endif
-
-        // mInfo = FxMemPool::Alloc<FxRefInfoBlock>(sizeof(FxRefInfoBlock));
-        std::cout << "CR new FxRef " << this << std::endl;
-
-        mInfo = new FxRefInfoBlock;
-        mPtr = ptr;
+        return FxRef<T>(new T(std::forward<Args>(args)...));
     }
 
     T* Get()
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(mMutex);
-    #endif
-
         return mPtr;
     }
 
     uint32 GetRefCount()
     {
-        if (mInfo) {
-            return mInfo->Ref.load();
+        if (mRefCnt) {
+            return mRefCnt->Count.load();
         }
         return 0;
     }
 
-    FxRef& operator = (const FxRef& other)
+
+    ///////////////////////////////
+    // Operator overloads
+    ///////////////////////////////
+
+    FxRef& operator = (const FxRef& other) noexcept
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(mMutex);
-    #endif
-
-        printf("Inheriting %s\n", typeid(T).name());
-
-
+        // If there is already a reference, decrement or destroy it
+        if (mPtr || mRefCnt) {
+            DecRef();
+        }
 
         mPtr = other.mPtr;
-        mInfo = other.mInfo;
+        mRefCnt = other.mRefCnt;
 
-        if (mInfo) {
-            mInfo->IncRef();
-        }
+        IncRef();
 
         return *this;
     }
 
-    FxRef& operator = (FxRef& other)
+    T* operator -> () const noexcept
     {
-    #ifdef FX_REF_USE_MUTEX
-        std::lock_guard<std::mutex> guard(mMutex);
-    #endif
-
-        mPtr = other.mPtr;
-        mInfo = other.mInfo;
-
-        printf("Inheriting %s\n", typeid(T).name());
-
-
-        if (mInfo) {
-            mInfo->IncRef();
-        }
-
-        return *this;
-    }
-
-    T* operator -> () const
-    {
-        FxAssert((mInfo != nullptr && mPtr != nullptr));
+        FxAssert((mRefCnt != nullptr && mPtr != nullptr));
 
         return mPtr;
     }
 
-    T& operator * () const
+    T& operator * () const noexcept
     {
-        FxAssert((mInfo != nullptr && mPtr != nullptr));
+        FxAssert((mRefCnt != nullptr && mPtr != nullptr));
 
         return *mPtr;
     }
 
+private:
+    /**
+     * Decrement the reference count and destroy the object if there are no other references.
+     */
+    void DecRef()
+    {
+        if (!mRefCnt) {
+            return;
+        }
+
+
+        if (mRefCnt->Dec() == 0) {
+            delete mPtr;
+            delete mRefCnt;
+
+            mPtr = nullptr;
+            mRefCnt = nullptr;
+        }
+    }
+
+    /**
+     * Increment the reference count if the FxRef is created.
+     */
+    void IncRef()
+    {
+        if (!mRefCnt) {
+            return;
+        }
+
+        mRefCnt->Inc();
+    }
+
+
 public:
-    FxRefInfoBlock* mInfo = nullptr;
+    FxRefCount* mRefCnt = nullptr;
     T* mPtr = nullptr;
 
 #ifdef FX_REF_USE_MUTEX

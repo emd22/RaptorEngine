@@ -51,7 +51,6 @@ public:
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        puts("Destroy muh queue");
         mQueue.clear();
     }
 

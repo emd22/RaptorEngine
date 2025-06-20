@@ -4,7 +4,7 @@
 
 #include <Core/FxDataNotifier.hpp>
 
-// #include <Core/FxRef.hpp>
+#include <Core/FxRef.hpp>
 
 /**
  * An asset base class for other assets to be derived from.
@@ -18,19 +18,14 @@ protected:
     {
     }
 
-    virtual void Destroy() = 0;
-
-    virtual ~FxBaseAsset()
-    {
-    }
 
     // template <typename T>
     // friend class FxRef;
 
 public:
 
-    using OnLoadFunc = void (*)(const std::shared_ptr<FxBaseAsset> asset);
-    using OnErrorFunc = void (*)(const std::shared_ptr<FxBaseAsset> asset);
+    using OnLoadFunc = void (*)(const FxRef<FxBaseAsset> asset);
+    using OnErrorFunc = void (*)(const FxRef<FxBaseAsset> asset);
 
     virtual void WaitUntilLoaded()
     {
@@ -39,6 +34,13 @@ public:
         }
 
         IsFinishedNotifier.WaitForData(true);
+    }
+
+
+    virtual void Destroy() = 0;
+
+    virtual ~FxBaseAsset()
+    {
     }
 
     /**

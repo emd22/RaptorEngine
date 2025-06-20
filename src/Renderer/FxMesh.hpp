@@ -131,8 +131,6 @@ public:
         }
         IsReady = false;
 
-
-        puts("Destroying MUHHHHHH Mesh!");
         mVertexBuffer.Destroy();
         mIndexBuffer.Destroy();
     }

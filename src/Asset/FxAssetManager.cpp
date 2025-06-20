@@ -113,9 +113,9 @@ void FxAssetManager::Shutdown()
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxModel>(std::shared_ptr<FxModel> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string& path)
 {
-    auto loader = std::make_shared<FxGltfLoader>();
+    auto loader = FxRef<FxGltfLoader>::New();
 
     FxAssetQueueItem queue_item(
         (loader),
@@ -133,9 +133,9 @@ void FxAssetManager::LoadAsset<FxModel>(std::shared_ptr<FxModel> asset, const st
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxImage>(std::shared_ptr<FxImage> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string& path)
 {
-    auto loader = std::shared_ptr<FxJpegLoader>(new FxJpegLoader);
+    auto loader = FxRef<FxJpegLoader>::New();
 
     FxAssetQueueItem queue_item(
         (loader),

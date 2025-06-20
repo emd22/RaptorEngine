@@ -9,5 +9,5 @@ public:
 
 
 public:
-    std::shared_ptr<FxImage> mDiffuse;
+    FxRef<FxImage> mDiffuse;
 };

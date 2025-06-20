@@ -62,16 +62,16 @@ public:
     static FxAssetManager &GetInstance();
 
     template <typename T>
-    static std::shared_ptr<T> NewAsset()
+    static FxRef<T> NewAsset()
     {
         // return PtrContainer<T>::New();
-        return std::make_shared<T>();
+        return FxRef<T>::New();
     }
 
     template <typename T>
-    static std::shared_ptr<T> LoadAsset(const std::string& path)
+    static FxRef<T> LoadAsset(const std::string& path)
     {
-        std::shared_ptr<T> asset = std::make_shared<T>();
+        FxRef<T> asset = FxRef<T>::New();
         LoadAsset<T>(asset, path);
 
         return asset;
@@ -79,7 +79,7 @@ public:
 
     // Specializations in cpp file
     template <typename T>
-    static void LoadAsset(std::shared_ptr<T> asset, const std::string& path)
+    static void LoadAsset(FxRef<T> asset, const std::string& path)
     {
         if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
             static_assert(0, "Asset type is not implemented!");

@@ -23,7 +23,6 @@ public:
 
     ~FxModel() override
     {
-        puts("WHERE ME?????");
         Destroy();
     }
 

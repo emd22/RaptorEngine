@@ -21,8 +21,8 @@ struct FxAssetQueueItem
 
     template <typename LoaderType, typename AssetType>
     FxAssetQueueItem(
-        std::shared_ptr<LoaderType> loader,
-        std::shared_ptr<AssetType> asset,
+        FxRef<LoaderType>& loader,
+        FxRef<AssetType>& asset,
         FxAssetType type,
         const std::string& path
     )
@@ -67,8 +67,8 @@ struct FxAssetQueueItem
 
     std::string Path;
 
-    std::shared_ptr<FxBaseLoader> Loader{nullptr};
-    std::shared_ptr<FxBaseAsset> Asset{nullptr};
+    FxRef<FxBaseLoader> Loader{nullptr};
+    FxRef<FxBaseAsset> Asset{nullptr};
 
     FxAssetType AssetType;
 };
