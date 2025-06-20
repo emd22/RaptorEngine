@@ -3,21 +3,11 @@
 #include <atomic>
 #include <cstddef>
 
-// #include <Asset/FxModel.hpp>
+#include "FxMemPool.hpp"
 
-// #include "FxMemPool.hpp"
 #include "FxPanic.hpp"
 
 #include "Types.hpp"
-
-#include <thread>
-#include <iostream>
-
-#include <mutex>
-#include <map>
-
-
-// #define FX_REF_USE_MUTEX 1
 
 
 struct FxRefCount
@@ -52,7 +42,10 @@ public:
      */
     FxRef(T* ptr)
     {
-        mRefCnt = new FxRefCount;
+        // mRefCnt = new FxRefCount;
+        mRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
+        new (mRefCnt) FxRefCount();
+
         mPtr = ptr;
     }
 
@@ -107,7 +100,10 @@ public:
     template<typename... Args>
     static FxRef<T> New(Args... args)
     {
-        return FxRef<T>(new T(std::forward<Args>(args)...));
+        T* ptr = FxMemPool::Alloc<T>(sizeof(T));
+        new (ptr) T(std::forward<Args>(args)...);
+
+        return FxRef<T>(ptr);
     }
 
     T* Get()
@@ -169,8 +165,10 @@ private:
 
 
         if (mRefCnt->Dec() == 0) {
-            delete mPtr;
-            delete mRefCnt;
+            mPtr->~T();
+            FxMemPool::Free<T>(mPtr);
+
+            FxMemPool::Free<FxRefCount>(mRefCnt);
 
             mPtr = nullptr;
             mRefCnt = nullptr;

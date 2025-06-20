@@ -57,7 +57,7 @@ public:
     template <typename T>
     static void Free(T* ptr)
     {
-        Free(static_cast<T*>(ptr));
+        FxMemPool::Free(static_cast<void*>(ptr));
     }
 
     void PrintAllocations() const;
