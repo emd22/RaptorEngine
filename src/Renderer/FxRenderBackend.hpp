@@ -2,6 +2,8 @@
 
 #include <Math/Vec2.hpp>
 
+#include <Core/FxRef.hpp>
+
 #include <Renderer/FxWindow.hpp>
 
 // TODO: make base versions of these components
@@ -15,7 +17,6 @@
 #include <Renderer/Backend/Vulkan/FxDeletionObject.hpp>
 
 #include <deque>
-#include <memory>
 
 #include <vma/vk_mem_alloc.h>
 
@@ -35,11 +36,11 @@ public:
     virtual void Init(Vec2u window_size) = 0;
     virtual void Destroy() = 0;
 
-    virtual void SelectWindow(std::shared_ptr<FxWindow> window) = 0;
-    virtual std::shared_ptr<FxWindow> GetWindow() = 0;
+    virtual void SelectWindow(FxRef<FxWindow> window) = 0;
+    virtual FxRef<FxWindow> GetWindow() = 0;
 
-    virtual FrameResult BeginFrame(vulkan::RvkGraphicsPipeline &pipeline, Mat4f &MVPMatrix) = 0;
-    virtual void FinishFrame(vulkan::RvkGraphicsPipeline &pipeline) = 0;
+    virtual FrameResult BeginFrame(vulkan::RvkGraphicsPipeline& pipeline, Mat4f& MVPMatrix) = 0;
+    virtual void FinishFrame(vulkan::RvkGraphicsPipeline& pipeline) = 0;
 
     virtual void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
@@ -71,9 +72,6 @@ public:
     }
 
     uint32 GetFrameNumber() { return mFrameNumber; }
-
-protected:
-    // virtual
 
 public:
     bool Initialized = false;

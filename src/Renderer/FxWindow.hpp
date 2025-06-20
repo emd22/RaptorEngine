@@ -6,11 +6,13 @@
 #include <SDL3/SDL.h>
 #include <memory>
 
+#include <Core/FxRef.hpp>
+
 class FxWindow {
 public:
     FxWindow() = default;
 
-    FxWindow(const char *title, int32 width, int32 height)
+    FxWindow(const char* title, int32 width, int32 height)
     {
         Create(title, width, height);
     }
@@ -26,9 +28,9 @@ public:
         }
     }
 
-    static std::shared_ptr<FxWindow> New(const char *title, int32 width, int32 height)
+    static FxRef<FxWindow> New(const char* title, int32 width, int32 height)
     {
-        return std::shared_ptr<FxWindow>(new FxWindow(title, width, height));
+        return FxRef<FxWindow>::New(title, width, height);
     }
 
     SDL_Window *GetWindow() { return mWindow; }

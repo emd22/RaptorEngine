@@ -129,8 +129,11 @@ public:
         Type* ptr = static_cast<Type*>(AllocRaw(size, nullptr));
 
         // Use a placement new if the object is constructable with the provided arguments
-        if constexpr (std::is_constructible_v<Type*, Args...>) {
+        if constexpr (std::is_constructible_v<Type, Args...>) {
             new (ptr) Type(std::forward<Args>(args)...);
+        }
+        else {
+            printf("Not constructable %s\n", typeid(Type).name());
         }
 
         return ptr;
@@ -147,7 +150,7 @@ public:
         Type* ptr = static_cast<Type*>(AllocRaw(size, pool));
 
         // Use a placement new if the object is constructable with the provided arguments
-        if constexpr (std::is_constructible_v<Type*, Args...>) {
+        if constexpr (std::is_constructible_v<Type, Args...>) {
             new (ptr) Type(std::forward<Args>(args)...);
         }
 
@@ -160,7 +163,7 @@ public:
     template <typename Type>
     static void Free(Type* ptr, FxMemPool* pool = nullptr)
     {
-        if constexpr (std::is_destructible_v<Type*>) {
+        if constexpr (std::is_destructible_v<Type>) {
             ptr->~Type();
         }
 

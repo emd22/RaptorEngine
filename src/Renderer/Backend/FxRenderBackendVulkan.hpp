@@ -21,6 +21,8 @@
 
 #include <Renderer/Backend/Vulkan/RvkSynchro.hpp>
 
+#include <Core/FxRef.hpp>
+
 struct SDL_Window;
 
 namespace vulkan {
@@ -48,17 +50,17 @@ public:
     FrameResult BeginFrame(RvkGraphicsPipeline &pipeline, Mat4f &MVPMatrix) override;
     void FinishFrame(RvkGraphicsPipeline &pipeline) override;
 
-    void SelectWindow(std::shared_ptr<FxWindow> window) override
+    void SelectWindow(FxRef<FxWindow> window) override
     {
         mWindow = window;
     }
 
-    std::shared_ptr<FxWindow> GetWindow() override
+    FxRef<FxWindow> GetWindow() override
     {
         return mWindow;
     }
 
-    vulkan::RvkGpuDevice *GetDevice()
+    vulkan::RvkGpuDevice* GetDevice()
     {
         return &mDevice;
     }
@@ -91,7 +93,7 @@ public:
 
         mInDeletionQueue.store(true);
 
-        FxDeletionObject &object = mDeletionQueue.front();
+        FxDeletionObject& object = mDeletionQueue.front();
 
         // Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
 
@@ -127,11 +129,11 @@ private:
     void InitFrames();
     void DestroyFrames();
 
-    FrameResult GetNextSwapchainImage(RvkFrameData *frame);
+    FrameResult GetNextSwapchainImage(RvkFrameData* frame);
 
     ExtensionList &QueryInstanceExtensions(bool invalidate_previous = false);
-    ExtensionNames MakeInstanceExtensionList(ExtensionNames &user_requested_extensions);
-    ExtensionNames CheckExtensionsAvailable(ExtensionNames &requested_extensions);
+    ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
+    ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
 
     FxStaticArray<VkLayerProperties> GetAvailableValidationLayers();
 
@@ -150,7 +152,7 @@ private:
     VkInstance mInstance = nullptr;
     VkSurfaceKHR mWindowSurface = nullptr;
 
-    std::shared_ptr<FxWindow> mWindow = nullptr;
+    FxRef<FxWindow> mWindow = nullptr;
     vulkan::RvkGpuDevice mDevice;
 
     VkDebugUtilsMessengerEXT mDebugMessenger;

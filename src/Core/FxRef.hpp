@@ -151,6 +151,11 @@ public:
         return *mPtr;
     }
 
+    bool operator == (nullptr_t np) const noexcept
+    {
+        return mPtr == nullptr;
+    }
+
 private:
     /**
      * Decrement the reference count and destroy the object if there are no other references.

@@ -91,7 +91,7 @@ int main()
     const uint32 window_width = config.GetValue<uint32>("Width");
     const uint32 window_height = config.GetValue<uint32>("Height");
 
-    auto window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
+    FxRef<FxWindow> window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
 
     vulkan::FxRenderBackendVulkan renderer_state;
     SetRendererBackend(&renderer_state);
