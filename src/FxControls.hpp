@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/FxStaticArray.hpp>
+#include <Core/FxSizedArray.hpp>
 #include <Core/Types.hpp>
 
 #include <Math/Vec2.hpp>
@@ -116,7 +116,7 @@ public:
     WindowEventFunc OnQuit;
 
 private:
-    FxStaticArray<FxControl> mKeyMap;
+    FxSizedArray<FxControl> mKeyMap;
     bool mMouseCaptured = false;
 
     Vec2f mMouseDelta = Vec2f::Zero;

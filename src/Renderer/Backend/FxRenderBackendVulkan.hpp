@@ -41,7 +41,7 @@ public:
 public:
     FxRenderBackendVulkan() = default;
 
-    using ExtensionList = FxStaticArray<VkExtensionProperties>;
+    using ExtensionList = FxSizedArray<VkExtensionProperties>;
     using ExtensionNames = std::vector<const char *>;
 
     void Init(Vec2u window_size) override;
@@ -135,11 +135,11 @@ private:
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
     ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
 
-    FxStaticArray<VkLayerProperties> GetAvailableValidationLayers();
+    FxSizedArray<VkLayerProperties> GetAvailableValidationLayers();
 
 public:
     vulkan::RvkSwapchain Swapchain;
-    FxStaticArray<RvkFrameData> Frames;
+    FxSizedArray<RvkFrameData> Frames;
 
     VmaAllocator GpuAllocator = nullptr;
 

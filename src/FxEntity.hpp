@@ -4,6 +4,8 @@
 #include <Asset/FxModel.hpp>
 #include <Asset/FxImage.hpp>
 
+#include "FxMaterial.hpp"
+
 #include <Math/Vector.hpp>
 
 #include <Math/Mat4.hpp>
@@ -30,18 +32,22 @@ public:
         Children.reserve(4);
     }
 
-    void AddChild(FxEntity* entity)
+    void AddChild(FxRef<FxEntity>& entity)
     {
         Children.push_back(entity);
     }
 
-public:
-    FxVec3f Transform = FxVec3f::Zero;
-    FxVec3f Rotation = FxVec3f::Zero;
 
+    void Translate(const FxVec3f& offset)
+    {
+        mPosition += offset;
+    }
 
+private:
+    FxVec3f mPosition = FxVec3f::Zero;
+    FxVec3f mRotation = FxVec3f::Zero;
 
-    std::vector<FxEntity*> Children;
+    std::vector<FxRef<FxEntity>> Children;
 };
 
 class FxEntityManager
@@ -51,7 +57,7 @@ public:
 
     void Create(uint32 entities_per_page=64);
 
-    static FxEntity* NewEntity();
+    static FxRef<FxEntity> New();
 
 private:
     FxPagedArray<FxEntity> mEntityPool;
@@ -66,13 +72,23 @@ public:
     //     mScript = std::move(script);
     // }
 
-    // void AttachModel(std::unique_ptr<FxModel>& model)
-    // {
-    //     mModel = std::move(model);
-    // }
+
+    void BuildWriteDescriptors()
+    {
+
+    }
+
+    void Attach(const FxRef<FxMaterial>& material)
+    {
+        mMaterial = material;
+    }
+
+    void Attach(const FxRef<FxModel>& model)
+    {
+        mModel = model;
+    }
 
 private:
-
-    // std::unique_ptr<FxModel> mModel;
-    // std::unique_ptr<FxScript> mScript;
+    FxRef<FxModel> mModel{nullptr};
+    FxRef<FxMaterial> mMaterial{nullptr};
 };

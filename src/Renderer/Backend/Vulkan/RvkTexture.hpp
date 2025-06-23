@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/FxStaticArray.hpp>
+#include <Core/FxSizedArray.hpp>
 #include "RvkGpuBuffer.hpp"
 #include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
 #include "Fwd/Fwd_AddToDeletionQueue.hpp"
@@ -23,7 +23,7 @@ class RvkTexture
 public:
     RvkTexture() = default;
 
-    void Create(const FxStaticArray<uint8>& image_data, Vec2u dimensions, uint32 components)
+    void Create(const FxSizedArray<uint8>& image_data, Vec2u dimensions, uint32 components)
     {
         mDevice = Fx_Fwd_GetGpuDevice();
 

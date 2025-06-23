@@ -10,7 +10,7 @@ namespace vulkan {
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void RvkFramebuffer::Create(FxStaticArray<VkImageView> &image_views, RvkGraphicsPipeline &pipeline, Vec2u size)
+void RvkFramebuffer::Create(FxSizedArray<VkImageView> &image_views, RvkGraphicsPipeline &pipeline, Vec2u size)
 {
     AssertRendererExists();
 

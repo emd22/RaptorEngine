@@ -1,6 +1,6 @@
 #include "FxAssetManager.hpp"
 #include "Core/FxPanic.hpp"
-#include "Core/FxStaticArray.hpp"
+#include "Core/FxSizedArray.hpp"
 
 #include "FxModel.hpp"
 #include "FxImage.hpp"

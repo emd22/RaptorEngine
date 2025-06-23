@@ -3,7 +3,7 @@
 #include <string>
 
 #include <Core/Types.hpp>
-#include <Core/FxStaticArray.hpp>
+#include <Core/FxSizedArray.hpp>
 #include "FxBaseLoader.hpp"
 
 #include <jpeglib.h>
@@ -25,5 +25,5 @@ protected:
 
 private:
     struct jpeg_decompress_struct mJpegInfo;
-    FxStaticArray<uint8> mImageData;
+    FxSizedArray<uint8> mImageData;
 };

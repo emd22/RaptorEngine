@@ -6,7 +6,7 @@
 #include <Renderer/Backend/Vulkan/RvkDevice.hpp>
 
 #include <Core/FxPanic.hpp>
-#include <Core/FxStaticArray.hpp>
+#include <Core/FxSizedArray.hpp>
 #include <vector>
 
 #include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>
@@ -47,7 +47,7 @@ private:
 class RvkDescriptorSet
 {
 public:
-    void Create(RvkDescriptorPool &pool, VkDescriptorSetLayout layout, int32 number_of_writes);
+    void Create(const RvkDescriptorPool &pool, VkDescriptorSetLayout layout);
 
     // template <typename T>
     // void WriteBuffer(VkBuffer& buffer)
@@ -79,10 +79,20 @@ public:
 
     VkWriteDescriptorSet GetImageWriteDescriptor(uint32 bind_dest, const RvkTexture& texture, VkImageLayout layout, VkDescriptorType type);
 
-    void SubmitWrites(FxStaticArray<VkWriteDescriptorSet>& to_write)
+    void SubmitWrites(FxSizedArray<VkWriteDescriptorSet>& to_write)
     {
         vkUpdateDescriptorSets(mDevice->Device, to_write.Size, to_write.Data, 0, nullptr);
         // mDescriptorWrites.Clear();
+    }
+
+    static void BindMultiple(
+        const RvkCommandBuffer& cmd,
+        VkPipelineBindPoint bind_point,
+        const RvkGraphicsPipeline& pipeline,
+        FxSizedArray<VkDescriptorSet>& sets)
+    {
+        const VkDescriptorSet* sets_ptr = sets.Data;
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, static_cast<uint32>(sets.Size), sets_ptr, 0, nullptr);
     }
 
     void Bind(RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, RvkGraphicsPipeline &pipeline) const
@@ -94,6 +104,11 @@ public:
 
     void Destroy()
     {
+    }
+
+    bool IsInited() const
+    {
+        return Set != nullptr;
     }
 
     // ~DescriptorSet()

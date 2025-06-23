@@ -23,7 +23,7 @@ VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
 
-    FxStaticArray<VkVertexInputAttributeDescription> attribs = {
+    FxSizedArray<VkVertexInputAttributeDescription> attribs = {
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
         { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
         { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
@@ -44,8 +44,8 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list) {
         .pData = nullptr,
     };
 
-    FxStaticArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
-    FxStaticArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
+    FxSizedArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
+    FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
 
     for (ShaderInfo stage : shader_stages) {
         const VkPipelineShaderStageCreateInfo create_info = {
@@ -61,7 +61,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list) {
         shader_create_info.Insert(create_info);
     }
 
-    FxStaticArray<VkDynamicState> dynamic_states = {
+    FxSizedArray<VkDynamicState> dynamic_states = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
     };
@@ -206,8 +206,12 @@ void RvkGraphicsPipeline::Destroy()
     if (Layout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
     }
-    if (DescriptorSetLayout) {
-        vkDestroyDescriptorSetLayout(mDevice->Device, DescriptorSetLayout, nullptr);
+
+    if (MainDescriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(mDevice->Device, MainDescriptorSetLayout, nullptr);
+    }
+    if (MaterialDescriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(mDevice->Device, MaterialDescriptorSetLayout, nullptr);
     }
 
     RenderPass.Destroy(*mDevice);
@@ -230,7 +234,7 @@ void RvkGraphicsPipeline::CreateLayout() {
     };
 
     VkDescriptorSetLayoutBinding image_layout_binding {
-        .binding = 1,
+        .binding = 0,
         .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -245,29 +249,44 @@ void RvkGraphicsPipeline::CreateLayout() {
     //     .pImmutableSamplers = nullptr,
     // };
 
-    VkDescriptorSetLayoutBinding bindings[] = {
-        ubo_layout_binding, //sampler_layout_binding,
-        image_layout_binding
-    };
+    // VkDescriptorSetLayoutBinding bindings[] = {
+    //     ubo_layout_binding, //sampler_layout_binding,
+    //     image_layout_binding
+    // };
 
-    VkDescriptorSetLayoutCreateInfo descriptor_set_layout_info {
+    VkDescriptorSetLayoutCreateInfo ds_layout_info {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = sizeof(bindings) / sizeof(bindings[0]),
-        .pBindings = bindings,
+        .bindingCount = 1,
+        .pBindings = &ubo_layout_binding,
     };
 
     VkResult status;
 
-    status = vkCreateDescriptorSetLayout(mDevice->Device, &descriptor_set_layout_info, nullptr, &DescriptorSetLayout);
+    status = vkCreateDescriptorSetLayout(mDevice->Device, &ds_layout_info, nullptr, &MainDescriptorSetLayout);
     if (status != VK_SUCCESS) {
         FxModulePanic("Failed to create pipeline descriptor set layout", status);
     }
 
+    VkDescriptorSetLayoutCreateInfo mat_layout_info {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1,
+        .pBindings = &image_layout_binding,
+    };
+
+    status = vkCreateDescriptorSetLayout(mDevice->Device, &mat_layout_info, nullptr, &MaterialDescriptorSetLayout);
+    if (status != VK_SUCCESS) {
+        FxModulePanic("Failed to create pipeline descriptor set layout", status);
+    }
+
+    VkDescriptorSetLayout layouts[] = {
+        MainDescriptorSetLayout,
+        MaterialDescriptorSetLayout,
+    };
 
     VkPipelineLayoutCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &DescriptorSetLayout,
+        .setLayoutCount = sizeof(layouts) / sizeof(layouts[0]),
+        .pSetLayouts = layouts,
 
         .pushConstantRangeCount = 1,
         .pPushConstantRanges = &buffer_range,

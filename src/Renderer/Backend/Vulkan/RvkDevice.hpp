@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/FxStaticArray.hpp"
+#include "Core/FxSizedArray.hpp"
 #include "vulkan/vulkan_core.h"
 #include <Core/Types.hpp>
 
@@ -47,7 +47,7 @@ private:
     bool FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index);
 
 public:
-    FxStaticArray<VkQueueFamilyProperties> RawFamilies;
+    FxSizedArray<VkQueueFamilyProperties> RawFamilies;
 private:
     uint32 mGraphicsIndex = QueueNull;
     uint32 mPresentIndex = QueueNull;
@@ -72,8 +72,8 @@ public:
 
     VkSurfaceFormatKHR GetBestSurfaceFormat();
 
-    operator VkDevice() const { return Device; }
-    operator VkPhysicalDevice() const { return Physical; }
+    operator VkDevice () const { return Device; }
+    operator VkPhysicalDevice () const { return Physical; }
 
 private:
     bool IsPhysicalDeviceSuitable(VkPhysicalDevice &device);

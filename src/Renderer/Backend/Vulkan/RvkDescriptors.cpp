@@ -24,7 +24,7 @@ void RvkDescriptorPool::Create(RvkGpuDevice* device, uint32 max_sets)
 
 }
 
-void RvkDescriptorSet::Create(RvkDescriptorPool& pool, VkDescriptorSetLayout layout, int32 number_of_writes)
+void RvkDescriptorSet::Create(const RvkDescriptorPool& pool, VkDescriptorSetLayout layout)
 {
     mDevice = pool.mDevice;
 
@@ -60,8 +60,5 @@ VkWriteDescriptorSet RvkDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest,
 
     return write;
 }
-
-
-
 
 }

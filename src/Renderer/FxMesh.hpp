@@ -17,12 +17,12 @@ public:
 
     using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
 
-    FxMesh(FxStaticArray<VertexType> &vertices)
+    FxMesh(FxSizedArray<VertexType> &vertices)
     {
         UploadVertices(vertices);
     }
 
-    FxMesh(FxStaticArray<VertexType> &vertices, FxStaticArray<uint32> &indices)
+    FxMesh(FxSizedArray<VertexType> &vertices, FxSizedArray<uint32> &indices)
     {
         CreateFromData(vertices, indices);
     }
@@ -39,18 +39,18 @@ public:
     //     return *this;
     // }
 
-    void CreateFromData(FxStaticArray<VertexType> &vertices, FxStaticArray<uint32> &indices)
+    void CreateFromData(FxSizedArray<VertexType> &vertices, FxSizedArray<uint32> &indices)
     {
         UploadVertices(vertices);
         UploadIndices(indices);
     }
 
-    void UploadVertices(FxStaticArray<VertexType> &vertices)
+    void UploadVertices(FxSizedArray<VertexType> &vertices)
     {
         mVertexBuffer.Create(RvkBufferUsageType::Vertices, vertices);
     }
 
-    void UploadIndices(FxStaticArray<uint32> &indices)
+    void UploadIndices(FxSizedArray<uint32> &indices)
     {
         mIndexBuffer.Create(RvkBufferUsageType::Indices, indices);
     }
@@ -69,11 +69,11 @@ public:
     //     return *this;
     // }
 
-    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(const FxStaticArray<float32>& positions, const FxStaticArray<float32>& normals, const FxStaticArray<float32>& uvs)
+    static FxSizedArray<VertexType> MakeCombinedVertexBuffer(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals, const FxSizedArray<float32>& uvs)
     {
         FxAssert((normals.Size == positions.Size));
 
-        FxStaticArray<VertexType> vertices(positions.Size / 3);
+        FxSizedArray<VertexType> vertices(positions.Size / 3);
 
         // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
         const bool has_texcoords = uvs.Size > 0;
@@ -118,7 +118,6 @@ public:
         vkCmdBindVertexBuffers(frame->CommandBuffer.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        frame->DescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
         vkCmdDrawIndexed(frame->CommandBuffer.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
         // vkCmdDraw(frame->CommandBuffer.CommandBuffer, mVertexBuffer.Size, 1, 0, 0);

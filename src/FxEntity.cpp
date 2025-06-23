@@ -11,7 +11,7 @@ void FxEntityManager::Create(uint32 entities_per_page)
     GetGlobalManager().mEntityPool.Create(entities_per_page);
 }
 
-FxEntity* FxEntityManager::NewEntity()
+FxRef<FxEntity> FxEntityManager::New()
 {
     FxEntityManager& global_manager = GetGlobalManager();
 
@@ -19,5 +19,5 @@ FxEntity* FxEntityManager::NewEntity()
         global_manager.Create();
     }
 
-    return global_manager.mEntityPool.Insert();
+    return FxRef<FxEntity>::New(global_manager.mEntityPool.Insert());
 }

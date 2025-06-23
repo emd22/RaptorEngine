@@ -5,7 +5,7 @@ layout(location = 0) out vec4 OutColor;
 layout(location = 0) in vec3 Normal;
 layout(location = 1) in vec2 Texcoord;
 
-layout(binding = 1) uniform sampler2D TextureSampler;
+layout(set = 1, binding = 0) uniform sampler2D TextureSampler;
 
 // layout(set = 0, binding = 0) uniform sampler2D Texture;
 

@@ -11,9 +11,7 @@ class FxModel : public FxBaseAsset
 {
 protected:
 public:
-    FxModel()
-    {
-    }
+    FxModel() = default;
 
     friend class FxAssetManager;
 

@@ -7,7 +7,7 @@
 
 #include "RvkFramebuffer.hpp"
 
-#include <Core/FxStaticArray.hpp>
+#include <Core/FxSizedArray.hpp>
 #include <Math/Vector.hpp>
 
 class RvkGpuDevice;
@@ -35,12 +35,12 @@ private:
     void DestroyInternalSwapchain();
 
 public:
-    FxStaticArray<VkImageView> ImageViews;
-    FxStaticArray<VkImage> Images;
+    FxSizedArray<VkImageView> ImageViews;
+    FxSizedArray<VkImage> Images;
 
-    FxStaticArray<RvkImage> DepthImages;
+    FxSizedArray<RvkImage> DepthImages;
 
-    FxStaticArray<RvkFramebuffer> Framebuffers;
+    FxSizedArray<RvkFramebuffer> Framebuffers;
 
     Vec2u Extent = Vec2u::Zero;
 

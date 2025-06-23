@@ -61,12 +61,12 @@ ExtensionNames FxRenderBackendVulkan::CheckExtensionsAvailable(ExtensionNames &r
     return missing_extensions;
 }
 
-FxStaticArray<VkLayerProperties> FxRenderBackendVulkan::GetAvailableValidationLayers()
+FxSizedArray<VkLayerProperties> FxRenderBackendVulkan::GetAvailableValidationLayers()
 {
     uint32 layer_count;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-    FxStaticArray<VkLayerProperties> validation_layers;
+    FxSizedArray<VkLayerProperties> validation_layers;
     validation_layers.InitSize(layer_count);
 
     vkEnumerateInstanceLayerProperties(&layer_count, validation_layers.Data);
@@ -627,13 +627,13 @@ void FxRenderBackendVulkan::CreateSurfaceFromWindow()
     }
 }
 
+
 void FxRenderBackendVulkan::Destroy()
 {
     GetDevice()->WaitForIdle();
 
     DestroyUploadContext();
     DestroyFrames();
-
 
     while (!mDeletionQueue.empty()) {
         ProcessDeletionQueue(true);

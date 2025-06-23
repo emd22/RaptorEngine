@@ -68,7 +68,7 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain) {
                 | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
     };
 
-    FxStaticArray attachments = {
+    FxSizedArray attachments = {
         color_attachment,
         depth_attachment
     };

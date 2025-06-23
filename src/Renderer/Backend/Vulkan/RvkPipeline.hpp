@@ -3,7 +3,7 @@
 #include "ShaderList.hpp"
 #include "RvkRenderPass.hpp"
 
-#include <Core/FxStaticArray.hpp>
+#include <Core/FxSizedArray.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -47,7 +47,7 @@ struct RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
 struct VertexInfo
 {
     VkVertexInputBindingDescription binding;
-    FxStaticArray<VkVertexInputAttributeDescription> attributes;
+    FxSizedArray<VkVertexInputAttributeDescription> attributes;
 };
 
 
@@ -74,7 +74,9 @@ private:
     void CreateLayout();
 
 public:
-    VkDescriptorSetLayout DescriptorSetLayout = nullptr;
+    VkDescriptorSetLayout MainDescriptorSetLayout = nullptr;
+    VkDescriptorSetLayout MaterialDescriptorSetLayout = nullptr;
+    // VkDescriptorSetLayout DescriptorSetLayout = nullptr;
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;
 

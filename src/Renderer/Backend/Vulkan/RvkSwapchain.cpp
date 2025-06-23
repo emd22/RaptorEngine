@@ -150,7 +150,7 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline)
     Framebuffers.Free();
     Framebuffers.InitSize(ImageViews.Size);
 
-    FxStaticArray<VkImageView> temp_views;
+    FxSizedArray<VkImageView> temp_views;
     temp_views.InitSize(2);
 
     for (int i = 0; i < ImageViews.Size; i++) {

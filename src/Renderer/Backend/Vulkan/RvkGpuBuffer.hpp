@@ -163,7 +163,7 @@ public:
         MappedBuffer = nullptr;
     }
 
-    void Upload(const FxStaticArray<ElementType> &data)
+    void Upload(const FxSizedArray<ElementType> &data)
     {
         auto buffer = GetMappedContext();
         memcpy(buffer, data.Data, data.GetSizeInBytes());
@@ -211,7 +211,7 @@ private:
 public:
     RvkGpuBuffer() = default;
 
-    void Create(RvkBufferUsageType usage, FxStaticArray<ElementType> &data)
+    void Create(RvkBufferUsageType usage, FxSizedArray<ElementType> &data)
     {
         this->Size = data.Size;
         Usage = usage;

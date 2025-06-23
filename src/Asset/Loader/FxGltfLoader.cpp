@@ -10,9 +10,9 @@
 
 void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
 {
-    FxStaticArray<float32> positions;
-    FxStaticArray<float32> normals;
-    FxStaticArray<float32> uvs;
+    FxSizedArray<float32> positions;
+    FxSizedArray<float32> normals;
+    FxSizedArray<float32> uvs;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto *attribute = &primitive->attributes[i];
@@ -59,7 +59,7 @@ void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
         auto *primitive = &gltf_mesh->primitives[i];
 
-        FxStaticArray<uint32> indices;
+        FxSizedArray<uint32> indices;
 
         FxMesh *mesh = new FxMesh;
 

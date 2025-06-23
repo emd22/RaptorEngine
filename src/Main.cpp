@@ -1,4 +1,5 @@
 
+#include "vulkan/vulkan_core.h"
 #define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
 
 #include <ThirdParty/vk_mem_alloc.h>
@@ -30,6 +31,8 @@
 #include "FxControls.hpp"
 #include <Math/Mat4.hpp>
 #include <Asset/FxConfigFile.hpp>
+
+#include "FxMaterial.hpp"
 
 #include <csignal>
 
@@ -121,8 +124,10 @@ int main()
 
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
+    FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
 
     asset_manager.Start(2);
+    material_manager.Create();
 
     // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
@@ -133,8 +138,13 @@ int main()
 
     test_image->WaitUntilLoaded();
 
+
+    FxRef<FxMaterial> material = FxMaterialManager::New("Default");
+    material->Attach(FxMaterial::ResourceType::Diffuse, test_image);
+    material->Build(pipeline);
+
     for (RvkFrameData& frame : RendererVulkan->Frames) {
-        frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.DescriptorSetLayout, 3);
+        frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.MainDescriptorSetLayout);
 
         VkDescriptorBufferInfo ubo_info{
             .buffer = frame.UniformBuffer.Buffer,
@@ -152,21 +162,21 @@ int main()
             .pBufferInfo = &ubo_info,
         };
 
-        VkDescriptorImageInfo image_info{
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .imageView = test_image->Texture.Image.View,
-            .sampler = test_image->Texture.Sampler
-        };
+        // VkDescriptorImageInfo image_info{
+        //     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        //     .imageView = test_image->Texture.Image.View,
+        //     .sampler = test_image->Texture.Sampler
+        // };
 
-        VkWriteDescriptorSet image_write{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
-            .dstSet = frame.DescriptorSet,
-            .dstBinding = 1,
-            .dstArrayElement = 0,
-            .pImageInfo = &image_info,
-        };
+        // VkWriteDescriptorSet image_write{
+        //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        //     .descriptorCount = 1,
+        //     .dstSet = frame.DescriptorSet,
+        //     .dstBinding = 1,
+        //     .dstArrayElement = 0,
+        //     .pImageInfo = &image_info,
+        // };
         // auto buffer_write = frame.DescriptorSet.GetBufferWrite(0, frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
         // auto image_write = frame.DescriptorSet.GetImageWrite(
         //     1,
@@ -175,7 +185,7 @@ int main()
         //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
         // );
 
-        const VkWriteDescriptorSet writes[] = { buffer_write, image_write };
+        const VkWriteDescriptorSet writes[] = { buffer_write };
 
         vkUpdateDescriptorSets(RendererVulkan->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
 
@@ -191,6 +201,9 @@ int main()
     camera.Position.Z += 5.0f;
 
     Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+
+    FxSizedArray<VkDescriptorSet> sets_to_bind;
+    sets_to_bind.InitSize(2);
 
 
     while (Running) {
@@ -244,6 +257,19 @@ int main()
 
         CheckGeneralControls();
 
+        RvkFrameData* frame = RendererVulkan->GetFrame();
+
+
+        sets_to_bind[0] = frame->DescriptorSet.Set;
+        sets_to_bind[1] = material->mDescriptorSet.Set;
+
+        RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, sets_to_bind);
+
+
+        // frame->DescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+        // material->mDescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
         // new_model->Render(pipeline);
         other_model->Render(pipeline);
 
@@ -256,6 +282,7 @@ int main()
 
     test_image->Destroy();
 
+    material_manager.Destroy();
     asset_manager.Shutdown();
 
     std::cout << "this thread: " << std::this_thread::get_id() << std::endl;

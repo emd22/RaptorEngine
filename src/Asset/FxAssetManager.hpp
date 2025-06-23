@@ -112,7 +112,7 @@ private:
     std::atomic_flag ItemsEnqueued;
 
     int32 mThreadCount = 2;
-    // FxStaticArray<std::thread *> mWorkerThreads;
-    FxStaticArray<FxAssetWorker> mWorkerThreads;
+    // FxSizedArray<std::thread *> mWorkerThreads;
+    FxSizedArray<FxAssetWorker> mWorkerThreads;
     std::thread *mAssetManagerThread;
 };
