@@ -6,12 +6,11 @@
 FX_SET_MODULE_NAME("Renderer")
 
 FxRenderBackend *Renderer;
-vulkan::FxRenderBackendVulkan *RendererVulkan;
 
 void SetRendererBackend(FxRenderBackend *backend)
 {
     Renderer = backend;
-    RendererVulkan = static_cast<vulkan::FxRenderBackendVulkan *>(Renderer);
+    Renderer = static_cast<FxRenderBackend *>(Renderer);
 }
 
 void AssertRendererExists()

@@ -1,14 +1,10 @@
 #pragma once
 
-#include "Renderer/Backend/Vulkan/RvkFrameData.hpp"
+#include "Backend/RvkFrameData.hpp"
+#include "Backend/RvkGpuBuffer.hpp"
 #include "Renderer/Renderer.hpp"
-#include "vulkan/vulkan_core.h"
-#include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>
+
 #include <atomic>
-
-// TEMP
-using namespace vulkan;
-
 
 class FxMesh
 {
@@ -113,7 +109,7 @@ public:
     void Render(RvkGraphicsPipeline &pipeline)
     {
         const VkDeviceSize offset = 0;
-        RvkFrameData *frame = RendererVulkan->GetFrame();
+        RvkFrameData *frame = Renderer->GetFrame();
 
         vkCmdBindVertexBuffers(frame->CommandBuffer.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);

@@ -1,10 +1,12 @@
 #include "FxMaterial.hpp"
-#include "Renderer/Backend/Vulkan/RvkPipeline.hpp"
+#include <Renderer/Backend/RvkPipeline.hpp>
 #include "vulkan/vulkan_core.h"
 
 #include <Core/Defines.hpp>
 #include <Renderer/Renderer.hpp>
-#include <Renderer/Backend/Vulkan/RvkDevice.hpp>
+#include <Renderer/Backend/RvkDevice.hpp>
+
+#include <Renderer/Backend/RvkCommands.hpp>
 
 #include <Core/FxStackArray.hpp>
 
@@ -26,10 +28,10 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     GetGlobalManager().mMaterials.Create(entities_per_page);
 
-    vulkan::RvkDescriptorPool& dp = mDescriptorPool;
+    RvkDescriptorPool& dp = mDescriptorPool;
 
     dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
-    dp.Create(RendererVulkan->GetDevice(), MaxMaterials);
+    dp.Create(Renderer->GetDevice(), MaxMaterials);
 
     mInitialized = true;
 }
@@ -56,7 +58,7 @@ void FxMaterialManager::Destroy()
         return;
     }
 
-    vkDestroyDescriptorPool(RendererVulkan->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
+    vkDestroyDescriptorPool(Renderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
 
     mInitialized = false;
 }
@@ -90,13 +92,31 @@ void FxMaterialManager::Destroy()
 //     return mSetLayout;
 // }
 
+void FxMaterial::Bind(RvkCommandBuffer* cmd)
+{
+    if (!mIsBuilt.load()) {
+        Log::Warning("Material %s is not built!", Name.c_str());
+        return;
+    }
+
+    if (!mDescriptorSet) {
+        return;
+    }
+
+    if (!cmd) {
+        cmd = &Renderer->GetFrame()->CommandBuffer;
+    }
+
+    mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
+}
+
 void FxMaterial::Destroy()
 {
     if (!mIsBuilt.load()) {
         return;
     }
 
-    vkDestroyDescriptorSetLayout(RendererVulkan->GetDevice()->Device, mSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
 
     mIsBuilt.store(false);
 }
@@ -120,23 +140,25 @@ void FxMaterial::Destroy()
         image_infos.Insert(image_write); \
     }
 
-void FxMaterial::Build(vulkan::RvkGraphicsPipeline& pipeline)
+void FxMaterial::Build(RvkGraphicsPipeline* pipeline)
 {
+    Pipeline = pipeline;
+
     if (!mDescriptorSet.IsInited()) {
-        mDescriptorSet.Create(FxMaterialManager::GetPool(), pipeline.MaterialDescriptorSetLayout);
+        mDescriptorSet.Create(FxMaterialManager::GetPool(), Pipeline->MaterialDescriptorSetLayout);
     }
 
     constexpr const int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
     FxStackArray<VkWriteDescriptorSet, max_images> image_infos;
 
-    vulkan::RvkDescriptorSet& descriptor_set = mDescriptorSet;
+    RvkDescriptorSet& descriptor_set = mDescriptorSet;
 
     // Push material textures
     PUSH_IMAGE_IF_SET(Diffuse, 0);
     // PUSH_IMAGE_IF_SET(Normal);
 
 
-    vkUpdateDescriptorSets(RendererVulkan->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
+    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
 
     // Mark material as built
     mIsBuilt.store(true);

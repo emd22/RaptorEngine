@@ -192,7 +192,7 @@ public:
         return Data[index];
     }
 
-    FxSizedArray<ElementType> operator = (std::initializer_list<ElementType>& list)
+    FxSizedArray<ElementType>& operator = (std::initializer_list<ElementType>& list)
     {
         const size_t list_size = list.size();
         if (list_size > Capacity) {
@@ -209,7 +209,7 @@ public:
         return *this;
     }
 
-    FxSizedArray<ElementType> operator = (FxSizedArray<ElementType>&& other)
+    FxSizedArray<ElementType>& operator = (FxSizedArray<ElementType>&& other)
     {
         if (Data) {
             Free();

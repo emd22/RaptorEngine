@@ -5,10 +5,9 @@
 #include <Core/FxHash.hpp>
 #include <Core/Log.hpp>
 
-#include <Renderer/Backend/Vulkan/RvkDescriptors.hpp>
+#include <Renderer/Backend/RvkDescriptors.hpp>
 
 #include <vulkan/vulkan.h>
-
 
 class FxMaterial
 {
@@ -33,7 +32,9 @@ public:
         }
     }
 
-    void Build(vulkan::RvkGraphicsPipeline& pipeline);
+    void Bind(RvkCommandBuffer* cmd);
+
+    void Build(RvkGraphicsPipeline* pipeline);
     void Destroy();
 
     ~FxMaterial()
@@ -50,9 +51,11 @@ public:
     FxHash NameHash{0};
     std::string Name = "";
 
-    vulkan::RvkDescriptorSet mDescriptorSet;
+    RvkDescriptorSet mDescriptorSet;
+    RvkGraphicsPipeline* Pipeline = nullptr;
+
 private:
-    VkDescriptorSetLayout mSetLayout{nullptr};
+    VkDescriptorSetLayout mSetLayout = nullptr;
 
     std::atomic_bool mIsBuilt = false;
 };
@@ -71,7 +74,7 @@ public:
     static FxRef<FxMaterial> New(const std::string& name);
 
 
-    static vulkan::RvkDescriptorPool& GetPool()
+    static RvkDescriptorPool& GetPool()
     {
         return GetGlobalManager().mDescriptorPool;
     }
@@ -80,7 +83,7 @@ public:
 
 private:
     FxPagedArray<FxMaterial> mMaterials;
-    vulkan::RvkDescriptorPool mDescriptorPool;
+    RvkDescriptorPool mDescriptorPool;
 
     bool mInitialized = false;
 };

@@ -3,7 +3,7 @@
 #include <Core/Defines.hpp>
 
 #include <Core/Log.hpp>
-#include <Renderer/Backend/Vulkan/Util.hpp>
+#include <Renderer/Backend/Util.hpp>
 
 #include <vulkan/vulkan.h>
 

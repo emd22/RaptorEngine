@@ -2,7 +2,7 @@
 
 #include "FxBaseAsset.hpp"
 
-#include <Renderer/Backend/Vulkan/RvkTexture.hpp>
+#include <Renderer/Backend/RvkTexture.hpp>
 
 #include <Core/FxStaticPtrArray.hpp>
 
@@ -37,7 +37,7 @@ public:
     }
 
 public:
-    vulkan::RvkTexture Texture;
+    RvkTexture Texture;
 
     uint32 NumComponents = 3;
     Vec2u Size = Vec2u::Zero;

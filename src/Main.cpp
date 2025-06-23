@@ -5,12 +5,11 @@
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include "Core/Defines.hpp"
-#include "Renderer/Backend/Vulkan/RvkFrameData.hpp"
+#include <Renderer/Backend/RvkFrameData.hpp>
 #include "Renderer/Constants.hpp"
 #include "Renderer/Renderer.hpp"
-#include "Renderer/Backend/Vulkan/ShaderList.hpp"
-#include "Renderer/Backend/Vulkan/RvkShader.hpp"
-#include "Renderer/Backend/Vulkan/RvkTexture.hpp"
+#include "Renderer/Backend/ShaderList.hpp"
+#include "Renderer/Backend/RvkShader.hpp"
 #include "Renderer/FxCamera.hpp"
 
 #include <Core/FxMemPool.hpp>
@@ -33,6 +32,7 @@
 #include <Asset/FxConfigFile.hpp>
 
 #include "FxMaterial.hpp"
+#include "FxEntity.hpp"
 
 #include <csignal>
 
@@ -71,6 +71,20 @@ void FirstTestFunc(FxRef<int> test_num)
     SecondTestFunc(test_num);
 }
 
+void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
+{
+    ShaderList shader_list;
+
+    RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
+    RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
+
+    shader_list.Vertex = vertex_shader.ShaderModule;
+    shader_list.Fragment = fragment_shader.ShaderModule;
+
+    pipeline.Create(shader_list);
+
+}
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100000);
@@ -96,31 +110,20 @@ int main()
 
     FxRef<FxWindow> window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
 
-    vulkan::FxRenderBackendVulkan renderer_state;
+    FxRenderBackend renderer_state;
     SetRendererBackend(&renderer_state);
 
     Renderer->SelectWindow(window);
     Renderer->Init(Vec2u(window_width, window_height));
 
-    vulkan::RvkGraphicsPipeline pipeline;
+    RvkGraphicsPipeline pipeline;
 
-    {
-        ShaderList shader_list;
+    CreateSolidPipeline(pipeline);
+    Renderer->Swapchain.CreateSwapchainFramebuffers(&pipeline);
 
-        vulkan::RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
-        vulkan::RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
-
-        shader_list.Vertex = vertex_shader.ShaderModule;
-        shader_list.Fragment = fragment_shader.ShaderModule;
-
-        pipeline.Create(shader_list);
-
-        RendererVulkan->Swapchain.CreateSwapchainFramebuffers(&pipeline);
-    }
-
-    RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
-    RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    RendererVulkan->DescriptorPool.Create(RendererVulkan->GetDevice(), RendererFramesInFlight);
+    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
+    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    Renderer->DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
@@ -138,13 +141,17 @@ int main()
 
     test_image->WaitUntilLoaded();
 
-
     FxRef<FxMaterial> material = FxMaterialManager::New("Default");
     material->Attach(FxMaterial::ResourceType::Diffuse, test_image);
-    material->Build(pipeline);
+    material->Build(&pipeline);
 
-    for (RvkFrameData& frame : RendererVulkan->Frames) {
-        frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.MainDescriptorSetLayout);
+
+    FxSceneObject scene_object;
+    scene_object.Attach(other_model);
+    scene_object.Attach(material);
+
+    for (RvkFrameData& frame : Renderer->Frames) {
+        frame.DescriptorSet.Create(Renderer->DescriptorPool, pipeline.MainDescriptorSetLayout);
 
         VkDescriptorBufferInfo ubo_info{
             .buffer = frame.UniformBuffer.Buffer,
@@ -187,11 +194,12 @@ int main()
 
         const VkWriteDescriptorSet writes[] = { buffer_write };
 
-        vkUpdateDescriptorSets(RendererVulkan->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
+        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
 
 
         // frame.DescriptorSet.SubmitWrites();
     }
+
 
 
     // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
@@ -257,28 +265,29 @@ int main()
 
         CheckGeneralControls();
 
-        RvkFrameData* frame = RendererVulkan->GetFrame();
+        RvkFrameData* frame = Renderer->GetFrame();
 
 
-        sets_to_bind[0] = frame->DescriptorSet.Set;
-        sets_to_bind[1] = material->mDescriptorSet.Set;
+        // sets_to_bind[0] = frame->DescriptorSet.Set;
+        // sets_to_bind[1] = material->mDescriptorSet.Set;
 
-        RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, sets_to_bind);
+        // RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, sets_to_bind);
 
 
-        // frame->DescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
         // material->mDescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
         // new_model->Render(pipeline);
-        other_model->Render(pipeline);
+        // other_model->Render(pipeline);
+        //
+        scene_object.Render();
 
         Renderer->FinishFrame(pipeline);
 
         LastTick = CurrentTick;
     }
 
-    RendererVulkan->GetDevice()->WaitForIdle();
+    Renderer->GetDevice()->WaitForIdle();
 
     test_image->Destroy();
 
