@@ -44,9 +44,9 @@ void FxPerspectiveCamera::Update()
     Direction.Set(sin(mAngleX), mAngleY, cos(mAngleX));
     Direction = Direction.Normalize();
 
-    const Vec3f target = Position + Direction;
+    const FxVec3f target = Position + Direction;
 
-    ViewMatrix.LookAt(Position, target, Vec3f::Up);
+    ViewMatrix.LookAt(Position, target, FxVec3f::Up);
 
     mRequiresUpdate = false;
 }

@@ -14,8 +14,22 @@ public:
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        mQueue.push_back(std::move(value));
+        mQueue.push_back(value);
     }
+
+    // void Push(FxAssetQueueItem &&value)
+    // {
+    //     std::lock_guard<std::mutex> lock(mMutex);
+
+    //     mQueue.push_back(std::move(value));
+    // }
+
+    // void Push(FxAssetQueueItem value)
+    // {
+    //     std::lock_guard<std::mutex> lock(mMutex);
+
+    //     mQueue.push_back(value);
+    // }
 
     bool PopIfAvailable(FxAssetQueueItem *item)
     {
@@ -31,6 +45,13 @@ public:
         mQueue.pop_front();
 
         return true;
+    }
+
+    void Destroy()
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+
+        mQueue.clear();
     }
 
 private:

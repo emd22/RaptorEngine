@@ -1,13 +1,18 @@
+
+#include "vulkan/vulkan_core.h"
+#define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
+
+#include <ThirdParty/vk_mem_alloc.h>
+
 #include "Core/Defines.hpp"
+#include <Renderer/Backend/RvkFrameData.hpp>
 #include "Renderer/Constants.hpp"
 #include "Renderer/Renderer.hpp"
-#include "Renderer/Backend/Vulkan/ShaderList.hpp"
-#include <Renderer/Backend/Vulkan/RvkShader.hpp>
+#include "Renderer/Backend/ShaderList.hpp"
+#include "Renderer/Backend/RvkShader.hpp"
 #include "Renderer/FxCamera.hpp"
-#include "vulkan/vulkan_core.h"
 
 #include <Core/FxMemPool.hpp>
-
 #include <Core/FxLinkedList.hpp>
 
 #define SDL_DISABLE_OLD_NAMES
@@ -22,14 +27,16 @@
 #include <Renderer/FxMesh.hpp>
 
 #include <Asset/FxAssetManager.hpp>
-
 #include "FxControls.hpp"
+#include <Math/Mat4.hpp>
+#include <Asset/FxConfigFile.hpp>
 
-FX_SET_MODULE_NAME("Main")
+#include "FxMaterial.hpp"
+#include "FxEntity.hpp"
 
 #include <csignal>
 
-#include <Math/Mat4.hpp>
+FX_SET_MODULE_NAME("Main")
 
 static bool Running = true;
 
@@ -52,9 +59,38 @@ void CheckGeneralControls()
     }
 }
 
+void SecondTestFunc(FxRef<int> test_num)
+{
+    (*test_num) += 30;
+    printf("Final number: %d\n", *test_num);
+}
+
+void FirstTestFunc(FxRef<int> test_num)
+{
+    (*test_num) = 20;
+    SecondTestFunc(test_num);
+}
+
+void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
+{
+    ShaderList shader_list;
+
+    RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
+    RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
+
+    shader_list.Vertex = vertex_shader.ShaderModule;
+    shader_list.Fragment = fragment_shader.ShaderModule;
+
+    pipeline.Create(shader_list);
+
+}
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100000);
+
+    FxConfigFile config;
+    config.Load("../Config/Main.conf");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
@@ -69,57 +105,113 @@ int main()
         exit(1);
     });
 
-    const uint32 window_width = 1024;
-    const uint32 window_height = 720;
+    const uint32 window_width = config.GetValue<uint32>("Width");
+    const uint32 window_height = config.GetValue<uint32>("Height");
 
-    auto window = FxWindow::New("Foxtrot Engine", window_width, window_height);
+    FxRef<FxWindow> window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
 
-    vulkan::FxRenderBackendVulkan renderer_state;
+    FxRenderBackend renderer_state;
     SetRendererBackend(&renderer_state);
 
     Renderer->SelectWindow(window);
     Renderer->Init(Vec2u(window_width, window_height));
 
-    vulkan::RvkGraphicsPipeline pipeline;
+    RvkGraphicsPipeline pipeline;
 
-    {
-        ShaderList shader_list;
+    CreateSolidPipeline(pipeline);
+    Renderer->Swapchain.CreateSwapchainFramebuffers(&pipeline);
 
-        vulkan::RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
-        vulkan::RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
+    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
+    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    Renderer->DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
-        shader_list.Vertex = vertex_shader.ShaderModule;
-        shader_list.Fragment = fragment_shader.ShaderModule;
-
-        pipeline.Create(shader_list);
-
-        RendererVulkan->Swapchain.CreateSwapchainFramebuffers(&pipeline);
-    }
-
-    RendererVulkan->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
-    RendererVulkan->DescriptorPool.Create(RendererVulkan->GetDevice(), RendererFramesInFlight);
-
-    for (RvkFrameData& frame : RendererVulkan->Frames) {
-        frame.DescriptorSet.Create(RendererVulkan->DescriptorPool, pipeline.DescriptorSetLayout);
-        frame.DescriptorSet.SetBuffer(frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    }
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
+    FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
 
     asset_manager.Start(2);
+    material_manager.Create();
 
     // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
 
-    PtrContainer<FxModel> other_model = FxAssetManager::LoadModel("../models/DamagedHelmet.glb");
+    FxRef<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
+    FxRef<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
+
+    test_image->WaitUntilLoaded();
+
+    FxRef<FxMaterial> material = FxMaterialManager::New("Default");
+    material->Attach(FxMaterial::ResourceType::Diffuse, test_image);
+    material->Build(&pipeline);
+
+
+    FxSceneObject scene_object;
+    scene_object.Attach(other_model);
+    scene_object.Attach(material);
+
+    for (RvkFrameData& frame : Renderer->Frames) {
+        frame.DescriptorSet.Create(Renderer->DescriptorPool, pipeline.MainDescriptorSetLayout);
+
+        VkDescriptorBufferInfo ubo_info{
+            .buffer = frame.UniformBuffer.Buffer,
+            .offset = 0,
+            .range = sizeof(RvkUniformBufferObject)
+        };
+
+        VkWriteDescriptorSet buffer_write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .dstSet = frame.DescriptorSet,
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .pBufferInfo = &ubo_info,
+        };
+
+        // VkDescriptorImageInfo image_info{
+        //     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        //     .imageView = test_image->Texture.Image.View,
+        //     .sampler = test_image->Texture.Sampler
+        // };
+
+        // VkWriteDescriptorSet image_write{
+        //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        //     .descriptorCount = 1,
+        //     .dstSet = frame.DescriptorSet,
+        //     .dstBinding = 1,
+        //     .dstArrayElement = 0,
+        //     .pImageInfo = &image_info,
+        // };
+        // auto buffer_write = frame.DescriptorSet.GetBufferWrite(0, frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        // auto image_write = frame.DescriptorSet.GetImageWrite(
+        //     1,
+        //     test_image->Texture,
+        //     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+        // );
+
+        const VkWriteDescriptorSet writes[] = { buffer_write };
+
+        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
+
+
+        // frame.DescriptorSet.SubmitWrites();
+    }
+
+
+
     // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
     camera.Position.Z += 5.0f;
 
-    Mat4f model_matrix = Mat4f::AsTranslation(Vec3f(0, 0, 0));
+    Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+
+    FxSizedArray<VkDescriptorSet> sets_to_bind;
+    sets_to_bind.InitSize(2);
 
 
     while (Running) {
@@ -138,20 +230,20 @@ int main()
         }
 
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            camera.Move(Vec3f(0.0f, 0.0f, 0.01f * DeltaTime));
+            camera.Move(FxVec3f(0.0f, 0.0f, 0.01f * DeltaTime));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            camera.Move(Vec3f(0.0f, 0.0f, -0.01f * DeltaTime));
+            camera.Move(FxVec3f(0.0f, 0.0f, -0.01f * DeltaTime));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-            camera.Move(Vec3f(0.01f * DeltaTime, 0.0f, 0.0f));
+            camera.Move(FxVec3f(0.01f * DeltaTime, 0.0f, 0.0f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-            camera.Move(Vec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
+            camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
-            FxMemPool::GetGlobalPool().PrintAllocations();
+            // FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
         // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !other_model->IsUploadedToGpu) {
@@ -173,17 +265,36 @@ int main()
 
         CheckGeneralControls();
 
+        RvkFrameData* frame = Renderer->GetFrame();
+
+
+        // sets_to_bind[0] = frame->DescriptorSet.Set;
+        // sets_to_bind[1] = material->mDescriptorSet.Set;
+
+        // RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, sets_to_bind);
+
+
+
+        // material->mDescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
         // new_model->Render(pipeline);
-        other_model->Render(pipeline);
+        // other_model->Render(pipeline);
+        //
+        scene_object.Render();
 
         Renderer->FinishFrame(pipeline);
 
         LastTick = CurrentTick;
     }
 
+    Renderer->GetDevice()->WaitForIdle();
+
+    test_image->Destroy();
+
+    material_manager.Destroy();
     asset_manager.Shutdown();
 
-    // FxMemPool::GetGlobalPool().Destroy();
+    std::cout << "this thread: " << std::this_thread::get_id() << std::endl;
 
     return 0;
 }

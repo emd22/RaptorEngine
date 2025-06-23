@@ -87,11 +87,11 @@ Mat4f Mat4f::operator *(const Mat4f &other)
     return result;
 }
 
-void Mat4f::LookAt(Vec3f position, Vec3f target, Vec3f upvec)
+void Mat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
 {
-    const Vec3f forward = (target - position).Normalize();
-    const Vec3f right = upvec.Cross(forward).Normalize();
-    const Vec3f up = forward.Cross(right);
+    const FxVec3f forward = (target - position).Normalize();
+    const FxVec3f right = upvec.Cross(forward).Normalize();
+    const FxVec3f up = forward.Cross(right);
 
     Columns[0].Load4(right.GetX(), up.GetX(), forward.GetX(), 0.0f);
     Columns[1].Load4(right.GetY(), up.GetY(), forward.GetY(), 0.0f);

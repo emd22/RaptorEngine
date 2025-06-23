@@ -1,28 +1,24 @@
 #pragma once
 
-#include "Renderer/Backend/Vulkan/RvkFrameData.hpp"
+#include "Backend/RvkFrameData.hpp"
+#include "Backend/RvkGpuBuffer.hpp"
 #include "Renderer/Renderer.hpp"
-#include "vulkan/vulkan_core.h"
-#include <Renderer/Backend/Vulkan/RvkGpuBuffer.hpp>
+
 #include <atomic>
-
-// TEMP
-using namespace vulkan;
-
 
 class FxMesh
 {
 public:
     FxMesh() = default;
 
-    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal>;
+    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
 
-    FxMesh(FxStaticArray<VertexType> &vertices)
+    FxMesh(FxSizedArray<VertexType> &vertices)
     {
         UploadVertices(vertices);
     }
 
-    FxMesh(FxStaticArray<VertexType> &vertices, FxStaticArray<uint32> &indices)
+    FxMesh(FxSizedArray<VertexType> &vertices, FxSizedArray<uint32> &indices)
     {
         CreateFromData(vertices, indices);
     }
@@ -39,18 +35,18 @@ public:
     //     return *this;
     // }
 
-    void CreateFromData(FxStaticArray<VertexType> &vertices, FxStaticArray<uint32> &indices)
+    void CreateFromData(FxSizedArray<VertexType> &vertices, FxSizedArray<uint32> &indices)
     {
         UploadVertices(vertices);
         UploadIndices(indices);
     }
 
-    void UploadVertices(FxStaticArray<VertexType> &vertices)
+    void UploadVertices(FxSizedArray<VertexType> &vertices)
     {
         mVertexBuffer.Create(RvkBufferUsageType::Vertices, vertices);
     }
 
-    void UploadIndices(FxStaticArray<uint32> &indices)
+    void UploadIndices(FxSizedArray<uint32> &indices)
     {
         mIndexBuffer.Create(RvkBufferUsageType::Indices, indices);
     }
@@ -69,31 +65,18 @@ public:
     //     return *this;
     // }
 
-    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(FxStaticArray<float32> &positions)
-    {
-        FxStaticArray<VertexType> vertices(positions.Size / 3);
-
-        // Log::Info("Creating combined vertex buffer (Contains:Position) (s: %d)", vertices.Capacity);
-
-        for (int i = 0; i < vertices.Capacity; i++) {
-            VertexType vertex;
-
-            memcpy(&vertex.Position, &positions.Data[i], sizeof(float32) * 3);
-            memset(&vertex.Normal, 0, sizeof(vertex.Normal));
-
-            vertices.Insert(vertex);
-        }
-
-        return vertices;
-    }
-
-    static FxStaticArray<VertexType> MakeCombinedVertexBuffer(FxStaticArray<float32> &positions, FxStaticArray<float32> &normals)
+    static FxSizedArray<VertexType> MakeCombinedVertexBuffer(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals, const FxSizedArray<float32>& uvs)
     {
         FxAssert((normals.Size == positions.Size));
 
-        FxStaticArray<VertexType> vertices(positions.Size / 3);
+        FxSizedArray<VertexType> vertices(positions.Size / 3);
 
         // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
+        const bool has_texcoords = uvs.Size > 0;
+
+        if (!has_texcoords) {
+            Log::Info("Model does not have texture coordinates!", 0);
+        }
 
         for (int i = 0; i < vertices.Capacity; i++) {
             // make a combined vertex + normal + other a
@@ -101,6 +84,13 @@ public:
 
             memcpy(&vertex.Position, &positions.Data[i * 3], sizeof(float32) * 3);
             memcpy(&vertex.Normal, &normals.Data[i * 3], sizeof(float32) * 3);
+
+            if (has_texcoords) {
+                memcpy(&vertex.UV, &uvs.Data[i * 2], sizeof(float32) * 2);
+            }
+            else {
+                memset(&vertex.UV, 0, sizeof(float32) * 2);
+            }
 
             vertices.Insert(vertex);
         }
@@ -119,12 +109,11 @@ public:
     void Render(RvkGraphicsPipeline &pipeline)
     {
         const VkDeviceSize offset = 0;
-        RvkFrameData *frame = RendererVulkan->GetFrame();
+        RvkFrameData *frame = Renderer->GetFrame();
 
         vkCmdBindVertexBuffers(frame->CommandBuffer.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        frame->DescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
         vkCmdDrawIndexed(frame->CommandBuffer.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
         // vkCmdDraw(frame->CommandBuffer.CommandBuffer, mVertexBuffer.Size, 1, 0, 0);

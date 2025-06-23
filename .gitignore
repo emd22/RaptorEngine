@@ -1,5 +1,7 @@
 build/*
 build/**/*
+xcbuild/*
+xcbuild/**/*
 .*
 !.gitignore
 !.gitattributes

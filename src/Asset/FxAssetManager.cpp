@@ -1,16 +1,21 @@
 #include "FxAssetManager.hpp"
-#include "Asset/Loader/FxGltfLoader.hpp"
 #include "Core/FxPanic.hpp"
-#include "Core/FxStaticArray.hpp"
+#include "Core/FxSizedArray.hpp"
 
 #include "FxModel.hpp"
+#include "FxImage.hpp"
+
+#include "Loader/FxGltfLoader.hpp"
+#include "Loader/FxJpegLoader.hpp"
+
 
 #include <atomic>
 #include <chrono>
-#include <memory>
 #include <thread>
 
 #include <Core/Types.hpp>
+
+#include <Core/Defines.hpp>
 
 
 ////////////////////////////////////
@@ -33,6 +38,7 @@ void FxAssetWorker::Update()
 
     while (Running.test()) {
         ItemReady.WaitForData();
+        ItemReady.Reset();
 
         if (!Running.test()) {
             break;
@@ -94,39 +100,58 @@ void FxAssetManager::Shutdown()
         worker.Thread.join();
     }
 
+
     mAssetManagerThread->join();
     delete mAssetManagerThread;
+
+    // Free the workers thread array here---
+    // this calls the destructors for each worker thread,
+    // which frees the `FxRef`'s to the data
+    mWorkerThreads.Free();
+
+    // mLoadQueue.Destroy();
 }
 
-PtrContainer<FxModel> FxAssetManager::NewModel()
+template<>
+void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string& path)
 {
-    return PtrContainer<FxModel>::New();
+    auto loader = FxRef<FxGltfLoader>::New();
+
+    FxAssetQueueItem queue_item(
+        (loader),
+        asset,
+        FxAssetType::Model,
+        path
+    );
+
+    FxAssetManager& mgr = GetInstance();
+
+    mgr.mLoadQueue.Push((queue_item));
+
+    mgr.ItemsEnqueued.test_and_set();
+    mgr.ItemsEnqueuedNotifier.SignalDataWritten();
 }
 
-PtrContainer<FxModel> FxAssetManager::LoadModel(std::string path)
+template<>
+void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string& path)
 {
-    PtrContainer<FxModel> model = NewModel();
-    LoadModel(model, path);
+    auto loader = FxRef<FxJpegLoader>::New();
 
-    return model;
+    FxAssetQueueItem queue_item(
+        (loader),
+        asset,
+        FxAssetType::Image,
+        path
+    );
+
+    FxAssetManager& mgr = GetInstance();
+
+    mgr.mLoadQueue.Push(queue_item);
+
+    mgr.ItemsEnqueued.test_and_set();
+    mgr.ItemsEnqueuedNotifier.SignalDataWritten();
 }
 
-void FxAssetManager::LoadModel(PtrContainer<FxModel> &model, std::string path)
-{
-    FxAssetQueueItem queue_item;
-
-    queue_item.Asset = model.Get();
-    queue_item.Loader = std::make_unique<FxGltfLoader>();
-    queue_item.AssetType = FxAssetType::Model;
-    queue_item.Path = path;
-
-    FxAssetManager& manager = GetInstance();
-
-    manager.mLoadQueue.Push(queue_item);
-
-    manager.ItemsEnqueued.test_and_set();
-    manager.ItemsEnqueuedNotifier.SignalDataWritten();
-}
 
 void FxAssetManager::CheckForUploadableData()
 {
@@ -136,7 +161,7 @@ void FxAssetManager::CheckForUploadableData()
             continue;
         }
 
-        auto &loaded_item = worker.Item;
+        auto& loaded_item = worker.Item;
 
         // The asset was successfully loaded, upload to GPU
         if (worker.LoadStatus == FxBaseLoader::Status::Success) {
@@ -146,18 +171,24 @@ void FxAssetManager::CheckForUploadableData()
                 loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
 
-            // Call the OnLoaded callback if it was registered.
-            if (loaded_item.Asset->OnLoaded) {
-                loaded_item.Asset->OnLoaded(loaded_item.Asset);
+            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+
+            // Call the OnLoaded callback if it was registered
+            if (loaded_item.Asset->mOnLoadedCallback) {
+                loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
             }
         }
-        else if (worker.LoadStatus == FxBaseLoader::Status::Success) {
-            // There was an error, call the OnError callback if it was registered.
-            if (loaded_item.Asset->OnError) {
-                loaded_item.Asset->OnError(loaded_item.Asset);
+        else if (worker.LoadStatus == FxBaseLoader::Status::Error) {
+            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+
+            // There was an error, call the OnError callback if it was registered
+            if (loaded_item.Asset->mOnErrorCallback) {
+                loaded_item.Asset->mOnErrorCallback(loaded_item.Asset);
             }
         }
         else if (worker.LoadStatus == FxBaseLoader::Status::None) {
+            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+
             FxPanic("FxAssetManager", "Worker status is none!", 0);
         }
 
@@ -184,7 +215,7 @@ void FxAssetManager::CheckForItemsToLoad()
         return;
     }
 
-    FxAssetWorker *worker = FindWorkerThread();
+    FxAssetWorker* worker = FindWorkerThread();
 
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
@@ -219,6 +250,7 @@ void FxAssetManager::AssetManagerUpdate()
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
         ItemsEnqueuedNotifier.WaitForData();
+        ItemsEnqueuedNotifier.Reset();
         if (!mActive.test()) {
             break;
         }

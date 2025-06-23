@@ -23,6 +23,11 @@
 #ifndef AMD_VULKAN_MEMORY_ALLOCATOR_H
 #define AMD_VULKAN_MEMORY_ALLOCATOR_H
 
+#define VMA_LEAK_LOG_FORMAT(format, ...) do { \
+        printf((format), __VA_ARGS__); \
+        printf("\n"); \
+    } while(false)
+
 /** \mainpage Vulkan Memory Allocator
 
 <b>Version 3.2.1</b>
@@ -4628,10 +4633,10 @@ public:
 
     bool empty() const { return m_Count == 0; }
     size_t size() const { return m_Count; }
-    T* data() { return m_Count > N ? m_DynamicArray.data() : m_FxStaticArray; }
+    T* data() { return m_Count > N ? m_DynamicArray.data() : m_FxSizedArray; }
     T& front() { VMA_HEAVY_ASSERT(m_Count > 0); return data()[0]; }
     T& back() { VMA_HEAVY_ASSERT(m_Count > 0); return data()[m_Count - 1]; }
-    const T* data() const { return m_Count > N ? m_DynamicArray.data() : m_FxStaticArray; }
+    const T* data() const { return m_Count > N ? m_DynamicArray.data() : m_FxSizedArray; }
     const T& front() const { VMA_HEAVY_ASSERT(m_Count > 0); return data()[0]; }
     const T& back() const { VMA_HEAVY_ASSERT(m_Count > 0); return data()[m_Count - 1]; }
 
@@ -4653,7 +4658,7 @@ public:
 
 private:
     size_t m_Count;
-    T m_FxStaticArray[N]; // Used when m_Size <= N
+    T m_FxSizedArray[N]; // Used when m_Size <= N
     VmaVector<T, AllocatorT> m_DynamicArray; // Used when m_Size > N
 };
 
@@ -4690,19 +4695,19 @@ void VmaSmallVector<T, AllocatorT, N>::resize(size_t newCount, bool freeMemory)
     }
     else if (newCount > N && m_Count <= N)
     {
-        // Growing, moving from m_FxStaticArray to m_DynamicArray
+        // Growing, moving from m_FxSizedArray to m_DynamicArray
         m_DynamicArray.resize(newCount);
         if (m_Count > 0)
         {
-            memcpy(m_DynamicArray.data(), m_FxStaticArray, m_Count * sizeof(T));
+            memcpy(m_DynamicArray.data(), m_FxSizedArray, m_Count * sizeof(T));
         }
     }
     else if (newCount <= N && m_Count > N)
     {
-        // Shrinking, moving from m_DynamicArray to m_FxStaticArray
+        // Shrinking, moving from m_DynamicArray to m_FxSizedArray
         if (newCount > 0)
         {
-            memcpy(m_FxStaticArray, m_DynamicArray.data(), newCount * sizeof(T));
+            memcpy(m_FxSizedArray, m_DynamicArray.data(), newCount * sizeof(T));
         }
         m_DynamicArray.resize(0);
         if (freeMemory)
@@ -4712,7 +4717,7 @@ void VmaSmallVector<T, AllocatorT, N>::resize(size_t newCount, bool freeMemory)
     }
     else
     {
-        // Any direction, staying in m_FxStaticArray - nothing to do here
+        // Any direction, staying in m_FxSizedArray - nothing to do here
     }
     m_Count = newCount;
 }
@@ -4737,7 +4742,7 @@ void VmaSmallVector<T, AllocatorT, N>::insert(size_t index, const T& src)
     T* const dataPtr = data();
     if (index < oldCount)
     {
-        //  I know, this could be more optimal for case where memmove can be memcpy directly from m_FxStaticArray to m_DynamicArray.
+        //  I know, this could be more optimal for case where memmove can be memcpy directly from m_FxSizedArray to m_DynamicArray.
         memmove(dataPtr + (index + 1), dataPtr + index, (oldCount - index) * sizeof(T));
     }
     dataPtr[index] = src;
@@ -4750,7 +4755,7 @@ void VmaSmallVector<T, AllocatorT, N>::remove(size_t index)
     const size_t oldCount = size();
     if (index < oldCount - 1)
     {
-        //  I know, this could be more optimal for case where memmove can be memcpy directly from m_DynamicArray to m_FxStaticArray.
+        //  I know, this could be more optimal for case where memmove can be memcpy directly from m_DynamicArray to m_FxSizedArray.
         T* const dataPtr = data();
         memmove(dataPtr + index, dataPtr + (index + 1), (oldCount - index - 1) * sizeof(T));
     }

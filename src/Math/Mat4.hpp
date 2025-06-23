@@ -44,7 +44,7 @@ public:
 
     static const Mat4f Identity;
 
-    static Mat4f AsTranslation(Vec3f position)
+    static Mat4f AsTranslation(FxVec3f position)
     {
         return Mat4f(
             (float32 [16]){
@@ -56,7 +56,7 @@ public:
         );
     }
 
-    void LookAt(Vec3f position, Vec3f target, Vec3f up);
+    void LookAt(FxVec3f position, FxVec3f target, FxVec3f up);
 
     Mat4f(float scalar) noexcept
     {

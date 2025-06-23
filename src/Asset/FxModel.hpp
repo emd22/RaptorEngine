@@ -11,9 +11,7 @@ class FxModel : public FxBaseAsset
 {
 protected:
 public:
-    FxModel()
-    {
-    }
+    FxModel() = default;
 
     friend class FxAssetManager;
 
@@ -31,8 +29,7 @@ public:
     {
         Log::Info("Destroy FxModel (%lu meshes)", Meshes.Size);
 
-        for (FxMesh *mesh : Meshes)
-        {
+        for (FxMesh *mesh : Meshes) {
             mesh->Destroy();
         }
 

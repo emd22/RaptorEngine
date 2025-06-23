@@ -3,7 +3,7 @@
 #include <Core/Defines.hpp>
 
 #include <Core/Log.hpp>
-#include <Renderer/Backend/Vulkan/Util.hpp>
+#include <Renderer/Backend/Util.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -46,6 +46,6 @@ void FxPanic(const char* module, const char* fmt, VkResult result, Types... item
     FxPanic(FxModuleName__, __VA_ARGS__)
 
 #define FxAssert(cond) \
-    if (!cond) { \
-        FxPanic(__func__, "Assertion failed! (%s)", #cond); \
+    if (!(cond)) { \
+        FxPanic(__func__, "Assertion failed! (%s)", (#cond)); \
     }

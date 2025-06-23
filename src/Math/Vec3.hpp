@@ -6,47 +6,47 @@
 #include <arm_neon.h>
 #endif
 
-class Vec3f {
+class FxVec3f {
 public:
-    Vec3f() = default;
-    Vec3f(float32 x, float32 y, float32 z);
-    explicit Vec3f(float32 scalar);
+    FxVec3f() = default;
+    FxVec3f(float32 x, float32 y, float32 z);
+    explicit FxVec3f(float32 scalar);
 
     void Set(float32 x, float32 y, float32 z);
 
-    Vec3f operator + (const Vec3f &other) const;
-    Vec3f operator - (const Vec3f &other) const;
-    Vec3f operator * (const Vec3f &other) const;
-    Vec3f operator * (float32 scalar) const;
+    FxVec3f operator + (const FxVec3f &other) const;
+    FxVec3f operator - (const FxVec3f &other) const;
+    FxVec3f operator * (const FxVec3f &other) const;
+    FxVec3f operator * (float32 scalar) const;
 
-    Vec3f operator - () const;
+    FxVec3f operator - () const;
 
-    Vec3f &operator += (const Vec3f &other);
-    Vec3f &operator -= (const Vec3f &other);
-    Vec3f &operator *= (const Vec3f &other);
+    FxVec3f &operator += (const FxVec3f &other);
+    FxVec3f &operator -= (const FxVec3f &other);
+    FxVec3f &operator *= (const FxVec3f &other);
 
-    static Vec3f MulAdd(const Vec3f &add_value, const Vec3f &mul_a, const Vec3f &mul_b);
+    static FxVec3f MulAdd(const FxVec3f &add_value, const FxVec3f &mul_a, const FxVec3f &mul_b);
 
-    Vec3f Normalize() const;
+    FxVec3f Normalize() const;
     float32 Length() const;
-    Vec3f Cross(const Vec3f &other) const;
+    FxVec3f Cross(const FxVec3f &other) const;
 
-    float32 Dot(const Vec3f &other) const;
+    float32 Dot(const FxVec3f &other) const;
 
     float32 GetX() const;
     float32 GetY() const;
     float32 GetZ() const;
 
-    static const Vec3f Zero;
-    static const Vec3f Up;
+    static const FxVec3f Zero;
+    static const FxVec3f Up;
 
 #ifdef FX_USE_NEON
-    explicit Vec3f(float32x4_t intrin)
+    explicit FxVec3f(float32x4_t intrin)
         : mIntrin(intrin)
     {
     }
 
-    Vec3f &operator = (const float32x4_t &other)
+    FxVec3f &operator = (const float32x4_t &other)
     {
         mIntrin = other;
         return *this;

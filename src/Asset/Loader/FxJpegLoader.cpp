@@ -1,0 +1,77 @@
+#include "FxJpegLoader.hpp"
+#include "Asset/FxBaseAsset.hpp"
+#include <Asset/FxImage.hpp>
+
+#include <Core/Log.hpp>
+#include <jpeglib.h>
+
+#include <Core/FxMemPool.hpp>
+
+#include <Core/FxRef.hpp>
+
+FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
+{
+    FxImage* image = static_cast<FxImage*>(asset.Get());
+
+    const char* c_path = path.c_str();
+
+    FILE* fp = fopen(c_path, "rb");
+
+    if (!fp) {
+        Log::Error("Could not find JPEG file at '%s'", c_path);
+        return FxJpegLoader::Status::Error;
+    }
+
+    struct jpeg_error_mgr error_mgr;
+
+    mJpegInfo.err = jpeg_std_error(&error_mgr);
+    jpeg_create_decompress(&mJpegInfo);
+
+    jpeg_stdio_src(&mJpegInfo, fp);
+    jpeg_read_header(&mJpegInfo, true);
+
+    mJpegInfo.out_color_space = JCS_EXT_RGBA;
+
+    jpeg_start_decompress(&mJpegInfo);
+
+    printf("Image has %d components.\n", mJpegInfo.output_components);
+    image->NumComponents = mJpegInfo.output_components;
+
+    printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
+    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+
+    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
+    mImageData.InitSize(data_size);
+
+    const uint32 row_stride = image->NumComponents * mJpegInfo.output_width;
+
+    uint8* ptr_list[1];
+
+    while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
+        ptr_list[0] = (mImageData.Data + (row_stride * mJpegInfo.output_scanline));
+        jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
+    }
+
+    jpeg_finish_decompress(&mJpegInfo);
+
+    fclose(fp);
+
+    return Status::Success;
+}
+
+void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
+{
+    FxImage* image = static_cast<FxImage*>(asset.Get());
+
+    image->Texture.Create(mImageData, image->Size, image->NumComponents);
+
+    asset->IsUploadedToGpu = true;
+    asset->IsUploadedToGpu.notify_all();
+}
+
+void FxJpegLoader::Destroy(FxRef<FxBaseAsset>& asset)
+{
+    (void)asset;
+
+    jpeg_destroy_decompress(&mJpegInfo);
+}

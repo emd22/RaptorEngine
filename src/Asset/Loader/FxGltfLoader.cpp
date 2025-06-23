@@ -6,10 +6,13 @@
 
 #include <Asset/FxModel.hpp>
 
+#include <Core/FxRef.hpp>
+
 void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
 {
-    FxStaticArray<float32> positions;
-    FxStaticArray<float32> normals;
+    FxSizedArray<float32> positions;
+    FxSizedArray<float32> normals;
+    FxSizedArray<float32> uvs;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto *attribute = &primitive->attributes[i];
@@ -33,9 +36,18 @@ void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
             normals.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, normals.Data, data_size);
         }
+        else if (attribute->type == cgltf_attribute_type_texcoord) {
+            printf("Attribute -> UV Buffer\n");
+
+            cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
+
+            // Create our vertex normal buffer
+            uvs.InitSize(data_size);
+            cgltf_accessor_unpack_floats(attribute->data, uvs.Data, data_size);
+        }
     }
 
-    auto combined_vertices = FxMesh::MakeCombinedVertexBuffer(positions, normals);
+    auto combined_vertices = FxMesh::MakeCombinedVertexBuffer(positions, normals, uvs);
 
     // Set the combined vertices to the mesh
     mesh->UploadVertices(combined_vertices);
@@ -47,7 +59,7 @@ void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
         auto *primitive = &gltf_mesh->primitives[i];
 
-        FxStaticArray<uint32> indices;
+        FxSizedArray<uint32> indices;
 
         FxMesh *mesh = new FxMesh;
 
@@ -74,8 +86,10 @@ void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
 
 }
 
-FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxBaseAsset *asset, std::string path)
+FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
 {
+    (void)asset;
+
     cgltf_options options{};
 
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
@@ -94,9 +108,9 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxBaseAsset *asset, std::string 
     return FxGltfLoader::Status::Success;
 }
 
-void FxGltfLoader::CreateGpuResource(FxBaseAsset *asset)
+void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
-    FxModel *model = static_cast<FxModel *>(asset);
+    FxModel *model = static_cast<FxModel *>(asset.Get());
     model->Meshes.InitSize(mGltfData->meshes_count);
 
     for (int i = 0; i < mGltfData->meshes_count; i++) {
@@ -112,8 +126,10 @@ void FxGltfLoader::CreateGpuResource(FxBaseAsset *asset)
     model->IsUploadedToGpu.notify_all();
 }
 
-void FxGltfLoader::Destroy(FxBaseAsset *asset)
+void FxGltfLoader::Destroy(FxRef<FxBaseAsset>& asset)
 {
+    (void)asset;
+
     if (mGltfData) {
         cgltf_free(mGltfData);
         mGltfData = nullptr;

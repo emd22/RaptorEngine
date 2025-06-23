@@ -3,7 +3,20 @@
 #include <Core/Types.hpp>
 #include <Core/FxLinkedList.hpp>
 
-#include <mutex>
+// This should be stable enough, but keeping the old mempool implementation for now just in case.
+#define FX_EXPERIMENTAL_PAGED_MEMPOOL 1
+
+#ifdef FX_EXPERIMENTAL_PAGED_MEMPOOL
+
+#include "Experimental/FxMemPool.hpp"
+
+using experimental::FxMemPool;
+using experimental::FxMemPoolPage;
+
+#endif
+
+
+#ifndef FX_EXPERIMENTAL_PAGED_MEMPOOL
 
 class FxMemPool
 {
@@ -23,18 +36,24 @@ public:
 
     /** Allocates a block of memory */
     template <typename PtrType> requires std::is_pointer_v<PtrType>
-    PtrType Alloc(uint32 size)
+    PtrType AllocInPool(uint32 size)
     {
         MemBlock& block = AllocateMemory(size)->Data;
 
-        return reinterpret_cast<PtrType>(block.Start);
+        return static_cast<PtrType>(block.Start);
     }
     /** Allocates memory on the global memory pool */
     static void* Alloc(uint32 size);
 
+    template <typename T>
+    static T* Alloc(uint32 size)
+    {
+        return static_cast<T*>(Alloc(size));
+    }
+
     /** Frees an allocated pointer */
     template <typename ElementType>
-    void Free(ElementType* ptr)
+    void FreeInPool(ElementType* ptr)
     {
         if (ptr == nullptr) {
             return;
@@ -47,6 +66,12 @@ public:
 
     /** Frees an allocated pointer on the global memory pool */
     static void Free(void* ptr);
+
+    template <typename T>
+    static void Free(T* ptr)
+    {
+        FxMemPool::Free(static_cast<void*>(ptr));
+    }
 
     void PrintAllocations() const;
 
@@ -81,3 +106,4 @@ private:
 
     FxLinkedList<MemBlock> mMemBlocks;
 };
+#endif

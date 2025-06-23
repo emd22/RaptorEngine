@@ -1,9 +1,13 @@
 #pragma once
 
 #include "Asset/FxAssetQueueItem.hpp"
-#include "Core/Types.hpp"
-#include "FxModel.hpp"
 #include "Asset/FxAssetQueue.hpp"
+
+#include "FxModel.hpp"
+#include "FxImage.hpp"
+
+#include <Core/Types.hpp>
+#include <Core/FxRef.hpp>
 
 #include <atomic>
 #include <thread>
@@ -57,9 +61,30 @@ public:
 
     static FxAssetManager &GetInstance();
 
-    static PtrContainer<FxModel> NewModel();
-    static PtrContainer<FxModel> LoadModel(std::string path);
-    static void LoadModel(PtrContainer<FxModel> &model, std::string path);
+    template <typename T>
+    static FxRef<T> NewAsset()
+    {
+        // return PtrContainer<T>::New();
+        return FxRef<T>::New();
+    }
+
+    template <typename T>
+    static FxRef<T> LoadAsset(const std::string& path)
+    {
+        FxRef<T> asset = FxRef<T>::New();
+        LoadAsset<T>(asset, path);
+
+        return asset;
+    }
+
+    // Specializations in cpp file
+    template <typename T>
+    static void LoadAsset(FxRef<T> asset, const std::string& path)
+    {
+        if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
+            static_assert(0, "Asset type is not implemented!");
+        }
+    }
 
     ~FxAssetManager()
     {
@@ -87,7 +112,7 @@ private:
     std::atomic_flag ItemsEnqueued;
 
     int32 mThreadCount = 2;
-    // FxStaticArray<std::thread *> mWorkerThreads;
-    FxStaticArray<FxAssetWorker> mWorkerThreads;
+    // FxSizedArray<std::thread *> mWorkerThreads;
+    FxSizedArray<FxAssetWorker> mWorkerThreads;
     std::thread *mAssetManagerThread;
 };
