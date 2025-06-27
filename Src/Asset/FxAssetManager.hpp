@@ -14,6 +14,9 @@
 
 #include <Core/FxDataNotifier.hpp>
 
+template <typename T>
+concept C_IsAsset = std::is_base_of_v<FxBaseAsset, T>;
+
 /**
  * Worker thread that waits and processes individual asset loading.
  */
@@ -61,14 +64,14 @@ public:
 
     static FxAssetManager &GetInstance();
 
-    template <typename T>
+    template <typename T> requires C_IsAsset<T>
     static FxRef<T> NewAsset()
     {
         // return PtrContainer<T>::New();
         return FxRef<T>::New();
     }
 
-    template <typename T>
+    template <typename T> requires C_IsAsset<T>
     static FxRef<T> LoadAsset(const std::string& path)
     {
         FxRef<T> asset = FxRef<T>::New();
@@ -77,9 +80,27 @@ public:
         return asset;
     }
 
+    template <typename T> requires C_IsAsset<T>
+    static FxRef<T> LoadFromMemory(const uint8* data, uint32 data_size)
+    {
+        FxRef<T> asset = FxRef<T>::New();
+        LoadFromMemory<T>(asset, data, data_size);
+
+        return asset;
+    }
+
+
     // Specializations in cpp file
-    template <typename T>
+    template <typename T> requires C_IsAsset<T>
     static void LoadAsset(FxRef<T> asset, const std::string& path)
+    {
+        if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
+            static_assert(0, "Asset type is not implemented!");
+        }
+    }
+
+    template <typename T> requires C_IsAsset<T>
+    static void LoadFromMemory(FxRef<T> asset, const uint8* data, uint32 data_size)
     {
         if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
             static_assert(0, "Asset type is not implemented!");
@@ -100,6 +121,47 @@ private:
     bool CheckWorkersBusy();
 
     void AssetManagerUpdate();
+
+    template <typename AssetType, typename LoaderType, FxAssetType EnumValue> requires C_IsAsset<AssetType>
+    static void DoLoadAsset(const FxRef<AssetType>& asset, const std::string& path)
+    {
+        FxRef<LoaderType> loader = FxRef<LoaderType>::New();
+
+        FxAssetQueueItem queue_item(
+            (loader),
+            asset,
+            EnumValue,
+            path
+        );
+
+        FxAssetManager& mgr = GetInstance();
+
+        mgr.mLoadQueue.Push(queue_item);
+
+        mgr.ItemsEnqueued.test_and_set();
+        mgr.ItemsEnqueuedNotifier.SignalDataWritten();
+    }
+
+    template <typename AssetType, typename LoaderType, FxAssetType EnumValue> requires C_IsAsset<AssetType>
+    static void DoLoadFromMemory(const FxRef<AssetType>& asset, const uint8* data, uint32 data_size)
+    {
+        FxRef<LoaderType> loader = FxRef<LoaderType>::New();
+
+        FxAssetQueueItem queue_item(
+            (loader),
+            asset,
+            EnumValue,
+            data,
+            data_size
+        );
+
+        FxAssetManager& mgr = GetInstance();
+
+        mgr.mLoadQueue.Push(queue_item);
+
+        mgr.ItemsEnqueued.test_and_set();
+        mgr.ItemsEnqueuedNotifier.SignalDataWritten();
+    }
 
 public:
     FxDataNotifier DataLoaded;

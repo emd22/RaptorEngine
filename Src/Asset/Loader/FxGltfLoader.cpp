@@ -86,9 +86,38 @@ void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
 
 }
 
+#include <FxMaterial.hpp>
+#include <iostream>
+
+#include <Asset/FxAssetManager.hpp>
+
+
+FxRef<FxImage> FxGltfLoader::LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
+{
+    // std::cout << "Texture name: " << texture_view.texture->image->name << '\n';
+
+    if (texture_view.texture->image->uri != nullptr) {
+        std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
+        return FxRef<FxImage>(nullptr);
+    }
+
+    if (texture_view.texture->image != nullptr) {
+        const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
+        ;
+
+        uint32 size = texture_view.texture->image->buffer_view->size;
+        return FxAssetManager::LoadFromMemory<FxImage>(data, size);
+    }
+    else {
+        std::cout << "no image added\n";
+    }
+
+    return FxRef<FxImage>(nullptr);
+}
+
 FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
 {
-    (void)asset;
+    FxModel* model = static_cast<FxModel*>(asset.Get());
 
     cgltf_options options{};
 
@@ -103,6 +132,60 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const
         Log::Error("Error loading buffers from GLTF file! (path: %s)", path.c_str());
 
         return FxGltfLoader::Status::Error;
+    }
+
+    std::cout << "cgltf textures; " << mGltfData->textures_count << '\n';
+
+    if (mGltfData->materials_count) {
+        for (int i = 0; i < mGltfData->materials_count; i++) {
+            cgltf_material& gltf_material = mGltfData->materials[i];
+            std::cout << "cgltf material: " << gltf_material.name << '\n';
+
+            FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
+
+
+            if (gltf_material.has_pbr_metallic_roughness) {
+                material->Diffuse = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
+            }
+
+
+            model->Materials.push_back(material);
+        }
+    }
+
+    return FxGltfLoader::Status::Success;
+}
+
+FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, const uint8* data, uint32 size)
+{
+    // (void)asset;
+    FxModel* model = static_cast<FxModel*>(asset.Get());
+
+    cgltf_options options{};
+
+
+    cgltf_result status = cgltf_parse(&options, data, size, &mGltfData);
+    if (status != cgltf_result_success) {
+        Log::Error("Error parsing GLTF file from data");
+        return FxGltfLoader::Status::Error;
+    }
+
+    std::cout << "cgltf textures; " << mGltfData->textures_count << '\n';
+
+    if (mGltfData->materials_count) {
+        for (int i = 0; i < mGltfData->materials_count; i++) {
+            cgltf_material& gltf_material = mGltfData->materials[i];
+            std::cout << "cgltf material: " << gltf_material.name << '\n';
+
+            FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
+
+
+            if (gltf_material.has_pbr_metallic_roughness) {
+                material->Diffuse = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
+            }
+
+            model->Materials.push_back(material);
+        }
     }
 
     return FxGltfLoader::Status::Success;

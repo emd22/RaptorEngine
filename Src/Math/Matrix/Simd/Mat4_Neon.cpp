@@ -44,7 +44,7 @@ Vec4f Mat4f::MultiplyVec4f(Vec4f &vec)
     creg_ = vfmaq_laneq_f32(creg_, a3, breg_, 3);
 
 
-Mat4f Mat4f::operator *(const Mat4f &other)
+Mat4f Mat4f::operator * (const Mat4f &other) const
 {
     // Since we will be reusing a[0-3] a lot, this ensures the values
     // are loaded into the q registers.
@@ -85,6 +85,19 @@ Mat4f Mat4f::operator *(const Mat4f &other)
     }
 
     return result;
+}
+
+void Mat4f::Rotate(FxVec3f rotation)
+{
+    /*
+     *  0  -z   y
+     *  z   0  -x
+     * -y   x   0
+     */
+
+
+
+
 }
 
 void Mat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)

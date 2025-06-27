@@ -33,7 +33,7 @@ public:
     }
 };
 
-#include "FxMemPool.hpp"
+#include "FxMemory.hpp"
 
 /**
  * Allocated and frees memory on the global memory pool

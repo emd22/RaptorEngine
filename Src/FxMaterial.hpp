@@ -2,6 +2,7 @@
 
 #include <Asset/FxImage.hpp>
 
+#include <Core/FxPagedArray.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/Log.hpp>
 
@@ -32,9 +33,15 @@ public:
         }
     }
 
-    void Bind(RvkCommandBuffer* cmd);
+    bool IsReady();
 
-    void Build(RvkGraphicsPipeline* pipeline);
+    /**
+     * Binds the material to be used in the given command buffer.
+     * @returns True if the material was bound succesfully.
+     */
+    bool Bind(RvkCommandBuffer* cmd);
+
+    void Build();
     void Destroy();
 
     ~FxMaterial()
@@ -54,10 +61,11 @@ public:
     RvkDescriptorSet mDescriptorSet;
     RvkGraphicsPipeline* Pipeline = nullptr;
 
+    std::atomic_bool IsBuilt = false;
 private:
     VkDescriptorSetLayout mSetLayout = nullptr;
 
-    std::atomic_bool mIsBuilt = false;
+    bool mIsReady = false;
 };
 
 
@@ -71,7 +79,7 @@ public:
 
     void Create(uint32 materials_per_page=32);
 
-    static FxRef<FxMaterial> New(const std::string& name);
+    static FxRef<FxMaterial> New(const std::string& name, RvkGraphicsPipeline* pipeline);
 
 
     static RvkDescriptorPool& GetPool()

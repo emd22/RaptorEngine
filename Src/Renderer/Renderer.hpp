@@ -6,5 +6,4 @@ void SetRendererBackend(FxRenderBackend *backend);
 
 void AssertRendererExists();
 
-// extern FxRenderBackend *Renderer;
 extern FxRenderBackend *Renderer;

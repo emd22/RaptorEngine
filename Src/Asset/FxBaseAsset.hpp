@@ -6,6 +6,8 @@
 
 #include <Core/FxRef.hpp>
 
+#include <functional>
+
 /**
  * An asset base class for other assets to be derived from.
  *
@@ -24,8 +26,9 @@ protected:
 
 public:
 
-    using OnLoadFunc = void (*)(const FxRef<FxBaseAsset> asset);
-    using OnErrorFunc = void (*)(const FxRef<FxBaseAsset> asset);
+    // using OnLoadFunc = void (*)(FxRef<FxBaseAsset> asset);
+    using OnLoadFunc = std::function<void (FxRef<FxBaseAsset>)>;
+    using OnErrorFunc = void (*)(FxRef<FxBaseAsset> asset);
 
     virtual void WaitUntilLoaded()
     {
@@ -34,6 +37,15 @@ public:
         }
 
         IsFinishedNotifier.WaitForData(true);
+    }
+
+    /** Returns true if the asset has been loaded and is in GPU memory. */
+    inline bool IsLoaded() const
+    {
+        if (mIsLoaded) {
+            printf("is loaded\n");
+        }
+        return mIsLoaded.load();
     }
 
 
@@ -54,12 +66,14 @@ public:
     {
         // If the asset has already been loaded, call the callback immediately.
         if (IsFinishedNotifier.IsDone()) {
-            // on_loaded_callback(this);
+            on_loaded_callback(this);
 
             return;
         }
         printf("Registered onload callback\n");
-        mOnLoadedCallback = on_loaded_callback;
+
+        mOnLoadedCallbacks.push_back(on_loaded_callback);
+        // mOnLoadedCallback = on_loaded_callback;
     }
 
     void OnError(const OnErrorFunc& on_error_callback)
@@ -77,8 +91,11 @@ public:
     std::atomic_bool IsUploadedToGpu = false;
 
 protected:
-    OnLoadFunc mOnLoadedCallback = nullptr;
+    std::vector<OnLoadFunc> mOnLoadedCallbacks;
+    // OnLoadFunc mOnLoadedCallback = nullptr;
     OnErrorFunc mOnErrorCallback = nullptr;
+
+    std::atomic_bool mIsLoaded = false;
 
     friend class FxAssetManager;
 };

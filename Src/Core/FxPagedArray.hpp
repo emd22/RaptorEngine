@@ -3,7 +3,9 @@
 #include "Types.hpp"
 #include "FxPanic.hpp"
 
-template <typename ElementType>
+#include "FxMemory.hpp"
+
+template <typename ElementType, bool UseMemPool = true>
 class FxPagedArray
 {
 public:
@@ -80,6 +82,8 @@ public:
         return CurrentPage->Data[CurrentPage->Size - 1];
     }
 
+
+
     ElementType* RemoveLast()
     {
         if (CurrentPage == nullptr) {
@@ -95,8 +99,8 @@ public:
 
             CurrentPage = current_page->Prev;
 
-            std::free(current_page->Data);
-            std::free(current_page);
+            FreePtr(current_page->Data);
+            FreePtr(current_page);
 
             return element;
         }
@@ -134,10 +138,10 @@ public:
             Page* next_page = current_page->Next;
 
             if (current_page->Data) {
-                std::free(static_cast<void*>(current_page->Data));
+                FreePtr(static_cast<void*>(current_page->Data));
             }
 
-            std::free(static_cast<void*>(current_page));
+            FreePtr(static_cast<void*>(current_page));
 
             current_page = next_page;
         }
@@ -152,10 +156,30 @@ public:
     }
 
 private:
+    template <typename T>
+    constexpr void FreePtr(T* ptr)
+    {
+        if constexpr (UseMemPool) {
+            FxMemPool::FreeRaw(ptr);
+        }
+        else {
+            std::free(ptr);
+        }
+    }
+
     Page* AllocateNewPage(Page* prev, Page* next)
     {
         // Allocate and initialize the page object
-        void* allocated_page = std::malloc(sizeof(Page));
+        // void* allocated_page = std::malloc(sizeof(Page));
+        void* allocated_page = nullptr;
+
+        if constexpr (UseMemPool) {
+            allocated_page = FxMemPool::AllocRaw(sizeof(Page));
+        }
+        else {
+            allocated_page = std::malloc(sizeof(Page));
+        }
+
         if (allocated_page == nullptr) {
             FxPanic("FxPagedArray", "Memory error allocating page", 0);
             return nullptr; // for msvc
@@ -168,7 +192,14 @@ private:
         page->Prev = prev;
 
         // Allocate the buffer of nodes in the page
-        void* allocated_nodes = std::malloc(sizeof(ElementType) * PageNodeCapacity);
+
+        void* allocated_nodes = nullptr;
+        if constexpr (UseMemPool) {
+            allocated_nodes = FxMemPool::AllocRaw(sizeof(ElementType) * PageNodeCapacity);
+        }
+        else {
+            allocated_nodes = std::malloc(sizeof(ElementType) * PageNodeCapacity);
+        }
 
         if (allocated_nodes == nullptr) {
             FxPanic("FxPagedArray", "Memory error allocating page data", 0);

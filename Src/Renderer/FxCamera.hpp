@@ -10,13 +10,12 @@ class FxCamera
 public:
     virtual void Update() = 0;
 
-
-
 public:
     FxVec3f Position = FxVec3f(0.0f);
 
     Mat4f ViewMatrix = Mat4f::Identity;
     Mat4f ProjectionMatrix = Mat4f::Identity;
+    Mat4f VPMatrix = Mat4f::Identity;
 };
 
 class FxPerspectiveCamera : public FxCamera

@@ -8,16 +8,18 @@
 #include "RvkGpuBuffer.hpp"
 #include <Math/Mat4.hpp>
 
+
 struct alignas(16) RvkUniformBufferObject
 {
     Mat4f MvpMatrix;
 };
 
+
 struct RvkFrameData
 {
 public:
     void Create(RvkGpuDevice *device);
-    void SubmitUbo(RvkUniformBufferObject *ubo);
+    void SubmitUbo(const RvkUniformBufferObject& ubo);
     void Destroy();
 public:
     RvkCommandPool CommandPool;
@@ -25,7 +27,7 @@ public:
 
     RvkDescriptorSet DescriptorSet;
 
-    RvkRawGpuBuffer<RvkUniformBufferObject> UniformBuffer;
+    RvkRawGpuBuffer<RvkUniformBufferObject> Ubo;
 
     RvkSemaphore ImageAvailable;
     RvkSemaphore RenderFinished;

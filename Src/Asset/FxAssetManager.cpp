@@ -44,8 +44,14 @@ void FxAssetWorker::Update()
             break;
         }
 
-        // Call our specialized loader to load the asset file
-        LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
+        if (Item.RawData != nullptr && Item.DataSize > 0) {
+            LoadStatus = Item.Loader->LoadFromMemory(Item.Asset, Item.RawData, Item.DataSize);
+        }
+        else {
+            // Call our specialized loader to load the asset file
+            LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
+        }
+
 
         // Mark that we are waiting for the data to be uploaded to the GPU
         DataPendingUpload.test_and_set();
@@ -115,41 +121,20 @@ void FxAssetManager::Shutdown()
 template<>
 void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string& path)
 {
-    auto loader = FxRef<FxGltfLoader>::New();
-
-    FxAssetQueueItem queue_item(
-        (loader),
-        asset,
-        FxAssetType::Model,
-        path
-    );
-
-    FxAssetManager& mgr = GetInstance();
-
-    mgr.mLoadQueue.Push((queue_item));
-
-    mgr.ItemsEnqueued.test_and_set();
-    mgr.ItemsEnqueuedNotifier.SignalDataWritten();
+    DoLoadAsset<FxModel, FxGltfLoader, FxAssetType::Model>(asset, path);
 }
 
 template<>
 void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string& path)
 {
-    auto loader = FxRef<FxJpegLoader>::New();
+    DoLoadAsset<FxImage, FxJpegLoader, FxAssetType::Image>(asset, path);
+}
 
-    FxAssetQueueItem queue_item(
-        (loader),
-        asset,
-        FxAssetType::Image,
-        path
-    );
 
-    FxAssetManager& mgr = GetInstance();
-
-    mgr.mLoadQueue.Push(queue_item);
-
-    mgr.ItemsEnqueued.test_and_set();
-    mgr.ItemsEnqueuedNotifier.SignalDataWritten();
+template<>
+void FxAssetManager::LoadFromMemory<FxImage>(FxRef<FxImage> asset, const uint8* data, uint32 data_size)
+{
+    DoLoadFromMemory<FxImage, FxJpegLoader, FxAssetType::Image>(asset, data, data_size);
 }
 
 
@@ -172,10 +157,14 @@ void FxAssetManager::CheckForUploadableData()
             }
 
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+            loaded_item.Asset->mIsLoaded.store(true);
 
             // Call the OnLoaded callback if it was registered
-            if (loaded_item.Asset->mOnLoadedCallback) {
-                loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
+            if (!loaded_item.Asset->mOnLoadedCallbacks.empty()) {
+                for (auto& callback : loaded_item.Asset->mOnLoadedCallbacks) {
+                    callback(loaded_item.Asset);
+                }
+                // loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
             }
         }
         else if (worker.LoadStatus == FxBaseLoader::Status::Error) {

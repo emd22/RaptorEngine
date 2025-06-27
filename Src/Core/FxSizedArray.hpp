@@ -8,7 +8,7 @@
 
 #include "FxAllocator.hpp"
 
-#include "FxMemPool.hpp"
+#include "FxMemory.hpp"
 
 // #define FX_STATIC_ARRAY_DEBUG 1
 // #define FX_STATIC_ARRAY_NO_MEMPOOL 1

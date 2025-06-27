@@ -47,7 +47,7 @@ public:
     void Init(Vec2u window_size);
     void Destroy();
 
-    FrameResult BeginFrame(RvkGraphicsPipeline& pipeline, Mat4f& MVPMatrix);
+    FrameResult BeginFrame(RvkGraphicsPipeline& pipeline);
     void FinishFrame(RvkGraphicsPipeline& pipeline);
 
     void SelectWindow(const FxRef<FxWindow>& window)
@@ -65,6 +65,7 @@ public:
         return &mDevice;
     }
 
+    RvkUniformBufferObject& GetUbo();
 
     void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
@@ -144,7 +145,8 @@ public:
     }
 
 
-    uint32 GetFrameNumber() { return mFrameNumber; }
+    uint32 GetElapsedFrameCount() const { return mInternalFrameCounter; }
+    uint32 GetFrameNumber() const { return mFrameNumber; }
 
 private:
     void InitVulkan();

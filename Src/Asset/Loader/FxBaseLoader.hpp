@@ -22,6 +22,8 @@ public:
     }
 
     virtual Status LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path) = 0;
+    virtual Status LoadFromMemory(FxRef<FxBaseAsset>& asset, const uint8* data, uint32 size) = 0;
+
     virtual void Destroy(FxRef<FxBaseAsset>& asset) = 0;
 
     virtual ~FxBaseLoader()

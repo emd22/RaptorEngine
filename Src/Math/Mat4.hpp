@@ -56,6 +56,8 @@ public:
         );
     }
 
+    void Rotate(FxVec3f rotation);
+
     void LookAt(FxVec3f position, FxVec3f target, FxVec3f up);
 
     Mat4f(float scalar) noexcept
@@ -98,7 +100,16 @@ public:
         Columns[3].Load4Ptr(data + 12);
     }
 
-    Mat4f operator * (const Mat4f &other);
+    Mat4f& operator = (const Mat4f& other)
+    {
+        Columns[0] = other.Columns[0];
+        Columns[1] = other.Columns[1];
+        Columns[2] = other.Columns[2];
+        Columns[3] = other.Columns[3];
+        return *this;
+    }
+
+    Mat4f operator * (const Mat4f &other) const;
 
     void Print()
     {

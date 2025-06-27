@@ -12,7 +12,7 @@
 #include "Renderer/Backend/RvkShader.hpp"
 #include "Renderer/FxCamera.hpp"
 
-#include <Core/FxMemPool.hpp>
+#include <Core/FxMemory.hpp>
 #include <Core/FxLinkedList.hpp>
 
 #define SDL_DISABLE_OLD_NAMES
@@ -59,17 +59,24 @@ void CheckGeneralControls()
     }
 }
 
-void SecondTestFunc(FxRef<int> test_num)
-{
-    (*test_num) += 30;
-    printf("Final number: %d\n", *test_num);
-}
+static FxPerspectiveCamera* current_camera = nullptr;
 
-void FirstTestFunc(FxRef<int> test_num)
+class TestScript : public FxScript
 {
-    (*test_num) = 20;
-    SecondTestFunc(test_num);
-}
+public:
+    TestScript()
+    {
+    }
+
+    void RenderTick() override
+    {
+        Entity->mModelMatrix.LookAt(Entity->GetPosition(), current_camera->Position, FxVec3f::Up);
+    }
+
+    ~TestScript() override
+    {
+    }
+};
 
 void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
 {
@@ -135,31 +142,53 @@ int main()
     // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
+    current_camera = &camera;
 
-    FxRef<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
-    FxRef<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
+    // FxRef<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
+    FxRef<FxModel> helmet_model = FxAssetManager::LoadAsset<FxModel>("../models/DamagedHelmet.glb");
 
-    test_image->WaitUntilLoaded();
+    // FxRef<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
+    FxRef<FxImage> cheese_image = FxAssetManager::LoadAsset<FxImage>("../textures/cheese.jpg");
 
-    FxRef<FxMaterial> material = FxMaterialManager::New("Default");
-    material->Attach(FxMaterial::ResourceType::Diffuse, test_image);
-    material->Build(&pipeline);
+    // FxRef<FxMaterial> material = FxMaterialManager::New("Default");
+    // material->Attach(FxMaterial::ResourceType::Diffuse, test_image);
+    // material->Build(&pipeline);
+    //
+    helmet_model->WaitUntilLoaded();
 
+    FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &pipeline);
+    cheese_material->Attach(FxMaterial::ResourceType::Diffuse, cheese_image);
 
-    FxSceneObject scene_object;
-    scene_object.Attach(other_model);
-    scene_object.Attach(material);
+    // FxSceneObject scene_object;
+    // scene_object.Attach(other_model);
+    // scene_object.Attach(material);
+
+    FxSceneObject helmet_object;
+    helmet_object.Attach(helmet_model, pipeline);
+
+    if (helmet_model->Materials.size() > 0) {
+        FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
+        helmet_material->Pipeline = &pipeline;
+
+        helmet_object.Attach(helmet_material);
+    }
+    else {
+        helmet_object.Attach(cheese_material);
+    }
+
+    // FxRef<FxScript> script_instance = FxRef<TestScript>::New();
+    // helmet_object.Attach(script_instance);
 
     for (RvkFrameData& frame : Renderer->Frames) {
         frame.DescriptorSet.Create(Renderer->DescriptorPool, pipeline.MainDescriptorSetLayout);
 
         VkDescriptorBufferInfo ubo_info{
-            .buffer = frame.UniformBuffer.Buffer,
+            .buffer = frame.Ubo.Buffer,
             .offset = 0,
             .range = sizeof(RvkUniformBufferObject)
         };
 
-        VkWriteDescriptorSet buffer_write{
+        VkWriteDescriptorSet ubo_write{
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount = 1,
@@ -169,30 +198,7 @@ int main()
             .pBufferInfo = &ubo_info,
         };
 
-        // VkDescriptorImageInfo image_info{
-        //     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        //     .imageView = test_image->Texture.Image.View,
-        //     .sampler = test_image->Texture.Sampler
-        // };
-
-        // VkWriteDescriptorSet image_write{
-        //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        //     .descriptorCount = 1,
-        //     .dstSet = frame.DescriptorSet,
-        //     .dstBinding = 1,
-        //     .dstArrayElement = 0,
-        //     .pImageInfo = &image_info,
-        // };
-        // auto buffer_write = frame.DescriptorSet.GetBufferWrite(0, frame.UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        // auto image_write = frame.DescriptorSet.GetImageWrite(
-        //     1,
-        //     test_image->Texture,
-        //     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
-        // );
-
-        const VkWriteDescriptorSet writes[] = { buffer_write };
+        const VkWriteDescriptorSet writes[] = { ubo_write };
 
         vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
 
@@ -242,30 +248,37 @@ int main()
             camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_R)) {
+            // camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
+        }
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
+
+            helmet_object.mModelMatrix.Print();
             // FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
-        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_C) && !other_model->IsUploadedToGpu) {
-        //     FxAssetManager::LoadModel(new_model, "../models/DamagedHelmet.glb");
-        //     FxAssetManager::LoadModel(other_model, "../models/DamagedHelmet.glb");
-        // }
-        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_V) && other_model->IsUploadedToGpu) {
-        //     other_model->Destroy();
-        // }
-
         camera.Update();
 
-        Mat4f VPMatrix = camera.ViewMatrix * camera.ProjectionMatrix;
-        Mat4f MVPMatrix = model_matrix * VPMatrix;
+        // FxVec3f translation = FxVec3f(sin(Renderer->GetElapsedFrameCount() * 0.05f) * 0.005f * DeltaTime, cos(Renderer->GetElapsedFrameCount() * 0.05f) * 0.005f * DeltaTime, 0.0f);
 
-        if (Renderer->BeginFrame(pipeline, MVPMatrix) != FrameResult::Success) {
+        // helmet_object.Translate(translation);
+
+
+        // Mat4f MVPMatrix = model_matrix * camera.VPMatrix;
+
+        if (Renderer->BeginFrame(pipeline) != FrameResult::Success) {
             continue;
         }
 
         CheckGeneralControls();
 
-        RvkFrameData* frame = Renderer->GetFrame();
+
+        // helmet_object.mModelMatrix.LookAt(helmet_object.GetPosition(), current_camera->Position, FxVec3f::Up);
+
+        // RvkFrameData* frame = Renderer->GetFrame();
+
+
 
 
         // sets_to_bind[0] = frame->DescriptorSet.Set;
@@ -280,7 +293,8 @@ int main()
         // new_model->Render(pipeline);
         // other_model->Render(pipeline);
         //
-        scene_object.Render();
+        helmet_object.Render(camera);
+        // scene_object.Render(camera);
 
         Renderer->FinishFrame(pipeline);
 
@@ -288,8 +302,6 @@ int main()
     }
 
     Renderer->GetDevice()->WaitForIdle();
-
-    test_image->Destroy();
 
     material_manager.Destroy();
     asset_manager.Shutdown();

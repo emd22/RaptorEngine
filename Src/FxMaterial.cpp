@@ -36,7 +36,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     mInitialized = true;
 }
 
-FxRef<FxMaterial> FxMaterialManager::New(const std::string& name)
+FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RvkGraphicsPipeline* pipeline)
 {
     FxMaterialManager& gm = GetGlobalManager();
 
@@ -44,12 +44,15 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name)
         gm.Create();
     }
 
-    FxMaterial* mat = gm.mMaterials.Insert();
+    // FxMaterial* mat = gm.mMaterials.Insert();
 
-    mat->NameHash = FxHashStr(name.c_str());
-    mat->Name = name;
+    FxRef<FxMaterial> ref = FxRef<FxMaterial>::New();
 
-    return FxRef<FxMaterial>::New();
+    ref->NameHash = FxHashStr(name.c_str());
+    ref->Name = name;
+    ref->Pipeline = pipeline;
+
+    return ref;
 }
 
 void FxMaterialManager::Destroy()
@@ -91,16 +94,37 @@ void FxMaterialManager::Destroy()
 
 //     return mSetLayout;
 // }
-
-void FxMaterial::Bind(RvkCommandBuffer* cmd)
+//
+bool FxMaterial::IsReady()
 {
-    if (!mIsBuilt.load()) {
-        Log::Warning("Material %s is not built!", Name.c_str());
-        return;
+    if (mIsReady) {
+        return true;
     }
 
+    if (!Diffuse || !Diffuse->IsLoaded()) {
+        return false;
+    }
+
+    return (mIsReady = true);
+}
+
+bool FxMaterial::Bind(RvkCommandBuffer* cmd)
+{
+    if (!IsBuilt.load()) {
+        Build();
+    }
+
+    if (!IsReady()) {
+        return false;
+    }
+
+    // if (!mIsBuilt.load()) {
+    //     Log::Warning("Material %s is not built!", Name.c_str());
+    //     return;
+    // }
+
     if (!mDescriptorSet) {
-        return;
+        return false;
     }
 
     if (!cmd) {
@@ -108,17 +132,19 @@ void FxMaterial::Bind(RvkCommandBuffer* cmd)
     }
 
     mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
+    return true;
 }
 
 void FxMaterial::Destroy()
 {
-    if (!mIsBuilt.load()) {
+    printf("Freeing material\n");
+    if (!IsBuilt.load()) {
         return;
     }
 
     vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
 
-    mIsBuilt.store(false);
+    IsBuilt.store(false);
 }
 
 #define PUSH_IMAGE_IF_SET(img, binding) \
@@ -140,10 +166,8 @@ void FxMaterial::Destroy()
         image_infos.Insert(image_write); \
     }
 
-void FxMaterial::Build(RvkGraphicsPipeline* pipeline)
+void FxMaterial::Build()
 {
-    Pipeline = pipeline;
-
     if (!mDescriptorSet.IsInited()) {
         mDescriptorSet.Create(FxMaterialManager::GetPool(), Pipeline->MaterialDescriptorSetLayout);
     }
@@ -161,5 +185,5 @@ void FxMaterial::Build(RvkGraphicsPipeline* pipeline)
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
 
     // Mark material as built
-    mIsBuilt.store(true);
+    IsBuilt.store(true);
 }

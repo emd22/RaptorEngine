@@ -2,12 +2,11 @@
 
 #include "../Types.hpp"
 
-#include "../FxLinkedList.hpp"
+#include "FxMPLinkedList.hpp"
 
 #include <type_traits>
 #include <vector>
 
-namespace experimental {
 
 class FxMemPoolPage
 {
@@ -60,6 +59,11 @@ public:
         }
 
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
+        if (node == nullptr) {
+            Log::Error("FxMemPoolPage::Free: Could not find ptr %p in memory page!", ptr);
+            FX_BREAKPOINT;
+            return;
+        }
         mMemBlocks.DeleteNode(node);
     }
 
@@ -77,8 +81,8 @@ public:
     }
 
 private:
-    auto AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPoolPage::MemBlock>::Node*;
-    auto GetNodeFromPtr(void* ptr) const->FxLinkedList<FxMemPoolPage::MemBlock>::Node*;
+    auto AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
+    auto GetNodeFromPtr(void* ptr) const->FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
 
     inline void CheckInited()
     {
@@ -92,7 +96,7 @@ private:
     uint64 mSize = 0;
     uint8* mMem = nullptr;
 
-    FxLinkedList<MemBlock> mMemBlocks;
+    FxMPLinkedList<MemBlock> mMemBlocks;
 };
 
 class FxMemPool
@@ -158,7 +162,7 @@ public:
     }
 
     /** Frees an allocated pointer on the global memory pool */
-    static void Free(void* ptr, FxMemPool* pool = nullptr);
+    static void FreeRaw(void* ptr, FxMemPool* pool = nullptr);
 
     template <typename Type>
     static void Free(Type* ptr, FxMemPool* pool = nullptr)
@@ -167,12 +171,12 @@ public:
             ptr->~Type();
         }
 
-        Free(static_cast<void*>(ptr), pool);
+        FreeRaw(static_cast<void*>(ptr), pool);
     }
 
 private:
 
-    auto AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPoolPage::MemBlock>::Node*;
+    auto AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
 
     FxMemPoolPage* FindPtrInPage(void* ptr);
     inline bool IsPtrInPage(void* ptr, FxMemPoolPage* page) const;
@@ -186,5 +190,3 @@ private:
     std::vector<FxMemPoolPage> mPoolPages;
 
 };
-
-} // namespace experimental

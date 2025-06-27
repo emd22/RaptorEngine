@@ -446,13 +446,12 @@ void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
 }
 
 
-static RvkUniformBufferObject ubo;
 
-FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline, Mat4f &MVPMatrix)
+FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline)
 {
     RvkFrameData *frame = GetFrame();
 
-    memcpy(ubo.MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
+    // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
     frame->InFlight.WaitFor();
 
@@ -505,8 +504,6 @@ void FxRenderBackend::SubmitFrame()
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
-
-    frame->SubmitUbo(&ubo);
 
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -605,6 +602,12 @@ FrameResult FxRenderBackend::GetNextSwapchainImage(RvkFrameData *frame)
     }
 
     return FrameResult::RenderError;
+}
+
+inline RvkUniformBufferObject& FxRenderBackend::GetUbo()
+{
+    static RvkUniformBufferObject ubo;
+    return ubo;
 }
 
 void FxRenderBackend::CreateSurfaceFromWindow()

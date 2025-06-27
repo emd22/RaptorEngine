@@ -5,7 +5,7 @@
 #include <Core/Log.hpp>
 #include <jpeglib.h>
 
-#include <Core/FxMemPool.hpp>
+#include <Core/FxMemory.hpp>
 
 #include <Core/FxRef.hpp>
 
@@ -55,6 +55,46 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const
     jpeg_finish_decompress(&mJpegInfo);
 
     fclose(fp);
+
+    return Status::Success;
+}
+
+FxJpegLoader::Status FxJpegLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, const uint8* data, uint32 size)
+{
+    FxImage* image = static_cast<FxImage*>(asset.Get());
+
+    struct jpeg_error_mgr error_mgr;
+
+    mJpegInfo.err = jpeg_std_error(&error_mgr);
+    jpeg_create_decompress(&mJpegInfo);
+
+    jpeg_mem_src(&mJpegInfo, data, size);
+
+    jpeg_read_header(&mJpegInfo, true);
+
+    mJpegInfo.out_color_space = JCS_EXT_RGBA;
+
+    jpeg_start_decompress(&mJpegInfo);
+
+    printf("Image has %d components.\n", mJpegInfo.output_components);
+    image->NumComponents = mJpegInfo.output_components;
+
+    printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
+    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+
+    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
+    mImageData.InitSize(data_size);
+
+    const uint32 row_stride = image->NumComponents * mJpegInfo.output_width;
+
+    uint8* ptr_list[1];
+
+    while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
+        ptr_list[0] = (mImageData.Data + (row_stride * mJpegInfo.output_scanline));
+        jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
+    }
+
+    jpeg_finish_decompress(&mJpegInfo);
 
     return Status::Success;
 }

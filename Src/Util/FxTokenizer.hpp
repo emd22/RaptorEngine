@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Core/Types.hpp>
-#include <Core/FxMemPool.hpp>
+#include <Core/FxMemory.hpp>
 
 #include <vector>
 #include <string>

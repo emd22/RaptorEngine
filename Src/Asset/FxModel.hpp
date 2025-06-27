@@ -3,6 +3,8 @@
 #include "FxBaseAsset.hpp"
 
 #include <Renderer/FxMesh.hpp>
+#include <Core/FxRef.hpp>
+#include <FxMaterial.hpp>
 
 #include <Core/FxStaticPtrArray.hpp>
 
@@ -41,6 +43,7 @@ public:
 
 public:
     FxStaticPtrArray<FxMesh> Meshes;
+    std::vector<FxRef<FxMaterial>> Materials;
 
 private:
     bool mModelReady = false;

@@ -3,7 +3,7 @@
 #include <atomic>
 #include <cstddef>
 
-#include "FxMemPool.hpp"
+#include "FxMemory.hpp"
 
 #include "FxPanic.hpp"
 
@@ -173,7 +173,9 @@ private:
 
 
         if (mRefCnt->Dec() == 0) {
-            FxMemPool::Free<T>(mPtr);
+            if (mPtr) {
+                FxMemPool::Free<T>(mPtr);
+            }
             FxMemPool::Free<FxRefCount>(mRefCnt);
 
             mPtr = nullptr;

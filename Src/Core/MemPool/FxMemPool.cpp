@@ -3,8 +3,6 @@
 #include "../FxPanic.hpp"
 #include "../Types.hpp"
 
-namespace experimental {
-
 void FxMemPoolPage::Create(uint64 size)
 {
     if (mMem || mSize) {
@@ -43,7 +41,7 @@ static inline uint8* GetAlignedPtr(uint8* ptr)
 }
 
 
-auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPoolPage::MemBlock>::Node*
+auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
     auto* node = mMemBlocks.Head;
 
@@ -118,7 +116,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemP
     return new_node;
 }
 
-auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxLinkedList<FxMemPoolPage::MemBlock>::Node*
+auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
     auto* node = mMemBlocks.Head;
 
@@ -138,7 +136,7 @@ FxMemPool& FxMemPool::GetGlobalPool()
     return global_pool;
 }
 
-auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxLinkedList<FxMemPoolPage::MemBlock>::Node*
+auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
     auto* node = mCurrentPage->AllocateMemory(requested_size);
 
@@ -298,7 +296,7 @@ void FxMemPool::AllocateNewPage()
 
 }
 
-void FxMemPool::Free(void* ptr, FxMemPool* pool)
+void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
 {
     if (pool == nullptr) {
         pool = &GetGlobalPool();
@@ -309,7 +307,11 @@ void FxMemPool::Free(void* ptr, FxMemPool* pool)
     }
 
     // From the global pool,
-    pool->FindPtrInPage(ptr)->Free(ptr);
+    FxMemPoolPage* page = pool->FindPtrInPage(ptr);
+    if (page == nullptr) {
+        Log::Error("FxMemPool::Free: Pointer %p not found! Has it been freed already?", ptr);
+        FX_BREAKPOINT;
+        return;
+    }
+    page->Free(ptr);
 }
-
-} // namespace experimental
