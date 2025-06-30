@@ -15,6 +15,9 @@
 class RvkImage
 {
 public:
+
+    RvkGpuDevice* GetDevice();
+
     void Create(
         Vec2u size,
         VkFormat format,

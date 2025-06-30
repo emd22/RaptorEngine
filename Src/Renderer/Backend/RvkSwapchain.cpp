@@ -29,22 +29,33 @@ void RvkSwapchain::CreateSwapchainImages()
 
     vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
 
-    Images.InitSize(image_count);
-    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, Images.Data);
+    // Images.InitSize(image_count);
+
+    FxSizedArray<VkImage> raw_images;
+    raw_images.InitSize(image_count);
+
+    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.Data);
+
+    Images.InitCapacity(image_count);
+
+    for (VkImage& raw_image : raw_images) {
+        RvkImage* image = Images.Insert();
+        image->Image = raw_image;
+        image->View = nullptr;
+        image->Allocation = nullptr;
+        image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        image->Format = SurfaceFormat.format;
+    }
 
     DepthImages.InitSize(image_count);
 }
 
 void RvkSwapchain::CreateImageViews()
 {
-    const uint64 images_size = Images.Size;
-
-    ImageViews.InitSize(images_size);
-
-    for (int32 i = 0; i < images_size; i++) {
+    for (int32 i = 0; i < Images.Size; i++) {
         const VkImageViewCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = Images[i],
+            .image = Images[i].Image,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
             .format = SurfaceFormat.format,
             .components = {
@@ -62,7 +73,7 @@ void RvkSwapchain::CreateImageViews()
             }
         };
 
-        VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &ImageViews[i]);
+        VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &Images[i].View);
         if (status != VK_SUCCESS) {
             FxModulePanic("Could not create swapchain image view", status);
         }
@@ -142,15 +153,15 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
 
 void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline)
 {
-    Log::Debug("Image view count: %d", ImageViews.Size);
+    Log::Debug("Image view count: %d", Images.Size);
     Framebuffers.Free();
-    Framebuffers.InitSize(ImageViews.Size);
+    Framebuffers.InitSize(Images.Size);
 
     FxSizedArray<VkImageView> temp_views;
     temp_views.InitSize(2);
 
-    for (int i = 0; i < ImageViews.Size; i++) {
-        temp_views[0] = ImageViews[i];
+    for (int i = 0; i < Images.Size; i++) {
+        temp_views[0] = Images[i].View;
         temp_views[1] = DepthImages[i].View;
 
         Framebuffers[i].Create(temp_views, *pipeline, Extent);
@@ -169,13 +180,15 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
     }
     DepthImages.Free();
 
-    for (int i = 0; i < ImageViews.Size; i++) {
+    for (int i = 0; i < Images.Size; i++) {
         Framebuffers[i].Destroy();
-        vkDestroyImageView(mDevice->Device, ImageViews[i], nullptr);
+        Images[i].Destroy();
+
+        // vkDestroyImageView(mDevice->Device, Images2[i].View, nullptr);
     }
 
     Framebuffers.Free();
-    ImageViews.Free();
+    Images.Free();
 }
 
 void RvkSwapchain::DestroyInternalSwapchain()
@@ -185,8 +198,12 @@ void RvkSwapchain::DestroyInternalSwapchain()
 
 void RvkSwapchain::Destroy()
 {
+    if (!Initialized) {
+        return;
+    }
+
     DestroyFramebuffersAndImageViews();
-    Images.Free();
+    // Images.Free();
     DestroyInternalSwapchain();
 
     Initialized = false;
@@ -194,5 +211,6 @@ void RvkSwapchain::Destroy()
 
 RvkSwapchain::~RvkSwapchain()
 {
-    Images.Free();
+    Destroy();
+    // Images.Free();
 }

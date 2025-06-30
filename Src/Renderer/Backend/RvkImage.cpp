@@ -9,6 +9,19 @@
 
 FX_SET_MODULE_NAME("RvkImage")
 
+RvkGpuDevice* RvkImage::GetDevice()
+{
+    // If the device has not been created with `::Create` then mDevice will not be set.
+    // I think this would be fine, there should probably be a `::Build` or `::Create` method that
+    // does this instead though.
+
+    if (mDevice == nullptr) {
+        mDevice = Renderer->GetDevice();
+    }
+
+    return mDevice;
+}
+
 void RvkImage::Create(
     Vec2u size,
     VkFormat format,
@@ -72,7 +85,7 @@ void RvkImage::Create(
         }
     };
 
-    status = vkCreateImageView(mDevice->Device, &view_create_info, nullptr, &View);
+    status = vkCreateImageView(GetDevice()->Device, &view_create_info, nullptr, &View);
     if (status != VK_SUCCESS) {
         FxModulePanic("Could not create swapchain image view", status);
     }
@@ -121,15 +134,17 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
 
 void RvkImage::Destroy()
 {
-    if (Image == nullptr || Allocation == nullptr) {
-        return;
+    if (View != nullptr) {
+        vkDestroyImageView(GetDevice()->Device, View, nullptr);
     }
 
-    vkDestroyImageView(this->mDevice->Device, this->View, nullptr);
-    vmaDestroyImage(Renderer->GpuAllocator, this->Image, this->Allocation);
+    if (Image != nullptr && Allocation != nullptr) {
+        vmaDestroyImage(Renderer->GpuAllocator, this->Image, this->Allocation);
+    }
 
     this->Image = nullptr;
     this->Allocation = nullptr;
+    this->View = nullptr;
 
     // Fx_Fwd_AddToDeletionQueue([this](FxDeletionObject* obj) {
     //     if (this->Image == nullptr || this->Allocation == nullptr) {
