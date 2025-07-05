@@ -139,6 +139,7 @@ public:
 
         DrawPushConstants push_constants{};
         memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(Mat4f));
+        memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(Mat4f));
 
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, mMaterial->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 

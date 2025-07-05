@@ -48,6 +48,7 @@ void RvkSwapchain::CreateSwapchainImages()
     }
 
     DepthImages.InitSize(image_count);
+    PositionImages.InitSize(image_count);
 }
 
 void RvkSwapchain::CreateImageViews()
@@ -86,6 +87,14 @@ void RvkSwapchain::CreateImageViews()
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             VK_IMAGE_ASPECT_DEPTH_BIT
+        );
+
+        PositionImages[i].Create(
+            Extent,
+            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT
         );
     }
 }
@@ -158,11 +167,12 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline)
     Framebuffers.InitSize(Images.Size);
 
     FxSizedArray<VkImageView> temp_views;
-    temp_views.InitSize(2);
+    temp_views.InitSize(3);
 
     for (int i = 0; i < Images.Size; i++) {
         temp_views[0] = Images[i].View;
-        temp_views[1] = DepthImages[i].View;
+        temp_views[1] = PositionImages[i].View;
+        temp_views[2] = DepthImages[i].View;
 
         Framebuffers[i].Create(temp_views, *pipeline, Extent);
     }
@@ -174,21 +184,21 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline)
 
 void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
-    // Destroy and free depth images
-    for (RvkImage &depth_image : DepthImages) {
-        depth_image.Destroy();
-    }
-    DepthImages.Free();
-
     for (int i = 0; i < Images.Size; i++) {
         Framebuffers[i].Destroy();
         Images[i].Destroy();
+
+        DepthImages[i].Destroy();
+        PositionImages[i].Destroy();
 
         // vkDestroyImageView(mDevice->Device, Images2[i].View, nullptr);
     }
 
     Framebuffers.Free();
     Images.Free();
+
+    DepthImages.Free();
+    PositionImages.Free();
 }
 
 void RvkSwapchain::DestroyInternalSwapchain()

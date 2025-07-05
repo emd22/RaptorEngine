@@ -139,20 +139,37 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list) {
     };
 
 
-    VkPipelineColorBlendAttachmentState color_blend_attachment {
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-                        | VK_COLOR_COMPONENT_G_BIT
-                        | VK_COLOR_COMPONENT_B_BIT
-                        | VK_COLOR_COMPONENT_A_BIT,
-        .blendEnable = VK_FALSE,
+    // VkPipelineColorBlendAttachmentState color_blend_attachment {
+    //     .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+    //                     | VK_COLOR_COMPONENT_G_BIT
+    //                     | VK_COLOR_COMPONENT_B_BIT
+    //                     | VK_COLOR_COMPONENT_A_BIT,
+    //     .blendEnable = VK_FALSE,
+    // };
+
+    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        },
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        },
     };
 
 
     VkPipelineColorBlendStateCreateInfo color_blend_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE,
-        .attachmentCount = 1,
-        .pAttachments = &color_blend_attachment,
+        .attachmentCount = sizeof(color_blend_attachments) / sizeof(color_blend_attachments[0]),
+        .pAttachments = color_blend_attachments,
     };
 
 

@@ -37,6 +37,7 @@ public:
 
     FxSizedArray<RvkImage> Images;
     FxSizedArray<RvkImage> DepthImages;
+    FxSizedArray<RvkImage> PositionImages;
 
     FxSizedArray<RvkFramebuffer> Framebuffers;
 

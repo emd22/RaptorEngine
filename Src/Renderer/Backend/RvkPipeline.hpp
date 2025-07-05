@@ -52,6 +52,7 @@ struct VertexInfo
 struct alignas(16) DrawPushConstants
 {
     float32 MVPMatrix[16];
+    float32 ModelMatrix[16];
 };
 
 class RvkGraphicsPipeline

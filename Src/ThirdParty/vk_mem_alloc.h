@@ -124,6 +124,7 @@ for user-defined purpose without allocating any real GPU memory.
 
 \defgroup group_stats Statistics
 
+ /Users/emd22/Projects/a2/src/ThirdParty/vk_mem_alloc.h:137:10 'vulkan/vulkan.h' file not found
 \brief API elements that query current status of the allocator, from memory usage, budget, to full dump of the internal state in JSON format.
 See documentation chapter: \ref statistics.
 */
