@@ -10,8 +10,11 @@ class RvkRenderPass
 {
 public:
     void Create(RvkGpuDevice &device, RvkSwapchain &swapchain);
+    void CreateComp(RvkGpuDevice& device, RvkSwapchain& swapchain);
 
     void Begin();
+    void BeginComp();
+
     void End();
 
     void Destroy(RvkGpuDevice &device);

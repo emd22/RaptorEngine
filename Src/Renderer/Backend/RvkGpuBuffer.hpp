@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/Util.hpp"
+#include "Core/FxUtil.hpp"
 #include <Core/Types.hpp>
 #include <Core/FxPanic.hpp>
 

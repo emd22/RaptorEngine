@@ -36,10 +36,10 @@ void RvkSwapchain::CreateSwapchainImages()
 
     vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.Data);
 
-    Images.InitCapacity(image_count);
+    OutputImages.InitCapacity(image_count);
 
     for (VkImage& raw_image : raw_images) {
-        RvkImage* image = Images.Insert();
+        RvkImage* image = OutputImages.Insert();
         image->Image = raw_image;
         image->View = nullptr;
         image->Allocation = nullptr;
@@ -47,16 +47,17 @@ void RvkSwapchain::CreateSwapchainImages()
         image->Format = SurfaceFormat.format;
     }
 
+    AlbedoImages.InitSize(image_count);
     DepthImages.InitSize(image_count);
     PositionImages.InitSize(image_count);
 }
 
 void RvkSwapchain::CreateImageViews()
 {
-    for (int32 i = 0; i < Images.Size; i++) {
+    for (int32 i = 0; i < OutputImages.Size; i++) {
         const VkImageViewCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = Images[i].Image,
+            .image = OutputImages[i].Image,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
             .format = SurfaceFormat.format,
             .components = {
@@ -74,14 +75,21 @@ void RvkSwapchain::CreateImageViews()
             }
         };
 
-        VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &Images[i].View);
+        VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &OutputImages[i].View);
         if (status != VK_SUCCESS) {
             FxModulePanic("Could not create swapchain image view", status);
         }
 
-        RvkImage &depth_image = DepthImages[i];
+        OutputImages[i].Create(
+            Extent,
+            VK_FORMAT_B8G8R8A8_UNORM,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT
+        );
 
-        depth_image.Create(
+
+        DepthImages[i].Create(
             Extent,
             VK_FORMAT_D16_UNORM,
             VK_IMAGE_TILING_OPTIMAL,
@@ -91,7 +99,15 @@ void RvkSwapchain::CreateImageViews()
 
         PositionImages[i].Create(
             Extent,
-            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_FORMAT_B8G8R8A8_UNORM,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT
+        );
+
+        AlbedoImages[i].Create(
+            Extent,
+            VK_FORMAT_B8G8R8A8_UNORM,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT
@@ -160,33 +176,48 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
     }
 }
 
-void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline *pipeline)
+void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, RvkGraphicsPipeline* comp_pipeline)
 {
-    Log::Debug("Image view count: %d", Images.Size);
-    Framebuffers.Free();
-    Framebuffers.InitSize(Images.Size);
+    Log::Debug("Image view count: %d", AlbedoImages.Size);
+    GPassFramebuffers.Free();
+    GPassFramebuffers.InitSize(AlbedoImages.Size);
 
     FxSizedArray<VkImageView> temp_views;
     temp_views.InitSize(3);
 
-    for (int i = 0; i < Images.Size; i++) {
-        temp_views[0] = Images[i].View;
+    for (int i = 0; i < AlbedoImages.Size; i++) {
+        temp_views[0] = AlbedoImages[i].View;
         temp_views[1] = PositionImages[i].View;
         temp_views[2] = DepthImages[i].View;
 
-        Framebuffers[i].Create(temp_views, *pipeline, Extent);
+        GPassFramebuffers[i].Create(temp_views, *pipeline, Extent);
     }
 
-    Log::Debug("Create framebuffers", 0);
+    Log::Debug("Create GPass framebuffers", 0);
+
+    assert(OutputImages.Size == AlbedoImages.Size);
+
+    CompFramebuffers.Free();
+    CompFramebuffers.InitSize(OutputImages.Size);
+
+    FxSizedArray<VkImageView> temp_views2;
+    temp_views2.InitSize(1);
+
+    for (int i = 0; i < OutputImages.Size; i++) {
+        temp_views2[0] = OutputImages[i].View;
+
+        CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
+    }
 
     mPipeline = pipeline;
+    mCompPipeline = comp_pipeline;
 }
 
 void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
-    for (int i = 0; i < Images.Size; i++) {
-        Framebuffers[i].Destroy();
-        Images[i].Destroy();
+    for (int i = 0; i < AlbedoImages.Size; i++) {
+        GPassFramebuffers[i].Destroy();
+        AlbedoImages[i].Destroy();
 
         DepthImages[i].Destroy();
         PositionImages[i].Destroy();
@@ -194,8 +225,8 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
         // vkDestroyImageView(mDevice->Device, Images2[i].View, nullptr);
     }
 
-    Framebuffers.Free();
-    Images.Free();
+    GPassFramebuffers.Free();
+    AlbedoImages.Free();
 
     DepthImages.Free();
     PositionImages.Free();

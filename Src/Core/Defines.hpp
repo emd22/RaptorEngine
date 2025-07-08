@@ -19,4 +19,4 @@
 
 
 #define FX_SET_MODULE_NAME(str) \
-    static const char *FxModuleName__ = str;
+    [[maybe_unused]] static const char *FxModuleName__ = str;

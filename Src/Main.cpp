@@ -78,8 +78,48 @@ public:
     }
 };
 
+void CreateCompositionPipeline(RvkGraphicsPipeline& pipeline)
+{
+    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        }
+    };
+
+    RvkShader vertex_shader("../shaders/composition.vert.spv", RvkShaderType::Vertex);
+    RvkShader fragment_shader("../shaders/composition.frag.spv", RvkShaderType::Fragment);
+
+    ShaderList shader_list{ .Vertex = vertex_shader, .Fragment = fragment_shader };
+
+    const int attachment_count = FxSizeofArray(color_blend_attachments);
+    pipeline.Create(shader_list, pipeline.CreateCompLayout(), FxMakeSlice(color_blend_attachments, attachment_count), true);
+}
+
 void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
 {
+    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+        // Positions
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        },
+        // Albedo
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        },
+    };
+
     ShaderList shader_list;
 
     RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
@@ -88,8 +128,8 @@ void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
 
-    pipeline.Create(shader_list);
-
+    const int attachment_count = FxSizeofArray(color_blend_attachments);
+    pipeline.Create(shader_list, pipeline.CreateGPassLayout(), FxMakeSlice(color_blend_attachments, attachment_count), false);
 }
 
 int main()
@@ -126,11 +166,22 @@ int main()
     RvkGraphicsPipeline pipeline;
 
     CreateSolidPipeline(pipeline);
-    Renderer->Swapchain.CreateSwapchainFramebuffers(&pipeline);
 
-    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
-    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    Renderer->DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+    Renderer->GPassDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
+    Renderer->GPassDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    Renderer->GPassDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+
+    RvkGraphicsPipeline composition_pipeline;
+
+    // Positions sampler
+    Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Albedo sampler
+    Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    Renderer->CompDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+
+    CreateCompositionPipeline(composition_pipeline);
+
+    Renderer->Swapchain.CreateSwapchainFramebuffers(&pipeline, &composition_pipeline);
 
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
@@ -180,7 +231,7 @@ int main()
     // helmet_object.Attach(script_instance);
 
     for (RvkFrameData& frame : Renderer->Frames) {
-        frame.DescriptorSet.Create(Renderer->DescriptorPool, pipeline.MainDescriptorSetLayout);
+        frame.DescriptorSet.Create(Renderer->GPassDescriptorPool, pipeline.MainDescriptorSetLayout);
 
         VkDescriptorBufferInfo ubo_info{
             .buffer = frame.Ubo.Buffer,

@@ -138,13 +138,11 @@ bool FxMaterial::Bind(RvkCommandBuffer* cmd)
 void FxMaterial::Destroy()
 {
     printf("Freeing material\n");
-    if (!IsBuilt.load()) {
-        return;
+
+    if (IsBuilt.load()) {
+        vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
+        IsBuilt.store(false);
     }
-
-    vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
-
-    IsBuilt.store(false);
 }
 
 #define PUSH_IMAGE_IF_SET(img, binding) \

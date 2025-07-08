@@ -144,7 +144,6 @@ public:
         });
     }
 
-
     uint32 GetElapsedFrameCount() const { return mInternalFrameCounter; }
     uint32 GetFrameNumber() const { return mFrameNumber; }
 
@@ -179,7 +178,8 @@ public:
     VmaAllocator GpuAllocator = nullptr;
 
     // XXX: temporary
-    RvkDescriptorPool DescriptorPool;
+    RvkDescriptorPool GPassDescriptorPool;
+    RvkDescriptorPool CompDescriptorPool;
 
     FxGpuUploadContext UploadContext;
 

@@ -4,6 +4,7 @@
 #include "RvkRenderPass.hpp"
 
 #include <Core/FxSizedArray.hpp>
+#include <Core/FxSlice.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -58,7 +59,10 @@ struct alignas(16) DrawPushConstants
 class RvkGraphicsPipeline
 {
 public:
-    void Create(ShaderList shader_list);
+    void Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
+    VkPipelineLayout CreateGPassLayout();
+    VkPipelineLayout CreateCompLayout();
+
     void Destroy();
 
     void Bind(RvkCommandBuffer &command_buffer);
@@ -67,14 +71,15 @@ public:
     {
         Destroy();
     }
-
 private:
     VertexInfo MakeVertexInfo();
-    void CreateLayout();
 
 public:
     VkDescriptorSetLayout MainDescriptorSetLayout = nullptr;
     VkDescriptorSetLayout MaterialDescriptorSetLayout = nullptr;
+
+    VkDescriptorSetLayout CompDescriptorSetLayout = nullptr;
+
     // VkDescriptorSetLayout DescriptorSetLayout = nullptr;
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;

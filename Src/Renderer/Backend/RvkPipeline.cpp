@@ -30,8 +30,9 @@ VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
     return { binding_desc, std::move(attribs) };
 }
 
-void RvkGraphicsPipeline::Create(ShaderList shader_list) {
+void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
     mDevice = Renderer->GetDevice();
+    Layout = layout;
 
     VkSpecializationInfo specialization_info = {
         .mapEntryCount = 0,
@@ -139,42 +140,38 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list) {
     };
 
 
-    // VkPipelineColorBlendAttachmentState color_blend_attachment {
-    //     .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-    //                     | VK_COLOR_COMPONENT_G_BIT
-    //                     | VK_COLOR_COMPONENT_B_BIT
-    //                     | VK_COLOR_COMPONENT_A_BIT,
-    //     .blendEnable = VK_FALSE,
+    // VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+    //     VkPipelineColorBlendAttachmentState {
+    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+    //                         | VK_COLOR_COMPONENT_G_BIT
+    //                         | VK_COLOR_COMPONENT_B_BIT
+    //                         | VK_COLOR_COMPONENT_A_BIT,
+    //         .blendEnable = VK_FALSE,
+    //     },
+    //     VkPipelineColorBlendAttachmentState {
+    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+    //                         | VK_COLOR_COMPONENT_G_BIT
+    //                         | VK_COLOR_COMPONENT_B_BIT
+    //                         | VK_COLOR_COMPONENT_A_BIT,
+    //         .blendEnable = VK_FALSE,
+    //     },
     // };
-
-    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-        VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-                            | VK_COLOR_COMPONENT_G_BIT
-                            | VK_COLOR_COMPONENT_B_BIT
-                            | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = VK_FALSE,
-        },
-        VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-                            | VK_COLOR_COMPONENT_G_BIT
-                            | VK_COLOR_COMPONENT_B_BIT
-                            | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = VK_FALSE,
-        },
-    };
 
 
     VkPipelineColorBlendStateCreateInfo color_blend_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE,
-        .attachmentCount = sizeof(color_blend_attachments) / sizeof(color_blend_attachments[0]),
+        .attachmentCount = color_blend_attachments.Size,
         .pAttachments = color_blend_attachments,
     };
 
-
-    CreateLayout();
-    RenderPass.Create(*mDevice, Renderer->Swapchain);
+    // CreateLayout();
+    if (!is_comp) {
+        RenderPass.Create(*mDevice, Renderer->Swapchain);
+    }
+    else {
+        RenderPass.CreateComp(*mDevice, Renderer->Swapchain);
+    }
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -230,7 +227,11 @@ void RvkGraphicsPipeline::Destroy()
     RenderPass.Destroy(*mDevice);
 }
 
-void RvkGraphicsPipeline::CreateLayout() {
+VkPipelineLayout RvkGraphicsPipeline::CreateGPassLayout() {
+    if (mDevice == nullptr) {
+        mDevice = Renderer->GetDevice();
+    }
+
     VkPushConstantRange buffer_range{};
     buffer_range.offset = 0;
     buffer_range.size = sizeof(DrawPushConstants);
@@ -253,19 +254,6 @@ void RvkGraphicsPipeline::CreateLayout() {
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .pImmutableSamplers = nullptr,
     };
-
-    // VkDescriptorSetLayoutBinding sampler_layout_binding {
-    //     .binding = 1,
-    //     .descriptorCount = 1,
-    //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-    //     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-    //     .pImmutableSamplers = nullptr,
-    // };
-
-    // VkDescriptorSetLayoutBinding bindings[] = {
-    //     ubo_layout_binding, //sampler_layout_binding,
-    //     image_layout_binding
-    // };
 
     VkDescriptorSetLayoutCreateInfo ds_layout_info {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -298,7 +286,7 @@ void RvkGraphicsPipeline::CreateLayout() {
 
     VkPipelineLayoutCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = sizeof(layouts) / sizeof(layouts[0]),
+        .setLayoutCount = FxSizeofArray(layouts),
         .pSetLayouts = layouts,
 
         .pushConstantRangeCount = 1,
@@ -306,9 +294,73 @@ void RvkGraphicsPipeline::CreateLayout() {
 
     };
 
-    status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);
+    VkPipelineLayout layout;
+
+    status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);
 
     if (status != VK_SUCCESS) {
         FxModulePanic("Failed to create pipeline layout", status);
     }
+
+    return layout;
+}
+
+
+VkPipelineLayout RvkGraphicsPipeline::CreateCompLayout() {
+    if (mDevice == nullptr) {
+        mDevice = Renderer->GetDevice();
+    }
+
+    VkDescriptorSetLayoutBinding positions_layout_binding {
+        .binding = 1,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    VkDescriptorSetLayoutBinding albedo_layout_binding {
+        .binding = 2,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    VkDescriptorSetLayoutBinding bindings[] = {
+        positions_layout_binding,
+        albedo_layout_binding
+    };
+
+    VkDescriptorSetLayoutCreateInfo comp_layout_info {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = FxSizeofArray(bindings),
+        .pBindings = bindings,
+    };
+
+    VkResult status;
+    status = vkCreateDescriptorSetLayout(mDevice->Device, &comp_layout_info, nullptr, &CompDescriptorSetLayout);
+    if (status != VK_SUCCESS) {
+        FxModulePanic("Failed to create pipeline descriptor set layout", status);
+    }
+
+    VkPipelineLayoutCreateInfo create_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &CompDescriptorSetLayout,
+
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = nullptr,
+
+    };
+
+    VkPipelineLayout layout;
+
+    status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);
+
+    if (status != VK_SUCCESS) {
+        FxModulePanic("Failed to create pipeline layout", status);
+    }
+
+    return layout;
 }

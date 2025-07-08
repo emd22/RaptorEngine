@@ -638,7 +638,8 @@ void FxRenderBackend::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
-    DescriptorPool.Destroy();
+    GPassDescriptorPool.Destroy();
+    CompDescriptorPool.Destroy();
 
     GetDevice()->WaitForIdle();
 
