@@ -3,6 +3,7 @@
 #include "RvkPipeline.hpp"
 #include "RvkImage.hpp"
 #include "RvkFramebuffer.hpp"
+#include "RvkSampler.hpp"
 
 #include <Core/FxSizedArray.hpp>
 #include <Math/Vector.hpp>
@@ -39,6 +40,9 @@ public:
     FxSizedArray<RvkImage> AlbedoImages;
     FxSizedArray<RvkImage> PositionImages;
     FxSizedArray<RvkImage> DepthImages;
+
+    RvkSampler AlbedoSampler;
+    RvkSampler PositionSampler;
 
     FxSizedArray<RvkFramebuffer> GPassFramebuffers;
     FxSizedArray<RvkFramebuffer> CompFramebuffers;

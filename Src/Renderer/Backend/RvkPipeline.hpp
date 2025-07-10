@@ -60,6 +60,7 @@ class RvkGraphicsPipeline
 {
 public:
     void Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
+    void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
     VkPipelineLayout CreateGPassLayout();
     VkPipelineLayout CreateCompLayout();
 

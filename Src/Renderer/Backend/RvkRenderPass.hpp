@@ -13,7 +13,7 @@ public:
     void CreateComp(RvkGpuDevice& device, RvkSwapchain& swapchain);
 
     void Begin();
-    void BeginComp();
+    void BeginComp(RvkCommandBuffer* cmd);
 
     void End();
 

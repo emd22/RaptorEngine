@@ -48,7 +48,7 @@ public:
     void Destroy();
 
     FrameResult BeginFrame(RvkGraphicsPipeline& pipeline);
-    void FinishFrame(RvkGraphicsPipeline& pipeline);
+    void FinishFrame(RvkGraphicsPipeline& pipeline, RvkGraphicsPipeline& comp_pipeline);
 
     void SelectWindow(const FxRef<FxWindow>& window)
     {
@@ -184,6 +184,8 @@ public:
     FxGpuUploadContext UploadContext;
 
     bool Initialized = false;
+
+    // RvkSemaphore OffscreenSemaphore;
 
 private:
 

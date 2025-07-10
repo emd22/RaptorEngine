@@ -110,10 +110,12 @@ void FxRenderBackend::InitFrames()
     RvkGpuDevice *device = GetDevice();
 
     for (int i = 0; i < Frames.Size; i++) {
-        Frames.Data[i].CommandPool.Create(device, graphics_family);
-        Frames.Data[i].CommandBuffer.Create(&Frames.Data[i].CommandPool);
+        RvkFrameData& frame = Frames.Data[i];
+        frame.CommandPool.Create(device, graphics_family);
+        frame.CommandBuffer.Create(&frame.CommandPool);
+        frame.CompCommandBuffer.Create(&frame.CommandPool);
 
-        Frames.Data[i].Create(device);
+        frame.Create(device);
     }
 }
 
@@ -123,8 +125,10 @@ void FxRenderBackend::DestroyFrames()
 
     for (auto &frame : Frames) {
         frame.DescriptorSet.Destroy();
+        frame.CompDescriptorSet.Destroy();
 
         frame.CommandBuffer.Destroy();
+        frame.CompCommandBuffer.Destroy();
         frame.CommandPool.Destroy();
 
         frame.Destroy();
@@ -515,11 +519,12 @@ void FxRenderBackend::SubmitFrame()
         .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
         // signal semaphores
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &frame->RenderFinished.Semaphore
+        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
+        .pSignalSemaphores = &frame->OffscreenSem.Semaphore
     };
 
     VkTry(
-        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
+        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
         "Error submitting draw buffer"
     );
 }
@@ -527,6 +532,29 @@ void FxRenderBackend::SubmitFrame()
 void FxRenderBackend::PresentFrame()
 {
     RvkFrameData *frame = GetFrame();
+
+    const VkPipelineStageFlags wait_stages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    };
+
+    const VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
+        .pWaitDstStageMask = wait_stages,
+        // command buffers
+        .commandBufferCount = 1,
+        .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
+        // signal semaphores
+        .signalSemaphoreCount = 1,
+        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
+        .pSignalSemaphores = &frame->RenderFinished.Semaphore
+    };
+
+    VkTry(
+        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
+        "Error submitting draw buffer"
+    );
 
     if (Swapchain.Initialized != true) {
         FxModulePanic("Swapchain not initialized!", 0);
@@ -560,11 +588,49 @@ void FxRenderBackend::PresentFrame()
     }
 }
 
-void FxRenderBackend::FinishFrame(RvkGraphicsPipeline &pipeline)
+void FxRenderBackend::FinishFrame(RvkGraphicsPipeline &pipeline, RvkGraphicsPipeline& comp_pipeline)
 {
+    RvkFrameData* frame = GetFrame();
     pipeline.RenderPass.End();
 
-    GetFrame()->CommandBuffer.End();
+    frame->CommandBuffer.End();
+    // GetFrame()->CompCommandBuffer.End();
+    //
+    frame->CompCommandBuffer.Reset();
+    frame->CompCommandBuffer.Record();
+
+
+    const int32 width = Swapchain.Extent.Width();
+    const int32 height = Swapchain.Extent.Height();
+
+    const VkViewport viewport = {
+        .x = 0, .y = 0,
+        .width = (float32)width,
+        .height = (float32)height,
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    };
+
+    vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
+
+    const VkRect2D scissor = {
+        .offset = { .x = 0, .y = 0 },
+        .extent = { .width = (uint32)width, .height = (uint32)height }
+    };
+
+    vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
+
+
+    comp_pipeline.RenderPass.BeginComp(&frame->CompCommandBuffer);
+    comp_pipeline.Bind(frame->CompCommandBuffer);
+
+    frame->CompDescriptorSet.Bind(frame->CompCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, comp_pipeline);
+
+    vkCmdDraw(frame->CompCommandBuffer, 3, 1, 0, 0);
+
+    comp_pipeline.RenderPass.End();
+
+    frame->CompCommandBuffer.End();
 
     SubmitFrame();
     PresentFrame();

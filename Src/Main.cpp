@@ -96,7 +96,7 @@ void CreateCompositionPipeline(RvkGraphicsPipeline& pipeline)
     ShaderList shader_list{ .Vertex = vertex_shader, .Fragment = fragment_shader };
 
     const int attachment_count = FxSizeofArray(color_blend_attachments);
-    pipeline.Create(shader_list, pipeline.CreateCompLayout(), FxMakeSlice(color_blend_attachments, attachment_count), true);
+    pipeline.CreateComp(shader_list, pipeline.CreateCompLayout(), FxMakeSlice(color_blend_attachments, attachment_count), true);
 }
 
 void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
@@ -130,6 +130,44 @@ void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
 
     const int attachment_count = FxSizeofArray(color_blend_attachments);
     pipeline.Create(shader_list, pipeline.CreateGPassLayout(), FxMakeSlice(color_blend_attachments, attachment_count), false);
+}
+
+
+#define PUSH_DESCRIPTOR_IMAGE(img_, sampler_, binding_) \
+    { \
+        VkDescriptorImageInfo image_info { \
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, \
+            .imageView = img_.View, \
+            .sampler = sampler_.Sampler, \
+        }; \
+        VkWriteDescriptorSet image_write { \
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, \
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, \
+            .descriptorCount = 1, \
+            .dstSet = descriptor_set.Set, \
+            .dstBinding = binding_, \
+            .dstArrayElement = 0, \
+            .pImageInfo = &image_info, \
+        }; \
+        image_infos.Insert(image_write); \
+    }
+
+
+void BuildCompositionDescriptorSet(int index)
+{
+    RvkFrameData* frame = &Renderer->Frames[index];
+    FxStackArray<VkWriteDescriptorSet, 3> image_infos;
+
+    RvkDescriptorSet& descriptor_set = frame->CompDescriptorSet;
+
+    RvkSwapchain& swapchain = Renderer->Swapchain;
+
+    PUSH_DESCRIPTOR_IMAGE(swapchain.PositionImages[index], swapchain.PositionSampler, 1);
+    PUSH_DESCRIPTOR_IMAGE(swapchain.AlbedoImages[index], swapchain.AlbedoSampler, 2);
+
+    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
+
+    // PUSH_IMAGE_IF_SET()
 }
 
 int main()
@@ -183,6 +221,8 @@ int main()
 
     Renderer->Swapchain.CreateSwapchainFramebuffers(&pipeline, &composition_pipeline);
 
+    // Renderer->OffscreenSemaphore.Create(Renderer->GetDevice());
+
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
@@ -230,8 +270,10 @@ int main()
     // FxRef<FxScript> script_instance = FxRef<TestScript>::New();
     // helmet_object.Attach(script_instance);
 
+    int index = 0;
     for (RvkFrameData& frame : Renderer->Frames) {
         frame.DescriptorSet.Create(Renderer->GPassDescriptorPool, pipeline.MainDescriptorSetLayout);
+        frame.CompDescriptorSet.Create(Renderer->CompDescriptorPool, composition_pipeline.CompDescriptorSetLayout);
 
         VkDescriptorBufferInfo ubo_info{
             .buffer = frame.Ubo.Buffer,
@@ -254,6 +296,7 @@ int main()
         vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
 
 
+        BuildCompositionDescriptorSet(index++);
         // frame.DescriptorSet.SubmitWrites();
     }
 
@@ -347,7 +390,7 @@ int main()
         helmet_object.Render(camera);
         // scene_object.Render(camera);
 
-        Renderer->FinishFrame(pipeline);
+        Renderer->FinishFrame(pipeline, composition_pipeline);
 
         LastTick = CurrentTick;
     }

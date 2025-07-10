@@ -113,7 +113,7 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 
             // .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         },
@@ -126,7 +126,7 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         },
 
         depth_attachment
@@ -292,13 +292,12 @@ void RvkRenderPass::Begin()
     vkCmdBeginRenderPass(CommandBuffer->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void RvkRenderPass::BeginComp()
+void RvkRenderPass::BeginComp(RvkCommandBuffer* cmd)
 {
     if (RenderPass == nullptr) {
         FxModulePanic("Render pass has not been previously created", 0);
     }
 
-    RvkFrameData *frame = Renderer->GetFrame();
     const auto extent = Renderer->Swapchain.Extent;
 
     //Log::Debug("Amount of framebuffers: %d", renderer->Swapchain.Framebuffers.Size);
@@ -320,7 +319,7 @@ void RvkRenderPass::BeginComp()
     };
 
 
-    CommandBuffer = &frame->CommandBuffer;
+    CommandBuffer = cmd;
     vkCmdBeginRenderPass(CommandBuffer->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 

@@ -80,13 +80,13 @@ void RvkSwapchain::CreateImageViews()
             FxModulePanic("Could not create swapchain image view", status);
         }
 
-        OutputImages[i].Create(
-            Extent,
-            VK_FORMAT_B8G8R8A8_UNORM,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT
-        );
+        // OutputImages[i].Create(
+        //     Extent,
+        //     VK_FORMAT_B8G8R8A8_UNORM,
+        //     VK_IMAGE_TILING_OPTIMAL,
+        //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        //     VK_IMAGE_ASPECT_COLOR_BIT
+        // );
 
 
         DepthImages[i].Create(
@@ -101,7 +101,7 @@ void RvkSwapchain::CreateImageViews()
             Extent,
             VK_FORMAT_B8G8R8A8_UNORM,
             VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT
         );
 
@@ -109,7 +109,7 @@ void RvkSwapchain::CreateImageViews()
             Extent,
             VK_FORMAT_B8G8R8A8_UNORM,
             VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT
         );
     }
@@ -209,25 +209,38 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, Rv
         CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
     }
 
+    AlbedoSampler.Create();
+    PositionSampler.Create();
+
     mPipeline = pipeline;
     mCompPipeline = comp_pipeline;
+
+
 }
 
 void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
     for (int i = 0; i < AlbedoImages.Size; i++) {
         GPassFramebuffers[i].Destroy();
-        AlbedoImages[i].Destroy();
+        CompFramebuffers[i].Destroy();
 
+        AlbedoImages[i].Destroy();
         DepthImages[i].Destroy();
         PositionImages[i].Destroy();
 
-        // vkDestroyImageView(mDevice->Device, Images2[i].View, nullptr);
+
+        // vkDestroyImageView(mDevice->Device, OutputImages[i].View, nullptr);
+        OutputImages[i].Image = nullptr;
+        OutputImages[i].Destroy();
     }
 
-    GPassFramebuffers.Free();
-    AlbedoImages.Free();
+    AlbedoSampler.Destroy();
+    PositionSampler.Destroy();
 
+    CompFramebuffers.Free();
+    GPassFramebuffers.Free();
+
+    AlbedoImages.Free();
     DepthImages.Free();
     PositionImages.Free();
 }
