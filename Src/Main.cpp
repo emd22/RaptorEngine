@@ -163,7 +163,7 @@ void BuildCompositionDescriptorSet(int index)
     RvkSwapchain& swapchain = Renderer->Swapchain;
 
     PUSH_DESCRIPTOR_IMAGE(swapchain.PositionImages[index], swapchain.PositionSampler, 1);
-    PUSH_DESCRIPTOR_IMAGE(swapchain.AlbedoImages[index], swapchain.AlbedoSampler, 2);
+    PUSH_DESCRIPTOR_IMAGE(swapchain.ColorImages[index], swapchain.ColorSampler, 2);
 
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
 
@@ -308,7 +308,7 @@ int main()
 
     camera.Position.Z += 5.0f;
 
-    Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+    // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
 
     FxSizedArray<VkDescriptorSet> sets_to_bind;
     sets_to_bind.InitSize(2);

@@ -47,7 +47,7 @@ void RvkSwapchain::CreateSwapchainImages()
         image->Format = SurfaceFormat.format;
     }
 
-    AlbedoImages.InitSize(image_count);
+    ColorImages.InitSize(image_count);
     DepthImages.InitSize(image_count);
     PositionImages.InitSize(image_count);
 }
@@ -105,7 +105,7 @@ void RvkSwapchain::CreateImageViews()
             VK_IMAGE_ASPECT_COLOR_BIT
         );
 
-        AlbedoImages[i].Create(
+        ColorImages[i].Create(
             Extent,
             VK_FORMAT_B8G8R8A8_UNORM,
             VK_IMAGE_TILING_OPTIMAL,
@@ -178,15 +178,15 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
 
 void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, RvkGraphicsPipeline* comp_pipeline)
 {
-    Log::Debug("Image view count: %d", AlbedoImages.Size);
+    Log::Debug("Image view count: %d", ColorImages.Size);
     GPassFramebuffers.Free();
-    GPassFramebuffers.InitSize(AlbedoImages.Size);
+    GPassFramebuffers.InitSize(ColorImages.Size);
 
     FxSizedArray<VkImageView> temp_views;
     temp_views.InitSize(3);
 
-    for (int i = 0; i < AlbedoImages.Size; i++) {
-        temp_views[0] = AlbedoImages[i].View;
+    for (int i = 0; i < ColorImages.Size; i++) {
+        temp_views[0] = ColorImages[i].View;
         temp_views[1] = PositionImages[i].View;
         temp_views[2] = DepthImages[i].View;
 
@@ -195,7 +195,7 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, Rv
 
     Log::Debug("Create GPass framebuffers", 0);
 
-    assert(OutputImages.Size == AlbedoImages.Size);
+    assert(OutputImages.Size == ColorImages.Size);
 
     CompFramebuffers.Free();
     CompFramebuffers.InitSize(OutputImages.Size);
@@ -209,7 +209,7 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, Rv
         CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
     }
 
-    AlbedoSampler.Create();
+    ColorSampler.Create();
     PositionSampler.Create();
 
     mPipeline = pipeline;
@@ -220,11 +220,11 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, Rv
 
 void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
-    for (int i = 0; i < AlbedoImages.Size; i++) {
+    for (int i = 0; i < ColorImages.Size; i++) {
         GPassFramebuffers[i].Destroy();
         CompFramebuffers[i].Destroy();
 
-        AlbedoImages[i].Destroy();
+        ColorImages[i].Destroy();
         DepthImages[i].Destroy();
         PositionImages[i].Destroy();
 
@@ -234,13 +234,13 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
         OutputImages[i].Destroy();
     }
 
-    AlbedoSampler.Destroy();
+    ColorSampler.Destroy();
     PositionSampler.Destroy();
 
     CompFramebuffers.Free();
     GPassFramebuffers.Free();
 
-    AlbedoImages.Free();
+    ColorImages.Free();
     DepthImages.Free();
     PositionImages.Free();
 }

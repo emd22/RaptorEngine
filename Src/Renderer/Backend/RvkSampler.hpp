@@ -9,7 +9,6 @@
 class RvkSampler
 {
 public:
-
     void Create();
     void Destroy();
 
@@ -19,7 +18,7 @@ public:
     }
 
 public:
-    VkSampler Sampler;
+    VkSampler Sampler = nullptr;;
 
 private:
     RvkGpuDevice* mDevice = nullptr;

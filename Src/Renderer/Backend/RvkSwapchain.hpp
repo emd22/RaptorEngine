@@ -37,11 +37,11 @@ public:
     // FxSizedArray<VkImage> Images;
     FxSizedArray<RvkImage> OutputImages;
 
-    FxSizedArray<RvkImage> AlbedoImages;
+    FxSizedArray<RvkImage> ColorImages;
     FxSizedArray<RvkImage> PositionImages;
     FxSizedArray<RvkImage> DepthImages;
 
-    RvkSampler AlbedoSampler;
+    RvkSampler ColorSampler;
     RvkSampler PositionSampler;
 
     FxSizedArray<RvkFramebuffer> GPassFramebuffers;

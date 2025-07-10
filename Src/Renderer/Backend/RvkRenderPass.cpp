@@ -16,24 +16,23 @@ FX_SET_MODULE_NAME("RvkRenderPass")
 void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
 {
     VkAttachmentReference color_refs[] = {
-        // Albedo attachment
+        // Positions output
         VkAttachmentReference{
             .attachment = 0,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         },
-        // Positions attachment
+        // Color output
         VkAttachmentReference{
             .attachment = 1,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         },
     };
 
-
+    // Depth output
     VkAttachmentReference depth_attachment_ref {
         .attachment = 2,
         .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     };
-
 
     VkSubpassDescription subpass {
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -42,18 +41,6 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
         .pDepthStencilAttachment = &depth_attachment_ref,
         .pResolveAttachments = nullptr,
     };
-
-    // VkSubpassDependency subpass_dependency = {
-    //     .srcSubpass = VK_SUBPASS_EXTERNAL,
-    //     .dstSubpass = 0,
-    //     .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    //         | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-    //     .srcAccessMask = 0,
-    //     .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    //         | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-    //     .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-    //             | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-    // };
 
 
     VkSubpassDependency subpass_dependencies[] = {
@@ -104,7 +91,7 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
     };
 
     FxSizedArray attachments = {
-        // Positions attachment
+        // Posiitons output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -114,10 +101,8 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-
-            // .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         },
-        // Albedo attachment
+        // Albedo output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -152,18 +137,12 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
 void RvkRenderPass::CreateComp(RvkGpuDevice &device, RvkSwapchain &swapchain)
 {
     VkAttachmentReference color_refs[] = {
-        // Albedo attachment
+        // Combined output
         VkAttachmentReference{
             .attachment = 0,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         },
     };
-
-
-    // VkAttachmentReference depth_attachment_ref {
-    //     .attachment = 1,
-    //     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    // };
 
 
     VkSubpassDescription subpass {
@@ -173,18 +152,6 @@ void RvkRenderPass::CreateComp(RvkGpuDevice &device, RvkSwapchain &swapchain)
         .pDepthStencilAttachment = nullptr,
         .pResolveAttachments = nullptr,
     };
-
-    // VkSubpassDependency subpass_dependency = {
-    //     .srcSubpass = VK_SUBPASS_EXTERNAL,
-    //     .dstSubpass = 0,
-    //     .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    //         | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-    //     .srcAccessMask = 0,
-    //     .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    //         | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-    //     .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-    //             | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-    // };
 
 
     VkSubpassDependency subpass_dependencies[] = {
@@ -224,7 +191,7 @@ void RvkRenderPass::CreateComp(RvkGpuDevice &device, RvkSwapchain &swapchain)
 
 
     FxSizedArray attachments = {
-        // Albedo attachment
+        // Combined output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -262,8 +229,6 @@ void RvkRenderPass::Begin()
     RvkFrameData *frame = Renderer->GetFrame();
     const auto extent = Renderer->Swapchain.Extent;
 
-    //Log::Debug("Amount of framebuffers: %d", renderer->Swapchain.Framebuffers.Size);
-
     const VkClearValue clear_values[] = {
         // Albedo
         VkClearValue {
@@ -277,6 +242,7 @@ void RvkRenderPass::Begin()
             .depthStencil = { 1.0f, 0 }
         }
     };
+
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = RenderPass,
@@ -286,7 +252,6 @@ void RvkRenderPass::Begin()
         .clearValueCount = sizeof(clear_values) / sizeof(clear_values[0]),
         .pClearValues = clear_values,
     };
-
 
     CommandBuffer = &frame->CommandBuffer;
     vkCmdBeginRenderPass(CommandBuffer->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
@@ -299,8 +264,6 @@ void RvkRenderPass::BeginComp(RvkCommandBuffer* cmd)
     }
 
     const auto extent = Renderer->Swapchain.Extent;
-
-    //Log::Debug("Amount of framebuffers: %d", renderer->Swapchain.Framebuffers.Size);
 
     const VkClearValue clear_values[] = {
         // Albedo

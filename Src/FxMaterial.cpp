@@ -33,6 +33,10 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
     dp.Create(Renderer->GetDevice(), MaxMaterials);
 
+
+    AlbedoSampler = FxMakeRef<RvkSampler>();
+    AlbedoSampler->Create();
+
     mInitialized = true;
 }
 
@@ -43,8 +47,6 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RvkGraphicsPip
     if (!gm.mMaterials.IsInited()) {
         gm.Create();
     }
-
-    // FxMaterial* mat = gm.mMaterials.Insert();
 
     FxRef<FxMaterial> ref = FxRef<FxMaterial>::New();
 
@@ -60,6 +62,8 @@ void FxMaterialManager::Destroy()
     if (!mInitialized) {
         return;
     }
+
+    AlbedoSampler->Destroy();
 
     vkDestroyDescriptorPool(Renderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
 
@@ -114,18 +118,10 @@ bool FxMaterial::Bind(RvkCommandBuffer* cmd)
         Build();
     }
 
-    if (!IsReady()) {
+    if (!IsReady() || !mDescriptorSet) {
         return false;
     }
 
-    // if (!mIsBuilt.load()) {
-    //     Log::Warning("Material %s is not built!", Name.c_str());
-    //     return;
-    // }
-
-    if (!mDescriptorSet) {
-        return false;
-    }
 
     if (!cmd) {
         cmd = &Renderer->GetFrame()->CommandBuffer;
@@ -150,7 +146,7 @@ void FxMaterial::Destroy()
         VkDescriptorImageInfo image_info { \
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, \
             .imageView = img->Texture.Image.View, \
-            .sampler = img->Texture.Sampler, \
+            .sampler = img->Texture.Sampler->Sampler, \
         }; \
         VkWriteDescriptorSet image_write { \
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, \
@@ -167,8 +163,15 @@ void FxMaterial::Destroy()
 void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
-        mDescriptorSet.Create(FxMaterialManager::GetPool(), Pipeline->MaterialDescriptorSetLayout);
+        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(), Pipeline->MaterialDescriptorSetLayout);
     }
+
+    FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
+
+    if (Diffuse) {
+        Diffuse->Texture.SetSampler(manager.AlbedoSampler);
+    }
+
 
     constexpr const int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
     FxStackArray<VkWriteDescriptorSet, max_images> image_infos;
@@ -178,7 +181,6 @@ void FxMaterial::Build()
     // Push material textures
     PUSH_IMAGE_IF_SET(Diffuse, 0);
     // PUSH_IMAGE_IF_SET(Normal);
-
 
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
 
