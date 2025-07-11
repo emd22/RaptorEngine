@@ -24,10 +24,14 @@ public:
 public:
     RvkCommandPool CommandPool;
     RvkCommandBuffer CommandBuffer;
+    RvkCommandBuffer CompCommandBuffer;
 
-    RvkDescriptorSet DescriptorSet;
+    // RvkDescriptorSet DescriptorSet;
+    RvkDescriptorSet CompDescriptorSet;
 
     RvkRawGpuBuffer<RvkUniformBufferObject> Ubo;
+
+    RvkSemaphore OffscreenSem;
 
     RvkSemaphore ImageAvailable;
     RvkSemaphore RenderFinished;

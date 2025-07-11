@@ -25,6 +25,7 @@
 #include <Renderer/Renderer.hpp>
 #include <Renderer/FxWindow.hpp>
 #include <Renderer/FxMesh.hpp>
+#include <Renderer/FxDeferred.hpp>
 
 #include <Asset/FxAssetManager.hpp>
 #include "FxControls.hpp"
@@ -78,18 +79,96 @@ public:
     }
 };
 
-void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
+void CreateCompositionPipeline(RvkGraphicsPipeline& pipeline)
 {
-    ShaderList shader_list;
+    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        }
+    };
 
-    RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
-    RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
+    RvkShader vertex_shader("../shaders/composition.vert.spv", RvkShaderType::Vertex);
+    RvkShader fragment_shader("../shaders/composition.frag.spv", RvkShaderType::Fragment);
 
-    shader_list.Vertex = vertex_shader.ShaderModule;
-    shader_list.Fragment = fragment_shader.ShaderModule;
+    ShaderList shader_list{ .Vertex = vertex_shader, .Fragment = fragment_shader };
 
-    pipeline.Create(shader_list);
+    const int attachment_count = FxSizeofArray(color_blend_attachments);
+    pipeline.CreateComp(shader_list, pipeline.CreateCompLayout(), FxMakeSlice(color_blend_attachments, attachment_count), true);
+}
 
+// void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
+// {
+//     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+//         // Positions
+//         VkPipelineColorBlendAttachmentState {
+//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+//                             | VK_COLOR_COMPONENT_G_BIT
+//                             | VK_COLOR_COMPONENT_B_BIT
+//                             | VK_COLOR_COMPONENT_A_BIT,
+//             .blendEnable = VK_FALSE,
+//         },
+//         // Albedo
+//         VkPipelineColorBlendAttachmentState {
+//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+//                             | VK_COLOR_COMPONENT_G_BIT
+//                             | VK_COLOR_COMPONENT_B_BIT
+//                             | VK_COLOR_COMPONENT_A_BIT,
+//             .blendEnable = VK_FALSE,
+//         },
+//     };
+
+//     ShaderList shader_list;
+
+//     RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
+//     RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
+
+//     shader_list.Vertex = vertex_shader.ShaderModule;
+//     shader_list.Fragment = fragment_shader.ShaderModule;
+
+//     const int attachment_count = FxSizeofArray(color_blend_attachments);
+//     pipeline.Create(shader_list, pipeline.CreateGPassLayout(), FxMakeSlice(color_blend_attachments, attachment_count), false);
+// }
+
+
+#define PUSH_DESCRIPTOR_IMAGE(img_, sampler_, binding_) \
+    { \
+        VkDescriptorImageInfo image_info { \
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, \
+            .imageView = (img_).View, \
+            .sampler = (sampler_).Sampler, \
+        }; \
+        VkWriteDescriptorSet image_write { \
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, \
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, \
+            .descriptorCount = 1, \
+            .dstSet = descriptor_set.Set, \
+            .dstBinding = binding_, \
+            .dstArrayElement = 0, \
+            .pImageInfo = &image_info, \
+        }; \
+        image_infos.Insert(image_write); \
+    }
+
+
+void BuildCompositionDescriptorSet(FxDeferredRenderer& renderer, int index)
+{
+    RvkFrameData* frame = &Renderer->Frames[index];
+    FxStackArray<VkWriteDescriptorSet, 3> image_infos;
+
+    RvkDescriptorSet& descriptor_set = frame->CompDescriptorSet;
+
+    RvkSwapchain& swapchain = Renderer->Swapchain;
+
+    PUSH_DESCRIPTOR_IMAGE(renderer.GPasses[index].PositionsAttachment, swapchain.PositionSampler, 1);
+    PUSH_DESCRIPTOR_IMAGE(renderer.GPasses[index].ColorAttachment, swapchain.ColorSampler, 2);
+
+    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
+
+    // PUSH_IMAGE_IF_SET()
 }
 
 int main()
@@ -123,14 +202,32 @@ int main()
     Renderer->SelectWindow(window);
     Renderer->Init(Vec2u(window_width, window_height));
 
-    RvkGraphicsPipeline pipeline;
+    // RvkGraphicsPipeline pipeline;
 
-    CreateSolidPipeline(pipeline);
-    Renderer->Swapchain.CreateSwapchainFramebuffers(&pipeline);
+    // CreateSolidPipeline(pipeline);
 
-    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
-    Renderer->DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    Renderer->DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+    // Renderer->GPassDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
+    // Renderer->GPassDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Renderer->GPassDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+
+    RvkGraphicsPipeline composition_pipeline;
+
+    // Positions sampler
+    Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Albedo sampler
+    Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    Renderer->CompDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+
+    CreateCompositionPipeline(composition_pipeline);
+
+    Renderer->Swapchain.CreateSwapchainFramebuffers(&composition_pipeline);
+
+    // Renderer->OffscreenSemaphore.Create(Renderer->GetDevice());
+
+    FxDeferredRenderer deferred_renderer;
+    deferred_renderer.Create(Renderer->Swapchain.Extent);
+
+
 
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
@@ -156,7 +253,7 @@ int main()
     //
     helmet_model->WaitUntilLoaded();
 
-    FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &pipeline);
+    FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer.GPassPipeline);
     cheese_material->Attach(FxMaterial::ResourceType::Diffuse, cheese_image);
 
     // FxSceneObject scene_object;
@@ -164,11 +261,11 @@ int main()
     // scene_object.Attach(material);
 
     FxSceneObject helmet_object;
-    helmet_object.Attach(helmet_model, pipeline);
+    helmet_object.Attach(helmet_model);
 
     if (helmet_model->Materials.size() > 0) {
         FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
-        helmet_material->Pipeline = &pipeline;
+        helmet_material->Pipeline = &deferred_renderer.GPassPipeline;
 
         helmet_object.Attach(helmet_material);
     }
@@ -179,30 +276,33 @@ int main()
     // FxRef<FxScript> script_instance = FxRef<TestScript>::New();
     // helmet_object.Attach(script_instance);
 
+    int index = 0;
     for (RvkFrameData& frame : Renderer->Frames) {
-        frame.DescriptorSet.Create(Renderer->DescriptorPool, pipeline.MainDescriptorSetLayout);
+        // frame.DescriptorSet.Create(Renderer->GPassDescriptorPool, pipeline.MainDescriptorSetLayout);
+        frame.CompDescriptorSet.Create(Renderer->CompDescriptorPool, composition_pipeline.CompDescriptorSetLayout);
 
-        VkDescriptorBufferInfo ubo_info{
-            .buffer = frame.Ubo.Buffer,
-            .offset = 0,
-            .range = sizeof(RvkUniformBufferObject)
-        };
+        // VkDescriptorBufferInfo ubo_info{
+        //     .buffer = frame.Ubo.Buffer,
+        //     .offset = 0,
+        //     .range = sizeof(RvkUniformBufferObject)
+        // };
 
-        VkWriteDescriptorSet ubo_write{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1,
-            .dstSet = frame.DescriptorSet,
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .pBufferInfo = &ubo_info,
-        };
+        // VkWriteDescriptorSet ubo_write{
+        //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        //     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        //     .descriptorCount = 1,
+        //     .dstSet = frame.DescriptorSet,
+        //     .dstBinding = 0,
+        //     .dstArrayElement = 0,
+        //     .pBufferInfo = &ubo_info,
+        // };
 
-        const VkWriteDescriptorSet writes[] = { ubo_write };
+        // const VkWriteDescriptorSet writes[] = { ubo_write };
 
-        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
+        // vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
 
 
+        BuildCompositionDescriptorSet(deferred_renderer, index++);
         // frame.DescriptorSet.SubmitWrites();
     }
 
@@ -214,7 +314,7 @@ int main()
 
     camera.Position.Z += 5.0f;
 
-    Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+    // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
 
     FxSizedArray<VkDescriptorSet> sets_to_bind;
     sets_to_bind.InitSize(2);
@@ -267,7 +367,7 @@ int main()
 
         // Mat4f MVPMatrix = model_matrix * camera.VPMatrix;
 
-        if (Renderer->BeginFrame(pipeline) != FrameResult::Success) {
+        if (Renderer->BeginFrame(deferred_renderer) != FrameResult::Success) {
             continue;
         }
 
@@ -296,7 +396,7 @@ int main()
         helmet_object.Render(camera);
         // scene_object.Render(camera);
 
-        Renderer->FinishFrame(pipeline);
+        Renderer->FinishFrame(composition_pipeline);
 
         LastTick = CurrentTick;
     }
@@ -305,6 +405,9 @@ int main()
 
     material_manager.Destroy();
     asset_manager.Shutdown();
+
+    composition_pipeline.Destroy();
+    deferred_renderer.Destroy();
 
     std::cout << "this thread: " << std::this_thread::get_id() << std::endl;
 

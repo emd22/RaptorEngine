@@ -2,6 +2,9 @@ build/*
 build/**/*
 xcbuild/*
 xcbuild/**/*
+
 .*
+
+# Exclusions for .*
 !.gitignore
 !.gitattributes

@@ -8,6 +8,7 @@ void RvkFrameData::Create(RvkGpuDevice *device)
 {
     ImageAvailable.Create(device);
     RenderFinished.Create(device);
+    OffscreenSem.Create(device);
 
     InFlight.Create(device);
 
@@ -24,6 +25,7 @@ void RvkFrameData::Destroy()
 {
     ImageAvailable.Destroy();
     RenderFinished.Destroy();
+    OffscreenSem.Destroy();
 
     InFlight.Destroy();
 

@@ -115,47 +115,14 @@ public:
     //     mScript = std::move(script);
     // }
 
-    void Render(const FxCamera& camera)
-    {
-        RvkFrameData* frame = Renderer->GetFrame();
+    void Render(const FxCamera& camera);
 
-        if (!mMaterial || !mMaterial->IsBuilt) {
-            mMaterial->Build();
-        }
-
-        VkDescriptorSet sets_to_bind[] = {
-            frame->DescriptorSet.Set,
-            mMaterial->mDescriptorSet
-        };
-
-        Mat4f VP = camera.VPMatrix;
-        Mat4f MVP = mModelMatrix * VP;
-
-        memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(Mat4f));
-
-        frame->SubmitUbo(mUbo);
-
-        RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mMaterial->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
-
-        DrawPushConstants push_constants{};
-        memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(Mat4f));
-
-        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, mMaterial->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
-
-
-        // if (mMaterial) {
-        //     mMaterial->Bind(nullptr);
-        // }
-
-        mModel->Render(*mMaterial->Pipeline);
-    }
-
-    void Attach(const FxRef<FxMaterial>& material)
+    FX_FORCE_INLINE void Attach(const FxRef<FxMaterial>& material)
     {
         mMaterial = material;
     }
 
-    void Attach(const FxRef<FxModel>& model, RvkGraphicsPipeline& pipeline)
+    void Attach(const FxRef<FxModel>& model)
     {
         mModel = model;
 

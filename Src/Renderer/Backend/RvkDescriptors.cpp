@@ -43,7 +43,7 @@ VkWriteDescriptorSet RvkDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest,
     VkDescriptorImageInfo image_info{
         .imageLayout = layout,
         .imageView = texture.Image.View,
-        .sampler = texture.Sampler
+        .sampler = texture.Sampler->Sampler
     };
 
     VkWriteDescriptorSet write{

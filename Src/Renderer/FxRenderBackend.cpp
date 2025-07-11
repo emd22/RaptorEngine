@@ -16,6 +16,9 @@
 #include <thread>
 #include <vector>
 
+#include "FxDeferred.hpp"
+
+
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
@@ -110,10 +113,12 @@ void FxRenderBackend::InitFrames()
     RvkGpuDevice *device = GetDevice();
 
     for (int i = 0; i < Frames.Size; i++) {
-        Frames.Data[i].CommandPool.Create(device, graphics_family);
-        Frames.Data[i].CommandBuffer.Create(&Frames.Data[i].CommandPool);
+        RvkFrameData& frame = Frames.Data[i];
+        frame.CommandPool.Create(device, graphics_family);
+        frame.CommandBuffer.Create(&frame.CommandPool);
+        frame.CompCommandBuffer.Create(&frame.CommandPool);
 
-        Frames.Data[i].Create(device);
+        frame.Create(device);
     }
 }
 
@@ -122,9 +127,11 @@ void FxRenderBackend::DestroyFrames()
     vkQueueWaitIdle(GetDevice()->GraphicsQueue);
 
     for (auto &frame : Frames) {
-        frame.DescriptorSet.Destroy();
+        // frame.DescriptorSet.Destroy();
+        frame.CompDescriptorSet.Destroy();
 
         frame.CommandBuffer.Destroy();
+        frame.CompCommandBuffer.Destroy();
         frame.CommandPool.Destroy();
 
         frame.Destroy();
@@ -215,6 +222,7 @@ uint32 DebugMessageCallback(
 ) {
     const char * message = callback_data->pMessage;
     const char *fmt = "VkValidator: %s";
+
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
         Log::Error(fmt, message);
@@ -447,9 +455,12 @@ void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
 
 
 
-FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline)
+FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 {
     RvkFrameData *frame = GetFrame();
+
+    CurrentGPass = renderer.GetCurrentGPass();
+
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -465,8 +476,11 @@ FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline)
     frame->CommandBuffer.Reset();
     frame->CommandBuffer.Record();
 
-    pipeline.RenderPass.Begin();
-    pipeline.Bind(frame->CommandBuffer);
+    // pipeline.RenderPass.Begin();
+    // pipeline.Bind(frame->CommandBuffer);
+
+    CurrentGPass->Begin();
+
 
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
@@ -488,16 +502,43 @@ FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline)
 
     vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
 
-
     DrawPushConstants push_constants{};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 
     return FrameResult::Success;
 }
 
 void FxRenderBackend::SubmitFrame()
+{
+    CurrentGPass->Submit();
+    // RvkFrameData *frame = GetFrame();
+
+    // const VkPipelineStageFlags wait_stages[] = {
+    //     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    // };
+
+    // const VkSubmitInfo submit_info = {
+    //     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    //     .waitSemaphoreCount = 1,
+    //     .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
+    //     .pWaitDstStageMask = wait_stages,
+    //     // command buffers
+    //     .commandBufferCount = 1,
+    //     .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
+    //     // signal semaphores
+    //     .signalSemaphoreCount = 1,
+    //     // .pSignalSemaphores = &frame->RenderFinished.Semaphore
+    //     .pSignalSemaphores = &frame->OffscreenSem.Semaphore
+    // };
+
+    // VkTry(
+    //     vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+    //     "Error submitting draw buffer"
+    // );
+}
+
+void FxRenderBackend::PresentFrame()
 {
     RvkFrameData *frame = GetFrame();
 
@@ -508,13 +549,14 @@ void FxRenderBackend::SubmitFrame()
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
+        .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
         .pWaitDstStageMask = wait_stages,
         // command buffers
         .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
+        .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
         // signal semaphores
         .signalSemaphoreCount = 1,
+        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
         .pSignalSemaphores = &frame->RenderFinished.Semaphore
     };
 
@@ -522,11 +564,6 @@ void FxRenderBackend::SubmitFrame()
         vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
         "Error submitting draw buffer"
     );
-}
-
-void FxRenderBackend::PresentFrame()
-{
-    RvkFrameData *frame = GetFrame();
 
     if (Swapchain.Initialized != true) {
         FxModulePanic("Swapchain not initialized!", 0);
@@ -560,11 +597,52 @@ void FxRenderBackend::PresentFrame()
     }
 }
 
-void FxRenderBackend::FinishFrame(RvkGraphicsPipeline &pipeline)
+void FxRenderBackend::FinishFrame(RvkGraphicsPipeline& comp_pipeline)
 {
-    pipeline.RenderPass.End();
+    RvkFrameData* frame = GetFrame();
 
-    GetFrame()->CommandBuffer.End();
+    CurrentGPass->End();
+
+    // pipeline.RenderPass.End();
+
+    frame->CommandBuffer.End();
+    // GetFrame()->CompCommandBuffer.End();
+    //
+    frame->CompCommandBuffer.Reset();
+    frame->CompCommandBuffer.Record();
+
+
+    const int32 width = Swapchain.Extent.Width();
+    const int32 height = Swapchain.Extent.Height();
+
+    const VkViewport viewport = {
+        .x = 0, .y = 0,
+        .width = (float32)width,
+        .height = (float32)height,
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    };
+
+    vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
+
+    const VkRect2D scissor = {
+        .offset = { .x = 0, .y = 0 },
+        .extent = { .width = (uint32)width, .height = (uint32)height }
+    };
+
+    vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
+
+
+    comp_pipeline.RenderPass.BeginComp(&frame->CompCommandBuffer);
+    comp_pipeline.Bind(frame->CompCommandBuffer);
+
+    frame->CompDescriptorSet.Bind(frame->CompCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, comp_pipeline);
+
+    vkCmdDraw(frame->CompCommandBuffer, 3, 1, 0, 0);
+
+    comp_pipeline.RenderPass.End();
+
+    frame->CompCommandBuffer.End();
 
     SubmitFrame();
     PresentFrame();
@@ -638,7 +716,8 @@ void FxRenderBackend::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
-    DescriptorPool.Destroy();
+    // GPassDescriptorPool.Destroy();
+    CompDescriptorPool.Destroy();
 
     GetDevice()->WaitForIdle();
 

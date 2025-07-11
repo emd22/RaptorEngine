@@ -27,6 +27,11 @@ public:
         Destroy();
     }
 
+    operator VkShaderModule()
+    {
+        return ShaderModule;
+    }
+
 private:
     void CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data);
 

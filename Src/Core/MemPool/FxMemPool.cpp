@@ -142,6 +142,7 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoo
 
     // No space remaining in the current page, try to allocate a new one
     if (node == nullptr) {
+        printf("ALLOCATING NEW PAGE!\n");
         AllocateNewPage();
         node = mCurrentPage->AllocateMemory(requested_size);
     }

@@ -78,16 +78,17 @@ public:
     static FxMaterialManager& GetGlobalManager();
 
     void Create(uint32 materials_per_page=32);
-
     static FxRef<FxMaterial> New(const std::string& name, RvkGraphicsPipeline* pipeline);
 
-
-    static RvkDescriptorPool& GetPool()
+    static RvkDescriptorPool& GetDescriptorPool()
     {
         return GetGlobalManager().mDescriptorPool;
     }
 
     void Destroy();
+
+public:
+    FxRef<RvkSampler> AlbedoSampler{nullptr};
 
 private:
     FxPagedArray<FxMaterial> mMaterials;

@@ -25,6 +25,9 @@ enum class FrameResult
     RenderError,
 };
 
+class FxDeferredRenderer;
+class FxDeferredGPass;
+
 struct FxGpuUploadContext
 {
     RvkCommandPool CommandPool;
@@ -47,20 +50,20 @@ public:
     void Init(Vec2u window_size);
     void Destroy();
 
-    FrameResult BeginFrame(RvkGraphicsPipeline& pipeline);
-    void FinishFrame(RvkGraphicsPipeline& pipeline);
+    FrameResult BeginFrame(FxDeferredRenderer& renderer);
+    void FinishFrame(RvkGraphicsPipeline& comp_pipeline);
 
     void SelectWindow(const FxRef<FxWindow>& window)
     {
         mWindow = window;
     }
 
-    FxRef<FxWindow> GetWindow()
+    FX_FORCE_INLINE FxRef<FxWindow> GetWindow()
     {
         return mWindow;
     }
 
-    RvkGpuDevice* GetDevice()
+    FX_FORCE_INLINE RvkGpuDevice* GetDevice()
     {
         return &mDevice;
     }
@@ -144,7 +147,6 @@ public:
         });
     }
 
-
     uint32 GetElapsedFrameCount() const { return mInternalFrameCounter; }
     uint32 GetFrameNumber() const { return mFrameNumber; }
 
@@ -179,11 +181,17 @@ public:
     VmaAllocator GpuAllocator = nullptr;
 
     // XXX: temporary
-    RvkDescriptorPool DescriptorPool;
+    // RvkDescriptorPool GPassDescriptorPool;
+    RvkDescriptorPool CompDescriptorPool;
 
     FxGpuUploadContext UploadContext;
 
     bool Initialized = false;
+
+    FxDeferredGPass* CurrentGPass;
+
+
+    // RvkSemaphore OffscreenSemaphore;
 
 private:
 
@@ -196,6 +204,7 @@ private:
     VkDebugUtilsMessengerEXT mDebugMessenger;
 
     ExtensionList mAvailableExtensions;
+
 
     uint32 mImageIndex = 0;
 
