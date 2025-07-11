@@ -13,8 +13,12 @@
 
 FX_SET_MODULE_NAME("RvkRenderPass")
 
+// TODO: remove device parameter
 void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
 {
+    mDevice = Renderer->GetDevice();
+
+
     VkAttachmentReference color_refs[] = {
         // Positions output
         VkAttachmentReference{
@@ -136,6 +140,8 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
 
 void RvkRenderPass::CreateComp(RvkGpuDevice &device, RvkSwapchain &swapchain)
 {
+    mDevice = Renderer->GetDevice();
+
     VkAttachmentReference color_refs[] = {
         // Combined output
         VkAttachmentReference{
@@ -220,7 +226,7 @@ void RvkRenderPass::CreateComp(RvkGpuDevice &device, RvkSwapchain &swapchain)
     }
 }
 
-void RvkRenderPass::Begin()
+void RvkRenderPass::Begin(VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_values)
 {
     if (RenderPass == nullptr) {
         FxModulePanic("Render pass has not been previously created", 0);
@@ -229,28 +235,14 @@ void RvkRenderPass::Begin()
     RvkFrameData *frame = Renderer->GetFrame();
     const auto extent = Renderer->Swapchain.Extent;
 
-    const VkClearValue clear_values[] = {
-        // Albedo
-        VkClearValue {
-            .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
-        },
-        // Positions
-        VkClearValue {
-            .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
-        },
-        VkClearValue {
-            .depthStencil = { 1.0f, 0 }
-        }
-    };
-
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = RenderPass,
-        .framebuffer = Renderer->Swapchain.GPassFramebuffers[Renderer->GetImageIndex()].Framebuffer,
+        .framebuffer = framebuffer,
         .renderArea.offset = {0, 0},
         .renderArea.extent = {(uint32)extent.Width(), (uint32)extent.Height()},
-        .clearValueCount = sizeof(clear_values) / sizeof(clear_values[0]),
-        .pClearValues = clear_values,
+        .clearValueCount = clear_values.Size,
+        .pClearValues = clear_values.Ptr,
     };
 
     CommandBuffer = &frame->CommandBuffer;
@@ -295,9 +287,10 @@ void RvkRenderPass::End()
     vkCmdEndRenderPass(CommandBuffer->CommandBuffer);
 }
 
-void RvkRenderPass::Destroy(RvkGpuDevice &device)
+void RvkRenderPass::Destroy()
 {
-    if (RenderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(device.Device, RenderPass, nullptr);
+    if (RenderPass != nullptr) {
+        vkDestroyRenderPass(mDevice->Device, RenderPass, nullptr);
     }
+    RenderPass = nullptr;
 }

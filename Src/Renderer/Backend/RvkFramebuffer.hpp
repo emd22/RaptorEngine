@@ -14,6 +14,11 @@ public:
     void Create(const FxSizedArray<VkImageView> &image_views, const RvkGraphicsPipeline &pipeline, Vec2u size);
     void Destroy();
 
+    ~RvkFramebuffer()
+    {
+        Destroy();
+    }
+
 public:
     VkFramebuffer Framebuffer = nullptr;
     RvkGpuDevice *mDevice = nullptr;

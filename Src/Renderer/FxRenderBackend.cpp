@@ -16,6 +16,9 @@
 #include <thread>
 #include <vector>
 
+#include "FxDeferred.hpp"
+
+
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
@@ -124,7 +127,7 @@ void FxRenderBackend::DestroyFrames()
     vkQueueWaitIdle(GetDevice()->GraphicsQueue);
 
     for (auto &frame : Frames) {
-        frame.DescriptorSet.Destroy();
+        // frame.DescriptorSet.Destroy();
         frame.CompDescriptorSet.Destroy();
 
         frame.CommandBuffer.Destroy();
@@ -219,6 +222,7 @@ uint32 DebugMessageCallback(
 ) {
     const char * message = callback_data->pMessage;
     const char *fmt = "VkValidator: %s";
+
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
         Log::Error(fmt, message);
@@ -451,9 +455,12 @@ void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
 
 
 
-FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline)
+FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 {
     RvkFrameData *frame = GetFrame();
+
+    CurrentGPass = renderer.GetCurrentGPass();
+
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -469,8 +476,11 @@ FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline)
     frame->CommandBuffer.Reset();
     frame->CommandBuffer.Record();
 
-    pipeline.RenderPass.Begin();
-    pipeline.Bind(frame->CommandBuffer);
+    // pipeline.RenderPass.Begin();
+    // pipeline.Bind(frame->CommandBuffer);
+
+    CurrentGPass->Begin();
+
 
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
@@ -492,41 +502,40 @@ FrameResult FxRenderBackend::BeginFrame(RvkGraphicsPipeline &pipeline)
 
     vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
 
-
     DrawPushConstants push_constants{};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 
     return FrameResult::Success;
 }
 
 void FxRenderBackend::SubmitFrame()
 {
-    RvkFrameData *frame = GetFrame();
+    CurrentGPass->Submit();
+    // RvkFrameData *frame = GetFrame();
 
-    const VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-    };
+    // const VkPipelineStageFlags wait_stages[] = {
+    //     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    // };
 
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
-        .pWaitDstStageMask = wait_stages,
-        // command buffers
-        .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
-        // signal semaphores
-        .signalSemaphoreCount = 1,
-        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-        .pSignalSemaphores = &frame->OffscreenSem.Semaphore
-    };
+    // const VkSubmitInfo submit_info = {
+    //     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    //     .waitSemaphoreCount = 1,
+    //     .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
+    //     .pWaitDstStageMask = wait_stages,
+    //     // command buffers
+    //     .commandBufferCount = 1,
+    //     .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
+    //     // signal semaphores
+    //     .signalSemaphoreCount = 1,
+    //     // .pSignalSemaphores = &frame->RenderFinished.Semaphore
+    //     .pSignalSemaphores = &frame->OffscreenSem.Semaphore
+    // };
 
-    VkTry(
-        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-        "Error submitting draw buffer"
-    );
+    // VkTry(
+    //     vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+    //     "Error submitting draw buffer"
+    // );
 }
 
 void FxRenderBackend::PresentFrame()
@@ -588,10 +597,13 @@ void FxRenderBackend::PresentFrame()
     }
 }
 
-void FxRenderBackend::FinishFrame(RvkGraphicsPipeline &pipeline, RvkGraphicsPipeline& comp_pipeline)
+void FxRenderBackend::FinishFrame(RvkGraphicsPipeline& comp_pipeline)
 {
     RvkFrameData* frame = GetFrame();
-    pipeline.RenderPass.End();
+
+    CurrentGPass->End();
+
+    // pipeline.RenderPass.End();
 
     frame->CommandBuffer.End();
     // GetFrame()->CompCommandBuffer.End();
@@ -704,7 +716,7 @@ void FxRenderBackend::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
-    GPassDescriptorPool.Destroy();
+    // GPassDescriptorPool.Destroy();
     CompDescriptorPool.Destroy();
 
     GetDevice()->WaitForIdle();

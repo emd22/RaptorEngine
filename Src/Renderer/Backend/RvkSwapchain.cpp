@@ -47,9 +47,9 @@ void RvkSwapchain::CreateSwapchainImages()
         image->Format = SurfaceFormat.format;
     }
 
-    ColorImages.InitSize(image_count);
-    DepthImages.InitSize(image_count);
-    PositionImages.InitSize(image_count);
+    // ColorImages.InitSize(image_count);
+    // DepthImages.InitSize(image_count);
+    // PositionImages.InitSize(image_count);
 }
 
 void RvkSwapchain::CreateImageViews()
@@ -80,38 +80,30 @@ void RvkSwapchain::CreateImageViews()
             FxModulePanic("Could not create swapchain image view", status);
         }
 
-        // OutputImages[i].Create(
+
+        // DepthImages[i].Create(
+        //     Extent,
+        //     VK_FORMAT_D16_UNORM,
+        //     VK_IMAGE_TILING_OPTIMAL,
+        //     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        //     VK_IMAGE_ASPECT_DEPTH_BIT
+        // );
+
+        // PositionImages[i].Create(
         //     Extent,
         //     VK_FORMAT_B8G8R8A8_UNORM,
         //     VK_IMAGE_TILING_OPTIMAL,
-        //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         //     VK_IMAGE_ASPECT_COLOR_BIT
         // );
 
-
-        DepthImages[i].Create(
-            Extent,
-            VK_FORMAT_D16_UNORM,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            VK_IMAGE_ASPECT_DEPTH_BIT
-        );
-
-        PositionImages[i].Create(
-            Extent,
-            VK_FORMAT_B8G8R8A8_UNORM,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT
-        );
-
-        ColorImages[i].Create(
-            Extent,
-            VK_FORMAT_B8G8R8A8_UNORM,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT
-        );
+        // ColorImages[i].Create(
+        //     Extent,
+        //     VK_FORMAT_B8G8R8A8_UNORM,
+        //     VK_IMAGE_TILING_OPTIMAL,
+        //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
+        //     VK_IMAGE_ASPECT_COLOR_BIT
+        // );
     }
 }
 
@@ -176,26 +168,26 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
     }
 }
 
-void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, RvkGraphicsPipeline* comp_pipeline)
+void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipeline)
 {
-    Log::Debug("Image view count: %d", ColorImages.Size);
-    GPassFramebuffers.Free();
-    GPassFramebuffers.InitSize(ColorImages.Size);
+    // Log::Debug("Image view count: %d", ColorImages.Size);
+    // GPassFramebuffers.Free();
+    // GPassFramebuffers.InitSize(ColorImages.Size);
 
-    FxSizedArray<VkImageView> temp_views;
-    temp_views.InitSize(3);
+    // FxSizedArray<VkImageView> temp_views;
+    // temp_views.InitSize(3);
 
-    for (int i = 0; i < ColorImages.Size; i++) {
-        temp_views[0] = ColorImages[i].View;
-        temp_views[1] = PositionImages[i].View;
-        temp_views[2] = DepthImages[i].View;
+    // for (int i = 0; i < ColorImages.Size; i++) {
+    //     temp_views[0] = ColorImages[i].View;
+    //     temp_views[1] = PositionImages[i].View;
+    //     temp_views[2] = DepthImages[i].View;
 
-        GPassFramebuffers[i].Create(temp_views, *pipeline, Extent);
-    }
+    //     GPassFramebuffers[i].Create(temp_views, *pipeline, Extent);
+    // }
 
-    Log::Debug("Create GPass framebuffers", 0);
+    // Log::Debug("Create GPass framebuffers", 0);
 
-    assert(OutputImages.Size == ColorImages.Size);
+    // assert(OutputImages.Size == ColorImages.Size);
 
     CompFramebuffers.Free();
     CompFramebuffers.InitSize(OutputImages.Size);
@@ -212,7 +204,7 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, Rv
     ColorSampler.Create();
     PositionSampler.Create();
 
-    mPipeline = pipeline;
+    // mPipeline = pipeline;
     mCompPipeline = comp_pipeline;
 
 
@@ -220,13 +212,13 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* pipeline, Rv
 
 void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
-    for (int i = 0; i < ColorImages.Size; i++) {
-        GPassFramebuffers[i].Destroy();
+    for (int i = 0; i < RendererFramesInFlight; i++) {
+        // GPassFramebuffers[i].Destroy();
         CompFramebuffers[i].Destroy();
 
-        ColorImages[i].Destroy();
-        DepthImages[i].Destroy();
-        PositionImages[i].Destroy();
+        // ColorImages[i].Destroy();
+        // DepthImages[i].Destroy();
+        // PositionImages[i].Destroy();
 
 
         // vkDestroyImageView(mDevice->Device, OutputImages[i].View, nullptr);
@@ -238,11 +230,11 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
     PositionSampler.Destroy();
 
     CompFramebuffers.Free();
-    GPassFramebuffers.Free();
+    // GPassFramebuffers.Free();
 
-    ColorImages.Free();
-    DepthImages.Free();
-    PositionImages.Free();
+    // ColorImages.Free();
+    // DepthImages.Free();
+    // PositionImages.Free();
 }
 
 void RvkSwapchain::DestroyInternalSwapchain()

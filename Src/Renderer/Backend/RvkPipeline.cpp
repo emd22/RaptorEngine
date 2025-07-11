@@ -32,6 +32,7 @@ VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
 
 void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
     mDevice = Renderer->GetDevice();
+
     Layout = layout;
 
     VkSpecializationInfo specialization_info = {
@@ -366,6 +367,8 @@ void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout la
     if (status != VK_SUCCESS) {
         FxModulePanic("Could not create graphics pipeline", status);
     }
+
+    printf("Create pipeline %p\n", Pipeline);
 }
 
 void RvkGraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
@@ -378,22 +381,27 @@ void RvkGraphicsPipeline::Destroy()
 
     if (Pipeline) {
         vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);
+        Pipeline = nullptr;
     }
     if (Layout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
+        Layout = nullptr;
     }
 
     if (MainDescriptorSetLayout) {
         vkDestroyDescriptorSetLayout(mDevice->Device, MainDescriptorSetLayout, nullptr);
+        MainDescriptorSetLayout = nullptr;
     }
     if (CompDescriptorSetLayout) {
         vkDestroyDescriptorSetLayout(mDevice->Device, CompDescriptorSetLayout, nullptr);
+        CompDescriptorSetLayout = nullptr;
     }
     if (MaterialDescriptorSetLayout) {
         vkDestroyDescriptorSetLayout(mDevice->Device, MaterialDescriptorSetLayout, nullptr);
+        MaterialDescriptorSetLayout = nullptr;
     }
 
-    RenderPass.Destroy(*mDevice);
+    RenderPass.Destroy();
 }
 
 VkPipelineLayout RvkGraphicsPipeline::CreateGPassLayout() {

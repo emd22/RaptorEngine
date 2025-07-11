@@ -26,7 +26,7 @@ public:
     RvkCommandBuffer CommandBuffer;
     RvkCommandBuffer CompCommandBuffer;
 
-    RvkDescriptorSet DescriptorSet;
+    // RvkDescriptorSet DescriptorSet;
     RvkDescriptorSet CompDescriptorSet;
 
     RvkRawGpuBuffer<RvkUniformBufferObject> Ubo;

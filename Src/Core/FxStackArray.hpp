@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 
-template <typename T, unsigned int Capacity>
+template <typename T, unsigned int TCapacity>
 class FxStackArray
 {
 public:
@@ -20,7 +20,7 @@ public:
 
     const T& operator[] (size_t index) const
     {
-        if (index >= Size) {
+        if (index > Capacity) {
             throw std::out_of_range("FxStackArray access out of range");
         }
         return Data[index];
@@ -28,7 +28,7 @@ public:
 
     T& operator[] (size_t index)
     {
-        if (index >= Size) {
+        if (index > Capacity) {
             throw std::out_of_range("FxStackArray access out of range");
         }
         return Data[index];
@@ -46,6 +46,8 @@ public:
 
 public:
     uint32 Size = 0;
+    const uint32 Capacity = TCapacity;
 
-    T Data[Capacity];
+    T Data[TCapacity];
+
 };
