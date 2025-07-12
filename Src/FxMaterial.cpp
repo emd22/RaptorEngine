@@ -4,6 +4,7 @@
 
 #include <Core/Defines.hpp>
 #include <Renderer/Renderer.hpp>
+#include <Renderer/FxDeferred.hpp>
 #include <Renderer/Backend/RvkDevice.hpp>
 
 #include <Renderer/Backend/RvkCommands.hpp>
@@ -163,7 +164,7 @@ void FxMaterial::Destroy()
 void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
-        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(), Pipeline->MaterialDescriptorSetLayout);
+        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(), Renderer->DeferredRenderer->DsLayoutMaterial);
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();

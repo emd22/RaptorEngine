@@ -22,12 +22,70 @@ void FxDeferredRenderer::Destroy()
         GPasses[i].Destroy();
     }
 
-    GPassPipeline.Destroy();
+    DestroyGPassPipeline();
 }
 
 FxDeferredGPass* FxDeferredRenderer::GetCurrentGPass()
 {
     return &GPasses[Renderer->GetFrameNumber()];
+}
+
+VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
+{
+    RvkGpuDevice* device = Renderer->GetDevice();
+
+
+    // Vertex DS
+    {
+        VkDescriptorSetLayoutBinding ubo_layout_binding {
+            .binding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
+        VkDescriptorSetLayoutCreateInfo ds_layout_info {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindings = &ubo_layout_binding,
+        };
+
+        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr, &DsLayoutUniforms);
+        if (status != VK_SUCCESS) {
+            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+        }
+    }
+
+    // Fragment DS
+    {
+        // Albedo texture
+        VkDescriptorSetLayoutBinding albedo_layout_binding {
+            .binding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
+        VkDescriptorSetLayoutCreateInfo ds_layout_info {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindings = &albedo_layout_binding,
+        };
+
+        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr, &DsLayoutMaterial);
+        if (status != VK_SUCCESS) {
+            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+        }
+    }
+
+    VkDescriptorSetLayout layouts[] = {
+        DsLayoutUniforms,
+        DsLayoutMaterial,
+    };
+
+    return GPassPipeline.CreateLayout(sizeof(DrawPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 void FxDeferredRenderer::CreateGPassPipeline()
@@ -60,7 +118,27 @@ void FxDeferredRenderer::CreateGPassPipeline()
     shader_list.Fragment = fragment_shader.ShaderModule;
 
     const int attachment_count = FxSizeofArray(color_blend_attachments);
-    GPassPipeline.Create(shader_list, GPassPipeline.CreateGPassLayout(), FxMakeSlice(color_blend_attachments, attachment_count), false);
+
+    VkPipelineLayout layout = CreateGPassPipelineLayout();
+
+    GPassPipeline.Create(shader_list, layout, FxMakeSlice(color_blend_attachments, attachment_count), false);
+}
+
+void FxDeferredRenderer::DestroyGPassPipeline()
+{
+    VkDevice device = Renderer->GetDevice()->Device;
+
+    // Destroy descriptor set layouts
+    if (DsLayoutUniforms) {
+        vkDestroyDescriptorSetLayout(device, DsLayoutUniforms, nullptr);
+        DsLayoutUniforms = nullptr;
+    }
+    if (DsLayoutMaterial) {
+        vkDestroyDescriptorSetLayout(device, DsLayoutMaterial, nullptr);
+        DsLayoutMaterial = nullptr;
+    }
+
+    GPassPipeline.Destroy();
 }
 
 
@@ -71,7 +149,7 @@ void FxDeferredRenderer::CreateGPassPipeline()
 
 void FxDeferredGPass::BuildDescriptorSets()
 {
-    DescriptorSet.Create(DescriptorPool, mGPassPipeline->MainDescriptorSetLayout);
+    DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutUniforms);
 
     VkDescriptorBufferInfo ubo_info{
         .buffer = UniformBuffer.Buffer,

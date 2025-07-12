@@ -40,6 +40,7 @@ public:
 
     RvkRawGpuBuffer<RvkUniformBufferObject> UniformBuffer;
 
+
 private:
     RvkGraphicsPipeline* mGPassPipeline = nullptr;
     FxDeferredRenderer* mRendererInst = nullptr;
@@ -62,8 +63,28 @@ public:
 
 private:
     void CreateGPassPipeline();
+    void DestroyGPassPipeline();
+
+    FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
 
 public:
+    /////////////////////
+    // Geometry Pass
+    /////////////////////
+
+    VkDescriptorSetLayout DsLayoutUniforms = nullptr;
+    VkDescriptorSetLayout DsLayoutMaterial = nullptr;
+
     RvkGraphicsPipeline GPassPipeline;
+
     FxStackArray<FxDeferredGPass, RendererFramesInFlight> GPasses;
+
+
+    //////////////////////
+    // Composition Pass
+    //////////////////////
+
+
+
+
 };

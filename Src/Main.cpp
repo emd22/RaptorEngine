@@ -226,7 +226,7 @@ int main()
 
     FxDeferredRenderer deferred_renderer;
     deferred_renderer.Create(Renderer->Swapchain.Extent);
-
+    Renderer->DeferredRenderer = &deferred_renderer;
 
 
 

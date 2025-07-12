@@ -64,6 +64,8 @@ public:
     VkPipelineLayout CreateGPassLayout();
     VkPipelineLayout CreateCompLayout();
 
+    VkPipelineLayout CreateLayout(uint32 push_consts_size, const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
+
     void Destroy();
 
     void Bind(RvkCommandBuffer &command_buffer);
@@ -76,8 +78,8 @@ private:
     VertexInfo MakeVertexInfo();
 
 public:
-    VkDescriptorSetLayout MainDescriptorSetLayout = nullptr;
-    VkDescriptorSetLayout MaterialDescriptorSetLayout = nullptr;
+    // VkDescriptorSetLayout MainDescriptorSetLayout = nullptr;
+    // VkDescriptorSetLayout MaterialDescriptorSetLayout = nullptr;
 
     VkDescriptorSetLayout CompDescriptorSetLayout = nullptr;
 

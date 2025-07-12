@@ -188,8 +188,8 @@ public:
 
     bool Initialized = false;
 
-    FxDeferredGPass* CurrentGPass;
-
+    FxDeferredGPass* CurrentGPass = nullptr;
+    FxDeferredRenderer* DeferredRenderer = nullptr;
 
     // RvkSemaphore OffscreenSemaphore;
 
