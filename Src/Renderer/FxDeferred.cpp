@@ -96,6 +96,14 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
 void FxDeferredRenderer::CreateGPassPipeline()
 {
     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+        // Color
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        },
         // Positions
         VkPipelineColorBlendAttachmentState {
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
@@ -104,7 +112,7 @@ void FxDeferredRenderer::CreateGPassPipeline()
                             | VK_COLOR_COMPONENT_A_BIT,
             .blendEnable = VK_FALSE,
         },
-        // Color
+        // Normals
         VkPipelineColorBlendAttachmentState {
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
                             | VK_COLOR_COMPONENT_G_BIT
@@ -195,14 +203,6 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const Vec2u& extent)
         VK_IMAGE_ASPECT_DEPTH_BIT
     );
 
-    PositionsAttachment.Create(
-        extent,
-        VK_FORMAT_B8G8R8A8_UNORM,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT
-    );
-
     ColorAttachment.Create(
         extent,
         VK_FORMAT_B8G8R8A8_UNORM,
@@ -211,10 +211,27 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const Vec2u& extent)
         VK_IMAGE_ASPECT_COLOR_BIT
     );
 
+    PositionsAttachment.Create(
+        extent,
+        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT
+    );
+
+    NormalsAttachment.Create(
+        extent,
+        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT
+    );
 
     FxSizedArray image_views = {
         ColorAttachment.View,
         PositionsAttachment.View,
+        NormalsAttachment.View,
+
         DepthAttachment.View
     };
 
@@ -237,6 +254,10 @@ void FxDeferredGPass::Begin()
             .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
         },
         // Positions
+        VkClearValue {
+            .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
+        },
+        // Normals
         VkClearValue {
             .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
         },

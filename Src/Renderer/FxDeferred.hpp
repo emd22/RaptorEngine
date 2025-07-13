@@ -27,6 +27,8 @@ public:
     // G-Pass attachments
     RvkImage ColorAttachment;
     RvkImage PositionsAttachment;
+    RvkImage NormalsAttachment;
+
     RvkImage DepthAttachment;
 
     // G-Pass samplers

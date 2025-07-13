@@ -12,5 +12,5 @@ void main()
     vec3 frag_pos = texture(s_Position, a_UV).rgb;
     vec4 albedo = texture(s_Albedo, a_UV);
 
-    v_Color = vec4(frag_pos.rgb, 1.0);
+    v_Color = vec4(albedo.rgb, 1.0);
 }

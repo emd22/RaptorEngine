@@ -18,23 +18,27 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
 {
     mDevice = Renderer->GetDevice();
 
-
     VkAttachmentReference color_refs[] = {
-        // Positions output
+        // Color output
         VkAttachmentReference{
             .attachment = 0,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         },
-        // Color output
+        // Positions output
         VkAttachmentReference{
             .attachment = 1,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        },
+        // Normals output
+        VkAttachmentReference{
+            .attachment = 2,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         },
     };
 
     // Depth output
     VkAttachmentReference depth_attachment_ref {
-        .attachment = 2,
+        .attachment = 3,
         .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     };
 
@@ -95,7 +99,7 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
     };
 
     FxSizedArray attachments = {
-        // Posiitons output
+        // Albedo output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -106,7 +110,18 @@ void RvkRenderPass::Create(RvkGpuDevice &device, RvkSwapchain &swapchain)
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         },
-        // Albedo output
+        // Positions output
+        VkAttachmentDescription {
+            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        },
+        // Normals output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
