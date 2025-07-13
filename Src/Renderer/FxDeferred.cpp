@@ -25,6 +25,11 @@ void FxDeferredRenderer::Destroy()
     DestroyGPassPipeline();
 }
 
+////////////////////////////////
+// FxRenderer GPass Functions
+////////////////////////////////
+
+
 FxDeferredGPass* FxDeferredRenderer::GetCurrentGPass()
 {
     return &GPasses[Renderer->GetFrameNumber()];
@@ -142,22 +147,22 @@ void FxDeferredRenderer::DestroyGPassPipeline()
 }
 
 
-////////////////////////
-// G-Pass functions
-////////////////////////
+/////////////////////////////////////
+// FxDeferredGPass Functions
+/////////////////////////////////////
 
 
 void FxDeferredGPass::BuildDescriptorSets()
 {
     DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutUniforms);
 
-    VkDescriptorBufferInfo ubo_info{
+    VkDescriptorBufferInfo ubo_info {
         .buffer = UniformBuffer.Buffer,
         .offset = 0,
         .range = sizeof(RvkUniformBufferObject)
     };
 
-    VkWriteDescriptorSet ubo_write{
+    VkWriteDescriptorSet ubo_write {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         .descriptorCount = 1,
@@ -293,7 +298,6 @@ void FxDeferredGPass::Destroy()
     PositionsAttachment.Destroy();
     ColorAttachment.Destroy();
 
-    DescriptorSet.Destroy();
     DescriptorPool.Destroy();
 
     Framebuffer.Destroy();
@@ -302,6 +306,4 @@ void FxDeferredGPass::Destroy()
     UniformBuffer.Destroy();
 
     mGPassPipeline = nullptr;
-
-    // Renderer->GPassDescriptorPool.Destroy();
 }

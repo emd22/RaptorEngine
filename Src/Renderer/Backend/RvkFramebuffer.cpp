@@ -33,7 +33,7 @@ void RvkFramebuffer::Create(const FxSizedArray<VkImageView> &image_views, const 
 
 void RvkFramebuffer::Destroy()
 {
-    if (Framebuffer == nullptr) {
+    if (!Framebuffer) {
         return;
     }
     vkDestroyFramebuffer(mDevice->Device, Framebuffer, nullptr);

@@ -173,6 +173,10 @@ public:
             return;
         }
 
+        // if (IsMapped()) {
+        //     UnMap();
+        // }
+
         Fx_Fwd_AddGpuBufferToDeletionQueue(this->Buffer, this->Allocation);
 
         Initialized.store(false);

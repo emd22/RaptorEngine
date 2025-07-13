@@ -406,8 +406,7 @@ int main()
     material_manager.Destroy();
     asset_manager.Shutdown();
 
-    composition_pipeline.Destroy();
-    deferred_renderer.Destroy();
+    // composition_pipeline.Destroy();
 
     std::cout << "this thread: " << std::this_thread::get_id() << std::endl;
 

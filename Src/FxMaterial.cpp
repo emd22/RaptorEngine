@@ -66,7 +66,11 @@ void FxMaterialManager::Destroy()
 
     AlbedoSampler->Destroy();
 
-    vkDestroyDescriptorPool(Renderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
+    // if (mDescriptorPool) {
+        // vkDestroyDescriptorPool(Renderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
+    // }
+    //
+    mDescriptorPool.Destroy();
 
     mInitialized = false;
 }

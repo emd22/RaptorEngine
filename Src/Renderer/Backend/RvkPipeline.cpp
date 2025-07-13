@@ -113,7 +113,6 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pScissors = &scissor,
     };
 
-
     VkPipelineRasterizationStateCreateInfo rasterizer_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .depthClampEnable = VK_FALSE,
@@ -140,24 +139,6 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
     };
-
-
-    // VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-    //     VkPipelineColorBlendAttachmentState {
-    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-    //                         | VK_COLOR_COMPONENT_G_BIT
-    //                         | VK_COLOR_COMPONENT_B_BIT
-    //                         | VK_COLOR_COMPONENT_A_BIT,
-    //         .blendEnable = VK_FALSE,
-    //     },
-    //     VkPipelineColorBlendAttachmentState {
-    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-    //                         | VK_COLOR_COMPONENT_G_BIT
-    //                         | VK_COLOR_COMPONENT_B_BIT
-    //                         | VK_COLOR_COMPONENT_A_BIT,
-    //         .blendEnable = VK_FALSE,
-    //     },
-    // };
 
 
     VkPipelineColorBlendStateCreateInfo color_blend_info {
@@ -389,102 +370,13 @@ void RvkGraphicsPipeline::Destroy()
         Layout = nullptr;
     }
 
-    // if (MainDescriptorSetLayout) {
-    //     vkDestroyDescriptorSetLayout(mDevice->Device, MainDescriptorSetLayout, nullptr);
-    //     MainDescriptorSetLayout = nullptr;
-    // }
     if (CompDescriptorSetLayout) {
         vkDestroyDescriptorSetLayout(mDevice->Device, CompDescriptorSetLayout, nullptr);
         CompDescriptorSetLayout = nullptr;
     }
-    // if (MaterialDescriptorSetLayout) {
-    //     vkDestroyDescriptorSetLayout(mDevice->Device, MaterialDescriptorSetLayout, nullptr);
-    //     MaterialDescriptorSetLayout = nullptr;
-    // }
 
     RenderPass.Destroy();
 }
-
-VkPipelineLayout RvkGraphicsPipeline::CreateGPassLayout() {
-    if (mDevice == nullptr) {
-        mDevice = Renderer->GetDevice();
-    }
-
-    VkPushConstantRange buffer_range{};
-    buffer_range.offset = 0;
-    buffer_range.size = sizeof(DrawPushConstants);
-    buffer_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-
-    // TODO: move descriptor set layout creation out of here
-    // VkDescriptorSetLayoutBinding ubo_layout_binding {
-    //     .binding = 0,
-    //     .descriptorCount = 1,
-    //     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    //     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-    //     .pImmutableSamplers = nullptr,
-    // };
-
-    // VkDescriptorSetLayoutCreateInfo ds_layout_info {
-    //     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-    //     .bindingCount = 1,
-    //     .pBindings = &ubo_layout_binding,
-    // };
-
-    VkResult status;
-
-    // status = vkCreateDescriptorSetLayout(mDevice->Device, &ds_layout_info, nullptr, &MainDescriptorSetLayout);
-    // if (status != VK_SUCCESS) {
-    //     FxModulePanic("Failed to create pipeline descriptor set layout", status);
-    // }
-
-    // VkDescriptorSetLayoutBinding image_layout_binding {
-    //     .binding = 0,
-    //     .descriptorCount = 1,
-    //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-    //     .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-    //     .pImmutableSamplers = nullptr,
-    // };
-
-    // VkDescriptorSetLayoutCreateInfo mat_layout_info {
-    //     .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-    //     .bindingCount = 1,
-    //     .pBindings = &image_layout_binding,
-    // };
-
-    // status = vkCreateDescriptorSetLayout(mDevice->Device, &mat_layout_info, nullptr, &MaterialDescriptorSetLayout);
-    // if (status != VK_SUCCESS) {
-    //     FxModulePanic("Failed to create pipeline descriptor set layout", status);
-    // }
-    //
-    //
-
-    VkDescriptorSetLayout layouts[] = {
-        Renderer->DeferredRenderer->DsLayoutUniforms,
-        Renderer->DeferredRenderer->DsLayoutMaterial,
-    };
-
-    VkPipelineLayoutCreateInfo create_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = FxSizeofArray(layouts),
-        .pSetLayouts = layouts,
-
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &buffer_range,
-
-    };
-
-    VkPipelineLayout layout;
-
-    status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);
-
-    if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline layout", status);
-    }
-
-    return layout;
-}
-
 
 
 VkPipelineLayout RvkGraphicsPipeline::CreateLayout(
