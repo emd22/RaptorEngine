@@ -59,9 +59,15 @@ struct alignas(16) DrawPushConstants
 class RvkGraphicsPipeline
 {
 public:
-    void Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
+    void Create(
+        ShaderList shader_list,
+        VkPipelineLayout layout,
+        const FxSlice<VkAttachmentDescription>& attachments,
+        const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments
+    );
+
     void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
-    // VkPipelineLayout CreateGPassLayout();
+
     VkPipelineLayout CreateCompLayout();
 
     VkPipelineLayout CreateLayout(uint32 push_consts_size, const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);

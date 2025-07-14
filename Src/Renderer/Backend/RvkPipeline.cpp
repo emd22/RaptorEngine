@@ -11,7 +11,8 @@
 
 FX_SET_MODULE_NAME("Pipeline")
 
-VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
+VertexInfo RvkGraphicsPipeline::MakeVertexInfo()
+{
     using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
 
     VkVertexInputBindingDescription binding_desc = {
@@ -31,10 +32,24 @@ VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
     return { binding_desc, std::move(attribs) };
 }
 
-void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
+void RvkGraphicsPipeline::Create(
+    ShaderList shader_list,
+    VkPipelineLayout layout,
+    const FxSlice<VkAttachmentDescription>& attachments,
+    const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments
+)
+{
     mDevice = Renderer->GetDevice();
-
     Layout = layout;
+
+    bool has_depth_attachment = false;
+
+    // Depth attachment is usually the last attachment, check last first
+    for (int32 i = attachments.Size - 1; i >= 0; --i) {
+        if (RvkUtil::IsFormatDepth(attachments[i].format)) {
+            has_depth_attachment = true;
+        }
+    }
 
     VkSpecializationInfo specialization_info = {
         .mapEntryCount = 0,
@@ -43,6 +58,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pData = nullptr,
     };
 
+    // Shaders
     FxSizedArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
     FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
 
@@ -60,6 +76,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         shader_create_info.Insert(create_info);
     }
 
+    // Dynamic states (scissor & viewport updates dynamically)
     FxSizedArray<VkDynamicState> dynamic_states = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
@@ -71,6 +88,32 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pDynamicStates = dynamic_states,
     };
 
+    const Vec2u extent = Renderer->Swapchain.Extent;
+
+    VkViewport viewport = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (float32)extent.Width(),
+        .height = (float32)extent.Height(),
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+
+    VkRect2D scissor = {
+        .offset = {0, 0},
+        .extent = {.width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
+    };
+
+    VkPipelineViewportStateCreateInfo viewport_state_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .pViewports = &viewport,
+        .scissorCount = 1,
+        .pScissors = &scissor,
+    };
+
+
+    // Vertex info + input info
     VertexInfo vertex_info = MakeVertexInfo();
 
     VkPipelineVertexInputStateCreateInfo vertex_input_info = {
@@ -87,31 +130,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .primitiveRestartEnable = VK_FALSE,
     };
 
-    const Vec2u extent = Renderer->Swapchain.Extent;
 
-    VkViewport viewport = {
-        .x = 0.0f,
-        .y = 0.0f,
-        .width = (float32)extent.Width(),
-        .height = (float32)extent.Height(),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    };
-
-
-    VkRect2D scissor = {
-        .offset = {0, 0},
-        .extent = {.width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
-    };
-
-
-    VkPipelineViewportStateCreateInfo viewport_state_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .pViewports = &viewport,
-        .scissorCount = 1,
-        .pScissors = &scissor,
-    };
 
     VkPipelineRasterizationStateCreateInfo rasterizer_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
@@ -131,14 +150,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
     };
 
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
-        .depthBoundsTestEnable = VK_FALSE,
-        .stencilTestEnable = VK_FALSE,
-    };
+
 
 
     VkPipelineColorBlendStateCreateInfo color_blend_info {
@@ -148,13 +160,17 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pAttachments = color_blend_attachments,
     };
 
-    // CreateLayout();
-    if (!is_comp) {
-        RenderPass.Create(*mDevice, Renderer->Swapchain);
-    }
-    else {
-        RenderPass.CreateComp(*mDevice, Renderer->Swapchain);
-    }
+    RenderPass.Create2(attachments);
+
+    // Unused if has_depth_attachment is false
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable = VK_FALSE,
+    };
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -168,7 +184,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pRasterizationState = &rasterizer_info,
         .pMultisampleState = &multisampling_info,
         .pColorBlendState = &color_blend_info,
-        .pDepthStencilState = &depth_stencil_info,
+        .pDepthStencilState = has_depth_attachment ? &depth_stencil_info : nullptr,
 
         .pDynamicState = &dynamic_state_info,
 
@@ -184,7 +200,6 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         FxModulePanic("Could not create graphics pipeline", status);
     }
 }
-
 
 void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
     mDevice = Renderer->GetDevice();
@@ -244,7 +259,7 @@ void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout la
 
 
     VkRect2D scissor = {
-        .offset = {0, 0},
+        .offset = { 0, 0 },
         .extent = {.width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
     };
 
@@ -311,13 +326,9 @@ void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout la
         .pAttachments = color_blend_attachments,
     };
 
-    // CreateLayout();
-    if (!is_comp) {
-        RenderPass.Create(*mDevice, Renderer->Swapchain);
-    }
-    else {
-        RenderPass.CreateComp(*mDevice, Renderer->Swapchain);
-    }
+    FxAssert(is_comp == true);
+    RenderPass.CreateComp(*mDevice, Renderer->Swapchain);
+
 
     VkPipelineVertexInputStateCreateInfo empty_vertex_input_info {};
 	empty_vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

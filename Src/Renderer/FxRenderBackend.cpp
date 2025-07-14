@@ -9,7 +9,7 @@
 #include "Backend/RvkSynchro.hpp"
 #include "Backend/RvkPipeline.hpp"
 #include "Backend/RvkCommands.hpp"
-#include "Backend/Util.hpp"
+#include "Backend/RvkUtil.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -295,7 +295,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     const auto status = CreateDebugUtilsMessengerEXT(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        Log::Error("Could not create debug messenger! (err: %s)", VulkanUtil::ResultToStr(status));
+        Log::Error("Could not create debug messenger! (err: %s)", RvkUtil::ResultToStr(status));
         return nullptr;
     }
 

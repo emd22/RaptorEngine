@@ -39,7 +39,6 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
 {
     RvkGpuDevice* device = Renderer->GetDevice();
 
-
     // Vertex DS
     {
         VkDescriptorSetLayoutBinding ubo_layout_binding {
@@ -122,6 +121,53 @@ void FxDeferredRenderer::CreateGPassPipeline()
         },
     };
 
+    VkAttachmentDescription attachments[] = {
+        // Albedo output
+        VkAttachmentDescription {
+            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        },
+        // Positions output
+        VkAttachmentDescription {
+            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        },
+        // Normals output
+        VkAttachmentDescription {
+            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        },
+
+        VkAttachmentDescription {
+            .format = VK_FORMAT_D16_UNORM,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        }
+    };
+
     ShaderList shader_list;
 
     RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
@@ -130,11 +176,14 @@ void FxDeferredRenderer::CreateGPassPipeline()
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
 
-    const int attachment_count = FxSizeofArray(color_blend_attachments);
-
     VkPipelineLayout layout = CreateGPassPipelineLayout();
 
-    GPassPipeline.Create(shader_list, layout, FxMakeSlice(color_blend_attachments, attachment_count), false);
+    GPassPipeline.Create(
+        shader_list,
+        layout,
+        FxMakeSlice(attachments, FxSizeofArray(attachments)),
+        FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments))
+    );
 }
 
 void FxDeferredRenderer::DestroyGPassPipeline()
