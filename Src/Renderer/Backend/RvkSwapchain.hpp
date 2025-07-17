@@ -18,7 +18,7 @@ public:
     ~RvkSwapchain();
 
     void Init(Vec2u size, VkSurfaceKHR& surface, RvkGpuDevice* device);
-    void CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipeline);
+    void CreateSwapchainFramebuffers();
 
     VkSwapchainKHR GetSwapchain() { return mSwapchain; }
 
@@ -45,7 +45,7 @@ public:
     RvkSampler PositionSampler;
 
     // FxSizedArray<RvkFramebuffer> GPassFramebuffers;
-    FxSizedArray<RvkFramebuffer> CompFramebuffers;
+    // FxSizedArray<RvkFramebuffer> CompFramebuffers;
 
     Vec2u Extent = Vec2u::Zero;
 
@@ -56,6 +56,6 @@ public:
 private:
     RvkGpuDevice *mDevice = nullptr;
     // RvkGraphicsPipeline* mPipeline = nullptr;
-    RvkGraphicsPipeline* mCompPipeline = nullptr;
+    // RvkGraphicsPipeline* mCompPipeline = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;
 };

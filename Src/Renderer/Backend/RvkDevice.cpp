@@ -260,6 +260,8 @@ void RvkGpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 void RvkGpuDevice::Destroy()
 {
     vkDestroyDevice(Device, nullptr);
+
+    Device = nullptr;
 }
 
 VkSurfaceFormatKHR RvkGpuDevice::GetBestSurfaceFormat()
@@ -308,5 +310,9 @@ void RvkGpuDevice::PickPhysicalDevice()
 
 void RvkGpuDevice::WaitForIdle()
 {
+    if (!Device) {
+        return;
+    }
+
     vkDeviceWaitIdle(Device);
 }

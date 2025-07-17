@@ -19,13 +19,6 @@ void RvkDescriptorPool::Create(RvkGpuDevice* device, uint32 max_sets)
     if (vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool) != VK_SUCCESS) {
         FxPanic("DescriptorPool", "Failed to create descriptor pool!", 0);
     }
-
-    printf("Creating early %p\n", this);
-    static int times = 0;
-    if ((++times) == 5) {
-        // FX_BREAKPOINT;
-    }
-
 }
 
 void RvkDescriptorSet::Create(const RvkDescriptorPool& pool, VkDescriptorSetLayout layout)
@@ -41,8 +34,6 @@ void RvkDescriptorSet::Create(const RvkDescriptorPool& pool, VkDescriptorSetLayo
     if (vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set) != VK_SUCCESS) {
         FxPanic("DescriptorSet", "Failed to allocate descriptor set!", 0);
     }
-
-    // FX_BREAKPOINT;
 }
 
 VkWriteDescriptorSet RvkDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest, const RvkTexture& texture, VkImageLayout layout, VkDescriptorType type)

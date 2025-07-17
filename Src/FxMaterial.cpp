@@ -168,7 +168,7 @@ void FxMaterial::Destroy()
 void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
-        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(), Renderer->DeferredRenderer->DsLayoutMaterial);
+        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(), Renderer->DeferredRenderer->DsLayoutGPassMaterial);
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();

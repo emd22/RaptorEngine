@@ -12,13 +12,13 @@ void RvkFrameData::Create(RvkGpuDevice *device)
 
     InFlight.Create(device);
 
-    Ubo.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    Ubo.Map();
+    // Ubo.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    // Ubo.Map();
 }
 
 void RvkFrameData::SubmitUbo(const RvkUniformBufferObject & ubo)
 {
-    memcpy(Ubo.MappedBuffer, &ubo, sizeof(RvkUniformBufferObject));
+    // memcpy(Ubo.MappedBuffer, &ubo, sizeof(RvkUniformBufferObject));
 }
 
 void RvkFrameData::Destroy()
@@ -29,6 +29,6 @@ void RvkFrameData::Destroy()
 
     InFlight.Destroy();
 
-    Ubo.UnMap();
-    Ubo.Destroy();
+    // Ubo.UnMap();
+    // Ubo.Destroy();
 };

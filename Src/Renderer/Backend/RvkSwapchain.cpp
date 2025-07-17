@@ -6,6 +6,8 @@
 #include <Core/Defines.hpp>
 #include <Core/FxPanic.hpp>
 
+#include <Renderer/FxDeferred.hpp>
+
 #include <vulkan/vulkan.h>
 
 FX_SET_MODULE_NAME("RvkSwapchain")
@@ -137,10 +139,10 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
     }
 }
 
-void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipeline)
+void RvkSwapchain::CreateSwapchainFramebuffers()
 {
-    CompFramebuffers.Free();
-    CompFramebuffers.InitSize(OutputImages.Size);
+    // CompFramebuffers.Free();
+    // CompFramebuffers.InitSize(OutputImages.Size);
 
     FxSizedArray<VkImageView> temp_views2;
     temp_views2.InitSize(1);
@@ -148,13 +150,13 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipelin
     for (int i = 0; i < OutputImages.Size; i++) {
         temp_views2[0] = OutputImages[i].View;
 
-        CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
+        // CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
     }
 
     ColorSampler.Create();
     PositionSampler.Create();
 
-    mCompPipeline = comp_pipeline;
+    // mCompPipeline = comp_pipeline;
 
 
 }
@@ -162,8 +164,10 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipelin
 void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
     for (int i = 0; i < RendererFramesInFlight; i++) {
-        CompFramebuffers[i].Destroy();
+        // CompFramebuffers[i].Destroy();
 
+        // Since the RvkImage's `VkImage` is from the swapchain, we do not want to destroy it
+        // using VMA. Mark the Image as nullptr incase something happened to the `Allocation` inside.
         OutputImages[i].Image = nullptr;
         OutputImages[i].Destroy();
     }
@@ -171,7 +175,8 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
     ColorSampler.Destroy();
     PositionSampler.Destroy();
 
-    CompFramebuffers.Free();
+
+    // CompFramebuffers.Free();
 }
 
 void RvkSwapchain::DestroyInternalSwapchain()

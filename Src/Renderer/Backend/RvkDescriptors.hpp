@@ -33,14 +33,12 @@ public:
             return;
         }
 
-        printf("Actual destroy %p\n", this);
         vkDestroyDescriptorPool(mDevice->Device, Pool, nullptr);
         Pool = nullptr;
     }
 
     ~RvkDescriptorPool()
     {
-        printf("Calling early %p\n", this);
         Destroy();
     }
 

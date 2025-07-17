@@ -79,26 +79,26 @@ public:
     }
 };
 
-void CreateCompositionPipeline(RvkGraphicsPipeline& pipeline)
-{
-    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-        VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-                            | VK_COLOR_COMPONENT_G_BIT
-                            | VK_COLOR_COMPONENT_B_BIT
-                            | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = VK_FALSE,
-        }
-    };
+// void CreateCompositionPipeline(RvkGraphicsPipeline& pipeline)
+// {
+//     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+//         VkPipelineColorBlendAttachmentState {
+//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+//                             | VK_COLOR_COMPONENT_G_BIT
+//                             | VK_COLOR_COMPONENT_B_BIT
+//                             | VK_COLOR_COMPONENT_A_BIT,
+//             .blendEnable = VK_FALSE,
+//         }
+//     };
 
-    RvkShader vertex_shader("../shaders/composition.vert.spv", RvkShaderType::Vertex);
-    RvkShader fragment_shader("../shaders/composition.frag.spv", RvkShaderType::Fragment);
+//     RvkShader vertex_shader("../shaders/composition.vert.spv", RvkShaderType::Vertex);
+//     RvkShader fragment_shader("../shaders/composition.frag.spv", RvkShaderType::Fragment);
 
-    ShaderList shader_list{ .Vertex = vertex_shader, .Fragment = fragment_shader };
+//     ShaderList shader_list{ .Vertex = vertex_shader, .Fragment = fragment_shader };
 
-    const int attachment_count = FxSizeofArray(color_blend_attachments);
-    pipeline.CreateComp(shader_list, pipeline.CreateCompLayout(), FxMakeSlice(color_blend_attachments, attachment_count), true);
-}
+//     const int attachment_count = FxSizeofArray(color_blend_attachments);
+//     pipeline.CreateComp(shader_list, pipeline.CreateCompLayout(), FxMakeSlice(color_blend_attachments, attachment_count), true);
+// }
 
 // void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
 // {
@@ -210,25 +210,23 @@ int main()
     // Renderer->GPassDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     // Renderer->GPassDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
-    RvkGraphicsPipeline composition_pipeline;
+    // RvkGraphicsPipeline composition_pipeline;
 
     // Positions sampler
-    Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     // Albedo sampler
-    Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    Renderer->CompDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+    // Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Renderer->CompDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
-    CreateCompositionPipeline(composition_pipeline);
+    // CreateCompositionPipeline(composition_pipeline);
 
-    Renderer->Swapchain.CreateSwapchainFramebuffers(&composition_pipeline);
+    Renderer->Swapchain.CreateSwapchainFramebuffers();
 
     // Renderer->OffscreenSemaphore.Create(Renderer->GetDevice());
 
-    FxDeferredRenderer deferred_renderer;
-    deferred_renderer.Create(Renderer->Swapchain.Extent);
-    Renderer->DeferredRenderer = &deferred_renderer;
-
-
+    FxRef<FxDeferredRenderer> deferred_renderer = FxMakeRef<FxDeferredRenderer>();
+    deferred_renderer->Create(Renderer->Swapchain.Extent);
+    Renderer->DeferredRenderer = deferred_renderer;
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
@@ -253,7 +251,7 @@ int main()
     //
     helmet_model->WaitUntilLoaded();
 
-    FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer.GPassPipeline);
+    FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::ResourceType::Diffuse, cheese_image);
 
     // FxSceneObject scene_object;
@@ -265,7 +263,7 @@ int main()
 
     if (helmet_model->Materials.size() > 0) {
         FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
-        helmet_material->Pipeline = &deferred_renderer.GPassPipeline;
+        helmet_material->Pipeline = &deferred_renderer->GPassPipeline;
 
         helmet_object.Attach(helmet_material);
     }
@@ -276,10 +274,10 @@ int main()
     // FxRef<FxScript> script_instance = FxRef<TestScript>::New();
     // helmet_object.Attach(script_instance);
 
-    int index = 0;
-    for (RvkFrameData& frame : Renderer->Frames) {
+    // int index = 0;
+    // for (RvkFrameData& frame : Renderer->Frames) {
         // frame.DescriptorSet.Create(Renderer->GPassDescriptorPool, pipeline.MainDescriptorSetLayout);
-        frame.CompDescriptorSet.Create(Renderer->CompDescriptorPool, composition_pipeline.CompDescriptorSetLayout);
+        // frame.CompDescriptorSet.Create(Renderer->CompDescriptorPool, composition_pipeline.CompDescriptorSetLayout);
 
         // VkDescriptorBufferInfo ubo_info{
         //     .buffer = frame.Ubo.Buffer,
@@ -302,9 +300,9 @@ int main()
         // vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
 
 
-        BuildCompositionDescriptorSet(deferred_renderer, index++);
+        // BuildCompositionDescriptorSet(deferred_renderer, index++);
         // frame.DescriptorSet.SubmitWrites();
-    }
+    // }
 
 
 
@@ -367,7 +365,7 @@ int main()
 
         // Mat4f MVPMatrix = model_matrix * camera.VPMatrix;
 
-        if (Renderer->BeginFrame(deferred_renderer) != FrameResult::Success) {
+        if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
             continue;
         }
 
@@ -396,7 +394,7 @@ int main()
         helmet_object.Render(camera);
         // scene_object.Render(camera);
 
-        Renderer->FinishFrame(composition_pipeline);
+        Renderer->FinishFrame();
 
         LastTick = CurrentTick;
     }
@@ -405,6 +403,8 @@ int main()
 
     material_manager.Destroy();
     asset_manager.Shutdown();
+
+    deferred_renderer->Destroy();
 
     // composition_pipeline.Destroy();
 

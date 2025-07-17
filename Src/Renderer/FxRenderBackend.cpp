@@ -460,7 +460,7 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
     RvkFrameData *frame = GetFrame();
 
     CurrentGPass = renderer.GetCurrentGPass();
-
+    CurrentCompPass = renderer.GetCurrentCompPass();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -502,7 +502,7 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 
     vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
 
-    DrawPushConstants push_constants{};
+    FxDrawPushConstants push_constants{};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 
@@ -548,14 +548,18 @@ void FxRenderBackend::PresentFrame()
 
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
         .pWaitDstStageMask = wait_stages,
+
         // command buffers
         .commandBufferCount = 1,
         .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
+
         // signal semaphores
         .signalSemaphoreCount = 1,
+
         // .pSignalSemaphores = &frame->RenderFinished.Semaphore
         .pSignalSemaphores = &frame->RenderFinished.Semaphore
     };
@@ -597,7 +601,7 @@ void FxRenderBackend::PresentFrame()
     }
 }
 
-void FxRenderBackend::FinishFrame(RvkGraphicsPipeline& comp_pipeline)
+void FxRenderBackend::FinishFrame()
 {
     RvkFrameData* frame = GetFrame();
 
@@ -608,9 +612,10 @@ void FxRenderBackend::FinishFrame(RvkGraphicsPipeline& comp_pipeline)
     frame->CommandBuffer.End();
     // GetFrame()->CompCommandBuffer.End();
     //
-    frame->CompCommandBuffer.Reset();
-    frame->CompCommandBuffer.Record();
+    // frame->CompCommandBuffer.Reset();
+    // frame->CompCommandBuffer.Record();
 
+    CurrentCompPass->Begin();
 
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
@@ -633,16 +638,18 @@ void FxRenderBackend::FinishFrame(RvkGraphicsPipeline& comp_pipeline)
     vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
 
-    comp_pipeline.RenderPass.BeginComp(&frame->CompCommandBuffer);
-    comp_pipeline.Bind(frame->CompCommandBuffer);
+    CurrentCompPass->DoCompPass();
 
-    frame->CompDescriptorSet.Bind(frame->CompCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, comp_pipeline);
+    // comp_pipeline.RenderPass.BeginComp(&frame->CompCommandBuffer);
+    // comp_pipeline.Bind(frame->CompCommandBuffer);
 
-    vkCmdDraw(frame->CompCommandBuffer, 3, 1, 0, 0);
+    // frame->CompDescriptorSet.Bind(frame->CompCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, comp_pipeline);
 
-    comp_pipeline.RenderPass.End();
+    // vkCmdDraw(frame->CompCommandBuffer, 3, 1, 0, 0);
 
-    frame->CompCommandBuffer.End();
+    // comp_pipeline.RenderPass.End();
+
+    // frame->CompCommandBuffer.End();
 
     SubmitFrame();
     PresentFrame();

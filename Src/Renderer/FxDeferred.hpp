@@ -9,6 +9,11 @@
 
 
 class FxDeferredRenderer;
+struct RvkFrameData;
+
+///////////////////////////////
+// Geometry Pass (Per FIF)
+///////////////////////////////
 
 class FxDeferredGPass
 {
@@ -48,6 +53,40 @@ private:
     FxDeferredRenderer* mRendererInst = nullptr;
 };
 
+///////////////////////////////
+// Composition Pass (Per FIF)
+///////////////////////////////
+
+class FxDeferredCompPass
+{
+public:
+    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const Vec2u& extent);
+    void Destroy();
+
+    void Begin();
+    void DoCompPass();
+
+    void BuildDescriptorSets(uint16 frame_index);
+
+public:
+    RvkFramebuffer Framebuffer;
+
+    RvkImage* OutputImage;
+
+    RvkDescriptorPool DescriptorPool;
+    RvkDescriptorSet DescriptorSet;
+
+private:
+    RvkGraphicsPipeline* mCompPipeline = nullptr;
+    FxDeferredRenderer* mRendererInst = nullptr;
+
+    RvkFrameData* mCurrentFrame = nullptr;
+};
+
+
+///////////////////////////////
+// Main Deferred Renderer
+///////////////////////////////
 
 class FxDeferredRenderer
 {
@@ -61,7 +100,8 @@ public:
         Destroy();
     }
 
-    FxDeferredGPass* GetCurrentGPass();
+    FX_FORCE_INLINE FxDeferredGPass* GetCurrentGPass();
+    FX_FORCE_INLINE FxDeferredCompPass* GetCurrentCompPass();
 
 private:
     void CreateGPassPipeline();
@@ -69,24 +109,33 @@ private:
 
     FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
 
+    void CreateCompPipeline();
+    void DestroyCompPipeline();
+
+    FX_FORCE_INLINE VkPipelineLayout CreateCompPipelineLayout();
+
+
 public:
     /////////////////////
     // Geometry Pass
     /////////////////////
 
-    VkDescriptorSetLayout DsLayoutUniforms = nullptr;
-    VkDescriptorSetLayout DsLayoutMaterial = nullptr;
+    VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
+    VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
     RvkGraphicsPipeline GPassPipeline;
 
-    FxStackArray<FxDeferredGPass, RendererFramesInFlight> GPasses;
+    FxSizedArray<FxDeferredGPass> GPasses;
 
 
     //////////////////////
     // Composition Pass
     //////////////////////
 
+    VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
+    RvkGraphicsPipeline CompPipeline;
+    FxSizedArray<RvkFramebuffer> OutputFramebuffers;
 
-
+    FxSizedArray<FxDeferredCompPass> CompPasses;
 };

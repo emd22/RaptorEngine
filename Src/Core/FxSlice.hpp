@@ -24,8 +24,6 @@ public:
         return Ptr + Size;
     }
 
-
-
     FxSlice(const FxSizedArray<T>& sized_arr)
         : Ptr(sized_arr.Data), Size(sized_arr.Size)
     {
@@ -50,11 +48,6 @@ public:
     FxSlice(FxSlice& other) = delete;
     FxSlice(const FxSlice& other) = delete;
     FxSlice& operator = (T* value) = delete;
-
-    operator T* ()
-    {
-        return Ptr;
-    }
 
     operator T* () const
     {
