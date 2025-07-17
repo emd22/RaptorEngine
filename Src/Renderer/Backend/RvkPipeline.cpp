@@ -7,10 +7,12 @@
 #include <Core/FxPanic.hpp>
 
 #include <Renderer/Renderer.hpp>
+#include <Renderer/FxDeferred.hpp>
 
 FX_SET_MODULE_NAME("Pipeline")
 
-VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
+FxVertexInfo FxMakeVertexInfo()
+{
     using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
 
     VkVertexInputBindingDescription binding_desc = {
@@ -30,10 +32,25 @@ VertexInfo RvkGraphicsPipeline::MakeVertexInfo() {
     return { binding_desc, std::move(attribs) };
 }
 
-void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
+void RvkGraphicsPipeline::Create(
+    ShaderList shader_list,
+    VkPipelineLayout layout,
+    const FxSlice<VkAttachmentDescription>& attachments,
+    const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
+    FxVertexInfo* vertex_info
+)
+{
     mDevice = Renderer->GetDevice();
-
     Layout = layout;
+
+    bool has_depth_attachment = false;
+
+    // Depth attachment is usually the last attachment, check last first
+    for (int32 i = attachments.Size - 1; i >= 0; --i) {
+        if (RvkUtil::IsFormatDepth(attachments[i].format)) {
+            has_depth_attachment = true;
+        }
+    }
 
     VkSpecializationInfo specialization_info = {
         .mapEntryCount = 0,
@@ -42,6 +59,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pData = nullptr,
     };
 
+    // Shaders
     FxSizedArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
     FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
 
@@ -59,6 +77,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         shader_create_info.Insert(create_info);
     }
 
+    // Dynamic states (scissor & viewport updates dynamically)
     FxSizedArray<VkDynamicState> dynamic_states = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
@@ -68,22 +87,6 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .dynamicStateCount = (uint32)dynamic_states.Size,
         .pDynamicStates = dynamic_states,
-    };
-
-    VertexInfo vertex_info = MakeVertexInfo();
-
-    VkPipelineVertexInputStateCreateInfo vertex_input_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions = &vertex_info.binding,
-        .vertexAttributeDescriptionCount = (uint32)vertex_info.attributes.Size,
-        .pVertexAttributeDescriptions = vertex_info.attributes.Data,
-    };
-
-    VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .primitiveRestartEnable = VK_FALSE,
     };
 
     const Vec2u extent = Renderer->Swapchain.Extent;
@@ -97,12 +100,10 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .maxDepth = 1.0f,
     };
 
-
     VkRect2D scissor = {
         .offset = {0, 0},
         .extent = {.width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
     };
-
 
     VkPipelineViewportStateCreateInfo viewport_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
@@ -112,6 +113,24 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pScissors = &scissor,
     };
 
+
+    // Vertex info + input info
+    VkPipelineVertexInputStateCreateInfo vertex_input_info {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+    };
+
+    if (vertex_info != nullptr) {
+        vertex_input_info.vertexBindingDescriptionCount = 1;
+        vertex_input_info.pVertexBindingDescriptions = &vertex_info->binding;
+        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->attributes.Size);
+        vertex_input_info.pVertexAttributeDescriptions = vertex_info->attributes.Data;
+    }
+
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        .primitiveRestartEnable = VK_FALSE,
+    };
 
     VkPipelineRasterizationStateCreateInfo rasterizer_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
@@ -131,32 +150,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
     };
 
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
-        .depthBoundsTestEnable = VK_FALSE,
-        .stencilTestEnable = VK_FALSE,
-    };
 
-
-    // VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-    //     VkPipelineColorBlendAttachmentState {
-    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-    //                         | VK_COLOR_COMPONENT_G_BIT
-    //                         | VK_COLOR_COMPONENT_B_BIT
-    //                         | VK_COLOR_COMPONENT_A_BIT,
-    //         .blendEnable = VK_FALSE,
-    //     },
-    //     VkPipelineColorBlendAttachmentState {
-    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-    //                         | VK_COLOR_COMPONENT_G_BIT
-    //                         | VK_COLOR_COMPONENT_B_BIT
-    //                         | VK_COLOR_COMPONENT_A_BIT,
-    //         .blendEnable = VK_FALSE,
-    //     },
-    // };
 
 
     VkPipelineColorBlendStateCreateInfo color_blend_info {
@@ -166,13 +160,17 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pAttachments = color_blend_attachments,
     };
 
-    // CreateLayout();
-    if (!is_comp) {
-        RenderPass.Create(*mDevice, Renderer->Swapchain);
-    }
-    else {
-        RenderPass.CreateComp(*mDevice, Renderer->Swapchain);
-    }
+    RenderPass.Create2(attachments);
+
+    // Unused if has_depth_attachment is false
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable = VK_FALSE,
+    };
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -186,7 +184,7 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
         .pRasterizationState = &rasterizer_info,
         .pMultisampleState = &multisampling_info,
         .pColorBlendState = &color_blend_info,
-        .pDepthStencilState = &depth_stencil_info,
+        .pDepthStencilState = has_depth_attachment ? &depth_stencil_info : nullptr,
 
         .pDynamicState = &dynamic_state_info,
 
@@ -203,173 +201,168 @@ void RvkGraphicsPipeline::Create(ShaderList shader_list, VkPipelineLayout layout
     }
 }
 
+// void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
+//     mDevice = Renderer->GetDevice();
+//     Layout = layout;
 
-void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
-    mDevice = Renderer->GetDevice();
-    Layout = layout;
+//     VkSpecializationInfo specialization_info = {
+//         .mapEntryCount = 0,
+//         .pMapEntries = nullptr,
+//         .dataSize = 0,
+//         .pData = nullptr,
+//     };
 
-    VkSpecializationInfo specialization_info = {
-        .mapEntryCount = 0,
-        .pMapEntries = nullptr,
-        .dataSize = 0,
-        .pData = nullptr,
-    };
+//     FxSizedArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
+//     FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
 
-    FxSizedArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
-    FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
+//     for (ShaderInfo stage : shader_stages) {
+//         const VkPipelineShaderStageCreateInfo create_info = {
+//             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+//             .stage = stage.GetStageBit(),
+//             .module = stage.ShaderModule,
+//             .pName = "main",
+//             .pSpecializationInfo = &specialization_info,
+//         };
 
-    for (ShaderInfo stage : shader_stages) {
-        const VkPipelineShaderStageCreateInfo create_info = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = stage.GetStageBit(),
-            .module = stage.ShaderModule,
-            .pName = "main",
-            .pSpecializationInfo = &specialization_info,
-        };
+//         Log::Debug("Added shader (Vertex?: %s)", Log::YesNo(create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
 
-        Log::Debug("Added shader (Vertex?: %s)", Log::YesNo(create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
+//         shader_create_info.Insert(create_info);
+//     }
 
-        shader_create_info.Insert(create_info);
-    }
+//     FxSizedArray<VkDynamicState> dynamic_states = {
+//         VK_DYNAMIC_STATE_VIEWPORT,
+//         VK_DYNAMIC_STATE_SCISSOR
+//     };
 
-    FxSizedArray<VkDynamicState> dynamic_states = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
+//     VkPipelineDynamicStateCreateInfo dynamic_state_info = {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+//         .dynamicStateCount = (uint32)dynamic_states.Size,
+//         .pDynamicStates = dynamic_states,
+//     };
 
-    VkPipelineDynamicStateCreateInfo dynamic_state_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = (uint32)dynamic_states.Size,
-        .pDynamicStates = dynamic_states,
-    };
+//     VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+//         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+//         .primitiveRestartEnable = VK_FALSE,
+//     };
 
-    VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-        .primitiveRestartEnable = VK_FALSE,
-    };
+//     const Vec2u extent = Renderer->Swapchain.Extent;
 
-    const Vec2u extent = Renderer->Swapchain.Extent;
-
-    VkViewport viewport = {
-        .x = 0.0f,
-        .y = 0.0f,
-        .width = (float32)extent.Width(),
-        .height = (float32)extent.Height(),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
-    };
-
-
-    VkRect2D scissor = {
-        .offset = {0, 0},
-        .extent = {.width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
-    };
+//     VkViewport viewport = {
+//         .x = 0.0f,
+//         .y = 0.0f,
+//         .width = (float32)extent.Width(),
+//         .height = (float32)extent.Height(),
+//         .minDepth = 0.0f,
+//         .maxDepth = 1.0f,
+//     };
 
 
-    VkPipelineViewportStateCreateInfo viewport_state_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .viewportCount = 1,
-        .pViewports = &viewport,
-        .scissorCount = 1,
-        .pScissors = &scissor,
-    };
+//     VkRect2D scissor = {
+//         .offset = { 0, 0 },
+//         .extent = {.width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
+//     };
 
 
-    VkPipelineRasterizationStateCreateInfo rasterizer_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .depthClampEnable = VK_FALSE,
-        .rasterizerDiscardEnable = VK_FALSE,
-        .polygonMode = VK_POLYGON_MODE_FILL,
-        .lineWidth = 1.0f,
-        .cullMode = VK_CULL_MODE_NONE,
-        .frontFace = VK_FRONT_FACE_CLOCKWISE,
-        .depthBiasEnable = VK_FALSE,
-    };
+//     VkPipelineViewportStateCreateInfo viewport_state_info = {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+//         .viewportCount = 1,
+//         .pViewports = &viewport,
+//         .scissorCount = 1,
+//         .pScissors = &scissor,
+//     };
 
 
-    VkPipelineMultisampleStateCreateInfo multisampling_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .sampleShadingEnable = VK_FALSE,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-    };
-
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
-        .depthBoundsTestEnable = VK_FALSE,
-        .stencilTestEnable = VK_FALSE,
-    };
+//     VkPipelineRasterizationStateCreateInfo rasterizer_info = {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+//         .depthClampEnable = VK_FALSE,
+//         .rasterizerDiscardEnable = VK_FALSE,
+//         .polygonMode = VK_POLYGON_MODE_FILL,
+//         .lineWidth = 1.0f,
+//         .cullMode = VK_CULL_MODE_NONE,
+//         .frontFace = VK_FRONT_FACE_CLOCKWISE,
+//         .depthBiasEnable = VK_FALSE,
+//     };
 
 
-    // VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-    //     VkPipelineColorBlendAttachmentState {
-    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-    //                         | VK_COLOR_COMPONENT_G_BIT
-    //                         | VK_COLOR_COMPONENT_B_BIT
-    //                         | VK_COLOR_COMPONENT_A_BIT,
-    //         .blendEnable = VK_FALSE,
-    //     },
-    //     VkPipelineColorBlendAttachmentState {
-    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-    //                         | VK_COLOR_COMPONENT_G_BIT
-    //                         | VK_COLOR_COMPONENT_B_BIT
-    //                         | VK_COLOR_COMPONENT_A_BIT,
-    //         .blendEnable = VK_FALSE,
-    //     },
-    // };
+//     VkPipelineMultisampleStateCreateInfo multisampling_info {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+//         .sampleShadingEnable = VK_FALSE,
+//         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+//     };
+
+//     VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+//         .depthTestEnable = VK_TRUE,
+//         .depthWriteEnable = VK_TRUE,
+//         .depthCompareOp = VK_COMPARE_OP_LESS,
+//         .depthBoundsTestEnable = VK_FALSE,
+//         .stencilTestEnable = VK_FALSE,
+//     };
 
 
-    VkPipelineColorBlendStateCreateInfo color_blend_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .logicOpEnable = VK_FALSE,
-        .attachmentCount = color_blend_attachments.Size,
-        .pAttachments = color_blend_attachments,
-    };
+//     // VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+//     //     VkPipelineColorBlendAttachmentState {
+//     //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+//     //                         | VK_COLOR_COMPONENT_G_BIT
+//     //                         | VK_COLOR_COMPONENT_B_BIT
+//     //                         | VK_COLOR_COMPONENT_A_BIT,
+//     //         .blendEnable = VK_FALSE,
+//     //     },
+//     //     VkPipelineColorBlendAttachmentState {
+//     //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+//     //                         | VK_COLOR_COMPONENT_G_BIT
+//     //                         | VK_COLOR_COMPONENT_B_BIT
+//     //                         | VK_COLOR_COMPONENT_A_BIT,
+//     //         .blendEnable = VK_FALSE,
+//     //     },
+//     // };
 
-    // CreateLayout();
-    if (!is_comp) {
-        RenderPass.Create(*mDevice, Renderer->Swapchain);
-    }
-    else {
-        RenderPass.CreateComp(*mDevice, Renderer->Swapchain);
-    }
 
-    VkPipelineVertexInputStateCreateInfo empty_vertex_input_info {};
-	empty_vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+//     VkPipelineColorBlendStateCreateInfo color_blend_info {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+//         .logicOpEnable = VK_FALSE,
+//         .attachmentCount = color_blend_attachments.Size,
+//         .pAttachments = color_blend_attachments,
+//     };
 
-    VkGraphicsPipelineCreateInfo pipeline_info = {
-        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+//     FxAssert(is_comp == true);
+//     RenderPass.CreateComp(*mDevice, Renderer->Swapchain);
 
-        .stageCount = (uint32)shader_create_info.Size,
-        .pStages = shader_create_info,
 
-        .pVertexInputState = &empty_vertex_input_info,
-        .pInputAssemblyState = &input_assembly_info,
-        .pViewportState = &viewport_state_info,
-        .pRasterizationState = &rasterizer_info,
-        .pMultisampleState = &multisampling_info,
-        .pColorBlendState = &color_blend_info,
-        .pDepthStencilState = &depth_stencil_info,
+//     VkPipelineVertexInputStateCreateInfo empty_vertex_input_info {};
+// 	empty_vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-        .pDynamicState = &dynamic_state_info,
+//     VkGraphicsPipelineCreateInfo pipeline_info = {
+//         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 
-        .layout = Layout,
+//         .stageCount = (uint32)shader_create_info.Size,
+//         .pStages = shader_create_info,
 
-        .renderPass = RenderPass.RenderPass,
-        .subpass = 0,
-    };
+//         .pVertexInputState = &empty_vertex_input_info,
+//         .pInputAssemblyState = &input_assembly_info,
+//         .pViewportState = &viewport_state_info,
+//         .pRasterizationState = &rasterizer_info,
+//         .pMultisampleState = &multisampling_info,
+//         .pColorBlendState = &color_blend_info,
+//         .pDepthStencilState = &depth_stencil_info,
 
-    const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
+//         .pDynamicState = &dynamic_state_info,
 
-    if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create graphics pipeline", status);
-    }
+//         .layout = Layout,
 
-    printf("Create pipeline %p\n", Pipeline);
-}
+//         .renderPass = RenderPass.RenderPass,
+//         .subpass = 0,
+//     };
+
+//     const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
+
+//     if (status != VK_SUCCESS) {
+//         FxModulePanic("Could not create graphics pipeline", status);
+//     }
+
+//     printf("Create pipeline %p\n", Pipeline);
+// }
 
 void RvkGraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
@@ -377,7 +370,9 @@ void RvkGraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
 
 void RvkGraphicsPipeline::Destroy()
 {
-    mDevice->WaitForIdle();
+    if (mDevice && mDevice->Device) {
+        mDevice->WaitForIdle();
+    }
 
     if (Pipeline) {
         vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);
@@ -388,92 +383,47 @@ void RvkGraphicsPipeline::Destroy()
         Layout = nullptr;
     }
 
-    if (MainDescriptorSetLayout) {
-        vkDestroyDescriptorSetLayout(mDevice->Device, MainDescriptorSetLayout, nullptr);
-        MainDescriptorSetLayout = nullptr;
-    }
     if (CompDescriptorSetLayout) {
         vkDestroyDescriptorSetLayout(mDevice->Device, CompDescriptorSetLayout, nullptr);
         CompDescriptorSetLayout = nullptr;
-    }
-    if (MaterialDescriptorSetLayout) {
-        vkDestroyDescriptorSetLayout(mDevice->Device, MaterialDescriptorSetLayout, nullptr);
-        MaterialDescriptorSetLayout = nullptr;
     }
 
     RenderPass.Destroy();
 }
 
-VkPipelineLayout RvkGraphicsPipeline::CreateGPassLayout() {
+
+VkPipelineLayout RvkGraphicsPipeline::CreateLayout(
+    uint32 push_consts_size,
+    const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts
+)
+{
     if (mDevice == nullptr) {
         mDevice = Renderer->GetDevice();
     }
 
-    VkPushConstantRange buffer_range{};
-    buffer_range.offset = 0;
-    buffer_range.size = sizeof(DrawPushConstants);
-    buffer_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-
-    // TODO: move descriptor set layout creation out of here
-    VkDescriptorSetLayoutBinding ubo_layout_binding {
-        .binding = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-        .pImmutableSamplers = nullptr,
+    VkPushConstantRange pc_range{
+        .offset = 0,
+        .size = push_consts_size,
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT
     };
 
-    VkDescriptorSetLayoutBinding image_layout_binding {
-        .binding = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pImmutableSamplers = nullptr,
-    };
-
-    VkDescriptorSetLayoutCreateInfo ds_layout_info {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindings = &ubo_layout_binding,
-    };
-
-    VkResult status;
-
-    status = vkCreateDescriptorSetLayout(mDevice->Device, &ds_layout_info, nullptr, &MainDescriptorSetLayout);
-    if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline descriptor set layout", status);
-    }
-
-    VkDescriptorSetLayoutCreateInfo mat_layout_info {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1,
-        .pBindings = &image_layout_binding,
-    };
-
-    status = vkCreateDescriptorSetLayout(mDevice->Device, &mat_layout_info, nullptr, &MaterialDescriptorSetLayout);
-    if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline descriptor set layout", status);
-    }
-
-    VkDescriptorSetLayout layouts[] = {
-        MainDescriptorSetLayout,
-        MaterialDescriptorSetLayout,
-    };
-
-    VkPipelineLayoutCreateInfo create_info = {
+    VkPipelineLayoutCreateInfo create_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = FxSizeofArray(layouts),
-        .pSetLayouts = layouts,
+        .setLayoutCount = descriptor_set_layouts.Size,
+        .pSetLayouts = descriptor_set_layouts.Ptr,
 
         .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &buffer_range,
-
+        .pPushConstantRanges = &pc_range
     };
 
-    VkPipelineLayout layout;
+    // Disable push consts if the size is zero
+    if (push_consts_size == 0) {
+        create_info.pushConstantRangeCount = 0;
+        create_info.pPushConstantRanges = nullptr;
+    }
 
-    status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);
+    VkPipelineLayout layout;
+    VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);
 
     if (status != VK_SUCCESS) {
         FxModulePanic("Failed to create pipeline layout", status);
@@ -482,62 +432,61 @@ VkPipelineLayout RvkGraphicsPipeline::CreateGPassLayout() {
     return layout;
 }
 
+// VkPipelineLayout RvkGraphicsPipeline::CreateCompLayout() {
+//     if (mDevice == nullptr) {
+//         mDevice = Renderer->GetDevice();
+//     }
 
-VkPipelineLayout RvkGraphicsPipeline::CreateCompLayout() {
-    if (mDevice == nullptr) {
-        mDevice = Renderer->GetDevice();
-    }
+//     VkDescriptorSetLayoutBinding positions_layout_binding {
+//         .binding = 1,
+//         .descriptorCount = 1,
+//         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+//         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+//         .pImmutableSamplers = nullptr,
+//     };
 
-    VkDescriptorSetLayoutBinding positions_layout_binding {
-        .binding = 1,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pImmutableSamplers = nullptr,
-    };
+//     VkDescriptorSetLayoutBinding albedo_layout_binding {
+//         .binding = 2,
+//         .descriptorCount = 1,
+//         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+//         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+//         .pImmutableSamplers = nullptr,
+//     };
 
-    VkDescriptorSetLayoutBinding albedo_layout_binding {
-        .binding = 2,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pImmutableSamplers = nullptr,
-    };
+//     VkDescriptorSetLayoutBinding bindings[] = {
+//         positions_layout_binding,
+//         albedo_layout_binding
+//     };
 
-    VkDescriptorSetLayoutBinding bindings[] = {
-        positions_layout_binding,
-        albedo_layout_binding
-    };
+//     VkDescriptorSetLayoutCreateInfo comp_layout_info {
+//         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+//         .bindingCount = FxSizeofArray(bindings),
+//         .pBindings = bindings,
+//     };
 
-    VkDescriptorSetLayoutCreateInfo comp_layout_info {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = FxSizeofArray(bindings),
-        .pBindings = bindings,
-    };
+//     VkResult status;
+//     status = vkCreateDescriptorSetLayout(mDevice->Device, &comp_layout_info, nullptr, &CompDescriptorSetLayout);
+//     if (status != VK_SUCCESS) {
+//         FxModulePanic("Failed to create pipeline descriptor set layout", status);
+//     }
 
-    VkResult status;
-    status = vkCreateDescriptorSetLayout(mDevice->Device, &comp_layout_info, nullptr, &CompDescriptorSetLayout);
-    if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline descriptor set layout", status);
-    }
+//     VkPipelineLayoutCreateInfo create_info = {
+//         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+//         .setLayoutCount = 1,
+//         .pSetLayouts = &CompDescriptorSetLayout,
 
-    VkPipelineLayoutCreateInfo create_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &CompDescriptorSetLayout,
+//         .pushConstantRangeCount = 0,
+//         .pPushConstantRanges = nullptr,
 
-        .pushConstantRangeCount = 0,
-        .pPushConstantRanges = nullptr,
+//     };
 
-    };
+//     VkPipelineLayout layout;
 
-    VkPipelineLayout layout;
+//     status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);
 
-    status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);
+//     if (status != VK_SUCCESS) {
+//         FxModulePanic("Failed to create pipeline layout", status);
+//     }
 
-    if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline layout", status);
-    }
-
-    return layout;
-}
+//     return layout;
+// }

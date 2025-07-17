@@ -13,9 +13,17 @@
         }                                         \
     }
 
-
-class VulkanUtil {
+class RvkUtil {
 public:
+
+    static constexpr bool IsFormatDepth(VkFormat format)
+    {
+        const VkFormat depths_start = VK_FORMAT_D16_UNORM;
+        const VkFormat depths_end = VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+        return (format >= depths_start && format <= depths_end);
+    }
+
     static const char * ResultToStr(VkResult result) {
         switch (result) {
             case VK_SUCCESS: return "VK_SUCCESS";

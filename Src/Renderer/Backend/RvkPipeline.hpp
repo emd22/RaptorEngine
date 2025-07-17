@@ -43,26 +43,38 @@ struct RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
     float32 UV[2];
 } __attribute__((packed));
 
-struct VertexInfo
+struct FxVertexInfo
 {
     VkVertexInputBindingDescription binding;
     FxSizedArray<VkVertexInputAttributeDescription> attributes;
 };
 
 
-struct alignas(16) DrawPushConstants
+struct alignas(16) FxDrawPushConstants
 {
     float32 MVPMatrix[16];
     float32 ModelMatrix[16];
 };
 
+FxVertexInfo FxMakeVertexInfo();
+
+
 class RvkGraphicsPipeline
 {
 public:
-    void Create(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
-    void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
-    VkPipelineLayout CreateGPassLayout();
-    VkPipelineLayout CreateCompLayout();
+    void Create(
+        ShaderList shader_list,
+        VkPipelineLayout layout,
+        const FxSlice<VkAttachmentDescription>& attachments,
+        const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
+        FxVertexInfo* vertex_info
+    );
+
+    // void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
+
+    // VkPipelineLayout CreateCompLayout();
+
+    VkPipelineLayout CreateLayout(uint32 push_consts_size, const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
 
     void Destroy();
 
@@ -73,11 +85,10 @@ public:
         Destroy();
     }
 private:
-    VertexInfo MakeVertexInfo();
 
 public:
-    VkDescriptorSetLayout MainDescriptorSetLayout = nullptr;
-    VkDescriptorSetLayout MaterialDescriptorSetLayout = nullptr;
+    // VkDescriptorSetLayout MainDescriptorSetLayout = nullptr;
+    // VkDescriptorSetLayout MaterialDescriptorSetLayout = nullptr;
 
     VkDescriptorSetLayout CompDescriptorSetLayout = nullptr;
 

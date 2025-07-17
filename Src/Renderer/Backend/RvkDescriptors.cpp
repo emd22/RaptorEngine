@@ -19,7 +19,6 @@ void RvkDescriptorPool::Create(RvkGpuDevice* device, uint32 max_sets)
     if (vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool) != VK_SUCCESS) {
         FxPanic("DescriptorPool", "Failed to create descriptor pool!", 0);
     }
-
 }
 
 void RvkDescriptorSet::Create(const RvkDescriptorPool& pool, VkDescriptorSetLayout layout)

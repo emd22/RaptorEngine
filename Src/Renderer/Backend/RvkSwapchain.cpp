@@ -6,6 +6,8 @@
 #include <Core/Defines.hpp>
 #include <Core/FxPanic.hpp>
 
+#include <Renderer/FxDeferred.hpp>
+
 #include <vulkan/vulkan.h>
 
 FX_SET_MODULE_NAME("RvkSwapchain")
@@ -29,8 +31,6 @@ void RvkSwapchain::CreateSwapchainImages()
 
     vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
 
-    // Images.InitSize(image_count);
-
     FxSizedArray<VkImage> raw_images;
     raw_images.InitSize(image_count);
 
@@ -46,10 +46,6 @@ void RvkSwapchain::CreateSwapchainImages()
         image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         image->Format = SurfaceFormat.format;
     }
-
-    // ColorImages.InitSize(image_count);
-    // DepthImages.InitSize(image_count);
-    // PositionImages.InitSize(image_count);
 }
 
 void RvkSwapchain::CreateImageViews()
@@ -79,31 +75,6 @@ void RvkSwapchain::CreateImageViews()
         if (status != VK_SUCCESS) {
             FxModulePanic("Could not create swapchain image view", status);
         }
-
-
-        // DepthImages[i].Create(
-        //     Extent,
-        //     VK_FORMAT_D16_UNORM,
-        //     VK_IMAGE_TILING_OPTIMAL,
-        //     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        //     VK_IMAGE_ASPECT_DEPTH_BIT
-        // );
-
-        // PositionImages[i].Create(
-        //     Extent,
-        //     VK_FORMAT_B8G8R8A8_UNORM,
-        //     VK_IMAGE_TILING_OPTIMAL,
-        //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        //     VK_IMAGE_ASPECT_COLOR_BIT
-        // );
-
-        // ColorImages[i].Create(
-        //     Extent,
-        //     VK_FORMAT_B8G8R8A8_UNORM,
-        //     VK_IMAGE_TILING_OPTIMAL,
-        //     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT  | VK_IMAGE_USAGE_SAMPLED_BIT,
-        //     VK_IMAGE_ASPECT_COLOR_BIT
-        // );
     }
 }
 
@@ -168,29 +139,10 @@ void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
     }
 }
 
-void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipeline)
+void RvkSwapchain::CreateSwapchainFramebuffers()
 {
-    // Log::Debug("Image view count: %d", ColorImages.Size);
-    // GPassFramebuffers.Free();
-    // GPassFramebuffers.InitSize(ColorImages.Size);
-
-    // FxSizedArray<VkImageView> temp_views;
-    // temp_views.InitSize(3);
-
-    // for (int i = 0; i < ColorImages.Size; i++) {
-    //     temp_views[0] = ColorImages[i].View;
-    //     temp_views[1] = PositionImages[i].View;
-    //     temp_views[2] = DepthImages[i].View;
-
-    //     GPassFramebuffers[i].Create(temp_views, *pipeline, Extent);
-    // }
-
-    // Log::Debug("Create GPass framebuffers", 0);
-
-    // assert(OutputImages.Size == ColorImages.Size);
-
-    CompFramebuffers.Free();
-    CompFramebuffers.InitSize(OutputImages.Size);
+    // CompFramebuffers.Free();
+    // CompFramebuffers.InitSize(OutputImages.Size);
 
     FxSizedArray<VkImageView> temp_views2;
     temp_views2.InitSize(1);
@@ -198,14 +150,13 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipelin
     for (int i = 0; i < OutputImages.Size; i++) {
         temp_views2[0] = OutputImages[i].View;
 
-        CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
+        // CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
     }
 
     ColorSampler.Create();
     PositionSampler.Create();
 
-    // mPipeline = pipeline;
-    mCompPipeline = comp_pipeline;
+    // mCompPipeline = comp_pipeline;
 
 
 }
@@ -213,15 +164,10 @@ void RvkSwapchain::CreateSwapchainFramebuffers(RvkGraphicsPipeline* comp_pipelin
 void RvkSwapchain::DestroyFramebuffersAndImageViews()
 {
     for (int i = 0; i < RendererFramesInFlight; i++) {
-        // GPassFramebuffers[i].Destroy();
-        CompFramebuffers[i].Destroy();
+        // CompFramebuffers[i].Destroy();
 
-        // ColorImages[i].Destroy();
-        // DepthImages[i].Destroy();
-        // PositionImages[i].Destroy();
-
-
-        // vkDestroyImageView(mDevice->Device, OutputImages[i].View, nullptr);
+        // Since the RvkImage's `VkImage` is from the swapchain, we do not want to destroy it
+        // using VMA. Mark the Image as nullptr incase something happened to the `Allocation` inside.
         OutputImages[i].Image = nullptr;
         OutputImages[i].Destroy();
     }
@@ -229,12 +175,8 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
     ColorSampler.Destroy();
     PositionSampler.Destroy();
 
-    CompFramebuffers.Free();
-    // GPassFramebuffers.Free();
 
-    // ColorImages.Free();
-    // DepthImages.Free();
-    // PositionImages.Free();
+    // CompFramebuffers.Free();
 }
 
 void RvkSwapchain::DestroyInternalSwapchain()
@@ -258,5 +200,4 @@ void RvkSwapchain::Destroy()
 RvkSwapchain::~RvkSwapchain()
 {
     Destroy();
-    // Images.Free();
 }

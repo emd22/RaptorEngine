@@ -9,7 +9,7 @@
 #include "Backend/RvkSynchro.hpp"
 #include "Backend/RvkPipeline.hpp"
 #include "Backend/RvkCommands.hpp"
-#include "Backend/Util.hpp"
+#include "Backend/RvkUtil.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -295,7 +295,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     const auto status = CreateDebugUtilsMessengerEXT(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        Log::Error("Could not create debug messenger! (err: %s)", VulkanUtil::ResultToStr(status));
+        Log::Error("Could not create debug messenger! (err: %s)", RvkUtil::ResultToStr(status));
         return nullptr;
     }
 
@@ -460,7 +460,7 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
     RvkFrameData *frame = GetFrame();
 
     CurrentGPass = renderer.GetCurrentGPass();
-
+    CurrentCompPass = renderer.GetCurrentCompPass();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -502,40 +502,11 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 
     vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
 
-    DrawPushConstants push_constants{};
+    FxDrawPushConstants push_constants{};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 
     return FrameResult::Success;
-}
-
-void FxRenderBackend::SubmitFrame()
-{
-    CurrentGPass->Submit();
-    // RvkFrameData *frame = GetFrame();
-
-    // const VkPipelineStageFlags wait_stages[] = {
-    //     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-    // };
-
-    // const VkSubmitInfo submit_info = {
-    //     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    //     .waitSemaphoreCount = 1,
-    //     .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
-    //     .pWaitDstStageMask = wait_stages,
-    //     // command buffers
-    //     .commandBufferCount = 1,
-    //     .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
-    //     // signal semaphores
-    //     .signalSemaphoreCount = 1,
-    //     // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-    //     .pSignalSemaphores = &frame->OffscreenSem.Semaphore
-    // };
-
-    // VkTry(
-    //     vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-    //     "Error submitting draw buffer"
-    // );
 }
 
 void FxRenderBackend::PresentFrame()
@@ -548,14 +519,18 @@ void FxRenderBackend::PresentFrame()
 
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
         .pWaitDstStageMask = wait_stages,
+
         // command buffers
         .commandBufferCount = 1,
         .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
+
         // signal semaphores
         .signalSemaphoreCount = 1,
+
         // .pSignalSemaphores = &frame->RenderFinished.Semaphore
         .pSignalSemaphores = &frame->RenderFinished.Semaphore
     };
@@ -597,20 +572,14 @@ void FxRenderBackend::PresentFrame()
     }
 }
 
-void FxRenderBackend::FinishFrame(RvkGraphicsPipeline& comp_pipeline)
+void FxRenderBackend::FinishFrame()
 {
     RvkFrameData* frame = GetFrame();
 
     CurrentGPass->End();
-
-    // pipeline.RenderPass.End();
-
     frame->CommandBuffer.End();
-    // GetFrame()->CompCommandBuffer.End();
-    //
-    frame->CompCommandBuffer.Reset();
-    frame->CompCommandBuffer.Record();
 
+    CurrentCompPass->Begin();
 
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
@@ -632,19 +601,9 @@ void FxRenderBackend::FinishFrame(RvkGraphicsPipeline& comp_pipeline)
 
     vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
+    CurrentCompPass->DoCompPass();
 
-    comp_pipeline.RenderPass.BeginComp(&frame->CompCommandBuffer);
-    comp_pipeline.Bind(frame->CompCommandBuffer);
-
-    frame->CompDescriptorSet.Bind(frame->CompCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, comp_pipeline);
-
-    vkCmdDraw(frame->CompCommandBuffer, 3, 1, 0, 0);
-
-    comp_pipeline.RenderPass.End();
-
-    frame->CompCommandBuffer.End();
-
-    SubmitFrame();
+    CurrentGPass->Submit();
     PresentFrame();
 
     ProcessDeletionQueue();

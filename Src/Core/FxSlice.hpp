@@ -7,10 +7,23 @@
 template <typename T>
 struct FxSlice
 {
-    uint32 Size;
     T* Ptr = nullptr;
+    uint32 Size;
 
 public:
+    using Iterator = T*;
+    using ConstIterator = T*;
+
+    Iterator begin() const
+    {
+        return Ptr;
+    }
+
+    Iterator end() const
+    {
+        return Ptr + Size;
+    }
+
     FxSlice(const FxSizedArray<T>& sized_arr)
         : Ptr(sized_arr.Data), Size(sized_arr.Size)
     {
@@ -28,18 +41,13 @@ public:
     }
 
     FxSlice(T* ptr, uint32 size)
-        : Size(size), Ptr(ptr)
+        : Ptr(ptr), Size(size)
     {
     }
 
     FxSlice(FxSlice& other) = delete;
     FxSlice(const FxSlice& other) = delete;
     FxSlice& operator = (T* value) = delete;
-
-    operator T* ()
-    {
-        return Ptr;
-    }
 
     operator T* () const
     {

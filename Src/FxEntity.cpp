@@ -51,7 +51,7 @@ void FxSceneObject::Render(const FxCamera& camera)
 
     RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mMaterial->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
-    DrawPushConstants push_constants{};
+    FxDrawPushConstants push_constants{};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(Mat4f));
     memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(Mat4f));
 

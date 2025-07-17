@@ -58,7 +58,7 @@ public:
     FxHash NameHash{0};
     std::string Name = "";
 
-    RvkDescriptorSet mDescriptorSet;
+    RvkDescriptorSet mDescriptorSet{};
     RvkGraphicsPipeline* Pipeline = nullptr;
 
     std::atomic_bool IsBuilt = false;
@@ -86,6 +86,11 @@ public:
     }
 
     void Destroy();
+
+    ~FxMaterialManager()
+    {
+        Destroy();
+    }
 
 public:
     FxRef<RvkSampler> AlbedoSampler{nullptr};

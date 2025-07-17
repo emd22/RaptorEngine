@@ -13,6 +13,8 @@
 
 #include <Core/FxRef.hpp>
 
+#include "FxDeferred.hpp"
+
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
@@ -27,6 +29,7 @@ enum class FrameResult
 
 class FxDeferredRenderer;
 class FxDeferredGPass;
+class FxDeferredCompPass;
 
 struct FxGpuUploadContext
 {
@@ -51,7 +54,7 @@ public:
     void Destroy();
 
     FrameResult BeginFrame(FxDeferredRenderer& renderer);
-    void FinishFrame(RvkGraphicsPipeline& comp_pipeline);
+    void FinishFrame();
 
     void SelectWindow(const FxRef<FxWindow>& window)
     {
@@ -160,7 +163,6 @@ private:
     void InitUploadContext();
     void DestroyUploadContext();
 
-    void SubmitFrame();
     void PresentFrame();
 
     void InitFrames();
@@ -188,8 +190,9 @@ public:
 
     bool Initialized = false;
 
-    FxDeferredGPass* CurrentGPass;
-
+    FxDeferredGPass* CurrentGPass = nullptr;
+    FxDeferredCompPass* CurrentCompPass = nullptr;
+    FxRef<FxDeferredRenderer> DeferredRenderer{ nullptr };
 
     // RvkSemaphore OffscreenSemaphore;
 

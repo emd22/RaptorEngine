@@ -29,7 +29,7 @@ public:
     // RvkDescriptorSet DescriptorSet;
     RvkDescriptorSet CompDescriptorSet;
 
-    RvkRawGpuBuffer<RvkUniformBufferObject> Ubo;
+    // RvkRawGpuBuffer<RvkUniformBufferObject> Ubo;
 
     RvkSemaphore OffscreenSem;
 

@@ -29,7 +29,17 @@ public:
 
     void Destroy()
     {
+        if (!Pool) {
+            return;
+        }
+
         vkDestroyDescriptorPool(mDevice->Device, Pool, nullptr);
+        Pool = nullptr;
+    }
+
+    ~RvkDescriptorPool()
+    {
+        Destroy();
     }
 
 public:

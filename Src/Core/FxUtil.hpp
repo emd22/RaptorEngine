@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-#define FxSizeofArray(arr_) sizeof(arr_) / sizeof(arr_[0])
+#define FxSizeofArray(arr_) (sizeof((arr_)) / sizeof((arr_)[0]))
 
 template <typename EnumClass>
 std::underlying_type<EnumClass>::type EnumToInt(EnumClass value)
