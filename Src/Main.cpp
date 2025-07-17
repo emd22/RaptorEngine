@@ -79,98 +79,6 @@ public:
     }
 };
 
-// void CreateCompositionPipeline(RvkGraphicsPipeline& pipeline)
-// {
-//     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-//         VkPipelineColorBlendAttachmentState {
-//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-//                             | VK_COLOR_COMPONENT_G_BIT
-//                             | VK_COLOR_COMPONENT_B_BIT
-//                             | VK_COLOR_COMPONENT_A_BIT,
-//             .blendEnable = VK_FALSE,
-//         }
-//     };
-
-//     RvkShader vertex_shader("../shaders/composition.vert.spv", RvkShaderType::Vertex);
-//     RvkShader fragment_shader("../shaders/composition.frag.spv", RvkShaderType::Fragment);
-
-//     ShaderList shader_list{ .Vertex = vertex_shader, .Fragment = fragment_shader };
-
-//     const int attachment_count = FxSizeofArray(color_blend_attachments);
-//     pipeline.CreateComp(shader_list, pipeline.CreateCompLayout(), FxMakeSlice(color_blend_attachments, attachment_count), true);
-// }
-
-// void CreateSolidPipeline(RvkGraphicsPipeline& pipeline)
-// {
-//     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-//         // Positions
-//         VkPipelineColorBlendAttachmentState {
-//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-//                             | VK_COLOR_COMPONENT_G_BIT
-//                             | VK_COLOR_COMPONENT_B_BIT
-//                             | VK_COLOR_COMPONENT_A_BIT,
-//             .blendEnable = VK_FALSE,
-//         },
-//         // Albedo
-//         VkPipelineColorBlendAttachmentState {
-//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-//                             | VK_COLOR_COMPONENT_G_BIT
-//                             | VK_COLOR_COMPONENT_B_BIT
-//                             | VK_COLOR_COMPONENT_A_BIT,
-//             .blendEnable = VK_FALSE,
-//         },
-//     };
-
-//     ShaderList shader_list;
-
-//     RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
-//     RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
-
-//     shader_list.Vertex = vertex_shader.ShaderModule;
-//     shader_list.Fragment = fragment_shader.ShaderModule;
-
-//     const int attachment_count = FxSizeofArray(color_blend_attachments);
-//     pipeline.Create(shader_list, pipeline.CreateGPassLayout(), FxMakeSlice(color_blend_attachments, attachment_count), false);
-// }
-
-
-#define PUSH_DESCRIPTOR_IMAGE(img_, sampler_, binding_) \
-    { \
-        VkDescriptorImageInfo image_info { \
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, \
-            .imageView = (img_).View, \
-            .sampler = (sampler_).Sampler, \
-        }; \
-        VkWriteDescriptorSet image_write { \
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, \
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, \
-            .descriptorCount = 1, \
-            .dstSet = descriptor_set.Set, \
-            .dstBinding = binding_, \
-            .dstArrayElement = 0, \
-            .pImageInfo = &image_info, \
-        }; \
-        image_infos.Insert(image_write); \
-    }
-
-
-void BuildCompositionDescriptorSet(FxDeferredRenderer& renderer, int index)
-{
-    RvkFrameData* frame = &Renderer->Frames[index];
-    FxStackArray<VkWriteDescriptorSet, 3> image_infos;
-
-    RvkDescriptorSet& descriptor_set = frame->CompDescriptorSet;
-
-    RvkSwapchain& swapchain = Renderer->Swapchain;
-
-    PUSH_DESCRIPTOR_IMAGE(renderer.GPasses[index].PositionsAttachment, swapchain.PositionSampler, 1);
-    PUSH_DESCRIPTOR_IMAGE(renderer.GPasses[index].ColorAttachment, swapchain.ColorSampler, 2);
-
-    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
-
-    // PUSH_IMAGE_IF_SET()
-}
-
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100000);
@@ -201,24 +109,6 @@ int main()
 
     Renderer->SelectWindow(window);
     Renderer->Init(Vec2u(window_width, window_height));
-
-    // RvkGraphicsPipeline pipeline;
-
-    // CreateSolidPipeline(pipeline);
-
-    // Renderer->GPassDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
-    // Renderer->GPassDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    // Renderer->GPassDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
-
-    // RvkGraphicsPipeline composition_pipeline;
-
-    // Positions sampler
-    // Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    // Albedo sampler
-    // Renderer->CompDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    // Renderer->CompDescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
-
-    // CreateCompositionPipeline(composition_pipeline);
 
     Renderer->Swapchain.CreateSwapchainFramebuffers();
 
@@ -271,42 +161,6 @@ int main()
         helmet_object.Attach(cheese_material);
     }
 
-    // FxRef<FxScript> script_instance = FxRef<TestScript>::New();
-    // helmet_object.Attach(script_instance);
-
-    // int index = 0;
-    // for (RvkFrameData& frame : Renderer->Frames) {
-        // frame.DescriptorSet.Create(Renderer->GPassDescriptorPool, pipeline.MainDescriptorSetLayout);
-        // frame.CompDescriptorSet.Create(Renderer->CompDescriptorPool, composition_pipeline.CompDescriptorSetLayout);
-
-        // VkDescriptorBufferInfo ubo_info{
-        //     .buffer = frame.Ubo.Buffer,
-        //     .offset = 0,
-        //     .range = sizeof(RvkUniformBufferObject)
-        // };
-
-        // VkWriteDescriptorSet ubo_write{
-        //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        //     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        //     .descriptorCount = 1,
-        //     .dstSet = frame.DescriptorSet,
-        //     .dstBinding = 0,
-        //     .dstArrayElement = 0,
-        //     .pBufferInfo = &ubo_info,
-        // };
-
-        // const VkWriteDescriptorSet writes[] = { ubo_write };
-
-        // vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
-
-
-        // BuildCompositionDescriptorSet(deferred_renderer, index++);
-        // frame.DescriptorSet.SubmitWrites();
-    // }
-
-
-
-    // PtrContainer<FxModel> other_model = FxAssetManager::NewModel();
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
@@ -358,13 +212,6 @@ int main()
 
         camera.Update();
 
-        // FxVec3f translation = FxVec3f(sin(Renderer->GetElapsedFrameCount() * 0.05f) * 0.005f * DeltaTime, cos(Renderer->GetElapsedFrameCount() * 0.05f) * 0.005f * DeltaTime, 0.0f);
-
-        // helmet_object.Translate(translation);
-
-
-        // Mat4f MVPMatrix = model_matrix * camera.VPMatrix;
-
         if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
             continue;
         }
@@ -372,25 +219,6 @@ int main()
         CheckGeneralControls();
 
 
-        // helmet_object.mModelMatrix.LookAt(helmet_object.GetPosition(), current_camera->Position, FxVec3f::Up);
-
-        // RvkFrameData* frame = Renderer->GetFrame();
-
-
-
-
-        // sets_to_bind[0] = frame->DescriptorSet.Set;
-        // sets_to_bind[1] = material->mDescriptorSet.Set;
-
-        // RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, sets_to_bind);
-
-
-
-        // material->mDescriptorSet.Bind(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-        // new_model->Render(pipeline);
-        // other_model->Render(pipeline);
-        //
         helmet_object.Render(camera);
         // scene_object.Render(camera);
 

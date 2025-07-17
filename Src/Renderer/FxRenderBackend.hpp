@@ -163,7 +163,6 @@ private:
     void InitUploadContext();
     void DestroyUploadContext();
 
-    void SubmitFrame();
     void PresentFrame();
 
     void InitFrames();

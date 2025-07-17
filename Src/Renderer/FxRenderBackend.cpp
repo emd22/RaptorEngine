@@ -509,35 +509,6 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
     return FrameResult::Success;
 }
 
-void FxRenderBackend::SubmitFrame()
-{
-    CurrentGPass->Submit();
-    // RvkFrameData *frame = GetFrame();
-
-    // const VkPipelineStageFlags wait_stages[] = {
-    //     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-    // };
-
-    // const VkSubmitInfo submit_info = {
-    //     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    //     .waitSemaphoreCount = 1,
-    //     .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
-    //     .pWaitDstStageMask = wait_stages,
-    //     // command buffers
-    //     .commandBufferCount = 1,
-    //     .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
-    //     // signal semaphores
-    //     .signalSemaphoreCount = 1,
-    //     // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-    //     .pSignalSemaphores = &frame->OffscreenSem.Semaphore
-    // };
-
-    // VkTry(
-    //     vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-    //     "Error submitting draw buffer"
-    // );
-}
-
 void FxRenderBackend::PresentFrame()
 {
     RvkFrameData *frame = GetFrame();
@@ -606,14 +577,7 @@ void FxRenderBackend::FinishFrame()
     RvkFrameData* frame = GetFrame();
 
     CurrentGPass->End();
-
-    // pipeline.RenderPass.End();
-
     frame->CommandBuffer.End();
-    // GetFrame()->CompCommandBuffer.End();
-    //
-    // frame->CompCommandBuffer.Reset();
-    // frame->CompCommandBuffer.Record();
 
     CurrentCompPass->Begin();
 
@@ -637,21 +601,9 @@ void FxRenderBackend::FinishFrame()
 
     vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
-
     CurrentCompPass->DoCompPass();
 
-    // comp_pipeline.RenderPass.BeginComp(&frame->CompCommandBuffer);
-    // comp_pipeline.Bind(frame->CompCommandBuffer);
-
-    // frame->CompDescriptorSet.Bind(frame->CompCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, comp_pipeline);
-
-    // vkCmdDraw(frame->CompCommandBuffer, 3, 1, 0, 0);
-
-    // comp_pipeline.RenderPass.End();
-
-    // frame->CompCommandBuffer.End();
-
-    SubmitFrame();
+    CurrentGPass->Submit();
     PresentFrame();
 
     ProcessDeletionQueue();
