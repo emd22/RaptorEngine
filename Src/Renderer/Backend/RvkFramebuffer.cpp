@@ -8,7 +8,7 @@
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void RvkFramebuffer::Create(const FxSizedArray<VkImageView> &image_views, const RvkGraphicsPipeline &pipeline, Vec2u size)
+void RvkFramebuffer::Create(const FxSizedArray<VkImageView> &image_views, const RvkGraphicsPipeline &pipeline, FxVec2u size)
 {
     AssertRendererExists();
 

@@ -56,7 +56,14 @@ struct alignas(16) FxDrawPushConstants
     float32 ModelMatrix[16];
 };
 
+struct alignas(16) FxLightPushConstants
+{
+    float32 MVPMatrix[16];
+};
+
+
 FxVertexInfo FxMakeVertexInfo();
+FxVertexInfo FxMakeLightVertexInfo();
 
 
 class RvkGraphicsPipeline

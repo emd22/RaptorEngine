@@ -18,6 +18,7 @@ public:
     FxVec3f operator - (const FxVec3f &other) const;
     FxVec3f operator * (const FxVec3f &other) const;
     FxVec3f operator * (float32 scalar) const;
+    FxVec3f operator / (float32 scalar) const;
 
     FxVec3f operator - () const;
 
@@ -27,15 +28,13 @@ public:
 
     static FxVec3f MulAdd(const FxVec3f &add_value, const FxVec3f &mul_a, const FxVec3f &mul_b);
 
-    FxVec3f Normalize() const;
-    float32 Length() const;
+    FX_FORCE_INLINE FxVec3f Normalize() const;
+    FX_FORCE_INLINE void NormalizeIP();
+
+    FX_FORCE_INLINE float32 Length() const;
     FxVec3f Cross(const FxVec3f &other) const;
 
     float32 Dot(const FxVec3f &other) const;
-
-    float32 GetX() const;
-    float32 GetY() const;
-    float32 GetZ() const;
 
     static const FxVec3f Zero;
     static const FxVec3f Up;
@@ -46,7 +45,13 @@ public:
     {
     }
 
-    FxVec3f &operator = (const float32x4_t &other)
+    FxVec3f& operator = (const float32x4_t &other)
+    {
+        mIntrin = other;
+        return *this;
+    }
+
+    FxVec3f& operator = (const float32x4_t other)
     {
         mIntrin = other;
         return *this;

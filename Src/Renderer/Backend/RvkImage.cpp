@@ -23,7 +23,7 @@ RvkGpuDevice* RvkImage::GetDevice()
 }
 
 void RvkImage::Create(
-    Vec2u size,
+    FxVec2u size,
     VkFormat format,
     VkImageTiling tiling,
     VkImageUsageFlags usage,

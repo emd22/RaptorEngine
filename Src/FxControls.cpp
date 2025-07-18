@@ -75,7 +75,7 @@ void FxControlManager::ReleaseMouse()
 {
     FxControlManager& inst = GetInstance();
 
-    Vec2f *pos = &inst.mCapturedMousePos;
+    FxVec2f *pos = &inst.mCapturedMousePos;
     SDL_Window *window = Renderer->GetWindow()->GetWindow();
 
     // Warp back to the original position
@@ -87,7 +87,7 @@ void FxControlManager::ReleaseMouse()
     );
 }
 
-Vec2f &FxControlManager::GetMouseDelta()
+FxVec2f &FxControlManager::GetMouseDelta()
 {
     return GetInstance().mMouseDelta;
 }
@@ -186,7 +186,7 @@ void FxControlManager::Update()
 {
     FxControlManager& inst = GetInstance();
 
-    inst.mMouseDelta = Vec2f::Zero;
+    inst.mMouseDelta = FxVec2f::Zero;
     inst.mThisTick++;
 
     SDL_Event event;

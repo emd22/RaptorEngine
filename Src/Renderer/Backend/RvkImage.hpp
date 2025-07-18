@@ -19,7 +19,7 @@ public:
     RvkGpuDevice* GetDevice();
 
     void Create(
-        Vec2u size,
+        FxVec2u size,
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
@@ -36,7 +36,7 @@ public:
     }
 
 public:
-    Vec2u Size = Vec2u::Zero;
+    FxVec2u Size = FxVec2u::Zero;
 
     VkImage Image = nullptr;
     VkImageView View = nullptr;

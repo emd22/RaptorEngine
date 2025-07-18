@@ -141,7 +141,9 @@ void FxMaterial::Destroy()
     printf("Freeing material\n");
 
     if (IsBuilt.load()) {
-        vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
+        if (mSetLayout) {
+            vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
+        }
         IsBuilt.store(false);
     }
 }

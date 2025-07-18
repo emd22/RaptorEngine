@@ -18,7 +18,7 @@ struct RvkFrameData;
 class FxDeferredGPass
 {
 public:
-    void Create(FxDeferredRenderer* renderer, const Vec2u& extent);
+    void Create(FxDeferredRenderer* renderer, const FxVec2u& extent);
     void Destroy();
 
     void Begin();
@@ -53,6 +53,37 @@ private:
     FxDeferredRenderer* mRendererInst = nullptr;
 };
 
+
+///////////////////////////////
+// Lighting Pass (Per FIF)
+///////////////////////////////
+
+class FxDeferredLightingPass
+{
+public:
+    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
+    void Destroy();
+
+    void Begin();
+    void End();
+    void Submit();
+
+    void BuildDescriptorSets(uint16 frame_index);
+
+public:
+    RvkImage ColorAttachment;
+
+    RvkFramebuffer Framebuffer;
+
+    RvkDescriptorPool DescriptorPool;
+    RvkDescriptorSet DescriptorSet;
+
+private:
+    RvkGraphicsPipeline* mLightingPipeline = nullptr;
+    FxDeferredRenderer* mRendererInst = nullptr;
+};
+
+
 ///////////////////////////////
 // Composition Pass (Per FIF)
 ///////////////////////////////
@@ -60,7 +91,7 @@ private:
 class FxDeferredCompPass
 {
 public:
-    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const Vec2u& extent);
+    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
     void Destroy();
 
     void Begin();
@@ -91,7 +122,7 @@ private:
 class FxDeferredRenderer
 {
 public:
-    void Create(const Vec2u& extent);
+    void Create(const FxVec2u& extent);
 
     void Destroy();
 
@@ -102,12 +133,18 @@ public:
 
     FX_FORCE_INLINE FxDeferredGPass* GetCurrentGPass();
     FX_FORCE_INLINE FxDeferredCompPass* GetCurrentCompPass();
+    FX_FORCE_INLINE FxDeferredLightingPass* GetCurrentLightingPass();
 
 private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
     FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
+
+    void CreateLightingPipeline();
+    void DestroyLightingPipeline();
+
+    FX_FORCE_INLINE VkPipelineLayout CreateLightingPipelineLayout();
 
     void CreateCompPipeline();
     void DestroyCompPipeline();
@@ -127,6 +164,14 @@ public:
 
     FxSizedArray<FxDeferredGPass> GPasses;
 
+    //////////////////////
+    // Lighting Pass
+    //////////////////////
+
+    VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
+    RvkGraphicsPipeline LightingPipeline;
+
+    FxSizedArray<FxDeferredLightingPass> LightingPasses;
 
     //////////////////////
     // Composition Pass

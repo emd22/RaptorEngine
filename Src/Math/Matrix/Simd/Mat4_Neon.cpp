@@ -106,9 +106,9 @@ void Mat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
     const FxVec3f right = upvec.Cross(forward).Normalize();
     const FxVec3f up = forward.Cross(right);
 
-    Columns[0].Load4(right.GetX(), up.GetX(), forward.GetX(), 0.0f);
-    Columns[1].Load4(right.GetY(), up.GetY(), forward.GetY(), 0.0f);
-    Columns[2].Load4(right.GetZ(), up.GetZ(), forward.GetZ(), 0.0f);
+    Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
+    Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
+    Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
     Columns[3].Load4(-right.Dot(position), -up.Dot(position), -forward.Dot(position), 1.0f);
 
     // Columns[0].Load4(right.GetX(),   right.GetY(),   right.GetZ(),   -right.Dot(position));

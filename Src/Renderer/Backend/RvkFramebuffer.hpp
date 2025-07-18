@@ -11,7 +11,7 @@
 class RvkFramebuffer
 {
 public:
-    void Create(const FxSizedArray<VkImageView> &image_views, const RvkGraphicsPipeline &pipeline, Vec2u size);
+    void Create(const FxSizedArray<VkImageView> &image_views, const RvkGraphicsPipeline &pipeline, FxVec2u size);
     void Destroy();
 
     ~RvkFramebuffer()

@@ -8,12 +8,14 @@
 
 FX_SET_MODULE_NAME("DeferredRenderer")
 
-void FxDeferredRenderer::Create(const Vec2u& extent)
+void FxDeferredRenderer::Create(const FxVec2u& extent)
 {
     CreateGPassPipeline();
     CreateCompPipeline();
+    CreateLightingPipeline();
 
     GPasses.InitSize(RendererFramesInFlight);
+    LightingPasses.InitSize(RendererFramesInFlight);
     CompPasses.InitSize(RendererFramesInFlight);
 
     FxSizedArray<VkImageView> temp_views;
@@ -27,6 +29,8 @@ void FxDeferredRenderer::Create(const Vec2u& extent)
 
         // Pass in the current frame index to map to the swapchain's output images
         CompPasses[frame_index].Create(this, frame_index, extent);
+
+        LightingPasses[frame_index].Create(this, frame_index, extent);
 
         temp_views[0] = Renderer->Swapchain.OutputImages[frame_index].View;
         OutputFramebuffers[frame_index].Create(temp_views, CompPipeline, extent);
@@ -42,13 +46,16 @@ void FxDeferredRenderer::Destroy()
     for (int i = 0; i < RendererFramesInFlight; i++) {
         GPasses[i].Destroy();
         CompPasses[i].Destroy();
+        LightingPasses[i].Destroy();
         OutputFramebuffers[i].Destroy();
     }
 
     DestroyCompPipeline();
     DestroyGPassPipeline();
+    DestroyLightingPipeline();
 
     GPasses.Free();
+    LightingPasses.Free();
     CompPasses.Free();
     OutputFramebuffers.Free();
 }
@@ -234,6 +241,136 @@ void FxDeferredRenderer::DestroyGPassPipeline()
     GPassPipeline.Destroy();
 }
 
+
+////////////////////////////////////////////////
+// FxDeferredRenderer LightingPass Functions
+////////////////////////////////////////////////
+
+FxDeferredLightingPass* FxDeferredRenderer::GetCurrentLightingPass()
+{
+    return &LightingPasses[Renderer->GetFrameNumber()];
+}
+
+VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
+{
+    RvkGpuDevice* device = Renderer->GetDevice();
+
+
+    // Fragment DS
+    {
+        VkDescriptorSetLayoutBinding positions_layout_binding {
+            .binding = 1,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
+        VkDescriptorSetLayoutBinding albedo_layout_binding {
+            .binding = 2,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
+        VkDescriptorSetLayoutBinding normals_layout_binding {
+            .binding = 3,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
+        VkDescriptorSetLayoutBinding bindings[] = {
+            positions_layout_binding,
+            albedo_layout_binding,
+            normals_layout_binding
+        };
+
+        VkDescriptorSetLayoutCreateInfo lighting_layout_info {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = FxSizeofArray(bindings),
+            .pBindings = bindings,
+        };
+
+        VkResult status;
+        status = vkCreateDescriptorSetLayout(device->Device, &lighting_layout_info, nullptr, &DsLayoutLightingFrag);
+        if (status != VK_SUCCESS) {
+            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+        }
+    }
+
+    VkDescriptorSetLayout layouts[] = {
+        DsLayoutLightingFrag,
+    };
+
+    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+}
+
+
+void FxDeferredRenderer::CreateLightingPipeline()
+{
+    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
+                            | VK_COLOR_COMPONENT_G_BIT
+                            | VK_COLOR_COMPONENT_B_BIT
+                            | VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        }
+    };
+
+    VkAttachmentDescription attachments[] = {
+        // Combined output
+        VkAttachmentDescription {
+            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        },
+    };
+
+    ShaderList shader_list;
+
+    RvkShader vertex_shader("../shaders/lighting.vert.spv", RvkShaderType::Vertex);
+    RvkShader fragment_shader("../shaders/lighting.frag.spv", RvkShaderType::Fragment);
+
+    shader_list.Vertex = vertex_shader.ShaderModule;
+    shader_list.Fragment = fragment_shader.ShaderModule;
+
+    VkPipelineLayout layout = CreateLightingPipelineLayout();
+
+    FxVertexInfo vertex_info = FxMakeLightVertexInfo();
+
+    LightingPipeline.Create(
+        shader_list,
+        layout,
+        FxMakeSlice(attachments, FxSizeofArray(attachments)),
+        FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
+        &vertex_info
+    );
+}
+
+void FxDeferredRenderer::DestroyLightingPipeline()
+{
+    VkDevice device = Renderer->GetDevice()->Device;
+
+    // Destroy descriptor set layouts
+    if (DsLayoutLightingFrag) {
+        vkDestroyDescriptorSetLayout(device, DsLayoutLightingFrag, nullptr);
+        DsLayoutLightingFrag = nullptr;
+    }
+
+    LightingPipeline.Destroy();
+}
+
+
+
 //////////////////////////////////////////
 // FxDeferredRenderer CompPass Functions
 //////////////////////////////////////////
@@ -264,9 +401,18 @@ VkPipelineLayout FxDeferredRenderer::CreateCompPipelineLayout()
             .pImmutableSamplers = nullptr,
         };
 
+        VkDescriptorSetLayoutBinding normals_layout_binding {
+            .binding = 3,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
         VkDescriptorSetLayoutBinding bindings[] = {
             positions_layout_binding,
-            albedo_layout_binding
+            albedo_layout_binding,
+            normals_layout_binding
         };
 
         VkDescriptorSetLayoutCreateInfo comp_layout_info {
@@ -384,7 +530,7 @@ void FxDeferredGPass::BuildDescriptorSets()
 
 }
 
-void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const Vec2u& extent)
+void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent)
 {
     mRendererInst = renderer;
     mGPassPipeline = &mRendererInst->GPassPipeline;
@@ -529,12 +675,202 @@ void FxDeferredGPass::Destroy()
 }
 
 
+
+
+/////////////////////////////////////
+// FxDeferredLightingPass Functions
+/////////////////////////////////////
+
+
+void FxDeferredLightingPass::Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
+{
+    mRendererInst = renderer;
+    mLightingPipeline = &mRendererInst->LightingPipeline;
+
+    // Albedo sampler
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Positions sampler
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Normals sampler
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+
+    ColorAttachment.Create(
+        extent,
+        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT
+    );
+
+    FxSizedArray image_views = {
+        ColorAttachment.View
+    };
+
+    Framebuffer.Create(image_views, renderer->LightingPipeline, extent);
+
+    BuildDescriptorSets(frame_index);
+}
+
+void FxDeferredLightingPass::Begin()
+{
+    RvkFrameData* frame = Renderer->GetFrame();
+
+
+    VkClearValue clear_values[] = {
+        // Output color
+        VkClearValue {
+            .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
+        },
+    };
+
+
+    mLightingPipeline->RenderPass.Begin(&frame->LightCommandBuffer, Framebuffer.Framebuffer, FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
+    mLightingPipeline->Bind(frame->LightCommandBuffer);
+
+    DescriptorSet.Bind(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mLightingPipeline);
+}
+
+void FxDeferredLightingPass::End()
+{
+    mLightingPipeline->RenderPass.End();
+}
+
+void FxDeferredLightingPass::Submit()
+{
+    RvkFrameData *frame = Renderer->GetFrame();
+
+
+    const VkPipelineStageFlags wait_stages[] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    };
+
+    const VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
+
+        .pWaitDstStageMask = wait_stages,
+        // command buffers
+        .commandBufferCount = 1,
+        .pCommandBuffers = &frame->LightCommandBuffer.CommandBuffer,
+        // signal semaphores
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = &frame->LightingSem.Semaphore
+    };
+
+    VkTry(
+        vkQueueSubmit(Renderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+        "Error submitting draw buffer"
+    );
+}
+
+
+void FxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
+{
+    DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutLightingFrag);
+
+    FxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
+
+    FxStackArray<VkWriteDescriptorSet, 3> write_infos;
+
+    // Positions image descriptor
+    {
+        const int binding_index = 1;
+
+        VkDescriptorImageInfo positions_image_info {
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .imageView = gpass.PositionsAttachment.View,
+            .sampler = Renderer->Swapchain.PositionSampler.Sampler
+        };
+
+        VkWriteDescriptorSet positions_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .dstSet = DescriptorSet.Set,
+            .dstBinding = binding_index,
+            .dstArrayElement = 0,
+            .pImageInfo = &positions_image_info,
+
+        };
+
+        write_infos.Insert(positions_write);
+    }
+
+    // Color image descriptor
+    {
+        const int binding_index = 2;
+
+        VkDescriptorImageInfo color_image_info {
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .imageView = gpass.ColorAttachment.View,
+            .sampler = Renderer->Swapchain.ColorSampler.Sampler
+        };
+
+        VkWriteDescriptorSet color_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .dstSet = DescriptorSet.Set,
+            .dstBinding = binding_index,
+            .dstArrayElement = 0,
+            .pImageInfo = &color_image_info,
+
+        };
+
+        write_infos.Insert(color_write);
+    }
+
+    // Normals image descriptor
+    {
+        const int binding_index = 3;
+
+        VkDescriptorImageInfo normals_image_info {
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .imageView = gpass.NormalsAttachment.View,
+            .sampler = Renderer->Swapchain.NormalsSampler.Sampler
+        };
+
+        VkWriteDescriptorSet normals_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .dstSet = DescriptorSet.Set,
+            .dstBinding = binding_index,
+            .dstArrayElement = 0,
+            .pImageInfo = &normals_image_info,
+
+        };
+
+        write_infos.Insert(normals_write);
+    }
+
+    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
+}
+
+
+void FxDeferredLightingPass::Destroy()
+{
+    if (mLightingPipeline == nullptr) {
+        return;
+    }
+
+    ColorAttachment.Destroy();
+    DescriptorPool.Destroy();
+    Framebuffer.Destroy();
+
+    mLightingPipeline = nullptr;
+}
+
+
+
 /////////////////////////////////////////
 // FxDeferredCompPass Functions
 /////////////////////////////////////////
 
 
-void FxDeferredCompPass::Create(FxDeferredRenderer* renderer, uint16 frame_index, const Vec2u& extent)
+void FxDeferredCompPass::Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
 {
     FxAssert(Renderer->Swapchain.Initialized == true);
 
@@ -544,6 +880,8 @@ void FxDeferredCompPass::Create(FxDeferredRenderer* renderer, uint16 frame_index
     // Albedo sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     // Positions sampler
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Normals sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
@@ -555,8 +893,6 @@ void FxDeferredCompPass::Create(FxDeferredRenderer* renderer, uint16 frame_index
     };
 
     Framebuffer.Create(image_views, renderer->CompPipeline, extent);
-
-
 
     BuildDescriptorSets(frame_index);
 }
@@ -598,24 +934,48 @@ void FxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 2;
 
-        VkDescriptorImageInfo positions_image_info {
+        VkDescriptorImageInfo color_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = gpass.ColorAttachment.View,
             .sampler = Renderer->Swapchain.ColorSampler.Sampler
         };
 
-        VkWriteDescriptorSet positions_write {
+        VkWriteDescriptorSet color_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &positions_image_info,
+            .pImageInfo = &color_image_info,
 
         };
 
-        write_infos.Insert(positions_write);
+        write_infos.Insert(color_write);
+    }
+
+    // Normals image descriptor
+    {
+        const int binding_index = 3;
+
+        VkDescriptorImageInfo normals_image_info {
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .imageView = gpass.NormalsAttachment.View,
+            .sampler = Renderer->Swapchain.NormalsSampler.Sampler
+        };
+
+        VkWriteDescriptorSet normals_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .dstSet = DescriptorSet.Set,
+            .dstBinding = binding_index,
+            .dstArrayElement = 0,
+            .pImageInfo = &normals_image_info,
+
+        };
+
+        write_infos.Insert(normals_write);
     }
 
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
@@ -631,7 +991,7 @@ void FxDeferredCompPass::Begin()
 void FxDeferredCompPass::DoCompPass()
 {
     VkClearValue clear_values[] = {
-        // Albedo
+        // Output colour
         VkClearValue {
             .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
         },
