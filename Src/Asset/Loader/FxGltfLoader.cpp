@@ -8,7 +8,7 @@
 
 #include <Core/FxRef.hpp>
 
-void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
+void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
 {
     FxSizedArray<float32> positions;
     FxSizedArray<float32> normals;
@@ -47,7 +47,7 @@ void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
         }
     }
 
-    auto combined_vertices = FxMesh::MakeCombinedVertexBuffer(positions, normals, uvs);
+    auto combined_vertices = FxMesh<>::MakeCombinedVertexBuffer(positions, normals, uvs);
 
     // Set the combined vertices to the mesh
     mesh->UploadVertices(combined_vertices);
@@ -57,11 +57,11 @@ void UnpackMeshAttributes(FxMesh *mesh, cgltf_primitive *primitive)
 void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
 {
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
-        auto *primitive = &gltf_mesh->primitives[i];
+        auto* primitive = &gltf_mesh->primitives[i];
 
         FxSizedArray<uint32> indices;
 
-        FxMesh *mesh = new FxMesh;
+        FxMesh<>* mesh = new FxMesh;
 
         // if there are indices in the mesh, add them to the FxMesh
         if (primitive->indices != nullptr) {
@@ -103,7 +103,6 @@ FxRef<FxImage> FxGltfLoader::LoadTexture(const FxRef<FxMaterial>& material, cons
 
     if (texture_view.texture->image != nullptr) {
         const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
-        ;
 
         uint32 size = texture_view.texture->image->buffer_view->size;
         return FxAssetManager::LoadFromMemory<FxImage>(data, size);
@@ -193,7 +192,7 @@ FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, con
 
 void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
-    FxModel *model = static_cast<FxModel *>(asset.Get());
+    FxModel* model = static_cast<FxModel *>(asset.Get());
     model->Meshes.InitSize(mGltfData->meshes_count);
 
     for (int i = 0; i < mGltfData->meshes_count; i++) {

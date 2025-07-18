@@ -6,70 +6,63 @@
 
 #include <atomic>
 
+template <typename TVertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>
 class FxMesh
 {
 public:
     FxMesh() = default;
 
-    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
-
-    FxMesh(FxSizedArray<VertexType> &vertices)
+    FxMesh(FxSizedArray<TVertexType>& vertices)
     {
         UploadVertices(vertices);
     }
 
-    FxMesh(FxSizedArray<VertexType> &vertices, FxSizedArray<uint32> &indices)
+    FxMesh(FxSizedArray<TVertexType>& vertices, FxSizedArray<uint32>& indices)
     {
         CreateFromData(vertices, indices);
     }
 
-    // FxMesh(const FxMesh &other)
+    template <typename T>
+    FxMesh(FxMesh<T>& other)
+    {
+        mVertexBuffer = other.mVertexBuffer;
+        mIndexBuffer = other.mIndexBuffer;
+
+        IsReady = other.IsReady;
+    }
+
+    // void CreateFromData(const FxSizedArray<FxVec3f>& vertices, FxSizedArray<uint32>& indices)
+    //     requires std::same_as<TVertexType, RvkVertex<FxVertexPosition>>
     // {
-    //     *this = other;
+    //     UploadVertices(static_cast<FxSizedArray<TVertexType>>(vertices));
+    //     UploadIndices(indices);
     // }
 
-    // FxMesh& operator=(const FxMesh& other)
-    // {
-    //     mVertexBuffer = std::move(other.mVertexBuffer);
-    //     mIndexBuffer = std::move(other.mIndexBuffer);
-    //     return *this;
-    // }
-
-    void CreateFromData(FxSizedArray<VertexType> &vertices, FxSizedArray<uint32> &indices)
+    void CreateFromData(FxSizedArray<TVertexType>& vertices, FxSizedArray<uint32>& indices)
     {
         UploadVertices(vertices);
         UploadIndices(indices);
     }
 
-    void UploadVertices(FxSizedArray<VertexType> &vertices)
+    void UploadVertices(FxSizedArray<TVertexType>& vertices)
     {
         mVertexBuffer.Create(RvkBufferUsageType::Vertices, vertices);
     }
 
-    void UploadIndices(FxSizedArray<uint32> &indices)
+    void UploadIndices(FxSizedArray<uint32>& indices)
     {
         mIndexBuffer.Create(RvkBufferUsageType::Indices, indices);
     }
 
-    // FxMesh(FxMesh &&other)
-    // {
-    //     mIndexBuffer = std::move(other.mIndexBuffer);
-    //     mVertexBuffer = std::move(other.mVertexBuffer);
-
-    // }
-
-    // FxMesh &operator=(FxMesh &&other)
-    // {
-    //     mIndexBuffer = std::move(other.mIndexBuffer);
-    //     mVertexBuffer = std::move(other.mVertexBuffer);
-    //     return *this;
-    // }
-
-    static FxSizedArray<VertexType> MakeCombinedVertexBuffer(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals, const FxSizedArray<float32>& uvs)
+    static FxSizedArray<TVertexType> MakeCombinedVertexBuffer(
+        const FxSizedArray<float32>& positions,
+        const FxSizedArray<float32>& normals,
+        const FxSizedArray<float32>& uvs
+    ) requires std::same_as<TVertexType, RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>
     {
         FxAssert((normals.Size == positions.Size));
 
-        FxSizedArray<VertexType> vertices(positions.Size / 3);
+        FxSizedArray<TVertexType> vertices(positions.Size / 3);
 
         // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
         const bool has_texcoords = uvs.Size > 0;
@@ -79,8 +72,7 @@ public:
         }
 
         for (int i = 0; i < vertices.Capacity; i++) {
-            // make a combined vertex + normal + other a
-            VertexType vertex;
+            TVertexType vertex;
 
             memcpy(&vertex.Position, &positions.Data[i * 3], sizeof(float32) * 3);
             memcpy(&vertex.Normal, &normals.Data[i * 3], sizeof(float32) * 3);
@@ -98,33 +90,108 @@ public:
         return vertices;
     }
 
+    /**
+     * Makes a combined vertex buffer (Contains a number of components) from a list of positions.
+     * This function zeros out any potential normals or UVs given `TVertexType` includes them.
+     *
+     * Positions {1, 2, 3, 4, 5, 6} -> Vertex 1: {1, 2, 3}, Vertex 2: {4, 5, 6}.
+     *
+     * @param positions The positions to create the vertex buffer from.
+     */
+    static FxSizedArray<TVertexType> MakeCombinedVertexBuffer(const FxSizedArray<float32>& positions)
+    {
+        const uint32 vertex_count = positions.Size / 3;
+
+        constexpr bool contains_uv = std::is_same_v<TVertexType, RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>;
+        constexpr bool contains_normal = std::is_same_v<TVertexType, RvkVertex<FxVertexPosition | FxVertexNormal>> || contains_uv;
+
+        FxSizedArray<TVertexType> vertices(vertex_count);
+
+        for (uint32 i = 0; i < vertex_count; i++) {
+            TVertexType vertex;
+            memcpy(&vertex.Position, &positions.Data[i * 3], sizeof(float32) * 3);
+
+            if constexpr (contains_normal) {
+                memset(&vertex.Normal, 0, sizeof(float32) * 3);
+            }
+
+            if constexpr (contains_uv) {
+                memset(&vertex.UV, 0, sizeof(float32) * 2);
+            }
+
+            vertices.Insert(vertex);
+        }
+
+        return vertices;
+    }
+
+    static FxSizedArray<TVertexType> MakeCombinedVertexBuffer(const FxSizedArray<FxVec3f>& positions)
+    {
+        const uint32 vertex_count = positions.Size;
+
+        constexpr bool contains_uv = std::is_same_v<TVertexType, RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>;
+        constexpr bool contains_normal = std::is_same_v<TVertexType, RvkVertex<FxVertexPosition | FxVertexNormal>> || contains_uv;
+
+        FxSizedArray<TVertexType> vertices(vertex_count);
+
+        for (uint32 i = 0; i < vertex_count; i++) {
+            TVertexType vertex;
+            memcpy(&vertex.Position, positions.Data[i].mData, sizeof(float32) * 3);
+
+            if constexpr (contains_normal) {
+                memset(&vertex.Normal, 0, sizeof(float32) * 3);
+            }
+
+            if constexpr (contains_uv) {
+                memset(&vertex.UV, 0, sizeof(float32) * 2);
+            }
+
+            vertices.Insert(vertex);
+        }
+
+        return vertices;
+    }
+
+
     bool IsWritable()
     {
         return (mVertexBuffer.Initialized && mIndexBuffer.Initialized);
     }
 
-    RvkGpuBuffer<VertexType> &GetVertexBuffer() { return mVertexBuffer; }
+    RvkGpuBuffer<TVertexType> &GetVertexBuffer() { return mVertexBuffer; }
     RvkGpuBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
 
-    void Render(RvkGraphicsPipeline &pipeline)
+    void Render(RvkGraphicsPipeline& pipeline)
     {
         const VkDeviceSize offset = 0;
-        RvkFrameData *frame = Renderer->GetFrame();
+        RvkFrameData* frame = Renderer->GetFrame();
 
         vkCmdBindVertexBuffers(frame->CommandBuffer.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-
         vkCmdDrawIndexed(frame->CommandBuffer.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
-        // vkCmdDraw(frame->CommandBuffer.CommandBuffer, mVertexBuffer.Size, 1, 0, 0);
+    }
+
+    void Render(RvkCommandBuffer& cmd, RvkGraphicsPipeline& pipeline)
+    {
+        const VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
+        vkCmdBindIndexBuffer(cmd.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
     }
 
     void Destroy()
     {
-        if (IsReady == false) {
+        if (IsReference) {
             return;
         }
-        IsReady = false;
+
+        if (IsReady.load() == false) {
+            return;
+        }
+
+        IsReady.store(false);
 
         mVertexBuffer.Destroy();
         mIndexBuffer.Destroy();
@@ -137,7 +204,9 @@ public:
 
     std::atomic_bool IsReady = std::atomic_bool(false);
 
+    bool IsReference = false;
+
 protected:
-    RvkGpuBuffer<VertexType> mVertexBuffer;
+    RvkGpuBuffer<TVertexType> mVertexBuffer;
     RvkGpuBuffer<uint32> mIndexBuffer;
 };

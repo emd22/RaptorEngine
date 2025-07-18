@@ -40,7 +40,7 @@ public:
     RvkTexture Texture;
 
     uint32 NumComponents = 3;
-    Vec2u Size = Vec2u::Zero;
+    FxVec2u Size = FxVec2u::Zero;
 
 private:
     // bool mImageReady = false;

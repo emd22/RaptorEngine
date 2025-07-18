@@ -56,6 +56,18 @@ public:
         );
     }
 
+    static Mat4f AsScale(FxVec3f scale)
+    {
+        return Mat4f(
+            (float32 [16]){
+                scale.X, 0, 0, 0,
+                0, scale.Y, 0, 0,
+                0, 0, scale.Z, 0,
+                0, 0, 0, 1
+            }
+        );
+    }
+
     void Rotate(FxVec3f rotation);
 
     void LookAt(FxVec3f position, FxVec3f target, FxVec3f up);

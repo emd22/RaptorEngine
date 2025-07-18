@@ -31,7 +31,7 @@ public:
     {
         Log::Info("Destroy FxModel (%lu meshes)", Meshes.Size);
 
-        for (FxMesh *mesh : Meshes) {
+        for (FxMesh<>* mesh : Meshes) {
             mesh->Destroy();
         }
 
@@ -42,7 +42,7 @@ public:
     }
 
 public:
-    FxStaticPtrArray<FxMesh> Meshes;
+    FxStaticPtrArray<FxMesh<>> Meshes;
     std::vector<FxRef<FxMaterial>> Materials;
 
 private:

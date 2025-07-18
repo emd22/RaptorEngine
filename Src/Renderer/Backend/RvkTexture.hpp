@@ -23,14 +23,14 @@ class RvkTexture
 public:
     RvkTexture() = default;
 
-    void Create(const FxSizedArray<uint8>& image_data, const Vec2u& dimensions, uint32 components, const FxRef<RvkSampler>& sampler)
+    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, uint32 components, const FxRef<RvkSampler>& sampler)
     {
         Sampler = sampler;
         Create(image_data, dimensions, components);
     }
 
     // TODO: update this and remove the format/color restrictions
-    void Create(const FxSizedArray<uint8>& image_data, const Vec2u& dimensions, uint32 components)
+    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, uint32 components)
     {
         mDevice = Fx_Fwd_GetGpuDevice();
 

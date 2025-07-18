@@ -32,6 +32,23 @@ FxVertexInfo FxMakeVertexInfo()
     return { binding_desc, std::move(attribs) };
 }
 
+FxVertexInfo FxMakeLightVertexInfo()
+{
+    using VertexType = RvkVertex<FxVertexPosition>;
+
+    VkVertexInputBindingDescription binding_desc = {
+        .binding = 0,
+        .stride = sizeof(VertexType),
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+    };
+
+    FxSizedArray<VkVertexInputAttributeDescription> attribs = {
+        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
+    };
+
+    return { binding_desc, std::move(attribs) };
+}
+
 void RvkGraphicsPipeline::Create(
     ShaderList shader_list,
     VkPipelineLayout layout,
@@ -89,7 +106,7 @@ void RvkGraphicsPipeline::Create(
         .pDynamicStates = dynamic_states,
     };
 
-    const Vec2u extent = Renderer->Swapchain.Extent;
+    const FxVec2u extent = Renderer->Swapchain.Extent;
 
     VkViewport viewport = {
         .x = 0.0f,

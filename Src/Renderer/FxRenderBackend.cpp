@@ -72,7 +72,7 @@ FxSizedArray<VkLayerProperties> FxRenderBackend::GetAvailableValidationLayers()
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
 
-void FxRenderBackend::Init(Vec2u window_size)
+void FxRenderBackend::Init(FxVec2u window_size)
 {
     InitVulkan();
     CreateSurfaceFromWindow();
@@ -117,6 +117,7 @@ void FxRenderBackend::InitFrames()
         frame.CommandPool.Create(device, graphics_family);
         frame.CommandBuffer.Create(&frame.CommandPool);
         frame.CompCommandBuffer.Create(&frame.CommandPool);
+        frame.LightCommandBuffer.Create(&frame.CommandPool);
 
         frame.Create(device);
     }
@@ -132,6 +133,7 @@ void FxRenderBackend::DestroyFrames()
 
         frame.CommandBuffer.Destroy();
         frame.CompCommandBuffer.Destroy();
+        frame.LightCommandBuffer.Destroy();
         frame.CommandPool.Destroy();
 
         frame.Destroy();
@@ -461,6 +463,7 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 
     CurrentGPass = renderer.GetCurrentGPass();
     CurrentCompPass = renderer.GetCurrentCompPass();
+    CurrentLightingPass = renderer.GetCurrentLightingPass();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -521,7 +524,7 @@ void FxRenderBackend::PresentFrame()
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
+        .pWaitSemaphores = &frame->LightingSem.Semaphore,
         .pWaitDstStageMask = wait_stages,
 
         // command buffers
@@ -572,12 +575,48 @@ void FxRenderBackend::PresentFrame()
     }
 }
 
-void FxRenderBackend::FinishFrame()
+void FxRenderBackend::BeginLighting()
 {
     RvkFrameData* frame = GetFrame();
 
     CurrentGPass->End();
     frame->CommandBuffer.End();
+
+    frame->LightCommandBuffer.Reset();
+    frame->LightCommandBuffer.Record();
+
+    CurrentLightingPass->Begin();
+
+    const int32 width = Swapchain.Extent.Width();
+    const int32 height = Swapchain.Extent.Height();
+
+    const VkViewport viewport = {
+        .x = 0, .y = 0,
+        .width = (float32)width,
+        .height = (float32)height,
+        .minDepth = 0.0,
+        .maxDepth = 1.0,
+    };
+
+    vkCmdSetViewport(frame->LightCommandBuffer.CommandBuffer, 0, 1, &viewport);
+
+    const VkRect2D scissor = {
+        .offset = { .x = 0, .y = 0 },
+        .extent = { .width = (uint32)width, .height = (uint32)height }
+    };
+
+    vkCmdSetScissor(frame->LightCommandBuffer.CommandBuffer, 0, 1, &scissor);
+
+}
+
+
+void FxRenderBackend::DoComposition()
+{
+    RvkFrameData* frame = GetFrame();
+
+
+    CurrentLightingPass->End();
+    frame->LightCommandBuffer.End();
 
     CurrentCompPass->Begin();
 
@@ -604,6 +643,8 @@ void FxRenderBackend::FinishFrame()
     CurrentCompPass->DoCompPass();
 
     CurrentGPass->Submit();
+
+    CurrentLightingPass->Submit();
     PresentFrame();
 
     ProcessDeletionQueue();

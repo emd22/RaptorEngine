@@ -30,7 +30,7 @@ public:
     static void ReleaseMouse();
     static bool IsMouseLocked();
 
-    static Vec2f &GetMouseDelta();
+    static FxVec2f &GetMouseDelta();
 
     /**
      * Check if a key is currently pressed.
@@ -119,8 +119,8 @@ private:
     FxSizedArray<FxControl> mKeyMap;
     bool mMouseCaptured = false;
 
-    Vec2f mMouseDelta = Vec2f::Zero;
-    Vec2f mCapturedMousePos = Vec2f::Zero;
+    FxVec2f mMouseDelta = FxVec2f::Zero;
+    FxVec2f mCapturedMousePos = FxVec2f::Zero;
 
     uint8 mThisTick : 1 = 0;
 };

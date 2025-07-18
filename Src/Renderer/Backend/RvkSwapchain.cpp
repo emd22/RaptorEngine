@@ -12,7 +12,7 @@
 
 FX_SET_MODULE_NAME("RvkSwapchain")
 
-void RvkSwapchain::Init(Vec2u size, VkSurfaceKHR &surface, RvkGpuDevice *device)
+void RvkSwapchain::Init(FxVec2u size, VkSurfaceKHR &surface, RvkGpuDevice *device)
 {
     AssertRendererExists();
 
@@ -78,7 +78,7 @@ void RvkSwapchain::CreateImageViews()
     }
 }
 
-void RvkSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR &surface)
+void RvkSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface)
 {
     Extent = size;
 
@@ -155,6 +155,8 @@ void RvkSwapchain::CreateSwapchainFramebuffers()
 
     ColorSampler.Create();
     PositionSampler.Create();
+    NormalsSampler.Create();
+    LightsSampler.Create();
 
     // mCompPipeline = comp_pipeline;
 
@@ -174,6 +176,8 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
 
     ColorSampler.Destroy();
     PositionSampler.Destroy();
+    NormalsSampler.Destroy();
+    LightsSampler.Destroy();
 
 
     // CompFramebuffers.Free();

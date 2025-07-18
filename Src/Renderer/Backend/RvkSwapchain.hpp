@@ -17,7 +17,7 @@ public:
     RvkSwapchain() = default;
     ~RvkSwapchain();
 
-    void Init(Vec2u size, VkSurfaceKHR& surface, RvkGpuDevice* device);
+    void Init(FxVec2u size, VkSurfaceKHR& surface, RvkGpuDevice* device);
     void CreateSwapchainFramebuffers();
 
     VkSwapchainKHR GetSwapchain() { return mSwapchain; }
@@ -25,7 +25,7 @@ public:
     void Destroy();
 
 private:
-    void CreateSwapchain(Vec2u size, VkSurfaceKHR &surface);
+    void CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface);
     void CreateSwapchainImages();
     void CreateImageViews();
 
@@ -43,11 +43,13 @@ public:
 
     RvkSampler ColorSampler;
     RvkSampler PositionSampler;
+    RvkSampler NormalsSampler;
+    RvkSampler LightsSampler;
 
     // FxSizedArray<RvkFramebuffer> GPassFramebuffers;
     // FxSizedArray<RvkFramebuffer> CompFramebuffers;
 
-    Vec2u Extent = Vec2u::Zero;
+    FxVec2u Extent = FxVec2u::Zero;
 
     VkSurfaceFormatKHR SurfaceFormat;
 

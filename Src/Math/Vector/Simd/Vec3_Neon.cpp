@@ -5,6 +5,7 @@
 
 const FxVec3f FxVec3f::Up = FxVec3f(0.0f, 1.0f, 0.0f);
 const FxVec3f FxVec3f::Zero = FxVec3f(0.0f, 0.0f, 0.0f);
+const FxVec3f FxVec3f::One = FxVec3f(1.0f, 1.0f, 1.0f);
 
 FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
 {
@@ -56,6 +57,17 @@ FxVec3f FxVec3f::Normalize() const
     v = vdivq_f32(v, len_v);
 
     return FxVec3f(v);
+}
+
+void FxVec3f::NormalizeIP()
+{
+    // Calculate length
+    const float32 len = Length();
+    // Splat to register
+    const float32x4_t len_v = vdupq_n_f32(len);
+
+    // Divide vector by length
+    mIntrin = vdivq_f32(mIntrin, len_v);
 }
 
 FxVec3f FxVec3f::Cross(const FxVec3f &other) const
@@ -116,6 +128,12 @@ FxVec3f FxVec3f::operator - () const
     return FxVec3f(result);
 }
 
+FxVec3f FxVec3f::operator / (float32 scalar) const
+{
+    float32x4_t result = vdivq_f32(mIntrin, vdupq_n_f32(scalar));
+    return FxVec3f(result);
+}
+
 FxVec3f &FxVec3f::operator += (const FxVec3f &other)
 {
     mIntrin = vaddq_f32(mIntrin, other);
@@ -134,23 +152,6 @@ FxVec3f &FxVec3f::operator *= (const FxVec3f &other)
     return *this;
 }
 
-/////////////////////////////////
-// Component Getters
-/////////////////////////////////
 
-float32 FxVec3f::GetX() const
-{
-    return vgetq_lane_f32(mIntrin, 0);
-}
-
-float32 FxVec3f::GetY() const
-{
-    return vgetq_lane_f32(mIntrin, 1);
-}
-
-float32 FxVec3f::GetZ() const
-{
-    return vgetq_lane_f32(mIntrin, 2);
-}
 
 #endif

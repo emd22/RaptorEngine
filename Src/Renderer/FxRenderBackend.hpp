@@ -50,11 +50,12 @@ public:
     using ExtensionList = FxSizedArray<VkExtensionProperties>;
     using ExtensionNames = std::vector<const char*>;
 
-    void Init(Vec2u window_size);
+    void Init(FxVec2u window_size);
     void Destroy();
 
     FrameResult BeginFrame(FxDeferredRenderer& renderer);
-    void FinishFrame();
+    void BeginLighting();
+    void DoComposition();
 
     void SelectWindow(const FxRef<FxWindow>& window)
     {
@@ -192,6 +193,8 @@ public:
 
     FxDeferredGPass* CurrentGPass = nullptr;
     FxDeferredCompPass* CurrentCompPass = nullptr;
+    FxDeferredLightingPass* CurrentLightingPass = nullptr;
+
     FxRef<FxDeferredRenderer> DeferredRenderer{ nullptr };
 
     // RvkSemaphore OffscreenSemaphore;

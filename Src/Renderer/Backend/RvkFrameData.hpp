@@ -24,6 +24,7 @@ public:
 public:
     RvkCommandPool CommandPool;
     RvkCommandBuffer CommandBuffer;
+    RvkCommandBuffer LightCommandBuffer;
     RvkCommandBuffer CompCommandBuffer;
 
     // RvkDescriptorSet DescriptorSet;
@@ -32,6 +33,7 @@ public:
     // RvkRawGpuBuffer<RvkUniformBufferObject> Ubo;
 
     RvkSemaphore OffscreenSem;
+    RvkSemaphore LightingSem;
 
     RvkSemaphore ImageAvailable;
     RvkSemaphore RenderFinished;
