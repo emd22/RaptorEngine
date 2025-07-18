@@ -164,7 +164,7 @@ int main()
         helmet_object.Attach(cheese_material);
     }
 
-    helmet_object.Translate(FxVec3f(-3, 0, 0));
+    helmet_object.Translate(FxVec3f(0, 0, 0));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(1);
 
@@ -178,9 +178,17 @@ int main()
     sets_to_bind.InitSize(2);
 
     FxLight light;
-    light.SetLightVolume(generated_sphere, true);
+    light.SetLightVolume(generated_sphere, false);
 
+
+    FxLight light2;
+    light2.SetLightVolume(generated_sphere, false);
+
+    light.Translate(FxVec3f(-1, 0, 0));
     light.Scale(FxVec3f(2, 2, 2));
+
+    light2.Translate(FxVec3f(1, 0, 0));
+    light2.Scale(FxVec3f(3, 3, 3));
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -235,6 +243,7 @@ int main()
         Renderer->BeginLighting();
 
         light.Render(camera);
+        light2.Render(camera);
 
         Renderer->DoComposition();
 

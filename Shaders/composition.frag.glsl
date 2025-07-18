@@ -18,7 +18,7 @@ void main()
 
     vec4 lights = texture(s_Lights, a_UV);
 
-    vec3 final_color = (albedo.rgb * 0.5) + (albedo.rgb * 0.5 * lights.rgb);
+    vec3 final_color = (albedo.rgb * 0.5) + (albedo.rgb * lights.a * lights.rgb);
 
     v_Color = vec4(final_color, 1.0);
 }

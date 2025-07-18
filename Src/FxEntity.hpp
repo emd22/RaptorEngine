@@ -56,13 +56,13 @@ public:
     void Translate(const FxVec3f& offset)
     {
         mPosition += offset;
-        mModelMatrix = Mat4f::AsTranslation(mPosition);
+        mModelMatrix = mModelMatrix * Mat4f::AsTranslation(mPosition);
     }
 
     void Scale(const FxVec3f& scale)
     {
         mScale *= scale;
-        mModelMatrix = Mat4f::AsScale(mScale);
+        mModelMatrix = mModelMatrix * Mat4f::AsScale(mScale);
     }
 
     void Rotate(const FxVec3f& rotation)

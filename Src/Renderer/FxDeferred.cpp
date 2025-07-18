@@ -317,7 +317,13 @@ void FxDeferredRenderer::CreateLightingPipeline()
                             | VK_COLOR_COMPONENT_G_BIT
                             | VK_COLOR_COMPONENT_B_BIT
                             | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = VK_FALSE,
+            .blendEnable = VK_TRUE,
+            .alphaBlendOp = VK_BLEND_OP_ADD,
+            .colorBlendOp = VK_BLEND_OP_ADD,
+            .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+            .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+            .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+            .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
         }
     };
 

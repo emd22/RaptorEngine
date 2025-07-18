@@ -61,6 +61,7 @@ public:
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         if (node == nullptr) {
             Log::Error("FxMemPoolPage::Free: Could not find ptr %p in memory page!", ptr);
+            FX_BREAKPOINT;
             return;
         }
         mMemBlocks.DeleteNode(node);

@@ -27,7 +27,9 @@ struct FxRefCount
 
     /** Decrements the reference count */
     uint32 Dec() {
-        return (--Count);
+        uint32 new_count = Count.load() - 1;
+        Count.store(new_count);
+        return new_count;
     }
 };
 

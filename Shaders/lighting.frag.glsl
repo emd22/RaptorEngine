@@ -14,5 +14,5 @@ void main()
     vec4 albedo = texture(s_Albedo, a_UV);
     vec3 normals = texture(s_Normals, a_UV).rgb;
 
-    v_Color = vec4(1.0, 1.0, 1.0, 1.0);
+    v_Color = vec4(1.0, 1.0, 1.0, 0.25);
 }
