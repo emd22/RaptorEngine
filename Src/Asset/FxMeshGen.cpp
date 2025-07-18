@@ -78,21 +78,19 @@ FxRef<FxMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::AsLightVol
    	FxRef<FxMesh<FxMeshGen::LightVolumeVertex>> mesh = FxMakeRef<FxMesh<FxMeshGen::LightVolumeVertex>>();
     mesh->IsReference = true;
 
-	// WARNING: HACK HACK HACK
-	// RvkVertex<FxVertexPosition> is essentially just a FxVec3f...
+    FxSizedArray<RvkVertex<FxVertexPosition>> points(Positions.Size);
 
-	FxSizedArray<RvkVertex<FxVertexPosition>> points;
-	points.Data = reinterpret_cast<RvkVertex<FxVertexPosition>*>(Positions.Data);
-	points.Size = Positions.Size;
-	points.Capacity = Positions.Capacity;
+    for (uint32 i = 0; i < Positions.Size; i++) {
+        auto* vertex = points.Insert();
+        FxVec3f& vec = Positions[i];
+
+        vertex->Position[0] = vec.X;
+        vertex->Position[1] = vec.Y;
+        vertex->Position[2] = vec.Z;
+    }
 
 	// Create the mesh using our bodged point array
 	mesh->CreateFromData(points, Indices);
-
-	// To avoid the array from destroying the memory:
-	points.Data = nullptr;
-	points.Size = 0;
-	points.Capacity = 0;
 
 	return mesh;
 }

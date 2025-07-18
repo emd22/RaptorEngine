@@ -164,10 +164,9 @@ int main()
         helmet_object.Attach(cheese_material);
     }
 
+    helmet_object.Translate(FxVec3f(-3, 0, 0));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(1);
-    // FX_BREAKPOINT;
-
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
@@ -179,9 +178,7 @@ int main()
     sets_to_bind.InitSize(2);
 
     FxLight light;
-    light.SetLightVolume(generated_sphere->AsLightVolume());
-
-    auto sphere_mesh = generated_sphere->AsMesh();
+    light.SetLightVolume(generated_sphere, true);
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -231,17 +228,12 @@ int main()
 
         helmet_object.Render(camera);
 
-        sphere_mesh->Render(deferred_renderer->GPassPipeline);
+        light.RenderDebugMesh(camera);
 
         // scene_object.Render(camera);
 
         Renderer->BeginLighting();
-        FxLightPushConstants push_constants{};
-        memcpy(push_constants.MVPMatrix, camera.VPMatrix.RawData, sizeof(Mat4f));
 
-        RvkFrameData* frame = Renderer->GetFrame();
-
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred_renderer->LightingPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
         // sphere_mesh->Render(frame->LightCommandBuffer, deferred_renderer->LightingPipeline);
         light.Render(camera);
 
@@ -256,8 +248,6 @@ int main()
     asset_manager.Shutdown();
 
     deferred_renderer->Destroy();
-
-    sphere_mesh->Destroy();
 
     // composition_pipeline.Destroy();
 
