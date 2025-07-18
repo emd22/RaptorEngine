@@ -27,10 +27,10 @@ void FxDeferredRenderer::Create(const FxVec2u& extent)
     for (int frame_index = 0; frame_index < RendererFramesInFlight; frame_index++) {
         GPasses[frame_index].Create(this, extent);
 
+        LightingPasses[frame_index].Create(this, frame_index, extent);
         // Pass in the current frame index to map to the swapchain's output images
         CompPasses[frame_index].Create(this, frame_index, extent);
 
-        LightingPasses[frame_index].Create(this, frame_index, extent);
 
         temp_views[0] = Renderer->Swapchain.OutputImages[frame_index].View;
         OutputFramebuffers[frame_index].Create(temp_views, CompPipeline, extent);
@@ -45,8 +45,8 @@ void FxDeferredRenderer::Destroy()
 
     for (int i = 0; i < RendererFramesInFlight; i++) {
         GPasses[i].Destroy();
-        CompPasses[i].Destroy();
         LightingPasses[i].Destroy();
+        CompPasses[i].Destroy();
         OutputFramebuffers[i].Destroy();
     }
 
@@ -409,10 +409,19 @@ VkPipelineLayout FxDeferredRenderer::CreateCompPipelineLayout()
             .pImmutableSamplers = nullptr,
         };
 
+        VkDescriptorSetLayoutBinding lights_layout_binding {
+            .binding = 4,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
         VkDescriptorSetLayoutBinding bindings[] = {
             positions_layout_binding,
             albedo_layout_binding,
-            normals_layout_binding
+            normals_layout_binding,
+            lights_layout_binding
         };
 
         VkDescriptorSetLayoutCreateInfo comp_layout_info {
@@ -883,6 +892,8 @@ void FxDeferredCompPass::Create(FxDeferredRenderer* renderer, uint16 frame_index
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     // Normals sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    // Lights sampler
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
     // The output image renders to the swapchains output
@@ -904,7 +915,7 @@ void FxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
     FxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
 
-    FxStackArray<VkWriteDescriptorSet, 3> write_infos;
+    FxStackArray<VkWriteDescriptorSet, 4> write_infos;
 
     // Positions image descriptor
     {
@@ -976,6 +987,32 @@ void FxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
         };
 
         write_infos.Insert(normals_write);
+    }
+
+    // Lights image descriptor
+    {
+        const int binding_index = 4;
+
+        FxDeferredLightingPass& light_pass = mRendererInst->LightingPasses[frame_index];
+
+        VkDescriptorImageInfo lights_image_info {
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .imageView = light_pass.ColorAttachment.View,
+            .sampler = Renderer->Swapchain.LightsSampler.Sampler
+        };
+
+        VkWriteDescriptorSet lights_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .dstSet = DescriptorSet.Set,
+            .dstBinding = binding_index,
+            .dstArrayElement = 0,
+            .pImageInfo = &lights_image_info,
+
+        };
+
+        write_infos.Insert(lights_write);
     }
 
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);

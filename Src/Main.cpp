@@ -180,6 +180,8 @@ int main()
     FxLight light;
     light.SetLightVolume(generated_sphere, true);
 
+    light.Scale(FxVec3f(2, 2, 2));
+
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
 
@@ -227,14 +229,11 @@ int main()
         }
 
         helmet_object.Render(camera);
+        // light.RenderDebugMesh(camera);
 
-        light.RenderDebugMesh(camera);
-
-        // scene_object.Render(camera);
 
         Renderer->BeginLighting();
 
-        // sphere_mesh->Render(frame->LightCommandBuffer, deferred_renderer->LightingPipeline);
         light.Render(camera);
 
         Renderer->DoComposition();

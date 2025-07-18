@@ -156,6 +156,7 @@ void RvkSwapchain::CreateSwapchainFramebuffers()
     ColorSampler.Create();
     PositionSampler.Create();
     NormalsSampler.Create();
+    LightsSampler.Create();
 
     // mCompPipeline = comp_pipeline;
 
@@ -176,6 +177,7 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
     ColorSampler.Destroy();
     PositionSampler.Destroy();
     NormalsSampler.Destroy();
+    LightsSampler.Destroy();
 
 
     // CompFramebuffers.Free();

@@ -59,6 +59,12 @@ public:
         mModelMatrix = Mat4f::AsTranslation(mPosition);
     }
 
+    void Scale(const FxVec3f& scale)
+    {
+        mScale *= scale;
+        mModelMatrix = Mat4f::AsScale(mScale);
+    }
+
     void Rotate(const FxVec3f& rotation)
     {
 
@@ -86,6 +92,7 @@ public:
 protected:
     FxVec3f mPosition = FxVec3f::Zero;
     FxVec3f mRotation = FxVec3f::Zero;
+    FxVec3f mScale = FxVec3f::One;
 
 
     FxRef<FxScript> mScript{nullptr};

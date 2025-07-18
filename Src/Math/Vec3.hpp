@@ -37,6 +37,7 @@ public:
     float32 Dot(const FxVec3f &other) const;
 
     static const FxVec3f Zero;
+    static const FxVec3f One;
     static const FxVec3f Up;
 
 #ifdef FX_USE_NEON

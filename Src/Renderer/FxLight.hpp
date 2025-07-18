@@ -5,9 +5,11 @@
 #include <Renderer/FxMesh.hpp>
 #include <Asset/FxMeshGen.hpp>
 
+#include <FxEntity.hpp>
+
 class FxCamera;
 
-class FxLight
+class FxLight : public FxEntity
 {
 public:
     using VertexType = RvkVertex<FxVertexPosition>;
@@ -22,12 +24,9 @@ public:
     void RenderDebugMesh(const FxCamera& camera) const;
 
 public:
-    Mat4f ModelMatrix = Mat4f::Identity;
     FxRef<FxMesh<VertexType>> LightVolume{nullptr};
-
     FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen{nullptr};
 
 private:
     FxRef<FxMesh<>> mDebugMesh{nullptr};
-
 };

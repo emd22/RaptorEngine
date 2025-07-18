@@ -44,6 +44,7 @@ public:
     RvkSampler ColorSampler;
     RvkSampler PositionSampler;
     RvkSampler NormalsSampler;
+    RvkSampler LightsSampler;
 
     // FxSizedArray<RvkFramebuffer> GPassFramebuffers;
     // FxSizedArray<RvkFramebuffer> CompFramebuffers;
