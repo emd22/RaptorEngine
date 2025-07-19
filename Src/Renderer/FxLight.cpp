@@ -36,7 +36,7 @@ void FxLight::Render(const FxCamera& camera) const
 }
 
 
-void FxLight::RenderDebugMesh(const FxCamera& camera) const
+void FxLight::RenderDebugMesh(const FxCamera& camera)
 {
     if (!mDebugMesh) {
         return;

@@ -10,14 +10,41 @@
 
 #include "FxMemory.hpp"
 
+struct FxSpinThreadGuard
+{
+public:
+    FxSpinThreadGuard(std::atomic_flag* busy_flag) noexcept
+    {
+        mFlag = busy_flag;
+
+        // If the busy flag is set currently, wait until it is cleared
+        if (mFlag->test(std::memory_order_acquire)) {
+            mFlag->wait(false, std::memory_order_relaxed);
+        }
+
+        // Mark as busy
+        mFlag->test_and_set();
+    }
+
+    ~FxSpinThreadGuard() noexcept
+    {
+        mFlag->clear(std::memory_order_release);
+        mFlag->notify_one();
+    }
+
+private:
+    std::atomic_flag* mFlag = nullptr;
+};
+
+
 /** The internal reference count for `FxRef`. */
 struct FxRefCount
 {
-    std::atomic_uint32_t Count = 1;
+    using RefCountType = uint32;
 
-    uint32 GetCount()
+    RefCountType GetCount() const
     {
-        return Count.load();
+        return Count;
     }
 
     /** Increments the reference count */
@@ -26,11 +53,12 @@ struct FxRefCount
     }
 
     /** Decrements the reference count */
-    uint32 Dec() {
-        uint32 new_count = Count.load() - 1;
-        Count.store(new_count);
-        return new_count;
+    RefCountType Dec() {
+        return (--Count);
     }
+
+public:
+    RefCountType Count = 1;
 };
 
 template <typename T>
@@ -47,7 +75,6 @@ public:
      */
     FxRef(T* ptr)
     {
-        // mRefCnt = new FxRefCount;
         mRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
         new (mRefCnt) FxRefCount();
 
@@ -62,6 +89,7 @@ public:
     template <typename U> requires std::is_base_of_v<T, U>
     FxRef(const FxRef<U>& other)
     {
+        FxSpinThreadGuard guard(&other.IsBusy);
 
         mRefCnt = other.mRefCnt;
         mPtr = other.mPtr;
@@ -76,8 +104,12 @@ public:
      * Inherits from another FxRef that contains the same type.
      */
     FxRef(const FxRef& other)
-        : mRefCnt(other.mRefCnt), mPtr(other.mPtr)
     {
+        FxSpinThreadGuard guard(&other.IsBusy);
+
+        mRefCnt = other.mRefCnt;
+        mPtr = other.mPtr;
+
         if (mRefCnt) {
             mRefCnt->Inc();
         }
@@ -85,6 +117,8 @@ public:
 
     FxRef(FxRef&& other)
     {
+        // FxThreadSpinGuard guard(&other.IsBusy);
+
         // No need to Inc or Dec the ref count here as we are moving the value.
         mRefCnt = std::move(other.mRefCnt);
         mPtr = std::move(other.mPtr);
@@ -92,6 +126,7 @@ public:
         other.mPtr = nullptr;
         other.mRefCnt = nullptr;
     }
+
 
     ~FxRef()
     {
@@ -112,25 +147,31 @@ public:
 
     T* Get()
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         return mPtr;
     }
 
     /** Retrieves the internal usage count for the reference. */
     uint32 GetRefCount()
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         if (mRefCnt) {
-            return mRefCnt->Count.load();
+            return mRefCnt->Count;
         }
+
         return 0;
     }
-
 
     ///////////////////////////////
     // Operator overloads
     ///////////////////////////////
 
-    FxRef& operator = (const FxRef& other) noexcept
+    FxRef& operator = (const FxRef& other)
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         // If there is already a pointer in this reference, decrement or destroy it
         // This will be an infinite memory printing machine if this is not here
         if (mPtr && mRefCnt) {
@@ -149,6 +190,8 @@ public:
 
     T* operator -> () const noexcept
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         FxAssert(mRefCnt != nullptr && mPtr != nullptr);
 
         return mPtr;
@@ -156,6 +199,8 @@ public:
 
     T& operator * () const noexcept
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         FxAssert((mRefCnt != nullptr && mPtr != nullptr));
 
         return *mPtr;
@@ -163,11 +208,15 @@ public:
 
     bool operator == (nullptr_t np) const noexcept
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         return mPtr == nullptr;
     }
 
     operator bool () const noexcept
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         return mPtr != nullptr;
     }
 
@@ -177,6 +226,8 @@ private:
      */
     void DecRef()
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         // Reference count does not exist, we can assume that the object is corrupt or no longer exists.
         if (!mRefCnt) {
             return;
@@ -187,13 +238,15 @@ private:
             // Free the ptr
             if (mPtr) {
                 FxMemPool::Free<T>(mPtr);
+                mPtr = nullptr;
             }
 
-            // Free the ref count
-            FxMemPool::Free<FxRefCount>(mRefCnt);
+            if (mRefCnt) {
+                // Free the ref count
+                FxMemPool::Free<FxRefCount>(mRefCnt);
+                mRefCnt = nullptr;
 
-            mPtr = nullptr;
-            mRefCnt = nullptr;
+            }
         }
     }
 
@@ -202,6 +255,8 @@ private:
      */
     void IncRef()
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         if (!mRefCnt) {
             return;
         }
@@ -213,8 +268,10 @@ private:
 public:
     /** The usage count for the reference */
     FxRefCount* mRefCnt = nullptr;
-
     T* mPtr = nullptr;
+
+    /** Denotes if the ref is currently in use from some thread */
+    mutable std::atomic_flag IsBusy {false};
 };
 
 /**

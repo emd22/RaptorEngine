@@ -21,7 +21,7 @@ public:
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
 
     void Render(const FxCamera& camera) const;
-    void RenderDebugMesh(const FxCamera& camera) const;
+    void RenderDebugMesh(const FxCamera& camera);
 
 public:
     FxRef<FxMesh<VertexType>> LightVolume{nullptr};

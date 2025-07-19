@@ -29,8 +29,9 @@ public:
 
     void SubmitItemToLoad(FxAssetQueueItem &item)
     {
-        while (IsBusy.test_and_set())
+        while (IsBusy.test_and_set()) {
             IsBusy.wait(true, std::memory_order_relaxed);
+        }
 
         Item = std::move(item);
         ItemReady.SignalDataWritten();

@@ -138,14 +138,6 @@ void FxDeferredRenderer::CreateGPassPipeline()
                             | VK_COLOR_COMPONENT_A_BIT,
             .blendEnable = VK_FALSE,
         },
-        // Positions
-        VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-                            | VK_COLOR_COMPONENT_G_BIT
-                            | VK_COLOR_COMPONENT_B_BIT
-                            | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = VK_FALSE,
-        },
         // Normals
         VkPipelineColorBlendAttachmentState {
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
@@ -158,17 +150,6 @@ void FxDeferredRenderer::CreateGPassPipeline()
 
     VkAttachmentDescription attachments[] = {
         // Albedo output
-        VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        },
-        // Positions output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -195,11 +176,11 @@ void FxDeferredRenderer::CreateGPassPipeline()
             .format = VK_FORMAT_D16_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
         }
     };
 
@@ -558,19 +539,11 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
         extent,
         VK_FORMAT_D16_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_DEPTH_BIT
     );
 
     ColorAttachment.Create(
-        extent,
-        VK_FORMAT_B8G8R8A8_UNORM,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT
-    );
-
-    PositionsAttachment.Create(
         extent,
         VK_FORMAT_B8G8R8A8_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
@@ -588,7 +561,6 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
 
     FxSizedArray image_views = {
         ColorAttachment.View,
-        PositionsAttachment.View,
         NormalsAttachment.View,
 
         DepthAttachment.View
@@ -611,10 +583,6 @@ void FxDeferredGPass::Begin()
         // Albedo
         VkClearValue {
             .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
-        },
-        // Positions
-        VkClearValue {
-            .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
         },
         // Normals
         VkClearValue {
@@ -676,7 +644,6 @@ void FxDeferredGPass::Destroy()
     }
 
     DepthAttachment.Destroy();
-    PositionsAttachment.Destroy();
     ColorAttachment.Destroy();
 
     DescriptorPool.Destroy();
@@ -789,13 +756,13 @@ void FxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 
     FxStackArray<VkWriteDescriptorSet, 3> write_infos;
 
-    // Positions image descriptor
+    // Depth image descriptor
     {
         const int binding_index = 1;
 
         VkDescriptorImageInfo positions_image_info {
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .imageView = gpass.PositionsAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            .imageView = gpass.DepthAttachment.View,
             .sampler = Renderer->Swapchain.PositionSampler.Sampler
         };
 
@@ -923,13 +890,13 @@ void FxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
     FxStackArray<VkWriteDescriptorSet, 4> write_infos;
 
-    // Positions image descriptor
+    // Depth image descriptor
     {
         const int binding_index = 1;
 
         VkDescriptorImageInfo positions_image_info {
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .imageView = gpass.PositionsAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            .imageView = gpass.DepthAttachment.View,
             .sampler = Renderer->Swapchain.PositionSampler.Sampler
         };
 

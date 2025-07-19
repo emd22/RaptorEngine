@@ -14,7 +14,6 @@ layout(location = 2) in vec2 a_UV;
 
 layout(location = 0) out vec3 v_Normal;
 layout(location = 1) out vec2 v_UV;
-layout(location = 2) out vec3 v_Position;
 
 layout(push_constant) uniform PushConstants {
     mat4 MvpMatrix;
@@ -26,9 +25,6 @@ void main() {
 
     gl_Position = a_PushConsts.MvpMatrix * position4;
 
-    vec3 local_position = vec3(a_PushConsts.ModelMatrix * position4);
-
     v_Normal = a_Normal;
     v_UV = a_UV;
-    v_Position = local_position;
 }
