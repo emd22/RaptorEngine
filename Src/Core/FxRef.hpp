@@ -18,12 +18,13 @@ public:
         mFlag = busy_flag;
 
         // If the busy flag is set currently, wait until it is cleared
-        if (mFlag->test(std::memory_order_acquire)) {
-            mFlag->wait(false, std::memory_order_relaxed);
+        if (mFlag->test()) {
+            mFlag->wait(true);
         }
 
         // Mark as busy
         mFlag->test_and_set();
+        mFlag->notify_one();
     }
 
     ~FxSpinThreadGuard() noexcept
@@ -75,6 +76,8 @@ public:
      */
     FxRef(T* ptr)
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         mRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
         new (mRefCnt) FxRefCount();
 
@@ -117,7 +120,8 @@ public:
 
     FxRef(FxRef&& other)
     {
-        // FxThreadSpinGuard guard(&other.IsBusy);
+        FxSpinThreadGuard other_guard(&other.IsBusy);
+        FxSpinThreadGuard guard(&IsBusy);
 
         // No need to Inc or Dec the ref count here as we are moving the value.
         mRefCnt = std::move(other.mRefCnt);
@@ -130,6 +134,8 @@ public:
 
     ~FxRef()
     {
+        FxSpinThreadGuard guard(&IsBusy);
+
         DecRef();
     }
 
@@ -171,6 +177,7 @@ public:
     FxRef& operator = (const FxRef& other)
     {
         FxSpinThreadGuard guard(&IsBusy);
+        FxSpinThreadGuard other_guard(&other.IsBusy);
 
         // If there is already a pointer in this reference, decrement or destroy it
         // This will be an infinite memory printing machine if this is not here
@@ -226,7 +233,7 @@ private:
      */
     void DecRef()
     {
-        FxSpinThreadGuard guard(&IsBusy);
+        // FxSpinThreadGuard guard(&IsBusy);
 
         // Reference count does not exist, we can assume that the object is corrupt or no longer exists.
         if (!mRefCnt) {
@@ -245,7 +252,6 @@ private:
                 // Free the ref count
                 FxMemPool::Free<FxRefCount>(mRefCnt);
                 mRefCnt = nullptr;
-
             }
         }
     }
@@ -255,7 +261,7 @@ private:
      */
     void IncRef()
     {
-        FxSpinThreadGuard guard(&IsBusy);
+        // FxSpinThreadGuard guard(&IsBusy);
 
         if (!mRefCnt) {
             return;

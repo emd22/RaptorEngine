@@ -177,7 +177,7 @@ void FxDeferredRenderer::CreateGPassPipeline()
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
@@ -608,7 +608,7 @@ void FxDeferredGPass::Submit()
     RvkFrameData *frame = Renderer->GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
     };
 
     const VkSubmitInfo submit_info = {
@@ -1003,7 +1003,7 @@ void FxDeferredCompPass::DoCompPass()
     VkClearValue clear_values[] = {
         // Output colour
         VkClearValue {
-            .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
+            .color = { { 1.0f, 1.0f, 0.7f, 1.0f } }
         },
     };
 
