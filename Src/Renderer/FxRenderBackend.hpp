@@ -39,6 +39,8 @@ struct FxGpuUploadContext
     RvkFence UploadFence;
 };
 
+class FxCamera;
+
 class FxRenderBackend {
     const uint32 DeletionFrameSpacing = 3;
 
@@ -55,7 +57,7 @@ public:
 
     FrameResult BeginFrame(FxDeferredRenderer& renderer);
     void BeginLighting();
-    void DoComposition();
+    void DoComposition(FxCamera& render_cam);
 
     void SelectWindow(const FxRef<FxWindow>& window)
     {

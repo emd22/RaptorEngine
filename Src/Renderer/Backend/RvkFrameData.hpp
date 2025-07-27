@@ -11,7 +11,7 @@
 
 struct alignas(16) RvkUniformBufferObject
 {
-    Mat4f MvpMatrix;
+    FxMat4f MvpMatrix;
 };
 
 

@@ -56,13 +56,13 @@ public:
     void Translate(const FxVec3f& offset)
     {
         mPosition += offset;
-        mModelMatrix = mModelMatrix * Mat4f::AsTranslation(mPosition);
+        mModelMatrix = mModelMatrix * FxMat4f::AsTranslation(mPosition);
     }
 
     void Scale(const FxVec3f& scale)
     {
         mScale *= scale;
-        mModelMatrix = mModelMatrix * Mat4f::AsScale(mScale);
+        mModelMatrix = mModelMatrix * FxMat4f::AsScale(mScale);
     }
 
     void Rotate(const FxVec3f& rotation)
@@ -88,7 +88,7 @@ public:
         return mPosition;
     }
 
-    Mat4f mModelMatrix = Mat4f::Identity;
+    FxMat4f mModelMatrix = FxMat4f::Identity;
 protected:
     FxVec3f mPosition = FxVec3f::Zero;
     FxVec3f mRotation = FxVec3f::Zero;

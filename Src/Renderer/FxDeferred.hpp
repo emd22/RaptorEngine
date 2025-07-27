@@ -84,6 +84,8 @@ private:
 };
 
 
+class FxCamera;
+
 ///////////////////////////////
 // Composition Pass (Per FIF)
 ///////////////////////////////
@@ -95,7 +97,7 @@ public:
     void Destroy();
 
     void Begin();
-    void DoCompPass();
+    void DoCompPass(FxCamera& render_cam);
 
     void BuildDescriptorSets(uint16 frame_index);
 

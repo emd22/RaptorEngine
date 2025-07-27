@@ -245,7 +245,7 @@ int main()
         light.Render(camera);
         light2.Render(camera);
 
-        Renderer->DoComposition();
+        Renderer->DoComposition(camera);
 
         LastTick = CurrentTick;
     }

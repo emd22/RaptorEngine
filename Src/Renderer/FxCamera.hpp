@@ -13,9 +13,13 @@ public:
 public:
     FxVec3f Position = FxVec3f(0.0f);
 
-    Mat4f ViewMatrix = Mat4f::Identity;
-    Mat4f ProjectionMatrix = Mat4f::Identity;
-    Mat4f VPMatrix = Mat4f::Identity;
+    FxMat4f ViewMatrix = FxMat4f::Identity;
+    FxMat4f ProjectionMatrix = FxMat4f::Identity;
+    FxMat4f VPMatrix = FxMat4f::Identity;
+
+    FxMat4f InvViewMatrix = FxMat4f::Identity;
+    FxMat4f InvProjectionMatrix = FxMat4f::Identity;
+
 };
 
 class FxPerspectiveCamera : public FxCamera

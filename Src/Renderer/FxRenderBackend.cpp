@@ -580,6 +580,9 @@ void FxRenderBackend::BeginLighting()
     RvkFrameData* frame = GetFrame();
 
     CurrentGPass->End();
+
+    CurrentGPass->DepthAttachment.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
+
     frame->CommandBuffer.End();
 
     frame->LightCommandBuffer.Reset();
@@ -609,8 +612,9 @@ void FxRenderBackend::BeginLighting()
 
 }
 
+#include <Renderer/FxCamera.hpp>
 
-void FxRenderBackend::DoComposition()
+void FxRenderBackend::DoComposition(FxCamera& render_cam)
 {
     RvkFrameData* frame = GetFrame();
 
@@ -640,7 +644,8 @@ void FxRenderBackend::DoComposition()
 
     vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
-    CurrentCompPass->DoCompPass();
+
+    CurrentCompPass->DoCompPass(render_cam);
 
     CurrentGPass->Submit();
 

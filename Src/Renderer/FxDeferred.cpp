@@ -124,7 +124,7 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
         DsLayoutGPassMaterial,
     };
 
-    return GPassPipeline.CreateLayout(sizeof(FxDrawPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return GPassPipeline.CreateLayout(sizeof(FxDrawPushConstants), 0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 void FxDeferredRenderer::CreateGPassPipeline()
@@ -286,7 +286,7 @@ VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
         DsLayoutLightingFrag,
     };
 
-    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), 0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 
@@ -428,7 +428,7 @@ VkPipelineLayout FxDeferredRenderer::CreateCompPipelineLayout()
         DsLayoutCompFrag
     };
 
-    return CompPipeline.CreateLayout(0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return CompPipeline.CreateLayout(0, sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 
@@ -657,8 +657,6 @@ void FxDeferredGPass::Destroy()
 }
 
 
-
-
 /////////////////////////////////////
 // FxDeferredLightingPass Functions
 /////////////////////////////////////
@@ -761,7 +759,7 @@ void FxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         const int binding_index = 1;
 
         VkDescriptorImageInfo positions_image_info {
-            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = gpass.DepthAttachment.View,
             .sampler = Renderer->Swapchain.PositionSampler.Sampler
         };
@@ -895,7 +893,7 @@ void FxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
         const int binding_index = 1;
 
         VkDescriptorImageInfo positions_image_info {
-            .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = gpass.DepthAttachment.View,
             .sampler = Renderer->Swapchain.PositionSampler.Sampler
         };
@@ -998,8 +996,16 @@ void FxDeferredCompPass::Begin()
     mCurrentFrame->CompCommandBuffer.Record();
 }
 
-void FxDeferredCompPass::DoCompPass()
+#include <Renderer/FxCamera.hpp>
+
+void FxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 {
+    FxCompositionPushConstants push_constants{};
+    memcpy(push_constants.ViewInverse, render_cam.InvViewMatrix.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.ProjInverse, render_cam.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+
+    vkCmdPushConstants(mCurrentFrame->CompCommandBuffer.CommandBuffer, mCompPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants), &push_constants);
+
     VkClearValue clear_values[] = {
         // Output colour
         VkClearValue {

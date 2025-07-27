@@ -59,6 +59,14 @@ struct alignas(16) FxDrawPushConstants
 struct alignas(16) FxLightPushConstants
 {
     float32 MVPMatrix[16];
+    float32 ModelMatrix[16];
+    float32 LightPos[3];
+};
+
+struct alignas(16) FxCompositionPushConstants
+{
+    float32 ViewInverse[16];
+    float32 ProjInverse[16];
 };
 
 
@@ -81,7 +89,7 @@ public:
 
     // VkPipelineLayout CreateCompLayout();
 
-    VkPipelineLayout CreateLayout(uint32 push_consts_size, const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
+    VkPipelineLayout CreateLayout(uint32 vert_push_consts_size, uint32 frag_push_consts_size, const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
 
     void Destroy();
 

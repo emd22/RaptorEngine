@@ -48,9 +48,13 @@ void FxPerspectiveCamera::Update()
 
     ViewMatrix.LookAt(Position, target, FxVec3f::Up);
 
-    Mat4f PM = ProjectionMatrix;
+    FxMat4f PM = ProjectionMatrix;
 
     VPMatrix = ViewMatrix * PM;
+
+    InvViewMatrix = ViewMatrix.Inverse();
+    InvProjectionMatrix = PM.Inverse();
+
     // VPMatrix =  ProjectionMatrix * ViewMatrix;
 
     mRequiresUpdate = false;
