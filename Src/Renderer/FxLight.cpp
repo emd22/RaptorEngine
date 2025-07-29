@@ -31,7 +31,7 @@ void FxLight::Render(const FxCamera& camera) const
     {
         FxLightPushConstants push_constants{};
         memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
-        memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
         memcpy(push_constants.LightPos, mPosition.mData, sizeof(float32) * 3);
         memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 3);
         push_constants.LightRadius = mScale.X;

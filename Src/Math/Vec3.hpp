@@ -40,6 +40,8 @@ public:
     static const FxVec3f One;
     static const FxVec3f Up;
 
+    void Print() const;
+
 #ifdef FX_USE_NEON
     explicit FxVec3f(float32x4_t intrin)
         : mIntrin(intrin)

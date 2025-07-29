@@ -184,8 +184,8 @@ int main()
     FxLight light2;
     light2.SetLightVolume(generated_sphere, false);
 
-    light.Translate(FxVec3f(0, 0, -0.75));
-    light.Scale(FxVec3f(8, 8, 8));
+    light.Translate(FxVec3f(4.08, -3.39, 2.8));
+    light.Scale(FxVec3f(20, 20, 20));
 
     light2.Translate(FxVec3f(1, 0, -0.5));
     light2.Scale(FxVec3f(20, 20, 20));
@@ -218,6 +218,12 @@ int main()
             camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
+            light.mModelMatrix = FxMat4f::AsScale(FxVec3f(8.0, 8.0, 8.0)) * camera.InvViewMatrix;
+            light.mPosition = camera.Position;
+            light.mPosition.Print();
+        }
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
             Renderer->DeferredRenderer->RebuildLightingPipeline();
             // FxMemPool::GetGlobalPool().PrintAllocations();
@@ -237,7 +243,7 @@ int main()
         Renderer->BeginLighting();
 
         light.Render(camera);
-        light2.Render(camera);
+        // light2.Render(camera);
 
         Renderer->DoComposition(camera);
 

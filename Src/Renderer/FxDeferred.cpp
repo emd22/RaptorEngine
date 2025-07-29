@@ -344,7 +344,7 @@ void FxDeferredRenderer::CreateLightingPipeline()
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
         &vertex_info,
-        VK_CULL_MODE_FRONT_BIT
+        VK_CULL_MODE_BACK_BIT
     );
 }
 
@@ -594,7 +594,7 @@ void FxDeferredGPass::Begin()
     VkClearValue clear_values[] = {
         // Albedo
         VkClearValue {
-            .color = { { 0.0f, 0.0f, 0.0f, 1.0f } }
+            .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
         },
         // Normals
         VkClearValue {
@@ -1021,7 +1021,7 @@ void FxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     VkClearValue clear_values[] = {
         // Output colour
         VkClearValue {
-            .color = { { 0.0f, 0.0f, 0.0f, 1.0f } }
+            .color = { { 1.0f, 1.0f, 0.7f, 1.0f } }
         },
     };
 
