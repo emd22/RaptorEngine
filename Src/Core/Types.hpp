@@ -57,3 +57,32 @@ private:
     bool mHasValue = false;
     std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
 };
+
+#include <atomic>
+
+struct FxSpinThreadGuard
+{
+public:
+    FxSpinThreadGuard(std::atomic_flag* busy_flag) noexcept
+    {
+        mFlag = busy_flag;
+
+        // If the busy flag is set currently, wait until it is cleared
+        if (mFlag->test()) {
+            mFlag->wait(true);
+        }
+
+        // Mark as busy
+        mFlag->test_and_set();
+        mFlag->notify_one();
+    }
+
+    ~FxSpinThreadGuard() noexcept
+    {
+        mFlag->clear(std::memory_order_release);
+        mFlag->notify_one();
+    }
+
+private:
+    std::atomic_flag* mFlag = nullptr;
+};

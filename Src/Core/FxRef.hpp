@@ -10,33 +10,6 @@
 
 #include "FxMemory.hpp"
 
-struct FxSpinThreadGuard
-{
-public:
-    FxSpinThreadGuard(std::atomic_flag* busy_flag) noexcept
-    {
-        mFlag = busy_flag;
-
-        // If the busy flag is set currently, wait until it is cleared
-        if (mFlag->test()) {
-            mFlag->wait(true);
-        }
-
-        // Mark as busy
-        mFlag->test_and_set();
-        mFlag->notify_one();
-    }
-
-    ~FxSpinThreadGuard() noexcept
-    {
-        mFlag->clear(std::memory_order_release);
-        mFlag->notify_one();
-    }
-
-private:
-    std::atomic_flag* mFlag = nullptr;
-};
-
 
 /** The internal reference count for `FxRef`. */
 struct FxRefCount

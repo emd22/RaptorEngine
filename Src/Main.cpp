@@ -84,7 +84,7 @@ public:
 
 int main()
 {
-    FxMemPool::GetGlobalPool().Create(100000);
+    FxMemPool::GetGlobalPool().Create(40, FxUnitMebibyte);
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
