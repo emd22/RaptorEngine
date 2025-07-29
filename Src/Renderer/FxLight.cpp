@@ -28,12 +28,24 @@ void FxLight::Render(const FxCamera& camera) const
 
     FxMat4f MVP = mModelMatrix * camera.VPMatrix;
 
-    FxLightPushConstants push_constants{};
-    memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.LightPos, mPosition.mData, sizeof(float32) * 3);
+    {
+        FxLightPushConstants push_constants{};
+        memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.LightPos, mPosition.mData, sizeof(float32) * 3);
+        memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 3);
+        push_constants.LightRadius = mScale.X;
 
-    vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->LightingPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->LightingPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
+    }
+    {
+        FxCompositionPushConstants push_constants{};
+        memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->LightingPipeline.Layout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(FxLightPushConstants), sizeof(push_constants), &push_constants);
+    }
+
     LightVolume->Render(frame->LightCommandBuffer, deferred->LightingPipeline);
 }
 

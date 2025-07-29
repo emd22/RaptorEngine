@@ -54,7 +54,8 @@ void RvkGraphicsPipeline::Create(
     VkPipelineLayout layout,
     const FxSlice<VkAttachmentDescription>& attachments,
     const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-    FxVertexInfo* vertex_info
+    FxVertexInfo* vertex_info,
+    VkCullModeFlags cull_mode
 )
 {
     mDevice = Renderer->GetDevice();
@@ -155,7 +156,7 @@ void RvkGraphicsPipeline::Create(
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = VK_POLYGON_MODE_FILL,
         .lineWidth = 1.0f,
-        .cullMode = VK_CULL_MODE_NONE,
+        .cullMode = cull_mode,
         .frontFace = VK_FRONT_FACE_CLOCKWISE,
         .depthBiasEnable = VK_FALSE,
     };
@@ -433,7 +434,7 @@ VkPipelineLayout RvkGraphicsPipeline::CreateLayout(
     if (frag_push_consts_size) {
         VkPushConstantRange& range = pc_ranges[pc_ranges_count];
         range.size = frag_push_consts_size;
-        range.offset = 0;
+        range.offset = vert_push_consts_size ? vert_push_consts_size : 0;
         range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         ++pc_ranges_count;
     }

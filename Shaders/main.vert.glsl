@@ -21,9 +21,7 @@ layout(push_constant) uniform PushConstants {
 } a_PushConsts;
 
 void main() {
-    vec4 position4 = vec4(a_Position, 1.0);
-
-    gl_Position = a_PushConsts.MvpMatrix * position4;
+    gl_Position = a_PushConsts.MvpMatrix * vec4(a_Position, 1.0);
 
     v_Normal = a_Normal;
     v_UV = a_UV;

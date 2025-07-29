@@ -137,6 +137,8 @@ public:
     FX_FORCE_INLINE FxDeferredCompPass* GetCurrentCompPass();
     FX_FORCE_INLINE FxDeferredLightingPass* GetCurrentLightingPass();
 
+    void RebuildLightingPipeline();
+
 private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
@@ -144,7 +146,9 @@ private:
     FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
 
     void CreateLightingPipeline();
+    void CreateLightingDSLayout();
     void DestroyLightingPipeline();
+
 
     FX_FORCE_INLINE VkPipelineLayout CreateLightingPipelineLayout();
 

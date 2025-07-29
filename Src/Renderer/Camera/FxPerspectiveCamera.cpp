@@ -53,7 +53,7 @@ void FxPerspectiveCamera::Update()
     VPMatrix = ViewMatrix * PM;
 
     InvViewMatrix = ViewMatrix.Inverse();
-    InvProjectionMatrix = PM.Inverse();
+    InvProjectionMatrix = ProjectionMatrix.Inverse();
 
     // VPMatrix =  ProjectionMatrix * ViewMatrix;
 

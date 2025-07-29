@@ -166,7 +166,7 @@ int main()
 
     helmet_object.Translate(FxVec3f(0, 0, 0));
 
-    auto generated_sphere = FxMeshGen::MakeIcoSphere(1);
+    auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
@@ -184,11 +184,11 @@ int main()
     FxLight light2;
     light2.SetLightVolume(generated_sphere, false);
 
-    light.Translate(FxVec3f(-1, 0, 0));
-    light.Scale(FxVec3f(2, 2, 2));
+    light.Translate(FxVec3f(0, 0, -0.75));
+    light.Scale(FxVec3f(8, 8, 8));
 
-    light2.Translate(FxVec3f(1, 0, 0));
-    light2.Scale(FxVec3f(3, 3, 3));
+    light2.Translate(FxVec3f(1, 0, -0.5));
+    light2.Scale(FxVec3f(20, 20, 20));
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -218,13 +218,8 @@ int main()
             camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_R)) {
-            // camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
-        }
-
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
-
-            helmet_object.mModelMatrix.Print();
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
+            Renderer->DeferredRenderer->RebuildLightingPipeline();
             // FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
@@ -238,7 +233,6 @@ int main()
 
         helmet_object.Render(camera);
         // light.RenderDebugMesh(camera);
-
 
         Renderer->BeginLighting();
 

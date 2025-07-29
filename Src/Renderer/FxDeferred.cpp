@@ -232,61 +232,62 @@ FxDeferredLightingPass* FxDeferredRenderer::GetCurrentLightingPass()
     return &LightingPasses[Renderer->GetFrameNumber()];
 }
 
-VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
+void FxDeferredRenderer::CreateLightingDSLayout()
 {
     RvkGpuDevice* device = Renderer->GetDevice();
 
-
     // Fragment DS
-    {
-        VkDescriptorSetLayoutBinding positions_layout_binding {
-            .binding = 1,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
 
-        VkDescriptorSetLayoutBinding albedo_layout_binding {
-            .binding = 2,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
+    VkDescriptorSetLayoutBinding positions_layout_binding {
+        .binding = 1,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
 
-        VkDescriptorSetLayoutBinding normals_layout_binding {
-            .binding = 3,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
+    VkDescriptorSetLayoutBinding albedo_layout_binding {
+        .binding = 2,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
 
-        VkDescriptorSetLayoutBinding bindings[] = {
-            positions_layout_binding,
-            albedo_layout_binding,
-            normals_layout_binding
-        };
+    VkDescriptorSetLayoutBinding normals_layout_binding {
+        .binding = 3,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
 
-        VkDescriptorSetLayoutCreateInfo lighting_layout_info {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = FxSizeofArray(bindings),
-            .pBindings = bindings,
-        };
+    VkDescriptorSetLayoutBinding bindings[] = {
+        positions_layout_binding,
+        albedo_layout_binding,
+        normals_layout_binding
+    };
 
-        VkResult status;
-        status = vkCreateDescriptorSetLayout(device->Device, &lighting_layout_info, nullptr, &DsLayoutLightingFrag);
-        if (status != VK_SUCCESS) {
-            FxModulePanic("Failed to create pipeline descriptor set layout", status);
-        }
+    VkDescriptorSetLayoutCreateInfo lighting_layout_info {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = FxSizeofArray(bindings),
+        .pBindings = bindings,
+    };
+
+    VkResult status;
+    status = vkCreateDescriptorSetLayout(device->Device, &lighting_layout_info, nullptr, &DsLayoutLightingFrag);
+    if (status != VK_SUCCESS) {
+        FxModulePanic("Failed to create pipeline descriptor set layout", status);
     }
+}
 
+VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
+{
     VkDescriptorSetLayout layouts[] = {
         DsLayoutLightingFrag,
     };
 
-    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), 0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 
@@ -330,6 +331,9 @@ void FxDeferredRenderer::CreateLightingPipeline()
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
 
+    if (DsLayoutLightingFrag == nullptr) {
+        CreateLightingDSLayout();
+    }
     VkPipelineLayout layout = CreateLightingPipelineLayout();
 
     FxVertexInfo vertex_info = FxMakeLightVertexInfo();
@@ -339,8 +343,16 @@ void FxDeferredRenderer::CreateLightingPipeline()
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-        &vertex_info
+        &vertex_info,
+        VK_CULL_MODE_FRONT_BIT
     );
+}
+
+void FxDeferredRenderer::RebuildLightingPipeline()
+{
+    RvkGraphicsPipeline old_pipeline = LightingPipeline;
+    CreateLightingPipeline();
+    old_pipeline.Destroy();
 }
 
 void FxDeferredRenderer::DestroyLightingPipeline()
@@ -582,7 +594,7 @@ void FxDeferredGPass::Begin()
     VkClearValue clear_values[] = {
         // Albedo
         VkClearValue {
-            .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
+            .color = { { 0.0f, 0.0f, 0.0f, 1.0f } }
         },
         // Normals
         VkClearValue {
@@ -1009,7 +1021,7 @@ void FxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     VkClearValue clear_values[] = {
         // Output colour
         VkClearValue {
-            .color = { { 1.0f, 1.0f, 0.7f, 1.0f } }
+            .color = { { 0.0f, 0.0f, 0.0f, 1.0f } }
         },
     };
 

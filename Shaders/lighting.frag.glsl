@@ -4,72 +4,61 @@ layout(binding = 1) uniform sampler2D s_Depth;
 layout(binding = 2) uniform sampler2D s_Albedo;
 layout(binding = 3) uniform sampler2D s_Normals;
 
+layout(location = 0) in vec3 a_LightPos;
+layout(location = 1) in float a_LightRadius;
+layout(location = 2) in vec3 a_PlayerPos;
+
 layout(location = 0) out vec4 v_Color;
 
-// vec3 WorldPosFromDepth(vec2 uv, float depth)
-// {
-// vec3 ndc = vec3(uv, depth) * 2.0 - 1.0;
-// vec4 world = a_InvVP * vec4(ndc, 1.0);
-// vec3 world_position = world.xyz / world.w;
-// return world_position;
+layout(push_constant) uniform PushConstants {
+    layout(offset = 160) mat4 InvViewMatrix;
+    mat4 InvProjMatrix;
+} a_PushConsts;
 
-// // Light Pixel shader
-// vec3 view_ray = vec3(a_ObjPos.xy / a_ObjPos.z, 1.0f);
+vec3 WorldPosFromDepth(vec2 uv, float depth) {
+    vec4 ndc = vec4(uv * 2.0 - 1.0, depth, 1.0);
 
-// // Sample the depth and convert to linear view space Z (assume it gets sampled as
-// // a floating point value of the range [0,1])
-// float lin_depth = a_ProjB / (depth - a_ProjA);
-// vec3 positionVS = view_ray * lin_depth;
+    vec4 clip = a_PushConsts.InvProjMatrix * ndc;
+    vec4 view = a_PushConsts.InvViewMatrix * (clip / clip.w);
+    vec3 result = view.xyz;
 
-// return positionVS;
-// }
-//
-
-// vec4 CalcLightInternal(vec3 light_direction, vec3 normal)
-// {
-//     vec4 AmbientColor = vec4(0.8, 0.8, 0.8, 1.0f) * 0.025;
-//     float DiffuseFactor = dot(Normal, -LightDirection);
-
-//     vec4 DiffuseColor = vec4(0, 0, 0, 0);
-//     vec4 SpecularColor = vec4(0, 0, 0, 0);
-
-//     if (DiffuseFactor > 0) {
-//         DiffuseColor = vec4(vec3(0.9, 0.9, 0.8) * 0.9 * DiffuseIntensity * DiffuseFactor, 1.0f);
-
-//         vec3 VertexToEye = normalize(gEyeWorldPos - WorldPos0);
-//         vec3 LightReflect = normalize(reflect(light_direction, Normal));
-//         float SpecularFactor = dot(VertexToEye, LightReflect);
-
-//         if (SpecularFactor > 0) {
-//             SpecularFactor = pow(SpecularFactor, gSpecularPower);
-//             SpecularColor = vec4(Light.Color * gMatSpecularIntensity * SpecularFactor, 1.0f);
-//         }
-//     }
-
-//     return (AmbientColor + DiffuseColor + SpecularColor);
-// }
-
-// vec4 CalcPointLight(int Index, vec3 Normal)
-// {
-//     vec3 LightDirection = WorldPos0 - gPointLights[Index].Position;
-//     float Distance = length(LightDirection);
-//     LightDirection = normalize(LightDirection);
-
-//     vec4 Color = CalcLightInternal(vec3(5, 5, 5), Normal);
-//     float Attenuation = 0.08 +
-//             gPointLights[Index].Atten.Linear * Distance +
-//             gPointLights[Index].Atten.Exp * Distance * Distance;
-
-//     return Color / Attenuation;
-// }
+    return result;
+}
 
 void main()
 {
+    vec2 screen_uv = gl_FragCoord.xy / vec2(1024, 720);
 
-    // v_Color = vec4(1.0, 1.0, 1.0, 0.25);
-    v_Color = vec4(1, 1, 1, 0.6);
+    // v_Color = vec4(screen_uv, 1.0, 1.0f);
+    // return;
     //
-    // v_Color = vec4(a_Position, 1.0);
+    float depth = texture(s_Depth, screen_uv).r;
+    vec3 albedo = texture(s_Albedo, screen_uv).rgb;
+    vec3 normal = texture(s_Normals, screen_uv).rgb;
 
-    // v_Color = vec4(WorldPosFromDepth(a_UV, depth), 1.0f);
+    // depth = 1.0 - depth;
+    vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
+    // vec3 world_pos = vec3(depth);
+
+    vec3 to_light = a_LightPos - world_pos;
+    float distance = length(to_light);
+
+    vec3 L = normalize(to_light);
+    vec3 V = normalize(a_PlayerPos - world_pos);
+    vec3 H = normalize(L + V);
+
+    float light_diff = max(dot(normal, L), 0.0);
+    float light_spec = pow(max(dot(normal, H), 0.0), 72);
+
+    float attenuation = 1.0 / (1.0 + 0 * distance + 1 * distance * distance);
+
+    vec3 light_color = vec3(1.0, 0.0, 1.0);
+
+    vec3 diffuse = albedo * light_diff * light_color;
+    vec3 specular = 3.0 * light_spec * vec3(1, 1, 1);
+
+    vec3 result = attenuation * (diffuse + specular);
+    // vec3 result = vec3(screen_uv, 1);
+
+    v_Color = vec4(result, 0.8);
 }
