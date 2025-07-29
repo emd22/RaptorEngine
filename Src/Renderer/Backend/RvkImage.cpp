@@ -34,6 +34,10 @@ void RvkImage::Create(
     Format = format;
     mDevice = Renderer->GetDevice();
 
+    if (RvkUtil::IsFormatDepth(format)) {
+        mIsDepthTexture = true;
+    }
+
     // Create the vulkan image
     VkImageCreateInfo image_info{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -100,8 +104,10 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image = Image,
+        .srcAccessMask = (mIsDepthTexture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
         .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = (mIsDepthTexture) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,
@@ -124,6 +130,11 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
         src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+
+    if (mIsDepthTexture) {
+        src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
 

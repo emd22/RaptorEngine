@@ -18,7 +18,7 @@ public:
 
     private:
         friend class FxMPLinkedList;
-        ElementType& InsertAfterNode(Node* other)
+        inline ElementType& InsertAfterNode(Node* other)
         {
             Prev = other;
             Next = other->Next;
@@ -31,7 +31,7 @@ public:
             return Data;
         }
 
-        ElementType& InsertBeforeNode(Node* other)
+        inline ElementType& InsertBeforeNode(Node* other)
         {
             Prev = other->Prev;
             Next = other;
@@ -102,6 +102,7 @@ public:
         if (node == Head) {
             Head = node->Next;
         }
+
         // If the current node is the tail, set the tail to be the node behind the current one.
         if (node == Tail) {
             Tail = node->Prev;
@@ -120,7 +121,7 @@ public:
     }
 
     /**
-     * Inserts a value at the end of a list.
+     * @brief Inserts a value at the end of a list.
      */
     Node* InsertLast(const ElementType& element)
     {

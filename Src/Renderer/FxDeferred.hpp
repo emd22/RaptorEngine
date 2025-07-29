@@ -54,6 +54,31 @@ private:
 };
 
 
+class FxDeferredLightVolumePass
+{
+public:
+    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
+    void Destroy();
+
+    void Begin();
+    void End();
+    void Submit();
+
+    void BuildDescriptorSets(uint16 frame_index);
+
+public:
+    RvkImage ColorAttachment;
+
+    RvkFramebuffer Framebuffer;
+
+    RvkDescriptorPool DescriptorPool;
+    RvkDescriptorSet DescriptorSet;
+
+private:
+    RvkGraphicsPipeline* mLightingPipeline = nullptr;
+    FxDeferredRenderer* mRendererInst = nullptr;
+};
+
 ///////////////////////////////
 // Lighting Pass (Per FIF)
 ///////////////////////////////
@@ -84,6 +109,8 @@ private:
 };
 
 
+class FxCamera;
+
 ///////////////////////////////
 // Composition Pass (Per FIF)
 ///////////////////////////////
@@ -95,7 +122,7 @@ public:
     void Destroy();
 
     void Begin();
-    void DoCompPass();
+    void DoCompPass(FxCamera& render_cam);
 
     void BuildDescriptorSets(uint16 frame_index);
 
@@ -135,17 +162,28 @@ public:
     FX_FORCE_INLINE FxDeferredCompPass* GetCurrentCompPass();
     FX_FORCE_INLINE FxDeferredLightingPass* GetCurrentLightingPass();
 
+    void RebuildLightingPipeline();
+
 private:
+    // Geometry
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
     FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
 
+    // Lighting
+    void CreateLightVolumePipeline();
     void CreateLightingPipeline();
+
+    void CreateLightingDSLayout();
+
+    void DestroyLightVolumePipeline();
     void DestroyLightingPipeline();
 
     FX_FORCE_INLINE VkPipelineLayout CreateLightingPipelineLayout();
+    FX_FORCE_INLINE VkPipelineLayout CreateLightPassPipelineLayout();
 
+    // Composition
     void CreateCompPipeline();
     void DestroyCompPipeline();
 
@@ -167,6 +205,9 @@ public:
     //////////////////////
     // Lighting Pass
     //////////////////////
+
+    RvkGraphicsPipeline LightVolumesPipeline;
+    FxSizedArray<FxDeferredLightVolumePass> LightVolumePasses;
 
     VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
     RvkGraphicsPipeline LightingPipeline;

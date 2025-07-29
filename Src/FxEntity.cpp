@@ -42,18 +42,18 @@ void FxSceneObject::Render(const FxCamera& camera)
         mMaterial->mDescriptorSet.Set
     };
 
-    Mat4f VP = camera.VPMatrix;
-    Mat4f MVP = mModelMatrix * VP;
+    FxMat4f VP = camera.VPMatrix;
+    FxMat4f MVP = mModelMatrix * VP;
 
-    memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(Mat4f));
+    memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
 
     frame->SubmitUbo(mUbo);
 
     RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mMaterial->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
     FxDrawPushConstants push_constants{};
-    memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(Mat4f));
-    memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(Mat4f));
+    memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, mMaterial->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 

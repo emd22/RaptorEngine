@@ -124,21 +124,13 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
         DsLayoutGPassMaterial,
     };
 
-    return GPassPipeline.CreateLayout(sizeof(FxDrawPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return GPassPipeline.CreateLayout(sizeof(FxDrawPushConstants), 0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 void FxDeferredRenderer::CreateGPassPipeline()
 {
     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
         // Color
-        VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
-                            | VK_COLOR_COMPONENT_G_BIT
-                            | VK_COLOR_COMPONENT_B_BIT
-                            | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = VK_FALSE,
-        },
-        // Positions
         VkPipelineColorBlendAttachmentState {
             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT
                             | VK_COLOR_COMPONENT_G_BIT
@@ -168,17 +160,6 @@ void FxDeferredRenderer::CreateGPassPipeline()
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         },
-        // Positions output
-        VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        },
         // Normals output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
@@ -195,11 +176,11 @@ void FxDeferredRenderer::CreateGPassPipeline()
             .format = VK_FORMAT_D16_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
         }
     };
 
@@ -251,61 +232,62 @@ FxDeferredLightingPass* FxDeferredRenderer::GetCurrentLightingPass()
     return &LightingPasses[Renderer->GetFrameNumber()];
 }
 
-VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
+void FxDeferredRenderer::CreateLightingDSLayout()
 {
     RvkGpuDevice* device = Renderer->GetDevice();
 
-
     // Fragment DS
-    {
-        VkDescriptorSetLayoutBinding positions_layout_binding {
-            .binding = 1,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
 
-        VkDescriptorSetLayoutBinding albedo_layout_binding {
-            .binding = 2,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
+    VkDescriptorSetLayoutBinding positions_layout_binding {
+        .binding = 1,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
 
-        VkDescriptorSetLayoutBinding normals_layout_binding {
-            .binding = 3,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
+    VkDescriptorSetLayoutBinding albedo_layout_binding {
+        .binding = 2,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
 
-        VkDescriptorSetLayoutBinding bindings[] = {
-            positions_layout_binding,
-            albedo_layout_binding,
-            normals_layout_binding
-        };
+    VkDescriptorSetLayoutBinding normals_layout_binding {
+        .binding = 3,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
 
-        VkDescriptorSetLayoutCreateInfo lighting_layout_info {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = FxSizeofArray(bindings),
-            .pBindings = bindings,
-        };
+    VkDescriptorSetLayoutBinding bindings[] = {
+        positions_layout_binding,
+        albedo_layout_binding,
+        normals_layout_binding
+    };
 
-        VkResult status;
-        status = vkCreateDescriptorSetLayout(device->Device, &lighting_layout_info, nullptr, &DsLayoutLightingFrag);
-        if (status != VK_SUCCESS) {
-            FxModulePanic("Failed to create pipeline descriptor set layout", status);
-        }
+    VkDescriptorSetLayoutCreateInfo lighting_layout_info {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = FxSizeofArray(bindings),
+        .pBindings = bindings,
+    };
+
+    VkResult status;
+    status = vkCreateDescriptorSetLayout(device->Device, &lighting_layout_info, nullptr, &DsLayoutLightingFrag);
+    if (status != VK_SUCCESS) {
+        FxModulePanic("Failed to create pipeline descriptor set layout", status);
     }
+}
 
+VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
+{
     VkDescriptorSetLayout layouts[] = {
         DsLayoutLightingFrag,
     };
 
-    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 
@@ -317,7 +299,13 @@ void FxDeferredRenderer::CreateLightingPipeline()
                             | VK_COLOR_COMPONENT_G_BIT
                             | VK_COLOR_COMPONENT_B_BIT
                             | VK_COLOR_COMPONENT_A_BIT,
-            .blendEnable = VK_FALSE,
+            .blendEnable = VK_TRUE,
+            .alphaBlendOp = VK_BLEND_OP_ADD,
+            .colorBlendOp = VK_BLEND_OP_ADD,
+            .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+            .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+            .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+            .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
         }
     };
 
@@ -343,6 +331,9 @@ void FxDeferredRenderer::CreateLightingPipeline()
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
 
+    if (DsLayoutLightingFrag == nullptr) {
+        CreateLightingDSLayout();
+    }
     VkPipelineLayout layout = CreateLightingPipelineLayout();
 
     FxVertexInfo vertex_info = FxMakeLightVertexInfo();
@@ -352,8 +343,16 @@ void FxDeferredRenderer::CreateLightingPipeline()
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-        &vertex_info
+        &vertex_info,
+        VK_CULL_MODE_BACK_BIT
     );
+}
+
+void FxDeferredRenderer::RebuildLightingPipeline()
+{
+    RvkGraphicsPipeline old_pipeline = LightingPipeline;
+    CreateLightingPipeline();
+    old_pipeline.Destroy();
 }
 
 void FxDeferredRenderer::DestroyLightingPipeline()
@@ -441,7 +440,7 @@ VkPipelineLayout FxDeferredRenderer::CreateCompPipelineLayout()
         DsLayoutCompFrag
     };
 
-    return CompPipeline.CreateLayout(0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return CompPipeline.CreateLayout(0, sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 
@@ -552,19 +551,11 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
         extent,
         VK_FORMAT_D16_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_DEPTH_BIT
     );
 
     ColorAttachment.Create(
-        extent,
-        VK_FORMAT_B8G8R8A8_UNORM,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT
-    );
-
-    PositionsAttachment.Create(
         extent,
         VK_FORMAT_B8G8R8A8_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
@@ -582,7 +573,6 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
 
     FxSizedArray image_views = {
         ColorAttachment.View,
-        PositionsAttachment.View,
         NormalsAttachment.View,
 
         DepthAttachment.View
@@ -605,10 +595,6 @@ void FxDeferredGPass::Begin()
         // Albedo
         VkClearValue {
             .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
-        },
-        // Positions
-        VkClearValue {
-            .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
         },
         // Normals
         VkClearValue {
@@ -634,7 +620,7 @@ void FxDeferredGPass::Submit()
     RvkFrameData *frame = Renderer->GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
     };
 
     const VkSubmitInfo submit_info = {
@@ -670,7 +656,6 @@ void FxDeferredGPass::Destroy()
     }
 
     DepthAttachment.Destroy();
-    PositionsAttachment.Destroy();
     ColorAttachment.Destroy();
 
     DescriptorPool.Destroy();
@@ -682,8 +667,6 @@ void FxDeferredGPass::Destroy()
 
     mGPassPipeline = nullptr;
 }
-
-
 
 
 /////////////////////////////////////
@@ -783,13 +766,13 @@ void FxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 
     FxStackArray<VkWriteDescriptorSet, 3> write_infos;
 
-    // Positions image descriptor
+    // Depth image descriptor
     {
         const int binding_index = 1;
 
         VkDescriptorImageInfo positions_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .imageView = gpass.PositionsAttachment.View,
+            .imageView = gpass.DepthAttachment.View,
             .sampler = Renderer->Swapchain.PositionSampler.Sampler
         };
 
@@ -917,13 +900,13 @@ void FxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
     FxStackArray<VkWriteDescriptorSet, 4> write_infos;
 
-    // Positions image descriptor
+    // Depth image descriptor
     {
         const int binding_index = 1;
 
         VkDescriptorImageInfo positions_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .imageView = gpass.PositionsAttachment.View,
+            .imageView = gpass.DepthAttachment.View,
             .sampler = Renderer->Swapchain.PositionSampler.Sampler
         };
 
@@ -1025,12 +1008,20 @@ void FxDeferredCompPass::Begin()
     mCurrentFrame->CompCommandBuffer.Record();
 }
 
-void FxDeferredCompPass::DoCompPass()
+#include <Renderer/FxCamera.hpp>
+
+void FxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 {
+    FxCompositionPushConstants push_constants{};
+    memcpy(push_constants.ViewInverse, render_cam.InvViewMatrix.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.ProjInverse, render_cam.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+
+    vkCmdPushConstants(mCurrentFrame->CompCommandBuffer.CommandBuffer, mCompPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants), &push_constants);
+
     VkClearValue clear_values[] = {
         // Output colour
         VkClearValue {
-            .color = { { 1.0f, 0.8f, 0.7f, 1.0f } }
+            .color = { { 1.0f, 1.0f, 0.7f, 1.0f } }
         },
     };
 

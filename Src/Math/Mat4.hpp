@@ -13,10 +13,10 @@
  * This class represents a 4x4 matrix represented using _Column-Major_ order to match
  * the layout of MSL, GLSL, and _modern_ HLSL.
  */
-class alignas(16) Mat4f
+class alignas(16) FxMat4f
 {
 public:
-    Mat4f() noexcept
+    FxMat4f() noexcept
     {
         Columns[0].Load1(0);
         Columns[1].Load1(0);
@@ -24,7 +24,7 @@ public:
         Columns[3].Load1(0);
     }
 
-    Mat4f(float data[16]) noexcept
+    FxMat4f(float data[16]) noexcept
     {
         Columns[0].Load4Ptr(data);
         Columns[1].Load4Ptr(data + 4);
@@ -32,9 +32,11 @@ public:
         Columns[3].Load4Ptr(data + 12);
     }
 
-    static Mat4f FromRows(float data[16])
+    FxMat4f(float data[4][4]) noexcept;
+
+    static FxMat4f FromRows(float data[16])
     {
-        return Mat4f(
+        return FxMat4f(
             Vec4f(data[0], data[4], data[8], data[12]),
             Vec4f(data[1], data[5], data[9], data[13]),
             Vec4f(data[2], data[6], data[10], data[14]),
@@ -42,11 +44,11 @@ public:
         );
     }
 
-    static const Mat4f Identity;
+    static const FxMat4f Identity;
 
-    static Mat4f AsTranslation(FxVec3f position)
+    static FxMat4f AsTranslation(FxVec3f position)
     {
-        return Mat4f(
+        return FxMat4f(
             (float32 [16]){
                 1, 0, 0, 0,
                 0, 1, 0, 0,
@@ -56,9 +58,9 @@ public:
         );
     }
 
-    static Mat4f AsScale(FxVec3f scale)
+    static FxMat4f AsScale(FxVec3f scale)
     {
-        return Mat4f(
+        return FxMat4f(
             (float32 [16]){
                 scale.X, 0, 0, 0,
                 0, scale.Y, 0, 0,
@@ -72,7 +74,7 @@ public:
 
     void LookAt(FxVec3f position, FxVec3f target, FxVec3f up);
 
-    Mat4f(float scalar) noexcept
+    FxMat4f(float scalar) noexcept
     {
         Columns[0].Load1(scalar);
         Columns[1].Load1(scalar);
@@ -80,7 +82,7 @@ public:
         Columns[3].Load1(scalar);
     }
 
-    Mat4f(Vec4f c0, Vec4f c1, Vec4f c2, Vec4f c3) noexcept
+    FxMat4f(Vec4f c0, Vec4f c1, Vec4f c2, Vec4f c3) noexcept
     {
         Columns[0] = c0;
         Columns[1] = c1;
@@ -88,7 +90,7 @@ public:
         Columns[3] = c3;
     }
 
-    Mat4f(Vec4f columns[4]) noexcept
+    FxMat4f(Vec4f columns[4]) noexcept
     {
         Columns[0] = columns[0];
         Columns[1] = columns[1];
@@ -112,7 +114,7 @@ public:
         Columns[3].Load4Ptr(data + 12);
     }
 
-    Mat4f& operator = (const Mat4f& other)
+    FxMat4f& operator = (const FxMat4f& other)
     {
         Columns[0] = other.Columns[0];
         Columns[1] = other.Columns[1];
@@ -121,7 +123,9 @@ public:
         return *this;
     }
 
-    Mat4f operator * (const Mat4f &other) const;
+    FxMat4f Inverse();
+
+    FxMat4f operator * (const FxMat4f &other) const;
 
     void Print()
     {

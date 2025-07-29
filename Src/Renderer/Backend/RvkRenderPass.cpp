@@ -46,20 +46,55 @@ void RvkRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
         .pResolveAttachments = nullptr,
     };
 
+    // VkSubpassDependency subpass_dependencies[] = {
+    //     VkSubpassDependency {
+    //         .srcSubpass = 0,
+    //         .dstSubpass = VK_SUBPASS_EXTERNAL,
+
+    //         .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    //                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+
+    //         .dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+
+    //         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+    //                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+
+    //         .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+
+    //         .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+    //     },
+    //     VkSubpassDependency {
+    //         .srcSubpass = VK_SUBPASS_EXTERNAL,
+    //         .dstSubpass = 0,
+
+    //         .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+
+    //         .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    //                       | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+
+    //         .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+
+    //         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+    //                        | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+
+    //         .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+    //     }
+    // };
+    //
     VkSubpassDependency subpass_dependencies[] = {
         VkSubpassDependency {
             .srcSubpass = 0,
             .dstSubpass = VK_SUBPASS_EXTERNAL,
 
             .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                          | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                          | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 
-            .dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 
             .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                           | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+                           | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 
-            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 
             .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
         },
@@ -67,15 +102,15 @@ void RvkRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
             .srcSubpass = VK_SUBPASS_EXTERNAL,
             .dstSubpass = 0,
 
-            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 
             .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
                           | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
 
-            .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+            .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 
             .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                           | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+                           | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 
             .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
         }

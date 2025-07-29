@@ -54,7 +54,8 @@ void RvkGraphicsPipeline::Create(
     VkPipelineLayout layout,
     const FxSlice<VkAttachmentDescription>& attachments,
     const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-    FxVertexInfo* vertex_info
+    FxVertexInfo* vertex_info,
+    VkCullModeFlags cull_mode
 )
 {
     mDevice = Renderer->GetDevice();
@@ -155,7 +156,7 @@ void RvkGraphicsPipeline::Create(
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = VK_POLYGON_MODE_FILL,
         .lineWidth = 1.0f,
-        .cullMode = VK_CULL_MODE_NONE,
+        .cullMode = cull_mode,
         .frontFace = VK_FRONT_FACE_CLOCKWISE,
         .depthBiasEnable = VK_FALSE,
     };
@@ -410,7 +411,8 @@ void RvkGraphicsPipeline::Destroy()
 
 
 VkPipelineLayout RvkGraphicsPipeline::CreateLayout(
-    uint32 push_consts_size,
+    uint32 vert_push_consts_size,
+    uint32 frag_push_consts_size,
     const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts
 )
 {
@@ -418,26 +420,33 @@ VkPipelineLayout RvkGraphicsPipeline::CreateLayout(
         mDevice = Renderer->GetDevice();
     }
 
-    VkPushConstantRange pc_range{
-        .offset = 0,
-        .size = push_consts_size,
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT
-    };
+    VkPushConstantRange pc_ranges[2];
+    uint32 pc_ranges_count = 0;
+
+    if (vert_push_consts_size) {
+        VkPushConstantRange& range = pc_ranges[0];
+        range.size = vert_push_consts_size;
+        range.offset = 0;
+        range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        ++pc_ranges_count;
+    }
+
+    if (frag_push_consts_size) {
+        VkPushConstantRange& range = pc_ranges[pc_ranges_count];
+        range.size = frag_push_consts_size;
+        range.offset = vert_push_consts_size ? vert_push_consts_size : 0;
+        range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        ++pc_ranges_count;
+    }
 
     VkPipelineLayoutCreateInfo create_info{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = descriptor_set_layouts.Size,
         .pSetLayouts = descriptor_set_layouts.Ptr,
 
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &pc_range
+        .pushConstantRangeCount = pc_ranges_count,
+        .pPushConstantRanges = pc_ranges
     };
-
-    // Disable push consts if the size is zero
-    if (push_consts_size == 0) {
-        create_info.pushConstantRangeCount = 0;
-        create_info.pPushConstantRanges = nullptr;
-    }
 
     VkPipelineLayout layout;
     VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);

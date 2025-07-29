@@ -61,7 +61,7 @@ public:
     RvkDescriptorSet mDescriptorSet{};
     RvkGraphicsPipeline* Pipeline = nullptr;
 
-    std::atomic_bool IsBuilt = false;
+    std::atomic_bool IsBuilt {false};
 private:
     VkDescriptorSetLayout mSetLayout = nullptr;
 

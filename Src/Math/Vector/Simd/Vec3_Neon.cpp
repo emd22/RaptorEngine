@@ -32,6 +32,11 @@ FxVec3f FxVec3f::MulAdd(const FxVec3f &add_value, const FxVec3f &mul_a, const Fx
     return result;
 }
 
+void FxVec3f::Print() const
+{
+    Log::Info("Vec3f {X=%.06f, Y=%.06f, Z=%.06f}\n", X, Y, Z);
+}
+
 float32 FxVec3f::Length() const
 {
     float32x4_t vec = mIntrin;

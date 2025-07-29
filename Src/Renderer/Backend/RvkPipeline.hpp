@@ -59,6 +59,16 @@ struct alignas(16) FxDrawPushConstants
 struct alignas(16) FxLightPushConstants
 {
     float32 MVPMatrix[16];
+    float32 VPMatrix[16];
+    float32 LightPos[3];
+    float32 PlayerPos[3];
+    float32 LightRadius;
+};
+
+struct alignas(16) FxCompositionPushConstants
+{
+    float32 ViewInverse[16];
+    float32 ProjInverse[16];
 };
 
 
@@ -74,14 +84,15 @@ public:
         VkPipelineLayout layout,
         const FxSlice<VkAttachmentDescription>& attachments,
         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-        FxVertexInfo* vertex_info
+        FxVertexInfo* vertex_info,
+        VkCullModeFlags = VK_CULL_MODE_BACK_BIT
     );
 
     // void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
 
     // VkPipelineLayout CreateCompLayout();
 
-    VkPipelineLayout CreateLayout(uint32 push_consts_size, const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
+    VkPipelineLayout CreateLayout(uint32 vert_push_consts_size, uint32 frag_push_consts_size, const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
 
     void Destroy();
 

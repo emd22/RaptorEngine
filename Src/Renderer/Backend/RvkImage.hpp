@@ -48,4 +48,6 @@ public:
 
 private:
     RvkGpuDevice *mDevice = nullptr;
+
+    bool mIsDepthTexture = false;
 };
