@@ -16,7 +16,7 @@ layout(push_constant) uniform PushConstants {
 } a_PushConsts;
 
 vec3 WorldPosFromDepth(vec2 uv, float depth) {
-    vec4 ndc = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 ndc = vec4(uv * 2.0 - 1.0, 1.0 - depth, 1.0);
 
     vec4 clip = a_PushConsts.InvProjMatrix * ndc;
     vec4 view = a_PushConsts.InvViewMatrix * (clip / clip.w);
@@ -30,7 +30,7 @@ void main()
     vec2 screen_uv = gl_FragCoord.xy / vec2(1024, 720);
 
     //
-    float depth = texture(s_Depth, screen_uv).r;
+    float depth = 1.0 - texture(s_Depth, screen_uv).r;
     vec3 albedo = texture(s_Albedo, screen_uv).rgb;
     vec3 normal = texture(s_Normals, screen_uv).rgb;
     //
@@ -38,8 +38,11 @@ void main()
     // return;
 
     // depth = 1.0 - depth;
-    vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
+    // vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
 
+    v_Color = vec4(1.0, 1.0, 1.0, 1.0);
+    return;
+    /*
     vec3 pos_to_light = world_pos - a_LightPos;
     float fdist = length(pos_to_light);
     pos_to_light = normalize(pos_to_light);
@@ -77,4 +80,5 @@ void main()
     // vec3 result = vec3(screen_uv, 1);
 
     v_Color = result;
+    */
 }

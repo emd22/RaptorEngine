@@ -85,7 +85,7 @@ public:
         const FxSlice<VkAttachmentDescription>& attachments,
         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
         FxVertexInfo* vertex_info,
-        VkCullModeFlags = VK_CULL_MODE_BACK_BIT
+        VkCullModeFlags cull_mode = VK_CULL_MODE_NONE
     );
 
     // void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);

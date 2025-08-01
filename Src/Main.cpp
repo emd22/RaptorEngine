@@ -191,7 +191,7 @@ int main()
     ground_object.Attach(ground_model);
     ground_object.Attach(cheese_material);
 
-    ground_object.Translate(FxVec3f(0, -2, 0));
+    ground_object.MoveBy(FxVec3f(0, -2, 0));
 
     if (helmet_model->Materials.size() > 0) {
         FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
@@ -203,7 +203,7 @@ int main()
         helmet_object.Attach(cheese_material);
     }
 
-    helmet_object.Translate(FxVec3f(0, 0, 0));
+    helmet_object.MoveBy(FxVec3f(0, 0, 0));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
@@ -217,17 +217,16 @@ int main()
     sets_to_bind.InitSize(2);
 
     FxLight light;
-    light.SetLightVolume(generated_sphere, false);
-
+    light.SetLightVolume(generated_sphere, true);
 
     FxLight light2;
     light2.SetLightVolume(generated_sphere, false);
 
-    light.Translate(FxVec3f(4.08, -3.39, 2.8));
-    light.Scale(FxVec3f(40, 40, 40));
+    light.MoveBy(FxVec3f(4.08, -3.39, 2.8));
+    light.Scale(FxVec3f(5, 5, 5));
 
-    light2.Translate(FxVec3f(1, 0, -0.5));
-    light2.Scale(FxVec3f(40, 40, 40));
+    light2.MoveBy(FxVec3f(1, 0, -0.5));
+    light2.Scale(FxVec3f(5, 5, 5));
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -238,17 +237,17 @@ int main()
 
         if (FxControlManager::IsMouseLocked()) {
             FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
-            mouse_delta.SetX(0.001 * mouse_delta.GetX() * DeltaTime);
-            mouse_delta.SetY(-0.001 * mouse_delta.GetY() * DeltaTime);
+            mouse_delta.SetX(-0.001 * mouse_delta.GetX() * DeltaTime);
+            mouse_delta.SetY(0.001 * mouse_delta.GetY() * DeltaTime);
 
             camera.Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         }
 
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            camera.Move(FxVec3f(0.0f, 0.0f, -0.01f * DeltaTime));
+            camera.Move(FxVec3f(0.0f, 0.0f, 0.01f * DeltaTime));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            camera.Move(FxVec3f(0.0f, 0.0f, 0.01f * DeltaTime));
+            camera.Move(FxVec3f(0.0f, 0.0f, -0.01f * DeltaTime));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
             camera.Move(FxVec3f(0.01f * DeltaTime, 0.0f, 0.0f));
@@ -257,9 +256,14 @@ int main()
             camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
+            light.MoveTo(FxVec3f(0.1, 0, 0));
+        }
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
-            light.mModelMatrix = FxMat4f::AsScale(FxVec3f(8.0, 8.0, 8.0)) * camera.ViewMatrix;
-            light.mPosition = camera.Position;
+            light.MoveTo(camera.Position);
+
             light.mPosition.Print();
         }
 
@@ -276,12 +280,12 @@ int main()
             continue;
         }
 
-        helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
-        helmet_object.Translate(FxVec3f(0, 0, 0));
+//         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
+//         helmet_object.Translate(FxVec3f(0, 0, 0));
 
         ground_object.Render(camera);
         helmet_object.Render(camera);
-        // light.RenderDebugMesh(camera);
+        light.RenderDebugMesh(camera);
 
         Renderer->BeginLighting();
 

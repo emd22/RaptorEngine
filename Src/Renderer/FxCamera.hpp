@@ -58,7 +58,7 @@ public:
         RequireUpdate();
     }
 
-    inline void Translate(const FxVec3f &offset)
+    inline void MoveBy(const FxVec3f &offset)
     {
         Position += FxVec3f(offset.X, offset.Y, offset.Z);
 
@@ -70,7 +70,7 @@ public:
         const FxVec3f forward = Direction * -offset.Z;
         const FxVec3f right = Direction.Cross(FxVec3f::Up) * offset.X;
 
-        Translate(forward + right);
+        MoveBy(forward + right);
     }
 
     inline void SetAspectRatio(float32 aspect_ratio)

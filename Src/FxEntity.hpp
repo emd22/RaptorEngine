@@ -52,11 +52,17 @@ public:
     {
         Children.push_back(entity);
     }
+    
+    void MoveTo(const FxVec3f& position)
+    {
+        mPosition = position;
+        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition);
+    }
 
-    void Translate(const FxVec3f& offset)
+    void MoveBy(const FxVec3f& offset)
     {
         mPosition += offset;
-        mModelMatrix = mModelMatrix * FxMat4f::AsTranslation(mPosition);
+        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition);
     }
 
     void Scale(const FxVec3f& scale)

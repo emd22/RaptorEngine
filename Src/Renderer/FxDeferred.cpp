@@ -201,7 +201,8 @@ void FxDeferredRenderer::CreateGPassPipeline()
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-        &vert_info
+        &vert_info,
+        VK_CULL_MODE_BACK_BIT
     );
 }
 
@@ -344,7 +345,7 @@ void FxDeferredRenderer::CreateLightingPipeline()
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
         &vertex_info,
-        VK_CULL_MODE_FRONT_BIT
+        VK_CULL_MODE_BACK_BIT
     );
 }
 
@@ -1021,7 +1022,7 @@ void FxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     VkClearValue clear_values[] = {
         // Output colour
         VkClearValue {
-            .color = { { 1.0f, 1.0f, 0.7f, 1.0f } }
+            .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
         },
     };
 
