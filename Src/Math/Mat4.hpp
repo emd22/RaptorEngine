@@ -70,6 +70,13 @@ public:
         );
     }
 
+    void FlipY()
+    {
+//         Vec4f& col = Columns[1];
+//         col.Y *= -1;
+//         col.W *= -1;
+    }
+
     void Rotate(FxVec3f rotation);
 
     void LookAt(FxVec3f position, FxVec3f target, FxVec3f up);

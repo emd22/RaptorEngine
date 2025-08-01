@@ -344,7 +344,7 @@ void FxDeferredRenderer::CreateLightingPipeline()
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
         &vertex_info,
-        VK_CULL_MODE_BACK_BIT
+        VK_CULL_MODE_FRONT_BIT
     );
 }
 
@@ -601,7 +601,7 @@ void FxDeferredGPass::Begin()
             .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
         },
         VkClearValue {
-            .depthStencil = { 1.0f, 0 }
+            .depthStencil = { 0.0f, 0 }
         }
     };
 

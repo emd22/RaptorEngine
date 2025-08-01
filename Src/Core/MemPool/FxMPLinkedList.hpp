@@ -94,6 +94,7 @@ public:
         // Insert the node into the freed list. This allocated node will be reused when needed.
         {
             auto* element = mFreedNodes.Insert();
+            
             (*element) = node;
         }
 

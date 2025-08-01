@@ -34,7 +34,7 @@ FxVec3f FxVec3f::MulAdd(const FxVec3f &add_value, const FxVec3f &mul_a, const Fx
 
 void FxVec3f::Print() const
 {
-    Log::Info("Vec3f {X=%.06f, Y=%.06f, Z=%.06f}\n", X, Y, Z);
+    Log::Info("Vec3f {X=%.06f, Y=%.06f, Z=%.06f}", X, Y, Z);
 }
 
 float32 FxVec3f::Length() const

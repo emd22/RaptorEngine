@@ -144,7 +144,7 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const
 
 
             if (gltf_material.has_pbr_metallic_roughness) {
-                material->Diffuse = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
+                material->DiffuseTexture = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
             }
 
 
@@ -180,7 +180,7 @@ FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, con
 
 
             if (gltf_material.has_pbr_metallic_roughness) {
-                material->Diffuse = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
+                material->DiffuseTexture = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
             }
 
             model->Materials.push_back(material);

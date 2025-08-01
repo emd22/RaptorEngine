@@ -44,6 +44,7 @@ void FxSceneObject::Render(const FxCamera& camera)
 
     FxMat4f VP = camera.VPMatrix;
     FxMat4f MVP = mModelMatrix * VP;
+    MVP.FlipY();
 
     memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
 

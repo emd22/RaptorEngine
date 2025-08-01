@@ -35,9 +35,9 @@ void main()
     vec4 lights = texture(s_Lights, a_UV);
 
     // vec3 final_color = lights.rgb;
-    // vec3 final_color = albedo.rgb;
+    vec3 final_color = albedo.rgb;
     // vec3 final_color = WorldPosFromDepth(depth);
-    vec3 final_color = (albedo.rgb * (lights.a * lights.rgb));
+    // vec3 final_color = (albedo.rgb * (lights.a * lights.rgb));
 
     v_Color = vec4(final_color, 1.0);
 }

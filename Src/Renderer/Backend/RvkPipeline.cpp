@@ -114,8 +114,8 @@ void RvkGraphicsPipeline::Create(
         .y = 0.0f,
         .width = (float32)extent.Width(),
         .height = (float32)extent.Height(),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
+        .minDepth = 1.0f,
+        .maxDepth = 0.0f,
     };
 
     VkRect2D scissor = {
@@ -185,7 +185,7 @@ void RvkGraphicsPipeline::Create(
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = VK_TRUE,
         .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthCompareOp = VK_COMPARE_OP_GREATER,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
     };

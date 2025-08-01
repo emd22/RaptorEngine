@@ -27,6 +27,7 @@ void FxLight::Render(const FxCamera& camera) const
     FxRef<FxDeferredRenderer>& deferred = Renderer->DeferredRenderer;
 
     FxMat4f MVP = mModelMatrix * camera.VPMatrix;
+    MVP.FlipY();
 
     {
         FxLightPushConstants push_constants{};
@@ -60,6 +61,7 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
     FxRef<FxDeferredRenderer>& deferred = Renderer->DeferredRenderer;
 
     FxMat4f MVP = mModelMatrix * camera.VPMatrix;
+    MVP.FlipY();
 
     FxDrawPushConstants push_constants{};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));

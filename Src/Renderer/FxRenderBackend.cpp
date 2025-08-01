@@ -492,8 +492,8 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
         .x = 0, .y = 0,
         .width = (float32)width,
         .height = (float32)height,
-        .minDepth = 0.0,
-        .maxDepth = 1.0,
+        .minDepth = 1.0,
+        .maxDepth = 0.0,
     };
 
     vkCmdSetViewport(frame->CommandBuffer.CommandBuffer, 0, 1, &viewport);
@@ -596,9 +596,9 @@ void FxRenderBackend::BeginLighting()
     const VkViewport viewport = {
         .x = 0, .y = 0,
         .width = (float32)width,
-        .height = (float32)height,
-        .minDepth = 0.0,
-        .maxDepth = 1.0,
+        .height = -(float32)height,
+        .minDepth = 1.0,
+        .maxDepth = 0.0,
     };
 
     vkCmdSetViewport(frame->LightCommandBuffer.CommandBuffer, 0, 1, &viewport);
@@ -631,8 +631,8 @@ void FxRenderBackend::DoComposition(FxCamera& render_cam)
         .x = 0, .y = 0,
         .width = (float32)width,
         .height = (float32)height,
-        .minDepth = 0.0,
-        .maxDepth = 1.0,
+        .minDepth = 1.0,
+        .maxDepth = 0.0,
     };
 
     vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
