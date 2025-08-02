@@ -345,7 +345,8 @@ void FxDeferredRenderer::CreateLightingPipeline()
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
         &vertex_info,
-        VK_CULL_MODE_BACK_BIT
+        VK_CULL_MODE_FRONT_BIT,
+        false
     );
 }
 

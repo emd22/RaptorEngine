@@ -55,7 +55,8 @@ void RvkGraphicsPipeline::Create(
     const FxSlice<VkAttachmentDescription>& attachments,
     const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
     FxVertexInfo* vertex_info,
-    VkCullModeFlags cull_mode
+    VkCullModeFlags cull_mode,
+    bool winding_is_ccw
 )
 {
     mDevice = Renderer->GetDevice();
@@ -157,7 +158,7 @@ void RvkGraphicsPipeline::Create(
         .polygonMode = VK_POLYGON_MODE_FILL,
         .lineWidth = 1.0f,
         .cullMode = cull_mode,
-        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+        .frontFace = winding_is_ccw ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE,
         .depthBiasEnable = VK_FALSE,
     };
 

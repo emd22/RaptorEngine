@@ -182,6 +182,8 @@ int main()
     // FxSceneObject scene_object;
     // scene_object.Attach(other_model);
     // scene_object.Attach(material);
+    
+    
 
 
     FxSceneObject helmet_object;
@@ -204,6 +206,8 @@ int main()
     }
 
     helmet_object.MoveBy(FxVec3f(0, 0, 0));
+    
+    helmet_object.RotateX((M_PI / 2));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
@@ -217,16 +221,16 @@ int main()
     sets_to_bind.InitSize(2);
 
     FxLight light;
-    light.SetLightVolume(generated_sphere, true);
+    light.SetLightVolume(generated_sphere, false);
 
     FxLight light2;
     light2.SetLightVolume(generated_sphere, false);
 
-    light.MoveBy(FxVec3f(4.08, -3.39, 2.8));
-    light.Scale(FxVec3f(5, 5, 5));
+    light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
+    light.Scale(FxVec3f(10));
 
     light2.MoveBy(FxVec3f(1, 0, -0.5));
-    light2.Scale(FxVec3f(5, 5, 5));
+    light2.Scale(FxVec3f(10));
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -256,11 +260,6 @@ int main()
             camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
         }
 
-
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
-            light.MoveTo(FxVec3f(0.1, 0, 0));
-        }
-
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
             light.MoveTo(camera.Position);
 
@@ -275,6 +274,8 @@ int main()
         CheckGeneralControls();
 
         camera.Update();
+        
+        light2.MoveTo(camera.Position);
 
         if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
             continue;
@@ -285,11 +286,12 @@ int main()
 
         ground_object.Render(camera);
         helmet_object.Render(camera);
-        light.RenderDebugMesh(camera);
+//        light.RenderDebugMesh(camera);
 
         Renderer->BeginLighting();
 
         light.Render(camera);
+//        light2.Render(camera);
         // light2.Render(camera);
 
         Renderer->DoComposition(camera);

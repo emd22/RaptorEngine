@@ -596,7 +596,7 @@ void FxRenderBackend::BeginLighting()
     const VkViewport viewport = {
         .x = 0, .y = 0,
         .width = (float32)width,
-        .height = -(float32)height,
+        .height = (float32)height,
         .minDepth = 1.0,
         .maxDepth = 0.0,
     };

@@ -35,7 +35,7 @@ void FxLight::Render(const FxCamera& camera) const
         memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
         memcpy(push_constants.LightPos, mPosition.mData, sizeof(float32) * 3);
         memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 3);
-        push_constants.LightRadius = mScale.X;
+        push_constants.LightRadius = 1.0;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->LightingPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
     }

@@ -71,10 +71,25 @@ public:
         mModelMatrix = FxMat4f::AsScale(mScale) * mModelMatrix;
     }
 
-    void Rotate(const FxVec3f& rotation)
+    void RotateX(float rad)
     {
-
+        mRotation.X += rad;
+        mModelMatrix = FxMat4f::AsRotationX(mRotation.X);
+        mModelMatrix.Print();
     }
+    
+    void RotateY(float rad)
+    {
+        mRotation.Y += rad;
+        mModelMatrix = FxMat4f::AsRotationY(mRotation.Y);
+    }
+    
+    void RotateZ(float rad)
+    {
+        mRotation.Z += rad;
+        mModelMatrix = FxMat4f::AsRotationZ(mRotation.Z);
+    }
+    
 
     void Update()
     {

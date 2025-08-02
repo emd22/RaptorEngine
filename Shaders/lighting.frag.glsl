@@ -16,7 +16,7 @@ layout(push_constant) uniform PushConstants {
 } a_PushConsts;
 
 vec3 WorldPosFromDepth(vec2 uv, float depth) {
-    vec4 ndc = vec4(uv * 2.0 - 1.0, 1.0 - depth, 1.0);
+    vec4 ndc = vec4(uv * 2.0 - 1.0, depth, 1.0);
 
     vec4 clip = a_PushConsts.InvProjMatrix * ndc;
     vec4 view = a_PushConsts.InvViewMatrix * (clip / clip.w);
@@ -38,20 +38,17 @@ void main()
     // return;
 
     // depth = 1.0 - depth;
-    // vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
+    vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
 
-    v_Color = vec4(1.0, 1.0, 1.0, 1.0);
-    return;
-    /*
     vec3 pos_to_light = world_pos - a_LightPos;
     float fdist = length(pos_to_light);
     pos_to_light = normalize(pos_to_light);
 
     float fdiffuse = max(0.0, dot(normal, -pos_to_light));
 
-    float att_const = 0.3;
+    float att_const = 0.35;
     float att_lin = 0.007;
-    float att_expr = 0.00008;
+    float att_expr = 0.02;
     float fatt = att_const + att_lin * fdist + att_expr * fdist * fdist;
 
     vec3 to_light = a_LightPos - world_pos;
@@ -80,5 +77,4 @@ void main()
     // vec3 result = vec3(screen_uv, 1);
 
     v_Color = result;
-    */
 }
