@@ -56,10 +56,15 @@ struct alignas(16) FxDrawPushConstants
     float32 ModelMatrix[16];
 };
 
-struct alignas(16) FxLightPushConstants
+struct alignas(16) FxLightVertPushConstants
 {
     float32 MVPMatrix[16];
-    float32 VPMatrix[16];
+};
+
+struct alignas(16) FxLightFragPushConstants
+{
+    float32 InvView[16];
+    float32 InvProj[16];
     float32 LightPos[3];
     float32 PlayerPos[3];
     float32 LightRadius;

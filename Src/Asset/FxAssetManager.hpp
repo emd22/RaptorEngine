@@ -26,7 +26,7 @@ public:
     FxAssetWorker() = default;
 
     void Create();
-d
+
     void SubmitItemToLoad(FxAssetQueueItem &item)
     {
         // Wait for item to no longer be busy

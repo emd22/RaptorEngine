@@ -288,7 +288,7 @@ VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
         DsLayoutLightingFrag,
     };
 
-    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return LightingPipeline.CreateLayout(sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 
