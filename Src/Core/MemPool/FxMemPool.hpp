@@ -7,11 +7,13 @@
 #include <type_traits>
 // #include <vector>
 
+#define FX_MEMPOOL_USE_ATOMIC_LOCKING
+
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
 #include <atomic>
 #endif
 
-#ifndef FX_MEMPOOL_USE_ATOMIC_LOCKING
+#if !defined(FX_MEMPOOL_USE_ATOMIC_LOCKING) && !defined(FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP)
 #define FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
 #endif
 

@@ -110,7 +110,7 @@ bool FxMaterial::IsReady()
         return true;
     }
 
-    if (!Diffuse || !Diffuse->IsLoaded()) {
+    if (!DiffuseTexture || !DiffuseTexture->IsLoaded()) {
         return false;
     }
 
@@ -175,8 +175,8 @@ void FxMaterial::Build()
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
-    if (Diffuse) {
-        Diffuse->Texture.SetSampler(manager.AlbedoSampler);
+    if (DiffuseTexture) {
+        DiffuseTexture->Texture.SetSampler(manager.AlbedoSampler);
     }
 
 
@@ -186,7 +186,7 @@ void FxMaterial::Build()
     RvkDescriptorSet& descriptor_set = mDescriptorSet;
 
     // Push material textures
-    PUSH_IMAGE_IF_SET(Diffuse, 0);
+    PUSH_IMAGE_IF_SET(DiffuseTexture, 0);
     // PUSH_IMAGE_IF_SET(Normal);
 
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);

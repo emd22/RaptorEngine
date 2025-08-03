@@ -162,7 +162,7 @@ void FxDeferredRenderer::CreateGPassPipeline()
         },
         // Normals output
         VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .format = VK_FORMAT_R16G16B16A16_SFLOAT,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -173,7 +173,7 @@ void FxDeferredRenderer::CreateGPassPipeline()
         },
 
         VkAttachmentDescription {
-            .format = VK_FORMAT_D16_UNORM,
+            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -201,7 +201,8 @@ void FxDeferredRenderer::CreateGPassPipeline()
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-        &vert_info
+        &vert_info,
+        VK_CULL_MODE_BACK_BIT
     );
 }
 
@@ -287,7 +288,7 @@ VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
         DsLayoutLightingFrag,
     };
 
-    return LightingPipeline.CreateLayout(sizeof(FxLightPushConstants), sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    return LightingPipeline.CreateLayout(sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
 }
 
 
@@ -344,7 +345,8 @@ void FxDeferredRenderer::CreateLightingPipeline()
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
         &vertex_info,
-        VK_CULL_MODE_BACK_BIT
+        VK_CULL_MODE_FRONT_BIT,
+        false
     );
 }
 
@@ -485,7 +487,9 @@ void FxDeferredRenderer::CreateCompPipeline()
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-        nullptr
+        nullptr,
+        VK_CULL_MODE_NONE,
+        false
     );
 }
 
@@ -549,7 +553,7 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
 
     DepthAttachment.Create(
         extent,
-        VK_FORMAT_D16_UNORM,
+        VK_FORMAT_D32_SFLOAT_S8_UINT,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_DEPTH_BIT
@@ -565,7 +569,7 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
 
     NormalsAttachment.Create(
         extent,
-        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_FORMAT_R16G16B16A16_SFLOAT,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT
@@ -601,7 +605,7 @@ void FxDeferredGPass::Begin()
             .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
         },
         VkClearValue {
-            .depthStencil = { 1.0f, 0 }
+            .depthStencil = { 0.0f, 0 }
         }
     };
 
@@ -773,7 +777,7 @@ void FxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         VkDescriptorImageInfo positions_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = gpass.DepthAttachment.View,
-            .sampler = Renderer->Swapchain.PositionSampler.Sampler
+            .sampler = Renderer->Swapchain.DepthSampler.Sampler
         };
 
         VkWriteDescriptorSet positions_write {
@@ -907,7 +911,7 @@ void FxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
         VkDescriptorImageInfo positions_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = gpass.DepthAttachment.View,
-            .sampler = Renderer->Swapchain.PositionSampler.Sampler
+            .sampler = Renderer->Swapchain.DepthSampler.Sampler
         };
 
         VkWriteDescriptorSet positions_write {
@@ -1021,7 +1025,7 @@ void FxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     VkClearValue clear_values[] = {
         // Output colour
         VkClearValue {
-            .color = { { 1.0f, 1.0f, 0.7f, 1.0f } }
+            .color = { { 0.0f, 0.0f, 0.0f, 0.0f } }
         },
     };
 

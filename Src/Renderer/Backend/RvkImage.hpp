@@ -23,7 +23,7 @@ public:
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
-        VkImageAspectFlagBits aspect_flags
+        VkImageAspectFlags aspect_flags
     );
 
     void TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd);

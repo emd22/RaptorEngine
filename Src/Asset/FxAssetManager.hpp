@@ -36,7 +36,7 @@ public:
         // Set busy
         IsBusy.test_and_set();
 
-        Item = std::move(item);
+        Item = (item);
         ItemReady.SignalDataWritten();
     }
 

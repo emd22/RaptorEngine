@@ -69,6 +69,18 @@ public:
             }
         );
     }
+    
+    static FxMat4f AsRotationX(float rad);
+    static FxMat4f AsRotationY(float rad);
+    static FxMat4f AsRotationZ(float rad);
+    
+
+    void FlipY()
+    {
+//         Vec4f& col = Columns[1];
+//         col.Y *= -1;
+//         col.W *= -1;
+    }
 
     void Rotate(FxVec3f rotation);
 
@@ -131,8 +143,7 @@ public:
     {
         printf("\t=== Matrix ===\n");
         for (int i = 0; i < 4; i++) {
-            Vec4f &column = Columns[i];
-            printf("{ %.06f\t%.06f\t%.06f\t%.06f }", column.mData[0], column.mData[1], column.mData[2], column.mData[3]);
+            printf("{ %.06f\t%.06f\t%.06f\t%.06f }", Columns[0].mData[i], Columns[1].mData[i], Columns[2].mData[i], Columns[3].mData[i]);
             putchar('\n');
         }
     }

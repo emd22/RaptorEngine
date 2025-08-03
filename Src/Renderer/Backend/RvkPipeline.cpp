@@ -55,7 +55,8 @@ void RvkGraphicsPipeline::Create(
     const FxSlice<VkAttachmentDescription>& attachments,
     const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
     FxVertexInfo* vertex_info,
-    VkCullModeFlags cull_mode
+    VkCullModeFlags cull_mode,
+    bool winding_is_ccw
 )
 {
     mDevice = Renderer->GetDevice();
@@ -114,8 +115,8 @@ void RvkGraphicsPipeline::Create(
         .y = 0.0f,
         .width = (float32)extent.Width(),
         .height = (float32)extent.Height(),
-        .minDepth = 0.0f,
-        .maxDepth = 1.0f,
+        .minDepth = 1.0f,
+        .maxDepth = 0.0f,
     };
 
     VkRect2D scissor = {
@@ -157,7 +158,7 @@ void RvkGraphicsPipeline::Create(
         .polygonMode = VK_POLYGON_MODE_FILL,
         .lineWidth = 1.0f,
         .cullMode = cull_mode,
-        .frontFace = VK_FRONT_FACE_CLOCKWISE,
+        .frontFace = winding_is_ccw ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE,
         .depthBiasEnable = VK_FALSE,
     };
 
@@ -185,7 +186,7 @@ void RvkGraphicsPipeline::Create(
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = VK_TRUE,
         .depthWriteEnable = VK_TRUE,
-        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthCompareOp = VK_COMPARE_OP_GREATER,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
     };

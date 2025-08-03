@@ -32,9 +32,9 @@ public:
 
     virtual void WaitUntilLoaded()
     {
-        if (IsFinishedNotifier.IsDone()) {
-            return;
-        }
+        // if (IsFinishedNotifier.IsDone()) {
+        //     return;
+        // }
 
         IsFinishedNotifier.WaitForData(true);
     }

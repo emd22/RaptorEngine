@@ -52,11 +52,17 @@ public:
     {
         Children.push_back(entity);
     }
+    
+    void MoveTo(const FxVec3f& position)
+    {
+        mPosition = position;
+        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition);
+    }
 
-    void Translate(const FxVec3f& offset)
+    void MoveBy(const FxVec3f& offset)
     {
         mPosition += offset;
-        mModelMatrix = mModelMatrix * FxMat4f::AsTranslation(mPosition);
+        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition);
     }
 
     void Scale(const FxVec3f& scale)
@@ -65,10 +71,25 @@ public:
         mModelMatrix = FxMat4f::AsScale(mScale) * mModelMatrix;
     }
 
-    void Rotate(const FxVec3f& rotation)
+    void RotateX(float rad)
     {
-
+        mRotation.X += rad;
+        mModelMatrix = FxMat4f::AsRotationX(mRotation.X);
+        mModelMatrix.Print();
     }
+    
+    void RotateY(float rad)
+    {
+        mRotation.Y += rad;
+        mModelMatrix = FxMat4f::AsRotationY(mRotation.Y);
+    }
+    
+    void RotateZ(float rad)
+    {
+        mRotation.Z += rad;
+        mModelMatrix = FxMat4f::AsRotationZ(mRotation.Z);
+    }
+    
 
     void Update()
     {

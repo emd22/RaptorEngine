@@ -8,6 +8,10 @@
 
 void FxMemPoolPage::Create(uint64 size)
 {
+#ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
+    FxSpinThreadGuard guard(&mInUse);
+#endif
+    
     if (mMem || mSize) {
         FxPanic("FxMemPool", "Mem pool has already been initialized!", 0);
     }
@@ -22,7 +26,7 @@ void FxMemPoolPage::Create(uint64 size)
     mMem = static_cast<uint8*>(allocated_ptr);
 
     // This should allocate enough items to avoid resizing the paged arrays / linked list
-    const uint32 num_mem_blocks = size / 16;
+    const uint32 num_mem_blocks = size / 64;
     mMemBlocks.Create(num_mem_blocks);
 
 }
@@ -292,6 +296,10 @@ auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolP
     while (node != nullptr) {
         if (node->Data.Start == ptr) {
             return node;
+        }
+        
+        if (node->Prev == mMemBlocks.Tail || node->Next == mMemBlocks.Head || node->Prev == node) {
+            FX_BREAKPOINT;
         }
 
         node = node->Prev;

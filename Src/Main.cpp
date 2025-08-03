@@ -82,6 +82,33 @@ public:
     }
 };
 
+
+
+#include <chrono>
+#include <iostream>
+
+#pragma clang optimize off
+
+template <typename FuncType>
+void TestSpeed(FuncType ft, int iterations)
+{
+    using namespace std::chrono;
+    uint64 time_in_ns = 0;
+
+    auto t1 = high_resolution_clock::now();
+    for (int32 i = 0; i < iterations; i++) {
+        ft(i);
+    }
+    auto t2 = high_resolution_clock::now();
+    auto ns = duration_cast<nanoseconds>(t2 - t1);
+    time_in_ns = ns.count() / iterations;
+
+    std::cout << "Function " << typeid(FuncType).name() << " Took " << time_in_ns << "ns.\n";
+}
+
+#pragma clang optimize on
+
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(40, FxUnitMebibyte);
@@ -136,7 +163,6 @@ int main()
     FxRef<FxModel> helmet_model = FxAssetManager::LoadAsset<FxModel>("../models/DamagedHelmet.glb");
 
     // FxRef<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
-    FxRef<FxImage> cheese_image = FxAssetManager::LoadAsset<FxImage>("../textures/cheese.jpg");
 
     // FxRef<FxMaterial> material = FxMaterialManager::New("Default");
     // material->Attach(FxMaterial::ResourceType::Diffuse, test_image);
@@ -144,15 +170,30 @@ int main()
     //
     helmet_model->WaitUntilLoaded();
 
+    FxRef<FxModel> ground_model = FxAssetManager::LoadAsset<FxModel>("../models/Ground.glb");
+    ground_model->WaitUntilLoaded();
+
+    FxRef<FxImage> cheese_image = FxAssetManager::LoadAsset<FxImage>("../textures/cheese.jpg");
+    cheese_image->WaitUntilLoaded();
+
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
-    cheese_material->Attach(FxMaterial::ResourceType::Diffuse, cheese_image);
+    cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
 
     // FxSceneObject scene_object;
     // scene_object.Attach(other_model);
     // scene_object.Attach(material);
+    
+    
+
 
     FxSceneObject helmet_object;
     helmet_object.Attach(helmet_model);
+
+    FxSceneObject ground_object;
+    ground_object.Attach(ground_model);
+    ground_object.Attach(cheese_material);
+
+    ground_object.MoveBy(FxVec3f(0, -2, 0));
 
     if (helmet_model->Materials.size() > 0) {
         FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
@@ -164,13 +205,15 @@ int main()
         helmet_object.Attach(cheese_material);
     }
 
-    helmet_object.Translate(FxVec3f(0, 0, 0));
+    helmet_object.MoveBy(FxVec3f(0, 0, 0));
+    
+//    helmet_object.RotateX(M_PI / 2);
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
-    camera.Position.Z += 5.0f;
+    camera.Position.Z += 15.0f;
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
 
@@ -180,15 +223,16 @@ int main()
     FxLight light;
     light.SetLightVolume(generated_sphere, false);
 
-
     FxLight light2;
     light2.SetLightVolume(generated_sphere, false);
 
-    light.Translate(FxVec3f(4.08, -3.39, 2.8));
-    light.Scale(FxVec3f(20, 20, 20));
+    light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
+    light.Scale(FxVec3f(25));
 
-    light2.Translate(FxVec3f(1, 0, -0.5));
-    light2.Scale(FxVec3f(20, 20, 20));
+    light2.MoveBy(FxVec3f(1, 0, -0.5));
+    light2.Scale(FxVec3f(25));
+    
+    bool second_light_on = false;
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -200,7 +244,7 @@ int main()
         if (FxControlManager::IsMouseLocked()) {
             FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
             mouse_delta.SetX(-0.001 * mouse_delta.GetX() * DeltaTime);
-            mouse_delta.SetY(-0.001 * mouse_delta.GetY() * DeltaTime);
+            mouse_delta.SetY(0.001 * mouse_delta.GetY() * DeltaTime);
 
             camera.Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         }
@@ -219,9 +263,13 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
-            light.mModelMatrix = FxMat4f::AsScale(FxVec3f(8.0, 8.0, 8.0)) * camera.InvViewMatrix;
-            light.mPosition = camera.Position;
+            light.MoveTo(camera.Position);
+
             light.mPosition.Print();
+        }
+        
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
+            second_light_on = !second_light_on;
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
@@ -232,17 +280,33 @@ int main()
         CheckGeneralControls();
 
         camera.Update();
+        
+        helmet_object.RotateY(0.001 * DeltaTime);
+        
+        
 
         if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
             continue;
         }
 
+//         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
+//         helmet_object.Translate(FxVec3f(0, 0, 0));
+
+        ground_object.Render(camera);
         helmet_object.Render(camera);
-        // light.RenderDebugMesh(camera);
+//        light.RenderDebugMesh(camera);
 
         Renderer->BeginLighting();
 
+        
+        if (second_light_on) {
+            light2.MoveTo(camera.Position);
+            
+            light2.Render(camera);
+        }
+        
         light.Render(camera);
+//        light2.Render(camera);
         // light2.Render(camera);
 
         Renderer->DoComposition(camera);

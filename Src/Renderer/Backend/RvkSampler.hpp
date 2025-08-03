@@ -9,7 +9,7 @@
 class RvkSampler
 {
 public:
-    void Create();
+    void Create(VkFilter min_filter = VK_FILTER_LINEAR, VkFilter mag_filter = VK_FILTER_LINEAR, VkSamplerMipmapMode mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR);
     void Destroy();
 
     ~RvkSampler()
@@ -18,7 +18,7 @@ public:
     }
 
 public:
-    VkSampler Sampler = nullptr;;
+    VkSampler Sampler = nullptr;
 
 private:
     RvkGpuDevice* mDevice = nullptr;

@@ -56,10 +56,15 @@ struct alignas(16) FxDrawPushConstants
     float32 ModelMatrix[16];
 };
 
-struct alignas(16) FxLightPushConstants
+struct alignas(16) FxLightVertPushConstants
 {
     float32 MVPMatrix[16];
-    float32 VPMatrix[16];
+};
+
+struct alignas(16) FxLightFragPushConstants
+{
+    float32 InvView[16];
+    float32 InvProj[16];
     float32 LightPos[3];
     float32 PlayerPos[3];
     float32 LightRadius;
@@ -85,7 +90,8 @@ public:
         const FxSlice<VkAttachmentDescription>& attachments,
         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
         FxVertexInfo* vertex_info,
-        VkCullModeFlags = VK_CULL_MODE_BACK_BIT
+        VkCullModeFlags cull_mode = VK_CULL_MODE_NONE,
+        bool winding_is_ccw = true
     );
 
     // void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);

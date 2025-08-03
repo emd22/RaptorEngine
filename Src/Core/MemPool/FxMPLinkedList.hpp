@@ -5,6 +5,8 @@
 
 #include <cstdlib>
 
+#define FX_LINKED_LIST_NO_REUSE_NODES 1
+
 template <typename ElementType>
 class FxMPLinkedList
 {
@@ -63,6 +65,7 @@ public:
     {
         Node* node = nullptr;
 
+#ifdef FX_LINKED_LIST_NO_REUSE_NODES
         // Check if there are available spaces that have been freed recently
         if (!mFreedNodes.IsEmpty()) {
             // Set the node to use as the last node that was freed
@@ -71,11 +74,16 @@ public:
             // Remove the node from the freed list
             mFreedNodes.RemoveLast();
         }
-
         // No nodes can be recycled, insert a new one
         if (node == nullptr) {
             node = mNodePool.Insert();
         }
+        
+#else
+        node = mNodePool.Insert();
+#endif
+
+        
 
         node->Data = data;
         node->Prev = nullptr;
@@ -91,11 +99,14 @@ public:
             return;
         }
 
+#ifdef FX_LINKED_LIST_NO_REUSE_NODES
         // Insert the node into the freed list. This allocated node will be reused when needed.
         {
             auto* element = mFreedNodes.Insert();
+            
             (*element) = node;
         }
+#endif
 
         // If the current node is the head of the list, set the head to be the next node.
         // This means that if there is no node next, the head will be set to null.

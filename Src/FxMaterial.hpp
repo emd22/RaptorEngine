@@ -13,7 +13,7 @@
 class FxMaterial
 {
 public:
-    enum class ResourceType {
+    enum ResourceType {
         Diffuse,
 
         MaxImages,
@@ -25,7 +25,7 @@ public:
     {
         switch (type) {
             case ResourceType::Diffuse:
-                Diffuse = image;
+                DiffuseTexture = image;
                 break;
             default:
                 Log::Error("Unsupported resource type to attach to material!", 0);
@@ -53,7 +53,7 @@ private:
     VkDescriptorSetLayout BuildLayout();
 
 public:
-    FxRef<FxImage> Diffuse{nullptr};
+    FxRef<FxImage> DiffuseTexture{nullptr};
 
     FxHash NameHash{0};
     std::string Name = "";
