@@ -26,7 +26,7 @@ public:
     FxAssetWorker() = default;
 
     void Create();
-
+d
     void SubmitItemToLoad(FxAssetQueueItem &item)
     {
         // Wait for item to no longer be busy
@@ -36,7 +36,7 @@ public:
         // Set busy
         IsBusy.test_and_set();
 
-        Item = std::move(item);
+        Item = (item);
         ItemReady.SignalDataWritten();
     }
 

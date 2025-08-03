@@ -154,7 +154,7 @@ void RvkSwapchain::CreateSwapchainFramebuffers()
     }
 
     ColorSampler.Create();
-    PositionSampler.Create();
+    DepthSampler.Create(VK_FILTER_NEAREST, VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST);
     NormalsSampler.Create();
     LightsSampler.Create();
 
@@ -175,7 +175,7 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
     }
 
     ColorSampler.Destroy();
-    PositionSampler.Destroy();
+    DepthSampler.Destroy();
     NormalsSampler.Destroy();
     LightsSampler.Destroy();
 

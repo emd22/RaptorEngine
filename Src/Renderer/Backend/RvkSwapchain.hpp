@@ -42,7 +42,7 @@ public:
     // FxSizedArray<RvkImage> DepthImages;
 
     RvkSampler ColorSampler;
-    RvkSampler PositionSampler;
+    RvkSampler DepthSampler;
     RvkSampler NormalsSampler;
     RvkSampler LightsSampler;
 

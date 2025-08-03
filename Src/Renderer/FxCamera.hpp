@@ -96,6 +96,6 @@ private:
     float32 mFovRad = FxDegToRad(80.0f);
 
     float32 mAspectRatio = 1.0f;
-    float32 mNearPlane = 100.0f;
+    float32 mNearPlane = 1000.0f;
     float32 mFarPlane = 0.01f;
 };

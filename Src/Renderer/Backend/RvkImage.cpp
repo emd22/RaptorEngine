@@ -27,7 +27,7 @@ void RvkImage::Create(
     VkFormat format,
     VkImageTiling tiling,
     VkImageUsageFlags usage,
-    VkImageAspectFlagBits aspect_flags
+    VkImageAspectFlags aspect_flags
 )
 {
     Size = size;
@@ -97,6 +97,7 @@ void RvkImage::Create(
 
 void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
 {
+    VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     VkImageMemoryBarrier barrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .oldLayout = ImageLayout,
@@ -107,13 +108,14 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
         .srcAccessMask = (mIsDepthTexture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
         .subresourceRange = {
-            .aspectMask = (mIsDepthTexture) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = (mIsDepthTexture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,
             .layerCount = 1,
         }
     };
+    
 
     VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;

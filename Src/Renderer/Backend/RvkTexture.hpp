@@ -23,14 +23,14 @@ class RvkTexture
 public:
     RvkTexture() = default;
 
-    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, uint32 components, const FxRef<RvkSampler>& sampler)
+    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, VkFormat format, uint32 components, const FxRef<RvkSampler>& sampler)
     {
         Sampler = sampler;
-        Create(image_data, dimensions, components);
+        Create(image_data, dimensions, format, components);
     }
 
     // TODO: update this and remove the format/color restrictions
-    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, uint32 components)
+    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, VkFormat format, uint32 components)
     {
         mDevice = Fx_Fwd_GetGpuDevice();
 
@@ -42,7 +42,7 @@ public:
         staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         staging_buffer.Upload(image_data);
 
-        Image.Create(dimensions, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+        Image.Create(dimensions, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
         // Copy image data to a new image fully on the GPU
         Fx_Fwd_SubmitUploadCmd([&](RvkCommandBuffer& cmd) {

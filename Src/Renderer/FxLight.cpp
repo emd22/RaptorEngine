@@ -40,7 +40,7 @@ void FxLight::Render(const FxCamera& camera) const
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->LightingPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
     }
     {
-        FxCompositionPushConstants push_constants{};
+    FxCompositionPushConstants push_constants{};
         memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
         memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 

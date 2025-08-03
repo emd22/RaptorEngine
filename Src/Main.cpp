@@ -207,13 +207,13 @@ int main()
 
     helmet_object.MoveBy(FxVec3f(0, 0, 0));
     
-    helmet_object.RotateX((M_PI / 2));
+//    helmet_object.RotateX(M_PI / 2);
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
-    camera.Position.Z += 5.0f;
+    camera.Position.Z += 15.0f;
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
 
@@ -227,10 +227,12 @@ int main()
     light2.SetLightVolume(generated_sphere, false);
 
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
-    light.Scale(FxVec3f(10));
+    light.Scale(FxVec3f(25));
 
     light2.MoveBy(FxVec3f(1, 0, -0.5));
-    light2.Scale(FxVec3f(10));
+    light2.Scale(FxVec3f(25));
+    
+    bool second_light_on = false;
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -265,6 +267,10 @@ int main()
 
             light.mPosition.Print();
         }
+        
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
+            second_light_on = !second_light_on;
+        }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
             Renderer->DeferredRenderer->RebuildLightingPipeline();
@@ -275,7 +281,9 @@ int main()
 
         camera.Update();
         
-        light2.MoveTo(camera.Position);
+        helmet_object.RotateY(0.001 * DeltaTime);
+        
+        
 
         if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
             continue;
@@ -290,6 +298,13 @@ int main()
 
         Renderer->BeginLighting();
 
+        
+        if (second_light_on) {
+            light2.MoveTo(camera.Position);
+            
+            light2.Render(camera);
+        }
+        
         light.Render(camera);
 //        light2.Render(camera);
         // light2.Render(camera);

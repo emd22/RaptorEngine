@@ -103,7 +103,7 @@ void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
     FxImage* image = static_cast<FxImage*>(asset.Get());
 
-    image->Texture.Create(mImageData, image->Size, image->NumComponents);
+    image->Texture.Create(mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, image->NumComponents);
 
     asset->IsUploadedToGpu = true;
     asset->IsUploadedToGpu.notify_all();

@@ -22,7 +22,7 @@ layout(push_constant) uniform PushConstants {
 
 void main() {
     gl_Position = a_PushConsts.MvpMatrix * vec4(a_Position, 1.0);
-
-    v_Normal = a_Normal;
+    mat3 normal_matrix = mat3(transpose(inverse(a_PushConsts.ModelMatrix)));
+    v_Normal = (normal_matrix * a_Normal);
     v_UV = a_UV;
 }
