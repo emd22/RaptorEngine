@@ -158,6 +158,9 @@ int main()
     // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
     current_camera = &camera;
+    
+    FxRef<FxImage> cheese_image = FxAssetManager::LoadAsset<FxImage>("../textures/cheese.jpg");
+    cheese_image->WaitUntilLoaded();
 
     // FxRef<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
     FxRef<FxModel> helmet_model = FxAssetManager::LoadAsset<FxModel>("../models/DamagedHelmet.glb");
@@ -170,11 +173,10 @@ int main()
     //
     helmet_model->WaitUntilLoaded();
 
-    FxRef<FxModel> ground_model = FxAssetManager::LoadAsset<FxModel>("../models/Ground.glb");
-    ground_model->WaitUntilLoaded();
+//    FxRef<FxModel> ground_model = FxAssetManager::LoadAsset<FxModel>("../models/Ground.glb");
+//    ground_model->WaitUntilLoaded();
 
-    FxRef<FxImage> cheese_image = FxAssetManager::LoadAsset<FxImage>("../textures/cheese.jpg");
-    cheese_image->WaitUntilLoaded();
+    
 
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
@@ -189,11 +191,11 @@ int main()
     FxSceneObject helmet_object;
     helmet_object.Attach(helmet_model);
 
-    FxSceneObject ground_object;
-    ground_object.Attach(ground_model);
-    ground_object.Attach(cheese_material);
+//    FxSceneObject ground_object;
+//    ground_object.Attach(ground_model);
+//    ground_object.Attach(cheese_material);
 
-    ground_object.MoveBy(FxVec3f(0, -2, 0));
+//    ground_object.MoveBy(FxVec3f(0, -2, 0));
 
     if (helmet_model->Materials.size() > 0) {
         FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
@@ -292,7 +294,7 @@ int main()
 //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
 //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
-        ground_object.Render(camera);
+//        ground_object.Render(camera);
         helmet_object.Render(camera);
 //        light.RenderDebugMesh(camera);
 

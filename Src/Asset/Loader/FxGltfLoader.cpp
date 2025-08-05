@@ -54,7 +54,7 @@ void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
     mesh->IsReady = true;
 }
 
-void UploadMeshToGpu(FxModel *model, cgltf_mesh *gltf_mesh, int mesh_index)
+void UploadMeshToGpu(FxRef<FxModel>& model, cgltf_mesh *gltf_mesh, int mesh_index)
 {
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
         auto* primitive = &gltf_mesh->primitives[i];
@@ -114,9 +114,9 @@ FxRef<FxImage> FxGltfLoader::LoadTexture(const FxRef<FxMaterial>& material, cons
     return FxRef<FxImage>(nullptr);
 }
 
-FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
+FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const std::string& path)
 {
-    FxModel* model = static_cast<FxModel*>(asset.Get());
+    FxRef<FxModel> model(asset);
 
     cgltf_options options{};
 
@@ -155,13 +155,12 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const
     return FxGltfLoader::Status::Success;
 }
 
-FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, const uint8* data, uint32 size)
+FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, const uint8* data, uint32 size)
 {
     // (void)asset;
-    FxModel* model = static_cast<FxModel*>(asset.Get());
+    FxRef<FxModel> model(asset);
 
     cgltf_options options{};
-
 
     cgltf_result status = cgltf_parse(&options, data, size, &mGltfData);
     if (status != cgltf_result_success) {
@@ -192,7 +191,8 @@ FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, con
 
 void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
-    FxModel* model = static_cast<FxModel *>(asset.Get());
+    FxRef<FxModel> model(asset);
+    
     model->Meshes.InitSize(mGltfData->meshes_count);
 
     for (int i = 0; i < mGltfData->meshes_count; i++) {
@@ -201,7 +201,7 @@ void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
         UploadMeshToGpu(model, mesh, i);
     }
 
-    cgltf_free(mGltfData);
+//    cgltf_free(mGltfData);
     mGltfData = nullptr;
 
     model->IsUploadedToGpu = true;
@@ -212,8 +212,8 @@ void FxGltfLoader::Destroy(FxRef<FxBaseAsset>& asset)
 {
     (void)asset;
 
-    if (mGltfData) {
-        cgltf_free(mGltfData);
-        mGltfData = nullptr;
-    }
+//    if (mGltfData) {
+//        cgltf_free(mGltfData);
+//        mGltfData = nullptr;
+//    }
 }

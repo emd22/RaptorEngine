@@ -389,9 +389,11 @@ void RvkGraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
 
 void RvkGraphicsPipeline::Destroy()
 {
-    if (mDevice && mDevice->Device) {
-        mDevice->WaitForIdle();
+    if (!mDevice || !mDevice->Device) {
+        return;
     }
+    
+    mDevice->WaitForIdle();
 
     if (Pipeline) {
         vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);

@@ -44,9 +44,11 @@ void FxAssetWorker::Update()
             break;
         }
 
+        // If there is data passed in then we load from memory
         if (Item.RawData != nullptr && Item.DataSize > 0) {
             LoadStatus = Item.Loader->LoadFromMemory(Item.Asset, Item.RawData, Item.DataSize);
         }
+        // There is no data passed in, load from file
         else {
             // Call our specialized loader to load the asset file
             LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
@@ -152,6 +154,7 @@ void FxAssetManager::CheckForUploadableData()
         if (worker.LoadStatus == FxBaseLoader::Status::Success) {
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
+            
             while (!loaded_item.Asset->IsUploadedToGpu) {
                 loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
@@ -231,8 +234,11 @@ void FxAssetManager::AssetManagerUpdate()
             // as check for new arrivals.
             while (CheckWorkersBusy()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
-
+                
+                // Check if there is data to be uploaded to the GPU
                 CheckForUploadableData();
+                
+                // Check if there are any items that can be loaded by a worker
                 CheckForItemsToLoad();
             }
         }

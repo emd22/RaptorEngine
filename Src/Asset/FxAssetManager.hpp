@@ -27,7 +27,7 @@ public:
 
     void Create();
 
-    void SubmitItemToLoad(FxAssetQueueItem &item)
+    void SubmitItemToLoad(const FxAssetQueueItem &item)
     {
         // Wait for item to no longer be busy
         while (IsBusy.test()) {

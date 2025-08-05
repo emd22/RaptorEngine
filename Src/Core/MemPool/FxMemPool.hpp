@@ -7,7 +7,7 @@
 #include <type_traits>
 // #include <vector>
 
-#define FX_MEMPOOL_USE_ATOMIC_LOCKING
+#define FX_MEMPOOL_USE_ATOMIC_LOCKING 1
 
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
 #include <atomic>
@@ -84,15 +84,17 @@ public:
             return;
         }
 
-    #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
-        FxSpinThreadGuard guard(&mInUse);
-    #endif
+    
 
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         if (node == nullptr) {
             Log::Error("FxMemPoolPage::Free: Could not find ptr %p in memory page!", ptr);
             return;
         }
+        
+    #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
+        FxSpinThreadGuard guard(&mInUse);
+    #endif
 
         // Do not mark as a freed block when we are at the end of the page as it is ambiguous
         // on whether the end is a previously freed block or has not been previously allocated.
@@ -171,7 +173,7 @@ private:
 
     FxMPLinkedList<MemBlock> mMemBlocks;
 
-    std::atomic_flag mInUse{ };
+    mutable FxAtomicFlag mInUse{ };
 };
 
 class FxMemPool
@@ -187,15 +189,20 @@ public:
      */
     void Create(uint64 page_size, uint64 size_unit)
     {
-        mPageSize = page_size * size_unit;
-
-        mPoolPages.Create(8);
-
+        FxSpinThreadGuard guard(&mInUse);
+        {
+            
+            mPageSize = page_size * size_unit;
+            
+            mPoolPages.Create(8);
+    #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
+            mCreatedThreadId = std::this_thread::get_id();
+    #endif
+        }
+        
         AllocateNewPage();
 
-#ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
-        mCreatedThreadId = std::this_thread::get_id();
-#endif
+
     }
 
     /**
@@ -251,10 +258,10 @@ public:
         if (pool == nullptr) {
             pool = &GetGlobalPool();
         }
-
+            
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
         const auto& this_id = std::this_thread::get_id();
-
+        
         if (this_id != pool->mCreatedThreadId) {
             Log::Warning("Attempting to free memory from a different thread!");
             std::cout << "Thread ids: " << pool->mCreatedThreadId << ", " << std::this_thread::get_id() << "\n";
@@ -263,7 +270,7 @@ public:
         if constexpr (std::is_destructible_v<Type>) {
             ptr->~Type();
         }
-
+        FxSpinThreadGuard guard(&pool->mInUse);
         FreeRaw(static_cast<void*>(ptr), pool);
     }
 
@@ -282,6 +289,8 @@ private:
     uint64 mPageSize = 0;
 
     FxMPPagedArray<FxMemPoolPage> mPoolPages;
+    
+    FxAtomicFlag mInUse{};
 
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
     std::thread::id mCreatedThreadId;

@@ -60,29 +60,52 @@ private:
 
 #include <atomic>
 
+#define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX 1
+
+#ifndef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
+using FxAtomicFlag = std::atomic_flag;
+#else
+#include <mutex>
+using FxAtomicFlag = std::mutex;
+#endif
+
 struct FxSpinThreadGuard
 {
 public:
-    FxSpinThreadGuard(std::atomic_flag* busy_flag) noexcept
+    FxSpinThreadGuard(FxAtomicFlag* busy_flag) noexcept
     {
+#ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
+        mMutex = busy_flag;
+        
+        mMutex->lock();
+#else
         mFlag = busy_flag;
 
         // If the busy flag is set currently, wait until it is cleared
-        if (mFlag->test()) {
+        while (mFlag->test()) {
             mFlag->wait(true);
         }
 
         // Mark as busy
         mFlag->test_and_set();
         mFlag->notify_one();
+#endif
     }
 
     ~FxSpinThreadGuard() noexcept
     {
+#ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
+        mMutex->unlock();
+#else
         mFlag->clear(std::memory_order_release);
         mFlag->notify_one();
+#endif
     }
 
 private:
-    std::atomic_flag* mFlag = nullptr;
+#ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
+    std::mutex* mMutex;
+#else
+    FxAtomicFlag* mFlag = nullptr;
+#endif
 };

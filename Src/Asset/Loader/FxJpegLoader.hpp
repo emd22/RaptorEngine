@@ -15,8 +15,8 @@ public:
 
     FxJpegLoader() = default;
 
-    Status LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path) override;
-    Status LoadFromMemory(FxRef<FxBaseAsset>& asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(FxRef<FxBaseAsset> asset, const std::string& path) override;
+    Status LoadFromMemory(FxRef<FxBaseAsset> asset, const uint8* data, uint32 size) override;
 
     void Destroy(FxRef<FxBaseAsset>& asset) override;
 
