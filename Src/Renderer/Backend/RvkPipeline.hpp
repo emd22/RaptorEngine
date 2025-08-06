@@ -85,6 +85,7 @@ class RvkGraphicsPipeline
 {
 public:
     void Create(
+        const std::string& name,
         ShaderList shader_list,
         VkPipelineLayout layout,
         const FxSlice<VkAttachmentDescription>& attachments,

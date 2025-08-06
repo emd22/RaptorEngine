@@ -18,6 +18,7 @@
 
 #include "FxDeferred.hpp"
 
+#include <Renderer/Backend/RvkExtensionHandles.hpp>
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
@@ -255,25 +256,6 @@ FuncProt GetExtensionFuncVk(VkInstance instance, const char *name)
     return nullptr;
 }
 
-VkResult CreateDebugUtilsMessengerEXT(
-    VkInstance instance,
-    const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
-    const VkAllocationCallbacks *pAllocator,
-    VkDebugUtilsMessengerEXT *pDebugMessenger)
-{
-    using FuncSig = VkResult (*)(VkInstance, const VkDebugUtilsMessengerCreateInfoEXT *, const VkAllocationCallbacks *, VkDebugUtilsMessengerEXT *);
-
-    const auto returned_function = GetExtensionFuncVk<FuncSig>(instance, "vkCreateDebugUtilsMessengerEXT");
-    return returned_function(instance, pCreateInfo, pAllocator, pDebugMessenger);
-}
-
-void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT messenger, const VkAllocationCallbacks *pAllocator) {
-    using FuncSig = void (*)(VkInstance, VkDebugUtilsMessengerEXT, const VkAllocationCallbacks *);
-
-    const auto returned_function = GetExtensionFuncVk<FuncSig>(instance, "vkDestroyDebugUtilsMessengerEXT");
-    return returned_function(instance, messenger, pAllocator);
-}
-
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 {
@@ -295,7 +277,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     VkDebugUtilsMessengerEXT messenger;
 
-    const auto status = CreateDebugUtilsMessengerEXT(instance, &create_info, nullptr, &messenger);
+    const auto status = Rvk_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
         Log::Error("Could not create debug messenger! (err: %s)", RvkUtil::ResultToStr(status));
         return nullptr;
@@ -309,7 +291,7 @@ void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messeng
         return;
     }
 
-    DestroyDebugUtilsMessengerEXT(instance, messenger, nullptr);
+    Rvk_EXT_DestroyDebugUtilsMessenger(instance, messenger, nullptr);
 }
 
 void FxRenderBackend::InitGPUAllocator()

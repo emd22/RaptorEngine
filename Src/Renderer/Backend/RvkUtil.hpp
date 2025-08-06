@@ -3,13 +3,11 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxPanic.hpp>
-
 #define VkTry(func_result, message)               \
     {                                             \
         const VkResult result__ = (func_result);  \
         if (result__ != VK_SUCCESS) {             \
-            FxModulePanic((message), result__);           \
+            FxModulePanic((message), result__);   \
         }                                         \
     }
 
@@ -77,5 +75,13 @@ public:
             case VK_ERROR_NOT_ENOUGH_SPACE_KHR: return "VK_ERROR_NOT_ENOUGH_SPACE_KHR";
             default: return "Unhandled VkResult";
         }
+    }
+
+    static void SetDebugLabel_(const char* name, VkObjectType object_type, unsigned long long obj);
+
+    template <typename T>
+    static void SetDebugLabel(const char* name, VkObjectType object_type, T obj)
+    {
+        SetDebugLabel_(name, object_type, reinterpret_cast<unsigned long long>(obj));
     }
 };

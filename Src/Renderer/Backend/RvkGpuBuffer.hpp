@@ -163,8 +163,10 @@ public:
 
     void Upload(const FxSizedArray<ElementType> &data)
     {
+        
         auto buffer = GetMappedContext();
-        memcpy(buffer, data.Data, data.GetSizeInBytes());
+        const size_t size_in_bytes = data.GetSizeInBytes();
+        memcpy(buffer, data.Data, size_in_bytes);
     }
 
     void Destroy()

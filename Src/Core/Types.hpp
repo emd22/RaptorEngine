@@ -16,53 +16,53 @@ typedef float float32;
 typedef double float64;
 
 #include <cstddef>
-#include <type_traits>
+// #include <type_traits>
 
 #include <Core/FxPanic.hpp>
 
-template <typename ValueType>
-class Optional {
-public:
-    Optional(ValueType &value)
-        : mHasValue(true),
-          mData()
-    {
-    }
+// template <typename ValueType>
+// class Optional {
+// public:
+//     Optional(ValueType &value)
+//         : mHasValue(true),
+//           mData()
+//     {
+//     }
 
-    Optional(std::nullptr_t)
-        : mHasValue(false),
-          mData()
-    {
-    }
+//     Optional(std::nullptr_t)
+//         : mHasValue(false),
+//           mData()
+//     {
+//     }
 
-    bool HasValue() const { return mHasValue; }
+//     bool HasValue() const { return mHasValue; }
 
-    void Clear()
-    {
-        mHasValue = false;
-    }
+//     void Clear()
+//     {
+//         mHasValue = false;
+//     }
 
-    ValueType &operator *() const
-    {
-        if (!HasValue()) {
-            FxPanic("Optional", "Could not retrieve undefined value", 0);
-        }
+//     ValueType &operator *() const
+//     {
+//         if (!HasValue()) {
+//             FxPanic("Optional", "Could not retrieve undefined value", 0);
+//         }
 
-        return *reinterpret_cast<ValueType *>(&mData);
-    }
+//         return *reinterpret_cast<ValueType *>(&mData);
+//     }
 
-    ValueType &Get() const { return *this; }
+//     ValueType &Get() const { return *this; }
 
-private:
-    bool mHasValue = false;
-    std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
-};
+// private:
+//     bool mHasValue = false;
+//     std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
+// };
 
-#include <atomic>
 
 #define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX 1
 
 #ifndef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
+#include <atomic>
 using FxAtomicFlag = std::atomic_flag;
 #else
 #include <mutex>
@@ -76,7 +76,7 @@ public:
     {
 #ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
         mMutex = busy_flag;
-        
+
         mMutex->lock();
 #else
         mFlag = busy_flag;

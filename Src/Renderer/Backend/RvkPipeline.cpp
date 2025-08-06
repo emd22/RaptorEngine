@@ -50,6 +50,7 @@ FxVertexInfo FxMakeLightVertexInfo()
 }
 
 void RvkGraphicsPipeline::Create(
+    const std::string& name,
     ShaderList shader_list,
     VkPipelineLayout layout,
     const FxSlice<VkAttachmentDescription>& attachments,
@@ -218,6 +219,8 @@ void RvkGraphicsPipeline::Create(
     if (status != VK_SUCCESS) {
         FxModulePanic("Could not create graphics pipeline", status);
     }
+
+    RvkUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 }
 
 // void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
@@ -392,7 +395,7 @@ void RvkGraphicsPipeline::Destroy()
     if (!mDevice || !mDevice->Device) {
         return;
     }
-    
+
     mDevice->WaitForIdle();
 
     if (Pipeline) {

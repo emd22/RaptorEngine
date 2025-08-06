@@ -34,7 +34,7 @@ void FxAssetWorker::Create()
 
 void FxAssetWorker::Update()
 {
-    FxAssetManager& manager = FxAssetManager::GetInstance();
+    // FxAssetManager& manager = FxAssetManager::GetInstance();
 
     while (Running.test()) {
         ItemReady.WaitForData();
@@ -59,7 +59,7 @@ void FxAssetWorker::Update()
         DataPendingUpload.test_and_set();
 
         // Signal the main asset thread that we are done
-        manager.DataLoaded.SignalDataWritten();
+//        manager.DataLoaded.SignalDataWritten();
     }
 }
 
@@ -154,7 +154,7 @@ void FxAssetManager::CheckForUploadableData()
         if (worker.LoadStatus == FxBaseLoader::Status::Success) {
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
-            
+
             while (!loaded_item.Asset->IsUploadedToGpu) {
                 loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
@@ -234,10 +234,10 @@ void FxAssetManager::AssetManagerUpdate()
             // as check for new arrivals.
             while (CheckWorkersBusy()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
-                
+
                 // Check if there is data to be uploaded to the GPU
                 CheckForUploadableData();
-                
+
                 // Check if there are any items that can be loaded by a worker
                 CheckForItemsToLoad();
             }

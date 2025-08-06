@@ -168,7 +168,7 @@ private:
     }
 
 public:
-    FxDataNotifier DataLoaded;
+//    FxDataNotifier DataLoaded;
 private:
     FxAssetQueue mLoadQueue;
 
