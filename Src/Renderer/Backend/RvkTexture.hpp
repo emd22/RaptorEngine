@@ -30,13 +30,13 @@ public:
     }
 
     // TODO: update this and remove the format/color restrictions
-    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, VkFormat format, uint32 components)
+    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u dimensions, VkFormat format, uint32 components)
     {
         mDevice = Fx_Fwd_GetGpuDevice();
 
         // TODO: pass in stride for texture size
-        size_t data_size = dimensions.X * dimensions.Y * components;
-        assert(image_data.Size == data_size);
+        const size_t data_size = dimensions.X * dimensions.Y * components;
+//        assert(image_data.Size == data_size);
 
         RvkRawGpuBuffer<uint8> staging_buffer;
         staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);

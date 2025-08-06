@@ -95,6 +95,11 @@ public:
         mInDeletionQueue.store(false);
     }
 
+    VkInstance GetVulkanInstance()
+    {
+        return mInstance;
+    }
+
     RvkFrameData *GetFrame();
 
     uint32 GetImageIndex() { return mImageIndex; }

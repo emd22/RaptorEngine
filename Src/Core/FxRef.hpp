@@ -14,20 +14,16 @@
 /** The internal reference count for `FxRef`. */
 struct FxRefCount
 {
-    using RefCountType = uint32;
-
-    RefCountType GetCount() const
-    {
-        return Count;
-    }
-
+    using IntType = uint32;
+    using RefCountType = std::atomic<IntType>;
+    
     /** Increments the reference count */
     void Inc() {
         ++Count;
     }
 
     /** Decrements the reference count */
-    RefCountType Dec() {
+    IntType Dec() {
         return (--Count);
     }
 
@@ -52,7 +48,6 @@ public:
         FxSpinThreadGuard guard(&IsBusy);
 
         mRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
-        new (mRefCnt) FxRefCount();
 
         mPtr = ptr;
     }
@@ -62,13 +57,31 @@ public:
      *
      * @tparam U The type of the other FxRef
      */
-    template <typename U> requires std::is_base_of_v<T, U>
-    FxRef(const FxRef<U>& other)
+    template <typename DerivedType> requires std::is_base_of_v<T, DerivedType>
+    FxRef(const FxRef<DerivedType>& other)
     {
-        FxSpinThreadGuard guard(&other.IsBusy);
+        FxSpinThreadGuard other_guard(&other.IsBusy);
+        FxSpinThreadGuard guard(&IsBusy);
 
         mRefCnt = other.mRefCnt;
         mPtr = other.mPtr;
+
+        if (mRefCnt) {
+            mRefCnt->Inc();
+        }
+    }
+    
+    /**
+     * @brief Converts from a base type FxRef to a derived type FxRef.
+     */
+    template <typename BaseType> requires std::is_base_of_v<BaseType, T>
+    FxRef(const FxRef<BaseType>& other)
+    {
+        FxSpinThreadGuard other_guard(&other.IsBusy);
+        FxSpinThreadGuard guard(&IsBusy);
+
+        mRefCnt = other.mRefCnt;
+        mPtr = static_cast<T*>(other.mPtr);
 
         if (mRefCnt) {
             mRefCnt->Inc();
@@ -81,7 +94,8 @@ public:
      */
     FxRef(const FxRef& other)
     {
-        FxSpinThreadGuard guard(&other.IsBusy);
+        FxSpinThreadGuard other_guard(&other.IsBusy);
+        FxSpinThreadGuard guard(&IsBusy);
 
         mRefCnt = other.mRefCnt;
         mPtr = other.mPtr;
@@ -122,13 +136,6 @@ public:
     {
         T* ptr = FxMemPool::Alloc<T>(sizeof(T), std::forward<Args>(args)...);
         return FxRef<T>(ptr);
-    }
-
-    T* Get()
-    {
-        FxSpinThreadGuard guard(&IsBusy);
-
-        return mPtr;
     }
 
     /** Retrieves the internal usage count for the reference. */
@@ -206,8 +213,8 @@ private:
      */
     void DecRef()
     {
-        // FxSpinThreadGuard guard(&IsBusy);
-
+        // Note that since these are only called by other protected ref functions, these do not need a spinlock guard.
+        
         // Reference count does not exist, we can assume that the object is corrupt or no longer exists.
         if (!mRefCnt) {
             return;
@@ -234,8 +241,8 @@ private:
      */
     void IncRef()
     {
-        // FxSpinThreadGuard guard(&IsBusy);
-
+        // Note that since these are only called by other protected ref functions, these do not need a spinlock guard.
+        
         if (!mRefCnt) {
             return;
         }
@@ -250,7 +257,7 @@ public:
     T* mPtr = nullptr;
 
     /** Denotes if the ref is currently in use from some thread */
-    mutable std::atomic_flag IsBusy {false};
+    mutable FxAtomicFlag IsBusy {};
 };
 
 /**

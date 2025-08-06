@@ -22,7 +22,6 @@ public:
 
         // Notify the other thread
         mCV.notify_one();
-
     }
 
     void WaitForData(bool pass_if_already_done=false)
@@ -32,7 +31,6 @@ public:
         if (pass_if_already_done && mDone) {
             return;
         }
-
 
         mCV.wait(lock, [this] { return mDone; });
     }

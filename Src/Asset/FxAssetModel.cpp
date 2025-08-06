@@ -1,6 +1,6 @@
-#include "FxModel.hpp"
+#include "FxAssetModel.hpp"
 
-bool FxModel::CheckIfReady()
+bool FxAssetModel::CheckIfReady()
 {
     if (mModelReady) {
         return mModelReady;
@@ -19,7 +19,7 @@ bool FxModel::CheckIfReady()
     return (mModelReady = true);
 }
 
-void FxModel::Render(RvkGraphicsPipeline &pipeline)
+void FxAssetModel::Render(RvkGraphicsPipeline &pipeline)
 {
     if (!CheckIfReady()) {
         return;

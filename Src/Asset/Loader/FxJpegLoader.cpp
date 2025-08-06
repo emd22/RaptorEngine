@@ -1,6 +1,6 @@
 #include "FxJpegLoader.hpp"
 #include "Asset/FxBaseAsset.hpp"
-#include <Asset/FxImage.hpp>
+#include <Asset/FxAssetImage.hpp>
 
 #include <Core/Log.hpp>
 #include <jpeglib.h>
@@ -9,9 +9,9 @@
 
 #include <Core/FxRef.hpp>
 
-FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path)
+FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const std::string& path)
 {
-    FxImage* image = static_cast<FxImage*>(asset.Get());
+    FxRef<FxAssetImage> image(asset);
 
     const char* c_path = path.c_str();
 
@@ -59,14 +59,16 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset>& asset, const
     return Status::Success;
 }
 
-FxJpegLoader::Status FxJpegLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, const uint8* data, uint32 size)
+FxJpegLoader::Status FxJpegLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, const uint8* data, uint32 size)
 {
-    FxImage* image = static_cast<FxImage*>(asset.Get());
+    FxRef<FxAssetImage> image(asset);
 
     struct jpeg_error_mgr error_mgr;
 
     mJpegInfo.err = jpeg_std_error(&error_mgr);
     jpeg_create_decompress(&mJpegInfo);
+
+    assert(data != nullptr);
 
     jpeg_mem_src(&mJpegInfo, data, size);
 
@@ -101,7 +103,7 @@ FxJpegLoader::Status FxJpegLoader::LoadFromMemory(FxRef<FxBaseAsset>& asset, con
 
 void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
-    FxImage* image = static_cast<FxImage*>(asset.Get());
+    FxRef<FxAssetImage> image(asset);
 
     image->Texture.Create(mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, image->NumComponents);
 

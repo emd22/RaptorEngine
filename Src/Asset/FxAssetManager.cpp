@@ -2,8 +2,8 @@
 #include "Core/FxPanic.hpp"
 #include "Core/FxSizedArray.hpp"
 
-#include "FxModel.hpp"
-#include "FxImage.hpp"
+#include "FxAssetModel.hpp"
+#include "FxAssetImage.hpp"
 
 #include "Loader/FxGltfLoader.hpp"
 #include "Loader/FxJpegLoader.hpp"
@@ -34,7 +34,7 @@ void FxAssetWorker::Create()
 
 void FxAssetWorker::Update()
 {
-    FxAssetManager& manager = FxAssetManager::GetInstance();
+    // FxAssetManager& manager = FxAssetManager::GetInstance();
 
     while (Running.test()) {
         ItemReady.WaitForData();
@@ -44,9 +44,11 @@ void FxAssetWorker::Update()
             break;
         }
 
+        // If there is data passed in then we load from memory
         if (Item.RawData != nullptr && Item.DataSize > 0) {
             LoadStatus = Item.Loader->LoadFromMemory(Item.Asset, Item.RawData, Item.DataSize);
         }
+        // There is no data passed in, load from file
         else {
             // Call our specialized loader to load the asset file
             LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
@@ -57,7 +59,7 @@ void FxAssetWorker::Update()
         DataPendingUpload.test_and_set();
 
         // Signal the main asset thread that we are done
-        manager.DataLoaded.SignalDataWritten();
+//        manager.DataLoaded.SignalDataWritten();
     }
 }
 
@@ -119,22 +121,22 @@ void FxAssetManager::Shutdown()
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxAssetModel>(FxRef<FxAssetModel> asset, const std::string& path)
 {
-    DoLoadAsset<FxModel, FxGltfLoader, FxAssetType::Model>(asset, path);
+    DoLoadAsset<FxAssetModel, FxGltfLoader, FxAssetType::Model>(asset, path);
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxAssetImage>(FxRef<FxAssetImage> asset, const std::string& path)
 {
-    DoLoadAsset<FxImage, FxJpegLoader, FxAssetType::Image>(asset, path);
+    DoLoadAsset<FxAssetImage, FxJpegLoader, FxAssetType::Image>(asset, path);
 }
 
 
 template<>
-void FxAssetManager::LoadFromMemory<FxImage>(FxRef<FxImage> asset, const uint8* data, uint32 data_size)
+void FxAssetManager::LoadFromMemory<FxAssetImage>(FxRef<FxAssetImage> asset, const uint8* data, uint32 data_size)
 {
-    DoLoadFromMemory<FxImage, FxJpegLoader, FxAssetType::Image>(asset, data, data_size);
+    DoLoadFromMemory<FxAssetImage, FxJpegLoader, FxAssetType::Image>(asset, data, data_size);
 }
 
 
@@ -152,6 +154,7 @@ void FxAssetManager::CheckForUploadableData()
         if (worker.LoadStatus == FxBaseLoader::Status::Success) {
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
+
             while (!loaded_item.Asset->IsUploadedToGpu) {
                 loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
@@ -232,7 +235,10 @@ void FxAssetManager::AssetManagerUpdate()
             while (CheckWorkersBusy()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
 
+                // Check if there is data to be uploaded to the GPU
                 CheckForUploadableData();
+
+                // Check if there are any items that can be loaded by a worker
                 CheckForItemsToLoad();
             }
         }

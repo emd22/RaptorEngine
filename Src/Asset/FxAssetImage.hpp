@@ -7,18 +7,18 @@
 #include <Core/FxStaticPtrArray.hpp>
 
 
-class FxImage : public FxBaseAsset
+class FxAssetImage : public FxBaseAsset
 {
 protected:
 public:
-    FxImage()
+    FxAssetImage()
     {
     }
 
     friend class FxAssetManager;
 
 public:
-    ~FxImage() override
+    ~FxAssetImage() override
     {
         Destroy();
     }

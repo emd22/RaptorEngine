@@ -21,8 +21,8 @@ public:
 
     FxGltfLoader() = default;
 
-    Status LoadFromFile(FxRef<FxBaseAsset>& asset, const std::string& path) override;
-    Status LoadFromMemory(FxRef<FxBaseAsset>& asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(FxRef<FxBaseAsset> asset, const std::string& path) override;
+    Status LoadFromMemory(FxRef<FxBaseAsset> asset, const uint8* data, uint32 size) override;
 
     void Destroy(FxRef<FxBaseAsset>& asset) override;
 
@@ -31,7 +31,7 @@ public:
 protected:
     void CreateGpuResource(FxRef<FxBaseAsset>& asset) override;
 
-    FxRef<FxImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
+    FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
 
 private:
     cgltf_data *mGltfData = nullptr;

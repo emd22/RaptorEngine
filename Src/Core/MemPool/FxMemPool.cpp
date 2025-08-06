@@ -81,6 +81,10 @@ static inline uint8* GetAlignedPtr(uint8* ptr)
  */
 auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
+//#ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
+    FxSpinThreadGuard guard(&mInUse);
+//#endif
+    
     auto* node = mMemBlocks.Head;
 
     uint8* new_block_ptr = mMem;
@@ -290,6 +294,8 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
 
 auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
+    FxSpinThreadGuard guard(&mInUse);
+    
     // Start from the tail as most allocations being freed will be recent ones.
     auto* node = mMemBlocks.Tail;
 
@@ -315,6 +321,8 @@ FxMemPool& FxMemPool::GetGlobalPool()
 
 auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
+    FxSpinThreadGuard guard(&mInUse);
+    
     auto* node = mCurrentPage->AllocateMemory(requested_size);
 
     // If we could not allocate any memory in the current page, try to allocate in one of the previous pages.
@@ -480,7 +488,7 @@ FxMemPoolPage* FxMemPool::FindPtrInPage(void* ptr)
     // Iterate in reverse as most allocations being freed are likely to be closer to the most recent allocation.
     size_t num_pages = mPoolPages.Size();
 
-    for (int32 i = num_pages; i >= 0; --i) {
+    for (int32 i = num_pages - 1; i >= 0; --i) {
         FxMemPoolPage* page = &mPoolPages[i];
 
         if (IsPtrInPage(ptr, page)) {
@@ -503,7 +511,6 @@ void FxMemPool::AllocateNewPage()
 
 void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
 {
-
     if (pool == nullptr) {
         pool = &GetGlobalPool();
     }
@@ -511,8 +518,6 @@ void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
     if (ptr == nullptr) {
         return;
     }
-
-    //FxSpinThreadGuard guard(&pool->mInUse);
 
     // Find the page that contains the allocation
     FxMemPoolPage* page = pool->FindPtrInPage(ptr);

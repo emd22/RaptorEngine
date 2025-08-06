@@ -4,11 +4,16 @@
 
 #define FxSizeofArray(arr_) (sizeof((arr_)) / sizeof((arr_)[0]))
 
-template <typename EnumClass>
-std::underlying_type<EnumClass>::type EnumToInt(EnumClass value)
+class FxUtil
 {
-    return static_cast<typename std::underlying_type<EnumClass>::type>(value);
-}
+public:
+    template <typename EnumClass>
+    static std::underlying_type<EnumClass>::type EnumToInt(EnumClass value)
+    {
+        return static_cast<typename std::underlying_type<EnumClass>::type>(value);
+    }
+};
+
 
 // https://en.cppreference.com/w/cpp/types/remove_reference
 // template <class T> struct RemoveReference { typedef T type; };

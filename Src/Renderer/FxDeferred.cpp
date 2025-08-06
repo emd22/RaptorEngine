@@ -197,6 +197,7 @@ void FxDeferredRenderer::CreateGPassPipeline()
     FxVertexInfo vert_info = FxMakeVertexInfo();
 
     GPassPipeline.Create(
+        "Geometry",
         shader_list,
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
@@ -340,6 +341,7 @@ void FxDeferredRenderer::CreateLightingPipeline()
     FxVertexInfo vertex_info = FxMakeLightVertexInfo();
 
     LightingPipeline.Create(
+        "Lighting",
         shader_list,
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
@@ -483,6 +485,7 @@ void FxDeferredRenderer::CreateCompPipeline()
     VkPipelineLayout layout = CreateCompPipelineLayout();
 
     CompPipeline.Create(
+        "Composition",
         shader_list,
         layout,
         FxMakeSlice(attachments, FxSizeofArray(attachments)),

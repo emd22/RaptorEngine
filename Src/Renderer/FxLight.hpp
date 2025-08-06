@@ -27,6 +27,8 @@ public:
     FxRef<FxMesh<VertexType>> LightVolume{nullptr};
     FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen{nullptr};
 
+    FxVec3f Color = FxVec3f::One;
+
 private:
     FxRef<FxMesh<>> mDebugMesh{nullptr};
 };

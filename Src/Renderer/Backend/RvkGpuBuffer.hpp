@@ -163,8 +163,10 @@ public:
 
     void Upload(const FxSizedArray<ElementType> &data)
     {
+
         auto buffer = GetMappedContext();
-        memcpy(buffer, data.Data, data.GetSizeInBytes());
+        const size_t size_in_bytes = data.GetSizeInBytes();
+        memcpy(buffer, data.Data, size_in_bytes);
     }
 
     void Destroy()
@@ -225,7 +227,7 @@ public:
         // Upload the data to the staging buffer
         staging_buffer.Upload(data);
 
-        this->Create(this->Size, EnumToInt(Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+        this->Create(this->Size, FxUtil::EnumToInt(Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
         Fx_Fwd_SubmitUploadCmd([&](RvkCommandBuffer &cmd) {
             VkBufferCopy copy = {

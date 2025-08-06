@@ -39,9 +39,15 @@ void FxLight::Render(const FxCamera& camera) const
         FxLightFragPushConstants push_constants{};
         memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
         memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
-        
-        memcpy(push_constants.LightPos, mPosition.mData, sizeof(float32) * 3);
-        memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 3);
+
+        memcpy(push_constants.LightPos, mPosition.mData, sizeof(float32) * 4);
+
+        push_constants.LightColor[0] = Color.X;
+        push_constants.LightColor[1] = Color.Y;
+        push_constants.LightColor[2] = Color.Z;
+        push_constants.LightColor[3] = 1.0;
+
+        memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 4);
         push_constants.LightRadius = 1.0;
 
         vkCmdPushConstants(

@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include <Asset/FxModel.hpp>
-#include <Asset/FxImage.hpp>
+#include <Asset/FxAssetModel.hpp>
+#include <Asset/FxAssetImage.hpp>
 
 #include "FxMaterial.hpp"
 #include "Renderer/Backend/RvkFrameData.hpp"
@@ -52,7 +52,7 @@ public:
     {
         Children.push_back(entity);
     }
-    
+
     void MoveTo(const FxVec3f& position)
     {
         mPosition = position;
@@ -77,19 +77,19 @@ public:
         mModelMatrix = FxMat4f::AsRotationX(mRotation.X);
         mModelMatrix.Print();
     }
-    
+
     void RotateY(float rad)
     {
         mRotation.Y += rad;
         mModelMatrix = FxMat4f::AsRotationY(mRotation.Y);
     }
-    
+
     void RotateZ(float rad)
     {
         mRotation.Z += rad;
         mModelMatrix = FxMat4f::AsRotationZ(mRotation.Z);
     }
-    
+
 
     void Update()
     {
@@ -150,7 +150,7 @@ public:
         mMaterial = material;
     }
 
-    void Attach(const FxRef<FxModel>& model)
+    void Attach(const FxRef<FxAssetModel>& model)
     {
         mModel = model;
 
@@ -180,6 +180,6 @@ public:
 private:
     RvkUniformBufferObject mUbo;
 
-    FxRef<FxModel> mModel{nullptr};
+    FxRef<FxAssetModel> mModel{nullptr};
     FxRef<FxMaterial> mMaterial{nullptr};
 };
