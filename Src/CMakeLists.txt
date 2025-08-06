@@ -46,7 +46,7 @@ add_compile_options(
     -g
     -Wall
     # -Wpedantic
-    #-fsanitize=address
+    -fsanitize=address
     -Wno-nullability-extension
 )
 

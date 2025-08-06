@@ -61,7 +61,7 @@ void UploadMeshToGpu(FxRef<FxAssetModel>& model, cgltf_mesh *gltf_mesh, int mesh
 
         FxSizedArray<uint32> indices;
 
-        FxMesh<>* mesh = new FxMesh;
+        FxMesh<>* primtive_mesh = new FxMesh;
 
         // if there are indices in the mesh, add them to the FxMesh
         if (primitive->indices != nullptr) {
@@ -75,12 +75,12 @@ void UploadMeshToGpu(FxRef<FxAssetModel>& model, cgltf_mesh *gltf_mesh, int mesh
             );
 
             // Set the mesh indices
-            mesh->UploadIndices(indices);
+            primtive_mesh->UploadIndices(indices);
         }
 
-        UnpackMeshAttributes(mesh, primitive);
+        UnpackMeshAttributes(primtive_mesh, primitive);
 
-        model->Meshes.Data[i] = mesh;
+        model->Meshes.Data[i] = primtive_mesh;
     }
     Log::Info("Add mesh:", 0);
 
@@ -95,6 +95,9 @@ void UploadMeshToGpu(FxRef<FxAssetModel>& model, cgltf_mesh *gltf_mesh, int mesh
 FxRef<FxAssetImage> FxLoaderGltf::LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
 {
     // std::cout << "Texture name: " << texture_view.texture->image->name << '\n';
+    if (!texture_view.texture) {
+        return FxRef<FxAssetImage>(nullptr);
+    }
 
     if (texture_view.texture->image->uri != nullptr) {
         std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
@@ -105,8 +108,12 @@ FxRef<FxAssetImage> FxLoaderGltf::LoadTexture(const FxRef<FxMaterial>& material,
         const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
 
         uint32 size = texture_view.texture->image->buffer_view->size;
+        
         FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
+        
+        // Since this is being loaded on another thread anyway, this shouldn't cause too much of an issue.
         texture->WaitUntilLoaded();
+        
         return texture;
     }
     else {
@@ -195,14 +202,18 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, cons
 void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
 {
     FxRef<FxAssetModel> model(asset);
+    
+    for (int mesh_index = 0; mesh_index < mGltfData->meshes_count; mesh_index++) {
+        cgltf_mesh* mesh = &mGltfData->meshes[mesh_index];
+        
+        printf("Primitives Count: %zu\n", mesh->primitives_count);
 
-    model->Meshes.InitSize(mGltfData->meshes_count);
+        model->Meshes.InitSize(mesh->primitives_count);
 
-    for (int i = 0; i < mGltfData->meshes_count; i++) {
-        auto *mesh = &mGltfData->meshes[i];
 
-        UploadMeshToGpu(model, mesh, i);
+        UploadMeshToGpu(model, mesh, mesh_index);
     }
+    
 
 //    cgltf_free(mGltfData);
 //    mGltfData = nullptr;

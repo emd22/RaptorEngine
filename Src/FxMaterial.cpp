@@ -138,8 +138,6 @@ bool FxMaterial::Bind(RvkCommandBuffer* cmd)
 
 void FxMaterial::Destroy()
 {
-    printf("Freeing material\n");
-
     if (IsBuilt) {
         if (mSetLayout) {
             vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);

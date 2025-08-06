@@ -111,7 +111,7 @@ void TestSpeed(FuncType ft, int iterations)
 
 int main()
 {
-    FxMemPool::GetGlobalPool().Create(40, FxUnitMebibyte);
+    FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
@@ -157,7 +157,7 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/BoomBox.glb");
+    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
 
     helmet_model->WaitUntilLoaded();
 
@@ -192,9 +192,11 @@ int main()
 
     helmet_object.MoveBy(FxVec3f(0, 0, 0));
     
-    helmet_object.Scale(FxVec3f(100, 100, 100));
+    
 
-//    helmet_object.RotateX(M_PI / 2);
+    helmet_object.RotateX(M_PI / 2);
+    
+    helmet_object.Scale(FxVec3f(3, 3, 3));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
