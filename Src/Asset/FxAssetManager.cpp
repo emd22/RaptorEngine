@@ -7,6 +7,7 @@
 
 #include "Loader/FxLoaderGltf.hpp"
 #include "Loader/FxLoaderJpeg.hpp"
+#include "Loader/FxLoaderStb.hpp"
 
 
 #include <atomic>
@@ -15,7 +16,7 @@
 
 #include <Core/Types.hpp>
 
-#include <Core/Defines.hpp>
+#include <Core/FxDefines.hpp>
 
 
 ////////////////////////////////////
@@ -133,10 +134,28 @@ void FxAssetManager::LoadAsset<FxAssetImage>(FxRef<FxAssetImage> asset, const st
 }
 
 
+inline bool IsJpegInMemory(const uint8* data, uint32 data_size)
+{
+    if (data_size < 120) {
+        return false;
+    }
+
+    const bool header_correct = (data[0] == 0xFF) && (data[1] == 0xD8);
+    const bool footer_correct = (data[data_size - 2] == 0xFF) && (data[data_size - 1] == 0xD9);
+
+    return header_correct && footer_correct;
+}
+
+
 template<>
 void FxAssetManager::LoadFromMemory<FxAssetImage>(FxRef<FxAssetImage> asset, const uint8* data, uint32 data_size)
 {
-    DoLoadFromMemory<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, data, data_size);
+    if (IsJpegInMemory(data, data_size)) {
+        DoLoadFromMemory<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, data, data_size);
+    }
+    else {
+        DoLoadFromMemory<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, data, data_size);
+    }
 }
 
 
@@ -169,6 +188,10 @@ void FxAssetManager::CheckForUploadableData()
                 }
                 // loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
             }
+            
+
+            // Destroy the loader(clearing the loading buffers)
+            loaded_item.Loader->Destroy(loaded_item.Asset);
         }
         else if (worker.LoadStatus == FxLoaderBase::Status::Error) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
@@ -186,6 +209,8 @@ void FxAssetManager::CheckForUploadableData()
 
         ItemsEnqueued.clear();
         worker.IsBusy.clear();
+        
+        worker.DataPendingUpload.clear();
     }
 }
 

@@ -4,7 +4,7 @@
 
 #include <ThirdParty/vk_mem_alloc.h>
 
-#include "Core/Defines.hpp"
+#include "Core/FxDefines.hpp"
 #include <Renderer/Backend/RvkFrameData.hpp>
 #include "Renderer/Backend/ShaderList.hpp"
 #include "Renderer/Backend/RvkShader.hpp"

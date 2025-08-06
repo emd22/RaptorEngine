@@ -1,7 +1,7 @@
 #include "FxRenderBackend.hpp"
 #include "Constants.hpp"
 
-#include <Core/Defines.hpp>
+#include <Core/FxDefines.hpp>
 #include <Core/Types.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/Log.hpp>

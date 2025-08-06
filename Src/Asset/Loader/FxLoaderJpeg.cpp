@@ -75,11 +75,13 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     jpeg_read_header(&mJpegInfo, true);
 
     mJpegInfo.out_color_space = JCS_EXT_RGBA;
+    uint32 requested_components = 4;
 
     jpeg_start_decompress(&mJpegInfo);
 
     printf("Image has %d components.\n", mJpegInfo.output_components);
     image->NumComponents = mJpegInfo.output_components;
+    FxDebugAssert(image->NumComponents == requested_components)
 
     printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
     image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
@@ -105,7 +107,7 @@ void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
 {
     FxRef<FxAssetImage> image(asset);
 
-    image->Texture.Create(mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, image->NumComponents);
+    image->Texture.Create(mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, 4);
 
     asset->IsUploadedToGpu = true;
     asset->IsUploadedToGpu.notify_all();
@@ -113,7 +115,9 @@ void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
 void FxLoaderJpeg::Destroy(FxRef<FxAssetBase>& asset)
 {
-    (void)asset;
+//    while (!asset->IsUploadedToGpu) {
+//        asset->IsUploadedToGpu.wait(true);
+//    }
 
     jpeg_destroy_decompress(&mJpegInfo);
 }

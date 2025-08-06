@@ -125,7 +125,7 @@ public:
 
     virtual void Free()
     {
-        if (Data == nullptr) {
+        if (Data == nullptr || DoNotDestroy) {
             return;
         }
 
@@ -350,4 +350,6 @@ public:
     size_t Capacity = 0;
 
     ElementType* Data = nullptr;
+
+    bool DoNotDestroy = false;
 };

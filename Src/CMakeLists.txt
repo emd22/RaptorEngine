@@ -18,6 +18,8 @@ target_compile_options(ThirdPartyLib PRIVATE -Wno-nullability-extension)
 
 project(cr CXX)
 
+set(CMAKE_BUILD_TYPE Debug)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
@@ -26,6 +28,7 @@ list(FILTER SOURCES EXCLUDE REGEX "ThirdParty/.*")
 
 file (GLOB_RECURSE HEADERS "*.hpp")
 list(FILTER HEADERS EXCLUDE REGEX "ThirdParty/.*")
+
 
 
 find_package(Vulkan REQUIRED)

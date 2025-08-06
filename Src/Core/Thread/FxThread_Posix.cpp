@@ -1,6 +1,6 @@
 #include <Core/FxThread.hpp>
 
-#include <Core/Defines.hpp>
+#include <Core/FxDefines.hpp>
 
 #ifdef FX_PLATFORM_MACOS
 #include <pthread.h>

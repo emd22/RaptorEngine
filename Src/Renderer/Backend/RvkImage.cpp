@@ -2,7 +2,7 @@
 #include "RvkImage.hpp"
 
 #include <Core/FxPanic.hpp>
-#include <Core/Defines.hpp>
+#include <Core/FxDefines.hpp>
 
 #include "../Renderer.hpp"
 #include "../FxRenderBackend.hpp"
@@ -115,7 +115,7 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
             .layerCount = 1,
         }
     };
-    
+
 
     VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;

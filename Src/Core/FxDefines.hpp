@@ -16,7 +16,11 @@
     #error "Unsupported platform"
 #endif
 
-
+#ifdef NDEBUG
+#define FX_BUILD_RELEASE
+#else
+#define FX_BUILD_DEBUG
+#endif
 
 #define FX_SET_MODULE_NAME(str) \
     [[maybe_unused]] static const char *FxModuleName__ = str;

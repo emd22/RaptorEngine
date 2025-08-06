@@ -45,9 +45,10 @@ public:
     }
 
     /** Returns the pointer representation of the mapped data. */
-    ElementType *GetPtr() const
+    ElementType *GetPtr()
     {
-        return static_cast<ElementType *>(this);
+        FxDebugAssert(mGpuBuffer->MappedBuffer != nullptr);
+        return static_cast<ElementType *>(mGpuBuffer->MappedBuffer);
     }
 
     ~RvkGpuBufferMapContext()
@@ -163,10 +164,12 @@ public:
 
     void Upload(const FxSizedArray<ElementType> &data)
     {
+        FxDebugAssert(data.Size > 0);
+        FxDebugAssert(data.Data != nullptr);
 
         auto buffer = GetMappedContext();
         const size_t size_in_bytes = data.GetSizeInBytes();
-        memcpy(buffer, data.Data, size_in_bytes);
+        memcpy(buffer.GetPtr(), data.Data, size_in_bytes);
     }
 
     void Destroy()

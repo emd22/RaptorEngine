@@ -1,6 +1,6 @@
 
 #include "RvkPipeline.hpp"
-#include "Core/Defines.hpp"
+#include "Core/FxDefines.hpp"
 #include "RvkCommands.hpp"
 
 #include <Core/Log.hpp>

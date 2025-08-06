@@ -1,5 +1,5 @@
 #include "RvkDevice.hpp"
-#include "Core/Defines.hpp"
+#include "Core/FxDefines.hpp"
 #include "Core/FxSizedArray.hpp"
 
 #include "vulkan/vulkan_core.h"

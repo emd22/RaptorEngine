@@ -1,9 +1,8 @@
 #include "RvkSwapchain.hpp"
 #include "RvkDevice.hpp"
-#include "RvkPipeline.hpp"
 #include "../Renderer.hpp"
 
-#include <Core/Defines.hpp>
+#include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 
 #include <Renderer/FxDeferred.hpp>

@@ -105,7 +105,9 @@ FxRef<FxAssetImage> FxLoaderGltf::LoadTexture(const FxRef<FxMaterial>& material,
         const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
 
         uint32 size = texture_view.texture->image->buffer_view->size;
-        return FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
+        FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
+//        texture->WaitUntilLoaded();
+        return texture;
     }
     else {
         std::cout << "no image added\n";
@@ -145,6 +147,7 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
 
             if (gltf_material.has_pbr_metallic_roughness) {
                 material->DiffuseTexture = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
+                
             }
 
 
@@ -202,7 +205,7 @@ void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
     }
 
 //    cgltf_free(mGltfData);
-    mGltfData = nullptr;
+//    mGltfData = nullptr;
 
     model->IsUploadedToGpu = true;
     model->IsUploadedToGpu.notify_all();
@@ -210,10 +213,13 @@ void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
 void FxLoaderGltf::Destroy(FxRef<FxAssetBase>& asset)
 {
-    (void)asset;
-
-//    if (mGltfData) {
-//        cgltf_free(mGltfData);
-//        mGltfData = nullptr;
+//    while (!asset->IsUploadedToGpu) {
+//        asset->IsUploadedToGpu.wait(true);
 //    }
+
+    if (mGltfData) {
+       printf("Destroyed mesh\n");
+       cgltf_free(mGltfData);
+       mGltfData = nullptr;
+    }
 }
