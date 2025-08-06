@@ -230,6 +230,8 @@ int main()
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light.Scale(FxVec3f(25));
 
+    light.Color = FxVec3f(0.2, 0.1, 0.2);
+
     light2.MoveBy(FxVec3f(1, 0, -0.5));
     light2.Scale(FxVec3f(25));
 
@@ -292,6 +294,9 @@ int main()
 
 //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
 //         helmet_object.Translate(FxVec3f(0, 0, 0));
+
+
+        light.Color.Y = sin(0.005 * Renderer->GetElapsedFrameCount());
 
         ground_object.Render(camera);
         helmet_object.Render(camera);
