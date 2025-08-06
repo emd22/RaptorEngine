@@ -4,7 +4,7 @@
 
 #include <ThirdParty/cgltf.h>
 
-#include <Asset/FxModel.hpp>
+#include <Asset/FxAssetModel.hpp>
 
 #include <Core/FxRef.hpp>
 
@@ -54,7 +54,7 @@ void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
     mesh->IsReady = true;
 }
 
-void UploadMeshToGpu(FxRef<FxModel>& model, cgltf_mesh *gltf_mesh, int mesh_index)
+void UploadMeshToGpu(FxRef<FxAssetModel>& model, cgltf_mesh *gltf_mesh, int mesh_index)
 {
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
         auto* primitive = &gltf_mesh->primitives[i];
@@ -92,31 +92,31 @@ void UploadMeshToGpu(FxRef<FxModel>& model, cgltf_mesh *gltf_mesh, int mesh_inde
 #include <Asset/FxAssetManager.hpp>
 
 
-FxRef<FxImage> FxGltfLoader::LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
+FxRef<FxAssetImage> FxGltfLoader::LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
 {
     // std::cout << "Texture name: " << texture_view.texture->image->name << '\n';
 
     if (texture_view.texture->image->uri != nullptr) {
         std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
-        return FxRef<FxImage>(nullptr);
+        return FxRef<FxAssetImage>(nullptr);
     }
 
     if (texture_view.texture->image != nullptr) {
         const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
 
         uint32 size = texture_view.texture->image->buffer_view->size;
-        return FxAssetManager::LoadFromMemory<FxImage>(data, size);
+        return FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
     }
     else {
         std::cout << "no image added\n";
     }
 
-    return FxRef<FxImage>(nullptr);
+    return FxRef<FxAssetImage>(nullptr);
 }
 
 FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const std::string& path)
 {
-    FxRef<FxModel> model(asset);
+    FxRef<FxAssetModel> model(asset);
 
     cgltf_options options{};
 
@@ -158,7 +158,7 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const 
 FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, const uint8* data, uint32 size)
 {
     // (void)asset;
-    FxRef<FxModel> model(asset);
+    FxRef<FxAssetModel> model(asset);
 
     cgltf_options options{};
 
@@ -191,8 +191,8 @@ FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, cons
 
 void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
 {
-    FxRef<FxModel> model(asset);
-    
+    FxRef<FxAssetModel> model(asset);
+
     model->Meshes.InitSize(mGltfData->meshes_count);
 
     for (int i = 0; i < mGltfData->meshes_count; i++) {

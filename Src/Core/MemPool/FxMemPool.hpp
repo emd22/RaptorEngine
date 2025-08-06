@@ -84,14 +84,14 @@ public:
             return;
         }
 
-    
+
 
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         if (node == nullptr) {
             Log::Error("FxMemPoolPage::Free: Could not find ptr %p in memory page!", ptr);
             return;
         }
-        
+
     #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
         FxSpinThreadGuard guard(&mInUse);
     #endif
@@ -191,15 +191,15 @@ public:
     {
         FxSpinThreadGuard guard(&mInUse);
         {
-            
+
             mPageSize = page_size * size_unit;
-            
+
             mPoolPages.Create(8);
     #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
             mCreatedThreadId = std::this_thread::get_id();
     #endif
         }
-        
+
         AllocateNewPage();
 
 
@@ -258,10 +258,10 @@ public:
         if (pool == nullptr) {
             pool = &GetGlobalPool();
         }
-            
+
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
         const auto& this_id = std::this_thread::get_id();
-        
+
         if (this_id != pool->mCreatedThreadId) {
             Log::Warning("Attempting to free memory from a different thread!");
             std::cout << "Thread ids: " << pool->mCreatedThreadId << ", " << std::this_thread::get_id() << "\n";
@@ -289,7 +289,7 @@ private:
     uint64 mPageSize = 0;
 
     FxMPPagedArray<FxMemPoolPage> mPoolPages;
-    
+
     FxAtomicFlag mInUse{};
 
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP

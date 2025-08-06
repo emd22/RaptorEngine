@@ -3,8 +3,8 @@
 #include "Asset/FxAssetQueueItem.hpp"
 #include "Asset/FxAssetQueue.hpp"
 
-#include "FxModel.hpp"
-#include "FxImage.hpp"
+#include "FxAssetModel.hpp"
+#include "FxAssetImage.hpp"
 
 #include <Core/Types.hpp>
 #include <Core/FxRef.hpp>
@@ -98,7 +98,7 @@ public:
     template <typename T> requires C_IsAsset<T>
     static void LoadAsset(FxRef<T> asset, const std::string& path)
     {
-        if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
+        if constexpr (!std::is_same<T, FxAssetImage>::value && !std::is_same<T, FxAssetModel>::value) {
             static_assert(0, "Asset type is not implemented!");
         }
     }
@@ -106,7 +106,7 @@ public:
     template <typename T> requires C_IsAsset<T>
     static void LoadFromMemory(FxRef<T> asset, const uint8* data, uint32 data_size)
     {
-        if constexpr (!std::is_same<T, FxImage>::value && !std::is_same<T, FxModel>::value) {
+        if constexpr (!std::is_same<T, FxAssetImage>::value && !std::is_same<T, FxAssetModel>::value) {
             static_assert(0, "Asset type is not implemented!");
         }
     }

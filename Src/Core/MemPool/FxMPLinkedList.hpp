@@ -5,7 +5,7 @@
 
 #include <cstdlib>
 
-#define FX_LINKED_LIST_NO_REUSE_NODES 1
+// #define FX_LINKED_LIST_NO_REUSE_NODES 1
 
 template <typename ElementType>
 class FxMPLinkedList
@@ -78,12 +78,12 @@ public:
         if (node == nullptr) {
             node = mNodePool.Insert();
         }
-        
+
 #else
         node = mNodePool.Insert();
 #endif
 
-        
+
 
         node->Data = data;
         node->Prev = nullptr;
@@ -103,7 +103,7 @@ public:
         // Insert the node into the freed list. This allocated node will be reused when needed.
         {
             auto* element = mFreedNodes.Insert();
-            
+
             (*element) = node;
         }
 #endif

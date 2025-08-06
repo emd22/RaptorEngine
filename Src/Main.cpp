@@ -154,13 +154,13 @@ int main()
     asset_manager.Start(2);
     material_manager.Create();
 
-    // PtrContainer<FxModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    // PtrContainer<FxModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
+    // PtrContainer<FxAssetModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
+    // PtrContainer<FxAssetModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
     // FxRef<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
-    FxRef<FxModel> helmet_model = FxAssetManager::LoadAsset<FxModel>("../models/DamagedHelmet.glb");
+    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/DamagedHelmet.glb");
 
     // FxRef<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
 
@@ -170,11 +170,11 @@ int main()
     //
     helmet_model->WaitUntilLoaded();
 
-    FxRef<FxModel> ground_model = FxAssetManager::LoadAsset<FxModel>("../models/Ground.glb");
+    FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
     ground_model->WaitUntilLoaded();
 
-    
-    FxRef<FxImage> cheese_image = FxAssetManager::LoadAsset<FxImage>("../textures/cheese.jpg");
+
+    FxRef<FxAssetImage> cheese_image = FxAssetManager::LoadAsset<FxAssetImage>("../textures/cheese.jpg");
     cheese_image->WaitUntilLoaded();
 
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
@@ -183,8 +183,8 @@ int main()
     // FxSceneObject scene_object;
     // scene_object.Attach(other_model);
     // scene_object.Attach(material);
-    
-    
+
+
 
 
     FxSceneObject helmet_object;
@@ -207,7 +207,7 @@ int main()
     }
 
     helmet_object.MoveBy(FxVec3f(0, 0, 0));
-    
+
 //    helmet_object.RotateX(M_PI / 2);
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
@@ -232,7 +232,7 @@ int main()
 
     light2.MoveBy(FxVec3f(1, 0, -0.5));
     light2.Scale(FxVec3f(25));
-    
+
     bool second_light_on = false;
 
     while (Running) {
@@ -268,7 +268,7 @@ int main()
 
             light.mPosition.Print();
         }
-        
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
             second_light_on = !second_light_on;
         }
@@ -281,10 +281,10 @@ int main()
         CheckGeneralControls();
 
         camera.Update();
-        
+
         helmet_object.RotateY(0.001 * DeltaTime);
-        
-        
+
+
 
         if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
             continue;
@@ -299,13 +299,13 @@ int main()
 
         Renderer->BeginLighting();
 
-        
+
         if (second_light_on) {
             light2.MoveTo(camera.Position);
-            
+
             light2.Render(camera);
         }
-        
+
         light.Render(camera);
 //        light2.Render(camera);
         // light2.Render(camera);

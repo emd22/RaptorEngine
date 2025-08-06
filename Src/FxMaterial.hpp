@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Asset/FxImage.hpp>
+#include <Asset/FxAssetImage.hpp>
 
 #include <Core/FxPagedArray.hpp>
 #include <Core/FxHash.hpp>
@@ -21,7 +21,7 @@ public:
 public:
     FxMaterial() = default;
 
-    void Attach(ResourceType type, FxRef<FxImage>& image)
+    void Attach(ResourceType type, FxRef<FxAssetImage>& image)
     {
         switch (type) {
             case ResourceType::Diffuse:
@@ -53,7 +53,7 @@ private:
     VkDescriptorSetLayout BuildLayout();
 
 public:
-    FxRef<FxImage> DiffuseTexture{nullptr};
+    FxRef<FxAssetImage> DiffuseTexture{nullptr};
 
     FxHash NameHash{0};
     std::string Name = "";

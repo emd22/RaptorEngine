@@ -2,8 +2,8 @@
 #include "Core/FxPanic.hpp"
 #include "Core/FxSizedArray.hpp"
 
-#include "FxModel.hpp"
-#include "FxImage.hpp"
+#include "FxAssetModel.hpp"
+#include "FxAssetImage.hpp"
 
 #include "Loader/FxGltfLoader.hpp"
 #include "Loader/FxJpegLoader.hpp"
@@ -121,22 +121,22 @@ void FxAssetManager::Shutdown()
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxModel>(FxRef<FxModel> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxAssetModel>(FxRef<FxAssetModel> asset, const std::string& path)
 {
-    DoLoadAsset<FxModel, FxGltfLoader, FxAssetType::Model>(asset, path);
+    DoLoadAsset<FxAssetModel, FxGltfLoader, FxAssetType::Model>(asset, path);
 }
 
 template<>
-void FxAssetManager::LoadAsset<FxImage>(FxRef<FxImage> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxAssetImage>(FxRef<FxAssetImage> asset, const std::string& path)
 {
-    DoLoadAsset<FxImage, FxJpegLoader, FxAssetType::Image>(asset, path);
+    DoLoadAsset<FxAssetImage, FxJpegLoader, FxAssetType::Image>(asset, path);
 }
 
 
 template<>
-void FxAssetManager::LoadFromMemory<FxImage>(FxRef<FxImage> asset, const uint8* data, uint32 data_size)
+void FxAssetManager::LoadFromMemory<FxAssetImage>(FxRef<FxAssetImage> asset, const uint8* data, uint32 data_size)
 {
-    DoLoadFromMemory<FxImage, FxJpegLoader, FxAssetType::Image>(asset, data, data_size);
+    DoLoadFromMemory<FxAssetImage, FxJpegLoader, FxAssetType::Image>(asset, data, data_size);
 }
 
 

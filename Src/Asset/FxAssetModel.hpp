@@ -9,11 +9,11 @@
 #include <Core/FxStaticPtrArray.hpp>
 
 
-class FxModel : public FxBaseAsset
+class FxAssetModel : public FxBaseAsset
 {
 protected:
 public:
-    FxModel() = default;
+    FxAssetModel() = default;
 
     friend class FxAssetManager;
 
@@ -21,7 +21,7 @@ public:
     void Render(RvkGraphicsPipeline &pipeline);
     bool CheckIfReady();
 
-    ~FxModel() override
+    ~FxAssetModel() override
     {
         Destroy();
     }
@@ -29,7 +29,7 @@ public:
 // private:
     void Destroy() override
     {
-        Log::Info("Destroy FxModel (%lu meshes)", Meshes.Size);
+        Log::Info("Destroy FxAssetModel (%lu meshes)", Meshes.Size);
 
         for (FxMesh<>* mesh : Meshes) {
             mesh->Destroy();

@@ -31,7 +31,7 @@ public:
 protected:
     void CreateGpuResource(FxRef<FxBaseAsset>& asset) override;
 
-    FxRef<FxImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
+    FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
 
 private:
     cgltf_data *mGltfData = nullptr;

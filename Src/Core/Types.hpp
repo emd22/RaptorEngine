@@ -59,7 +59,7 @@ typedef double float64;
 // };
 
 
-#define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX 1
+// #define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX 1
 
 #ifndef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
 #include <atomic>
