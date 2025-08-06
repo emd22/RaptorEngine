@@ -1,5 +1,5 @@
-#include "FxGltfLoader.hpp"
-#include "Asset/FxBaseAsset.hpp"
+#include "FxLoaderGltf.hpp"
+#include "Asset/FxAssetBase.hpp"
 #include "Renderer/FxMesh.hpp"
 
 #include <ThirdParty/cgltf.h>
@@ -92,7 +92,7 @@ void UploadMeshToGpu(FxRef<FxAssetModel>& model, cgltf_mesh *gltf_mesh, int mesh
 #include <Asset/FxAssetManager.hpp>
 
 
-FxRef<FxAssetImage> FxGltfLoader::LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
+FxRef<FxAssetImage> FxLoaderGltf::LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
 {
     // std::cout << "Texture name: " << texture_view.texture->image->name << '\n';
 
@@ -114,7 +114,7 @@ FxRef<FxAssetImage> FxGltfLoader::LoadTexture(const FxRef<FxMaterial>& material,
     return FxRef<FxAssetImage>(nullptr);
 }
 
-FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const std::string& path)
+FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
 {
     FxRef<FxAssetModel> model(asset);
 
@@ -123,14 +123,14 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const 
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
     if (status != cgltf_result_success) {
         Log::Error("Error parsing GLTF file! (path: %s)", path.c_str());
-        return FxGltfLoader::Status::Error;
+        return FxLoaderGltf::Status::Error;
     }
 
     status = cgltf_load_buffers(&options, mGltfData, path.c_str());
     if (status != cgltf_result_success) {
         Log::Error("Error loading buffers from GLTF file! (path: %s)", path.c_str());
 
-        return FxGltfLoader::Status::Error;
+        return FxLoaderGltf::Status::Error;
     }
 
     std::cout << "cgltf textures; " << mGltfData->textures_count << '\n';
@@ -152,10 +152,10 @@ FxGltfLoader::Status FxGltfLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const 
         }
     }
 
-    return FxGltfLoader::Status::Success;
+    return FxLoaderGltf::Status::Success;
 }
 
-FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, const uint8* data, uint32 size)
+FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
 {
     // (void)asset;
     FxRef<FxAssetModel> model(asset);
@@ -165,7 +165,7 @@ FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, cons
     cgltf_result status = cgltf_parse(&options, data, size, &mGltfData);
     if (status != cgltf_result_success) {
         Log::Error("Error parsing GLTF file from data");
-        return FxGltfLoader::Status::Error;
+        return FxLoaderGltf::Status::Error;
     }
 
     std::cout << "cgltf textures; " << mGltfData->textures_count << '\n';
@@ -186,10 +186,10 @@ FxGltfLoader::Status FxGltfLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, cons
         }
     }
 
-    return FxGltfLoader::Status::Success;
+    return FxLoaderGltf::Status::Success;
 }
 
-void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
+void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
 {
     FxRef<FxAssetModel> model(asset);
 
@@ -208,7 +208,7 @@ void FxGltfLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
     model->IsUploadedToGpu.notify_all();
 }
 
-void FxGltfLoader::Destroy(FxRef<FxBaseAsset>& asset)
+void FxLoaderGltf::Destroy(FxRef<FxAssetBase>& asset)
 {
     (void)asset;
 

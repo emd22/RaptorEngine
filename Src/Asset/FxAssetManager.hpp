@@ -15,7 +15,7 @@
 #include <Core/FxDataNotifier.hpp>
 
 template <typename T>
-concept C_IsAsset = std::is_base_of_v<FxBaseAsset, T>;
+concept C_IsAsset = std::is_base_of_v<FxAssetBase, T>;
 
 /**
  * Worker thread that waits and processes individual asset loading.
@@ -44,7 +44,7 @@ public:
 
 public:
     FxAssetQueueItem Item;
-    FxBaseLoader::Status LoadStatus = FxBaseLoader::Status::None;
+    FxLoaderBase::Status LoadStatus = FxLoaderBase::Status::None;
 
     FxDataNotifier ItemReady;
 

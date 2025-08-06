@@ -1,13 +1,13 @@
 #pragma once
 
-#include "FxBaseAsset.hpp"
+#include "FxAssetBase.hpp"
 
 #include <Renderer/Backend/RvkTexture.hpp>
 
 #include <Core/FxStaticPtrArray.hpp>
 
 
-class FxAssetImage : public FxBaseAsset
+class FxAssetImage : public FxAssetBase
 {
 protected:
 public:

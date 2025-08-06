@@ -1,5 +1,5 @@
-#include "FxJpegLoader.hpp"
-#include "Asset/FxBaseAsset.hpp"
+#include "FxLoaderJpeg.hpp"
+#include "Asset/FxAssetBase.hpp"
 #include <Asset/FxAssetImage.hpp>
 
 #include <Core/Log.hpp>
@@ -9,7 +9,7 @@
 
 #include <Core/FxRef.hpp>
 
-FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const std::string& path)
+FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
 {
     FxRef<FxAssetImage> image(asset);
 
@@ -19,7 +19,7 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const 
 
     if (!fp) {
         Log::Error("Could not find JPEG file at '%s'", c_path);
-        return FxJpegLoader::Status::Error;
+        return FxLoaderJpeg::Status::Error;
     }
 
     struct jpeg_error_mgr error_mgr;
@@ -59,7 +59,7 @@ FxJpegLoader::Status FxJpegLoader::LoadFromFile(FxRef<FxBaseAsset> asset, const 
     return Status::Success;
 }
 
-FxJpegLoader::Status FxJpegLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, const uint8* data, uint32 size)
+FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
 {
     FxRef<FxAssetImage> image(asset);
 
@@ -101,7 +101,7 @@ FxJpegLoader::Status FxJpegLoader::LoadFromMemory(FxRef<FxBaseAsset> asset, cons
     return Status::Success;
 }
 
-void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
+void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
 {
     FxRef<FxAssetImage> image(asset);
 
@@ -111,7 +111,7 @@ void FxJpegLoader::CreateGpuResource(FxRef<FxBaseAsset>& asset)
     asset->IsUploadedToGpu.notify_all();
 }
 
-void FxJpegLoader::Destroy(FxRef<FxBaseAsset>& asset)
+void FxLoaderJpeg::Destroy(FxRef<FxAssetBase>& asset)
 {
     (void)asset;
 

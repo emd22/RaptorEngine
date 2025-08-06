@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FxBaseAsset.hpp"
+#include "FxAssetBase.hpp"
 
 #include <Renderer/FxMesh.hpp>
 #include <Core/FxRef.hpp>
@@ -9,7 +9,7 @@
 #include <Core/FxStaticPtrArray.hpp>
 
 
-class FxAssetModel : public FxBaseAsset
+class FxAssetModel : public FxAssetBase
 {
 protected:
 public:

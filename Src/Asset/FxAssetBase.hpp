@@ -13,10 +13,10 @@
  *
  * @see FxModel
  */
-class FxBaseAsset
+class FxAssetBase
 {
 protected:
-    FxBaseAsset()
+    FxAssetBase()
     {
     }
 
@@ -27,8 +27,8 @@ protected:
 public:
 
     // using OnLoadFunc = void (*)(FxRef<FxBaseAsset> asset);
-    using OnLoadFunc = std::function<void (FxRef<FxBaseAsset>)>;
-    using OnErrorFunc = void (*)(FxRef<FxBaseAsset> asset);
+    using OnLoadFunc = std::function<void (FxRef<FxAssetBase>)>;
+    using OnErrorFunc = void (*)(FxRef<FxAssetBase> asset);
 
     virtual void WaitUntilLoaded()
     {
@@ -51,7 +51,7 @@ public:
 
     virtual void Destroy() = 0;
 
-    virtual ~FxBaseAsset()
+    virtual ~FxAssetBase()
     {
     }
 
