@@ -154,20 +154,11 @@ int main()
     asset_manager.Start(2);
     material_manager.Create();
 
-    // PtrContainer<FxAssetModel> test_model = FxAssetManager::LoadModel("../models/Box.glb");
-    // PtrContainer<FxAssetModel> new_model = FxAssetManager::LoadModel("../models/Box.glb");
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    // FxRef<FxModel> other_model = FxAssetManager::LoadAsset<FxModel>("../models/Cube.glb");
-    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/DamagedHelmet.glb");
+    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/BoomBox.glb");
 
-    // FxRef<FxImage> test_image = FxAssetManager::LoadAsset<FxImage>("../textures/squid.jpg");
-
-    // FxRef<FxMaterial> material = FxMaterialManager::New("Default");
-    // material->Attach(FxMaterial::ResourceType::Diffuse, test_image);
-    // material->Build(&pipeline);
-    //
     helmet_model->WaitUntilLoaded();
 
     FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
@@ -179,13 +170,6 @@ int main()
 
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
-
-    // FxSceneObject scene_object;
-    // scene_object.Attach(other_model);
-    // scene_object.Attach(material);
-
-
-
 
     FxSceneObject helmet_object;
     helmet_object.Attach(helmet_model);
@@ -207,6 +191,8 @@ int main()
     }
 
     helmet_object.MoveBy(FxVec3f(0, 0, 0));
+    
+    helmet_object.Scale(FxVec3f(100, 100, 100));
 
 //    helmet_object.RotateX(M_PI / 2);
 
@@ -284,7 +270,7 @@ int main()
 
         camera.Update();
 
-        helmet_object.RotateY(0.001 * DeltaTime);
+//        helmet_object.RotateY(0.001 * DeltaTime);
 
 
 

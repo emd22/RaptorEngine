@@ -106,7 +106,7 @@ FxRef<FxAssetImage> FxLoaderGltf::LoadTexture(const FxRef<FxMaterial>& material,
 
         uint32 size = texture_view.texture->image->buffer_view->size;
         FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
-//        texture->WaitUntilLoaded();
+        texture->WaitUntilLoaded();
         return texture;
     }
     else {
