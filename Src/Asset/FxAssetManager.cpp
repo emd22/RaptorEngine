@@ -178,8 +178,7 @@ void FxAssetManager::CheckForUploadableData()
                 loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
 
-            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
-            loaded_item.Asset->mIsLoaded.store(true);
+            
 
             // Call the OnLoaded callback if it was registered
             if (!loaded_item.Asset->mOnLoadedCallbacks.empty()) {
@@ -189,6 +188,8 @@ void FxAssetManager::CheckForUploadableData()
                 // loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
             }
             
+            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+            loaded_item.Asset->mIsLoaded.store(true);
 
             // Destroy the loader(clearing the loading buffers)
             loaded_item.Loader->Destroy(loaded_item.Asset);

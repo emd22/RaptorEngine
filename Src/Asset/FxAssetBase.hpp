@@ -67,13 +67,12 @@ public:
         // If the asset has already been loaded, call the callback immediately.
         if (IsFinishedNotifier.IsDone()) {
             on_loaded_callback(this);
-
             return;
         }
+        
         printf("Registered onload callback\n");
 
         mOnLoadedCallbacks.push_back(on_loaded_callback);
-        // mOnLoadedCallback = on_loaded_callback;
     }
 
     void OnError(const OnErrorFunc& on_error_callback)

@@ -157,9 +157,9 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
-
-    helmet_model->WaitUntilLoaded();
+    FxRef<FxAssetModel> helmet_model = FxAssetManager::NewAsset<FxAssetModel>();
+//    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
+//    helmet_model->WaitUntilLoaded();
 
     FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
     ground_model->WaitUntilLoaded();
@@ -172,7 +172,7 @@ int main()
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
 
     FxSceneObject helmet_object;
-    helmet_object.Attach(helmet_model);
+//    helmet_object.Attach(helmet_model);
 
     FxSceneObject ground_object;
     ground_object.Attach(ground_model);
@@ -180,22 +180,23 @@ int main()
 
     ground_object.MoveBy(FxVec3f(0, -2, 0));
 
-    if (helmet_model->Materials.size() > 0) {
-        FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
-        helmet_material->Pipeline = &deferred_renderer->GPassPipeline;
 
-        helmet_object.Attach(helmet_material);
-    }
-    else {
-        helmet_object.Attach(cheese_material);
-    }
+//    if (helmet_model->Materials.size() > 0) {
+//        FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
+//        helmet_material->Pipeline = &deferred_renderer->GPassPipeline;
+//
+//        helmet_object.Attach(helmet_material);
+//    }
+//    else {
+//        helmet_object.Attach(cheese_material);
+//    }
 
     helmet_object.MoveBy(FxVec3f(0, 0, 0));
-    
-    
+
+
 
     helmet_object.RotateX(M_PI / 2);
-    
+
     helmet_object.Scale(FxVec3f(3, 3, 3));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
@@ -258,6 +259,14 @@ int main()
 
             light.mPosition.Print();
         }
+        
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
+            FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
+//            helmet_model->WaitUntilLoaded();
+            
+            helmet_object.Attach(helmet_model);
+            helmet_object.Attach(cheese_material);
+        }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
             second_light_on = !second_light_on;
@@ -287,6 +296,7 @@ int main()
         light.Color.Y = sin(0.005 * Renderer->GetElapsedFrameCount());
 
         ground_object.Render(camera);
+        
         helmet_object.Render(camera);
 //        light.RenderDebugMesh(camera);
 

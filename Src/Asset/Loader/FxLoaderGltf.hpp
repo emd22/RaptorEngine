@@ -26,7 +26,7 @@ public:
 
     void Destroy(FxRef<FxAssetBase>& asset) override;
 
-    ~FxLoaderGltf() = default;
+    ~FxLoaderGltf() override = default;
 
 protected:
     void CreateGpuResource(FxRef<FxAssetBase>& asset) override;

@@ -32,8 +32,12 @@ FxRef<FxEntity> FxEntityManager::New()
 void FxSceneObject::Render(const FxCamera& camera)
 {
     RvkFrameData* frame = Renderer->GetFrame();
+    
+    if (!mMaterial) {
+        return;
+    }
 
-    if (!mMaterial || !mMaterial->IsBuilt) {
+    if (!mMaterial->IsBuilt) {
         mMaterial->Build();
     }
 

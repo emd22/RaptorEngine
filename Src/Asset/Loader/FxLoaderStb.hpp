@@ -20,7 +20,7 @@ public:
 
     void Destroy(FxRef<FxAssetBase>& asset) override;
 
-    ~FxLoaderStb() = default;
+    ~FxLoaderStb() override = default;
 
 protected:
     void CreateGpuResource(FxRef<FxAssetBase>& asset) override;
