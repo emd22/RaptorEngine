@@ -11,7 +11,7 @@
         }                                         \
     }
 
-class RvkUtil {
+class RxUtil {
 public:
 
     static constexpr bool IsFormatDepth(VkFormat format)

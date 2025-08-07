@@ -18,7 +18,7 @@ public:
     friend class FxAssetManager;
 
 public:
-    void Render(RvkGraphicsPipeline &pipeline);
+    void Render(RxGraphicsPipeline &pipeline);
     bool CheckIfReady();
 
     ~FxAssetModel() override

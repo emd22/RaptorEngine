@@ -1,13 +1,13 @@
 #include "FxMaterial.hpp"
-#include <Renderer/Backend/RvkPipeline.hpp>
+#include <Renderer/Backend/RxPipeline.hpp>
 #include "vulkan/vulkan_core.h"
 
 #include <Core/FxDefines.hpp>
 #include <Renderer/Renderer.hpp>
 #include <Renderer/FxDeferred.hpp>
-#include <Renderer/Backend/RvkDevice.hpp>
+#include <Renderer/Backend/RxDevice.hpp>
 
-#include <Renderer/Backend/RvkCommands.hpp>
+#include <Renderer/Backend/RxCommands.hpp>
 
 #include <Core/FxStackArray.hpp>
 
@@ -29,19 +29,19 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     GetGlobalManager().mMaterials.Create(entities_per_page);
 
-    RvkDescriptorPool& dp = mDescriptorPool;
+    RxDescriptorPool& dp = mDescriptorPool;
 
     dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
     dp.Create(Renderer->GetDevice(), MaxMaterials);
 
 
-    AlbedoSampler = FxMakeRef<RvkSampler>();
+    AlbedoSampler = FxMakeRef<RxSampler>();
     AlbedoSampler->Create();
 
     mInitialized = true;
 }
 
-FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RvkGraphicsPipeline* pipeline)
+FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipeline* pipeline)
 {
     FxMaterialManager& gm = GetGlobalManager();
 
@@ -117,7 +117,7 @@ bool FxMaterial::IsReady()
     return (mIsReady = true);
 }
 
-bool FxMaterial::Bind(RvkCommandBuffer* cmd)
+bool FxMaterial::Bind(RxCommandBuffer* cmd)
 {
     if (!IsBuilt.load()) {
         Build();
@@ -181,7 +181,7 @@ void FxMaterial::Build()
     constexpr const int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
     FxStackArray<VkWriteDescriptorSet, max_images> image_infos;
 
-    RvkDescriptorSet& descriptor_set = mDescriptorSet;
+    RxDescriptorSet& descriptor_set = mDescriptorSet;
 
     // Push material textures
     PUSH_IMAGE_IF_SET(DiffuseTexture, 0);

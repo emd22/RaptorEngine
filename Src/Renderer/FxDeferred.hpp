@@ -1,15 +1,15 @@
 #pragma once
 
-#include "Backend/RvkImage.hpp"
-#include "Backend/RvkSampler.hpp"
-#include "Backend/RvkFramebuffer.hpp"
-#include "Backend/RvkDescriptors.hpp"
+#include "Backend/RxImage.hpp"
+#include "Backend/RxSampler.hpp"
+#include "Backend/RxFramebuffer.hpp"
+#include "Backend/RxDescriptors.hpp"
 
-#include "Backend/RvkFrameData.hpp"
+#include "Backend/RxFrameData.hpp"
 
 
 class FxDeferredRenderer;
-struct RvkFrameData;
+struct RxFrameData;
 
 ///////////////////////////////
 // Geometry Pass (Per FIF)
@@ -25,31 +25,31 @@ public:
     void End();
     void Submit();
 
-    void SubmitUniforms(const RvkUniformBufferObject& ubo);
+    void SubmitUniforms(const RxUniformBufferObject& ubo);
     void BuildDescriptorSets();
 
 public:
     // G-Pass attachments
-    RvkImage ColorAttachment;
-    RvkImage PositionsAttachment;
-    RvkImage NormalsAttachment;
+    RxImage ColorAttachment;
+    RxImage PositionsAttachment;
+    RxImage NormalsAttachment;
 
-    RvkImage DepthAttachment;
+    RxImage DepthAttachment;
 
     // G-Pass samplers
-    RvkSampler ColorSampler;
-    RvkSampler PositionsSampler;
+    RxSampler ColorSampler;
+    RxSampler PositionsSampler;
 
-    RvkFramebuffer Framebuffer;
+    RxFramebuffer Framebuffer;
 
-    RvkDescriptorPool DescriptorPool;
-    RvkDescriptorSet DescriptorSet;
+    RxDescriptorPool DescriptorPool;
+    RxDescriptorSet DescriptorSet;
 
-    RvkRawGpuBuffer<RvkUniformBufferObject> UniformBuffer;
+    RxRawGpuBuffer<RxUniformBufferObject> UniformBuffer;
 
 
 private:
-    RvkGraphicsPipeline* mGPassPipeline = nullptr;
+    RxGraphicsPipeline* mGPassPipeline = nullptr;
     FxDeferredRenderer* mRendererInst = nullptr;
 };
 
@@ -67,15 +67,15 @@ public:
     void BuildDescriptorSets(uint16 frame_index);
 
 public:
-    RvkImage ColorAttachment;
+    RxImage ColorAttachment;
 
-    RvkFramebuffer Framebuffer;
+    RxFramebuffer Framebuffer;
 
-    RvkDescriptorPool DescriptorPool;
-    RvkDescriptorSet DescriptorSet;
+    RxDescriptorPool DescriptorPool;
+    RxDescriptorSet DescriptorSet;
 
 private:
-    RvkGraphicsPipeline* mLightingPipeline = nullptr;
+    RxGraphicsPipeline* mLightingPipeline = nullptr;
     FxDeferredRenderer* mRendererInst = nullptr;
 };
 
@@ -96,15 +96,15 @@ public:
     void BuildDescriptorSets(uint16 frame_index);
 
 public:
-    RvkImage ColorAttachment;
+    RxImage ColorAttachment;
 
-    RvkFramebuffer Framebuffer;
+    RxFramebuffer Framebuffer;
 
-    RvkDescriptorPool DescriptorPool;
-    RvkDescriptorSet DescriptorSet;
+    RxDescriptorPool DescriptorPool;
+    RxDescriptorSet DescriptorSet;
 
 private:
-    RvkGraphicsPipeline* mLightingPipeline = nullptr;
+    RxGraphicsPipeline* mLightingPipeline = nullptr;
     FxDeferredRenderer* mRendererInst = nullptr;
 };
 
@@ -127,18 +127,18 @@ public:
     void BuildDescriptorSets(uint16 frame_index);
 
 public:
-    RvkFramebuffer Framebuffer;
+    RxFramebuffer Framebuffer;
 
-    RvkImage* OutputImage;
+    RxImage* OutputImage;
 
-    RvkDescriptorPool DescriptorPool;
-    RvkDescriptorSet DescriptorSet;
+    RxDescriptorPool DescriptorPool;
+    RxDescriptorSet DescriptorSet;
 
 private:
-    RvkGraphicsPipeline* mCompPipeline = nullptr;
+    RxGraphicsPipeline* mCompPipeline = nullptr;
     FxDeferredRenderer* mRendererInst = nullptr;
 
-    RvkFrameData* mCurrentFrame = nullptr;
+    RxFrameData* mCurrentFrame = nullptr;
 };
 
 
@@ -198,7 +198,7 @@ public:
     VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
-    RvkGraphicsPipeline GPassPipeline;
+    RxGraphicsPipeline GPassPipeline;
 
     FxSizedArray<FxDeferredGPass> GPasses;
 
@@ -206,11 +206,11 @@ public:
     // Lighting Pass
     //////////////////////
 
-    RvkGraphicsPipeline LightVolumesPipeline;
+    RxGraphicsPipeline LightVolumesPipeline;
     FxSizedArray<FxDeferredLightVolumePass> LightVolumePasses;
 
     VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
-    RvkGraphicsPipeline LightingPipeline;
+    RxGraphicsPipeline LightingPipeline;
 
     FxSizedArray<FxDeferredLightingPass> LightingPasses;
 
@@ -220,8 +220,8 @@ public:
 
     VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
-    RvkGraphicsPipeline CompPipeline;
-    FxSizedArray<RvkFramebuffer> OutputFramebuffers;
+    RxGraphicsPipeline CompPipeline;
+    FxSizedArray<RxFramebuffer> OutputFramebuffers;
 
     FxSizedArray<FxDeferredCompPass> CompPasses;
 };

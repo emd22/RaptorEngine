@@ -13,22 +13,22 @@
 #include <memory.h>
 
 template <typename ElementType>
-class RvkRawGpuBuffer;
+class RxRawGpuBuffer;
 
 template <typename ElementType>
-class RvkGpuBuffer;
+class RxGpuBuffer;
 
-enum class RvkBufferUsageType {
+enum class RxBufferUsageType {
     Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 };
 
 template <typename ElementType>
-class RvkGpuBufferMapContext
+class RxGpuBufferMapContext
 {
 public:
 
-    RvkGpuBufferMapContext(RvkRawGpuBuffer<ElementType> *buffer)
+    RxGpuBufferMapContext(RxRawGpuBuffer<ElementType> *buffer)
         : mGpuBuffer(buffer)
     {
         mGpuBuffer->Map();
@@ -51,7 +51,7 @@ public:
         return static_cast<ElementType *>(mGpuBuffer->MappedBuffer);
     }
 
-    ~RvkGpuBufferMapContext()
+    ~RxGpuBufferMapContext()
     {
         mGpuBuffer->UnMap();
     }
@@ -65,7 +65,7 @@ public:
     }
 
 private:
-    RvkRawGpuBuffer<ElementType> *mGpuBuffer = nullptr;
+    RxRawGpuBuffer<ElementType> *mGpuBuffer = nullptr;
 };
 
 
@@ -73,17 +73,17 @@ private:
  * Provides a GPU buffer that can be created with more complex parameters without staging.
  */
 template <typename ElementType>
-class RvkRawGpuBuffer
+class RxRawGpuBuffer
 {
 public:
     const int32 ElementSize = sizeof(ElementType);
 
 public:
-    RvkRawGpuBuffer() = default;
+    RxRawGpuBuffer() = default;
 
-    RvkRawGpuBuffer(RvkRawGpuBuffer<ElementType> &other) = delete;
+    RxRawGpuBuffer(RxRawGpuBuffer<ElementType> &other) = delete;
 
-    RvkRawGpuBuffer operator = (RvkRawGpuBuffer<ElementType> &other) = delete;
+    RxRawGpuBuffer operator = (RxRawGpuBuffer<ElementType> &other) = delete;
 
     void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage)
     {
@@ -127,9 +127,9 @@ public:
      *
      * To get the mapped buffer, either use `value.MappedBuffer`, or `value` when using the value as a pointer.
      */
-    RvkGpuBufferMapContext<ElementType> GetMappedContext()
+    RxGpuBufferMapContext<ElementType> GetMappedContext()
     {
-        return RvkGpuBufferMapContext<ElementType>(this);
+        return RxGpuBufferMapContext<ElementType>(this);
     }
 
     void Map()
@@ -188,7 +188,7 @@ public:
         Size = 0;
     }
 
-    ~RvkRawGpuBuffer()
+    ~RxRawGpuBuffer()
     {
         Destroy();
     }
@@ -211,28 +211,28 @@ private:
  * buffer type.
  */
 template <typename ElementType>
-class RvkGpuBuffer : public RvkRawGpuBuffer<ElementType>
+class RxGpuBuffer : public RxRawGpuBuffer<ElementType>
 {
 private:
-    using RvkRawGpuBuffer<ElementType>::Create;
+    using RxRawGpuBuffer<ElementType>::Create;
 public:
-    RvkGpuBuffer() = default;
+    RxGpuBuffer() = default;
 
-    void Create(RvkBufferUsageType usage, FxSizedArray<ElementType> &data)
+    void Create(RxBufferUsageType usage, FxSizedArray<ElementType> &data)
     {
         this->Size = data.Size;
         Usage = usage;
 
         const uint64_t buffer_size = data.Size * sizeof(ElementType);
 
-        RvkRawGpuBuffer<ElementType> staging_buffer;
+        RxRawGpuBuffer<ElementType> staging_buffer;
         staging_buffer.Create(this->Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         // Upload the data to the staging buffer
         staging_buffer.Upload(data);
 
         this->Create(this->Size, FxUtil::EnumToInt(Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-        Fx_Fwd_SubmitUploadCmd([&](RvkCommandBuffer &cmd) {
+        Fx_Fwd_SubmitUploadCmd([&](RxCommandBuffer &cmd) {
             VkBufferCopy copy = {
                 .dstOffset = 0,
                 .srcOffset = 0,
@@ -244,7 +244,7 @@ public:
         staging_buffer.Destroy();
     }
 public:
-    RvkBufferUsageType Usage;
+    RxBufferUsageType Usage;
 private:
     size_t ElementSize = sizeof(ElementType);
 };

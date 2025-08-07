@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RvkDevice.hpp"
+#include "RxDevice.hpp"
 
 #include <Core/FxPanic.hpp>
 
@@ -8,10 +8,10 @@
 
 #include <vulkan/vulkan.h>
 
-class RvkFence
+class RxFence
 {
 public:
-    void Create(RvkGpuDevice *device)
+    void Create(RxGpuDevice *device)
     {
         const VkFenceCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -58,14 +58,14 @@ public:
 public:
     VkFence Fence;
 private:
-    RvkGpuDevice *mDevice = nullptr;
+    RxGpuDevice *mDevice = nullptr;
 };
 
 
-class RvkSemaphore
+class RxSemaphore
 {
 public:
-    void Create(RvkGpuDevice *device)
+    void Create(RxGpuDevice *device)
     {
         const VkSemaphoreCreateInfo create_info {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -90,5 +90,5 @@ public:
 public:
     VkSemaphore Semaphore;
 private:
-    RvkGpuDevice *mDevice = nullptr;
+    RxGpuDevice *mDevice = nullptr;
 };

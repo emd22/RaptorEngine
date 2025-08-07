@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ShaderList.hpp"
-#include "RvkRenderPass.hpp"
+#include "RxRenderPass.hpp"
 
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxSlice.hpp>
@@ -10,7 +10,7 @@
 
 #include <Math/Mat4.hpp>
 
-class RvkCommandBuffer;
+class RxCommandBuffer;
 
 enum FxVertexFlags : int8
 {
@@ -20,23 +20,23 @@ enum FxVertexFlags : int8
 };
 
 template <int8 Flags>
-struct RvkVertex;
+struct RxVertex;
 
 template <>
-struct RvkVertex<FxVertexPosition>
+struct RxVertex<FxVertexPosition>
 {
     float32 Position[3];
 } __attribute__((packed));
 
 template <>
-struct RvkVertex<FxVertexPosition | FxVertexNormal>
+struct RxVertex<FxVertexPosition | FxVertexNormal>
 {
     float32 Position[3];
     float32 Normal[3];
 } __attribute__((packed));
 
 template <>
-struct RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
+struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
 {
     float32 Position[3];
     float32 Normal[3];
@@ -82,7 +82,7 @@ FxVertexInfo FxMakeVertexInfo();
 FxVertexInfo FxMakeLightVertexInfo();
 
 
-class RvkGraphicsPipeline
+class RxGraphicsPipeline
 {
 public:
     void Create(
@@ -104,9 +104,9 @@ public:
 
     void Destroy();
 
-    void Bind(RvkCommandBuffer &command_buffer);
+    void Bind(RxCommandBuffer &command_buffer);
 
-    ~RvkGraphicsPipeline()
+    ~RxGraphicsPipeline()
     {
         Destroy();
     }
@@ -122,8 +122,8 @@ public:
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;
 
-    RvkRenderPass RenderPass;
+    RxRenderPass RenderPass;
 private:
-    RvkGpuDevice *mDevice = nullptr;
+    RxGpuDevice *mDevice = nullptr;
     ShaderList mShaders;
 };

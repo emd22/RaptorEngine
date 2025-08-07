@@ -4,10 +4,10 @@
 
 #include <Core/FxSizedArray.hpp>
 
-#include "RvkGpuBuffer.hpp"
-#include "RvkImage.hpp"
-#include "RvkDevice.hpp"
-#include "RvkSampler.hpp"
+#include "RxGpuBuffer.hpp"
+#include "RxImage.hpp"
+#include "RxDevice.hpp"
+#include "RxSampler.hpp"
 
 #include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
 // #include "Fwd/Fwd_AddToDeletionQueue.hpp"
@@ -18,12 +18,12 @@
 
 #include <assert.h>
 
-class RvkTexture
+class RxTexture
 {
 public:
-    RvkTexture() = default;
+    RxTexture() = default;
 
-    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, VkFormat format, uint32 components, const FxRef<RvkSampler>& sampler)
+    void Create(const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, VkFormat format, uint32 components, const FxRef<RxSampler>& sampler)
     {
         Sampler = sampler;
         Create(image_data, dimensions, format, components);
@@ -38,14 +38,14 @@ public:
         const size_t data_size = dimensions.X * dimensions.Y * components;
 //        assert(image_data.Size == data_size);
 
-        RvkRawGpuBuffer<uint8> staging_buffer;
+        RxRawGpuBuffer<uint8> staging_buffer;
         staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         staging_buffer.Upload(image_data);
 
         Image.Create(dimensions, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
         // Copy image data to a new image fully on the GPU
-        Fx_Fwd_SubmitUploadCmd([&](RvkCommandBuffer& cmd) {
+        Fx_Fwd_SubmitUploadCmd([&](RxCommandBuffer& cmd) {
             Image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd);
 
             VkBufferImageCopy copy {
@@ -71,12 +71,12 @@ public:
         });
     }
 
-    void SetSampler(const FxRef<RvkSampler>& sampler)
+    void SetSampler(const FxRef<RxSampler>& sampler)
     {
         Sampler = sampler;
     }
 
-    FxRef<RvkSampler> GetSampler()
+    FxRef<RxSampler> GetSampler()
     {
         return Sampler;
     }
@@ -86,15 +86,15 @@ public:
         this->Image.Destroy();
     }
 
-    ~RvkTexture()
+    ~RxTexture()
     {
         this->Destroy();
     }
 
 public:
-    RvkImage Image;
-    FxRef<RvkSampler> Sampler{nullptr};
+    RxImage Image;
+    FxRef<RxSampler> Sampler{nullptr};
 
 private:
-    RvkGpuDevice* mDevice = nullptr;
+    RxGpuDevice* mDevice = nullptr;
 };

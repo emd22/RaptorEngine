@@ -1,11 +1,11 @@
-#include "RvkDescriptors.hpp"
+#include "RxDescriptors.hpp"
 
 
 /////////////////////////////////////
 // Descriptor Pool Functions
 /////////////////////////////////////
 
-void RvkDescriptorPool::Create(RvkGpuDevice* device, uint32 max_sets)
+void RxDescriptorPool::Create(RxGpuDevice* device, uint32 max_sets)
 {
 
     mDevice = device;
@@ -21,7 +21,7 @@ void RvkDescriptorPool::Create(RvkGpuDevice* device, uint32 max_sets)
     }
 }
 
-void RvkDescriptorSet::Create(const RvkDescriptorPool& pool, VkDescriptorSetLayout layout)
+void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout)
 {
     mDevice = pool.mDevice;
 
@@ -36,7 +36,7 @@ void RvkDescriptorSet::Create(const RvkDescriptorPool& pool, VkDescriptorSetLayo
     }
 }
 
-VkWriteDescriptorSet RvkDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest, const RvkTexture& texture, VkImageLayout layout, VkDescriptorType type)
+VkWriteDescriptorSet RxDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest, const RxTexture& texture, VkImageLayout layout, VkDescriptorType type)
 {
 
     VkDescriptorImageInfo image_info{

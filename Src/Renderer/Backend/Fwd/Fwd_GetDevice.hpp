@@ -1,5 +1,5 @@
 #pragma once
 
-#include "../RvkDevice.hpp"
+#include "../RxDevice.hpp"
 
-RvkGpuDevice* Fx_Fwd_GetGpuDevice();
+RxGpuDevice* Fx_Fwd_GetGpuDevice();

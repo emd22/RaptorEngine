@@ -1,8 +1,8 @@
-#include "RvkExtensionHandles.hpp"
+#include "RxExtensionHandles.hpp"
 
-RvkVoidFunction RvkGetExtensionFunc_(VkInstance instance, const char *name)
+RxVoidFunction RxGetExtensionFunc_(VkInstance instance, const char *name)
 {
-    RvkVoidFunction raw_ptr = vkGetInstanceProcAddr(instance, name);
+    RxVoidFunction raw_ptr = vkGetInstanceProcAddr(instance, name);
 
     if (raw_ptr != nullptr) {
         return raw_ptr;
@@ -13,15 +13,15 @@ RvkVoidFunction RvkGetExtensionFunc_(VkInstance instance, const char *name)
 }
 
 
-VkResult Rvk_EXT_SetDebugUtilsObjectName(VkInstance instance, VkDevice device, const VkDebugUtilsObjectNameInfoEXT* pNameInfo)
+VkResult Rx_EXT_SetDebugUtilsObjectName(VkInstance instance, VkDevice device, const VkDebugUtilsObjectNameInfoEXT* pNameInfo)
 {
     using TFn = VkResult (*)(VkDevice, const VkDebugUtilsObjectNameInfoEXT*);
-    const auto ext_function = RvkGetExtensionFunc<TFn>(instance, "vkSetDebugUtilsObjectNameEXT");
+    const auto ext_function = RxGetExtensionFunc<TFn>(instance, "vkSetDebugUtilsObjectNameEXT");
     return ext_function(device, pNameInfo);
 }
 
 
-VkResult Rvk_EXT_CreateDebugUtilsMessenger(
+VkResult Rx_EXT_CreateDebugUtilsMessenger(
     VkInstance instance,
     const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
     const VkAllocationCallbacks *pAllocator,
@@ -30,16 +30,16 @@ VkResult Rvk_EXT_CreateDebugUtilsMessenger(
 {
     using TFn = VkResult (*)(VkInstance, const VkDebugUtilsMessengerCreateInfoEXT *, const VkAllocationCallbacks *, VkDebugUtilsMessengerEXT *);
 
-    const auto ext_function = RvkGetExtensionFunc<TFn>(instance, "vkCreateDebugUtilsMessengerEXT");
+    const auto ext_function = RxGetExtensionFunc<TFn>(instance, "vkCreateDebugUtilsMessengerEXT");
     return ext_function(instance, pCreateInfo, pAllocator, pDebugMessenger);
 }
 
 
 
 
-void Rvk_EXT_DestroyDebugUtilsMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger, const VkAllocationCallbacks *pAllocator) {
+void Rx_EXT_DestroyDebugUtilsMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger, const VkAllocationCallbacks *pAllocator) {
     using TFn = void (*)(VkInstance, VkDebugUtilsMessengerEXT, const VkAllocationCallbacks *);
 
-    const auto ext_function = RvkGetExtensionFunc<TFn>(instance, "vkDestroyDebugUtilsMessengerEXT");
+    const auto ext_function = RxGetExtensionFunc<TFn>(instance, "vkDestroyDebugUtilsMessengerEXT");
     return ext_function(instance, messenger, pAllocator);
 }

@@ -1,8 +1,8 @@
-#include "RvkSampler.hpp"
+#include "RxSampler.hpp"
 
 #include <Renderer/Renderer.hpp>
 
-void RvkSampler::Create(VkFilter min_filter, VkFilter mag_filter, VkSamplerMipmapMode mipmap_mode)
+void RxSampler::Create(VkFilter min_filter, VkFilter mag_filter, VkSamplerMipmapMode mipmap_mode)
 {
     mDevice = Renderer->GetDevice();
 
@@ -10,7 +10,7 @@ void RvkSampler::Create(VkFilter min_filter, VkFilter mag_filter, VkSamplerMipma
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .minFilter = min_filter,
         .magFilter = mag_filter,
-       
+
         .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -30,14 +30,14 @@ void RvkSampler::Create(VkFilter min_filter, VkFilter mag_filter, VkSamplerMipma
     };
 
     VkResult result = vkCreateSampler(mDevice->Device, &sampler_info, nullptr, &Sampler);
-    
+
     if (result != VK_SUCCESS) {
         Log::Error("Error creating texture sampler!", 0);
         Sampler = nullptr;
     }
 }
 
-void RvkSampler::Destroy()
+void RxSampler::Destroy()
 {
     if (!Sampler) {
         return;

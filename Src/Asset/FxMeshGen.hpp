@@ -6,7 +6,7 @@
 class FxMeshGen
 {
 public:
-    using LightVolumeVertex = RvkVertex<FxVertexPosition>;
+    using LightVolumeVertex = RxVertex<FxVertexPosition>;
 
     struct GeneratedMesh
     {

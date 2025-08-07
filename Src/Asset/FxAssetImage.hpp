@@ -2,7 +2,7 @@
 
 #include "FxAssetBase.hpp"
 
-#include <Renderer/Backend/RvkTexture.hpp>
+#include <Renderer/Backend/RxTexture.hpp>
 
 #include <Core/FxStaticPtrArray.hpp>
 
@@ -37,7 +37,7 @@ public:
     }
 
 public:
-    RvkTexture Texture;
+    RxTexture Texture;
 
     uint32 NumComponents = 3;
     FxVec2u Size = FxVec2u::Zero;

@@ -1,13 +1,13 @@
-#include "RvkCommands.hpp"
-#include "RvkDevice.hpp"
+#include "RxCommands.hpp"
+#include "RxDevice.hpp"
 
 #include "../Renderer.hpp"
 
 #include <Core/FxPanic.hpp>
 
-FX_SET_MODULE_NAME("RvkCommandBuffer")
+FX_SET_MODULE_NAME("RxCommandBuffer")
 
-void RvkCommandBuffer::Create(RvkCommandPool *pool)
+void RxCommandBuffer::Create(RxCommandPool *pool)
 {
     mCommandPool = pool;
 
@@ -30,14 +30,14 @@ void RvkCommandBuffer::Create(RvkCommandPool *pool)
     mInitialized = true;
 }
 
-inline void RvkCommandBuffer::CheckInitialized() const
+inline void RxCommandBuffer::CheckInitialized() const
 {
     if (!IsInitialized()) {
         FxModulePanic("Command buffer has not been initialized!", 0);
     }
 }
 
-void RvkCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
+void RxCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
 {
     CheckInitialized();
 
@@ -53,14 +53,14 @@ void RvkCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
     }
 }
 
-void RvkCommandBuffer::Reset()
+void RxCommandBuffer::Reset()
 {
     CheckInitialized();
 
     vkResetCommandBuffer(CommandBuffer, 0);
 }
 
-void RvkCommandBuffer::End()
+void RxCommandBuffer::End()
 {
     CheckInitialized();
 
@@ -70,7 +70,7 @@ void RvkCommandBuffer::End()
     }
 }
 
-void RvkCommandBuffer::Destroy()
+void RxCommandBuffer::Destroy()
 {
     vkFreeCommandBuffers(mDevice->Device, mCommandPool->CommandPool, 1, &CommandBuffer);
 }

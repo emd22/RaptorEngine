@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-#include "../RvkCommands.hpp"
+#include "../RxCommands.hpp"
 
 
-void Fx_Fwd_SubmitUploadCmd(std::function<void (RvkCommandBuffer &)> func);
+void Fx_Fwd_SubmitUploadCmd(std::function<void (RxCommandBuffer &)> func);

@@ -3,22 +3,22 @@
 #include "vulkan/vulkan_core.h"
 #include <vulkan/vulkan.h>
 
-#include "RvkDevice.hpp"
+#include "RxDevice.hpp"
 
 #include <Core/FxPanic.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <vector>
 
-#include "RvkGpuBuffer.hpp"
-#include "RvkPipeline.hpp"
-#include "RvkTexture.hpp"
+#include "RxGpuBuffer.hpp"
+#include "RxPipeline.hpp"
+#include "RxTexture.hpp"
 
 #include <Renderer/Constants.hpp>
 
-class RvkDescriptorPool
+class RxDescriptorPool
 {
 public:
-    void Create(RvkGpuDevice* device, uint32 max_sets = 10);
+    void Create(RxGpuDevice* device, uint32 max_sets = 10);
 
     void AddPoolSize(VkDescriptorType type, uint32_t count)
     {
@@ -37,7 +37,7 @@ public:
         Pool = nullptr;
     }
 
-    ~RvkDescriptorPool()
+    ~RxDescriptorPool()
     {
         Destroy();
     }
@@ -46,15 +46,15 @@ public:
     VkDescriptorPool Pool = nullptr;
     std::vector<VkDescriptorPoolSize> PoolSizes;
 private:
-    friend class RvkDescriptorSet;
+    friend class RxDescriptorSet;
 
-    RvkGpuDevice *mDevice = nullptr;
+    RxGpuDevice *mDevice = nullptr;
 };
 
-class RvkDescriptorSet
+class RxDescriptorSet
 {
 public:
-    void Create(const RvkDescriptorPool &pool, VkDescriptorSetLayout layout);
+    void Create(const RxDescriptorPool &pool, VkDescriptorSetLayout layout);
 
     // template <typename T>
     // void WriteBuffer(VkBuffer& buffer)
@@ -63,7 +63,7 @@ public:
     // }
 
     template <typename T>
-    VkWriteDescriptorSet GetBufferWriteDescriptor(uint32 bind_dest, const RvkRawGpuBuffer<T>& buffer, VkDescriptorType type)
+    VkWriteDescriptorSet GetBufferWriteDescriptor(uint32 bind_dest, const RxRawGpuBuffer<T>& buffer, VkDescriptorType type)
     {
         VkDescriptorBufferInfo info{
             .buffer = buffer.Buffer,
@@ -84,7 +84,7 @@ public:
         return write;
     }
 
-    VkWriteDescriptorSet GetImageWriteDescriptor(uint32 bind_dest, const RvkTexture& texture, VkImageLayout layout, VkDescriptorType type);
+    VkWriteDescriptorSet GetImageWriteDescriptor(uint32 bind_dest, const RxTexture& texture, VkImageLayout layout, VkDescriptorType type);
 
     void SubmitWrites(FxSizedArray<VkWriteDescriptorSet>& to_write)
     {
@@ -93,16 +93,16 @@ public:
     }
 
     static void BindMultiple(
-        const RvkCommandBuffer& cmd,
+        const RxCommandBuffer& cmd,
         VkPipelineBindPoint bind_point,
-        const RvkGraphicsPipeline& pipeline,
+        const RxGraphicsPipeline& pipeline,
         VkDescriptorSet* sets,
         uint32 sets_count)
     {
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets_count, sets, 0, nullptr);
     }
 
-    void Bind(const RvkCommandBuffer &cmd, VkPipelineBindPoint bind_point, const RvkGraphicsPipeline &pipeline) const
+    void Bind(const RxCommandBuffer &cmd, VkPipelineBindPoint bind_point, const RxGraphicsPipeline &pipeline) const
     {
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);
     }
@@ -126,5 +126,5 @@ public:
 public:
     VkDescriptorSet Set = nullptr;
 private:
-    RvkGpuDevice *mDevice = nullptr;
+    RxGpuDevice *mDevice = nullptr;
 };

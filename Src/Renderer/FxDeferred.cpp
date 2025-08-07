@@ -2,7 +2,7 @@
 #include "Renderer.hpp"
 
 #include "Backend/ShaderList.hpp"
-#include "Backend/RvkShader.hpp"
+#include "Backend/RxShader.hpp"
 
 #include <Renderer/FxDeferred.hpp>
 
@@ -72,7 +72,7 @@ FxDeferredGPass* FxDeferredRenderer::GetCurrentGPass()
 
 VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
 {
-    RvkGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = Renderer->GetDevice();
 
     // Vertex DS
     {
@@ -186,8 +186,8 @@ void FxDeferredRenderer::CreateGPassPipeline()
 
     ShaderList shader_list;
 
-    RvkShader vertex_shader("../shaders/main.vert.spv", RvkShaderType::Vertex);
-    RvkShader fragment_shader("../shaders/main.frag.spv", RvkShaderType::Fragment);
+    RxShader vertex_shader("../shaders/main.vert.spv", RxShaderType::Vertex);
+    RxShader fragment_shader("../shaders/main.frag.spv", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
@@ -236,7 +236,7 @@ FxDeferredLightingPass* FxDeferredRenderer::GetCurrentLightingPass()
 
 void FxDeferredRenderer::CreateLightingDSLayout()
 {
-    RvkGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = Renderer->GetDevice();
 
     // Fragment DS
 
@@ -327,8 +327,8 @@ void FxDeferredRenderer::CreateLightingPipeline()
 
     ShaderList shader_list;
 
-    RvkShader vertex_shader("../shaders/lighting.vert.spv", RvkShaderType::Vertex);
-    RvkShader fragment_shader("../shaders/lighting.frag.spv", RvkShaderType::Fragment);
+    RxShader vertex_shader("../shaders/lighting.vert.spv", RxShaderType::Vertex);
+    RxShader fragment_shader("../shaders/lighting.frag.spv", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
@@ -354,7 +354,7 @@ void FxDeferredRenderer::CreateLightingPipeline()
 
 void FxDeferredRenderer::RebuildLightingPipeline()
 {
-    RvkGraphicsPipeline old_pipeline = LightingPipeline;
+    RxGraphicsPipeline old_pipeline = LightingPipeline;
     CreateLightingPipeline();
     old_pipeline.Destroy();
 }
@@ -385,7 +385,7 @@ FxDeferredCompPass* FxDeferredRenderer::GetCurrentCompPass()
 
 VkPipelineLayout FxDeferredRenderer::CreateCompPipelineLayout()
 {
-    RvkGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = Renderer->GetDevice();
 
     {
         VkDescriptorSetLayoutBinding positions_layout_binding {
@@ -476,8 +476,8 @@ void FxDeferredRenderer::CreateCompPipeline()
 
     ShaderList shader_list;
 
-    RvkShader vertex_shader("../shaders/composition.vert.spv", RvkShaderType::Vertex);
-    RvkShader fragment_shader("../shaders/composition.frag.spv", RvkShaderType::Fragment);
+    RxShader vertex_shader("../shaders/composition.vert.spv", RxShaderType::Vertex);
+    RxShader fragment_shader("../shaders/composition.frag.spv", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
@@ -526,7 +526,7 @@ void FxDeferredGPass::BuildDescriptorSets()
     VkDescriptorBufferInfo ubo_info {
         .buffer = UniformBuffer.Buffer,
         .offset = 0,
-        .range = sizeof(RvkUniformBufferObject)
+        .range = sizeof(RxUniformBufferObject)
     };
 
     VkWriteDescriptorSet ubo_write {
@@ -595,7 +595,7 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
 
 void FxDeferredGPass::Begin()
 {
-    RvkFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = Renderer->GetFrame();
 
 
     VkClearValue clear_values[] = {
@@ -624,7 +624,7 @@ void FxDeferredGPass::End()
 
 void FxDeferredGPass::Submit()
 {
-    RvkFrameData *frame = Renderer->GetFrame();
+    RxFrameData *frame = Renderer->GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
@@ -651,9 +651,9 @@ void FxDeferredGPass::Submit()
 }
 
 
-void FxDeferredGPass::SubmitUniforms(const RvkUniformBufferObject& ubo)
+void FxDeferredGPass::SubmitUniforms(const RxUniformBufferObject& ubo)
 {
-    memcpy(UniformBuffer.MappedBuffer, &ubo, sizeof(RvkUniformBufferObject));
+    memcpy(UniformBuffer.MappedBuffer, &ubo, sizeof(RxUniformBufferObject));
 }
 
 void FxDeferredGPass::Destroy()
@@ -713,7 +713,7 @@ void FxDeferredLightingPass::Create(FxDeferredRenderer* renderer, uint16 frame_i
 
 void FxDeferredLightingPass::Begin()
 {
-    RvkFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = Renderer->GetFrame();
 
 
     VkClearValue clear_values[] = {
@@ -737,7 +737,7 @@ void FxDeferredLightingPass::End()
 
 void FxDeferredLightingPass::Submit()
 {
-    RvkFrameData *frame = Renderer->GetFrame();
+    RxFrameData *frame = Renderer->GetFrame();
 
 
     const VkPipelineStageFlags wait_stages[] = {
@@ -1034,7 +1034,7 @@ void FxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 
     FxSlice<VkClearValue> slice(clear_values, FxSizeofArray(clear_values));
 
-    RvkCommandBuffer& cmd = mCurrentFrame->CompCommandBuffer;
+    RxCommandBuffer& cmd = mCurrentFrame->CompCommandBuffer;
 
     VkFramebuffer framebuffer = mRendererInst->OutputFramebuffers[Renderer->GetImageIndex()].Framebuffer;
     mCompPipeline->RenderPass.Begin(&mCurrentFrame->CompCommandBuffer, framebuffer, slice);

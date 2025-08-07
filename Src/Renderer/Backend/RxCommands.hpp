@@ -1,14 +1,14 @@
 #pragma once
 
-#include "RvkDevice.hpp"
+#include "RxDevice.hpp"
 
 #include <vulkan/vulkan.h>
 
-class RvkCommandPool
+class RxCommandPool
 {
 public:
 
-    void Create(RvkGpuDevice *device, uint32 queue_family)
+    void Create(RxGpuDevice *device, uint32 queue_family)
     {
         QueueFamilyIndex = queue_family;
 
@@ -41,13 +41,13 @@ public:
     VkCommandPool CommandPool = nullptr;
     uint32 QueueFamilyIndex = 0;
 private:
-    RvkGpuDevice *mDevice = nullptr;
+    RxGpuDevice *mDevice = nullptr;
 };
 
-class RvkCommandBuffer
+class RxCommandBuffer
 {
 public:
-    void Create(RvkCommandPool *pool);
+    void Create(RxCommandPool *pool);
     void Destroy();
 
     void Record(VkCommandBufferUsageFlags usage_flags = 0);
@@ -69,6 +69,6 @@ public:
     VkCommandBuffer CommandBuffer = nullptr;
 private:
     bool mInitialized = false;
-    RvkCommandPool *mCommandPool = nullptr;
-    RvkGpuDevice *mDevice = nullptr;
+    RxCommandPool *mCommandPool = nullptr;
+    RxGpuDevice *mDevice = nullptr;
 };

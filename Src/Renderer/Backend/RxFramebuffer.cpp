@@ -1,5 +1,5 @@
-#include "RvkFramebuffer.hpp"
-#include "RvkDevice.hpp"
+#include "RxFramebuffer.hpp"
+#include "RxDevice.hpp"
 #include "../Renderer.hpp"
 
 #include <Core/FxDefines.hpp>
@@ -8,7 +8,7 @@
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void RvkFramebuffer::Create(const FxSizedArray<VkImageView> &image_views, const RvkGraphicsPipeline &pipeline, FxVec2u size)
+void RxFramebuffer::Create(const FxSizedArray<VkImageView> &image_views, const RxGraphicsPipeline &pipeline, FxVec2u size)
 {
     AssertRendererExists();
 
@@ -31,7 +31,7 @@ void RvkFramebuffer::Create(const FxSizedArray<VkImageView> &image_views, const 
     }
 }
 
-void RvkFramebuffer::Destroy()
+void RxFramebuffer::Destroy()
 {
     if (!Framebuffer) {
         return;

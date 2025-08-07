@@ -3,7 +3,7 @@
 #include <Core/FxDefines.hpp>
 
 #include <Core/Log.hpp>
-#include <Renderer/Backend/RvkUtil.hpp>
+#include <Renderer/Backend/RxUtil.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -36,7 +36,7 @@ void FxPanic(const char* module, const char* fmt, VkResult result, Types... item
     Log::Write(fmt, items...);
     Log::Write("\n");
 
-    printf("=> Vulkan Err: %s\n", RvkUtil::ResultToStr(result));
+    printf("=> Vulkan Err: %s\n", RxUtil::ResultToStr(result));
 
     std::terminate();
 }

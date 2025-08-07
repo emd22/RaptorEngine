@@ -6,10 +6,10 @@
 #include <Core/FxPanic.hpp>
 #include <Core/Log.hpp>
 
-#include "Backend/RvkSynchro.hpp"
-#include "Backend/RvkPipeline.hpp"
-#include "Backend/RvkCommands.hpp"
-#include "Backend/RvkUtil.hpp"
+#include "Backend/RxSynchro.hpp"
+#include "Backend/RxPipeline.hpp"
+#include "Backend/RxCommands.hpp"
+#include "Backend/RxUtil.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -18,7 +18,7 @@
 
 #include "FxDeferred.hpp"
 
-#include <Renderer/Backend/RvkExtensionHandles.hpp>
+#include <Renderer/Backend/RxExtensionHandles.hpp>
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
@@ -111,10 +111,10 @@ void FxRenderBackend::InitFrames()
 
     const uint32 graphics_family = GetDevice()->mQueueFamilies.GetGraphicsFamily();
 
-    RvkGpuDevice *device = GetDevice();
+    RxGpuDevice *device = GetDevice();
 
     for (int i = 0; i < Frames.Size; i++) {
-        RvkFrameData& frame = Frames.Data[i];
+        RxFrameData& frame = Frames.Data[i];
         frame.CommandPool.Create(device, graphics_family);
         frame.CommandBuffer.Create(&frame.CommandPool);
         frame.CompCommandBuffer.Create(&frame.CommandPool);
@@ -277,9 +277,9 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     VkDebugUtilsMessengerEXT messenger;
 
-    const auto status = Rvk_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
+    const auto status = Rx_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        Log::Error("Could not create debug messenger! (err: %s)", RvkUtil::ResultToStr(status));
+        Log::Error("Could not create debug messenger! (err: %s)", RxUtil::ResultToStr(status));
         return nullptr;
     }
 
@@ -291,12 +291,12 @@ void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messeng
         return;
     }
 
-    Rvk_EXT_DestroyDebugUtilsMessenger(instance, messenger, nullptr);
+    Rx_EXT_DestroyDebugUtilsMessenger(instance, messenger, nullptr);
 }
 
 void FxRenderBackend::InitGPUAllocator()
 {
-    const RvkGpuDevice *device = GetDevice();
+    const RxGpuDevice *device = GetDevice();
 
     const VmaAllocatorCreateInfo create_info = {
         .physicalDevice = device->Physical,
@@ -380,7 +380,7 @@ ExtensionList &FxRenderBackend::QueryInstanceExtensions(bool invalidate_previous
 
 void FxRenderBackend::SubmitUploadCmd(FxRenderBackend::SubmitFunc upload_func)
 {
-    RvkCommandBuffer &cmd = UploadContext.CommandBuffer;
+    RxCommandBuffer &cmd = UploadContext.CommandBuffer;
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     upload_func(cmd);
@@ -412,7 +412,7 @@ void FxRenderBackend::SubmitUploadCmd(FxRenderBackend::SubmitFunc upload_func)
 
 void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
 {
-    RvkCommandBuffer cmd;
+    RxCommandBuffer cmd;
     cmd.Create(&GetFrame()->CommandPool);
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -441,7 +441,7 @@ void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
 
 FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 {
-    RvkFrameData *frame = GetFrame();
+    RxFrameData *frame = GetFrame();
 
     CurrentGPass = renderer.GetCurrentGPass();
     CurrentCompPass = renderer.GetCurrentCompPass();
@@ -496,7 +496,7 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 
 void FxRenderBackend::PresentFrame()
 {
-    RvkFrameData *frame = GetFrame();
+    RxFrameData *frame = GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -559,7 +559,7 @@ void FxRenderBackend::PresentFrame()
 
 void FxRenderBackend::BeginLighting()
 {
-    RvkFrameData* frame = GetFrame();
+    RxFrameData* frame = GetFrame();
 
     CurrentGPass->End();
 
@@ -598,7 +598,7 @@ void FxRenderBackend::BeginLighting()
 
 void FxRenderBackend::DoComposition(FxCamera& render_cam)
 {
-    RvkFrameData* frame = GetFrame();
+    RxFrameData* frame = GetFrame();
 
 
     CurrentLightingPass->End();
@@ -642,7 +642,7 @@ void FxRenderBackend::DoComposition(FxCamera& render_cam)
     mFrameNumber = (mInternalFrameCounter) % RendererFramesInFlight;
 }
 
-FrameResult FxRenderBackend::GetNextSwapchainImage(RvkFrameData *frame)
+FrameResult FxRenderBackend::GetNextSwapchainImage(RxFrameData *frame)
 {
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
@@ -669,9 +669,9 @@ FrameResult FxRenderBackend::GetNextSwapchainImage(RvkFrameData *frame)
     return FrameResult::RenderError;
 }
 
-inline RvkUniformBufferObject& FxRenderBackend::GetUbo()
+inline RxUniformBufferObject& FxRenderBackend::GetUbo()
 {
-    static RvkUniformBufferObject ubo;
+    static RxUniformBufferObject ubo;
     return ubo;
 }
 
@@ -724,7 +724,7 @@ void FxRenderBackend::Destroy()
     Initialized = false;
 }
 
-RvkFrameData *FxRenderBackend::GetFrame()
+RxFrameData *FxRenderBackend::GetFrame()
 {
     return &Frames[GetFrameNumber()];
 }

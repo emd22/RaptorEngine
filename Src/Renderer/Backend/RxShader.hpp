@@ -7,22 +7,22 @@
 
 #include "ShaderList.hpp"
 
-class RvkShader
+class RxShader
 {
 public:
 
-    RvkShader() = default;
+    RxShader() = default;
 
-    RvkShader(const char *path, RvkShaderType type)
+    RxShader(const char *path, RxShaderType type)
         : Type(type)
     {
         Load(path, type);
     }
 
-    void Load(const char *path, RvkShaderType type);
+    void Load(const char *path, RxShaderType type);
     void Destroy();
 
-    ~RvkShader()
+    ~RxShader()
     {
         Destroy();
     }
@@ -37,7 +37,7 @@ private:
 
 public:
     VkShaderModule ShaderModule = nullptr;
-    RvkShaderType Type = RvkShaderType::Unknown;
+    RxShaderType Type = RxShaderType::Unknown;
 };
 
 // #include <Renderer/FxShader.hpp>

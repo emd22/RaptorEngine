@@ -1,5 +1,5 @@
-#include "RvkSwapchain.hpp"
-#include "RvkDevice.hpp"
+#include "RxSwapchain.hpp"
+#include "RxDevice.hpp"
 #include "../Renderer.hpp"
 
 #include <Core/FxDefines.hpp>
@@ -9,9 +9,9 @@
 
 #include <vulkan/vulkan.h>
 
-FX_SET_MODULE_NAME("RvkSwapchain")
+FX_SET_MODULE_NAME("RxSwapchain")
 
-void RvkSwapchain::Init(FxVec2u size, VkSurfaceKHR &surface, RvkGpuDevice *device)
+void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR &surface, RxGpuDevice *device)
 {
     AssertRendererExists();
 
@@ -24,7 +24,7 @@ void RvkSwapchain::Init(FxVec2u size, VkSurfaceKHR &surface, RvkGpuDevice *devic
     Initialized = true;
 }
 
-void RvkSwapchain::CreateSwapchainImages()
+void RxSwapchain::CreateSwapchainImages()
 {
     uint32 image_count;
 
@@ -38,7 +38,7 @@ void RvkSwapchain::CreateSwapchainImages()
     OutputImages.InitCapacity(image_count);
 
     for (VkImage& raw_image : raw_images) {
-        RvkImage* image = OutputImages.Insert();
+        RxImage* image = OutputImages.Insert();
         image->Image = raw_image;
         image->View = nullptr;
         image->Allocation = nullptr;
@@ -47,7 +47,7 @@ void RvkSwapchain::CreateSwapchainImages()
     }
 }
 
-void RvkSwapchain::CreateImageViews()
+void RxSwapchain::CreateImageViews()
 {
     for (int32 i = 0; i < OutputImages.Size; i++) {
         const VkImageViewCreateInfo create_info = {
@@ -77,7 +77,7 @@ void RvkSwapchain::CreateImageViews()
     }
 }
 
-void RvkSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface)
+void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface)
 {
     Extent = size;
 
@@ -138,7 +138,7 @@ void RvkSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface)
     }
 }
 
-void RvkSwapchain::CreateSwapchainFramebuffers()
+void RxSwapchain::CreateSwapchainFramebuffers()
 {
     // CompFramebuffers.Free();
     // CompFramebuffers.InitSize(OutputImages.Size);
@@ -162,12 +162,12 @@ void RvkSwapchain::CreateSwapchainFramebuffers()
 
 }
 
-void RvkSwapchain::DestroyFramebuffersAndImageViews()
+void RxSwapchain::DestroyFramebuffersAndImageViews()
 {
     for (int i = 0; i < RendererFramesInFlight; i++) {
         // CompFramebuffers[i].Destroy();
 
-        // Since the RvkImage's `VkImage` is from the swapchain, we do not want to destroy it
+        // Since the RxImage's `VkImage` is from the swapchain, we do not want to destroy it
         // using VMA. Mark the Image as nullptr incase something happened to the `Allocation` inside.
         OutputImages[i].Image = nullptr;
         OutputImages[i].Destroy();
@@ -182,12 +182,12 @@ void RvkSwapchain::DestroyFramebuffersAndImageViews()
     // CompFramebuffers.Free();
 }
 
-void RvkSwapchain::DestroyInternalSwapchain()
+void RxSwapchain::DestroyInternalSwapchain()
 {
     vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr);
 }
 
-void RvkSwapchain::Destroy()
+void RxSwapchain::Destroy()
 {
     if (!Initialized) {
         return;
@@ -200,7 +200,7 @@ void RvkSwapchain::Destroy()
     Initialized = false;
 }
 
-RvkSwapchain::~RvkSwapchain()
+RxSwapchain::~RxSwapchain()
 {
     Destroy();
 }

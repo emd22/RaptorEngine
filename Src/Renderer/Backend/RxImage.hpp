@@ -7,16 +7,16 @@
 #include <ThirdParty/vk_mem_alloc.h>
 
 
-#include "RvkDevice.hpp"
-#include "RvkCommands.hpp"
+#include "RxDevice.hpp"
+#include "RxCommands.hpp"
 
 #include <Math/Vec2.hpp>
 
-class RvkImage
+class RxImage
 {
 public:
 
-    RvkGpuDevice* GetDevice();
+    RxGpuDevice* GetDevice();
 
     void Create(
         FxVec2u size,
@@ -26,11 +26,11 @@ public:
         VkImageAspectFlags aspect_flags
     );
 
-    void TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd);
+    void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer &cmd);
 
     void Destroy();
 
-    ~RvkImage()
+    ~RxImage()
     {
         Destroy();
     }
@@ -47,7 +47,7 @@ public:
     VmaAllocation Allocation = nullptr;
 
 private:
-    RvkGpuDevice *mDevice = nullptr;
+    RxGpuDevice *mDevice = nullptr;
 
     bool mIsDepthTexture = false;
 };

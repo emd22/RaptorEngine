@@ -8,7 +8,7 @@
 
 #include <vulkan/vulkan.h>
 
-class RvkQueueFamilies {
+class RxQueueFamilies {
 public:
     static const uint32 QueueNull = UINT32_MAX;
 
@@ -51,10 +51,10 @@ private:
     uint32 mTransferIndex = QueueNull;
 };
 
-class RvkGpuDevice {
+class RxGpuDevice {
 public:
-    RvkGpuDevice() = default;
-    RvkGpuDevice(VkInstance instance, VkSurfaceKHR surface)
+    RxGpuDevice() = default;
+    RxGpuDevice(VkInstance instance, VkSurfaceKHR surface)
     {
         Create(instance, surface);
     }
@@ -80,7 +80,7 @@ public:
     VkPhysicalDevice Physical = nullptr;
     VkDevice Device = nullptr;
 
-    RvkQueueFamilies mQueueFamilies;
+    RxQueueFamilies mQueueFamilies;
 
     VkQueue GraphicsQueue = nullptr;
     VkQueue TransferQueue = nullptr;

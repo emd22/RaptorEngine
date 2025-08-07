@@ -1,7 +1,7 @@
 
-#include "RvkPipeline.hpp"
+#include "RxPipeline.hpp"
 #include "Core/FxDefines.hpp"
-#include "RvkCommands.hpp"
+#include "RxCommands.hpp"
 
 #include <Core/Log.hpp>
 #include <Core/FxPanic.hpp>
@@ -13,7 +13,7 @@ FX_SET_MODULE_NAME("Pipeline")
 
 FxVertexInfo FxMakeVertexInfo()
 {
-    using VertexType = RvkVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
+    using VertexType = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
@@ -34,7 +34,7 @@ FxVertexInfo FxMakeVertexInfo()
 
 FxVertexInfo FxMakeLightVertexInfo()
 {
-    using VertexType = RvkVertex<FxVertexPosition>;
+    using VertexType = RxVertex<FxVertexPosition>;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
@@ -49,7 +49,7 @@ FxVertexInfo FxMakeLightVertexInfo()
     return { binding_desc, std::move(attribs) };
 }
 
-void RvkGraphicsPipeline::Create(
+void RxGraphicsPipeline::Create(
     const std::string& name,
     ShaderList shader_list,
     VkPipelineLayout layout,
@@ -67,7 +67,7 @@ void RvkGraphicsPipeline::Create(
 
     // Depth attachment is usually the last attachment, check last first
     for (int32 i = attachments.Size - 1; i >= 0; --i) {
-        if (RvkUtil::IsFormatDepth(attachments[i].format)) {
+        if (RxUtil::IsFormatDepth(attachments[i].format)) {
             has_depth_attachment = true;
         }
     }
@@ -220,10 +220,10 @@ void RvkGraphicsPipeline::Create(
         FxModulePanic("Could not create graphics pipeline", status);
     }
 
-    RvkUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
+    RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 }
 
-// void RvkGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
+// void RxGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
 //     mDevice = Renderer->GetDevice();
 //     Layout = layout;
 
@@ -386,11 +386,11 @@ void RvkGraphicsPipeline::Create(
 //     printf("Create pipeline %p\n", Pipeline);
 // }
 
-void RvkGraphicsPipeline::Bind(RvkCommandBuffer &command_buffer) {
+void RxGraphicsPipeline::Bind(RxCommandBuffer &command_buffer) {
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }
 
-void RvkGraphicsPipeline::Destroy()
+void RxGraphicsPipeline::Destroy()
 {
     if (!mDevice || !mDevice->Device) {
         return;
@@ -416,7 +416,7 @@ void RvkGraphicsPipeline::Destroy()
 }
 
 
-VkPipelineLayout RvkGraphicsPipeline::CreateLayout(
+VkPipelineLayout RxGraphicsPipeline::CreateLayout(
     uint32 vert_push_consts_size,
     uint32 frag_push_consts_size,
     const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts
@@ -464,7 +464,7 @@ VkPipelineLayout RvkGraphicsPipeline::CreateLayout(
     return layout;
 }
 
-// VkPipelineLayout RvkGraphicsPipeline::CreateCompLayout() {
+// VkPipelineLayout RxGraphicsPipeline::CreateCompLayout() {
 //     if (mDevice == nullptr) {
 //         mDevice = Renderer->GetDevice();
 //     }

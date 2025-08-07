@@ -3,16 +3,16 @@
 
 #include <Renderer/Renderer.hpp>
 
-#include "RvkDevice.hpp"
-#include "RvkRenderPass.hpp"
+#include "RxDevice.hpp"
+#include "RxRenderPass.hpp"
 
-#include "RvkSwapchain.hpp"
+#include "RxSwapchain.hpp"
 
 #include <Core/FxPanic.hpp>
 
-FX_SET_MODULE_NAME("RvkRenderPass")
+FX_SET_MODULE_NAME("RxRenderPass")
 
-void RvkRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
+void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
 {
     mDevice = Renderer->GetDevice();
 
@@ -24,7 +24,7 @@ void RvkRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
     for (int i = 0; i < attachments.Size; i++) {
         VkAttachmentDescription& attachment = attachments[i];
 
-        if (RvkUtil::IsFormatDepth(attachment.format)) {
+        if (RxUtil::IsFormatDepth(attachment.format)) {
             has_depth_attachment = true;
 
             depth_attachment_ref.attachment = i;
@@ -134,7 +134,7 @@ void RvkRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
 
 }
 
-void RvkRenderPass::Begin(RvkCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_values)
+void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_values)
 {
     CommandBuffer = cmd;
 
@@ -157,14 +157,14 @@ void RvkRenderPass::Begin(RvkCommandBuffer* cmd, VkFramebuffer framebuffer, cons
     vkCmdBeginRenderPass(cmd->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void RvkRenderPass::End()
+void RxRenderPass::End()
 {
     FxAssert(CommandBuffer != nullptr);
 
     vkCmdEndRenderPass(CommandBuffer->CommandBuffer);
 }
 
-void RvkRenderPass::Destroy()
+void RxRenderPass::Destroy()
 {
     if (RenderPass != nullptr) {
         vkDestroyRenderPass(mDevice->Device, RenderPass, nullptr);

@@ -5,8 +5,8 @@
 #include <Asset/FxAssetImage.hpp>
 
 #include "FxMaterial.hpp"
-#include "Renderer/Backend/RvkFrameData.hpp"
-#include "Renderer/Backend/RvkPipeline.hpp"
+#include "Renderer/Backend/RxFrameData.hpp"
+#include "Renderer/Backend/RxPipeline.hpp"
 
 #include <Math/Vector.hpp>
 #include <Math/Mat4.hpp>
@@ -178,7 +178,7 @@ public:
     }
 
 private:
-    RvkUniformBufferObject mUbo;
+    RxUniformBufferObject mUbo;
 
     FxRef<FxAssetModel> mModel{nullptr};
     FxRef<FxMaterial> mMaterial{nullptr};

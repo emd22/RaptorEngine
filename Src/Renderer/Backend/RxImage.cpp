@@ -1,5 +1,5 @@
 
-#include "RvkImage.hpp"
+#include "RxImage.hpp"
 
 #include <Core/FxPanic.hpp>
 #include <Core/FxDefines.hpp>
@@ -7,9 +7,9 @@
 #include "../Renderer.hpp"
 #include "../FxRenderBackend.hpp"
 
-FX_SET_MODULE_NAME("RvkImage")
+FX_SET_MODULE_NAME("RxImage")
 
-RvkGpuDevice* RvkImage::GetDevice()
+RxGpuDevice* RxImage::GetDevice()
 {
     // If the device has not been created with `::Create` then mDevice will not be set.
     // I think this would be fine, there should probably be a `::Build` or `::Create` method that
@@ -22,7 +22,7 @@ RvkGpuDevice* RvkImage::GetDevice()
     return mDevice;
 }
 
-void RvkImage::Create(
+void RxImage::Create(
     FxVec2u size,
     VkFormat format,
     VkImageTiling tiling,
@@ -34,7 +34,7 @@ void RvkImage::Create(
     Format = format;
     mDevice = Renderer->GetDevice();
 
-    if (RvkUtil::IsFormatDepth(format)) {
+    if (RxUtil::IsFormatDepth(format)) {
         mIsDepthTexture = true;
     }
 
@@ -95,7 +95,7 @@ void RvkImage::Create(
     }
 }
 
-void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
+void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer &cmd)
 {
     VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     VkImageMemoryBarrier barrier{
@@ -145,7 +145,7 @@ void RvkImage::TransitionLayout(VkImageLayout new_layout, RvkCommandBuffer &cmd)
     ImageLayout = new_layout;
 }
 
-void RvkImage::Destroy()
+void RxImage::Destroy()
 {
     if (View != nullptr) {
         vkDestroyImageView(GetDevice()->Device, View, nullptr);

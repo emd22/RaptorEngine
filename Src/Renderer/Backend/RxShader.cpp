@@ -1,4 +1,4 @@
-#include "RvkShader.hpp"
+#include "RxShader.hpp"
 #include "ShaderList.hpp"
 #include "../Renderer.hpp"
 
@@ -11,7 +11,7 @@
 
 
 
-void RvkShader::Load(const char *path, RvkShaderType type)
+void RxShader::Load(const char *path, RxShaderType type)
 {
     Type = type;
 
@@ -44,17 +44,17 @@ void RvkShader::Load(const char *path, RvkShaderType type)
     delete[] file_buffer;
 }
 
-void RvkShader::Destroy()
+void RxShader::Destroy()
 {
     if (ShaderModule == nullptr) {
         return;
     }
 
-    RvkGpuDevice *device = Renderer->GetDevice();
+    RxGpuDevice *device = Renderer->GetDevice();
     vkDestroyShaderModule(device->Device, ShaderModule, nullptr);
 }
 
-void RvkShader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data)
+void RxShader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data)
 {
     const VkShaderModuleCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -62,7 +62,7 @@ void RvkShader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_
         .pCode = (uint32_t *)shader_data,
     };
 
-    RvkGpuDevice *device = Renderer->GetDevice();
+    RxGpuDevice *device = Renderer->GetDevice();
 
     const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &ShaderModule);
 

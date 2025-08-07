@@ -1,4 +1,4 @@
-#include "RvkDevice.hpp"
+#include "RxDevice.hpp"
 #include "Core/FxDefines.hpp"
 #include "Core/FxSizedArray.hpp"
 
@@ -13,7 +13,7 @@ FX_SET_MODULE_NAME("Device")
 // Queue Families
 ///////////////////////////////
 
-void RvkQueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
+void RxQueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
     for (int32 index = 0; index < RawFamilies.Size; index++) {
         VkQueueFamilyProperties &family_props = RawFamilies[index];
@@ -27,7 +27,7 @@ void RvkQueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR 
     }
 }
 
-void RvkQueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
+void RxQueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
     for (int32 index = 0; index < RawFamilies.Size; index++) {
         VkQueueFamilyProperties &family_props = RawFamilies[index];
@@ -39,7 +39,7 @@ void RvkQueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR 
     }
 }
 
-bool RvkQueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index)
+bool RxQueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index)
 {
     uint32 support = 0;
 
@@ -53,7 +53,7 @@ bool RvkQueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfac
     return support > 0;
 }
 
-void RvkQueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
+void RxQueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
     uint32 family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, nullptr);
@@ -111,12 +111,12 @@ void RvkQueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSur
 // GPU Device
 ///////////////////////////////
 
-bool RvkGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
+bool RxGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
 {
     VkPhysicalDeviceProperties properties;
     VkPhysicalDeviceFeatures features;
 
-    RvkQueueFamilies new_families;
+    RxQueueFamilies new_families;
     new_families.FindQueueFamilies(physical, mSurface);
 
     vkGetPhysicalDeviceFeatures(physical, &features);
@@ -132,16 +132,16 @@ bool RvkGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice &physical)
         VK_VERSION_MAJOR(version),
         VK_VERSION_MINOR(version),
         VK_VERSION_PATCH(version),
-        Log::YesNo(new_families.GetGraphicsFamily() != RvkQueueFamilies::QueueNull),
-        Log::YesNo(new_families.GetPresentFamily() != RvkQueueFamilies::QueueNull),
-        Log::YesNo(new_families.GetTransferFamily() != RvkQueueFamilies::QueueNull),
+        Log::YesNo(new_families.GetGraphicsFamily() != RxQueueFamilies::QueueNull),
+        Log::YesNo(new_families.GetPresentFamily() != RxQueueFamilies::QueueNull),
+        Log::YesNo(new_families.GetTransferFamily() != RxQueueFamilies::QueueNull),
         Log::YesNo(new_families.IsComplete())
     );
 
     return false;
 }
 
-void RvkGpuDevice::QueryQueues()
+void RxGpuDevice::QueryQueues()
 {
     vkGetDeviceQueue(Device, mQueueFamilies.GetGraphicsFamily(), 0, &GraphicsQueue);
     vkGetDeviceQueue(Device, mQueueFamilies.GetPresentFamily(), 0, &PresentQueue);
@@ -149,7 +149,7 @@ void RvkGpuDevice::QueryQueues()
     vkGetDeviceQueue(Device, mQueueFamilies.GetTransferFamily(), 0, &TransferQueue);
 }
 
-void RvkGpuDevice::CreateLogicalDevice()
+void RxGpuDevice::CreateLogicalDevice()
 {
     if (Physical == nullptr) {
         PickPhysicalDevice();
@@ -242,7 +242,7 @@ void RvkGpuDevice::CreateLogicalDevice()
     QueryQueues();
 }
 
-void RvkGpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
+void RxGpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 {
     mInstance = instance;
     mSurface = surface;
@@ -257,14 +257,14 @@ void RvkGpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
         mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(), mQueueFamilies.GetTransferFamily());
 }
 
-void RvkGpuDevice::Destroy()
+void RxGpuDevice::Destroy()
 {
     vkDestroyDevice(Device, nullptr);
 
     Device = nullptr;
 }
 
-VkSurfaceFormatKHR RvkGpuDevice::GetBestSurfaceFormat()
+VkSurfaceFormatKHR RxGpuDevice::GetBestSurfaceFormat()
 {
     uint32 format_count;
     vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, nullptr);
@@ -281,7 +281,7 @@ VkSurfaceFormatKHR RvkGpuDevice::GetBestSurfaceFormat()
     return surface_formats[0];
 }
 
-void RvkGpuDevice::PickPhysicalDevice()
+void RxGpuDevice::PickPhysicalDevice()
 {
     // enumerate physical devices
     //
@@ -308,7 +308,7 @@ void RvkGpuDevice::PickPhysicalDevice()
     }
 }
 
-void RvkGpuDevice::WaitForIdle()
+void RxGpuDevice::WaitForIdle()
 {
     if (!Device) {
         return;

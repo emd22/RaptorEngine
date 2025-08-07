@@ -1,10 +1,10 @@
-#include "RvkFrameData.hpp"
+#include "RxFrameData.hpp"
 
 #include <vulkan/vulkan.h>
 
 #include <Renderer/Renderer.hpp>
 
-void RvkFrameData::Create(RvkGpuDevice *device)
+void RxFrameData::Create(RxGpuDevice *device)
 {
     ImageAvailable.Create(device);
     RenderFinished.Create(device);
@@ -17,12 +17,12 @@ void RvkFrameData::Create(RvkGpuDevice *device)
     // Ubo.Map();
 }
 
-void RvkFrameData::SubmitUbo(const RvkUniformBufferObject & ubo)
+void RxFrameData::SubmitUbo(const RxUniformBufferObject & ubo)
 {
-    // memcpy(Ubo.MappedBuffer, &ubo, sizeof(RvkUniformBufferObject));
+    // memcpy(Ubo.MappedBuffer, &ubo, sizeof(RxUniformBufferObject));
 }
 
-void RvkFrameData::Destroy()
+void RxFrameData::Destroy()
 {
     ImageAvailable.Destroy();
     RenderFinished.Destroy();

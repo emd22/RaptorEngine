@@ -5,9 +5,9 @@
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include "Core/FxDefines.hpp"
-#include <Renderer/Backend/RvkFrameData.hpp>
+#include <Renderer/Backend/RxFrameData.hpp>
 #include "Renderer/Backend/ShaderList.hpp"
-#include "Renderer/Backend/RvkShader.hpp"
+#include "Renderer/Backend/RxShader.hpp"
 
 #include "Renderer/Renderer.hpp"
 #include "Renderer/FxLight.hpp"

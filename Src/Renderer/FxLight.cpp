@@ -23,7 +23,7 @@ void FxLight::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, 
 
 void FxLight::Render(const FxCamera& camera) const
 {
-    RvkFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = Renderer->GetFrame();
     FxRef<FxDeferredRenderer>& deferred = Renderer->DeferredRenderer;
 
     FxMat4f MVP = mModelMatrix * camera.VPMatrix;
@@ -69,7 +69,7 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
         return;
     }
 
-    RvkFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = Renderer->GetFrame();
     FxRef<FxDeferredRenderer>& deferred = Renderer->DeferredRenderer;
 
     FxMat4f MVP = mModelMatrix * camera.VPMatrix;
