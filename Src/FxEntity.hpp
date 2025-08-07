@@ -134,9 +134,9 @@ private:
     FxPagedArray<FxEntity> mEntityPool;
 };
 
-class FxSceneObject : public FxEntity {
+class FxObject : public FxEntity {
 public:
-    FxSceneObject() = default;
+    FxObject() = default;
 
     // void AttachScript(std::unique_ptr<FxScript>& script)
     // {

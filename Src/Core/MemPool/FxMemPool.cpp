@@ -11,7 +11,7 @@ void FxMemPoolPage::Create(uint64 size)
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
     FxSpinThreadGuard guard(&mInUse);
 #endif
-    
+
     if (mMem || mSize) {
         FxPanic("FxMemPool", "Mem pool has already been initialized!", 0);
     }
@@ -84,7 +84,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
 //#ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
     FxSpinThreadGuard guard(&mInUse);
 //#endif
-    
+
     auto* node = mMemBlocks.Head;
 
     uint8* new_block_ptr = mMem;
@@ -295,7 +295,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
 auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
     FxSpinThreadGuard guard(&mInUse);
-    
+
     // Start from the tail as most allocations being freed will be recent ones.
     auto* node = mMemBlocks.Tail;
 
@@ -303,7 +303,7 @@ auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolP
         if (node->Data.Start == ptr) {
             return node;
         }
-        
+
         if (node->Prev == mMemBlocks.Tail || node->Next == mMemBlocks.Head || node->Prev == node) {
             FX_BREAKPOINT;
         }
@@ -322,7 +322,7 @@ FxMemPool& FxMemPool::GetGlobalPool()
 auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
     FxSpinThreadGuard guard(&mInUse);
-    
+
     auto* node = mCurrentPage->AllocateMemory(requested_size);
 
     // If we could not allocate any memory in the current page, try to allocate in one of the previous pages.
@@ -506,6 +506,8 @@ void FxMemPool::AllocateNewPage()
 
     mCurrentPage = page;
     mCurrentPage->Create(mPageSize);
+
+    Log::Info("Allocating a new memory page!");
 
 }
 

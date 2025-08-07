@@ -19,8 +19,6 @@ void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
 
 
         if (attribute->type == cgltf_attribute_type_position) {
-            printf("Attribute -> Vertex Buffer\n");
-
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
             // Create our vertex position buffer
@@ -28,8 +26,6 @@ void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
             cgltf_accessor_unpack_floats(attribute->data, positions.Data, data_size);
         }
         else if (attribute->type == cgltf_attribute_type_normal) {
-            printf("Attribute -> Normal Buffer\n");
-
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
             // Create our vertex normal buffer
@@ -37,8 +33,6 @@ void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
             cgltf_accessor_unpack_floats(attribute->data, normals.Data, data_size);
         }
         else if (attribute->type == cgltf_attribute_type_texcoord) {
-            printf("Attribute -> UV Buffer\n");
-
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
             // Create our vertex normal buffer
@@ -94,7 +88,6 @@ void UploadMeshToGpu(FxRef<FxAssetModel>& model, cgltf_mesh *gltf_mesh, int mesh
 
 FxRef<FxAssetImage> FxLoaderGltf::LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
 {
-    // std::cout << "Texture name: " << texture_view.texture->image->name << '\n';
     if (!texture_view.texture) {
         return FxRef<FxAssetImage>(nullptr);
     }
@@ -108,12 +101,12 @@ FxRef<FxAssetImage> FxLoaderGltf::LoadTexture(const FxRef<FxMaterial>& material,
         const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
 
         uint32 size = texture_view.texture->image->buffer_view->size;
-        
+
         FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
-        
+
         // Since this is being loaded on another thread anyway, this shouldn't cause too much of an issue.
         texture->WaitUntilLoaded();
-        
+
         return texture;
     }
     else {
@@ -147,14 +140,13 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
     if (mGltfData->materials_count) {
         for (int i = 0; i < mGltfData->materials_count; i++) {
             cgltf_material& gltf_material = mGltfData->materials[i];
-            std::cout << "cgltf material: " << gltf_material.name << '\n';
 
             FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
 
 
             if (gltf_material.has_pbr_metallic_roughness) {
                 material->DiffuseTexture = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
-                
+
             }
 
 
@@ -183,7 +175,6 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     if (mGltfData->materials_count) {
         for (int i = 0; i < mGltfData->materials_count; i++) {
             cgltf_material& gltf_material = mGltfData->materials[i];
-            std::cout << "cgltf material: " << gltf_material.name << '\n';
 
             FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
 
@@ -202,10 +193,10 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, cons
 void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
 {
     FxRef<FxAssetModel> model(asset);
-    
+
     for (int mesh_index = 0; mesh_index < mGltfData->meshes_count; mesh_index++) {
         cgltf_mesh* mesh = &mGltfData->meshes[mesh_index];
-        
+
         printf("Primitives Count: %zu\n", mesh->primitives_count);
 
         model->Meshes.InitSize(mesh->primitives_count);
@@ -213,7 +204,7 @@ void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
         UploadMeshToGpu(model, mesh, mesh_index);
     }
-    
+
 
 //    cgltf_free(mGltfData);
 //    mGltfData = nullptr;

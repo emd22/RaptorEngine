@@ -164,17 +164,16 @@ int main()
     FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
     ground_model->WaitUntilLoaded();
 
-
     FxRef<FxAssetImage> cheese_image = FxAssetManager::LoadAsset<FxAssetImage>("../textures/cheese.jpg");
     cheese_image->WaitUntilLoaded();
 
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
 
-    FxSceneObject helmet_object;
+    FxObject helmet_object;
 //    helmet_object.Attach(helmet_model);
 
-    FxSceneObject ground_object;
+    FxObject ground_object;
     ground_object.Attach(ground_model);
     ground_object.Attach(cheese_material);
 
@@ -192,11 +191,7 @@ int main()
 //    }
 
     helmet_object.MoveBy(FxVec3f(0, 0, 0));
-
-
-
     helmet_object.RotateX(M_PI / 2);
-
     helmet_object.Scale(FxVec3f(3, 3, 3));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
@@ -259,11 +254,10 @@ int main()
 
             light.mPosition.Print();
         }
-        
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
             FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
-//            helmet_model->WaitUntilLoaded();
-            
+
             helmet_object.Attach(helmet_model);
             helmet_object.Attach(cheese_material);
         }
@@ -296,7 +290,7 @@ int main()
         light.Color.Y = sin(0.005 * Renderer->GetElapsedFrameCount());
 
         ground_object.Render(camera);
-        
+
         helmet_object.Render(camera);
 //        light.RenderDebugMesh(camera);
 

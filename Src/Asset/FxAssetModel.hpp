@@ -37,6 +37,13 @@ public:
 
         Meshes.Free();
 
+        // Delete the materials
+        for (FxRef<FxMaterial>& mat : Materials) {
+            mat->Destroy();
+        }
+
+        Materials.clear();
+
         mModelReady = false;
         IsUploadedToGpu = false;
     }

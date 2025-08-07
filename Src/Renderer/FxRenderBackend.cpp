@@ -243,18 +243,18 @@ uint32 DebugMessageCallback(
     return 0;
 }
 
-template<typename FuncProt>
-FuncProt GetExtensionFuncVk(VkInstance instance, const char *name)
-{
-    PFN_vkVoidFunction raw_ptr = vkGetInstanceProcAddr(instance, name);
+// template<typename FuncProt>
+// FuncProt GetExtensionFuncVk(VkInstance instance, const char *name)
+// {
+//     PFN_vkVoidFunction raw_ptr = vkGetInstanceProcAddr(instance, name);
 
-    if (raw_ptr != nullptr) {
-        return (FuncProt)raw_ptr;
-    }
+//     if (raw_ptr != nullptr) {
+//         return (FuncProt)raw_ptr;
+//     }
 
-    Log::Error("Could not load extension function '%s'", name);
-    return nullptr;
-}
+//     Log::Error("Could not load extension function '%s'", name);
+//     return nullptr;
+// }
 
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)

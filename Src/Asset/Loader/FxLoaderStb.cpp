@@ -32,8 +32,8 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
 {
 
     FxRef<FxAssetImage> image(asset);
-    
-    
+
+
 
     const int requested_channels = 4; /* RGBA */
 
@@ -41,7 +41,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
         Log::Error("Could not retrieve info from image in memory! (Size:%u)", size);
         return FxLoaderStb::Status::Error;
     }
-    
+
     mChannels = requested_channels;
 
     uint32 data_size = mWidth * mHeight * (requested_channels * sizeof(uint8));
@@ -56,10 +56,6 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
         Log::Error("Could not load image file from memory!");
         return FxLoaderStb::Status::Error;
     }
-    else {
-        Log::Info("Loaded the image!", 0);
-    }
-    
 
     return FxLoaderStb::Status::Success;
 }
@@ -84,9 +80,9 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
 void FxLoaderStb::Destroy(FxRef<FxAssetBase>& asset)
 {
-    while (!asset->IsUploadedToGpu) {
-        asset->IsUploadedToGpu.wait(true);
-    }
-    
+    // while (!asset->IsUploadedToGpu) {
+    //     asset->IsUploadedToGpu.wait(true);
+    // }
+
     stbi_image_free(mImageData);
 }

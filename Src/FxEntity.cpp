@@ -29,10 +29,10 @@ FxRef<FxEntity> FxEntityManager::New()
 /////////////////////////////
 
 
-void FxSceneObject::Render(const FxCamera& camera)
+void FxObject::Render(const FxCamera& camera)
 {
     RvkFrameData* frame = Renderer->GetFrame();
-    
+
     if (!mMaterial) {
         return;
     }

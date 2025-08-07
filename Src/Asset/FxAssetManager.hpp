@@ -129,6 +129,11 @@ private:
     template <typename AssetType, typename LoaderType, FxAssetType EnumValue> requires C_IsAsset<AssetType>
     static void DoLoadAsset(const FxRef<AssetType>& asset, const std::string& path)
     {
+        if (asset->IsUploadedToGpu) {
+            printf("*** DELETING ***\n");
+            asset->Destroy();
+        }
+
         FxRef<LoaderType> loader = FxRef<LoaderType>::New();
 
         FxAssetQueueItem queue_item(
@@ -149,6 +154,10 @@ private:
     template <typename AssetType, typename LoaderType, FxAssetType EnumValue> requires C_IsAsset<AssetType>
     static void DoLoadFromMemory(const FxRef<AssetType>& asset, const uint8* data, uint32 data_size)
     {
+        if (asset->IsUploadedToGpu) {
+            asset->Destroy();
+        }
+
         FxRef<LoaderType> loader = FxRef<LoaderType>::New();
 
         FxAssetQueueItem queue_item(
