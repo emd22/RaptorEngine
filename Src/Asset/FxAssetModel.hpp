@@ -2,7 +2,7 @@
 
 #include "FxAssetBase.hpp"
 
-#include <Renderer/FxMesh.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Core/FxRef.hpp>
 #include <FxMaterial.hpp>
 
@@ -31,7 +31,7 @@ public:
     {
         Log::Info("Destroy FxAssetModel (%lu meshes)", Meshes.Size);
 
-        for (FxMesh<>* mesh : Meshes) {
+        for (FxPrimitiveMesh<>* mesh : Meshes) {
             mesh->Destroy();
         }
 
@@ -49,7 +49,7 @@ public:
     }
 
 public:
-    FxStaticPtrArray<FxMesh<>> Meshes;
+    FxStaticPtrArray<FxPrimitiveMesh<>> Meshes;
     std::vector<FxRef<FxMaterial>> Materials;
 
 private:

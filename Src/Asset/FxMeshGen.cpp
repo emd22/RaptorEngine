@@ -4,7 +4,7 @@
 #include <Math/Vec3.hpp>
 #include <unordered_map>
 
-#include <Renderer/FxMesh.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 
 static const float Z = (1.0f + sqrt(5.0f)) / 2.0f; // Golden ratio
 static const FxVec2f UV = FxVec2f(1 / 11.0f, 1 / 3.0f); // The UV coordinates are laid out in a 11x3 grid
@@ -73,9 +73,9 @@ static const int32 IcoIndex[] = {
 
 
 
-FxRef<FxMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::AsLightVolume()
+FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::AsLightVolume()
 {
-   	FxRef<FxMesh<FxMeshGen::LightVolumeVertex>> mesh = FxMakeRef<FxMesh<FxMeshGen::LightVolumeVertex>>();
+   	FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> mesh = FxMakeRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>>();
     mesh->IsReference = true;
 
     FxSizedArray<RxVertex<FxVertexPosition>> points(Positions.Size);
@@ -95,12 +95,12 @@ FxRef<FxMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::AsLightVol
 	return mesh;
 }
 
-FxRef<FxMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
+FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
 {
-    FxRef<FxMesh<>> mesh = FxMakeRef<FxMesh<>>();
+    FxRef<FxPrimitiveMesh<>> mesh = FxMakeRef<FxPrimitiveMesh<>>();
     mesh->IsReference = true;
 
-    auto vertices = FxMesh<>::MakeCombinedVertexBuffer(Positions);
+    auto vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
     mesh->CreateFromData(vertices, Indices);
 
     return mesh;

@@ -5,7 +5,7 @@
 
 using VertexType = FxLight::VertexType;
 
-void FxLight::SetLightVolume(const FxRef<FxMesh<VertexType>>& volume)
+void FxLight::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume)
 {
     LightVolume = volume;
 }

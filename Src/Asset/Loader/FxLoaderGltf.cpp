@@ -1,6 +1,6 @@
 #include "FxLoaderGltf.hpp"
 #include "Asset/FxAssetBase.hpp"
-#include "Renderer/FxMesh.hpp"
+#include "Renderer/FxPrimitiveMesh.hpp"
 
 #include <ThirdParty/cgltf.h>
 
@@ -8,7 +8,7 @@
 
 #include <Core/FxRef.hpp>
 
-void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
+void UnpackMeshAttributes(FxPrimitiveMesh<>* mesh, cgltf_primitive* primitive)
 {
     FxSizedArray<float32> positions;
     FxSizedArray<float32> normals;
@@ -41,7 +41,7 @@ void UnpackMeshAttributes(FxMesh<>* mesh, cgltf_primitive* primitive)
         }
     }
 
-    auto combined_vertices = FxMesh<>::MakeCombinedVertexBuffer(positions, normals, uvs);
+    auto combined_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(positions, normals, uvs);
 
     // Set the combined vertices to the mesh
     mesh->UploadVertices(combined_vertices);
@@ -55,9 +55,9 @@ void UploadMeshToGpu(FxRef<FxAssetModel>& model, cgltf_mesh *gltf_mesh, int mesh
 
         FxSizedArray<uint32> indices;
 
-        FxMesh<>* primtive_mesh = new FxMesh;
+        FxPrimitiveMesh<>* primtive_mesh = new FxPrimitiveMesh;
 
-        // if there are indices in the mesh, add them to the FxMesh
+        // if there are indices in the mesh, add them to the FxPrimitiveMesh
         if (primitive->indices != nullptr) {
             indices.InitSize(primitive->indices->count);
 

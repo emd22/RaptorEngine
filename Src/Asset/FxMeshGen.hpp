@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Renderer/FxMesh.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Core/FxRef.hpp>
 
 class FxMeshGen
@@ -13,8 +13,8 @@ public:
         FxSizedArray<FxVec3f> Positions;
         FxSizedArray<uint32> Indices;
 
-        FxRef<FxMesh<LightVolumeVertex>> AsLightVolume();
-        FxRef<FxMesh<>> AsMesh();
+        FxRef<FxPrimitiveMesh<LightVolumeVertex>> AsLightVolume();
+        FxRef<FxPrimitiveMesh<>> AsMesh();
 
         void Destroy()
         {

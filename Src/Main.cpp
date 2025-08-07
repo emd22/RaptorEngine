@@ -25,7 +25,7 @@
 
 #include <Renderer/Renderer.hpp>
 #include <Renderer/FxWindow.hpp>
-#include <Renderer/FxMesh.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/FxDeferred.hpp>
 
 #include <Asset/FxAssetManager.hpp>
