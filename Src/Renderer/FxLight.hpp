@@ -12,7 +12,7 @@ class FxCamera;
 class FxLight : public FxEntity
 {
 public:
-    using VertexType = RvkVertex<FxVertexPosition>;
+    using VertexType = RxVertex<FxVertexPosition>;
 
 public:
     FxLight() = default;

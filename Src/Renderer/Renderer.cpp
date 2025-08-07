@@ -1,5 +1,5 @@
 #include "Renderer.hpp"
-#include "Core/Defines.hpp"
+#include "Core/FxDefines.hpp"
 
 #include <Core/FxPanic.hpp>
 

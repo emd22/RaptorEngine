@@ -1,13 +1,13 @@
 #pragma once
 
-#include "FxBaseAsset.hpp"
+#include "FxAssetBase.hpp"
 
-#include <Renderer/Backend/RvkTexture.hpp>
+#include <Renderer/Backend/RxTexture.hpp>
 
 #include <Core/FxStaticPtrArray.hpp>
 
 
-class FxAssetImage : public FxBaseAsset
+class FxAssetImage : public FxAssetBase
 {
 protected:
 public:
@@ -37,7 +37,7 @@ public:
     }
 
 public:
-    RvkTexture Texture;
+    RxTexture Texture;
 
     uint32 NumComponents = 3;
     FxVec2u Size = FxVec2u::Zero;

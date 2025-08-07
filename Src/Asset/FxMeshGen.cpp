@@ -78,7 +78,7 @@ FxRef<FxMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::AsLightVol
    	FxRef<FxMesh<FxMeshGen::LightVolumeVertex>> mesh = FxMakeRef<FxMesh<FxMeshGen::LightVolumeVertex>>();
     mesh->IsReference = true;
 
-    FxSizedArray<RvkVertex<FxVertexPosition>> points(Positions.Size);
+    FxSizedArray<RxVertex<FxVertexPosition>> points(Positions.Size);
 
     for (uint32 i = 0; i < Positions.Size; i++) {
         auto* vertex = points.Insert();

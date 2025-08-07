@@ -223,11 +223,11 @@ void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event *event)
         return;
     }
 
-    if (event->key.down && !button->IsKeyDown()) {
+    if (event->key.down != false && !button->IsKeyDown()) {
         button->mTickBit = GetInstance().mThisTick;
         button->mKeyDown = true;
     }
-    else if (!event->key.down && button->IsKeyDown()) {
+    else if (!event->key.down != false && button->IsKeyDown()) {
         button->mKeyDown = false;
         button->mContinuedPress = false;
     }

@@ -29,11 +29,15 @@ FxRef<FxEntity> FxEntityManager::New()
 /////////////////////////////
 
 
-void FxSceneObject::Render(const FxCamera& camera)
+void FxObject::Render(const FxCamera& camera)
 {
-    RvkFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = Renderer->GetFrame();
 
-    if (!mMaterial || !mMaterial->IsBuilt) {
+    if (!mMaterial) {
+        return;
+    }
+
+    if (!mMaterial->IsBuilt) {
         mMaterial->Build();
     }
 
@@ -50,7 +54,7 @@ void FxSceneObject::Render(const FxCamera& camera)
 
     frame->SubmitUbo(mUbo);
 
-    RvkDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mMaterial->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
+    RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mMaterial->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
     FxDrawPushConstants push_constants{};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));

@@ -6,7 +6,7 @@
 #include <Core/FxHash.hpp>
 #include <Core/Log.hpp>
 
-#include <Renderer/Backend/RvkDescriptors.hpp>
+#include <Renderer/Backend/RxDescriptors.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -39,7 +39,7 @@ public:
      * Binds the material to be used in the given command buffer.
      * @returns True if the material was bound succesfully.
      */
-    bool Bind(RvkCommandBuffer* cmd);
+    bool Bind(RxCommandBuffer* cmd);
 
     void Build();
     void Destroy();
@@ -58,8 +58,8 @@ public:
     FxHash NameHash{0};
     std::string Name = "";
 
-    RvkDescriptorSet mDescriptorSet{};
-    RvkGraphicsPipeline* Pipeline = nullptr;
+    RxDescriptorSet mDescriptorSet{};
+    RxGraphicsPipeline* Pipeline = nullptr;
 
     std::atomic_bool IsBuilt {false};
 private:
@@ -78,9 +78,9 @@ public:
     static FxMaterialManager& GetGlobalManager();
 
     void Create(uint32 materials_per_page=32);
-    static FxRef<FxMaterial> New(const std::string& name, RvkGraphicsPipeline* pipeline);
+    static FxRef<FxMaterial> New(const std::string& name, RxGraphicsPipeline* pipeline);
 
-    static RvkDescriptorPool& GetDescriptorPool()
+    static RxDescriptorPool& GetDescriptorPool()
     {
         return GetGlobalManager().mDescriptorPool;
     }
@@ -93,11 +93,11 @@ public:
     }
 
 public:
-    FxRef<RvkSampler> AlbedoSampler{nullptr};
+    FxRef<RxSampler> AlbedoSampler{nullptr};
 
 private:
     FxPagedArray<FxMaterial> mMaterials;
-    RvkDescriptorPool mDescriptorPool;
+    RxDescriptorPool mDescriptorPool;
 
     bool mInitialized = false;
 };

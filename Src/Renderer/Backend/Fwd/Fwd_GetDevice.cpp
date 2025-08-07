@@ -2,7 +2,7 @@
 
 #include <Renderer/Renderer.hpp>
 
-RvkGpuDevice* Fx_Fwd_GetGpuDevice()
+RxGpuDevice* Fx_Fwd_GetGpuDevice()
 {
     return Renderer->GetDevice();
 }

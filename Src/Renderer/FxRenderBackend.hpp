@@ -5,11 +5,11 @@
 #include "FxDeletionObject.hpp"
 #include "FxWindow.hpp"
 
-#include "Backend/RvkPipeline.hpp"
-#include "Backend/RvkFrameData.hpp"
-#include "Backend/RvkCommands.hpp"
-#include "Backend/RvkSwapchain.hpp"
-#include "Backend/RvkSynchro.hpp"
+#include "Backend/RxPipeline.hpp"
+#include "Backend/RxFrameData.hpp"
+#include "Backend/RxCommands.hpp"
+#include "Backend/RxSwapchain.hpp"
+#include "Backend/RxSynchro.hpp"
 
 #include <Core/FxRef.hpp>
 
@@ -33,10 +33,10 @@ class FxDeferredCompPass;
 
 struct FxGpuUploadContext
 {
-    RvkCommandPool CommandPool;
-    RvkCommandBuffer CommandBuffer;
+    RxCommandPool CommandPool;
+    RxCommandBuffer CommandBuffer;
 
-    RvkFence UploadFence;
+    RxFence UploadFence;
 };
 
 class FxCamera;
@@ -45,7 +45,7 @@ class FxRenderBackend {
     const uint32 DeletionFrameSpacing = 3;
 
 public:
-    using SubmitFunc = std::function<void(RvkCommandBuffer& cmd)>;
+    using SubmitFunc = std::function<void(RxCommandBuffer& cmd)>;
 public:
     FxRenderBackend() = default;
 
@@ -69,12 +69,12 @@ public:
         return mWindow;
     }
 
-    FX_FORCE_INLINE RvkGpuDevice* GetDevice()
+    FX_FORCE_INLINE RxGpuDevice* GetDevice()
     {
         return &mDevice;
     }
 
-    RvkUniformBufferObject& GetUbo();
+    RxUniformBufferObject& GetUbo();
 
     void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
@@ -100,7 +100,7 @@ public:
         return mInstance;
     }
 
-    RvkFrameData *GetFrame();
+    RxFrameData *GetFrame();
 
     uint32 GetImageIndex() { return mImageIndex; }
     VmaAllocator *GetGPUAllocator() { return &GpuAllocator; }
@@ -176,7 +176,7 @@ private:
     void InitFrames();
     void DestroyFrames();
 
-    FrameResult GetNextSwapchainImage(RvkFrameData* frame);
+    FrameResult GetNextSwapchainImage(RxFrameData* frame);
 
     ExtensionList &QueryInstanceExtensions(bool invalidate_previous = false);
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
@@ -185,14 +185,14 @@ private:
     FxSizedArray<VkLayerProperties> GetAvailableValidationLayers();
 
 public:
-    RvkSwapchain Swapchain;
-    FxSizedArray<RvkFrameData> Frames;
+    RxSwapchain Swapchain;
+    FxSizedArray<RxFrameData> Frames;
 
     VmaAllocator GpuAllocator = nullptr;
 
     // XXX: temporary
-    // RvkDescriptorPool GPassDescriptorPool;
-    RvkDescriptorPool CompDescriptorPool;
+    // RxDescriptorPool GPassDescriptorPool;
+    RxDescriptorPool CompDescriptorPool;
 
     FxGpuUploadContext UploadContext;
 
@@ -204,7 +204,7 @@ public:
 
     FxRef<FxDeferredRenderer> DeferredRenderer{ nullptr };
 
-    // RvkSemaphore OffscreenSemaphore;
+    // RxSemaphore OffscreenSemaphore;
 
 private:
 
@@ -212,7 +212,7 @@ private:
     VkSurfaceKHR mWindowSurface = nullptr;
 
     FxRef<FxWindow> mWindow = nullptr;
-    RvkGpuDevice mDevice;
+    RxGpuDevice mDevice;
 
     VkDebugUtilsMessengerEXT mDebugMessenger;
 

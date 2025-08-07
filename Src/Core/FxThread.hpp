@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Defines.hpp"
+#include "FxDefines.hpp"
 
 #ifdef FX_PLATFORM_MACOS
 #include <pthread.h>

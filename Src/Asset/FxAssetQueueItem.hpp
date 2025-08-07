@@ -2,8 +2,8 @@
 
 #include <Core/FxRef.hpp>
 
-#include "FxBaseAsset.hpp"
-#include "Loader/FxBaseLoader.hpp"
+#include "FxAssetBase.hpp"
+#include "Loader/FxLoaderBase.hpp"
 
 #include <string>
 
@@ -81,8 +81,8 @@ struct FxAssetQueueItem
 
     std::string Path;
 
-    FxRef<FxBaseLoader> Loader{nullptr};
-    FxRef<FxBaseAsset> Asset{nullptr};
+    FxRef<FxLoaderBase> Loader{nullptr};
+    FxRef<FxAssetBase> Asset{nullptr};
 
     // Data for loading from memory
     const uint8* RawData = nullptr;

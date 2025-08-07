@@ -19,7 +19,7 @@ bool FxAssetModel::CheckIfReady()
     return (mModelReady = true);
 }
 
-void FxAssetModel::Render(RvkGraphicsPipeline &pipeline)
+void FxAssetModel::Render(RxGraphicsPipeline &pipeline)
 {
     if (!CheckIfReady()) {
         return;
