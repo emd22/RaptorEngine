@@ -60,7 +60,6 @@ void FxObject::Render(const FxCamera& camera)
 
     FxMat4f VP = camera.VPMatrix;
     FxMat4f MVP = mModelMatrix * VP;
-//    MVP.FlipY();
 
     memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
 
@@ -69,7 +68,6 @@ void FxObject::Render(const FxCamera& camera)
     FxDrawPushConstants push_constants{};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
     memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
-
     
     // mModel->Render(*mMaterial->Pipeline);
     

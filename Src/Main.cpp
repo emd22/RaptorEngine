@@ -172,36 +172,34 @@ int main()
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
     
+    
+    
+    
+    
     FxRef<FxObject> ground_object = FxAssetManager::LoadAsset<FxObject>("../models/Ground.glb");
     ground_object->WaitUntilLoaded();
     
     ground_object->Material = cheese_material;
+    
+    
+    
+    
 
     // FxOldSceneObject helmet_object;
     FxRef<FxObject> fireplace_object = FxAssetManager::LoadAsset<FxObject>("../models/FireplaceRoom.glb");
     fireplace_object->WaitUntilLoaded();
     
     for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-        if (obj->Material) {
-            obj->Material->Build();
-        }
-        else {
+        // TEMP: If there are missing materials, cheese it up
+        if (!obj->Material) {
             obj->Material = cheese_material;
         }
     }
     
-//    fireplace_object->Material = cheese_material;
     
-//    for (const auto& obj : fireplace_object->AttachedNodes) {
-//        obj->Material = cheese_material;
-//    }
-//    helmet_object.Attach(helmet_model);
+    
 
-    // FxOldSceneObject ground_object;
-    // ground_object.Attach(ground_model);
-    // ground_object.Attach(cheese_material);
-
-     ground_object->MoveBy(FxVec3f(0, -4, 0));
+    ground_object->MoveBy(FxVec3f(0, -1, 0));
 
 
 //    if (helmet_model->Materials.size() > 0) {
@@ -228,7 +226,8 @@ int main()
 
     camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
 
-    camera.Position.Z += 15.0f;
+    camera.Position.Z += 5.0f;
+    camera.Position.Y += 4.0f;
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
 
@@ -351,6 +350,8 @@ int main()
     deferred_renderer->Destroy();
 
     // composition_pipeline.Destroy();
+    
+//    ground_object->Destroy();
 
     std::cout << "this thread: " << std::this_thread::get_id() << std::endl;
 

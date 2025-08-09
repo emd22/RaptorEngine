@@ -74,6 +74,22 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
 //    }
 //}
 
+void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, cgltf_texture_view& texture_view)
+{
+    if (!texture_view.texture) {
+        return;
+    }
+   
+    const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
+    uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
+
+    // Stage that shit so we can nuke mGltfData as soon as we can
+    uint8* goober_buffer = FxMemPool::Alloc<uint8>(image_buffer_size);
+    memcpy(goober_buffer, image_buffer, image_buffer_size);
+    
+    material->DiffuseTexture.DataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
+}
+
 
 void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive)
 {
@@ -85,21 +101,9 @@ void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitiv
     
     FxRef<FxMaterial> material = FxMaterialManager::New("Fireplace", &Renderer->DeferredRenderer->GPassPipeline);
 
+    // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
-        // Get the image buffer from the gltf
-        cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
-        if (!texture_view.texture) {
-            return;
-        }
-        
-        const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
-        uint32 size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
-        
-        uint8* new_data = FxMemPool::Alloc<uint8>(size);
-        memcpy(new_data, data, size);
-        
-        // Assign the data that needs to be loaded
-        material->DiffuseTexture.DataToLoad = FxMakeSlice(new_data, size);
+        MakeMaterialTextureForPrimitive(material, gltf_material->pbr_metallic_roughness.base_color_texture);
     }
     
     object->Material = material;

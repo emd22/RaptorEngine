@@ -16,6 +16,20 @@
     #error "Unsupported platform"
 #endif
 
+
+
+#ifdef __clang__
+    #define FX_COMPILER_CLANG 1
+#elif __GNUC__
+    #define FX_COMPILER_GCC 1
+#elif _MSC_VER
+    #define FX_COMPILER_MSVC 1
+#else
+    #error "Unsupported compiler"
+#endif
+
+
+
 #ifdef NDEBUG
 #define FX_BUILD_RELEASE
 #else

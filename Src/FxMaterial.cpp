@@ -151,7 +151,7 @@ void FxMaterial::Destroy()
 void FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
 {
     if (!component.Texture && component.DataToLoad) {
-        FxSlice<uint8>& image_data = component.DataToLoad;
+        FxSlice<const uint8>& image_data = component.DataToLoad;
         component.Texture = FxAssetManager::LoadFromMemory<FxAssetImage>(image_data.Ptr, image_data.Size);
         component.Texture->WaitUntilLoaded();
     }

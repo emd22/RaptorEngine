@@ -7,10 +7,11 @@
 #include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
 #include "Fwd/Fwd_AddToDeletionQueue.hpp"
 #include "Fwd/Fwd_GetGpuAllocator.hpp"
-#include "vulkan/vulkan_core.h"
 
 #include <cstring>
 #include <memory.h>
+
+#define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
 template <typename ElementType>
 class RxRawGpuBuffer;
@@ -104,6 +105,7 @@ public:
             .usage = memory_usage,
         };
 
+
         const VkResult status = vmaCreateBuffer(
             Fx_Fwd_GetGpuAllocator(),
             &create_info,
@@ -116,6 +118,24 @@ public:
         if (status != VK_SUCCESS) {
             FxPanic("GPUBuffer", "Error allocating staging buffer!", status);
         }
+
+    #ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
+        static uint32 allocation_number = 0;
+
+        allocation_number += 1;
+
+        std::string allocation_name = "";
+        // typeid(ElementType).name();
+
+        char name_buffer[256];
+        char demangled_name_buffer[128];
+
+        FxUtil::DemangleName(typeid(ElementType).name(), demangled_name_buffer, 128);
+
+        snprintf(name_buffer, 128, "%s{%u}", demangled_name_buffer, allocation_number);
+
+        vmaSetAllocationName(Fx_Fwd_GetGpuAllocator(), Allocation, name_buffer);
+    #endif
 
         Initialized = true;
     }
