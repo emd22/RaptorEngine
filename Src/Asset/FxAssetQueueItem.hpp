@@ -11,7 +11,8 @@ enum class FxAssetType
 {
     None,
     Binary,
-    Model,
+    // Model,
+    Object,
     Image,
 };
 

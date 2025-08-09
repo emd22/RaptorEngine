@@ -109,6 +109,8 @@ void TestSpeed(FuncType ft, int iterations)
 #pragma clang optimize on
 
 
+#include <FxObject.hpp>
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
@@ -157,27 +159,44 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    FxRef<FxAssetModel> helmet_model = FxAssetManager::NewAsset<FxAssetModel>();
+    // FxRef<FxAssetModel> helmet_model = FxAssetManager::NewAsset<FxAssetModel>();
 //    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
 //    helmet_model->WaitUntilLoaded();
 
-    FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
-    ground_model->WaitUntilLoaded();
+    // FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
+    // ground_model->WaitUntilLoaded();
 
     FxRef<FxAssetImage> cheese_image = FxAssetManager::LoadAsset<FxAssetImage>("../textures/cheese.jpg");
     cheese_image->WaitUntilLoaded();
 
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
+    
+    FxRef<FxObject> ground_object = FxAssetManager::LoadAsset<FxObject>("../models/Ground.glb");
+    ground_object->WaitUntilLoaded();
+    
+    ground_object->Material = cheese_material;
 
-    FxObject helmet_object;
+    // FxOldSceneObject helmet_object;
+    FxRef<FxObject> fireplace_object = FxAssetManager::LoadAsset<FxObject>("../models/FireplaceRoom.glb");
+    fireplace_object->WaitUntilLoaded();
+    
+    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
+        obj->Material = cheese_material;
+    }
+    
+//    fireplace_object->Material = cheese_material;
+    
+//    for (const auto& obj : fireplace_object->AttachedNodes) {
+//        obj->Material = cheese_material;
+//    }
 //    helmet_object.Attach(helmet_model);
 
-    FxObject ground_object;
-    ground_object.Attach(ground_model);
-    ground_object.Attach(cheese_material);
+    // FxOldSceneObject ground_object;
+    // ground_object.Attach(ground_model);
+    // ground_object.Attach(cheese_material);
 
-    ground_object.MoveBy(FxVec3f(0, -2, 0));
+     ground_object->MoveBy(FxVec3f(0, -4, 0));
 
 
 //    if (helmet_model->Materials.size() > 0) {
@@ -190,9 +209,15 @@ int main()
 //        helmet_object.Attach(cheese_material);
 //    }
 
-    helmet_object.MoveBy(FxVec3f(0, 0, 0));
-    helmet_object.RotateX(M_PI / 2);
-    helmet_object.Scale(FxVec3f(3, 3, 3));
+    // helmet_object.MoveBy(FxVec3f(0, 0, 0));
+    // helmet_object.RotateX(M_PI / 2);
+    // helmet_object.Scale(FxVec3f(3, 3, 3));
+    //
+    
+    
+//    
+    fireplace_object->RotateX(M_PI / 2);
+    fireplace_object->Scale(FxVec3f(3));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
@@ -206,7 +231,7 @@ int main()
     sets_to_bind.InitSize(2);
 
     FxLight light;
-    light.SetLightVolume(generated_sphere, false);
+    light.SetLightVolume(generated_sphere, true);
 
     FxLight light2;
     light2.SetLightVolume(generated_sphere, false);
@@ -219,7 +244,7 @@ int main()
     light2.MoveBy(FxVec3f(1, 0, -0.5));
     light2.Scale(FxVec3f(25));
 
-    bool second_light_on = false;
+    bool second_light_on = true;
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -256,13 +281,13 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
-            FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
+            // FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
 
-            helmet_object.Attach(helmet_model);
-            helmet_object.Attach(cheese_material);
+            // helmet_object.Attach(helmet_model);
+            // helmet_object.Attach(cheese_material);
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
             second_light_on = !second_light_on;
         }
 
@@ -286,13 +311,14 @@ int main()
 //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
 //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
-
         light.Color.Y = sin(0.005 * Renderer->GetElapsedFrameCount());
 
-        ground_object.Render(camera);
-
-        helmet_object.Render(camera);
+        // ground_object.Render(camera);
+        // helmet_object.Render(camera);
 //        light.RenderDebugMesh(camera);
+        
+        fireplace_object->Render(camera);
+        ground_object->Render(camera);
 
         Renderer->BeginLighting();
 

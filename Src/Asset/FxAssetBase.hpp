@@ -3,6 +3,7 @@
 #include <atomic>
 
 #include <Core/FxDataNotifier.hpp>
+#include <Core/MemPool/FxMPPagedArray.hpp>
 
 #include <Core/FxRef.hpp>
 
@@ -93,7 +94,6 @@ protected:
     std::vector<OnLoadFunc> mOnLoadedCallbacks;
     // OnLoadFunc mOnLoadedCallback = nullptr;
     OnErrorFunc mOnErrorCallback = nullptr;
-
     std::atomic_bool mIsLoaded = false;
 
     friend class FxAssetManager;

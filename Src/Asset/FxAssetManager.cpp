@@ -2,6 +2,8 @@
 #include "Core/FxPanic.hpp"
 #include "Core/FxSizedArray.hpp"
 
+#include <FxObject.hpp>
+
 #include "FxAssetModel.hpp"
 #include "FxAssetImage.hpp"
 
@@ -121,10 +123,16 @@ void FxAssetManager::Shutdown()
     // mLoadQueue.Destroy();
 }
 
+// template<>
+// void FxAssetManager::LoadAsset<FxAssetModel>(FxRef<FxAssetModel> asset, const std::string& path)
+// {
+//     DoLoadAsset<FxAssetModel, FxLoaderGltf, FxAssetType::Model>(asset, path);
+// }
+
 template<>
-void FxAssetManager::LoadAsset<FxAssetModel>(FxRef<FxAssetModel> asset, const std::string& path)
+void FxAssetManager::LoadAsset<FxObject>(FxRef<FxObject> asset, const std::string& path)
 {
-    DoLoadAsset<FxAssetModel, FxLoaderGltf, FxAssetType::Model>(asset, path);
+    DoLoadAsset<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, path);
 }
 
 template<>
@@ -178,7 +186,7 @@ void FxAssetManager::CheckForUploadableData()
                 loaded_item.Asset->IsUploadedToGpu.wait(true);
             }
 
-            
+
 
             // Call the OnLoaded callback if it was registered
             if (!loaded_item.Asset->mOnLoadedCallbacks.empty()) {
@@ -187,12 +195,12 @@ void FxAssetManager::CheckForUploadableData()
                 }
                 // loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
             }
-            
+
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
             loaded_item.Asset->mIsLoaded.store(true);
 
             // Destroy the loader(clearing the loading buffers)
-            loaded_item.Loader->Destroy(loaded_item.Asset);
+//            loaded_item.Loader->Destroy(loaded_item.Asset);
         }
         else if (worker.LoadStatus == FxLoaderBase::Status::Error) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
@@ -210,7 +218,8 @@ void FxAssetManager::CheckForUploadableData()
 
         ItemsEnqueued.clear();
         worker.IsBusy.clear();
-        
+        worker.LoadStatus = FxLoaderBase::Status::None;
+
         worker.DataPendingUpload.clear();
     }
 }
@@ -238,7 +247,7 @@ void FxAssetManager::CheckForItemsToLoad()
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
         Log::Debug("No workers available; Polling for worker thread...");
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up
         worker = FindWorkerThread();

@@ -33,8 +33,6 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
 
     FxRef<FxAssetImage> image(asset);
 
-
-
     const int requested_channels = 4; /* RGBA */
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
