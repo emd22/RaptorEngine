@@ -110,7 +110,7 @@ bool FxMaterial::IsReady()
         return true;
     }
 
-    if (!DiffuseTexture || !DiffuseTexture->IsLoaded()) {
+    if (!DiffuseTexture.Texture || !DiffuseTexture.Texture->IsLoaded()) {
         return false;
     }
 
@@ -146,6 +146,18 @@ void FxMaterial::Destroy()
     }
 }
 
+#include <Asset/FxAssetManager.hpp>
+
+void FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
+{
+    if (!component.Texture && component.DataToLoad) {
+        FxSlice<uint8>& image_data = component.DataToLoad;
+        component.Texture = FxAssetManager::LoadFromMemory<FxAssetImage>(image_data.Ptr, image_data.Size);
+        component.Texture->WaitUntilLoaded();
+    }
+}
+
+
 #define PUSH_IMAGE_IF_SET(img, binding) \
     if (img != nullptr) { \
         VkDescriptorImageInfo image_info { \
@@ -173,8 +185,10 @@ void FxMaterial::Build()
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
-    if (DiffuseTexture) {
-        DiffuseTexture->Texture.SetSampler(manager.AlbedoSampler);
+    CheckComponentTextureLoaded(DiffuseTexture);
+    
+    if (DiffuseTexture.Texture) {
+        DiffuseTexture.Texture->Texture.SetSampler(manager.AlbedoSampler);
     }
 
 
@@ -184,7 +198,7 @@ void FxMaterial::Build()
     RxDescriptorSet& descriptor_set = mDescriptorSet;
 
     // Push material textures
-    PUSH_IMAGE_IF_SET(DiffuseTexture, 0);
+    PUSH_IMAGE_IF_SET(DiffuseTexture.Texture, 0);
     // PUSH_IMAGE_IF_SET(Normal);
 
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);

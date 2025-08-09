@@ -51,23 +51,61 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
     mesh->IsReady = true;
 }
 
-void CreateMaterialFromPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive)
+//void CreateMaterialFromGltfMesh(FxRef<FxObject>& object, cgltf_material* gltf_material)
+//{
+////    cgltf_material* gltf_material = primitive->material;
+//    if (!gltf_material) {
+//        return;
+//    }
+//
+//    FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
+//
+//    if (gltf_material->has_pbr_metallic_roughness) {
+//        material->DiffuseTexture.Texture = LoadTexture(material, gltf_material->pbr_metallic_roughness.base_color_texture);
+//    }
+//
+//    object->Material = material;
+//}
+
+//void FxLoaderGltf::LoadAttachedMaterials()
+//{
+//    for (FxGltfMaterialToLoad& to_load : MaterialsToLoad) {
+//        CreateMaterialFromGltfMesh(to_load.Object, mGltfData->meshes[to_load.MeshIndex].primitives[to_load.PrimitiveIndex].material);
+//    }
+//}
+
+
+void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive)
 {
     cgltf_material* gltf_material = primitive->material;
+    
     if (!gltf_material) {
         return;
     }
-
-    FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
+    
+    FxRef<FxMaterial> material = FxMaterialManager::New("Fireplace", &Renderer->DeferredRenderer->GPassPipeline);
 
     if (gltf_material->has_pbr_metallic_roughness) {
-        material->DiffuseTexture = LoadTexture(material, gltf_material->pbr_metallic_roughness.base_color_texture);
+        // Get the image buffer from the gltf
+        cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
+        if (!texture_view.texture) {
+            return;
+        }
+        
+        const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
+        uint32 size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
+        
+        uint8* new_data = FxMemPool::Alloc<uint8>(size);
+        memcpy(new_data, data, size);
+        
+        // Assign the data that needs to be loaded
+        material->DiffuseTexture.DataToLoad = FxMakeSlice(new_data, size);
     }
-
+    
     object->Material = material;
 }
 
-void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mesh, int mesh_index)
+void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mesh, int mesh_index)
 {
     const bool has_multiple_primitives = gltf_mesh->primitives_count > 1;
 
@@ -103,8 +141,21 @@ void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mesh, int mesh_in
         }
 
         UnpackMeshAttributes(primitive_mesh, primitive);
+        
+        MakeMaterialForPrimitive(current_object, primitive);
 
 //        CreateMaterialFromPrimitive(current_object, primitive);
+//        FxGltfMaterialToLoad material{
+//            .PrimitiveIndex = i,
+////            .GltfMaterial = gltf_mesh->primitives[i].material,
+//            .Object = current_object,
+//            .MeshIndex = mesh_index
+//        };
+
+        
+        
+//        MaterialsToLoad.push_back(material);
+                
         current_object->Mesh = primitive_mesh;
         
         if (has_multiple_primitives) {
@@ -128,6 +179,7 @@ void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mesh, int mesh_in
 #include <iostream>
 
 #include <Asset/FxAssetManager.hpp>
+
 
 
 FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
@@ -289,9 +341,9 @@ void FxLoaderGltf::Destroy(FxRef<FxAssetBase>& asset)
 //        asset->IsUploadedToGpu.wait(true);
 //    }
 
-    if (mGltfData) {
-       printf("Destroyed mesh\n");
-       cgltf_free(mGltfData);
-       mGltfData = nullptr;
-    }
+//    if (mGltfData) {
+//       printf("Destroyed mesh\n");
+//       cgltf_free(mGltfData);
+//       mGltfData = nullptr;
+//    }
 }

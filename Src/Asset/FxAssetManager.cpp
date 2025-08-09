@@ -198,6 +198,9 @@ void FxAssetManager::CheckForUploadableData()
 
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
             loaded_item.Asset->mIsLoaded.store(true);
+            
+//            FxRef<FxLoaderGltf> gltf_loader(loaded_item.Loader);
+//            gltf_loader->LoadAttachedMaterials();
 
             // Destroy the loader(clearing the loading buffers)
 //            loaded_item.Loader->Destroy(loaded_item.Asset);

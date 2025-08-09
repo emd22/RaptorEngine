@@ -6,9 +6,17 @@
 #include <Core/FxHash.hpp>
 #include <Core/Log.hpp>
 
+
 #include <Renderer/Backend/RxDescriptors.hpp>
 
 #include <vulkan/vulkan.h>
+
+struct FxMaterialComponent
+{
+    FxRef<FxAssetImage> Texture{nullptr};
+    FxSlice<uint8> DataToLoad{nullptr};
+};
+
 
 class FxMaterial
 {
@@ -25,7 +33,7 @@ public:
     {
         switch (type) {
             case ResourceType::Diffuse:
-                DiffuseTexture = image;
+                DiffuseTexture.Texture = image;
                 break;
             default:
                 Log::Error("Unsupported resource type to attach to material!", 0);
@@ -51,9 +59,12 @@ public:
 
 private:
     VkDescriptorSetLayout BuildLayout();
+    
+    void CheckComponentTextureLoaded(FxMaterialComponent& component);
 
 public:
-    FxRef<FxAssetImage> DiffuseTexture{nullptr};
+//    FxRef<FxAssetImage> DiffuseTexture{nullptr};
+    FxMaterialComponent DiffuseTexture;
 
     FxHash NameHash{0};
     std::string Name = "";

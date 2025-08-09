@@ -182,7 +182,12 @@ int main()
     fireplace_object->WaitUntilLoaded();
     
     for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-        obj->Material = cheese_material;
+        if (obj->Material) {
+            obj->Material->Build();
+        }
+        else {
+            obj->Material = cheese_material;
+        }
     }
     
 //    fireplace_object->Material = cheese_material;

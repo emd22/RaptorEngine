@@ -2,17 +2,23 @@
 
 #include "FxLoaderBase.hpp"
 #include <FxMaterial.hpp>
+#include <FxObject.hpp>
 
 #include <string>
 
 struct cgltf_data;
+struct cgltf_material;
+struct cgltf_mesh;
 struct cgltf_texture_view;
 
-struct FxGltfResource
+struct FxGltfMaterialToLoad
 {
-    uint8* DecodedData = nullptr;
-
+//    cgltf_material* GltfMaterial = nullptr;
+    FxRef<FxObject> Object{nullptr};
+    int PrimitiveIndex = 0;
+    int MeshIndex = 0;
 };
+
 
 class FxLoaderGltf : public FxLoaderBase
 {
@@ -23,12 +29,19 @@ public:
 
     Status LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path) override;
     Status LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size) override;
-
     
+    void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mesh, int mesh_index);
+    
+    
+
+//    void LoadAttachedMaterials();
     
     void Destroy(FxRef<FxAssetBase>& asset) override;
 
     ~FxLoaderGltf() override = default;
+    
+public:
+    std::vector<FxGltfMaterialToLoad> MaterialsToLoad;
 
 protected:
     void CreateGpuResource(FxRef<FxAssetBase>& asset) override;
@@ -37,4 +50,5 @@ protected:
 
 private:
     cgltf_data* mGltfData = nullptr;
+    
 };
