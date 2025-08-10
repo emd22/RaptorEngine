@@ -24,7 +24,7 @@
 #define AMD_VULKAN_MEMORY_ALLOCATOR_H
 
 
-#define VMA_DEBUG_LOG_FORMAT(fmt, ...) printf(fmt "\n", __VA_ARGS__)
+//#define VMA_DEBUG_LOG_FORMAT(fmt, ...) printf(fmt "\n", __VA_ARGS__)
 
 //#define VMA_LEAK_LOG_FORMAT(format, ...) do { \
 //        printf((format), __VA_ARGS__); \

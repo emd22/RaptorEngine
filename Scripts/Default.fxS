@@ -1,0 +1,7 @@
+local int TestNumber = 5;
+
+action AddValues(int by) {
+    add(TestNumber, 3);
+}
+
+AddValues(3);

@@ -111,12 +111,70 @@ void TestSpeed(FuncType ft, int iterations)
 
 #include <FxObject.hpp>
 
+#include <Script/FxScript.hpp>
+
+void TestScript()
+{
+    FxConfigScript script;
+	script.LoadFile("../Scripts/Default.fxS");
+
+
+	FxAstBlock* root_block = script.Parse();
+
+	FxScriptInterpreter interpreter(root_block);
+
+	interpreter.RegisterInternalFunc(
+		FxHashStr("add"),
+		{ FxScriptValue::REF, FxScriptValue::INT },
+		[&interpreter](std::vector<FxScriptValue>& params, FxScriptValue* return_value) {
+			int first_value = interpreter.GetImmediateValue(params[0]).ValueInt;
+			int second_value = interpreter.GetImmediateValue(params[1]).ValueInt;
+
+			interpreter.FindVar(params[0].ValueRef->Name->GetHash())->Value.ValueInt = first_value + second_value;
+		},
+		false
+	);
+
+	interpreter.RegisterInternalFunc(FxHashStr("log"), {}, [&interpreter](std::vector<FxScriptValue>& params, FxScriptValue* return_value) {
+		printf("Log: ");
+
+		for (FxScriptValue& param : params) {
+			FxScriptValue& value = interpreter.GetImmediateValue(param);
+
+			switch (param.Type) {
+			case FxScriptValue::NONETYPE:
+				printf("null");
+				break;
+			case FxScriptValue::INT:
+				printf("%d", param.ValueInt);
+				break;
+			case FxScriptValue::FLOAT:
+				printf("%f", param.ValueFloat);
+				break;
+			case FxScriptValue::STRING:
+				printf("%s", param.ValueString);
+				break;
+			}
+
+			putchar(' ');
+		}
+		putchar('\n');
+		}, true);
+
+	interpreter.Interpret();
+}
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
+    TestScript();
+
+    return 0;
+
     FxConfigFile config;
     config.Load("../Config/Main.conf");
+
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
@@ -171,33 +229,33 @@ int main()
 
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
-    
-    
-    
-    
-    
+
+
+
+
+
     FxRef<FxObject> ground_object = FxAssetManager::LoadAsset<FxObject>("../models/Ground.glb");
     ground_object->WaitUntilLoaded();
-    
+
     ground_object->Material = cheese_material;
-    
-    
-    
-    
+
+
+
+
 
     // FxOldSceneObject helmet_object;
     FxRef<FxObject> fireplace_object = FxAssetManager::LoadAsset<FxObject>("../models/FireplaceRoom.glb");
     fireplace_object->WaitUntilLoaded();
-    
+
     for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
         // TEMP: If there are missing materials, cheese it up
         if (!obj->Material) {
             obj->Material = cheese_material;
         }
     }
-    
-    
-    
+
+
+
 
     ground_object->MoveBy(FxVec3f(0, -1, 0));
 
@@ -216,9 +274,9 @@ int main()
     // helmet_object.RotateX(M_PI / 2);
     // helmet_object.Scale(FxVec3f(3, 3, 3));
     //
-    
-    
-//    
+
+
+//
     fireplace_object->RotateX(M_PI / 2);
     fireplace_object->Scale(FxVec3f(3));
 
@@ -320,7 +378,7 @@ int main()
         // ground_object.Render(camera);
         // helmet_object.Render(camera);
 //        light.RenderDebugMesh(camera);
-        
+
         fireplace_object->Render(camera);
         ground_object->Render(camera);
 
@@ -350,7 +408,7 @@ int main()
     deferred_renderer->Destroy();
 
     // composition_pipeline.Destroy();
-    
+
 //    ground_object->Destroy();
 
     std::cout << "this thread: " << std::this_thread::get_id() << std::endl;

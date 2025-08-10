@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <Core/FxDefines.hpp>
 
+#include <stdio.h>
 
 #if defined(FX_COMPILER_CLANG) || defined(FX_COMPILER_GCC)
 #define FX_UTIL_DEFINE_DEMANGLE_NAME 1
@@ -20,6 +21,11 @@ public:
         return static_cast<typename std::underlying_type<EnumClass>::type>(value);
     }
 
+    static FILE* FileOpen(const char* path, const char* mode)
+    {
+        // TODO: readd fopen_s for Windows;
+        return fopen(path, mode);
+    }
 
     static int DemangleName(const char* mangled_name, char* buffer, size_t buffer_size)
     {
