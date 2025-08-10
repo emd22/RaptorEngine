@@ -82,7 +82,7 @@ void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, cgltf_texture_
    
     const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
-
+    
     // Stage that shit so we can nuke mGltfData as soon as we can
     uint8* goober_buffer = FxMemPool::Alloc<uint8>(image_buffer_size);
     memcpy(goober_buffer, image_buffer, image_buffer_size);
@@ -147,6 +147,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mes
         UnpackMeshAttributes(primitive_mesh, primitive);
         
         MakeMaterialForPrimitive(current_object, primitive);
+        
 
 //        CreateMaterialFromPrimitive(current_object, primitive);
 //        FxGltfMaterialToLoad material{
@@ -173,7 +174,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mes
         // model->Meshes.Data[i] = primtive_mesh;
     }
     
-    object = current_object;
+//    object = current_object;
     
     Log::Info("Add primitive:", 0);
 
@@ -186,39 +187,39 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mes
 
 
 
-FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
-{
-    if (!texture_view.texture) {
-        return FxRef<FxAssetImage>(nullptr);
-    }
-
-    if (texture_view.texture->image->uri != nullptr) {
-        std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
-        return FxRef<FxAssetImage>(nullptr);
-    }
-
-    if (texture_view.texture->image != nullptr) {
-        const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
-
-        uint32 size = texture_view.texture->image->buffer_view->size;
-
-        FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
-
-        // Since this is being loaded on another thread anyway, this shouldn't cause too much of an issue.
-//        texture->WaitUntilLoaded();
-
-        return texture;
-    }
-    else {
-        std::cout << "no image added\n";
-    }
-
-    return FxRef<FxAssetImage>(nullptr);
-}
+//FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
+//{
+//    if (!texture_view.texture) {
+//        return FxRef<FxAssetImage>(nullptr);
+//    }
+//
+//    if (texture_view.texture->image->uri != nullptr) {
+//        std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
+//        return FxRef<FxAssetImage>(nullptr);
+//    }
+//
+//    if (texture_view.texture->image != nullptr) {
+//        const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
+//
+//        uint32 size = texture_view.texture->image->buffer_view->size;
+//
+//        FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
+//
+//        // Since this is being loaded on another thread anyway, this shouldn't cause too much of an issue.
+////        texture->WaitUntilLoaded();
+//
+//        return texture;
+//    }
+//    else {
+//        std::cout << "no image added\n";
+//    }
+//
+//    return FxRef<FxAssetImage>(nullptr);
+//}
 
 FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
 {
-    FxRef<FxAssetModel> model(asset);
+//    FxRef<FxAssetModel> model(asset);
 
     cgltf_options options{};
 
@@ -263,7 +264,7 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
 FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
 {
     // (void)asset;
-    FxRef<FxAssetModel> model(asset);
+//    FxRef<FxAssetModel> model(asset);
 
     cgltf_options options{};
 
@@ -330,8 +331,8 @@ void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
     
     
     asset = output_object;
-    current_object.mPtr = nullptr;
-    current_object.mRefCnt = nullptr;
+//    current_object.mPtr = nullptr;
+//    current_object.mRefCnt = nullptr;
     
 
     asset->IsUploadedToGpu = true;
@@ -345,9 +346,9 @@ void FxLoaderGltf::Destroy(FxRef<FxAssetBase>& asset)
 //        asset->IsUploadedToGpu.wait(true);
 //    }
 
-//    if (mGltfData) {
-//       printf("Destroyed mesh\n");
-//       cgltf_free(mGltfData);
-//       mGltfData = nullptr;
-//    }
+    if (mGltfData) {
+       printf("Destroyed mesh\n");
+       cgltf_free(mGltfData);
+       mGltfData = nullptr;
+    }
 }

@@ -44,6 +44,10 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
 
     uint32 data_size = mWidth * mHeight * (requested_channels * sizeof(uint8));
     mDataSize = data_size;
+    
+    if (data_size == 4194304) {
+        
+    }
 
     image->NumComponents = mChannels;
     image->Size = { uint32(mWidth), uint32(mHeight) };
@@ -63,6 +67,9 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
     FxRef<FxAssetImage> image(asset);
 
     FxSizedArray<uint8> data_arr;
+    
+    // Since the image data in mImageData is not ours(it is stb's),
+    // we need to set this flag to prevent it from attemping to be freed.
     data_arr.DoNotDestroy = true;
 
     data_arr.Data = mImageData;
@@ -71,6 +78,7 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
     image->Texture.Create(data_arr, image->Size, VK_FORMAT_R8G8B8A8_SRGB, 4);
 
+    asset = image;
 
     asset->IsUploadedToGpu = true;
     asset->IsUploadedToGpu.notify_all();

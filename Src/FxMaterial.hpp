@@ -15,6 +15,8 @@ struct FxMaterialComponent
 {
     FxRef<FxAssetImage> Texture{nullptr};
     FxSlice<const uint8> DataToLoad{nullptr};
+    
+    ~FxMaterialComponent() = default;
 };
 
 

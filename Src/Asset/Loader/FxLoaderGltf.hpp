@@ -19,6 +19,12 @@ struct FxGltfMaterialToLoad
     int MeshIndex = 0;
 };
 
+/*
+ 4194304
+ 2793472
+ 194560
+ 7454720
+ */
 
 class FxLoaderGltf : public FxLoaderBase
 {

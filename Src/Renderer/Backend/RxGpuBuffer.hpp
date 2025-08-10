@@ -92,6 +92,13 @@ public:
         mUsageFlags = buffer_usage;
 
         const uint64 buffer_size = ElementSize * Size;
+        
+        if (buffer_size == 4194304) {
+            
+        }
+        if (buffer_size == 2793472) {
+            
+        }
 
         const VkBufferCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -104,7 +111,6 @@ public:
         const VmaAllocationCreateInfo alloc_create_info = {
             .usage = memory_usage,
         };
-
 
         const VkResult status = vmaCreateBuffer(
             Fx_Fwd_GetGpuAllocator(),
