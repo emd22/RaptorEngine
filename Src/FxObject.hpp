@@ -11,13 +11,7 @@ class FxObject : public FxAssetBase, public FxEntity
     friend class FxLoaderGltf;
     friend class FxAssetManager;
 public:
-    FxObject()
-    {
-        
-            static int creates = 0;
-            creates++;
-        Log::Info("Create FxObject %d", creates);
-    };
+    FxObject() = default;
 
     void Render(const FxCamera& camera);
     bool CheckIfReady();
@@ -29,17 +23,13 @@ public:
 
     void Destroy() override
     {
-        static int destroys = 0;
-        destroys++;
-        Log::Info("Destroy FxObject %d", destroys);
-
         if (Mesh) {
             Mesh->Destroy();
         }
         if (Material) {
             Material->Destroy();
         }
-        
+
         if (!AttachedNodes.IsEmpty()) {
             for (FxRef<FxObject>& obj : AttachedNodes) {
                 obj->Destroy();

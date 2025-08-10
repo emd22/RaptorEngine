@@ -79,10 +79,8 @@ FxAstNode* FxConfigScript::TryParseKeyword()
 
 	FxHash hash = tk.GetHash();
 
-	constexpr FxHash kw_outline = FxHashStr("outline");
 	constexpr FxHash kw_action = FxHashStr("action");
 	constexpr FxHash kw_local = FxHashStr("local");
-	constexpr FxHash kw_do = FxHashStr("do");
 
 
 	if (hash == kw_action) {
@@ -235,6 +233,7 @@ FxScriptValue FxConfigScript::ParseValue()
 		value.Type = FxScriptValue::STRING;
 		value.ValueString = token.GetHeapStr();
 		break;
+	default:;
 	}
 
 	return value;

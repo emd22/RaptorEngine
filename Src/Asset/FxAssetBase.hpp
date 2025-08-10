@@ -43,9 +43,6 @@ public:
     /** Returns true if the asset has been loaded and is in GPU memory. */
     inline bool IsLoaded() const
     {
-        if (mIsLoaded) {
-            printf("is loaded\n");
-        }
         return mIsLoaded.load();
     }
 
@@ -70,7 +67,7 @@ public:
             on_loaded_callback(this);
             return;
         }
-        
+
         printf("Registered onload callback\n");
 
         mOnLoadedCallbacks.push_back(on_loaded_callback);

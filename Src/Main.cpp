@@ -146,14 +146,15 @@ void TestScript()
 				printf("null");
 				break;
 			case FxScriptValue::INT:
-				printf("%d", param.ValueInt);
+				printf("%d", value.ValueInt);
 				break;
 			case FxScriptValue::FLOAT:
-				printf("%f", param.ValueFloat);
+				printf("%f", value.ValueFloat);
 				break;
 			case FxScriptValue::STRING:
-				printf("%s", param.ValueString);
+				printf("%s", value.ValueString);
 				break;
+			default:;
 			}
 
 			putchar(' ');
@@ -168,9 +169,8 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    TestScript();
-
-    return 0;
+    // TestScript();
+    // return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");

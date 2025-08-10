@@ -474,7 +474,7 @@ public:
             else {
                 actioncall->Action->Name->Print(true);
             }
-            printf(" (%d params)\n", actioncall->Params.size());
+            printf(" (%zu params)\n", actioncall->Params.size());
         }
         else {
             puts("[UNKNOWN]");

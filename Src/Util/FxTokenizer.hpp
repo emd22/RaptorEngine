@@ -72,9 +72,9 @@ public:
 			"Semicolon"
 		};
 
-		if (type >= (sizeof(type_names) / sizeof(type_names[0]))) {
-			return "Not Supported";
-		}
+		// if (type >= (sizeof(type_names) / sizeof(type_names[0]))) {
+		// 	return "Not Supported";
+		// }
 
 		return type_names[type];
 	}
@@ -306,7 +306,9 @@ public:
 
 			// Submit the operator as its own token
 			current_token.Increment();
-			SubmitTokenIfData(current_token, mData, ++mData);
+
+			SubmitTokenIfData(current_token, mData, mData + 1);
+			++mData;
 
 			return true;
 		}
