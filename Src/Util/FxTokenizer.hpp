@@ -17,7 +17,7 @@ class FxTokenizer
 {
 private:
 public:
-	const char* SingleCharOperators = "=()[]{}+.,;";
+	const char* SingleCharOperators = "=()[]{}+-$.,;";
 
 	struct State
 	{
@@ -46,6 +46,8 @@ public:
 		LBrace,
 		RBrace,
 		Plus,
+		Minus,
+		Dollar,
 		Dot,
 		Comma,
 		Semicolon,
@@ -67,6 +69,8 @@ public:
 			"LBrace",
 			"RBrace",
 			"Plus",
+			"Dollar",
+			"Minus",
 			"Dot",
 			"Comma",
 			"Semicolon"
@@ -228,6 +232,15 @@ public:
 		if (token.Length > 2) {
 			// Checks if the token is a string
 			if (token.Start[0] == '"' && token.Start[token.Length - 1] == '"') {
+				// Remove start quote
+				{
+					++token.Start;
+					--token.Length;
+				}
+				// Remove end quote
+				{
+					token.Length--;
+				}
 				return TokenType::String;
 			}
 		}
@@ -250,6 +263,10 @@ public:
 				return TokenType::RBrace;
 			case '+':
 				return TokenType::Plus;
+			case '-':
+				return TokenType::Minus;
+			case '$':
+				return TokenType::Dollar;
 			case '.':
 				return TokenType::Dot;
 			case ',':
@@ -307,8 +324,10 @@ public:
 			// Submit the operator as its own token
 			current_token.Increment();
 
-			SubmitTokenIfData(current_token, mData, mData + 1);
+			char* end_of_operator = mData;
 			++mData;
+
+			SubmitTokenIfData(current_token, end_of_operator, mData);
 
 			return true;
 		}

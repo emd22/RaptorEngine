@@ -1,7 +1,15 @@
-local int TestNumber = 5;
 
-action AddValues(int by) {
-    add(TestNumber, 3);
+action aTestReturnValue(int a, int b)
+    int rValue      # The return value
+{
+    rValue = a + b;
+
+    global string gGlobalName = "Test String";
 }
 
-AddValues(3);
+
+# eExternalVar is defined in C++
+local int test_value = aTestReturnValue(5, eExternalVar);
+
+
+log("Test Value:", test_value);

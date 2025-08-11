@@ -107,6 +107,8 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
             .pImmutableSamplers = nullptr,
         };
 
+        // VkDescriptorSetLayoutBinding
+
         VkDescriptorSetLayoutCreateInfo ds_layout_info {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .bindingCount = 1,

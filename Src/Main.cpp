@@ -118,59 +118,20 @@ void TestScript()
     FxConfigScript script;
 	script.LoadFile("../Scripts/Default.fxS");
 
+	// Define an external variable that can be used in our script
+	script.DefineExternalVar("int", "eExternalVar", FxScriptValue(FxScriptValue::INT, 42));
 
-	FxAstBlock* root_block = script.Parse();
+	FxScriptInterpreter interpreter;
 
-	FxScriptInterpreter interpreter(root_block);
-
-	interpreter.RegisterInternalFunc(
-		FxHashStr("add"),
-		{ FxScriptValue::REF, FxScriptValue::INT },
-		[&interpreter](std::vector<FxScriptValue>& params, FxScriptValue* return_value) {
-			int first_value = interpreter.GetImmediateValue(params[0]).ValueInt;
-			int second_value = interpreter.GetImmediateValue(params[1]).ValueInt;
-
-			interpreter.FindVar(params[0].ValueRef->Name->GetHash())->Value.ValueInt = first_value + second_value;
-		},
-		false
-	);
-
-	interpreter.RegisterInternalFunc(FxHashStr("log"), {}, [&interpreter](std::vector<FxScriptValue>& params, FxScriptValue* return_value) {
-		printf("Log: ");
-
-		for (FxScriptValue& param : params) {
-			FxScriptValue& value = interpreter.GetImmediateValue(param);
-
-			switch (param.Type) {
-			case FxScriptValue::NONETYPE:
-				printf("null");
-				break;
-			case FxScriptValue::INT:
-				printf("%d", value.ValueInt);
-				break;
-			case FxScriptValue::FLOAT:
-				printf("%f", value.ValueFloat);
-				break;
-			case FxScriptValue::STRING:
-				printf("%s", value.ValueString);
-				break;
-			default:;
-			}
-
-			putchar(' ');
-		}
-		putchar('\n');
-		}, true);
-
-	interpreter.Interpret();
+	script.Execute(interpreter);
 }
 
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    // TestScript();
-    // return 0;
+    TestScript();
+    return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
