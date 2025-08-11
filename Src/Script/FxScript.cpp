@@ -598,10 +598,8 @@ FxAstBlock* FxConfigScript::Parse()
 		return nullptr;
 	}
 
-	FxAstPrinter printer(root_block);
-	printer.Print(root_block);
-
-
+	// FxAstPrinter printer(root_block);
+	// printer.Print(root_block);
 
 	return root_block;
 }
@@ -793,7 +791,7 @@ FxScriptValue FxScriptInterpreter::VisitActionCall(FxAstActionCall* call)
 		return_value = GetImmediateValue(mCurrentScope->ReturnVar->Value);
 	}
 
-	mCurrentScope->PrintAllVarsInScope();
+	// mCurrentScope->PrintAllVarsInScope();
 
 	PopScope();
 

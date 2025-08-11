@@ -130,8 +130,8 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    TestScript();
-    return 0;
+    // TestScript();
+    // return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");

@@ -14,7 +14,7 @@ bool FxObject::CheckIfReady()
         if (Mesh && !Mesh->IsReady) {
             return (mReadyToRender = false);
         }
-        
+
         if (Material && !Material->IsReady()) {
             return (mReadyToRender = false);
         }
@@ -31,11 +31,11 @@ bool FxObject::CheckIfReady()
     if (!Mesh) {
         FX_BREAKPOINT;
     }
-    
+
     if (!Material || !Material->IsReady()) {
         return (mReadyToRender = false);
     }
-    
+
     // This is not a container object, just check that the mesh is loaded
     if (!Mesh || !Mesh->IsReady.load()) {
         return (mReadyToRender = false);
@@ -56,6 +56,7 @@ void FxObject::Render(const FxCamera& camera)
 
     if (Material && !Material->IsBuilt) {
         Material->Build();
+        return;
     }
 
     FxMat4f VP = camera.VPMatrix;
@@ -64,15 +65,15 @@ void FxObject::Render(const FxCamera& camera)
     memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
 
     frame->SubmitUbo(mUbo);
-  
+
     FxDrawPushConstants push_constants{};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
     memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
-    
+
     // mModel->Render(*mMaterial->Pipeline);
-    
+
     if (Material && CheckIfReady()) {
-        
+
         VkDescriptorSet sets_to_bind[] = {
             Renderer->CurrentGPass->DescriptorSet.Set,
             Material->mDescriptorSet.Set
@@ -80,10 +81,10 @@ void FxObject::Render(const FxCamera& camera)
         RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, Material->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
-        
+
         RenderMesh();
     }
-    
+
     // If there are no attached nodes, break early
     if (AttachedNodes.IsEmpty()) {
         return;
@@ -95,20 +96,20 @@ void FxObject::Render(const FxCamera& camera)
         if (!obj->Material) {
             continue;
         }
-        
+
         if (!obj->Material->IsBuilt) {
             obj->Material->Build();
         }
-        
+
         VkDescriptorSet sets_to_bind[] = {
             Renderer->CurrentGPass->DescriptorSet.Set,
             obj->Material->mDescriptorSet.Set
         };
-        
+
         RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *obj->Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
-        
+
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->Material->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
-        
+
         obj->RenderMesh();
     }
 }
@@ -119,7 +120,7 @@ void FxObject::RenderMesh()
     if (!CheckIfReady()) {
         return;
     }
-    
+
     if (Mesh) {
         Mesh->Render(*Material->Pipeline);
     }

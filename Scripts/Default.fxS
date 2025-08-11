@@ -11,5 +11,4 @@ action aTestReturnValue(int a, int b)
 # eExternalVar is defined in C++
 local int test_value = aTestReturnValue(5, eExternalVar);
 
-
 log("Test Value:", test_value);

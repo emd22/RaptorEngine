@@ -142,10 +142,10 @@ void FxMaterial::Destroy()
         if (mSetLayout) {
             vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
         }
-        
+
         IsBuilt.store(false);
     }
-    
+
     // TODO: figure out why the FxRef isn't destroying the object...
     if (DiffuseTexture.Texture) {
         DiffuseTexture.Texture->Destroy();
@@ -154,14 +154,20 @@ void FxMaterial::Destroy()
 
 #include <Asset/FxAssetManager.hpp>
 
-void FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
+bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
 {
     if (!component.Texture && component.DataToLoad) {
         FxSlice<const uint8>& image_data = component.DataToLoad;
-        
+
         component.Texture = FxAssetManager::LoadFromMemory<FxAssetImage>(image_data.Ptr, image_data.Size);
-        component.Texture->WaitUntilLoaded();
+        return false;
     }
+
+    if (!component.Texture || !component.Texture->IsLoaded()) {
+        return false;
+    }
+    return true;
+
 }
 
 
@@ -192,12 +198,13 @@ void FxMaterial::Build()
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
-    CheckComponentTextureLoaded(DiffuseTexture);
-    
+    if (!CheckComponentTextureLoaded(DiffuseTexture)) {
+        return;
+    }
+
     if (DiffuseTexture.Texture) {
         DiffuseTexture.Texture->Texture.SetSampler(manager.AlbedoSampler);
     }
-
 
     constexpr const int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
     FxStackArray<VkWriteDescriptorSet, max_images> image_infos;
