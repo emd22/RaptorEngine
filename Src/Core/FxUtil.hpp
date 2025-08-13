@@ -44,6 +44,23 @@ public:
 };
 
 
+/**
+ * @brief Defines an enum class as a set of bitflags.
+ */
+#define FX_DEFINE_AS_FLAG_ENUM FlagMax
+
+template <typename T>
+decltype(T::FlagMax) operator | (T lhs, T rhs)
+{
+    return static_cast<T>(static_cast<unsigned int>(lhs) | static_cast<unsigned int>(rhs));
+}
+
+template <typename T>
+unsigned int operator & (T lhs, T rhs)
+{
+    return static_cast<unsigned int>(lhs) & static_cast<unsigned int>(rhs);
+}
+
 
 
 // https://en.cppreference.com/w/cpp/types/remove_reference

@@ -38,6 +38,18 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     AlbedoSampler = FxMakeRef<RxSampler>();
     AlbedoSampler->Create();
 
+
+    const uint32 material_buffer_size = FX_MAX_MATERIALS * RendererFramesInFlight;
+
+    Log::Info("Creating material buffer of size %u", material_buffer_size);
+
+    MaterialPropertiesBuffer.Create(
+        material_buffer_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU,
+        RxGpuBufferFlags::PersistentMapped
+    );
+
     mInitialized = true;
 }
 
@@ -65,6 +77,8 @@ void FxMaterialManager::Destroy()
     }
 
     AlbedoSampler->Destroy();
+
+    MaterialPropertiesBuffer.Destroy();
 
     // if (mDescriptorPool) {
         // vkDestroyDescriptorPool(Renderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
@@ -213,9 +227,15 @@ void FxMaterial::Build()
 
     // Push material textures
     PUSH_IMAGE_IF_SET(DiffuseTexture.Texture, 0);
-    // PUSH_IMAGE_IF_SET(Normal);
 
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
+
+    // VkDescriptorBufferInfo buffer_info{
+    //     .buffer = manager.MaterialPropertiesUbo.Buffer,
+    //     .
+    // };
+    // PUSH_IMAGE_IF_SET(Normal);
+
 
     // Mark material as built
     IsBuilt.store(true);

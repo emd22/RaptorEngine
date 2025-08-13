@@ -8,8 +8,12 @@
 
 
 #include <Renderer/Backend/RxDescriptors.hpp>
+#include <Renderer/Backend/RxGpuBuffer.hpp>
 
 #include <vulkan/vulkan.h>
+
+// TODO: Replace this, make dynamic
+#define FX_MAX_MATERIALS 64
 
 struct FxMaterialComponent
 {
@@ -19,6 +23,10 @@ struct FxMaterialComponent
     ~FxMaterialComponent() = default;
 };
 
+struct FxMaterialProperties
+{
+    alignas(16) Vec4f BaseColor = Vec4f(0);
+};
 
 class FxMaterial
 {
@@ -68,6 +76,8 @@ public:
 //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
     FxMaterialComponent DiffuseTexture;
 
+    FxMaterialProperties Properties{};
+
     FxHash NameHash{0};
     std::string Name = "";
 
@@ -80,6 +90,7 @@ private:
 
     bool mIsReady = false;
 };
+
 
 
 class FxMaterialManager
@@ -108,9 +119,19 @@ public:
 public:
     FxRef<RxSampler> AlbedoSampler{nullptr};
 
+    RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
+
+    /**
+     * @brief A large GPU buffer containing all material properties for the frame.
+     */
+    RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesBuffer;
+    uint32 NumMaterialsInBuffer = 0;
+
 private:
     FxPagedArray<FxMaterial> mMaterials;
     RxDescriptorPool mDescriptorPool;
+
+
 
     bool mInitialized = false;
 };

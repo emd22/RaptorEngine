@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/FxUtil.hpp"
+#include <Core/FxUtil.hpp>
 #include <Core/Types.hpp>
 #include <Core/FxPanic.hpp>
 
@@ -11,7 +11,7 @@
 #include <cstring>
 #include <memory.h>
 
-#define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
+// #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
 template <typename ElementType>
 class RxRawGpuBuffer;
@@ -69,9 +69,18 @@ private:
     RxRawGpuBuffer<ElementType> *mGpuBuffer = nullptr;
 };
 
+enum class RxGpuBufferFlags : uint16
+{
+    None              = 0x00,
+    /** The buffer is mapped for the lifetime of the buffer. */
+    PersistentMapped  = 0x01,
+
+    FX_DEFINE_AS_FLAG_ENUM,
+};
+
 
 /**
- * Provides a GPU buffer that can be created with more complex parameters without staging.
+ * @brief Provides a GPU buffer that can be created with more complex parameters without staging.
  */
 template <typename ElementType>
 class RxRawGpuBuffer
@@ -86,18 +95,23 @@ public:
 
     RxRawGpuBuffer operator = (RxRawGpuBuffer<ElementType> &other) = delete;
 
-    void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage)
+    void Create(
+        uint64 element_count,
+        VkBufferUsageFlags buffer_usage,
+        VmaMemoryUsage memory_usage,
+        RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::None
+    )
     {
         Size = element_count;
         mUsageFlags = buffer_usage;
+        mBufferFlags = buffer_flags;
 
         const uint64 buffer_size = ElementSize * Size;
-        
-        if (buffer_size == 4194304) {
-            
-        }
-        if (buffer_size == 2793472) {
-            
+
+        VmaAllocationCreateFlags vma_create_flags = 0;
+
+        if ((mBufferFlags & RxGpuBufferFlags::PersistentMapped) != 0) {
+            vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
         }
 
         const VkBufferCreateInfo create_info = {
@@ -110,19 +124,27 @@ public:
 
         const VmaAllocationCreateInfo alloc_create_info = {
             .usage = memory_usage,
+            .flags = vma_create_flags
         };
 
+        VmaAllocationInfo allocation_info;
         const VkResult status = vmaCreateBuffer(
             Fx_Fwd_GetGpuAllocator(),
             &create_info,
             &alloc_create_info,
             &Buffer,
             &Allocation,
-            nullptr
+            &allocation_info
         );
 
         if (status != VK_SUCCESS) {
             FxPanic("GPUBuffer", "Error allocating staging buffer!", status);
+        }
+
+
+        if ((mBufferFlags & RxGpuBufferFlags::PersistentMapped) != 0) {
+            // Get the pointer from VMA for the mapped GPU buffer
+            MappedBuffer = allocation_info.pMappedData;
         }
 
     #ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
@@ -227,8 +249,10 @@ public:
 
     std::atomic_bool Initialized = false;
     uint64 Size = 0;
+
 private:
     VkBufferUsageFlags mUsageFlags = 0;
+    RxGpuBufferFlags mBufferFlags = RxGpuBufferFlags::None;
 };
 
 
@@ -269,6 +293,7 @@ public:
 
         staging_buffer.Destroy();
     }
+
 public:
     RxBufferUsageType Usage;
 private:
