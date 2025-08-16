@@ -13,7 +13,7 @@
 #include <vulkan/vulkan.h>
 
 // TODO: Replace this, make dynamic
-#define FX_MAX_MATERIALS 64
+#define FX_MAX_MATERIALS 256
 
 struct FxMaterialComponent
 {
@@ -88,6 +88,11 @@ public:
 private:
     VkDescriptorSetLayout mSetLayout = nullptr;
 
+    /**
+     * @brief Offset into `MaterialPropertiesBuffer` for this material.
+     */
+    uint32 mMaterialPropertiesIndex = 0;
+
     bool mIsReady = false;
 };
 
@@ -122,7 +127,7 @@ public:
     RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**
-     * @brief A large GPU buffer containing all material properties for the frame.
+     * @brief A large GPU buffer containing all loaded in material properties.
      */
     RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesBuffer;
     uint32 NumMaterialsInBuffer = 0;

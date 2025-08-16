@@ -353,7 +353,7 @@ void RxGraphicsPipeline::Create(
 
 
 //     VkPipelineVertexInputStateCreateInfo empty_vertex_input_info {};
-// 	empty_vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+//     empty_vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
 //     VkGraphicsPipelineCreateInfo pipeline_info = {
 //         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,

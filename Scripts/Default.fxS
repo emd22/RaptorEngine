@@ -1,14 +1,22 @@
 
-action aTestReturnValue(int a, int b)
-    int rValue      # The return value
-{
-    rValue = a + b;
+# action hello()
+# {
 
-    global string gGlobalName = "Test String";
+# }
+
+# hello();
+#local int x = 5;
+# jmpr 8
+action test() # offset -> 4
+{
+    # push32 2
+#    x = x + 2;
+    # ret
 }
 
+# push32 24
+# jmpa 4
+test();
 
-# eExternalVar is defined in C++
-local int test_value = aTestReturnValue(5, eExternalVar);
-
-log("Test Value:", test_value);
+local int x = 10;
+#local int x = 10;

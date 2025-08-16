@@ -86,6 +86,40 @@ public:
         Create(page_node_capacity);
     }
 
+    FxMPPagedArray& operator = (const FxMPPagedArray& other)
+    {
+        FirstPage = other.FirstPage;
+        CurrentPage = other.CurrentPage;
+
+        PageNodeCapacity = other.PageNodeCapacity;
+        CurrentPageIndex = other.CurrentPageIndex;
+
+        TrackedSize = other.TrackedSize;
+
+        return *this;
+    }
+
+    FxMPPagedArray& operator = (FxMPPagedArray&& other)
+    {
+        FirstPage = other.FirstPage;
+        CurrentPage = other.CurrentPage;
+
+        PageNodeCapacity = other.PageNodeCapacity;
+        CurrentPageIndex = other.CurrentPageIndex;
+
+        TrackedSize = other.TrackedSize;
+
+        other.FirstPage = nullptr;
+        other.CurrentPage = nullptr;
+
+        other.PageNodeCapacity = 0;
+        other.CurrentPageIndex = 0;
+
+        other.TrackedSize = 0;
+
+        return *this;
+    }
+
     Iterator begin() const
     {
         return Iterator(FirstPage, 0);
@@ -96,7 +130,7 @@ public:
         return Iterator(CurrentPage, CurrentPage->Size);
     }
 
-    size_t Size() const
+    size_t GetCalculatedSize() const
     {
         size_t size = 0;
         Page* page = FirstPage;
@@ -106,7 +140,15 @@ public:
             page = page->Next;
         }
 
+        assert(size == TrackedSize);
+
         return size;
+    }
+
+    inline size_t Size() const
+    {
+        //return GetCalculatedSize();
+        return TrackedSize;
     }
 
     void Create(uint32 page_node_capacity = 32)
@@ -137,6 +179,8 @@ public:
         // Move to the next index
         ++CurrentPage->Size;
 
+        ++TrackedSize;
+
         // There are no free slots left in the page, allocate a new page
         if (CurrentPage->Size >= PageNodeCapacity) {
             // Since the size will be N + 1, decrement by one
@@ -160,6 +204,8 @@ public:
 
         ++CurrentPage->Size;
 
+        ++TrackedSize;
+
         // There are no free slots left in the page, allocate a new page
         if (CurrentPage->Size >= PageNodeCapacity) {
             // Since the size will be N + 1, decrement by one
@@ -179,11 +225,13 @@ public:
         Page* current_page = CurrentPage;
 
         while (current_page != nullptr) {
-            const void* data_start_ptr = current_page->Data;
+            const void* data_start_ptr = reinterpret_cast<char*>(current_page->Data);
             const void* data_end_ptr = data_start_ptr + (sizeof(ElementType) * PageNodeCapacity);
 
+            const char* value_u8 = reinterpret_cast<char*>(value);
+
             // If the value is within the bounds of this pages' pointers, then we know it is in this page.
-            if (value >= data_start_ptr && value <= data_end_ptr) {
+            if (value_u8 >= data_start_ptr && value_u8 <= data_end_ptr) {
                 return current_page;
             }
         }
@@ -227,6 +275,8 @@ public:
         }
 
         --CurrentPage->Size;
+
+        --TrackedSize;
 
         return element;
     }
@@ -303,7 +353,7 @@ public:
 
     void Destroy()
     {
-        if (FirstPage == nullptr) {
+        if (FirstPage == nullptr || DoNotDestroy) {
             return;
         }
 
@@ -321,12 +371,18 @@ public:
             current_page = next_page;
         }
 
+        TrackedSize = 0;
+
         FirstPage = nullptr;
         CurrentPage = nullptr;
     }
 
     ~FxMPPagedArray()
     {
+        if (FirstPage == nullptr) {
+            return;
+        }
+
         Destroy();
     }
 
@@ -374,4 +430,8 @@ public:
     Page* FirstPage = nullptr;
     Page* CurrentPage = nullptr;
     int32 CurrentPageIndex = 0;
+
+    bool DoNotDestroy = false;
+
+    uint32 TrackedSize = 0;
 };

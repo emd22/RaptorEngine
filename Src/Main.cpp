@@ -116,22 +116,51 @@ void TestSpeed(FuncType ft, int iterations)
 void TestScript()
 {
     FxConfigScript script;
-	script.LoadFile("../Scripts/Default.fxS");
+    script.LoadFile("../Scripts/Default.fxS");
 
-	// Define an external variable that can be used in our script
-	script.DefineExternalVar("int", "eExternalVar", FxScriptValue(FxScriptValue::INT, 42));
+    // Define an external variable that can be used in our script
+    // script.DefineExternalVar("int", "eExternalVar", FxScriptValue(FxScriptValue::INT, 42));
 
-	FxScriptInterpreter interpreter;
+    FxScriptInterpreter interpreter;
 
-	script.Execute(interpreter);
+    script.Execute(interpreter);
+
+
+    // std::string command = "";
+
+    // printf(
+    //     "\nFoxtrot Script\nVersion %d.%d.%d\n",
+    //     FX_SCRIPT_VERSION_MAJOR,
+    //     FX_SCRIPT_VERSION_MINOR,
+    //     FX_SCRIPT_VERSION_PATCH
+    // );
+
+    // while (true) {
+    //     printf(" -> ");
+    //     fflush(stdout);
+
+    //     std::getline(std::cin, command);
+
+    //     if (command == "quit") {
+    //         break;
+    //     }
+
+    //     if (!command.ends_with(';')) {
+    //         command += ';';
+    //     }
+
+    //     //printf("Executing command {%s}\n", command.c_str());
+
+    //     script.ExecuteUserCommand(command.c_str(), interpreter);
+    // }
 }
 
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    // TestScript();
-    // return 0;
+    TestScript();
+    return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
@@ -267,7 +296,7 @@ int main()
     light2.MoveBy(FxVec3f(1, 0, -0.5));
     light2.Scale(FxVec3f(25));
 
-    bool second_light_on = true;
+    bool second_light_on = false;
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -334,7 +363,7 @@ int main()
 //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
 //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
-        light.Color.Y = sin(0.005 * Renderer->GetElapsedFrameCount());
+        light.Color.Y = 0.7;
 
         // ground_object.Render(camera);
         // helmet_object.Render(camera);

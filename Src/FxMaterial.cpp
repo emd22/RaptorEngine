@@ -228,6 +228,16 @@ void FxMaterial::Build()
     // Push material textures
     PUSH_IMAGE_IF_SET(DiffuseTexture.Texture, 0);
 
+    {
+        VkDescriptorBufferInfo info{
+            .buffer = manager.MaterialPropertiesBuffer.Buffer,
+            .offset = mMaterialPropertiesIndex,
+            .range = sizeof(FxMaterialProperties)
+        };
+
+
+    }
+
     vkUpdateDescriptorSets(Renderer->GetDevice()->Device, image_infos.Size, image_infos.Data, 0, nullptr);
 
     // VkDescriptorBufferInfo buffer_info{

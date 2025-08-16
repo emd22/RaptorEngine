@@ -40,82 +40,82 @@ FxMat4f FxMat4f::AsRotationX(float rad)
 {
     // I doubt these functions are any more efficient than just plopping the sin's and cos's into
     // a matrix directly. But hey, gotta sharpen my neon skills somehow
-    
+
     FxMat4f result;
-    
+
     const float cr = cos(rad);
     const float sr = sin(rad);
-    
+
     const float32x4_t zero = vdupq_n_f32(0);
     // {1, 0, 0, 0}
     result.Columns[0].mIntrin = vsetq_lane_f32(1, zero, 0);
-    
+
     // {0, cos(x), sin(x), 0}
     const float32 c1_v[4] = { 0, cr, sr, 0 };
     result.Columns[1].mIntrin = vld1q_f32(c1_v);
-    
+
     // {0, sin(x), cos(x), 0}
     const float32x4_t c2 = vrev64q_f32(result.Columns[1].mIntrin);
-    
+
     // {0, sin(x)}, {cos(x), 0}
     const float32x2_t c2_lo = vget_low_f32(c2);
     const float32x2_t c2_hi = vget_high_f32(c2);
-    
+
     // {0, -sin(x), cos(x), 0}
     result.Columns[2].mIntrin = vcombine_f32(vmul_f32(c2_hi, vdup_n_f32(-1)), c2_lo);
-    
+
     // {0, 0, 0, 1}
     result.Columns[3].mIntrin = vsetq_lane_f32(1, zero, 3);
-    
+
     /*
      CX = cos(x), SX = sin(x)
-     
+
         0    1    2   3
      ----------------------
      [   1   0    0   0   ]
      [   0  CX  -SX   0   ]
      [   0  SX   CX   0   ]
      [   0   0    0   1   ]
-     
+
      */
-    
+
     return result;
 }
 
 FxMat4f FxMat4f::AsRotationY(float rad)
 {
     FxMat4f result;
-    
+
     const float cr = cos(rad);
     const float sr = sin(rad);
-    
+
     // {sin(x), 0, cos(x), 0}
     float c2_v[4] = {sr, 0, cr, 0};
     const float32x4_t c2 = vld1q_f32(c2_v);
     result.Columns[2].mIntrin = c2;
-    
+
     // {0, 1, 0, 0}
     const float32x4_t c1 = vsetq_lane_f32(1, vdupq_n_f32(0), 1);
     result.Columns[1].mIntrin = c1;
-    
+
     // {0, 0, 0, 1}
     result.Columns[3].mIntrin = vcombine_f32(vget_high_f32(c1), vget_low_f32(c1));
-    
+
     // {cos(x), 0, -sin(x), 0}
     result.Columns[0].mIntrin = vcombine_f32(vget_high_f32(c2), vmul_f32(vget_low_f32(c2), vdup_n_f32(-1)));
-    
+
     /*
      CX = cos(x), SX = sin(x)
-     
+
         0     1    2   3
      -----------------------
      [   CX   0   SX   0   ]
      [    0   1    0   0   ]
      [  -SX   0   CX   0   ]
      [    0   0    0   1   ]
-     
+
      */
-    
+
     return result;
 }
 
@@ -123,41 +123,41 @@ FxMat4f FxMat4f::AsRotationY(float rad)
 FxMat4f FxMat4f::AsRotationZ(float rad)
 {
     FxMat4f result;
-    
+
     const float cr = cos(rad);
     const float sr = sin(rad);
-    
+
     float32x4_t zero = vdupq_n_f32(0);
-    
+
     // {cos(x), sin(x), 0, 0}
     float c0_low_v[2] = {cr, sr};
     float32x4_t c0 = vcombine_f32(vld1_f32(c0_low_v), vget_low_f32(zero));
     result.Columns[0].mIntrin = c0;
-    
+
     // {-1, 1}
     float32x2_t nmask  = vset_lane_f32(-1, vdup_n_f32(1), 0);
-    
+
     // {-sin(x), cos(x), 0, 0}
     result.Columns[1].mIntrin = vcombine_f32(vmul_f32(vrev64_f32(vget_low_f32(c0)), nmask), vget_high_f32(c0));
-    
+
     // {0, 0, 1, 0}
     result.Columns[2].mIntrin = vsetq_lane_f32(1, zero, 2);
-    
+
     // {0, 0, 0, 1}
     result.Columns[3].mIntrin = vsetq_lane_f32(1, zero, 3);
-    
+
     /*
      CX = cos(x), SX = sin(x)
-     
+
           0    1    2    3
      -------------------------
      [   CX  -SX    0    0   ]
      [   SX   CX    0    0   ]
      [    0    0    1    0   ]
      [    0    0    0    1   ]
-     
+
      */
-    
+
     return result;
 }
 
@@ -243,46 +243,46 @@ FxMat4f FxMat4f::Inverse()
 
     float T[4][4];
 
-	float s[6];
-	float c[6];
-	s[0] = M[0][0]*M[1][1] - M[1][0]*M[0][1];
-	s[1] = M[0][0]*M[1][2] - M[1][0]*M[0][2];
-	s[2] = M[0][0]*M[1][3] - M[1][0]*M[0][3];
-	s[3] = M[0][1]*M[1][2] - M[1][1]*M[0][2];
-	s[4] = M[0][1]*M[1][3] - M[1][1]*M[0][3];
-	s[5] = M[0][2]*M[1][3] - M[1][2]*M[0][3];
+    float s[6];
+    float c[6];
+    s[0] = M[0][0]*M[1][1] - M[1][0]*M[0][1];
+    s[1] = M[0][0]*M[1][2] - M[1][0]*M[0][2];
+    s[2] = M[0][0]*M[1][3] - M[1][0]*M[0][3];
+    s[3] = M[0][1]*M[1][2] - M[1][1]*M[0][2];
+    s[4] = M[0][1]*M[1][3] - M[1][1]*M[0][3];
+    s[5] = M[0][2]*M[1][3] - M[1][2]*M[0][3];
 
-	c[0] = M[2][0]*M[3][1] - M[3][0]*M[2][1];
-	c[1] = M[2][0]*M[3][2] - M[3][0]*M[2][2];
-	c[2] = M[2][0]*M[3][3] - M[3][0]*M[2][3];
-	c[3] = M[2][1]*M[3][2] - M[3][1]*M[2][2];
-	c[4] = M[2][1]*M[3][3] - M[3][1]*M[2][3];
-	c[5] = M[2][2]*M[3][3] - M[3][2]*M[2][3];
+    c[0] = M[2][0]*M[3][1] - M[3][0]*M[2][1];
+    c[1] = M[2][0]*M[3][2] - M[3][0]*M[2][2];
+    c[2] = M[2][0]*M[3][3] - M[3][0]*M[2][3];
+    c[3] = M[2][1]*M[3][2] - M[3][1]*M[2][2];
+    c[4] = M[2][1]*M[3][3] - M[3][1]*M[2][3];
+    c[5] = M[2][2]*M[3][3] - M[3][2]*M[2][3];
 
-	/* Assumes it is invertible */
-	float idet = 1.0f / ( s[0]*c[5]-s[1]*c[4]+s[2]*c[3]+s[3]*c[2]-s[4]*c[1]+s[5]*c[0] );
+    /* Assumes it is invertible */
+    float idet = 1.0f / ( s[0]*c[5]-s[1]*c[4]+s[2]*c[3]+s[3]*c[2]-s[4]*c[1]+s[5]*c[0] );
 
-	T[0][0] = ( M[1][1] * c[5] - M[1][2] * c[4] + M[1][3] * c[3]) * idet;
-	T[0][1] = (-M[0][1] * c[5] + M[0][2] * c[4] - M[0][3] * c[3]) * idet;
-	T[0][2] = ( M[3][1] * s[5] - M[3][2] * s[4] + M[3][3] * s[3]) * idet;
-	T[0][3] = (-M[2][1] * s[5] + M[2][2] * s[4] - M[2][3] * s[3]) * idet;
+    T[0][0] = ( M[1][1] * c[5] - M[1][2] * c[4] + M[1][3] * c[3]) * idet;
+    T[0][1] = (-M[0][1] * c[5] + M[0][2] * c[4] - M[0][3] * c[3]) * idet;
+    T[0][2] = ( M[3][1] * s[5] - M[3][2] * s[4] + M[3][3] * s[3]) * idet;
+    T[0][3] = (-M[2][1] * s[5] + M[2][2] * s[4] - M[2][3] * s[3]) * idet;
 
-	T[1][0] = (-M[1][0] * c[5] + M[1][2] * c[2] - M[1][3] * c[1]) * idet;
-	T[1][1] = ( M[0][0] * c[5] - M[0][2] * c[2] + M[0][3] * c[1]) * idet;
-	T[1][2] = (-M[3][0] * s[5] + M[3][2] * s[2] - M[3][3] * s[1]) * idet;
-	T[1][3] = ( M[2][0] * s[5] - M[2][2] * s[2] + M[2][3] * s[1]) * idet;
+    T[1][0] = (-M[1][0] * c[5] + M[1][2] * c[2] - M[1][3] * c[1]) * idet;
+    T[1][1] = ( M[0][0] * c[5] - M[0][2] * c[2] + M[0][3] * c[1]) * idet;
+    T[1][2] = (-M[3][0] * s[5] + M[3][2] * s[2] - M[3][3] * s[1]) * idet;
+    T[1][3] = ( M[2][0] * s[5] - M[2][2] * s[2] + M[2][3] * s[1]) * idet;
 
-	T[2][0] = ( M[1][0] * c[4] - M[1][1] * c[2] + M[1][3] * c[0]) * idet;
-	T[2][1] = (-M[0][0] * c[4] + M[0][1] * c[2] - M[0][3] * c[0]) * idet;
-	T[2][2] = ( M[3][0] * s[4] - M[3][1] * s[2] + M[3][3] * s[0]) * idet;
-	T[2][3] = (-M[2][0] * s[4] + M[2][1] * s[2] - M[2][3] * s[0]) * idet;
+    T[2][0] = ( M[1][0] * c[4] - M[1][1] * c[2] + M[1][3] * c[0]) * idet;
+    T[2][1] = (-M[0][0] * c[4] + M[0][1] * c[2] - M[0][3] * c[0]) * idet;
+    T[2][2] = ( M[3][0] * s[4] - M[3][1] * s[2] + M[3][3] * s[0]) * idet;
+    T[2][3] = (-M[2][0] * s[4] + M[2][1] * s[2] - M[2][3] * s[0]) * idet;
 
-	T[3][0] = (-M[1][0] * c[3] + M[1][1] * c[1] - M[1][2] * c[0]) * idet;
-	T[3][1] = ( M[0][0] * c[3] - M[0][1] * c[1] + M[0][2] * c[0]) * idet;
-	T[3][2] = (-M[3][0] * s[3] + M[3][1] * s[1] - M[3][2] * s[0]) * idet;
-	T[3][3] = ( M[2][0] * s[3] - M[2][1] * s[1] + M[2][2] * s[0]) * idet;
+    T[3][0] = (-M[1][0] * c[3] + M[1][1] * c[1] - M[1][2] * c[0]) * idet;
+    T[3][1] = ( M[0][0] * c[3] - M[0][1] * c[1] + M[0][2] * c[0]) * idet;
+    T[3][2] = (-M[3][0] * s[3] + M[3][1] * s[1] - M[3][2] * s[0]) * idet;
+    T[3][3] = ( M[2][0] * s[3] - M[2][1] * s[1] + M[2][2] * s[0]) * idet;
 
-	return FxMat4f(T);
+    return FxMat4f(T);
 }
 
 void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
