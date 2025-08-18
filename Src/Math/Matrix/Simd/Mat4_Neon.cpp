@@ -13,7 +13,7 @@ const FxMat4f FxMat4f::Identity = FxMat4f(
     }
 );
 
-float32x4_t FxMat4f::MultiplyVec4f_Neon(Vec4f &vec)
+float32x4_t FxMat4f::MultiplyVec4f_Neon(FxVec4f &vec)
 {
     float32x4_t result = vmovq_n_f32(0);
 
@@ -31,9 +31,9 @@ float32x4_t FxMat4f::MultiplyVec4f_Neon(Vec4f &vec)
     return result;
 }
 
-Vec4f FxMat4f::MultiplyVec4f(Vec4f &vec)
+FxVec4f FxMat4f::MultiplyVec4f(FxVec4f &vec)
 {
-    return Vec4f(MultiplyVec4f_Neon(vec));
+    return FxVec4f(MultiplyVec4f_Neon(vec));
 }
 
 FxMat4f FxMat4f::AsRotationX(float rad)

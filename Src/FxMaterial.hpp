@@ -25,7 +25,7 @@ struct FxMaterialComponent
 
 struct FxMaterialProperties
 {
-    alignas(16) Vec4f BaseColor = Vec4f(0);
+    alignas(16) uint32 BaseColor = 0xFFFFFFFF;
 };
 
 class FxMaterial
@@ -39,7 +39,7 @@ public:
 public:
     FxMaterial() = default;
 
-    void Attach(ResourceType type, FxRef<FxAssetImage>& image)
+    void Attach(ResourceType type, const FxRef<FxAssetImage>& image)
     {
         switch (type) {
             case ResourceType::Diffuse:
@@ -52,6 +52,11 @@ public:
     }
 
     bool IsReady();
+
+    inline uint32 GetMaterialIndex()
+    {
+        return mMaterialPropertiesIndex;
+    }
 
     /**
      * Binds the material to be used in the given command buffer.
@@ -82,11 +87,23 @@ public:
     std::string Name = "";
 
     RxDescriptorSet mDescriptorSet{};
+
+    /**
+     * @brief Descriptor set for material properties. Used in the light pass.
+     */
+    RxDescriptorSet mMaterialPropertiesDS{};
+
     RxGraphicsPipeline* Pipeline = nullptr;
 
     std::atomic_bool IsBuilt {false};
+
 private:
-    VkDescriptorSetLayout mSetLayout = nullptr;
+    // VkDescriptorSetLayout mSetLayout = nullptr;
+
+    /**
+     * @brief Descriptor set layout for material properties, used in the light pass fragment shader.
+     */
+    // VkDescriptorSetLayout mMaterialPropertiesLayoutDS = nullptr;
 
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
@@ -123,8 +140,7 @@ public:
 
 public:
     FxRef<RxSampler> AlbedoSampler{nullptr};
-
-    RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
+    // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**
      * @brief A large GPU buffer containing all loaded in material properties.
@@ -135,8 +151,6 @@ public:
 private:
     FxPagedArray<FxMaterial> mMaterials;
     RxDescriptorPool mDescriptorPool;
-
-
 
     bool mInitialized = false;
 };

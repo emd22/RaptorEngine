@@ -10,6 +10,7 @@ struct cgltf_data;
 struct cgltf_material;
 struct cgltf_mesh;
 struct cgltf_texture_view;
+struct cgltf_primitive;
 
 struct FxGltfMaterialToLoad
 {
@@ -18,13 +19,6 @@ struct FxGltfMaterialToLoad
     int PrimitiveIndex = 0;
     int MeshIndex = 0;
 };
-
-/*
- 4194304
- 2793472
- 194560
- 7454720
- */
 
 class FxLoaderGltf : public FxLoaderBase
 {
@@ -35,17 +29,20 @@ public:
 
     Status LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path) override;
     Status LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size) override;
-    
+
     void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mesh, int mesh_index);
-    
-    
 
 //    void LoadAttachedMaterials();
-    
+
     void Destroy(FxRef<FxAssetBase>& asset) override;
 
     ~FxLoaderGltf() override = default;
-    
+
+private:
+    void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
+    void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive);
+
+
 public:
     std::vector<FxGltfMaterialToLoad> MaterialsToLoad;
 
@@ -56,5 +53,5 @@ protected:
 
 private:
     cgltf_data* mGltfData = nullptr;
-    
+
 };

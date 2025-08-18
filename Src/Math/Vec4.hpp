@@ -6,25 +6,27 @@
 #include <arm_neon.h>
 #endif
 
-class alignas(16) Vec4f
+class alignas(16) FxVec4f
 {
 public:
-    friend class Mat4f;
+    friend class FxMat4f;
 
-    Vec4f() = default;
-    Vec4f(float32 x, float32 y, float32 z, float32 w);
-    explicit Vec4f(float32 scalar);
+    FxVec4f() = default;
+    FxVec4f(float32 x, float32 y, float32 z, float32 w);
+    FxVec4f(float32 values[4]);
 
-    Vec4f operator + (const Vec4f &other) const;
-    Vec4f operator * (const Vec4f &other) const;
+    explicit FxVec4f(float32 scalar);
 
-    Vec4f &operator += (const Vec4f &other);
-    Vec4f &operator -= (const Vec4f &other);
-    Vec4f &operator *= (const Vec4f &other);
+    FxVec4f operator + (const FxVec4f &other) const;
+    FxVec4f operator * (const FxVec4f &other) const;
 
-    Vec4f &operator = (const Vec4f &other);
+    FxVec4f &operator += (const FxVec4f &other);
+    FxVec4f &operator -= (const FxVec4f &other);
+    FxVec4f &operator *= (const FxVec4f &other);
 
-    static Vec4f MulAdd(const Vec4f &add_value, const Vec4f &mul_a, const Vec4f &mul_b);
+    FxVec4f &operator = (const FxVec4f &other);
+
+    static FxVec4f MulAdd(const FxVec4f &add_value, const FxVec4f &mul_a, const FxVec4f &mul_b);
 
     float32 GetX() const;
     float32 GetY() const;
@@ -51,18 +53,18 @@ public:
      */
     void Load1(float32 scalar);
 
-    static const Vec4f Zero()
+    static const FxVec4f Zero()
     {
-        return Vec4f(0.0f, 0.0f, 0.0f, 0.0f);
+        return FxVec4f(0.0f, 0.0f, 0.0f, 0.0f);
     };
 
 #ifdef FX_USE_NEON
-    explicit Vec4f(float32x4_t intrin)
+    explicit FxVec4f(float32x4_t intrin)
         : mIntrin(intrin)
     {
     }
 
-    Vec4f &operator = (const float32x4_t &other)
+    FxVec4f &operator = (const float32x4_t &other)
     {
         mIntrin = other;
         return *this;

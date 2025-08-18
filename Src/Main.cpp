@@ -159,8 +159,8 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    TestScript();
-    return 0;
+    // TestScript();
+    // return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
@@ -235,15 +235,16 @@ int main()
 
     // FxOldSceneObject helmet_object;
     FxRef<FxObject> fireplace_object = FxAssetManager::LoadAsset<FxObject>("../models/FireplaceRoom.glb");
-    fireplace_object->WaitUntilLoaded();
+    // fireplace_object->WaitUntilLoaded();
 
-    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-        // TEMP: If there are missing materials, cheese it up
-        if (!obj->Material) {
-            obj->Material = cheese_material;
-        }
-    }
+    // for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
+    //     // TEMP: If there are missing materials, cheese it up
+    //     if (!obj->Material) {
+    //         obj->Material = cheese_material;
+    //     }
+    // }
 
+    FxRef<FxObject> mallard_object = FxAssetManager::LoadAsset<FxObject>("../models/Mallard.glb");
 
 
 
@@ -291,7 +292,7 @@ int main()
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light.Scale(FxVec3f(25));
 
-    light.Color = FxVec3f(0.2, 0.1, 0.2);
+    light.Color = FxVec3f(0.6, 0.7, 0.6);
 
     light2.MoveBy(FxVec3f(1, 0, -0.5));
     light2.Scale(FxVec3f(25));
@@ -371,6 +372,8 @@ int main()
 
         fireplace_object->Render(camera);
         ground_object->Render(camera);
+
+        mallard_object->Render(camera);
 
         Renderer->BeginLighting();
 

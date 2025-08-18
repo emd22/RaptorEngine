@@ -74,6 +74,30 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
 {
     RxGpuDevice* device = Renderer->GetDevice();
 
+
+    // Material properties buffer DS
+
+    {
+        VkDescriptorSetLayoutBinding material_properties_binding {
+            .binding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        };
+
+        VkDescriptorSetLayoutCreateInfo ds_material_info {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .bindingCount = 1,
+            .pBindings = &material_properties_binding
+        };
+
+        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_material_info, nullptr, &DsLayoutLightingMaterialProperties);
+        if (status != VK_SUCCESS) {
+            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+        }
+    }
+
     // Vertex DS
     {
         VkDescriptorSetLayoutBinding ubo_layout_binding {
@@ -107,8 +131,6 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
             .pImmutableSamplers = nullptr,
         };
 
-        // VkDescriptorSetLayoutBinding
-
         VkDescriptorSetLayoutCreateInfo ds_layout_info {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .bindingCount = 1,
@@ -124,9 +146,18 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
     VkDescriptorSetLayout layouts[] = {
         DsLayoutGPassVertex,
         DsLayoutGPassMaterial,
+        // DsLayoutLightingMaterialProperties,
     };
 
-    return GPassPipeline.CreateLayout(sizeof(FxDrawPushConstants), 0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = GPassPipeline.CreateLayout(
+        sizeof(FxDrawPushConstants),
+        0,
+        FxMakeSlice(layouts, FxSizeofArray(layouts))
+    );
+
+    RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+
+    return layout;
 }
 
 void FxDeferredRenderer::CreateGPassPipeline()
@@ -279,19 +310,30 @@ void FxDeferredRenderer::CreateLightingDSLayout()
     };
 
     VkResult status;
+
     status = vkCreateDescriptorSetLayout(device->Device, &lighting_layout_info, nullptr, &DsLayoutLightingFrag);
     if (status != VK_SUCCESS) {
         FxModulePanic("Failed to create pipeline descriptor set layout", status);
     }
+
 }
 
 VkPipelineLayout FxDeferredRenderer::CreateLightingPipelineLayout()
 {
     VkDescriptorSetLayout layouts[] = {
         DsLayoutLightingFrag,
+        DsLayoutLightingMaterialProperties,
     };
 
-    return LightingPipeline.CreateLayout(sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout =  LightingPipeline.CreateLayout(
+        sizeof(FxLightVertPushConstants), // Vertex push constants
+        sizeof(FxLightFragPushConstants), // Fragment push constants
+        FxMakeSlice(layouts, FxSizeofArray(layouts))
+    );
+
+    RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+
+    return layout;
 }
 
 
@@ -443,10 +485,13 @@ VkPipelineLayout FxDeferredRenderer::CreateCompPipelineLayout()
     }
 
     VkDescriptorSetLayout layouts[] = {
-        DsLayoutCompFrag
+        DsLayoutCompFrag,
     };
 
-    return CompPipeline.CreateLayout(0, sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = CompPipeline.CreateLayout(0, sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+
+    return layout;
 }
 
 
@@ -511,7 +556,6 @@ void FxDeferredRenderer::DestroyCompPipeline()
 
     CompPipeline.Destroy();
 }
-
 
 
 

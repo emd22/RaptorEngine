@@ -88,6 +88,8 @@ public:
     std::atomic_bool IsUploadedToGpu = false;
 
 protected:
+    friend class FxLoaderGltf;
+
     std::vector<OnLoadFunc> mOnLoadedCallbacks;
     // OnLoadFunc mOnLoadedCallback = nullptr;
     OnErrorFunc mOnErrorCallback = nullptr;

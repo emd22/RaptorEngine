@@ -37,10 +37,10 @@ public:
     static FxMat4f FromRows(float data[16])
     {
         return FxMat4f(
-            Vec4f(data[0], data[4], data[8], data[12]),
-            Vec4f(data[1], data[5], data[9], data[13]),
-            Vec4f(data[2], data[6], data[10], data[14]),
-            Vec4f(data[3], data[7], data[11], data[15])
+            FxVec4f(data[0], data[4], data[8], data[12]),
+            FxVec4f(data[1], data[5], data[9], data[13]),
+            FxVec4f(data[2], data[6], data[10], data[14]),
+            FxVec4f(data[3], data[7], data[11], data[15])
         );
     }
 
@@ -69,11 +69,11 @@ public:
             }
         );
     }
-    
+
     static FxMat4f AsRotationX(float rad);
     static FxMat4f AsRotationY(float rad);
     static FxMat4f AsRotationZ(float rad);
-    
+
 
     void FlipY()
     {
@@ -94,7 +94,7 @@ public:
         Columns[3].Load1(scalar);
     }
 
-    FxMat4f(Vec4f c0, Vec4f c1, Vec4f c2, Vec4f c3) noexcept
+    FxMat4f(FxVec4f c0, FxVec4f c1, FxVec4f c2, FxVec4f c3) noexcept
     {
         Columns[0] = c0;
         Columns[1] = c1;
@@ -102,7 +102,7 @@ public:
         Columns[3] = c3;
     }
 
-    FxMat4f(Vec4f columns[4]) noexcept
+    FxMat4f(FxVec4f columns[4]) noexcept
     {
         Columns[0] = columns[0];
         Columns[1] = columns[1];
@@ -149,19 +149,19 @@ public:
     }
 
     // Mat4f Multiply(const Mat4f &other);
-    Vec4f MultiplyVec4f(Vec4f &vec);
+    FxVec4f MultiplyVec4f(FxVec4f &vec);
 
 private:
-    float32x4_t MultiplyVec4f_Neon(Vec4f &vec);
+    float32x4_t MultiplyVec4f_Neon(FxVec4f &vec);
 
 public:
     union {
-        Vec4f Columns[4];
+        FxVec4f Columns[4];
         float32 RawData[16];
     };
 
 
-    friend class Vec4f;
+    friend class FxVec4f;
 
 private:
 };
