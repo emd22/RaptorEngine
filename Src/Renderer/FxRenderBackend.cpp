@@ -679,7 +679,7 @@ void FxRenderBackend::CreateSurfaceFromWindow()
 {
     if (mWindow == nullptr) {
         FxModulePanic("No window attached! use FxRenderBackend::SelectWindow()", 0);
-    }
+}
 
     bool success = SDL_Vulkan_CreateSurface(mWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
 

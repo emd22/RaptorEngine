@@ -14,7 +14,7 @@ void FxPanic(const char* const module, const char* fmt, T first, Types... items)
 {
     Log::LogSeverityText<Log::Severity::Fatal>();
 
-    if (module != nullptr) {
+if (module != nullptr) {
         Log::Write("%s: ", module);
     }
 

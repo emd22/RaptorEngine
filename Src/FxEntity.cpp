@@ -29,7 +29,7 @@ FxRef<FxEntity> FxEntityManager::New()
 /////////////////////////////
 
 
-void FxObject::Render(const FxCamera& camera)
+void FxOldSceneObject::Render(const FxCamera& camera)
 {
     RxFrameData* frame = Renderer->GetFrame();
 

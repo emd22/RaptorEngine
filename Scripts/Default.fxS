@@ -1,0 +1,22 @@
+
+# action hello()
+# {
+
+# }
+
+# hello();
+#local int x = 5;
+# jmpr 8
+action test() # offset -> 4
+{
+    # push32 2
+#    x = x + 2;
+    # ret
+}
+
+# push32 24
+# jmpa 4
+test();
+
+local int x = 10;
+#local int x = 10;

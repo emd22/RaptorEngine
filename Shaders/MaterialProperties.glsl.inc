@@ -1,0 +1,5 @@
+
+struct MaterialProperties
+{
+    uint BaseColor;
+};

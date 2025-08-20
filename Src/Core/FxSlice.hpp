@@ -35,19 +35,28 @@ public:
     {
     }
 
-    FxSlice(const T* ptr, uint32 size)
-        : Ptr(ptr), Size(size)
-    {
-    }
-
     FxSlice(T* ptr, uint32 size)
         : Ptr(ptr), Size(size)
     {
     }
+    
+    FxSlice(nullptr_t np)
+        : Ptr(nullptr), Size(0)
+    {
+    }
 
-    FxSlice(FxSlice& other) = delete;
-    FxSlice(const FxSlice& other) = delete;
+    FxSlice(const FxSlice& other)
+    {
+        Ptr = other.Ptr;
+        Size = other.Size;
+    }
+    
     FxSlice& operator = (T* value) = delete;
+    
+    bool operator == (nullptr_t np)
+    {
+        return Ptr == nullptr;
+    }
 
     operator T* () const
     {

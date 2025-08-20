@@ -7,23 +7,23 @@
 #include <atomic>
 
 template <typename TVertexType = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>
-class FxMesh
+class FxPrimitiveMesh
 {
 public:
-    FxMesh() = default;
+    FxPrimitiveMesh() = default;
 
-    FxMesh(FxSizedArray<TVertexType>& vertices)
+    FxPrimitiveMesh(FxSizedArray<TVertexType>& vertices)
     {
         UploadVertices(vertices);
     }
 
-    FxMesh(FxSizedArray<TVertexType>& vertices, FxSizedArray<uint32>& indices)
+    FxPrimitiveMesh(FxSizedArray<TVertexType>& vertices, FxSizedArray<uint32>& indices)
     {
         CreateFromData(vertices, indices);
     }
 
     template <typename T>
-    FxMesh(FxMesh<T>& other)
+    FxPrimitiveMesh(FxPrimitiveMesh<T>& other)
     {
         mVertexBuffer = other.mVertexBuffer;
         mIndexBuffer = other.mIndexBuffer;
@@ -197,7 +197,7 @@ public:
         mIndexBuffer.Destroy();
     }
 
-    ~FxMesh()
+    ~FxPrimitiveMesh()
     {
         Destroy();
     }

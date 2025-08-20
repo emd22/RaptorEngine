@@ -6,7 +6,7 @@ bool FxAssetModel::CheckIfReady()
         return mModelReady;
     }
 
-    for (FxMesh<>* mesh : Meshes) {
+    for (FxPrimitiveMesh<>* mesh : Meshes) {
         if (mesh->IsReady.load() == false) {
             return (mModelReady = false);
         }
@@ -25,7 +25,7 @@ void FxAssetModel::Render(RxGraphicsPipeline &pipeline)
         return;
     }
 
-    for (FxMesh<>* mesh : Meshes) {
+    for (FxPrimitiveMesh<>* mesh : Meshes) {
         // if we know the model is not fully loaded, check each
         // individual mesh to see if they're ready.
         if (!mModelReady && !mesh->IsReady) {

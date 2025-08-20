@@ -7,9 +7,97 @@
 
 #include "Backend/RxFrameData.hpp"
 
-
-class FxDeferredRenderer;
 struct RxFrameData;
+
+class FxDeferredGPass;
+class FxDeferredCompPass;
+class FxDeferredLightingPass;
+
+
+///////////////////////////////
+// Main Deferred Renderer
+///////////////////////////////
+
+class FxDeferredRenderer
+{
+public:
+    void Create(const FxVec2u& extent);
+
+    void Destroy();
+
+    ~FxDeferredRenderer()
+    {
+        Destroy();
+    }
+
+    FX_FORCE_INLINE FxDeferredGPass* GetCurrentGPass();
+    FX_FORCE_INLINE FxDeferredCompPass* GetCurrentCompPass();
+    FX_FORCE_INLINE FxDeferredLightingPass* GetCurrentLightingPass();
+
+    void RebuildLightingPipeline();
+
+private:
+    // Geometry
+    void CreateGPassPipeline();
+    void DestroyGPassPipeline();
+
+    FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
+
+    // Lighting
+    void CreateLightVolumePipeline();
+    void CreateLightingPipeline();
+
+    void CreateLightingDSLayout();
+
+    void DestroyLightVolumePipeline();
+    void DestroyLightingPipeline();
+
+    FX_FORCE_INLINE VkPipelineLayout CreateLightingPipelineLayout();
+    FX_FORCE_INLINE VkPipelineLayout CreateLightPassPipelineLayout();
+
+    // Composition
+    void CreateCompPipeline();
+    void DestroyCompPipeline();
+
+    FX_FORCE_INLINE VkPipelineLayout CreateCompPipelineLayout();
+
+
+public:
+    /////////////////////
+    // Geometry Pass
+    /////////////////////
+
+    VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
+    VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
+
+    RxGraphicsPipeline GPassPipeline;
+
+    FxSizedArray<FxDeferredGPass> GPasses;
+
+    //////////////////////
+    // Lighting Pass
+    //////////////////////
+
+    VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
+    VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
+
+    RxGraphicsPipeline LightingPipeline;
+
+    FxSizedArray<FxDeferredLightingPass> LightingPasses;
+
+    //////////////////////
+    // Composition Pass
+    //////////////////////
+
+    VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
+
+    RxGraphicsPipeline CompPipeline;
+    FxSizedArray<RxFramebuffer> OutputFramebuffers;
+
+    FxSizedArray<FxDeferredCompPass> CompPasses;
+};
+
+
 
 ///////////////////////////////
 // Geometry Pass (Per FIF)
@@ -139,89 +227,4 @@ private:
     FxDeferredRenderer* mRendererInst = nullptr;
 
     RxFrameData* mCurrentFrame = nullptr;
-};
-
-
-///////////////////////////////
-// Main Deferred Renderer
-///////////////////////////////
-
-class FxDeferredRenderer
-{
-public:
-    void Create(const FxVec2u& extent);
-
-    void Destroy();
-
-    ~FxDeferredRenderer()
-    {
-        Destroy();
-    }
-
-    FX_FORCE_INLINE FxDeferredGPass* GetCurrentGPass();
-    FX_FORCE_INLINE FxDeferredCompPass* GetCurrentCompPass();
-    FX_FORCE_INLINE FxDeferredLightingPass* GetCurrentLightingPass();
-
-    void RebuildLightingPipeline();
-
-private:
-    // Geometry
-    void CreateGPassPipeline();
-    void DestroyGPassPipeline();
-
-    FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
-
-    // Lighting
-    void CreateLightVolumePipeline();
-    void CreateLightingPipeline();
-
-    void CreateLightingDSLayout();
-
-    void DestroyLightVolumePipeline();
-    void DestroyLightingPipeline();
-
-    FX_FORCE_INLINE VkPipelineLayout CreateLightingPipelineLayout();
-    FX_FORCE_INLINE VkPipelineLayout CreateLightPassPipelineLayout();
-
-    // Composition
-    void CreateCompPipeline();
-    void DestroyCompPipeline();
-
-    FX_FORCE_INLINE VkPipelineLayout CreateCompPipelineLayout();
-
-
-public:
-    /////////////////////
-    // Geometry Pass
-    /////////////////////
-
-    VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
-    VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
-
-    RxGraphicsPipeline GPassPipeline;
-
-    FxSizedArray<FxDeferredGPass> GPasses;
-
-    //////////////////////
-    // Lighting Pass
-    //////////////////////
-
-    RxGraphicsPipeline LightVolumesPipeline;
-    FxSizedArray<FxDeferredLightVolumePass> LightVolumePasses;
-
-    VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
-    RxGraphicsPipeline LightingPipeline;
-
-    FxSizedArray<FxDeferredLightingPass> LightingPasses;
-
-    //////////////////////
-    // Composition Pass
-    //////////////////////
-
-    VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
-
-    RxGraphicsPipeline CompPipeline;
-    FxSizedArray<RxFramebuffer> OutputFramebuffers;
-
-    FxSizedArray<FxDeferredCompPass> CompPasses;
 };

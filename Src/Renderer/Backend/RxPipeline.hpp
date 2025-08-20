@@ -54,6 +54,7 @@ struct alignas(16) FxDrawPushConstants
 {
     float32 MVPMatrix[16];
     float32 ModelMatrix[16];
+    uint32 MaterialIndex = 0;
 };
 
 struct alignas(16) FxLightVertPushConstants

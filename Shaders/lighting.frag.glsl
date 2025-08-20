@@ -1,21 +1,39 @@
 #version 450
 
+#include "MaterialProperties.glsl.inc"
+
+////////////////////////
+// Outputs
+////////////////////////
+
+layout(location = 0) out vec4 v_Color;
+
+////////////////////////
+// Inputs
+////////////////////////
+
 layout(binding = 1) uniform sampler2D s_Depth;
 layout(binding = 2) uniform sampler2D s_Albedo;
 layout(binding = 3) uniform sampler2D s_Normals;
 
-layout(location = 0) out vec4 v_Color;
-
-layout(push_constant) uniform PushConstants {
-    layout(offset = 64) mat4 InvViewMatrix;
-    mat4 InvProjMatrix;
+layout(push_constant) uniform PushConstants
+{
+    layout(offset = 64) mat4 InvViewMatrix; // 128
+    mat4 InvProjMatrix; // 192
     vec4 LightPos;
     vec4 LightColor;
     vec4 PlayerPos;
     float LightRadius;
 } a_PC;
 
-vec3 WorldPosFromDepth(vec2 uv, float depth) {
+// A list of all materials loaded into the GPU
+// layout(set = 2, binding = 1) readonly buffer MaterialPropertiesBO
+// {
+//     MaterialProperties Materials[];
+// } mats;
+
+vec3 WorldPosFromDepth(vec2 uv, float depth)
+{
     vec4 ndc = vec4(uv * 2.0 - 1.0, depth, 1.0);
 
     vec4 clip = a_PC.InvProjMatrix * ndc;
