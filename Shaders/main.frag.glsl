@@ -29,6 +29,6 @@ layout(set = 1, binding = 0) uniform sampler2D s_Albedo;
 // } mats;
 
 void main() {
-    v_Albedo = vec4(1, 1, 1, 1);
+    v_Albedo = vec4(texture(s_Albedo, a_UV).rgb, 1.0);
     v_Normal = vec4(a_Normal, 1.0f);
 }

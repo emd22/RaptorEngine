@@ -59,10 +59,6 @@ void FxObject::Render(const FxCamera& camera)
         return;
     }
 
-    if (!Material) {
-        return;
-    }
-
     FxMat4f VP = camera.VPMatrix;
     FxMat4f MVP = mModelMatrix * VP;
 
@@ -74,7 +70,9 @@ void FxObject::Render(const FxCamera& camera)
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
     memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
 
-    push_constants.MaterialIndex = Material->GetMaterialIndex();
+    if (Material) {
+        push_constants.MaterialIndex = Material->GetMaterialIndex();
+    }
 
     // mModel->Render(*mMaterial->Pipeline);
 

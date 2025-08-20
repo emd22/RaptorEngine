@@ -96,7 +96,7 @@ void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMater
 
     component.Texture = FxMakeRef<FxAssetImage>();
     component.Texture->Texture.Create(image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
-    // component.Texture->IsFinishedNotifier.SignalDataWritten();
+    component.Texture->IsFinishedNotifier.SignalDataWritten();
     component.Texture->IsUploadedToGpu = true;
     component.Texture->IsUploadedToGpu.notify_all();
 
@@ -120,10 +120,10 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
     }
     // There is no albedo texture on the model, use the base colour.
-    else {
-        MakeEmptyMaterialTexture(material, material->DiffuseTexture);
-        material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
-    }
+//    else {
+//        MakeEmptyMaterialTexture(material, material->DiffuseTexture);
+//        material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+//    }
 
     object->Material = material;
 }

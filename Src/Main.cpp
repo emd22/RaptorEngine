@@ -235,14 +235,14 @@ int main()
 
     // FxOldSceneObject helmet_object;
     FxRef<FxObject> fireplace_object = FxAssetManager::LoadAsset<FxObject>("../models/FireplaceRoom.glb");
-    // fireplace_object->WaitUntilLoaded();
+    fireplace_object->WaitUntilLoaded();
 
-    // for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-    //     // TEMP: If there are missing materials, cheese it up
-    //     if (!obj->Material) {
-    //         obj->Material = cheese_material;
-    //     }
-    // }
+    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
+        // TEMP: If there are missing materials, cheese it up
+        if (!obj->Material) {
+            obj->Material = cheese_material;
+        }
+    }
 
     FxRef<FxObject> mallard_object = FxAssetManager::LoadAsset<FxObject>("../models/Mallard.glb");
 
