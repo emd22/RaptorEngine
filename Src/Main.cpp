@@ -121,9 +121,9 @@ void TestScript()
     // Define an external variable that can be used in our script
     // script.DefineExternalVar("int", "eExternalVar", FxScriptValue(FxScriptValue::INT, 42));
 
-    FxScriptInterpreter interpreter;
+    FxScriptVM vm;
 
-    script.Execute(interpreter);
+    script.Execute(vm);
 
 
     // std::string command = "";

@@ -4,11 +4,51 @@
 #include <Util/FxTokenizer.hpp>
 #include <Core/MemPool/FxMPPagedArray.hpp>
 
-#include <functional>
-
 #define FX_SCRIPT_VERSION_MAJOR 0
-#define FX_SCRIPT_VERSION_MINOR 1
+#define FX_SCRIPT_VERSION_MINOR 3
 #define FX_SCRIPT_VERSION_PATCH 0
+
+#define FX_SCRIPT_USE_MEMPOOL 1
+
+#ifdef FX_SCRIPT_USE_MEMPOOL
+
+#include <Core/FxMemory.hpp>
+
+#define FX_SCRIPT_ALLOC_MEMORY(ptrtype_, size_) FxMemPool::Alloc<ptrtype_>(size_)
+#define FX_SCRIPT_ALLOC_NODE(nodetype_) FxMemPool::Alloc<nodetype_>(sizeof(nodetype_))
+#define FX_SCRIPT_FREE(ptrtype_, ptr_) FxMemPool::Free<ptrtype_>(ptr_)
+
+#else
+
+// #define FX_SCRIPT_ALLOC_MEMORY(ptrtype_, size_) new ptrtype_[size_]
+#define FX_SCRIPT_ALLOC_MEMORY(ptrtype_, size_) FxScriptAllocMemory<ptrtype_>(size_)
+#define FX_SCRIPT_ALLOC_NODE(nodetype_) FxScriptAllocMemory<nodetype_>(sizeof(nodetype_))
+#define FX_SCRIPT_FREE(ptrtype_, ptr_) FxScriptFreeMemory<ptrtype_>(ptr_)
+
+#include <cstdlib>
+
+#endif
+
+template <typename T>
+T* FxScriptAllocMemory(size_t size)
+{
+    T* ptr = reinterpret_cast<T*>(malloc(size));
+    if constexpr (std::is_constructible_v<T>) {
+        new (ptr) T;
+    }
+
+    return ptr;
+}
+
+template <typename T>
+void FxScriptFreeMemory(T* ptr)
+{
+    if constexpr (std::is_destructible_v<T>) {
+        ptr->~T();
+    }
+
+    free(ptr);
+}
 
 struct FxAstVarRef;
 struct FxScriptScope;
@@ -342,20 +382,24 @@ struct FxScriptVar : public FxScriptLabelledData
 
         // Free tokens allocated by external variables
         if (Type && Type->Start) {
-            FxMemPool::Free<char>(Type->Start);
+            FX_SCRIPT_FREE(char, Type->Start);
         }
 
         if (this->Name && this->Name->Start) {
-            FxMemPool::Free<char>(this->Name->Start);
+            FX_SCRIPT_FREE(char, this->Name->Start);
         }
     }
 };
 
 class FxScriptInterpreter;
+class FxScriptVM;
+
 
 struct FxScriptExternalFunc
 {
-    using FuncType = void (*)(FxScriptInterpreter& interpreter, std::vector<FxScriptValue>& params, FxScriptValue* return_value);
+    //using FuncType = void (*)(FxScriptInterpreter& interpreter, std::vector<FxScriptValue>& params, FxScriptValue* return_value);
+
+    using FuncType = void (*)(FxScriptVM* vm, std::vector<FxScriptValue>& params, FxScriptValue* return_value);
 
     FxHash HashedName = 0;
     FuncType Function = nullptr;
@@ -414,6 +458,8 @@ class FxConfigScript
     using TT = FxTokenizer::TokenType;
 
 public:
+    FxConfigScript() = default;
+
     void LoadFile(const char* path);
 
     void PushScope();
@@ -448,7 +494,7 @@ public:
      * @brief Parses and executes a script.
      * @param interpreter The interpreter to execute with
      */
-    void Execute(FxScriptInterpreter& interpreter);
+    void Execute(FxScriptVM& vm);
 
     /**
      * @brief Executes a command on a script. Defaults to parsing with command style syntax.
@@ -502,284 +548,9 @@ private:
     uint32 mTokenIndex = 0;
 };
 
-/////////////////////////////////////////////
-// Script Bytecode Emitter
-/////////////////////////////////////////////
-
-enum FxScriptRegister : uint8
-{
-    FX_REG_NONE = 0x00,
-    FX_REG_X0,
-    FX_REG_X1,
-    FX_REG_X2,
-    FX_REG_X3,
-    FX_REG_X4,
-    FX_REG_XR,
-    FX_REG_SP,
-
-    FX_REG_SIZE,
-};
-
-enum FxScriptRegisterFlag : uint16
-{
-    FX_REGFLAG_NONE = 0x00,
-    FX_REGFLAG_X0 = 0x01,
-    FX_REGFLAG_X1 = 0x02,
-    FX_REGFLAG_X2 = 0x04,
-    FX_REGFLAG_X3 = 0x08,
-    FX_REGFLAG_X4 = 0x10,
-    FX_REGFLAG_XR = 0x20,
-};
-
-inline FxScriptRegisterFlag operator | (FxScriptRegisterFlag a, FxScriptRegisterFlag b)
-{
-    return static_cast<FxScriptRegisterFlag>(static_cast<uint16>(a) | static_cast<uint16>(b));
-}
-
-inline FxScriptRegisterFlag operator & (FxScriptRegisterFlag a, FxScriptRegisterFlag b)
-{
-    return static_cast<FxScriptRegisterFlag>(static_cast<uint16>(a) & static_cast<uint16>(b));
-}
-
-struct FxScriptBytecodeVarHandle
-{
-    FxHash HashedName = 0;
-    FxScriptValue::ValueType Type = FxScriptValue::INT;
-    int64 Offset = 0;
-    FxScriptRegister Register = FX_REG_NONE;
-};
-
-struct FxScriptBytecodeActionHandle
-{
-    FxHash HashedName = 0;
-    uint32 BytecodeIndex = 0;
-};
-
-class FxScriptBCEmitter
-{
-public:
-    FxScriptBCEmitter() = default;
-
-    void BeginEmitting(FxAstNode* node);
-    void Emit(FxAstNode* node);
-
-    enum RhsMode
-    {
-        RHS_FETCH,
-        RHS_DEFINE,
-    };
-
-    static FxScriptRegister RegFlagToReg(FxScriptRegisterFlag reg_flag);
-    static FxScriptRegisterFlag RegToRegFlag(FxScriptRegister reg);
-
-    static const char* GetRegisterName(FxScriptRegister reg);
-
-    FxMPPagedArray<uint8> mBytecode{};
-
-private:
-    void EmitBlock(FxAstBlock* block);
-    void EmitAction(FxAstActionDecl* action);
-    void DoActionCall(FxAstActionCall* call);
-    void EmitVarDecl(FxAstVarDecl* decl);
-    void EmitAssign(FxAstAssign* assign);
-
-    FxScriptRegister EmitVarFetch(FxAstVarRef* ref, RhsMode mode);
-
-    void EmitPush32(uint32 value);
-    void EmitPush32r(FxScriptRegister reg);
-
-    void EmitPop32(FxScriptRegister output_reg);
-
-    void EmitLoad32(int offset, FxScriptRegister output_reg);
-
-    void EmitSave32(uint16 offset, uint32 value);
-    void EmitSave32r(uint16 offset, FxScriptRegister reg);
-
-    void EmitJumpRelative(uint16 offset);
-    void EmitJumpAbsolute(uint32 position);
-    void EmitJumpAbsoluteReg32(FxScriptRegister reg);
-    void EmitJumpCallAbsolute(uint32 position);
-    void EmitJumpReturnToCaller();
-
-    FxScriptRegister EmitBinop(FxAstBinop* binop, FxScriptBytecodeVarHandle* handle);
-
-    FxScriptRegister EmitRhs(FxAstNode* rhs, RhsMode mode, FxScriptBytecodeVarHandle* handle = nullptr);
-
-    void WriteOp(uint8 base_op, uint8 spec_op);
-    void Write16(uint16 value);
-    void Write32(uint32 value);
-
-    FxScriptRegister FindFreeRegister();
-
-    FxScriptBytecodeVarHandle* FindVarHandle(FxHash hashed_name);
-    FxScriptBytecodeActionHandle* FindActionHandle(FxHash hashed_name);
-
-    void PrintBytecode();
-public:
-
-    std::vector<FxScriptBytecodeVarHandle> VarHandles;
-    std::vector<FxScriptBytecodeActionHandle> ActionHandles;
-private:
-
-    FxScriptRegisterFlag mRegsInUse = FX_REGFLAG_NONE;
-
-    int64 mStackOffset = 0;
-
-    uint32 mStackSize = 0;
-};
-
-class FxScriptBCPrinter
-{
-public:
-    FxScriptBCPrinter(FxMPPagedArray<uint8>& bytecode)
-    {
-        mBytecode = bytecode;
-        mBytecode.DoNotDestroy = true;
-    }
-
-    void Print();
-    void PrintOp();
-
-
-private:
-    uint16 Read16();
-    uint32 Read32();
-
-    void DoPush(uint8 op_base, uint8 op_spec);
-    void DoPop(uint8 op_base, uint8 op_spec);
-    void DoLoad(uint8 op_base, uint8 op_spec);
-    void DoArith(uint8 op_base, uint8 op_spec);
-    void DoSave(uint8 op_base, uint8 op_spec);
-    void DoJump(uint8 op_base, uint8 op_spec);
-
-private:
-    uint32 mBytecodeIndex = 0;
-    FxMPPagedArray<uint8> mBytecode;
-};
-
-
-///////////////////////////////////////////
-// Bytecode VM
-///////////////////////////////////////////
-
-struct FxScriptVMCallFrame
-{
-    uint32 StackAllocation = 0;
-};
-
-class FxScriptVM
-{
-public:
-    FxScriptVM() = default;
-
-    void Start(FxMPPagedArray<uint8>&& bytecode)
-    {
-        mBytecode = std::move(bytecode);
-
-        Stack = new uint8[1024];
-        //mStackOffset = 0;
-        Registers[FX_REG_SP] = 0;
-        memset(Registers, 0, sizeof(Registers));
-
-        while (mPC < mBytecode.Size()) {
-            ExecuteOp();
-        }
-
-        PrintRegisters();
-    }
-
-    void PrintRegisters();
-
-    void Push16(uint16 value);
-    void Push32(uint32 value);
-
-    uint32 Pop32();
-
-private:
-    void ExecuteOp();
-
-    void DoPush(uint8 op_base, uint8 op_spec);
-    void DoPop(uint8 op_base, uint8 op_spec);
-    void DoLoad(uint8 op_base, uint8 op_spec);
-    void DoArith(uint8 op_base, uint8 op_spec);
-    void DoSave(uint8 op_base, uint8 op_spec);
-    void DoJump(uint8 op_base, uint8 op_spec);
-
-    uint16 Read16();
-    uint32 Read32();
-
-    FxScriptVMCallFrame& GetCurrentCallFrame();
-    void PushCallFrame();
-    void PopCallFrame();
-
-public:
-    // NONE, X0, X1, X2, X3, X4, XR, SP
-    uint32 Registers[FX_REG_SIZE];
-
-    uint8* Stack = nullptr;
-
-private:
-    FxMPPagedArray<uint8> mBytecode;
-    uint32 mPC = 0;
-
-
-    bool mIsInCallFrame = false;
-
-    FxScriptVMCallFrame mCallFrames[8];
-    int mCallFrameIndex = 0;
-};
-
-////////////////////////////////////////////////
-// Script Interpreter
-////////////////////////////////////////////////
-class FxScriptInterpreter
-{
-public:
-    FxScriptInterpreter() = default;
-
-    void PushScope();
-    void PopScope();
-
-    FxScriptVar* FindVar(FxHash hashed_name);
-    FxScriptAction* FindAction(FxHash hashed_name);
-    FxScriptExternalFunc* FindExternalAction(FxHash hashed_name);
-
-    /**
-     * @brief Evaluates and gets the immediate value if `value` is a reference, or returns the value if it is already immediate.
-     * @param value The value to query from
-     * @return the immediate(literal) value
-     */
-    const FxScriptValue& GetImmediateValue(const FxScriptValue& value);
-
-    void DefineExternalVar(const char* type, const char* name, const FxScriptValue& value);
-
-private:
-    friend class FxConfigScript;
-    void Create(FxAstBlock* root_block);
-
-    void Visit(FxAstNode* node);
-
-    void Interpret();
-
-    FxScriptValue VisitExternalCall(FxAstActionCall* call, FxScriptExternalFunc& func);
-    FxScriptValue VisitActionCall(FxAstActionCall* call);
-    void VisitAssignment(FxAstAssign* assign);
-    FxScriptValue VisitRhs(FxAstNode* node);
-
-    bool CheckExternalCallArgs(FxAstActionCall* call, FxScriptExternalFunc& func);
-
-
-
-private:
-    FxAstNode* mRootBlock = nullptr;
-
-    bool mInCommandMode = false;
-
-    std::vector<FxScriptExternalFunc> mExternalFuncs;
-
-    FxMPPagedArray<FxScriptScope> mScopes;
-    FxScriptScope* mCurrentScope = nullptr;
-};
+//////////////////////////////////
+// Script AST Printer
+//////////////////////////////////
 
 class FxAstPrinter
 {
@@ -881,4 +652,354 @@ public:
 
 public:
     //FxAstBlock* mRootBlock = nullptr;
+};
+
+/////////////////////////////////////////////
+// Script Bytecode Emitter
+/////////////////////////////////////////////
+
+enum FxScriptRegister : uint8
+{
+    FX_REG_NONE = 0x00,
+    FX_REG_X0,
+    FX_REG_X1,
+    FX_REG_X2,
+    FX_REG_X3,
+
+    /**
+     * @brief Return address register.
+     */
+    FX_REG_RA,
+
+    /**
+     * @brief Register that contains the result of an operation.
+     */
+    FX_REG_XR,
+
+    /**
+     * @brief Register that contains the stack pointer for the VM.
+     */
+    FX_REG_SP,
+
+    FX_REG_SIZE,
+};
+
+enum FxScriptRegisterFlag : uint16
+{
+    FX_REGFLAG_NONE = 0x00,
+    FX_REGFLAG_X0 = 0x01,
+    FX_REGFLAG_X1 = 0x02,
+    FX_REGFLAG_X2 = 0x04,
+    FX_REGFLAG_X3 = 0x08,
+    FX_REGFLAG_RA = 0x10,
+    FX_REGFLAG_XR = 0x20,
+};
+
+inline FxScriptRegisterFlag operator | (FxScriptRegisterFlag a, FxScriptRegisterFlag b)
+{
+    return static_cast<FxScriptRegisterFlag>(static_cast<uint16>(a) | static_cast<uint16>(b));
+}
+
+inline FxScriptRegisterFlag operator & (FxScriptRegisterFlag a, FxScriptRegisterFlag b)
+{
+    return static_cast<FxScriptRegisterFlag>(static_cast<uint16>(a) & static_cast<uint16>(b));
+}
+
+struct FxScriptBytecodeVarHandle
+{
+    FxHash HashedName = 0;
+    FxScriptValue::ValueType Type = FxScriptValue::INT;
+    int64 Offset = 0;
+
+    uint16 SizeOnStack = 4;
+    uint32 ScopeIndex = 0;
+};
+
+struct FxScriptBytecodeActionHandle
+{
+    FxHash HashedName = 0;
+    uint32 BytecodeIndex = 0;
+};
+
+class FxScriptBCEmitter
+{
+public:
+    FxScriptBCEmitter() = default;
+
+    void BeginEmitting(FxAstNode* node);
+    void Emit(FxAstNode* node);
+
+    enum RhsMode
+    {
+        RHS_FETCH_TO_REGISTER,
+
+        /**
+         * @brief Pushes the value to the stack, assuming that the value does not exist yet.
+         */
+        RHS_DEFINE_IN_MEMORY,
+
+        RHS_ASSIGN_TO_HANDLE,
+    };
+
+    static FxScriptRegister RegFlagToReg(FxScriptRegisterFlag reg_flag);
+    static FxScriptRegisterFlag RegToRegFlag(FxScriptRegister reg);
+
+    static const char* GetRegisterName(FxScriptRegister reg);
+
+    FxMPPagedArray<uint8> mBytecode{};
+
+    enum VarDeclareMode {
+        DECLARE_DEFAULT,
+        DECLARE_NO_EMIT,
+    };
+
+
+private:
+    void EmitBlock(FxAstBlock* block);
+    void EmitAction(FxAstActionDecl* action);
+    void DoActionCall(FxAstActionCall* call);
+    FxScriptBytecodeVarHandle* DoVarDeclare(FxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
+    void EmitAssign(FxAstAssign* assign);
+    FxScriptBytecodeVarHandle* DefineAndFetchParam(FxAstNode* param_decl_node);
+    FxScriptBytecodeVarHandle* DefineReturnVar(FxAstVarDecl* decl);
+
+    FxScriptRegister EmitVarFetch(FxAstVarRef* ref, RhsMode mode);
+
+    void DoLoad(uint32 stack_offset, FxScriptRegister output_reg, bool force_absolute = false);
+    void DoSaveInt32(uint32 stack_offset, uint32 value, bool force_absolute = false);
+    void DoSaveReg32(uint32 stack_offset, FxScriptRegister reg, bool force_absolute = false);
+
+    void EmitPush32(uint32 value);
+    void EmitPush32r(FxScriptRegister reg);
+
+    void EmitPop32(FxScriptRegister output_reg);
+
+    void EmitLoad32(int offset, FxScriptRegister output_reg);
+    void EmitLoadAbsolute32(uint32 position, FxScriptRegister output_reg);
+
+    void EmitSave32(int16 offset, uint32 value);
+    void EmitSaveReg32(int16 offset, FxScriptRegister reg);
+
+    void EmitSaveAbsolute32(uint32 offset, uint32 value);
+    void EmitSaveAbsoluteReg32(uint32 offset, FxScriptRegister reg);
+
+    void EmitJumpRelative(uint16 offset);
+    void EmitJumpAbsolute(uint32 position);
+    void EmitJumpAbsoluteReg32(FxScriptRegister reg);
+    void EmitJumpCallAbsolute(uint32 position);
+    void EmitJumpReturnToCaller();
+    void EmitJumpCallExternal(FxHash hashed_name);
+
+    void EmitMoveInt32(FxScriptRegister reg, uint32 value);
+
+    void EmitParamsStart();
+    void EmitType(FxScriptValue::ValueType type);
+
+    uint32 EmitDataString(char* str, uint16 length);
+
+    FxScriptRegister EmitBinop(FxAstBinop* binop, FxScriptBytecodeVarHandle* handle);
+
+    FxScriptRegister EmitRhs(FxAstNode* rhs, RhsMode mode, FxScriptBytecodeVarHandle* handle);
+
+    FxScriptRegister EmitLiteralInt(FxAstLiteral* literal, RhsMode mode, FxScriptBytecodeVarHandle* handle);
+    FxScriptRegister EmitLiteralString(FxAstLiteral* literal, RhsMode mode, FxScriptBytecodeVarHandle* handle);
+
+
+    void WriteOp(uint8 base_op, uint8 spec_op);
+    void Write16(uint16 value);
+    void Write32(uint32 value);
+
+    FxScriptRegister FindFreeRegister();
+
+    FxScriptBytecodeVarHandle* FindVarHandle(FxHash hashed_name);
+    FxScriptBytecodeActionHandle* FindActionHandle(FxHash hashed_name);
+
+    void PrintBytecode();
+
+    void MarkRegisterUsed(FxScriptRegister reg);
+    void MarkRegisterFree(FxScriptRegister reg);
+
+public:
+
+    FxMPPagedArray<FxScriptBytecodeVarHandle> VarHandles;
+    std::vector<FxScriptBytecodeActionHandle> ActionHandles;
+private:
+
+    FxScriptRegisterFlag mRegsInUse = FX_REGFLAG_NONE;
+
+    int64 mStackOffset = 0;
+    uint32 mStackSize = 0;
+
+    uint16 mScopeIndex = 0;
+};
+
+class FxScriptBCPrinter
+{
+public:
+    FxScriptBCPrinter(FxMPPagedArray<uint8>& bytecode)
+    {
+        mBytecode = bytecode;
+        mBytecode.DoNotDestroy = true;
+    }
+
+    void Print();
+    void PrintOp();
+
+
+private:
+    uint16 Read16();
+    uint32 Read32();
+
+    void DoPush(char* s, uint8 op_base, uint8 op_spec);
+    void DoPop(char* s, uint8 op_base, uint8 op_spec);
+    void DoLoad(char* s, uint8 op_base, uint8 op_spec);
+    void DoArith(char* s, uint8 op_base, uint8 op_spec);
+    void DoSave(char* s, uint8 op_base, uint8 op_spec);
+    void DoJump(char* s, uint8 op_base, uint8 op_spec);
+    void DoData(char* s, uint8 op_base, uint8 op_spec);
+    void DoType(char* s, uint8 op_base, uint8 op_spec);
+    void DoMove(char* s, uint8 op_base, uint8 op_spec);
+
+private:
+    uint32 mBytecodeIndex = 0;
+    FxMPPagedArray<uint8> mBytecode;
+};
+
+
+///////////////////////////////////////////
+// Bytecode VM
+///////////////////////////////////////////
+
+struct FxScriptVMCallFrame
+{
+    uint32 StartStackIndex = 0;
+};
+
+class FxScriptVM
+{
+public:
+    FxScriptVM() = default;
+
+    void Start(FxMPPagedArray<uint8>&& bytecode)
+    {
+        mBytecode = std::move(bytecode);
+        mPushedTypes.Create(64);
+
+        Stack = FX_SCRIPT_ALLOC_MEMORY(uint8, 1024);
+        //mStackOffset = 0;
+        Registers[FX_REG_SP] = 0;
+        memset(Registers, 0, sizeof(Registers));
+
+        while (mPC < mBytecode.Size()) {
+            ExecuteOp();
+        }
+
+        PrintRegisters();
+    }
+
+    void PrintRegisters();
+
+    void Push16(uint16 value);
+    void Push32(uint32 value);
+
+    uint32 Pop32();
+
+private:
+    void ExecuteOp();
+
+    void DoPush(uint8 op_base, uint8 op_spec);
+    void DoPop(uint8 op_base, uint8 op_spec);
+    void DoLoad(uint8 op_base, uint8 op_spec);
+    void DoArith(uint8 op_base, uint8 op_spec);
+    void DoSave(uint8 op_base, uint8 op_spec);
+    void DoJump(uint8 op_base, uint8 op_spec);
+    void DoData(uint8 op_base, uint8 op_spec);
+    void DoType(uint8 op_base, uint8 op_spec);
+    void DoMove(uint8 op_base, uint8 op_spec);
+
+    uint16 Read16();
+    uint32 Read32();
+
+    FxScriptVMCallFrame& PushCallFrame();
+    FxScriptVMCallFrame* GetCurrentCallFrame();
+    void PopCallFrame();
+
+    FxScriptExternalFunc* FindExternalAction(FxHash hashed_name);
+
+public:
+    // NONE, X0, X1, X2, X3, RA, XR, SP
+    int32 Registers[FX_REG_SIZE];
+
+    uint8* Stack = nullptr;
+
+    std::vector<FxScriptExternalFunc> mExternalFuncs;
+
+    FxMPPagedArray<uint8> mBytecode;
+
+private:
+    uint32 mPC = 0;
+
+
+    bool mIsInCallFrame = false;
+
+    FxScriptVMCallFrame mCallFrames[8];
+    int mCallFrameIndex = 0;
+
+    bool mIsInParams = false;
+    FxMPPagedArray<FxScriptValue::ValueType> mPushedTypes;
+
+    FxScriptValue::ValueType mCurrentType = FxScriptValue::NONETYPE;
+};
+
+////////////////////////////////////////////////
+// Script Interpreter
+////////////////////////////////////////////////
+
+class FxScriptInterpreter
+{
+public:
+    FxScriptInterpreter() = default;
+
+    void PushScope();
+    void PopScope();
+
+    FxScriptVar* FindVar(FxHash hashed_name);
+    FxScriptAction* FindAction(FxHash hashed_name);
+    FxScriptExternalFunc* FindExternalAction(FxHash hashed_name);
+
+    /**
+     * @brief Evaluates and gets the immediate value if `value` is a reference, or returns the value if it is already immediate.
+     * @param value The value to query from
+     * @return the immediate(literal) value
+     */
+    const FxScriptValue& GetImmediateValue(const FxScriptValue& value);
+
+    void DefineExternalVar(const char* type, const char* name, const FxScriptValue& value);
+
+private:
+    friend class FxConfigScript;
+    void Create(FxAstBlock* root_block);
+
+    void Visit(FxAstNode* node);
+
+    void Interpret();
+
+    FxScriptValue VisitExternalCall(FxAstActionCall* call, FxScriptExternalFunc& func);
+    FxScriptValue VisitActionCall(FxAstActionCall* call);
+    void VisitAssignment(FxAstAssign* assign);
+    FxScriptValue VisitRhs(FxAstNode* node);
+
+    bool CheckExternalCallArgs(FxAstActionCall* call, FxScriptExternalFunc& func);
+
+
+
+private:
+    FxAstNode* mRootBlock = nullptr;
+
+    bool mInCommandMode = false;
+
+    std::vector<FxScriptExternalFunc> mExternalFuncs;
+
+    FxMPPagedArray<FxScriptScope> mScopes;
+    FxScriptScope* mCurrentScope = nullptr;
 };

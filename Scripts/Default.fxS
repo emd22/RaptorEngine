@@ -1,22 +1,14 @@
-
-# action hello()
-# {
-
-# }
-
-# hello();
-#local int x = 5;
-# jmpr 8
-action test() # offset -> 4
+action gv(int x) int r
 {
-    # push32 2
-#    x = x + 2;
-    # ret
+	r = x;
 }
 
-# push32 24
-# jmpa 4
-test();
+action add_values(int x2, int y2) int r2
+{
+	r2 = x2 + y2;
+}
 
-local int x = 10;
-#local int x = 10;
+log("Values:", add_values(2, 3));
+
+
+
