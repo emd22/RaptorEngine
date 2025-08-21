@@ -298,6 +298,8 @@ public:
 
         FirstPage->Next = nullptr;
         FirstPage->Size = 0;
+
+        TrackedSize = 0;
     }
 
     inline bool IsEmpty() const
