@@ -77,11 +77,13 @@ void FxObject::Render(const FxCamera& camera)
     // mModel->Render(*mMaterial->Pipeline);
 
     if (Material && CheckIfReady()) {
-        VkDescriptorSet sets_to_bind[] = {
-            Renderer->CurrentGPass->DescriptorSet.Set,
-            Material->mDescriptorSet.Set
-        };
-        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
+//        VkDescriptorSet sets_to_bind[] = {
+////            Renderer->CurrentGPass->DescriptorSet.Set,
+//            
+//            Material->mDescriptorSet.Set
+//            Material->
+//        };
+//        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, Material->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 
@@ -104,12 +106,33 @@ void FxObject::Render(const FxCamera& camera)
             obj->Material->Build();
         }
 
-        VkDescriptorSet sets_to_bind[] = {
-            Renderer->CurrentGPass->DescriptorSet.Set,
-            obj->Material->mDescriptorSet.Set
-        };
-
-        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *obj->Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
+//        VkDescriptorSet sets_to_bind[] = {
+//            Renderer->CurrentGPass->DescriptorSet.Set,
+//            obj->Material->mDescriptorSet.Set,
+//            obj->Material->mMaterialPropertiesDS.Set
+            
+//        };
+        
+        
+//        const uint32 num_sets = FxSizeofArray(sets_to_bind);
+//        const uint32 properties_offset = static_cast<uint32>(obj->Material->mMaterialPropertiesIndex * sizeof(FxMaterialProperties));
+        
+//        uint32 dynamic_offsets[] = {
+//            0,
+//            properties_offset
+//        };
+        
+//        RxCommandBuffer& cmd = frame->CommandBuffer;
+//
+//        RxDescriptorSet::BindMultipleOffset(
+//            cmd,
+//            VK_PIPELINE_BIND_POINT_GRAPHICS,
+//            *obj->Material->Pipeline,
+//            FxMakeSlice(sets_to_bind, num_sets),
+//            FxMakeSlice(dynamic_offsets, num_sets)
+//        );
+//        
+//        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *obj->Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->Material->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
 
@@ -123,8 +146,16 @@ void FxObject::RenderMesh()
     if (!CheckIfReady()) {
         return;
     }
+    
+    if (!Material) {
+        return;
+    }
+    
+    
+    Material->Bind(&Renderer->GetFrame()->CommandBuffer);
 
     if (Mesh) {
+        
         Mesh->Render(*Material->Pipeline);
     }
 }

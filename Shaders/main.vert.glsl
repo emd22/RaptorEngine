@@ -15,10 +15,10 @@ layout(location = 2) out uint v_MaterialIndex;
 // Inputs
 ////////////////////////
 
-layout(binding = 1) uniform UniformBufferObject
-{
-    mat4 MvpMatrix;
-} Ubo;
+// layout(binding = 1) uniform UniformBufferObject
+// {
+//     mat4 MvpMatrix;
+// } Ubo;
 
 layout(location = 0) in vec3 a_Position;
 layout(location = 1) in vec3 a_Normal;

@@ -81,7 +81,7 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
         VkDescriptorSetLayoutBinding material_properties_binding {
             .binding = 0,
             .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
             .pImmutableSamplers = nullptr,
         };
@@ -99,26 +99,26 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
     }
 
     // Vertex DS
-    {
-        VkDescriptorSetLayoutBinding ubo_layout_binding {
-            .binding = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-            .pImmutableSamplers = nullptr,
-        };
-
-        VkDescriptorSetLayoutCreateInfo ds_layout_info {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = 1,
-            .pBindings = &ubo_layout_binding,
-        };
-
-        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr, &DsLayoutGPassVertex);
-        if (status != VK_SUCCESS) {
-            FxModulePanic("Failed to create pipeline descriptor set layout", status);
-        }
-    }
+//    {
+//        VkDescriptorSetLayoutBinding ubo_layout_binding {
+//            .binding = 0,
+//            .descriptorCount = 1,
+//            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+//            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+//            .pImmutableSamplers = nullptr,
+//        };
+//
+//        VkDescriptorSetLayoutCreateInfo ds_layout_info {
+//            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+//            .bindingCount = 1,
+//            .pBindings = &ubo_layout_binding,
+//        };
+//
+//        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr, &DsLayoutGPassVertex);
+//        if (status != VK_SUCCESS) {
+//            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+//        }
+//    }
 
     // Fragment DS
     {
@@ -144,9 +144,9 @@ VkPipelineLayout FxDeferredRenderer::CreateGPassPipelineLayout()
     }
 
     VkDescriptorSetLayout layouts[] = {
-        DsLayoutGPassVertex,
         DsLayoutGPassMaterial,
-        // DsLayoutLightingMaterialProperties,
+        DsLayoutLightingMaterialProperties,
+//        DsLayoutGPassVertex,
     };
 
     VkPipelineLayout layout = GPassPipeline.CreateLayout(
@@ -236,7 +236,7 @@ void FxDeferredRenderer::CreateGPassPipeline()
         FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
         &vert_info,
-        VK_CULL_MODE_BACK_BIT
+        VK_CULL_MODE_NONE
     );
 }
 
@@ -567,27 +567,27 @@ void FxDeferredRenderer::DestroyCompPipeline()
 
 void FxDeferredGPass::BuildDescriptorSets()
 {
-    DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutGPassVertex);
-
-    VkDescriptorBufferInfo ubo_info {
-        .buffer = UniformBuffer.Buffer,
-        .offset = 0,
-        .range = sizeof(RxUniformBufferObject)
-    };
-
-    VkWriteDescriptorSet ubo_write {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount = 1,
-        .dstSet = DescriptorSet,
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .pBufferInfo = &ubo_info,
-    };
-
-    const VkWriteDescriptorSet writes[] = { ubo_write };
-
-    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
+//    DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutGPassVertex);
+//
+//    VkDescriptorBufferInfo ubo_info {
+//        .buffer = UniformBuffer.Buffer,
+//        .offset = 0,
+//        .range = sizeof(RxUniformBufferObject)
+//    };
+//
+//    VkWriteDescriptorSet ubo_write {
+//        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+//        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+//        .descriptorCount = 1,
+//        .dstSet = DescriptorSet,
+//        .dstBinding = 0,
+//        .dstArrayElement = 0,
+//        .pBufferInfo = &ubo_info,
+//    };
+//
+//    const VkWriteDescriptorSet writes[] = { ubo_write };
+//
+//    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) / sizeof(writes[0]), writes, 0, nullptr);
 
 }
 
@@ -596,8 +596,9 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
     mRendererInst = renderer;
     mGPassPipeline = &mRendererInst->GPassPipeline;
 
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
+//    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RendererFramesInFlight);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RendererFramesInFlight);
     DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
     DepthAttachment.Create(
@@ -633,8 +634,8 @@ void FxDeferredGPass::Create(FxDeferredRenderer* renderer, const FxVec2u& extent
 
     Framebuffer.Create(image_views, renderer->GPassPipeline, extent);
 
-    UniformBuffer.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    UniformBuffer.Map();
+//    UniformBuffer.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+//    UniformBuffer.Map();
 
     BuildDescriptorSets();
 }

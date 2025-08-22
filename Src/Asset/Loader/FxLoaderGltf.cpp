@@ -92,14 +92,13 @@ void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComp
 
 void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component)
 {
-    FxSizedArray<uint8> image_data = { 255, 255, 255, 255 };
+    FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
 
     component.Texture = FxMakeRef<FxAssetImage>();
     component.Texture->Texture.Create(image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
     component.Texture->IsFinishedNotifier.SignalDataWritten();
     component.Texture->IsUploadedToGpu = true;
     component.Texture->IsUploadedToGpu.notify_all();
-
     component.Texture->mIsLoaded.store(true);
 }
 
@@ -116,14 +115,24 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
-        MakeMaterialTextureForPrimitive(material, material->DiffuseTexture, gltf_material->pbr_metallic_roughness.base_color_texture);
-        material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
+        cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
+        
+        if (!texture_view.texture) {
+            MakeEmptyMaterialTexture(material, material->DiffuseTexture);
+            material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+        }
+        else {
+            MakeMaterialTextureForPrimitive(material, material->DiffuseTexture, texture_view);
+            material->Properties.BaseColor = FxColorFromRGBA(1, 1, 1, 1);
+        }
+        
+        
     }
     // There is no albedo texture on the model, use the base colour.
-//    else {
-//        MakeEmptyMaterialTexture(material, material->DiffuseTexture);
-//        material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
-//    }
+    else {
+        
+        material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+    }
 
     object->Material = material;
 }

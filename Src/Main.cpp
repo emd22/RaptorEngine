@@ -237,12 +237,12 @@ int main()
     FxRef<FxObject> fireplace_object = FxAssetManager::LoadAsset<FxObject>("../models/FireplaceRoom.glb");
     fireplace_object->WaitUntilLoaded();
 
-    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-        // TEMP: If there are missing materials, cheese it up
-        if (!obj->Material) {
-            obj->Material = cheese_material;
-        }
-    }
+//    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
+//        // TEMP: If there are missing materials, cheese it up
+//        if (!obj->Material) {
+//            obj->Material = cheese_material;
+//        }
+//    }
 
     FxRef<FxObject> mallard_object = FxAssetManager::LoadAsset<FxObject>("../models/Mallard.glb");
 
@@ -338,6 +338,7 @@ int main()
 
             // helmet_object.Attach(helmet_model);
             // helmet_object.Attach(cheese_material);
+             FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
@@ -346,7 +347,6 @@ int main()
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
             Renderer->DeferredRenderer->RebuildLightingPipeline();
-            // FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
         CheckGeneralControls();

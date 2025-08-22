@@ -88,14 +88,14 @@ public:
 
     RxDescriptorSet mDescriptorSet{};
 
-    /**
-     * @brief Descriptor set for material properties. Used in the light pass.
-     */
-    RxDescriptorSet mMaterialPropertiesDS{};
-
     RxGraphicsPipeline* Pipeline = nullptr;
 
     std::atomic_bool IsBuilt {false};
+
+    /**
+     * @brief Offset into `MaterialPropertiesBuffer` for this material.
+     */
+    uint32 mMaterialPropertiesIndex = 0;
 
 private:
     // VkDescriptorSetLayout mSetLayout = nullptr;
@@ -105,11 +105,6 @@ private:
      */
     // VkDescriptorSetLayout mMaterialPropertiesLayoutDS = nullptr;
 
-    /**
-     * @brief Offset into `MaterialPropertiesBuffer` for this material.
-     */
-    uint32 mMaterialPropertiesIndex = 0;
-
     bool mIsReady = false;
 };
 
@@ -118,12 +113,12 @@ private:
 class FxMaterialManager
 {
     // TODO: replace with a calculated material count
-    const uint32 MaxMaterials = 32;
+    const uint32 MaxMaterials = 64;
 
 public:
     static FxMaterialManager& GetGlobalManager();
 
-    void Create(uint32 materials_per_page=32);
+    void Create(uint32 materials_per_page=64);
     static FxRef<FxMaterial> New(const std::string& name, RxGraphicsPipeline* pipeline);
 
     static RxDescriptorPool& GetDescriptorPool()
@@ -147,6 +142,11 @@ public:
      */
     RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesBuffer;
     uint32 NumMaterialsInBuffer = 0;
+    
+    /**
+     * @brief Descriptor set for material properties. Used in the light pass.
+     */
+    RxDescriptorSet mMaterialPropertiesDS{};
 
 private:
     FxPagedArray<FxMaterial> mMaterials;

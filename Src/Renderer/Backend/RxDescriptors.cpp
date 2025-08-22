@@ -21,7 +21,7 @@ void RxDescriptorPool::Create(RxGpuDevice* device, uint32 max_sets)
     }
 }
 
-void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout)
+void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, uint32 count)
 {
     mDevice = pool.mDevice;
 
@@ -30,9 +30,11 @@ void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout
     alloc_info.descriptorPool = pool.Pool;
     alloc_info.descriptorSetCount = 1;
     alloc_info.pSetLayouts = &layout;
+    
+    VkResult result = vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set);
 
-    if (vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set) != VK_SUCCESS) {
-        FxPanic("DescriptorSet", "Failed to allocate descriptor set!", 0);
+    if (result != VK_SUCCESS) {
+        FxPanic("DescriptorSet", "Failed to allocate descriptor set!", result);
     }
 }
 
