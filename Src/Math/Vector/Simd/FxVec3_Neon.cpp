@@ -1,6 +1,6 @@
 #ifdef FX_USE_NEON
 
-#include <Math/Vec3.hpp>
+#include <Math/FxVec3.hpp>
 #include <arm_neon.h>
 
 const FxVec3f FxVec3f::Up = FxVec3f(0.0f, 1.0f, 0.0f);

@@ -2,7 +2,7 @@
 
 #include <Math/Util.hpp>
 
-#include <Math/Vec3.hpp>
+#include <Math/FxVec3.hpp>
 #include <Math/Mat4.hpp>
 
 class FxCamera

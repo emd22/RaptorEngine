@@ -1,7 +1,7 @@
 #ifdef FX_NO_SIMD
 
 #include <Core/FxDefines.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FxVec3.hpp>
 
 inline Vec3f::Vec3f(float32 x, float32 y, float32 z)
     : X(x), Y(y), Z(z)

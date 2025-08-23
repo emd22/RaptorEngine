@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Vec4.hpp"
-#include "Vec3.hpp"
+#include "FxVec4.hpp"
+#include "FxVec3.hpp"
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>

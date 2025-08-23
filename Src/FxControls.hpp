@@ -3,7 +3,7 @@
 #include <Core/FxSizedArray.hpp>
 #include <Core/Types.hpp>
 
-#include <Math/Vec2.hpp>
+#include <Math/FxVec2.hpp>
 
 #include <Util/FxKey.hpp>
 

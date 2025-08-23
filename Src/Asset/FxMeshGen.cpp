@@ -1,7 +1,7 @@
 #include "FxMeshGen.hpp"
 
-#include <Math/Vec2.hpp>
-#include <Math/Vec3.hpp>
+#include <Math/FxVec2.hpp>
+#include <Math/FxVec3.hpp>
 #include <unordered_map>
 
 #include <Renderer/FxPrimitiveMesh.hpp>

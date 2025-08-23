@@ -1,5 +1,5 @@
 #pragma once
 
-#include "Vec4.hpp"
-#include "Vec3.hpp"
-#include "Vec2.hpp"
+#include "FxVec4.hpp"
+#include "FxVec3.hpp"
+#include "FxVec2.hpp"

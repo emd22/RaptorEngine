@@ -43,6 +43,58 @@ public:
     }
 };
 
+/*
+template <typename TEnum>
+struct FxEnumFlags
+{
+    using FlagsType = std::underlying_type_t<TEnum>;
+
+public:
+    FxEnumFlags() = default;
+
+    ////////////////////////
+    // Unary Operators
+    ////////////////////////
+
+    constexpr FxEnumFlags operator ~ ()
+    {
+        return ~(Flags);
+    }
+
+    ////////////////////////
+    // Binary Operators
+    ////////////////////////
+
+    constexpr FxEnumFlags operator | (FxEnumFlags other) const
+    {
+        return (Flags | other.Flags);
+    }
+
+    constexpr FxEnumFlags operator & (FxEnumFlags other) const
+    {
+        return (Flags & other.Flags);
+    }
+
+    FxEnumFlags& operator |= (FxEnumFlags other)
+    {
+        Flags |= other.Flags;
+        return *this;
+    }
+
+    FxEnumFlags& operator &= (FxEnumFlags other)
+    {
+        Flags &= other.Flags;
+        return *this;
+    }
+
+public:
+    FlagsType Flags = 0;
+};
+
+*/
+
+
+
 
 /**
  * @brief Defines an enum class as a set of bitflags.
