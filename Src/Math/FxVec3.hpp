@@ -6,7 +6,8 @@
 #include <arm_neon.h>
 #endif
 
-class alignas(16) FxVec3f {
+class alignas(16) FxVec3f
+{
 public:
     static const FxVec3f Zero;
     static const FxVec3f One;
@@ -19,45 +20,45 @@ public:
 
     void Set(float32 x, float32 y, float32 z);
 
-    FxVec3f operator + (const FxVec3f &other) const;
-    FxVec3f operator - (const FxVec3f &other) const;
-    FxVec3f operator * (const FxVec3f &other) const;
+    FxVec3f operator+(const FxVec3f& other) const;
+    FxVec3f operator-(const FxVec3f& other) const;
+    FxVec3f operator*(const FxVec3f& other) const;
 
-    FxVec3f operator * (float32 scalar) const;
-    FxVec3f operator / (float32 scalar) const;
+    FxVec3f operator*(float32 scalar) const;
+    FxVec3f operator/(float32 scalar) const;
 
-    FxVec3f operator - () const;
+    FxVec3f operator-() const;
 
-    FxVec3f &operator += (const FxVec3f &other);
-    FxVec3f &operator -= (const FxVec3f &other);
-    FxVec3f &operator *= (const FxVec3f &other);
+    FxVec3f& operator+=(const FxVec3f& other);
+    FxVec3f& operator-=(const FxVec3f& other);
+    FxVec3f& operator*=(const FxVec3f& other);
 
-    static FxVec3f MulAdd(const FxVec3f &add_value, const FxVec3f &mul_a, const FxVec3f &mul_b);
+    static FxVec3f MulAdd(const FxVec3f& add_value, const FxVec3f& mul_a, const FxVec3f& mul_b);
 
     FX_FORCE_INLINE FxVec3f Normalize() const;
     FX_FORCE_INLINE void NormalizeIP();
 
     FX_FORCE_INLINE float32 Length() const;
-    FxVec3f Cross(const FxVec3f &other) const;
+    FxVec3f Cross(const FxVec3f& other) const;
+    FxVec3f CrossSlow(const FxVec3f& other) const;
 
-    float32 Dot(const FxVec3f &other) const;
+    float32 Dot(const FxVec3f& other) const;
 
 
     void Print() const;
 
 #ifdef FX_USE_NEON
-    explicit FxVec3f(float32x4_t intrin)
-        : mIntrin(intrin)
+    explicit FxVec3f(float32x4_t intrin) : mIntrin(intrin)
     {
     }
 
-    FxVec3f& operator = (const float32x4_t &other)
+    FxVec3f& operator=(const float32x4_t& other)
     {
         mIntrin = other;
         return *this;
     }
 
-    FxVec3f& operator = (const float32x4_t other)
+    FxVec3f& operator=(const float32x4_t other)
     {
         mIntrin = other;
         return *this;
@@ -71,15 +72,21 @@ public:
 
 public:
 #if defined(FX_USE_NEON)
-    union alignas(16) {
+    union alignas(16)
+    {
         float32x4_t mIntrin;
         float mData[4];
 
-        struct { float32 X, Y, Z, mPadding0; };
+        struct
+        {
+            float32 X, Y, Z, mPadding0;
+        };
     };
 
 #else
-    struct { float32 X, Y, Z; };
+    struct
+    {
+        float32 X, Y, Z;
+    };
 #endif
-
 };

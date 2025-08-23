@@ -308,23 +308,23 @@ int main()
 
         if (FxControlManager::IsMouseLocked()) {
             FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
-            mouse_delta.SetX(-0.001 * mouse_delta.GetX() * DeltaTime);
-            mouse_delta.SetY(0.001 * mouse_delta.GetY() * DeltaTime);
+            mouse_delta.SetX(DeltaTime * mouse_delta.GetX() * -0.001);
+            mouse_delta.SetY(DeltaTime * mouse_delta.GetY() * 0.001);
 
             camera.Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         }
 
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            camera.Move(FxVec3f(0.0f, 0.0f, 0.01f * DeltaTime));
+            camera.Move(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            camera.Move(FxVec3f(0.0f, 0.0f, -0.01f * DeltaTime));
+            camera.Move(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-            camera.Move(FxVec3f(0.01f * DeltaTime, 0.0f, 0.0f));
+            camera.Move(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-            camera.Move(FxVec3f(-0.01f * DeltaTime, 0.0f, 0.0f));
+            camera.Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
