@@ -54,7 +54,7 @@ private:
 class RxDescriptorSet
 {
 public:
-    void Create(const RxDescriptorPool &pool, VkDescriptorSetLayout layout);
+    void Create(const RxDescriptorPool &pool, VkDescriptorSetLayout layout, uint32 count = 1);
 
     // template <typename T>
     // void WriteBuffer(VkBuffer& buffer)
@@ -92,7 +92,7 @@ public:
         // mDescriptorWrites.Clear();
     }
 
-    static void BindMultiple(
+    static inline void BindMultiple(
         const RxCommandBuffer& cmd,
         VkPipelineBindPoint bind_point,
         const RxGraphicsPipeline& pipeline,
@@ -100,6 +100,25 @@ public:
         uint32 sets_count)
     {
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets_count, sets, 0, nullptr);
+    }
+    
+    static inline void BindMultiple(
+        const RxCommandBuffer& cmd,
+        VkPipelineBindPoint bind_point,
+        const RxGraphicsPipeline& pipeline,
+        const FxSlice<VkDescriptorSet>& sets)
+    {
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets.Size, sets.Ptr, 0, nullptr);
+    }
+    
+    static inline void BindMultipleOffset(
+        const RxCommandBuffer& cmd,
+        VkPipelineBindPoint bind_point,
+        const RxGraphicsPipeline& pipeline,
+        const FxSlice<VkDescriptorSet>& sets,
+        const FxSlice<uint32>& offsets)
+    {
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets.Size, sets.Ptr, offsets.Size, offsets.Ptr);
     }
 
     void Bind(const RxCommandBuffer &cmd, VkPipelineBindPoint bind_point, const RxGraphicsPipeline &pipeline) const

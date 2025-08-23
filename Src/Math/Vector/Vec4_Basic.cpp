@@ -1,7 +1,7 @@
 #ifdef FX_NO_SIMD
 
 #include <Core/FxDefines.hpp>
-#include <Math/Vec4.hpp>
+#include <Math/FxVec4.hpp>
 
 Vec4f::Vec4f(float32 x, float32 y, float32 z, float32 w)
     : X(x), Y(y), Z(z), W(w)

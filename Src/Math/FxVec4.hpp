@@ -9,6 +9,10 @@
 class alignas(16) FxVec4f
 {
 public:
+    static const FxVec4f Zero;
+    static const FxVec4f One;
+
+public:
     friend class FxMat4f;
 
     FxVec4f() = default;
@@ -17,26 +21,23 @@ public:
 
     explicit FxVec4f(float32 scalar);
 
-    FxVec4f operator + (const FxVec4f &other) const;
-    FxVec4f operator * (const FxVec4f &other) const;
+    void Set(float32 x, float32 y, float32 z, float32 w);
 
-    FxVec4f &operator += (const FxVec4f &other);
-    FxVec4f &operator -= (const FxVec4f &other);
-    FxVec4f &operator *= (const FxVec4f &other);
+    FxVec4f operator + (const FxVec4f& other) const;
+    FxVec4f operator - (const FxVec4f& other) const;
+    FxVec4f operator * (const FxVec4f& other) const;
+    FxVec4f operator / (const FxVec4f& other) const;
 
-    FxVec4f &operator = (const FxVec4f &other);
+    FxVec4f operator * (float32 scalar) const;
+    FxVec4f operator / (float32 scalar) const;
 
-    static FxVec4f MulAdd(const FxVec4f &add_value, const FxVec4f &mul_a, const FxVec4f &mul_b);
+    FxVec4f operator - () const;
 
-    float32 GetX() const;
-    float32 GetY() const;
-    float32 GetZ() const;
-    float32 GetW() const;
+    FxVec4f &operator += (const FxVec4f& other);
+    FxVec4f &operator -= (const FxVec4f& other);
+    FxVec4f &operator *= (const FxVec4f& other);
 
-    void SetX(float32 x);
-    void SetY(float32 y);
-    void SetZ(float32 z);
-    void SetW(float32 w);
+    FxVec4f &operator = (const FxVec4f& other);
 
     /**
      * Loads 4 values into the vector.
@@ -53,18 +54,13 @@ public:
      */
     void Load1(float32 scalar);
 
-    static const FxVec4f Zero()
-    {
-        return FxVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-    };
-
 #ifdef FX_USE_NEON
     explicit FxVec4f(float32x4_t intrin)
         : mIntrin(intrin)
     {
     }
 
-    FxVec4f &operator = (const float32x4_t &other)
+    FxVec4f &operator = (const float32x4_t& other)
     {
         mIntrin = other;
         return *this;

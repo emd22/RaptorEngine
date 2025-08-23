@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "Math/Vec2.hpp"
+#include "Math/FxVec2.hpp"
 #include "RxPipeline.hpp"
 
 #include <Core/FxSizedArray.hpp>

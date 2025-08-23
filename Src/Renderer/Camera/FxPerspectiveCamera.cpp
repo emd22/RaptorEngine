@@ -24,14 +24,14 @@ void FxPerspectiveCamera::UpdateProjectionMatrix()
            0,    0,  -1,   0
     */
 
-    ProjectionMatrix.Columns[0].SetX(Sa);
-    ProjectionMatrix.Columns[1].SetY(-Sv);
+    ProjectionMatrix.Columns[0].X = (Sa);
+    ProjectionMatrix.Columns[1].Y = (-Sv);
 
-    ProjectionMatrix.Columns[2].SetZ(a);
-    ProjectionMatrix.Columns[2].SetW(-1);
+    ProjectionMatrix.Columns[2].Z = (a);
+    ProjectionMatrix.Columns[2].W = (-1);
 
-    ProjectionMatrix.Columns[3].SetZ(b);
-    ProjectionMatrix.Columns[3].SetW(0);
+    ProjectionMatrix.Columns[3].Z = (b);
+    ProjectionMatrix.Columns[3].W = (0);
 
     ProjectionMatrix.Print();
 }

@@ -31,6 +31,8 @@ FxRef<FxEntity> FxEntityManager::New()
 
 void FxOldSceneObject::Render(const FxCamera& camera)
 {
+    assert(false);
+    
     RxFrameData* frame = Renderer->GetFrame();
 
     if (!mMaterial) {
@@ -42,7 +44,7 @@ void FxOldSceneObject::Render(const FxCamera& camera)
     }
 
     VkDescriptorSet sets_to_bind[] = {
-        Renderer->CurrentGPass->DescriptorSet.Set,
+//        Renderer->CurrentGPass->DescriptorSet.Set,
         mMaterial->mDescriptorSet.Set
     };
 

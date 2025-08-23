@@ -10,7 +10,7 @@
 #include "RxDevice.hpp"
 #include "RxCommands.hpp"
 
-#include <Math/Vec2.hpp>
+#include <Math/FxVec2.hpp>
 
 class RxImage
 {

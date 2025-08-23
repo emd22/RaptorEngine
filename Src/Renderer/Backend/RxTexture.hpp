@@ -13,7 +13,7 @@
 // #include "Fwd/Fwd_AddToDeletionQueue.hpp"
 #include "Fwd/Fwd_GetDevice.hpp"
 
-#include <Math/Vec2.hpp>
+#include <Math/FxVec2.hpp>
 #include <Core/FxRef.hpp>
 
 #include <assert.h>

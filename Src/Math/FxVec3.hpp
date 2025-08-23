@@ -6,7 +6,12 @@
 #include <arm_neon.h>
 #endif
 
-class FxVec3f {
+class alignas(16) FxVec3f {
+public:
+    static const FxVec3f Zero;
+    static const FxVec3f One;
+    static const FxVec3f Up;
+
 public:
     FxVec3f() = default;
     FxVec3f(float32 x, float32 y, float32 z);
@@ -17,6 +22,7 @@ public:
     FxVec3f operator + (const FxVec3f &other) const;
     FxVec3f operator - (const FxVec3f &other) const;
     FxVec3f operator * (const FxVec3f &other) const;
+
     FxVec3f operator * (float32 scalar) const;
     FxVec3f operator / (float32 scalar) const;
 
@@ -36,9 +42,6 @@ public:
 
     float32 Dot(const FxVec3f &other) const;
 
-    static const FxVec3f Zero;
-    static const FxVec3f One;
-    static const FxVec3f Up;
 
     void Print() const;
 

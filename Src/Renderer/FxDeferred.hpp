@@ -131,7 +131,7 @@ public:
     RxFramebuffer Framebuffer;
 
     RxDescriptorPool DescriptorPool;
-    RxDescriptorSet DescriptorSet;
+//    RxDescriptorSet DescriptorSet;
 
     RxRawGpuBuffer<RxUniformBufferObject> UniformBuffer;
 
