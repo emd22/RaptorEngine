@@ -1,13 +1,13 @@
 
 #include "RxPipeline.hpp"
+
 #include "Core/FxDefines.hpp"
 #include "RxCommands.hpp"
 
-#include <Core/Log.hpp>
 #include <Core/FxPanic.hpp>
-
+#include <Core/Log.hpp>
 #include <Renderer/Renderer.hpp>
-#include <Renderer/FxDeferred.hpp>
+#include <Renderer/RxDeferred.hpp>
 
 FX_SET_MODULE_NAME("Pipeline")
 
@@ -49,16 +49,10 @@ FxVertexInfo FxMakeLightVertexInfo()
     return { binding_desc, std::move(attribs) };
 }
 
-void RxGraphicsPipeline::Create(
-    const std::string& name,
-    ShaderList shader_list,
-    VkPipelineLayout layout,
-    const FxSlice<VkAttachmentDescription>& attachments,
-    const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-    FxVertexInfo* vertex_info,
-    VkCullModeFlags cull_mode,
-    bool winding_is_ccw
-)
+void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list, VkPipelineLayout layout,
+                                const FxSlice<VkAttachmentDescription>& attachments,
+                                const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, FxVertexInfo* vertex_info,
+                                VkCullModeFlags cull_mode, bool winding_is_ccw)
 {
     mDevice = Renderer->GetDevice();
     Layout = layout;
@@ -98,10 +92,7 @@ void RxGraphicsPipeline::Create(
     }
 
     // Dynamic states (scissor & viewport updates dynamically)
-    FxSizedArray<VkDynamicState> dynamic_states = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
+    FxSizedArray<VkDynamicState> dynamic_states = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
     VkPipelineDynamicStateCreateInfo dynamic_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -121,8 +112,8 @@ void RxGraphicsPipeline::Create(
     };
 
     VkRect2D scissor = {
-        .offset = {0, 0},
-        .extent = {.width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
+        .offset = { 0, 0 },
+        .extent = { .width = (uint32)extent.Width(), .height = (uint32)extent.Height() },
     };
 
     VkPipelineViewportStateCreateInfo viewport_state_info = {
@@ -135,9 +126,7 @@ void RxGraphicsPipeline::Create(
 
 
     // Vertex info + input info
-    VkPipelineVertexInputStateCreateInfo vertex_input_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
-    };
+    VkPipelineVertexInputStateCreateInfo vertex_input_info { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
     if (vertex_info != nullptr) {
         vertex_input_info.vertexBindingDescriptionCount = 1;
@@ -169,8 +158,6 @@ void RxGraphicsPipeline::Create(
         .sampleShadingEnable = VK_FALSE,
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
     };
-
-
 
 
     VkPipelineColorBlendStateCreateInfo color_blend_info {
@@ -223,7 +210,8 @@ void RxGraphicsPipeline::Create(
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 }
 
-// void RxGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp) {
+// void RxGraphicsPipeline::CreateComp(ShaderList shader_list, VkPipelineLayout layout, const FxSlice<VkPipelineColorBlendAttachmentState>&
+// color_blend_attachments, bool is_comp) {
 //     mDevice = Renderer->GetDevice();
 //     Layout = layout;
 
@@ -386,7 +374,8 @@ void RxGraphicsPipeline::Create(
 //     printf("Create pipeline %p\n", Pipeline);
 // }
 
-void RxGraphicsPipeline::Bind(RxCommandBuffer &command_buffer) {
+void RxGraphicsPipeline::Bind(RxCommandBuffer& command_buffer)
+{
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }
 
@@ -416,11 +405,8 @@ void RxGraphicsPipeline::Destroy()
 }
 
 
-VkPipelineLayout RxGraphicsPipeline::CreateLayout(
-    uint32 vert_push_consts_size,
-    uint32 frag_push_consts_size,
-    const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts
-)
+VkPipelineLayout RxGraphicsPipeline::CreateLayout(uint32 vert_push_consts_size, uint32 frag_push_consts_size,
+                                                  const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
     if (mDevice == nullptr) {
         mDevice = Renderer->GetDevice();
@@ -445,14 +431,12 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(
         ++pc_ranges_count;
     }
 
-    VkPipelineLayoutCreateInfo create_info{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = descriptor_set_layouts.Size,
-        .pSetLayouts = descriptor_set_layouts.Ptr,
+    VkPipelineLayoutCreateInfo create_info { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                                             .setLayoutCount = descriptor_set_layouts.Size,
+                                             .pSetLayouts = descriptor_set_layouts.Ptr,
 
-        .pushConstantRangeCount = pc_ranges_count,
-        .pPushConstantRanges = pc_ranges
-    };
+                                             .pushConstantRangeCount = pc_ranges_count,
+                                             .pPushConstantRanges = pc_ranges };
 
     VkPipelineLayout layout;
     VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &layout);

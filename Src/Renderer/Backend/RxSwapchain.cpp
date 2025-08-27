@@ -1,17 +1,17 @@
 #include "RxSwapchain.hpp"
-#include "RxDevice.hpp"
+
 #include "../Renderer.hpp"
-
-#include <Core/FxDefines.hpp>
-#include <Core/FxPanic.hpp>
-
-#include <Renderer/FxDeferred.hpp>
+#include "RxDevice.hpp"
 
 #include <vulkan/vulkan.h>
 
+#include <Core/FxDefines.hpp>
+#include <Core/FxPanic.hpp>
+#include <Renderer/RxDeferred.hpp>
+
 FX_SET_MODULE_NAME("RxSwapchain")
 
-void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR &surface, RxGpuDevice *device)
+void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device)
 {
     AssertRendererExists();
 
@@ -77,7 +77,7 @@ void RxSwapchain::CreateImageViews()
     }
 }
 
-void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface)
+void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
 {
     Extent = size;
 
@@ -158,8 +158,6 @@ void RxSwapchain::CreateSwapchainFramebuffers()
     LightsSampler.Create();
 
     // mCompPipeline = comp_pipeline;
-
-
 }
 
 void RxSwapchain::DestroyFramebuffersAndImageViews()

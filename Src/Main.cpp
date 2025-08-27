@@ -29,10 +29,10 @@
 #include <Asset/FxMeshGen.hpp>
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
-#include <Renderer/FxDeferred.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/FxWindow.hpp>
 #include <Renderer/Renderer.hpp>
+#include <Renderer/RxDeferred.hpp>
 #include <csignal>
 
 FX_SET_MODULE_NAME("Main")
@@ -179,7 +179,7 @@ int main()
 
     FxRef<FxWindow> window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
 
-    FxRenderBackend renderer_state;
+    RxRenderBackend renderer_state;
     SetRendererBackend(&renderer_state);
 
     Renderer->SelectWindow(window);
@@ -189,7 +189,7 @@ int main()
 
     // Renderer->OffscreenSemaphore.Create(Renderer->GetDevice());
 
-    FxRef<FxDeferredRenderer> deferred_renderer = FxMakeRef<FxDeferredRenderer>();
+    FxRef<RxDeferredRenderer> deferred_renderer = FxMakeRef<RxDeferredRenderer>();
     deferred_renderer->Create(Renderer->Swapchain.Extent);
     Renderer->DeferredRenderer = deferred_renderer;
 
@@ -234,6 +234,8 @@ int main()
     //    }
 
     FxRef<FxObject> mallard_object = FxAssetManager::LoadObject("../models/Mallard.glb");
+
+    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Cubemap, "../Textures/TestCubemap.png");
 
 
     ground_object->MoveBy(FxVec3f(0, -1, 0));
@@ -344,7 +346,7 @@ int main()
         //        helmet_object.RotateY(0.001 * DeltaTime);
 
 
-        if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
+        if (Renderer->BeginFrame(*deferred_renderer) != RxFrameResult::Success) {
             continue;
         }
 
@@ -363,7 +365,6 @@ int main()
         mallard_object->Render(camera);
 
         Renderer->BeginLighting();
-
 
         if (second_light_on) {
             light2.MoveTo(camera.Position);
