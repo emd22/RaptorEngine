@@ -2,8 +2,8 @@
 
 #include <Renderer/FxRenderBackend.hpp>
 
-void SetRendererBackend(FxRenderBackend *backend);
+void SetRendererBackend(FxRenderBackend* backend);
 
 void AssertRendererExists();
 
-extern FxRenderBackend *Renderer;
+extern FxRenderBackend* Renderer;

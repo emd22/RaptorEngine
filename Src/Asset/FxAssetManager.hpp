@@ -1,18 +1,15 @@
 #pragma once
 
-#include "Asset/FxAssetQueueItem.hpp"
 #include "Asset/FxAssetQueue.hpp"
-
-#include "FxObject.hpp"
+#include "Asset/FxAssetQueueItem.hpp"
 #include "FxAssetImage.hpp"
-
-#include <Core/Types.hpp>
-#include <Core/FxRef.hpp>
-
-#include <atomic>
-#include <thread>
+#include "FxObject.hpp"
 
 #include <Core/FxDataNotifier.hpp>
+#include <Core/FxRef.hpp>
+#include <Core/Types.hpp>
+#include <atomic>
+#include <thread>
 
 template <typename T>
 concept C_IsAsset = std::is_base_of_v<FxAssetBase, T>;
@@ -27,7 +24,7 @@ public:
 
     void Create();
 
-    void SubmitItemToLoad(const FxAssetQueueItem &item)
+    void SubmitItemToLoad(const FxAssetQueueItem& item)
     {
         // Wait for item to no longer be busy
         while (IsBusy.test()) {
@@ -66,50 +63,111 @@ public:
 
     void WorkerUpdate();
 
-    static FxAssetManager &GetInstance();
+    static FxAssetManager& GetInstance();
 
-    template <typename T> requires C_IsAsset<T>
+    template <typename T>
+        requires C_IsAsset<T>
     static FxRef<T> NewAsset()
     {
-        // return PtrContainer<T>::New();
         return FxRef<T>::New();
     }
 
-    template <typename T> requires C_IsAsset<T>
-    static FxRef<T> LoadAsset(const std::string& path)
+
+    ////////////////////////////////////////////////
+    // Methods to create and load objects
+    ////////////////////////////////////////////////
+
+
+    /**
+     * @brief Creates a new `FxObject` and loads the provided asset into it from
+     * the path provided.
+     */
+    static FxRef<FxObject> LoadObject(const std::string& path)
     {
-        FxRef<T> asset = FxRef<T>::New();
-        LoadAsset<T>(asset, path);
+        FxRef<FxObject> asset = FxRef<FxObject>::New();
+        LoadObject(asset, path);
 
         return asset;
     }
 
-    template <typename T> requires C_IsAsset<T>
-    static FxRef<T> LoadFromMemory(const uint8* data, uint32 data_size)
+    /**
+     * @brief Creates a new `FxObject` and loads the asset into it from
+     * the data provided.
+     */
+    static FxRef<FxObject> LoadObjectFromMemory(const uint8* data, uint32 data_size)
     {
-        FxRef<T> asset = FxRef<T>::New();
-        LoadFromMemory<T>(asset, data, data_size);
+        FxRef<FxObject> asset = FxRef<FxObject>::New();
+        LoadObjectFromMemory(asset, data, data_size);
 
         return asset;
     }
 
-
-    // Specializations in cpp file
-    template <typename T> requires C_IsAsset<T>
-    static void LoadAsset(FxRef<T> asset, const std::string& path)
+    static FxRef<FxAssetImage> LoadImage(RxImageType image_type, const std::string& path)
     {
-        if constexpr (!std::is_same<T, FxAssetImage>::value && !std::is_same<T, FxObject>::value) {
-            static_assert(0, "Asset type is not implemented!");
-        }
+        FxRef<FxAssetImage> asset = FxRef<FxAssetImage>::New();
+        LoadImage(image_type, asset, path);
+
+        return asset;
     }
 
-    template <typename T> requires C_IsAsset<T>
-    static void LoadFromMemory(FxRef<T> asset, const uint8* data, uint32 data_size)
+    static inline FxRef<FxAssetImage> LoadImage(const std::string& path)
     {
-        if constexpr (!std::is_same<T, FxAssetImage>::value && !std::is_same<T, FxObject>::value) {
-            static_assert(0, "Asset type is not implemented!");
-        }
+        return LoadImage(RxImageType::Image2D, path);
     }
+
+    /**
+     * @brief Creates a new `FxObject` and loads the asset into it from
+     * the data provided.
+     */
+    static FxRef<FxAssetImage> LoadImageFromMemory(RxImageType image_type, const uint8* data, uint32 data_size)
+    {
+        FxRef<FxAssetImage> asset = FxRef<FxAssetImage>::New();
+        LoadImageFromMemory(image_type, asset, data, data_size);
+
+        return asset;
+    }
+
+    static inline FxRef<FxAssetImage> LoadImageFromMemory(const uint8* data, uint32 data_size)
+    {
+        return LoadImageFromMemory(RxImageType::Image2D, data, data_size);
+    }
+
+
+    ////////////////////////////////////////////////
+    // Methods to load into existing containers
+    ////////////////////////////////////////////////
+
+    /**
+     * @brief Loads an object into the provided asset from a path.
+     */
+    static void LoadObject(FxRef<FxObject>& asset, const std::string& path);
+
+    /**
+     * @brief Loads an asset into the provided asset from the provided data.
+     */
+    static void LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size);
+
+    static void LoadImage(RxImageType image_type, FxRef<FxAssetImage>& asset, const std::string& path);
+
+    /**
+     * @brief Loads an Image2D from the path provided into `asset`.
+     */
+    static inline void LoadImage(FxRef<FxAssetImage>& asset, const std::string& path)
+    {
+        return LoadImage(RxImageType::Image2D, asset, path);
+    }
+
+
+    static void LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size);
+
+    /**
+     * @brief Loads an Image2D from the data provided into `asset`.
+     */
+    static void LoadImageFromMemory(FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size)
+    {
+        return LoadImageFromMemory(RxImageType::Image2D, asset, data, data_size);
+    }
+
 
     ~FxAssetManager()
     {
@@ -117,7 +175,7 @@ public:
     }
 
 private:
-    FxAssetWorker *FindWorkerThread();
+    FxAssetWorker* FindWorkerThread();
 
     void CheckForUploadableData();
     void CheckForItemsToLoad();
@@ -126,58 +184,35 @@ private:
 
     void AssetManagerUpdate();
 
-    template <typename AssetType, typename LoaderType, FxAssetType EnumValue> requires C_IsAsset<AssetType>
-    static void DoLoadAsset(const FxRef<AssetType>& asset, const std::string& path)
+    template <typename AssetType, typename LoaderType, FxAssetType EnumValue>
+        requires C_IsAsset<AssetType>
+    static void SubmitAssetToLoad(const FxRef<AssetType>& asset, FxRef<LoaderType>& loader, const std::string& path, const uint8* data = nullptr,
+                                  uint32 data_size = 0)
     {
         if (asset->IsUploadedToGpu) {
             printf("*** DELETING ***\n");
             asset->Destroy();
         }
 
-        FxRef<LoaderType> loader = FxRef<LoaderType>::New();
-
-        FxAssetQueueItem queue_item(
-            (loader),
-            asset,
-            EnumValue,
-            path
-        );
+        // FxRef<LoaderType> loader = FxRef<LoaderType>::New();
 
         FxAssetManager& mgr = GetInstance();
 
-        mgr.mLoadQueue.Push(queue_item);
-
-        mgr.ItemsEnqueued.test_and_set();
-        mgr.ItemsEnqueuedNotifier.SignalDataWritten();
-    }
-
-    template <typename AssetType, typename LoaderType, FxAssetType EnumValue> requires C_IsAsset<AssetType>
-    static void DoLoadFromMemory(const FxRef<AssetType>& asset, const uint8* data, uint32 data_size)
-    {
-        if (asset->IsUploadedToGpu) {
-            asset->Destroy();
+        if (data != nullptr) {
+            FxAssetQueueItem queue_item((loader), asset, EnumValue, data, data_size);
+            mgr.mLoadQueue.Push(queue_item);
         }
-
-        FxRef<LoaderType> loader = FxRef<LoaderType>::New();
-
-        FxAssetQueueItem queue_item(
-            (loader),
-            asset,
-            EnumValue,
-            data,
-            data_size
-        );
-
-        FxAssetManager& mgr = GetInstance();
-
-        mgr.mLoadQueue.Push(queue_item);
+        else {
+            FxAssetQueueItem queue_item((loader), asset, EnumValue, path);
+            mgr.mLoadQueue.Push(queue_item);
+        }
 
         mgr.ItemsEnqueued.test_and_set();
         mgr.ItemsEnqueuedNotifier.SignalDataWritten();
     }
 
 public:
-//    FxDataNotifier DataLoaded;
+    //    FxDataNotifier DataLoaded;
 private:
     FxAssetQueue mLoadQueue;
 
@@ -189,5 +224,5 @@ private:
     int32 mThreadCount = 2;
     // FxSizedArray<std::thread *> mWorkerThreads;
     FxSizedArray<FxAssetWorker> mWorkerThreads;
-    std::thread *mAssetManagerThread;
+    std::thread* mAssetManagerThread;
 };

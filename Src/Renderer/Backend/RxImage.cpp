@@ -1,19 +1,38 @@
 
 #include "RxImage.hpp"
 
-#include <Core/FxPanic.hpp>
-#include <Core/FxDefines.hpp>
-
-#include "../Renderer.hpp"
 #include "../FxRenderBackend.hpp"
+#include "../Renderer.hpp"
+
+#include <Core/FxDefines.hpp>
+#include <Core/FxPanic.hpp>
 
 FX_SET_MODULE_NAME("RxImage")
 
+const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
+{
+    RxImageTypeProperties props {};
+
+    if (image_type == RxImageType::Image2D) {
+        props.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+        props.LayerCount = 1;
+    }
+    else if (image_type == RxImageType::Cubemap) {
+        props.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        props.LayerCount = 6;
+    }
+    else {
+        Log::Error("Unknown image type!", 0);
+    }
+
+    return props;
+}
+
 RxGpuDevice* RxImage::GetDevice()
 {
-    // If the device has not been created with `::Create` then mDevice will not be set.
-    // I think this would be fine, there should probably be a `::Build` or `::Create` method that
-    // does this instead though.
+    // If the device has not been created with `::Create` then mDevice will not be
+    // set. I think this would be fine, there should probably be a `::Build` or
+    // `::Create` method that does this instead though.
 
     if (mDevice == nullptr) {
         mDevice = Renderer->GetDevice();
@@ -22,13 +41,8 @@ RxGpuDevice* RxImage::GetDevice()
     return mDevice;
 }
 
-void RxImage::Create(
-    FxVec2u size,
-    VkFormat format,
-    VkImageTiling tiling,
-    VkImageUsageFlags usage,
-    VkImageAspectFlags aspect_flags
-)
+void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+                     VkImageAspectFlags aspect_flags)
 {
     Size = size;
     Format = format;
@@ -39,7 +53,7 @@ void RxImage::Create(
     }
 
     // Create the vulkan image
-    VkImageCreateInfo image_info{
+    VkImageCreateInfo image_info {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .imageType = VK_IMAGE_TYPE_2D,
 
@@ -58,7 +72,7 @@ void RxImage::Create(
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
 
-    VmaAllocationCreateInfo create_info{
+    VmaAllocationCreateInfo create_info {
         .usage = VMA_MEMORY_USAGE_AUTO,
         .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
         .priority = 1.0f,
@@ -69,24 +83,29 @@ void RxImage::Create(
         FxModulePanic("Could not create vulkan image", status);
     }
 
+    // Get the vulkan values for the image type
+    RxImageTypeProperties image_type_props = RxImageTypeGetProperties(image_type);
+
     const VkImageViewCreateInfo view_create_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = Image,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .viewType = image_type_props.ViewType,
         .format = format,
-        .components = {
-            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-        },
-        .subresourceRange = {
-            .aspectMask = aspect_flags,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        }
+        .components =
+            {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+        .subresourceRange =
+            {
+                .aspectMask = aspect_flags,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = image_type_props.LayerCount,
+            },
     };
 
     status = vkCreateImageView(GetDevice()->Device, &view_create_info, nullptr, &View);
@@ -95,10 +114,16 @@ void RxImage::Create(
     }
 }
 
-void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer &cmd)
+void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect_flags)
+{
+    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect_flags);
+}
+
+void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd)
 {
     VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    VkImageMemoryBarrier barrier{
+
+    VkImageMemoryBarrier barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .oldLayout = ImageLayout,
         .newLayout = new_layout,
@@ -107,15 +132,15 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer &cmd)
         .image = Image,
         .srcAccessMask = (mIsDepthTexture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .subresourceRange = {
-            .aspectMask = (mIsDepthTexture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1,
-        }
+        .subresourceRange =
+            {
+                .aspectMask = (mIsDepthTexture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
     };
-
 
     VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
@@ -167,7 +192,8 @@ void RxImage::Destroy()
     //     printf("Destroy image!!\n");
 
     //     vkDestroyImageView(this->mDevice->Device, this->View, nullptr);
-    //     vmaDestroyImage(RendererVulkan->GpuAllocator, this->Image, this->Allocation);
+    //     vmaDestroyImage(RendererVulkan->GpuAllocator, this->Image,
+    //     this->Allocation);
 
     //     this->Image = nullptr;
     //     this->Allocation = nullptr;

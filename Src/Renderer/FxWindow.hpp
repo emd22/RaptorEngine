@@ -1,14 +1,14 @@
 #pragma once
 
-#include <Core/FxPanic.hpp>
-#include <Core/Types.hpp>
-
 #include <SDL3/SDL.h>
+
+#include <Core/FxPanic.hpp>
+#include <Core/FxRef.hpp>
+#include <Core/Types.hpp>
 #include <memory>
 
-#include <Core/FxRef.hpp>
-
-class FxWindow {
+class FxWindow
+{
 public:
     FxWindow() = default;
 
@@ -17,7 +17,7 @@ public:
         Create(title, width, height);
     }
 
-    void Create(const char *title, int32 width, int32 height)
+    void Create(const char* title, int32 width, int32 height)
     {
         const uint64 window_flags = SDL_WINDOW_VULKAN;
 
@@ -33,7 +33,10 @@ public:
         return FxRef<FxWindow>::New(title, width, height);
     }
 
-    SDL_Window *GetWindow() { return mWindow; }
+    SDL_Window* GetWindow()
+    {
+        return mWindow;
+    }
 
     ~FxWindow()
     {
@@ -41,5 +44,5 @@ public:
     }
 
 private:
-    SDL_Window *mWindow;
+    SDL_Window* mWindow;
 };

@@ -1,14 +1,15 @@
 #pragma once
 
 #include "Core/FxSizedArray.hpp"
-#include <Core/Types.hpp>
-
-#include <cstdint>
-#include <vector>
 
 #include <vulkan/vulkan.h>
 
-class RxQueueFamilies {
+#include <Core/Types.hpp>
+#include <cstdint>
+#include <vector>
+
+class RxQueueFamilies
+{
 public:
     static const uint32 QueueNull = UINT32_MAX;
 
@@ -17,9 +18,7 @@ public:
     /// Checks if the main graphics and presentation queues have been queried
     bool IsComplete()
     {
-        return (mGraphicsIndex != QueueNull
-             && mPresentIndex != QueueNull
-             && mTransferIndex != QueueNull);
+        return (mGraphicsIndex != QueueNull && mPresentIndex != QueueNull && mTransferIndex != QueueNull);
     }
 
     /// Retrieves the available queue indices
@@ -33,9 +32,18 @@ public:
         });
     }
 
-    uint32 GetGraphicsFamily() { return mGraphicsIndex; }
-    uint32 GetPresentFamily() { return mPresentIndex; }
-    uint32 GetTransferFamily() { return mTransferIndex; }
+    uint32 GetGraphicsFamily()
+    {
+        return mGraphicsIndex;
+    }
+    uint32 GetPresentFamily()
+    {
+        return mPresentIndex;
+    }
+    uint32 GetTransferFamily()
+    {
+        return mTransferIndex;
+    }
 
 private:
     void FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
@@ -45,13 +53,15 @@ private:
 
 public:
     FxSizedArray<VkQueueFamilyProperties> RawFamilies;
+
 private:
     uint32 mGraphicsIndex = QueueNull;
     uint32 mPresentIndex = QueueNull;
     uint32 mTransferIndex = QueueNull;
 };
 
-class RxGpuDevice {
+class RxGpuDevice
+{
 public:
     RxGpuDevice() = default;
     RxGpuDevice(VkInstance instance, VkSurfaceKHR surface)
@@ -69,11 +79,17 @@ public:
 
     VkSurfaceFormatKHR GetBestSurfaceFormat();
 
-    operator VkDevice () const { return Device; }
-    operator VkPhysicalDevice () const { return Physical; }
+    operator VkDevice() const
+    {
+        return Device;
+    }
+    operator VkPhysicalDevice() const
+    {
+        return Physical;
+    }
 
 private:
-    bool IsPhysicalDeviceSuitable(VkPhysicalDevice &device);
+    bool IsPhysicalDeviceSuitable(VkPhysicalDevice& device);
     void QueryQueues();
 
 public:

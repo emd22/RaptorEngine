@@ -1,13 +1,13 @@
 #include "FxLoaderGltf.hpp"
+
 #include "Asset/FxAssetBase.hpp"
 #include "Renderer/FxPrimitiveMesh.hpp"
 
 #include <ThirdParty/cgltf.h>
 
-#include <Asset/FxAssetModel.hpp>
-#include <FxObject.hpp>
-
+// #include <Asset/FxAssetModel.hpp>
 #include <Core/FxRef.hpp>
+#include <FxObject.hpp>
 
 FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
 
@@ -18,7 +18,7 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
     FxSizedArray<float32> uvs;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
-        auto *attribute = &primitive->attributes[i];
+        auto* attribute = &primitive->attributes[i];
 
 
         if (attribute->type == cgltf_attribute_type_position) {
@@ -51,7 +51,7 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
     mesh->IsReady = true;
 }
 
-//void CreateMaterialFromGltfMesh(FxRef<FxObject>& object, cgltf_material* gltf_material)
+// void CreateMaterialFromGltfMesh(FxRef<FxObject>& object, cgltf_material* gltf_material)
 //{
 ////    cgltf_material* gltf_material = primitive->material;
 //    if (!gltf_material) {
@@ -67,12 +67,12 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
 //    object->Material = material;
 //}
 
-//void FxLoaderGltf::LoadAttachedMaterials()
+// void FxLoaderGltf::LoadAttachedMaterials()
 //{
-//    for (FxGltfMaterialToLoad& to_load : MaterialsToLoad) {
-//        CreateMaterialFromGltfMesh(to_load.Object, mGltfData->meshes[to_load.MeshIndex].primitives[to_load.PrimitiveIndex].material);
-//    }
-//}
+//     for (FxGltfMaterialToLoad& to_load : MaterialsToLoad) {
+//         CreateMaterialFromGltfMesh(to_load.Object, mGltfData->meshes[to_load.MeshIndex].primitives[to_load.PrimitiveIndex].material);
+//     }
+// }
 
 void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent& component, cgltf_texture_view& texture_view)
 {
@@ -95,7 +95,7 @@ void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMater
     FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
 
     component.Texture = FxMakeRef<FxAssetImage>();
-    component.Texture->Texture.Create(image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
+    component.Texture->Texture.Create(RxImageType::Image2D, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
     component.Texture->IsFinishedNotifier.SignalDataWritten();
     component.Texture->IsUploadedToGpu = true;
     component.Texture->IsUploadedToGpu.notify_all();
@@ -116,7 +116,7 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
         cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
-        
+
         if (!texture_view.texture) {
             MakeEmptyMaterialTexture(material, material->DiffuseTexture);
             material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
@@ -125,19 +125,16 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
             MakeMaterialTextureForPrimitive(material, material->DiffuseTexture, texture_view);
             material->Properties.BaseColor = FxColorFromRGBA(1, 1, 1, 1);
         }
-        
-        
     }
     // There is no albedo texture on the model, use the base colour.
     else {
-        
         material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
     }
 
     object->Material = material;
 }
 
-void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mesh, int mesh_index)
+void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index)
 {
     const bool has_multiple_primitives = gltf_mesh->primitives_count > 1;
 
@@ -161,12 +158,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mes
         if (primitive->indices != nullptr) {
             indices.InitSize(primitive->indices->count);
 
-            cgltf_accessor_unpack_indices(
-                primitive->indices,
-                indices.Data,
-                sizeof(uint32),
-                primitive->indices->count
-            );
+            cgltf_accessor_unpack_indices(primitive->indices, indices.Data, sizeof(uint32), primitive->indices->count);
 
             // Set the mesh indices
             primitive_mesh->UploadIndices(indices);
@@ -177,17 +169,16 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mes
         MakeMaterialForPrimitive(current_object, primitive);
 
 
-//        CreateMaterialFromPrimitive(current_object, primitive);
-//        FxGltfMaterialToLoad material{
-//            .PrimitiveIndex = i,
-////            .GltfMaterial = gltf_mesh->primitives[i].material,
-//            .Object = current_object,
-//            .MeshIndex = mesh_index
-//        };
+        //        CreateMaterialFromPrimitive(current_object, primitive);
+        //        FxGltfMaterialToLoad material{
+        //            .PrimitiveIndex = i,
+        ////            .GltfMaterial = gltf_mesh->primitives[i].material,
+        //            .Object = current_object,
+        //            .MeshIndex = mesh_index
+        //        };
 
 
-
-//        MaterialsToLoad.push_back(material);
+        //        MaterialsToLoad.push_back(material);
 
         current_object->Mesh = primitive_mesh;
 
@@ -202,38 +193,35 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mes
         // model->Meshes.Data[i] = primtive_mesh;
     }
 
-//    object = current_object;
+    //    object = current_object;
 
     Log::Info("Add primitive:", 0);
-
 }
 
+#include <Asset/FxAssetManager.hpp>
 #include <FxMaterial.hpp>
 #include <iostream>
 
-#include <Asset/FxAssetManager.hpp>
 
-
-
-//FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
+// FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
 //{
-//    if (!texture_view.texture) {
-//        return FxRef<FxAssetImage>(nullptr);
-//    }
+//     if (!texture_view.texture) {
+//         return FxRef<FxAssetImage>(nullptr);
+//     }
 //
-//    if (texture_view.texture->image->uri != nullptr) {
-//        std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
-//        return FxRef<FxAssetImage>(nullptr);
-//    }
+//     if (texture_view.texture->image->uri != nullptr) {
+//         std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
+//         return FxRef<FxAssetImage>(nullptr);
+//     }
 //
-//    if (texture_view.texture->image != nullptr) {
-//        const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
+//     if (texture_view.texture->image != nullptr) {
+//         const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
 //
-//        uint32 size = texture_view.texture->image->buffer_view->size;
+//         uint32 size = texture_view.texture->image->buffer_view->size;
 //
-//        FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
+//         FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
 //
-//        // Since this is being loaded on another thread anyway, this shouldn't cause too much of an issue.
+//         // Since this is being loaded on another thread anyway, this shouldn't cause too much of an issue.
 ////        texture->WaitUntilLoaded();
 //
 //        return texture;
@@ -247,9 +235,9 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh *gltf_mes
 
 FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
 {
-//    FxRef<FxAssetModel> model(asset);
+    //    FxRef<FxAssetModel> model(asset);
 
-    cgltf_options options{};
+    cgltf_options options {};
 
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
     if (status != cgltf_result_success) {
@@ -281,7 +269,6 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
     //         }
 
 
-
     //         model->Materials.push_back(material);
     //     }
     // }
@@ -292,9 +279,9 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
 FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
 {
     // (void)asset;
-//    FxRef<FxAssetModel> model(asset);
+    //    FxRef<FxAssetModel> model(asset);
 
-    cgltf_options options{};
+    cgltf_options options {};
 
     cgltf_result status = cgltf_parse(&options, data, size, &mGltfData);
     if (status != cgltf_result_success) {
@@ -354,29 +341,28 @@ void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
         }
     }
 
-//    cgltf_free(mGltfData);
-//    mGltfData = nullptr;
+    //    cgltf_free(mGltfData);
+    //    mGltfData = nullptr;
 
 
     asset = output_object;
-//    current_object.mPtr = nullptr;
-//    current_object.mRefCnt = nullptr;
+    //    current_object.mPtr = nullptr;
+    //    current_object.mRefCnt = nullptr;
 
 
     asset->IsUploadedToGpu = true;
     asset->IsUploadedToGpu.notify_all();
-
 }
 
 void FxLoaderGltf::Destroy(FxRef<FxAssetBase>& asset)
 {
-//    while (!asset->IsUploadedToGpu) {
-//        asset->IsUploadedToGpu.wait(true);
-//    }
+    //    while (!asset->IsUploadedToGpu) {
+    //        asset->IsUploadedToGpu.wait(true);
+    //    }
 
     if (mGltfData) {
-       printf("Destroyed mesh\n");
-       cgltf_free(mGltfData);
-       mGltfData = nullptr;
+        printf("Destroyed mesh\n");
+        cgltf_free(mGltfData);
+        mGltfData = nullptr;
     }
 }

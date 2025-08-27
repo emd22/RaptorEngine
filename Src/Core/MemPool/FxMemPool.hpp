@@ -1,13 +1,13 @@
 #pragma once
 
 #include "../Types.hpp"
-
 #include "FxMPLinkedList.hpp"
 
 #include <type_traits>
 // #include <vector>
 
 #define FX_MEMPOOL_USE_ATOMIC_LOCKING 1
+#define FX_MEMPOOL_TRACK_STATISTICS 1
 
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
 #include <atomic>
@@ -18,14 +18,20 @@
 #endif
 
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
-#include <thread>
 #include <iostream>
+#include <thread>
 #endif
 
 constexpr uint64 FxUnitByte = 1;
 constexpr uint64 FxUnitKibibyte = 1024;
 constexpr uint64 FxUnitMebibyte = FxUnitKibibyte * 1024;
 constexpr uint64 FxUnitGibibyte = FxUnitMebibyte * 1024;
+
+struct FxMemPoolStatistics
+{
+    uint32 TotalAllocs = 0;
+    uint32 TotalFrees = 0;
+};
 
 class FxMemPoolPage
 {
@@ -56,9 +62,9 @@ public:
     template <typename ElementType, typename... Args>
     ElementType* Alloc(uint32 size, Args... args)
     {
-    #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
+#ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
         FxSpinThreadGuard guard(&mInUse);
-    #endif
+#endif
 
         MemBlock& block = AllocateMemory(size)->Data;
 
@@ -70,9 +76,9 @@ public:
     template <typename Type>
     Type* Realloc(Type* ptr, uint32 new_size)
     {
-    #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
+#ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
         FxSpinThreadGuard guard(&mInUse);
-    #endif
+#endif
         return static_cast<Type*>(Realloc(static_cast<void*>(ptr), new_size));
     }
 
@@ -85,16 +91,15 @@ public:
         }
 
 
-
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         if (node == nullptr) {
             Log::Error("FxMemPoolPage::Free: Could not find ptr %p in memory page!", ptr);
             return;
         }
 
-    #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
+#ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
         FxSpinThreadGuard guard(&mInUse);
-    #endif
+#endif
 
         // Do not mark as a freed block when we are at the end of the page as it is ambiguous
         // on whether the end is a previously freed block or has not been previously allocated.
@@ -146,7 +151,7 @@ public:
 
 private:
     auto AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
-    auto GetNodeFromPtr(void* ptr) const->FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
+    auto GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
 
     inline void CheckInited()
     {
@@ -173,7 +178,7 @@ private:
 
     FxMPLinkedList<MemBlock> mMemBlocks;
 
-    mutable FxAtomicFlag mInUse{ };
+    mutable FxAtomicFlag mInUse {};
 };
 
 class FxMemPool
@@ -191,18 +196,15 @@ public:
     {
         FxSpinThreadGuard guard(&mInUse);
         {
-
             mPageSize = page_size * size_unit;
 
             mPoolPages.Create(8);
-    #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
+#ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
             mCreatedThreadId = std::this_thread::get_id();
-    #endif
+#endif
         }
 
         AllocateNewPage();
-
-
     }
 
     /**
@@ -271,6 +273,10 @@ public:
             ptr->~Type();
         }
         FxSpinThreadGuard guard(&pool->mInUse);
+
+#ifdef FX_MEMPOOL_TRACK_STATISTICS
+        ++pool->mStats.TotalFrees;
+#endif
         FreeRaw(static_cast<void*>(ptr), pool);
     }
 
@@ -290,9 +296,13 @@ private:
 
     FxMPPagedArray<FxMemPoolPage> mPoolPages;
 
-    FxAtomicFlag mInUse{};
+    FxAtomicFlag mInUse {};
 
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
     std::thread::id mCreatedThreadId;
+#endif
+
+#ifdef FX_MEMPOOL_TRACK_STATISTICS
+    FxMemPoolStatistics mStats;
 #endif
 };

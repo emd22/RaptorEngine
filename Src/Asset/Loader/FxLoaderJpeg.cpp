@@ -1,13 +1,13 @@
 #include "FxLoaderJpeg.hpp"
-#include "Asset/FxAssetBase.hpp"
-#include <Asset/FxAssetImage.hpp>
 
-#include <Core/Log.hpp>
+#include "Asset/FxAssetBase.hpp"
+
 #include <jpeglib.h>
 
+#include <Asset/FxAssetImage.hpp>
 #include <Core/FxMemory.hpp>
-
 #include <Core/FxRef.hpp>
+#include <Core/Log.hpp>
 
 FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
 {
@@ -38,7 +38,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
     image->NumComponents = mJpegInfo.output_components;
 
     printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+    image->Size = {mJpegInfo.output_width, mJpegInfo.output_height};
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
     mImageData.InitSize(data_size);
@@ -83,8 +83,8 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     image->NumComponents = mJpegInfo.output_components;
     FxDebugAssert(image->NumComponents == requested_components)
 
-    printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+        printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
+    image->Size = {mJpegInfo.output_width, mJpegInfo.output_height};
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
     mImageData.InitSize(data_size);
@@ -107,7 +107,7 @@ void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
 {
     FxRef<FxAssetImage> image(asset);
 
-    image->Texture.Create(mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, 4);
+    image->Texture.Create(image->ImageType, mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, 4);
 
     asset->IsUploadedToGpu = true;
     asset->IsUploadedToGpu.notify_all();
@@ -115,9 +115,9 @@ void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
 void FxLoaderJpeg::Destroy(FxRef<FxAssetBase>& asset)
 {
-//    while (!asset->IsUploadedToGpu) {
-//        asset->IsUploadedToGpu.wait(true);
-//    }
+    //    while (!asset->IsUploadedToGpu) {
+    //        asset->IsUploadedToGpu.wait(true);
+    //    }
 
     jpeg_destroy_decompress(&mJpegInfo);
 }

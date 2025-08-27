@@ -2,42 +2,37 @@
 #include "vulkan/vulkan_core.h"
 #define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
 
+#include "Core/FxDefines.hpp"
+#include "Renderer/Backend/RxShader.hpp"
+#include "Renderer/Backend/ShaderList.hpp"
+#include "Renderer/FxCamera.hpp"
+#include "Renderer/FxLight.hpp"
+#include "Renderer/Renderer.hpp"
+
 #include <ThirdParty/vk_mem_alloc.h>
 
-#include "Core/FxDefines.hpp"
-#include <Renderer/Backend/RxFrameData.hpp>
-#include "Renderer/Backend/ShaderList.hpp"
-#include "Renderer/Backend/RxShader.hpp"
-
-#include "Renderer/Renderer.hpp"
-#include "Renderer/FxLight.hpp"
-#include "Renderer/FxCamera.hpp"
-
-#include <Core/FxMemory.hpp>
 #include <Core/FxLinkedList.hpp>
+#include <Core/FxMemory.hpp>
+#include <Renderer/Backend/RxFrameData.hpp>
 
 #define SDL_DISABLE_OLD_NAMES
+#include "FxControls.hpp"
+#include "FxEntity.hpp"
+#include "FxMaterial.hpp"
+
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_revision.h>
 #include <SDL3/SDL_main.h>
-
-#include <Core/Types.hpp>
-
-#include <Renderer/Renderer.hpp>
-#include <Renderer/FxWindow.hpp>
-#include <Renderer/FxPrimitiveMesh.hpp>
-#include <Renderer/FxDeferred.hpp>
+#include <SDL3/SDL_revision.h>
 
 #include <Asset/FxAssetManager.hpp>
-#include "FxControls.hpp"
-#include <Math/Mat4.hpp>
 #include <Asset/FxConfigFile.hpp>
-
-#include "FxMaterial.hpp"
-#include "FxEntity.hpp"
-
 #include <Asset/FxMeshGen.hpp>
-
+#include <Core/Types.hpp>
+#include <Math/Mat4.hpp>
+#include <Renderer/FxDeferred.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Renderer/FxWindow.hpp>
+#include <Renderer/Renderer.hpp>
 #include <csignal>
 
 FX_SET_MODULE_NAME("Main")
@@ -83,7 +78,6 @@ public:
 };
 
 
-
 #include <chrono>
 #include <iostream>
 
@@ -110,7 +104,6 @@ void TestSpeed(FuncType ft, int iterations)
 
 
 #include <FxObject.hpp>
-
 #include <Script/FxScript.hpp>
 
 void TestScript()
@@ -174,10 +167,12 @@ int main()
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };
 
     // catch sigabrt to avoid macOS showing "report" popup
-    signal(SIGABRT, [](int signum) {
-        Log::Error("Aborted!");
-        exit(1);
-    });
+    signal(SIGABRT,
+           [](int signum)
+           {
+               Log::Error("Aborted!");
+               exit(1);
+           });
 
     const uint32 window_width = config.GetValue<uint32>("Width");
     const uint32 window_height = config.GetValue<uint32>("Height");
@@ -208,58 +203,51 @@ int main()
     current_camera = &camera;
 
     // FxRef<FxAssetModel> helmet_model = FxAssetManager::NewAsset<FxAssetModel>();
-//    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
-//    helmet_model->WaitUntilLoaded();
+    //    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
+    //    helmet_model->WaitUntilLoaded();
 
     // FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
     // ground_model->WaitUntilLoaded();
 
-    FxRef<FxAssetImage> cheese_image = FxAssetManager::LoadAsset<FxAssetImage>("../textures/cheese.jpg");
+    FxRef<FxAssetImage> cheese_image = FxAssetManager::LoadImage("../textures/cheese.jpg");
     cheese_image->WaitUntilLoaded();
 
     FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
 
 
-
-
-
-    FxRef<FxObject> ground_object = FxAssetManager::LoadAsset<FxObject>("../models/Ground.glb");
+    FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../models/Ground.glb");
     ground_object->WaitUntilLoaded();
 
     ground_object->Material = cheese_material;
 
 
-
-
-
     // FxOldSceneObject helmet_object;
-    FxRef<FxObject> fireplace_object = FxAssetManager::LoadAsset<FxObject>("../models/FireplaceRoom.glb");
+    FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
     fireplace_object->WaitUntilLoaded();
 
-//    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-//        // TEMP: If there are missing materials, cheese it up
-//        if (!obj->Material) {
-//            obj->Material = cheese_material;
-//        }
-//    }
+    //    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
+    //        // TEMP: If there are missing materials, cheese it up
+    //        if (!obj->Material) {
+    //            obj->Material = cheese_material;
+    //        }
+    //    }
 
-    FxRef<FxObject> mallard_object = FxAssetManager::LoadAsset<FxObject>("../models/Mallard.glb");
-
+    FxRef<FxObject> mallard_object = FxAssetManager::LoadObject("../models/Mallard.glb");
 
 
     ground_object->MoveBy(FxVec3f(0, -1, 0));
 
 
-//    if (helmet_model->Materials.size() > 0) {
-//        FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
-//        helmet_material->Pipeline = &deferred_renderer->GPassPipeline;
-//
-//        helmet_object.Attach(helmet_material);
-//    }
-//    else {
-//        helmet_object.Attach(cheese_material);
-//    }
+    //    if (helmet_model->Materials.size() > 0) {
+    //        FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
+    //        helmet_material->Pipeline = &deferred_renderer->GPassPipeline;
+    //
+    //        helmet_object.Attach(helmet_material);
+    //    }
+    //    else {
+    //        helmet_object.Attach(cheese_material);
+    //    }
 
     // helmet_object.MoveBy(FxVec3f(0, 0, 0));
     // helmet_object.RotateX(M_PI / 2);
@@ -267,7 +255,7 @@ int main()
     //
 
 
-//
+    //
     fireplace_object->RotateX(M_PI / 2);
     fireplace_object->Scale(FxVec3f(3));
 
@@ -338,7 +326,7 @@ int main()
 
             // helmet_object.Attach(helmet_model);
             // helmet_object.Attach(cheese_material);
-             FxMemPool::GetGlobalPool().PrintAllocations();
+            FxMemPool::GetGlobalPool().PrintAllocations();
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
@@ -353,22 +341,21 @@ int main()
 
         camera.Update();
 
-//        helmet_object.RotateY(0.001 * DeltaTime);
-
+        //        helmet_object.RotateY(0.001 * DeltaTime);
 
 
         if (Renderer->BeginFrame(*deferred_renderer) != FrameResult::Success) {
             continue;
         }
 
-//         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
-//         helmet_object.Translate(FxVec3f(0, 0, 0));
+        //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
+        //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
         light.Color.Y = 0.7;
 
         // ground_object.Render(camera);
         // helmet_object.Render(camera);
-//        light.RenderDebugMesh(camera);
+        //        light.RenderDebugMesh(camera);
 
         fireplace_object->Render(camera);
         ground_object->Render(camera);
@@ -385,7 +372,7 @@ int main()
         }
 
         light.Render(camera);
-//        light2.Render(camera);
+        //        light2.Render(camera);
         // light2.Render(camera);
 
         Renderer->DoComposition(camera);
@@ -402,7 +389,7 @@ int main()
 
     // composition_pipeline.Destroy();
 
-//    ground_object->Destroy();
+    //    ground_object->Destroy();
 
     std::cout << "this thread: " << std::this_thread::get_id() << std::endl;
 

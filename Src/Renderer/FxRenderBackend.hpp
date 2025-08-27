@@ -1,22 +1,19 @@
 #pragma once
 
-#include <deque>
-
+#include "Backend/RxCommands.hpp"
+#include "Backend/RxFrameData.hpp"
+#include "Backend/RxPipeline.hpp"
+#include "Backend/RxSwapchain.hpp"
+#include "Backend/RxSynchro.hpp"
+#include "FxDeferred.hpp"
 #include "FxDeletionObject.hpp"
 #include "FxWindow.hpp"
 
-#include "Backend/RxPipeline.hpp"
-#include "Backend/RxFrameData.hpp"
-#include "Backend/RxCommands.hpp"
-#include "Backend/RxSwapchain.hpp"
-#include "Backend/RxSynchro.hpp"
-
-#include <Core/FxRef.hpp>
-
-#include "FxDeferred.hpp"
-
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
+
+#include <Core/FxRef.hpp>
+#include <deque>
 
 struct SDL_Window;
 
@@ -41,11 +38,13 @@ struct FxGpuUploadContext
 
 class FxCamera;
 
-class FxRenderBackend {
+class FxRenderBackend
+{
     const uint32 DeletionFrameSpacing = 3;
 
 public:
     using SubmitFunc = std::function<void(RxCommandBuffer& cmd)>;
+
 public:
     FxRenderBackend() = default;
 
@@ -100,10 +99,16 @@ public:
         return mInstance;
     }
 
-    RxFrameData *GetFrame();
+    RxFrameData* GetFrame();
 
-    uint32 GetImageIndex() { return mImageIndex; }
-    VmaAllocator *GetGPUAllocator() { return &GpuAllocator; }
+    uint32 GetImageIndex()
+    {
+        return mImageIndex;
+    }
+    VmaAllocator* GetGPUAllocator()
+    {
+        return &GpuAllocator;
+    }
 
     void SubmitUploadCmd(SubmitFunc func);
     void SubmitOneTimeCmd(SubmitFunc func);
@@ -158,8 +163,14 @@ public:
         });
     }
 
-    uint32 GetElapsedFrameCount() const { return mInternalFrameCounter; }
-    uint32 GetFrameNumber() const { return mFrameNumber; }
+    uint32 GetElapsedFrameCount() const
+    {
+        return mInternalFrameCounter;
+    }
+    uint32 GetFrameNumber() const
+    {
+        return mFrameNumber;
+    }
 
 private:
     void InitVulkan();
@@ -178,7 +189,7 @@ private:
 
     FrameResult GetNextSwapchainImage(RxFrameData* frame);
 
-    ExtensionList &QueryInstanceExtensions(bool invalidate_previous = false);
+    ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
     ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
 
@@ -202,12 +213,11 @@ public:
     FxDeferredCompPass* CurrentCompPass = nullptr;
     FxDeferredLightingPass* CurrentLightingPass = nullptr;
 
-    FxRef<FxDeferredRenderer> DeferredRenderer{ nullptr };
+    FxRef<FxDeferredRenderer> DeferredRenderer {nullptr};
 
     // RxSemaphore OffscreenSemaphore;
 
 private:
-
     VkInstance mInstance = nullptr;
     VkSurfaceKHR mWindowSurface = nullptr;
 
