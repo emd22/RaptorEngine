@@ -8,6 +8,7 @@
 #include "FxDeletionObject.hpp"
 #include "FxWindow.hpp"
 #include "RxDeferred.hpp"
+#include "RxSamplerCache.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
@@ -58,20 +59,11 @@ public:
     void BeginLighting();
     void DoComposition(FxCamera& render_cam);
 
-    void SelectWindow(const FxRef<FxWindow>& window)
-    {
-        mWindow = window;
-    }
+    void SelectWindow(const FxRef<FxWindow>& window) { mWindow = window; }
 
-    FX_FORCE_INLINE FxRef<FxWindow> GetWindow()
-    {
-        return mWindow;
-    }
+    FX_FORCE_INLINE FxRef<FxWindow> GetWindow() { return mWindow; }
 
-    FX_FORCE_INLINE RxGpuDevice* GetDevice()
-    {
-        return &mDevice;
-    }
+    FX_FORCE_INLINE RxGpuDevice* GetDevice() { return &mDevice; }
 
     RxUniformBufferObject& GetUbo();
 
@@ -94,29 +86,17 @@ public:
         mInDeletionQueue.store(false);
     }
 
-    VkInstance GetVulkanInstance()
-    {
-        return mInstance;
-    }
+    VkInstance GetVulkanInstance() { return mInstance; }
 
     RxFrameData* GetFrame();
 
-    uint32 GetImageIndex()
-    {
-        return mImageIndex;
-    }
-    VmaAllocator* GetGPUAllocator()
-    {
-        return &GpuAllocator;
-    }
+    uint32 GetImageIndex() { return mImageIndex; }
+    VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
 
     void SubmitUploadCmd(SubmitFunc func);
     void SubmitOneTimeCmd(SubmitFunc func);
 
-    ~RxRenderBackend()
-    {
-        Destroy();
-    }
+    ~RxRenderBackend() { Destroy(); }
 
     void ProcessDeletionQueue(bool immediate = false)
     {
@@ -163,14 +143,8 @@ public:
         });
     }
 
-    uint32 GetElapsedFrameCount() const
-    {
-        return mInternalFrameCounter;
-    }
-    uint32 GetFrameNumber() const
-    {
-        return mFrameNumber;
-    }
+    uint32 GetElapsedFrameCount() const { return mInternalFrameCounter; }
+    uint32 GetFrameNumber() const { return mFrameNumber; }
 
 private:
     void InitVulkan();
@@ -215,6 +189,8 @@ public:
 
     FxRef<RxDeferredRenderer> DeferredRenderer { nullptr };
 
+    RxSamplerCache SamplerCache;
+
     // RxSemaphore OffscreenSemaphore;
 
 private:
@@ -227,7 +203,6 @@ private:
     VkDebugUtilsMessengerEXT mDebugMessenger;
 
     ExtensionList mAvailableExtensions;
-
 
     uint32 mImageIndex = 0;
 

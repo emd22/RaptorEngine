@@ -27,6 +27,7 @@
 #include <Asset/FxAssetManager.hpp>
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxMeshGen.hpp>
+#include <Core/FxBitset.hpp>
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
@@ -34,6 +35,7 @@
 #include <Renderer/Renderer.hpp>
 #include <Renderer/RxDeferred.hpp>
 #include <csignal>
+
 
 FX_SET_MODULE_NAME("Main")
 
@@ -63,18 +65,14 @@ static FxPerspectiveCamera* current_camera = nullptr;
 class TestScript : public FxScript
 {
 public:
-    TestScript()
-    {
-    }
+    TestScript() {}
 
     void RenderTick() override
     {
         Entity->mModelMatrix.LookAt(Entity->GetPosition(), current_camera->Position, FxVec3f::Up);
     }
 
-    ~TestScript() override
-    {
-    }
+    ~TestScript() override {}
 };
 
 
@@ -148,6 +146,7 @@ void TestScript()
     // }
 }
 
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
@@ -216,10 +215,10 @@ int main()
     cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
 
 
-    FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../models/Ground.glb");
-    ground_object->WaitUntilLoaded();
+    // FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../models/Ground.glb");
+    // ground_object->WaitUntilLoaded();
 
-    ground_object->Material = cheese_material;
+    // ground_object->Material = cheese_material;
 
 
     // FxOldSceneObject helmet_object;
@@ -233,12 +232,22 @@ int main()
     //        }
     //    }
 
-    FxRef<FxObject> mallard_object = FxAssetManager::LoadObject("../models/Mallard.glb");
+    // FxRef<FxObject> mallard_object = FxAssetManager::LoadObject("../models/Mallard.glb");
 
     FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Cubemap, "../Textures/TestCubemap.png");
+    skybox_texture->WaitUntilLoaded();
+
+    FxRef<FxObject> cube_object = FxAssetManager::LoadObject("../models/Cube.glb");
+    cube_object->WaitUntilLoaded();
+
+    FxRef<FxMaterial> skybox_material = FxMaterialManager::New("Skybox", &deferred_renderer->GPassPipeline);
+
+    skybox_material->Attach(FxMaterial::Diffuse, skybox_texture);
+
+    cube_object->Material = skybox_material;
 
 
-    ground_object->MoveBy(FxVec3f(0, -1, 0));
+    // ground_object->MoveBy(FxVec3f(0, -1, 0));
 
 
     //    if (helmet_model->Materials.size() > 0) {
@@ -360,9 +369,11 @@ int main()
         //        light.RenderDebugMesh(camera);
 
         fireplace_object->Render(camera);
-        ground_object->Render(camera);
+        cube_object->Render(camera);
 
-        mallard_object->Render(camera);
+        // ground_object->Render(camera);
+
+        // mallard_object->Render(camera);
 
         Renderer->BeginLighting();
 

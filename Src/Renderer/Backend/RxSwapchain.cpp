@@ -99,7 +99,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
         image_count = capabilities.maxImageCount;
     }
 
-    Log::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount, image_count);
+    Log::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount,
+              image_count);
 
     SurfaceFormat = mDevice->GetBestSurfaceFormat();
 
@@ -153,7 +154,7 @@ void RxSwapchain::CreateSwapchainFramebuffers()
     }
 
     ColorSampler.Create();
-    DepthSampler.Create(VK_FILTER_NEAREST, VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST);
+    DepthSampler.Create(RxSamplerFilter::Nearest, RxSamplerFilter::Nearest, RxSamplerFilter::Nearest);
     NormalsSampler.Create();
     LightsSampler.Create();
 

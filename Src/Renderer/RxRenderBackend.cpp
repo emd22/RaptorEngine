@@ -82,6 +82,8 @@ void RxRenderBackend::Init(FxVec2u window_size)
     InitFrames();
     InitUploadContext();
 
+    // SamplerCache.Create();
+
     Initialized = true;
 }
 
@@ -253,10 +255,12 @@ uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_sever
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 {
-    const auto severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+    const auto severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                          VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
 
-    const auto message_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+    const auto message_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
 
@@ -289,7 +293,9 @@ void RxRenderBackend::InitGPUAllocator()
 {
     const RxGpuDevice* device = GetDevice();
 
-    const VmaAllocatorCreateInfo create_info = { .physicalDevice = device->Physical, .device = device->Device, .instance = mInstance };
+    const VmaAllocatorCreateInfo create_info = { .physicalDevice = device->Physical,
+                                                 .device = device->Device,
+                                                 .instance = mInstance };
 
     const VkResult status = vmaCreateAllocator(&create_info, &GpuAllocator);
     if (status != VK_SUCCESS) {
@@ -297,10 +303,7 @@ void RxRenderBackend::InitGPUAllocator()
     }
 }
 
-void RxRenderBackend::DestroyGPUAllocator()
-{
-    vmaDestroyAllocator(GpuAllocator);
-}
+void RxRenderBackend::DestroyGPUAllocator() { vmaDestroyAllocator(GpuAllocator); }
 
 ExtensionNames RxRenderBackend::MakeInstanceExtensionList(ExtensionNames& user_requested_extensions)
 {
@@ -314,7 +317,8 @@ ExtensionNames RxRenderBackend::MakeInstanceExtensionList(ExtensionNames& user_r
     total_extensions.reserve(total_extensions_size);
 
     // append the user requested extensions
-    total_extensions.insert(total_extensions.begin(), user_requested_extensions.begin(), user_requested_extensions.end());
+    total_extensions.insert(total_extensions.begin(), user_requested_extensions.begin(),
+                            user_requested_extensions.end());
 
     for (int32 i = 0; i < required_extension_count; i++) {
         total_extensions.push_back(required_extensions[i]);
@@ -385,7 +389,8 @@ void RxRenderBackend::SubmitUploadCmd(RxRenderBackend::SubmitFunc upload_func)
     //     std::this_thread::get_id()
     // );
 
-    VkTry(vkQueueSubmit(GetDevice()->TransferQueue, 1, &submit_info, UploadContext.UploadFence.Fence), "Error submitting upload buffer");
+    VkTry(vkQueueSubmit(GetDevice()->TransferQueue, 1, &submit_info, UploadContext.UploadFence.Fence),
+          "Error submitting upload buffer");
 
     UploadContext.UploadFence.WaitFor();
     UploadContext.UploadFence.Reset();
@@ -461,14 +466,15 @@ RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
 
     vkCmdSetViewport(frame->CommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 }, .extent = { .width = (uint32)width, .height = (uint32)height } };
+    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+                               .extent = { .width = (uint32)width, .height = (uint32)height } };
 
     vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
 
     FxDrawPushConstants push_constants {};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
-                       &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                       sizeof(push_constants), &push_constants);
 
     return RxFrameResult::Success;
 }
@@ -497,7 +503,8 @@ void RxRenderBackend::PresentFrame()
                                        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
                                        .pSignalSemaphores = &frame->RenderFinished.Semaphore };
 
-    VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence), "Error submitting draw buffer");
+    VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
+          "Error submitting draw buffer");
 
     if (Swapchain.Initialized != true) {
         FxModulePanic("Swapchain not initialized!", 0);
@@ -561,7 +568,8 @@ void RxRenderBackend::BeginLighting()
 
     vkCmdSetViewport(frame->LightCommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 }, .extent = { .width = (uint32)width, .height = (uint32)height } };
+    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+                               .extent = { .width = (uint32)width, .height = (uint32)height } };
 
     vkCmdSetScissor(frame->LightCommandBuffer.CommandBuffer, 0, 1, &scissor);
 }
@@ -592,7 +600,8 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 
     vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 }, .extent = { .width = (uint32)width, .height = (uint32)height } };
+    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+                               .extent = { .width = (uint32)width, .height = (uint32)height } };
 
     vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
@@ -616,8 +625,8 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
 {
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
-    const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout, frame->ImageAvailable.Semaphore, nullptr,
-                                                  &mImageIndex);
+    const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
+                                                  frame->ImageAvailable.Semaphore, nullptr, &mImageIndex);
 
     if (result == VK_SUCCESS) {
         return RxFrameResult::Success;
@@ -667,6 +676,8 @@ void RxRenderBackend::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
+    // SamplerCache.Destroy();
+
     // GPassDescriptorPool.Destroy();
     CompDescriptorPool.Destroy();
 
@@ -688,7 +699,4 @@ void RxRenderBackend::Destroy()
     Initialized = false;
 }
 
-RxFrameData* RxRenderBackend::GetFrame()
-{
-    return &Frames[GetFrameNumber()];
-}
+RxFrameData* RxRenderBackend::GetFrame() { return &Frames[GetFrameNumber()]; }

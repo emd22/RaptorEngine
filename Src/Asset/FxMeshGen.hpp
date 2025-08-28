@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Core/FxRef.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 
 class FxMeshGen
 {
@@ -18,13 +18,12 @@ public:
 
         void Destroy()
         {
-            // Positions.Free();
-            // Indices.Free();
         }
     };
 
 public:
     static FxRef<GeneratedMesh> MakeIcoSphere(int resolution);
+    static FxRef<GeneratedMesh> MakeQuad();
 
 private:
 };

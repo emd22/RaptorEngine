@@ -48,8 +48,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     Log::Info("Creating material buffer of size %u", material_buffer_size);
 
-    MaterialPropertiesBuffer.Create(material_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU,
-                                    RxGpuBufferFlags::PersistentMapped);
+    MaterialPropertiesBuffer.Create(material_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                    VMA_MEMORY_USAGE_CPU_TO_GPU, RxGpuBufferFlags::PersistentMapped);
 
 
     if (!mMaterialPropertiesDS.IsInited()) {
@@ -62,20 +62,27 @@ void FxMaterialManager::Create(uint32 entities_per_page)
         FxStackArray<VkWriteDescriptorSet, 1> write_descriptor_sets;
 
         {
-            VkDescriptorBufferInfo info { .buffer = MaterialPropertiesBuffer.Buffer, .offset = 0, .range = sizeof(FxMaterialProperties) };
+            VkDescriptorBufferInfo info {
+                .buffer = MaterialPropertiesBuffer.Buffer,
+                .offset = 0,
+                .range = sizeof(FxMaterialProperties),
+            };
 
-            VkWriteDescriptorSet buffer_write { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-                                                .descriptorCount = 1,
-                                                .dstSet = mMaterialPropertiesDS.Set,
-                                                .dstBinding = 0,
-                                                .dstArrayElement = 0,
-                                                .pBufferInfo = &info };
+            VkWriteDescriptorSet buffer_write {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+                .descriptorCount = 1,
+                .dstSet = mMaterialPropertiesDS.Set,
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .pBufferInfo = &info,
+            };
 
             write_descriptor_sets.Insert(buffer_write);
         }
 
-        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data, 0, nullptr);
+        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data, 0,
+                               nullptr);
     }
 
     RxUtil::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Set);
@@ -140,8 +147,8 @@ void FxMaterialManager::Destroy()
 //         .pBindings = bindings,
 //     };
 
-//     VkResult status = vkCreateDescriptorSetLayout(RendererVulkan->GetDevice()->Device, &ds_info, nullptr, &mSetLayout);
-//     if (status != VK_SUCCESS) {
+//     VkResult status = vkCreateDescriptorSetLayout(RendererVulkan->GetDevice()->Device, &ds_info, nullptr,
+//     &mSetLayout); if (status != VK_SUCCESS) {
 //         FxModulePanic("Failed to create material descriptor set layout", status);
 //     }
 
@@ -184,8 +191,8 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
 
     uint32 dynamic_offsets[] = { properties_offset };
 
-    RxDescriptorSet::BindMultipleOffset(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline, FxMakeSlice(sets_to_bind, num_sets),
-                                        FxMakeSlice(dynamic_offsets, 1));
+    RxDescriptorSet::BindMultipleOffset(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline,
+                                        FxMakeSlice(sets_to_bind, num_sets), FxMakeSlice(dynamic_offsets, 1));
     // mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
 
     // mMaterialPropertiesDS.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Renderer->DeferredRenderer->GPassPipeline);
@@ -226,29 +233,30 @@ bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
     return true;
 }
 
-#define PUSH_IMAGE_IF_SET(img, binding)                                                                                                              \
-    if (img != nullptr) {                                                                                                                            \
-        VkDescriptorImageInfo image_info {                                                                                                           \
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                                                                                 \
-            .imageView = img->Texture.Image.View,                                                                                                    \
-            .sampler = img->Texture.Sampler->Sampler,                                                                                                \
-        };                                                                                                                                           \
-        VkWriteDescriptorSet image_write {                                                                                                           \
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,                                                                                         \
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,                                                                             \
-            .descriptorCount = 1,                                                                                                                    \
-            .dstSet = descriptor_set.Set,                                                                                                            \
-            .dstBinding = binding,                                                                                                                   \
-            .dstArrayElement = 0,                                                                                                                    \
-            .pImageInfo = &image_info,                                                                                                               \
-        };                                                                                                                                           \
-        write_descriptor_sets.Insert(image_write);                                                                                                   \
+#define PUSH_IMAGE_IF_SET(img, binding)                                                                                \
+    if (img != nullptr) {                                                                                              \
+        VkDescriptorImageInfo image_info {                                                                             \
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                                                   \
+            .imageView = img->Texture.Image.View,                                                                      \
+            .sampler = img->Texture.Sampler->Sampler,                                                                  \
+        };                                                                                                             \
+        VkWriteDescriptorSet image_write {                                                                             \
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,                                                           \
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,                                               \
+            .descriptorCount = 1,                                                                                      \
+            .dstSet = descriptor_set.Set,                                                                              \
+            .dstBinding = binding,                                                                                     \
+            .dstArrayElement = 0,                                                                                      \
+            .pImageInfo = &image_info,                                                                                 \
+        };                                                                                                             \
+        write_descriptor_sets.Insert(image_write);                                                                     \
     }
 
 void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
-        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(), Renderer->DeferredRenderer->DsLayoutGPassMaterial);
+        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(),
+                              Renderer->DeferredRenderer->DsLayoutGPassMaterial);
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
@@ -270,12 +278,14 @@ void FxMaterial::Build()
         // Push material textures
         PUSH_IMAGE_IF_SET(DiffuseTexture.Texture, 0);
 
-        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data, 0, nullptr);
+        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data, 0,
+                               nullptr);
     }
 
     mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++ /* * RendererFramesInFlight */);
 
-    FxMaterialProperties* materials_buffer = reinterpret_cast<FxMaterialProperties*>(manager.MaterialPropertiesBuffer.MappedBuffer);
+    FxMaterialProperties* materials_buffer = reinterpret_cast<FxMaterialProperties*>(
+        manager.MaterialPropertiesBuffer.MappedBuffer);
 
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;

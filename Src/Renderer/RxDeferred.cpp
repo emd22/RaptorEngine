@@ -166,39 +166,40 @@ void RxDeferredRenderer::CreateGPassPipeline()
         },
     };
 
-    VkAttachmentDescription attachments[] = { // Albedo output
-                                              VkAttachmentDescription {
-                                                  .format = VK_FORMAT_B8G8R8A8_UNORM,
-                                                  .samples = VK_SAMPLE_COUNT_1_BIT,
-                                                  .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                                  .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                                                  .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                                  .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                                                  .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                              },
-                                              // Normals output
-                                              VkAttachmentDescription {
-                                                  .format = VK_FORMAT_R16G16B16A16_SFLOAT,
-                                                  .samples = VK_SAMPLE_COUNT_1_BIT,
-                                                  .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                                  .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                                                  .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                                  .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                                                  .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                              },
+    VkAttachmentDescription attachments[] = {
+        // Albedo output
+        VkAttachmentDescription {
+            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        },
+        // Normals output
+        VkAttachmentDescription {
+            .format = VK_FORMAT_R16G16B16A16_SFLOAT,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        },
 
-                                              VkAttachmentDescription {
-                                                  .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
-                                                  .samples = VK_SAMPLE_COUNT_1_BIT,
-                                                  .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                                  .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                                                  .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                                  .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                  .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                                                  .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-                                              }
+        VkAttachmentDescription {
+            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+        },
     };
 
     ShaderList shader_list;
@@ -214,7 +215,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
     FxVertexInfo vert_info = FxMakeVertexInfo();
 
     GPassPipeline.Create("Geometry", shader_list, layout, FxMakeSlice(attachments, FxSizeofArray(attachments)),
-                         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info, VK_CULL_MODE_NONE);
+                         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info, VK_CULL_MODE_BACK_BIT);
 }
 
 void RxDeferredRenderer::DestroyGPassPipeline()

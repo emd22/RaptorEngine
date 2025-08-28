@@ -1,25 +1,42 @@
 #pragma once
 
+#include "RxDescriptors.hpp"
+#include "RxDevice.hpp"
+
 #include <vulkan/vulkan.h>
 
 #include <Core/Log.hpp>
 
-#include <Renderer/Backend/RxDevice.hpp>
+enum class RxSamplerFilter
+{
+    Nearest,
+    Linear,
+};
+
 
 class RxSampler
 {
 public:
-    void Create(VkFilter min_filter = VK_FILTER_LINEAR, VkFilter mag_filter = VK_FILTER_LINEAR, VkSamplerMipmapMode mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR);
+    RxSampler() = default;
+    RxSampler(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter);
+
+    RxSampler(RxSampler&& other);
+
+    void Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter);
+    void Create();
+
     void Destroy();
 
-    ~RxSampler()
-    {
-        Destroy();
-    }
+    ~RxSampler() { Destroy(); }
 
 public:
     VkSampler Sampler = nullptr;
 
 private:
+    friend class RxSamplerCache;
+    friend struct RxSamplerHandle;
+
     RxGpuDevice* mDevice = nullptr;
+
+    RxDescriptorSet mDescriptorSet {};
 };
