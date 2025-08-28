@@ -2,9 +2,8 @@
 
 #include "FxAssetBase.hpp"
 
-#include <Renderer/Backend/RxTexture.hpp>
-
 #include <Core/FxStaticPtrArray.hpp>
+#include <Renderer/Backend/RxTexture.hpp>
 
 
 class FxAssetImage : public FxAssetBase
@@ -23,7 +22,7 @@ public:
         Destroy();
     }
 
-// private:
+    // private:
     void Destroy() override
     {
         if (!IsUploadedToGpu.load()) {
@@ -40,6 +39,8 @@ public:
     RxTexture Texture;
 
     uint32 NumComponents = 3;
+
+    RxImageType ImageType = RxImageType::Image2D;
     FxVec2u Size = FxVec2u::Zero;
 
 private:

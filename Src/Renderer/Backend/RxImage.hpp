@@ -4,29 +4,38 @@
 
 #define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
 
+#include "RxCommands.hpp"
+#include "RxDevice.hpp"
+
 #include <ThirdParty/vk_mem_alloc.h>
 
-
-#include "RxDevice.hpp"
-#include "RxCommands.hpp"
-
 #include <Math/FxVec2.hpp>
+
+struct RxImageTypeProperties
+{
+    VkImageViewType ViewType;
+    uint32 LayerCount;
+};
+
+enum class RxImageType
+{
+    Image2D,
+    Cubemap,
+};
+
+const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type);
 
 class RxImage
 {
 public:
-
     RxGpuDevice* GetDevice();
 
-    void Create(
-        FxVec2u size,
-        VkFormat format,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage,
-        VkImageAspectFlags aspect_flags
-    );
+    void Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+                VkImageAspectFlags aspect_flags);
 
-    void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer &cmd);
+    void Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect_flags);
+
+    void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd);
 
     void Destroy();
 
@@ -47,7 +56,8 @@ public:
     VmaAllocation Allocation = nullptr;
 
 private:
-    RxGpuDevice *mDevice = nullptr;
+    RxGpuDevice* mDevice = nullptr;
 
+    RxImageType mViewType = RxImageType::Image2D;
     bool mIsDepthTexture = false;
 };

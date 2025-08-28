@@ -1,38 +1,37 @@
 #pragma once
 
+#include "Backend/RxDescriptors.hpp"
+#include "Backend/RxFrameData.hpp"
+#include "Backend/RxFramebuffer.hpp"
 #include "Backend/RxImage.hpp"
 #include "Backend/RxSampler.hpp"
-#include "Backend/RxFramebuffer.hpp"
-#include "Backend/RxDescriptors.hpp"
-
-#include "Backend/RxFrameData.hpp"
 
 struct RxFrameData;
 
-class FxDeferredGPass;
-class FxDeferredCompPass;
-class FxDeferredLightingPass;
+class RxDeferredGPass;
+class RxDeferredCompPass;
+class RxDeferredLightingPass;
 
 
 ///////////////////////////////
 // Main Deferred Renderer
 ///////////////////////////////
 
-class FxDeferredRenderer
+class RxDeferredRenderer
 {
 public:
     void Create(const FxVec2u& extent);
 
     void Destroy();
 
-    ~FxDeferredRenderer()
+    ~RxDeferredRenderer()
     {
         Destroy();
     }
 
-    FX_FORCE_INLINE FxDeferredGPass* GetCurrentGPass();
-    FX_FORCE_INLINE FxDeferredCompPass* GetCurrentCompPass();
-    FX_FORCE_INLINE FxDeferredLightingPass* GetCurrentLightingPass();
+    FX_FORCE_INLINE RxDeferredGPass* GetCurrentGPass();
+    FX_FORCE_INLINE RxDeferredCompPass* GetCurrentCompPass();
+    FX_FORCE_INLINE RxDeferredLightingPass* GetCurrentLightingPass();
 
     void RebuildLightingPipeline();
 
@@ -72,7 +71,7 @@ public:
 
     RxGraphicsPipeline GPassPipeline;
 
-    FxSizedArray<FxDeferredGPass> GPasses;
+    FxSizedArray<RxDeferredGPass> GPasses;
 
     //////////////////////
     // Lighting Pass
@@ -83,7 +82,7 @@ public:
 
     RxGraphicsPipeline LightingPipeline;
 
-    FxSizedArray<FxDeferredLightingPass> LightingPasses;
+    FxSizedArray<RxDeferredLightingPass> LightingPasses;
 
     //////////////////////
     // Composition Pass
@@ -94,19 +93,18 @@ public:
     RxGraphicsPipeline CompPipeline;
     FxSizedArray<RxFramebuffer> OutputFramebuffers;
 
-    FxSizedArray<FxDeferredCompPass> CompPasses;
+    FxSizedArray<RxDeferredCompPass> CompPasses;
 };
-
 
 
 ///////////////////////////////
 // Geometry Pass (Per FIF)
 ///////////////////////////////
 
-class FxDeferredGPass
+class RxDeferredGPass
 {
 public:
-    void Create(FxDeferredRenderer* renderer, const FxVec2u& extent);
+    void Create(RxDeferredRenderer* renderer, const FxVec2u& extent);
     void Destroy();
 
     void Begin();
@@ -131,21 +129,21 @@ public:
     RxFramebuffer Framebuffer;
 
     RxDescriptorPool DescriptorPool;
-//    RxDescriptorSet DescriptorSet;
+    //    RxDescriptorSet DescriptorSet;
 
     RxRawGpuBuffer<RxUniformBufferObject> UniformBuffer;
 
 
 private:
     RxGraphicsPipeline* mGPassPipeline = nullptr;
-    FxDeferredRenderer* mRendererInst = nullptr;
+    RxDeferredRenderer* mRendererInst = nullptr;
 };
 
 
-class FxDeferredLightVolumePass
+class RxDeferredLightVolumePass
 {
 public:
-    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
+    void Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
     void Destroy();
 
     void Begin();
@@ -164,17 +162,17 @@ public:
 
 private:
     RxGraphicsPipeline* mLightingPipeline = nullptr;
-    FxDeferredRenderer* mRendererInst = nullptr;
+    RxDeferredRenderer* mRendererInst = nullptr;
 };
 
 ///////////////////////////////
 // Lighting Pass (Per FIF)
 ///////////////////////////////
 
-class FxDeferredLightingPass
+class RxDeferredLightingPass
 {
 public:
-    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
+    void Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
     void Destroy();
 
     void Begin();
@@ -193,7 +191,7 @@ public:
 
 private:
     RxGraphicsPipeline* mLightingPipeline = nullptr;
-    FxDeferredRenderer* mRendererInst = nullptr;
+    RxDeferredRenderer* mRendererInst = nullptr;
 };
 
 
@@ -203,10 +201,10 @@ class FxCamera;
 // Composition Pass (Per FIF)
 ///////////////////////////////
 
-class FxDeferredCompPass
+class RxDeferredCompPass
 {
 public:
-    void Create(FxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
+    void Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
     void Destroy();
 
     void Begin();
@@ -224,7 +222,7 @@ public:
 
 private:
     RxGraphicsPipeline* mCompPipeline = nullptr;
-    FxDeferredRenderer* mRendererInst = nullptr;
+    RxDeferredRenderer* mRendererInst = nullptr;
 
     RxFrameData* mCurrentFrame = nullptr;
 };

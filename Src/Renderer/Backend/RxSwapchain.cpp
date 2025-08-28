@@ -1,17 +1,17 @@
 #include "RxSwapchain.hpp"
-#include "RxDevice.hpp"
+
 #include "../Renderer.hpp"
-
-#include <Core/FxDefines.hpp>
-#include <Core/FxPanic.hpp>
-
-#include <Renderer/FxDeferred.hpp>
+#include "RxDevice.hpp"
 
 #include <vulkan/vulkan.h>
 
+#include <Core/FxDefines.hpp>
+#include <Core/FxPanic.hpp>
+#include <Renderer/RxDeferred.hpp>
+
 FX_SET_MODULE_NAME("RxSwapchain")
 
-void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR &surface, RxGpuDevice *device)
+void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device)
 {
     AssertRendererExists();
 
@@ -77,7 +77,7 @@ void RxSwapchain::CreateImageViews()
     }
 }
 
-void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface)
+void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
 {
     Extent = size;
 
@@ -99,7 +99,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface)
         image_count = capabilities.maxImageCount;
     }
 
-    Log::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount, image_count);
+    Log::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount,
+              image_count);
 
     SurfaceFormat = mDevice->GetBestSurfaceFormat();
 
@@ -153,13 +154,11 @@ void RxSwapchain::CreateSwapchainFramebuffers()
     }
 
     ColorSampler.Create();
-    DepthSampler.Create(VK_FILTER_NEAREST, VK_FILTER_NEAREST, VK_SAMPLER_MIPMAP_MODE_NEAREST);
+    DepthSampler.Create(RxSamplerFilter::Nearest, RxSamplerFilter::Nearest, RxSamplerFilter::Nearest);
     NormalsSampler.Create();
     LightsSampler.Create();
 
     // mCompPipeline = comp_pipeline;
-
-
 }
 
 void RxSwapchain::DestroyFramebuffersAndImageViews()

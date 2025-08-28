@@ -1,6 +1,6 @@
 #include "FxEntity.hpp"
 
-#include <Renderer/FxDeferred.hpp>
+#include <Renderer/RxDeferred.hpp>
 
 FxEntityManager& FxEntityManager::GetGlobalManager()
 {
@@ -32,7 +32,7 @@ FxRef<FxEntity> FxEntityManager::New()
 void FxOldSceneObject::Render(const FxCamera& camera)
 {
     assert(false);
-    
+
     RxFrameData* frame = Renderer->GetFrame();
 
     if (!mMaterial) {
@@ -43,9 +43,8 @@ void FxOldSceneObject::Render(const FxCamera& camera)
         mMaterial->Build();
     }
 
-    VkDescriptorSet sets_to_bind[] = {
-//        Renderer->CurrentGPass->DescriptorSet.Set,
-        mMaterial->mDescriptorSet.Set
+    VkDescriptorSet sets_to_bind[] = { //        Renderer->CurrentGPass->DescriptorSet.Set,
+                                       mMaterial->mDescriptorSet.Set
     };
 
     FxMat4f VP = camera.VPMatrix;
@@ -56,13 +55,15 @@ void FxOldSceneObject::Render(const FxCamera& camera)
 
     frame->SubmitUbo(mUbo);
 
-    RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mMaterial->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
+    RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mMaterial->Pipeline, sets_to_bind,
+                                  sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
-    FxDrawPushConstants push_constants{};
+    FxDrawPushConstants push_constants {};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
     memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
 
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, mMaterial->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, mMaterial->Pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
+                       &push_constants);
 
     // if (mMaterial) {
     //     mMaterial->Bind(nullptr);

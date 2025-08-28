@@ -1,9 +1,9 @@
 #pragma once
 
-#include <Renderer/FxRenderBackend.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
-void SetRendererBackend(FxRenderBackend *backend);
+void SetRendererBackend(RxRenderBackend* backend);
 
 void AssertRendererExists();
 
-extern FxRenderBackend *Renderer;
+extern RxRenderBackend* Renderer;

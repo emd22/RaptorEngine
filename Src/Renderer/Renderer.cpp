@@ -1,16 +1,17 @@
 #include "Renderer.hpp"
+
 #include "Core/FxDefines.hpp"
 
 #include <Core/FxPanic.hpp>
 
 FX_SET_MODULE_NAME("Renderer")
 
-FxRenderBackend *Renderer;
+RxRenderBackend* Renderer;
 
-void SetRendererBackend(FxRenderBackend *backend)
+void SetRendererBackend(RxRenderBackend* backend)
 {
     Renderer = backend;
-    Renderer = static_cast<FxRenderBackend *>(Renderer);
+    Renderer = static_cast<RxRenderBackend*>(Renderer);
 }
 
 void AssertRendererExists()

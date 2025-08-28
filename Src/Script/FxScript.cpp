@@ -1,9 +1,10 @@
 #include "FxScript.hpp"
 
 #include <stdio.h>
-#include <Core/Types.hpp>
-#include <Core/FxUtil.hpp>
+
 #include <Core/FxMemory.hpp>
+#include <Core/FxUtil.hpp>
+#include <Core/Types.hpp>
 
 #define FX_SCRIPT_SCOPE_GLOBAL_VARS_START_SIZE 32
 #define FX_SCRIPT_SCOPE_LOCAL_VARS_START_SIZE 16
@@ -14,7 +15,7 @@
 using Token = FxTokenizer::Token;
 using TT = FxTokenizer::TokenType;
 
-FxScriptValue FxScriptValue::None{};
+FxScriptValue FxScriptValue::None {};
 
 void FxConfigScript::LoadFile(const char* path)
 {
@@ -32,12 +33,13 @@ void FxConfigScript::LoadFile(const char* path)
 
     size_t read_size = std::fread(mFileData, 1, file_size, fp);
     if (read_size != file_size) {
-        printf("[WARNING] Error reading all data from config file at '%s' (read=%zu, size=%zu)\n", path, read_size, file_size);
+        printf("[WARNING] Error reading all data from config file at '%s' "
+               "(read=%zu, size=%zu)\n",
+               path, read_size, file_size);
     }
 
     FxTokenizer tokenizer(mFileData, read_size);
     tokenizer.Tokenize();
-
 
     fclose(fp);
 
@@ -67,7 +69,8 @@ Token& FxConfigScript::EatToken(TT token_type)
 {
     Token& token = GetToken();
     if (token.Type != token_type) {
-        printf("[ERROR] %u:%u: Unexpected token type %s when expecting %s!\n", token.FileLine, token.FileColumn, FxTokenizer::GetTypeName(token.Type), FxTokenizer::GetTypeName(token_type));
+        printf("[ERROR] %u:%u: Unexpected token type %s when expecting %s!\n", token.FileLine, token.FileColumn, FxTokenizer::GetTypeName(token.Type),
+               FxTokenizer::GetTypeName(token_type));
         mHasErrors = true;
     }
     ++mTokenIndex;
@@ -148,7 +151,7 @@ FxAstNode* FxConfigScript::TryParseKeyword()
 
     if (hash == kw_action) {
         EatToken(TT::Identifier);
-        //ParseActionDeclare();
+        // ParseActionDeclare();
         return ParseActionDeclare();
     }
     if (hash == kw_local) {
@@ -221,7 +224,7 @@ FxAstVarDecl* FxConfigScript::ParseVarDeclare(FxScriptScope* scope)
     node->Type = &type;
     node->DefineAsGlobal = (scope == &mScopes[0]);
 
-    FxScriptVar var{ &type, &name, scope };
+    FxScriptVar var {&type, &name, scope};
 
     node->Assignment = TryParseAssignment(node->Name);
     /*if (node->Assignment) {
@@ -232,19 +235,19 @@ FxAstVarDecl* FxConfigScript::ParseVarDeclare(FxScriptScope* scope)
     return node;
 }
 
-//FxScriptVar& FxConfigScript::ParseVarDeclare()
+// FxScriptVar& FxConfigScript::ParseVarDeclare()
 //{
-//    Token& type = EatToken(TT::Identifier);
-//    Token& name = EatToken(TT::Identifier);
+//     Token& type = EatToken(TT::Identifier);
+//     Token& name = EatToken(TT::Identifier);
 //
-//    FxScriptVar var{ name.GetHash(), &type, &name };
+//     FxScriptVar var{ name.GetHash(), &type, &name };
 //
-//    TryParseAssignment(var);
+//     TryParseAssignment(var);
 //
-//    mCurrentScope->Vars.Insert(var);
+//     mCurrentScope->Vars.Insert(var);
 //
-//    return mCurrentScope->Vars.GetLast();
-//}
+//     return mCurrentScope->Vars.GetLast();
+// }
 
 FxScriptVar* FxConfigScript::FindVar(FxHash hashed_name)
 {
@@ -314,7 +317,7 @@ void FxConfigScript::Execute(FxScriptVM& vm)
         printf("Var(%u) AT %lld\n", handle.HashedName, handle.Offset);
     }
 
-    //return;
+    // return;
 
     vm.mExternalFuncs = mExternalFuncs;
     vm.Start(std::move(emitter.mBytecode));
@@ -365,7 +368,7 @@ bool FxConfigScript::ExecuteUserCommand(const char* command, FxScriptInterpreter
         tokenizer.Tokenize();
 
         for (FxTokenizer::Token& token : tokenizer.GetTokens()) {
-            //token.Print();
+            // token.Print();
             mTokens.Insert(token);
         }
 
@@ -384,7 +387,7 @@ bool FxConfigScript::ExecuteUserCommand(const char* command, FxScriptInterpreter
         root_block->Statements.push_back(statement);
     }
 
-    //FxAstNode* node = ParseStatementAsCommand();
+    // FxAstNode* node = ParseStatementAsCommand();
 
     // Revert the current state if there have been errors
     if (root_block == nullptr) {
@@ -440,16 +443,16 @@ FxScriptValue FxConfigScript::ParseValue()
             EatToken(TT::Identifier);
 
             return value;
-        }
-        else {
-            // We cannot find the definition for the variable, assume that it is an external variable that will be defined
-            // during the interpret stage.
+        } else {
+            // We cannot find the definition for the variable, assume that it is an
+            // external variable that will be defined during the interpret stage.
 
             printf("ERROR: Undefined reference to variable ");
             token.Print();
             printf("\n");
 
-            //printf("Undefined reference to variable \"%.*s\"! (Hash:%u)\n", token.Length, token.Start, token.GetHash());
+            // printf("Undefined reference to variable \"%.*s\"! (Hash:%u)\n",
+            // token.Length, token.Start, token.GetHash());
             EatToken(TT::Identifier);
         }
     }
@@ -476,10 +479,10 @@ FxScriptValue FxConfigScript::ParseValue()
     return value;
 }
 
-#define RETURN_IF_NO_TOKENS(rval_) \
-    { \
-        if (mTokenIndex >= mTokens.Size()) \
-            return (rval_); \
+#define RETURN_IF_NO_TOKENS(rval_)                                                                                                                   \
+    {                                                                                                                                                \
+        if (mTokenIndex >= mTokens.Size())                                                                                                           \
+            return (rval_);                                                                                                                          \
     }
 
 static bool IsTokenTypeLiteral(FxTokenizer::TokenType type)
@@ -489,7 +492,6 @@ static bool IsTokenTypeLiteral(FxTokenizer::TokenType type)
 
 FxAstNode* FxConfigScript::ParseRhs()
 {
-
     RETURN_IF_NO_TOKENS(nullptr);
 
     bool has_parameters = false;
@@ -499,7 +501,8 @@ FxAstNode* FxConfigScript::ParseRhs()
         has_parameters = next_token_type == TT::LParen;
 
         if (mInCommandMode) {
-            has_parameters = next_token_type == TT::Identifier || next_token_type == TT::Integer || next_token_type == TT::Float || next_token_type == TT::String;
+            has_parameters =
+                next_token_type == TT::Identifier || next_token_type == TT::Integer || next_token_type == TT::Float || next_token_type == TT::String;
         }
     }
 
@@ -509,19 +512,17 @@ FxAstNode* FxConfigScript::ParseRhs()
 
     if (token.Type == TT::Identifier) {
         if (has_parameters) {
-            lhs =  ParseActionCall();
-        }
-        else {
+            lhs = ParseActionCall();
+        } else {
             FxScriptExternalFunc* external_action = FindExternalAction(token.GetHash());
             if (external_action != nullptr) {
-                lhs =  ParseActionCall();
+                lhs = ParseActionCall();
             }
 
             FxScriptAction* action = FindAction(token.GetHash());
             if (action != nullptr) {
-                lhs =  ParseActionCall();
+                lhs = ParseActionCall();
             }
-
         }
     }
     if (!lhs) {
@@ -532,12 +533,10 @@ FxAstNode* FxConfigScript::ParseRhs()
             literal->Value = value;
 
             lhs = literal;
-        }
-        else {
+        } else {
             lhs = ParseRhs();
         }
     }
-
 
     // FxAstLiteral* literal = FX_SCRIPT_ALLOC_NODE(FxAstLiteral);
     // literal->Value = value;
@@ -565,7 +564,9 @@ FxAstNode* FxConfigScript::ParseRhs()
         has_parameters = next_token_type == TT::LParen;
 
         if (mInCommandMode) {
-            has_parameters = next_token_type == TT::Identifier || next_token_type == TT::Integer || next_token_type == TT::Float || next_token_type == TT::String;
+            has_parameters = next_token_type == TT::Identifier || next_token_type
+    == TT::Integer || next_token_type == TT::Float || next_token_type ==
+    TT::String;
         }
     }
 
@@ -578,9 +579,9 @@ FxAstNode* FxConfigScript::ParseRhs()
             lhs = ParseActionCall();
         }
         else {
-            FxScriptExternalFunc* external_action = FindExternalAction(token.GetHash());
-            if (external_action != nullptr) {
-                return ParseActionCall();
+            FxScriptExternalFunc* external_action =
+    FindExternalAction(token.GetHash()); if (external_action != nullptr) { return
+    ParseActionCall();
             }
 
             FxScriptAction* action = FindAction(token.GetHash());
@@ -627,7 +628,7 @@ FxAstAssign* FxConfigScript::TryParseAssignment(FxTokenizer::Token* var_name)
     var_ref->Scope = mCurrentScope;
     node->Var = var_ref;
 
-    //node->Value = ParseValue();
+    // node->Value = ParseValue();
     node->Rhs = ParseRhs();
 
     return node;
@@ -717,15 +718,15 @@ FxAstNode* FxConfigScript::ParseStatementAsCommand()
             FxScriptExternalFunc* external_action = FindExternalAction(GetToken().GetHash());
             if (external_action != nullptr) {
                 node = ParseActionCall();
-            }
-            else {
+            } else {
                 FxScriptAction* action = FindAction(GetToken().GetHash());
                 if (action != nullptr) {
                     node = ParseActionCall();
                 }
             }
         }
-        // If there is just a semicolon after an identifier, parse as an rhs to print out later
+        // If there is just a semicolon after an identifier, parse as an rhs to
+        // print out later
         if (!node && next_token_type == TT::Semicolon) {
             node = ParseRhs();
         }
@@ -783,16 +784,13 @@ FxAstNode* FxConfigScript::ParseStatement()
     if (!node && (mTokenIndex < mTokens.Size() && GetToken().Type == TT::Identifier)) {
         if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::LParen) {
             node = ParseActionCall();
-        }
-        else if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::Equals) {
+        } else if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::Equals) {
             Token& assign_name = EatToken(TT::Identifier);
             node = TryParseAssignment(&assign_name);
-        }
-        else {
+        } else {
             GetToken().Print();
         }
     }
-
 
     if (!node) {
         return nullptr;
@@ -879,19 +877,20 @@ FxAstActionDecl* FxConfigScript::ParseActionDeclare()
     return node;
 }
 
-//FxScriptValue FxConfigScript::TryCallInternalFunc(FxHash func_name, std::vector<FxScriptValue>& params)
+// FxScriptValue FxConfigScript::TryCallInternalFunc(FxHash func_name,
+// std::vector<FxScriptValue>& params)
 //{
-//    FxScriptValue return_value;
+//     FxScriptValue return_value;
 //
-//    for (const FxScriptInternalFunc& func : mInternalFuncs) {
-//        if (func.HashedName == func_name) {
-//            func.Func(params, &return_value);
-//            return return_value;
-//        }
-//    }
+//     for (const FxScriptInternalFunc& func : mInternalFuncs) {
+//         if (func.HashedName == func_name) {
+//             func.Func(params, &return_value);
+//             return return_value;
+//         }
+//     }
 //
-//    return return_value;
-//}
+//     return return_value;
+// }
 
 FxAstActionCall* FxConfigScript::ParseActionCall()
 {
@@ -932,7 +931,6 @@ FxAstActionCall* FxConfigScript::ParseActionCall()
             continue;
         }
 
-
         break;
     }
 
@@ -943,40 +941,37 @@ FxAstActionCall* FxConfigScript::ParseActionCall()
     return node;
 }
 
-
-
-//void FxConfigScript::ParseDoCall()
+// void FxConfigScript::ParseDoCall()
 //{
-//    Token& call_name = EatToken(TT::Identifier);
+//     Token& call_name = EatToken(TT::Identifier);
 //
-//    EatToken(TT::LParen);
+//     EatToken(TT::LParen);
 //
-//    std::vector<FxScriptValue> params;
+//     std::vector<FxScriptValue> params;
 //
-//    while (true) {
-//        params.push_back(ParseValue());
+//     while (true) {
+//         params.push_back(ParseValue());
 //
-//        if (GetToken().Type == TT::Comma) {
-//            EatToken(TT::Comma);
-//            continue;
-//        }
+//         if (GetToken().Type == TT::Comma) {
+//             EatToken(TT::Comma);
+//             continue;
+//         }
 //
-//        break;
-//    }
+//         break;
+//     }
 //
-//    EatToken(TT::RParen);
+//     EatToken(TT::RParen);
 //
-//    TryCallInternalFunc(call_name.GetHash(), params);
+//     TryCallInternalFunc(call_name.GetHash(), params);
 //
-//    printf("Calling ");
-//    call_name.Print();
+//     printf("Calling ");
+//     call_name.Print();
 //
-//    for (const auto& param : params) {
-//        printf("param : ");
-//        param.Print();
-//    }
-//}
-
+//     for (const auto& param : params) {
+//         printf("param : ");
+//         param.Print();
+//     }
+// }
 
 FxAstBlock* FxConfigScript::Parse()
 {
@@ -1001,13 +996,10 @@ FxAstBlock* FxConfigScript::Parse()
     return root_block;
 }
 
-
-
-
 //////////////////////////////////////////
 // Script Interpreter
 //////////////////////////////////////////
-//#if 0
+// #if 0
 void FxScriptInterpreter::Create(FxAstBlock* root_block)
 {
     mRootBlock = root_block;
@@ -1018,7 +1010,6 @@ void FxScriptInterpreter::Create(FxAstBlock* root_block)
     mCurrentScope->Vars.Create(FX_SCRIPT_SCOPE_LOCAL_VARS_START_SIZE);
     mCurrentScope->Actions.Create(FX_SCRIPT_SCOPE_LOCAL_ACTIONS_START_SIZE);
 }
-
 
 void FxScriptInterpreter::Interpret()
 {
@@ -1116,7 +1107,7 @@ FxScriptValue FxScriptInterpreter::VisitExternalCall(FxAstActionCall* call, FxSc
 {
     FxScriptValue return_value;
 
-    //PushScope();
+    // PushScope();
 
     if (!CheckExternalCallArgs(call, func)) {
         printf("!!! Parameters do not match for function call!\n");
@@ -1133,7 +1124,7 @@ FxScriptValue FxScriptInterpreter::VisitExternalCall(FxAstActionCall* call, FxSc
 
     // func.Function(*this, params, &return_value);
 
-    //PopScope();
+    // PopScope();
 
     return return_value;
 }
@@ -1179,7 +1170,6 @@ FxScriptValue FxScriptInterpreter::VisitActionCall(FxAstActionCall* call)
         mCurrentScope->Vars.Insert(param);
     }
 
-
     if (call->Action->Declaration->ReturnVar) {
         FxAstVarDecl* decl = call->Action->Declaration->ReturnVar;
 
@@ -1187,7 +1177,6 @@ FxScriptValue FxScriptInterpreter::VisitActionCall(FxAstActionCall* call)
         mCurrentScope->Vars.Insert(return_var);
 
         mCurrentScope->ReturnVar = &mCurrentScope->Vars.GetLast();
-
     }
 
     Visit(call->Action->Block);
@@ -1197,7 +1186,7 @@ FxScriptValue FxScriptInterpreter::VisitActionCall(FxAstActionCall* call)
         return_value = GetImmediateValue(mCurrentScope->ReturnVar->Value);
     }
 
-    //mCurrentScope->PrintAllVarsInScope();
+    // mCurrentScope->PrintAllVarsInScope();
 
     PopScope();
 
@@ -1209,12 +1198,10 @@ FxScriptValue FxScriptInterpreter::VisitRhs(FxAstNode* node)
     if (node->NodeType == FX_AST_LITERAL) {
         FxAstLiteral* literal = reinterpret_cast<FxAstLiteral*>(node);
         return literal->Value;
-    }
-    else if (node->NodeType == FX_AST_ACTIONCALL) {
+    } else if (node->NodeType == FX_AST_ACTIONCALL) {
         FxAstActionCall* call = reinterpret_cast<FxAstActionCall*>(node);
         return VisitActionCall(call);
-    }
-    else if (node->NodeType == FX_AST_BINOP) {
+    } else if (node->NodeType == FX_AST_BINOP) {
         FxAstBinop* binop = reinterpret_cast<FxAstBinop*>(node);
 
         FxScriptValue lhs_pre_val = VisitRhs(binop->Left);
@@ -1233,19 +1220,16 @@ FxScriptValue FxScriptInterpreter::VisitRhs(FxAstNode* node)
 
             if (rhs.Type == FxScriptValue::INT) {
                 result.ValueInt += rhs.ValueInt * sign;
-            }
-            else if (rhs.Type == FxScriptValue::FLOAT) {
+            } else if (rhs.Type == FxScriptValue::FLOAT) {
                 result.ValueInt += rhs.ValueFloat * sign;
             }
-        }
-        else if (lhs.Type == FxScriptValue::FLOAT) {
+        } else if (lhs.Type == FxScriptValue::FLOAT) {
             result.ValueFloat = lhs.ValueFloat;
             result.Type = FxScriptValue::FLOAT;
 
             if (rhs.Type == FxScriptValue::INT) {
                 result.ValueFloat += rhs.ValueInt * sign;
-            }
-            else if (rhs.Type == FxScriptValue::FLOAT) {
+            } else if (rhs.Type == FxScriptValue::FLOAT) {
                 result.ValueFloat += rhs.ValueFloat * sign;
             }
         }
@@ -1253,7 +1237,7 @@ FxScriptValue FxScriptInterpreter::VisitRhs(FxAstNode* node)
         return result;
     }
 
-    FxScriptValue value{};
+    FxScriptValue value {};
     return value;
 }
 
@@ -1261,17 +1245,14 @@ void FxConfigScript::DefineDefaultExternalFunctions()
 {
     // log([int | float | string | ref] args...)
     RegisterExternalFunc(
-        FxHashStr("log"),
-        {},        // Do not check argument types as we handle it here
-        [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue* return_value)
-        {
+        FxHashStr("log"), {}, // Do not check argument types as we handle it here
+        [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue* return_value) {
             printf("[SCRIPT]: ");
 
             for (int i = args.size() - 1; i >= 0; i--) {
-
                 FxScriptValue& arg = args[i];
 
-                //const FxScriptValue& value = interpreter.GetImmediateValue(arg);
+                // const FxScriptValue& value = interpreter.GetImmediateValue(arg);
                 const FxScriptValue& value = arg;
 
                 switch (value.Type) {
@@ -1297,18 +1278,19 @@ void FxConfigScript::DefineDefaultExternalFunctions()
 
             putchar('\n');
         },
-        true    // Is variadic?
+        true // Is variadic?
     );
 
     // listvars()
-    //RegisterExternalFunc(
+    // RegisterExternalFunc(
     //    FxHashStr("__listvars__"),
     //    {},
-    //    [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue* return_value)
+    //    [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue*
+    //    return_value)
     //    {
     //        FxScriptScope* scope = interpreter.mCurrentScope;
-    //        // Since there is a new scope created on function call, we need to start from the parent scope
-    //        if (scope && scope->Parent) {
+    //        // Since there is a new scope created on function call, we need to
+    //        start from the parent scope if (scope && scope->Parent) {
     //            scope = scope->Parent;
     //        }
 
@@ -1321,14 +1303,15 @@ void FxConfigScript::DefineDefaultExternalFunctions()
     //);
 
     // listactions()
-    //RegisterExternalFunc(
+    // RegisterExternalFunc(
     //    FxHashStr("__listactions__"),
     //    {},
-    //    [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue* return_value)
+    //    [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue*
+    //    return_value)
     //    {
     //        FxScriptScope* scope = interpreter.mCurrentScope;
-    //        // Since there is a new scope created on function call, we need to start from the parent scope
-    //        if (scope && scope->Parent) {
+    //        // Since there is a new scope created on function call, we need to
+    //        start from the parent scope if (scope && scope->Parent) {
     //            scope = scope->Parent;
     //        }
 
@@ -1336,11 +1319,13 @@ void FxConfigScript::DefineDefaultExternalFunctions()
 
     //            for (const FxScriptAction& action : scope->Actions) {
     //                // Print out the action name
-    //                printf("action %.*s", action.Declaration->Name->Length, action.Declaration->Name->Start);
+    //                printf("action %.*s", action.Declaration->Name->Length,
+    //                action.Declaration->Name->Start);
 
     //                // Retrieve the declarations for all parameters
-    //                std::vector<FxAstNode*>& param_decls = action.Declaration->Params->Statements;
-    //                const size_t param_count = param_decls.size();
+    //                std::vector<FxAstNode*>& param_decls =
+    //                action.Declaration->Params->Statements; const size_t
+    //                param_count = param_decls.size();
 
     //                // Print out the parameter list
     //                putchar('(');
@@ -1351,25 +1336,30 @@ void FxConfigScript::DefineDefaultExternalFunctions()
     //                        continue;
     //                    }
 
-    //                    FxAstVarDecl* param_decl = reinterpret_cast<FxAstVarDecl*>(param_node);
+    //                    FxAstVarDecl* param_decl =
+    //                    reinterpret_cast<FxAstVarDecl*>(param_node);
 
     //                    // Print the type of the parameter
-    //                    printf("%.*s ", param_decl->Type->Length, param_decl->Type->Start);
+    //                    printf("%.*s ", param_decl->Type->Length,
+    //                    param_decl->Type->Start);
 
     //                    // Print the name of the parameter
-    //                    printf("%.*s", param_decl->Name->Length, param_decl->Name->Start);
+    //                    printf("%.*s", param_decl->Name->Length,
+    //                    param_decl->Name->Start);
 
-    //                    // If there are more parameters following, output a comma
-    //                    if (i < param_count - 1) {
+    //                    // If there are more parameters following, output a
+    //                    comma if (i < param_count - 1) {
     //                        printf(", ");
     //                    }
     //                }
 
     //                putchar(')');
 
-    //                // Print out the return type at the end of the declaration if it exists
-    //                if (action.Declaration->ReturnVar) {
-    //                    printf(" %.*s", action.Declaration->ReturnVar->Type->Length, action.Declaration->ReturnVar->Type->Start);
+    //                // Print out the return type at the end of the declaration
+    //                if it exists if (action.Declaration->ReturnVar) {
+    //                    printf(" %.*s",
+    //                    action.Declaration->ReturnVar->Type->Length,
+    //                    action.Declaration->ReturnVar->Type->Start);
     //                }
 
     //                putchar('\n');
@@ -1425,10 +1415,9 @@ void FxScriptInterpreter::VisitAssignment(FxAstAssign* assign)
         return;
     }
 
-
     var->Value = new_value;
 
-    //puts("Visit Assign");
+    // puts("Visit Assign");
 }
 
 void FxScriptInterpreter::Visit(FxAstNode* node)
@@ -1438,7 +1427,7 @@ void FxScriptInterpreter::Visit(FxAstNode* node)
     }
 
     if (node->NodeType == FX_AST_BLOCK) {
-        //puts("Visit Block");
+        // puts("Visit Block");
 
         FxAstBlock* block = reinterpret_cast<FxAstBlock*>(node);
         for (FxAstNode* child : block->Statements) {
@@ -1448,19 +1437,17 @@ void FxScriptInterpreter::Visit(FxAstNode* node)
 
             Visit(child);
         }
-    }
-    else if (node->NodeType == FX_AST_ACTIONDECL) {
+    } else if (node->NodeType == FX_AST_ACTIONDECL) {
         FxAstActionDecl* actiondecl = reinterpret_cast<FxAstActionDecl*>(node);
-        //puts("Visit ActionDecl");
+        // puts("Visit ActionDecl");
 
         FxScriptAction action(actiondecl->Name, mCurrentScope, actiondecl->Block, actiondecl);
         mCurrentScope->Actions.Insert(action);
 
-        //Visit(actiondecl->Block);
-    }
-    else if (node->NodeType == FX_AST_VARDECL) {
+        // Visit(actiondecl->Block);
+    } else if (node->NodeType == FX_AST_VARDECL) {
         FxAstVarDecl* vardecl = reinterpret_cast<FxAstVarDecl*>(node);
-        //puts("Visit VarDecl");
+        // puts("Visit VarDecl");
 
         FxScriptScope* scope = mCurrentScope;
         if (vardecl->DefineAsGlobal) {
@@ -1471,12 +1458,10 @@ void FxScriptInterpreter::Visit(FxAstNode* node)
         scope->Vars.Insert(var);
 
         Visit(vardecl->Assignment);
-    }
-    else if (node->NodeType == FX_AST_ASSIGN) {
+    } else if (node->NodeType == FX_AST_ASSIGN) {
         FxAstAssign* assign = reinterpret_cast<FxAstAssign*>(node);
         VisitAssignment(assign);
-    }
-    else if (node->NodeType == FX_AST_ACTIONCALL) {
+    } else if (node->NodeType == FX_AST_ACTIONCALL) {
         FxAstActionCall* actioncall = reinterpret_cast<FxAstActionCall*>(node);
         FxScriptValue return_value = VisitActionCall(actioncall);
 
@@ -1504,8 +1489,7 @@ void FxScriptInterpreter::Visit(FxAstNode* node)
         mInCommandMode = true;
         Visit(reinterpret_cast<FxAstCommandMode*>(node)->Node);
         mInCommandMode = false;
-    }
-    else {
+    } else {
         puts("[UNKNOWN]");
     }
 }
@@ -1519,8 +1503,7 @@ void FxScriptInterpreter::DefineExternalVar(const char* type, const char* name, 
         const uint32 type_len = strlen(type);
         char* type_buffer = FX_SCRIPT_ALLOC_MEMORY(char, (type_len + 1));
         strcpy(type_buffer, type);
-        //type_buffer[type_len + 1] = 0;
-
+        // type_buffer[type_len + 1] = 0;
 
         type_token->Start = type_buffer;
         type_token->Type = TT::Identifier;
@@ -1556,7 +1539,7 @@ const FxScriptValue& FxScriptInterpreter::GetImmediateValue(const FxScriptValue&
 
         if (!var) {
             printf("!!! Undefined reference to variable\n");
-            //value.ValueRef->Name->Print();
+            // value.ValueRef->Name->Print();
             putchar('\n');
 
             return FxScriptValue::None;
@@ -1568,11 +1551,12 @@ const FxScriptValue& FxScriptInterpreter::GetImmediateValue(const FxScriptValue&
     return value;
 }
 
-//#endif
+// #endif
 
-void FxConfigScript::RegisterExternalFunc(FxHash func_name, std::vector<FxScriptValue::ValueType> param_types, FxScriptExternalFunc::FuncType callback, bool is_variadic)
+void FxConfigScript::RegisterExternalFunc(FxHash func_name, std::vector<FxScriptValue::ValueType> param_types,
+                                          FxScriptExternalFunc::FuncType callback, bool is_variadic)
 {
-    FxScriptExternalFunc func{
+    FxScriptExternalFunc func {
         .HashedName = func_name,
         .Function = callback,
         .ParameterTypes = param_types,
@@ -1581,7 +1565,6 @@ void FxConfigScript::RegisterExternalFunc(FxHash func_name, std::vector<FxScript
 
     mExternalFuncs.push_back(func);
 }
-
 
 /////////////////////////////////////////
 // Script Bytecode Emitter
@@ -1606,11 +1589,15 @@ void FxScriptBCEmitter::BeginEmitting(FxAstNode* node)
     PrintBytecode();
 }
 
-#define RETURN_IF_NO_NODE(node_) \
-    if ((node_) == nullptr) { return; }
+#define RETURN_IF_NO_NODE(node_)                                                                                                                     \
+    if ((node_) == nullptr) {                                                                                                                        \
+        return;                                                                                                                                      \
+    }
 
-#define RETURN_VALUE_IF_NO_NODE(node_, value_) \
-    if ((node_) == nullptr) { return (value_); }
+#define RETURN_VALUE_IF_NO_NODE(node_, value_)                                                                                                       \
+    if ((node_) == nullptr) {                                                                                                                        \
+        return (value_);                                                                                                                             \
+    }
 
 void FxScriptBCEmitter::Emit(FxAstNode* node)
 {
@@ -1618,17 +1605,13 @@ void FxScriptBCEmitter::Emit(FxAstNode* node)
 
     if (node->NodeType == FX_AST_BLOCK) {
         return EmitBlock(reinterpret_cast<FxAstBlock*>(node));
-    }
-    else if (node->NodeType == FX_AST_ACTIONDECL) {
+    } else if (node->NodeType == FX_AST_ACTIONDECL) {
         return EmitAction(reinterpret_cast<FxAstActionDecl*>(node));
-    }
-    else if (node->NodeType == FX_AST_ACTIONCALL) {
+    } else if (node->NodeType == FX_AST_ACTIONCALL) {
         return DoActionCall(reinterpret_cast<FxAstActionCall*>(node));
-    }
-    else if (node->NodeType == FX_AST_ASSIGN) {
+    } else if (node->NodeType == FX_AST_ASSIGN) {
         return EmitAssign(reinterpret_cast<FxAstAssign*>(node));
-    }
-    else if (node->NodeType == FX_AST_VARDECL) {
+    } else if (node->NodeType == FX_AST_VARDECL) {
         DoVarDeclare(reinterpret_cast<FxAstVarDecl*>(node));
         return;
     }
@@ -1653,8 +1636,6 @@ FxScriptBytecodeActionHandle* FxScriptBCEmitter::FindActionHandle(FxHash hashed_
     }
     return nullptr;
 }
-
-
 
 FxScriptRegister FxScriptBCEmitter::FindFreeRegister()
 {
@@ -1748,7 +1729,6 @@ FxScriptRegisterFlag FxScriptBCEmitter::RegToRegFlag(FxScriptRegister reg)
     return FX_REGFLAG_NONE;
 }
 
-
 void FxScriptBCEmitter::Write16(uint16 value)
 {
     mBytecode.Insert(static_cast<uint8>(value >> 8));
@@ -1769,8 +1749,14 @@ void FxScriptBCEmitter::WriteOp(uint8 op_base, uint8 op_spec)
 
 using RhsMode = FxScriptBCEmitter::RhsMode;
 
-#define MARK_REGISTER_USED(regn_) { MarkRegisterUsed(regn_); }
-#define MARK_REGISTER_FREE(regn_) { MarkRegisterFree(regn_); }
+#define MARK_REGISTER_USED(regn_)                                                                                                                    \
+    {                                                                                                                                                \
+        MarkRegisterUsed(regn_);                                                                                                                     \
+    }
+#define MARK_REGISTER_FREE(regn_)                                                                                                                    \
+    {                                                                                                                                                \
+        MarkRegisterFree(regn_);                                                                                                                     \
+    }
 
 void FxScriptBCEmitter::MarkRegisterUsed(FxScriptRegister reg)
 {
@@ -1809,7 +1795,6 @@ void FxScriptBCEmitter::EmitSaveReg32(int16 offset, FxScriptRegister reg)
     Write16(reg);
 }
 
-
 void FxScriptBCEmitter::EmitSaveAbsolute32(uint32 position, uint32 value)
 {
     // SAVE32a [i32 offset] [i32]
@@ -1834,10 +1819,6 @@ void FxScriptBCEmitter::EmitSaveAbsoluteReg32(uint32 position, FxScriptRegister 
     Write16(reg);
 }
 
-
-
-
-
 void FxScriptBCEmitter::EmitPush32(uint32 value)
 {
     // PUSH32 [i32]
@@ -1860,7 +1841,6 @@ void FxScriptBCEmitter::EmitPush32r(FxScriptRegister reg)
 
     mStackOffset += 4;
 }
-
 
 void FxScriptBCEmitter::EmitPop32(FxScriptRegister output_reg)
 {
@@ -1907,7 +1887,6 @@ void FxScriptBCEmitter::EmitJumpAbsolute(uint32 position)
     Write32(position);
 }
 
-
 void FxScriptBCEmitter::EmitJumpAbsoluteReg32(FxScriptRegister reg)
 {
     printf("jmpar %s\n", FxScriptBCEmitter::GetRegisterName(reg));
@@ -1923,7 +1902,6 @@ void FxScriptBCEmitter::EmitJumpCallAbsolute(uint32 position)
     WriteOp(OpBase_Jump, OpSpecJump_CallAbsolute);
     Write32(position);
 }
-
 
 void FxScriptBCEmitter::EmitJumpCallExternal(FxHash hashed_name)
 {
@@ -1966,14 +1944,14 @@ void FxScriptBCEmitter::EmitType(FxScriptValue::ValueType type)
 
 uint32 FxScriptBCEmitter::EmitDataString(char* str, uint16 length)
 {
-
     WriteOp(OpBase_Data, OpSpecData_String);
 
     uint32 start_index = mBytecode.Size();
 
     uint16 final_length = length + 1;
 
-    // If the length is not a factor of 2 (sizeof uint16) then add a byte of padding
+    // If the length is not a factor of 2 (sizeof uint16) then add a byte of
+    // padding
     if ((final_length & 0x01)) {
         ++final_length;
     }
@@ -1994,15 +1972,15 @@ uint32 FxScriptBCEmitter::EmitDataString(char* str, uint16 length)
     return start_index;
 }
 
-
 FxScriptRegister FxScriptBCEmitter::EmitBinop(FxAstBinop* binop, FxScriptBytecodeVarHandle* handle)
 {
     bool will_preserve_lhs = false;
     // Load the A and B values into the registers
     FxScriptRegister a_reg = EmitRhs(binop->Left, RhsMode::RHS_FETCH_TO_REGISTER, handle);
 
-    // Since there is a chance that this register will be clobbered (by binop, action call, etc), we will
-    // push the value of the register here and return it after processing the RHS
+    // Since there is a chance that this register will be clobbered (by binop,
+    // action call, etc), we will push the value of the register here and return
+    // it after processing the RHS
     if (binop->Right->NodeType != FX_AST_LITERAL) {
         will_preserve_lhs = true;
         EmitPush32r(a_reg);
@@ -2037,8 +2015,8 @@ FxScriptRegister FxScriptBCEmitter::EmitVarFetch(FxAstVarRef* ref, RhsMode mode)
 
     bool force_absolute_load = false;
 
-    // If the variable is from a previous scope, load it from an absolute address. local offsets
-    // will change depending on where they are called.
+    // If the variable is from a previous scope, load it from an absolute address.
+    // local offsets will change depending on where they are called.
     if (var_handle->ScopeIndex < mScopeIndex) {
         force_absolute_load = true;
     }
@@ -2058,8 +2036,8 @@ FxScriptRegister FxScriptBCEmitter::EmitVarFetch(FxAstVarRef* ref, RhsMode mode)
         return reg;
     }
 
-    // If we are just copying the variable to this new variable, we can free the register after
-    // we push to the stack.
+    // If we are just copying the variable to this new variable, we can free the
+    // register after we push to the stack.
     if (mode == RhsMode::RHS_DEFINE_IN_MEMORY) {
         if (var_handle->Type == FxScriptValue::STRING) {
             EmitType(var_handle->Type);
@@ -2084,8 +2062,7 @@ void FxScriptBCEmitter::DoLoad(uint32 stack_offset, FxScriptRegister output_reg,
         int input_offset = -(static_cast<int>(mStackOffset) - static_cast<int>(stack_offset));
 
         EmitLoad32(input_offset, output_reg);
-    }
-    else {
+    } else {
         // Absolute load
         EmitLoadAbsolute32(stack_offset, output_reg);
     }
@@ -2100,8 +2077,7 @@ void FxScriptBCEmitter::DoSaveInt32(uint32 stack_offset, uint32 value, bool forc
         int input_offset = -(static_cast<int>(mStackOffset) - static_cast<int>(stack_offset));
 
         EmitSave32(input_offset, value);
-    }
-    else {
+    } else {
         // Absolute save
         EmitSaveAbsolute32(stack_offset, value);
     }
@@ -2116,8 +2092,7 @@ void FxScriptBCEmitter::DoSaveReg32(uint32 stack_offset, FxScriptRegister reg, b
         int input_offset = -(static_cast<int>(mStackOffset) - static_cast<int>(stack_offset));
 
         EmitSaveReg32(input_offset, reg);
-    }
-    else {
+    } else {
         // Absolute save
         EmitSaveAbsoluteReg32(stack_offset, reg);
     }
@@ -2137,7 +2112,8 @@ void FxScriptBCEmitter::EmitAssign(FxAstAssign* assign)
     //     force_absolute_save = true;
     // }
 
-    //int output_offset = -(static_cast<int>(mStackOffset) - static_cast<int>(var_handle->Offset));
+    // int output_offset = -(static_cast<int>(mStackOffset) -
+    // static_cast<int>(var_handle->Offset));
 
     if (!var_handle) {
         printf("Could not find var handle to assign to!");
@@ -2156,12 +2132,13 @@ FxScriptRegister FxScriptBCEmitter::EmitLiteralInt(FxAstLiteral* literal, RhsMod
         return FX_REG_NONE;
     }
 
-    // If this is as a literal, push the value to the stack and pop onto the target register.
+    // If this is as a literal, push the value to the stack and pop onto the
+    // target register.
     else if (mode == RhsMode::RHS_FETCH_TO_REGISTER) {
-        //EmitPush32(literal->Value.ValueInt);
+        // EmitPush32(literal->Value.ValueInt);
 
         FxScriptRegister output_reg = FindFreeRegister();
-        //EmitPop32(output_reg);
+        // EmitPop32(output_reg);
 
         EmitMoveInt32(output_reg, literal->Value.ValueInt);
 
@@ -2180,7 +2157,6 @@ FxScriptRegister FxScriptBCEmitter::EmitLiteralInt(FxAstLiteral* literal, RhsMod
 
     return FX_REG_NONE;
 }
-
 
 FxScriptRegister FxScriptBCEmitter::EmitLiteralString(FxAstLiteral* literal, RhsMode mode, FxScriptBytecodeVarHandle* handle)
 {
@@ -2204,11 +2180,11 @@ FxScriptRegister FxScriptBCEmitter::EmitLiteralString(FxAstLiteral* literal, Rhs
         EmitType(FxScriptValue::STRING);
 
         // Push the string position
-        //EmitPush32(string_position);
+        // EmitPush32(string_position);
 
         // Find a register to output to and write the index
         FxScriptRegister output_reg = FindFreeRegister();
-        //EmitPop32(output_reg);
+        // EmitPop32(output_reg);
 
         EmitMoveInt32(output_reg, string_position);
 
@@ -2238,11 +2214,9 @@ FxScriptRegister FxScriptBCEmitter::EmitRhs(FxAstNode* rhs, FxScriptBCEmitter::R
 
         if (literal->Value.Type == FxScriptValue::INT) {
             return EmitLiteralInt(literal, mode, handle);
-        }
-        else if (literal->Value.Type == FxScriptValue::STRING) {
+        } else if (literal->Value.Type == FxScriptValue::STRING) {
             return EmitLiteralString(literal, mode, handle);
-        }
-        else if (literal->Value.Type == FxScriptValue::REF) {
+        } else if (literal->Value.Type == FxScriptValue::REF) {
             // Reference another value, load from memory into register
             FxScriptRegister output_register = EmitVarFetch(literal->Value.ValueRef, mode);
             if (mode == RhsMode::RHS_ASSIGN_TO_HANDLE) {
@@ -2268,7 +2242,6 @@ FxScriptRegister FxScriptBCEmitter::EmitRhs(FxAstNode* rhs, FxScriptBCEmitter::R
             result_register = FX_REG_XR;
         }
 
-
         if (mode == RhsMode::RHS_DEFINE_IN_MEMORY) {
             uint32 offset = mStackOffset;
             EmitPush32r(result_register);
@@ -2292,8 +2265,7 @@ FxScriptRegister FxScriptBCEmitter::EmitRhs(FxAstNode* rhs, FxScriptBCEmitter::R
             MARK_REGISTER_USED(output_reg);
 
             return output_reg;
-        }
-        else if (mode == RhsMode::RHS_ASSIGN_TO_HANDLE) {
+        } else if (mode == RhsMode::RHS_ASSIGN_TO_HANDLE) {
             const bool force_absolute_save = (handle->ScopeIndex < mScopeIndex);
 
             // Save the value back to the variable
@@ -2329,7 +2301,7 @@ FxScriptBytecodeVarHandle* FxScriptBCEmitter::DoVarDeclare(FxAstVarDecl* decl, V
         break;
     };
 
-    FxScriptBytecodeVarHandle handle{
+    FxScriptBytecodeVarHandle handle {
         .HashedName = decl->Name->GetHash(),
         .Type = value_type, // Just int for now
         .Offset = (mStackOffset),
@@ -2348,18 +2320,15 @@ FxScriptBytecodeVarHandle* FxScriptBCEmitter::DoVarDeclare(FxAstVarDecl* decl, V
         return inserted_handle;
     }
 
-
     if (decl->Assignment) {
         FxAstNode* rhs = decl->Assignment->Rhs;
 
         EmitRhs(rhs, RhsMode::RHS_DEFINE_IN_MEMORY, inserted_handle);
 
-
         // EmitPush32(0);
 
         // EmitRhs(rhs, RhsMode::RHS_ASSIGN_TO_HANDLE, inserted_handle);
-    }
-    else {
+    } else {
         // There is no assignment, push zero as the value for now and
         // a later assignment can set it using save32.
         EmitPush32(0);
@@ -2374,7 +2343,6 @@ void FxScriptBCEmitter::DoActionCall(FxAstActionCall* call)
 
     FxScriptBytecodeActionHandle* handle = FindActionHandle(call->HashedName);
 
-
     std::vector<uint32> call_locations;
     call_locations.reserve(8);
 
@@ -2385,7 +2353,7 @@ void FxScriptBCEmitter::DoActionCall(FxAstActionCall* call)
             call_locations.push_back(mStackOffset);
             EmitRhs(param, RhsMode::RHS_DEFINE_IN_MEMORY, nullptr);
         }
-        //MARK_REGISTER_FREE(reg);
+        // MARK_REGISTER_FREE(reg);
     }
 
     EmitPush32r(FX_REG_RA);
@@ -2471,10 +2439,11 @@ void FxScriptBCEmitter::EmitAction(FxAstActionDecl* action)
     const size_t start_of_action = mBytecode.Size();
     printf("Start of action %zu\n", start_of_action);
 
-    // Emit the jump instruction, we will update the jump position after emitting all of the code inside the block
+    // Emit the jump instruction, we will update the jump position after emitting
+    // all of the code inside the block
     EmitJumpRelative(0);
 
-    //const uint32 initial_stack_offset = mStackOffset;
+    // const uint32 initial_stack_offset = mStackOffset;
 
     const size_t header_jump_start_index = start_of_action + sizeof(uint16);
 
@@ -2494,8 +2463,8 @@ void FxScriptBCEmitter::EmitAction(FxAstActionDecl* action)
     EmitBlock(action->Block);
 
     if (return_var) {
-        //const int offset = -(static_cast<int>(mStackOffset) - static_cast<int>(return_var->Offset));
-        //EmitLoad32(offset, FX_REG_XR);
+        // const int offset = -(static_cast<int>(mStackOffset) -
+        // static_cast<int>(return_var->Offset)); EmitLoad32(offset, FX_REG_XR);
 
         DoLoad(return_var->Offset, FX_REG_XR);
     }
@@ -2506,7 +2475,7 @@ void FxScriptBCEmitter::EmitAction(FxAstActionDecl* action)
     EmitJumpReturnToCaller();
 
     const size_t end_of_action = mBytecode.Size();
-    const uint16 distance_to_action = static_cast<uint16>(end_of_action - (start_of_action) - 4);
+    const uint16 distance_to_action = static_cast<uint16>(end_of_action - (start_of_action)-4);
 
     printf("End of action: %zu\n", end_of_action);
     printf("Distance to action: %d\n", distance_to_action);
@@ -2515,10 +2484,7 @@ void FxScriptBCEmitter::EmitAction(FxAstActionDecl* action)
     mBytecode[header_jump_start_index] = static_cast<uint8>(distance_to_action >> 8);
     mBytecode[header_jump_start_index + 1] = static_cast<uint8>((distance_to_action & 0xFF));
 
-    FxScriptBytecodeActionHandle action_handle{
-        .HashedName = action->Name->GetHash(),
-        .BytecodeIndex = static_cast<uint32>(start_of_action + 4)
-    };
+    FxScriptBytecodeActionHandle action_handle {.HashedName = action->Name->GetHash(), .BytecodeIndex = static_cast<uint32>(start_of_action + 4)};
 
     const size_t number_of_scope_var_handles = VarHandles.Size() - start_var_handle_count;
     printf("Number of var handles to remove: %zu\n", number_of_scope_var_handles);
@@ -2565,8 +2531,6 @@ void FxScriptBCEmitter::PrintBytecode()
     printf("\n");
 }
 
-
-
 /////////////////////////////////////
 // Bytecode Printer
 /////////////////////////////////////
@@ -2597,8 +2561,7 @@ void FxScriptBCPrinter::DoLoad(char* s, uint8 op_base, uint8 op_spec_raw)
     if (op_spec == OpSpecLoad_Int32) {
         int16 offset = Read16();
         BC_PRINT_OP("load32 %d, %s", offset, FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(op_reg)));
-    }
-    else if (op_spec == OpSpecLoad_AbsoluteInt32) {
+    } else if (op_spec == OpSpecLoad_AbsoluteInt32) {
         uint32 offset = Read32();
         BC_PRINT_OP("load32a %u, %s", offset, FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(op_reg)));
     }
@@ -2609,8 +2572,7 @@ void FxScriptBCPrinter::DoPush(char* s, uint8 op_base, uint8 op_spec)
     if (op_spec == OpSpecPush_Int32) {
         uint32 value = Read32();
         BC_PRINT_OP("push32 %u", value);
-    }
-    else if (op_spec == OpSpecPush_Reg32) {
+    } else if (op_spec == OpSpecPush_Reg32) {
         uint16 reg = Read16();
         BC_PRINT_OP("push32r %s", FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(reg)));
     }
@@ -2632,13 +2594,13 @@ void FxScriptBCPrinter::DoArith(char* s, uint8 op_base, uint8 op_spec)
     uint8 b_reg = mBytecode[mBytecodeIndex++];
 
     if (op_spec == OpSpecArith_Add) {
-        BC_PRINT_OP("add32 %s, %s", FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(a_reg)), FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(b_reg)));
+        BC_PRINT_OP("add32 %s, %s", FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(a_reg)),
+                    FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(b_reg)));
     }
 }
 
 void FxScriptBCPrinter::DoSave(char* s, uint8 op_base, uint8 op_spec)
 {
-
     // Save a imm32 into an offset in the stack
     if (op_spec == OpSpecSave_Int32) {
         const int16 offset = Read16();
@@ -2653,14 +2615,12 @@ void FxScriptBCPrinter::DoSave(char* s, uint8 op_base, uint8 op_spec)
         uint16 reg = Read16();
 
         BC_PRINT_OP("save32r %d, %s", offset, FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(reg)));
-    }
-    else if (op_spec == OpSpecSave_AbsoluteInt32) {
+    } else if (op_spec == OpSpecSave_AbsoluteInt32) {
         const uint32 offset = Read32();
         const uint32 value = Read32();
 
         BC_PRINT_OP("save32a %u, %u", offset, value);
-    }
-    else if (op_spec == OpSpecSave_AbsoluteReg32) {
+    } else if (op_spec == OpSpecSave_AbsoluteReg32) {
         const uint32 offset = Read32();
         uint16 reg = Read16();
 
@@ -2674,23 +2634,18 @@ void FxScriptBCPrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
         uint16 offset = Read16();
         printf("# jump relative to (%u)\n", mBytecodeIndex + offset);
         BC_PRINT_OP("jmpr %d", offset);
-    }
-    else if (op_spec == OpSpecJump_Absolute) {
+    } else if (op_spec == OpSpecJump_Absolute) {
         uint32 position = Read32();
         BC_PRINT_OP("jmpa %u", position);
-    }
-    else if (op_spec == OpSpecJump_AbsoluteReg32) {
+    } else if (op_spec == OpSpecJump_AbsoluteReg32) {
         uint16 reg = Read16();
         BC_PRINT_OP("jmpar %s", FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(reg)));
-    }
-    else if (op_spec == OpSpecJump_CallAbsolute) {
+    } else if (op_spec == OpSpecJump_CallAbsolute) {
         uint32 position = Read32();
         BC_PRINT_OP("calla %u", position);
-    }
-    else if (op_spec == OpSpecJump_ReturnToCaller) {
+    } else if (op_spec == OpSpecJump_ReturnToCaller) {
         BC_PRINT_OP("ret");
-    }
-    else if (op_spec == OpSpecJump_CallExternal) {
+    } else if (op_spec == OpSpecJump_CallExternal) {
         uint32 hashed_name = Read32();
         BC_PRINT_OP("callext %u", hashed_name);
     }
@@ -2713,8 +2668,7 @@ void FxScriptBCPrinter::DoData(char* s, uint8 op_base, uint8 op_spec)
         BC_PRINT_OP("datastr %d, %.*s", length, length, data_str);
 
         FX_SCRIPT_FREE(char, data_str);
-    }
-    else if (op_spec == OpSpecData_ParamsStart) {
+    } else if (op_spec == OpSpecData_ParamsStart) {
         BC_PRINT_OP("paramsstart");
     }
 }
@@ -2723,8 +2677,7 @@ void FxScriptBCPrinter::DoType(char* s, uint8 op_base, uint8 op_spec)
 {
     if (op_spec == OpSpecType_Int) {
         BC_PRINT_OP("typeint");
-    }
-    else if (op_spec == OpSpecType_String) {
+    } else if (op_spec == OpSpecType_String) {
         BC_PRINT_OP("typestr");
     }
 }
@@ -2739,7 +2692,6 @@ void FxScriptBCPrinter::DoMove(char* s, uint8 op_base, uint8 op_spec_raw)
         BC_PRINT_OP("move32 %s, %u\t", FxScriptBCEmitter::GetRegisterName(static_cast<FxScriptRegister>(op_reg)), value);
     }
 }
-
 
 void FxScriptBCPrinter::Print()
 {
@@ -2792,10 +2744,7 @@ void FxScriptBCPrinter::PrintOp()
     printf("%-25s", s);
 
     printf("\t# Offset: %u\n", bc_index);
-
 }
-
-
 
 ///////////////////////////////////////////
 // Bytecode VM
@@ -2804,8 +2753,7 @@ void FxScriptBCPrinter::PrintOp()
 void FxScriptVM::PrintRegisters()
 {
     printf("\n=== Register Dump ===\n\n");
-    printf("X0=%u\tX1=%u\tX2=%u\tX3=%u\n",
-        Registers[FX_REG_X0], Registers[FX_REG_X1], Registers[FX_REG_X2], Registers[FX_REG_X3]);
+    printf("X0=%u\tX1=%u\tX2=%u\tX3=%u\n", Registers[FX_REG_X0], Registers[FX_REG_X1], Registers[FX_REG_X2], Registers[FX_REG_X3]);
 
     printf("XR=%u\tRA=%u\n", Registers[FX_REG_XR], Registers[FX_REG_RA]);
 
@@ -2856,8 +2804,6 @@ uint32 FxScriptVM::Pop32()
     return value;
 }
 
-
-
 FxScriptVMCallFrame& FxScriptVM::PushCallFrame()
 {
     mIsInCallFrame = true;
@@ -2872,7 +2818,6 @@ void FxScriptVM::PopCallFrame()
 {
     FxScriptVMCallFrame* frame = GetCurrentCallFrame();
     if (!frame) {
-
         FX_BREAKPOINT;
     }
 
@@ -2956,8 +2901,7 @@ void FxScriptVM::DoLoad(uint8 op_base, uint8 op_spec_raw)
         uint32 data32 = *reinterpret_cast<uint32*>(dataptr);
 
         Registers[op_reg] = data32;
-    }
-    else if (op_spec == OpSpecLoad_AbsoluteInt32) {
+    } else if (op_spec == OpSpecLoad_AbsoluteInt32) {
         uint32 offset = Read32();
 
         uint8* dataptr = &Stack[offset];
@@ -2973,8 +2917,7 @@ void FxScriptVM::DoPush(uint8 op_base, uint8 op_spec)
         if (mCurrentType != FxScriptValue::NONETYPE) {
             mPushedTypes.Insert(mCurrentType);
             mCurrentType = FxScriptValue::NONETYPE;
-        }
-        else {
+        } else {
             mPushedTypes.Insert(FxScriptValue::INT);
         }
     }
@@ -2982,8 +2925,7 @@ void FxScriptVM::DoPush(uint8 op_base, uint8 op_spec)
     if (op_spec == OpSpecPush_Int32) {
         uint32 value = Read32();
         Push32(value);
-    }
-    else if (op_spec == OpSpecPush_Reg32) {
+    } else if (op_spec == OpSpecPush_Reg32) {
         uint16 reg = Read16();
         Push32(Registers[reg]);
     }
@@ -3021,8 +2963,7 @@ void FxScriptVM::DoSave(uint8 op_base, uint8 op_spec)
 
     if (op_spec == OpSpecSave_AbsoluteInt32 || op_spec == OpSpecSave_AbsoluteReg32) {
         offset = Read32();
-    }
-    else {
+    } else {
         // The offset is relative to the stack pointer, get the absolute value
         const int16 relative_offset = static_cast<int16>(Read16());
         offset = static_cast<uint32>(Registers[FX_REG_SP] + relative_offset);
@@ -3053,24 +2994,20 @@ void FxScriptVM::DoSave(uint8 op_base, uint8 op_spec)
 
 void FxScriptVM::DoJump(uint8 op_base, uint8 op_spec)
 {
-
     if (op_spec == OpSpecJump_Relative) {
         uint16 offset = Read16();
         mPC += offset;
-    }
-    else if (op_spec == OpSpecJump_Absolute) {
+    } else if (op_spec == OpSpecJump_Absolute) {
         uint32 position = Read32();
         mPC = position;
-    }
-    else if (op_spec == OpSpecJump_AbsoluteReg32) {
+    } else if (op_spec == OpSpecJump_AbsoluteReg32) {
         uint16 reg = Read16();
         mPC = Registers[reg];
-    }
-    else if (op_spec == OpSpecJump_CallAbsolute) {
+    } else if (op_spec == OpSpecJump_CallAbsolute) {
         uint32 call_address = Read32();
-        //printf("Call to address % 4u\n", call_address);
+        // printf("Call to address % 4u\n", call_address);
 
-        //Push32(mPC);
+        // Push32(mPC);
 
         Registers[FX_REG_RA] = mPC;
 
@@ -3081,20 +3018,19 @@ void FxScriptVM::DoJump(uint8 op_base, uint8 op_spec)
 
         // Jump to the action address
         mPC = call_address;
-    }
-    else if (op_spec == OpSpecJump_ReturnToCaller) {
+    } else if (op_spec == OpSpecJump_ReturnToCaller) {
         PopCallFrame();
 
-        //uint32 return_address = Pop32();
+        // uint32 return_address = Pop32();
 
         uint32 return_address = Registers[FX_REG_RA];
-        //printf("Return to caller (%04d)\n", return_address);
+        // printf("Return to caller (%04d)\n", return_address);
         mPC = return_address;
 
-        // Restore the return address register to its previous value. This is pushed when `paramsstart` is encountered.
-        //Registers[FX_REG_RA] = Pop32();
-    }
-    else if (op_spec == OpSpecJump_CallExternal) {
+        // Restore the return address register to its previous value. This is pushed
+        // when `paramsstart` is encountered.
+        // Registers[FX_REG_RA] = Pop32();
+    } else if (op_spec == OpSpecJump_CallExternal) {
         uint32 hashed_name = Read32();
 
         FxScriptExternalFunc* external_func = FindExternalAction(hashed_name);
@@ -3120,8 +3056,7 @@ void FxScriptVM::DoJump(uint8 op_base, uint8 op_spec)
             if (param_type == FxScriptValue::INT) {
                 value.ValueInt = Pop32();
                 value.Type = param_type;
-            }
-            else if (param_type == FxScriptValue::STRING) {
+            } else if (param_type == FxScriptValue::STRING) {
                 uint32 string_location = Pop32();
                 uint8* str_base_ptr = &mBytecode[string_location];
                 // uint16 str_length = *((uint16*)str_base_ptr);
@@ -3140,7 +3075,7 @@ void FxScriptVM::DoJump(uint8 op_base, uint8 op_spec)
         mPushedTypes.Clear();
         mIsInParams = false;
 
-        FxScriptValue return_value{};
+        FxScriptValue return_value {};
         external_func->Function(this, params, &return_value);
     }
 }
@@ -3150,13 +3085,12 @@ void FxScriptVM::DoData(uint8 op_base, uint8 op_spec)
     if (op_spec == OpSpecData_String) {
         uint16 length = Read16();
         mPC += length;
-    }
-    else if (op_spec == OpSpecData_ParamsStart) {
+    } else if (op_spec == OpSpecData_ParamsStart) {
         mIsInParams = true;
 
-        // Push the current return address pointer. This is so nested action calls can correctly navigate back
-        // to the caller.
-        //Push32(Registers[FX_REG_RA]);
+        // Push the current return address pointer. This is so nested action calls
+        // can correctly navigate back to the caller.
+        // Push32(Registers[FX_REG_RA]);
     }
 }
 
@@ -3164,8 +3098,7 @@ void FxScriptVM::DoType(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == OpSpecType_Int) {
         mCurrentType = FxScriptValue::INT;
-    }
-    else if (op_spec == OpSpecType_String) {
+    } else if (op_spec == OpSpecType_String) {
         mCurrentType = FxScriptValue::STRING;
     }
 }

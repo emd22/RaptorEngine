@@ -1,37 +1,35 @@
 #pragma once
 
-#include <deque>
-
-#include "FxDeletionObject.hpp"
-#include "FxWindow.hpp"
-
-#include "Backend/RxPipeline.hpp"
-#include "Backend/RxFrameData.hpp"
 #include "Backend/RxCommands.hpp"
+#include "Backend/RxFrameData.hpp"
+#include "Backend/RxPipeline.hpp"
 #include "Backend/RxSwapchain.hpp"
 #include "Backend/RxSynchro.hpp"
-
-#include <Core/FxRef.hpp>
-
-#include "FxDeferred.hpp"
+#include "FxDeletionObject.hpp"
+#include "FxWindow.hpp"
+#include "RxDeferred.hpp"
+#include "RxSamplerCache.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
+#include <Core/FxRef.hpp>
+#include <deque>
+
 struct SDL_Window;
 
-enum class FrameResult
+enum class RxFrameResult
 {
     Success,
     GraphicsOutOfDate,
     RenderError,
 };
 
-class FxDeferredRenderer;
-class FxDeferredGPass;
-class FxDeferredCompPass;
+class RxDeferredRenderer;
+class RxDeferredGPass;
+class RxDeferredCompPass;
 
-struct FxGpuUploadContext
+struct RxGpuUploadContext
 {
     RxCommandPool CommandPool;
     RxCommandBuffer CommandBuffer;
@@ -41,13 +39,15 @@ struct FxGpuUploadContext
 
 class FxCamera;
 
-class FxRenderBackend {
+class RxRenderBackend
+{
     const uint32 DeletionFrameSpacing = 3;
 
 public:
     using SubmitFunc = std::function<void(RxCommandBuffer& cmd)>;
+
 public:
-    FxRenderBackend() = default;
+    RxRenderBackend() = default;
 
     using ExtensionList = FxSizedArray<VkExtensionProperties>;
     using ExtensionNames = std::vector<const char*>;
@@ -55,24 +55,15 @@ public:
     void Init(FxVec2u window_size);
     void Destroy();
 
-    FrameResult BeginFrame(FxDeferredRenderer& renderer);
+    RxFrameResult BeginFrame(RxDeferredRenderer& renderer);
     void BeginLighting();
     void DoComposition(FxCamera& render_cam);
 
-    void SelectWindow(const FxRef<FxWindow>& window)
-    {
-        mWindow = window;
-    }
+    void SelectWindow(const FxRef<FxWindow>& window) { mWindow = window; }
 
-    FX_FORCE_INLINE FxRef<FxWindow> GetWindow()
-    {
-        return mWindow;
-    }
+    FX_FORCE_INLINE FxRef<FxWindow> GetWindow() { return mWindow; }
 
-    FX_FORCE_INLINE RxGpuDevice* GetDevice()
-    {
-        return &mDevice;
-    }
+    FX_FORCE_INLINE RxGpuDevice* GetDevice() { return &mDevice; }
 
     RxUniformBufferObject& GetUbo();
 
@@ -95,23 +86,17 @@ public:
         mInDeletionQueue.store(false);
     }
 
-    VkInstance GetVulkanInstance()
-    {
-        return mInstance;
-    }
+    VkInstance GetVulkanInstance() { return mInstance; }
 
-    RxFrameData *GetFrame();
+    RxFrameData* GetFrame();
 
     uint32 GetImageIndex() { return mImageIndex; }
-    VmaAllocator *GetGPUAllocator() { return &GpuAllocator; }
+    VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
 
     void SubmitUploadCmd(SubmitFunc func);
     void SubmitOneTimeCmd(SubmitFunc func);
 
-    ~FxRenderBackend()
-    {
-        Destroy();
-    }
+    ~RxRenderBackend() { Destroy(); }
 
     void ProcessDeletionQueue(bool immediate = false)
     {
@@ -176,9 +161,9 @@ private:
     void InitFrames();
     void DestroyFrames();
 
-    FrameResult GetNextSwapchainImage(RxFrameData* frame);
+    RxFrameResult GetNextSwapchainImage(RxFrameData* frame);
 
-    ExtensionList &QueryInstanceExtensions(bool invalidate_previous = false);
+    ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
     ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
 
@@ -194,20 +179,21 @@ public:
     // RxDescriptorPool GPassDescriptorPool;
     RxDescriptorPool CompDescriptorPool;
 
-    FxGpuUploadContext UploadContext;
+    RxGpuUploadContext UploadContext;
 
     bool Initialized = false;
 
-    FxDeferredGPass* CurrentGPass = nullptr;
-    FxDeferredCompPass* CurrentCompPass = nullptr;
-    FxDeferredLightingPass* CurrentLightingPass = nullptr;
+    RxDeferredGPass* CurrentGPass = nullptr;
+    RxDeferredCompPass* CurrentCompPass = nullptr;
+    RxDeferredLightingPass* CurrentLightingPass = nullptr;
 
-    FxRef<FxDeferredRenderer> DeferredRenderer{ nullptr };
+    FxRef<RxDeferredRenderer> DeferredRenderer { nullptr };
+
+    RxSamplerCache SamplerCache;
 
     // RxSemaphore OffscreenSemaphore;
 
 private:
-
     VkInstance mInstance = nullptr;
     VkSurfaceKHR mWindowSurface = nullptr;
 
@@ -217,7 +203,6 @@ private:
     VkDebugUtilsMessengerEXT mDebugMessenger;
 
     ExtensionList mAvailableExtensions;
-
 
     uint32 mImageIndex = 0;
 

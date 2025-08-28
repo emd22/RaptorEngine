@@ -1,8 +1,8 @@
 #pragma once
 
-#include <string>
-
 #include "../FxAssetBase.hpp"
+
+#include <string>
 
 template <typename T>
 class FxRef;
@@ -31,6 +31,7 @@ public:
     }
 
     virtual void CreateGpuResource(FxRef<FxAssetBase>& asset) = 0;
+
 protected:
     friend class FxAssetManager;
 };

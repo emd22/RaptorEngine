@@ -1,5 +1,7 @@
 #include "RxDescriptors.hpp"
 
+#include "RxTexture.hpp"
+
 
 /////////////////////////////////////
 // Descriptor Pool Functions
@@ -7,10 +9,9 @@
 
 void RxDescriptorPool::Create(RxGpuDevice* device, uint32 max_sets)
 {
-
     mDevice = device;
 
-    VkDescriptorPoolCreateInfo pool_info{};
+    VkDescriptorPoolCreateInfo pool_info {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.maxSets = max_sets;
     pool_info.poolSizeCount = PoolSizes.size();
@@ -25,12 +26,12 @@ void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout
 {
     mDevice = pool.mDevice;
 
-    VkDescriptorSetAllocateInfo alloc_info{};
+    VkDescriptorSetAllocateInfo alloc_info {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool = pool.Pool;
     alloc_info.descriptorSetCount = 1;
     alloc_info.pSetLayouts = &layout;
-    
+
     VkResult result = vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set);
 
     if (result != VK_SUCCESS) {
@@ -38,16 +39,16 @@ void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout
     }
 }
 
-VkWriteDescriptorSet RxDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest, const RxTexture& texture, VkImageLayout layout, VkDescriptorType type)
+VkWriteDescriptorSet RxDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest, const RxTexture& texture,
+                                                              VkImageLayout layout, VkDescriptorType type)
 {
-
-    VkDescriptorImageInfo image_info{
+    VkDescriptorImageInfo image_info {
         .imageLayout = layout,
         .imageView = texture.Image.View,
-        .sampler = texture.Sampler->Sampler
+        .sampler = texture.Sampler->Sampler,
     };
 
-    VkWriteDescriptorSet write{
+    VkWriteDescriptorSet write {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .descriptorType = type,
         .descriptorCount = 1,

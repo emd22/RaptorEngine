@@ -1,10 +1,10 @@
 #pragma once
 
-#include <type_traits>
+#include <stdio.h>
+
 #include <Core/FxDefines.hpp>
 #include <Core/Types.hpp>
-
-#include <stdio.h>
+#include <type_traits>
 
 #if defined(FX_COMPILER_CLANG) || defined(FX_COMPILER_GCC)
 #define FX_UTIL_DEFINE_DEMANGLE_NAME 1
@@ -17,7 +17,7 @@ class FxUtil
 {
 public:
     template <typename EnumClass>
-    static std::underlying_type<EnumClass>::type EnumToInt(EnumClass value)
+    static constexpr std::underlying_type<EnumClass>::type EnumToInt(EnumClass value)
     {
         return static_cast<typename std::underlying_type<EnumClass>::type>(value);
     }
@@ -30,16 +30,16 @@ public:
 
     static int DemangleName(const char* mangled_name, char* buffer, size_t buffer_size)
     {
-    #ifdef FX_UTIL_DEFINE_DEMANGLE_NAME
+#ifdef FX_UTIL_DEFINE_DEMANGLE_NAME
         int status;
         abi::__cxa_demangle(mangled_name, buffer, &buffer_size, &status);
 
         return status;
-    #else
+#else
         // Should we print a warning about this?
         strcpy(mangled_name, buffer);
         return 0;
-    #endif
+#endif
     }
 };
 
@@ -94,21 +94,19 @@ public:
 */
 
 
-
-
 /**
  * @brief Defines an enum class as a set of bitflags.
  */
 #define FX_DEFINE_AS_FLAG_ENUM FlagMax
 
 template <typename T>
-decltype(T::FlagMax) operator | (T lhs, T rhs)
+decltype(T::FlagMax) operator|(T lhs, T rhs)
 {
     return static_cast<T>(static_cast<unsigned int>(lhs) | static_cast<unsigned int>(rhs));
 }
 
 template <typename T>
-unsigned int operator & (T lhs, T rhs)
+unsigned int operator&(T lhs, T rhs)
 {
     return static_cast<unsigned int>(lhs) & static_cast<unsigned int>(rhs);
 }

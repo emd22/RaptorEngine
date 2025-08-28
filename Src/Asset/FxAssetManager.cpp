@@ -1,24 +1,19 @@
 #include "FxAssetManager.hpp"
+
 #include "Core/FxPanic.hpp"
 #include "Core/FxSizedArray.hpp"
-
-#include <FxObject.hpp>
-
-#include "FxAssetModel.hpp"
 #include "FxAssetImage.hpp"
-
+#include "FxAssetModel.hpp"
 #include "Loader/FxLoaderGltf.hpp"
 #include "Loader/FxLoaderJpeg.hpp"
 #include "Loader/FxLoaderStb.hpp"
 
-
+#include <Core/FxDefines.hpp>
+#include <Core/Types.hpp>
+#include <FxObject.hpp>
 #include <atomic>
 #include <chrono>
 #include <thread>
-
-#include <Core/Types.hpp>
-
-#include <Core/FxDefines.hpp>
 
 
 ////////////////////////////////////
@@ -32,7 +27,6 @@ void FxAssetWorker::Create()
     }
 
     Thread = std::thread([this]() { this->Update(); });
-
 }
 
 void FxAssetWorker::Update()
@@ -62,7 +56,7 @@ void FxAssetWorker::Update()
         DataPendingUpload.test_and_set();
 
         // Signal the main asset thread that we are done
-//        manager.DataLoaded.SignalDataWritten();
+        //        manager.DataLoaded.SignalDataWritten();
     }
 }
 
@@ -129,20 +123,8 @@ void FxAssetManager::Shutdown()
 //     DoLoadAsset<FxAssetModel, FxLoaderGltf, FxAssetType::Model>(asset, path);
 // }
 
-template<>
-void FxAssetManager::LoadAsset<FxObject>(FxRef<FxObject> asset, const std::string& path)
-{
-    DoLoadAsset<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, path);
-}
 
-template<>
-void FxAssetManager::LoadAsset<FxAssetImage>(FxRef<FxAssetImage> asset, const std::string& path)
-{
-    DoLoadAsset<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, path);
-}
-
-
-inline bool IsJpegInMemory(const uint8* data, uint32 data_size)
+inline bool IsMemoryJpeg(const uint8* data, uint32 data_size)
 {
     if (data_size < 120) {
         return false;
@@ -155,14 +137,83 @@ inline bool IsJpegInMemory(const uint8* data, uint32 data_size)
 }
 
 
-template<>
-void FxAssetManager::LoadFromMemory<FxAssetImage>(FxRef<FxAssetImage> asset, const uint8* data, uint32 data_size)
+inline bool IsFileJpeg(const std::string& path)
 {
-    if (IsJpegInMemory(data, data_size)) {
-        DoLoadFromMemory<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, data, data_size);
+    const char* path_cstr = path.c_str();
+
+    FILE* fp = fopen(path_cstr, "rb");
+
+    if (fp == nullptr) {
+        return false;
+    }
+
+    constexpr size_t magic_size = sizeof(uint16);
+    uint8 magic_buffer[2];
+
+    if (fread(magic_buffer, 1, magic_size, fp) != magic_size) {
+        fclose(fp);
+        return false;
+    }
+
+    fclose(fp);
+
+    if (magic_buffer[0] == 0xFF && magic_buffer[1] == 0xD8) {
+        return true;
+    }
+
+    return false;
+}
+
+void FxAssetManager::LoadObject(FxRef<FxObject>& asset, const std::string& path)
+{
+    FxRef<FxLoaderGltf> loader = FxRef<FxLoaderGltf>::New();
+
+    SubmitAssetToLoad<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, loader, path);
+}
+
+
+void FxAssetManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size)
+{
+    FxRef<FxLoaderGltf> loader = FxRef<FxLoaderGltf>::New();
+
+    SubmitAssetToLoad<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, loader, "", data, data_size);
+}
+
+
+void FxAssetManager::LoadImage(RxImageType image_type, FxRef<FxAssetImage>& asset, const std::string& path)
+{
+    bool is_jpeg = IsFileJpeg(path);
+
+    if (is_jpeg) {
+        FxRef<FxLoaderJpeg> loader = FxRef<FxLoaderJpeg>::New();
+        loader->ImageType = image_type;
+
+        SubmitAssetToLoad<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, loader, path);
     }
     else {
-        DoLoadFromMemory<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, data, data_size);
+        FxRef<FxLoaderStb> loader = FxRef<FxLoaderStb>::New();
+        loader->ImageType = image_type;
+
+        SubmitAssetToLoad<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, loader, path);
+    }
+}
+
+
+void FxAssetManager::LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size)
+{
+    if (IsMemoryJpeg(data, data_size)) {
+        // Load the image using turbojpeg
+        FxRef<FxLoaderJpeg> loader = FxRef<FxLoaderJpeg>::New();
+        loader->ImageType = image_type;
+
+        SubmitAssetToLoad<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, loader, "", data, data_size);
+    }
+    else {
+        // Load the image using stb_image
+        FxRef<FxLoaderStb> loader = FxRef<FxLoaderStb>::New();
+        loader->ImageType = image_type;
+
+        SubmitAssetToLoad<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, loader, "", data, data_size);
     }
 }
 
@@ -187,7 +238,6 @@ void FxAssetManager::CheckForUploadableData()
             }
 
 
-
             // Call the OnLoaded callback if it was registered
             if (!loaded_item.Asset->mOnLoadedCallbacks.empty()) {
                 for (auto& callback : loaded_item.Asset->mOnLoadedCallbacks) {
@@ -198,9 +248,9 @@ void FxAssetManager::CheckForUploadableData()
 
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
             loaded_item.Asset->mIsLoaded.store(true);
-            
-//            FxRef<FxLoaderGltf> gltf_loader(loaded_item.Loader);
-//            gltf_loader->LoadAttachedMaterials();
+
+            //            FxRef<FxLoaderGltf> gltf_loader(loaded_item.Loader);
+            //            gltf_loader->LoadAttachedMaterials();
 
             // Destroy the loader(clearing the loading buffers)
             loaded_item.Loader->Destroy(loaded_item.Asset);

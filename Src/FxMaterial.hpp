@@ -1,24 +1,21 @@
 #pragma once
 
+#include <vulkan/vulkan.h>
+
 #include <Asset/FxAssetImage.hpp>
-
-#include <Core/FxPagedArray.hpp>
 #include <Core/FxHash.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <Core/Log.hpp>
-
-
 #include <Renderer/Backend/RxDescriptors.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
-
-#include <vulkan/vulkan.h>
 
 // TODO: Replace this, make dynamic
 #define FX_MAX_MATERIALS 256
 
 struct FxMaterialComponent
 {
-    FxRef<FxAssetImage> Texture{nullptr};
-    FxSlice<const uint8> DataToLoad{nullptr};
+    FxRef<FxAssetImage> Texture { nullptr };
+    FxSlice<const uint8> DataToLoad { nullptr };
 
     ~FxMaterialComponent() = default;
 };
@@ -31,32 +28,31 @@ struct FxMaterialProperties
 class FxMaterial
 {
 public:
-    enum ResourceType {
+    enum ResourceType
+    {
         Diffuse,
 
         MaxImages,
     };
+
 public:
     FxMaterial() = default;
 
     void Attach(ResourceType type, const FxRef<FxAssetImage>& image)
     {
         switch (type) {
-            case ResourceType::Diffuse:
-                DiffuseTexture.Texture = image;
-                break;
-            default:
-                Log::Error("Unsupported resource type to attach to material!", 0);
-                break;
+        case ResourceType::Diffuse:
+            DiffuseTexture.Texture = image;
+            break;
+        default:
+            Log::Error("Unsupported resource type to attach to material!", 0);
+            break;
         }
     }
 
     bool IsReady();
 
-    inline uint32 GetMaterialIndex()
-    {
-        return mMaterialPropertiesIndex;
-    }
+    inline uint32 GetMaterialIndex() { return mMaterialPropertiesIndex; }
 
     /**
      * Binds the material to be used in the given command buffer.
@@ -67,10 +63,7 @@ public:
     void Build();
     void Destroy();
 
-    ~FxMaterial()
-    {
-        Destroy();
-    }
+    ~FxMaterial() { Destroy(); }
 
 private:
     VkDescriptorSetLayout BuildLayout();
@@ -78,19 +71,19 @@ private:
     bool CheckComponentTextureLoaded(FxMaterialComponent& component);
 
 public:
-//    FxRef<FxAssetImage> DiffuseTexture{nullptr};
+    //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
     FxMaterialComponent DiffuseTexture;
 
-    FxMaterialProperties Properties{};
+    FxMaterialProperties Properties {};
 
-    FxHash NameHash{0};
+    FxHash NameHash { 0 };
     std::string Name = "";
 
-    RxDescriptorSet mDescriptorSet{};
+    RxDescriptorSet mDescriptorSet {};
 
     RxGraphicsPipeline* Pipeline = nullptr;
 
-    std::atomic_bool IsBuilt {false};
+    std::atomic_bool IsBuilt { false };
 
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
@@ -109,7 +102,6 @@ private:
 };
 
 
-
 class FxMaterialManager
 {
     // TODO: replace with a calculated material count
@@ -118,23 +110,17 @@ class FxMaterialManager
 public:
     static FxMaterialManager& GetGlobalManager();
 
-    void Create(uint32 materials_per_page=64);
+    void Create(uint32 materials_per_page = 64);
     static FxRef<FxMaterial> New(const std::string& name, RxGraphicsPipeline* pipeline);
 
-    static RxDescriptorPool& GetDescriptorPool()
-    {
-        return GetGlobalManager().mDescriptorPool;
-    }
+    static RxDescriptorPool& GetDescriptorPool() { return GetGlobalManager().mDescriptorPool; }
 
     void Destroy();
 
-    ~FxMaterialManager()
-    {
-        Destroy();
-    }
+    ~FxMaterialManager() { Destroy(); }
 
 public:
-    FxRef<RxSampler> AlbedoSampler{nullptr};
+    FxRef<RxSampler> AlbedoSampler { nullptr };
     // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**
@@ -142,11 +128,11 @@ public:
      */
     RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesBuffer;
     uint32 NumMaterialsInBuffer = 0;
-    
+
     /**
      * @brief Descriptor set for material properties. Used in the light pass.
      */
-    RxDescriptorSet mMaterialPropertiesDS{};
+    RxDescriptorSet mMaterialPropertiesDS {};
 
 private:
     FxPagedArray<FxMaterial> mMaterials;

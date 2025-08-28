@@ -1,49 +1,45 @@
-#include "FxRenderBackend.hpp"
+#include "RxRenderBackend.hpp"
+
+#include "Backend/RxCommands.hpp"
+#include "Backend/RxPipeline.hpp"
+#include "Backend/RxSynchro.hpp"
+#include "Backend/RxUtil.hpp"
 #include "Constants.hpp"
+#include "RxDeferred.hpp"
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+#include <ThirdParty/vk_mem_alloc.h>
+#include <vulkan/vulkan.h>
 
 #include <Core/FxDefines.hpp>
-#include <Core/Types.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/Log.hpp>
-
-#include "Backend/RxSynchro.hpp"
-#include "Backend/RxPipeline.hpp"
-#include "Backend/RxCommands.hpp"
-#include "Backend/RxUtil.hpp"
-
+#include <Core/Types.hpp>
+#include <Renderer/Backend/RxExtensionHandles.hpp>
 #include <chrono>
 #include <iostream>
 #include <thread>
 #include <vector>
 
-#include "FxDeferred.hpp"
-
-#include <Renderer/Backend/RxExtensionHandles.hpp>
-
-#include <ThirdParty/vk_mem_alloc.h>
-#include <vulkan/vulkan.h>
-
-#include <SDL3/SDL_vulkan.h>
-#include <SDL3/SDL.h>
-
 #define FX_VULKAN_DEBUG 1
 
-using ExtensionNames = FxRenderBackend::ExtensionNames;
-using ExtensionList = FxRenderBackend::ExtensionList;
+using ExtensionNames = RxRenderBackend::ExtensionNames;
+using ExtensionList = RxRenderBackend::ExtensionList;
 
 FX_SET_MODULE_NAME("RenderBackend")
 
-ExtensionNames FxRenderBackend::CheckExtensionsAvailable(ExtensionNames &requested_extensions)
+ExtensionNames RxRenderBackend::CheckExtensionsAvailable(ExtensionNames& requested_extensions)
 {
     if (mAvailableExtensions.IsEmpty()) {
         QueryInstanceExtensions();
     }
 
-    std::vector<const char *> missing_extensions;
+    std::vector<const char*> missing_extensions;
 
-    for (const char *requested_name : requested_extensions) {
+    for (const char* requested_name : requested_extensions) {
         bool found_extension = false;
-        for (const auto &extension : mAvailableExtensions) {
+        for (const auto& extension : mAvailableExtensions) {
             if (!strncmp(extension.extensionName, requested_name, 256)) {
                 found_extension = true;
                 break;
@@ -58,7 +54,7 @@ ExtensionNames FxRenderBackend::CheckExtensionsAvailable(ExtensionNames &request
     return missing_extensions;
 }
 
-FxSizedArray<VkLayerProperties> FxRenderBackend::GetAvailableValidationLayers()
+FxSizedArray<VkLayerProperties> RxRenderBackend::GetAvailableValidationLayers()
 {
     uint32 layer_count;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
@@ -73,7 +69,7 @@ FxSizedArray<VkLayerProperties> FxRenderBackend::GetAvailableValidationLayers()
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
 
-void FxRenderBackend::Init(FxVec2u window_size)
+void RxRenderBackend::Init(FxVec2u window_size)
 {
     InitVulkan();
     CreateSurfaceFromWindow();
@@ -86,10 +82,12 @@ void FxRenderBackend::Init(FxVec2u window_size)
     InitFrames();
     InitUploadContext();
 
+    // SamplerCache.Create();
+
     Initialized = true;
 }
 
-void FxRenderBackend::InitUploadContext()
+void RxRenderBackend::InitUploadContext()
 {
     UploadContext.CommandPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
     UploadContext.CommandBuffer.Create(&UploadContext.CommandPool);
@@ -98,20 +96,20 @@ void FxRenderBackend::InitUploadContext()
     UploadContext.UploadFence.Reset();
 }
 
-void FxRenderBackend::DestroyUploadContext()
+void RxRenderBackend::DestroyUploadContext()
 {
     UploadContext.UploadFence.Destroy();
     UploadContext.CommandBuffer.Destroy();
     UploadContext.CommandPool.Destroy();
 }
 
-void FxRenderBackend::InitFrames()
+void RxRenderBackend::InitFrames()
 {
     Frames.InitSize(RendererFramesInFlight);
 
     const uint32 graphics_family = GetDevice()->mQueueFamilies.GetGraphicsFamily();
 
-    RxGpuDevice *device = GetDevice();
+    RxGpuDevice* device = GetDevice();
 
     for (int i = 0; i < Frames.Size; i++) {
         RxFrameData& frame = Frames.Data[i];
@@ -124,11 +122,11 @@ void FxRenderBackend::InitFrames()
     }
 }
 
-void FxRenderBackend::DestroyFrames()
+void RxRenderBackend::DestroyFrames()
 {
     vkQueueWaitIdle(GetDevice()->GraphicsQueue);
 
-    for (auto &frame : Frames) {
+    for (auto& frame : Frames) {
         // frame.DescriptorSet.Destroy();
         frame.CompDescriptorSet.Destroy();
 
@@ -143,7 +141,7 @@ void FxRenderBackend::DestroyFrames()
     Frames.Free();
 }
 
-void FxRenderBackend::InitVulkan()
+void RxRenderBackend::InitVulkan()
 {
     const char* app_name = "Foxtrot";
     VkApplicationInfo app_info = {};
@@ -218,13 +216,11 @@ void FxRenderBackend::InitVulkan()
     Initialized = true;
 }
 
-uint32 DebugMessageCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, uint32 type,
-    const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
-    void *user_data
-) {
-    const char * message = callback_data->pMessage;
-    const char *fmt = "VkValidator: %s";
+uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, uint32 type,
+                            const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data)
+{
+    const char* message = callback_data->pMessage;
+    const char* fmt = "VkValidator: %s";
 
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
@@ -259,21 +255,19 @@ uint32 DebugMessageCallback(
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 {
-    const auto severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
-        | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-        | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
+    const auto severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                          VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                          VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
 
-    const auto message_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
-        | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
-        | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    const auto message_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
 
-    VkDebugUtilsMessengerCreateInfoEXT create_info = {
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        .messageSeverity = severity,
-        .messageType = message_type,
-        .pfnUserCallback = DebugMessageCallback
-    };
+    VkDebugUtilsMessengerCreateInfoEXT create_info = { .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                                                       .messageSeverity = severity,
+                                                       .messageType = message_type,
+                                                       .pfnUserCallback = DebugMessageCallback };
 
     VkDebugUtilsMessengerEXT messenger;
 
@@ -286,7 +280,8 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
     return messenger;
 }
 
-void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger) {
+void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger)
+{
     if (messenger == nullptr) {
         return;
     }
@@ -294,15 +289,13 @@ void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messeng
     Rx_EXT_DestroyDebugUtilsMessenger(instance, messenger, nullptr);
 }
 
-void FxRenderBackend::InitGPUAllocator()
+void RxRenderBackend::InitGPUAllocator()
 {
-    const RxGpuDevice *device = GetDevice();
+    const RxGpuDevice* device = GetDevice();
 
-    const VmaAllocatorCreateInfo create_info = {
-        .physicalDevice = device->Physical,
-        .device = device->Device,
-        .instance = mInstance
-    };
+    const VmaAllocatorCreateInfo create_info = { .physicalDevice = device->Physical,
+                                                 .device = device->Device,
+                                                 .instance = mInstance };
 
     const VkResult status = vmaCreateAllocator(&create_info, &GpuAllocator);
     if (status != VK_SUCCESS) {
@@ -310,15 +303,12 @@ void FxRenderBackend::InitGPUAllocator()
     }
 }
 
-void FxRenderBackend::DestroyGPUAllocator()
-{
-    vmaDestroyAllocator(GpuAllocator);
-}
+void RxRenderBackend::DestroyGPUAllocator() { vmaDestroyAllocator(GpuAllocator); }
 
-ExtensionNames FxRenderBackend::MakeInstanceExtensionList(ExtensionNames &user_requested_extensions)
+ExtensionNames RxRenderBackend::MakeInstanceExtensionList(ExtensionNames& user_requested_extensions)
 {
     uint32 required_extension_count = 0;
-    const char * const * required_extensions = SDL_Vulkan_GetInstanceExtensions(&required_extension_count);
+    const char* const* required_extensions = SDL_Vulkan_GetInstanceExtensions(&required_extension_count);
 
     QueryInstanceExtensions();
 
@@ -327,7 +317,8 @@ ExtensionNames FxRenderBackend::MakeInstanceExtensionList(ExtensionNames &user_r
     total_extensions.reserve(total_extensions_size);
 
     // append the user requested extensions
-    total_extensions.insert(total_extensions.begin(), user_requested_extensions.begin(), user_requested_extensions.end());
+    total_extensions.insert(total_extensions.begin(), user_requested_extensions.begin(),
+                            user_requested_extensions.end());
 
     for (int32 i = 0; i < required_extension_count; i++) {
         total_extensions.push_back(required_extensions[i]);
@@ -336,7 +327,7 @@ ExtensionNames FxRenderBackend::MakeInstanceExtensionList(ExtensionNames &user_r
     return total_extensions;
 }
 
-ExtensionList &FxRenderBackend::QueryInstanceExtensions(bool invalidate_previous)
+ExtensionList& RxRenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 {
     Log::Debug("Query Extensions", 0);
 
@@ -378,9 +369,9 @@ ExtensionList &FxRenderBackend::QueryInstanceExtensions(bool invalidate_previous
     return mAvailableExtensions;
 }
 
-void FxRenderBackend::SubmitUploadCmd(FxRenderBackend::SubmitFunc upload_func)
+void RxRenderBackend::SubmitUploadCmd(RxRenderBackend::SubmitFunc upload_func)
 {
-    RxCommandBuffer &cmd = UploadContext.CommandBuffer;
+    RxCommandBuffer& cmd = UploadContext.CommandBuffer;
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     upload_func(cmd);
@@ -398,10 +389,8 @@ void FxRenderBackend::SubmitUploadCmd(FxRenderBackend::SubmitFunc upload_func)
     //     std::this_thread::get_id()
     // );
 
-    VkTry(
-        vkQueueSubmit(GetDevice()->TransferQueue, 1, &submit_info, UploadContext.UploadFence.Fence),
-        "Error submitting upload buffer"
-    );
+    VkTry(vkQueueSubmit(GetDevice()->TransferQueue, 1, &submit_info, UploadContext.UploadFence.Fence),
+          "Error submitting upload buffer");
 
     UploadContext.UploadFence.WaitFor();
     UploadContext.UploadFence.Reset();
@@ -410,7 +399,7 @@ void FxRenderBackend::SubmitUploadCmd(FxRenderBackend::SubmitFunc upload_func)
 }
 
 
-void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
+void RxRenderBackend::SubmitOneTimeCmd(RxRenderBackend::SubmitFunc submit_func)
 {
     RxCommandBuffer cmd;
     cmd.Create(&GetFrame()->CommandPool);
@@ -426,10 +415,7 @@ void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
         .pCommandBuffers = &cmd.CommandBuffer,
     };
 
-    VkTry(
-        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, nullptr),
-        "Error submitting upload buffer"
-    );
+    VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, nullptr), "Error submitting upload buffer");
 
     vkQueueWaitIdle(GetDevice()->GraphicsQueue);
 
@@ -438,10 +424,9 @@ void FxRenderBackend::SubmitOneTimeCmd(FxRenderBackend::SubmitFunc submit_func)
 }
 
 
-
-FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
+RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
 {
-    RxFrameData *frame = GetFrame();
+    RxFrameData* frame = GetFrame();
 
     CurrentGPass = renderer.GetCurrentGPass();
     CurrentCompPass = renderer.GetCurrentCompPass();
@@ -451,8 +436,8 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 
     frame->InFlight.WaitFor();
 
-    FrameResult result = GetNextSwapchainImage(frame);
-    if (result != FrameResult::Success) {
+    RxFrameResult result = GetNextSwapchainImage(frame);
+    if (result != RxFrameResult::Success) {
         return result;
     }
 
@@ -471,7 +456,8 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
     const int32 height = Swapchain.Extent.Height();
 
     const VkViewport viewport = {
-        .x = 0, .y = 0,
+        .x = 0,
+        .y = 0,
         .width = (float32)width,
         .height = (float32)height,
         .minDepth = 1.0,
@@ -480,50 +466,45 @@ FrameResult FxRenderBackend::BeginFrame(FxDeferredRenderer& renderer)
 
     vkCmdSetViewport(frame->CommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = {
-        .offset = { .x = 0, .y = 0 },
-        .extent = { .width = (uint32)width, .height = (uint32)height }
-    };
+    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+                               .extent = { .width = (uint32)width, .height = (uint32)height } };
 
     vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
 
-    FxDrawPushConstants push_constants{};
+    FxDrawPushConstants push_constants {};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                       sizeof(push_constants), &push_constants);
 
-    return FrameResult::Success;
+    return RxFrameResult::Success;
 }
 
-void FxRenderBackend::PresentFrame()
+void RxRenderBackend::PresentFrame()
 {
-    RxFrameData *frame = GetFrame();
+    RxFrameData* frame = GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    const VkSubmitInfo submit_info = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->LightingSem.Semaphore,
-        .pWaitDstStageMask = wait_stages,
+                                       .waitSemaphoreCount = 1,
+                                       .pWaitSemaphores = &frame->LightingSem.Semaphore,
+                                       .pWaitDstStageMask = wait_stages,
 
-        // command buffers
-        .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
+                                       // command buffers
+                                       .commandBufferCount = 1,
+                                       .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
 
-        // signal semaphores
-        .signalSemaphoreCount = 1,
+                                       // signal semaphores
+                                       .signalSemaphoreCount = 1,
 
-        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-        .pSignalSemaphores = &frame->RenderFinished.Semaphore
-    };
+                                       // .pSignalSemaphores = &frame->RenderFinished.Semaphore
+                                       .pSignalSemaphores = &frame->RenderFinished.Semaphore };
 
-    VkTry(
-        vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
-        "Error submitting draw buffer"
-    );
+    VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
+          "Error submitting draw buffer");
 
     if (Swapchain.Initialized != true) {
         FxModulePanic("Swapchain not initialized!", 0);
@@ -548,7 +529,8 @@ void FxRenderBackend::PresentFrame()
 
     const VkResult status = vkQueuePresentKHR(GetDevice()->PresentQueue, &present_info);
 
-    if (status == VK_SUCCESS) { }
+    if (status == VK_SUCCESS) {
+    }
     else if (status == VK_ERROR_OUT_OF_DATE_KHR || status == VK_SUBOPTIMAL_KHR) {
         // Swapchain.Rebuild()..
     }
@@ -557,7 +539,7 @@ void FxRenderBackend::PresentFrame()
     }
 }
 
-void FxRenderBackend::BeginLighting()
+void RxRenderBackend::BeginLighting()
 {
     RxFrameData* frame = GetFrame();
 
@@ -576,7 +558,8 @@ void FxRenderBackend::BeginLighting()
     const int32 height = Swapchain.Extent.Height();
 
     const VkViewport viewport = {
-        .x = 0, .y = 0,
+        .x = 0,
+        .y = 0,
         .width = (float32)width,
         .height = (float32)height,
         .minDepth = 1.0,
@@ -585,18 +568,15 @@ void FxRenderBackend::BeginLighting()
 
     vkCmdSetViewport(frame->LightCommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = {
-        .offset = { .x = 0, .y = 0 },
-        .extent = { .width = (uint32)width, .height = (uint32)height }
-    };
+    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+                               .extent = { .width = (uint32)width, .height = (uint32)height } };
 
     vkCmdSetScissor(frame->LightCommandBuffer.CommandBuffer, 0, 1, &scissor);
-
 }
 
 #include <Renderer/FxCamera.hpp>
 
-void FxRenderBackend::DoComposition(FxCamera& render_cam)
+void RxRenderBackend::DoComposition(FxCamera& render_cam)
 {
     RxFrameData* frame = GetFrame();
 
@@ -610,7 +590,8 @@ void FxRenderBackend::DoComposition(FxCamera& render_cam)
     const int32 height = Swapchain.Extent.Height();
 
     const VkViewport viewport = {
-        .x = 0, .y = 0,
+        .x = 0,
+        .y = 0,
         .width = (float32)width,
         .height = (float32)height,
         .minDepth = 1.0,
@@ -619,10 +600,8 @@ void FxRenderBackend::DoComposition(FxCamera& render_cam)
 
     vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = {
-        .offset = { .x = 0, .y = 0 },
-        .extent = { .width = (uint32)width, .height = (uint32)height }
-    };
+    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+                               .extent = { .width = (uint32)width, .height = (uint32)height } };
 
     vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
@@ -642,44 +621,38 @@ void FxRenderBackend::DoComposition(FxCamera& render_cam)
     mFrameNumber = (mInternalFrameCounter) % RendererFramesInFlight;
 }
 
-FrameResult FxRenderBackend::GetNextSwapchainImage(RxFrameData *frame)
+RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
 {
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
-    const VkResult result = vkAcquireNextImageKHR(
-        GetDevice()->Device,
-        Swapchain.GetSwapchain(),
-        timeout,
-        frame->ImageAvailable.Semaphore,
-        nullptr,
-        &mImageIndex
-    );
+    const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
+                                                  frame->ImageAvailable.Semaphore, nullptr, &mImageIndex);
 
     if (result == VK_SUCCESS) {
-        return FrameResult::Success;
+        return RxFrameResult::Success;
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         // Swapchain.Rebuild()..
-        return FrameResult::GraphicsOutOfDate;
+        return RxFrameResult::GraphicsOutOfDate;
     }
     else {
         Log::Error("Error getting next swapchain image!", result);
     }
 
-    return FrameResult::RenderError;
+    return RxFrameResult::RenderError;
 }
 
-inline RxUniformBufferObject& FxRenderBackend::GetUbo()
+inline RxUniformBufferObject& RxRenderBackend::GetUbo()
 {
     static RxUniformBufferObject ubo;
     return ubo;
 }
 
-void FxRenderBackend::CreateSurfaceFromWindow()
+void RxRenderBackend::CreateSurfaceFromWindow()
 {
     if (mWindow == nullptr) {
         FxModulePanic("No window attached! use FxRenderBackend::SelectWindow()", 0);
-}
+    }
 
     bool success = SDL_Vulkan_CreateSurface(mWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
 
@@ -689,7 +662,7 @@ void FxRenderBackend::CreateSurfaceFromWindow()
 }
 
 
-void FxRenderBackend::Destroy()
+void RxRenderBackend::Destroy()
 {
     GetDevice()->WaitForIdle();
 
@@ -702,6 +675,8 @@ void FxRenderBackend::Destroy()
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
+
+    // SamplerCache.Destroy();
 
     // GPassDescriptorPool.Destroy();
     CompDescriptorPool.Destroy();
@@ -724,7 +699,4 @@ void FxRenderBackend::Destroy()
     Initialized = false;
 }
 
-RxFrameData *FxRenderBackend::GetFrame()
-{
-    return &Frames[GetFrameNumber()];
-}
+RxFrameData* RxRenderBackend::GetFrame() { return &Frames[GetFrameNumber()]; }

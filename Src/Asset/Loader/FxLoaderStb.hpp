@@ -1,14 +1,14 @@
 #pragma once
 
-#include <string>
-
-#include <Core/Types.hpp>
-#include <Core/FxSizedArray.hpp>
-#include "FxLoaderBase.hpp"
+#include "FxLoaderImageBase.hpp"
 
 #include <ThirdParty/stb_image.h>
 
-class FxLoaderStb : public FxLoaderBase
+#include <Core/FxSizedArray.hpp>
+#include <Core/Types.hpp>
+#include <string>
+
+class FxLoaderStb : public FxLoaderImageBase
 {
 public:
     using Status = FxLoaderBase::Status;
