@@ -15,16 +15,15 @@ void RxSkyboxRenderer::Create(const FxVec2u& extent)
 }
 
 
-void RxSkyboxRenderer::Render()
-{
-}
+void RxSkyboxRenderer::Render() {}
 
 void RxSkyboxRenderer::CreateSkyboxPipeline()
 {
     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
         // Color
         VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                              VK_COLOR_COMPONENT_A_BIT,
             .blendEnable = VK_FALSE,
         },
     };
@@ -55,8 +54,9 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
 
     FxVertexInfo vert_info = FxMakeVertexInfo();
 
-    SkyboxPipeline.Create("Skybox", shader_list, layout, FxMakeSlice(attachments, FxSizeofArray(attachments)),
-                          FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info, VK_CULL_MODE_NONE);
+    SkyboxPipeline.Create("Skybox", shader_list, FxMakeSlice(attachments, FxSizeofArray(attachments)),
+                          FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
+                          Renderer->DeferredRenderer->RpGeometry, { .CullMode = VK_CULL_MODE_NONE });
 }
 
 VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
@@ -79,7 +79,8 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
             .pBindings = &skybox_layout_binding,
         };
 
-        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr, &DsLayoutSkyboxFragment);
+        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr,
+                                                      &DsLayoutSkyboxFragment);
         if (status != VK_SUCCESS) {
             FxModulePanic("Failed to create pipeline descriptor set layout", status);
         }
@@ -87,7 +88,8 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
 
     VkDescriptorSetLayout layouts[] = { DsLayoutSkyboxFragment };
 
-    VkPipelineLayout layout = SkyboxPipeline.CreateLayout(sizeof(RxSkyboxPushConstants), 0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = SkyboxPipeline.CreateLayout(sizeof(RxSkyboxPushConstants), 0,
+                                                          FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Skybox Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
