@@ -31,7 +31,7 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
         CompPasses[frame_index].Create(this, frame_index, extent);
 
         temp_views[0] = Renderer->Swapchain.OutputImages[frame_index].View;
-        OutputFramebuffers[frame_index].Create(temp_views, CompPipeline, extent);
+        OutputFramebuffers[frame_index].Create(temp_views, CompPipeline, RpComposition, extent);
     }
 }
 
@@ -52,6 +52,10 @@ void RxDeferredRenderer::Destroy()
     DestroyGPassPipeline();
     DestroyLightingPipeline();
 
+    RpGeometry.Destroy();
+    RpLighting.Destroy();
+    RpComposition.Destroy();
+
     GPasses.Free();
     LightingPasses.Free();
     CompPasses.Free();
@@ -62,10 +66,7 @@ void RxDeferredRenderer::Destroy()
 // FxRenderer GPass Functions
 /////////////////////////////////////
 
-RxDeferredGPass* RxDeferredRenderer::GetCurrentGPass()
-{
-    return &GPasses[Renderer->GetFrameNumber()];
-}
+RxDeferredGPass* RxDeferredRenderer::GetCurrentGPass() { return &GPasses[Renderer->GetFrameNumber()]; }
 
 VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 {
@@ -86,7 +87,8 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
                                                            .bindingCount = 1,
                                                            .pBindings = &material_properties_binding };
 
-        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_material_info, nullptr, &DsLayoutLightingMaterialProperties);
+        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_material_info, nullptr,
+                                                      &DsLayoutLightingMaterialProperties);
         if (status != VK_SUCCESS) {
             FxModulePanic("Failed to create pipeline descriptor set layout", status);
         }
@@ -144,7 +146,8 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         //        DsLayoutGPassVertex,
     };
 
-    VkPipelineLayout layout = GPassPipeline.CreateLayout(sizeof(FxDrawPushConstants), 0, FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = GPassPipeline.CreateLayout(sizeof(FxDrawPushConstants), 0,
+                                                         FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -156,17 +159,19 @@ void RxDeferredRenderer::CreateGPassPipeline()
     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
         // Color
         VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                              VK_COLOR_COMPONENT_A_BIT,
             .blendEnable = VK_FALSE,
         },
         // Normals
         VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                              VK_COLOR_COMPONENT_A_BIT,
             .blendEnable = VK_FALSE,
         },
     };
 
-    VkAttachmentDescription attachments[] = {
+    VkAttachmentDescription color_attachments_list[] = {
         // Albedo output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
@@ -210,12 +215,20 @@ void RxDeferredRenderer::CreateGPassPipeline()
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
 
-    VkPipelineLayout layout = CreateGPassPipelineLayout();
+    // Create the layout for the GPass pipeline
+    CreateGPassPipelineLayout();
 
     FxVertexInfo vert_info = FxMakeVertexInfo();
 
-    GPassPipeline.Create("Geometry", shader_list, layout, FxMakeSlice(attachments, FxSizeofArray(attachments)),
-                         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info, VK_CULL_MODE_BACK_BIT);
+    const FxSlice<VkAttachmentDescription> color_attachments = FxMakeSlice(color_attachments_list,
+                                                                           FxSizeofArray(color_attachments_list));
+
+    RpGeometry.Create2(color_attachments);
+
+    GPassPipeline.Create("Geometry", shader_list, color_attachments,
+                         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
+                         RpGeometry,
+                         { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE });
 }
 
 void RxDeferredRenderer::DestroyGPassPipeline()
@@ -274,7 +287,8 @@ void RxDeferredRenderer::CreateLightingDSLayout()
         .pImmutableSamplers = nullptr,
     };
 
-    VkDescriptorSetLayoutBinding bindings[] = { positions_layout_binding, albedo_layout_binding, normals_layout_binding };
+    VkDescriptorSetLayoutBinding bindings[] = { positions_layout_binding, albedo_layout_binding,
+                                                normals_layout_binding };
 
     VkDescriptorSetLayoutCreateInfo lighting_layout_info {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -309,7 +323,8 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
 void RxDeferredRenderer::CreateLightingPipeline()
 {
     VkPipelineColorBlendAttachmentState color_blend_attachments[] = { VkPipelineColorBlendAttachmentState {
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                          VK_COLOR_COMPONENT_A_BIT,
         .blendEnable = VK_TRUE,
         .alphaBlendOp = VK_BLEND_OP_ADD,
         .colorBlendOp = VK_BLEND_OP_ADD,
@@ -319,7 +334,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
         .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
     } };
 
-    VkAttachmentDescription attachments[] = {
+    VkAttachmentDescription color_attachments_list[] = {
         // Combined output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
@@ -344,13 +359,20 @@ void RxDeferredRenderer::CreateLightingPipeline()
     if (DsLayoutLightingFrag == nullptr) {
         CreateLightingDSLayout();
     }
-    VkPipelineLayout layout = CreateLightingPipelineLayout();
+
+    CreateLightingPipelineLayout();
 
     FxVertexInfo vertex_info = FxMakeLightVertexInfo();
 
-    LightingPipeline.Create("Lighting", shader_list, layout, FxMakeSlice(attachments, FxSizeofArray(attachments)),
-                            FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vertex_info, VK_CULL_MODE_FRONT_BIT,
-                            false);
+    const FxSlice<VkAttachmentDescription> color_attachments = FxMakeSlice(color_attachments_list,
+                                                                           FxSizeofArray(color_attachments_list));
+
+    RpLighting.Create2(color_attachments);
+
+    LightingPipeline.Create("Lighting", shader_list, color_attachments,
+                            FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vertex_info,
+                            RpLighting,
+                            { .CullMode = VK_CULL_MODE_FRONT_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 }
 
 void RxDeferredRenderer::RebuildLightingPipeline()
@@ -383,10 +405,7 @@ void RxDeferredRenderer::DestroyLightingPipeline()
 // RxDeferredRenderer CompPass Functions
 //////////////////////////////////////////
 
-RxDeferredCompPass* RxDeferredRenderer::GetCurrentCompPass()
-{
-    return &CompPasses[Renderer->GetFrameNumber()];
-}
+RxDeferredCompPass* RxDeferredRenderer::GetCurrentCompPass() { return &CompPasses[Renderer->GetFrameNumber()]; }
 
 VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 {
@@ -425,7 +444,8 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
             .pImmutableSamplers = nullptr,
         };
 
-        VkDescriptorSetLayoutBinding bindings[] = { positions_layout_binding, albedo_layout_binding, normals_layout_binding, lights_layout_binding };
+        VkDescriptorSetLayoutBinding bindings[] = { positions_layout_binding, albedo_layout_binding,
+                                                    normals_layout_binding, lights_layout_binding };
 
         VkDescriptorSetLayoutCreateInfo comp_layout_info {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -444,7 +464,8 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
         DsLayoutCompFrag,
     };
 
-    VkPipelineLayout layout = CompPipeline.CreateLayout(0, sizeof(FxCompositionPushConstants), FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = CompPipeline.CreateLayout(0, sizeof(FxCompositionPushConstants),
+                                                        FxMakeSlice(layouts, FxSizeofArray(layouts)));
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
     return layout;
@@ -453,7 +474,8 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 void RxDeferredRenderer::CreateCompPipeline()
 {
     VkPipelineColorBlendAttachmentState color_blend_attachments[] = { VkPipelineColorBlendAttachmentState {
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                          VK_COLOR_COMPONENT_A_BIT,
         .blendEnable = VK_FALSE,
     } };
 
@@ -479,10 +501,15 @@ void RxDeferredRenderer::CreateCompPipeline()
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
 
-    VkPipelineLayout layout = CreateCompPipelineLayout();
+    CreateCompPipelineLayout();
 
-    CompPipeline.Create("Composition", shader_list, layout, FxMakeSlice(attachments, FxSizeofArray(attachments)),
-                        FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), nullptr, VK_CULL_MODE_NONE, false);
+    FxSlice<VkAttachmentDescription> color_attachments = FxMakeSlice(attachments, FxSizeofArray(attachments));
+
+    RpComposition.Create2(color_attachments);
+
+    CompPipeline.Create("Composition", shader_list, color_attachments,
+                        FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), nullptr,
+                        RpComposition, { .CullMode = VK_CULL_MODE_NONE, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 }
 
 void RxDeferredRenderer::DestroyCompPipeline()
@@ -532,7 +559,9 @@ void RxDeferredGPass::BuildDescriptorSets()
 void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent)
 {
     mRendererInst = renderer;
+    mRenderPass = &mRendererInst->RpGeometry;
     mGPassPipeline = &mRendererInst->GPassPipeline;
+
 
     //    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
     //    RendererFramesInFlight);
@@ -541,17 +570,19 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
     DepthAttachment.Create(RxImageType::Image2D, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
-                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
+                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                           VK_IMAGE_ASPECT_DEPTH_BIT);
 
     ColorAttachment.Create(RxImageType::Image2D, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     NormalsAttachment.Create(RxImageType::Image2D, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-                             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+                             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                             VK_IMAGE_ASPECT_COLOR_BIT);
 
     FxSizedArray image_views = { ColorAttachment.View, NormalsAttachment.View, DepthAttachment.View };
 
-    Framebuffer.Create(image_views, renderer->GPassPipeline, extent);
+    Framebuffer.Create(image_views, renderer->GPassPipeline, *mRenderPass, extent);
 
     //    UniformBuffer.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     //    VMA_MEMORY_USAGE_CPU_TO_GPU); UniformBuffer.Map();
@@ -571,14 +602,12 @@ void RxDeferredGPass::Begin()
         VkClearValue { .depthStencil = { 0.0f, 0 } },
     };
 
-    mGPassPipeline->RenderPass.Begin(&frame->CommandBuffer, Framebuffer.Framebuffer, FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
+    mRenderPass->Begin(&frame->CommandBuffer, Framebuffer.Framebuffer,
+                       FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
     mGPassPipeline->Bind(frame->CommandBuffer);
 }
 
-void RxDeferredGPass::End()
-{
-    mGPassPipeline->RenderPass.End();
-}
+void RxDeferredGPass::End() { mRenderPass->End(); }
 
 void RxDeferredGPass::Submit()
 {
@@ -600,7 +629,8 @@ void RxDeferredGPass::Submit()
         .pSignalSemaphores = &frame->OffscreenSem.Semaphore,
     };
 
-    VkTry(vkQueueSubmit(Renderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE), "Error submitting draw buffer");
+    VkTry(vkQueueSubmit(Renderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+          "Error submitting draw buffer");
 }
 
 void RxDeferredGPass::SubmitUniforms(const RxUniformBufferObject& ubo)
@@ -634,6 +664,7 @@ void RxDeferredGPass::Destroy()
 void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
 {
     mRendererInst = renderer;
+    mRenderPass = &mRendererInst->RpLighting;
     mLightingPipeline = &mRendererInst->LightingPipeline;
 
     // Albedo sampler
@@ -649,7 +680,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
 
     FxSizedArray image_views = { ColorAttachment.View };
 
-    Framebuffer.Create(image_views, renderer->LightingPipeline, extent);
+    Framebuffer.Create(image_views, renderer->LightingPipeline, *mRenderPass, extent);
 
     BuildDescriptorSets(frame_index);
 }
@@ -663,16 +694,14 @@ void RxDeferredLightingPass::Begin()
         VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
     };
 
-    mLightingPipeline->RenderPass.Begin(&frame->LightCommandBuffer, Framebuffer.Framebuffer, FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
+    mRenderPass->Begin(&frame->LightCommandBuffer, Framebuffer.Framebuffer,
+                       FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
     mLightingPipeline->Bind(frame->LightCommandBuffer);
 
     DescriptorSet.Bind(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mLightingPipeline);
 }
 
-void RxDeferredLightingPass::End()
-{
-    mLightingPipeline->RenderPass.End();
-}
+void RxDeferredLightingPass::End() { mRenderPass->End(); }
 
 void RxDeferredLightingPass::Submit()
 {
@@ -696,7 +725,8 @@ void RxDeferredLightingPass::Submit()
         .pSignalSemaphores = &frame->LightingSem.Semaphore,
     };
 
-    VkTry(vkQueueSubmit(Renderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE), "Error submitting draw buffer");
+    VkTry(vkQueueSubmit(Renderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+          "Error submitting draw buffer");
 }
 
 void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
@@ -801,6 +831,7 @@ void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index
 
     mRendererInst = renderer;
     mCompPipeline = &mRendererInst->CompPipeline;
+    mRenderPass = &mRendererInst->RpComposition;
 
     // Albedo sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
@@ -817,7 +848,7 @@ void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index
 
     FxSizedArray<VkImageView> image_views = { OutputImage->View };
 
-    Framebuffer.Create(image_views, renderer->CompPipeline, extent);
+    Framebuffer.Create(image_views, renderer->CompPipeline, *mRenderPass, extent);
 
     BuildDescriptorSets(frame_index);
 }
@@ -938,8 +969,8 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     memcpy(push_constants.ViewInverse, render_cam.InvViewMatrix.RawData, sizeof(FxMat4f));
     memcpy(push_constants.ProjInverse, render_cam.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
-    vkCmdPushConstants(mCurrentFrame->CompCommandBuffer.CommandBuffer, mCompPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                       &push_constants);
+    vkCmdPushConstants(mCurrentFrame->CompCommandBuffer.CommandBuffer, mCompPipeline->Layout,
+                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants), &push_constants);
 
     VkClearValue clear_values[] = {
         // Output colour
@@ -951,14 +982,14 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     RxCommandBuffer& cmd = mCurrentFrame->CompCommandBuffer;
 
     VkFramebuffer framebuffer = mRendererInst->OutputFramebuffers[Renderer->GetImageIndex()].Framebuffer;
-    mCompPipeline->RenderPass.Begin(&mCurrentFrame->CompCommandBuffer, framebuffer, slice);
+    mRenderPass->Begin(&mCurrentFrame->CompCommandBuffer, framebuffer, slice);
 
     mCompPipeline->Bind(cmd);
     DescriptorSet.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mRendererInst->CompPipeline);
 
     vkCmdDraw(cmd.CommandBuffer, 3, 1, 0, 0);
 
-    mCompPipeline->RenderPass.End();
+    mRenderPass->End();
 
     cmd.End();
 }

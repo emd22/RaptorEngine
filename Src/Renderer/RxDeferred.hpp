@@ -24,10 +24,7 @@ public:
 
     void Destroy();
 
-    ~RxDeferredRenderer()
-    {
-        Destroy();
-    }
+    ~RxDeferredRenderer() { Destroy(); }
 
     FX_FORCE_INLINE RxDeferredGPass* GetCurrentGPass();
     FX_FORCE_INLINE RxDeferredCompPass* GetCurrentCompPass();
@@ -70,6 +67,7 @@ public:
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
     RxGraphicsPipeline GPassPipeline;
+    RxRenderPass RpGeometry;
 
     FxSizedArray<RxDeferredGPass> GPasses;
 
@@ -81,6 +79,7 @@ public:
     VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
 
     RxGraphicsPipeline LightingPipeline;
+    RxRenderPass RpLighting;
 
     FxSizedArray<RxDeferredLightingPass> LightingPasses;
 
@@ -91,6 +90,8 @@ public:
     VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
     RxGraphicsPipeline CompPipeline;
+    RxRenderPass RpComposition;
+
     FxSizedArray<RxFramebuffer> OutputFramebuffers;
 
     FxSizedArray<RxDeferredCompPass> CompPasses;
@@ -136,32 +137,7 @@ public:
 
 private:
     RxGraphicsPipeline* mGPassPipeline = nullptr;
-    RxDeferredRenderer* mRendererInst = nullptr;
-};
-
-
-class RxDeferredLightVolumePass
-{
-public:
-    void Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
-    void Destroy();
-
-    void Begin();
-    void End();
-    void Submit();
-
-    void BuildDescriptorSets(uint16 frame_index);
-
-public:
-    RxImage ColorAttachment;
-
-    RxFramebuffer Framebuffer;
-
-    RxDescriptorPool DescriptorPool;
-    RxDescriptorSet DescriptorSet;
-
-private:
-    RxGraphicsPipeline* mLightingPipeline = nullptr;
+    RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 };
 
@@ -191,6 +167,7 @@ public:
 
 private:
     RxGraphicsPipeline* mLightingPipeline = nullptr;
+    RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 };
 
@@ -222,6 +199,7 @@ public:
 
 private:
     RxGraphicsPipeline* mCompPipeline = nullptr;
+    RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 
     RxFrameData* mCurrentFrame = nullptr;
