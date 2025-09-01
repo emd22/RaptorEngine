@@ -1,11 +1,9 @@
 #pragma once
 
-#include <Math/Mat4.hpp>
-
-#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Asset/FxMeshGen.hpp>
-
 #include <FxEntity.hpp>
+#include <Math/Mat4.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 
 class FxCamera;
 
@@ -24,11 +22,11 @@ public:
     void RenderDebugMesh(const FxCamera& camera);
 
 public:
-    FxRef<FxPrimitiveMesh<VertexType>> LightVolume{nullptr};
-    FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen{nullptr};
+    FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };
+    FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen { nullptr };
 
     FxVec3f Color = FxVec3f::One;
 
 private:
-    FxRef<FxPrimitiveMesh<>> mDebugMesh{nullptr};
+    FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
 };

@@ -3,6 +3,7 @@
 #include "Backend/RxImage.hpp"
 #include "Backend/RxPipeline.hpp"
 #include "Backend/RxSampler.hpp"
+#include "FxPrimitiveMesh.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -19,7 +20,10 @@ struct alignas(16) RxSkyboxPushConstants
 class RxSkyboxRenderer
 {
 public:
-    void Create(const FxVec2u& extent);
+    using VertexType = RxVertex<FxVertexPosition>;
+
+public:
+    void Create(const FxVec2u& extent, const FxRef<FxPrimitiveMesh<VertexType>>& skybox_mesh);
 
     void Render();
 
@@ -38,6 +42,8 @@ public:
 private:
     RxSampler mSkySampler;
     RxImage mSky;
+
+    FxRef<FxPrimitiveMesh<VertexType>> mSkyboxMesh { nullptr };
 
     RxDeferredRenderer* mDeferredRenderer = nullptr;
 };
