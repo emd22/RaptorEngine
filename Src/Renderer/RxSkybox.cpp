@@ -7,7 +7,8 @@
 
 FX_SET_MODULE_NAME("RxSkybox");
 
-void RxSkyboxRenderer::Create(const FxVec2u& extent)
+void RxSkyboxRenderer::Create(const FxVec2u& extent,
+                              const FxRef<FxPrimitiveMesh<RxSkyboxRenderer::VertexType>>& skybox_mesh)
 {
     CreateSkyboxPipeline();
 
@@ -50,7 +51,7 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
 
-    VkPipelineLayout layout = CreateSkyboxPipelineLayout();
+    CreateSkyboxPipelineLayout();
 
     FxVertexInfo vert_info = FxMakeVertexInfo();
 

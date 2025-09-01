@@ -1,14 +1,12 @@
-#include <vulkan/vulkan.h>
-#include <stdexcept>
-
-#include <Renderer/Renderer.hpp>
-
-#include "RxDevice.hpp"
 #include "RxRenderPass.hpp"
 
+#include "RxDevice.hpp"
 #include "RxSwapchain.hpp"
 
+#include <vulkan/vulkan.h>
+
 #include <Core/FxPanic.hpp>
+#include <Renderer/Renderer.hpp>
 
 FX_SET_MODULE_NAME("RxRenderPass")
 
@@ -19,7 +17,7 @@ void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
     FxSizedArray<VkAttachmentReference> color_refs(attachments.Size);
 
     bool has_depth_attachment = false;
-    VkAttachmentReference depth_attachment_ref{};
+    VkAttachmentReference depth_attachment_ref {};
 
     for (int i = 0; i < attachments.Size; i++) {
         VkAttachmentDescription& attachment = attachments[i];
@@ -86,13 +84,11 @@ void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
             .srcSubpass = 0,
             .dstSubpass = VK_SUBPASS_EXTERNAL,
 
-            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                          | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 
             .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                           | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 
@@ -104,13 +100,11 @@ void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
 
             .srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 
-            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-                          | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
 
             .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                           | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 
             .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
         }
@@ -131,7 +125,6 @@ void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
     if (status != VK_SUCCESS) {
         FxModulePanic("Failed to create render pass", status);
     }
-
 }
 
 void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_values)
@@ -148,8 +141,8 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = RenderPass,
         .framebuffer = framebuffer,
-        .renderArea.offset = {0, 0},
-        .renderArea.extent = {(uint32)extent.Width(), (uint32)extent.Height()},
+        .renderArea.offset = { 0, 0 },
+        .renderArea.extent = { (uint32)extent.Width(), (uint32)extent.Height() },
         .clearValueCount = clear_values.Size,
         .pClearValues = clear_values.Ptr,
     };
