@@ -123,7 +123,7 @@ public:
             char* str = static_cast<char*>(std::malloc(Length + 1));
 
             if (str == nullptr) {
-                FxPanic("FxTokenizer", "Error allocating heap string!", 0);
+                FxPanic("FxTokenizer", "Error allocating heap string!");
                 return nullptr;
             }
 

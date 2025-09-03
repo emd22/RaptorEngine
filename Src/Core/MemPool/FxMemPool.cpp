@@ -1,10 +1,11 @@
 #include "FxMemPool.hpp"
 
+#include "../FxDefines.hpp"
 #include "../FxPanic.hpp"
 #include "../Types.hpp"
 
-#define FX_MEMPOOL_WARN_SLOW_ALLOC 1
-#define FX_MEMPOOL_NEXT_FIT        1
+// #define FX_MEMPOOL_WARN_SLOW_ALLOC 1
+// #define FX_MEMPOOL_NEXT_FIT        1
 
 void FxMemPoolPage::Create(uint64 size)
 {
@@ -13,14 +14,14 @@ void FxMemPoolPage::Create(uint64 size)
 #endif
 
     if (mMem || mSize) {
-        FxPanic("FxMemPool", "Mem pool has already been initialized!", 0);
+        FxPanic("FxMemPool", "Memory pool has already been initialized!");
     }
 
     mSize = size;
 
     void* allocated_ptr = std::malloc(mSize);
     if (allocated_ptr == nullptr) {
-        FxPanic("FxMemPool", "Error allocating buffer for memory pool!", 0);
+        FxPanic("FxMemPool", "Error allocating buffer for memory pool!");
     }
 
     mMem = static_cast<uint8*>(allocated_ptr);
@@ -155,7 +156,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
     // There are no fun tricks left, we need to search for first fit now.
 
 #ifdef FX_MEMPOOL_WARN_SLOW_ALLOC
-    OldLog::Warning("Using slow allocation path!", 0);
+    FxLogWarning("Using slow allocation path in FxMemPool!");
 #endif
 
     // Since there are blocks allocated and there is not enough space for our allocations at the end,
@@ -334,7 +335,7 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoo
     // If we have a fresh memory block and that is still too small, we can assume
     // the memory block is larger than page size and fail.
     if (node == nullptr) {
-        FxPanic("FxMemPool", "Allocation is too large for memory pool page size!", 0);
+        FxPanic("FxMemPool", "Allocation is too large for memory pool page size!");
     }
 
 #ifdef FX_MEMPOOL_TRACK_STATISTICS
@@ -383,9 +384,9 @@ void FxMemPoolPage::PrintAllocations() const
 {
     auto* node = mMemBlocks.Head;
 
-    OldLog::Debug("");
-    OldLog::Debug("=== MemStat [size=%llu, start=%p, end=%p, freed=%lld] ===", mSize, mMem, mMem + mSize,
-                  mFreedTotalSize);
+    FxLogDebug("");
+    FxLogDebug("=== MemStat [size={:d}, start={:p}, end={:p}, freed={:d}] ===", mSize, reinterpret_cast<void*>(mMem),
+               reinterpret_cast<void*>(mMem + mSize), mFreedTotalSize);
 
     while (node != nullptr) {
         FxMemPoolPage::MemBlock& block = node->Data;
@@ -397,7 +398,7 @@ void FxMemPoolPage::PrintAllocations() const
             const uint64 gap_size = next_block.Start - current_block_end;
 
             if (gap_size) {
-                OldLog::Debug("MemGap  [size=%llu, ptr=%p]", gap_size, current_block_end);
+                FxLogDebug("MemGap  [size={:d}, ptr={:p}]", gap_size, reinterpret_cast<void*>(current_block_end));
             }
         }
 
@@ -406,15 +407,15 @@ void FxMemPoolPage::PrintAllocations() const
 
             uint64 gap_size = block.Start - mMem;
             if (gap_size) {
-                OldLog::Debug("MemGap  [size=%llu, ptr=%p]", gap_size, mMem);
+                FxLogDebug("MemGap  [size={:d}, ptr={:p}]", gap_size, reinterpret_cast<void*>(mMem));
             }
         }
 
-        OldLog::Debug("MemAlloc[size=%llu, ptr=%p]", block.Size, block.Start);
+        FxLogDebug("MemAlloc[size={:d}, ptr={:p}]", block.Size, reinterpret_cast<void*>(block.Start));
 
         node = node->Next;
     }
-    OldLog::Debug("");
+    FxLogDebug("");
 }
 
 void FxMemPoolPage::Destroy()
@@ -496,7 +497,7 @@ void FxMemPool::AllocateNewPage()
     mCurrentPage = page;
     mCurrentPage->Create(mPageSize);
 
-    OldLog::Info("Allocating a new memory page!");
+    FxLogInfo("Allocating a new memory page!");
 }
 
 void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
@@ -513,7 +514,7 @@ void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
     FxMemPoolPage* page = pool->FindPtrInPage(ptr);
 
     if (page == nullptr) {
-        OldLog::Error("FxMemPool::Free: Pointer %p not found! Has it been freed already?", ptr);
+        FxLogError("FxMemPool::Free: Pointer {:p} not found! Has it been freed already?", ptr);
         FX_BREAKPOINT;
         return;
     }

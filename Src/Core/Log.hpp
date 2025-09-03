@@ -12,6 +12,10 @@ enum class TextColor
     Blue,
 };
 
+
+/**
+ * @deprecated Log using the old logging system. This does not work with log files. Use `FxLog` functions instead.
+ */
 class OldLog
 {
 public:

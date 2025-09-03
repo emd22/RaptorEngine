@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
+// #define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
 
 #include "RxCommands.hpp"
 #include "RxDevice.hpp"

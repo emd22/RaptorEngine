@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <Core/FxLog.hpp>
 #include <Renderer/Renderer.hpp>
 
 /** Converts an SDL scancode to its corresponding FxKey ID. */
@@ -85,7 +86,8 @@ static inline bool IsKeyInRange(FxKey key_id)
     bool in_range = (key_id >= 0 && key_id < FxControlManager::MaxKeys);
 
     if (!in_range) {
-        OldLog::Warning("Invalid Control Key ID! (0 <= %d < %d)", key_id, FxControlManager::MaxKeys);
+        int max_keys = FxControlManager::MaxKeys;
+        FxLogWarning("Invalid Control Key ID! (0 <= {:d} < {:d})", static_cast<int>(key_id), max_keys);
     }
 
     return in_range;
@@ -223,8 +225,9 @@ void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event* event)
 void FxControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
 {
     const FxKey key_id = ConvertScancodeToFxKey(event->key.scancode);
+
     if (key_id == FxKey::FX_KEY_UNKNOWN) {
-        OldLog::Warning("Unknown scancode %d. Could not convert to Key ID\n", event->key.scancode);
+        FxLogWarning("Unknown scancode {:d}!", static_cast<int>(event->key.scancode));
         return;
     }
 
@@ -240,7 +243,7 @@ void FxControlManager::UpdateFromMouseButtonEvent(SDL_Event* event)
 {
     const FxKey key_id = ConvertMouseButtonToFxKey(event->button.button);
     if (key_id == FxKey::FX_KEY_UNKNOWN) {
-        OldLog::Warning("Unknown mouse button %d. Could not convert to Key ID\n", event->button.button);
+        FxLogWarning("Unknown mouse button {:d}!", static_cast<int>(event->button.button));
         return;
     }
 

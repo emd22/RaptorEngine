@@ -171,7 +171,7 @@ public:
             CurrentPage->Next = new_page;
             CurrentPage = new_page;
 
-            OldLog::Info("Allocating new page", 0);
+            FxLogDebug("Allocating new page for FxMPPagedArray");
         }
 
         return element;
@@ -196,7 +196,7 @@ public:
             CurrentPage->Next = new_page;
             CurrentPage = new_page;
 
-            OldLog::Info("Allocating new page", 0);
+            FxLogDebug("Allocating new page for FxMPPagedArray");
         }
     }
 
@@ -368,7 +368,7 @@ private:
         // Allocate and initialize the page object
         void* allocated_page = std::malloc(sizeof(Page));
         if (allocated_page == nullptr) {
-            FxPanic("FxPagedArray", "Memory error allocating page", 0);
+            FxPanic("FxPagedArray", "Memory error allocating page");
             return nullptr; // for msvc
         }
 
@@ -382,7 +382,7 @@ private:
         void* allocated_nodes = std::malloc(sizeof(ElementType) * PageNodeCapacity);
 
         if (allocated_nodes == nullptr) {
-            FxPanic("FxPagedArray", "Memory error allocating page data", 0);
+            FxPanic("FxPagedArray", "Memory error allocating page data");
             return nullptr; // for msvc
         }
 
@@ -396,7 +396,7 @@ private:
     inline void SizeCheck(uint32 size) const
     {
         if (size > PageNodeCapacity) {
-            FxPanic("FxPagedArray", "The current size of a page is greater than the allocated page node capacity!", 0);
+            FxPanic("FxPagedArray", "The current size of a page is greater than the allocated page node capacity!");
         }
     }
 

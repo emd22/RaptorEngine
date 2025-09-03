@@ -25,7 +25,7 @@ public:
     // private:
     void Destroy() override
     {
-        OldLog::Info("Destroy FxAssetModel (%lu meshes)", Meshes.Size);
+        FxLogInfo("Destroy FxAssetModel ({:d} meshes)", Meshes.Size);
 
         for (FxPrimitiveMesh<>* mesh : Meshes) {
             mesh->Destroy();

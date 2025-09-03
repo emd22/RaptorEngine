@@ -113,7 +113,7 @@ public:
                                                 &Allocation, &allocation_info);
 
         if (status != VK_SUCCESS) {
-            FxPanic("GPUBuffer", "Error allocating staging buffer!", status);
+            FxPanicVulkan("GPUBuffer", "Error allocating staging buffer!", status);
         }
 
 

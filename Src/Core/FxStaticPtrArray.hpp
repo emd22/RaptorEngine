@@ -11,7 +11,7 @@ protected:
     void InternalAllocateArray(size_t element_count) override
     {
 #ifdef FX_DEBUG_STATIC_ARRAY
-        OldLog::Debug("Allocating FxSizedArray of capacity %lu (type: %s)", element_count, typeid(ElementType).name());
+        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", element_count, typeid(ElementType).name());
 #endif
         // this->Data = new ElementType *[element_count];
         void* allocated_ptr = std::malloc(sizeof(ElementType*) * element_count);
@@ -31,7 +31,7 @@ public:
     {
         if (this->Data != nullptr) {
 #ifdef FX_DEBUG_STATIC_ARRAY
-            OldLog::Debug("Freeing FxSizedArray of size %lu (type: %s)", this->Size, typeid(ElementType).name());
+            FxLogDebug("Freeing FxSizedArray of size {:d} (type: {:s})", this->Size, typeid(ElementType).name());
 #endif
             for (int i = 0; i < this->Capacity; i++) {
                 delete this->Data[i];

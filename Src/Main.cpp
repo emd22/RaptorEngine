@@ -1,6 +1,6 @@
 
 #include "vulkan/vulkan_core.h"
-#define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
+#define VMA_DEBUG_LOG(...) FxLogWarning(__VA_ARGS__)
 
 #include "Core/FxDefines.hpp"
 #include "Renderer/Backend/RxShader.hpp"
@@ -150,6 +150,8 @@ void TestScript()
 
 int main()
 {
+    FxLogCreateFile("FoxtrotLog.log");
+
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
     // TestScript();
@@ -158,12 +160,9 @@ int main()
     FxConfigFile config;
     config.Load("../Config/Main.conf");
 
-    FxLogCreateFile("FoxtrotLog.log");
-
-    FxLog<FxLogChannel::Info>("Hey there! This is a test of the new logging system!");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
+        FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
     }
 
     FxControlManager::Init();
@@ -173,7 +172,7 @@ int main()
     signal(SIGABRT,
            [](int signum)
            {
-               OldLog::Error("Aborted!");
+               FxLogError("Aborted!");
                exit(1);
            });
 

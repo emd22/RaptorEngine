@@ -267,7 +267,7 @@ void FxAssetManager::CheckForUploadableData()
         else if (worker.LoadStatus == FxLoaderBase::Status::None) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
 
-            FxPanic("FxAssetManager", "Worker status is none!", 0);
+            FxPanic("FxAssetManager", "Worker status is none!");
         }
 
         ItemsEnqueued.clear();
@@ -300,7 +300,7 @@ void FxAssetManager::CheckForItemsToLoad()
 
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
-        OldLog::Debug("No workers available; Polling for worker thread...");
+        FxLogDebug("No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up

@@ -2,20 +2,18 @@
 
 #include <Core/FxSizedArray.hpp>
 #include <Core/Types.hpp>
-
 #include <Math/FxVec2.hpp>
-
 #include <Util/FxKey.hpp>
-
 #include <cstring>
 
 // Forward Declarations
 union SDL_Event;
 class FxControl;
 
-class FxControlManager {
+class FxControlManager
+{
 private:
-    friend void CheckKeyForContinuedPress(FxControl *key);
+    friend void CheckKeyForContinuedPress(FxControl* key);
 
 public:
     static const int MaxKeys = FxKey::FX_KEY_MAX;
@@ -30,7 +28,7 @@ public:
     static void ReleaseMouse();
     static bool IsMouseLocked();
 
-    static FxVec2f &GetMouseDelta();
+    static FxVec2f& GetMouseDelta();
 
     /**
      * Check if a key is currently pressed.
@@ -62,8 +60,8 @@ public:
     /**
      * Checks if a combination of keys is currently pressed down.
      */
-    template <std::same_as<FxKey> ...KeyV>
-    static bool IsComboDown(KeyV ...keys)
+    template <std::same_as<FxKey>... KeyV>
+    static bool IsComboDown(KeyV... keys)
     {
         return (IsKeyDown(keys) && ...);
     }
@@ -71,8 +69,8 @@ public:
     /**
      * Checks if a combination of keys is no longer pressed.
      */
-    template <std::same_as<FxKey> ...KeyV>
-    static bool IsComboUp(KeyV ...keys)
+    template <std::same_as<FxKey>... KeyV>
+    static bool IsComboUp(KeyV... keys)
     {
         return (IsKeyUp(keys) && ...);
     }
@@ -83,8 +81,8 @@ public:
      * This function will only return true if at least one of the keys satisifies `IsKeyPressed()`,
      * and all of the keys are pressed down.
      */
-    template <std::same_as<FxKey> ...KeyV>
-    static bool IsComboPressed(KeyV ...keys)
+    template <std::same_as<FxKey>... KeyV>
+    static bool IsComboPressed(KeyV... keys)
     {
         // If all keys are down and at least one key has just been pressed, then return true
         return (IsKeyDown(keys) && ...) && (IsKeyPressed(keys) || ...);
@@ -94,7 +92,7 @@ public:
      * Get a pointer to the control associated with the given keycode.
      * Returns `nullptr` if the keycode does not exist or is out of range.
      */
-    static FxControl *GetKey(FxKey scancode);
+    static FxControl* GetKey(FxKey scancode);
 
     ////////////////////////////////
     // Update functions
@@ -103,12 +101,12 @@ public:
     static void Update();
 
 private:
-    static void UpdateFromKeyboardEvent(SDL_Event *event);
-    static void UpdateFromMouseButtonEvent(SDL_Event *event);
-    static void UpdateFromMouseMoveEvent(SDL_Event *event);
+    static void UpdateFromKeyboardEvent(SDL_Event* event);
+    static void UpdateFromMouseButtonEvent(SDL_Event* event);
+    static void UpdateFromMouseMoveEvent(SDL_Event* event);
 
     // General, used by UpdateFromKeyboardEvent and UpdateFromMouseButtonEvent
-    static void UpdateButtonFromEvent(FxKey key_id, SDL_Event *event);
+    static void UpdateButtonFromEvent(FxKey key_id, SDL_Event* event);
 
 public:
     using WindowEventFunc = void (*)();
@@ -128,7 +126,7 @@ private:
 class FxControl
 {
 private:
-    friend void CheckKeyForContinuedPress(FxControl *control);
+    friend void CheckKeyForContinuedPress(FxControl* control);
     friend class FxControlManager;
 
 public:
@@ -139,7 +137,8 @@ public:
     //     FrameBit = (1 << 2), /* Flag for if this is the current frame or the previous frame. */
     // };
 
-    enum Flag : uint8 {
+    enum Flag : uint8
+    {
         NoFlag = (0),
     };
 
@@ -149,7 +148,7 @@ public:
 
     inline bool IsContinuedPress() const { return mContinuedPress; }
 
-    bool IsKeyPressed() const{ return (IsKeyDown() && !IsContinuedPress()); }
+    bool IsKeyPressed() const { return (IsKeyDown() && !IsContinuedPress()); }
 
     /**
      * Set the flags of the control. These are defined by `Flag`.

@@ -27,7 +27,7 @@ FxVertexInfo FxMakeVertexInfo()
         { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
     };
 
-    OldLog::Debug("Amount of attributes: %d", attribs.Size);
+    FxLogDebug("Amount of attributes: {:d}", attribs.Size);
 
     return { binding_desc, std::move(attribs) };
 }
@@ -86,7 +86,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
             .pSpecializationInfo = &specialization_info,
         };
 
-        OldLog::Debug("Added shader (Vertex?: %s)", OldLog::YesNo(create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
+        FxLogDebug("Added shader (Vertex?: {:b})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
 
         shader_create_info.Insert(create_info);
     }
@@ -205,7 +205,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
     const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create graphics pipeline", status);
+        FxModulePanicVulkan("Could not create graphics pipeline", status);
     }
 
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
@@ -280,7 +280,7 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(uint32 vert_push_consts_size, 
     VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline layout", status);
+        FxModulePanicVulkan("Failed to create pipeline layout", status);
     }
 
     return Layout;

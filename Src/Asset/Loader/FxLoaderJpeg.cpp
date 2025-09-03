@@ -18,7 +18,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
     FILE* fp = fopen(c_path, "rb");
 
     if (!fp) {
-        OldLog::Error("Could not find JPEG file at '%s'", c_path);
+        FxLogError("Could not find JPEG file at '{:s}'", c_path);
         return FxLoaderJpeg::Status::Error;
     }
 

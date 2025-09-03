@@ -47,7 +47,7 @@ bool RxQueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurface
     VkResult status = vkGetPhysicalDeviceSurfaceSupportKHR(device, family_index, surface, &support);
 
     if (status != VK_SUCCESS) {
-        OldLog::Error("Could not query present support for family at index %d", family_index);
+        FxLogError("Could not query present support for family at index {:d}", family_index);
         return false;
     }
 
@@ -62,7 +62,7 @@ void RxQueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurf
     RawFamilies.InitSize(family_count);
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, RawFamilies.Data);
 
-    OldLog::Info("Amount of queue families: %d", family_count);
+    FxLogInfo("Amount of queue families: {:d}", family_count);
 
 
     FindGraphicsFamily(physical_device, surface);
@@ -235,7 +235,7 @@ void RxGpuDevice::CreateLogicalDevice()
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create logical device", status);
+        FxModulePanicVulkan("Could not create logical device", status);
     }
 
     QueryQueues();
@@ -252,9 +252,9 @@ void RxGpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 
     CreateLogicalDevice();
 
-    OldLog::Info("Device Queue Families: \n\tPresent: %d\n\tGraphics: %d\n\tTransfer: %d",
-                 mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(),
-                 mQueueFamilies.GetTransferFamily());
+    FxLogInfo("Device Queue Families: \n\tPresent: {:d}\n\tGraphics: {:d}\n\tTransfer: {:d}",
+              mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(),
+              mQueueFamilies.GetTransferFamily());
 }
 
 void RxGpuDevice::Destroy()

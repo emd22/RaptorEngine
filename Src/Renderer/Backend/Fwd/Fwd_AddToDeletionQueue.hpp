@@ -1,6 +1,6 @@
 #pragma once
 
-#define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
+// #define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
 
 #include <ThirdParty/vk_mem_alloc.h>
 

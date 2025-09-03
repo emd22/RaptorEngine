@@ -83,7 +83,7 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
         VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr,
                                                       &DsLayoutSkyboxFragment);
         if (status != VK_SUCCESS) {
-            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+            FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
         }
     }
 

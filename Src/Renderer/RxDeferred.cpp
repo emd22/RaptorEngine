@@ -90,7 +90,7 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_material_info, nullptr,
                                                       &DsLayoutLightingMaterialProperties);
         if (status != VK_SUCCESS) {
-            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+            FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
         }
     }
 
@@ -137,7 +137,7 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 
         VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr, &DsLayoutGPassMaterial);
         if (status != VK_SUCCESS) {
-            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+            FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
         }
     }
 
@@ -300,7 +300,7 @@ void RxDeferredRenderer::CreateLightingDSLayout()
 
     status = vkCreateDescriptorSetLayout(device->Device, &lighting_layout_info, nullptr, &DsLayoutLightingFrag);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline descriptor set layout", status);
+        FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
     }
 }
 
@@ -456,7 +456,7 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
         VkResult status;
         status = vkCreateDescriptorSetLayout(device->Device, &comp_layout_info, nullptr, &DsLayoutCompFrag);
         if (status != VK_SUCCESS) {
-            FxModulePanic("Failed to create pipeline descriptor set layout", status);
+            FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
         }
     }
 

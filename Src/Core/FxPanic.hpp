@@ -3,50 +3,49 @@
 #include <vulkan/vulkan.h>
 
 #include <Core/FxDefines.hpp>
+#include <Core/FxLog.hpp>
 #include <Core/Log.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
 
 #define FX_BREAKPOINT __builtin_trap()
 
-template <typename T, typename... Types>
-void FxPanic(const char* const module, const char* fmt, T first, Types... items)
+template <typename... TTypes>
+void FxPanic(const char* module, const char* fmt, TTypes&&... items)
 {
-    OldLog::LogSeverityText<OldLog::Severity::Fatal>();
+    // OldLog::LogSeverityText<OldLog::Severity::Fatal>();
+    FxLogFatal("An irrecoverable error has occurred");
 
     if (module != nullptr) {
-        OldLog::Write("%s: ", module);
+        FxLogFatal("{:s}: ", module);
     }
 
-    OldLog::Write(fmt, items...);
-    OldLog::Write("\n");
+    FxLogFatal(fmt, std::forward<TTypes>(items)...);
 
     std::terminate();
 }
 
-template <typename... Types>
-void FxPanic(const char* module, const char* fmt, VkResult result, Types... items)
+template <typename... TTypes>
+void FxPanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&... items)
 {
-    OldLog::LogSeverityText<OldLog::Severity::Fatal>();
+    FxLogFatal("An irrecoverable error has occurred");
 
     if (module != nullptr) {
-        OldLog::Write("%s: ", module);
+        FxLogFatal("{:s}: ", module);
     }
 
-    OldLog::Write(fmt, items...);
-    OldLog::Write("\n");
-
-    printf("=> Vulkan Err: %s\n", RxUtil::ResultToStr(result));
+    FxLogFatal(fmt, std::forward<TTypes>(items)...);
+    FxLogFatal("=> Vulkan Err: {:s}", RxUtil::ResultToStr(result));
 
     std::terminate();
 }
 
 
-#define FxModulePanic(...) FxPanic(FxModuleName__, __VA_ARGS__)
+#define FxModulePanic(...)       FxPanic(FxModuleName__, __VA_ARGS__)
+#define FxModulePanicVulkan(...) FxPanicVulkan(FxModuleName__, __VA_ARGS__)
 
 #define FxAssert(cond)                                                                                                 \
     if (!(cond)) {                                                                                                     \
-        OldLog::Fatal("", 0);                                                                                          \
-        OldLog::Fatal("An assertion failed (Cond: %s) at (%s:%d)", #cond, __FILE__, __LINE__);                         \
+        FxLogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond, __FILE__, __LINE__);                      \
         FxPanic(__func__, "Assertion failed!", 0);                                                                     \
     }
 
@@ -54,9 +53,9 @@ void FxPanic(const char* module, const char* fmt, VkResult result, Types... item
 #define FxDebugAssert(cond)                                                                                            \
     {                                                                                                                  \
         if (!(cond)) {                                                                                                 \
-            OldLog::Fatal("=== DEBUG ASSERTION FAILED ===", 0);                                                        \
-            OldLog::Fatal("An assertion failed (Cond: %s) at (%s:%d)", #cond, __FILE__, __LINE__);                     \
-            FxPanic(__func__, "Debug assertion failed!", 0);                                                           \
+            FxLogFatal("=== DEBUG ASSERTION FAILED ===");                                                              \
+            FxLogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond, __FILE__, __LINE__);                  \
+            FxPanic(__func__, "Debug assertion failed!");                                                              \
         }                                                                                                              \
     }
 #else

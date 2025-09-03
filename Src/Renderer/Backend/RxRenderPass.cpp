@@ -123,7 +123,7 @@ void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
     const VkResult status = vkCreateRenderPass(mDevice->Device, &create_info, nullptr, &RenderPass);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create render pass", status);
+        FxModulePanicVulkan("Failed to create render pass", status);
     }
 }
 

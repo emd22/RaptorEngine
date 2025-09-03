@@ -198,7 +198,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
     //    object = current_object;
 
-    OldLog::Info("Add primitive:", 0);
+    FxLogInfo("Add primitive:");
 }
 
 #include <Asset/FxAssetManager.hpp>

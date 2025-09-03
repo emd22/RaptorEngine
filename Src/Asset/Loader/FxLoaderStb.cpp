@@ -21,7 +21,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromFile(FxRef<FxAssetBase> asset, const st
 
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, requested_channels);
     if (mImageData == nullptr) {
-        OldLog::Error("Could not load image file at '%d'", c_path);
+        FxLogError("Could not load image file at '{:d}'", c_path);
         return FxLoaderStb::Status::Error;
     }
 
@@ -35,7 +35,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
     const int requested_channels = 4; /* RGBA */
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
-        OldLog::Error("Could not retrieve info from image in memory! (Size:%u)", size);
+        FxLogError("Could not retrieve info from image in memory! (Size:{u})", size);
         return FxLoaderStb::Status::Error;
     }
 
@@ -50,7 +50,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
     mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, requested_channels);
 
     if (mImageData == nullptr) {
-        OldLog::Error("Could not load image file from memory!");
+        FxLogError("Could not load image file from memory!");
         return FxLoaderStb::Status::Error;
     }
 

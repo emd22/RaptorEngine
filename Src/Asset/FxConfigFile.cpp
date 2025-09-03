@@ -26,7 +26,7 @@ void FxConfigFile::Load(const std::string& path)
 {
     FILE* fp = FileOpen(path.c_str(), "rb");
     if (fp == nullptr) {
-        OldLog::Error("Could not open config file at '%s'", path.c_str());
+        FxLogError("Could not open config file at '{:s}'", path);
         return;
     }
 
@@ -38,8 +38,8 @@ void FxConfigFile::Load(const std::string& path)
 
     size_t read_size = std::fread(file_buffer, 1, file_size, fp);
     if (read_size != file_size) {
-        OldLog::Warning("Error reading all data from config file at '%s' (read=%zu, size=%zu)", path.c_str(), read_size,
-                        file_size);
+        FxLogWarning("Error reading all data from config file at '{:s}' (BytesRead={:d}, Size={:d})", path, read_size,
+                     file_size);
     }
 
     FxTokenizer tokenizer(file_buffer, read_size);

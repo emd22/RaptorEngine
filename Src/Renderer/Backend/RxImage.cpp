@@ -80,7 +80,7 @@ void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkIm
 
     VkResult status = vmaCreateImage(Renderer->GpuAllocator, &image_info, &create_info, &Image, &Allocation, nullptr);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create vulkan image", status);
+        FxModulePanicVulkan("Could not create vulkan image", status);
     }
 
     // Get the vulkan values for the image type
@@ -110,7 +110,7 @@ void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkIm
 
     status = vkCreateImageView(GetDevice()->Device, &view_create_info, nullptr, &View);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create swapchain image view", status);
+        FxModulePanicVulkan("Could not create swapchain image view", status);
     }
 }
 

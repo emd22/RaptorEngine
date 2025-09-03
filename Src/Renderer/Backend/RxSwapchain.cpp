@@ -72,7 +72,7 @@ void RxSwapchain::CreateImageViews()
 
         VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &OutputImages[i].View);
         if (status != VK_SUCCESS) {
-            FxModulePanic("Could not create swapchain image view", status);
+            FxModulePanicVulkan("Could not create swapchain image view", status);
         }
     }
 }
@@ -85,7 +85,7 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mDevice->Physical, surface, &capabilities);
 
     if (result != VK_SUCCESS) {
-        FxModulePanic("Error retrieving surface capabilities", result);
+        FxModulePanicVulkan("Error retrieving surface capabilities", result);
     }
 
     const VkExtent2D extent = {
@@ -99,8 +99,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
         image_count = capabilities.maxImageCount;
     }
 
-    OldLog::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount,
-                 image_count);
+    FxLogInfo("Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount, capabilities.maxImageCount,
+              image_count);
 
     SurfaceFormat = mDevice->GetBestSurfaceFormat();
 
@@ -135,7 +135,7 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create swapchain", status);
+        FxModulePanicVulkan("Could not create swapchain", status);
     }
 }
 

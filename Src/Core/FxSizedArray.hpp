@@ -1,6 +1,8 @@
 #pragma once
 
 #include "FxAllocator.hpp"
+#include "FxDefines.hpp"
+#include "FxLog.hpp"
 #include "FxMemory.hpp"
 
 #include <stddef.h>
@@ -9,9 +11,6 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <stdexcept>
-
-// #define FX_STATIC_ARRAY_DEBUG 1
-// #define FX_STATIC_ARRAY_NO_MEMPOOL 1
 
 static inline void NoMemError()
 {
@@ -55,11 +54,11 @@ public:
 
     FxSizedArray(size_t element_count) : Capacity(element_count)
     {
-#ifdef FX_STATIC_ARRAY_DEBUG
-        OldLog::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
+#ifdef FX_SIZED_ARRAY_DEBUG
+        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", Capacity, typeid(ElementType).name());
 #endif
 
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         Data = FxMemPool::Alloc<ElementType>(static_cast<uint32>(sizeof(ElementType)) * element_count);
         if (Data == nullptr) {
             NoMemError();
@@ -113,7 +112,7 @@ public:
             return;
         }
 
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (size_t i = 0; i < Size; i++) {
             ElementType& element = Data[i];
             element.~ElementType();
@@ -125,8 +124,8 @@ public:
 #endif
 
 
-#ifdef FX_STATIC_ARRAY_DEBUG
-        OldLog::Debug("Freeing FxSizedArray of size %zu (type: %s)", Size, typeid(ElementType).name());
+#ifdef FX_SIZED_ARRAY_DEBUG
+        FxLogDebug("Freeing FxSizedArray of size {:d} (type: {:s})", Size, typeid(ElementType).name());
 #endif
 
         //
@@ -275,7 +274,7 @@ public:
 
         Size = Capacity;
 
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (uint64 i = 0; i < Size; i++) {
             new (&Data[i]) ElementType;
         }
@@ -300,10 +299,10 @@ public:
 protected:
     virtual void InternalAllocateArray(size_t element_count)
     {
-#ifdef FX_DEBUG_STATIC_ARRAY
-        OldLog::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
+#ifdef FX_SIZED_ARRAY_DEBUG
+        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", element_count, typeid(ElementType).name());
 #endif
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         Data = FxMemPool::Alloc<ElementType>(sizeof(ElementType) * element_count);
         if (Data == nullptr) {
             NoMemError();

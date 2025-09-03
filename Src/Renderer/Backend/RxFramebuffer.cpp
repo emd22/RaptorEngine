@@ -29,7 +29,7 @@ void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const R
     const VkResult status = vkCreateFramebuffer(mDevice->Device, &create_info, nullptr, &Framebuffer);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create framebuffer", status);
+        FxModulePanicVulkan("Failed to create framebuffer", status);
     }
 }
 
