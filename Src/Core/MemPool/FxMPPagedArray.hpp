@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Types.hpp"
 #include "../FxPanic.hpp"
+#include "../Types.hpp"
 
 template <typename ElementType>
 class FxMPPagedArray
@@ -26,14 +26,10 @@ public:
         // {
         // }
 
-        Iterator(Page* current_page, uint32 index)
-            : mCurrentPage(current_page), mCurrentIndex(index)
-        {
-        }
+        Iterator(Page* current_page, uint32 index) : mCurrentPage(current_page), mCurrentIndex(index) {}
 
-        Iterator& operator ++ ()
+        Iterator& operator++()
         {
-
             ++mCurrentIndex;
 
             if (mCurrentIndex > mCurrentPage->Size) {
@@ -44,7 +40,7 @@ public:
             return *this;
         }
 
-        Iterator operator ++ (int)
+        Iterator operator++(int)
         {
             Iterator iterator = *this;
             ++*this;
@@ -52,9 +48,8 @@ public:
             return iterator;
         }
 
-        Iterator& operator -- ()
+        Iterator& operator--()
         {
-
             if (mCurrentIndex == 0) {
                 mCurrentPage = mCurrentPage->Prev;
                 mCurrentIndex = mCurrentPage->Size;
@@ -65,12 +60,9 @@ public:
             return *this;
         }
 
-        ElementType& operator * ()
-        {
-            return mCurrentPage->Data[mCurrentIndex];
-        }
+        ElementType& operator*() { return mCurrentPage->Data[mCurrentIndex]; }
 
-        bool operator != (const Iterator& other)
+        bool operator!=(const Iterator& other)
         {
             return mCurrentPage && (mCurrentPage != other.mCurrentPage || mCurrentIndex != other.mCurrentIndex);
         }
@@ -81,12 +73,9 @@ public:
 
     FxMPPagedArray() = default;
 
-    FxMPPagedArray(uint32 page_node_capacity)
-    {
-        Create(page_node_capacity);
-    }
+    FxMPPagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
 
-    FxMPPagedArray& operator = (const FxMPPagedArray& other)
+    FxMPPagedArray& operator=(const FxMPPagedArray& other)
     {
         FirstPage = other.FirstPage;
         CurrentPage = other.CurrentPage;
@@ -99,7 +88,7 @@ public:
         return *this;
     }
 
-    FxMPPagedArray& operator = (FxMPPagedArray&& other)
+    FxMPPagedArray& operator=(FxMPPagedArray&& other)
     {
         FirstPage = other.FirstPage;
         CurrentPage = other.CurrentPage;
@@ -120,15 +109,9 @@ public:
         return *this;
     }
 
-    Iterator begin() const
-    {
-        return Iterator(FirstPage, 0);
-    }
+    Iterator begin() const { return Iterator(FirstPage, 0); }
 
-    Iterator end() const
-    {
-        return Iterator(CurrentPage, CurrentPage->Size);
-    }
+    Iterator end() const { return Iterator(CurrentPage, CurrentPage->Size); }
 
     size_t GetCalculatedSize() const
     {
@@ -147,7 +130,7 @@ public:
 
     inline size_t Size() const
     {
-        //return GetCalculatedSize();
+        // return GetCalculatedSize();
         return TrackedSize;
     }
 
@@ -165,10 +148,7 @@ public:
         CurrentPage = FirstPage;
     }
 
-    bool IsInited() const
-    {
-        return (FirstPage != nullptr && CurrentPage != nullptr);
-    }
+    bool IsInited() const { return (FirstPage != nullptr && CurrentPage != nullptr); }
 
     ElementType* Insert()
     {
@@ -191,7 +171,7 @@ public:
             CurrentPage->Next = new_page;
             CurrentPage = new_page;
 
-            Log::Info("Allocating new page", 0);
+            OldLog::Info("Allocating new page", 0);
         }
 
         return element;
@@ -216,7 +196,7 @@ public:
             CurrentPage->Next = new_page;
             CurrentPage = new_page;
 
-            Log::Info("Allocating new page", 0);
+            OldLog::Info("Allocating new page", 0);
         }
     }
 
@@ -238,10 +218,7 @@ public:
         return nullptr;
     }
 
-    ElementType& GetLast()
-    {
-        return CurrentPage->Data[CurrentPage->Size - 1];
-    }
+    ElementType& GetLast() { return CurrentPage->Data[CurrentPage->Size - 1]; }
 
     ElementType* RemoveLast()
     {
@@ -316,10 +293,7 @@ public:
     }
 
 
-    ElementType& operator [] (size_t index)
-    {
-        return Get(index);
-    }
+    ElementType& operator[](size_t index) { return Get(index); }
 
     ElementType& Get(size_t index)
     {

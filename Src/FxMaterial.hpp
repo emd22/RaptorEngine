@@ -45,7 +45,7 @@ public:
             DiffuseTexture.Texture = image;
             break;
         default:
-            Log::Error("Unsupported resource type to attach to material!", 0);
+            OldLog::Error("Unsupported resource type to attach to material!", 0);
             break;
         }
     }

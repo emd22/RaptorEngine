@@ -46,7 +46,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
-    Log::Info("Creating material buffer of size %u", material_buffer_size);
+    OldLog::Info("Creating material buffer of size %u", material_buffer_size);
 
     MaterialPropertiesBuffer.Create(material_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                     VMA_MEMORY_USAGE_CPU_TO_GPU, RxGpuBufferFlags::PersistentMapped);

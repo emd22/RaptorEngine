@@ -61,7 +61,8 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
 //    FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
 //
 //    if (gltf_material->has_pbr_metallic_roughness) {
-//        material->DiffuseTexture.Texture = LoadTexture(material, gltf_material->pbr_metallic_roughness.base_color_texture);
+//        material->DiffuseTexture.Texture = LoadTexture(material,
+//        gltf_material->pbr_metallic_roughness.base_color_texture);
 //    }
 //
 //    object->Material = material;
@@ -70,11 +71,13 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
 // void FxLoaderGltf::LoadAttachedMaterials()
 //{
 //     for (FxGltfMaterialToLoad& to_load : MaterialsToLoad) {
-//         CreateMaterialFromGltfMesh(to_load.Object, mGltfData->meshes[to_load.MeshIndex].primitives[to_load.PrimitiveIndex].material);
+//         CreateMaterialFromGltfMesh(to_load.Object,
+//         mGltfData->meshes[to_load.MeshIndex].primitives[to_load.PrimitiveIndex].material);
 //     }
 // }
 
-void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent& component, cgltf_texture_view& texture_view)
+void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent& component,
+                                     cgltf_texture_view& texture_view)
 {
     if (!texture_view.texture) {
         return;
@@ -195,7 +198,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
     //    object = current_object;
 
-    Log::Info("Add primitive:", 0);
+    OldLog::Info("Add primitive:", 0);
 }
 
 #include <Asset/FxAssetManager.hpp>
@@ -241,13 +244,13 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
 
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
     if (status != cgltf_result_success) {
-        Log::Error("Error parsing GLTF file! (path: %s)", path.c_str());
+        OldLog::Error("Error parsing GLTF file! (path: %s)", path.c_str());
         return FxLoaderGltf::Status::Error;
     }
 
     status = cgltf_load_buffers(&options, mGltfData, path.c_str());
     if (status != cgltf_result_success) {
-        Log::Error("Error loading buffers from GLTF file! (path: %s)", path.c_str());
+        OldLog::Error("Error loading buffers from GLTF file! (path: %s)", path.c_str());
 
         return FxLoaderGltf::Status::Error;
     }
@@ -264,7 +267,8 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
 
 
     //         if (gltf_material.has_pbr_metallic_roughness) {
-    //             material->DiffuseTexture = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
+    //             material->DiffuseTexture = LoadTexture(material,
+    //             gltf_material.pbr_metallic_roughness.base_color_texture);
 
     //         }
 
@@ -285,7 +289,7 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, cons
 
     cgltf_result status = cgltf_parse(&options, data, size, &mGltfData);
     if (status != cgltf_result_success) {
-        Log::Error("Error parsing GLTF file from data");
+        OldLog::Error("Error parsing GLTF file from data");
         return FxLoaderGltf::Status::Error;
     }
 
@@ -299,7 +303,8 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, cons
 
 
     //         if (gltf_material.has_pbr_metallic_roughness) {
-    //             material->DiffuseTexture = LoadTexture(material, gltf_material.pbr_metallic_roughness.base_color_texture);
+    //             material->DiffuseTexture = LoadTexture(material,
+    //             gltf_material.pbr_metallic_roughness.base_color_texture);
     //         }
 
     //         model->Materials.push_back(material);

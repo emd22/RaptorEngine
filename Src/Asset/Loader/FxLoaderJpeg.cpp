@@ -18,7 +18,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
     FILE* fp = fopen(c_path, "rb");
 
     if (!fp) {
-        Log::Error("Could not find JPEG file at '%s'", c_path);
+        OldLog::Error("Could not find JPEG file at '%s'", c_path);
         return FxLoaderJpeg::Status::Error;
     }
 
@@ -38,7 +38,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
     image->NumComponents = mJpegInfo.output_components;
 
     printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-    image->Size = {mJpegInfo.output_width, mJpegInfo.output_height};
+    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
     mImageData.InitSize(data_size);
@@ -84,7 +84,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     FxDebugAssert(image->NumComponents == requested_components)
 
         printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-    image->Size = {mJpegInfo.output_width, mJpegInfo.output_height};
+    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
     mImageData.InitSize(data_size);

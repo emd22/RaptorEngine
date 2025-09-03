@@ -1,6 +1,6 @@
 
 #include "vulkan/vulkan_core.h"
-#define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
+#define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
 
 #include "Core/FxDefines.hpp"
 #include "Renderer/Backend/RxShader.hpp"
@@ -28,6 +28,7 @@
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxMeshGen.hpp>
 #include <Core/FxBitset.hpp>
+#include <Core/FxLog.hpp>
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
@@ -157,6 +158,9 @@ int main()
     FxConfigFile config;
     config.Load("../Config/Main.conf");
 
+    FxLogCreateFile("FoxtrotLog.log");
+
+    FxLog<FxLogChannel::Info>("Hey there! This is a test of the new logging system!");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
@@ -169,7 +173,7 @@ int main()
     signal(SIGABRT,
            [](int signum)
            {
-               Log::Error("Aborted!");
+               OldLog::Error("Aborted!");
                exit(1);
            });
 
@@ -239,6 +243,7 @@ int main()
 
     FxRef<FxObject> cube_object = FxAssetManager::LoadObject("../models/Cube.glb");
     cube_object->WaitUntilLoaded();
+
 
     FxRef<FxMaterial> skybox_material = FxMaterialManager::New("Skybox", &deferred_renderer->GPassPipeline);
 

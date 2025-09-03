@@ -27,7 +27,7 @@ FxVertexInfo FxMakeVertexInfo()
         { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
     };
 
-    Log::Debug("Amount of attributes: %d", attribs.Size);
+    OldLog::Debug("Amount of attributes: %d", attribs.Size);
 
     return { binding_desc, std::move(attribs) };
 }
@@ -86,7 +86,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
             .pSpecializationInfo = &specialization_info,
         };
 
-        Log::Debug("Added shader (Vertex?: %s)", Log::YesNo(create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
+        OldLog::Debug("Added shader (Vertex?: %s)", OldLog::YesNo(create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
 
         shader_create_info.Insert(create_info);
     }

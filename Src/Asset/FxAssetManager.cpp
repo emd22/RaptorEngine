@@ -199,7 +199,8 @@ void FxAssetManager::LoadImage(RxImageType image_type, FxRef<FxAssetImage>& asse
 }
 
 
-void FxAssetManager::LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size)
+void FxAssetManager::LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data,
+                                         uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
@@ -299,7 +300,7 @@ void FxAssetManager::CheckForItemsToLoad()
 
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
-        Log::Debug("No workers available; Polling for worker thread...");
+        OldLog::Debug("No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up

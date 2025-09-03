@@ -164,7 +164,7 @@ void RxRenderBackend::InitVulkan()
     std::cout << "Requested to load " << all_extensions.size() << " extensions...\n";
 
     for (const auto& extension : all_extensions) {
-        Log::Debug("Ext: %s", extension);
+        OldLog::Debug("Ext: %s", extension);
     }
 
     ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions);
@@ -224,16 +224,16 @@ uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_sever
 
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
-        Log::Error(fmt, message);
+        OldLog::Error(fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
-        Log::Warning(fmt, message);
+        OldLog::Warning(fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
         // Log::Info(fmt, message);
     }
     else {
-        Log::Debug(fmt, message);
+        OldLog::Debug(fmt, message);
     }
 
     return 0;
@@ -273,7 +273,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     const auto status = Rx_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        Log::Error("Could not create debug messenger! (err: %s)", RxUtil::ResultToStr(status));
+        OldLog::Error("Could not create debug messenger! (err: %s)", RxUtil::ResultToStr(status));
         return nullptr;
     }
 
@@ -329,7 +329,7 @@ ExtensionNames RxRenderBackend::MakeInstanceExtensionList(ExtensionNames& user_r
 
 ExtensionList& RxRenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 {
-    Log::Debug("Query Extensions", 0);
+    OldLog::Debug("Query Extensions", 0);
 
 
     if (mAvailableExtensions.IsNotEmpty()) {
@@ -535,7 +535,7 @@ void RxRenderBackend::PresentFrame()
         // Swapchain.Rebuild()..
     }
     else {
-        Log::Error("Error submitting present queue", status);
+        OldLog::Error("Error submitting present queue", status);
     }
 }
 
@@ -636,7 +636,7 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
         return RxFrameResult::GraphicsOutOfDate;
     }
     else {
-        Log::Error("Error getting next swapchain image!", result);
+        OldLog::Error("Error getting next swapchain image!", result);
     }
 
     return RxFrameResult::RenderError;

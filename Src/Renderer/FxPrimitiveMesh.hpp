@@ -12,10 +12,7 @@ class FxPrimitiveMesh
 public:
     FxPrimitiveMesh() = default;
 
-    FxPrimitiveMesh(FxSizedArray<TVertexType>& vertices)
-    {
-        UploadVertices(vertices);
-    }
+    FxPrimitiveMesh(FxSizedArray<TVertexType>& vertices) { UploadVertices(vertices); }
 
     FxPrimitiveMesh(FxSizedArray<TVertexType>& vertices, FxSizedArray<uint32>& indices)
     {
@@ -49,16 +46,12 @@ public:
         mVertexBuffer.Create(RxBufferUsageType::Vertices, vertices);
     }
 
-    void UploadIndices(FxSizedArray<uint32>& indices)
-    {
-        mIndexBuffer.Create(RxBufferUsageType::Indices, indices);
-    }
+    void UploadIndices(FxSizedArray<uint32>& indices) { mIndexBuffer.Create(RxBufferUsageType::Indices, indices); }
 
-    static FxSizedArray<TVertexType> MakeCombinedVertexBuffer(
-        const FxSizedArray<float32>& positions,
-        const FxSizedArray<float32>& normals,
-        const FxSizedArray<float32>& uvs
-    ) requires std::same_as<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>
+    static FxSizedArray<TVertexType> MakeCombinedVertexBuffer(const FxSizedArray<float32>& positions,
+                                                              const FxSizedArray<float32>& normals,
+                                                              const FxSizedArray<float32>& uvs)
+        requires std::same_as<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>
     {
         FxAssert((normals.Size == positions.Size));
 
@@ -68,7 +61,7 @@ public:
         const bool has_texcoords = uvs.Size > 0;
 
         if (!has_texcoords) {
-            Log::Info("Model does not have texture coordinates!", 0);
+            OldLog::Info("Model does not have texture coordinates!", 0);
         }
 
         for (int i = 0; i < vertices.Capacity; i++) {
@@ -102,8 +95,10 @@ public:
     {
         const uint32 vertex_count = positions.Size / 3;
 
-        constexpr bool contains_uv = std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>;
-        constexpr bool contains_normal = std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal>> || contains_uv;
+        constexpr bool contains_uv =
+            std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>;
+        constexpr bool contains_normal = std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal>> ||
+                                         contains_uv;
 
         FxSizedArray<TVertexType> vertices(vertex_count);
 
@@ -129,8 +124,10 @@ public:
     {
         const uint32 vertex_count = positions.Size;
 
-        constexpr bool contains_uv = std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>;
-        constexpr bool contains_normal = std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal>> || contains_uv;
+        constexpr bool contains_uv =
+            std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>;
+        constexpr bool contains_normal = std::is_same_v<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal>> ||
+                                         contains_uv;
 
         FxSizedArray<TVertexType> vertices(vertex_count);
 
@@ -153,13 +150,10 @@ public:
     }
 
 
-    bool IsWritable()
-    {
-        return (mVertexBuffer.Initialized && mIndexBuffer.Initialized);
-    }
+    bool IsWritable() { return (mVertexBuffer.Initialized && mIndexBuffer.Initialized); }
 
-    RxGpuBuffer<TVertexType> &GetVertexBuffer() { return mVertexBuffer; }
-    RxGpuBuffer<uint32> &GetIndexBuffer() { return mIndexBuffer; }
+    RxGpuBuffer<TVertexType>& GetVertexBuffer() { return mVertexBuffer; }
+    RxGpuBuffer<uint32>& GetIndexBuffer() { return mIndexBuffer; }
 
     void Render(RxGraphicsPipeline& pipeline)
     {
@@ -197,10 +191,7 @@ public:
         mIndexBuffer.Destroy();
     }
 
-    ~FxPrimitiveMesh()
-    {
-        Destroy();
-    }
+    ~FxPrimitiveMesh() { Destroy(); }
 
     std::atomic_bool IsReady = std::atomic_bool(false);
 

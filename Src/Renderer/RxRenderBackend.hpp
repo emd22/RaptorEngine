@@ -135,7 +135,7 @@ public:
 
     void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
-        Log::Info("Adding object to deletion queue at frame %d", mInternalFrameCounter);
+        OldLog::Info("Adding object to deletion queue at frame %d", mInternalFrameCounter);
 
         mDeletionQueue.push_back(FxDeletionObject {
             .DeletionFrameNumber = mInternalFrameCounter,

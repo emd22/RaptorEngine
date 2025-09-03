@@ -56,7 +56,7 @@ public:
     FxSizedArray(size_t element_count) : Capacity(element_count)
     {
 #ifdef FX_STATIC_ARRAY_DEBUG
-        Log::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
+        OldLog::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
 #endif
 
 #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
@@ -126,7 +126,7 @@ public:
 
 
 #ifdef FX_STATIC_ARRAY_DEBUG
-        Log::Debug("Freeing FxSizedArray of size %zu (type: %s)", Size, typeid(ElementType).name());
+        OldLog::Debug("Freeing FxSizedArray of size %zu (type: %s)", Size, typeid(ElementType).name());
 #endif
 
         //
@@ -295,11 +295,13 @@ public:
 
     size_t GetCapacityInBytes() const { return Capacity * sizeof(ElementType); }
 
+    void Print() {}
+
 protected:
     virtual void InternalAllocateArray(size_t element_count)
     {
 #ifdef FX_DEBUG_STATIC_ARRAY
-        Log::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
+        OldLog::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
 #endif
 #if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
         Data = FxMemPool::Alloc<ElementType>(sizeof(ElementType) * element_count);

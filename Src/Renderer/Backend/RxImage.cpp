@@ -22,7 +22,7 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
         props.LayerCount = 6;
     }
     else {
-        Log::Error("Unknown image type!", 0);
+        OldLog::Error("Unknown image type!", 0);
     }
 
     return props;
@@ -41,8 +41,8 @@ RxGpuDevice* RxImage::GetDevice()
     return mDevice;
 }
 
-void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-                     VkImageAspectFlags aspect_flags)
+void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageTiling tiling,
+                     VkImageUsageFlags usage, VkImageAspectFlags aspect_flags)
 {
     Size = size;
     Format = format;
@@ -114,7 +114,8 @@ void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkIm
     }
 }
 
-void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect_flags)
+void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageUsageFlags usage,
+                     VkImageAspectFlags aspect_flags)
 {
     Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect_flags);
 }
@@ -152,7 +153,8 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd)
         src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         dest_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
-    else if (ImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    else if (ImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 

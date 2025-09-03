@@ -2,11 +2,10 @@
 
 #include "FxAssetBase.hpp"
 
-#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Core/FxRef.hpp>
-#include <FxMaterial.hpp>
-
 #include <Core/FxStaticPtrArray.hpp>
+#include <FxMaterial.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 
 
 class FxAssetModel : public FxAssetBase
@@ -18,18 +17,15 @@ public:
     friend class FxAssetManager;
 
 public:
-    void Render(RxGraphicsPipeline &pipeline);
+    void Render(RxGraphicsPipeline& pipeline);
     bool CheckIfReady();
 
-    ~FxAssetModel() override
-    {
-        Destroy();
-    }
+    ~FxAssetModel() override { Destroy(); }
 
-// private:
+    // private:
     void Destroy() override
     {
-        Log::Info("Destroy FxAssetModel (%lu meshes)", Meshes.Size);
+        OldLog::Info("Destroy FxAssetModel (%lu meshes)", Meshes.Size);
 
         for (FxPrimitiveMesh<>* mesh : Meshes) {
             mesh->Destroy();

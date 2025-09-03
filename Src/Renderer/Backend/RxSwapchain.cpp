@@ -99,8 +99,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
         image_count = capabilities.maxImageCount;
     }
 
-    Log::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount,
-              image_count);
+    OldLog::Info("Swapchain - Min:%d, Max:%d, Selected:%d", capabilities.minImageCount, capabilities.maxImageCount,
+                 image_count);
 
     SurfaceFormat = mDevice->GetBestSurfaceFormat();
 
@@ -181,10 +181,7 @@ void RxSwapchain::DestroyFramebuffersAndImageViews()
     // CompFramebuffers.Free();
 }
 
-void RxSwapchain::DestroyInternalSwapchain()
-{
-    vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr);
-}
+void RxSwapchain::DestroyInternalSwapchain() { vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr); }
 
 void RxSwapchain::Destroy()
 {
@@ -199,7 +196,4 @@ void RxSwapchain::Destroy()
     Initialized = false;
 }
 
-RxSwapchain::~RxSwapchain()
-{
-    Destroy();
-}
+RxSwapchain::~RxSwapchain() { Destroy(); }

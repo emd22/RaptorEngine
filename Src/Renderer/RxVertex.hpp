@@ -9,6 +9,9 @@ enum FxVertexFlags : int8
     FxVertexUV = 0x04,
 };
 
+// Pack all of the structs below
+#pragma pack(push, 1)
+
 template <int8 Flags>
 struct RxVertex;
 
@@ -32,3 +35,6 @@ struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
     float32 Normal[3];
     float32 UV[2];
 } __attribute__((packed));
+
+// End packing structs
+#pragma pack(pop)

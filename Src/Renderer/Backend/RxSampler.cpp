@@ -43,7 +43,7 @@ RxSampler::RxSampler(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxS
 void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter)
 {
     if (Sampler) {
-        Log::Warning("Sampler has been previously initialized!", 0);
+        OldLog::Warning("Sampler has been previously initialized!", 0);
         return;
     }
 
@@ -77,7 +77,7 @@ void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, R
     VkResult result = vkCreateSampler(mDevice->Device, &sampler_info, nullptr, &Sampler);
 
     if (result != VK_SUCCESS) {
-        Log::Error("Error creating texture sampler!", 0);
+        OldLog::Error("Error creating texture sampler!", 0);
         Sampler = nullptr;
     }
 }

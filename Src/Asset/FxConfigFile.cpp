@@ -1,10 +1,10 @@
-#include <string>
 #include "FxConfigFile.hpp"
 
 #include <stdio.h>
 
 #include <Core/FxHash.hpp>
 #include <Util/FxTokenizer.hpp>
+#include <string>
 
 static FILE* FileOpen(const char* path, const char* mode)
 {
@@ -26,7 +26,7 @@ void FxConfigFile::Load(const std::string& path)
 {
     FILE* fp = FileOpen(path.c_str(), "rb");
     if (fp == nullptr) {
-        Log::Error("Could not open config file at '%s'", path.c_str());
+        OldLog::Error("Could not open config file at '%s'", path.c_str());
         return;
     }
 
@@ -38,7 +38,8 @@ void FxConfigFile::Load(const std::string& path)
 
     size_t read_size = std::fread(file_buffer, 1, file_size, fp);
     if (read_size != file_size) {
-        Log::Warning("Error reading all data from config file at '%s' (read=%zu, size=%zu)", path.c_str(), read_size, file_size);
+        OldLog::Warning("Error reading all data from config file at '%s' (read=%zu, size=%zu)", path.c_str(), read_size,
+                        file_size);
     }
 
     FxTokenizer tokenizer(file_buffer, read_size);
@@ -54,10 +55,7 @@ static bool TokenIsValue(const FxTokenizer::Token& token, const char* str)
     return (!strncmp(token.Start, str, token.Length));
 }
 
-static inline bool IsNumber(char ch)
-{
-    return (ch >= '0' && ch <= '9');
-}
+static inline bool IsNumber(char ch) { return (ch >= '0' && ch <= '9'); }
 
 static FxConfigEntry::ValueType GetValueTokenType(const FxTokenizer::Token& token)
 {
@@ -103,7 +101,7 @@ void FxConfigFile::ParseEntries(FxMPPagedArray<FxTokenizer::Token>& tokens)
         }
         // Token is not equals, print warning and continue
         if (!TokenIsValue(tokens[i], "=")) {
-            Log::Warning("Expected '=' but found '%.*s'", tokens[i].Length, tokens[i].Start);
+            OldLog::Warning("Expected '=' but found '%.*s'", tokens[i].Length, tokens[i].Start);
             continue;
         }
 
@@ -115,24 +113,24 @@ void FxConfigFile::ParseEntries(FxMPPagedArray<FxTokenizer::Token>& tokens)
         entry.Type = GetValueTokenType(value_token);
 
         switch (entry.Type) {
-            case VType::None:
-                break;
-            case VType::Str:
-                // Remove the first quote
-                value_token.Start++;
-                value_token.Length--;
+        case VType::None:
+            break;
+        case VType::Str:
+            // Remove the first quote
+            value_token.Start++;
+            value_token.Length--;
 
-                // Remove the ending quote
-                value_token.Length--;
-                [[fallthrough]];
-            case VType::Identifier:
-                entry.ValueStr = value_token.GetHeapStr();
-                break;
-            case VType::Int:
-                entry.ValueInt = value_token.ToInt();
-                break;
-            default:
-                break;
+            // Remove the ending quote
+            value_token.Length--;
+            [[fallthrough]];
+        case VType::Identifier:
+            entry.ValueStr = value_token.GetHeapStr();
+            break;
+        case VType::Int:
+            entry.ValueInt = value_token.ToInt();
+            break;
+        default:
+            break;
         }
 
         mConfigEntries.emplace_back(entry);

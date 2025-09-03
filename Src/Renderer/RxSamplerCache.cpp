@@ -80,7 +80,7 @@ RxSamplerHandle RxSamplerCache::RequestSampler(RxSamplerPackedPropertiesType pro
 
     // Section could not be found
     if (section_it == mSamplerCache.end()) {
-        Log::Debug("Could not find sampler cache section; creating new section from properties");
+        OldLog::Debug("Could not find sampler cache section; creating new section from properties");
 
         CreateSamplersWithProperties(RX_SAMPLER_CACHE_FALLBACK_COUNT, properties);
     }
@@ -101,7 +101,7 @@ RxSamplerHandle RxSamplerCache::RequestSampler(RxSamplerPackedPropertiesType pro
         return handle;
     }
 
-    Log::Error("Could not find a free sampler in sampler cache! -> PackedProperties: 0x%08u", properties);
+    OldLog::Error("Could not find a free sampler in sampler cache! -> PackedProperties: 0x%08u", properties);
 
     RxSamplerHandle handle { .Sampler = nullptr, .Index = 0, .PackedProperties = properties };
     return handle;

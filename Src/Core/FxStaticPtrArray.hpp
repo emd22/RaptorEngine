@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FxSizedArray.hpp"
+
 #include <Core/Log.hpp>
 
 template <typename ElementType>
@@ -9,9 +10,9 @@ class FxStaticPtrArray : public FxSizedArray<ElementType*>
 protected:
     void InternalAllocateArray(size_t element_count) override
     {
-    #ifdef FX_DEBUG_STATIC_ARRAY
-        Log::Debug("Allocating FxSizedArray of capacity %lu (type: %s)", element_count, typeid(ElementType).name());
-    #endif
+#ifdef FX_DEBUG_STATIC_ARRAY
+        OldLog::Debug("Allocating FxSizedArray of capacity %lu (type: %s)", element_count, typeid(ElementType).name());
+#endif
         // this->Data = new ElementType *[element_count];
         void* allocated_ptr = std::malloc(sizeof(ElementType*) * element_count);
         if (allocated_ptr == nullptr) {
@@ -29,9 +30,9 @@ public:
     void Free() override
     {
         if (this->Data != nullptr) {
-    #ifdef FX_DEBUG_STATIC_ARRAY
-            Log::Debug("Freeing FxSizedArray of size %lu (type: %s)", this->Size, typeid(ElementType).name());
-    #endif
+#ifdef FX_DEBUG_STATIC_ARRAY
+            OldLog::Debug("Freeing FxSizedArray of size %lu (type: %s)", this->Size, typeid(ElementType).name());
+#endif
             for (int i = 0; i < this->Capacity; i++) {
                 delete this->Data[i];
             }
@@ -44,8 +45,5 @@ public:
         this->Capacity = 0;
     }
 
-    ~FxStaticPtrArray()
-    {
-        FxStaticPtrArray::Free();
-    }
+    ~FxStaticPtrArray() { FxStaticPtrArray::Free(); }
 };

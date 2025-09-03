@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
+#define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
 
 #include "RxCommands.hpp"
 #include "RxDevice.hpp"
@@ -33,16 +33,14 @@ public:
     void Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
                 VkImageAspectFlags aspect_flags);
 
-    void Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect_flags);
+    void Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageUsageFlags usage,
+                VkImageAspectFlags aspect_flags);
 
     void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd);
 
     void Destroy();
 
-    ~RxImage()
-    {
-        Destroy();
-    }
+    ~RxImage() { Destroy(); }
 
 public:
     FxVec2u Size = FxVec2u::Zero;
