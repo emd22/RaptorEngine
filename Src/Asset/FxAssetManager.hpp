@@ -53,6 +53,11 @@ public:
     std::thread Thread;
 };
 
+struct FxLoadObjectOptions
+{
+    bool KeepInMemory = false;
+};
+
 class FxAssetManager
 {
 public:
@@ -82,10 +87,10 @@ public:
      * @brief Creates a new `FxObject` and loads the provided asset into it from
      * the path provided.
      */
-    static FxRef<FxObject> LoadObject(const std::string& path)
+    static FxRef<FxObject> LoadObject(const std::string& path, FxLoadObjectOptions options = {})
     {
         FxRef<FxObject> asset = FxRef<FxObject>::New();
-        LoadObject(asset, path);
+        LoadObject(asset, path, options);
 
         return asset;
     }
@@ -137,7 +142,7 @@ public:
     /**
      * @brief Loads an object into the provided asset from a path.
      */
-    static void LoadObject(FxRef<FxObject>& asset, const std::string& path);
+    static void LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options = {});
 
     /**
      * @brief Loads an asset into the provided asset from the provided data.

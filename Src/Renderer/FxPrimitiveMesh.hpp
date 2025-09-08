@@ -22,8 +22,8 @@ public:
     template <typename T>
     FxPrimitiveMesh(FxPrimitiveMesh<T>& other)
     {
-        mVertexBuffer = other.mVertexBuffer;
-        mIndexBuffer = other.mIndexBuffer;
+        mGpuVertexBuffer = other.mGpuVertexBuffer;
+        mGpuIndexBuffer = other.mGpuIndexBuffer;
 
         IsReady = other.IsReady;
     }
@@ -35,18 +35,72 @@ public:
     //     UploadIndices(indices);
     // }
 
-    void CreateFromData(FxSizedArray<TVertexType>& vertices, FxSizedArray<uint32>& indices)
+    /**
+     * @brief Uploads the vertices and indices to the primitive mesh. Copies the vertices and indices into
+     * a cpu-side buffer if the property `KeepInMemory` is true.
+     */
+    void CreateFromData(const FxSizedArray<TVertexType>& vertices, const FxSizedArray<uint32>& indices)
     {
         UploadVertices(vertices);
         UploadIndices(indices);
     }
 
-    void UploadVertices(FxSizedArray<TVertexType>& vertices)
+    /**
+     * @brief Uploads the vertices and indices to the primitive mesh. Moves the vertices and indices (no copy)
+     * into a cpu-side buffer if the property `KeepInMemory` is true.
+     */
+    void CreateFromData(FxSizedArray<TVertexType>&& vertices, FxSizedArray<uint32>&& indices)
     {
-        mVertexBuffer.Create(RxBufferUsageType::Vertices, vertices);
+        UploadVertices(vertices);
+        UploadIndices(indices);
     }
 
-    void UploadIndices(FxSizedArray<uint32>& indices) { mIndexBuffer.Create(RxBufferUsageType::Indices, indices); }
+    /** @brief Uploads mesh vertices to a primitve mesh. */
+    void UploadVertices(const FxSizedArray<TVertexType>& vertices)
+    {
+        if (KeepInMemory) {
+            mVertexBuffer.InitAsCopyOf(vertices);
+        }
+
+        mGpuVertexBuffer.Create(RxBufferUsageType::Vertices, vertices);
+    }
+
+    /**
+     * @brief Uploads mesh vertices to a primtive mesh, and stores the vertices without copy if the property
+     * `KeepInMemory` is true.
+     */
+    void UploadVertices(FxSizedArray<TVertexType>&& vertices)
+    {
+        mGpuVertexBuffer.Create(RxBufferUsageType::Vertices, vertices);
+
+        if (KeepInMemory) {
+            mVertexBuffer = std::move(vertices);
+        }
+    }
+
+    /** @brief Uploads mesh indices to a primitive mesh. */
+    void UploadIndices(const FxSizedArray<uint32>& indices)
+    {
+        if (KeepInMemory) {
+            mIndexBuffer.InitAsCopyOf(indices);
+        }
+
+        mGpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
+    }
+
+    /**
+     * @brief Uploads mesh indices to a primtive mesh, and stores the indices without copy if the property
+     * `KeepInMemory` is true.
+     */
+    void UploadIndices(FxSizedArray<uint32>&& indices)
+    {
+        mGpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
+
+        if (KeepInMemory) {
+            mIndexBuffer = std::move(indices);
+        }
+    }
+
 
     static FxSizedArray<TVertexType> MakeCombinedVertexBuffer(const FxSizedArray<float32>& positions,
                                                               const FxSizedArray<float32>& normals,
@@ -81,6 +135,26 @@ public:
         }
 
         return vertices;
+    }
+
+    FxSizedArray<TVertexType>& GetVertices()
+    {
+        if (!KeepInMemory) {
+            FxLogWarning("Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
+        }
+
+        // This will return an empty FxSizedArray if `KeepInMemory` is false!
+        return mVertexBuffer;
+    }
+
+    FxSizedArray<TVertexType>& GetIndices()
+    {
+        if (!KeepInMemory) {
+            FxLogWarning("Requesting indices from a primitive mesh while `KeepInMemory` != true!");
+        }
+
+        // This will return an empty FxSizedArray if `KeepInMemory` is false!
+        return mIndexBuffer;
     }
 
     /**
@@ -150,30 +224,30 @@ public:
     }
 
 
-    bool IsWritable() { return (mVertexBuffer.Initialized && mIndexBuffer.Initialized); }
+    bool IsWritable() { return (mGpuVertexBuffer.Initialized && mGpuIndexBuffer.Initialized); }
 
-    RxGpuBuffer<TVertexType>& GetVertexBuffer() { return mVertexBuffer; }
-    RxGpuBuffer<uint32>& GetIndexBuffer() { return mIndexBuffer; }
+    RxGpuBuffer<TVertexType>& GetVertexBuffer() { return mGpuVertexBuffer; }
+    RxGpuBuffer<uint32>& GetIndexBuffer() { return mGpuIndexBuffer; }
 
     void Render(const RxCommandBuffer& cmd, const RxGraphicsPipeline& pipeline)
     {
         const VkDeviceSize offset = 0;
-//        RxFrameData* frame = Rx_Fwd_GetFrame();
+        //        RxFrameData* frame = Rx_Fwd_GetFrame();
 
-        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
-        vkCmdBindIndexBuffer(cmd.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mGpuVertexBuffer.Buffer, &offset);
+        vkCmdBindIndexBuffer(cmd.CommandBuffer, mGpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
+        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mGpuIndexBuffer.Size), 1, 0, 0, 0);
     }
-//-
-//    void Render(RxCommandBuffer& cmd, RxGraphicsPipeline& pipeline)
-//    {
-//        const VkDeviceSize offset = 0;
-//        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
-//        vkCmdBindIndexBuffer(cmd.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-//
-//        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
-//    }
+
+    //    void Render(RxCommandBuffer& cmd, RxGraphicsPipeline& pipeline)
+    //    {
+    //        const VkDeviceSize offset = 0;
+    //        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
+    //        vkCmdBindIndexBuffer(cmd.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+    //
+    //        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
+    //    }
 
     void Destroy()
     {
@@ -187,8 +261,8 @@ public:
 
         IsReady.store(false);
 
-        mVertexBuffer.Destroy();
-        mIndexBuffer.Destroy();
+        mGpuVertexBuffer.Destroy();
+        mGpuIndexBuffer.Destroy();
     }
 
     ~FxPrimitiveMesh() { Destroy(); }
@@ -196,8 +270,13 @@ public:
     std::atomic_bool IsReady = std::atomic_bool(false);
 
     bool IsReference = false;
+    bool KeepInMemory = false;
 
 protected:
-    RxGpuBuffer<TVertexType> mVertexBuffer;
-    RxGpuBuffer<uint32> mIndexBuffer;
+    RxGpuBuffer<TVertexType> mGpuVertexBuffer;
+    RxGpuBuffer<uint32> mGpuIndexBuffer;
+
+    /* CPU memory vertex and index buffers */
+    FxSizedArray<TVertexType> mVertexBuffer;
+    FxSizedArray<uint32> mIndexBuffer;
 };

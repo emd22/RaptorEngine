@@ -198,6 +198,14 @@ public:
         return *this;
     }
 
+    void InitAsCopyOf(const FxSizedArray<ElementType>& other)
+    {
+        InitCapacity(other.Capacity);
+        Size = other.Size;
+
+        memcpy(Data, other.Data, other.GetSizeInBytes());
+    }
+
     void Clear() { Size = 0; }
 
     bool IsEmpty() { return Size == 0; }

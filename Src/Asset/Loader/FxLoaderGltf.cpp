@@ -55,8 +55,8 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
 
     // printf("\n");
 
-    // Set the combined vertices to the mesh
-    mesh->UploadVertices(combined_vertices);
+    // Upload the vertices to the primtive mesh
+    mesh->UploadVertices(std::move(combined_vertices));
     mesh->IsReady = true;
 }
 
@@ -166,6 +166,9 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
         FxRef<FxPrimitiveMesh<>> primitive_mesh = FxMakeRef<FxPrimitiveMesh<>>();
 
+        // Keep the primitive mesh's vertices and indices in memory if `KeepInMemory` is set
+        primitive_mesh->KeepInMemory = KeepInMemory;
+
         // if there are indices in the mesh, add them to the FxPrimitiveMesh
         if (primitive->indices != nullptr) {
             indices.InitSize(primitive->indices->count);
@@ -181,7 +184,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
             // printf("\n");
 
             // Set the mesh indices
-            primitive_mesh->UploadIndices(indices);
+            primitive_mesh->UploadIndices(std::move(indices));
         }
 
         UnpackMeshAttributes(primitive_mesh, primitive);

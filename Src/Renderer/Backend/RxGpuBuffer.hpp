@@ -235,7 +235,7 @@ private:
 public:
     RxGpuBuffer() = default;
 
-    void Create(RxBufferUsageType usage, FxSizedArray<ElementType>& data)
+    void Create(RxBufferUsageType usage, const FxSizedArray<ElementType>& data)
     {
         this->Size = data.Size;
         Usage = usage;

@@ -248,8 +248,10 @@ int main()
                          VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
     cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image);
 
-    FxRef<FxObject> cube_object = FxAssetManager::LoadObject("../models/Cube.glb");
+    FxRef<FxObject> cube_object = FxAssetManager::LoadObject("../models/Cube.glb", { .KeepInMemory = true });
     cube_object->WaitUntilLoaded();
+
+    FxLogInfo("Cube object has {} indices", cube_object->Mesh->GetIndexBuffer().Size);
 
 
     // FxRef<FxMaterial> skybox_material = FxMaterialManager::New("Skybox", &deferred_renderer->GPassPipeline);

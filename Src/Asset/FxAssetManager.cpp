@@ -164,9 +164,10 @@ inline bool IsFileJpeg(const std::string& path)
     return false;
 }
 
-void FxAssetManager::LoadObject(FxRef<FxObject>& asset, const std::string& path)
+void FxAssetManager::LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options)
 {
     FxRef<FxLoaderGltf> loader = FxRef<FxLoaderGltf>::New();
+    loader->KeepInMemory = options.KeepInMemory;
 
     SubmitAssetToLoad<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, loader, path);
 }
