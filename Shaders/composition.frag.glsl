@@ -29,16 +29,22 @@ void main()
     // v_Color = vec4(a_UV, 0.0, 1.0);
     // return;
 
-    float depth = 1.0 - texture(s_Depth, a_UV).r;
+    float inv_depth = texture(s_Depth, a_UV).r;
+    // float depth = 1.0 - inv_depth;
+
     vec4 albedo = texture(s_Albedo, a_UV);
-    vec3 normals = texture(s_Normals, a_UV).rgb;
+    vec4 normals = texture(s_Normals, a_UV);
 
     vec4 lights = texture(s_Lights, a_UV);
 
     // vec3 final_color = lights.rgb;
     // vec3 final_color = WorldPosFromDepth(depth);
     // vec3 final_color = WorldPosFromDepth(depth);
-    vec3 final_color = (albedo.rgb * (lights.rgb));
+    vec3 final_color = (albedo.rgb);
+
+    if (normals.a > 0.01) {
+        final_color *= ((lights.rgb));
+    }
 
     v_Color = vec4(final_color, 1.0);
 }

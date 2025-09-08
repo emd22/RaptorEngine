@@ -17,4 +17,5 @@ layout(set = 0, binding = 0) uniform samplerCube s_Sky;
 void main()
 {
     v_Albedo = texture(s_Sky, a_UVW);
+    // v_Albedo = vec4(0.0, 1.0, 0.0, 1.0);
 }

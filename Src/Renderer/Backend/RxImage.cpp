@@ -6,6 +6,7 @@
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
+#include <Core/FxStackArray.hpp>
 
 FX_SET_MODULE_NAME("RxImage")
 
@@ -13,7 +14,7 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
 {
     RxImageTypeProperties props {};
 
-    if (image_type == RxImageType::Image2D) {
+    if (image_type == RxImageType::Image) {
         props.ViewType = VK_IMAGE_VIEW_TYPE_2D;
         props.LayerCount = 1;
     }
@@ -41,7 +42,7 @@ RxGpuDevice* RxImage::GetDevice()
     return mDevice;
 }
 
-void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageTiling tiling,
+void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, VkImageAspectFlags aspect_flags)
 {
     Size = size;
@@ -50,6 +51,16 @@ void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkIm
 
     if (RxUtil::IsFormatDepth(format)) {
         mIsDepthTexture = true;
+    }
+
+
+    // Get the vulkan values for the image type
+    RxImageTypeProperties image_type_props = RxImageTypeGetProperties(image_type);
+
+    VkImageCreateFlags image_create_flags = 0;
+
+    if (image_type == RxImageType::Cubemap) {
+        image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     }
 
     // Create the vulkan image
@@ -63,13 +74,15 @@ void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkIm
         .extent.depth = 1,
 
         .mipLevels = 1,
-        .arrayLayers = 1,
+        .arrayLayers = image_type_props.LayerCount,
         .format = format,
         .tiling = tiling,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
         .usage = usage,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+
+        .flags = image_create_flags,
     };
 
     VmaAllocationCreateInfo create_info {
@@ -83,8 +96,6 @@ void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkIm
         FxModulePanicVulkan("Could not create vulkan image", status);
     }
 
-    // Get the vulkan values for the image type
-    RxImageTypeProperties image_type_props = RxImageTypeGetProperties(image_type);
 
     const VkImageViewCreateInfo view_create_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -114,13 +125,13 @@ void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkIm
     }
 }
 
-void RxImage::Create(RxImageType image_type, FxVec2u size, VkFormat format, VkImageUsageFlags usage,
+void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageUsageFlags usage,
                      VkImageAspectFlags aspect_flags)
 {
     Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect_flags);
 }
 
-void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd)
+void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count)
 {
     VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
@@ -139,7 +150,7 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd)
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
-                .layerCount = 1,
+                .layerCount = layer_count,
             },
     };
 
@@ -170,6 +181,193 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd)
     vkCmdPipelineBarrier(cmd, src_stage, dest_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
     ImageLayout = new_layout;
+}
+
+
+void RxImage::CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout final_layout, FxVec2u size,
+                             uint32 base_layer)
+{
+    Fx_Fwd_SubmitUploadCmd(
+        [&](RxCommandBuffer& cmd)
+        {
+            TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd);
+
+            VkBufferImageCopy copy {
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = base_layer,
+                    .layerCount = 1,
+                },
+                .imageExtent =
+                    VkExtent3D {
+                        .width = size.X,
+                        .height = size.Y,
+                        .depth = 1,
+                    },
+            };
+
+            vkCmdCopyBufferToImage(cmd, buffer.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+            TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd);
+        });
+}
+
+enum CubemapLayer
+{
+    // Forward,
+
+    Left,
+    Right,
+    Top,
+    Bottom,
+    Backwards,
+    Forward,
+};
+
+void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap)
+{
+    // Here is the type of cubemap we will be reading here:
+    //
+    // T -> Top, B -> Bottom, L -> Left, R -> Right
+    // FW -> Forward, BW -> Backward
+    //
+    // +-----+-----+-----+-----+
+    // |     |  T  |     |     |
+    // +-----+-----+-----+-----+
+    // |  L  |  FW |  R  |  BW |
+    // +-----+-----+-----+-----+
+    // |     |  B  |     |     |
+    // +-----+-----+-----+-----+
+    //
+    // Note that it is 4 tiles wide and 3 tiles tall.
+
+    const uint32 tile_width = cubemap.Size.X / 4;
+    const uint32 tile_height = cubemap.Size.Y / 3;
+
+    FxAssert(tile_width == tile_height);
+
+    FxStackArray<VkImageCopy, 6> copy_infos;
+
+    VkImageCopy copy_info {
+        .dstOffset = { .x = 0, .y = 0 },
+        .srcSubresource = { .baseArrayLayer = 0, .layerCount = 1, .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, },
+
+        .extent = { .width = tile_width, .height = tile_height, .depth = 1 },
+    };
+
+    // Top
+    {
+        copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = 0 };
+        copy_info.dstSubresource = {
+            .baseArrayLayer = CubemapLayer::Top,
+            .layerCount = 1,
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        };
+
+        copy_infos.Insert(copy_info);
+    }
+
+
+    // Left
+    {
+        copy_info.srcOffset = { .x = 0, .y = static_cast<int32>(tile_height) };
+        copy_info.dstSubresource = {
+            .baseArrayLayer = CubemapLayer::Left,
+            .layerCount = 1,
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        };
+
+        copy_infos.Insert(copy_info);
+    }
+
+    // Backward
+
+    {
+        copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = static_cast<int32>(tile_height) };
+        copy_info.dstSubresource = {
+            .baseArrayLayer = CubemapLayer::Forward,
+            .layerCount = 1,
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        };
+
+        copy_infos.Insert(copy_info);
+    }
+
+    // Forward
+    {
+        copy_info.srcOffset = { .x = static_cast<int32>(tile_width) * 2, .y = static_cast<int32>(tile_height) };
+        copy_info.dstSubresource = {
+            .baseArrayLayer = CubemapLayer::Right,
+            .layerCount = 1,
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        };
+
+        copy_infos.Insert(copy_info);
+    }
+
+    // Right
+    {
+        copy_info.srcOffset = { .x = static_cast<int32>(tile_width) * 3, .y = static_cast<int32>(tile_height) };
+        copy_info.dstSubresource = {
+            .baseArrayLayer = CubemapLayer::Backwards,
+            .layerCount = 1,
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        };
+
+        copy_infos.Insert(copy_info);
+    }
+
+    // Bottom
+    {
+        copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = static_cast<int32>(tile_height) * 2 };
+        copy_info.dstSubresource = {
+            .baseArrayLayer = CubemapLayer::Bottom,
+            .layerCount = 1,
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        };
+
+        copy_infos.Insert(copy_info);
+    }
+
+
+    Renderer->SubmitOneTimeCmd(
+        [&](RxCommandBuffer& cmd)
+        {
+            cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd);
+            TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 6);
+
+            vkCmdCopyImage(cmd.CommandBuffer, cubemap.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.Data);
+
+            // VkBufferImageCopy copy {
+            //     .bufferOffset = 0,
+            //     .bufferRowLength = 0,
+            //     .bufferImageHeight = 0,
+            //     .imageSubresource {
+            //         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            //         .mipLevel = 0,
+            //         .baseArrayLayer = base_layer,
+            //         .layerCount = 1,
+            //     },
+            //     .imageExtent =
+            //         VkExtent3D {
+            //             .width = size.X,
+            //             .height = size.Y,
+            //             .depth = 1,
+            //         },
+            // };
+
+            // vkCmdCopyImage(cmd.CommandBuffer, cubemap.Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Image,
+            //                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+            // TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd);
+            //
+            TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 6);
+        });
 }
 
 void RxImage::Destroy()

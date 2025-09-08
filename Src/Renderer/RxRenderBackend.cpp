@@ -453,7 +453,6 @@ RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
 
     CurrentGPass->Begin();
 
-
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
 

@@ -10,17 +10,12 @@ class FxAssetImage : public FxAssetBase
 {
 protected:
 public:
-    FxAssetImage()
-    {
-    }
+    FxAssetImage() {}
 
     friend class FxAssetManager;
 
 public:
-    ~FxAssetImage() override
-    {
-        Destroy();
-    }
+    ~FxAssetImage() override { Destroy(); }
 
     // private:
     void Destroy() override
@@ -40,7 +35,7 @@ public:
 
     uint32 NumComponents = 3;
 
-    RxImageType ImageType = RxImageType::Image2D;
+    RxImageType ImageType = RxImageType::Image;
     FxVec2u Size = FxVec2u::Zero;
 
 private:

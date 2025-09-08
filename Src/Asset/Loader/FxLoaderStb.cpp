@@ -79,6 +79,35 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
     asset->IsUploadedToGpu.notify_all();
 }
 
+// void FxLoaderStb::LoadCubemapToLayeredImage(const RxImage&)
+// {
+//     FxVec2u cubemap_size = cubemap_image.Size;
+
+//     // Here is the type of cubemap we will be looking for here:
+//     //
+//     // T -> Top, B -> Bottom, L -> Left, R -> Right
+//     // FW -> Forward, BW -> Backward
+//     //
+//     // +-----+-----+-----+-----+
+//     // |     |  T  |     |     |
+//     // +-----+-----+-----+-----+
+//     // |  L  |  FW |  R  |  BW |
+//     // +-----+-----+-----+-----+
+//     // |     |  B  |     |     |
+//     // +-----+-----+-----+-----+
+//     //
+//     // Note that it is 4 tiles wide and 3 tiles tall.
+
+//     const uint32 tile_width = cubemap_size.X / 4;
+//     const uint32 tile_height = cubemap_size.Y / 3;
+
+//     if (tile_width != tile_height) {
+//         FxLogWarning("Cubemap tile width != cubemap tile height!");
+//     }
+
+//     FxStackArray<VkImageCopy, 6> image_copy_infos;
+// }
+
 void FxLoaderStb::Destroy(FxRef<FxAssetBase>& asset)
 {
     // while (!asset->IsUploadedToGpu) {

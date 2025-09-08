@@ -86,7 +86,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
             .pSpecializationInfo = &specialization_info,
         };
 
-        FxLogDebug("Added shader (Vertex?: {:b})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
+        FxLogDebug("Added shader (Vertex?: {})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
 
         shader_create_info.Insert(create_info);
     }
@@ -170,11 +170,17 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
 
     // RenderPass->Create2(attachments);
 
+    VkBool32 use_depth = VK_TRUE;
+
+    if (properties.ForceNoDepthTest) {
+        use_depth = VK_FALSE;
+    }
+
     // Unused if has_depth_attachment is false
     VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
+        .depthTestEnable = use_depth,
+        .depthWriteEnable = use_depth,
         .depthCompareOp = VK_COMPARE_OP_GREATER,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
@@ -211,7 +217,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 }
 
-void RxGraphicsPipeline::Bind(RxCommandBuffer& command_buffer)
+void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
 {
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }

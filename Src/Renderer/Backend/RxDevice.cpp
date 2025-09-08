@@ -130,12 +130,11 @@ bool RxGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice& physical)
         return true;
     }
 
-    OldLog::Info("Device not suitable: (Vk: %d.%d.%d), Graphics?: %s, Present?: %s, Xfer?: %s, IsComplete?: %s",
-                 VK_VERSION_MAJOR(version), VK_VERSION_MINOR(version), VK_VERSION_PATCH(version),
-                 OldLog::YesNo(new_families.GetGraphicsFamily() != RxQueueFamilies::QueueNull),
-                 OldLog::YesNo(new_families.GetPresentFamily() != RxQueueFamilies::QueueNull),
-                 OldLog::YesNo(new_families.GetTransferFamily() != RxQueueFamilies::QueueNull),
-                 OldLog::YesNo(new_families.IsComplete()));
+    FxLogInfo("Device not suitable: (Vk: {}.{}.{}), Graphics?: {}, Present?: {}, Xfer?: {}, IsComplete?: {}",
+              VK_VERSION_MAJOR(version), VK_VERSION_MINOR(version), VK_VERSION_PATCH(version),
+              (new_families.GetGraphicsFamily() != RxQueueFamilies::QueueNull),
+              (new_families.GetPresentFamily() != RxQueueFamilies::QueueNull),
+              (new_families.GetTransferFamily() != RxQueueFamilies::QueueNull), (new_families.IsComplete()));
 
     return false;
 }

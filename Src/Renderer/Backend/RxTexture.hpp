@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Fwd/Fwd_SubmitUploadGpuCmd.hpp"
+#include "Fwd/Rx_Fwd_SubmitUploadGpuCmd.hpp"
 #include "RxDevice.hpp"
 #include "RxGpuBuffer.hpp"
 #include "RxImage.hpp"
@@ -10,7 +10,7 @@
 
 #include <Core/FxSizedArray.hpp>
 // #include "Fwd/Fwd_AddToDeletionQueue.hpp"
-#include "Fwd/Fwd_GetDevice.hpp"
+#include "Fwd/Rx_Fwd_GetDevice.hpp"
 
 #include <assert.h>
 
@@ -22,15 +22,16 @@ class RxTexture
 public:
     RxTexture() = default;
 
-    void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions, VkFormat format, uint32 components,
-                const FxRef<RxSampler>& sampler)
+    void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions,
+                VkFormat format, uint32 components, const FxRef<RxSampler>& sampler)
     {
         Sampler = sampler;
         Create(image_type, image_data, dimensions, format, components);
     }
 
     // TODO: update this and remove the format/color restrictions
-    void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u dimensions, VkFormat format, uint32 components)
+    void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u dimensions,
+                VkFormat format, uint32 components)
     {
         mDevice = Fx_Fwd_GetGpuDevice();
 
@@ -39,7 +40,8 @@ public:
         //        assert(image_data.Size == data_size);
 
         RxRawGpuBuffer<uint8> staging_buffer;
-        staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                              VMA_MEMORY_USAGE_CPU_TO_GPU);
         staging_buffer.Upload(image_data);
 
         const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
@@ -47,57 +49,50 @@ public:
 
         Image.Create(image_type, dimensions, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        RxImageTypeProperties type_properties = RxImageTypeGetProperties(image_type);
+        // RxImageTypeProperties type_properties = RxImageTypeGetProperties(image_type);
+
+        Image.CopyFromBuffer(staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, dimensions);
+
 
         // Copy image data to a new image fully on the GPU
-        Fx_Fwd_SubmitUploadCmd(
-            [&](RxCommandBuffer& cmd)
-            {
-                Image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd);
+        // Fx_Fwd_SubmitUploadCmd(
+        //     [&](RxCommandBuffer& cmd)
+        //     {
+        //         Image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd);
 
-                VkBufferImageCopy copy {
-                    .bufferOffset = 0,
-                    .bufferRowLength = 0,
-                    .bufferImageHeight = 0,
-                    .imageSubresource {
-                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                        .mipLevel = 0,
-                        .baseArrayLayer = 0,
-                        .layerCount = type_properties.LayerCount,
-                    },
-                    .imageExtent =
-                        VkExtent3D {
-                            .width = dimensions.X,
-                            .height = dimensions.Y,
-                            .depth = 1,
-                        },
-                };
+        //         VkBufferImageCopy copy {
+        //             .bufferOffset = 0,
+        //             .bufferRowLength = 0,
+        //             .bufferImageHeight = 0,
+        //             .imageSubresource {
+        //                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        //                 .mipLevel = 0,
+        //                 .baseArrayLayer = 0,
+        //                 .layerCount = type_properties.LayerCount,
+        //             },
+        //             .imageExtent =
+        //                 VkExtent3D {
+        //                     .width = dimensions.X,
+        //                     .height = dimensions.Y,
+        //                     .depth = 1,
+        //                 },
+        //         };
 
-                vkCmdCopyBufferToImage(cmd, staging_buffer.Buffer, Image.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+        //         vkCmdCopyBufferToImage(cmd, staging_buffer.Buffer, Image.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        //         1,
+        //                                &copy);
 
-                Image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd);
-            });
+        //         Image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd);
+        //     });
     }
 
-    void SetSampler(const FxRef<RxSampler>& sampler)
-    {
-        Sampler = sampler;
-    }
+    void SetSampler(const FxRef<RxSampler>& sampler) { Sampler = sampler; }
 
-    FxRef<RxSampler> GetSampler()
-    {
-        return Sampler;
-    }
+    FxRef<RxSampler> GetSampler() { return Sampler; }
 
-    void Destroy()
-    {
-        this->Image.Destroy();
-    }
+    void Destroy() { this->Image.Destroy(); }
 
-    ~RxTexture()
-    {
-        this->Destroy();
-    }
+    ~RxTexture() { this->Destroy(); }
 
 public:
     RxImage Image;

@@ -151,11 +151,14 @@ void FxObject::RenderMesh()
         return;
     }
     
+    RxFrameData* frame = Renderer->GetFrame();
     
-    Material->Bind(&Renderer->GetFrame()->CommandBuffer);
+    RxCommandBuffer& cmd = frame->CommandBuffer;
+    
+    Material->Bind(&cmd);
 
     if (Mesh) {
         
-        Mesh->Render(*Material->Pipeline);
+        Mesh->Render(cmd, *Material->Pipeline);
     }
 }

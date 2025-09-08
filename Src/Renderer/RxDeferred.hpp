@@ -5,6 +5,7 @@
 #include "Backend/RxFramebuffer.hpp"
 #include "Backend/RxImage.hpp"
 #include "Backend/RxSampler.hpp"
+#include "RxSkybox.hpp"
 
 struct RxFrameData;
 
@@ -95,6 +96,9 @@ public:
     FxSizedArray<RxFramebuffer> OutputFramebuffers;
 
     FxSizedArray<RxDeferredCompPass> CompPasses;
+
+
+    RxSkyboxRenderer SkyboxRenderer;
 };
 
 

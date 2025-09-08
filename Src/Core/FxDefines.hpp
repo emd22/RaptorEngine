@@ -7,7 +7,7 @@
 
 
 #define FX_LOG_OUTPUT_TO_STDOUT
-#define FX_LOG_OUTPUT_TO_FILE
+// #define FX_LOG_OUTPUT_TO_FILE
 #define FX_LOG_ENABLE_COLORS
 
 #define FX_MEMPOOL_USE_ATOMIC_LOCKING
@@ -23,7 +23,6 @@
 // #define FX_SIZED_ARRAY_NO_MEMPOOL
 
 // #define FX_NO_DEBUG_ASSERTS
-
 
 ////////////////////////////////
 // Platform/Compiler macros

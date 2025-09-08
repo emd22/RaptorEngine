@@ -1,7 +1,7 @@
 #pragma once
 
-#include "FxVec4.hpp"
 #include "FxVec3.hpp"
+#include "FxVec4.hpp"
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
@@ -36,38 +36,20 @@ public:
 
     static FxMat4f FromRows(float data[16])
     {
-        return FxMat4f(
-            FxVec4f(data[0], data[4], data[8], data[12]),
-            FxVec4f(data[1], data[5], data[9], data[13]),
-            FxVec4f(data[2], data[6], data[10], data[14]),
-            FxVec4f(data[3], data[7], data[11], data[15])
-        );
+        return FxMat4f(FxVec4f(data[0], data[4], data[8], data[12]), FxVec4f(data[1], data[5], data[9], data[13]),
+                       FxVec4f(data[2], data[6], data[10], data[14]), FxVec4f(data[3], data[7], data[11], data[15]));
     }
 
     static const FxMat4f Identity;
 
     static FxMat4f AsTranslation(FxVec3f position)
     {
-        return FxMat4f(
-            (float32 [16]){
-                1, 0, 0, 0,
-                0, 1, 0, 0,
-                0, 0, 1, 0,
-                position.X, position.Y, position.Z, 1
-            }
-        );
+        return FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, position.X, position.Y, position.Z, 1 });
     }
 
     static FxMat4f AsScale(FxVec3f scale)
     {
-        return FxMat4f(
-            (float32 [16]){
-                scale.X, 0, 0, 0,
-                0, scale.Y, 0, 0,
-                0, 0, scale.Z, 0,
-                0, 0, 0, 1
-            }
-        );
+        return FxMat4f((float32[16]) { scale.X, 0, 0, 0, 0, scale.Y, 0, 0, 0, 0, scale.Z, 0, 0, 0, 0, 1 });
     }
 
     static FxMat4f AsRotationX(float rad);
@@ -77,9 +59,9 @@ public:
 
     void FlipY()
     {
-//         Vec4f& col = Columns[1];
-//         col.Y *= -1;
-//         col.W *= -1;
+        //         Vec4f& col = Columns[1];
+        //         col.Y *= -1;
+        //         col.W *= -1;
     }
 
     void Rotate(FxVec3f rotation);
@@ -126,7 +108,7 @@ public:
         Columns[3].Load4Ptr(data + 12);
     }
 
-    FxMat4f& operator = (const FxMat4f& other)
+    FxMat4f& operator=(const FxMat4f& other)
     {
         Columns[0] = other.Columns[0];
         Columns[1] = other.Columns[1];
@@ -137,25 +119,29 @@ public:
 
     FxMat4f Inverse();
 
-    FxMat4f operator * (const FxMat4f &other) const;
+    FxMat4f operator*(const FxMat4f& other) const;
 
     void Print()
     {
         printf("\t=== Matrix ===\n");
         for (int i = 0; i < 4; i++) {
-            printf("{ %.06f\t%.06f\t%.06f\t%.06f }", Columns[0].mData[i], Columns[1].mData[i], Columns[2].mData[i], Columns[3].mData[i]);
+            printf("{ %.06f\t%.06f\t%.06f\t%.06f }", Columns[0].mData[i], Columns[1].mData[i], Columns[2].mData[i],
+                   Columns[3].mData[i]);
             putchar('\n');
         }
     }
 
     // Mat4f Multiply(const Mat4f &other);
-    FxVec4f MultiplyVec4f(FxVec4f &vec);
+    FxVec4f MultiplyVec4f(FxVec4f& vec);
+
+    FxMat4f GetWithoutTranslation() const;
 
 private:
-    float32x4_t MultiplyVec4f_Neon(FxVec4f &vec);
+    float32x4_t MultiplyVec4f_Neon(FxVec4f& vec);
 
 public:
-    union {
+    union
+    {
         FxVec4f Columns[4];
         float32 RawData[16];
     };

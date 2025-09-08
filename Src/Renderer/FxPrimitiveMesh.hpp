@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Backend/Fwd/Rx_Fwd_GetFrame.hpp"
 #include "Backend/RxFrameData.hpp"
 #include "Backend/RxGpuBuffer.hpp"
-#include "Renderer/Renderer.hpp"
 
 #include <atomic>
 
@@ -155,25 +155,25 @@ public:
     RxGpuBuffer<TVertexType>& GetVertexBuffer() { return mVertexBuffer; }
     RxGpuBuffer<uint32>& GetIndexBuffer() { return mIndexBuffer; }
 
-    void Render(RxGraphicsPipeline& pipeline)
+    void Render(const RxCommandBuffer& cmd, const RxGraphicsPipeline& pipeline)
     {
         const VkDeviceSize offset = 0;
-        RxFrameData* frame = Renderer->GetFrame();
+//        RxFrameData* frame = Rx_Fwd_GetFrame();
 
-        vkCmdBindVertexBuffers(frame->CommandBuffer.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
-        vkCmdBindIndexBuffer(frame->CommandBuffer.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-
-        vkCmdDrawIndexed(frame->CommandBuffer.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
-    }
-
-    void Render(RxCommandBuffer& cmd, RxGraphicsPipeline& pipeline)
-    {
-        const VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(cmd.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
         vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
     }
+//-
+//    void Render(RxCommandBuffer& cmd, RxGraphicsPipeline& pipeline)
+//    {
+//        const VkDeviceSize offset = 0;
+//        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
+//        vkCmdBindIndexBuffer(cmd.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+//
+//        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
+//    }
 
     void Destroy()
     {

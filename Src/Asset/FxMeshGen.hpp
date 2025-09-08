@@ -16,14 +16,13 @@ public:
         FxRef<FxPrimitiveMesh<LightVolumeVertex>> AsLightVolume();
         FxRef<FxPrimitiveMesh<>> AsMesh();
 
-        void Destroy()
-        {
-        }
+        void Destroy() {}
     };
 
 public:
     static FxRef<GeneratedMesh> MakeIcoSphere(int resolution);
-    static FxRef<GeneratedMesh> MakeQuad();
+    // static FxRef<GeneratedMesh> MakeQuad();
+    static FxRef<GeneratedMesh> MakeCube();
 
 private:
 };

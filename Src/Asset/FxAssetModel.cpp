@@ -1,5 +1,7 @@
 #include "FxAssetModel.hpp"
 
+#include <Renderer/Renderer.hpp>
+
 bool FxAssetModel::CheckIfReady()
 {
     if (mModelReady) {
@@ -32,6 +34,6 @@ void FxAssetModel::Render(RxGraphicsPipeline &pipeline)
             continue;
         }
 
-        mesh->Render(pipeline);
+        mesh->Render(Renderer->GetFrame()->CommandBuffer, pipeline);
     }
 }

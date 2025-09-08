@@ -101,7 +101,7 @@ void FxConfigFile::ParseEntries(FxMPPagedArray<FxTokenizer::Token>& tokens)
         }
         // Token is not equals, print warning and continue
         if (!TokenIsValue(tokens[i], "=")) {
-            OldLog::Warning("Expected '=' but found '%.*s'", tokens[i].Length, tokens[i].Start);
+            FxLogWarning("Expected '=' but found '{:.{}}'", tokens[i].Start, tokens[i].Length);
             continue;
         }
 

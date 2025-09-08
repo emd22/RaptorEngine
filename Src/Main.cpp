@@ -150,7 +150,9 @@ void TestScript()
 
 int main()
 {
+#ifdef FX_LOG_OUTPUT_TO_FILE
     FxLogCreateFile("FoxtrotLog.log");
+#endif
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
@@ -237,19 +239,24 @@ int main()
 
     // FxRef<FxObject> mallard_object = FxAssetManager::LoadObject("../models/Mallard.glb");
 
-    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Cubemap, "../Textures/TestCubemap.png");
+    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image,
+                                                                   "../Textures/DirectionCubemap.jpg");
     skybox_texture->WaitUntilLoaded();
+
+    RxImage cubemap_image;
+    cubemap_image.Create(RxImageType::Cubemap, FxVec2u(129, 129), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+                         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image);
 
     FxRef<FxObject> cube_object = FxAssetManager::LoadObject("../models/Cube.glb");
     cube_object->WaitUntilLoaded();
 
 
-    FxRef<FxMaterial> skybox_material = FxMaterialManager::New("Skybox", &deferred_renderer->GPassPipeline);
+    // FxRef<FxMaterial> skybox_material = FxMaterialManager::New("Skybox", &deferred_renderer->GPassPipeline);
 
-    skybox_material->Attach(FxMaterial::Diffuse, skybox_texture);
+    // skybox_material->Attach(FxMaterial::Diffuse, skybox_texture);
 
-    cube_object->Material = skybox_material;
-
+    // cube_object->Material = skybox_material;
 
     // ground_object->MoveBy(FxVec3f(0, -1, 0));
 
@@ -273,6 +280,19 @@ int main()
     //
     fireplace_object->RotateX(M_PI / 2);
     fireplace_object->Scale(FxVec3f(3));
+
+
+    auto generated_cube = FxMeshGen::MakeCube();
+
+    for (int i = 0; i < RendererFramesInFlight; i++) {
+        RxImage& skybox_output_image = Renderer->Swapchain.OutputImages[i];
+        Renderer->DeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
+    }
+
+    Renderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
+
+    Renderer->DeferredRenderer->SkyboxRenderer.Create(Renderer->Swapchain.Extent, generated_cube->AsLightVolume());
+
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
@@ -363,6 +383,9 @@ int main()
             continue;
         }
 
+        deferred_renderer->SkyboxRenderer.Render(Renderer->GetFrame()->CommandBuffer, *current_camera);
+        deferred_renderer->GPassPipeline.Bind(Renderer->GetFrame()->CommandBuffer);
+
         //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
@@ -373,7 +396,7 @@ int main()
         //        light.RenderDebugMesh(camera);
 
         fireplace_object->Render(camera);
-        cube_object->Render(camera);
+        // cube_object->Render(camera);
 
         // ground_object->Render(camera);
 

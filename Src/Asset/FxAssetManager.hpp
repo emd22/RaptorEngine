@@ -110,10 +110,7 @@ public:
         return asset;
     }
 
-    static inline FxRef<FxAssetImage> LoadImage(const std::string& path)
-    {
-        return LoadImage(RxImageType::Image2D, path);
-    }
+    static inline FxRef<FxAssetImage> LoadImage(const std::string& path) { return LoadImage(RxImageType::Image, path); }
 
     /**
      * @brief Creates a new `FxObject` and loads the asset into it from
@@ -129,7 +126,7 @@ public:
 
     static inline FxRef<FxAssetImage> LoadImageFromMemory(const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::Image2D, data, data_size);
+        return LoadImageFromMemory(RxImageType::Image, data, data_size);
     }
 
 
@@ -154,25 +151,23 @@ public:
      */
     static inline void LoadImage(FxRef<FxAssetImage>& asset, const std::string& path)
     {
-        return LoadImage(RxImageType::Image2D, asset, path);
+        return LoadImage(RxImageType::Image, asset, path);
     }
 
 
-    static void LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size);
+    static void LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data,
+                                    uint32 data_size);
 
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
     static void LoadImageFromMemory(FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::Image2D, asset, data, data_size);
+        return LoadImageFromMemory(RxImageType::Image, asset, data, data_size);
     }
 
 
-    ~FxAssetManager()
-    {
-        Shutdown();
-    }
+    ~FxAssetManager() { Shutdown(); }
 
 private:
     FxAssetWorker* FindWorkerThread();
@@ -186,8 +181,8 @@ private:
 
     template <typename AssetType, typename LoaderType, FxAssetType EnumValue>
         requires C_IsAsset<AssetType>
-    static void SubmitAssetToLoad(const FxRef<AssetType>& asset, FxRef<LoaderType>& loader, const std::string& path, const uint8* data = nullptr,
-                                  uint32 data_size = 0)
+    static void SubmitAssetToLoad(const FxRef<AssetType>& asset, FxRef<LoaderType>& loader, const std::string& path,
+                                  const uint8* data = nullptr, uint32 data_size = 0)
     {
         if (asset->IsUploadedToGpu) {
             printf("*** DELETING ***\n");

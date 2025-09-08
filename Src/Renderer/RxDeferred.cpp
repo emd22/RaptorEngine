@@ -473,18 +473,20 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 
 void RxDeferredRenderer::CreateCompPipeline()
 {
-    VkPipelineColorBlendAttachmentState color_blend_attachments[] = { VkPipelineColorBlendAttachmentState {
-        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-                          VK_COLOR_COMPONENT_A_BIT,
-        .blendEnable = VK_FALSE,
-    } };
+    VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+        VkPipelineColorBlendAttachmentState {
+            .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                              VK_COLOR_COMPONENT_A_BIT,
+            .blendEnable = VK_FALSE,
+        },
+    };
 
     VkAttachmentDescription attachments[] = {
         // Combined output
         VkAttachmentDescription {
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -569,14 +571,14 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RendererFramesInFlight);
     DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
-    DepthAttachment.Create(RxImageType::Image2D, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    DepthAttachment.Create(RxImageType::Image, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    ColorAttachment.Create(RxImageType::Image2D, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    NormalsAttachment.Create(RxImageType::Image2D, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+    NormalsAttachment.Create(RxImageType::Image, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
                              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -596,7 +598,7 @@ void RxDeferredGPass::Begin()
 
     VkClearValue clear_values[] = {
         // Albedo
-        VkClearValue { .color = { { 1.0f, 0.8f, 0.7f, 1.0f } } },
+        VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
         // Normals
         VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
         VkClearValue { .depthStencil = { 0.0f, 0 } },
@@ -604,6 +606,8 @@ void RxDeferredGPass::Begin()
 
     mRenderPass->Begin(&frame->CommandBuffer, Framebuffer.Framebuffer,
                        FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
+
+
     mGPassPipeline->Bind(frame->CommandBuffer);
 }
 
@@ -675,7 +679,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
 
-    ColorAttachment.Create(RxImageType::Image2D, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     FxSizedArray image_views = { ColorAttachment.View };
@@ -974,7 +978,7 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 
     VkClearValue clear_values[] = {
         // Output colour
-        VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
+        // VkClearValue { .color = { { 0.0f, 0.3f, 0.0f, 1.0f } } },
     };
 
     FxSlice<VkClearValue> slice(clear_values, FxSizeofArray(clear_values));
@@ -984,9 +988,10 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     VkFramebuffer framebuffer = mRendererInst->OutputFramebuffers[Renderer->GetImageIndex()].Framebuffer;
     mRenderPass->Begin(&mCurrentFrame->CompCommandBuffer, framebuffer, slice);
 
-    mCompPipeline->Bind(cmd);
-    DescriptorSet.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mRendererInst->CompPipeline);
+    // mRendererInst->SkyboxRenderer.SkyboxAttachment = OutputImage;
 
+    DescriptorSet.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mRendererInst->CompPipeline);
+    mCompPipeline->Bind(cmd);
     vkCmdDraw(cmd.CommandBuffer, 3, 1, 0, 0);
 
     mRenderPass->End();
