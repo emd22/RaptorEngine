@@ -2,7 +2,6 @@
 
 #include "FxAssetBase.hpp"
 
-#include <Core/FxStaticPtrArray.hpp>
 #include <Renderer/Backend/RxTexture.hpp>
 
 

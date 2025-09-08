@@ -263,6 +263,9 @@ public:
 
         mGpuVertexBuffer.Destroy();
         mGpuIndexBuffer.Destroy();
+
+        mVertexBuffer.Free();
+        mIndexBuffer.Free();
     }
 
     ~FxPrimitiveMesh() { Destroy(); }

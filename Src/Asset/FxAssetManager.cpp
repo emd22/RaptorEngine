@@ -3,7 +3,6 @@
 #include "Core/FxPanic.hpp"
 #include "Core/FxSizedArray.hpp"
 #include "FxAssetImage.hpp"
-#include "FxAssetModel.hpp"
 #include "Loader/FxLoaderGltf.hpp"
 #include "Loader/FxLoaderJpeg.hpp"
 #include "Loader/FxLoaderStb.hpp"
