@@ -52,7 +52,8 @@ void main()
     float depth = 1.0 - inv_depth;
 
     vec3 albedo = texture(s_Albedo, screen_uv).rgb;
-    vec3 normal = texture(s_Normals, screen_uv).rgb;
+    vec4 normal_rgba = texture(s_Normals, screen_uv);
+    vec3 normal = normal_rgba.rgb;
 
     vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
 
@@ -83,5 +84,5 @@ void main()
     vec3 result = vec3(pl_color) / fatt;
     // vec3 result = (pl_color * (ambient + fdiffuse + specular) / fatt);
 
-    v_Color = vec4(result, 1.0);
+    v_Color = vec4(result, normal_rgba.a);
 }

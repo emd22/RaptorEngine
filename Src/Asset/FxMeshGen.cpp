@@ -159,19 +159,22 @@ FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeIcoSphere(int resolution)
     return mesh;
 }
 
-FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube()
+
+FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenCubeOptions options)
 {
     FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
 
+    const float s = options.Scale;
+
     mesh->Positions = {
-        FxVec3f(-5, -5, -5), // 0
-        FxVec3f(5, -5, -5),  // 1
-        FxVec3f(5, 5, -5),   // 2
-        FxVec3f(-5, 5, -5),  // 3
-        FxVec3f(-5, -5, 5),  // 4
-        FxVec3f(5, -5, 5),   // 5
-        FxVec3f(5, 5, 5),    // 6
-        FxVec3f(-5, 5, 5)    // 7
+        FxVec3f(-s, -s, -s), // 0
+        FxVec3f(s, -s, -s),  // 1
+        FxVec3f(s, s, -s),   // 2
+        FxVec3f(-s, s, -s),  // 3
+        FxVec3f(-s, -s, s),  // 4
+        FxVec3f(s, -s, s),   // 5
+        FxVec3f(s, s, s),    // 6
+        FxVec3f(-s, s, s)    // 7
     };
 
     mesh->Indices = { // Front (z = +5)

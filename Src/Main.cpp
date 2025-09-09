@@ -206,8 +206,8 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    // FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
-    // fireplace_object->WaitUntilLoaded();
+    FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
+    fireplace_object->WaitUntilLoaded();
 
     FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
@@ -215,7 +215,7 @@ int main()
     RxImage cubemap_image;
     cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
 
-    auto generated_cube = FxMeshGen::MakeCube();
+    auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 
     for (int i = 0; i < RendererFramesInFlight; i++) {
         RxImage& skybox_output_image = Renderer->Swapchain.OutputImages[i];
@@ -235,6 +235,9 @@ int main()
     camera.Position.Y += 4.0f;
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+
+
+    fireplace_object->RotateX(M_PI_2);
 
     FxSizedArray<VkDescriptorSet> sets_to_bind;
     sets_to_bind.InitSize(2);
@@ -324,16 +327,8 @@ int main()
 
         light.Color.Y = 0.7;
 
-        // ground_object.Render(camera);
-        // helmet_object.Render(camera);
-        //        light.RenderDebugMesh(camera);
+        fireplace_object->Render(camera);
 
-        // fireplace_object->Render(camera);
-        // cube_object->Render(camera);
-
-        // ground_object->Render(camera);
-
-        // mallard_object->Render(camera);
 
         Renderer->BeginLighting();
 
