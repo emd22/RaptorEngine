@@ -12,10 +12,7 @@ class FxWindow
 public:
     FxWindow() = default;
 
-    FxWindow(const char* title, int32 width, int32 height)
-    {
-        Create(title, width, height);
-    }
+    FxWindow(const char* title, int32 width, int32 height) { Create(title, width, height); }
 
     void Create(const char* title, int32 width, int32 height)
     {
@@ -24,7 +21,7 @@ public:
         mWindow = SDL_CreateWindow(title, width, height, window_flags);
 
         if (mWindow == nullptr) {
-            FxPanic("Window", "Could not create SDL window (SDL err: %s)", SDL_GetError());
+            FxPanic("Window", "Could not create SDL window (SDL err: {})", SDL_GetError());
         }
     }
 
@@ -33,15 +30,9 @@ public:
         return FxRef<FxWindow>::New(title, width, height);
     }
 
-    SDL_Window* GetWindow()
-    {
-        return mWindow;
-    }
+    SDL_Window* GetWindow() { return mWindow; }
 
-    ~FxWindow()
-    {
-        SDL_DestroyWindow(mWindow);
-    }
+    ~FxWindow() { SDL_DestroyWindow(mWindow); }
 
 private:
     SDL_Window* mWindow;

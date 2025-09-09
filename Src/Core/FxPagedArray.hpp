@@ -1,9 +1,8 @@
 #pragma once
 
-#include "Types.hpp"
-#include "FxPanic.hpp"
-
 #include "FxMemory.hpp"
+#include "FxPanic.hpp"
+#include "Types.hpp"
 
 template <typename ElementType, bool UseMemPool = true>
 class FxPagedArray
@@ -23,10 +22,7 @@ public:
 public:
     FxPagedArray() = default;
 
-    FxPagedArray(uint32 page_node_capacity)
-    {
-        Create(page_node_capacity);
-    }
+    FxPagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
 
     void Create(uint32 page_node_capacity = 32)
     {
@@ -36,14 +32,10 @@ public:
         CurrentPage = FirstPage;
     }
 
-    bool IsInited() const
-    {
-        return (FirstPage != nullptr && CurrentPage != nullptr);
-    }
+    bool IsInited() const { return (FirstPage != nullptr && CurrentPage != nullptr); }
 
     ElementType* Insert()
     {
-
         // There are no elements left in the page, allocate a new page.
         if (CurrentPage->Size >= PageNodeCapacity) {
             Page* new_page = AllocateNewPage(CurrentPage, nullptr);
@@ -51,7 +43,7 @@ public:
             CurrentPage->Next = new_page;
             CurrentPage = new_page;
 
-            Log::Info("Allocating new page", 0);
+            FxLogInfo("Allocating new page for FxPagedArray");
         }
 
         ElementType* element = &CurrentPage->Data[CurrentPage->Size++];
@@ -77,11 +69,7 @@ public:
         return nullptr;
     }
 
-    ElementType& GetLast()
-    {
-        return CurrentPage->Data[CurrentPage->Size - 1];
-    }
-
+    ElementType& GetLast() { return CurrentPage->Data[CurrentPage->Size - 1]; }
 
 
     ElementType* RemoveLast()
@@ -150,10 +138,7 @@ public:
         CurrentPage = nullptr;
     }
 
-    ~FxPagedArray()
-    {
-        Destroy();
-    }
+    ~FxPagedArray() { Destroy(); }
 
 private:
     template <typename T>
@@ -181,7 +166,7 @@ private:
         }
 
         if (allocated_page == nullptr) {
-            FxPanic("FxPagedArray", "Memory error allocating page", 0);
+            FxPanic("FxPagedArray", "Memory error allocating page");
             return nullptr; // for msvc
         }
 
@@ -202,7 +187,7 @@ private:
         }
 
         if (allocated_nodes == nullptr) {
-            FxPanic("FxPagedArray", "Memory error allocating page data", 0);
+            FxPanic("FxPagedArray", "Memory error allocating page data");
             return nullptr; // for msvc
         }
 
@@ -215,7 +200,7 @@ private:
     inline void SizeCheck(uint32 size) const
     {
         if (size > PageNodeCapacity) {
-            FxPanic("FxPagedArray", "The current size of a page is greater than the allocated page node capacity!", 0);
+            FxPanic("FxPagedArray", "The current size of a page is greater than the allocated page node capacity!");
         }
     }
 

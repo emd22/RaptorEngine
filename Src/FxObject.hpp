@@ -1,25 +1,22 @@
 #pragma once
 
-#include <Renderer/FxPrimitiveMesh.hpp>
-#include <FxMaterial.hpp>
-#include <FxEntity.hpp>
-
 #include <Core/MemPool/FxMPPagedArray.hpp>
+#include <FxEntity.hpp>
+#include <FxMaterial.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 
 class FxObject : public FxAssetBase, public FxEntity
 {
     friend class FxLoaderGltf;
     friend class FxAssetManager;
+
 public:
     FxObject() = default;
 
     void Render(const FxCamera& camera);
     bool CheckIfReady();
 
-    ~FxObject() override
-    {
-        Destroy();
-    }
+    ~FxObject() override { Destroy(); }
 
     void Destroy() override
     {
@@ -53,8 +50,8 @@ private:
     void RenderMesh();
 
 public:
-    FxRef<FxPrimitiveMesh<>> Mesh{nullptr};
-    FxRef<FxMaterial> Material{nullptr};
+    FxRef<FxPrimitiveMesh<>> Mesh { nullptr };
+    FxRef<FxMaterial> Material { nullptr };
 
     FxMPPagedArray<FxRef<FxObject>> AttachedNodes;
 

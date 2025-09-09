@@ -7,12 +7,12 @@
 
 // #include <Core/Types.hpp>
 
-#define VkTry(func_result, message)                                                                                                                  \
-    {                                                                                                                                                \
-        const VkResult result__ = (func_result);                                                                                                     \
-        if (result__ != VK_SUCCESS) {                                                                                                                \
-            FxModulePanic((message), result__);                                                                                                      \
-        }                                                                                                                                            \
+#define VkTry(func_result, message)                                                                                    \
+    {                                                                                                                  \
+        const VkResult result__ = (func_result);                                                                       \
+        if (result__ != VK_SUCCESS) {                                                                                  \
+            FxModulePanicVulkan((message), result__);                                                                  \
+        }                                                                                                              \
     }
 
 class RxUtil

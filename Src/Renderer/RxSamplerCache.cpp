@@ -80,7 +80,7 @@ RxSamplerHandle RxSamplerCache::RequestSampler(RxSamplerPackedPropertiesType pro
 
     // Section could not be found
     if (section_it == mSamplerCache.end()) {
-        Log::Debug("Could not find sampler cache section; creating new section from properties");
+        FxLogDebug("Could not find sampler cache section; creating new section from properties");
 
         CreateSamplersWithProperties(RX_SAMPLER_CACHE_FALLBACK_COUNT, properties);
     }
@@ -101,7 +101,7 @@ RxSamplerHandle RxSamplerCache::RequestSampler(RxSamplerPackedPropertiesType pro
         return handle;
     }
 
-    Log::Error("Could not find a free sampler in sampler cache! -> PackedProperties: 0x%08u", properties);
+    FxLogError("Could not find a free sampler in sampler cache! -> PackedProperties: 0x{:08d}", properties);
 
     RxSamplerHandle handle { .Sampler = nullptr, .Index = 0, .PackedProperties = properties };
     return handle;
@@ -137,7 +137,7 @@ void RxSamplerCache::CreateSamplerDsLayout()
     VkResult status = vkCreateDescriptorSetLayout(Renderer->GetDevice()->Device, &sampler_layout_info, nullptr,
                                                   &mDsLayoutSampler);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create descriptor set layout", status);
+        FxModulePanicVulkan("Failed to create descriptor set layout", status);
     }
 }
 

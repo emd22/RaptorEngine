@@ -1,17 +1,16 @@
 #include "RxShader.hpp"
-#include "ShaderList.hpp"
-#include "../Renderer.hpp"
 
+#include "../Renderer.hpp"
+#include "ShaderList.hpp"
+
+#include <Core/Log.hpp>
+#include <Core/Types.hpp>
 #include <fstream>
 #include <ios>
 #include <iostream>
 
-#include <Core/Log.hpp>
-#include <Core/Types.hpp>
 
-
-
-void RxShader::Load(const char *path, RxShaderType type)
+void RxShader::Load(const char* path, RxShaderType type)
 {
     Type = type;
 
@@ -21,7 +20,7 @@ void RxShader::Load(const char *path, RxShaderType type)
     file.open(path, std::iostream::binary);
 
     if (!file.is_open()) {
-        Log::Error("Could not open shader file [%s]", path);
+        OldLog::Error("Could not open shader file [%s]", path);
         return;
     }
 
@@ -31,15 +30,15 @@ void RxShader::Load(const char *path, RxShaderType type)
 
     // as we are aliging to uint32* (4 bytes), we should ensure there
     // is enough memory allocated
-    const auto buffer_size =  ((file_size / sizeof(uint32)) + 1) * sizeof(uint32);
+    const auto buffer_size = ((file_size / sizeof(uint32)) + 1) * sizeof(uint32);
 
     // TODO: use pooled memory!
-    char *file_buffer = new char[buffer_size];
+    char* file_buffer = new char[buffer_size];
 
     file.read(file_buffer, file_size);
     file.close();
 
-    CreateShaderModule(file_size, (uint32 *)file_buffer);
+    CreateShaderModule(file_size, (uint32*)file_buffer);
 
     delete[] file_buffer;
 }
@@ -50,24 +49,24 @@ void RxShader::Destroy()
         return;
     }
 
-    RxGpuDevice *device = Renderer->GetDevice();
+    RxGpuDevice* device = Renderer->GetDevice();
     vkDestroyShaderModule(device->Device, ShaderModule, nullptr);
 }
 
-void RxShader::CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data)
+void RxShader::CreateShaderModule(std::ios::pos_type file_size, uint32* shader_data)
 {
     const VkShaderModuleCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = (uint32)file_size,
-        .pCode = (uint32_t *)shader_data,
+        .pCode = (uint32_t*)shader_data,
     };
 
-    RxGpuDevice *device = Renderer->GetDevice();
+    RxGpuDevice* device = Renderer->GetDevice();
 
     const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &ShaderModule);
 
     if (status != VK_SUCCESS) {
-        Log::Error("Could not create vulkan shader module...");
+        OldLog::Error("Could not create vulkan shader module...");
         return;
     }
 }

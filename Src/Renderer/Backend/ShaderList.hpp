@@ -1,11 +1,11 @@
 #pragma once
 
+#include <vulkan/vulkan.h>
+
 #include <Core/FxPanic.hpp>
-#include <Core/Types.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/Log.hpp>
-
-#include <vulkan/vulkan.h>
+#include <Core/Types.hpp>
 
 enum class RxShaderType
 {
@@ -19,20 +19,17 @@ class ShaderInfo
 public:
     ShaderInfo() = default;
 
-    ShaderInfo(RxShaderType type, VkShaderModule module)
-        : ShaderModule(module), mShaderType(type)
-    {
-    }
+    ShaderInfo(RxShaderType type, VkShaderModule module) : ShaderModule(module), mShaderType(type) {}
 
     VkShaderStageFlagBits GetStageBit()
     {
         switch (mShaderType) {
-            case RxShaderType::Unknown:
-                FxPanic("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!", 0);
-            case RxShaderType::Vertex:
-                return VK_SHADER_STAGE_VERTEX_BIT;
-            case RxShaderType::Fragment:
-                return VK_SHADER_STAGE_FRAGMENT_BIT;
+        case RxShaderType::Unknown:
+            FxPanic("ShaderList", "Attempting to get shader stage bit of ShaderType::Unknown!");
+        case RxShaderType::Vertex:
+            return VK_SHADER_STAGE_VERTEX_BIT;
+        case RxShaderType::Fragment:
+            return VK_SHADER_STAGE_FRAGMENT_BIT;
         }
     }
 

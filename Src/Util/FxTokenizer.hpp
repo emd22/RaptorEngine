@@ -1,17 +1,13 @@
 #pragma once
 
-#include <Core/Types.hpp>
-#include <Core/FxUtil.hpp>
-
-#include <vector>
-#include <string>
-
-#include <cstdlib>
-
-#include <cassert>
-
-#include <Core/FxMemory.hpp>
 #include <Core/FxHash.hpp>
+#include <Core/FxMemory.hpp>
+#include <Core/FxUtil.hpp>
+#include <Core/Types.hpp>
+#include <cassert>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 class FxTokenizer
 {
@@ -30,7 +26,8 @@ public:
     };
 
 
-    enum TokenType {
+    enum TokenType
+    {
         Unknown,
         Identifier,
 
@@ -65,33 +62,23 @@ public:
     static const char* GetTypeName(TokenType type)
     {
         const char* type_names[] = {
-            "Unknown",
-            "Identifier",
+            "Unknown",    "Identifier",
 
-            "String",
-            "Integer",
-            "Float",
+            "String",     "Integer",    "Float",
 
             "Equals",
 
-            "LParen",
-            "RParen",
+            "LParen",     "RParen",
 
-            "LBracket",
-            "RBracket",
+            "LBracket",   "RBracket",
 
-            "LBrace",
-            "RBrace",
+            "LBrace",     "RBrace",
 
-            "Plus",
-            "Dollar",
-            "Minus",
+            "Plus",       "Dollar",     "Minus",
 
             "Question",
 
-            "Dot",
-            "Comma",
-            "Semicolon",
+            "Dot",        "Comma",      "Semicolon",
 
             "DocComment",
         };
@@ -103,7 +90,8 @@ public:
         return type_names[type];
     }
 
-    enum class IsNumericResult {
+    enum class IsNumericResult
+    {
         NaN,
         Integer,
         Fractional
@@ -121,27 +109,21 @@ public:
         uint16 FileColumn = 0;
         uint32 FileLine = 0;
 
-        void Print(bool no_newline=false) const
+        void Print(bool no_newline = false) const
         {
             printf("Token: (T:%-10s) {%.*s} %c", GetTypeName(Type), Length, Start, (no_newline) ? ' ' : '\n');
         }
 
-        void Increment()
-        {
-            ++Length;
-        }
+        void Increment() { ++Length; }
 
-        inline std::string GetStr() const
-        {
-            return std::string(Start, Length);
-        }
+        inline std::string GetStr() const { return std::string(Start, Length); }
 
         inline char* GetHeapStr() const
         {
             char* str = static_cast<char*>(std::malloc(Length + 1));
 
             if (str == nullptr) {
-                FxPanic("FxTokenizer", "Error allocating heap string!", 0);
+                FxPanic("FxTokenizer", "Error allocating heap string!");
                 return nullptr;
             }
 
@@ -174,7 +156,7 @@ public:
                     continue;
                 }
 
-                if ((ch >= '0' && ch <= '9') ) {
+                if ((ch >= '0' && ch <= '9')) {
                     // If no numbers have been found yet then set to integer
                     if (result == IsNumericResult::NaN) {
                         result = IsNumericResult::Integer;
@@ -210,15 +192,9 @@ public:
             return strtof(buffer, &end);
         }
 
-        bool operator == (const char* str) const
-        {
-            return !strncmp(Start, str, Length);
-        }
+        bool operator==(const char* str) const { return !strncmp(Start, str, Length); }
 
-        bool IsEmpty() const
-        {
-            return (Start == nullptr || Length == 0);
-        }
+        bool IsEmpty() const { return (Start == nullptr || Length == 0); }
 
         void Clear()
         {
@@ -230,10 +206,7 @@ public:
 
     FxTokenizer() = delete;
 
-    FxTokenizer(char* data, uint32 buffer_size)
-        : mData(data), mDataEnd(data + buffer_size), mStartOfLine(data)
-    {
-    }
+    FxTokenizer(char* data, uint32 buffer_size) : mData(data), mDataEnd(data + buffer_size), mStartOfLine(data) {}
 
     TokenType GetTokenType(Token& token)
     {
@@ -370,7 +343,8 @@ public:
         }
 
         // Skip spaces and tabs
-        while ((ch = *(data)) && (ch == ' ' || ch == '\t')) ++data;
+        while ((ch = *(data)) && (ch == ' ' || ch == '\t'))
+            ++data;
 
         // Check if this is a string
         if (ch != '"') {
@@ -455,7 +429,7 @@ public:
         // Restore back to previous state
         RestoreState();
 
-        //FxMemPool::Free(include_data);
+        // FxMemPool::Free(include_data);
     }
 
     void TryReadInternalCall()
@@ -488,7 +462,7 @@ public:
 
         size_t read_size = std::fread(data, 1, file_size, fp);
         if (read_size != file_size) {
-            Log::Warning("Error tokenizing data(reading from file) (read=%zu, size=%zu)", read_size, file_size);
+            OldLog::Warning("Error tokenizing data(reading from file) (read=%zu, size=%zu)", read_size, file_size);
         }
 
         return data;
@@ -608,10 +582,7 @@ public:
         return (token.Start - mData);
     }
 
-    FxMPPagedArray<Token>& GetTokens()
-    {
-        return mTokens;
-    }
+    FxMPPagedArray<Token>& GetTokens() { return mTokens; }
 
     void SaveState()
     {
@@ -631,14 +602,10 @@ public:
 
         mFileLine = mSavedState.FileLine;
         mStartOfLine = mSavedState.StartOfLine;
-
     }
 
 private:
-    bool IsWhitespace(char ch)
-    {
-        return (ch == ' ' || ch == '\t' || IsNewline(ch) || ch == '\r');
-    }
+    bool IsWhitespace(char ch) { return (ch == ' ' || ch == '\t' || IsNewline(ch) || ch == '\r'); }
 
 private:
     State mSavedState;

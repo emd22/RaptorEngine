@@ -3,6 +3,11 @@
 #include <Core/FxRef.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
+struct FxMeshGenCubeOptions
+{
+    float Scale = 1;
+};
+
 class FxMeshGen
 {
 public:
@@ -16,14 +21,13 @@ public:
         FxRef<FxPrimitiveMesh<LightVolumeVertex>> AsLightVolume();
         FxRef<FxPrimitiveMesh<>> AsMesh();
 
-        void Destroy()
-        {
-        }
+        void Destroy() {}
     };
 
 public:
     static FxRef<GeneratedMesh> MakeIcoSphere(int resolution);
-    static FxRef<GeneratedMesh> MakeQuad();
+    // static FxRef<GeneratedMesh> MakeQuad();
+    static FxRef<GeneratedMesh> MakeCube(FxMeshGenCubeOptions options = {});
 
 private:
 };

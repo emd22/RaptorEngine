@@ -48,9 +48,7 @@ public:
     void Print() const;
 
 #ifdef FX_USE_NEON
-    explicit FxVec3f(float32x4_t intrin) : mIntrin(intrin)
-    {
-    }
+    explicit FxVec3f(float32x4_t intrin) : mIntrin(intrin) {}
 
     FxVec3f& operator=(const float32x4_t& other)
     {
@@ -64,10 +62,7 @@ public:
         return *this;
     }
 
-    operator float32x4_t() const
-    {
-        return mIntrin;
-    }
+    operator float32x4_t() const { return mIntrin; }
 #endif
 
 public:
@@ -89,4 +84,15 @@ public:
         float32 X, Y, Z;
     };
 #endif
+};
+
+template <>
+struct std::formatter<FxVec3f>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    constexpr auto format(const FxVec3f& obj, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z);
+    }
 };

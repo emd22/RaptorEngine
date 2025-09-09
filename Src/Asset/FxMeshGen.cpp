@@ -11,30 +11,37 @@ static const FxVec2f UV = FxVec2f(1 / 11.0f, 1 / 3.0f); // The UV coordinates ar
 static const int IcoVertexCount = 22;
 static const int IcoIndexCount = 60;
 
-static const FxVec3f IcoVerts[] = { FxVec3f(0, -1, -Z), FxVec3f(-1, -Z, 0), FxVec3f(Z, 0, -1),  FxVec3f(1, -Z, 0),  FxVec3f(1, Z, 0),
-                                    FxVec3f(-1, -Z, 0), FxVec3f(Z, 0, 1),   FxVec3f(0, -1, Z),  FxVec3f(1, Z, 0),   FxVec3f(-1, -Z, 0),
-                                    FxVec3f(0, 1, Z),   FxVec3f(-Z, 0, 1),  FxVec3f(1, Z, 0),   FxVec3f(-1, -Z, 0), FxVec3f(-1, Z, 0),
-                                    FxVec3f(-Z, 0, -1), FxVec3f(1, Z, 0),   FxVec3f(-1, -Z, 0), FxVec3f(0, 1, -Z),  FxVec3f(0, -1, -Z),
-                                    FxVec3f(1, Z, 0),   FxVec3f(Z, 0, -1) };
+static const FxVec3f IcoVerts[] = {
+    FxVec3f(0, -1, -Z), FxVec3f(-1, -Z, 0), FxVec3f(Z, 0, -1), FxVec3f(1, -Z, 0),  FxVec3f(1, Z, 0), FxVec3f(-1, -Z, 0),
+    FxVec3f(Z, 0, 1),   FxVec3f(0, -1, Z),  FxVec3f(1, Z, 0),  FxVec3f(-1, -Z, 0), FxVec3f(0, 1, Z), FxVec3f(-Z, 0, 1),
+    FxVec3f(1, Z, 0),   FxVec3f(-1, -Z, 0), FxVec3f(-1, Z, 0), FxVec3f(-Z, 0, -1), FxVec3f(1, Z, 0), FxVec3f(-1, -Z, 0),
+    FxVec3f(0, 1, -Z),  FxVec3f(0, -1, -Z), FxVec3f(1, Z, 0),  FxVec3f(Z, 0, -1),
+};
 
-static const FxVec2f IcoUvs[] = { UV * FxVec2f(0, 1), UV* FxVec2f(1, 0),  UV* FxVec2f(1, 2),  UV* FxVec2f(2, 1), UV* FxVec2f(2, 3), UV* FxVec2f(3, 0),
-                                  UV* FxVec2f(3, 2),  UV* FxVec2f(4, 1),  UV* FxVec2f(4, 3),  UV* FxVec2f(5, 0), UV* FxVec2f(5, 2), UV* FxVec2f(6, 1),
-                                  UV* FxVec2f(6, 3),  UV* FxVec2f(7, 0),  UV* FxVec2f(7, 2),  UV* FxVec2f(8, 1), UV* FxVec2f(8, 3), UV* FxVec2f(9, 0),
-                                  UV* FxVec2f(9, 2),  UV* FxVec2f(10, 1), UV* FxVec2f(10, 3), UV* FxVec2f(11, 2) };
+static const FxVec2f IcoUvs[] = {
+    UV * FxVec2f(0, 1), UV* FxVec2f(1, 0),  UV* FxVec2f(1, 2), UV* FxVec2f(2, 1), UV* FxVec2f(2, 3),
+    UV* FxVec2f(3, 0),  UV* FxVec2f(3, 2),  UV* FxVec2f(4, 1), UV* FxVec2f(4, 3), UV* FxVec2f(5, 0),
+    UV* FxVec2f(5, 2),  UV* FxVec2f(6, 1),  UV* FxVec2f(6, 3), UV* FxVec2f(7, 0), UV* FxVec2f(7, 2),
+    UV* FxVec2f(8, 1),  UV* FxVec2f(8, 3),  UV* FxVec2f(9, 0), UV* FxVec2f(9, 2), UV* FxVec2f(10, 1),
+    UV* FxVec2f(10, 3), UV* FxVec2f(11, 2),
+};
 
-static const int32 IcoIndex[] = { 2, 6,  4, // Top
-                                  6, 10, 8, 10, 14, 12, 14, 18, 16, 18, 21, 20,
+static const int32 IcoIndex[] = {
+    2, 6,  4, // Top
+    6, 10, 8, 10, 14, 12, 14, 18, 16, 18, 21, 20,
 
-                                  0, 3,  2, // Middle
-                                  2, 3,  6, 3,  7,  6,  6,  7,  10, 7,  11, 10, 10, 11, 14, 11, 15, 14, 14, 15, 18, 15, 19, 18, 18, 19, 21,
+    0, 3,  2, // Middle
+    2, 3,  6, 3,  7,  6,  6,  7,  10, 7,  11, 10, 10, 11, 14, 11, 15, 14, 14, 15, 18, 15, 19, 18, 18, 19, 21,
 
-                                  0, 1,  3, // Bottom
-                                  3, 5,  7, 7,  9,  11, 11, 13, 15, 15, 17, 19 };
+    0, 1,  3, // Bottom
+    3, 5,  7, 7,  9,  11, 11, 13, 15, 15, 17, 19,
+};
 
 
 FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::AsLightVolume()
 {
-    FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> mesh = FxMakeRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>>();
+    FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> mesh =
+        FxMakeRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>>();
     mesh->IsReference = true;
 
     FxSizedArray<RxVertex<FxVertexPosition>> points(Positions.Size);
@@ -59,8 +66,8 @@ FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
     FxRef<FxPrimitiveMesh<>> mesh = FxMakeRef<FxPrimitiveMesh<>>();
     mesh->IsReference = true;
 
-    auto vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
-    mesh->CreateFromData(vertices, Indices);
+    auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
+    mesh->CreateFromData(fat_vertices, Indices);
 
     return mesh;
 }
@@ -153,23 +160,36 @@ FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeIcoSphere(int resolution)
 }
 
 
-FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeQuad()
+FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenCubeOptions options)
 {
-    // FxSizedArray<FxVec3f> positions = {
-    //     FxVec3f(-0.5f, 0.5f, 0.0f),
-    //     FxVec3f(-0.5f, -0.5f, 0.0f),
-    //     FxVec3f(0.5f, -0.5f, 0.0f),
-    //     FxVec3f(0.5f, 0.5f, 0.0f),
-    // };
+    FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
 
-    // FxSizedArray<uint32> indices = {
-    //     0, 1, 3, 3, 1, 2,
-    // };
+    const float s = options.Scale;
 
-    // FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
+    mesh->Positions = {
+        FxVec3f(-s, -s, -s), // 0
+        FxVec3f(s, -s, -s),  // 1
+        FxVec3f(s, s, -s),   // 2
+        FxVec3f(-s, s, -s),  // 3
+        FxVec3f(-s, -s, s),  // 4
+        FxVec3f(s, -s, s),   // 5
+        FxVec3f(s, s, s),    // 6
+        FxVec3f(-s, s, s)    // 7
+    };
 
-    // mesh->Positions = std::move(positions);
-    // mesh->Indices = std::move(indices);
+    mesh->Indices = { // Front (z = +5)
+                      4, 5, 6, 4, 6, 7,
+                      // Back (z = -5)
+                      1, 0, 3, 1, 3, 2,
+                      // Left (x = -5)
+                      0, 4, 7, 0, 7, 3,
+                      // Right (x = +5)
+                      5, 1, 2, 5, 2, 6,
+                      // Top (y = +5)
+                      3, 7, 6, 3, 6, 2,
+                      // Bottom (y = -5)
+                      0, 1, 5, 0, 5, 4
+    };
 
-    // return mesh;
+    return mesh;
 }

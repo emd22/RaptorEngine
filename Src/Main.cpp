@@ -1,6 +1,6 @@
 
 #include "vulkan/vulkan_core.h"
-#define VMA_DEBUG_LOG(...) Log::Warning(__VA_ARGS__)
+#define VMA_DEBUG_LOG(...) FxLogWarning(__VA_ARGS__)
 
 #include "Core/FxDefines.hpp"
 #include "Renderer/Backend/RxShader.hpp"
@@ -28,6 +28,7 @@
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxMeshGen.hpp>
 #include <Core/FxBitset.hpp>
+#include <Core/FxLog.hpp>
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
@@ -149,6 +150,10 @@ void TestScript()
 
 int main()
 {
+#ifdef FX_LOG_OUTPUT_TO_FILE
+    FxLogCreateFile("FoxtrotLog.log");
+#endif
+
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
     // TestScript();
@@ -159,7 +164,7 @@ int main()
 
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        FxModulePanic("Could not initialize SDL! (SDL err: %s)\n", SDL_GetError());
+        FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
     }
 
     FxControlManager::Init();
@@ -169,7 +174,7 @@ int main()
     signal(SIGABRT,
            [](int signum)
            {
-               Log::Error("Aborted!");
+               FxLogError("Aborted!");
                exit(1);
            });
 
@@ -201,74 +206,26 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    // FxRef<FxAssetModel> helmet_model = FxAssetManager::NewAsset<FxAssetModel>();
-    //    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
-    //    helmet_model->WaitUntilLoaded();
-
-    // FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
-    // ground_model->WaitUntilLoaded();
-
-    FxRef<FxAssetImage> cheese_image = FxAssetManager::LoadImage("../textures/cheese.jpg");
-    cheese_image->WaitUntilLoaded();
-
-    FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
-    cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
-
-
-    // FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../models/Ground.glb");
-    // ground_object->WaitUntilLoaded();
-
-    // ground_object->Material = cheese_material;
-
-
-    // FxOldSceneObject helmet_object;
     FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
     fireplace_object->WaitUntilLoaded();
 
-    //    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-    //        // TEMP: If there are missing materials, cheese it up
-    //        if (!obj->Material) {
-    //            obj->Material = cheese_material;
-    //        }
-    //    }
-
-    // FxRef<FxObject> mallard_object = FxAssetManager::LoadObject("../models/Mallard.glb");
-
-    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Cubemap, "../Textures/TestCubemap.png");
+    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
 
-    FxRef<FxObject> cube_object = FxAssetManager::LoadObject("../models/Cube.glb");
-    cube_object->WaitUntilLoaded();
+    RxImage cubemap_image;
+    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
 
-    FxRef<FxMaterial> skybox_material = FxMaterialManager::New("Skybox", &deferred_renderer->GPassPipeline);
+    auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 
-    skybox_material->Attach(FxMaterial::Diffuse, skybox_texture);
+    for (int i = 0; i < RendererFramesInFlight; i++) {
+        RxImage& skybox_output_image = Renderer->Swapchain.OutputImages[i];
+        Renderer->DeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
+    }
 
-    cube_object->Material = skybox_material;
+    Renderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
 
+    Renderer->DeferredRenderer->SkyboxRenderer.Create(Renderer->Swapchain.Extent, generated_cube->AsLightVolume());
 
-    // ground_object->MoveBy(FxVec3f(0, -1, 0));
-
-
-    //    if (helmet_model->Materials.size() > 0) {
-    //        FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
-    //        helmet_material->Pipeline = &deferred_renderer->GPassPipeline;
-    //
-    //        helmet_object.Attach(helmet_material);
-    //    }
-    //    else {
-    //        helmet_object.Attach(cheese_material);
-    //    }
-
-    // helmet_object.MoveBy(FxVec3f(0, 0, 0));
-    // helmet_object.RotateX(M_PI / 2);
-    // helmet_object.Scale(FxVec3f(3, 3, 3));
-    //
-
-
-    //
-    fireplace_object->RotateX(M_PI / 2);
-    fireplace_object->Scale(FxVec3f(3));
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
@@ -278,6 +235,9 @@ int main()
     camera.Position.Y += 4.0f;
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+
+
+    fireplace_object->RotateX(M_PI_2);
 
     FxSizedArray<VkDescriptorSet> sets_to_bind;
     sets_to_bind.InitSize(2);
@@ -359,21 +319,16 @@ int main()
             continue;
         }
 
+        deferred_renderer->SkyboxRenderer.Render(Renderer->GetFrame()->CommandBuffer, *current_camera);
+        deferred_renderer->GPassPipeline.Bind(Renderer->GetFrame()->CommandBuffer);
+
         //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
         light.Color.Y = 0.7;
 
-        // ground_object.Render(camera);
-        // helmet_object.Render(camera);
-        //        light.RenderDebugMesh(camera);
-
         fireplace_object->Render(camera);
-        cube_object->Render(camera);
 
-        // ground_object->Render(camera);
-
-        // mallard_object->Render(camera);
 
         Renderer->BeginLighting();
 

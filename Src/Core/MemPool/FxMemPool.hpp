@@ -1,13 +1,14 @@
 #pragma once
 
+#include "../FxDefines.hpp"
 #include "../Types.hpp"
 #include "FxMPLinkedList.hpp"
 
 #include <type_traits>
 // #include <vector>
 
-#define FX_MEMPOOL_USE_ATOMIC_LOCKING 1
-#define FX_MEMPOOL_TRACK_STATISTICS 1
+// #define FX_MEMPOOL_USE_ATOMIC_LOCKING 1
+// #define FX_MEMPOOL_TRACK_STATISTICS   1
 
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
 #include <atomic>
@@ -93,7 +94,7 @@ public:
 
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         if (node == nullptr) {
-            Log::Error("FxMemPoolPage::Free: Could not find ptr %p in memory page!", ptr);
+            FxLogError("FxMemPoolPage::Free: Could not find ptr {:p} in memory page!", ptr);
             return;
         }
 
@@ -139,15 +140,9 @@ public:
     void PrintAllocations() const;
 
     void Destroy();
-    ~FxMemPoolPage()
-    {
-        Destroy();
-    }
+    ~FxMemPoolPage() { Destroy(); }
 
-    inline bool IsInited() const
-    {
-        return (mMem != nullptr && mSize > 0);
-    }
+    inline bool IsInited() const { return (mMem != nullptr && mSize > 0); }
 
 private:
     auto AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
@@ -156,7 +151,7 @@ private:
     inline void CheckInited()
     {
         if (!IsInited()) {
-            FxPanic("FxMemoryPage", "Page has not been initialized!", 0);
+            FxPanic("FxMemoryPage", "Page has not been initialized!");
         }
     }
 
@@ -265,7 +260,7 @@ public:
         const auto& this_id = std::this_thread::get_id();
 
         if (this_id != pool->mCreatedThreadId) {
-            Log::Warning("Attempting to free memory from a different thread!");
+            FxLogWarning("Attempting to free memory from a different thread!");
             std::cout << "Thread ids: " << pool->mCreatedThreadId << ", " << std::this_thread::get_id() << "\n";
         }
 #endif

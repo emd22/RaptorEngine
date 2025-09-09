@@ -1,6 +1,8 @@
 #pragma once
 
 #include "FxAllocator.hpp"
+#include "FxDefines.hpp"
+#include "FxLog.hpp"
 #include "FxMemory.hpp"
 
 #include <stddef.h>
@@ -10,24 +12,20 @@
 #include <initializer_list>
 #include <stdexcept>
 
-// #define FX_STATIC_ARRAY_DEBUG 1
-// #define FX_STATIC_ARRAY_NO_MEMPOOL 1
-
 static inline void NoMemError()
 {
     puts("FxSizedArray: out of memory");
     std::terminate();
 }
 
-template <typename ElementType, class Allocator = FxGlobalPoolAllocator<ElementType>>
-    requires C_IsAllocator<Allocator>
+template <typename TElementType>
 
 class FxSizedArray
 {
 public:
     struct Iterator
     {
-        Iterator(ElementType* ptr, size_t index) : mPtr(ptr), mIndex(index) {}
+        Iterator(TElementType* ptr, size_t index) : mPtr(ptr), mIndex(index) {}
 
         Iterator& operator++()
         {
@@ -42,25 +40,25 @@ public:
             return before;
         }
 
-        ElementType& operator*() const { return mPtr[mIndex]; }
+        TElementType& operator*() const { return mPtr[mIndex]; }
 
         bool operator==(const Iterator& b) const { return mPtr == b.mPtr && mIndex == b.mIndex; }
 
     private:
-        ElementType* mPtr;
+        TElementType* mPtr;
         size_t mIndex;
     };
 
-    FxSizedArray(ElementType* ptr, size_t size) : Data(ptr), Size(size), Capacity(size) {}
+    FxSizedArray(TElementType* ptr, size_t size) : Data(ptr), Size(size), Capacity(size) {}
 
     FxSizedArray(size_t element_count) : Capacity(element_count)
     {
-#ifdef FX_STATIC_ARRAY_DEBUG
-        Log::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", Capacity, typeid(ElementType).name());
+#ifdef FX_SIZED_ARRAY_DEBUG
+        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", Capacity, typeid(ElementType).name());
 #endif
 
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
-        Data = FxMemPool::Alloc<ElementType>(static_cast<uint32>(sizeof(ElementType)) * element_count);
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
+        Data = FxMemPool::Alloc<TElementType>(static_cast<uint32>(sizeof(TElementType)) * element_count);
         if (Data == nullptr) {
             NoMemError();
         }
@@ -82,16 +80,16 @@ public:
         // }
     }
 
-    FxSizedArray(std::initializer_list<ElementType> list)
+    FxSizedArray(std::initializer_list<TElementType> list)
     {
         InitCapacity(list.size());
 
-        for (const ElementType& obj : list) {
+        for (const TElementType& obj : list) {
             Insert(obj);
         }
     }
 
-    FxSizedArray(FxSizedArray<ElementType>&& other)
+    FxSizedArray(FxSizedArray<TElementType>&& other)
     {
         Data = std::move(other.Data);
         other.Data = nullptr;
@@ -113,10 +111,10 @@ public:
             return;
         }
 
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (size_t i = 0; i < Size; i++) {
-            ElementType& element = Data[i];
-            element.~ElementType();
+            TElementType& element = Data[i];
+            element.~TElementType();
         }
 
         FxMemPool::Free(static_cast<void*>(Data));
@@ -125,8 +123,8 @@ public:
 #endif
 
 
-#ifdef FX_STATIC_ARRAY_DEBUG
-        Log::Debug("Freeing FxSizedArray of size %zu (type: %s)", Size, typeid(ElementType).name());
+#ifdef FX_SIZED_ARRAY_DEBUG
+        FxLogDebug("Freeing FxSizedArray of size {:d} (type: {:s})", Size, typeid(ElementType).name());
 #endif
 
         //
@@ -144,11 +142,11 @@ public:
 
     Iterator end() { return Iterator(Data, Size); }
 
-    operator ElementType*() const { return Data; }
+    operator TElementType*() const { return Data; }
 
-    operator ElementType&() const { return *Data; }
+    operator TElementType&() const { return *Data; }
 
-    const ElementType& operator[](size_t index) const
+    const TElementType& operator[](size_t index) const
     {
         if (index >= Size) {
             throw std::out_of_range("FxSizedArray access out of range");
@@ -156,7 +154,7 @@ public:
         return Data[index];
     }
 
-    ElementType& operator[](size_t index)
+    TElementType& operator[](size_t index)
     {
         if (index >= Size) {
             throw std::out_of_range("FxSizedArray access out of range");
@@ -164,7 +162,7 @@ public:
         return Data[index];
     }
 
-    FxSizedArray<ElementType>& operator=(std::initializer_list<ElementType>& list)
+    FxSizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
     {
         const size_t list_size = list.size();
         if (list_size > Capacity) {
@@ -174,14 +172,14 @@ public:
 
         Clear();
 
-        for (const ElementType& obj : list) {
+        for (const TElementType& obj : list) {
             Insert(obj);
         }
 
         return *this;
     }
 
-    FxSizedArray<ElementType>& operator=(FxSizedArray<ElementType>&& other)
+    FxSizedArray<TElementType>& operator=(FxSizedArray<TElementType>&& other)
     {
         if (Data) {
             Free();
@@ -199,47 +197,55 @@ public:
         return *this;
     }
 
+    void InitAsCopyOf(const FxSizedArray<TElementType>& other)
+    {
+        InitCapacity(other.Capacity);
+        Size = other.Size;
+
+        memcpy(Data, other.Data, other.GetSizeInBytes());
+    }
+
     void Clear() { Size = 0; }
 
     bool IsEmpty() { return Size == 0; }
 
     bool IsNotEmpty() { return !IsEmpty(); }
 
-    void Insert(const ElementType& object)
+    void Insert(const TElementType& object)
     {
         if (Size > Capacity) {
             printf("New Size(%zu) > Capacity(%zu)!\n", Size, Capacity);
             throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
         }
 
-        ElementType* element = &Data[Size++];
+        TElementType* element = &Data[Size++];
 
-        new (element) ElementType(object);
+        new (element) TElementType(object);
     }
 
-    void Insert(ElementType&& object)
+    void Insert(TElementType&& object)
     {
         if (Size > Capacity) {
             printf("New Size(%zu) > Capacity(%zu)!\n", Size, Capacity);
             throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
         }
 
-        ElementType* element = &Data[Size++];
+        TElementType* element = &Data[Size++];
 
-        new (element) ElementType(std::move(object));
+        new (element) TElementType(std::move(object));
     }
 
     /** Inserts a new empty element into the array and returns a pointer to the element */
-    ElementType* Insert()
+    TElementType* Insert()
     {
         if (Size > Capacity) {
             printf("New Size(%zu) > Capacity(%zu)!\n", Size, Capacity);
             throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
         }
 
-        ElementType* element = &Data[Size++];
+        TElementType* element = &Data[Size++];
 
-        new (element) ElementType;
+        new (element) TElementType;
 
         return element;
     }
@@ -275,9 +281,9 @@ public:
 
         Size = Capacity;
 
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (uint64 i = 0; i < Size; i++) {
-            new (&Data[i]) ElementType;
+            new (&Data[i]) TElementType;
         }
 #endif
     }
@@ -291,24 +297,42 @@ public:
     //     Size = Capacity;
     // }
 
-    size_t GetSizeInBytes() const { return Size * sizeof(ElementType); }
+    size_t GetSizeInBytes() const { return Size * sizeof(TElementType); }
 
-    size_t GetCapacityInBytes() const { return Capacity * sizeof(ElementType); }
+    size_t GetCapacityInBytes() const { return Capacity * sizeof(TElementType); }
+
+    void Print()
+    {
+        FxLogChannelText<FxLogChannel::Info>();
+
+        FxLogDirect("Array: {{ ");
+
+        for (size_t i = 0; i < Size; i++) {
+            FxLogDirect("{}", (*this)[i]);
+
+            if (i < Size - 1) {
+                FxLogDirect(", ");
+            }
+        }
+
+        FxLogDirect(" }}\n");
+    }
+
 
 protected:
     virtual void InternalAllocateArray(size_t element_count)
     {
-#ifdef FX_DEBUG_STATIC_ARRAY
-        Log::Debug("Allocating FxSizedArray of capacity %zu (type: %s)", element_count, typeid(ElementType).name());
+#ifdef FX_SIZED_ARRAY_DEBUG
+        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", element_count, typeid(ElementType).name());
 #endif
-#if !defined(FX_STATIC_ARRAY_NO_MEMPOOL)
-        Data = FxMemPool::Alloc<ElementType>(sizeof(ElementType) * element_count);
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
+        Data = FxMemPool::Alloc<TElementType>(sizeof(TElementType) * element_count);
         if (Data == nullptr) {
             NoMemError();
         }
 #else
         try {
-            Data = new ElementType[element_count];
+            Data = new TElementType[element_count];
         }
         catch (const std::bad_alloc& e) {
             NoMemError();
@@ -325,7 +349,7 @@ public:
     size_t Size = 0;
     size_t Capacity = 0;
 
-    ElementType* Data = nullptr;
+    TElementType* Data = nullptr;
 
     bool DoNotDestroy = false;
 };

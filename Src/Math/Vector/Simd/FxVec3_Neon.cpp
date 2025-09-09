@@ -10,18 +10,15 @@ const FxVec3f FxVec3f::One = FxVec3f(1.0f, 1.0f, 1.0f);
 
 FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
 {
-    const float32 values[4] = {x, y, z, 0};
+    const float32 values[4] = { x, y, z, 0 };
     mIntrin = vld1q_f32(values);
 }
 
-FxVec3f::FxVec3f(float32 scalar)
-{
-    mIntrin = vdupq_n_f32(scalar);
-}
+FxVec3f::FxVec3f(float32 scalar) { mIntrin = vdupq_n_f32(scalar); }
 
 void FxVec3f::Set(float32 x, float32 y, float32 z)
 {
-    const float32 values[4] = {x, y, z, 0};
+    const float32 values[4] = { x, y, z, 0 };
     mIntrin = vld1q_f32(values);
 }
 
@@ -33,10 +30,7 @@ FxVec3f FxVec3f::MulAdd(const FxVec3f& add_value, const FxVec3f& mul_a, const Fx
     return result;
 }
 
-void FxVec3f::Print() const
-{
-    Log::Info("Vec3f {X=%.06f, Y=%.06f, Z=%.06f}", X, Y, Z);
-}
+void FxVec3f::Print() const { FxLogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
 
 float32 FxVec3f::Length() const
 {

@@ -46,10 +46,18 @@ private:
 public:
     std::vector<FxGltfMaterialToLoad> MaterialsToLoad;
 
+    bool KeepInMemory = false;
+
+    FxSizedArray<RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>> VertexBuffer;
+    FxSizedArray<uint32> IndexBuffer;
+
 protected:
     void CreateGpuResource(FxRef<FxAssetBase>& asset) override;
 
-    // static FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
+    // void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primitive);
+
+    // static FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view&
+    // texture_view);
 
 private:
     cgltf_data* mGltfData = nullptr;

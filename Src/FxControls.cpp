@@ -1,9 +1,11 @@
 #include "FxControls.hpp"
+
 #include "Util/FxKey.hpp"
 
-#include <Renderer/Renderer.hpp>
-
 #include <SDL3/SDL.h>
+
+#include <Core/FxLog.hpp>
+#include <Renderer/Renderer.hpp>
 
 /** Converts an SDL scancode to its corresponding FxKey ID. */
 static inline FxKey ConvertScancodeToFxKey(int32 sdl_scancode)
@@ -14,8 +16,7 @@ static inline FxKey ConvertScancodeToFxKey(int32 sdl_scancode)
     }
     // Check for ctrl, alt, meta keys
     else if (sdl_scancode >= FX_KEYBOARD_STANDARD_END &&
-             sdl_scancode <= FX_KEYBOARD_SPECIALS_END + FX_KEYBOARD_SPECIALS_OFFSET)
-    {
+             sdl_scancode <= FX_KEYBOARD_SPECIALS_END + FX_KEYBOARD_SPECIALS_OFFSET) {
         return static_cast<FxKey>(sdl_scancode - FX_KEYBOARD_SPECIALS_OFFSET);
     }
 
@@ -60,58 +61,46 @@ void FxControlManager::CaptureMouse()
     SDL_GetMouseState(&x, &y);
     inst.mCapturedMousePos.Set(x, y);
 
-    SDL_SetWindowRelativeMouseMode(
-        Renderer->GetWindow()->GetWindow(),
-        (inst.mMouseCaptured = true)
-    );
+    SDL_SetWindowRelativeMouseMode(Renderer->GetWindow()->GetWindow(), (inst.mMouseCaptured = true));
 }
 
-bool FxControlManager::IsMouseLocked()
-{
-    return GetInstance().mMouseCaptured;
-}
+bool FxControlManager::IsMouseLocked() { return GetInstance().mMouseCaptured; }
 
 void FxControlManager::ReleaseMouse()
 {
     FxControlManager& inst = GetInstance();
 
-    FxVec2f *pos = &inst.mCapturedMousePos;
-    SDL_Window *window = Renderer->GetWindow()->GetWindow();
+    FxVec2f* pos = &inst.mCapturedMousePos;
+    SDL_Window* window = Renderer->GetWindow()->GetWindow();
 
     // Warp back to the original position
     SDL_WarpMouseInWindow(window, pos->GetX(), pos->GetY());
 
-    SDL_SetWindowRelativeMouseMode(
-        window,
-        (inst.mMouseCaptured = false)
-    );
+    SDL_SetWindowRelativeMouseMode(window, (inst.mMouseCaptured = false));
 }
 
-FxVec2f &FxControlManager::GetMouseDelta()
-{
-    return GetInstance().mMouseDelta;
-}
+FxVec2f& FxControlManager::GetMouseDelta() { return GetInstance().mMouseDelta; }
 
 static inline bool IsKeyInRange(FxKey key_id)
 {
     bool in_range = (key_id >= 0 && key_id < FxControlManager::MaxKeys);
 
     if (!in_range) {
-        Log::Warning("Invalid Control Key ID! (0 <= %d < %d)", key_id, FxControlManager::MaxKeys);
+        int max_keys = FxControlManager::MaxKeys;
+        FxLogWarning("Invalid Control Key ID! (0 <= {:d} < {:d})", static_cast<int>(key_id), max_keys);
     }
 
     return in_range;
 }
 
 
-
-FxControl *FxControlManager::GetKey(FxKey key_id)
+FxControl* FxControlManager::GetKey(FxKey key_id)
 {
     if (!IsKeyInRange(key_id)) {
         return nullptr;
     }
 
-    FxControl *key = &GetInstance().mKeyMap[key_id];
+    FxControl* key = &GetInstance().mKeyMap[key_id];
 
     return key;
 }
@@ -120,7 +109,7 @@ FxControl *FxControlManager::GetKey(FxKey key_id)
 // Key State functions
 ///////////////////////////////
 
-inline void CheckKeyForContinuedPress(FxControl *key)
+inline void CheckKeyForContinuedPress(FxControl* key)
 {
     // When a key is pressed, we set the `mTickBit` inside the FxControl
     // to the current value of `mThisTick`. When a function is called that checks  the
@@ -144,7 +133,7 @@ inline void CheckKeyForContinuedPress(FxControl *key)
 
 bool FxControlManager::IsKeyDown(FxKey scancode)
 {
-    FxControl *key = GetInstance().GetKey(scancode);
+    FxControl* key = GetInstance().GetKey(scancode);
     if (!key) {
         return false;
     }
@@ -156,7 +145,7 @@ bool FxControlManager::IsKeyDown(FxKey scancode)
 
 bool FxControlManager::IsKeyPressed(FxKey scancode)
 {
-    FxControl *key = GetInstance().GetKey(scancode);
+    FxControl* key = GetInstance().GetKey(scancode);
     if (!key) {
         return false;
     }
@@ -168,7 +157,7 @@ bool FxControlManager::IsKeyPressed(FxKey scancode)
 
 bool FxControlManager::IsKeyUp(FxKey scancode)
 {
-    FxControl *key = GetInstance().GetKey(scancode);
+    FxControl* key = GetInstance().GetKey(scancode);
     if (!key) {
         return false;
     }
@@ -193,32 +182,32 @@ void FxControlManager::Update()
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
-            case SDL_EVENT_QUIT:
-                inst.OnQuit();
-                break;
+        case SDL_EVENT_QUIT:
+            inst.OnQuit();
+            break;
 
-            // Keyboard events
-            case SDL_EVENT_KEY_DOWN: // fallthrough
-            case SDL_EVENT_KEY_UP:
-                inst.UpdateFromKeyboardEvent(&event);
-                break;
-            case SDL_EVENT_MOUSE_BUTTON_DOWN: // fallthrough
-            case SDL_EVENT_MOUSE_BUTTON_UP:
-                inst.UpdateFromMouseButtonEvent(&event);
-                break;
+        // Keyboard events
+        case SDL_EVENT_KEY_DOWN: // fallthrough
+        case SDL_EVENT_KEY_UP:
+            inst.UpdateFromKeyboardEvent(&event);
+            break;
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: // fallthrough
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            inst.UpdateFromMouseButtonEvent(&event);
+            break;
 
-            case SDL_EVENT_MOUSE_MOTION:
-                inst.UpdateFromMouseMoveEvent(&event);
-                break;
+        case SDL_EVENT_MOUSE_MOTION:
+            inst.UpdateFromMouseMoveEvent(&event);
+            break;
 
-            default:;
+        default:;
         }
     }
 }
 
-void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event *event)
+void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event* event)
 {
-    FxControl *button = GetInstance().GetKey(key_id);
+    FxControl* button = GetInstance().GetKey(key_id);
     if (!button) {
         return;
     }
@@ -233,27 +222,28 @@ void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event *event)
     }
 }
 
-void FxControlManager::UpdateFromKeyboardEvent(SDL_Event *event)
+void FxControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
 {
     const FxKey key_id = ConvertScancodeToFxKey(event->key.scancode);
+
     if (key_id == FxKey::FX_KEY_UNKNOWN) {
-        Log::Warning("Unknown scancode %d. Could not convert to Key ID\n", event->key.scancode);
+        FxLogWarning("Unknown scancode {:d}!", static_cast<int>(event->key.scancode));
         return;
     }
 
     UpdateButtonFromEvent(key_id, event);
 }
 
-void FxControlManager::UpdateFromMouseMoveEvent(SDL_Event *event)
+void FxControlManager::UpdateFromMouseMoveEvent(SDL_Event* event)
 {
     GetInstance().mMouseDelta += { event->motion.xrel, event->motion.yrel };
 }
 
-void FxControlManager::UpdateFromMouseButtonEvent(SDL_Event *event)
+void FxControlManager::UpdateFromMouseButtonEvent(SDL_Event* event)
 {
     const FxKey key_id = ConvertMouseButtonToFxKey(event->button.button);
     if (key_id == FxKey::FX_KEY_UNKNOWN) {
-        Log::Warning("Unknown mouse button %d. Could not convert to Key ID\n", event->button.button);
+        FxLogWarning("Unknown mouse button {:d}!", static_cast<int>(event->button.button));
         return;
     }
 

@@ -3,7 +3,6 @@
 #include "Core/FxPanic.hpp"
 #include "Core/FxSizedArray.hpp"
 #include "FxAssetImage.hpp"
-#include "FxAssetModel.hpp"
 #include "Loader/FxLoaderGltf.hpp"
 #include "Loader/FxLoaderJpeg.hpp"
 #include "Loader/FxLoaderStb.hpp"
@@ -164,9 +163,10 @@ inline bool IsFileJpeg(const std::string& path)
     return false;
 }
 
-void FxAssetManager::LoadObject(FxRef<FxObject>& asset, const std::string& path)
+void FxAssetManager::LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options)
 {
     FxRef<FxLoaderGltf> loader = FxRef<FxLoaderGltf>::New();
+    loader->KeepInMemory = options.KeepInMemory;
 
     SubmitAssetToLoad<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, loader, path);
 }
@@ -199,7 +199,8 @@ void FxAssetManager::LoadImage(RxImageType image_type, FxRef<FxAssetImage>& asse
 }
 
 
-void FxAssetManager::LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size)
+void FxAssetManager::LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data,
+                                         uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
@@ -266,7 +267,7 @@ void FxAssetManager::CheckForUploadableData()
         else if (worker.LoadStatus == FxLoaderBase::Status::None) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
 
-            FxPanic("FxAssetManager", "Worker status is none!", 0);
+            FxPanic("FxAssetManager", "Worker status is none!");
         }
 
         ItemsEnqueued.clear();
@@ -299,7 +300,7 @@ void FxAssetManager::CheckForItemsToLoad()
 
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
-        Log::Debug("No workers available; Polling for worker thread...");
+        FxLogDebug("No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up

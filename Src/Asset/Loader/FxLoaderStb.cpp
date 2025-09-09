@@ -21,7 +21,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromFile(FxRef<FxAssetBase> asset, const st
 
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, requested_channels);
     if (mImageData == nullptr) {
-        Log::Error("Could not load image file at '%d'", c_path);
+        FxLogError("Could not load image file at '{:d}'", c_path);
         return FxLoaderStb::Status::Error;
     }
 
@@ -35,7 +35,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
     const int requested_channels = 4; /* RGBA */
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
-        Log::Error("Could not retrieve info from image in memory! (Size:%u)", size);
+        FxLogError("Could not retrieve info from image in memory! (Size:{u})", size);
         return FxLoaderStb::Status::Error;
     }
 
@@ -50,7 +50,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
     mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, requested_channels);
 
     if (mImageData == nullptr) {
-        Log::Error("Could not load image file from memory!");
+        FxLogError("Could not load image file from memory!");
         return FxLoaderStb::Status::Error;
     }
 
@@ -78,6 +78,35 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
     asset->IsUploadedToGpu = true;
     asset->IsUploadedToGpu.notify_all();
 }
+
+// void FxLoaderStb::LoadCubemapToLayeredImage(const RxImage&)
+// {
+//     FxVec2u cubemap_size = cubemap_image.Size;
+
+//     // Here is the type of cubemap we will be looking for here:
+//     //
+//     // T -> Top, B -> Bottom, L -> Left, R -> Right
+//     // FW -> Forward, BW -> Backward
+//     //
+//     // +-----+-----+-----+-----+
+//     // |     |  T  |     |     |
+//     // +-----+-----+-----+-----+
+//     // |  L  |  FW |  R  |  BW |
+//     // +-----+-----+-----+-----+
+//     // |     |  B  |     |     |
+//     // +-----+-----+-----+-----+
+//     //
+//     // Note that it is 4 tiles wide and 3 tiles tall.
+
+//     const uint32 tile_width = cubemap_size.X / 4;
+//     const uint32 tile_height = cubemap_size.Y / 3;
+
+//     if (tile_width != tile_height) {
+//         FxLogWarning("Cubemap tile width != cubemap tile height!");
+//     }
+
+//     FxStackArray<VkImageCopy, 6> image_copy_infos;
+// }
 
 void FxLoaderStb::Destroy(FxRef<FxAssetBase>& asset)
 {

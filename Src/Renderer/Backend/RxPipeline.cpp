@@ -27,7 +27,7 @@ FxVertexInfo FxMakeVertexInfo()
         { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
     };
 
-    Log::Debug("Amount of attributes: %d", attribs.Size);
+    FxLogDebug("Amount of attributes: {:d}", attribs.Size);
 
     return { binding_desc, std::move(attribs) };
 }
@@ -86,7 +86,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
             .pSpecializationInfo = &specialization_info,
         };
 
-        Log::Debug("Added shader (Vertex?: %s)", Log::YesNo(create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
+        FxLogDebug("Added shader (Vertex?: {})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
 
         shader_create_info.Insert(create_info);
     }
@@ -170,11 +170,17 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
 
     // RenderPass->Create2(attachments);
 
+    VkBool32 use_depth = VK_TRUE;
+
+    if (properties.ForceNoDepthTest) {
+        use_depth = VK_FALSE;
+    }
+
     // Unused if has_depth_attachment is false
     VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = VK_TRUE,
-        .depthWriteEnable = VK_TRUE,
+        .depthTestEnable = use_depth,
+        .depthWriteEnable = use_depth,
         .depthCompareOp = VK_COMPARE_OP_GREATER,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
@@ -205,13 +211,13 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
     const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create graphics pipeline", status);
+        FxModulePanicVulkan("Could not create graphics pipeline", status);
     }
 
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 }
 
-void RxGraphicsPipeline::Bind(RxCommandBuffer& command_buffer)
+void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
 {
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 }
@@ -280,7 +286,7 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(uint32 vert_push_consts_size, 
     VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);
 
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create pipeline layout", status);
+        FxModulePanicVulkan("Failed to create pipeline layout", status);
     }
 
     return Layout;

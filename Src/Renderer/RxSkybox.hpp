@@ -7,8 +7,10 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Core/FxRef.hpp>
 #include <Math/FxVec2.hpp>
 
+class FxCamera;
 class RxDeferredRenderer;
 
 struct alignas(16) RxSkyboxPushConstants
@@ -25,23 +27,31 @@ public:
 public:
     void Create(const FxVec2u& extent, const FxRef<FxPrimitiveMesh<VertexType>>& skybox_mesh);
 
-    void Render();
+    void Render(const RxCommandBuffer& cmd, const FxCamera& render_cam);
 
     void Destroy();
 
 private:
     void CreateSkyboxPipeline();
     VkPipelineLayout CreateSkyboxPipelineLayout();
+    void BuildDescriptorSets(uint32 frame_index);
 
 public:
     // VkDescriptorSetLayout DsLayoutSkyboxVertex = nullptr;
     VkDescriptorSetLayout DsLayoutSkyboxFragment = nullptr;
 
+    FxStackArray<RxDescriptorSet, RendererFramesInFlight> DsSkyboxFragments {};
+
     RxGraphicsPipeline SkyboxPipeline;
 
+    FxStackArray<RxImage*, RendererFramesInFlight> SkyboxAttachments;
+
+    RxImage* SkyAttachment = nullptr;
+
 private:
-    RxSampler mSkySampler;
-    RxImage mSky;
+    // RxSampler mSkySampler;
+
+    RxDescriptorPool mDescriptorPool {};
 
     FxRef<FxPrimitiveMesh<VertexType>> mSkyboxMesh { nullptr };
 

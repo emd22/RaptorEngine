@@ -164,7 +164,7 @@ void RxRenderBackend::InitVulkan()
     std::cout << "Requested to load " << all_extensions.size() << " extensions...\n";
 
     for (const auto& extension : all_extensions) {
-        Log::Debug("Ext: %s", extension);
+        FxLogDebug("Ext: {:s}", extension);
     }
 
     ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions);
@@ -178,7 +178,7 @@ void RxRenderBackend::InitVulkan()
             }
         }
 
-        FxModulePanic("Missing required instance extensions", 0);
+        FxModulePanic("Missing required instance extensions");
     }
 
     // auto validation_layers = GetAvailableValidationLayers();
@@ -203,13 +203,13 @@ void RxRenderBackend::InitVulkan()
     VkResult result = vkCreateInstance(&instance_info, nullptr, &mInstance);
 
     if (result != VK_SUCCESS) {
-        FxModulePanic("Could not create vulkan instance!", result);
+        FxModulePanicVulkan("Could not create vulkan instance!", result);
     }
 
 #ifdef FX_VULKAN_DEBUG
     mDebugMessenger = CreateDebugMessenger(mInstance);
     if (!mDebugMessenger) {
-        FxModulePanic("Could not create debug messenger", 0);
+        FxModulePanic("Could not create debug messenger");
     }
 #endif
 
@@ -220,20 +220,20 @@ uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_sever
                             const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data)
 {
     const char* message = callback_data->pMessage;
-    const char* fmt = "VkValidator: %s";
+    const char* fmt = "VkValidator: {:s}";
 
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
-        Log::Error(fmt, message);
+        FxLogError(fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
-        Log::Warning(fmt, message);
+        FxLogWarning(fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
         // Log::Info(fmt, message);
     }
     else {
-        Log::Debug(fmt, message);
+        FxLogDebug(fmt, message);
     }
 
     return 0;
@@ -264,16 +264,18 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
                               VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
 
-    VkDebugUtilsMessengerCreateInfoEXT create_info = { .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-                                                       .messageSeverity = severity,
-                                                       .messageType = message_type,
-                                                       .pfnUserCallback = DebugMessageCallback };
+    VkDebugUtilsMessengerCreateInfoEXT create_info = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .messageSeverity = severity,
+        .messageType = message_type,
+        .pfnUserCallback = DebugMessageCallback,
+    };
 
     VkDebugUtilsMessengerEXT messenger;
 
     const auto status = Rx_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        Log::Error("Could not create debug messenger! (err: %s)", RxUtil::ResultToStr(status));
+        FxLogError("Could not create debug messenger! (err: {:s})", RxUtil::ResultToStr(status));
         return nullptr;
     }
 
@@ -299,7 +301,7 @@ void RxRenderBackend::InitGPUAllocator()
 
     const VkResult status = vmaCreateAllocator(&create_info, &GpuAllocator);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not create VMA allocator!", status);
+        FxModulePanicVulkan("Could not create VMA allocator!", status);
     }
 }
 
@@ -329,7 +331,7 @@ ExtensionNames RxRenderBackend::MakeInstanceExtensionList(ExtensionNames& user_r
 
 ExtensionList& RxRenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 {
-    Log::Debug("Query Extensions", 0);
+    FxLogDebug("Querying for instance extensions...");
 
 
     if (mAvailableExtensions.IsNotEmpty()) {
@@ -451,7 +453,6 @@ RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
 
     CurrentGPass->Begin();
 
-
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
 
@@ -507,7 +508,7 @@ void RxRenderBackend::PresentFrame()
           "Error submitting draw buffer");
 
     if (Swapchain.Initialized != true) {
-        FxModulePanic("Swapchain not initialized!", 0);
+        FxModulePanic("Swapchain not initialized!");
     }
 
     const VkSwapchainKHR swapchains[] = {
@@ -535,7 +536,7 @@ void RxRenderBackend::PresentFrame()
         // Swapchain.Rebuild()..
     }
     else {
-        Log::Error("Error submitting present queue", status);
+        FxLogError("Error submitting present queue. Status: {:x}", static_cast<int32>(status));
     }
 }
 
@@ -636,7 +637,7 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
         return RxFrameResult::GraphicsOutOfDate;
     }
     else {
-        Log::Error("Error getting next swapchain image!", result);
+        FxLogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
     }
 
     return RxFrameResult::RenderError;
@@ -651,13 +652,13 @@ inline RxUniformBufferObject& RxRenderBackend::GetUbo()
 void RxRenderBackend::CreateSurfaceFromWindow()
 {
     if (mWindow == nullptr) {
-        FxModulePanic("No window attached! use FxRenderBackend::SelectWindow()", 0);
+        FxModulePanic("No window attached! use FxRenderBackend::SelectWindow()");
     }
 
     bool success = SDL_Vulkan_CreateSurface(mWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
 
     if (!success) {
-        FxModulePanic("Could not attach Vulkan instance to window! (SDL err: %s)", SDL_GetError());
+        FxModulePanic("Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
     }
 }
 

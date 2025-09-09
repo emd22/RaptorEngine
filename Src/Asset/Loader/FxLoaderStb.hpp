@@ -26,6 +26,9 @@ protected:
     void CreateGpuResource(FxRef<FxAssetBase>& asset) override;
 
 private:
+    void LoadCubemapToLayeredImage();
+
+private:
     int mWidth;
     int mHeight;
     int mChannels;

@@ -19,7 +19,10 @@ typedef double float64;
 #include <cstddef>
 // #include <type_traits>
 
+#include "FxDefines.hpp"
+
 #include <Core/FxPanic.hpp>
+
 
 // template <typename ValueType>
 // class Optional {

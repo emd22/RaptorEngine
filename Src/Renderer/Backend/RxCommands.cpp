@@ -1,13 +1,13 @@
 #include "RxCommands.hpp"
-#include "RxDevice.hpp"
 
 #include "../Renderer.hpp"
+#include "RxDevice.hpp"
 
 #include <Core/FxPanic.hpp>
 
 FX_SET_MODULE_NAME("RxCommandBuffer")
 
-void RxCommandBuffer::Create(RxCommandPool *pool)
+void RxCommandBuffer::Create(RxCommandPool* pool)
 {
     mCommandPool = pool;
 
@@ -22,10 +22,11 @@ void RxCommandBuffer::Create(RxCommandPool *pool)
 
     const VkResult status = vkAllocateCommandBuffers(mDevice->Device, &buffer_info, &CommandBuffer);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Could not allocate command buffer", status);
+        FxModulePanicVulkan("Could not allocate command buffer", status);
     }
 
-    Log::Debug("Creating Command buffer 0x%llx from queue family %d", CommandBuffer, pool->QueueFamilyIndex);
+    FxLogDebug("Creating Command buffer 0x{:p} from queue family {:d}", reinterpret_cast<void*>(CommandBuffer),
+               pool->QueueFamilyIndex);
 
     mInitialized = true;
 }
@@ -44,12 +45,12 @@ void RxCommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
     const VkCommandBufferBeginInfo begin_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = 0,
-        .pInheritanceInfo = nullptr
+        .pInheritanceInfo = nullptr,
     };
 
     const VkResult status = vkBeginCommandBuffer(CommandBuffer, &begin_info);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to begin recording command buffer", status);
+        FxModulePanicVulkan("Failed to begin recording command buffer", status);
     }
 }
 
@@ -66,11 +67,8 @@ void RxCommandBuffer::End()
 
     const VkResult status = vkEndCommandBuffer(CommandBuffer);
     if (status != VK_SUCCESS) {
-        FxModulePanic("Failed to create command buffer!", status);
+        FxModulePanicVulkan("Failed to create command buffer!", status);
     }
 }
 
-void RxCommandBuffer::Destroy()
-{
-    vkFreeCommandBuffers(mDevice->Device, mCommandPool->CommandPool, 1, &CommandBuffer);
-}
+void RxCommandBuffer::Destroy() { vkFreeCommandBuffers(mDevice->Device, mCommandPool->CommandPool, 1, &CommandBuffer); }

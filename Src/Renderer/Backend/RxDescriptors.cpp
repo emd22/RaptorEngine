@@ -17,8 +17,10 @@ void RxDescriptorPool::Create(RxGpuDevice* device, uint32 max_sets)
     pool_info.poolSizeCount = PoolSizes.size();
     pool_info.pPoolSizes = PoolSizes.data();
 
-    if (vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool) != VK_SUCCESS) {
-        FxPanic("DescriptorPool", "Failed to create descriptor pool!", 0);
+    VkResult status = vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool);
+
+    if (status != VK_SUCCESS) {
+        FxPanicVulkan("DescriptorPool", "Failed to create descriptor pool!", status);
     }
 }
 
@@ -32,10 +34,10 @@ void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout
     alloc_info.descriptorSetCount = 1;
     alloc_info.pSetLayouts = &layout;
 
-    VkResult result = vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set);
+    VkResult status = vkAllocateDescriptorSets(pool.mDevice->Device, &alloc_info, &Set);
 
-    if (result != VK_SUCCESS) {
-        FxPanic("DescriptorSet", "Failed to allocate descriptor set!", result);
+    if (status != VK_SUCCESS) {
+        FxPanicVulkan("DescriptorSet", "Failed to allocate descriptor set!", status);
     }
 }
 
