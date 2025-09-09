@@ -24,6 +24,19 @@ enum class RxImageType
     Cubemap,
 };
 
+enum class RxImageAspectFlag
+{
+    Auto,
+    Color = VK_IMAGE_ASPECT_COLOR_BIT,
+    Depth = VK_IMAGE_ASPECT_DEPTH_BIT,
+
+};
+
+struct RxImageCubemapOptions
+{
+    RxImageAspectFlag AspectFlag = RxImageAspectFlag::Auto;
+};
+
 const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type);
 
 class RxImage
@@ -42,7 +55,7 @@ public:
     void CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout final_layout, FxVec2u size,
                         uint32 base_layer = 0);
 
-    void CreateLayeredImageFromCubemap(RxImage& cubemap);
+    void CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_format, RxImageCubemapOptions options = {});
     void Destroy();
 
     ~RxImage() { Destroy(); }

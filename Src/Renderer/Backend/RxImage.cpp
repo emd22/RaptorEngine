@@ -47,6 +47,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
 {
     Size = size;
     Format = format;
+    mViewType = image_type;
     mDevice = Renderer->GetDevice();
 
     if (RxUtil::IsFormatDepth(format)) {
@@ -220,15 +221,28 @@ enum CubemapLayer
 {
     // Forward,
 
-    Left,
     Right,
+    Left,
     Top,
     Bottom,
-    Backwards,
-    Forward,
+    Front,
+    Back,
 };
 
-void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap)
+inline VkImageAspectFlags GetVulkanAspectFlag(RxImageAspectFlag rx_flag, VkFormat image_format)
+{
+    if (rx_flag == RxImageAspectFlag::Auto) {
+        if (RxUtil::IsFormatDepth(image_format)) {
+            rx_flag = RxImageAspectFlag::Depth;
+        }
+
+        rx_flag = RxImageAspectFlag::Color;
+    }
+
+    return static_cast<VkImageAspectFlags>(rx_flag);
+}
+
+void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_format, RxImageCubemapOptions options)
 {
     // Here is the type of cubemap we will be reading here:
     //
@@ -245,16 +259,24 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap)
     //
     // Note that it is 4 tiles wide and 3 tiles tall.
 
+
     const uint32 tile_width = cubemap.Size.X / 4;
     const uint32 tile_height = cubemap.Size.Y / 3;
 
     FxAssert(tile_width == tile_height);
 
+    VkImageAspectFlags image_aspect_flag = GetVulkanAspectFlag(options.AspectFlag, image_format);
+
+
+    Create(RxImageType::Cubemap, FxVec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
+           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, image_aspect_flag);
+
     FxStackArray<VkImageCopy, 6> copy_infos;
 
     VkImageCopy copy_info {
         .dstOffset = { .x = 0, .y = 0 },
-        .srcSubresource = { .baseArrayLayer = 0, .layerCount = 1, .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, },
+        .srcSubresource = { .baseArrayLayer = 0, .layerCount = 1, .aspectMask = image_aspect_flag, },
+        .dstSubresource = { .baseArrayLayer = 0, .layerCount = 1, .aspectMask = image_aspect_flag, },
 
         .extent = { .width = tile_width, .height = tile_height, .depth = 1 },
     };
@@ -262,11 +284,7 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap)
     // Top
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = 0 };
-        copy_info.dstSubresource = {
-            .baseArrayLayer = CubemapLayer::Top,
-            .layerCount = 1,
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        };
+        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Top;
 
         copy_infos.Insert(copy_info);
     }
@@ -275,24 +293,18 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap)
     // Left
     {
         copy_info.srcOffset = { .x = 0, .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource = {
-            .baseArrayLayer = CubemapLayer::Left,
-            .layerCount = 1,
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        };
+        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Left;
+
 
         copy_infos.Insert(copy_info);
     }
 
-    // Backward
+    // Front
 
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource = {
-            .baseArrayLayer = CubemapLayer::Forward,
-            .layerCount = 1,
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        };
+        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Front;
+
 
         copy_infos.Insert(copy_info);
     }
@@ -300,23 +312,15 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap)
     // Forward
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width) * 2, .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource = {
-            .baseArrayLayer = CubemapLayer::Right,
-            .layerCount = 1,
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        };
+        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Right;
 
         copy_infos.Insert(copy_info);
     }
 
-    // Right
+    // Back
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width) * 3, .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource = {
-            .baseArrayLayer = CubemapLayer::Backwards,
-            .layerCount = 1,
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        };
+        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Back;
 
         copy_infos.Insert(copy_info);
     }
@@ -324,11 +328,7 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap)
     // Bottom
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = static_cast<int32>(tile_height) * 2 };
-        copy_info.dstSubresource = {
-            .baseArrayLayer = CubemapLayer::Bottom,
-            .layerCount = 1,
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        };
+        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Bottom;
 
         copy_infos.Insert(copy_info);
     }

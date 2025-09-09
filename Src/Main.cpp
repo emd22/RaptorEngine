@@ -206,83 +206,14 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    // FxRef<FxAssetModel> helmet_model = FxAssetManager::NewAsset<FxAssetModel>();
-    //    FxRef<FxAssetModel> helmet_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/FireplaceRoom.glb");
-    //    helmet_model->WaitUntilLoaded();
+    // FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
+    // fireplace_object->WaitUntilLoaded();
 
-    // FxRef<FxAssetModel> ground_model = FxAssetManager::LoadAsset<FxAssetModel>("../models/Ground.glb");
-    // ground_model->WaitUntilLoaded();
-
-    FxRef<FxAssetImage> cheese_image = FxAssetManager::LoadImage("../textures/cheese.jpg");
-    cheese_image->WaitUntilLoaded();
-
-    FxRef<FxMaterial> cheese_material = FxMaterialManager::New("Cheese", &deferred_renderer->GPassPipeline);
-    cheese_material->Attach(FxMaterial::Diffuse, cheese_image);
-
-
-    // FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../models/Ground.glb");
-    // ground_object->WaitUntilLoaded();
-
-    // ground_object->Material = cheese_material;
-
-
-    // FxOldSceneObject helmet_object;
-    FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
-    fireplace_object->WaitUntilLoaded();
-
-    //    for (FxRef<FxObject>& obj : fireplace_object->AttachedNodes) {
-    //        // TEMP: If there are missing materials, cheese it up
-    //        if (!obj->Material) {
-    //            obj->Material = cheese_material;
-    //        }
-    //    }
-
-    // FxRef<FxObject> mallard_object = FxAssetManager::LoadObject("../models/Mallard.glb");
-
-    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image,
-                                                                   "../Textures/DirectionCubemap.jpg");
+    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
 
     RxImage cubemap_image;
-    cubemap_image.Create(RxImageType::Cubemap, FxVec2u(129, 129), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-                         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
-    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image);
-
-    FxRef<FxObject> cube_object = FxAssetManager::LoadObject("../models/Cube.glb", { .KeepInMemory = true });
-    cube_object->WaitUntilLoaded();
-
-    FxLogInfo("Cube object has {} indices", cube_object->Mesh->GetIndexBuffer().Size);
-
-
-    // FxRef<FxMaterial> skybox_material = FxMaterialManager::New("Skybox", &deferred_renderer->GPassPipeline);
-
-    // skybox_material->Attach(FxMaterial::Diffuse, skybox_texture);
-
-    // cube_object->Material = skybox_material;
-
-    // ground_object->MoveBy(FxVec3f(0, -1, 0));
-
-
-    //    if (helmet_model->Materials.size() > 0) {
-    //        FxRef<FxMaterial>& helmet_material = helmet_model->Materials.at(0);
-    //        helmet_material->Pipeline = &deferred_renderer->GPassPipeline;
-    //
-    //        helmet_object.Attach(helmet_material);
-    //    }
-    //    else {
-    //        helmet_object.Attach(cheese_material);
-    //    }
-
-    // helmet_object.MoveBy(FxVec3f(0, 0, 0));
-    // helmet_object.RotateX(M_PI / 2);
-    // helmet_object.Scale(FxVec3f(3, 3, 3));
-    //
-
-
-    //
-    fireplace_object->RotateX(M_PI / 2);
-    fireplace_object->Scale(FxVec3f(3));
-
+    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
 
     auto generated_cube = FxMeshGen::MakeCube();
 
@@ -397,7 +328,7 @@ int main()
         // helmet_object.Render(camera);
         //        light.RenderDebugMesh(camera);
 
-        fireplace_object->Render(camera);
+        // fireplace_object->Render(camera);
         // cube_object->Render(camera);
 
         // ground_object->Render(camera);

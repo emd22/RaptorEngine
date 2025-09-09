@@ -163,53 +163,29 @@ FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube()
 {
     FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
 
-
     mesh->Positions = {
-        // Front face
-        FxVec3f(-0.5f, -0.5f, 0.5f),
-        FxVec3f(0.5f, -0.5f, 0.5f),
-        FxVec3f(0.5f, 0.5f, 0.5f),
-        FxVec3f(-0.5f, 0.5f, 0.5f),
-
-        // Back face
-        FxVec3f(-0.5f, -0.5f, -0.5f),
-        FxVec3f(0.5f, -0.5f, -0.5f),
-        FxVec3f(0.5f, 0.5f, -0.5f),
-        FxVec3f(-0.5f, 0.5f, -0.5f),
-
-        // Left face
-        FxVec3f(-0.5f, -0.5f, -0.5f),
-        FxVec3f(-0.5f, -0.5f, 0.5f),
-        FxVec3f(-0.5f, 0.5f, 0.5f),
-        FxVec3f(-0.5f, 0.5f, -0.5f),
-
-        // Right face
-        FxVec3f(0.5f, -0.5f, -0.5f),
-        FxVec3f(0.5f, -0.5f, 0.5f),
-        FxVec3f(0.5f, 0.5f, 0.5f),
-        FxVec3f(0.5f, 0.5f, -0.5f),
-
-        // Top face
-        FxVec3f(-0.5f, 0.5f, -0.5f),
-        FxVec3f(-0.5f, 0.5f, 0.5f),
-        FxVec3f(0.5f, 0.5f, 0.5f),
-        FxVec3f(0.5f, 0.5f, -0.5f),
-
-        // Bottom face
-        FxVec3f(-0.5f, -0.5f, -0.5f),
-        FxVec3f(-0.5f, -0.5f, 0.5f),
-        FxVec3f(0.5f, -0.5f, 0.5f),
-        FxVec3f(0.5f, -0.5f, -0.5f),
+        FxVec3f(-5, -5, -5), // 0
+        FxVec3f(5, -5, -5),  // 1
+        FxVec3f(5, 5, -5),   // 2
+        FxVec3f(-5, 5, -5),  // 3
+        FxVec3f(-5, -5, 5),  // 4
+        FxVec3f(5, -5, 5),   // 5
+        FxVec3f(5, 5, 5),    // 6
+        FxVec3f(-5, 5, 5)    // 7
     };
 
-    // Index array 36 indices (2 triangles per face)
-    mesh->Indices = {
-        0,  1,  2,  2,  3,  0,  // v0-v1-v2, v2-v3-v0
-        4,  5,  6,  6,  7,  4,  // v0-v3-v7, v7-v4-v0
-        8,  9,  10, 10, 11, 8,  // v0-v4-v5, v5-v1-v0
-        12, 13, 14, 14, 15, 12, // v1-v5-v6, v6-v2-v1
-        16, 17, 18, 18, 19, 16, // v6-v7-v3, v3-v2-v6
-        20, 21, 22, 22, 23, 20  // v5-v4-v7, v7-v6-v5
+    mesh->Indices = { // Front (z = +5)
+                      4, 5, 6, 4, 6, 7,
+                      // Back (z = -5)
+                      1, 0, 3, 1, 3, 2,
+                      // Left (x = -5)
+                      0, 4, 7, 0, 7, 3,
+                      // Right (x = +5)
+                      5, 1, 2, 5, 2, 6,
+                      // Top (y = +5)
+                      3, 7, 6, 3, 6, 2,
+                      // Bottom (y = -5)
+                      0, 1, 5, 0, 5, 4
     };
 
     return mesh;

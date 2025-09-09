@@ -36,5 +36,18 @@ struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
     float32 UV[2];
 } __attribute__((packed));
 
+template <>
+struct std::formatter<RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    template <typename FmtContext>
+    constexpr auto format(const RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>& obj, FmtContext& ctx) const
+    {
+        return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
+                              static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));
+    }
+};
+
 // End packing structs
 #pragma pack(pop)

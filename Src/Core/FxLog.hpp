@@ -30,7 +30,7 @@ std::ofstream& FxLogGetFile(bool* can_write);
 void FxLogCreateFile(const std::string& path);
 
 template <FxLogChannel TLogChannel, bool TAllowColors = true>
-constexpr std::string FxLogChannelText()
+constexpr std::string FxLogGetChannelText()
 {
     if constexpr (TLogChannel == FxLogChannel::None) {
         return "";
@@ -82,6 +82,13 @@ constexpr std::string FxLogChannelText()
 }
 
 
+template <typename... TTypes>
+void FxLogDirectToStdout(std::string_view fmt, TTypes&&... args)
+{
+    auto msg = std::vformat(fmt, std::make_format_args(args...));
+    std::cout << msg;
+}
+
 template <FxLogChannel TChannel, typename... TTypes>
 void FxLogToStdout(std::string_view fmt, TTypes&&... args)
 {
@@ -100,10 +107,28 @@ void FxLogToStdout(std::string_view fmt, TTypes&&... args)
         return;
     }
 
-    auto channel = FxLogChannelText<TChannel>();
+    auto channel = FxLogGetChannelText<TChannel>();
 
     std::cout << channel << msg << '\n';
 }
+
+
+template <typename... TTypes>
+void FxLogDirectToFile(std::string_view fmt, TTypes&&... args)
+{
+    bool can_write = false;
+    std::ofstream& stream = FxLogGetFile(&can_write);
+
+    if (!can_write) {
+        return;
+    }
+
+    auto msg = std::vformat(fmt, std::make_format_args(args...));
+
+    // If the channel is set to `None`, do not print the channel name
+    stream << msg << '\n';
+}
+
 
 template <FxLogChannel TChannel, typename... TTypes>
 void FxLogToFile(std::string_view fmt, TTypes&&... args)
@@ -130,7 +155,7 @@ void FxLogToFile(std::string_view fmt, TTypes&&... args)
         return;
     }
 
-    auto channel = FxLogChannelText<TChannel, false>();
+    auto channel = FxLogGetChannelText<TChannel, false>();
 
     stream << channel << msg << '\n';
 }
@@ -157,18 +182,20 @@ void FxLog(std::string_view fmt, TTypes&&... args)
 #endif
 }
 
+/**
+ * @brief Logs a message to a channel from `FxLogChannel`.
+ */
 template <typename... TTypes>
-void FxLogRaw(std::string_view fmt, TTypes... args)
+void FxLogDirect(std::string_view fmt, TTypes&&... args)
 {
 #ifdef FX_LOG_OUTPUT_TO_STDOUT
-    FxLogToStdout<FxLogChannel::None>(fmt, std::forward<TTypes>(args)...);
+    FxLogDirectToStdout(fmt, std::forward<TTypes>(args)...);
 #endif
 
 #ifdef FX_LOG_OUTPUT_TO_FILE
-    FxLogToFile<FxLogChannel::None>(fmt, std::forward<TTypes>(args)...);
+    FxLogDirectToFile(fmt, std::forward<TTypes>(args)...);
 #endif
 }
-
 
 template <typename... TTypes>
 void FxLogInfo(std::string_view fmt, TTypes&&... args)
@@ -198,4 +225,16 @@ template <typename... TTypes>
 void FxLogFatal(std::string_view fmt, TTypes&&... args)
 {
     FxLog<FxLogChannel::Fatal>(fmt, std::forward<TTypes>(args)...);
+}
+
+
+template <FxLogChannel TChannel>
+constexpr void FxLogChannelText()
+{
+#ifdef FX_LOG_OUTPUT_TO_STDOUT
+    FxLogDirectToStdout("{}", FxLogGetChannelText<TChannel>());
+#endif
+#ifdef FX_LOG_OUTPUT_TO_FILE
+    FxLogDirectToFile("{}", FxLogGetChannelText<TChannel, false>());
+#endif
 }

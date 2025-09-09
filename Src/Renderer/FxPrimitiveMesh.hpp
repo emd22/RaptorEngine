@@ -147,7 +147,7 @@ public:
         return mVertexBuffer;
     }
 
-    FxSizedArray<TVertexType>& GetIndices()
+    FxSizedArray<uint32>& GetIndices()
     {
         if (!KeepInMemory) {
             FxLogWarning("Requesting indices from a primitive mesh while `KeepInMemory` != true!");
