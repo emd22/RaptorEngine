@@ -39,17 +39,18 @@ public:
 
     void AddChild(FxRef<FxEntity>& entity) { Children.push_back(entity); }
 
-    void MoveTo(const FxVec3f& position)
+    virtual void MoveTo(const FxVec3f& position)
     {
         mPosition = position;
-        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition);
+        UpdateTranslation();
     }
 
-    void MoveBy(const FxVec3f& offset)
+    virtual void MoveBy(const FxVec3f& offset)
     {
         mPosition += offset;
-        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition);
+        UpdateTranslation();
     }
+
 
     void Scale(const FxVec3f& scale)
     {
@@ -92,13 +93,19 @@ public:
 
     const FxVec3f& GetPosition() const { return mPosition; }
 
-    FxMat4f mModelMatrix = FxMat4f::Identity;
+    virtual ~FxEntity() {}
+
+
+protected:
+    inline void UpdateTranslation() { mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition); }
+
 
 public:
+    FxMat4f mModelMatrix = FxMat4f::Identity;
+
     FxVec3f mPosition = FxVec3f::Zero;
     FxVec3f mRotation = FxVec3f::Zero;
     FxVec3f mScale = FxVec3f::One;
-
 
     FxRef<FxScript> mScript { nullptr };
 

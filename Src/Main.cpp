@@ -63,20 +63,6 @@ void CheckGeneralControls()
 
 static FxPerspectiveCamera* current_camera = nullptr;
 
-class TestScript : public FxScript
-{
-public:
-    TestScript() {}
-
-    void RenderTick() override
-    {
-        Entity->mModelMatrix.LookAt(Entity->GetPosition(), current_camera->Position, FxVec3f::Up);
-    }
-
-    ~TestScript() override {}
-};
-
-
 #include <chrono>
 #include <iostream>
 
@@ -217,6 +203,8 @@ int main()
 
     auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 
+    auto generated_quad = FxMeshGen::MakeQuad({ .Scale = 1 });
+
     for (int i = 0; i < RendererFramesInFlight; i++) {
         RxImage& skybox_output_image = Renderer->Swapchain.OutputImages[i];
         Renderer->DeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
@@ -245,16 +233,16 @@ int main()
     FxLight light;
     light.SetLightVolume(generated_sphere, true);
 
-    FxLight light2;
-    light2.SetLightVolume(generated_sphere, false);
-
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light.Scale(FxVec3f(25));
 
     light.Color = FxVec3f(0.6, 0.7, 0.6);
 
+    FxDirectionalLight light2;
+    light2.SetLightVolume(generated_quad, false);
+
     light2.MoveBy(FxVec3f(1, 0, -0.5));
-    light2.Scale(FxVec3f(25));
+    // light2.Scale(FxVec3f(25));
 
     bool second_light_on = false;
 
@@ -325,15 +313,13 @@ int main()
         //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
-        light.Color.Y = 0.7;
-
         fireplace_object->Render(camera);
 
 
         Renderer->BeginLighting();
 
         if (second_light_on) {
-            light2.MoveTo(camera.Position);
+            light2.mModelMatrix = camera.VPMatrix;
 
             light2.Render(camera);
         }

@@ -160,7 +160,7 @@ FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeIcoSphere(int resolution)
 }
 
 
-FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenCubeOptions options)
+FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenOptions options)
 {
     FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
 
@@ -189,6 +189,42 @@ FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenCubeOptions options
                       3, 7, 6, 3, 6, 2,
                       // Bottom (y = -5)
                       0, 1, 5, 0, 5, 4
+    };
+
+    return mesh;
+}
+
+FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeQuad(FxMeshGenOptions options)
+{
+    FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
+
+    const float s = options.Scale;
+
+    /*
+        0-------1
+        |     / |
+        |   /   |
+        | /     |
+        3-------2
+    */
+
+    mesh->Positions = {
+        // Top Left
+        FxVec3f(-s, -s, 0.0f), // 0
+        // Top Right
+        FxVec3f(s, -s, 0.0f), // 1
+
+        // Bottom Right
+        FxVec3f(s, s, 0.0f), // 2
+
+        // Bottom Left
+        FxVec3f(-s, s, 0.0f), // 3
+    };
+
+    mesh->Indices = { // Top left triangle
+                      1, 0, 3,
+                      // Bottom right triangle
+                      1, 3, 2
     };
 
     return mesh;

@@ -79,6 +79,10 @@ void main()
     float att_expr = 0.02;
     float fatt = att_const + att_lin * fdist + att_expr * fdist * fdist;
 
+    if (a_PC.LightRadius == 0) {
+        fatt = 1.0f;
+    }
+
     float ambient = 0.05;
 
     vec3 result = vec3(pl_color) / fatt;

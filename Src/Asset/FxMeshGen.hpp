@@ -3,7 +3,7 @@
 #include <Core/FxRef.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
-struct FxMeshGenCubeOptions
+struct FxMeshGenOptions
 {
     float Scale = 1;
 };
@@ -27,7 +27,8 @@ public:
 public:
     static FxRef<GeneratedMesh> MakeIcoSphere(int resolution);
     // static FxRef<GeneratedMesh> MakeQuad();
-    static FxRef<GeneratedMesh> MakeCube(FxMeshGenCubeOptions options = {});
+    static FxRef<GeneratedMesh> MakeCube(FxMeshGenOptions options = {});
+    static FxRef<GeneratedMesh> MakeQuad(FxMeshGenOptions options = {});
 
 private:
 };
