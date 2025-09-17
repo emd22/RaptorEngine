@@ -1,14 +1,11 @@
 #pragma once
 
+#include "FxMemory.hpp"
+#include "FxPanic.hpp"
+#include "FxTypes.hpp"
+
 #include <atomic>
 #include <cstddef>
-
-
-#include "FxPanic.hpp"
-
-#include "Types.hpp"
-
-#include "FxMemory.hpp"
 
 
 /** The internal reference count for `FxRef`. */
@@ -16,16 +13,12 @@ struct FxRefCount
 {
     using IntType = uint32;
     using RefCountType = std::atomic<IntType>;
-    
+
     /** Increments the reference count */
-    void Inc() {
-        ++Count;
-    }
+    void Inc() { ++Count; }
 
     /** Decrements the reference count */
-    IntType Dec() {
-        return (--Count);
-    }
+    IntType Dec() { return (--Count); }
 
 public:
     RefCountType Count = 1;
@@ -35,10 +28,7 @@ template <typename T>
 class FxRef
 {
 public:
-    FxRef(nullptr_t np)
-        : mRefCnt(nullptr), mPtr(nullptr)
-    {
-    }
+    FxRef(nullptr_t np) : mRefCnt(nullptr), mPtr(nullptr) {}
 
     /**
      * Constructs a new FxRef from a pointer.
@@ -57,7 +47,8 @@ public:
      *
      * @tparam U The type of the other FxRef
      */
-    template <typename DerivedType> requires std::is_base_of_v<T, DerivedType>
+    template <typename DerivedType>
+        requires std::is_base_of_v<T, DerivedType>
     FxRef(const FxRef<DerivedType>& other)
     {
         FxSpinThreadGuard other_guard(&other.IsBusy);
@@ -70,11 +61,12 @@ public:
             mRefCnt->Inc();
         }
     }
-    
+
     /**
      * @brief Converts from a base type FxRef to a derived type FxRef.
      */
-    template <typename BaseType> requires std::is_base_of_v<BaseType, T>
+    template <typename BaseType>
+        requires std::is_base_of_v<BaseType, T>
     FxRef(const FxRef<BaseType>& other)
     {
         FxSpinThreadGuard other_guard(&other.IsBusy);
@@ -131,7 +123,7 @@ public:
      *
      * @param args The arguments to be forwarded to the constructor of T.
      */
-    template<typename... Args>
+    template <typename... Args>
     static FxRef<T> New(Args... args)
     {
         T* ptr = FxMemPool::Alloc<T>(sizeof(T), std::forward<Args>(args)...);
@@ -154,7 +146,7 @@ public:
     // Operator overloads
     ///////////////////////////////
 
-    FxRef& operator = (const FxRef& other)
+    FxRef& operator=(const FxRef& other)
     {
         FxSpinThreadGuard guard(&IsBusy);
         FxSpinThreadGuard other_guard(&other.IsBusy);
@@ -175,7 +167,7 @@ public:
         return *this;
     }
 
-    T* operator -> () const noexcept
+    T* operator->() const noexcept
     {
         FxSpinThreadGuard guard(&IsBusy);
 
@@ -184,7 +176,7 @@ public:
         return mPtr;
     }
 
-    T& operator * () const noexcept
+    T& operator*() const noexcept
     {
         FxSpinThreadGuard guard(&IsBusy);
 
@@ -193,14 +185,14 @@ public:
         return *mPtr;
     }
 
-    bool operator == (nullptr_t np) const noexcept
+    bool operator==(nullptr_t np) const noexcept
     {
         FxSpinThreadGuard guard(&IsBusy);
 
         return mPtr == nullptr;
     }
 
-    operator bool () const noexcept
+    operator bool() const noexcept
     {
         FxSpinThreadGuard guard(&IsBusy);
 
@@ -214,7 +206,7 @@ private:
     void DecRef()
     {
         // Note that since these are only called by other protected ref functions, these do not need a spinlock guard.
-        
+
         // Reference count does not exist, we can assume that the object is corrupt or no longer exists.
         if (!mRefCnt) {
             return;
@@ -242,7 +234,7 @@ private:
     void IncRef()
     {
         // Note that since these are only called by other protected ref functions, these do not need a spinlock guard.
-        
+
         if (!mRefCnt) {
             return;
         }

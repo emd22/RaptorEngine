@@ -5,7 +5,7 @@
 #include <ThirdParty/stb_image.h>
 
 #include <Core/FxSizedArray.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <string>
 
 class FxLoaderStb : public FxLoaderImageBase

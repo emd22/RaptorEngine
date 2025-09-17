@@ -1,7 +1,7 @@
 #include "FxLight.hpp"
 
 #include "FxCamera.hpp"
-#include "Renderer.hpp"
+#include "FxEngine.hpp"
 
 using VertexType = FxLight::VertexType;
 
@@ -71,8 +71,8 @@ void FxLight::MoveLightVolumeTo(const FxVec3f& position) { this->FxEntity::MoveT
 
 void FxLight::Render(const FxCamera& camera) const
 {
-    RxFrameData* frame = Renderer->GetFrame();
-    FxRef<RxDeferredRenderer>& deferred = Renderer->DeferredRenderer;
+    RxFrameData* frame = gRenderer->GetFrame();
+    FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
     FxMat4f MVP = mModelMatrix * camera.VPMatrix;
     MVP.FlipY();
@@ -125,8 +125,8 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
         return;
     }
 
-    RxFrameData* frame = Renderer->GetFrame();
-    FxRef<RxDeferredRenderer>& deferred = Renderer->DeferredRenderer;
+    RxFrameData* frame = gRenderer->GetFrame();
+    FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
     FxMat4f MVP = mModelMatrix * camera.VPMatrix;
     MVP.FlipY();

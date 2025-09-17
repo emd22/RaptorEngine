@@ -2,7 +2,7 @@
 
 #include "Backend/RxShader.hpp"
 #include "Backend/ShaderList.hpp"
-#include "Renderer.hpp"
+#include "FxEngine.hpp"
 
 #include <Renderer/RxDeferred.hpp>
 
@@ -30,7 +30,7 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
         // Pass in the current frame index to map to the swapchain's output images
         CompPasses[frame_index].Create(this, frame_index, extent);
 
-        temp_views[0] = Renderer->Swapchain.OutputImages[frame_index].View;
+        temp_views[0] = gRenderer->Swapchain.OutputImages[frame_index].View;
         OutputFramebuffers[frame_index].Create(temp_views, CompPipeline, RpComposition, extent);
     }
 }
@@ -66,11 +66,11 @@ void RxDeferredRenderer::Destroy()
 // FxRenderer GPass Functions
 /////////////////////////////////////
 
-RxDeferredGPass* RxDeferredRenderer::GetCurrentGPass() { return &GPasses[Renderer->GetFrameNumber()]; }
+RxDeferredGPass* RxDeferredRenderer::GetCurrentGPass() { return &GPasses[gRenderer->GetFrameNumber()]; }
 
 VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 {
-    RxGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = gRenderer->GetDevice();
 
     // Material properties buffer DS
 
@@ -233,7 +233,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
 void RxDeferredRenderer::DestroyGPassPipeline()
 {
-    VkDevice device = Renderer->GetDevice()->Device;
+    VkDevice device = gRenderer->GetDevice()->Device;
 
     // Destroy descriptor set layouts
     if (DsLayoutGPassVertex) {
@@ -254,12 +254,12 @@ void RxDeferredRenderer::DestroyGPassPipeline()
 
 RxDeferredLightingPass* RxDeferredRenderer::GetCurrentLightingPass()
 {
-    return &LightingPasses[Renderer->GetFrameNumber()];
+    return &LightingPasses[gRenderer->GetFrameNumber()];
 }
 
 void RxDeferredRenderer::CreateLightingDSLayout()
 {
-    RxGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = gRenderer->GetDevice();
 
     // Fragment DS
 
@@ -384,7 +384,7 @@ void RxDeferredRenderer::RebuildLightingPipeline()
 
 void RxDeferredRenderer::DestroyLightingPipeline()
 {
-    VkDevice device = Renderer->GetDevice()->Device;
+    VkDevice device = gRenderer->GetDevice()->Device;
 
     // Destroy descriptor set layouts
     if (DsLayoutLightingFrag) {
@@ -405,11 +405,11 @@ void RxDeferredRenderer::DestroyLightingPipeline()
 // RxDeferredRenderer CompPass Functions
 //////////////////////////////////////////
 
-RxDeferredCompPass* RxDeferredRenderer::GetCurrentCompPass() { return &CompPasses[Renderer->GetFrameNumber()]; }
+RxDeferredCompPass* RxDeferredRenderer::GetCurrentCompPass() { return &CompPasses[gRenderer->GetFrameNumber()]; }
 
 VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 {
-    RxGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = gRenderer->GetDevice();
 
     {
         VkDescriptorSetLayoutBinding positions_layout_binding {
@@ -516,7 +516,7 @@ void RxDeferredRenderer::CreateCompPipeline()
 
 void RxDeferredRenderer::DestroyCompPipeline()
 {
-    VkDevice device = Renderer->GetDevice()->Device;
+    VkDevice device = gRenderer->GetDevice()->Device;
 
     // Destroy descriptor set layouts
     if (DsLayoutCompFrag) {
@@ -554,7 +554,7 @@ void RxDeferredGPass::BuildDescriptorSets()
     //
     //    const VkWriteDescriptorSet writes[] = { ubo_write };
     //
-    //    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, sizeof(writes) /
+    //    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, sizeof(writes) /
     //    sizeof(writes[0]), writes, 0, nullptr);
 }
 
@@ -569,7 +569,7 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     //    RendererFramesInFlight);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RendererFramesInFlight);
-    DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+    DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
     DepthAttachment.Create(RxImageType::Image, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -594,7 +594,7 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
 
 void RxDeferredGPass::Begin()
 {
-    RxFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = gRenderer->GetFrame();
 
     VkClearValue clear_values[] = {
         // Albedo
@@ -615,7 +615,7 @@ void RxDeferredGPass::End() { mRenderPass->End(); }
 
 void RxDeferredGPass::Submit()
 {
-    RxFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = gRenderer->GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
@@ -633,7 +633,7 @@ void RxDeferredGPass::Submit()
         .pSignalSemaphores = &frame->OffscreenSem.Semaphore,
     };
 
-    VkTry(vkQueueSubmit(Renderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+    VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
           "Error submitting draw buffer");
 }
 
@@ -677,7 +677,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     // Normals sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+    DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
     ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -691,7 +691,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
 
 void RxDeferredLightingPass::Begin()
 {
-    RxFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = gRenderer->GetFrame();
 
     VkClearValue clear_values[] = {
         // Output color
@@ -709,7 +709,7 @@ void RxDeferredLightingPass::End() { mRenderPass->End(); }
 
 void RxDeferredLightingPass::Submit()
 {
-    RxFrameData* frame = Renderer->GetFrame();
+    RxFrameData* frame = gRenderer->GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -729,7 +729,7 @@ void RxDeferredLightingPass::Submit()
         .pSignalSemaphores = &frame->LightingSem.Semaphore,
     };
 
-    VkTry(vkQueueSubmit(Renderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+    VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
           "Error submitting draw buffer");
 }
 
@@ -747,7 +747,7 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 
         VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                      .imageView = gpass.DepthAttachment.View,
-                                                     .sampler = Renderer->Swapchain.DepthSampler.Sampler };
+                                                     .sampler = gRenderer->Swapchain.DepthSampler.Sampler };
 
         VkWriteDescriptorSet positions_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -769,7 +769,7 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 
         VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                  .imageView = gpass.ColorAttachment.View,
-                                                 .sampler = Renderer->Swapchain.ColorSampler.Sampler };
+                                                 .sampler = gRenderer->Swapchain.ColorSampler.Sampler };
 
         VkWriteDescriptorSet color_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -792,7 +792,7 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         VkDescriptorImageInfo normals_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = gpass.NormalsAttachment.View,
-            .sampler = Renderer->Swapchain.NormalsSampler.Sampler,
+            .sampler = gRenderer->Swapchain.NormalsSampler.Sampler,
         };
 
         VkWriteDescriptorSet normals_write {
@@ -809,7 +809,7 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         write_infos.Insert(normals_write);
     }
 
-    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
 }
 
 void RxDeferredLightingPass::Destroy()
@@ -831,7 +831,7 @@ void RxDeferredLightingPass::Destroy()
 
 void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
 {
-    FxAssert(Renderer->Swapchain.Initialized == true);
+    FxAssert(gRenderer->Swapchain.Initialized == true);
 
     mRendererInst = renderer;
     mCompPipeline = &mRendererInst->CompPipeline;
@@ -845,10 +845,10 @@ void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     // Lights sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    DescriptorPool.Create(Renderer->GetDevice(), RendererFramesInFlight);
+    DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
     // The output image renders to the swapchains output
-    OutputImage = &Renderer->Swapchain.OutputImages[frame_index];
+    OutputImage = &gRenderer->Swapchain.OutputImages[frame_index];
 
     FxSizedArray<VkImageView> image_views = { OutputImage->View };
 
@@ -871,7 +871,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                      .imageView = gpass.DepthAttachment.View,
-                                                     .sampler = Renderer->Swapchain.DepthSampler.Sampler };
+                                                     .sampler = gRenderer->Swapchain.DepthSampler.Sampler };
 
         VkWriteDescriptorSet positions_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -893,7 +893,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                  .imageView = gpass.ColorAttachment.View,
-                                                 .sampler = Renderer->Swapchain.ColorSampler.Sampler };
+                                                 .sampler = gRenderer->Swapchain.ColorSampler.Sampler };
 
         VkWriteDescriptorSet color_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -915,7 +915,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         VkDescriptorImageInfo normals_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                    .imageView = gpass.NormalsAttachment.View,
-                                                   .sampler = Renderer->Swapchain.NormalsSampler.Sampler };
+                                                   .sampler = gRenderer->Swapchain.NormalsSampler.Sampler };
 
         VkWriteDescriptorSet normals_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -939,7 +939,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         VkDescriptorImageInfo lights_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                   .imageView = light_pass.ColorAttachment.View,
-                                                  .sampler = Renderer->Swapchain.LightsSampler.Sampler };
+                                                  .sampler = gRenderer->Swapchain.LightsSampler.Sampler };
 
         VkWriteDescriptorSet lights_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -955,12 +955,12 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
         write_infos.Insert(lights_write);
     }
 
-    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
 }
 
 void RxDeferredCompPass::Begin()
 {
-    mCurrentFrame = Renderer->GetFrame();
+    mCurrentFrame = gRenderer->GetFrame();
     mCurrentFrame->CompCommandBuffer.Reset();
     mCurrentFrame->CompCommandBuffer.Record();
 }
@@ -985,7 +985,7 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 
     RxCommandBuffer& cmd = mCurrentFrame->CompCommandBuffer;
 
-    VkFramebuffer framebuffer = mRendererInst->OutputFramebuffers[Renderer->GetImageIndex()].Framebuffer;
+    VkFramebuffer framebuffer = mRendererInst->OutputFramebuffers[gRenderer->GetImageIndex()].Framebuffer;
     mRenderPass->Begin(&mCurrentFrame->CompCommandBuffer, framebuffer, slice);
 
     // mRendererInst->SkyboxRenderer.SkyboxAttachment = OutputImage;

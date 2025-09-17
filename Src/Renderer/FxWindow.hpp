@@ -4,7 +4,7 @@
 
 #include <Core/FxPanic.hpp>
 #include <Core/FxRef.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <memory>
 
 class FxWindow

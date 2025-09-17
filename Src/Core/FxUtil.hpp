@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #include <Core/FxDefines.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <type_traits>
 
 #if defined(FX_COMPILER_CLANG) || defined(FX_COMPILER_GCC)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 
 enum FxVertexFlags : int8
 {

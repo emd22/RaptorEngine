@@ -1,5 +1,8 @@
 #pragma once
 
+#include <ThirdParty/Jolt/Jolt.h>
+#include <ThirdParty/Jolt/Physics/Body/BodyID.h>
+
 #include <Core/MemPool/FxMPPagedArray.hpp>
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
@@ -54,6 +57,8 @@ public:
     FxRef<FxMaterial> Material { nullptr };
 
     FxMPPagedArray<FxRef<FxObject>> AttachedNodes;
+
+    JPH::BodyID JoltBodyID {};
 
 private:
     bool mReadyToRender = false;

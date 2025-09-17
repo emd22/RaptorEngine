@@ -4,8 +4,8 @@
 
 #include <Core/FxPanic.hpp>
 #include <Core/FxSizedArray.hpp>
+#include <Core/FxTypes.hpp>
 #include <Core/Log.hpp>
-#include <Core/Types.hpp>
 
 enum class RxShaderType
 {

@@ -1,14 +1,10 @@
 #pragma once
 
-#include <string>
-
-
-#include <Core/FxMemory.hpp>
-#include <Core/Types.hpp>
 #include <Core/FxHash.hpp>
-
+#include <Core/FxMemory.hpp>
+#include <Core/FxTypes.hpp>
 #include <Util/FxTokenizer.hpp>
-
+#include <string>
 #include <vector>
 
 struct FxConfigEntry
@@ -75,7 +71,8 @@ struct FxConfigEntry
         return ValueStr;
     }
 
-    enum class ValueType {
+    enum class ValueType
+    {
         None,
         Int,
         Float,
@@ -99,10 +96,7 @@ public:
     FxConfigFile() = default;
 
     void Load(const std::string& path);
-    std::vector<FxConfigEntry>& GetEntries()
-    {
-        return mConfigEntries;
-    }
+    std::vector<FxConfigEntry>& GetEntries() { return mConfigEntries; }
 
     const FxConfigEntry* GetEntry(uint32 requested_name_hash) const
     {
@@ -131,11 +125,9 @@ public:
     }
 
 
-
 private:
     void ParseEntries(FxMPPagedArray<FxTokenizer::Token>& tokens);
 
 private:
-
     std::vector<FxConfigEntry> mConfigEntries;
 };

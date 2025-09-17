@@ -2,8 +2,8 @@
 
 #include <Core/FxHash.hpp>
 #include <Core/FxMemory.hpp>
+#include <Core/FxTypes.hpp>
 #include <Core/FxUtil.hpp>
-#include <Core/Types.hpp>
 #include <cassert>
 #include <cstdlib>
 #include <string>

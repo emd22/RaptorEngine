@@ -5,7 +5,7 @@
 #include <jpeglib.h>
 
 #include <Core/FxSizedArray.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <string>
 
 class FxLoaderJpeg : public FxLoaderImageBase

@@ -4,9 +4,16 @@ cmake_minimum_required(VERSION 3.26)
 
 project(ThirdPartyLib)
 
+set(CMAKE_CXX_STANDARD 20)
+
+
+link_directories(../Lib)
+include_directories(ThirdParty)
+
 # add third party sources to static library
 file (GLOB_RECURSE THIRD_PARTY_SOURCES "ThirdParty/*.cpp" "ThirdParty/*.h" "ThirdParty/*.hpp")
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
+
 target_compile_definitions(
     ThirdPartyLib
     PRIVATE
@@ -28,8 +35,6 @@ list(FILTER SOURCES EXCLUDE REGEX "ThirdParty/.*")
 
 file (GLOB_RECURSE HEADERS "*.hpp")
 list(FILTER HEADERS EXCLUDE REGEX "ThirdParty/.*")
-
-
 
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
@@ -56,7 +61,7 @@ add_link_options(
 )
 
 include_directories(
-    ./
+    ../Src
     ${Vulkan_INCLUDE_DIRS}
     JPEG::JPEG
     # ${SDL3_INCLUDE_DIRS}

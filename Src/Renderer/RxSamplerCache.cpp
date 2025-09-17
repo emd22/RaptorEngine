@@ -1,6 +1,6 @@
 #include "RxSamplerCache.hpp"
 
-#include "Renderer.hpp"
+#include "FxEngine.hpp"
 
 #include <Core/FxUtil.hpp>
 
@@ -59,7 +59,7 @@ void RxSamplerCache::SetupSamplerDescriptor(RxSampler& sampler, uint32 binding)
         .pImageInfo = &sampler_info,
     };
 
-    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, 1, &sampler_write_descriptor_set, 0, nullptr);
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &sampler_write_descriptor_set, 0, nullptr);
 }
 
 
@@ -134,7 +134,7 @@ void RxSamplerCache::CreateSamplerDsLayout()
         .pBindings = &sampler_binding,
     };
 
-    VkResult status = vkCreateDescriptorSetLayout(Renderer->GetDevice()->Device, &sampler_layout_info, nullptr,
+    VkResult status = vkCreateDescriptorSetLayout(gRenderer->GetDevice()->Device, &sampler_layout_info, nullptr,
                                                   &mDsLayoutSampler);
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Failed to create descriptor set layout", status);
@@ -144,7 +144,7 @@ void RxSamplerCache::CreateSamplerDsLayout()
 void RxSamplerCache::Create()
 {
     mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_SAMPLER, 30);
-    mDescriptorPool.Create(Renderer->GetDevice());
+    mDescriptorPool.Create(gRenderer->GetDevice());
 
     CreateSamplerDsLayout();
 

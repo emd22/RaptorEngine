@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>

@@ -4,13 +4,11 @@
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxStackArray.hpp>
+#include <FxEngine.hpp>
 #include <Renderer/Backend/RxCommands.hpp>
 #include <Renderer/Backend/RxDevice.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
-#include <Renderer/Renderer.hpp>
 #include <Renderer/RxDeferred.hpp>
-
-#include "vulkan/vulkan_core.h"
 
 FX_SET_MODULE_NAME("FxMaterial")
 
@@ -33,7 +31,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 3);
-        dp.Create(Renderer->GetDevice(), MaxMaterials);
+        dp.Create(gRenderer->GetDevice(), MaxMaterials);
     }
 
 
@@ -53,8 +51,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 
     if (!mMaterialPropertiesDS.IsInited()) {
-        assert(Renderer->DeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
-        mMaterialPropertiesDS.Create(dp, Renderer->DeferredRenderer->DsLayoutLightingMaterialProperties);
+        assert(gRenderer->DeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
+        mMaterialPropertiesDS.Create(dp, gRenderer->DeferredRenderer->DsLayoutLightingMaterialProperties);
     }
 
 
@@ -81,8 +79,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
             write_descriptor_sets.Insert(buffer_write);
         }
 
-        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data, 0,
-                               nullptr);
+        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data,
+                               0, nullptr);
     }
 
     RxUtil::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Set);
@@ -118,7 +116,7 @@ void FxMaterialManager::Destroy()
     MaterialPropertiesBuffer.Destroy();
 
     // if (mDescriptorPool) {
-    // vkDestroyDescriptorPool(Renderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
+    // vkDestroyDescriptorPool(gRenderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
     // }
     //
     mDescriptorPool.Destroy();
@@ -179,7 +177,7 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
     }
 
     if (!cmd) {
-        cmd = &Renderer->GetFrame()->CommandBuffer;
+        cmd = &gRenderer->GetFrame()->CommandBuffer;
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
@@ -195,7 +193,7 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
                                         FxMakeSlice(sets_to_bind, num_sets), FxMakeSlice(dynamic_offsets, 1));
     // mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
 
-    // mMaterialPropertiesDS.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Renderer->DeferredRenderer->GPassPipeline);
+    // mMaterialPropertiesDS.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gRenderer->DeferredgRenderer->GPassPipeline);
 
     return true;
 }
@@ -204,7 +202,7 @@ void FxMaterial::Destroy()
 {
     if (IsBuilt) {
         // if (mSetLayout) {
-        //     vkDestroyDescriptorSetLayout(Renderer->GetDevice()->Device, mSetLayout, nullptr);
+        //     vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, mSetLayout, nullptr);
         // }
 
         IsBuilt.store(false);
@@ -256,7 +254,7 @@ void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
         mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(),
-                              Renderer->DeferredRenderer->DsLayoutGPassMaterial);
+                              gRenderer->DeferredRenderer->DsLayoutGPassMaterial);
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
@@ -278,8 +276,8 @@ void FxMaterial::Build()
         // Push material textures
         PUSH_IMAGE_IF_SET(DiffuseTexture.Texture, 0);
 
-        vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data, 0,
-                               nullptr);
+        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data,
+                               0, nullptr);
     }
 
     mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++ /* * RendererFramesInFlight */);

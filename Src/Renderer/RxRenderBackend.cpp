@@ -14,8 +14,8 @@
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
+#include <Core/FxTypes.hpp>
 #include <Core/Log.hpp>
-#include <Core/Types.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
 #include <chrono>
 #include <iostream>

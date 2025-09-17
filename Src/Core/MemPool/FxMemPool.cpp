@@ -2,7 +2,7 @@
 
 #include "../FxDefines.hpp"
 #include "../FxPanic.hpp"
-#include "../Types.hpp"
+#include "../FxTypes.hpp"
 
 // #define FX_MEMPOOL_WARN_SLOW_ALLOC 1
 // #define FX_MEMPOOL_NEXT_FIT        1

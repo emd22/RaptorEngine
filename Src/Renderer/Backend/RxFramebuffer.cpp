@@ -1,19 +1,17 @@
 #include "RxFramebuffer.hpp"
 
-#include "../Renderer.hpp"
 #include "RxDevice.hpp"
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
+#include <FxEngine.hpp>
 
 FX_SET_MODULE_NAME("Framebuffer")
 
 void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const RxGraphicsPipeline& pipeline,
                            const RxRenderPass& render_pass, FxVec2u size)
 {
-    AssertRendererExists();
-
     const VkFramebufferCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
         .renderPass = render_pass.RenderPass,
@@ -24,7 +22,7 @@ void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const R
         .layers = 1,
     };
 
-    mDevice = Renderer->GetDevice();
+    mDevice = gRenderer->GetDevice();
 
     const VkResult status = vkCreateFramebuffer(mDevice->Device, &create_info, nullptr, &Framebuffer);
 

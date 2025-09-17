@@ -1,7 +1,7 @@
 #include "RxSkybox.hpp"
 
 #include "Backend/RxShader.hpp"
-#include "Renderer.hpp"
+#include "FxEngine.hpp"
 
 #include <Core/FxPanic.hpp>
 #include <Renderer/FxCamera.hpp>
@@ -13,7 +13,7 @@ void RxSkyboxRenderer::Create(const FxVec2u& extent,
 {
     CreateSkyboxPipeline();
 
-    mDeferredRenderer = Renderer->DeferredRenderer.mPtr;
+    mDeferredRenderer = gRenderer->DeferredRenderer.mPtr;
     mSkyboxMesh = skybox_mesh;
 
     // SkyboxAttachment.Create(RxImageType::Cubemap, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -39,7 +39,7 @@ void RxSkyboxRenderer::Render(const RxCommandBuffer& cmd, const FxCamera& render
                        &push_constants);
 
 
-    DsSkyboxFragments[Renderer->GetFrameNumber()].Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline);
+    DsSkyboxFragments[gRenderer->GetFrameNumber()].Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, SkyboxPipeline);
     SkyboxPipeline.Bind(cmd);
     mSkyboxMesh->Render(cmd, SkyboxPipeline);
 }
@@ -102,16 +102,16 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
     SkyboxPipeline.Create(
         "Skybox", shader_list, FxMakeSlice(attachments, FxSizeofArray(attachments)),
         FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
-        Renderer->DeferredRenderer->RpGeometry,
+        gRenderer->DeferredRenderer->RpGeometry,
         { .CullMode = VK_CULL_MODE_NONE, .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE, .ForceNoDepthTest = true });
 }
 
 VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
 {
-    RxGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = gRenderer->GetDevice();
 
     mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    mDescriptorPool.Create(Renderer->GetDevice());
+    mDescriptorPool.Create(gRenderer->GetDevice());
 
     {
         // Albedo texture
@@ -166,7 +166,7 @@ void RxSkyboxRenderer::BuildDescriptorSets(uint32 frame_index)
         VkDescriptorImageInfo positions_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = SkyAttachment->View,
-            .sampler = Renderer->Swapchain.ColorSampler.Sampler,
+            .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
         };
 
         VkWriteDescriptorSet positions_write {
@@ -183,5 +183,5 @@ void RxSkyboxRenderer::BuildDescriptorSets(uint32 frame_index)
         write_infos.Insert(positions_write);
     }
 
-    vkUpdateDescriptorSets(Renderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../FxDefines.hpp"
-#include "../Types.hpp"
+#include "../FxTypes.hpp"
 #include "FxMPLinkedList.hpp"
 
 #include <type_traits>
@@ -22,11 +22,6 @@
 #include <iostream>
 #include <thread>
 #endif
-
-constexpr uint64 FxUnitByte = 1;
-constexpr uint64 FxUnitKibibyte = 1024;
-constexpr uint64 FxUnitMebibyte = FxUnitKibibyte * 1024;
-constexpr uint64 FxUnitGibibyte = FxUnitMebibyte * 1024;
 
 struct FxMemPoolStatistics
 {

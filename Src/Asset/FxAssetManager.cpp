@@ -8,7 +8,7 @@
 #include "Loader/FxLoaderStb.hpp"
 
 #include <Core/FxDefines.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <FxObject.hpp>
 #include <atomic>
 #include <chrono>

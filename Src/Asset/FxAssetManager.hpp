@@ -7,7 +7,7 @@
 
 #include <Core/FxDataNotifier.hpp>
 #include <Core/FxRef.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <atomic>
 #include <thread>
 

@@ -7,8 +7,8 @@
 #include <memory.h>
 
 #include <Core/FxPanic.hpp>
+#include <Core/FxTypes.hpp>
 #include <Core/FxUtil.hpp>
-#include <Core/Types.hpp>
 #include <cstring>
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1

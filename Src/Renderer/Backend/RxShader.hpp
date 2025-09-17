@@ -1,39 +1,27 @@
 #pragma once
 
+#include "ShaderList.hpp"
+
+#include <Core/FxTypes.hpp>
 #include <ios>
 #include <iostream>
-
-#include <Core/Types.hpp>
-
-#include "ShaderList.hpp"
 
 class RxShader
 {
 public:
-
     RxShader() = default;
 
-    RxShader(const char *path, RxShaderType type)
-        : Type(type)
-    {
-        Load(path, type);
-    }
+    RxShader(const char* path, RxShaderType type) : Type(type) { Load(path, type); }
 
-    void Load(const char *path, RxShaderType type);
+    void Load(const char* path, RxShaderType type);
     void Destroy();
 
-    ~RxShader()
-    {
-        Destroy();
-    }
+    ~RxShader() { Destroy(); }
 
-    operator VkShaderModule()
-    {
-        return ShaderModule;
-    }
+    operator VkShaderModule() { return ShaderModule; }
 
 private:
-    void CreateShaderModule(std::ios::pos_type file_size, uint32 *shader_data);
+    void CreateShaderModule(std::ios::pos_type file_size, uint32* shader_data);
 
 public:
     VkShaderModule ShaderModule = nullptr;

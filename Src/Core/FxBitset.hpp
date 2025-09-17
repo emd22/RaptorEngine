@@ -1,7 +1,7 @@
 #pragma once
 
 #include "FxSizedArray.hpp"
-#include "Types.hpp"
+#include "FxTypes.hpp"
 
 class FxBitset
 {

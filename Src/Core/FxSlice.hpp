@@ -2,7 +2,7 @@
 
 #include "FxSizedArray.hpp"
 #include "FxStackArray.hpp"
-#include "Types.hpp"
+#include "FxTypes.hpp"
 
 template <typename T>
 struct FxSlice

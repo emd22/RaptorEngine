@@ -1,19 +1,21 @@
 
-#include "vulkan/vulkan_core.h"
 #define VMA_DEBUG_LOG(...) FxLogWarning(__VA_ARGS__)
 
 #include "Core/FxDefines.hpp"
-#include "Renderer/Backend/RxShader.hpp"
 #include "Renderer/Backend/ShaderList.hpp"
 #include "Renderer/FxCamera.hpp"
 #include "Renderer/FxLight.hpp"
 #include "Renderer/Renderer.hpp"
 
+
+/* Vulkan Memory Allocator */
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include <Core/FxLinkedList.hpp>
 #include <Core/FxMemory.hpp>
+#include <FxEngine.hpp>
 #include <Renderer/Backend/RxFrameData.hpp>
+#include <Renderer/Backend/RxShader.hpp>
 
 #define SDL_DISABLE_OLD_NAMES
 #include "FxControls.hpp"
@@ -29,13 +31,17 @@
 #include <Asset/FxMeshGen.hpp>
 #include <Core/FxBitset.hpp>
 #include <Core/FxLog.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
+#include <FxObject.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/FxWindow.hpp>
 #include <Renderer/Renderer.hpp>
 #include <Renderer/RxDeferred.hpp>
+#include <Script/FxScript.hpp>
+#include <chrono>
 #include <csignal>
+#include <iostream>
 
 
 FX_SET_MODULE_NAME("Main")
@@ -63,33 +69,27 @@ void CheckGeneralControls()
 
 static FxPerspectiveCamera* current_camera = nullptr;
 
-#include <chrono>
-#include <iostream>
+// #pragma clang optimize off
 
-#pragma clang optimize off
+// template <typename FuncType>
+// void TestSpeed(FuncType ft, int iterations)
+// {
+//     using namespace std::chrono;
+//     uint64 time_in_ns = 0;
 
-template <typename FuncType>
-void TestSpeed(FuncType ft, int iterations)
-{
-    using namespace std::chrono;
-    uint64 time_in_ns = 0;
+//     auto t1 = high_resolution_clock::now();
+//     for (int32 i = 0; i < iterations; i++) {
+//         ft(i);
+//     }
+//     auto t2 = high_resolution_clock::now();
+//     auto ns = duration_cast<nanoseconds>(t2 - t1);
+//     time_in_ns = ns.count() / iterations;
 
-    auto t1 = high_resolution_clock::now();
-    for (int32 i = 0; i < iterations; i++) {
-        ft(i);
-    }
-    auto t2 = high_resolution_clock::now();
-    auto ns = duration_cast<nanoseconds>(t2 - t1);
-    time_in_ns = ns.count() / iterations;
+//     std::cout << "Function " << typeid(FuncType).name() << " Took " << time_in_ns << "ns.\n";
+// }
 
-    std::cout << "Function " << typeid(FuncType).name() << " Took " << time_in_ns << "ns.\n";
-}
+// #pragma clang optimize on
 
-#pragma clang optimize on
-
-
-#include <FxObject.hpp>
-#include <Script/FxScript.hpp>
 
 void TestScript()
 {
@@ -153,6 +153,8 @@ int main()
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
     }
 
+    FxEngineGlobalsInit();
+
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };
 
@@ -169,19 +171,19 @@ int main()
 
     FxRef<FxWindow> window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
 
-    RxRenderBackend renderer_state;
-    SetRendererBackend(&renderer_state);
+    // RxRenderBackend renderer_state;
+    // SetRendererBackend(&renderer_state);
 
-    Renderer->SelectWindow(window);
-    Renderer->Init(FxVec2u(window_width, window_height));
+    gRenderer->SelectWindow(window);
+    gRenderer->Init(FxVec2u(window_width, window_height));
 
-    Renderer->Swapchain.CreateSwapchainFramebuffers();
+    gRenderer->Swapchain.CreateSwapchainFramebuffers();
 
-    // Renderer->OffscreenSemaphore.Create(Renderer->GetDevice());
+    // gRenderer->OffscreenSemaphore.Create(gRenderer->GetDevice());
 
     FxRef<RxDeferredRenderer> deferred_renderer = FxMakeRef<RxDeferredRenderer>();
-    deferred_renderer->Create(Renderer->Swapchain.Extent);
-    Renderer->DeferredRenderer = deferred_renderer;
+    deferred_renderer->Create(gRenderer->Swapchain.Extent);
+    gRenderer->DeferredRenderer = deferred_renderer;
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
@@ -206,13 +208,13 @@ int main()
     auto generated_quad = FxMeshGen::MakeQuad({ .Scale = 1 });
 
     for (int i = 0; i < RendererFramesInFlight; i++) {
-        RxImage& skybox_output_image = Renderer->Swapchain.OutputImages[i];
-        Renderer->DeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
+        RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
+        gRenderer->DeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
     }
 
-    Renderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
+    gRenderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
 
-    Renderer->DeferredRenderer->SkyboxRenderer.Create(Renderer->Swapchain.Extent, generated_cube->AsLightVolume());
+    gRenderer->DeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, generated_cube->AsLightVolume());
 
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
@@ -245,6 +247,7 @@ int main()
     // light2.Scale(FxVec3f(25));
 
     bool second_light_on = false;
+
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -293,7 +296,7 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-            Renderer->DeferredRenderer->RebuildLightingPipeline();
+            gRenderer->DeferredRenderer->RebuildLightingPipeline();
         }
 
         CheckGeneralControls();
@@ -303,20 +306,20 @@ int main()
         //        helmet_object.RotateY(0.001 * DeltaTime);
 
 
-        if (Renderer->BeginFrame(*deferred_renderer) != RxFrameResult::Success) {
+        if (gRenderer->BeginFrame(*deferred_renderer) != RxFrameResult::Success) {
             continue;
         }
 
-        deferred_renderer->SkyboxRenderer.Render(Renderer->GetFrame()->CommandBuffer, *current_camera);
-        deferred_renderer->GPassPipeline.Bind(Renderer->GetFrame()->CommandBuffer);
+        deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *current_camera);
+        deferred_renderer->GPassPipeline.Bind(gRenderer->GetFrame()->CommandBuffer);
 
-        //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
+        //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
         fireplace_object->Render(camera);
 
 
-        Renderer->BeginLighting();
+        gRenderer->BeginLighting();
 
         if (second_light_on) {
             light2.mModelMatrix = camera.VPMatrix;
@@ -328,12 +331,12 @@ int main()
         //        light2.Render(camera);
         // light2.Render(camera);
 
-        Renderer->DoComposition(camera);
+        gRenderer->DoComposition(camera);
 
         LastTick = CurrentTick;
     }
 
-    Renderer->GetDevice()->WaitForIdle();
+    gRenderer->GetDevice()->WaitForIdle();
 
     material_manager.Destroy();
     asset_manager.Shutdown();

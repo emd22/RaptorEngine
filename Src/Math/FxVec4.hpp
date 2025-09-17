@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
@@ -23,21 +23,21 @@ public:
 
     void Set(float32 x, float32 y, float32 z, float32 w);
 
-    FxVec4f operator + (const FxVec4f& other) const;
-    FxVec4f operator - (const FxVec4f& other) const;
-    FxVec4f operator * (const FxVec4f& other) const;
-    FxVec4f operator / (const FxVec4f& other) const;
+    FxVec4f operator+(const FxVec4f& other) const;
+    FxVec4f operator-(const FxVec4f& other) const;
+    FxVec4f operator*(const FxVec4f& other) const;
+    FxVec4f operator/(const FxVec4f& other) const;
 
-    FxVec4f operator * (float32 scalar) const;
-    FxVec4f operator / (float32 scalar) const;
+    FxVec4f operator*(float32 scalar) const;
+    FxVec4f operator/(float32 scalar) const;
 
-    FxVec4f operator - () const;
+    FxVec4f operator-() const;
 
-    FxVec4f &operator += (const FxVec4f& other);
-    FxVec4f &operator -= (const FxVec4f& other);
-    FxVec4f &operator *= (const FxVec4f& other);
+    FxVec4f& operator+=(const FxVec4f& other);
+    FxVec4f& operator-=(const FxVec4f& other);
+    FxVec4f& operator*=(const FxVec4f& other);
 
-    FxVec4f &operator = (const FxVec4f& other);
+    FxVec4f& operator=(const FxVec4f& other);
 
     /**
      * Loads 4 values into the vector.
@@ -47,7 +47,7 @@ public:
     /**
      * Loads 4 values into the vector from a pointer.
      */
-    void Load4Ptr(float32 *values);
+    void Load4Ptr(float32* values);
 
     /**
      * Loads a single value into the vector to all components.
@@ -55,29 +55,27 @@ public:
     void Load1(float32 scalar);
 
 #ifdef FX_USE_NEON
-    explicit FxVec4f(float32x4_t intrin)
-        : mIntrin(intrin)
-    {
-    }
+    explicit FxVec4f(float32x4_t intrin) : mIntrin(intrin) {}
 
-    FxVec4f &operator = (const float32x4_t& other)
+    FxVec4f& operator=(const float32x4_t& other)
     {
         mIntrin = other;
         return *this;
     }
 
-    operator float32x4_t() const
-    {
-        return mIntrin;
-    }
+    operator float32x4_t() const { return mIntrin; }
 #endif
 
 public:
 #if defined(FX_USE_NEON)
-    union alignas(16) {
+    union alignas(16)
+    {
         float32x4_t mIntrin;
         float32 mData[4];
-        struct { float32 X, Y, Z, W; };
+        struct
+        {
+            float32 X, Y, Z, W;
+        };
     };
 
 #else

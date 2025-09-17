@@ -5,8 +5,7 @@
 #include "RxCommands.hpp"
 
 #include <Core/FxPanic.hpp>
-#include <Core/Log.hpp>
-#include <Renderer/Renderer.hpp>
+#include <FxEngine.hpp>
 #include <Renderer/RxDeferred.hpp>
 
 FX_SET_MODULE_NAME("Pipeline")
@@ -55,7 +54,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
                                 FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
                                 const RxGraphicsPipelineProperties& properties)
 {
-    mDevice = Renderer->GetDevice();
+    mDevice = gRenderer->GetDevice();
 
     bool has_depth_attachment = false;
 
@@ -100,7 +99,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
         .pDynamicStates = dynamic_states,
     };
 
-    const FxVec2u extent = Renderer->Swapchain.Extent;
+    const FxVec2u extent = gRenderer->Swapchain.Extent;
 
     VkViewport viewport = {
         .x = 0.0f,
@@ -252,7 +251,7 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(uint32 vert_push_consts_size, 
                                                   const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
     if (mDevice == nullptr) {
-        mDevice = Renderer->GetDevice();
+        mDevice = gRenderer->GetDevice();
     }
 
     VkPushConstantRange pc_ranges[2];

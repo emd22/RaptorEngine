@@ -16,6 +16,12 @@ typedef float float32;
 typedef double float64;
 
 
+constexpr uint64 FxUnitByte = 1;
+constexpr uint64 FxUnitKibibyte = 1024;
+constexpr uint64 FxUnitMebibyte = FxUnitKibibyte * 1024;
+constexpr uint64 FxUnitGibibyte = FxUnitMebibyte * 1024;
+
+
 #include <cstddef>
 // #include <type_traits>
 
@@ -112,4 +118,40 @@ private:
 #else
     FxAtomicFlag* mFlag = nullptr;
 #endif
+};
+
+template <typename TPtrType>
+struct FxMemberRef
+{
+    FxMemberRef() = default;
+
+    FxMemberRef(const FxMemberRef& other) = delete;
+    FxMemberRef(FxMemberRef&& other) = delete;
+
+    template <typename... TArgTypes>
+    inline void Create(TArgTypes... args)
+    {
+        pPtr = new TPtrType(std::forward<TArgTypes>(args)...);
+    }
+
+    inline void Destroy()
+    {
+        if (pPtr == nullptr) {
+            return;
+        }
+
+        delete pPtr;
+
+        pPtr = nullptr;
+    }
+
+    void operator=(FxMemberRef& other) = delete;
+
+    TPtrType& operator->() { return *pPtr; }
+    TPtrType& operator*() { return *pPtr; }
+
+    ~FxMemberRef() { Destroy(); }
+
+public:
+    TPtrType* pPtr = nullptr;
 };

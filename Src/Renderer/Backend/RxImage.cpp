@@ -1,12 +1,12 @@
 
 #include "RxImage.hpp"
 
-#include "../Renderer.hpp"
 #include "../RxRenderBackend.hpp"
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxStackArray.hpp>
+#include <FxEngine.hpp>
 
 FX_SET_MODULE_NAME("RxImage")
 
@@ -36,7 +36,7 @@ RxGpuDevice* RxImage::GetDevice()
     // `::Create` method that does this instead though.
 
     if (mDevice == nullptr) {
-        mDevice = Renderer->GetDevice();
+        mDevice = gRenderer->GetDevice();
     }
 
     return mDevice;
@@ -48,7 +48,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
     Size = size;
     Format = format;
     mViewType = image_type;
-    mDevice = Renderer->GetDevice();
+    mDevice = gRenderer->GetDevice();
 
     if (RxUtil::IsFormatDepth(format)) {
         mIsDepthTexture = true;
@@ -92,7 +92,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
         .priority = 1.0f,
     };
 
-    VkResult status = vmaCreateImage(Renderer->GpuAllocator, &image_info, &create_info, &Image, &Allocation, nullptr);
+    VkResult status = vmaCreateImage(gRenderer->GpuAllocator, &image_info, &create_info, &Image, &Allocation, nullptr);
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Could not create vulkan image", status);
     }
@@ -334,7 +334,7 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_for
     }
 
 
-    Renderer->SubmitOneTimeCmd(
+    gRenderer->SubmitOneTimeCmd(
         [&](RxCommandBuffer& cmd)
         {
             cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd);
@@ -377,7 +377,7 @@ void RxImage::Destroy()
     }
 
     if (Image != nullptr && Allocation != nullptr) {
-        vmaDestroyImage(Renderer->GpuAllocator, this->Image, this->Allocation);
+        vmaDestroyImage(gRenderer->GpuAllocator, this->Image, this->Allocation);
     }
 
     this->Image = nullptr;

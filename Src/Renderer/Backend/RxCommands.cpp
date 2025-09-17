@@ -1,9 +1,9 @@
 #include "RxCommands.hpp"
 
-#include "../Renderer.hpp"
 #include "RxDevice.hpp"
 
 #include <Core/FxPanic.hpp>
+#include <FxEngine.hpp>
 
 FX_SET_MODULE_NAME("RxCommandBuffer")
 
@@ -18,7 +18,7 @@ void RxCommandBuffer::Create(RxCommandPool* pool)
         .commandBufferCount = 1,
     };
 
-    mDevice = Renderer->GetDevice();
+    mDevice = gRenderer->GetDevice();
 
     const VkResult status = vkAllocateCommandBuffers(mDevice->Device, &buffer_info, &CommandBuffer);
     if (status != VK_SUCCESS) {

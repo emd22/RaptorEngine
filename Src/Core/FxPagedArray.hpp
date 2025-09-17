@@ -2,7 +2,7 @@
 
 #include "FxMemory.hpp"
 #include "FxPanic.hpp"
-#include "Types.hpp"
+#include "FxTypes.hpp"
 
 template <typename ElementType, bool UseMemPool = true>
 class FxPagedArray
