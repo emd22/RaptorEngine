@@ -1,7 +1,6 @@
 #pragma once
 
-#include <Math/Util.hpp>
-
+#include <Math/FxMathUtil.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/Mat4.hpp>
 
@@ -19,7 +18,6 @@ public:
 
     FxMat4f InvViewMatrix = FxMat4f::Identity;
     FxMat4f InvProjectionMatrix = FxMat4f::Identity;
-
 };
 
 class FxPerspectiveCamera : public FxCamera
@@ -38,10 +36,7 @@ public:
     float32 GetFov() const { return FxRadToDeg(mFovRad); }
     float32 GetFovRad() const { return mFovRad; }
 
-    void SetFov(float32 fov)
-    {
-        SetFovRad(FxDegToRad(fov));
-    }
+    void SetFov(float32 fov) { SetFovRad(FxDegToRad(fov)); }
 
     void SetFovRad(float32 fov_rad)
     {
@@ -58,14 +53,14 @@ public:
         RequireUpdate();
     }
 
-    inline void MoveBy(const FxVec3f &offset)
+    inline void MoveBy(const FxVec3f& offset)
     {
         Position += FxVec3f(offset.X, offset.Y, offset.Z);
 
         RequireUpdate();
     }
 
-    inline void Move(const FxVec3f &offset)
+    inline void Move(const FxVec3f& offset)
     {
         const FxVec3f forward = Direction * -offset.Z;
         const FxVec3f right = Direction.Cross(FxVec3f::Up) * offset.X;

@@ -1,5 +1,10 @@
 #include "FxObject.hpp"
 
+#include <ThirdParty/Jolt/Jolt.h>
+#include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
+#include <ThirdParty/Jolt/Physics/Body/MotionType.h>
+#include <ThirdParty/Jolt/Physics/EActivation.h>
+
 #include <FxEngine.hpp>
 
 bool FxObject::CheckIfReady()
@@ -164,4 +169,53 @@ void FxObject::RenderMesh()
     if (Mesh) {
         Mesh->Render(cmd, *Material->Pipeline);
     }
+}
+
+void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::PhysicsType type)
+{
+    if (mbHasPhysicsBody) {
+        FxLogWarning("Attempting to create physics body when one is already created!");
+        return;
+    }
+
+    JPH::EActivation activation_mode = JPH::EActivation::Activate;
+
+    if (flags & FxObject::PF_CreateInactive) {
+        activation_mode = JPH::EActivation::DontActivate;
+    }
+
+    JPH::EMotionType motion_type = JPH::EMotionType::Static;
+
+    switch (type) {
+    case FxObject::PhysicsType::Static:
+        motion_type = JPH::EMotionType::Static;
+        break;
+    case FxObject::PhysicsType::Dynamic:
+        motion_type = JPH::EMotionType::Dynamic;
+        break;
+    default:
+        break;
+    }
+
+    JPH::BodyCreationSettings body_settings {};
+
+    body_settings.mMotionType = motion_type;
+    mPosition.ToJoltVec3(body_settings.mPosition);
+
+    JPH::RVec3 box_scale;
+    // mScale.ToJoltVec3();
+
+    // BoxShapeSettings box_shape_settings();
+
+
+    gPhysics->PhysicsSystem.GetBodyInterface().CreateAndAddBody(body_settings, activation_mode);
+}
+
+void FxObject::DestroyPhysicsBody()
+{
+    if (!mbHasPhysicsBody) {
+        return;
+    }
+
+    gPhysics->PhysicsSystem.GetBodyInterface().DestroyBody(mPhysicsBodyId);
 }

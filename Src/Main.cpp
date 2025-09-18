@@ -179,6 +179,9 @@ int main()
 
     gRenderer->Swapchain.CreateSwapchainFramebuffers();
 
+    // Initialize the physics system
+    // gPhysics->Create();
+
     // gRenderer->OffscreenSemaphore.Create(gRenderer->GetDevice());
 
     FxRef<RxDeferredRenderer> deferred_renderer = FxMakeRef<RxDeferredRenderer>();
@@ -296,7 +299,8 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-            gRenderer->DeferredRenderer->RebuildLightingPipeline();
+            // gRenderer->DeferredRenderer->RebuildLightingPipeline();
+            FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 
         CheckGeneralControls();
@@ -343,11 +347,11 @@ int main()
 
     deferred_renderer->Destroy();
 
+    FxEngineGlobalsDestroy();
+
     // composition_pipeline.Destroy();
 
     //    ground_object->Destroy();
-
-    std::cout << "this thread: " << std::this_thread::get_id() << std::endl;
 
     return 0;
 }

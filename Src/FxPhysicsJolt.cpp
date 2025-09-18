@@ -17,18 +17,6 @@
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
 #include <ThirdParty/Jolt/RegisterTypes.h>
 
-namespace Layers {
-static constexpr JPH::ObjectLayer NON_MOVING = 0;
-static constexpr JPH::ObjectLayer MOVING = 1;
-static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
-}; // namespace Layers
-
-namespace BroadPhaseLayers {
-static constexpr JPH::BroadPhaseLayer NON_MOVING(0);
-static constexpr JPH::BroadPhaseLayer MOVING(1);
-static constexpr uint NUM_LAYERS(2);
-}; // namespace BroadPhaseLayers
-
 // Callback for traces, connect this to your own trace function if you have one
 static void JoltTrace(const char* fmt, ...)
 {
@@ -51,9 +39,9 @@ public:
     virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
     {
         switch (inObject1) {
-        case Layers::NON_MOVING:
-            return inObject2 == Layers::MOVING; // Non moving only collides with moving
-        case Layers::MOVING:
+        case FxPhysicsLayer::Static:
+            return inObject2 == FxPhysicsLayer::Dynamic; // Non moving only collides with moving
+        case FxPhysicsLayer::Dynamic:
             return true; // Moving collides with everything
         default:
             JPH_ASSERT(false);
@@ -70,15 +58,15 @@ public:
     BPLayerInterfaceImpl()
     {
         // Create a mapping table from object to broad phase layer
-        mObjectToBroadPhase[Layers::NON_MOVING] = BroadPhaseLayers::NON_MOVING;
-        mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
+        mObjectToBroadPhase[FxPhysicsLayer::Static] = FxPhysicsBroadPhaseLayer::Static;
+        mObjectToBroadPhase[FxPhysicsLayer::Dynamic] = FxPhysicsBroadPhaseLayer::Dynamic;
     }
 
-    virtual uint GetNumBroadPhaseLayers() const override { return BroadPhaseLayers::NUM_LAYERS; }
+    virtual uint GetNumBroadPhaseLayers() const override { return FxPhysicsBroadPhaseLayer::NumLayers; }
 
     virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
     {
-        JPH_ASSERT(inLayer < Layers::NUM_LAYERS);
+        JPH_ASSERT(inLayer < FxPhysicsLayer::NumLayers);
         return mObjectToBroadPhase[inLayer];
     }
 
@@ -98,7 +86,7 @@ public:
 #endif // JPH_EXTERNAL_PROFILE || JPH_PROFILE_ENABLED
 
 private:
-    JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
+    JPH::BroadPhaseLayer mObjectToBroadPhase[FxPhysicsLayer::NumLayers];
 };
 
 /// Class that determines if an object layer can collide with a broadphase layer
@@ -108,9 +96,9 @@ public:
     virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
     {
         switch (inLayer1) {
-        case Layers::NON_MOVING:
-            return inLayer2 == BroadPhaseLayers::MOVING;
-        case Layers::MOVING:
+        case FxPhysicsLayer::Static:
+            return inLayer2 == FxPhysicsBroadPhaseLayer::Dynamic;
+        case FxPhysicsLayer::Dynamic:
             return true;
         default:
             JPH_ASSERT(false);
@@ -176,11 +164,16 @@ void FxPhysicsJolt::Update()
     // simulation stable. Do 1 collision step per 1 / 60th of a second (round up).
     const int collision_steps = 1;
 
-    mPhysicsSystem.Update(mDeltaTime, collision_steps, mpTempAllocator.pPtr, mpJobSystem.pPtr);
+    PhysicsSystem.Update(mDeltaTime, collision_steps, mpTempAllocator.pPtr, mpJobSystem.pPtr);
 }
 
 void FxPhysicsJolt::Create()
 {
+    if (mbIsInited) {
+        FxLogWarning("FxPhysicsJolt is already initialized!");
+        return;
+    }
+
     JPH::RegisterDefaultAllocator();
     JPH::Trace = JoltTrace;
 
@@ -212,25 +205,25 @@ void FxPhysicsJolt::Create()
     ObjectLayerPairFilterImpl object_vs_object_layer_filter;
 
     // Now we can create the actual physics system.
-    mPhysicsSystem.Init(max_bodies, num_body_mutexes, max_body_pairs, max_contact_constraints,
-                        broad_phase_layer_interface, object_vs_broadphase_layer_filter, object_vs_object_layer_filter);
+    PhysicsSystem.Init(max_bodies, num_body_mutexes, max_body_pairs, max_contact_constraints,
+                       broad_phase_layer_interface, object_vs_broadphase_layer_filter, object_vs_object_layer_filter);
 
     // A body activation listener gets notified when bodies activate and go to sleep
     // Note that this is called from a job so whatever you do here needs to be thread safe.
     // Registering one is entirely optional.
     MyBodyActivationListener body_activation_listener;
-    mPhysicsSystem.SetBodyActivationListener(&body_activation_listener);
+    PhysicsSystem.SetBodyActivationListener(&body_activation_listener);
 
     // A contact listener gets notified when bodies (are about to) collide, and when they separate again.
     // Note that this is called from a job so whatever you do here needs to be thread safe.
     // Registering one is entirely optional.
     MyContactListener contact_listener;
-    mPhysicsSystem.SetContactListener(&contact_listener);
+    PhysicsSystem.SetContactListener(&contact_listener);
 
     // The main way to interact with the bodies in the physics system is through the body interface. There is a locking
     // and a non-locking variant of this. We're going to use the locking version (even though we're not planning to
     // access bodies from multiple threads)
-    JPH::BodyInterface& body_interface = mPhysicsSystem.GetBodyInterface();
+    JPH::BodyInterface& body_interface = PhysicsSystem.GetBodyInterface();
 
     // Next we can create a rigid body to serve as the floor, we make a large box
     // Create the settings for the collision volume (the shape).
@@ -247,7 +240,7 @@ void FxPhysicsJolt::Create()
     // Create the settings for the body itself. Note that here you can also set other properties like the restitution /
     // friction.
     JPH::BodyCreationSettings floor_settings(floor_shape, JPH::RVec3(0.0_r, -1.0_r, 0.0_r), JPH::Quat::sIdentity(),
-                                             JPH::EMotionType::Static, Layers::NON_MOVING);
+                                             JPH::EMotionType::Static, FxPhysicsLayer::Static);
 
     // Create the actual rigid body
     JPH::Body* floor = body_interface.CreateBody(
@@ -259,7 +252,8 @@ void FxPhysicsJolt::Create()
     // Now create a dynamic body to bounce on the floor
     // Note that this uses the shorthand version of creating and adding a body to the world
     JPH::BodyCreationSettings sphere_settings(new JPH::SphereShape(0.5f), JPH::RVec3(0.0_r, 2.0_r, 0.0_r),
-                                              JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic, Layers::MOVING);
+                                              JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic,
+                                              FxPhysicsLayer::Dynamic);
     JPH::BodyID sphere_id = body_interface.CreateAndAddBody(sphere_settings, JPH::EActivation::Activate);
 
     // Now you can interact with the dynamic body, in this case we're going to give it a velocity.
@@ -271,11 +265,25 @@ void FxPhysicsJolt::Create()
     // detection performance (it's pointless here because we only have 2 bodies). You should definitely not call this
     // every frame or when e.g. streaming in a new level section as it is an expensive operation. Instead insert all new
     // objects in batches instead of 1 at a time to keep the broad phase efficient.
-    mPhysicsSystem.OptimizeBroadPhase();
+    PhysicsSystem.OptimizeBroadPhase();
+
+    mbIsInited = true;
 }
 
-void FxPhysicsJolt::Destroy() {}
+void FxPhysicsJolt::Destroy()
+{
+    if (!mbIsInited) {
+        return;
+    }
+
+    JPH::UnregisterTypes();
+}
 
 FxPhysicsJolt::FxPhysicsJolt() {}
 
-FxPhysicsJolt::~FxPhysicsJolt() { Destroy(); }
+FxPhysicsJolt::~FxPhysicsJolt()
+{
+    Destroy();
+
+    mbIsInited = false;
+}

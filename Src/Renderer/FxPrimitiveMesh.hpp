@@ -137,6 +137,59 @@ public:
         return vertices;
     }
 
+    static FxSizedArray<TVertexType> MakeCombinedVertexBufferAndCalcDimensions(const FxSizedArray<float32>& positions,
+                                                                               const FxSizedArray<float32>& normals,
+                                                                               const FxSizedArray<float32>& uvs,
+                                                                               FxVec3f* dimensions)
+        requires std::same_as<TVertexType, RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>>
+    {
+        FxAssert((normals.Size == positions.Size));
+
+        FxSizedArray<TVertexType> vertices(positions.Size / 3);
+
+        // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
+        const bool has_texcoords = uvs.Size > 0;
+
+        if (!has_texcoords) {
+            OldLog::Info("Model does not have texture coordinates!", 0);
+        }
+
+        FxVec3f min_positions = FxVec3f(10000);
+        FxVec3f max_positions = FxVec3f(-10000);
+
+        for (int i = 0; i < vertices.Capacity; i++) {
+            TVertexType vertex;
+
+            memcpy(&vertex.Position, &positions.Data[i * 3], sizeof(float32) * 3);
+            memcpy(&vertex.Normal, &normals.Data[i * 3], sizeof(float32) * 3);
+
+
+            // If the resulting component is less than zero, we know that the value is less than our current minimum.
+            FxVec3f position(vertex.Position);
+
+            min_positions = FxVec3f::Min(min_positions, vertex.Position);
+            max_positions = FxVec3f::Max(max_positions, vertex.Position);
+
+            if (has_texcoords) {
+                memcpy(&vertex.UV, &uvs.Data[i * 2], sizeof(float32) * 2);
+            }
+            else {
+                memset(&vertex.UV, 0, sizeof(float32) * 2);
+            }
+
+            vertices.Insert(vertex);
+        }
+
+        (*dimensions) = max_positions - min_positions;
+
+        FxLogDebug("max positions: {}", max_positions);
+        FxLogDebug("min positions: {}", min_positions);
+        FxLogDebug("final positions: {}", *dimensions);
+
+
+        return vertices;
+    }
+
     FxSizedArray<TVertexType>& GetVertices()
     {
         if (!KeepInMemory) {

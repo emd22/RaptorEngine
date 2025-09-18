@@ -5,15 +5,17 @@
 
 #include <ThirdParty/cgltf.h>
 
-#include <FxEngine.hpp>
-
-// #include <Asset/FxAssetModel.hpp>
+#include <Asset/FxAssetManager.hpp>
 #include <Core/FxRef.hpp>
+#include <FxEngine.hpp>
+#include <FxMaterial.hpp>
 #include <FxObject.hpp>
+#include <iostream>
 
 FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
 
-void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primitive)
+void FxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh<>>& mesh,
+                                        cgltf_primitive* primitive)
 {
     FxSizedArray<float32> positions;
     FxSizedArray<float32> normals;
@@ -21,7 +23,6 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto* attribute = &primitive->attributes[i];
-
 
         if (attribute->type == cgltf_attribute_type_position) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
@@ -48,7 +49,8 @@ void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primi
 
     // FxLogInfo("Positions:");
 
-    auto combined_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(positions, normals, uvs);
+    auto combined_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBufferAndCalcDimensions(positions, normals, uvs,
+                                                                                          &object->Dimensions);
     // for (const auto& vertex : combined_vertices) {
     //     printf("FxVec3f(%f, %f, %f), ", vertex.Position[0], vertex.Position[1], vertex.Position[2]);
     // }
@@ -187,7 +189,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
             primitive_mesh->UploadIndices(std::move(indices));
         }
 
-        UnpackMeshAttributes(primitive_mesh, primitive);
+        UnpackMeshAttributes(current_object, primitive_mesh, primitive);
 
         MakeMaterialForPrimitive(current_object, primitive);
 
@@ -220,10 +222,6 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
     FxLogInfo("Add primitive:");
 }
-
-#include <Asset/FxAssetManager.hpp>
-#include <FxMaterial.hpp>
-#include <iostream>
 
 
 // FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)

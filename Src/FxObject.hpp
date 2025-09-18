@@ -8,10 +8,22 @@
 #include <FxMaterial.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
+
 class FxObject : public FxAssetBase, public FxEntity
 {
     friend class FxLoaderGltf;
     friend class FxAssetManager;
+
+    enum PhysicsFlags
+    {
+        PF_CreateInactive = 0x01,
+    };
+
+    enum class PhysicsType
+    {
+        Static,
+        Dynamic,
+    };
 
 public:
     FxObject() = default;
@@ -41,16 +53,22 @@ public:
     }
 
 
-    void AttachObject(FxRef<FxObject>& object)
+    void AttachObject(const FxRef<FxObject>& object)
     {
         if (AttachedNodes.IsEmpty()) {
             AttachedNodes.Create(32);
         }
+
+        Dimensions += object->Dimensions;
+
         AttachedNodes.Insert(object);
     }
 
 private:
     void RenderMesh();
+
+    void CreatePhysicsBody(PhysicsFlags flags, PhysicsType type);
+    void DestroyPhysicsBody();
 
 public:
     FxRef<FxPrimitiveMesh<>> Mesh { nullptr };
@@ -58,10 +76,15 @@ public:
 
     FxMPPagedArray<FxRef<FxObject>> AttachedNodes;
 
-    JPH::BodyID JoltBodyID {};
+    FxVec3f Dimensions = FxVec3f::Zero;
 
 private:
     bool mReadyToRender = false;
 
     RxUniformBufferObject mUbo;
+
+    JPH::BodyID mPhysicsBodyId {};
+
+    bool mbPhysicsEnabled = false;
+    bool mbHasPhysicsBody = false;
 };
