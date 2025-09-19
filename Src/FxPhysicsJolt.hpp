@@ -13,12 +13,14 @@ class TempAllocatorImpl;
 }; // namespace JPH
 
 namespace FxPhysicsLayer {
+using Type = JPH::ObjectLayer;
 static constexpr JPH::ObjectLayer Static = 0;
 static constexpr JPH::ObjectLayer Dynamic = 1;
 static constexpr JPH::ObjectLayer NumLayers = 2;
 }; // namespace FxPhysicsLayer
 
 namespace FxPhysicsBroadPhaseLayer {
+using Type = JPH::BroadPhaseLayer;
 static constexpr JPH::BroadPhaseLayer Static(0);
 static constexpr JPH::BroadPhaseLayer Dynamic(1);
 static constexpr uint NumLayers(2);

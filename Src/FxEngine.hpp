@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/FxRef.hpp>
 #include <FxPhysicsJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 

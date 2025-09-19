@@ -180,7 +180,7 @@ int main()
     gRenderer->Swapchain.CreateSwapchainFramebuffers();
 
     // Initialize the physics system
-    // gPhysics->Create();
+    gPhysics->Create();
 
     // gRenderer->OffscreenSemaphore.Create(gRenderer->GetDevice());
 
@@ -228,7 +228,18 @@ int main()
     camera.Position.Y += 4.0f;
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+    //
 
+    FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material", &deferred_renderer->GPassPipeline);
+
+    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
+    cube_material->DiffuseTexture.Texture = FxAssetImage::GetEmptyImage();
+
+    FxObject cube_object;
+
+    FxRef<FxPrimitiveMesh<>> cube_mesh = generated_cube->AsMesh();
+
+    cube_object.Create(cube_mesh, cube_material);
 
     fireplace_object->RotateX(M_PI_2);
 
@@ -299,8 +310,8 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-            // gRenderer->DeferredRenderer->RebuildLightingPipeline();
-            FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
+            gRenderer->DeferredRenderer->RebuildLightingPipeline();
+            // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 
         CheckGeneralControls();
@@ -320,7 +331,8 @@ int main()
         //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
-        fireplace_object->Render(camera);
+        // fireplace_object->Render(camera);
+        cube_object.Render(camera);
 
 
         gRenderer->BeginLighting();

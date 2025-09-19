@@ -106,14 +106,15 @@ void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComp
 
 void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component)
 {
-    FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
+    component.Texture = FxAssetImage::GetEmptyImage();
+    // FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
 
-    component.Texture = FxMakeRef<FxAssetImage>();
-    component.Texture->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
-    component.Texture->IsFinishedNotifier.SignalDataWritten();
-    component.Texture->IsUploadedToGpu = true;
-    component.Texture->IsUploadedToGpu.notify_all();
-    component.Texture->mIsLoaded.store(true);
+    // component.Texture = FxMakeRef<FxAssetImage>();
+    // component.Texture->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
+    // component.Texture->IsFinishedNotifier.SignalDataWritten();
+    // component.Texture->IsUploadedToGpu = true;
+    // component.Texture->IsUploadedToGpu.notify_all();
+    // component.Texture->mIsLoaded.store(true);
 }
 
 

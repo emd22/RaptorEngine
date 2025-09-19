@@ -3,9 +3,16 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
 #include <ThirdParty/Jolt/Physics/Body/MotionType.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <FxEngine.hpp>
+
+void FxObject::Create(FxRef<FxPrimitiveMesh<>>& mesh, FxRef<FxMaterial>& material)
+{
+    Mesh = mesh;
+    Material = material;
+}
 
 bool FxObject::CheckIfReady()
 {
@@ -186,27 +193,29 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
 
     JPH::EMotionType motion_type = JPH::EMotionType::Static;
 
+    FxPhysicsLayer::Type object_layer = FxPhysicsLayer::Static;
+
     switch (type) {
     case FxObject::PhysicsType::Static:
         motion_type = JPH::EMotionType::Static;
+        object_layer = FxPhysicsLayer::Static;
         break;
     case FxObject::PhysicsType::Dynamic:
         motion_type = JPH::EMotionType::Dynamic;
+        object_layer = FxPhysicsLayer::Dynamic;
         break;
     default:
         break;
     }
 
-    JPH::BodyCreationSettings body_settings {};
+    JPH::RVec3 box_position;
+    mPosition.ToJoltVec3(box_position);
 
-    body_settings.mMotionType = motion_type;
-    mPosition.ToJoltVec3(body_settings.mPosition);
+    JPH::RVec3 box_dimensions;
+    Dimensions.ToJoltVec3(box_dimensions);
 
-    JPH::RVec3 box_scale;
-    // mScale.ToJoltVec3();
-
-    // BoxShapeSettings box_shape_settings();
-
+    JPH::BodyCreationSettings body_settings(new JPH::BoxShape(box_dimensions), box_position, JPH::Quat::sIdentity(),
+                                            motion_type, object_layer);
 
     gPhysics->PhysicsSystem.GetBodyInterface().CreateAndAddBody(body_settings, activation_mode);
 }

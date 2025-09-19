@@ -28,6 +28,8 @@ class FxObject : public FxAssetBase, public FxEntity
 public:
     FxObject() = default;
 
+    void Create(FxRef<FxPrimitiveMesh<>>& mesh, FxRef<FxMaterial>& material);
+
     void Render(const FxCamera& camera);
     bool CheckIfReady();
 
@@ -64,11 +66,13 @@ public:
         AttachedNodes.Insert(object);
     }
 
-private:
-    void RenderMesh();
 
     void CreatePhysicsBody(PhysicsFlags flags, PhysicsType type);
     void DestroyPhysicsBody();
+
+private:
+    void RenderMesh();
+
 
 public:
     FxRef<FxPrimitiveMesh<>> Mesh { nullptr };

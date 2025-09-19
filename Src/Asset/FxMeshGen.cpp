@@ -69,6 +69,8 @@ FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
     auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
     mesh->CreateFromData(fat_vertices, Indices);
 
+    mesh->IsReady.store(true);
+
     return mesh;
 }
 
