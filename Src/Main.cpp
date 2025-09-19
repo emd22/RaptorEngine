@@ -233,13 +233,10 @@ int main()
     FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material", &deferred_renderer->GPassPipeline);
 
     cube_material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
-    cube_material->DiffuseTexture.Texture = FxAssetImage::GetEmptyImage();
+    cube_material->DiffuseComponent.Texture = FxAssetImage::GetEmptyImage();
 
     FxObject cube_object;
-
-    FxRef<FxPrimitiveMesh<>> cube_mesh = generated_cube->AsMesh();
-
-    cube_object.Create(cube_mesh, cube_material);
+    cube_object.Create(generated_cube->AsMesh(), cube_material);
 
     fireplace_object->RotateX(M_PI_2);
 

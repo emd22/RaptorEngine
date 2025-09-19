@@ -8,7 +8,7 @@
 
 #include <FxEngine.hpp>
 
-void FxObject::Create(FxRef<FxPrimitiveMesh<>>& mesh, FxRef<FxMaterial>& material)
+void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
 {
     Mesh = mesh;
     Material = material;

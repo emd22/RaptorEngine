@@ -159,7 +159,7 @@ bool FxMaterial::IsReady()
         return true;
     }
 
-    if (!DiffuseTexture.Texture || !DiffuseTexture.Texture->IsLoaded()) {
+    if (!DiffuseComponent.Texture || !DiffuseComponent.Texture->IsLoaded()) {
         return false;
     }
 
@@ -209,12 +209,31 @@ void FxMaterial::Destroy()
     }
 
     // TODO: figure out why the FxRef isn't destroying the object...
-    if (DiffuseTexture.Texture) {
-        DiffuseTexture.Texture->Destroy();
+    if (DiffuseComponent.Texture) {
+        DiffuseComponent.Texture->Destroy();
     }
 }
 
 #include <Asset/FxAssetManager.hpp>
+
+bool FxMaterialComponent::CheckIfReady()
+{
+    // If there is data passed in and the image has not been loaded yet, load it using the
+    // asset manager. This will be validated on the next call of this function. (when attempting to build the material)
+    if (!Texture && DataToLoad) {
+        FxSlice<const uint8>& image_data = DataToLoad;
+
+        Texture = FxAssetManager::LoadImageFromMemory(image_data.Ptr, image_data.Size);
+        return false;
+    }
+
+    // If there is no texture and we are not loaded, return not loaded.
+    if (!Texture || !Texture->IsLoaded()) {
+        return false;
+    }
+
+    return true;
+}
 
 bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
 {
@@ -230,6 +249,25 @@ bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
     }
     return true;
 }
+
+FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& sampler)
+{
+    // There is no texture provided, we will use the base colours passed in and a dummy texture
+    if (!Texture && !DataToLoad) {
+        Texture = FxAssetImage::GetEmptyImage();
+    }
+
+    if (!CheckIfReady()) {
+        // The texture is not ready, return the status to the material build function
+        return Status::NotReady;
+    }
+
+
+    Texture->Texture.SetSampler(sampler);
+
+    return Status::Ready;
+}
+
 
 #define PUSH_IMAGE_IF_SET(img, binding)                                                                                \
     if (img != nullptr) {                                                                                              \
@@ -250,6 +288,11 @@ bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
         write_descriptor_sets.Insert(image_write);                                                                     \
     }
 
+#define BUILD_MATERIAL_COMPONENT(component_, sampler_)                                                                 \
+    if (component_.Build(sampler_) == FxMaterialComponent::Status::NotReady) {                                         \
+        return;                                                                                                        \
+    }
+
 void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
@@ -259,14 +302,10 @@ void FxMaterial::Build()
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
-    if (!CheckComponentTextureLoaded(DiffuseTexture)) {
-        return;
-    }
+    // Build components
+    BUILD_MATERIAL_COMPONENT(DiffuseComponent, manager.AlbedoSampler);
 
-    if (DiffuseTexture.Texture) {
-        DiffuseTexture.Texture->Texture.SetSampler(manager.AlbedoSampler);
-    }
-
+    // Update the material descriptor
     {
         constexpr const int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
         FxStackArray<VkWriteDescriptorSet, max_images> write_descriptor_sets;
@@ -274,7 +313,7 @@ void FxMaterial::Build()
         RxDescriptorSet& descriptor_set = mDescriptorSet;
 
         // Push material textures
-        PUSH_IMAGE_IF_SET(DiffuseTexture.Texture, 0);
+        PUSH_IMAGE_IF_SET(DiffuseComponent.Texture, 0);
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data,
                                0, nullptr);

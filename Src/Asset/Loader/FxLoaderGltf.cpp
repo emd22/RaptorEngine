@@ -133,11 +133,11 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
 
         if (!texture_view.texture) {
-            MakeEmptyMaterialTexture(material, material->DiffuseTexture);
+            MakeEmptyMaterialTexture(material, material->DiffuseComponent);
             material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
         }
         else {
-            MakeMaterialTextureForPrimitive(material, material->DiffuseTexture, texture_view);
+            MakeMaterialTextureForPrimitive(material, material->DiffuseComponent, texture_view);
             material->Properties.BaseColor = FxColorFromRGBA(1, 1, 1, 1);
         }
     }

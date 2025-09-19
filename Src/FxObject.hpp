@@ -28,7 +28,7 @@ class FxObject : public FxAssetBase, public FxEntity
 public:
     FxObject() = default;
 
-    void Create(FxRef<FxPrimitiveMesh<>>& mesh, FxRef<FxMaterial>& material);
+    void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
     void Render(const FxCamera& camera);
     bool CheckIfReady();
@@ -72,7 +72,6 @@ public:
 
 private:
     void RenderMesh();
-
 
 public:
     FxRef<FxPrimitiveMesh<>> Mesh { nullptr };
