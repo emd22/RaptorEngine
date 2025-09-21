@@ -137,6 +137,24 @@ public:
         return vertices;
     }
 
+    static FxVec3f GetDimensionsFromPositions(const FxSizedArray<float32> positions)
+    {
+        FxVec3f min_positions = FxVec3f(10000);
+        FxVec3f max_positions = FxVec3f(-10000);
+
+        for (int i = 0; i < positions.Size; i++) {
+            FxVec3f position(&positions.Data[i * 3]);
+
+            min_positions = FxVec3f::Min(min_positions, position);
+            max_positions = FxVec3f::Max(max_positions, position);
+        }
+
+        // Return the difference between the min and max positions
+        max_positions -= min_positions;
+
+        return max_positions;
+    }
+
     static FxSizedArray<TVertexType> MakeCombinedVertexBufferAndCalcDimensions(const FxSizedArray<float32>& positions,
                                                                                const FxSizedArray<float32>& normals,
                                                                                const FxSizedArray<float32>& uvs,
@@ -147,7 +165,6 @@ public:
 
         FxSizedArray<TVertexType> vertices(positions.Size / 3);
 
-        // Log::Info("Creating combined vertex buffer (s: %d)", vertices.Capacity);
         const bool has_texcoords = uvs.Size > 0;
 
         if (!has_texcoords) {
@@ -167,8 +184,8 @@ public:
             // If the resulting component is less than zero, we know that the value is less than our current minimum.
             FxVec3f position(vertex.Position);
 
-            min_positions = FxVec3f::Min(min_positions, vertex.Position);
-            max_positions = FxVec3f::Max(max_positions, vertex.Position);
+            min_positions = FxVec3f::Min(min_positions, position);
+            max_positions = FxVec3f::Max(max_positions, position);
 
             if (has_texcoords) {
                 memcpy(&vertex.UV, &uvs.Data[i * 2], sizeof(float32) * 2);
@@ -180,12 +197,10 @@ public:
             vertices.Insert(vertex);
         }
 
-        (*dimensions) = max_positions - min_positions;
-
-        FxLogDebug("max positions: {}", max_positions);
-        FxLogDebug("min positions: {}", min_positions);
-        FxLogDebug("final positions: {}", *dimensions);
-
+        // Calculate the difference between the min and max positions and copy to
+        // the output
+        max_positions -= min_positions;
+        (*dimensions) = max_positions;
 
         return vertices;
     }
@@ -314,16 +329,19 @@ public:
 
         IsReady.store(false);
 
-        mGpuVertexBuffer.Destroy();
+        // mGpuVertexBuffer.Destroy();
         mGpuIndexBuffer.Destroy();
 
-        mVertexBuffer.Free();
+        // mVertexBuffer.Free();
         mIndexBuffer.Free();
     }
 
     ~FxPrimitiveMesh() { Destroy(); }
 
     std::atomic_bool IsReady = std::atomic_bool(false);
+
+public:
+    FxVec3f Dimensions = FxVec3f::Zero;
 
     bool IsReference = false;
     bool KeepInMemory = false;

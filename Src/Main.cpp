@@ -237,6 +237,7 @@ int main()
 
     FxObject cube_object;
     cube_object.Create(generated_cube->AsMesh(), cube_material);
+    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic);
 
     fireplace_object->RotateX(M_PI_2);
 
@@ -258,6 +259,8 @@ int main()
     // light2.Scale(FxVec3f(25));
 
     bool second_light_on = false;
+
+    // gPhysics->bPhysicsPaused = true;
 
 
     while (Running) {
@@ -307,13 +310,16 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-            gRenderer->DeferredRenderer->RebuildLightingPipeline();
+            // gRenderer->DeferredRenderer->RebuildLightingPipeline();
+            gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
             // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 
         CheckGeneralControls();
 
         camera.Update();
+
+        // gPhysics->Update();
 
         //        helmet_object.RotateY(0.001 * DeltaTime);
 
@@ -329,6 +335,7 @@ int main()
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
         // fireplace_object->Render(camera);
+        // cube_object.Update();
         cube_object.Render(camera);
 
 

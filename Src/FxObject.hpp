@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ThirdParty/Jolt/Jolt.h>
+#include <ThirdParty/Jolt/Physics/Body/Body.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Core/MemPool/FxMPPagedArray.hpp>
@@ -14,6 +15,7 @@ class FxObject : public FxAssetBase, public FxEntity
     friend class FxLoaderGltf;
     friend class FxAssetManager;
 
+public:
     enum PhysicsFlags
     {
         PF_CreateInactive = 0x01,
@@ -70,6 +72,11 @@ public:
     void CreatePhysicsBody(PhysicsFlags flags, PhysicsType type);
     void DestroyPhysicsBody();
 
+    inline JPH::Body* GetPhysicsBody() { return mpPhysicsBody; };
+    inline const JPH::BodyID& GetPhysicsBodyId() { return mpPhysicsBody->GetID(); };
+
+    void Update();
+
 private:
     void RenderMesh();
 
@@ -86,7 +93,7 @@ private:
 
     RxUniformBufferObject mUbo;
 
-    JPH::BodyID mPhysicsBodyId {};
+    JPH::Body* mpPhysicsBody = nullptr;
 
     bool mbPhysicsEnabled = false;
     bool mbHasPhysicsBody = false;

@@ -127,7 +127,8 @@ float32 FxVec3f::Dot(const FxVec3f& other) const
     return vaddvq_f32(prod);
 }
 
-void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) { jolt_vec.mValue = mIntrin; }
+void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
+void FxVec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }
 
 FxVec3f FxVec3f::Min(const FxVec3f& a, const FxVec3f& b) { return FxVec3f(vminq_f32(a.mIntrin, b.mIntrin)); }
 FxVec3f FxVec3f::Max(const FxVec3f& a, const FxVec3f& b) { return FxVec3f(vmaxq_f32(a.mIntrin, b.mIntrin)); }

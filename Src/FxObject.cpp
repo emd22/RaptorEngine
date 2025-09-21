@@ -178,6 +178,12 @@ void FxObject::RenderMesh()
     }
 }
 
+void FxObject::Update()
+{
+    mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
+    UpdateTranslation();
+}
+
 void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::PhysicsType type)
 {
     if (mbHasPhysicsBody) {
@@ -213,12 +219,20 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
 
     JPH::RVec3 box_dimensions;
     Dimensions.ToJoltVec3(box_dimensions);
+    FxLogDebug("Creating physics body of dimensions {}", Dimensions);
 
     JPH::BodyCreationSettings body_settings(new JPH::BoxShape(box_dimensions), box_position, JPH::Quat::sIdentity(),
                                             motion_type, object_layer);
 
-    gPhysics->PhysicsSystem.GetBodyInterface().CreateAndAddBody(body_settings, activation_mode);
+    JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
+
+
+    mpPhysicsBody = body_interface.CreateBody(body_settings);
+    body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
+
+    // body_interface.CreateAndAddBody(body_settings, activation_mode);
 }
+
 
 void FxObject::DestroyPhysicsBody()
 {
@@ -226,5 +240,5 @@ void FxObject::DestroyPhysicsBody()
         return;
     }
 
-    gPhysics->PhysicsSystem.GetBodyInterface().DestroyBody(mPhysicsBodyId);
+    gPhysics->PhysicsSystem.GetBodyInterface().DestroyBody(GetPhysicsBodyId());
 }

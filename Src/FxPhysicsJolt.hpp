@@ -40,6 +40,8 @@ public:
 public:
     JPH::PhysicsSystem PhysicsSystem;
 
+    bool bPhysicsPaused = false;
+
 private:
     FxMemberRef<JPH::TempAllocatorImpl> mpTempAllocator;
     FxMemberRef<JPH::JobSystemThreadPool> mpJobSystem;

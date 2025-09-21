@@ -27,7 +27,8 @@ public:
 
     void Set(float32 x, float32 y, float32 z);
 
-    void ToJoltVec3(JPH::RVec3& jolt_vec);
+    void ToJoltVec3(JPH::RVec3& jolt_vec) const;
+    void FromJoltVec3(const JPH::RVec3& jolt_vec);
 
     FxVec3f operator+(const FxVec3f& other) const;
     FxVec3f operator-(const FxVec3f& other) const;
