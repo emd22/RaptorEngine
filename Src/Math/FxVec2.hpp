@@ -90,8 +90,15 @@ public:
     static const FxVec2Base<Type> Zero;
 
 public:
-    Type X;
-    Type Y;
+    union alignas(16)
+    {
+        float32 mData[2];
+
+        struct
+        {
+            Type X, Y;
+        };
+    };
 };
 
 // Declaration of Vec2::Zero

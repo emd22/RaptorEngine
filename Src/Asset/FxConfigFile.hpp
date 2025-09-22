@@ -126,7 +126,7 @@ public:
 
 
 private:
-    void ParseEntries(FxMPPagedArray<FxTokenizer::Token>& tokens);
+    void ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens);
 
 private:
     std::vector<FxConfigEntry> mConfigEntries;

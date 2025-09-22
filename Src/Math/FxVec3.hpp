@@ -82,7 +82,7 @@ public:
     union alignas(16)
     {
         float32x4_t mIntrin;
-        float mData[4];
+        float32 mData[4];
 
         struct
         {

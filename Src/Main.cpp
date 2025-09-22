@@ -197,8 +197,8 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
-    fireplace_object->WaitUntilLoaded();
+    // FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
+    // fireplace_object->WaitUntilLoaded();
 
     FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
@@ -239,7 +239,7 @@ int main()
     cube_object.Create(generated_cube->AsMesh(), cube_material);
     cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic);
 
-    fireplace_object->RotateX(M_PI_2);
+    // fireplace_object->RotateX(M_PI_2);
 
     FxSizedArray<VkDescriptorSet> sets_to_bind;
     sets_to_bind.InitSize(2);

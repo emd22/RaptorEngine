@@ -55,19 +55,33 @@ FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::A
         vertex->Position[2] = vec.Z;
     }
 
+    mesh->VertexList.LocalBuffer = std::move(points);
+    mesh->UploadVertices();
+
+    mesh->UploadIndices(Indices);
+
+    mesh->IsReady.store(true);
+
     // Create the mesh using our bodged point array
-    mesh->CreateFromData(points, Indices);
+    // mesh->CreateFromData(points, Indices);
 
     return mesh;
 }
 
 FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
 {
+    // Create a mesh using the default vertex format (positions, normals, uvs)
     FxRef<FxPrimitiveMesh<>> mesh = FxMakeRef<FxPrimitiveMesh<>>();
     mesh->IsReference = true;
 
-    auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
-    mesh->CreateFromData(fat_vertices, Indices);
+    // Create the vertex list from our list of positions
+    mesh->VertexList.CreateFrom(Positions);
+    mesh->UploadVertices();
+
+    mesh->UploadIndices(Indices);
+
+    // auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
+    // mesh->CreateFromData(fat_vertices, Indices);
 
     mesh->IsReady.store(true);
 

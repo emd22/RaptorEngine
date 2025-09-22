@@ -191,6 +191,8 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
         return;
     }
 
+    Dimensions = Mesh->VertexList.CalculateDimensionsFromPositions();
+
     JPH::EActivation activation_mode = JPH::EActivation::Activate;
 
     if (flags & FxObject::PF_CreateInactive) {
@@ -221,8 +223,13 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
     Dimensions.ToJoltVec3(box_dimensions);
     FxLogDebug("Creating physics body of dimensions {}", Dimensions);
 
-    JPH::BodyCreationSettings body_settings(new JPH::BoxShape(box_dimensions), box_position, JPH::Quat::sIdentity(),
-                                            motion_type, object_layer);
+    JPH::BoxShapeSettings box_shape_settings(box_dimensions);
+    box_shape_settings.SetEmbedded();
+
+    JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
+    JPH::ShapeRefC box_shape = box_shape_result.Get();
+
+    JPH::BodyCreationSettings body_settings(box_shape, box_position, JPH::Quat::sIdentity(), motion_type, object_layer);
 
     JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
 

@@ -1,3 +1,6 @@
+#define FX_PAGED_ARRAY_USE_MALLOC 1
+
+
 #include "FxMemPool.hpp"
 
 #include "../FxDefines.hpp"
@@ -302,9 +305,9 @@ FxMemPool& FxMemPool::GetGlobalPool()
 
 auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
-    FxSpinThreadGuard guard(&mInUse);
+    FxSpinThreadGuard guard(&mbInUse);
 
-    auto* node = mCurrentPage->AllocateMemory(requested_size);
+    auto* node = mpCurrentPage->AllocateMemory(requested_size);
 
     // If we could not allocate any memory in the current page, try to allocate in one of the previous pages.
 
@@ -329,7 +332,7 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoo
     if (node == nullptr) {
         printf("Allocating new MemPool!\n");
         AllocateNewPage();
-        node = mCurrentPage->AllocateMemory(requested_size);
+        node = mpCurrentPage->AllocateMemory(requested_size);
     }
 
     // If we have a fresh memory block and that is still too small, we can assume
@@ -429,6 +432,21 @@ void FxMemPoolPage::Destroy()
 // FxMemPool Functions
 ////////////////////////////
 
+void FxMemPool::Create(uint64 page_size, uint64 size_unit)
+{
+    FxSpinThreadGuard guard(&mbInUse);
+    {
+        mPageSize = page_size * size_unit;
+
+        mPoolPages.Create(8);
+#ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
+        mCreatedThreadId = std::this_thread::get_id();
+#endif
+    }
+
+    AllocateNewPage();
+}
+
 void FxMemPool::PrintAllocations()
 {
     FxMemPool& pool = GetGlobalPool();
@@ -494,8 +512,8 @@ void FxMemPool::AllocateNewPage()
 {
     FxMemPoolPage* page = mPoolPages.Insert();
 
-    mCurrentPage = page;
-    mCurrentPage->Create(mPageSize);
+    mpCurrentPage = page;
+    mpCurrentPage->Create(mPageSize);
 
     FxLogInfo("Allocating a new memory page!");
 }

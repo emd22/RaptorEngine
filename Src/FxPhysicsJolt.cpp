@@ -32,129 +32,6 @@ static void JoltTrace(const char* fmt, ...)
 }
 
 
-/// Class that determines if two object layers can collide
-class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
-{
-public:
-    virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
-    {
-        switch (inObject1) {
-        case FxPhysicsLayer::Static:
-            return inObject2 == FxPhysicsLayer::Dynamic; // Non moving only collides with moving
-        case FxPhysicsLayer::Dynamic:
-            return true; // Moving collides with everything
-        default:
-            JPH_ASSERT(false);
-            return false;
-        }
-    }
-};
-
-// BroadPhaseLayerInterface implementation
-// This defines a mapping between object and broadphase layers.
-class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
-{
-public:
-    BPLayerInterfaceImpl()
-    {
-        // Create a mapping table from object to broad phase layer
-        mObjectToBroadPhase[FxPhysicsLayer::Static] = FxPhysicsBroadPhaseLayer::Static;
-        mObjectToBroadPhase[FxPhysicsLayer::Dynamic] = FxPhysicsBroadPhaseLayer::Dynamic;
-    }
-
-    virtual uint GetNumBroadPhaseLayers() const override { return FxPhysicsBroadPhaseLayer::NumLayers; }
-
-    virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
-    {
-        JPH_ASSERT(inLayer < FxPhysicsLayer::NumLayers);
-        return mObjectToBroadPhase[inLayer];
-    }
-
-#if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
-    virtual const char* GetBroadPhaseLayerName(BroadPhaseLayer inLayer) const override
-    {
-        switch ((BroadPhaseLayer::Type)inLayer) {
-        case (BroadPhaseLayer::Type)BroadPhaseLayers::NON_MOVING:
-            return "NON_MOVING";
-        case (BroadPhaseLayer::Type)BroadPhaseLayers::MOVING:
-            return "MOVING";
-        default:
-            JPH_ASSERT(false);
-            return "INVALID";
-        }
-    }
-#endif // JPH_EXTERNAL_PROFILE || JPH_PROFILE_ENABLED
-
-private:
-    JPH::BroadPhaseLayer mObjectToBroadPhase[FxPhysicsLayer::NumLayers];
-};
-
-/// Class that determines if an object layer can collide with a broadphase layer
-class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter
-{
-public:
-    virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
-    {
-        switch (inLayer1) {
-        case FxPhysicsLayer::Static:
-            return inLayer2 == FxPhysicsBroadPhaseLayer::Dynamic;
-        case FxPhysicsLayer::Dynamic:
-            return true;
-        default:
-            JPH_ASSERT(false);
-            return false;
-        }
-    }
-};
-
-// An example contact listener
-class MyContactListener : public JPH::ContactListener
-{
-public:
-    // See: ContactListener
-    virtual JPH::ValidateResult OnContactValidate(const JPH::Body& inBody1, const JPH::Body& inBody2,
-                                                  JPH::RVec3Arg inBaseOffset,
-                                                  const JPH::CollideShapeResult& inCollisionResult) override
-    {
-        FxLogInfo("Contact validate callback");
-
-        // Allows you to ignore a contact before it is created (using layers to not make objects collide is cheaper!)
-        return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;
-    }
-
-    virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
-                                const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
-    {
-        FxLogInfo("A contact was added");
-    }
-
-    virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
-                                    const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
-    {
-        FxLogInfo("A contact was persisted");
-    }
-
-    virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override
-    {
-        FxLogInfo("A contact was removed");
-    }
-};
-
-// An example activation listener
-class MyBodyActivationListener : public JPH::BodyActivationListener
-{
-public:
-    virtual void OnBodyActivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override
-    {
-        FxLogInfo("A body got activated");
-    }
-
-    virtual void OnBodyDeactivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override
-    {
-        FxLogInfo("A body went to sleep");
-    }
-};
-
 using namespace JPH::literals;
 
 
@@ -185,9 +62,9 @@ void FxPhysicsJolt::Create()
 
     JPH::RegisterTypes();
 
-    mpTempAllocator.Create(10 * FxUnitMebibyte);
+    mpTempAllocator.InitRef(10 * FxUnitMebibyte);
 
-    mpJobSystem.Create(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, JPH::thread::hardware_concurrency() - 1);
+    mpJobSystem.InitRef(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, JPH::thread::hardware_concurrency() - 1);
 
     const uint32 max_bodies = 1024;
     const uint32 num_body_mutexes = 0;
@@ -195,34 +72,19 @@ void FxPhysicsJolt::Create()
 
     const uint32 max_contact_constraints = 1024;
 
-    BPLayerInterfaceImpl broad_phase_layer_interface;
-
-    // Create class that filters object vs broadphase layers
-    // Note: As this is an interface, PhysicsSystem will take a reference to this so this instance needs to stay alive!
-    // Also have a look at ObjectVsBroadPhaseLayerFilterTable or ObjectVsBroadPhaseLayerFilterMask for a simpler
-    // interface.
-    ObjectVsBroadPhaseLayerFilterImpl object_vs_broadphase_layer_filter;
-
-    // Create class that filters object vs object layers
-    // Note: As this is an interface, PhysicsSystem will take a reference to this so this instance needs to stay alive!
-    // Also have a look at ObjectLayerPairFilterTable or ObjectLayerPairFilterMask for a simpler interface.
-    ObjectLayerPairFilterImpl object_vs_object_layer_filter;
-
     // Now we can create the actual physics system.
-    PhysicsSystem.Init(max_bodies, num_body_mutexes, max_body_pairs, max_contact_constraints,
-                       broad_phase_layer_interface, object_vs_broadphase_layer_filter, object_vs_object_layer_filter);
+    PhysicsSystem.Init(max_bodies, num_body_mutexes, max_body_pairs, max_contact_constraints, mBroadPhaseInterface,
+                       mObjectVsBPLayerFilter, mObjectLayerPairFilter);
 
     // A body activation listener gets notified when bodies activate and go to sleep
     // Note that this is called from a job so whatever you do here needs to be thread safe.
     // Registering one is entirely optional.
-    MyBodyActivationListener body_activation_listener;
-    PhysicsSystem.SetBodyActivationListener(&body_activation_listener);
+    PhysicsSystem.SetBodyActivationListener(&mBodyActivationListener);
 
     // A contact listener gets notified when bodies (are about to) collide, and when they separate again.
     // Note that this is called from a job so whatever you do here needs to be thread safe.
     // Registering one is entirely optional.
-    MyContactListener contact_listener;
-    PhysicsSystem.SetContactListener(&contact_listener);
+    PhysicsSystem.SetContactListener(&mContactListener);
 
     // The main way to interact with the bodies in the physics system is through the body interface. There is a locking
     // and a non-locking variant of this. We're going to use the locking version (even though we're not planning to
@@ -271,7 +133,7 @@ void FxPhysicsJolt::Create()
     // detection performance (it's pointless here because we only have 2 bodies). You should definitely not call this
     // every frame or when e.g. streaming in a new level section as it is an expensive operation. Instead insert all new
     // objects in batches instead of 1 at a time to keep the broad phase efficient.
-    PhysicsSystem.OptimizeBroadPhase();
+    // PhysicsSystem.OptimizeBroadPhase();
 
     mbIsInited = true;
 }

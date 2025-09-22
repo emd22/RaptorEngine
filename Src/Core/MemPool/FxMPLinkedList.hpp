@@ -217,6 +217,6 @@ public:
     Node* Tail = nullptr;
 
 private:
-    FxMPPagedArray<Node> mNodePool;
-    FxMPPagedArray<Node*> mFreedNodes;
+    FxPagedArray<Node> mNodePool;
+    FxPagedArray<Node*> mFreedNodes;
 };

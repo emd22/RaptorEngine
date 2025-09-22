@@ -84,7 +84,7 @@ public:
     FxRef<FxPrimitiveMesh<>> Mesh { nullptr };
     FxRef<FxMaterial> Material { nullptr };
 
-    FxMPPagedArray<FxRef<FxObject>> AttachedNodes;
+    FxPagedArray<FxRef<FxObject>> AttachedNodes;
 
     FxVec3f Dimensions = FxVec3f::Zero;
 

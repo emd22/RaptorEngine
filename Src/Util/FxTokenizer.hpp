@@ -582,7 +582,7 @@ public:
         return (token.Start - mData);
     }
 
-    FxMPPagedArray<Token>& GetTokens() { return mTokens; }
+    FxPagedArray<Token>& GetTokens() { return mTokens; }
 
     void SaveState()
     {
@@ -618,5 +618,5 @@ private:
     uint32 mFileLine = 0;
     char* mStartOfLine = nullptr;
 
-    FxMPPagedArray<Token> mTokens;
+    FxPagedArray<Token> mTokens;
 };

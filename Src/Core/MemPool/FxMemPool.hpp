@@ -2,6 +2,8 @@
 
 #include "../FxDefines.hpp"
 #include "../FxTypes.hpp"
+
+#define FX_PAGED_ARRAY_USE_MALLOC 1
 #include "FxMPLinkedList.hpp"
 
 #include <type_traits>
@@ -182,20 +184,7 @@ public:
      * Creates a new memory pool with paging.
      * @param page_size_kb The size of each page in kilobytes.
      */
-    void Create(uint64 page_size, uint64 size_unit)
-    {
-        FxSpinThreadGuard guard(&mInUse);
-        {
-            mPageSize = page_size * size_unit;
-
-            mPoolPages.Create(8);
-#ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
-            mCreatedThreadId = std::this_thread::get_id();
-#endif
-        }
-
-        AllocateNewPage();
-    }
+    void Create(uint64 page_size, uint64 size_unit);
 
     /**
      * Allocates a raw memory block on a memory pool.
@@ -262,7 +251,7 @@ public:
         if constexpr (std::is_destructible_v<Type>) {
             ptr->~Type();
         }
-        FxSpinThreadGuard guard(&pool->mInUse);
+        FxSpinThreadGuard guard(&pool->mbInUse);
 
 #ifdef FX_MEMPOOL_TRACK_STATISTICS
         ++pool->mStats.TotalFrees;
@@ -281,12 +270,12 @@ private:
     void AllocateNewPage();
 
 private:
-    FxMemPoolPage* mCurrentPage = nullptr;
+    FxMemPoolPage* mpCurrentPage = nullptr;
     uint64 mPageSize = 0;
 
-    FxMPPagedArray<FxMemPoolPage> mPoolPages;
+    FxPagedArray<FxMemPoolPage> mPoolPages;
 
-    FxAtomicFlag mInUse {};
+    FxAtomicFlag mbInUse {};
 
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
     std::thread::id mCreatedThreadId;
@@ -296,3 +285,5 @@ private:
     FxMemPoolStatistics mStats;
 #endif
 };
+
+#undef FX_PAGED_ARRAY_USE_MALLOC

@@ -155,14 +155,14 @@ public:
     void Map()
     {
         if (IsMapped()) {
-            OldLog::Warning("Buffer %p is already mapped!", Buffer);
+            FxLogWarning("Buffer {:p} is already mapped!", reinterpret_cast<void*>(Buffer));
             return;
         }
 
         const VkResult status = vmaMapMemory(Fx_Fwd_GetGpuAllocator(), Allocation, &MappedBuffer);
 
         if (status != VK_SUCCESS) {
-            OldLog::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", mUsageFlags);
+            FxLogError("Could not map GPU memory to main memory! (Usage: 0x{:x})", mUsageFlags);
             return;
         }
     }

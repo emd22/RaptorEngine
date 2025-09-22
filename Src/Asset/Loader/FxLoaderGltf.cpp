@@ -49,16 +49,21 @@ void FxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
 
     // FxLogInfo("Positions:");
 
-    auto combined_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBufferAndCalcDimensions(positions, normals, uvs,
-                                                                                          &object->Dimensions);
+    // auto combined_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBufferAndCalcDimensions(positions, normals, uvs,
+    // &object->Dimensions);
     // for (const auto& vertex : combined_vertices) {
     //     printf("FxVec3f(%f, %f, %f), ", vertex.Position[0], vertex.Position[1], vertex.Position[2]);
     // }
 
     // printf("\n");
 
+
     // Upload the vertices to the primtive mesh
-    mesh->UploadVertices(std::move(combined_vertices));
+    // mesh->UploadVertices(std::move(combined_vertices));
+
+    mesh->VertexList.CreateFrom(positions, normals, uvs);
+    mesh->UploadVertices();
+
     mesh->IsReady = true;
 }
 

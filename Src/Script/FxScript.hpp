@@ -15,15 +15,15 @@
 #include <Core/FxMemory.hpp>
 
 #define FX_SCRIPT_ALLOC_MEMORY(ptrtype_, size_) FxMemPool::Alloc<ptrtype_>(size_)
-#define FX_SCRIPT_ALLOC_NODE(nodetype_) FxMemPool::Alloc<nodetype_>(sizeof(nodetype_))
-#define FX_SCRIPT_FREE(ptrtype_, ptr_) FxMemPool::Free<ptrtype_>(ptr_)
+#define FX_SCRIPT_ALLOC_NODE(nodetype_)         FxMemPool::Alloc<nodetype_>(sizeof(nodetype_))
+#define FX_SCRIPT_FREE(ptrtype_, ptr_)          FxMemPool::Free<ptrtype_>(ptr_)
 
 #else
 
 // #define FX_SCRIPT_ALLOC_MEMORY(ptrtype_, size_) new ptrtype_[size_]
 #define FX_SCRIPT_ALLOC_MEMORY(ptrtype_, size_) FxScriptAllocMemory<ptrtype_>(size_)
-#define FX_SCRIPT_ALLOC_NODE(nodetype_) FxScriptAllocMemory<nodetype_>(sizeof(nodetype_))
-#define FX_SCRIPT_FREE(ptrtype_, ptr_) FxScriptFreeMemory<ptrtype_>(ptr_)
+#define FX_SCRIPT_ALLOC_NODE(nodetype_)         FxScriptAllocMemory<nodetype_>(sizeof(nodetype_))
+#define FX_SCRIPT_FREE(ptrtype_, ptr_)          FxScriptFreeMemory<ptrtype_>(ptr_)
 
 #include <cstdlib>
 
@@ -80,17 +80,11 @@ struct FxScriptValue
         FxAstVarRef* ValueRef;
     };
 
-    FxScriptValue()
-    {
-    }
+    FxScriptValue() {}
 
-    explicit FxScriptValue(ValueType type, int value) : Type(type), ValueInt(value)
-    {
-    }
+    explicit FxScriptValue(ValueType type, int value) : Type(type), ValueInt(value) {}
 
-    explicit FxScriptValue(ValueType type, float value) : Type(type), ValueFloat(value)
-    {
-    }
+    explicit FxScriptValue(ValueType type, float value) : Type(type), ValueFloat(value) {}
 
     FxScriptValue(const FxScriptValue& other)
     {
@@ -129,15 +123,9 @@ struct FxScriptValue
         }
     }
 
-    inline bool IsNumber()
-    {
-        return (Type == INT || Type == FLOAT);
-    }
+    inline bool IsNumber() { return (Type == INT || Type == FLOAT); }
 
-    inline bool IsRef()
-    {
-        return (Type == REF);
-    }
+    inline bool IsRef() { return (Type == REF); }
 };
 
 enum FxAstType
@@ -172,10 +160,7 @@ struct FxAstNode
 
 struct FxAstLiteral : public FxAstNode
 {
-    FxAstLiteral()
-    {
-        this->NodeType = FX_AST_LITERAL;
-    }
+    FxAstLiteral() { this->NodeType = FX_AST_LITERAL; }
 
     // FxTokenizer::Token* Token = nullptr;
     FxScriptValue Value;
@@ -183,10 +168,7 @@ struct FxAstLiteral : public FxAstNode
 
 struct FxAstBinop : public FxAstNode
 {
-    FxAstBinop()
-    {
-        this->NodeType = FX_AST_BINOP;
-    }
+    FxAstBinop() { this->NodeType = FX_AST_BINOP; }
 
     FxTokenizer::Token* OpToken = nullptr;
     FxAstNode* Left = nullptr;
@@ -195,20 +177,14 @@ struct FxAstBinop : public FxAstNode
 
 struct FxAstBlock : public FxAstNode
 {
-    FxAstBlock()
-    {
-        this->NodeType = FX_AST_BLOCK;
-    }
+    FxAstBlock() { this->NodeType = FX_AST_BLOCK; }
 
     std::vector<FxAstNode*> Statements;
 };
 
 struct FxAstVarRef : public FxAstNode
 {
-    FxAstVarRef()
-    {
-        this->NodeType = FX_AST_VARREF;
-    }
+    FxAstVarRef() { this->NodeType = FX_AST_VARREF; }
 
     FxTokenizer::Token* Name = nullptr;
     FxScriptScope* Scope = nullptr;
@@ -216,10 +192,7 @@ struct FxAstVarRef : public FxAstNode
 
 struct FxAstAssign : public FxAstNode
 {
-    FxAstAssign()
-    {
-        this->NodeType = FX_AST_ASSIGN;
-    }
+    FxAstAssign() { this->NodeType = FX_AST_ASSIGN; }
 
     FxAstVarRef* Var = nullptr;
     // FxScriptValue Value;
@@ -228,10 +201,7 @@ struct FxAstAssign : public FxAstNode
 
 struct FxAstVarDecl : public FxAstNode
 {
-    FxAstVarDecl()
-    {
-        this->NodeType = FX_AST_VARDECL;
-    }
+    FxAstVarDecl() { this->NodeType = FX_AST_VARDECL; }
 
     FxTokenizer::Token* Name = nullptr;
     FxTokenizer::Token* Type = nullptr;
@@ -243,20 +213,14 @@ struct FxAstVarDecl : public FxAstNode
 
 struct FxAstDocComment : public FxAstNode
 {
-    FxAstDocComment()
-    {
-        this->NodeType = FX_AST_DOCCOMMENT;
-    }
+    FxAstDocComment() { this->NodeType = FX_AST_DOCCOMMENT; }
 
     FxTokenizer::Token* Comment;
 };
 
 struct FxAstActionDecl : public FxAstNode
 {
-    FxAstActionDecl()
-    {
-        this->NodeType = FX_AST_ACTIONDECL;
-    }
+    FxAstActionDecl() { this->NodeType = FX_AST_ACTIONDECL; }
 
     FxTokenizer::Token* Name = nullptr;
     FxAstVarDecl* ReturnVar = nullptr;
@@ -268,20 +232,14 @@ struct FxAstActionDecl : public FxAstNode
 
 struct FxAstCommandMode : public FxAstNode
 {
-    FxAstCommandMode()
-    {
-        this->NodeType = FX_AST_COMMANDMODE;
-    }
+    FxAstCommandMode() { this->NodeType = FX_AST_COMMANDMODE; }
 
     FxAstNode* Node = nullptr;
 };
 
 struct FxAstActionCall : public FxAstNode
 {
-    FxAstActionCall()
-    {
-        this->NodeType = FX_AST_ACTIONCALL;
-    }
+    FxAstActionCall() { this->NodeType = FX_AST_ACTIONCALL; }
 
     FxScriptAction* Action = nullptr;
     FxHash HashedName = 0;
@@ -290,10 +248,7 @@ struct FxAstActionCall : public FxAstNode
 
 struct FxAstReturn : public FxAstNode
 {
-    FxAstReturn()
-    {
-        this->NodeType = FX_AST_RETURN;
-    }
+    FxAstReturn() { this->NodeType = FX_AST_RETURN; }
 };
 
 /**
@@ -331,15 +286,15 @@ struct FxScriptVar : public FxScriptLabelledData
 
     void Print() const
     {
-        printf("[Var] Type: %.*s, Name: %.*s (Hash:%u)", Type->Length, Type->Start, Name->Length, Name->Start, Name->GetHash());
+        printf("[Var] Type: %.*s, Name: %.*s (Hash:%u)", Type->Length, Type->Start, Name->Length, Name->Start,
+               Name->GetHash());
         Value.Print();
     }
 
-    FxScriptVar()
-    {
-    }
+    FxScriptVar() {}
 
-    FxScriptVar(FxTokenizer::Token* type, FxTokenizer::Token* name, FxScriptScope* scope, bool is_external = false) : Type(type)
+    FxScriptVar(FxTokenizer::Token* type, FxTokenizer::Token* name, FxScriptScope* scope, bool is_external = false)
+        : Type(type)
     {
         this->HashedName = name->GetHash();
         this->Name = name;
@@ -394,7 +349,8 @@ class FxScriptVM;
 
 struct FxScriptExternalFunc
 {
-    // using FuncType = void (*)(FxScriptInterpreter& interpreter, std::vector<FxScriptValue>& params, FxScriptValue* return_value);
+    // using FuncType = void (*)(FxScriptInterpreter& interpreter, std::vector<FxScriptValue>& params, FxScriptValue*
+    // return_value);
 
     using FuncType = void (*)(FxScriptVM* vm, std::vector<FxScriptValue>& params, FxScriptValue* return_value);
 
@@ -407,8 +363,8 @@ struct FxScriptExternalFunc
 
 struct FxScriptScope
 {
-    FxMPPagedArray<FxScriptVar> Vars;
-    FxMPPagedArray<FxScriptAction> Actions;
+    FxPagedArray<FxScriptVar> Vars;
+    FxPagedArray<FxScriptAction> Actions;
 
     FxScriptScope* Parent = nullptr;
 
@@ -424,19 +380,13 @@ struct FxScriptScope
         }
     }
 
-    FxScriptVar* FindVarInScope(FxHash hashed_name)
-    {
-        return FindInScope<FxScriptVar>(hashed_name, Vars);
-    }
+    FxScriptVar* FindVarInScope(FxHash hashed_name) { return FindInScope<FxScriptVar>(hashed_name, Vars); }
 
-    FxScriptAction* FindActionInScope(FxHash hashed_name)
-    {
-        return FindInScope<FxScriptAction>(hashed_name, Actions);
-    }
+    FxScriptAction* FindActionInScope(FxHash hashed_name) { return FindInScope<FxScriptAction>(hashed_name, Actions); }
 
     template <typename T>
         requires std::is_base_of_v<FxScriptLabelledData, T>
-    T* FindInScope(FxHash hashed_name, const FxMPPagedArray<T>& buffer)
+    T* FindInScope(FxHash hashed_name, const FxPagedArray<T>& buffer)
     {
         for (T& var : buffer) {
             if (var.HashedName == hashed_name) {
@@ -504,15 +454,15 @@ public:
     Token& GetToken(int offset = 0);
     Token& EatToken(TT token_type);
 
-    void RegisterExternalFunc(FxHash func_name, std::vector<FxScriptValue::ValueType> param_types, FxScriptExternalFunc::FuncType func,
-                              bool is_variadic);
+    void RegisterExternalFunc(FxHash func_name, std::vector<FxScriptValue::ValueType> param_types,
+                              FxScriptExternalFunc::FuncType func, bool is_variadic);
 
     void DefineExternalVar(const char* type, const char* name, const FxScriptValue& value);
 
 private:
     template <typename T>
         requires std::is_base_of_v<FxScriptLabelledData, T>
-    T* FindLabelledData(FxHash hashed_name, FxMPPagedArray<T>& buffer)
+    T* FindLabelledData(FxHash hashed_name, FxPagedArray<T>& buffer)
     {
         FxScriptScope* scope = mCurrentScope;
 
@@ -531,7 +481,7 @@ private:
     void DefineDefaultExternalFunctions();
 
 private:
-    FxMPPagedArray<FxScriptScope> mScopes;
+    FxPagedArray<FxScriptScope> mScopes;
     FxScriptScope* mCurrentScope;
 
     std::vector<FxScriptExternalFunc> mExternalFuncs;
@@ -544,7 +494,7 @@ private:
     bool mInCommandMode = false;
 
     char* mFileData;
-    FxMPPagedArray<Token> mTokens = {};
+    FxPagedArray<Token> mTokens = {};
     uint32 mTokenIndex = 0;
 };
 
@@ -746,7 +696,7 @@ public:
 
     static const char* GetRegisterName(FxScriptRegister reg);
 
-    FxMPPagedArray<uint8> mBytecode {};
+    FxPagedArray<uint8> mBytecode {};
 
     enum VarDeclareMode
     {
@@ -821,7 +771,7 @@ private:
     void MarkRegisterFree(FxScriptRegister reg);
 
 public:
-    FxMPPagedArray<FxScriptBytecodeVarHandle> VarHandles;
+    FxPagedArray<FxScriptBytecodeVarHandle> VarHandles;
     std::vector<FxScriptBytecodeActionHandle> ActionHandles;
 
 private:
@@ -836,7 +786,7 @@ private:
 class FxScriptBCPrinter
 {
 public:
-    FxScriptBCPrinter(FxMPPagedArray<uint8>& bytecode)
+    FxScriptBCPrinter(FxPagedArray<uint8>& bytecode)
     {
         mBytecode = bytecode;
         mBytecode.DoNotDestroy = true;
@@ -862,7 +812,7 @@ private:
 
 private:
     uint32 mBytecodeIndex = 0;
-    FxMPPagedArray<uint8> mBytecode;
+    FxPagedArray<uint8> mBytecode;
 };
 
 
@@ -880,7 +830,7 @@ class FxScriptVM
 public:
     FxScriptVM() = default;
 
-    void Start(FxMPPagedArray<uint8>&& bytecode)
+    void Start(FxPagedArray<uint8>&& bytecode)
     {
         mBytecode = std::move(bytecode);
         mPushedTypes.Create(64);
@@ -934,7 +884,7 @@ public:
 
     std::vector<FxScriptExternalFunc> mExternalFuncs;
 
-    FxMPPagedArray<uint8> mBytecode;
+    FxPagedArray<uint8> mBytecode;
 
 private:
     uint32 mPC = 0;
@@ -946,7 +896,7 @@ private:
     int mCallFrameIndex = 0;
 
     bool mIsInParams = false;
-    FxMPPagedArray<FxScriptValue::ValueType> mPushedTypes;
+    FxPagedArray<FxScriptValue::ValueType> mPushedTypes;
 
     FxScriptValue::ValueType mCurrentType = FxScriptValue::NONETYPE;
 };
@@ -968,7 +918,8 @@ public:
     FxScriptExternalFunc* FindExternalAction(FxHash hashed_name);
 
     /**
-     * @brief Evaluates and gets the immediate value if `value` is a reference, or returns the value if it is already immediate.
+     * @brief Evaluates and gets the immediate value if `value` is a reference, or returns the value if it is already
+     * immediate.
      * @param value The value to query from
      * @return the immediate(literal) value
      */
@@ -999,6 +950,6 @@ private:
 
     std::vector<FxScriptExternalFunc> mExternalFuncs;
 
-    FxMPPagedArray<FxScriptScope> mScopes;
+    FxPagedArray<FxScriptScope> mScopes;
     FxScriptScope* mCurrentScope = nullptr;
 };

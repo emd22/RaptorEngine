@@ -207,9 +207,8 @@ public:
 
     void Clear() { Size = 0; }
 
-    bool IsEmpty() { return Size == 0; }
-
-    bool IsNotEmpty() { return !IsEmpty(); }
+    inline bool IsEmpty() const { return Size == 0; }
+    inline bool IsNotEmpty() const { return !IsEmpty(); }
 
     void Insert(const TElementType& object)
     {
