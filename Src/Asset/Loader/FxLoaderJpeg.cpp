@@ -109,14 +109,14 @@ void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
     image->Texture.Create(image->ImageType, mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, 4);
 
-    asset->IsUploadedToGpu = true;
-    asset->IsUploadedToGpu.notify_all();
+    asset->bIsUploadedToGpu = true;
+    asset->bIsUploadedToGpu.notify_all();
 }
 
 void FxLoaderJpeg::Destroy(FxRef<FxAssetBase>& asset)
 {
-    //    while (!asset->IsUploadedToGpu) {
-    //        asset->IsUploadedToGpu.wait(true);
+    //    while (!asset->bIsUploadedToGpu) {
+    //        asset->bIsUploadedToGpu.wait(true);
     //    }
 
     jpeg_destroy_decompress(&mJpegInfo);

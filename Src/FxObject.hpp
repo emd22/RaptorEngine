@@ -10,6 +10,16 @@
 #include <Renderer/FxPrimitiveMesh.hpp>
 
 
+struct FxPhysicsProperties
+{
+public:
+    FxPhysicsProperties() = default;
+
+    float32 ConvexRadius = 0.01f;
+    float32 Friction = 0.5f;
+    float32 Restitution = 0.3f;
+};
+
 class FxObject : public FxAssetBase, public FxEntity
 {
     friend class FxLoaderGltf;
@@ -52,8 +62,8 @@ public:
             }
         }
 
-        mReadyToRender = false;
-        IsUploadedToGpu = false;
+        mbReadyToRender = false;
+        bIsUploadedToGpu = false;
     }
 
 
@@ -69,7 +79,7 @@ public:
     }
 
 
-    void CreatePhysicsBody(PhysicsFlags flags, PhysicsType type);
+    void CreatePhysicsBody(PhysicsFlags flags, PhysicsType type, const FxPhysicsProperties& properties);
     void DestroyPhysicsBody();
 
     inline JPH::Body* GetPhysicsBody() { return mpPhysicsBody; };
@@ -89,12 +99,11 @@ public:
     FxVec3f Dimensions = FxVec3f::Zero;
 
 private:
-    bool mReadyToRender = false;
-
     RxUniformBufferObject mUbo;
 
     JPH::Body* mpPhysicsBody = nullptr;
 
-    bool mbPhysicsEnabled = false;
-    bool mbHasPhysicsBody = false;
+    bool mbReadyToRender : 1 = false;
+    bool mbPhysicsEnabled : 1 = false;
+    bool mbHasPhysicsBody : 1 = false;
 };

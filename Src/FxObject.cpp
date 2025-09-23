@@ -16,28 +16,28 @@ void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMateri
 
 bool FxObject::CheckIfReady()
 {
-    if (mReadyToRender) {
-        return mReadyToRender;
+    if (mbReadyToRender) {
+        return mbReadyToRender;
     }
 
     // If this is a container object, check that the attached nodes are ready
     if (!AttachedNodes.IsEmpty()) {
         // If there is a mesh attached to the container as well, check it
         if (Mesh && !Mesh->IsReady) {
-            return (mReadyToRender = false);
+            return (mbReadyToRender = false);
         }
 
         if (Material && !Material->IsReady()) {
-            return (mReadyToRender = false);
+            return (mbReadyToRender = false);
         }
 
         for (FxRef<FxObject>& object : AttachedNodes) {
             if (!object->CheckIfReady()) {
-                return (mReadyToRender = false);
+                return (mbReadyToRender = false);
             }
         }
 
-        return (mReadyToRender = true);
+        return (mbReadyToRender = true);
     }
 
     if (!Mesh) {
@@ -45,15 +45,15 @@ bool FxObject::CheckIfReady()
     }
 
     if (!Material || !Material->IsReady()) {
-        return (mReadyToRender = false);
+        return (mbReadyToRender = false);
     }
 
     // This is not a container object, just check that the mesh is loaded
     if (!Mesh || !Mesh->IsReady.load()) {
-        return (mReadyToRender = false);
+        return (mbReadyToRender = false);
     }
 
-    return (mReadyToRender = true);
+    return (mbReadyToRender = true);
 }
 
 
@@ -181,10 +181,13 @@ void FxObject::RenderMesh()
 void FxObject::Update()
 {
     mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
+
+    mPosition *= FxVec3f(1, 1, 1);
     UpdateTranslation();
 }
 
-void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::PhysicsType type)
+void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::PhysicsType type,
+                                 const FxPhysicsProperties& properties)
 {
     if (mbHasPhysicsBody) {
         FxLogWarning("Attempting to create physics body when one is already created!");
@@ -217,24 +220,32 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
     }
 
     JPH::RVec3 box_position;
-    mPosition.ToJoltVec3(box_position);
+    (mPosition * FxVec3f(1, 1, 1)).ToJoltVec3(box_position);
 
     JPH::RVec3 box_dimensions;
-    Dimensions.ToJoltVec3(box_dimensions);
-    FxLogDebug("Creating physics body of dimensions {}", Dimensions);
+
+    FxVec3f fx_dimensions = Dimensions * mScale;
+
+    fx_dimensions.ToJoltVec3(box_dimensions);
+
+    FxLogDebug("Creating physics body of dimensions {}", fx_dimensions);
 
     JPH::BoxShapeSettings box_shape_settings(box_dimensions);
-    box_shape_settings.SetEmbedded();
+    box_shape_settings.mConvexRadius = properties.ConvexRadius;
+
+    // box_shape_settings.SetEmbedded();
 
     JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
     JPH::ShapeRefC box_shape = box_shape_result.Get();
 
     JPH::BodyCreationSettings body_settings(box_shape, box_position, JPH::Quat::sIdentity(), motion_type, object_layer);
+    body_settings.mFriction = properties.Friction;
+    body_settings.mRestitution = properties.Restitution;
 
     JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
 
-
     mpPhysicsBody = body_interface.CreateBody(body_settings);
+
     body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
 
     // body_interface.CreateAndAddBody(body_settings, activation_mode);

@@ -48,6 +48,8 @@ void FxPhysicsJolt::Update()
     PhysicsSystem.Update(mDeltaTime, collision_steps, mpTempAllocator.pPtr, mpJobSystem.pPtr);
 }
 
+void FxPhysicsJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
+
 void FxPhysicsJolt::Create()
 {
     if (mbIsInited) {
@@ -75,6 +77,7 @@ void FxPhysicsJolt::Create()
     // Now we can create the actual physics system.
     PhysicsSystem.Init(max_bodies, num_body_mutexes, max_body_pairs, max_contact_constraints, mBroadPhaseInterface,
                        mObjectVsBPLayerFilter, mObjectLayerPairFilter);
+
 
     // A body activation listener gets notified when bodies activate and go to sleep
     // Note that this is called from a job so whatever you do here needs to be thread safe.
@@ -145,6 +148,9 @@ void FxPhysicsJolt::Destroy()
     }
 
     JPH::UnregisterTypes();
+
+    delete JPH::Factory::sInstance;
+    JPH::Factory::sInstance = nullptr;
 }
 
 FxPhysicsJolt::FxPhysicsJolt() {}

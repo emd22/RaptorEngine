@@ -1,12 +1,9 @@
 #pragma once
 
-#include <atomic>
-
 #include <Core/FxDataNotifier.hpp>
-#include <Core/MemPool/FxMPPagedArray.hpp>
-
 #include <Core/FxRef.hpp>
-
+#include <Core/MemPool/FxMPPagedArray.hpp>
+#include <atomic>
 #include <functional>
 
 /**
@@ -17,47 +14,38 @@
 class FxAssetBase
 {
 protected:
-    FxAssetBase()
-    {
-    }
+    FxAssetBase() {}
 
 
     // template <typename T>
     // friend class FxRef;
 
 public:
-
     // using OnLoadFunc = void (*)(FxRef<FxBaseAsset> asset);
-    using OnLoadFunc = std::function<void (FxRef<FxAssetBase>)>;
+    using OnLoadFunc = std::function<void(FxRef<FxAssetBase>)>;
     using OnErrorFunc = void (*)(FxRef<FxAssetBase> asset);
 
     virtual void WaitUntilLoaded()
     {
-         if (IsFinishedNotifier.IsDone()) {
-             return;
-         }
+        if (IsFinishedNotifier.IsDone()) {
+            return;
+        }
 
         IsFinishedNotifier.WaitForData(true);
     }
 
     /** Returns true if the asset has been loaded and is in GPU memory. */
-    inline bool IsLoaded() const
-    {
-        return mIsLoaded.load();
-    }
+    inline bool IsLoaded() const { return mIsLoaded.load(); }
 
 
     virtual void Destroy() = 0;
 
-    virtual ~FxAssetBase()
-    {
-    }
+    virtual ~FxAssetBase() {}
 
     /**
      * Attaches a new callback for when the Asset is finished being loaded by the AssetManager.
      */
     // void OnLoaded(CallbackFunc &&on_loaded) { AttachCallback(FxAssetCallbackType::OnLoaded, std::move(on_loaded)); }
-
 
 
     void OnLoaded(const OnLoadFunc& on_loaded_callback)
@@ -85,7 +73,7 @@ public:
 
 public:
     FxDataNotifier IsFinishedNotifier;
-    std::atomic_bool IsUploadedToGpu = false;
+    std::atomic_bool bIsUploadedToGpu = false;
 
 protected:
     friend class FxLoaderGltf;

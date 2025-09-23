@@ -75,8 +75,8 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
     asset = image;
 
-    asset->IsUploadedToGpu = true;
-    asset->IsUploadedToGpu.notify_all();
+    asset->bIsUploadedToGpu = true;
+    asset->bIsUploadedToGpu.notify_all();
 }
 
 // void FxLoaderStb::LoadCubemapToLayeredImage(const RxImage&)
@@ -110,8 +110,8 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
 
 void FxLoaderStb::Destroy(FxRef<FxAssetBase>& asset)
 {
-    // while (!asset->IsUploadedToGpu) {
-    //     asset->IsUploadedToGpu.wait(true);
+    // while (!asset->bIsUploadedToGpu) {
+    //     asset->bIsUploadedToGpu.wait(true);
     // }
 
     stbi_image_free(mImageData);

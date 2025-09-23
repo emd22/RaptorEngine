@@ -117,8 +117,8 @@ void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMater
     // component.Texture = FxMakeRef<FxAssetImage>();
     // component.Texture->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
     // component.Texture->IsFinishedNotifier.SignalDataWritten();
-    // component.Texture->IsUploadedToGpu = true;
-    // component.Texture->IsUploadedToGpu.notify_all();
+    // component.Texture->bIsUploadedToGpu = true;
+    // component.Texture->bIsUploadedToGpu.notify_all();
     // component.Texture->mIsLoaded.store(true);
 }
 
@@ -380,14 +380,14 @@ void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
     //    current_object.mRefCnt = nullptr;
 
 
-    asset->IsUploadedToGpu = true;
-    asset->IsUploadedToGpu.notify_all();
+    asset->bIsUploadedToGpu = true;
+    asset->bIsUploadedToGpu.notify_all();
 }
 
 void FxLoaderGltf::Destroy(FxRef<FxAssetBase>& asset)
 {
-    //    while (!asset->IsUploadedToGpu) {
-    //        asset->IsUploadedToGpu.wait(true);
+    //    while (!asset->bIsUploadedToGpu) {
+    //        asset->bIsUploadedToGpu.wait(true);
     //    }
 
     if (mGltfData) {

@@ -234,8 +234,8 @@ void FxAssetManager::CheckForUploadableData()
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
 
-            while (!loaded_item.Asset->IsUploadedToGpu) {
-                loaded_item.Asset->IsUploadedToGpu.wait(true);
+            while (!loaded_item.Asset->bIsUploadedToGpu) {
+                loaded_item.Asset->bIsUploadedToGpu.wait(true);
             }
 
 

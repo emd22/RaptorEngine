@@ -116,8 +116,10 @@ public:
     {
         FxLogInfo("Contact validate callback");
 
-        // Allows you to ignore a contact before it is created (using layers to not make objects collide is cheaper!)
-        return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;
+        const JPH::ValidateResult result = ContactListener::OnContactValidate(inBody1, inBody2, inBaseOffset,
+                                                                              inCollisionResult);
+
+        return result;
     }
 
     virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
@@ -162,6 +164,8 @@ public:
     void Create();
     void Update();
     void Destroy();
+
+    void OptimizeBroadPhase();
 
     ~FxPhysicsJolt();
 

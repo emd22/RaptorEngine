@@ -7,14 +7,14 @@ static FxRef<FxAssetImage> sEmptyImage { nullptr };
 
 void FxAssetImage::Destroy()
 {
-    if (!IsUploadedToGpu.load()) {
+    if (!bIsUploadedToGpu.load()) {
         return;
     }
 
     Texture.Destroy();
 
     // mImageReady = false;
-    IsUploadedToGpu = false;
+    bIsUploadedToGpu = false;
 }
 
 FxRef<FxAssetImage> FxAssetImage::GetEmptyImage()
@@ -29,8 +29,8 @@ FxRef<FxAssetImage> FxAssetImage::GetEmptyImage()
 
     sEmptyImage->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
     sEmptyImage->IsFinishedNotifier.SignalDataWritten();
-    sEmptyImage->IsUploadedToGpu = true;
-    sEmptyImage->IsUploadedToGpu.notify_all();
+    sEmptyImage->bIsUploadedToGpu = true;
+    sEmptyImage->bIsUploadedToGpu.notify_all();
     sEmptyImage->mIsLoaded.store(true);
 
     return sEmptyImage;

@@ -232,12 +232,26 @@ int main()
 
     FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material", &deferred_renderer->GPassPipeline);
 
-    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
+    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 100, 100, 255);
     cube_material->DiffuseComponent.Texture = FxAssetImage::GetEmptyImage();
 
+    FxRef<FxPrimitiveMesh<>> generated_cube_mesh = generated_cube->AsMesh();
+
+    FxObject ground_object;
+    ground_object.Create(generated_cube_mesh, cube_material);
+    // ground_object.Scale(FxVec3f(10, 1, 10));
+    ground_object.MoveBy(FxVec3f(0, 10, 0));
+
+    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
+                                    FxObject::PhysicsType::Static, {});
+
     FxObject cube_object;
-    cube_object.Create(generated_cube->AsMesh(), cube_material);
-    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic);
+    cube_object.Create(generated_cube_mesh, cube_material);
+    cube_object.MoveBy(FxVec3f(0, 0, 0));
+
+    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
+
+    gPhysics->OptimizeBroadPhase();
 
     // fireplace_object->RotateX(M_PI_2);
 
@@ -319,7 +333,7 @@ int main()
 
         camera.Update();
 
-        // gPhysics->Update();
+        gPhysics->Update();
 
         //        helmet_object.RotateY(0.001 * DeltaTime);
 
@@ -334,9 +348,13 @@ int main()
         //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
+
         // fireplace_object->Render(camera);
-        // cube_object.Update();
+        cube_object.Update();
         cube_object.Render(camera);
+
+        ground_object.Update();
+        ground_object.Render(camera);
 
 
         gRenderer->BeginLighting();
