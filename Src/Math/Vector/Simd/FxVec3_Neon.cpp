@@ -4,6 +4,7 @@
 #include <ThirdParty/Jolt/Math/Real.h>
 #include <arm_neon.h>
 
+#include <Math/FxNeonUtil.hpp>
 #include <Math/FxVec3.hpp>
 
 const FxVec3f FxVec3f::Up = FxVec3f(0.0f, 1.0f, 0.0f);
@@ -69,10 +70,8 @@ FxVec3f FxVec3f::Normalize() const
 
 void FxVec3f::NormalizeIP()
 {
-    // Calculate length
-    const float32 len = Length();
-    // Splat to register
-    const float32x4_t len_v = vdupq_n_f32(len);
+    // Calculate length and splat to register
+    const float32x4_t len_v = vdupq_n_f32(Length());
 
     // Divide vector by length
     mIntrin = vdivq_f32(mIntrin, len_v);
@@ -92,33 +91,17 @@ FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const
     return FxVec3f(ay * bz - by * az, az * bx - bz * ax, ax * by - bx * ay);
 }
 
-static inline float32x4_t ShuffleYZXW(float32x4_t xyzw)
-{
-    // X Y Z W -> Y Z W X
-    xyzw = vextq_f32(xyzw, xyzw, 1);
-
-    // Y Z
-    float32x2_t a_lo = vget_low_f32(xyzw);
-
-    // W X -> X W
-    float32x2_t a_hi = vrev64_f32(vget_high_f32(xyzw));
-
-    // Y Z X W
-    return vcombine_f32(a_lo, a_hi);
-}
-
 FxVec3f FxVec3f::Cross(const FxVec3f& other) const
 {
     const float32x4_t a = mIntrin;
     const float32x4_t b = other.mIntrin;
 
-    // Shuffle this vector and the other vector
-    float32x4_t a_yzxw = ShuffleYZXW(a);
-    float32x4_t b_yzxw = ShuffleYZXW(b);
+    float32x4_t a_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
+    float32x4_t b_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
 
     const float32x4_t result_yzxw = vsubq_f32(vmulq_f32(a, b_yzxw), vmulq_f32(a_yzxw, b));
 
-    return FxVec3f(ShuffleYZXW(result_yzxw));
+    return FxVec3f(FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));
 }
 
 float32 FxVec3f::Dot(const FxVec3f& other) const
