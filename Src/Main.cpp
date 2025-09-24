@@ -242,14 +242,14 @@ int main()
     // ground_object.Scale(FxVec3f(10, 1, 10));
     ground_object.MoveBy(FxVec3f(0, 10, 0));
 
-    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
-                                    FxObject::PhysicsType::Static, {});
+    // ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
+    // FxObject::PhysicsType::Static, {});
 
     FxObject cube_object;
     cube_object.Create(generated_cube_mesh, cube_material);
     cube_object.MoveBy(FxVec3f(0, 0, 0));
 
-    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
+    // cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
 
     gPhysics->OptimizeBroadPhase();
 
@@ -305,6 +305,26 @@ int main()
             camera.Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
         }
 
+
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_U)) {
+            cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_J)) {
+            cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_H)) {
+            cube_object.MoveBy(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_K)) {
+            cube_object.MoveBy(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Y)) {
+            cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * -0.01f, 0.0f));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_I)) {
+            cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * 0.01f, 0.0f));
+        }
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
             light.MoveTo(camera.Position);
 
@@ -350,10 +370,10 @@ int main()
 
 
         // fireplace_object->Render(camera);
-        cube_object.Update();
+        // cube_object.Update();
         cube_object.Render(camera);
 
-        ground_object.Update();
+        // ground_object.Update();
         ground_object.Render(camera);
 
 
