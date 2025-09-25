@@ -82,3 +82,15 @@ public:
     float32 X, Y, Z, W;
 #endif
 };
+
+
+template <>
+struct std::formatter<FxVec4f>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    constexpr auto format(const FxVec4f& obj, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
+    }
+};

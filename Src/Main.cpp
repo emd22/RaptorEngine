@@ -133,12 +133,31 @@ void TestScript()
     // }
 }
 
+#include <Math/FxNeonUtil.hpp>
+
+
+void TestNeonSin()
+{
+    float32x4_t v = vdupq_n_f32(0.5);
+    float32x4_t sv = v;
+    float32x4_t cv = v;
+
+    FxNeon::SinCos4(v, &sv, &cv);
+
+    FxVec4f s_result(sv);
+
+    FxLogInfo("Sin Result: {}", s_result);
+}
+
 
 int main()
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
     FxLogCreateFile("FoxtrotLog.log");
 #endif
+
+    TestNeonSin();
+    return 0;
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
