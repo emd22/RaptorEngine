@@ -72,7 +72,7 @@
 #ifdef _WIN64
 #define FX_FORCE_INLINE __forceinline
 #else
-#define FX_FORCE_INLINE __attribute__((always_inline))
+#define FX_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
 

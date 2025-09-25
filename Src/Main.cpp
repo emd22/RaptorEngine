@@ -133,8 +133,10 @@ void TestScript()
     // }
 }
 
-#include <Math/FxNeonUtil.hpp>
+#ifdef FX_USE_NEON
 
+#include <Math/FxNeonUtil.hpp>
+#include <Math/FxQuat.hpp>
 
 void TestNeonSin()
 {
@@ -145,8 +147,19 @@ void TestNeonSin()
     FxNeon::SinCos4(v, &sv, &cv);
 
     FxVec4f s_result(sv);
+    FxVec4f c_result(cv);
 
     FxLogInfo("Sin Result: {}", s_result);
+    FxLogInfo("Cos Result: {}", c_result);
+}
+
+#endif
+
+void TestQuatFromEuler()
+{
+    FxVec3f angles(0.24, 0.24, 0.0);
+    FxLogInfo("Slow pass: {}", FxQuat::FromEulerAngles_Slow(angles));
+    FxLogInfo("Fast pass: {}", FxQuat::FromEulerAngles(angles));
 }
 
 
@@ -156,13 +169,19 @@ int main()
     FxLogCreateFile("FoxtrotLog.log");
 #endif
 
-    TestNeonSin();
+    TestQuatFromEuler();
+    // FxQuat quat = FxQuat::FromEulerAngles(FxVec3f(1.24, 1.24, 0));
+
+    // FxLogInfo("Quat result: {}", quat);
+
+
+    // TestNeonSin();
     return 0;
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    // TestScript();
-    // return 0;
+    TestScript();
+    return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");

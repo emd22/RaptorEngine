@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/FxDefines.hpp>
+#include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
 
 #ifdef FX_USE_NEON
@@ -11,7 +12,11 @@
 class FxQuat
 {
 public:
+    FxQuat() = default;
     FxQuat(float32 x, float32 y, float32 z, float32 w);
+
+    static FxQuat FromEulerAngles(FxVec3f angles);
+    static FxQuat FromEulerAngles_Slow(FxVec3f angles);
 
 #ifdef FX_USE_NEON
     explicit FxQuat(float32x4_t intrin) : mIntrin(intrin) {}
@@ -21,6 +26,7 @@ public:
         mIntrin = other;
         return *this;
     }
+
 
     operator float32x4_t() const { return mIntrin; }
 
@@ -37,4 +43,16 @@ public:
         };
     };
 #endif
+};
+
+
+template <>
+struct std::formatter<FxQuat>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    constexpr auto format(const FxQuat& obj, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
+    }
 };

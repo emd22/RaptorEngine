@@ -27,9 +27,9 @@ public:
 
     ~RxDeferredRenderer() { Destroy(); }
 
-    FX_FORCE_INLINE RxDeferredGPass* GetCurrentGPass();
-    FX_FORCE_INLINE RxDeferredCompPass* GetCurrentCompPass();
-    FX_FORCE_INLINE RxDeferredLightingPass* GetCurrentLightingPass();
+    RxDeferredGPass* GetCurrentGPass();
+    RxDeferredCompPass* GetCurrentCompPass();
+    RxDeferredLightingPass* GetCurrentLightingPass();
 
     void RebuildLightingPipeline();
 
@@ -38,7 +38,7 @@ private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
-    FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
+    VkPipelineLayout CreateGPassPipelineLayout();
 
     // Lighting
     void CreateLightVolumePipeline();
@@ -49,14 +49,14 @@ private:
     void DestroyLightVolumePipeline();
     void DestroyLightingPipeline();
 
-    FX_FORCE_INLINE VkPipelineLayout CreateLightingPipelineLayout();
-    FX_FORCE_INLINE VkPipelineLayout CreateLightPassPipelineLayout();
+    VkPipelineLayout CreateLightingPipelineLayout();
+    VkPipelineLayout CreateLightPassPipelineLayout();
 
     // Composition
     void CreateCompPipeline();
     void DestroyCompPipeline();
 
-    FX_FORCE_INLINE VkPipelineLayout CreateCompPipelineLayout();
+    VkPipelineLayout CreateCompPipelineLayout();
 
 
 public:

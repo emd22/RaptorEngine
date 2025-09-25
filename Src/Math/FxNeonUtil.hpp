@@ -39,7 +39,7 @@ concept C_SinglePermuteForB = (TA >= FxShuffle_BX) && (TB >= FxShuffle_BX) && (T
                               (TD >= FxShuffle_BX);
 
 
-FX_FORCE_INLINE inline float32 Length(float32x4_t vec)
+FX_FORCE_INLINE float32 Length(float32x4_t vec)
 {
     // Square the vector
     vec = vmulq_f32(vec, vec);
@@ -50,7 +50,7 @@ FX_FORCE_INLINE inline float32 Length(float32x4_t vec)
     return sqrtf(len2);
 }
 
-FX_FORCE_INLINE inline float32x4_t Normalize(float32x4_t vec)
+FX_FORCE_INLINE float32x4_t Normalize(float32x4_t vec)
 {
     // Load vector into register
     const float32x4_t res = vec;
@@ -70,7 +70,7 @@ FX_FORCE_INLINE inline float32x4_t Normalize(float32x4_t vec)
  * @brief Returns a single vector rearranged to the template parameter values.
  */
 template <FxShuffleComponent TComp1, FxShuffleComponent TComp2, FxShuffleComponent TComp3, FxShuffleComponent TComp4>
-FX_FORCE_INLINE inline float32x4_t Permute4(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
     requires C_SinglePermute<TComp1, TComp2, TComp3, TComp4>
 {
     // Unspecialized shuffle, reorder the lanes directly
@@ -87,44 +87,44 @@ FX_FORCE_INLINE inline float32x4_t Permute4(float32x4_t a)
 // Specializations
 
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AW>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AW>(float32x4_t a)
 {
     return a;
 }
 
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AZ>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AZ>(float32x4_t a)
 {
     return vcombine_f32(vget_low_f32(a), vdup_lane_f32(vget_high_f32(a), 0));
 }
 
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AW, FxShuffle_AW>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AW, FxShuffle_AW>(float32x4_t a)
 {
     return vcombine_f32(vget_low_f32(a), vdup_lane_f32(vget_high_f32(a), 1));
 }
 
 
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AY, FxShuffle_AX, FxShuffle_AW, FxShuffle_AZ>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AX, FxShuffle_AW, FxShuffle_AZ>(float32x4_t a)
 {
     return vcombine_f32(vrev64_f32(vget_low_f32(a)), vrev64_f32(vget_high_f32(a)));
 }
 
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX>(float32x4_t a)
 {
     return vcombine_f32(vdup_lane_f32(vget_high_f32(a), 0), vrev64_f32(vget_low_f32(a)));
 }
 
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AW, FxShuffle_AX, FxShuffle_AY>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AW, FxShuffle_AX, FxShuffle_AY>(float32x4_t a)
 {
     return vcombine_f32(vget_high_f32(a), vget_low_f32(a));
 }
 
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AX>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AX>(float32x4_t a)
 {
     static uint8x16_t table = { 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
                                 0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03 };
@@ -135,7 +135,7 @@ FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffl
  * @brief Returns the vector A rearranged to the components {Y, Z, X, W}.
  */
 template <>
-FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(float32x4_t a)
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(float32x4_t a)
 {
     // Extend vector (XYZW -> YZWX)
     a = vextq_f32(a, a, 1);
@@ -161,7 +161,7 @@ FX_FORCE_INLINE inline float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffl
  *
  */
 template <FxShuffleComponent TComp1, FxShuffleComponent TComp2, FxShuffleComponent TComp3, FxShuffleComponent TComp4>
-FX_FORCE_INLINE inline float32x4_t Permute4(float32x4_t a, float32x4_t b)
+FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
 {
     // Unspecialized shuffle, reorder the lanes directly
 
@@ -179,7 +179,7 @@ FX_FORCE_INLINE inline float32x4_t Permute4(float32x4_t a, float32x4_t b)
  * parameters.
  */
 template <FxShuffleComponent TComp1, FxShuffleComponent TComp2, FxShuffleComponent TComp3, FxShuffleComponent TComp4>
-FX_FORCE_INLINE inline float32x4_t Permute4(float32x4_t a, float32x4_t b)
+FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
     requires C_SinglePermute<TComp1, TComp2, TComp3, TComp4>
 {
     return Permute4<TComp1, TComp2, TComp3, TComp4>(a);
@@ -189,27 +189,26 @@ FX_FORCE_INLINE inline float32x4_t Permute4(float32x4_t a, float32x4_t b)
  * @brief Returns the vector B shuffled to the order passed in from the template arguments.
  */
 template <FxShuffleComponent TComp1, FxShuffleComponent TComp2, FxShuffleComponent TComp3, FxShuffleComponent TComp4>
-FX_FORCE_INLINE inline float32x4_t Permute4(float32x4_t a, float32x4_t b)
+FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
     requires C_SinglePermuteForB<TComp1, TComp2, TComp3, TComp4>
 {
     // Adjust indices for single permutations
     return Permute4<TComp1 - FxShuffle_BX, TComp2 - FxShuffle_BX, TComp3 - FxShuffle_BX, TComp4 - FxShuffle_BX>(b);
 }
 
-FX_FORCE_INLINE inline float32x4_t Xor(float32x4_t a, float32x4_t b)
+FX_FORCE_INLINE float32x4_t Xor(float32x4_t a, float32x4_t b)
 {
     return vreinterpretq_f32_u32(veorq_u32(vreinterpretq_u32_f32(a), vreinterpretq_u32_f32(b)));
 }
 
-
-FX_FORCE_INLINE inline float32x4_t And(float32x4_t a, float32x4_t b)
+FX_FORCE_INLINE float32x4_t And(float32x4_t a, float32x4_t b)
 {
     return vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(a), vreinterpretq_u32_f32(b)));
 }
 
 // Implementation based on `Vec4::FlipSign` from Jolt physics!
 template <int TX, int TY, int TZ, int TW>
-FX_FORCE_INLINE inline float32x4_t SetSign(float32x4_t v)
+FX_FORCE_INLINE float32x4_t SetSign(float32x4_t v)
 {
     // (this is such a cool idea)
     constexpr float32 signs[4] = {

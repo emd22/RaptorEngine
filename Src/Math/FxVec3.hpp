@@ -45,10 +45,10 @@ public:
 
     static FxVec3f MulAdd(const FxVec3f& add_value, const FxVec3f& mul_a, const FxVec3f& mul_b);
 
-    FX_FORCE_INLINE FxVec3f Normalize() const;
-    FX_FORCE_INLINE void NormalizeIP();
+    FxVec3f Normalize() const;
+    void NormalizeIP();
 
-    FX_FORCE_INLINE float32 Length() const;
+    float32 Length() const;
     FxVec3f Cross(const FxVec3f& other) const;
     FxVec3f CrossSlow(const FxVec3f& other) const;
 
