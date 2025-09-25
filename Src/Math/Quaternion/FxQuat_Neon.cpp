@@ -11,6 +11,8 @@ FxQuat::FxQuat(float32 x, float32 y, float32 z, float32 w)
     mIntrin = vld1q_f32(values);
 }
 
+#include <math.h>
+
 FxQuat FxQuat::FromEulerAngles_Slow(FxVec3f angles)
 {
     /*
@@ -27,6 +29,10 @@ FxQuat FxQuat::FromEulerAngles_Slow(FxVec3f angles)
     // Sin and Cos all lanes at once
     float32x4_t sv, cv;
     FxNeon::SinCos4(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
+
+    FxLogDebug("Slow Cos of 0.0: {:.6f}", std::cosf(0.0f));
+    FxLogDebug("Fast Cos of 0.0: {:.6f}", vgetq_lane_f32(cv, 2));
+
     FxVec4f s(sv);
     FxVec4f c(cv);
 
