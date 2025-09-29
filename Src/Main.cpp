@@ -145,14 +145,14 @@ void TestScript()
 
 void TestNeonSin()
 {
-    FxVec4f angles(0.24f, 0.0f, 0.46f, 0.0f);
+    FxVec4f angles(0.1f, 0.2f, 0.3f, 0.0f);
 
     const float32x4_t v = angles.mIntrin;
 
     float32x4_t sv = v;
     float32x4_t cv = v;
 
-    FxNeon::SinCos4(v, &sv, &cv);
+    FxNeon::SinCos4_New(v, &sv, &cv);
 
     FxVec4f s_result(sv);
     FxVec4f c_result(cv);

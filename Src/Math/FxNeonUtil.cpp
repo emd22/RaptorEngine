@@ -9,13 +9,6 @@ static constexpr float32 sConst3HalfPi = sConstHalfPi * 3.0f;
 static constexpr float32 sConst2Pi = M_PI * 2.0;
 static constexpr float32 sConstInv2Pi = 1.0f / sConst2Pi;
 
-#define __m128  float32x4_t
-#define __m128i int32x4_t
-
-// Represents a constant value as an integer SSE vector
-#define AS_INTV(constant)   *(__m128i*)constant
-#define AS_FLOATV(constant) *(__m128*)constant
-
 // Implementation based on Cephes math library (https://www.moshier.net/index.html#Cephes)
 // And the modified algorithm from http://gruntthepeon.free.fr/ssemath/sse_mathfun.h.
 
@@ -29,9 +22,6 @@ static constexpr float32 sConstInv2Pi = 1.0f / sConst2Pi;
 #define c_coscof_p1        -1.388731625493765E-003
 #define c_coscof_p2        4.166664568298827E-002
 #define c_cephes_FOPI      1.27323954473516 // 4 / M_PI
-
-// Get the absolute value of a vector
-#define SSE_ABS_PS(vx_) _mm_and_ps(vx_, AS_FLOATV(_ps_inv_sign_mask))
 
 namespace FxNeon {
 
@@ -58,7 +48,7 @@ void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cos
     // Sine/cosine algorithm based on the SSE implementation in FastTrigo at https://github.com/divideconcept/FastTrigo.
 
     const float32x4_t v_f32_one = vdupq_n_f32(1.0f);
-    const float32x4_t v_signmask = vdupq_n_f32(sConstSignMask);
+    const float32x4_t v_signmask = vreinterpretq_f32_u32(vdupq_n_u32(sConstSignMask));
 
 
     // 1 / (2 * Pi)
@@ -76,7 +66,7 @@ void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cos
 
     // Remove the sign bit
     angles = AndNot(v_signmask, angles);
-    angles = vsubq_f32(angles, vmulq_f32(Floor(vmulq_f32(angles, v_inv_2pi)), v_2pi));
+    angles = vsubq_f32(angles, vmulq_f32(ToFloat(ToInt(vmulq_f32(angles, v_inv_2pi))), v_2pi));
 
 
     float32x4_t cos_angles = angles;
@@ -97,7 +87,8 @@ void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cos
     (*out_cosine) = result;
 
     const float32x4_t sine_multiplier = vmulq_f32(
-        angle_signs, ToFloat(vorrq_u32(ReinterpretAsUInt(v_f32_one), vandq_u32(vcgtq_f32(angles, v_pi), v_signmask))));
+        angle_signs,
+        ReinterpretAsFloat(vorrq_u32(ReinterpretAsUInt(v_f32_one), vandq_u32(vcgtq_f32(angles, v_pi), v_signmask))));
 
     (*out_sine) = vmulq_f32(sine_multiplier, Sqrt(vsubq_f32(v_f32_one, vmulq_f32(result, result))));
 }
