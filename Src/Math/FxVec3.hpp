@@ -60,6 +60,18 @@ public:
     void Print() const;
 
 #ifdef FX_USE_NEON
+    FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }
+    FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
+    FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
+
+#else
+    FX_FORCE_INLINE float32 GetX() const { return X; }
+    FX_FORCE_INLINE float32 GetY() const { return Y; }
+    FX_FORCE_INLINE float32 GetZ() const { return Z; }
+
+#endif
+
+#ifdef FX_USE_NEON
     explicit FxVec3f(float32x4_t intrin) : mIntrin(intrin) {}
 
     FxVec3f& operator=(const float32x4_t& other)

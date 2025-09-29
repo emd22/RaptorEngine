@@ -13,7 +13,7 @@ FxQuat::FxQuat(float32 x, float32 y, float32 z, float32 w)
 
 #include <math.h>
 
-FxQuat FxQuat::FromEulerAngles_Slow(FxVec3f angles)
+FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
 {
     /*
         Create the quaternion using
@@ -24,24 +24,27 @@ FxQuat FxQuat::FromEulerAngles_Slow(FxVec3f angles)
         cz * cx * cy + sz * sx * sy
     */
 
-    float32x4_t half_one = vdupq_n_f32(0.5);
+    const float32x4_t half_one = vdupq_n_f32(0.5);
 
     // Sin and Cos all lanes at once
-    float32x4_t sv, cv;
-    FxNeon::SinCos4(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
+    float32x4_t sv = vdupq_n_f32(0);
+    float32x4_t cv = sv;
+    FxNeon::SinCos4_New(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
 
-    FxLogDebug("Slow Cos of 0.0: {:.6f}", std::cosf(0.0f));
-    FxLogDebug("Fast Cos of 0.0: {:.6f}", vgetq_lane_f32(cv, 2));
+    float32 sin_vals[4];
+    float32 cos_vals[4];
 
-    FxVec4f s(sv);
-    FxVec4f c(cv);
+    // Load the values from our vector into local arrays
+    vst1q_f32(sin_vals, sv);
+    vst1q_f32(cos_vals, cv);
 
-    float cx = c.X;
-    float sx = s.X;
-    float cy = c.Y;
-    float sy = s.Y;
-    float cz = c.Z;
-    float sz = s.Z;
+    const float32 sx = sin_vals[0];
+    const float32 sy = sin_vals[1];
+    const float32 sz = sin_vals[2];
+
+    const float32 cx = cos_vals[0];
+    const float32 cy = cos_vals[1];
+    const float32 cz = cos_vals[2];
 
     return FxQuat(cz * sx * cy - sz * cx * sy, /* First Row */
                   cz * cx * sy + sz * sx * cy, /* Second Row */
@@ -50,7 +53,7 @@ FxQuat FxQuat::FromEulerAngles_Slow(FxVec3f angles)
 }
 
 
-FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
+FxQuat FxQuat::FromEulerAngles_NeonTest(FxVec3f angles)
 {
     FxQuat quat;
 
@@ -63,11 +66,11 @@ FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
         cz * cx * cy + sz * sx * sy
     */
 
-    float32x4_t half_one = vdupq_n_f32(0.5);
+    const float32x4_t half_one = vdupq_n_f32(0.5);
 
     // Sin and Cos all lanes at once
     float32x4_t sv, cv;
-    FxNeon::SinCos4(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
+    FxNeon::SinCos4_New(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
 
     float32x4_t lhs_term;
 
@@ -143,6 +146,27 @@ FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
     quat.mIntrin = vaddq_f32(lhs_term, FxNeon::SetSign<-1, 1, -1, 1>(rhs_term));
 
     return quat;
+}
+
+
+FxVec3f FxQuat::GetEulerAngles() const
+{
+    const float32 y_sq = Y * Y;
+
+    // X
+    float t0 = 2.0f * (W * X + Y * Z);
+    float t1 = 1.0f - 2.0f * (X * X + y_sq);
+
+    // Y
+    float t2 = 2.0f * (W * Y - Z * X);
+    t2 = t2 > 1.0f ? 1.0f : t2;
+    t2 = t2 < -1.0f ? -1.0f : t2;
+
+    // Z
+    float t3 = 2.0f * (W * Z + X * Y);
+    float t4 = 1.0f - 2.0f * (y_sq + Z * Z);
+
+    return FxVec3f(atan2(t0, t1), sin(t2), atan2(t3, t4));
 }
 
 

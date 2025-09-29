@@ -69,26 +69,31 @@ void CheckGeneralControls()
 
 static FxPerspectiveCamera* current_camera = nullptr;
 
-// #pragma clang optimize off
+#pragma clang optimize off
 
-// template <typename FuncType>
-// void TestSpeed(FuncType ft, int iterations)
-// {
-//     using namespace std::chrono;
-//     uint64 time_in_ns = 0;
+template <typename FuncType>
+void FxSpeedTest(FuncType ft, int iterations)
+{
+    using namespace std::chrono;
+    uint64 time_in_ns = 0;
 
-//     auto t1 = high_resolution_clock::now();
-//     for (int32 i = 0; i < iterations; i++) {
-//         ft(i);
-//     }
-//     auto t2 = high_resolution_clock::now();
-//     auto ns = duration_cast<nanoseconds>(t2 - t1);
-//     time_in_ns = ns.count() / iterations;
+    auto t1 = high_resolution_clock::now();
+    for (int32 i = 0; i < iterations; i++) {
+        ft(i);
+    }
+    auto t2 = high_resolution_clock::now();
+    auto ns = duration_cast<nanoseconds>(t2 - t1);
+    time_in_ns = ns.count() / iterations;
 
-//     std::cout << "Function " << typeid(FuncType).name() << " Took " << time_in_ns << "ns.\n";
-// }
+    const char* raw_name = typeid(FuncType).name();
+    char name_buffer[256];
 
-// #pragma clang optimize on
+    FxUtil::DemangleName(raw_name, name_buffer, 256);
+
+    FxLogInfo("Speed test took {} ns.", time_in_ns);
+}
+
+#pragma clang optimize on
 
 
 void TestScript()
@@ -140,7 +145,10 @@ void TestScript()
 
 void TestNeonSin()
 {
-    float32x4_t v = vdupq_n_f32(0.5);
+    FxVec4f angles(0.24f, 0.0f, 0.46f, 0.0f);
+
+    const float32x4_t v = angles.mIntrin;
+
     float32x4_t sv = v;
     float32x4_t cv = v;
 
@@ -157,9 +165,13 @@ void TestNeonSin()
 
 void TestQuatFromEuler()
 {
-    FxVec3f angles(0.24, 0.24, 0.0);
-    FxLogInfo("Slow pass: {}", FxQuat::FromEulerAngles_Slow(angles));
-    FxLogInfo("Fast pass: {}", FxQuat::FromEulerAngles(angles));
+    FxVec3f angles(0.1, 0.0, 0.2);
+    FxLogInfo("Angles: {}", angles);
+
+    FxQuat quat = FxQuat::FromEulerAngles(angles);
+    FxLogInfo("Quaternion: {}", quat);
+
+    FxLogInfo("Returned angles: {}", quat.GetEulerAngles());
 }
 
 
@@ -169,13 +181,13 @@ int main()
     FxLogCreateFile("FoxtrotLog.log");
 #endif
 
-    TestQuatFromEuler();
+    // TestQuatFromEuler();
     // FxQuat quat = FxQuat::FromEulerAngles(FxVec3f(1.24, 1.24, 0));
 
     // FxLogInfo("Quat result: {}", quat);
 
 
-    // TestNeonSin();
+    TestNeonSin();
     return 0;
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);

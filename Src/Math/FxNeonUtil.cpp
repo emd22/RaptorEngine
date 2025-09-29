@@ -1,5 +1,13 @@
 #include "FxNeonUtil.hpp"
 
+static constexpr uint32 sConstSignMask = 0x80000000;
+
+static constexpr float32 sConstHalfPi = M_PI_2;
+static constexpr float32 sConstPi = M_PI;
+static constexpr float32 sConst3HalfPi = sConstHalfPi * 3.0f;
+
+static constexpr float32 sConst2Pi = M_PI * 2.0;
+static constexpr float32 sConstInv2Pi = 1.0f / sConst2Pi;
 
 #define __m128  float32x4_t
 #define __m128i int32x4_t
@@ -27,32 +35,104 @@
 
 namespace FxNeon {
 
-void SinCos4(float32x4_t x, float32x4_t* ysin, float32x4_t* ycos)
+/**
+ * @brief Fast limited precision polynomial cosine approximation.
+ *
+ */
+FX_FORCE_INLINE static float32x4_t CosFastApprox(float32x4_t angle)
 {
-    // any x
-    float32x4_t y = vdupq_n_f32(0);
+    // Algorithm adapted from https://www.ganssle.com/item/approximations-for-trig-c-code.htm and FastTrigo.
+
+    const float32x4_t c1 = vdupq_n_f32(0.99940307f);
+    const float32x4_t c2 = vdupq_n_f32(-0.49558072f);
+    const float32x4_t c3 = vdupq_n_f32(0.03679168f);
+
+    const float32x4_t angle_sq = vmulq_f32(angle, angle);
+
+    return vaddq_f32(c1, vmulq_f32(angle_sq, vaddq_f32(c2, vmulq_f32(c3, angle_sq))));
+}
+
+
+void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cosine)
+{
+    // Sine/cosine algorithm based on the SSE implementation in FastTrigo at https://github.com/divideconcept/FastTrigo.
+
+    const float32x4_t v_f32_one = vdupq_n_f32(1.0f);
+    const float32x4_t v_signmask = vdupq_n_f32(sConstSignMask);
+
+
+    // 1 / (2 * Pi)
+    const float32x4_t v_inv_2pi = vdupq_n_f32(sConstInv2Pi);
+
+    const float32x4_t v_pi = vdupq_n_f32(sConstPi);
+    const float32x4_t v_halfpi = vdupq_n_f32(sConstHalfPi);
+
+    // 2 * Pi
+    const float32x4_t v_2pi = vdupq_n_f32(sConst2Pi);
+
+    const float32x4_t v_3halfpi = vmulq_n_f32(v_halfpi, 3.0f);
+
+    uint32x4_t angle_signs = vorrq_u32(ReinterpretAsUInt(v_f32_one), vandq_u32(v_signmask, ReinterpretAsUInt(angles)));
+
+    // Remove the sign bit
+    angles = AndNot(v_signmask, angles);
+    angles = vsubq_f32(angles, vmulq_f32(Floor(vmulq_f32(angles, v_inv_2pi)), v_2pi));
+
+
+    float32x4_t cos_angles = angles;
+
+    cos_angles = Xor(cos_angles,
+                     And(ReinterpretAsFloat(vcgeq_f32(angles, v_halfpi)), Xor(cos_angles, vsubq_f32(v_pi, angles))));
+    cos_angles = Xor(cos_angles, And(ReinterpretAsFloat(vcgeq_f32(angles, v_pi)), v_signmask));
+    cos_angles = Xor(cos_angles,
+                     And(ReinterpretAsFloat(vcgeq_f32(angles, v_3halfpi)), Xor(cos_angles, vsubq_f32(v_2pi, angles))));
+
+    float32x4_t result = CosFastApprox(cos_angles);
+
+    // Calculate the cosine result
+    result = Xor(result, And(And(ReinterpretAsFloat(vcgeq_f32(angles, v_halfpi)),
+                                 ReinterpretAsFloat(vcltq_f32(angles, v_3halfpi))),
+                             v_signmask));
+
+    (*out_cosine) = result;
+
+    const float32x4_t sine_multiplier = vmulq_f32(
+        angle_signs, ToFloat(vorrq_u32(ReinterpretAsUInt(v_f32_one), vandq_u32(vcgtq_f32(angles, v_pi), v_signmask))));
+
+    (*out_sine) = vmulq_f32(sine_multiplier, Sqrt(vsubq_f32(v_f32_one, vmulq_f32(result, result))));
+}
+
+
+void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
+{
+    float32x4_t x, y;
 
     uint32x4_t emm2;
 
     // const uint32x4_t v_u32_one = vdupq_n_f32(1);
-    const float32x4_t v_f32_zero = y;
+    const float32x4_t v_f32_zero = vdupq_n_f32(0);
 
+    uint32x4_t sine_sign;
 
-    uint32x4_t sign_mask_sin, sign_mask_cos;
-    sign_mask_sin = vcltq_f32(x, v_f32_zero);
-    x = vabsq_f32(x);
+    {
+        const uint32x4_t v_high_sign = vdupq_n_u32(0x80000000U);
 
-    // Scale by 4 / PI
-    const float32x4_t c_f32_fopi = vdupq_n_f32(c_cephes_FOPI);
-    y = vmulq_f32(x, c_f32_fopi);
+        sine_sign = vandq_u32(ReinterpretAsUInt(in_values), v_high_sign);
+        x = Xor(in_values, sine_sign);
+    }
 
-    // Store the integer part of y
-    emm2 = vcvtq_u32_f32(y);
+    {
+        const float32x4_t c_f32_fopi = vdupq_n_f32(c_cephes_FOPI);
+        y = vmulq_f32(x, c_f32_fopi);
 
-    // j=(j+1) & (~1) (see the cephes sources)
-    emm2 = vaddq_u32(emm2, vdupq_n_u32(1));
-    emm2 = vandq_u32(emm2, vdupq_n_u32(~1));
-    y = vcvtq_f32_u32(emm2);
+        // Store the integer part of y
+        emm2 = vcvtq_u32_f32(y);
+
+        // j=(j+1) & (~1) (see the cephes sources)
+        emm2 = vaddq_u32(emm2, vdupq_n_u32(1));
+        emm2 = vandq_u32(emm2, vdupq_n_u32(~1));
+        y = vcvtq_f32_u32(emm2);
+    }
 
     /* get the polynom selection mask
      *     there is one polynom for 0 <= x <= Pi/4
@@ -68,8 +148,8 @@ void SinCos4(float32x4_t x, float32x4_t* ysin, float32x4_t* ycos)
     x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP2));
     x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP3));
 
-    sign_mask_sin = veorq_u32(sign_mask_sin, vtstq_u32(emm2, vdupq_n_u32(4)));
-    sign_mask_cos = vtstq_u32(vsubq_u32(emm2, vdupq_n_u32(2)), vdupq_n_u32(4));
+    sine_sign = veorq_u32(sine_sign, vtstq_u32(emm2, vdupq_n_u32(4)));
+    float32x4_t cosine_sign = vtstq_u32(vsubq_u32(emm2, vdupq_n_u32(2)), vdupq_n_u32(4));
 
     /* Evaluate the first polynom  (0 <= x <= Pi/4) in y1,
      *     and the second polynom      (Pi/4 <= x <= 0) in y2 */
@@ -78,20 +158,26 @@ void SinCos4(float32x4_t x, float32x4_t* ysin, float32x4_t* ycos)
 
     y1 = vmlaq_f32(vdupq_n_f32(c_coscof_p1), z, vdupq_n_f32(c_coscof_p0));
     y2 = vmlaq_f32(vdupq_n_f32(c_sincof_p1), z, vdupq_n_f32(c_sincof_p0));
+
     y1 = vmlaq_f32(vdupq_n_f32(c_coscof_p2), y1, z);
     y2 = vmlaq_f32(vdupq_n_f32(c_sincof_p2), y2, z);
+
     y1 = vmulq_f32(y1, z);
     y2 = vmulq_f32(y2, z);
+
     y1 = vmulq_f32(y1, z);
     y1 = vmlsq_f32(y1, z, vdupq_n_f32(0.5f));
+
     y2 = vmlaq_f32(x, y2, x);
+
     y1 = vaddq_f32(y1, vdupq_n_f32(1));
 
     /* select the correct result from the two polynoms */
     float32x4_t ys = vbslq_f32(poly_mask, y1, y2);
     float32x4_t yc = vbslq_f32(poly_mask, y2, y1);
-    *ysin = vbslq_f32(sign_mask_sin, vnegq_f32(ys), ys);
-    *ycos = vbslq_f32(sign_mask_cos, yc, vnegq_f32(yc));
+    *ysin = vbslq_f32(sine_sign, vnegq_f32(ys), ys);
+    *ycos = vbslq_f32(cosine_sign, yc, vnegq_f32(yc));
 }
 
+float32x4_t Sqrt(float32x4_t vec) { return vsqrtq_f32(vec); }
 }; // namespace FxNeon

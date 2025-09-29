@@ -16,7 +16,9 @@ public:
     FxQuat(float32 x, float32 y, float32 z, float32 w);
 
     static FxQuat FromEulerAngles(FxVec3f angles);
-    static FxQuat FromEulerAngles_Slow(FxVec3f angles);
+    static FxQuat FromEulerAngles_NeonTest(FxVec3f angles);
+
+    FxVec3f GetEulerAngles() const;
 
 #ifdef FX_USE_NEON
     explicit FxQuat(float32x4_t intrin) : mIntrin(intrin) {}

@@ -62,6 +62,23 @@ FX_FORCE_INLINE float32x4_t Normalize(float32x4_t vec)
     return vdivq_f32(res, len_v);
 }
 
+FX_FORCE_INLINE uint32x4_t ToUInt(float32x4_t vec) { return vcvtq_u32_f32(vec); }
+FX_FORCE_INLINE int32x4_t ToInt(float32x4_t vec) { return vcvtq_s32_f32(vec); }
+FX_FORCE_INLINE float32x4_t ToFloat(uint32x4_t vec) { return vcvtq_f32_u32(vec); }
+FX_FORCE_INLINE float32x4_t ToFloat(int32x4_t vec) { return vcvtq_f32_s32(vec); }
+
+FX_FORCE_INLINE uint32x4_t ReinterpretAsUInt(float32x4_t vec) { return vreinterpretq_u32_f32(vec); }
+FX_FORCE_INLINE uint32x4_t ReinterpretAsInt(float32x4_t vec) { return vreinterpretq_s32_f32(vec); }
+FX_FORCE_INLINE float32x4_t ReinterpretAsFloat(uint32x4_t vec) { return vreinterpretq_f32_u32(vec); }
+FX_FORCE_INLINE float32x4_t ReinterpretAsFloat(int32x4_t vec) { return vreinterpretq_f32_s32(vec); }
+
+FX_FORCE_INLINE float32x4_t AndNot(float32x4_t a, float32x4_t b)
+{
+    return ReinterpretAsFloat(vbicq_u32(ReinterpretAsUInt(b), ReinterpretAsUInt(a)));
+}
+
+FX_FORCE_INLINE float32x4_t Floor(float32x4_t vec) { return vrndmq_f32(vec); }
+
 ////////////////////////////////
 // Permute/Reorder Functions
 ////////////////////////////////
@@ -201,6 +218,11 @@ FX_FORCE_INLINE float32x4_t Xor(float32x4_t a, float32x4_t b)
     return vreinterpretq_f32_u32(veorq_u32(vreinterpretq_u32_f32(a), vreinterpretq_u32_f32(b)));
 }
 
+FX_FORCE_INLINE float32x4_t Xor(float32x4_t a, uint32x4_t b)
+{
+    return vreinterpretq_f32_u32(veorq_u32(vreinterpretq_u32_f32(a), b));
+}
+
 FX_FORCE_INLINE float32x4_t And(float32x4_t a, float32x4_t b)
 {
     return vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(a), vreinterpretq_u32_f32(b)));
@@ -223,7 +245,9 @@ FX_FORCE_INLINE float32x4_t SetSign(float32x4_t v)
     return Xor(v, sign_v);
 }
 
+float32x4_t Sqrt(float32x4_t vec);
 void SinCos4(float32x4_t x, float32x4_t* ysin, float32x4_t* ycos);
+void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cosine);
 
 }; // namespace FxNeon
 
