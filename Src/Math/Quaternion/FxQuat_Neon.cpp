@@ -2,6 +2,8 @@
 
 #ifdef FX_USE_NEON
 
+#include <math.h>
+
 #include <Math/FxNeonUtil.hpp>
 #include <Math/FxQuat.hpp>
 
@@ -11,7 +13,18 @@ FxQuat::FxQuat(float32 x, float32 y, float32 z, float32 w)
     mIntrin = vld1q_f32(values);
 }
 
-#include <math.h>
+FxQuat FxQuat::FromAngle(FxVec3f axis, float32 angle)
+{
+    // float32x4_t sv, cv;
+
+    // FxNeon::SinCos4(angle, &sv, &cv);
+
+
+    // s, c = sincos(theta / 2)
+    // axis = normalize(axis)
+    // return Quaternion(c, s*axis[1], s*axis[2], s*axis[3])
+}
+
 
 FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
 {
@@ -29,7 +42,7 @@ FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
     // Sin and Cos all lanes at once
     float32x4_t sv = vdupq_n_f32(0);
     float32x4_t cv = sv;
-    FxNeon::SinCos4_New(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
+    FxNeon::SinCos4(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
 
     float32 sin_vals[4];
     float32 cos_vals[4];
@@ -70,7 +83,7 @@ FxQuat FxQuat::FromEulerAngles_NeonTest(FxVec3f angles)
 
     // Sin and Cos all lanes at once
     float32x4_t sv, cv;
-    FxNeon::SinCos4_New(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
+    FxNeon::SinCos4(vmulq_f32(angles.mIntrin, half_one), &sv, &cv);
 
     float32x4_t lhs_term;
 

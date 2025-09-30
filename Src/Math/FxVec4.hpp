@@ -54,18 +54,22 @@ public:
      */
     void Load1(float32 scalar);
 
+    FX_FORCE_INLINE float32 LengthSquared() const;
+    FX_FORCE_INLINE bool IsNormalized(float32 tolerance) const { return abs(LengthSquared() - 1.0f) <= tolerance; }
+
+
 #ifdef FX_USE_NEON
     FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
     FX_FORCE_INLINE float32 GetW() const { return vgetq_lane_f32(mIntrin, 3); }
 
+
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
     FX_FORCE_INLINE float32 GetZ() const { return Z; }
     FX_FORCE_INLINE float32 GetW() const { return W; }
-
 #endif
 
 
@@ -109,3 +113,7 @@ struct std::formatter<FxVec4f>
         return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
     }
 };
+
+/* Definitions for inline functions */
+#include "Vector/FxVec4_None.inl"
+#include "Vector/Simd/FxVec4_Neon.inl"

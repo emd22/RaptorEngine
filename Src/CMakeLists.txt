@@ -11,7 +11,7 @@ link_directories(../Lib)
 include_directories(ThirdParty)
 
 # add third party sources to static library
-file (GLOB_RECURSE THIRD_PARTY_SOURCES "ThirdParty/*.cpp" "ThirdParty/*.h" "ThirdParty/*.hpp")
+file (GLOB_RECURSE THIRD_PARTY_SOURCES "ThirdParty/*.cpp" "ThirdParty/*.h" "ThirdParty/*.hpp" "ThirdParty/*.inl")
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 
 target_compile_definitions(
@@ -30,10 +30,10 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-file (GLOB_RECURSE SOURCES "*.cpp")
+file (GLOB_RECURSE SOURCES "*.cpp" "*.inl")
 list(FILTER SOURCES EXCLUDE REGEX "ThirdParty/.*")
 
-file (GLOB_RECURSE HEADERS "*.hpp")
+file (GLOB_RECURSE HEADERS "*.hpp" "*.inl")
 list(FILTER HEADERS EXCLUDE REGEX "ThirdParty/.*")
 
 find_package(Vulkan REQUIRED)

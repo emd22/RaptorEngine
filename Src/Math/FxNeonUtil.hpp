@@ -39,7 +39,10 @@ concept C_SinglePermuteForB = (TA >= FxShuffle_BX) && (TB >= FxShuffle_BX) && (T
                               (TD >= FxShuffle_BX);
 
 
-FX_FORCE_INLINE float32 Length(float32x4_t vec)
+template <FxShuffleComponent TA, FxShuffleComponent TB, FxShuffleComponent TC, FxShuffleComponent TD>
+concept C_AllComponentsSame = (TA == TB == TC == TD);
+
+FX_FORCE_INLINE float32 LengthSquared(float32x4_t vec)
 {
     // Square the vector
     vec = vmulq_f32(vec, vec);
@@ -47,8 +50,10 @@ FX_FORCE_INLINE float32 Length(float32x4_t vec)
     // Add all components (horizontal add)
     const float32 len2 = vaddvq_f32(vec);
 
-    return sqrtf(len2);
+    return len2;
 }
+
+FX_FORCE_INLINE float32 Length(float32x4_t vec) { return sqrtf(LengthSquared(vec)); }
 
 FX_FORCE_INLINE float32x4_t Normalize(float32x4_t vec)
 {
@@ -102,6 +107,13 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
 }
 
 // Specializations
+
+
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AW, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX>(float32x4_t a)
+{
+    return vcombine_f32(vrev64_f32(vget_high_f32(a)), vrev64_f32(vget_low_f32(a)));
+}
 
 template <>
 FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AW>(float32x4_t a)
@@ -165,6 +177,13 @@ FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, F
 
     // Return result YZXW
     return vcombine_f32(a_lo, a_hi);
+}
+
+template <FxShuffleComponent TComp1, FxShuffleComponent TComp2, FxShuffleComponent TComp3, FxShuffleComponent TComp4>
+    requires C_AllComponentsSame<TComp1, TComp2, TComp3, TComp4>
+FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
+{
+    return vdupq_laneq_f32(a, TComp1);
 }
 
 /**
@@ -245,9 +264,14 @@ FX_FORCE_INLINE float32x4_t SetSign(float32x4_t v)
     return Xor(v, sign_v);
 }
 
-float32x4_t Sqrt(float32x4_t vec);
+FX_FORCE_INLINE float32x4_t Sqrt(float32x4_t vec) { return vsqrtq_f32(vec); }
+
 void SinCos4(float32x4_t x, float32x4_t* ysin, float32x4_t* ycos);
-void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cosine);
+
+/**
+ * @brief A low-accuracy but super fast SinCos implementation (about 0.06% error)
+ */
+void SinCos4_Fast(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cosine);
 
 }; // namespace FxNeon
 

@@ -15,6 +15,8 @@ public:
     FxQuat() = default;
     FxQuat(float32 x, float32 y, float32 z, float32 w);
 
+    static FxQuat FromAngle(FxVec3f axis, float32 angle);
+
     static FxQuat FromEulerAngles(FxVec3f angles);
     static FxQuat FromEulerAngles_NeonTest(FxVec3f angles);
 

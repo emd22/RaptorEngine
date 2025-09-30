@@ -43,7 +43,7 @@ FX_FORCE_INLINE static float32x4_t CosFastApprox(float32x4_t angle)
 }
 
 
-void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cosine)
+void SinCos4_Fast(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cosine)
 {
     // Sine/cosine algorithm based on the SSE implementation in FastTrigo at https://github.com/divideconcept/FastTrigo.
 
@@ -60,13 +60,13 @@ void SinCos4_New(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cos
     // 2 * Pi
     const float32x4_t v_2pi = vdupq_n_f32(sConst2Pi);
 
-    const float32x4_t v_3halfpi = vmulq_n_f32(v_halfpi, 3.0f);
+    const float32x4_t v_3halfpi = vdupq_n_f32(sConst3HalfPi);
 
     uint32x4_t angle_signs = vorrq_u32(ReinterpretAsUInt(v_f32_one), vandq_u32(v_signmask, ReinterpretAsUInt(angles)));
 
     // Remove the sign bit
     angles = AndNot(v_signmask, angles);
-    angles = vsubq_f32(angles, vmulq_f32(ToFloat(ToInt(vmulq_f32(angles, v_inv_2pi))), v_2pi));
+    angles = vsubq_f32(angles, vmulq_f32(Floor(vmulq_f32(angles, v_inv_2pi)), v_2pi));
 
 
     float32x4_t cos_angles = angles;
@@ -169,6 +169,4 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
     *ysin = vbslq_f32(sine_sign, vnegq_f32(ys), ys);
     *ycos = vbslq_f32(cosine_sign, yc, vnegq_f32(yc));
 }
-
-float32x4_t Sqrt(float32x4_t vec) { return vsqrtq_f32(vec); }
 }; // namespace FxNeon
