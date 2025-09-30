@@ -15,12 +15,27 @@ public:
     FxQuat() = default;
     FxQuat(float32 x, float32 y, float32 z, float32 w);
 
-    static FxQuat FromAngle(FxVec3f axis, float32 angle);
+    static FxQuat FromAxisAngle(FxVec3f axis, float32 angle);
 
     static FxQuat FromEulerAngles(FxVec3f angles);
-    static FxQuat FromEulerAngles_NeonTest(FxVec3f angles);
+    // static FxQuat FromEulerAngles_NeonTest(FxVec3f angles);
 
     FxVec3f GetEulerAngles() const;
+
+    FxQuat operator*(const FxQuat& other) const;
+
+
+#ifdef FX_USE_NEON
+    FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }
+    FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
+    FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
+    FX_FORCE_INLINE float32 GetW() const { return vgetq_lane_f32(mIntrin, 3); }
+#else
+    FX_FORCE_INLINE float32 GetX() const { return X; }
+    FX_FORCE_INLINE float32 GetY() const { return Y; }
+    FX_FORCE_INLINE float32 GetZ() const { return Z; }
+    FX_FORCE_INLINE float32 GetW() const { return W; }
+#endif
 
 #ifdef FX_USE_NEON
     explicit FxQuat(float32x4_t intrin) : mIntrin(intrin) {}

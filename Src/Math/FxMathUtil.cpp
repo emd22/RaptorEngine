@@ -16,12 +16,14 @@ namespace FxMath {
 
 FX_FORCE_INLINE static uint32 TstU32(uint32 a, uint32 b) { return (a & b) ? (~0) : 0; }
 
+
 void SinCos(float32 in_angle, float32* out_sine, float32* out_cosine)
 {
+    // TODO: Clean up this function to be more tailored to scalar
+
     float32 x, y;
 
     uint32 emm2;
-
     uint32 sine_sign;
 
     {

@@ -2,6 +2,7 @@
 #include <arm_neon.h>
 #ifdef FX_USE_NEON
 
+#include <Math/FxQuat.hpp>
 #include <Math/Mat4.hpp>
 
 const FxMat4f FxMat4f::Identity = FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
@@ -25,6 +26,36 @@ float32x4_t FxMat4f::MultiplyVec4f_Neon(FxVec4f& vec)
 }
 
 FxVec4f FxMat4f::MultiplyVec4f(FxVec4f& vec) { return FxVec4f(MultiplyVec4f_Neon(vec)); }
+
+FxMat4f FxMat4f::AsRotation(const FxQuat& quat)
+{
+    float x = quat.GetX();
+    float y = quat.GetY();
+    float z = quat.GetZ();
+    float w = quat.GetW();
+
+    const float tx = x * 2.0f;
+    const float ty = y * 2.0f;
+    const float tz = z * 2.0f;
+
+    float xx = tx * x;
+    float yy = ty * y;
+    float zz = tz * z;
+
+    float xy = tx * y;
+    float xz = tx * z;
+    float xw = tx * w;
+
+    float yz = ty * z;
+    float yw = ty * w;
+    float zw = tz * w;
+
+    return FxMat4f(FxVec4f((1.0f - yy) - zz, xy + zw, xz - yw, 0.0f), /* */
+                   FxVec4f(xy - zw, (1.0f - zz) - xx, yz + xw, 0.0f), /* */
+                   FxVec4f(xz + yw, yz - xw, (1.0f - xx) - yy, 0.0f), /* */
+                   FxVec4f(0.0f, 0.0f, 0.0f, 1.0f));
+}
+
 
 FxMat4f FxMat4f::AsRotationX(float rad)
 {

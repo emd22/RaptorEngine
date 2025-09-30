@@ -7,6 +7,8 @@
 #include <arm_neon.h>
 #endif
 
+class FxQuat;
+
 /**
  * @brief A single-precision 4x4 matrix class using SIMD instructions.
  *
@@ -34,6 +36,7 @@ public:
 
     FxMat4f(float data[4][4]) noexcept;
 
+
     static FxMat4f FromRows(float data[16])
     {
         return FxMat4f(FxVec4f(data[0], data[4], data[8], data[12]), FxVec4f(data[1], data[5], data[9], data[13]),
@@ -56,6 +59,7 @@ public:
     static FxMat4f AsRotationY(float rad);
     static FxMat4f AsRotationZ(float rad);
 
+    static FxMat4f AsRotation(const FxQuat& quat);
 
     void FlipY()
     {

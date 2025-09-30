@@ -154,20 +154,21 @@ void TestNeonSin()
         FxLogInfo("Angle: {}, Sin: {}, Cos: {}", angle, sv, cv);
     }
 
-    FxVec4f angles(0.1f, -0.2f, 0.3f, 0.0f);
 
-    const float32x4_t v = angles.mIntrin;
+    // FxVec4f angles(0.1f, -0.2f, 0.3f, 0.0f);
 
-    float32x4_t sv = v;
-    float32x4_t cv = v;
+    // const float32x4_t v = angles.mIntrin;
 
-    FxNeon::SinCos4(v, &sv, &cv);
+    // float32x4_t sv = v;
+    // float32x4_t cv = v;
 
-    FxVec4f s_result(sv);
-    FxVec4f c_result(cv);
+    // FxNeon::SinCos4(v, &sv, &cv);
 
-    FxLogInfo("Sin Result: {}", s_result);
-    FxLogInfo("Cos Result: {}", c_result);
+    // FxVec4f s_result(sv);
+    // FxVec4f c_result(cv);
+
+    // FxLogInfo("Sin Result: {}", s_result);
+    // FxLogInfo("Cos Result: {}", c_result);
 }
 
 #endif
@@ -176,6 +177,9 @@ void TestQuatFromEuler()
 {
     FxVec3f angles(0.1, 0.0, 0.2);
     FxLogInfo("Angles: {}", angles);
+
+    FxQuat rot_quat = FxQuat::FromAxisAngle(FxVec3f(1, 0, 0), 0.1);
+    FxLogInfo("RotQuat: {}", rot_quat);
 
     FxQuat quat = FxQuat::FromEulerAngles(angles);
     FxLogInfo("Quaternion: {}", quat);
@@ -190,13 +194,13 @@ int main()
     FxLogCreateFile("FoxtrotLog.log");
 #endif
 
-    // TestQuatFromEuler();
+    TestQuatFromEuler();
     // FxQuat quat = FxQuat::FromEulerAngles(FxVec3f(1.24, 1.24, 0));
 
     // FxLogInfo("Quat result: {}", quat);
 
 
-    TestNeonSin();
+    // TestNeonSin();
     return 0;
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
