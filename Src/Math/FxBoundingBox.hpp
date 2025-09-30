@@ -14,6 +14,6 @@ public:
     FxBoundingBox& operator=(const FxBoundingBox& other);
 
 public:
-    FxVec3f Min = FxVec3f::Zero;
-    FxVec3f Max = FxVec3f::Zero;
+    FxVec3f Min = FxVec3f::sZero;
+    FxVec3f Max = FxVec3f::sZero;
 };

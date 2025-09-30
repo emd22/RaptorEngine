@@ -69,12 +69,12 @@ void FxLight::MoveBy(const FxVec3f& offset, bool force_move_mesh)
 
 void FxLight::MoveLightVolumeTo(const FxVec3f& position) { this->FxEntity::MoveTo(position); }
 
-void FxLight::Render(const FxCamera& camera) const
+void FxLight::Render(const FxCamera& camera)
 {
     RxFrameData* frame = gRenderer->GetFrame();
     FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
-    FxMat4f MVP = mModelMatrix * camera.VPMatrix;
+    FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
     MVP.FlipY();
 
     {
@@ -128,12 +128,12 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
     RxFrameData* frame = gRenderer->GetFrame();
     FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
-    FxMat4f MVP = mModelMatrix * camera.VPMatrix;
+    FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
     MVP.FlipY();
 
     FxDrawPushConstants push_constants {};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT,
                        0, sizeof(push_constants), &push_constants);

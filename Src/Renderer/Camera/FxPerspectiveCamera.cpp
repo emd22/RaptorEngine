@@ -62,7 +62,7 @@ void FxPerspectiveCamera::Update()
 
     const FxVec3f target = Position + Direction;
 
-    ViewMatrix.LookAt(Position, target, FxVec3f::Up);
+    ViewMatrix.LookAt(Position, target, FxVec3f::sUp);
 
     FxMat4f PM = ProjectionMatrix;
 

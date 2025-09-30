@@ -9,8 +9,8 @@
 class alignas(16) FxVec4f
 {
 public:
-    static const FxVec4f Zero;
-    static const FxVec4f One;
+    static const FxVec4f sZero;
+    static const FxVec4f sOne;
 
 public:
     friend class FxMat4f;

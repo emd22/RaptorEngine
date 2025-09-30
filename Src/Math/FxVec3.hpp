@@ -14,9 +14,12 @@ using RVec3 = Vec3;
 class alignas(16) FxVec3f
 {
 public:
-    static const FxVec3f Zero;
-    static const FxVec3f One;
-    static const FxVec3f Up;
+    static const FxVec3f sZero;
+    static const FxVec3f sOne;
+
+    static const FxVec3f sUp;
+    static const FxVec3f sRight;
+    static const FxVec3f sForward;
 
 public:
     FxVec3f() = default;

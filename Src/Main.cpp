@@ -194,19 +194,19 @@ int main()
     FxLogCreateFile("FoxtrotLog.log");
 #endif
 
-    TestQuatFromEuler();
+    // TestQuatFromEuler();
     // FxQuat quat = FxQuat::FromEulerAngles(FxVec3f(1.24, 1.24, 0));
 
     // FxLogInfo("Quat result: {}", quat);
 
 
     // TestNeonSin();
-    return 0;
+    // return 0;
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    TestScript();
-    return 0;
+    // TestScript();
+    // return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
@@ -443,7 +443,8 @@ int main()
         gRenderer->BeginLighting();
 
         if (second_light_on) {
-            light2.mModelMatrix = camera.VPMatrix;
+            // light2.mModelMatrix = camera.VPMatrix;
+            light2.SetModelMatrix(camera.VPMatrix);
 
             light2.Render(camera);
         }

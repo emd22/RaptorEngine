@@ -2,11 +2,15 @@
 
 #ifdef FX_USE_NEON
 
+#include <ThirdParty/Jolt/Jolt.h>
+#include <ThirdParty/Jolt/Math/Quat.h>
 #include <math.h>
 
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxNeonUtil.hpp>
 #include <Math/FxQuat.hpp>
+
+const FxQuat FxQuat::sIdentity = FxQuat(0, 0, 0, 1);
 
 FxQuat::FxQuat(float32 x, float32 y, float32 z, float32 w)
 {
@@ -24,6 +28,7 @@ FxQuat FxQuat::FromAxisAngle(FxVec3f axis, float32 angle)
     return FxQuat(vsetq_lane_f32(cv, vec, 3));
 }
 
+void FxQuat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
 
 FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
 {

@@ -8,6 +8,7 @@
 
 #include <Asset/FxAssetImage.hpp>
 #include <Core/FxPagedArray.hpp>
+#include <Math/FxQuat.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Vector.hpp>
 #include <Renderer/FxCamera.hpp>
@@ -42,74 +43,107 @@ public:
     virtual void MoveTo(const FxVec3f& position)
     {
         mPosition = position;
-        UpdateTranslation();
+
+        MarkMatrixOutOfDate();
+
+        // UpdateTranslation();
     }
 
     virtual void MoveBy(const FxVec3f& offset)
     {
         mPosition += offset;
-        UpdateTranslation();
+
+        MarkMatrixOutOfDate();
+
+        // UpdateTranslation();
     }
 
 
     void Scale(const FxVec3f& scale)
     {
         mScale *= scale;
-        mModelMatrix = FxMat4f::AsScale(mScale) * mModelMatrix;
+
+        MarkMatrixOutOfDate();
+        // mModelMatrix = FxMat4f::AsScale(mScale) * mModelMatrix;
     }
 
     void RotateX(float rad)
     {
-        mRotation.X += rad;
-        mModelMatrix = FxMat4f::AsRotationX(mRotation.X);
-        mModelMatrix.Print();
+        mRotation2 = mRotation2 * FxQuat::FromAxisAngle(FxVec3f::sRight, rad);
+
+        MarkMatrixOutOfDate();
+        // mRotation.X += rad;
+        // mModelMatrix = FxMat4f::AsRotationX(mRotation.X);
+        // mModelMatrix.Print();
     }
 
     void RotateY(float rad)
     {
-        mRotation.Y += rad;
-        mModelMatrix = FxMat4f::AsRotationY(mRotation.Y);
+        mRotation2 = mRotation2 * FxQuat::FromAxisAngle(FxVec3f::sUp, rad);
+
+        MarkMatrixOutOfDate();
+
+        // mRotation.Y += rad;
+        // mModelMatrix = FxMat4f::AsRotationY(mRotation.Y);
     }
 
     void RotateZ(float rad)
     {
-        mRotation.Z += rad;
-        mModelMatrix = FxMat4f::AsRotationZ(mRotation.Z);
+        mRotation2 = mRotation2 * FxQuat::FromAxisAngle(FxVec3f::sForward, rad);
+
+        MarkMatrixOutOfDate();
+
+        // mRotation2 = mRotation2 * FxQuat::
+        // mRotation.Z += rad;
+        // mModelMatrix = FxMat4f::AsRotationZ(mRotation.Z);
+    }
+
+    void SetModelMatrix(const FxMat4f& other)
+    {
+        // We do not want the next update to replace the new matrix
+        mbMatrixOutOfDate = false;
+
+        mModelMatrix = other;
     }
 
 
-    void Update()
+    FxMat4f& GetModelMatrix()
     {
-        if (mScript) {
-            mScript->RenderTick();
+        if (mbMatrixOutOfDate) {
+            RecalculateModelMatrix();
         }
-    }
 
-    void AttachScript(FxRef<FxScript> script)
-    {
-        mScript = script;
-        mScript->Entity = this;
+        return mModelMatrix;
     }
 
     const FxVec3f& GetPosition() const { return mPosition; }
+
+    FX_FORCE_INLINE void MarkMatrixOutOfDate() { mbMatrixOutOfDate = true; }
 
     virtual ~FxEntity() {}
 
 
 protected:
-    inline void UpdateTranslation() { mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition); }
+    // inline void UpdateTranslation() { mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition); }
+
+    void RecalculateModelMatrix()
+    {
+        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsRotation(mRotation2) * FxMat4f::AsTranslation(mPosition);
+    }
 
 
 public:
-    FxMat4f mModelMatrix = FxMat4f::Identity;
-
-    FxVec3f mPosition = FxVec3f::Zero;
-    FxVec3f mRotation = FxVec3f::Zero;
-    FxVec3f mScale = FxVec3f::One;
-
-    FxRef<FxScript> mScript { nullptr };
+    FxVec3f mPosition = FxVec3f::sZero;
+    FxQuat mRotation2 = FxQuat::sIdentity;
+    // FxVec3f mRotation = FxVec3f::Zero;
+    FxVec3f mScale = FxVec3f::sOne;
 
     std::vector<FxRef<FxEntity>> Children;
+
+
+private:
+    bool mbMatrixOutOfDate : 1 = false;
+    FxMat4f mModelMatrix = FxMat4f::Identity;
 };
 
 class FxEntityManager

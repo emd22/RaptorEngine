@@ -29,7 +29,7 @@ public:
     void SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume);
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
 
-    void Render(const FxCamera& camera) const;
+    void Render(const FxCamera& camera);
     void RenderDebugMesh(const FxCamera& camera);
 
     void MoveTo(const FxVec3f& position) override;
@@ -45,7 +45,7 @@ public:
     FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };
     FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen { nullptr };
 
-    FxVec3f Color = FxVec3f::One;
+    FxVec3f Color = FxVec3f::sOne;
 
     float Radius = 2.0f;
 
@@ -55,7 +55,7 @@ private:
     FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
 
 protected:
-    FxVec3f mLightPosition = FxVec3f::Zero;
+    FxVec3f mLightPosition = FxVec3f::sZero;
 };
 
 

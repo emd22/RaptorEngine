@@ -9,8 +9,16 @@
 
 #endif
 
+namespace JPH {
+class Quat;
+}
+
+
 class FxQuat
 {
+public:
+    static const FxQuat sIdentity;
+
 public:
     FxQuat() = default;
     FxQuat(float32 x, float32 y, float32 z, float32 w);
@@ -23,6 +31,8 @@ public:
     FxVec3f GetEulerAngles() const;
 
     FxQuat operator*(const FxQuat& other) const;
+
+    void FromJoltQuaternion(const JPH::Quat& quat);
 
 
 #ifdef FX_USE_NEON

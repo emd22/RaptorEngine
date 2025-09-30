@@ -184,7 +184,7 @@ public:
         if (LocalBuffer.IsEmpty()) {
             FxLogWarning("Cannot calculate dimensions as the local vertex buffer has been cleared!");
 
-            return FxVec3f::Zero;
+            return FxVec3f::sZero;
         }
 
         FxVec3f min_positions = FxVec3f(10000);
@@ -219,7 +219,7 @@ public:
     ~RxVertexList() { Destroy(); }
 
 public:
-    FxVec3f Dimensions = FxVec3f::Zero;
+    FxVec3f Dimensions = FxVec3f::sZero;
 
     RxGpuBuffer<TVertexType> GpuBuffer {};
     FxSizedArray<TVertexType> LocalBuffer {};

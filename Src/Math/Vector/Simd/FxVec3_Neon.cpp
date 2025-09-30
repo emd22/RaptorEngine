@@ -7,9 +7,12 @@
 #include <Math/FxNeonUtil.hpp>
 #include <Math/FxVec3.hpp>
 
-const FxVec3f FxVec3f::Up = FxVec3f(0.0f, 1.0f, 0.0f);
-const FxVec3f FxVec3f::Zero = FxVec3f(0.0f, 0.0f, 0.0f);
-const FxVec3f FxVec3f::One = FxVec3f(1.0f, 1.0f, 1.0f);
+const FxVec3f FxVec3f::sZero = FxVec3f(0.0f, 0.0f, 0.0f);
+const FxVec3f FxVec3f::sOne = FxVec3f(1.0f, 1.0f, 1.0f);
+
+const FxVec3f FxVec3f::sUp = FxVec3f(0.0f, 1.0f, 0.0f);
+const FxVec3f FxVec3f::sRight = FxVec3f(1.0f, 0.0f, 0.0f);
+const FxVec3f FxVec3f::sForward = FxVec3f(0.0f, 0.0f, 1.0f);
 
 FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
 {

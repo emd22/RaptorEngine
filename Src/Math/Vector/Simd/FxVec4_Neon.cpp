@@ -4,8 +4,8 @@
 
 #include <Math/FxVec4.hpp>
 
-const FxVec4f FxVec4f::Zero = FxVec4f(0.0f, 0.0f, 0.0f, 0.0f);
-const FxVec4f FxVec4f::One = FxVec4f(1.0f, 1.0f, 1.0f, 1.0f);
+const FxVec4f FxVec4f::sZero = FxVec4f(0.0f, 0.0f, 0.0f, 0.0f);
+const FxVec4f FxVec4f::sOne = FxVec4f(1.0f, 1.0f, 1.0f, 1.0f);
 
 
 ///////////////////////////////

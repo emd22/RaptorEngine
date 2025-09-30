@@ -71,7 +71,7 @@ void FxObject::Render(const FxCamera& camera)
     }
 
     FxMat4f VP = camera.VPMatrix;
-    FxMat4f MVP = mModelMatrix * VP;
+    FxMat4f MVP = GetModelMatrix() * VP;
 
     memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
 
@@ -79,7 +79,7 @@ void FxObject::Render(const FxCamera& camera)
 
     FxDrawPushConstants push_constants {};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.ModelMatrix, mModelMatrix.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
     if (Material) {
         push_constants.MaterialIndex = Material->GetMaterialIndex();
@@ -181,9 +181,12 @@ void FxObject::RenderMesh()
 void FxObject::Update()
 {
     mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
+    mRotation2.FromJoltQuaternion(mpPhysicsBody->GetRotation());
+    // mPosition *= FxVec3f(1, 1, 1);
 
-    mPosition *= FxVec3f(1, 1, 1);
-    UpdateTranslation();
+    MarkMatrixOutOfDate();
+
+    // UpdateTranslation();
 }
 
 void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::PhysicsType type,

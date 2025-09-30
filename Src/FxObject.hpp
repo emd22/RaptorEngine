@@ -96,7 +96,7 @@ public:
 
     FxPagedArray<FxRef<FxObject>> AttachedNodes;
 
-    FxVec3f Dimensions = FxVec3f::Zero;
+    FxVec3f Dimensions = FxVec3f::sZero;
 
 private:
     RxUniformBufferObject mUbo;
