@@ -739,24 +739,27 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 
     RxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
 
-    FxStackArray<VkWriteDescriptorSet, 3> write_infos;
+    constexpr uint32 num_image_infos = 3;
+
+    FxStackArray<VkDescriptorImageInfo, num_image_infos> write_image_infos;
+    FxStackArray<VkWriteDescriptorSet, num_image_infos> write_infos;
 
     // Depth image descriptor
     {
         const int binding_index = 1;
 
-        VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        const VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                      .imageView = gpass.DepthAttachment.View,
                                                      .sampler = gRenderer->Swapchain.DepthSampler.Sampler };
 
-        VkWriteDescriptorSet positions_write {
+        const VkWriteDescriptorSet positions_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &positions_image_info,
+            .pImageInfo = write_image_infos.Insert(positions_image_info),
 
         };
 
@@ -767,18 +770,18 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 2;
 
-        VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        const VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                  .imageView = gpass.ColorAttachment.View,
                                                  .sampler = gRenderer->Swapchain.ColorSampler.Sampler };
 
-        VkWriteDescriptorSet color_write {
+        const VkWriteDescriptorSet color_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &color_image_info,
+            .pImageInfo = write_image_infos.Insert(color_image_info),
 
         };
 
@@ -789,20 +792,20 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 3;
 
-        VkDescriptorImageInfo normals_image_info {
+        const VkDescriptorImageInfo normals_image_info {
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .imageView = gpass.NormalsAttachment.View,
             .sampler = gRenderer->Swapchain.NormalsSampler.Sampler,
         };
 
-        VkWriteDescriptorSet normals_write {
+        const VkWriteDescriptorSet normals_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &normals_image_info,
+            .pImageInfo = write_image_infos.Insert(normals_image_info),
 
         };
 
@@ -863,24 +866,27 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
     RxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
 
-    FxStackArray<VkWriteDescriptorSet, 4> write_infos;
+    constexpr uint32 num_image_infos = 4;
+    
+    FxStackArray<VkDescriptorImageInfo, num_image_infos> write_image_infos;
+    FxStackArray<VkWriteDescriptorSet, num_image_infos> write_infos;
 
     // Depth image descriptor
     {
         const int binding_index = 1;
 
-        VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        const VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                      .imageView = gpass.DepthAttachment.View,
                                                      .sampler = gRenderer->Swapchain.DepthSampler.Sampler };
 
-        VkWriteDescriptorSet positions_write {
+        const VkWriteDescriptorSet positions_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &positions_image_info,
+            .pImageInfo = write_image_infos.Insert(positions_image_info),
 
         };
 
@@ -891,18 +897,18 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 2;
 
-        VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        const VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                  .imageView = gpass.ColorAttachment.View,
                                                  .sampler = gRenderer->Swapchain.ColorSampler.Sampler };
 
-        VkWriteDescriptorSet color_write {
+        const VkWriteDescriptorSet color_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &color_image_info,
+            .pImageInfo = write_image_infos.Insert(color_image_info),
 
         };
 
@@ -913,18 +919,18 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 3;
 
-        VkDescriptorImageInfo normals_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        const VkDescriptorImageInfo normals_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                    .imageView = gpass.NormalsAttachment.View,
                                                    .sampler = gRenderer->Swapchain.NormalsSampler.Sampler };
 
-        VkWriteDescriptorSet normals_write {
+        const VkWriteDescriptorSet normals_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &normals_image_info,
+            .pImageInfo = write_image_infos.Insert(normals_image_info),
 
         };
 
@@ -937,18 +943,18 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         RxDeferredLightingPass& light_pass = mRendererInst->LightingPasses[frame_index];
 
-        VkDescriptorImageInfo lights_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        const VkDescriptorImageInfo lights_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                                   .imageView = light_pass.ColorAttachment.View,
                                                   .sampler = gRenderer->Swapchain.LightsSampler.Sampler };
 
-        VkWriteDescriptorSet lights_write {
+        const VkWriteDescriptorSet lights_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
-            .pImageInfo = &lights_image_info,
+            .pImageInfo = write_image_infos.Insert(lights_image_info),
 
         };
 

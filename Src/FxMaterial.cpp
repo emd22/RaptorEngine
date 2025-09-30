@@ -57,29 +57,25 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 
     {
-        FxStackArray<VkWriteDescriptorSet, 1> write_descriptor_sets;
+//        FxStackArray<VkWriteDescriptorSet, 1> write_descriptor_sets;
 
-        {
-            VkDescriptorBufferInfo info {
-                .buffer = MaterialPropertiesBuffer.Buffer,
-                .offset = 0,
-                .range = sizeof(FxMaterialProperties),
-            };
+        VkDescriptorBufferInfo info {
+            .buffer = MaterialPropertiesBuffer.Buffer,
+            .offset = 0,
+            .range = sizeof(FxMaterialProperties),
+        };
 
-            VkWriteDescriptorSet buffer_write {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-                .descriptorCount = 1,
-                .dstSet = mMaterialPropertiesDS.Set,
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .pBufferInfo = &info,
-            };
+        VkWriteDescriptorSet buffer_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+            .descriptorCount = 1,
+            .dstSet = mMaterialPropertiesDS.Set,
+            .dstBinding = 0,
+            .dstArrayElement = 0,
+            .pBufferInfo = &info,
+        };
 
-            write_descriptor_sets.Insert(buffer_write);
-        }
-
-        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data,
+        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &buffer_write,
                                0, nullptr);
     }
 
@@ -271,19 +267,19 @@ FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& s
 
 #define PUSH_IMAGE_IF_SET(img, binding)                                                                                \
     if (img != nullptr) {                                                                                              \
-        VkDescriptorImageInfo image_info {                                                                             \
+        const VkDescriptorImageInfo image_info {                                                                             \
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                                                   \
             .imageView = img->Texture.Image.View,                                                                      \
             .sampler = img->Texture.Sampler->Sampler,                                                                  \
-        };                                                                                                             \
-        VkWriteDescriptorSet image_write {                                                                             \
+        };                                                                                                  \
+        const VkWriteDescriptorSet image_write {                                                                             \
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,                                                           \
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,                                               \
             .descriptorCount = 1,                                                                                      \
             .dstSet = descriptor_set.Set,                                                                              \
             .dstBinding = binding,                                                                                     \
             .dstArrayElement = 0,                                                                                      \
-            .pImageInfo = &image_info,                                                                                 \
+            .pImageInfo = write_image_infos.Insert(image_info),                                                                                 \
         };                                                                                                             \
         write_descriptor_sets.Insert(image_write);                                                                     \
     }
@@ -307,7 +303,8 @@ void FxMaterial::Build()
 
     // Update the material descriptor
     {
-        constexpr const int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
+        constexpr int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
+        FxStackArray<VkDescriptorImageInfo, max_images> write_image_infos;
         FxStackArray<VkWriteDescriptorSet, max_images> write_descriptor_sets;
 
         RxDescriptorSet& descriptor_set = mDescriptorSet;

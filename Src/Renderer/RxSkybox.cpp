@@ -158,30 +158,25 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
 
 void RxSkyboxRenderer::BuildDescriptorSets(uint32 frame_index)
 {
-    FxStackArray<VkWriteDescriptorSet, 1> write_infos;
+    
+    
+    const int binding_index = 0;
 
-    {
-        const int binding_index = 0;
+    const VkDescriptorImageInfo positions_image_info {
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        .imageView = SkyAttachment->View,
+        .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
+    };
 
-        VkDescriptorImageInfo positions_image_info {
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .imageView = SkyAttachment->View,
-            .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
-        };
+    const VkWriteDescriptorSet positions_write {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
+        .dstSet = DsSkyboxFragments[frame_index].Set,
+        .dstBinding = binding_index,
+        .dstArrayElement = 0,
+        .pImageInfo = &positions_image_info,
+    };
 
-        VkWriteDescriptorSet positions_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
-            .dstSet = DsSkyboxFragments[frame_index].Set,
-            .dstBinding = binding_index,
-            .dstArrayElement = 0,
-            .pImageInfo = &positions_image_info,
-
-        };
-
-        write_infos.Insert(positions_write);
-    }
-
-    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &positions_write, 0, nullptr);
 }

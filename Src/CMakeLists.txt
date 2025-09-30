@@ -53,7 +53,7 @@ add_compile_options(
     # -Wpedantic
     # -fsanitize=address
     -Wno-nullability-extension
-    -O2
+    # -O2
 )
 
 

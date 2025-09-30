@@ -10,12 +10,13 @@ class FxStackArray
 public:
     FxStackArray() = default;
 
-    void Insert(const T& value)
+    T* Insert(const T& value)
     {
         if (Size + 1 > Capacity) {
             throw std::out_of_range("FxStackArray insert out of range");
         }
         Data[Size++] = value;
+        return &Data[Size - 1];
     }
 
     const T& operator[](size_t index) const
