@@ -45,38 +45,8 @@ public:
     void Render(const FxCamera& camera);
     bool CheckIfReady();
 
-    ~FxObject() override { Destroy(); }
 
-    void Destroy() override
-    {
-        if (Mesh) {
-            Mesh->Destroy();
-        }
-        if (Material) {
-            Material->Destroy();
-        }
-
-        if (!AttachedNodes.IsEmpty()) {
-            for (FxRef<FxObject>& obj : AttachedNodes) {
-                obj->Destroy();
-            }
-        }
-
-        mbReadyToRender = false;
-        bIsUploadedToGpu = false;
-    }
-
-
-    void AttachObject(const FxRef<FxObject>& object)
-    {
-        if (AttachedNodes.IsEmpty()) {
-            AttachedNodes.Create(32);
-        }
-
-        Dimensions += object->Dimensions;
-
-        AttachedNodes.Insert(object);
-    }
+    void AttachObject(const FxRef<FxObject>& object);
 
     void CreatePhysicsBody(PhysicsFlags flags, PhysicsType type, const FxPhysicsProperties& properties);
     void DestroyPhysicsBody();
@@ -84,11 +54,18 @@ public:
     FX_FORCE_INLINE JPH::Body* GetPhysicsBody() { return mpPhysicsBody; };
     FX_FORCE_INLINE const JPH::BodyID& GetPhysicsBodyId() { return mpPhysicsBody->GetID(); };
 
+    void SetPhysicsEnabled(bool enabled);
+    FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
+
     void Update();
+
+    void Destroy() override;
+    ~FxObject() override { Destroy(); }
 
 private:
     void RenderMesh();
 
+    void UpdatePhysics();
     void UpdateJoltForDirectTransform();
 
 public:

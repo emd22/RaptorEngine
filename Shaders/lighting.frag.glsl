@@ -75,7 +75,7 @@ void main()
     float fdiffuse = max(0.0, dot(normal, light_dir));
 
     float att_const = 0.35;
-    float att_lin = 0.007;
+    float att_lin = 0.1;
     float att_expr = 0.02;
     float fatt = att_const + att_lin * fdist + att_expr * fdist * fdist;
 

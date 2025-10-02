@@ -21,3 +21,52 @@ FxRef<FxEntity> FxEntityManager::New()
 
     return FxRef<FxEntity>::New(global_manager.mEntityPool.Insert());
 }
+
+void FxEntity::Scale(const FxVec3f& scale)
+{
+    mScale *= scale;
+    MarkTransformOutOfDate();
+}
+
+void FxEntity::RotateX(float32 rad)
+{
+    mRotation = mRotation * FxQuat::FromAxisAngle(FxVec3f::sRight, rad);
+    MarkTransformOutOfDate();
+}
+
+
+void FxEntity::RotateY(float32 rad)
+{
+    mRotation = mRotation * FxQuat::FromAxisAngle(FxVec3f::sUp, rad);
+    MarkTransformOutOfDate();
+}
+
+
+void FxEntity::RotateZ(float32 rad)
+{
+    mRotation = mRotation * FxQuat::FromAxisAngle(FxVec3f::sForward, rad);
+    MarkTransformOutOfDate();
+}
+
+void FxEntity::SetModelMatrix(const FxMat4f& other)
+{
+    // We do not want the next update to replace the new matrix
+    mbMatrixOutOfDate = false;
+
+    mModelMatrix = other;
+}
+
+FxMat4f& FxEntity::GetModelMatrix()
+{
+    if (mbMatrixOutOfDate) {
+        RecalculateModelMatrix();
+    }
+
+    return mModelMatrix;
+}
+
+void FxEntity::RecalculateModelMatrix()
+{
+    mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsRotation(mRotation) * FxMat4f::AsTranslation(mPosition);
+    mbMatrixOutOfDate = false;
+}

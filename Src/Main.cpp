@@ -310,9 +310,10 @@ int main()
 
     FxObject cube_object;
     cube_object.Create(generated_cube_mesh, cube_material);
-    cube_object.MoveBy(FxVec3f(0, 10, 0));
+    cube_object.MoveBy(FxVec3f(5, 10, 0));
 
     cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
+    cube_object.SetPhysicsEnabled(false);
 
     gPhysics->OptimizeBroadPhase();
 
@@ -336,8 +337,7 @@ int main()
     // light2.Scale(FxVec3f(25));
 
     bool second_light_on = false;
-
-    gPhysics->bPhysicsPaused = true;
+    // gPhysics->bPhysicsPaused = true;
 
 
     while (Running) {
@@ -367,26 +367,6 @@ int main()
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
             camera.Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
         }
-
-
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_U)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_J)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_H)) {
-        //     cube_object.MoveBy(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_K)) {
-        //     cube_object.MoveBy(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Y)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * -0.01f, 0.0f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_I)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * 0.01f, 0.0f));
-        // }
 
         if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
             gRenderer->DeferredRenderer->ToggleWireframe(true);
@@ -420,9 +400,15 @@ int main()
             cube_object.MoveBy(FxVec3f(DeltaTime * -0.001f, 0, 0));
         }
 
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_0)) {
+            cube_object.SetPhysicsEnabled(false);
+            cube_object.MoveTo(FxVec3f(5, 10, 0));
+        }
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
             // gRenderer->DeferredRenderer->RebuildLightingPipeline();
-            gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
+            // gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
+            cube_object.SetPhysicsEnabled(!cube_object.GetPhysicsEnabled());
             // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 

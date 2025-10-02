@@ -167,6 +167,8 @@ public:
 
     void OptimizeBroadPhase();
 
+    FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
+
     ~FxPhysicsJolt();
 
 public:

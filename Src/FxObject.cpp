@@ -178,15 +178,21 @@ void FxObject::RenderMesh()
     }
 }
 
-void FxObject::Update()
+void FxObject::Update() { UpdatePhysics(); }
+
+void FxObject::UpdatePhysics()
 {
-    if (mbPendingDirectTransform) {
+    if (!mbPhysicsEnabled) {
+        return;
+    }
+
+    if (mbPhysicsTransformOutOfDate) {
         UpdateJoltForDirectTransform();
     }
 
-    if ((!mPosition.IsCloseTo(mpPhysicsBody->GetPosition()) || !mRotation2.IsCloseTo(mpPhysicsBody->GetRotation()))) {
+    if ((!mPosition.IsCloseTo(mpPhysicsBody->GetPosition()) || !mRotation.IsCloseTo(mpPhysicsBody->GetRotation()))) {
         mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
-        mRotation2.FromJoltQuaternion(mpPhysicsBody->GetRotation());
+        mRotation.FromJoltQuaternion(mpPhysicsBody->GetRotation());
         MarkMatrixOutOfDate();
     }
 
@@ -256,6 +262,7 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
     body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
 
     mbHasPhysicsBody = true;
+    mbPhysicsEnabled = body_interface.IsActive(mpPhysicsBody->GetID());
 
     // body_interface.CreateAndAddBody(body_settings, activation_mode);
 }
@@ -263,11 +270,13 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
 
 void FxObject::DestroyPhysicsBody()
 {
-    if (!mbHasPhysicsBody) {
+    if (!mbHasPhysicsBody && mpPhysicsBody != nullptr) {
         return;
     }
 
     gPhysics->PhysicsSystem.GetBodyInterface().DestroyBody(GetPhysicsBodyId());
+
+    mpPhysicsBody = nullptr;
 }
 
 
@@ -281,10 +290,59 @@ void FxObject::UpdateJoltForDirectTransform()
     JPH::Quat jolt_rotation;
 
     mPosition.ToJoltVec3(jolt_position);
-    mRotation2.ToJoltQuaternion(jolt_rotation);
-
+    mRotation.ToJoltQuaternion(jolt_rotation);
 
     gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetPhysicsBodyId(), jolt_position, jolt_rotation,
                                                                       JPH::EActivation::Activate);
-    mbPendingDirectTransform = false;
+
+    mbPhysicsTransformOutOfDate = false;
+}
+
+void FxObject::AttachObject(const FxRef<FxObject>& object)
+{
+    if (AttachedNodes.IsEmpty()) {
+        AttachedNodes.Create(32);
+    }
+
+    Dimensions += object->Dimensions;
+
+    AttachedNodes.Insert(object);
+}
+
+void FxObject::SetPhysicsEnabled(bool enabled)
+{
+    if (mpPhysicsBody != nullptr) {
+        if (enabled) {
+            gPhysics->GetBodyInterface().ActivateBody(GetPhysicsBodyId());
+        }
+        else {
+            gPhysics->GetBodyInterface().DeactivateBody(GetPhysicsBodyId());
+        }
+    }
+
+
+    mbPhysicsEnabled = enabled;
+}
+
+void FxObject::Destroy()
+{
+    if (Mesh) {
+        Mesh->Destroy();
+    }
+    if (Material) {
+        Material->Destroy();
+    }
+
+    if (mpPhysicsBody) {
+        DestroyPhysicsBody();
+    }
+
+    if (!AttachedNodes.IsEmpty()) {
+        for (FxRef<FxObject>& obj : AttachedNodes) {
+            obj->Destroy();
+        }
+    }
+
+    mbReadyToRender = false;
+    bIsUploadedToGpu = false;
 }

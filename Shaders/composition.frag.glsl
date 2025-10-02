@@ -43,7 +43,8 @@ void main()
     vec3 base_color = (albedo.rgb);
     vec3 base_color_with_lighting = base_color * lights.rgb;
 
-    vec3 final_color = mix(base_color, base_color_with_lighting, lights.a);
+    // vec3 final_color = mix(base_color, base_color_with_lighting, lights.a);
+    vec3 final_color = base_color_with_lighting;
 
     v_Color = vec4(final_color, 1.0);
 }
