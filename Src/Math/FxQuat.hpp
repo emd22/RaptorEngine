@@ -33,7 +33,7 @@ public:
     FxQuat operator*(const FxQuat& other) const;
 
     void FromJoltQuaternion(const JPH::Quat& quat);
-
+    void ToJoltQuaternion(JPH::Quat& quat);
 
 #ifdef FX_USE_NEON
     FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }

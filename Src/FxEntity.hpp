@@ -124,11 +124,16 @@ public:
 
 
 protected:
+    virtual void OnTransformUpdate() { FxLogInfo("Update BASE transform"); };
+
     // inline void UpdateTranslation() { mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition); }
 
     void RecalculateModelMatrix()
     {
         mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsRotation(mRotation2) * FxMat4f::AsTranslation(mPosition);
+        mbMatrixOutOfDate = false;
+
+        this->OnTransformUpdate();
     }
 
 

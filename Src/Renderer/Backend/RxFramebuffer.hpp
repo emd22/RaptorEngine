@@ -11,8 +11,7 @@
 class RxFramebuffer
 {
 public:
-    void Create(const FxSizedArray<VkImageView>& image_views, const RxGraphicsPipeline& pipeline,
-                const RxRenderPass& render_pass, FxVec2u size);
+    void Create(const FxSizedArray<VkImageView>& image_views, const RxRenderPass& render_pass, FxVec2u size);
     void Destroy();
 
     ~RxFramebuffer() { Destroy(); }

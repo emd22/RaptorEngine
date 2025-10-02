@@ -293,7 +293,8 @@ int main()
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
     //
 
-    FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material", &deferred_renderer->GPassPipeline);
+    FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material",
+                                                           &deferred_renderer->PlGeometryWireframe);
 
     cube_material->Properties.BaseColor = FxColorFromRGBA(255, 100, 100, 255);
     cube_material->DiffuseComponent.Texture = FxAssetImage::GetEmptyImage();
@@ -303,16 +304,16 @@ int main()
     FxObject ground_object;
     ground_object.Create(generated_cube_mesh, cube_material);
     // ground_object.Scale(FxVec3f(10, 1, 10));
-    ground_object.MoveBy(FxVec3f(0, 10, 0));
+    ground_object.MoveBy(FxVec3f(0, -20, 0));
 
-    // ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
-    // FxObject::PhysicsType::Static, {});
+    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
+                                    FxObject::PhysicsType::Static, {});
 
     FxObject cube_object;
     cube_object.Create(generated_cube_mesh, cube_material);
-    cube_object.MoveBy(FxVec3f(0, 0, 0));
+    cube_object.MoveBy(FxVec3f(0, 10, 0));
 
-    // cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
+    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
 
     gPhysics->OptimizeBroadPhase();
 
@@ -337,7 +338,7 @@ int main()
 
     bool second_light_on = false;
 
-    // gPhysics->bPhysicsPaused = true;
+    gPhysics->bPhysicsPaused = true;
 
 
     while (Running) {
@@ -369,23 +370,30 @@ int main()
         }
 
 
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_U)) {
-            cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_U)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_J)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_H)) {
+        //     cube_object.MoveBy(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_K)) {
+        //     cube_object.MoveBy(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Y)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * -0.01f, 0.0f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_I)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * 0.01f, 0.0f));
+        // }
+
+        if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
+            gRenderer->DeferredRenderer->ToggleWireframe(true);
         }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_J)) {
-            cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_H)) {
-            cube_object.MoveBy(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_K)) {
-            cube_object.MoveBy(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Y)) {
-            cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * -0.01f, 0.0f));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_I)) {
-            cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * 0.01f, 0.0f));
+        if (FxControlManager::IsKeyPressed(FX_KEY_MINUS)) {
+            gRenderer->DeferredRenderer->ToggleWireframe(false);
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
@@ -394,19 +402,21 @@ int main()
             light.mPosition.Print();
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
-            // FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
+        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
+        //     // FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
 
-            // helmet_object.Attach(helmet_model);
-            // helmet_object.Attach(cheese_material);
-            FxMemPool::GetGlobalPool().PrintAllocations();
+        //     // helmet_object.Attach(helmet_model);
+        //     // helmet_object.Attach(cheese_material);
+        //     FxMemPool::GetGlobalPool().PrintAllocations();
+        // }
+
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_F)) {
+            // second_light_on = !second_light_on;
+
+            cube_object.RotateY(DeltaTime * 0.01f);
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
-            second_light_on = !second_light_on;
-        }
-
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
             // gRenderer->DeferredRenderer->RebuildLightingPipeline();
             gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
             // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
@@ -426,14 +436,16 @@ int main()
         }
 
         deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *current_camera);
-        deferred_renderer->GPassPipeline.Bind(gRenderer->GetFrame()->CommandBuffer);
+
+
+        deferred_renderer->pGeometryPipeline->Bind(gRenderer->GetFrame()->CommandBuffer);
 
         //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
 
         // fireplace_object->Render(camera);
-        // cube_object.Update();
+        cube_object.Update();
         cube_object.Render(camera);
 
         // ground_object.Update();

@@ -10,6 +10,8 @@
 
 FX_SET_MODULE_NAME("Pipeline")
 
+static VkPipeline spBoundPipeline = nullptr;
+
 FxVertexInfo FxMakeVertexInfo()
 {
     using VertexType = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
@@ -218,7 +220,13 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
 
 void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
 {
+    if (Pipeline == spBoundPipeline) {
+        return;
+    }
+
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+
+    spBoundPipeline = Pipeline;
 }
 
 void RxGraphicsPipeline::Destroy()

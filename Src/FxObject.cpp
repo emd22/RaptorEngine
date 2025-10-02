@@ -180,8 +180,11 @@ void FxObject::RenderMesh()
 
 void FxObject::Update()
 {
-    mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
-    mRotation2.FromJoltQuaternion(mpPhysicsBody->GetRotation());
+    if (mPosition.IsCloseTo(mpPhysicsBody->GetPosition())) {
+        mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
+        mRotation2.FromJoltQuaternion(mpPhysicsBody->GetRotation());
+    }
+
     // mPosition *= FxVec3f(1, 1, 1);
 
     MarkMatrixOutOfDate();
@@ -223,12 +226,10 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
     }
 
     JPH::RVec3 box_position;
-    (mPosition * FxVec3f(1, 1, 1)).ToJoltVec3(box_position);
+    mPosition.ToJoltVec3(box_position);
 
     JPH::RVec3 box_dimensions;
-
-    FxVec3f fx_dimensions = Dimensions * mScale;
-
+    FxVec3f fx_dimensions = Dimensions * (mScale * 0.5);
     fx_dimensions.ToJoltVec3(box_dimensions);
 
     FxLogDebug("Creating physics body of dimensions {}", fx_dimensions);
@@ -262,4 +263,23 @@ void FxObject::DestroyPhysicsBody()
     }
 
     gPhysics->PhysicsSystem.GetBodyInterface().DestroyBody(GetPhysicsBodyId());
+}
+
+
+void FxObject::OnTransformUpdate()
+{
+    if (!mbHasPhysicsBody || !mbPhysicsEnabled) {
+        return;
+    }
+
+    JPH::RVec3 jolt_position;
+    JPH::Quat jolt_rotation;
+
+    mPosition.ToJoltVec3(jolt_position);
+    mRotation2.ToJoltQuaternion(jolt_rotation);
+
+    FxLogInfo("Update transform");
+
+    gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetPhysicsBodyId(), jolt_position, jolt_rotation,
+                                                                      JPH::EActivation::Activate);
 }

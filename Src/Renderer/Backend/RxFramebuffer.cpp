@@ -9,8 +9,7 @@
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const RxGraphicsPipeline& pipeline,
-                           const RxRenderPass& render_pass, FxVec2u size)
+void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const RxRenderPass& render_pass, FxVec2u size)
 {
     const VkFramebufferCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,

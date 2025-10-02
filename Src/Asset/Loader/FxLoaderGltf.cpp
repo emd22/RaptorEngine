@@ -131,7 +131,7 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         return;
     }
 
-    FxRef<FxMaterial> material = FxMaterialManager::New("Fireplace", &gRenderer->DeferredRenderer->GPassPipeline);
+    FxRef<FxMaterial> material = FxMaterialManager::New("Fireplace", &gRenderer->DeferredRenderer->PlGeometry);
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {

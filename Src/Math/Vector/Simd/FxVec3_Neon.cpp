@@ -28,19 +28,8 @@ FxVec3f::FxVec3f(float32* values)
 
 FxVec3f::FxVec3f(float32 scalar) { mIntrin = vdupq_n_f32(scalar); }
 
-void FxVec3f::Set(float32 x, float32 y, float32 z)
-{
-    const float32 values[4] = { x, y, z, 0 };
-    mIntrin = vld1q_f32(values);
-}
+FxVec3f::FxVec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
 
-
-FxVec3f FxVec3f::MulAdd(const FxVec3f& add_value, const FxVec3f& mul_a, const FxVec3f& mul_b)
-{
-    FxVec3f result;
-    result.mIntrin = vmlaq_f32(add_value, mul_a, mul_b);
-    return result;
-}
 
 void FxVec3f::Print() const { FxLogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
 
@@ -116,66 +105,12 @@ float32 FxVec3f::Dot(const FxVec3f& other) const
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
 void FxVec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }
 
-FxVec3f FxVec3f::Min(const FxVec3f& a, const FxVec3f& b) { return FxVec3f(vminq_f32(a.mIntrin, b.mIntrin)); }
-FxVec3f FxVec3f::Max(const FxVec3f& a, const FxVec3f& b) { return FxVec3f(vmaxq_f32(a.mIntrin, b.mIntrin)); }
-
-//////////////////////////////
-// Operator Overloads
-//////////////////////////////
-
-FxVec3f FxVec3f::operator+(const FxVec3f& other) const
+bool FxVec3f::IsCloseTo(const JPH::Vec3& other, const float32 threshold) const
 {
-    float32x4_t result = vaddq_f32(mIntrin, other.mIntrin);
-    return FxVec3f(result);
+    return IsCloseTo(other.mValue, threshold);
 }
 
-FxVec3f FxVec3f::operator-(const FxVec3f& other) const
-{
-    float32x4_t result = vsubq_f32(mIntrin, other.mIntrin);
-    return FxVec3f(result);
-}
 
-FxVec3f FxVec3f::operator*(const FxVec3f& other) const
-{
-    float32x4_t result = vmulq_f32(mIntrin, other.mIntrin);
-    return FxVec3f(result);
-}
-
-FxVec3f FxVec3f::operator*(float32 scalar) const
-{
-    float32x4_t result = vmulq_n_f32(mIntrin, scalar);
-    return FxVec3f(result);
-}
-
-FxVec3f FxVec3f::operator-() const
-{
-    float32x4_t result = vnegq_f32(mIntrin);
-    return FxVec3f(result);
-}
-
-FxVec3f FxVec3f::operator/(float32 scalar) const
-{
-    float32x4_t result = vdivq_f32(mIntrin, vdupq_n_f32(scalar));
-    return FxVec3f(result);
-}
-
-FxVec3f& FxVec3f::operator+=(const FxVec3f& other)
-{
-    mIntrin = vaddq_f32(mIntrin, other);
-    return *this;
-}
-
-FxVec3f& FxVec3f::operator-=(const FxVec3f& other)
-{
-    mIntrin = vsubq_f32(mIntrin, other);
-    return *this;
-}
-
-FxVec3f& FxVec3f::operator*=(const FxVec3f& other)
-{
-    mIntrin = vmulq_f32(mIntrin, other);
-    return *this;
-}
-
+bool FxVec3f::operator==(const JPH::Vec3& other) const { return (*this) == FxVec3f(other.mValue); }
 
 #endif

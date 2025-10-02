@@ -6,13 +6,17 @@
 class FxBitset
 {
 public:
+    static constexpr int scNoFreeBits = -1;
+
+public:
     void InitZero(uint32 max_bits);
     void InitOne(uint32 max_bits);
 
-    bool Get(uint32 index);
+    FX_FORCE_INLINE int FindNextFreeBit() const;
 
-    void Set(uint32 index);
-    void Unset(uint32 index);
+    FX_FORCE_INLINE void Set(uint32 index);
+    FX_FORCE_INLINE bool Get(uint32 index);
+    FX_FORCE_INLINE void Unset(uint32 index);
 
     void Print();
 
@@ -22,3 +26,6 @@ private:
 private:
     FxSizedArray<uint64> mBits;
 };
+
+// Inline definitions
+#include "FxBitset.inl"

@@ -156,3 +156,17 @@ struct FxMemberRef
 public:
     TPtrType* pPtr = nullptr;
 };
+
+
+// template <typename TResultType>
+// struct FxOptional
+// {
+//     using Type = TResultType;
+
+//     std::aligned_storage_t<sizeof(Type), alignof(Type)> Result;
+//     bool bExists;
+
+// public:
+//     FxOptional() : bExists(false) {}
+//     FxOptional(const TResultType& result) : bExists(true) { ::new ((void*)&result) TResultType(result); }
+// };

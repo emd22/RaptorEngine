@@ -23,6 +23,9 @@ template <typename TElementType>
 class FxSizedArray
 {
 public:
+    static constexpr int64 scItemNotFound = -1;
+
+public:
     struct Iterator
     {
         Iterator(TElementType* ptr, size_t index) : mPtr(ptr), mIndex(index) {}
@@ -258,6 +261,30 @@ public:
         InternalAllocateArray(element_count);
 
         Capacity = element_count;
+    }
+
+    bool ContainsItem(TElementType* ptr) const
+    {
+        const TElementType* end_ptr = (Data + Size);
+
+        if (ptr >= Data && ptr <= end_ptr) {
+            return true;
+        }
+
+        return false;
+    }
+
+    int64 GetItemIndex(TElementType* ptr) const
+    {
+        const TElementType* end_ptr = (Data + Size);
+
+        if (ptr < Data || ptr > end_ptr) {
+            return scItemNotFound;
+        }
+
+        FxAssert(ptr >= Data);
+
+        return ptr - Data;
     }
 
     /**

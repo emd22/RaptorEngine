@@ -29,6 +29,7 @@ FxQuat FxQuat::FromAxisAngle(FxVec3f axis, float32 angle)
 }
 
 void FxQuat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
+void FxQuat::ToJoltQuaternion(JPH::Quat& quat) { quat.mValue.mValue = mIntrin; }
 
 FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
 {

@@ -78,14 +78,16 @@ public:
         AttachedNodes.Insert(object);
     }
 
-
     void CreatePhysicsBody(PhysicsFlags flags, PhysicsType type, const FxPhysicsProperties& properties);
     void DestroyPhysicsBody();
 
-    inline JPH::Body* GetPhysicsBody() { return mpPhysicsBody; };
-    inline const JPH::BodyID& GetPhysicsBodyId() { return mpPhysicsBody->GetID(); };
+    FX_FORCE_INLINE JPH::Body* GetPhysicsBody() { return mpPhysicsBody; };
+    FX_FORCE_INLINE const JPH::BodyID& GetPhysicsBodyId() { return mpPhysicsBody->GetID(); };
 
     void Update();
+
+protected:
+    void OnTransformUpdate() override;
 
 private:
     void RenderMesh();

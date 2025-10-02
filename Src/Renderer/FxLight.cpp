@@ -81,7 +81,7 @@ void FxLight::Render(const FxCamera& camera)
         FxLightVertPushConstants push_constants {};
         memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->LightingPipeline.Layout,
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->PlLighting.Layout,
                            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants), &push_constants);
     }
     {
@@ -110,12 +110,12 @@ void FxLight::Render(const FxCamera& camera)
         memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 4);
         push_constants.LightRadius = Radius;
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->LightingPipeline.Layout,
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, deferred->PlLighting.Layout,
                            VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(FxLightVertPushConstants),
                            sizeof(FxLightFragPushConstants), &push_constants);
     }
 
-    LightVolume->Render(frame->LightCommandBuffer, deferred->LightingPipeline);
+    LightVolume->Render(frame->LightCommandBuffer, deferred->PlLighting);
 }
 
 
@@ -135,8 +135,8 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
     memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT,
-                       0, sizeof(push_constants), &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                       sizeof(push_constants), &push_constants);
 
-    mDebugMesh->Render(frame->CommandBuffer, deferred->GPassPipeline);
+    mDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
 }
