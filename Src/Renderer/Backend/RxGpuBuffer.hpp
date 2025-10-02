@@ -68,6 +68,8 @@ enum class RxGpuBufferFlags : uint16
     FX_DEFINE_AS_FLAG_ENUM,
 };
 
+// FX_DEFINE_ENUM_AS_FLAGS(RxGpuBufferFlags);
+
 
 /**
  * @brief Provides a GPU buffer that can be created with more complex parameters without staging.

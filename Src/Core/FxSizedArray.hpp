@@ -19,7 +19,6 @@ static inline void NoMemError()
 }
 
 template <typename TElementType>
-
 class FxSizedArray
 {
 public:
