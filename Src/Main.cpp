@@ -306,8 +306,7 @@ int main()
     // ground_object.Scale(FxVec3f(10, 1, 10));
     ground_object.MoveBy(FxVec3f(0, -20, 0));
 
-    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
-                                    FxObject::PhysicsType::Static, {});
+    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Static, {});
 
     FxObject cube_object;
     cube_object.Create(generated_cube_mesh, cube_material);
@@ -410,10 +409,15 @@ int main()
         //     FxMemPool::GetGlobalPool().PrintAllocations();
         // }
 
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_F)) {
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_R)) {
             // second_light_on = !second_light_on;
 
-            cube_object.RotateY(DeltaTime * 0.01f);
+            cube_object.MoveBy(FxVec3f(DeltaTime * 0.001f, 0, 0));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_E)) {
+            // second_light_on = !second_light_on;
+
+            cube_object.MoveBy(FxVec3f(DeltaTime * -0.001f, 0, 0));
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {

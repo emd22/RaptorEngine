@@ -143,10 +143,10 @@ public:
     };
 
 public:
-    inline bool IsKeyDown() const { return mKeyDown; }
-    inline bool IsKeyUp() const { return !mKeyDown; }
+    inline bool IsKeyDown() const { return mbKeyDown; }
+    inline bool IsKeyUp() const { return !mbKeyDown; }
 
-    inline bool IsContinuedPress() const { return mContinuedPress; }
+    inline bool IsContinuedPress() const { return mbContinuedPress; }
 
     bool IsKeyPressed() const { return (IsKeyDown() && !IsContinuedPress()); }
 
@@ -176,7 +176,7 @@ public:
 private:
     uint8 mFlags = Flag::NoFlag;
 
-    uint8 mContinuedPress : 1 = 0;
-    uint8 mKeyDown : 1 = 0;
-    uint8 mTickBit : 1 = 0;
+    uint8 mbContinuedPress : 1 = 0;
+    uint8 mbKeyDown : 1 = 0;
+    uint8 mbTickBit : 1 = 0;
 };
