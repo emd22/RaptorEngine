@@ -83,7 +83,7 @@ static FxConfigEntry::ValueType GetValueTokenType(const FxTokenizer::Token& toke
     return current_type;
 }
 
-void FxConfigFile::ParseEntries(FxMPPagedArray<FxTokenizer::Token>& tokens)
+void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
 {
     FxConfigEntry entry;
 

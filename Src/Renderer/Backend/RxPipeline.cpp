@@ -5,11 +5,12 @@
 #include "RxCommands.hpp"
 
 #include <Core/FxPanic.hpp>
-#include <Core/Log.hpp>
-#include <Renderer/Renderer.hpp>
+#include <FxEngine.hpp>
 #include <Renderer/RxDeferred.hpp>
 
 FX_SET_MODULE_NAME("Pipeline")
+
+static VkPipeline spBoundPipeline = nullptr;
 
 FxVertexInfo FxMakeVertexInfo()
 {
@@ -55,7 +56,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
                                 FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
                                 const RxGraphicsPipelineProperties& properties)
 {
-    mDevice = Renderer->GetDevice();
+    mDevice = gRenderer->GetDevice();
 
     bool has_depth_attachment = false;
 
@@ -94,13 +95,13 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
     // Dynamic states (scissor & viewport updates dynamically)
     FxSizedArray<VkDynamicState> dynamic_states = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 
-    VkPipelineDynamicStateCreateInfo dynamic_state_info = {
+    const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .dynamicStateCount = static_cast<uint32>(dynamic_states.Size),
         .pDynamicStates = dynamic_states,
     };
 
-    const FxVec2u extent = Renderer->Swapchain.Extent;
+    const FxVec2u extent = gRenderer->Swapchain.Extent;
 
     VkViewport viewport = {
         .x = 0.0f,
@@ -116,7 +117,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
         .extent = { .width = static_cast<uint32>(extent.X), .height = static_cast<uint32>(extent.Y) },
     };
 
-    VkPipelineViewportStateCreateInfo viewport_state_info = {
+    const VkPipelineViewportStateCreateInfo viewport_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .viewportCount = 1,
         .pViewports = &viewport,
@@ -136,13 +137,13 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
         vertex_input_info.pVertexAttributeDescriptions = vertex_info->attributes.Data;
     }
 
-    VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
+    const VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
         .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .primitiveRestartEnable = VK_FALSE,
     };
 
-    VkPipelineRasterizationStateCreateInfo rasterizer_info = {
+    const VkPipelineRasterizationStateCreateInfo rasterizer_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
         .depthClampEnable = VK_FALSE,
         .rasterizerDiscardEnable = VK_FALSE,
@@ -154,14 +155,14 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
     };
 
 
-    VkPipelineMultisampleStateCreateInfo multisampling_info {
+    const VkPipelineMultisampleStateCreateInfo multisampling_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
         .sampleShadingEnable = VK_FALSE,
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
     };
 
 
-    VkPipelineColorBlendStateCreateInfo color_blend_info {
+    const VkPipelineColorBlendStateCreateInfo color_blend_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE,
         .attachmentCount = color_blend_attachments.Size,
@@ -177,7 +178,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
     }
 
     // Unused if has_depth_attachment is false
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
+    const VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = use_depth,
         .depthWriteEnable = use_depth,
@@ -186,7 +187,7 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
         .stencilTestEnable = VK_FALSE,
     };
 
-    VkGraphicsPipelineCreateInfo pipeline_info = {
+    const VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 
         .stageCount = (uint32)shader_create_info.Size,
@@ -219,7 +220,13 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
 
 void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
 {
+    if (Pipeline == spBoundPipeline) {
+        return;
+    }
+
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+
+    spBoundPipeline = Pipeline;
 }
 
 void RxGraphicsPipeline::Destroy()
@@ -252,7 +259,7 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(uint32 vert_push_consts_size, 
                                                   const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
     if (mDevice == nullptr) {
-        mDevice = Renderer->GetDevice();
+        mDevice = gRenderer->GetDevice();
     }
 
     VkPushConstantRange pc_ranges[2];

@@ -55,19 +55,35 @@ FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::A
         vertex->Position[2] = vec.Z;
     }
 
+    mesh->VertexList.LocalBuffer = std::move(points);
+    mesh->UploadVertices();
+
+    mesh->UploadIndices(Indices);
+
+    mesh->IsReady.store(true);
+
     // Create the mesh using our bodged point array
-    mesh->CreateFromData(points, Indices);
+    // mesh->CreateFromData(points, Indices);
 
     return mesh;
 }
 
 FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
 {
+    // Create a mesh using the default vertex format (positions, normals, uvs)
     FxRef<FxPrimitiveMesh<>> mesh = FxMakeRef<FxPrimitiveMesh<>>();
     mesh->IsReference = true;
 
-    auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
-    mesh->CreateFromData(fat_vertices, Indices);
+    // Create the vertex list from our list of positions
+    mesh->VertexList.CreateFrom(Positions);
+    mesh->UploadVertices();
+
+    mesh->UploadIndices(Indices);
+
+    // auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
+    // mesh->CreateFromData(fat_vertices, Indices);
+
+    mesh->IsReady.store(true);
 
     return mesh;
 }
@@ -160,7 +176,7 @@ FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeIcoSphere(int resolution)
 }
 
 
-FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenCubeOptions options)
+FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenOptions options)
 {
     FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
 
@@ -189,6 +205,42 @@ FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeCube(FxMeshGenCubeOptions options
                       3, 7, 6, 3, 6, 2,
                       // Bottom (y = -5)
                       0, 1, 5, 0, 5, 4
+    };
+
+    return mesh;
+}
+
+FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeQuad(FxMeshGenOptions options)
+{
+    FxRef<FxMeshGen::GeneratedMesh> mesh = FxMakeRef<FxMeshGen::GeneratedMesh>();
+
+    const float s = options.Scale;
+
+    /*
+        0-------1
+        |     / |
+        |   /   |
+        | /     |
+        3-------2
+    */
+
+    mesh->Positions = {
+        // Top Left
+        FxVec3f(-s, -s, 0.0f), // 0
+        // Top Right
+        FxVec3f(s, -s, 0.0f), // 1
+
+        // Bottom Right
+        FxVec3f(s, s, 0.0f), // 2
+
+        // Bottom Left
+        FxVec3f(-s, s, 0.0f), // 3
+    };
+
+    mesh->Indices = { // Top left triangle
+                      1, 0, 3,
+                      // Bottom right triangle
+                      1, 3, 2
     };
 
     return mesh;

@@ -1,44 +1,39 @@
 #pragma once
 
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 
 template <typename Type>
-class FxVec2Base {
+class FxVec2Base
+{
 public:
     FxVec2Base() = default;
 
-    FxVec2Base(Type x, Type y)
-        : X(x), Y(y)
-    {
-    }
+    FxVec2Base(Type x, Type y) : X(x), Y(y) {}
 
-    explicit FxVec2Base(Type scalar)
-        : X(scalar), Y(scalar)
-    {
-    }
+    explicit FxVec2Base(Type scalar) : X(scalar), Y(scalar) {}
 
-    FxVec2Base operator + (const FxVec2Base &other) const
+    FxVec2Base operator+(const FxVec2Base& other) const
     {
         FxVec2Base result = *this;
         result += other;
         return result;
     }
 
-    FxVec2Base operator - (const FxVec2Base &other) const
+    FxVec2Base operator-(const FxVec2Base& other) const
     {
         FxVec2Base result = *this;
         result -= other;
         return result;
     }
 
-    FxVec2Base operator * (const FxVec2Base &other) const
+    FxVec2Base operator*(const FxVec2Base& other) const
     {
         FxVec2Base result = *this;
         result *= other;
         return result;
     }
 
-    FxVec2Base &operator += (const FxVec2Base &other)
+    FxVec2Base& operator+=(const FxVec2Base& other)
     {
         X += other.X;
         Y += other.Y;
@@ -46,7 +41,7 @@ public:
         return *this;
     }
 
-    FxVec2Base &operator -= (const FxVec2Base &other)
+    FxVec2Base& operator-=(const FxVec2Base& other)
     {
         X -= other.X;
         Y -= other.Y;
@@ -54,7 +49,7 @@ public:
         return *this;
     }
 
-    FxVec2Base &operator *= (const FxVec2Base &other)
+    FxVec2Base& operator*=(const FxVec2Base& other)
     {
         X *= other.X;
         Y *= other.Y;
@@ -62,7 +57,7 @@ public:
         return *this;
     }
 
-    FxVec2Base operator * (float scalar) const
+    FxVec2Base operator*(float scalar) const
     {
         FxVec2Base result = *this;
         result.X *= scalar;
@@ -70,14 +65,18 @@ public:
         return result;
     }
 
-    FxVec2Base<Type> &operator = (const FxVec2Base<Type> &other)
+    FxVec2Base<Type>& operator=(const FxVec2Base<Type>& other)
     {
         X = other.X;
         Y = other.Y;
         return *this;
     }
 
-    void Set(Type x, Type y) { X = x; Y = y; }
+    void Set(Type x, Type y)
+    {
+        X = x;
+        Y = y;
+    }
 
     Type GetX() const { return X; }
     Type GetY() const { return Y; }
@@ -91,8 +90,15 @@ public:
     static const FxVec2Base<Type> Zero;
 
 public:
-    Type X;
-    Type Y;
+    union alignas(16)
+    {
+        float32 mData[2];
+
+        struct
+        {
+            Type X, Y;
+        };
+    };
 };
 
 // Declaration of Vec2::Zero

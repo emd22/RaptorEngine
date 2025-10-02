@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <cstdint>
 #include <vector>
 
@@ -32,18 +32,9 @@ public:
         });
     }
 
-    uint32 GetGraphicsFamily()
-    {
-        return mGraphicsIndex;
-    }
-    uint32 GetPresentFamily()
-    {
-        return mPresentIndex;
-    }
-    uint32 GetTransferFamily()
-    {
-        return mTransferIndex;
-    }
+    uint32 GetGraphicsFamily() { return mGraphicsIndex; }
+    uint32 GetPresentFamily() { return mPresentIndex; }
+    uint32 GetTransferFamily() { return mTransferIndex; }
 
 private:
     void FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
@@ -64,10 +55,7 @@ class RxGpuDevice
 {
 public:
     RxGpuDevice() = default;
-    RxGpuDevice(VkInstance instance, VkSurfaceKHR surface)
-    {
-        Create(instance, surface);
-    }
+    RxGpuDevice(VkInstance instance, VkSurfaceKHR surface) { Create(instance, surface); }
 
     void Create(VkInstance instance, VkSurfaceKHR surface);
     void Destroy();
@@ -79,14 +67,8 @@ public:
 
     VkSurfaceFormatKHR GetBestSurfaceFormat();
 
-    operator VkDevice() const
-    {
-        return Device;
-    }
-    operator VkPhysicalDevice() const
-    {
-        return Physical;
-    }
+    operator VkDevice() const { return Device; }
+    operator VkPhysicalDevice() const { return Physical; }
 
 private:
     bool IsPhysicalDeviceSuitable(VkPhysicalDevice& device);

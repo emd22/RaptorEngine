@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Core/FxSizedArray.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <Math/FxVec2.hpp>
 #include <Util/FxKey.hpp>
 #include <cstring>

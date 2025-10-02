@@ -72,5 +72,43 @@
 #ifdef _WIN64
 #define FX_FORCE_INLINE __forceinline
 #else
-#define FX_FORCE_INLINE __attribute__((always_inline))
+#define FX_FORCE_INLINE inline __attribute__((always_inline))
 #endif
+
+
+#define FX_ENUM_AS_BITS(EnumType_, value_) static_cast<std::underlying_type_t<EnumType_>>(value_)
+
+#define FX_ENUM_DEFINE_BITWISE_OR(EnumType_)                                                                           \
+    inline constexpr EnumType_ operator|(EnumType_ lhs, EnumType_ rhs)                                                 \
+    {                                                                                                                  \
+        return static_cast<EnumType_>(FX_ENUM_AS_BITS(EnumType_, lhs) | FX_ENUM_AS_BITS(EnumType_, rhs));              \
+    }                                                                                                                  \
+    inline constexpr EnumType_& operator|=(EnumType_& lhs, EnumType_ rhs)                                              \
+    {                                                                                                                  \
+        lhs = (lhs | rhs);                                                                                             \
+        return lhs;                                                                                                    \
+    }
+
+#define FX_ENUM_DEFINE_BITWISE_AND(EnumType_)                                                                          \
+    inline constexpr EnumType_ operator&(EnumType_ lhs, EnumType_ rhs)                                                 \
+    {                                                                                                                  \
+        return static_cast<EnumType_>(FX_ENUM_AS_BITS(EnumType_, lhs) & FX_ENUM_AS_BITS(EnumType_, rhs));              \
+    }                                                                                                                  \
+    inline constexpr EnumType_& operator&=(EnumType_& lhs, EnumType_ rhs)                                              \
+    {                                                                                                                  \
+        lhs = (lhs & rhs);                                                                                             \
+        return lhs;                                                                                                    \
+    }
+
+#define FX_ENUM_DEFINE_BITWISE_NOT(EnumType_)                                                                          \
+    inline constexpr EnumType_ operator~(EnumType_ value)                                                              \
+    {                                                                                                                  \
+        return static_cast<EnumType_>(~FX_ENUM_AS_BITS(EnumType_, value));                                             \
+    }
+
+
+#define FX_DEFINE_ENUM_AS_FLAGS(EnumType_)                                                                             \
+    FX_ENUM_DEFINE_BITWISE_OR(EnumType_)                                                                               \
+    FX_ENUM_DEFINE_BITWISE_AND(EnumType_)                                                                              \
+    FX_ENUM_DEFINE_BITWISE_NOT(EnumType_)                                                                              \
+    using EnumType_##Bits = std::underlying_type_t<EnumType_>;

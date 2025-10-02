@@ -4,23 +4,23 @@
 #include "Rx_Fwd_GetGpuAllocator.hpp"
 #include "Rx_Fwd_SubmitUploadGpuCmd.hpp"
 
-#include <Renderer/Renderer.hpp>
+#include <FxEngine.hpp>
 
 /* Rx_Fwd_GetFrame.hpp */
-RxFrameData* Rx_Fwd_GetFrame() { return Renderer->GetFrame(); }
+RxFrameData* Rx_Fwd_GetFrame() { return gRenderer->GetFrame(); }
 
 /* Rx_Fwd_SubmitUploadGpuCmd.hpp */
-void Fx_Fwd_SubmitUploadCmd(std::function<void(RxCommandBuffer&)> func) { Renderer->SubmitUploadCmd(func); }
+void Fx_Fwd_SubmitUploadCmd(std::function<void(RxCommandBuffer&)> func) { gRenderer->SubmitUploadCmd(func); }
 
 
-VmaAllocator Fx_Fwd_GetGpuAllocator() { return Renderer->GpuAllocator; }
+VmaAllocator Fx_Fwd_GetGpuAllocator() { return gRenderer->GpuAllocator; }
 
-RxGpuDevice* Fx_Fwd_GetGpuDevice() { return Renderer->GetDevice(); }
+RxGpuDevice* Fx_Fwd_GetGpuDevice() { return gRenderer->GetDevice(); }
 
 
-void Fx_Fwd_AddToDeletionQueue(const FxDeletionObject::FuncType& func) { Renderer->AddToDeletionQueue(func); }
+void Fx_Fwd_AddToDeletionQueue(const FxDeletionObject::FuncType& func) { gRenderer->AddToDeletionQueue(func); }
 
 void Fx_Fwd_AddGpuBufferToDeletionQueue(const VkBuffer& buffer, const VmaAllocation& allocation)
 {
-    Renderer->AddGpuBufferToDeletionQueue(buffer, allocation);
+    gRenderer->AddGpuBufferToDeletionQueue(buffer, allocation);
 }

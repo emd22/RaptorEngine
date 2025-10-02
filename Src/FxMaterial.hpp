@@ -14,10 +14,24 @@
 
 struct FxMaterialComponent
 {
+public:
+    enum class Status
+    {
+        Ready,
+        NotReady,
+    };
+
+public:
     FxRef<FxAssetImage> Texture { nullptr };
     FxSlice<const uint8> DataToLoad { nullptr };
 
     ~FxMaterialComponent() = default;
+
+public:
+    Status Build(const FxRef<RxSampler>& sampler);
+
+private:
+    bool CheckIfReady();
 };
 
 struct FxMaterialProperties
@@ -42,7 +56,7 @@ public:
     {
         switch (type) {
         case ResourceType::Diffuse:
-            DiffuseTexture.Texture = image;
+            DiffuseComponent.Texture = image;
             break;
         default:
             FxLogError("Unsupported resource type to attach to material!");
@@ -72,7 +86,7 @@ private:
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent DiffuseTexture;
+    FxMaterialComponent DiffuseComponent;
 
     FxMaterialProperties Properties {};
 

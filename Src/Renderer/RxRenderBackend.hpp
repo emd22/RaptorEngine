@@ -8,6 +8,7 @@
 #include "FxDeletionObject.hpp"
 #include "FxWindow.hpp"
 #include "RxDeferred.hpp"
+#include "RxPipelineCache.hpp"
 #include "RxSamplerCache.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>
@@ -189,7 +190,9 @@ public:
 
     FxRef<RxDeferredRenderer> DeferredRenderer { nullptr };
 
-    RxSamplerCache SamplerCache;
+    // RxSamplerCache SamplerCache;
+
+    // RxPipelineCache PipelineCache;
 
     // RxSemaphore OffscreenSemaphore;
 

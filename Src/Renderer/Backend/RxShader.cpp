@@ -1,10 +1,10 @@
 #include "RxShader.hpp"
 
-#include "../Renderer.hpp"
+#include "FxEngine.hpp"
 #include "ShaderList.hpp"
 
+#include <Core/FxTypes.hpp>
 #include <Core/Log.hpp>
-#include <Core/Types.hpp>
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -49,7 +49,7 @@ void RxShader::Destroy()
         return;
     }
 
-    RxGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = gRenderer->GetDevice();
     vkDestroyShaderModule(device->Device, ShaderModule, nullptr);
 }
 
@@ -61,7 +61,7 @@ void RxShader::CreateShaderModule(std::ios::pos_type file_size, uint32* shader_d
         .pCode = (uint32_t*)shader_data,
     };
 
-    RxGpuDevice* device = Renderer->GetDevice();
+    RxGpuDevice* device = gRenderer->GetDevice();
 
     const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &ShaderModule);
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Types.hpp"
 #include "FxPagedArray.hpp"
+#include "FxTypes.hpp"
 
 #include <cstdlib>
 
@@ -48,10 +48,7 @@ public:
 public:
     FxLinkedList() = default;
 
-    FxLinkedList(uint32 initial_pool_size)
-    {
-        Create(initial_pool_size);
-    }
+    FxLinkedList(uint32 initial_pool_size) { Create(initial_pool_size); }
 
     void Create(uint32 initial_pool_size = 32)
     {

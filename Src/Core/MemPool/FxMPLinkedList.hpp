@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Types.hpp"
+#include "../FxTypes.hpp"
 #include "FxMPPagedArray.hpp"
 
 #include <cstdlib>
@@ -50,10 +50,7 @@ public:
 public:
     FxMPLinkedList() = default;
 
-    FxMPLinkedList(uint32 initial_pool_size)
-    {
-        Create(initial_pool_size);
-    }
+    FxMPLinkedList(uint32 initial_pool_size) { Create(initial_pool_size); }
 
     void Create(uint32 initial_pool_size = 32)
     {
@@ -82,7 +79,6 @@ public:
 #else
         node = mNodePool.Insert();
 #endif
-
 
 
         node->Data = data;
@@ -221,6 +217,6 @@ public:
     Node* Tail = nullptr;
 
 private:
-    FxMPPagedArray<Node> mNodePool;
-    FxMPPagedArray<Node*> mFreedNodes;
+    FxPagedArray<Node> mNodePool;
+    FxPagedArray<Node*> mFreedNodes;
 };

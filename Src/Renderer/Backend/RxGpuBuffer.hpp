@@ -7,8 +7,8 @@
 #include <memory.h>
 
 #include <Core/FxPanic.hpp>
+#include <Core/FxTypes.hpp>
 #include <Core/FxUtil.hpp>
-#include <Core/Types.hpp>
 #include <cstring>
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
@@ -67,6 +67,8 @@ enum class RxGpuBufferFlags : uint16
 
     FX_DEFINE_AS_FLAG_ENUM,
 };
+
+// FX_DEFINE_ENUM_AS_FLAGS(RxGpuBufferFlags);
 
 
 /**
@@ -155,14 +157,14 @@ public:
     void Map()
     {
         if (IsMapped()) {
-            OldLog::Warning("Buffer %p is already mapped!", Buffer);
+            FxLogWarning("Buffer {:p} is already mapped!", reinterpret_cast<void*>(Buffer));
             return;
         }
 
         const VkResult status = vmaMapMemory(Fx_Fwd_GetGpuAllocator(), Allocation, &MappedBuffer);
 
         if (status != VK_SUCCESS) {
-            OldLog::Error("Could not map GPU memory to main memory! (Usage: 0x%X)", mUsageFlags);
+            FxLogError("Could not map GPU memory to main memory! (Usage: 0x{:x})", mUsageFlags);
             return;
         }
     }

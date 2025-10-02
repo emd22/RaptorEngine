@@ -27,9 +27,11 @@ public:
 
     ~RxDeferredRenderer() { Destroy(); }
 
-    FX_FORCE_INLINE RxDeferredGPass* GetCurrentGPass();
-    FX_FORCE_INLINE RxDeferredCompPass* GetCurrentCompPass();
-    FX_FORCE_INLINE RxDeferredLightingPass* GetCurrentLightingPass();
+    void ToggleWireframe(bool enable);
+
+    RxDeferredGPass* GetCurrentGPass();
+    RxDeferredCompPass* GetCurrentCompPass();
+    RxDeferredLightingPass* GetCurrentLightingPass();
 
     void RebuildLightingPipeline();
 
@@ -38,25 +40,25 @@ private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
-    FX_FORCE_INLINE VkPipelineLayout CreateGPassPipelineLayout();
+    VkPipelineLayout CreateGPassPipelineLayout();
 
     // Lighting
-    void CreateLightVolumePipeline();
+    // void CreateLightVolumePipeline();
     void CreateLightingPipeline();
 
     void CreateLightingDSLayout();
 
-    void DestroyLightVolumePipeline();
+    // void DestroyLightVolumePipeline();
     void DestroyLightingPipeline();
 
-    FX_FORCE_INLINE VkPipelineLayout CreateLightingPipelineLayout();
-    FX_FORCE_INLINE VkPipelineLayout CreateLightPassPipelineLayout();
+    VkPipelineLayout CreateLightingPipelineLayout();
+    VkPipelineLayout CreateLightPassPipelineLayout();
 
     // Composition
     void CreateCompPipeline();
     void DestroyCompPipeline();
 
-    FX_FORCE_INLINE VkPipelineLayout CreateCompPipelineLayout();
+    VkPipelineLayout CreateCompPipelineLayout();
 
 
 public:
@@ -67,7 +69,10 @@ public:
     VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
-    RxGraphicsPipeline GPassPipeline;
+    RxGraphicsPipeline PlGeometry;
+    RxGraphicsPipeline PlGeometryWireframe;
+    RxGraphicsPipeline* pGeometryPipeline = nullptr;
+
     RxRenderPass RpGeometry;
 
     FxSizedArray<RxDeferredGPass> GPasses;
@@ -79,7 +84,7 @@ public:
     VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
     VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
 
-    RxGraphicsPipeline LightingPipeline;
+    RxGraphicsPipeline PlLighting;
     RxRenderPass RpLighting;
 
     FxSizedArray<RxDeferredLightingPass> LightingPasses;
@@ -90,7 +95,7 @@ public:
 
     VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
-    RxGraphicsPipeline CompPipeline;
+    RxGraphicsPipeline PlComposition;
     RxRenderPass RpComposition;
 
     FxSizedArray<RxFramebuffer> OutputFramebuffers;
@@ -108,6 +113,8 @@ public:
 
 class RxDeferredGPass
 {
+    friend class RxDeferredRenderer;
+
 public:
     void Create(RxDeferredRenderer* renderer, const FxVec2u& extent);
     void Destroy();
@@ -140,7 +147,7 @@ public:
 
 
 private:
-    RxGraphicsPipeline* mGPassPipeline = nullptr;
+    RxGraphicsPipeline* mPlGeometry = nullptr;
     RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 };
@@ -170,7 +177,7 @@ public:
     RxDescriptorSet DescriptorSet;
 
 private:
-    RxGraphicsPipeline* mLightingPipeline = nullptr;
+    RxGraphicsPipeline* mPlLighting = nullptr;
     RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 };
@@ -202,7 +209,7 @@ public:
     RxDescriptorSet DescriptorSet;
 
 private:
-    RxGraphicsPipeline* mCompPipeline = nullptr;
+    RxGraphicsPipeline* mPlComposition = nullptr;
     RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 

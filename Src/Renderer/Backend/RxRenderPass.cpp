@@ -6,13 +6,13 @@
 #include <vulkan/vulkan.h>
 
 #include <Core/FxPanic.hpp>
-#include <Renderer/Renderer.hpp>
+#include <FxEngine.hpp>
 
 FX_SET_MODULE_NAME("RxRenderPass")
 
 void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
 {
-    mDevice = Renderer->GetDevice();
+    mDevice = gRenderer->GetDevice();
 
     FxSizedArray<VkAttachmentReference> color_refs(attachments.Size);
 
@@ -135,7 +135,7 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
         FxModulePanic("Render pass has not been previously created", 0);
     }
 
-    const auto extent = Renderer->Swapchain.Extent;
+    const auto extent = gRenderer->Swapchain.Extent;
 
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,

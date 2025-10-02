@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/Types.hpp"
+#include <Core/FxTypes.hpp>
 
 /*
 [BASE] [SPEC]
@@ -21,24 +21,24 @@ enum OpBase : uint8
 
 enum OpSpecPush : uint8
 {
-    OpSpecPush_Int32 = 1,    // PUSH32  [imm]
-    OpSpecPush_Reg32,        // PUSH32r [%r32]
+    OpSpecPush_Int32 = 1, // PUSH32  [imm]
+    OpSpecPush_Reg32,     // PUSH32r [%r32]
 };
 
 enum OpSpecPop : uint8
 {
-    OpSpecPop_Int32 = 1,    // POP32 [%r32]
+    OpSpecPop_Int32 = 1, // POP32 [%r32]
 };
 
 enum OpSpecLoad : uint8
 {
-    OpSpecLoad_Int32 = 1,    // LOAD32 [offset] [%r32]
+    OpSpecLoad_Int32 = 1, // LOAD32 [offset] [%r32]
     OpSpecLoad_AbsoluteInt32,
 };
 
 enum OpSpecArith : uint8
 {
-    OpSpecArith_Add = 1     // ADD [%r32] [%r32]
+    OpSpecArith_Add = 1 // ADD [%r32] [%r32]
 };
 
 enum OpSpecSave : uint8

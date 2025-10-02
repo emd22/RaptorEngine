@@ -1,6 +1,5 @@
 #include "FxBitset.hpp"
 
-
 uint32 FxBitset::Init(uint32 max_bits)
 {
     // 0 0 1 1 1 1 1 1 -> 63 -> 3F
@@ -11,7 +10,7 @@ uint32 FxBitset::Init(uint32 max_bits)
         max_bits += (64 - remainder);
     }
 
-    const uint32 ints_required = (max_bits / 64);
+    const uint32 ints_required = (max_bits >> 6);
 
     mBits.InitSize(ints_required);
 
@@ -37,44 +36,20 @@ void FxBitset::InitOne(uint32 max_bits)
     }
 }
 
-bool FxBitset::Get(uint32 index)
-{
-    // The index into the int array (index / 64)
-    const uint16 int_index = (index >> 6);
 
-    // The mask for the bit that we are querying
-    const uint64 mask = (1ULL << (index & 0x3F));
+// void FxBitset::Set(uint32 index)
+// {
+//     // The index into the int array (index / 64)
+//     const uint16 int_index = (index >> 6);
 
-    return (mBits.Data[int_index] & mask);
-}
+//     // The mask for the bit that we are querying
+//     const uint64 mask = (1ULL << (index & 0x3F));
+
+//     mBits.Data[int_index] |= mask;
+// }
 
 
-void FxBitset::Set(uint32 index)
-{
-    // The index into the int array (index / 64)
-    const uint16 int_index = (index >> 6);
-
-    // The mask for the bit that we are querying
-    const uint64 mask = (1ULL << (index & 0x3F));
-
-    mBits.Data[int_index] |= mask;
-}
-
-void FxBitset::Unset(uint32 index)
-{
-    // The index into the int array (index / 64)
-    const uint16 int_index = (index >> 6);
-
-    // The mask for the bit that we are querying
-    const uint64 mask = (1ULL << (index & 0x3F));
-
-    mBits.Data[int_index] &= (~mask);
-}
-
-static constexpr uint8 GetBit(uint8 byte, uint8 bit)
-{
-    return ((byte >> bit) & 0x01);
-}
+static constexpr uint8 GetBit(uint8 byte, uint8 bit) { return ((byte >> bit) & 0x01); }
 
 static void PrintByte(uint8 b)
 {

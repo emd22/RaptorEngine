@@ -1,19 +1,21 @@
 
-#include "vulkan/vulkan_core.h"
 #define VMA_DEBUG_LOG(...) FxLogWarning(__VA_ARGS__)
 
 #include "Core/FxDefines.hpp"
-#include "Renderer/Backend/RxShader.hpp"
 #include "Renderer/Backend/ShaderList.hpp"
 #include "Renderer/FxCamera.hpp"
 #include "Renderer/FxLight.hpp"
 #include "Renderer/Renderer.hpp"
 
+
+/* Vulkan Memory Allocator */
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include <Core/FxLinkedList.hpp>
 #include <Core/FxMemory.hpp>
+#include <FxEngine.hpp>
 #include <Renderer/Backend/RxFrameData.hpp>
+#include <Renderer/Backend/RxShader.hpp>
 
 #define SDL_DISABLE_OLD_NAMES
 #include "FxControls.hpp"
@@ -29,13 +31,17 @@
 #include <Asset/FxMeshGen.hpp>
 #include <Core/FxBitset.hpp>
 #include <Core/FxLog.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
+#include <FxObject.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/FxWindow.hpp>
 #include <Renderer/Renderer.hpp>
 #include <Renderer/RxDeferred.hpp>
+#include <Script/FxScript.hpp>
+#include <chrono>
 #include <csignal>
+#include <iostream>
 
 
 FX_SET_MODULE_NAME("Main")
@@ -63,27 +69,10 @@ void CheckGeneralControls()
 
 static FxPerspectiveCamera* current_camera = nullptr;
 
-class TestScript : public FxScript
-{
-public:
-    TestScript() {}
-
-    void RenderTick() override
-    {
-        Entity->mModelMatrix.LookAt(Entity->GetPosition(), current_camera->Position, FxVec3f::Up);
-    }
-
-    ~TestScript() override {}
-};
-
-
-#include <chrono>
-#include <iostream>
-
 #pragma clang optimize off
 
 template <typename FuncType>
-void TestSpeed(FuncType ft, int iterations)
+void FxSpeedTest(FuncType ft, int iterations)
 {
     using namespace std::chrono;
     uint64 time_in_ns = 0;
@@ -96,14 +85,16 @@ void TestSpeed(FuncType ft, int iterations)
     auto ns = duration_cast<nanoseconds>(t2 - t1);
     time_in_ns = ns.count() / iterations;
 
-    std::cout << "Function " << typeid(FuncType).name() << " Took " << time_in_ns << "ns.\n";
+    const char* raw_name = typeid(FuncType).name();
+    char name_buffer[256];
+
+    FxUtil::DemangleName(raw_name, name_buffer, 256);
+
+    FxLogInfo("Speed test took {} ns.", time_in_ns);
 }
 
 #pragma clang optimize on
 
-
-#include <FxObject.hpp>
-#include <Script/FxScript.hpp>
 
 void TestScript()
 {
@@ -147,12 +138,70 @@ void TestScript()
     // }
 }
 
+#ifdef FX_USE_NEON
+
+#include <Math/FxNeonUtil.hpp>
+#include <Math/FxQuat.hpp>
+
+void TestNeonSin()
+{
+    {
+        float32 sv, cv;
+        const float32 angle = 0.1f;
+
+        FxMath::SinCos(angle, &sv, &cv);
+
+        FxLogInfo("Angle: {}, Sin: {}, Cos: {}", angle, sv, cv);
+    }
+
+
+    // FxVec4f angles(0.1f, -0.2f, 0.3f, 0.0f);
+
+    // const float32x4_t v = angles.mIntrin;
+
+    // float32x4_t sv = v;
+    // float32x4_t cv = v;
+
+    // FxNeon::SinCos4(v, &sv, &cv);
+
+    // FxVec4f s_result(sv);
+    // FxVec4f c_result(cv);
+
+    // FxLogInfo("Sin Result: {}", s_result);
+    // FxLogInfo("Cos Result: {}", c_result);
+}
+
+#endif
+
+void TestQuatFromEuler()
+{
+    FxVec3f angles(0.1, 0.0, 0.2);
+    FxLogInfo("Angles: {}", angles);
+
+    FxQuat rot_quat = FxQuat::FromAxisAngle(FxVec3f(1, 0, 0), 0.1);
+    FxLogInfo("RotQuat: {}", rot_quat);
+
+    FxQuat quat = FxQuat::FromEulerAngles(angles);
+    FxLogInfo("Quaternion: {}", quat);
+
+    FxLogInfo("Returned angles: {}", quat.GetEulerAngles());
+}
+
 
 int main()
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
     FxLogCreateFile("FoxtrotLog.log");
 #endif
+
+    // TestQuatFromEuler();
+    // FxQuat quat = FxQuat::FromEulerAngles(FxVec3f(1.24, 1.24, 0));
+
+    // FxLogInfo("Quat result: {}", quat);
+
+
+    // TestNeonSin();
+    // return 0;
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
@@ -166,6 +215,8 @@ int main()
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
     }
+
+    FxEngineGlobalsInit();
 
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };
@@ -183,19 +234,22 @@ int main()
 
     FxRef<FxWindow> window = FxWindow::New(config.GetValue<const char*>("WindowTitle"), window_width, window_height);
 
-    RxRenderBackend renderer_state;
-    SetRendererBackend(&renderer_state);
+    // RxRenderBackend renderer_state;
+    // SetRendererBackend(&renderer_state);
 
-    Renderer->SelectWindow(window);
-    Renderer->Init(FxVec2u(window_width, window_height));
+    gRenderer->SelectWindow(window);
+    gRenderer->Init(FxVec2u(window_width, window_height));
 
-    Renderer->Swapchain.CreateSwapchainFramebuffers();
+    gRenderer->Swapchain.CreateSwapchainFramebuffers();
 
-    // Renderer->OffscreenSemaphore.Create(Renderer->GetDevice());
+    // Initialize the physics system
+    gPhysics->Create();
+
+    // gRenderer->OffscreenSemaphore.Create(gRenderer->GetDevice());
 
     FxRef<RxDeferredRenderer> deferred_renderer = FxMakeRef<RxDeferredRenderer>();
-    deferred_renderer->Create(Renderer->Swapchain.Extent);
-    Renderer->DeferredRenderer = deferred_renderer;
+    deferred_renderer->Create(gRenderer->Swapchain.Extent);
+    gRenderer->DeferredRenderer = deferred_renderer;
 
     FxAssetManager& asset_manager = FxAssetManager::GetInstance();
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
@@ -206,8 +260,8 @@ int main()
     FxPerspectiveCamera camera;
     current_camera = &camera;
 
-    FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
-    fireplace_object->WaitUntilLoaded();
+    // FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
+    // fireplace_object->WaitUntilLoaded();
 
     FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
@@ -217,14 +271,16 @@ int main()
 
     auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 
+    auto generated_quad = FxMeshGen::MakeQuad({ .Scale = 1 });
+
     for (int i = 0; i < RendererFramesInFlight; i++) {
-        RxImage& skybox_output_image = Renderer->Swapchain.OutputImages[i];
-        Renderer->DeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
+        RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
+        gRenderer->DeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
     }
 
-    Renderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
+    gRenderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
 
-    Renderer->DeferredRenderer->SkyboxRenderer.Create(Renderer->Swapchain.Extent, generated_cube->AsLightVolume());
+    gRenderer->DeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, generated_cube->AsLightVolume());
 
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
@@ -235,9 +291,33 @@ int main()
     camera.Position.Y += 4.0f;
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
+    //
 
+    FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material",
+                                                           &deferred_renderer->PlGeometryWireframe);
 
-    fireplace_object->RotateX(M_PI_2);
+    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 100, 100, 255);
+    cube_material->DiffuseComponent.Texture = FxAssetImage::GetEmptyImage();
+
+    FxRef<FxPrimitiveMesh<>> generated_cube_mesh = generated_cube->AsMesh();
+
+    FxObject ground_object;
+    ground_object.Create(generated_cube_mesh, cube_material);
+    // ground_object.Scale(FxVec3f(10, 1, 10));
+    ground_object.MoveBy(FxVec3f(0, -20, 0));
+
+    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
+                                    FxObject::PhysicsType::Static, {});
+
+    FxObject cube_object;
+    cube_object.Create(generated_cube_mesh, cube_material);
+    cube_object.MoveBy(FxVec3f(0, 10, 0));
+
+    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
+
+    gPhysics->OptimizeBroadPhase();
+
+    // fireplace_object->RotateX(M_PI_2);
 
     FxSizedArray<VkDescriptorSet> sets_to_bind;
     sets_to_bind.InitSize(2);
@@ -245,18 +325,21 @@ int main()
     FxLight light;
     light.SetLightVolume(generated_sphere, true);
 
-    FxLight light2;
-    light2.SetLightVolume(generated_sphere, false);
-
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light.Scale(FxVec3f(25));
 
     light.Color = FxVec3f(0.6, 0.7, 0.6);
 
+    FxDirectionalLight light2;
+    light2.SetLightVolume(generated_quad, false);
+
     light2.MoveBy(FxVec3f(1, 0, -0.5));
-    light2.Scale(FxVec3f(25));
+    // light2.Scale(FxVec3f(25));
 
     bool second_light_on = false;
+
+    gPhysics->bPhysicsPaused = true;
+
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -286,54 +369,94 @@ int main()
             camera.Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
         }
 
+
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_U)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_J)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_H)) {
+        //     cube_object.MoveBy(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_K)) {
+        //     cube_object.MoveBy(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Y)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * -0.01f, 0.0f));
+        // }
+        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_I)) {
+        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * 0.01f, 0.0f));
+        // }
+
+        if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
+            gRenderer->DeferredRenderer->ToggleWireframe(true);
+        }
+        if (FxControlManager::IsKeyPressed(FX_KEY_MINUS)) {
+            gRenderer->DeferredRenderer->ToggleWireframe(false);
+        }
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
             light.MoveTo(camera.Position);
 
             light.mPosition.Print();
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
-            // FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
+        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
+        //     // FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
 
-            // helmet_object.Attach(helmet_model);
-            // helmet_object.Attach(cheese_material);
-            FxMemPool::GetGlobalPool().PrintAllocations();
+        //     // helmet_object.Attach(helmet_model);
+        //     // helmet_object.Attach(cheese_material);
+        //     FxMemPool::GetGlobalPool().PrintAllocations();
+        // }
+
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_F)) {
+            // second_light_on = !second_light_on;
+
+            cube_object.RotateY(DeltaTime * 0.01f);
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
-            second_light_on = !second_light_on;
-        }
-
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-            Renderer->DeferredRenderer->RebuildLightingPipeline();
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
+            // gRenderer->DeferredRenderer->RebuildLightingPipeline();
+            gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
+            // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 
         CheckGeneralControls();
 
         camera.Update();
 
+        gPhysics->Update();
+
         //        helmet_object.RotateY(0.001 * DeltaTime);
 
 
-        if (Renderer->BeginFrame(*deferred_renderer) != RxFrameResult::Success) {
+        if (gRenderer->BeginFrame(*deferred_renderer) != RxFrameResult::Success) {
             continue;
         }
 
-        deferred_renderer->SkyboxRenderer.Render(Renderer->GetFrame()->CommandBuffer, *current_camera);
-        deferred_renderer->GPassPipeline.Bind(Renderer->GetFrame()->CommandBuffer);
+        deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *current_camera);
 
-        //         helmet_object.mPosition.X = sin((0.05 * Renderer->GetElapsedFrameCount())) * 0.01;
+
+        deferred_renderer->pGeometryPipeline->Bind(gRenderer->GetFrame()->CommandBuffer);
+
+        //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
-        light.Color.Y = 0.7;
 
-        fireplace_object->Render(camera);
+        // fireplace_object->Render(camera);
+        cube_object.Update();
+        cube_object.Render(camera);
+
+        // ground_object.Update();
+        ground_object.Render(camera);
 
 
-        Renderer->BeginLighting();
+        gRenderer->BeginLighting();
 
         if (second_light_on) {
-            light2.MoveTo(camera.Position);
+            // light2.mModelMatrix = camera.VPMatrix;
+            light2.SetModelMatrix(camera.VPMatrix);
 
             light2.Render(camera);
         }
@@ -342,23 +465,23 @@ int main()
         //        light2.Render(camera);
         // light2.Render(camera);
 
-        Renderer->DoComposition(camera);
+        gRenderer->DoComposition(camera);
 
         LastTick = CurrentTick;
     }
 
-    Renderer->GetDevice()->WaitForIdle();
+    gRenderer->GetDevice()->WaitForIdle();
 
     material_manager.Destroy();
     asset_manager.Shutdown();
 
     deferred_renderer->Destroy();
 
+    FxEngineGlobalsDestroy();
+
     // composition_pipeline.Destroy();
 
     //    ground_object->Destroy();
-
-    std::cout << "this thread: " << std::this_thread::get_id() << std::endl;
 
     return 0;
 }

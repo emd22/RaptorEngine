@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Types.hpp"
+#include "FxTypes.hpp"
 
 #include <concepts>
 
@@ -8,8 +8,7 @@
  * Concept to determine if a type is an allocator
  */
 template <typename T>
-concept C_IsAllocator = requires()
-{
+concept C_IsAllocator = requires() {
     { T::Alloc(0xB00B) };
     { T::Free(nullptr) };
 };
@@ -27,10 +26,7 @@ public:
         return new T[size];
     }
 
-    static void Free(T* ptr)
-    {
-        delete[] ptr;
-    }
+    static void Free(T* ptr) { delete[] ptr; }
 };
 
 #include "FxMemory.hpp"
@@ -49,8 +45,5 @@ public:
         return FxMemPool::Alloc<T>(size, std::forward<Args>(args)...);
     }
 
-    static void Free(T* ptr)
-    {
-        FxMemPool::Free<T>(ptr);
-    }
+    static void Free(T* ptr) { FxMemPool::Free<T>(ptr); }
 };

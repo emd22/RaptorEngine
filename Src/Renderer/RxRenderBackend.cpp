@@ -14,8 +14,8 @@
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
+#include <Core/FxTypes.hpp>
 #include <Core/Log.hpp>
-#include <Core/Types.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
 #include <chrono>
 #include <iostream>
@@ -81,6 +81,8 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     InitFrames();
     InitUploadContext();
+
+    // PipelineCache.Create(RendererFramesInFlight);
 
     // SamplerCache.Create();
 
@@ -474,7 +476,7 @@ RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
 
     FxDrawPushConstants push_constants {};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.GPassPipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.PlGeometry.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(push_constants), &push_constants);
 
     return RxFrameResult::Success;

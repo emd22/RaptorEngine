@@ -8,7 +8,7 @@
 #include "Loader/FxLoaderStb.hpp"
 
 #include <Core/FxDefines.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <FxObject.hpp>
 #include <atomic>
 #include <chrono>
@@ -234,8 +234,8 @@ void FxAssetManager::CheckForUploadableData()
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
 
-            while (!loaded_item.Asset->IsUploadedToGpu) {
-                loaded_item.Asset->IsUploadedToGpu.wait(true);
+            while (!loaded_item.Asset->bIsUploadedToGpu) {
+                loaded_item.Asset->bIsUploadedToGpu.wait(true);
             }
 
 

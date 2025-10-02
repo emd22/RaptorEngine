@@ -13,8 +13,6 @@ FX_SET_MODULE_NAME("RxSwapchain")
 
 void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device)
 {
-    AssertRendererExists();
-
     mDevice = device;
 
     CreateSwapchain(size, surface);

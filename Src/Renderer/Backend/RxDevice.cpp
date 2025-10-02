@@ -208,7 +208,10 @@ void RxGpuDevice::CreateLogicalDevice()
         .pQueuePriorities = transfer_priorities,
     });
 
-    const VkPhysicalDeviceFeatures device_features {};
+    const VkPhysicalDeviceFeatures device_features {
+        .fillModeNonSolid = true,
+    };
+
     const char* device_extensions[] = {
 #ifdef FX_PLATFORM_MACOS
         "VK_KHR_portability_subset",

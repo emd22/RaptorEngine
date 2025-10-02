@@ -32,8 +32,6 @@ public:
 
     void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index);
 
-    //    void LoadAttachedMaterials();
-
     void Destroy(FxRef<FxAssetBase>& asset) override;
 
     ~FxLoaderGltf() override = default;
@@ -41,6 +39,9 @@ public:
 private:
     void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
     void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive);
+
+    void UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh<>>& mesh,
+                              cgltf_primitive* primitive);
 
 
 public:

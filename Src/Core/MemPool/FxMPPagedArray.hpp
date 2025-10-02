@@ -1,7 +1,33 @@
 #pragma once
 
+#include <cstdlib>
+
+#define FX_PAGED_ARRAY_ALLOC(type_, size_) reinterpret_cast<type_*>(std::malloc(size_))
+#define FX_PAGED_ARRAY_FREE(type_, ptr_)   std::free(reinterpret_cast<void*>(ptr_))
+
+#include <Core/FxPagedArrayImpl.hpp>
+
+#undef FX_PAGED_ARRAY_ALLOC
+#undef FX_PAGED_ARRAY_FREE
+
+#if 0
 #include "../FxPanic.hpp"
-#include "../Types.hpp"
+#include "../FxTypes.hpp"
+
+#ifdef FX_PAGED_ARRAY_USE_MALLOC
+#include <cstdlib>
+
+#define FX_PAGED_ARRAY_ALLOC(type_, n_bytes_) reinterpret_cast<type_>(std::malloc(n_bytes_))
+#define FX_PAGED_ARRAY_FREE(type_, ptr_)      std::free(reinterpret_cast<void*>(ptr_));
+
+#else
+
+#include <Core/MemPool/FxMemPool.hpp>
+
+#define FX_PAGED_ARRAY_ALLOC(type_, n_bytes_) reinterpret_cast<type_>(std::malloc(n_bytes_))
+#define FX_PAGED_ARRAY_FREE(type_, ptr_)      std::free(reinterpret_cast<void*>(ptr_));
+
+#endif
 
 template <typename ElementType>
 class FxMPPagedArray
@@ -411,3 +437,4 @@ public:
 
     uint32 TrackedSize = 0;
 };
+#endif

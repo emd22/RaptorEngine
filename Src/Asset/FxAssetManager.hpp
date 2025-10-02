@@ -7,7 +7,7 @@
 
 #include <Core/FxDataNotifier.hpp>
 #include <Core/FxRef.hpp>
-#include <Core/Types.hpp>
+#include <Core/FxTypes.hpp>
 #include <atomic>
 #include <thread>
 
@@ -189,7 +189,7 @@ private:
     static void SubmitAssetToLoad(const FxRef<AssetType>& asset, FxRef<LoaderType>& loader, const std::string& path,
                                   const uint8* data = nullptr, uint32 data_size = 0)
     {
-        if (asset->IsUploadedToGpu) {
+        if (asset->bIsUploadedToGpu) {
             printf("*** DELETING ***\n");
             asset->Destroy();
         }

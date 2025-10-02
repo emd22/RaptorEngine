@@ -5,7 +5,7 @@
 #include <SDL3/SDL.h>
 
 #include <Core/FxLog.hpp>
-#include <Renderer/Renderer.hpp>
+#include <FxEngine.hpp>
 
 /** Converts an SDL scancode to its corresponding FxKey ID. */
 static inline FxKey ConvertScancodeToFxKey(int32 sdl_scancode)
@@ -61,7 +61,7 @@ void FxControlManager::CaptureMouse()
     SDL_GetMouseState(&x, &y);
     inst.mCapturedMousePos.Set(x, y);
 
-    SDL_SetWindowRelativeMouseMode(Renderer->GetWindow()->GetWindow(), (inst.mMouseCaptured = true));
+    SDL_SetWindowRelativeMouseMode(gRenderer->GetWindow()->GetWindow(), (inst.mMouseCaptured = true));
 }
 
 bool FxControlManager::IsMouseLocked() { return GetInstance().mMouseCaptured; }
@@ -71,7 +71,7 @@ void FxControlManager::ReleaseMouse()
     FxControlManager& inst = GetInstance();
 
     FxVec2f* pos = &inst.mCapturedMousePos;
-    SDL_Window* window = Renderer->GetWindow()->GetWindow();
+    SDL_Window* window = gRenderer->GetWindow()->GetWindow();
 
     // Warp back to the original position
     SDL_WarpMouseInWindow(window, pos->GetX(), pos->GetY());

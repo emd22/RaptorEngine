@@ -2,8 +2,8 @@
 
 #include "FxAssetBase.hpp"
 
+#include <Core/FxRef.hpp>
 #include <Renderer/Backend/RxTexture.hpp>
-
 
 class FxAssetImage : public FxAssetBase
 {
@@ -13,21 +13,14 @@ public:
 
     friend class FxAssetManager;
 
+
 public:
+    static FxRef<FxAssetImage> GetEmptyImage();
+
     ~FxAssetImage() override { Destroy(); }
 
     // private:
-    void Destroy() override
-    {
-        if (!IsUploadedToGpu.load()) {
-            return;
-        }
-
-        Texture.Destroy();
-
-        // mImageReady = false;
-        IsUploadedToGpu = false;
-    }
+    void Destroy() override;
 
 public:
     RxTexture Texture;

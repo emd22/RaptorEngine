@@ -19,9 +19,11 @@ static inline void NoMemError()
 }
 
 template <typename TElementType>
-
 class FxSizedArray
 {
+public:
+    static constexpr int64 scItemNotFound = -1;
+
 public:
     struct Iterator
     {
@@ -207,9 +209,8 @@ public:
 
     void Clear() { Size = 0; }
 
-    bool IsEmpty() { return Size == 0; }
-
-    bool IsNotEmpty() { return !IsEmpty(); }
+    inline bool IsEmpty() const { return Size == 0; }
+    inline bool IsNotEmpty() const { return !IsEmpty(); }
 
     void Insert(const TElementType& object)
     {
@@ -259,6 +260,30 @@ public:
         InternalAllocateArray(element_count);
 
         Capacity = element_count;
+    }
+
+    bool ContainsItem(TElementType* ptr) const
+    {
+        const TElementType* end_ptr = (Data + Size);
+
+        if (ptr >= Data && ptr <= end_ptr) {
+            return true;
+        }
+
+        return false;
+    }
+
+    int64 GetItemIndex(TElementType* ptr) const
+    {
+        const TElementType* end_ptr = (Data + Size);
+
+        if (ptr < Data || ptr > end_ptr) {
+            return scItemNotFound;
+        }
+
+        FxAssert(ptr >= Data);
+
+        return ptr - Data;
     }
 
     /**

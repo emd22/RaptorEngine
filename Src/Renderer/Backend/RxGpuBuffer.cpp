@@ -1,9 +1,6 @@
 #include "RxGpuBuffer.hpp"
 
-#include <Renderer/Renderer.hpp>
+#include <FxEngine.hpp>
 
 
-void RxGpuBufferSubmitUploadCmd(std::function<void(RxCommandBuffer &)> func)
-{
-    Renderer->SubmitUploadCmd(func);
-}
+void RxGpuBufferSubmitUploadCmd(std::function<void(RxCommandBuffer&)> func) { gRenderer->SubmitUploadCmd(func); }

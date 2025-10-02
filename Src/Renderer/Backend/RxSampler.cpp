@@ -1,6 +1,6 @@
 #include "RxSampler.hpp"
 
-#include <Renderer/Renderer.hpp>
+#include <FxEngine.hpp>
 
 static constexpr VkSamplerMipmapMode FilterToMipmapMode(RxSamplerFilter filter)
 {
@@ -47,7 +47,7 @@ void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, R
         return;
     }
 
-    mDevice = Renderer->GetDevice();
+    mDevice = gRenderer->GetDevice();
 
 
     VkSamplerCreateInfo sampler_info {
