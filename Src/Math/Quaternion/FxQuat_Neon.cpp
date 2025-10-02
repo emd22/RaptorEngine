@@ -28,6 +28,9 @@ FxQuat FxQuat::FromAxisAngle(FxVec3f axis, float32 angle)
     return FxQuat(vsetq_lane_f32(cv, vec, 3));
 }
 
+bool FxQuat::IsCloseTo(const JPH::Quat& other, const float32 tolerance) const { return IsCloseTo(other.mValue.mValue); }
+
+
 void FxQuat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
 void FxQuat::ToJoltQuaternion(JPH::Quat& quat) { quat.mValue.mValue = mIntrin; }
 

@@ -44,7 +44,7 @@ public:
     {
         mPosition = position;
 
-        MarkMatrixOutOfDate();
+        MarkDirectTransform();
 
         // UpdateTranslation();
     }
@@ -53,7 +53,7 @@ public:
     {
         mPosition += offset;
 
-        MarkMatrixOutOfDate();
+        MarkDirectTransform();
 
         // UpdateTranslation();
     }
@@ -63,7 +63,8 @@ public:
     {
         mScale *= scale;
 
-        MarkMatrixOutOfDate();
+        MarkDirectTransform();
+
         // mModelMatrix = FxMat4f::AsScale(mScale) * mModelMatrix;
     }
 
@@ -71,7 +72,8 @@ public:
     {
         mRotation2 = mRotation2 * FxQuat::FromAxisAngle(FxVec3f::sRight, rad);
 
-        MarkMatrixOutOfDate();
+        MarkDirectTransform();
+
         // mRotation.X += rad;
         // mModelMatrix = FxMat4f::AsRotationX(mRotation.X);
         // mModelMatrix.Print();
@@ -81,7 +83,8 @@ public:
     {
         mRotation2 = mRotation2 * FxQuat::FromAxisAngle(FxVec3f::sUp, rad);
 
-        MarkMatrixOutOfDate();
+        MarkDirectTransform();
+
 
         // mRotation.Y += rad;
         // mModelMatrix = FxMat4f::AsRotationY(mRotation.Y);
@@ -91,7 +94,7 @@ public:
     {
         mRotation2 = mRotation2 * FxQuat::FromAxisAngle(FxVec3f::sForward, rad);
 
-        MarkMatrixOutOfDate();
+        MarkDirectTransform();
 
         // mRotation2 = mRotation2 * FxQuat::
         // mRotation.Z += rad;
@@ -118,24 +121,24 @@ public:
 
     const FxVec3f& GetPosition() const { return mPosition; }
 
+    FX_FORCE_INLINE void MarkDirectTransform()
+    {
+        mbPendingDirectTransform = true;
+        MarkMatrixOutOfDate();
+    }
+
     FX_FORCE_INLINE void MarkMatrixOutOfDate() { mbMatrixOutOfDate = true; }
 
     virtual ~FxEntity() {}
 
-
 protected:
-    virtual void OnTransformUpdate() { FxLogInfo("Update BASE transform"); };
-
     // inline void UpdateTranslation() { mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(mPosition); }
 
     void RecalculateModelMatrix()
     {
         mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsRotation(mRotation2) * FxMat4f::AsTranslation(mPosition);
         mbMatrixOutOfDate = false;
-
-        this->OnTransformUpdate();
     }
-
 
 public:
     FxVec3f mPosition = FxVec3f::sZero;
@@ -146,8 +149,10 @@ public:
     std::vector<FxRef<FxEntity>> Children;
 
 
-private:
+protected:
+    bool mbPendingDirectTransform : 1 = false;
     bool mbMatrixOutOfDate : 1 = false;
+
     FxMat4f mModelMatrix = FxMat4f::Identity;
 };
 

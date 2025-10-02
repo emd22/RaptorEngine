@@ -180,14 +180,17 @@ void FxObject::RenderMesh()
 
 void FxObject::Update()
 {
-    if (mPosition.IsCloseTo(mpPhysicsBody->GetPosition())) {
+    if (mbPendingDirectTransform) {
+        UpdateJoltForDirectTransform();
+    }
+
+    if ((!mPosition.IsCloseTo(mpPhysicsBody->GetPosition()) || !mRotation2.IsCloseTo(mpPhysicsBody->GetRotation()))) {
         mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
         mRotation2.FromJoltQuaternion(mpPhysicsBody->GetRotation());
+        MarkMatrixOutOfDate();
     }
 
     // mPosition *= FxVec3f(1, 1, 1);
-
-    MarkMatrixOutOfDate();
 
     // UpdateTranslation();
 }
@@ -252,6 +255,8 @@ void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::Physics
 
     body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
 
+    mbHasPhysicsBody = true;
+
     // body_interface.CreateAndAddBody(body_settings, activation_mode);
 }
 
@@ -266,9 +271,9 @@ void FxObject::DestroyPhysicsBody()
 }
 
 
-void FxObject::OnTransformUpdate()
+void FxObject::UpdateJoltForDirectTransform()
 {
-    if (!mbHasPhysicsBody || !mbPhysicsEnabled) {
+    if (!mbHasPhysicsBody) {
         return;
     }
 
@@ -278,8 +283,8 @@ void FxObject::OnTransformUpdate()
     mPosition.ToJoltVec3(jolt_position);
     mRotation2.ToJoltQuaternion(jolt_rotation);
 
-    FxLogInfo("Update transform");
 
     gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetPhysicsBodyId(), jolt_position, jolt_rotation,
                                                                       JPH::EActivation::Activate);
+    mbPendingDirectTransform = false;
 }

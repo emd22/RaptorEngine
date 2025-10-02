@@ -105,9 +105,9 @@ float32 FxVec3f::Dot(const FxVec3f& other) const
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
 void FxVec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }
 
-bool FxVec3f::IsCloseTo(const JPH::Vec3& other, const float32 threshold) const
+bool FxVec3f::IsCloseTo(const JPH::Vec3& other, const float32 tolerance) const
 {
-    return IsCloseTo(other.mValue, threshold);
+    return IsCloseTo(other.mValue, tolerance);
 }
 
 

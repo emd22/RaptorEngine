@@ -86,11 +86,10 @@ public:
 
     void Update();
 
-protected:
-    void OnTransformUpdate() override;
-
 private:
     void RenderMesh();
+
+    void UpdateJoltForDirectTransform();
 
 public:
     FxRef<FxPrimitiveMesh<>> Mesh { nullptr };

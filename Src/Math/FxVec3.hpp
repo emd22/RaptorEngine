@@ -50,7 +50,7 @@ public:
     FX_FORCE_INLINE bool operator==(const FxVec3f& other) const;
     bool operator==(const JPH::Vec3& other) const;
 
-    FX_FORCE_INLINE bool IsCloseTo(const FxVec3f& other, const float32 threshold = 0.001) const;
+    FX_FORCE_INLINE bool IsCloseTo(const FxVec3f& other, const float32 tolerance = 0.00001) const;
     bool IsCloseTo(const JPH::Vec3& other, const float32 threshold = 0.001) const;
 
     FxVec3f Normalize() const;
@@ -72,7 +72,7 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
 
-    FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 threshold = 0.001) const;
+    FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 tolerance = 0.00001) const;
 
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
