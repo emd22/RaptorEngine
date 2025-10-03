@@ -22,6 +22,7 @@ public:
 public:
     FxQuat() = default;
     FxQuat(float32 x, float32 y, float32 z, float32 w);
+    FxQuat(const JPH::Quat& other);
 
     static FxQuat FromAxisAngle(FxVec3f axis, float32 angle);
 

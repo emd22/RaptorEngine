@@ -342,9 +342,10 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
         DsLayoutLightingMaterialProperties,
     };
 
-    VkPipelineLayout layout = PlLighting.CreateLayout(sizeof(FxLightVertPushConstants), // Vertex push constants
-                                                      sizeof(FxLightFragPushConstants), // Fragment push constants
-                                                      FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = PlLightingOutsideVolume.CreateLayout(
+        sizeof(FxLightVertPushConstants), // Vertex push constants
+        sizeof(FxLightFragPushConstants), // Fragment push constants
+        FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -400,16 +401,23 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     RpLighting.Create2(color_attachments);
 
-    PlLighting.Create("Lighting", shader_list, color_attachments,
-                      FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vertex_info,
-                      RpLighting, { .CullMode = VK_CULL_MODE_FRONT_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
+    PlLightingOutsideVolume.Create("Lighting(Inside Volume)", shader_list, color_attachments,
+                                   FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
+                                   &vertex_info, RpLighting,
+                                   { .CullMode = VK_CULL_MODE_FRONT_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
+
+    PlLightingInsideVolume.Layout = PlLightingOutsideVolume.Layout;
+    PlLightingInsideVolume.Create("Lighting (Outside Volume)", shader_list, color_attachments,
+                                  FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
+                                  &vertex_info, RpLighting,
+                                  { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 }
 
 void RxDeferredRenderer::RebuildLightingPipeline()
 {
-    RxGraphicsPipeline old_pipeline = PlLighting;
-    CreateLightingPipeline();
-    old_pipeline.Destroy();
+    // RxGraphicsPipeline old_pipeline = PlLightingInsideVolume;
+    // CreateLightingPipeline();
+    // old_pipeline.Destroy();
 }
 
 void RxDeferredRenderer::DestroyLightingPipeline()
@@ -427,8 +435,10 @@ void RxDeferredRenderer::DestroyLightingPipeline()
         DsLayoutLightingMaterialProperties = nullptr;
     }
 
+    PlLightingOutsideVolume.Destroy();
 
-    PlLighting.Destroy();
+    PlLightingInsideVolume.Layout = nullptr;
+    PlLightingInsideVolume.Destroy();
 }
 
 //////////////////////////////////////////
@@ -699,7 +709,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
 {
     mRendererInst = renderer;
     mRenderPass = &mRendererInst->RpLighting;
-    mPlLighting = &mRendererInst->PlLighting;
+    mPlLighting = &mRendererInst->PlLightingOutsideVolume;
 
     // Albedo sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);

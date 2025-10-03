@@ -18,6 +18,8 @@ FxQuat::FxQuat(float32 x, float32 y, float32 z, float32 w)
     mIntrin = vld1q_f32(values);
 }
 
+FxQuat::FxQuat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
+
 FxQuat FxQuat::FromAxisAngle(FxVec3f axis, float32 angle)
 {
     float32 sv, cv;

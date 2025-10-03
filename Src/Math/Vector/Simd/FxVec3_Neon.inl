@@ -42,7 +42,6 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Max(const FxVec3f& a, const FxVec3f& b)
     return FxVec3f(vmaxq_f32(a.mIntrin, b.mIntrin));
 }
 
-
 //////////////////////////////
 // Operator Overloads
 //////////////////////////////

@@ -57,6 +57,18 @@ bool FxObject::CheckIfReady()
 }
 
 
+void FxObject::PhysicsObjectCreate(FxPhysicsObject::PhysicsFlags flags, FxPhysicsObject::PhysicsType type,
+                                   const FxPhysicsProperties& properties)
+{
+    Dimensions = Mesh->VertexList.CalculateDimensionsFromPositions();
+
+    FxVec3f scaled_dimensions = Dimensions * (mScale * 0.5);
+
+    Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
+    mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+}
+
+
 void FxObject::Render(const FxCamera& camera)
 {
     RxFrameData* frame = gRenderer->GetFrame();
@@ -178,125 +190,20 @@ void FxObject::RenderMesh()
     }
 }
 
-void FxObject::Update() { UpdatePhysics(); }
-
-void FxObject::UpdatePhysics()
+void FxObject::Update()
 {
     if (!mbPhysicsEnabled) {
         return;
     }
 
     if (mbPhysicsTransformOutOfDate) {
-        UpdateJoltForDirectTransform();
+        Physics.Teleport(mPosition, mRotation);
+        mbPhysicsTransformOutOfDate = false;
     }
 
-    if ((!mPosition.IsCloseTo(mpPhysicsBody->GetPosition()) || !mRotation.IsCloseTo(mpPhysicsBody->GetRotation()))) {
-        mPosition.FromJoltVec3(mpPhysicsBody->GetPosition());
-        mRotation.FromJoltQuaternion(mpPhysicsBody->GetRotation());
-        MarkMatrixOutOfDate();
-    }
-
-    // mPosition *= FxVec3f(1, 1, 1);
-
-    // UpdateTranslation();
+    SyncObjectWithPhysics();
 }
 
-void FxObject::CreatePhysicsBody(FxObject::PhysicsFlags flags, FxObject::PhysicsType type,
-                                 const FxPhysicsProperties& properties)
-{
-    if (mbHasPhysicsBody) {
-        FxLogWarning("Attempting to create physics body when one is already created!");
-        return;
-    }
-
-    Dimensions = Mesh->VertexList.CalculateDimensionsFromPositions();
-
-    JPH::EActivation activation_mode = JPH::EActivation::Activate;
-
-    if (flags & FxObject::PF_CreateInactive) {
-        activation_mode = JPH::EActivation::DontActivate;
-    }
-
-    JPH::EMotionType motion_type = JPH::EMotionType::Static;
-
-    FxPhysicsLayer::Type object_layer = FxPhysicsLayer::Static;
-
-    switch (type) {
-    case FxObject::PhysicsType::Static:
-        motion_type = JPH::EMotionType::Static;
-        object_layer = FxPhysicsLayer::Static;
-        break;
-    case FxObject::PhysicsType::Dynamic:
-        motion_type = JPH::EMotionType::Dynamic;
-        object_layer = FxPhysicsLayer::Dynamic;
-        break;
-    default:
-        break;
-    }
-
-    JPH::RVec3 box_position;
-    mPosition.ToJoltVec3(box_position);
-
-    JPH::RVec3 box_dimensions;
-    FxVec3f fx_dimensions = Dimensions * (mScale * 0.5);
-    fx_dimensions.ToJoltVec3(box_dimensions);
-
-    FxLogDebug("Creating physics body of dimensions {}", fx_dimensions);
-
-    JPH::BoxShapeSettings box_shape_settings(box_dimensions);
-    box_shape_settings.mConvexRadius = properties.ConvexRadius;
-
-    // box_shape_settings.SetEmbedded();
-
-    JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
-    JPH::ShapeRefC box_shape = box_shape_result.Get();
-
-    JPH::BodyCreationSettings body_settings(box_shape, box_position, JPH::Quat::sIdentity(), motion_type, object_layer);
-    body_settings.mFriction = properties.Friction;
-    body_settings.mRestitution = properties.Restitution;
-
-    JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
-
-    mpPhysicsBody = body_interface.CreateBody(body_settings);
-
-    body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
-
-    mbHasPhysicsBody = true;
-    mbPhysicsEnabled = body_interface.IsActive(mpPhysicsBody->GetID());
-
-    // body_interface.CreateAndAddBody(body_settings, activation_mode);
-}
-
-
-void FxObject::DestroyPhysicsBody()
-{
-    if (!mbHasPhysicsBody && mpPhysicsBody != nullptr) {
-        return;
-    }
-
-    gPhysics->PhysicsSystem.GetBodyInterface().DestroyBody(GetPhysicsBodyId());
-
-    mpPhysicsBody = nullptr;
-}
-
-
-void FxObject::UpdateJoltForDirectTransform()
-{
-    if (!mbHasPhysicsBody) {
-        return;
-    }
-
-    JPH::RVec3 jolt_position;
-    JPH::Quat jolt_rotation;
-
-    mPosition.ToJoltVec3(jolt_position);
-    mRotation.ToJoltQuaternion(jolt_rotation);
-
-    gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetPhysicsBodyId(), jolt_position, jolt_rotation,
-                                                                      JPH::EActivation::Activate);
-
-    mbPhysicsTransformOutOfDate = false;
-}
 
 void FxObject::AttachObject(const FxRef<FxObject>& object)
 {
@@ -309,20 +216,34 @@ void FxObject::AttachObject(const FxRef<FxObject>& object)
     AttachedNodes.Insert(object);
 }
 
+void FxObject::SyncObjectWithPhysics()
+{
+    if ((!mPosition.IsCloseTo(Physics.GetPosition()) || !mRotation.IsCloseTo(Physics.GetRotation()))) {
+        mPosition = Physics.GetPosition();
+        mRotation = Physics.GetRotation();
+
+        MarkMatrixOutOfDate();
+    }
+}
+
+
 void FxObject::SetPhysicsEnabled(bool enabled)
 {
-    if (mpPhysicsBody != nullptr) {
+    if (Physics.mbHasPhysicsBody) {
         if (enabled) {
-            gPhysics->GetBodyInterface().ActivateBody(GetPhysicsBodyId());
+            FxLogDebug("Activate body");
+            gPhysics->GetBodyInterface().ActivateBody(Physics.GetBodyId());
         }
         else {
-            gPhysics->GetBodyInterface().DeactivateBody(GetPhysicsBodyId());
+            FxLogDebug("Deactivate body");
+            gPhysics->GetBodyInterface().DeactivateBody(Physics.GetBodyId());
         }
     }
 
 
     mbPhysicsEnabled = enabled;
 }
+
 
 void FxObject::Destroy()
 {
@@ -333,9 +254,7 @@ void FxObject::Destroy()
         Material->Destroy();
     }
 
-    if (mpPhysicsBody) {
-        DestroyPhysicsBody();
-    }
+    Physics.DestroyPhysicsBody();
 
     if (!AttachedNodes.IsEmpty()) {
         for (FxRef<FxObject>& obj : AttachedNodes) {

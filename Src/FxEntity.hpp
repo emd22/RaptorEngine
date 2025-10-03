@@ -26,7 +26,7 @@ public:
         MarkTransformOutOfDate();
     }
 
-    void Scale(const FxVec3f& scale);
+    virtual void Scale(const FxVec3f& scale);
 
     void RotateX(float32 rad);
     void RotateY(float32 rad);

@@ -47,6 +47,16 @@ public:
     FX_FORCE_INLINE FxVec3f& operator-=(const FxVec3f& other);
     FX_FORCE_INLINE FxVec3f& operator*=(const FxVec3f& other);
 
+    FX_FORCE_INLINE float32 DistanceTo(const FxVec3f& other) const { return (other - *this).Length(); }
+
+    FX_FORCE_INLINE bool IntersectsSphere(const FxVec3f& sphere_center, float32 sphere_radius) const
+    {
+        const FxVec3f diff = (*this) - sphere_center;
+        const float dist2 = diff.Dot(diff);
+
+        return dist2 <= sphere_radius * sphere_radius;
+    }
+
     FX_FORCE_INLINE bool operator==(const FxVec3f& other) const;
     bool operator==(const JPH::Vec3& other) const;
 

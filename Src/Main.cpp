@@ -305,14 +305,17 @@ int main()
     ground_object.Create(generated_cube_mesh, cube_material);
     // ground_object.Scale(FxVec3f(10, 1, 10));
     ground_object.MoveBy(FxVec3f(0, -20, 0));
+    ground_object.Scale(FxVec3f(10, 1.0, 10));
 
-    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Static, {});
+    ground_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
+                                      FxPhysicsObject::PhysicsType::Static, {});
 
     FxObject cube_object;
     cube_object.Create(generated_cube_mesh, cube_material);
     cube_object.MoveBy(FxVec3f(5, 10, 0));
 
-    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
+    cube_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
+                                    FxPhysicsObject::PhysicsType::Dynamic, {});
     cube_object.SetPhysicsEnabled(false);
 
     gPhysics->OptimizeBroadPhase();
