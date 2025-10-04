@@ -3,6 +3,8 @@
 #include <Core/FxTypes.hpp>
 
 #ifdef FX_USE_NEON
+#include "FxNeonUtil.hpp"
+
 #include <arm_neon.h>
 #endif
 
@@ -84,10 +86,27 @@ public:
 
     FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 tolerance = 0.00001) const;
 
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    {
+        return FxVec3f(FxNeon::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
+    }
+
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
     FX_FORCE_INLINE float32 GetZ() const { return Z; }
+
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    {
+        constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
+        constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
+        constexpr float rz = TZ > 0.0 ? vec.Z : -vec.Z;
+        constexpr float rw = TW > 0.0 ? vec.W : -vec.W;
+
+        return FxVec3f(rx, ry, rz, rw);
+    }
 
 #endif
 

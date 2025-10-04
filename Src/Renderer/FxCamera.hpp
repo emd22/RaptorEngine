@@ -62,7 +62,7 @@ public:
 
     inline void Move(const FxVec3f& offset)
     {
-        const FxVec3f forward = Direction * -offset.Z;
+        const FxVec3f forward = Direction * offset.Z;
         const FxVec3f right = Direction.Cross(FxVec3f::sUp) * offset.X;
 
         MoveBy(forward + right);

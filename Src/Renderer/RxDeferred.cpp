@@ -245,15 +245,14 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     PlGeometry.Create("Geometry", shader_list, color_attachments,
                       FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
-                      RpGeometry,
-                      { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE });
+                      RpGeometry, { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 
     PlGeometryWireframe.Layout = PlGeometry.Layout;
     PlGeometryWireframe.Create("Geometry Wireframe", shader_list, color_attachments,
                                FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
                                RpGeometry,
                                { .CullMode = VK_CULL_MODE_BACK_BIT,
-                                 .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                                 .WindingOrder = VK_FRONT_FACE_CLOCKWISE,
                                  .PolygonMode = VK_POLYGON_MODE_LINE });
 
     pGeometryPipeline = &PlGeometry;

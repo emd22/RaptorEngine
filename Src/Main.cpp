@@ -333,13 +333,17 @@ int main()
 
     light.Color = FxVec3f(0.6, 0.7, 0.6);
 
-    FxDirectionalLight light2;
-    light2.SetLightVolume(generated_quad, false);
+    FxLight light2;
+    light2.SetLightVolume(generated_sphere, true);
 
+    light.Scale(FxVec3f(25));
     light2.MoveBy(FxVec3f(1, 0, -0.5));
+
+    light.Color = FxVec3f(0.6, 0.7, 0.6);
+
     // light2.Scale(FxVec3f(25));
 
-    bool second_light_on = false;
+    bool second_light_on = true;
     // gPhysics->bPhysicsPaused = true;
 
 
@@ -352,8 +356,8 @@ int main()
 
         if (FxControlManager::IsMouseLocked()) {
             FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
-            mouse_delta.SetX(DeltaTime * mouse_delta.GetX() * -0.001);
-            mouse_delta.SetY(DeltaTime * mouse_delta.GetY() * 0.001);
+            mouse_delta.SetX(DeltaTime * mouse_delta.GetX() * 0.001);
+            mouse_delta.SetY(DeltaTime * mouse_delta.GetY() * -0.001);
 
             camera.Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         }
@@ -381,7 +385,12 @@ int main()
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
             light.MoveTo(camera.Position);
 
+            // camera.Position.Print();
             light.mPosition.Print();
+        }
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
+            second_light_on = !second_light_on;
         }
 
         // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
@@ -436,6 +445,7 @@ int main()
         //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
+        // cube_object.MoveTo(camera.Position + camera.Direction);
 
         // fireplace_object->Render(camera);
         cube_object.Update();
@@ -449,14 +459,15 @@ int main()
 
         if (second_light_on) {
             // light2.mModelMatrix = camera.VPMatrix;
-            light2.SetModelMatrix(camera.VPMatrix);
+            // light2.SetModelMatrix(camera.VPMatrix);
+            light2.MoveTo(camera.Position);
 
             light2.Render(camera);
         }
 
         light.Render(camera);
-        //        light2.Render(camera);
         // light2.Render(camera);
+        light2.Render(camera);
 
         gRenderer->DoComposition(camera);
 

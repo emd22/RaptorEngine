@@ -47,7 +47,7 @@ public:
 
     static FxMat4f AsTranslation(FxVec3f position)
     {
-        return FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, position.X, position.Y, -position.Z, 1 });
+        return FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, position.X, position.Y, position.Z, 1 });
     }
 
     static FxMat4f AsScale(FxVec3f scale)
