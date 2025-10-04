@@ -2,9 +2,9 @@
 
 layout(location = 0) in vec3 a_Position;
 
-layout(location = 0) out vec3 v_LightPos;
-layout(location = 1) out float v_LightRadius;
-layout(location = 2) out vec3 v_PlayerPos;
+// layout(location = 0) out vec3 v_LightPos;
+// layout(location = 1) out float v_LightRadius;
+// layout(location = 2) out vec3 v_PlayerPos;
 
 layout(push_constant) uniform VertMatrices
 {

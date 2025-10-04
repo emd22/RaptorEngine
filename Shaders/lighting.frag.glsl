@@ -101,7 +101,7 @@ void main()
     vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
 
     const float roughness = 0.1;
-    const float metallic = 0.00;
+    const float metallic = 0.6;
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
@@ -138,8 +138,8 @@ void main()
 
     float NdotL = max(dot(N, L), 0.0);
 
-    v_Color = vec4(radiance, 1.0);
-    // v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, normal_rgba.a);
+    // v_Color = vec4((radiance), 1.0);
+    v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, 1.0);
 
     // vec3 light_dir = a_PC.LightPos.xyz - world_pos;
 

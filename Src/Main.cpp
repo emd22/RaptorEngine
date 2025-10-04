@@ -310,13 +310,16 @@ int main()
     ground_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
                                       FxPhysicsObject::PhysicsType::Static, {});
 
-    FxObject cube_object;
-    cube_object.Create(generated_cube_mesh, cube_material);
-    cube_object.MoveBy(FxVec3f(5, 10, 0));
+    FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../models/DamagedHelmet.glb");
+    helmet_object->MoveBy(FxVec3f(5, 0, 0));
+    helmet_object->RotateX(M_PI_2);
+    // FxObject cube_object;
+    // cube_object.Create(generated_cube_mesh, cube_material);
+    // cube_object.MoveBy(FxVec3f(5, 10, 0));
 
-    cube_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
-                                    FxPhysicsObject::PhysicsType::Dynamic, {});
-    cube_object.SetPhysicsEnabled(false);
+    // cube_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
+    // FxPhysicsObject::PhysicsType::Dynamic, {});
+    // cube_object.SetPhysicsEnabled(false);
 
     gPhysics->OptimizeBroadPhase();
 
@@ -404,23 +407,23 @@ int main()
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_R)) {
             // second_light_on = !second_light_on;
 
-            cube_object.MoveBy(FxVec3f(DeltaTime * 0.001f, 0, 0));
+            // cube_object.MoveBy(FxVec3f(DeltaTime * 0.001f, 0, 0));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_E)) {
             // second_light_on = !second_light_on;
 
-            cube_object.MoveBy(FxVec3f(DeltaTime * -0.001f, 0, 0));
+            // cube_object.MoveBy(FxVec3f(DeltaTime * -0.001f, 0, 0));
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_0)) {
-            cube_object.SetPhysicsEnabled(false);
-            cube_object.MoveTo(FxVec3f(5, 10, 0));
+            // cube_object.SetPhysicsEnabled(false);
+            // cube_object.MoveTo(FxVec3f(5, 10, 0));
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
             // gRenderer->DeferredRenderer->RebuildLightingPipeline();
             // gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
-            cube_object.SetPhysicsEnabled(!cube_object.GetPhysicsEnabled());
+            // cube_object.SetPhysicsEnabled(!cube_object.GetPhysicsEnabled());
             // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 
@@ -448,8 +451,10 @@ int main()
         // cube_object.MoveTo(camera.Position + camera.Direction);
 
         // fireplace_object->Render(camera);
-        cube_object.Update();
-        cube_object.Render(camera);
+        // cube_object.Update();
+        // cube_object.Render(camera);
+        //
+        helmet_object->Render(camera);
 
         // ground_object.Update();
         ground_object.Render(camera);
