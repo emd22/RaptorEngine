@@ -296,7 +296,7 @@ int main()
     FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material",
                                                            &deferred_renderer->PlGeometryWireframe);
 
-    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 100, 100, 255);
+    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
     cube_material->DiffuseComponent.Texture = FxAssetImage::GetEmptyImage();
 
     FxRef<FxPrimitiveMesh<>> generated_cube_mesh = generated_cube->AsMesh();
@@ -465,7 +465,7 @@ int main()
         if (second_light_on) {
             // light2.mModelMatrix = camera.VPMatrix;
             // light2.SetModelMatrix(camera.VPMatrix);
-            light2.MoveTo(camera.Position);
+            light2.MoveTo(camera.Position + (camera.Direction * 1.0));
 
             light2.Render(camera);
         }

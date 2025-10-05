@@ -32,6 +32,11 @@ layout(push_constant) uniform PushConstants
 //     MaterialProperties Materials[];
 // } mats;
 
+// Clamped dot product
+float ClampedDot(vec3 a, vec3 b) {
+    return max(dot(a, b), 1e-5);
+}
+
 vec3 WorldPosFromDepth(vec2 uv, float depth)
 {
     vec4 ndc = vec4(uv * 2.0 - 1.0, depth, 1.0);
@@ -43,47 +48,98 @@ vec3 WorldPosFromDepth(vec2 uv, float depth)
 }
 
 const float PI = 3.14159265359;
-// ----------------------------------------------------------------------------
-float DistributionGGX(vec3 N, vec3 H, float roughness)
+const float ONE_OVER_PI = 0.31830988618;
+
+float D_GGX(float NdotH, float m)
 {
-    float a = roughness * roughness;
-    float a2 = a * a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH * NdotH;
+    float m2 = m * m;
+    float f = (NdotH * m2 - NdotH) * NdotH + 1;
+    return m2 / (f * f);
+}
 
-    float nom = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
+// ----------------------------------------------------------------------------
+// float DistributionGGX(vec3 N, vec3 H, float roughness)
+// {
+//     float a_2 = roughness * roughness;
+//     float NdotH = ClampedDot(N, H);
+//     float denom = (NdotH * NdotH) * (a_2 - 1.0) + 1.0;
+//     return (a_2 / (PI * (denom * denom)));
 
-    return nom / denom;
+//     // float a = roughness * roughness;
+//     // float a2 = a * a;
+//     // float NdotH = max(dot(N, H), 0.0);
+//     // float NdotH2 = NdotH * NdotH;
+
+//     // float nom = a2;
+//     // float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+//     // denom = PI * denom * denom;
+
+//     // return nom / denom;
+// }
+
+float GeometrySchlickBeckmann(float cos_theta, float K)
+{
+    return (cos_theta) / (cos_theta * (1.0 - K) + K);
+}
+
+float V_SmithGGXCorrelated(float NdotL, float NdotV, float alphaG)
+{
+    float alphaG2 = alphaG * alphaG;
+
+    float L_GGXV = NdotL * sqrt((-NdotV * alphaG2 + NdotV) * NdotV + alphaG2);
+    float L_GGXL = NdotV * sqrt((-NdotL * alphaG2 + NdotL) * NdotL + alphaG2);
+
+    return 0.5f / (L_GGXV + L_GGXL);
+}
+
+// float GeometrySmith(float NdotV, float NdotL, float roughness)
+// {
+//     float rn2 = roughness + 1.0;
+//     float K = (rn2 * rn2) / 8.0;
+//     return GeometrySchlickBeckmann(NdotV, K) * GeometrySchlickBeckmann(NdotL, K);
+// }
+
+// ----------------------------------------------------------------------------
+// float GeometrySchlickGGX(float NdotV, float roughness)
+// {
+//     float r = (roughness + 1.0);
+//     float k = (r * r) / 8.0;
+
+//     float nom = NdotV;
+//     float denom = NdotV * (1.0 - k) + k;
+
+//     return nom / denom;
+// }
+// // ----------------------------------------------------------------------------
+// float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+// {
+//     float NdotL = max(dot(N, L), 0.0);
+//     float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+//     float NdotV = max(dot(N, V), 0.0);
+//     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+
+//     return ggx1 * ggx2;
+// }
+// ----------------------------------------------------------------------------
+vec3 F_Schlick(vec3 f0, float f90, float u)
+{
+    return f0 + (f90 - f0) * pow(1.0 - u, 5.0);
 }
 // ----------------------------------------------------------------------------
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
-    float r = (roughness + 1.0);
-    float k = (r * r) / 8.0;
 
-    float nom = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-}
-// ----------------------------------------------------------------------------
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+float Fr_DisneyDiffuse(float NdotV, float NdotL, float LdotH, float linear_roughness)
 {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+    float energy_bias = mix(0, 0.5, linear_roughness);
+    float energy_factor = mix(1.0, 1.0 / 1.51, linear_roughness);
 
-    return ggx1 * ggx2;
+    float fd90 = energy_bias + 2.0 * LdotH * LdotH * linear_roughness;
+    vec3 f0 = vec3(1.0);
+    float light_scatter = F_Schlick(f0, fd90, NdotL).r;
+    float view_scatter = F_Schlick(f0, fd90, NdotV).r;
+
+    return light_scatter * view_scatter * energy_factor;
 }
-// ----------------------------------------------------------------------------
-vec3 fresnelSchlick(float cosTheta, vec3 F0)
-{
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-// ----------------------------------------------------------------------------
 
 void main()
 {
@@ -118,30 +174,39 @@ void main()
     const vec3 L = normalize(local_light_pos);
     const vec3 H = normalize(V + L);
 
+    float NdotL = ClampedDot(N, L);
+    float NdotV = ClampedDot(N, V);
+    float NdotH = ClampedDot(N, H);
+    float LdotH = ClampedDot(L, H);
+
     float light_distance = length(local_light_pos);
     float attenuation = 1.0 / (light_distance * light_distance);
     // float attenuation = 1.0 / (light_distance * light_distance + 1.0);
 
     vec3 radiance = a_PC.LightColor.rgb * attenuation;
 
-    float NDF = DistributionGGX(N, H, roughness);
-    float G = GeometrySmith(N, V, L, roughness);
-    vec3 F = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
+    vec3 F = F_Schlick(F0, 1.0, LdotH);
 
-    vec3 numerator = NDF * G * F;
-    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    // !!!TEMP!!!
+    float diffuse_reflectance = 1.0 - metallic;
 
-    vec3 specular = numerator / denominator;
+    float D = D_GGX(NdotH, roughness);
+    float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
+    // float Vis = GeometrySmith(NdotV, NdotL, roughness);
+    // vec3 F = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
 
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
+    vec3 Fr = D * F * Vis * ONE_OVER_PI;
 
-    kD *= 1.0 - metallic;
+    float linear_roughness = sqrt(roughness);
 
-    float NdotL = max(dot(N, L), 0.0);
+    float Fd = Fr_DisneyDiffuse(NdotV, NdotL, LdotH, linear_roughness) * ONE_OVER_PI;
+
+    vec3 diffuse_c = vec3(Fd) * albedo;
+
+    v_Color = vec4(diffuse_c + Fr, 1.0f);
 
     // v_Color = vec4(vec3(attenuation), 1.0);
-    v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, 1.0) * a_PC.LightColor;
+    // v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, normal_rgba.a);
 
     // vec3 light_dir = a_PC.LightPos.xyz - world_pos;
 
