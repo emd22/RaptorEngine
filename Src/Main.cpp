@@ -334,7 +334,7 @@ int main()
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light.Scale(FxVec3f(25));
 
-    light.Color = FxVec3f(0.6, 0.7, 0.6);
+    light.Color = FxVec3f(1.0, 0.1, 0.1);
 
     FxLight light2;
     light2.SetLightVolume(generated_sphere, true);
@@ -471,8 +471,6 @@ int main()
         }
 
         light.Render(camera);
-        // light2.Render(camera);
-        light2.Render(camera);
 
         gRenderer->DoComposition(camera);
 

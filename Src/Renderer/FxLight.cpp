@@ -12,7 +12,7 @@ void FxLight::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, 
     LightVolumeGen = volume_gen;
     LightVolume = volume_gen->AsLightVolume();
     // Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
-    Radius = 5.0f;
+    Radius = 10.0f;
 
     if (create_debug_mesh) {
         mDebugMesh = volume_gen->AsMesh();

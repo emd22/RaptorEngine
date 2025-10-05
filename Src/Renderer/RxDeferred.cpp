@@ -368,7 +368,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     VkAttachmentDescription color_attachments_list[] = {
         // Combined output
         VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .format = VK_FORMAT_R16G16B16A16_SFLOAT,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -718,7 +718,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
-    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     FxSizedArray image_views = { ColorAttachment.View };

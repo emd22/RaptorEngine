@@ -101,7 +101,7 @@ void main()
     vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
 
     const float roughness = 0.1;
-    const float metallic = 0.6;
+    const float metallic = 0.1;
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
@@ -110,7 +110,7 @@ void main()
 
     // START
 
-    const vec3 local_light_pos = a_PC.LightPos.xyz - world_pos;
+    vec3 local_light_pos = a_PC.LightPos.xyz - world_pos;
 
     vec3 N = normalize(normal);
     vec3 V = normalize(a_PC.PlayerPos.xyz - world_pos);
@@ -120,6 +120,8 @@ void main()
 
     float light_distance = length(local_light_pos);
     float attenuation = 1.0 / (light_distance * light_distance);
+    // float attenuation = 1.0 / (light_distance * light_distance + 1.0);
+
     vec3 radiance = a_PC.LightColor.rgb * attenuation;
 
     float NDF = DistributionGGX(N, H, roughness);
@@ -138,8 +140,8 @@ void main()
 
     float NdotL = max(dot(N, L), 0.0);
 
-    // v_Color = vec4((radiance), 1.0);
-    v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, 1.0);
+    // v_Color = vec4(vec3(attenuation), 1.0);
+    v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, 1.0) * a_PC.LightColor;
 
     // vec3 light_dir = a_PC.LightPos.xyz - world_pos;
 

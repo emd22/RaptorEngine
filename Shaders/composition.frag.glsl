@@ -42,7 +42,7 @@ void main()
     // vec3 final_color = WorldPosFromDepth(depth);
     vec3 base_color = (albedo.rgb);
 
-    const vec3 ambient = vec3(0.03) * base_color;
+    const vec3 ambient = vec3(0.01) * base_color;
 
     // vec3 base_color_with_lighting = base_color * lights.rgb;
     vec3 base_color_with_lighting = ambient + lights.rgb;
