@@ -20,9 +20,9 @@ FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
     mIntrin = vld1q_f32(values);
 }
 
-FxVec3f::FxVec3f(float32* values)
+FxVec3f::FxVec3f(const float32* values)
 {
-    float32 values4[4] = { values[0], values[1], values[2], 0 };
+    const float32 values4[4] = { values[0], values[1], values[2], 0 };
     mIntrin = vld1q_f32(values4);
 }
 

@@ -10,3 +10,5 @@ namespace FxMath {
 void SinCos(float32 rad, float32* out_sine, float32* out_cosine);
 
 } // namespace FxMath
+
+#include "FxMathUtil.hpp"

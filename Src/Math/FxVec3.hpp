@@ -26,7 +26,7 @@ public:
 public:
     FxVec3f() = default;
     FxVec3f(float32 x, float32 y, float32 z);
-    FxVec3f(float32* values);
+    FxVec3f(const float32* values);
     FxVec3f(const JPH::Vec3& other);
 
     explicit FxVec3f(float32 scalar);
@@ -35,6 +35,22 @@ public:
 
     void ToJoltVec3(JPH::RVec3& jolt_vec) const;
     void FromJoltVec3(const JPH::RVec3& jolt_vec);
+
+    static FX_FORCE_INLINE FxVec3f FromDifference(const float32* a, const float32* b)
+    {
+        const float32 vx = (a[0] - b[0]);
+        const float32 vy = (a[1] - b[1]);
+        const float32 vz = (a[2] - b[2]);
+
+        return FxVec3f(vx, vy, vz);
+    }
+
+    FX_FORCE_INLINE void CopyTo(float32* output)
+    {
+        output[0] = X;
+        output[1] = Y;
+        output[2] = Z;
+    }
 
     FX_FORCE_INLINE FxVec3f operator+(const FxVec3f& other) const;
     FX_FORCE_INLINE FxVec3f operator-(const FxVec3f& other) const;
