@@ -523,7 +523,7 @@ void RxDeferredRenderer::CreateCompPipeline()
     VkAttachmentDescription attachments[] = {
         // Combined output
         VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .format = gRenderer->Swapchain.SurfaceFormat.format,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,

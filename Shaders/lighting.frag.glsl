@@ -130,15 +130,25 @@ vec3 F_Schlick(vec3 f0, float f90, float u)
 
 float Fr_DisneyDiffuse(float NdotV, float NdotL, float LdotH, float linear_roughness)
 {
-    float energy_bias = mix(0, 0.5, linear_roughness);
+    float energy_bias = 0.5 * linear_roughness;
     float energy_factor = mix(1.0, 1.0 / 1.51, linear_roughness);
 
-    float fd90 = energy_bias + 2.0 * LdotH * LdotH * linear_roughness;
-    vec3 f0 = vec3(1.0);
-    float light_scatter = F_Schlick(f0, fd90, NdotL).r;
-    float view_scatter = F_Schlick(f0, fd90, NdotV).r;
+    float fd90_minus_one = energy_bias + 2.0 * LdotH * LdotH * linear_roughness - 1.0;
+
+    float light_scatter = 1.0 + (fd90_minus_one * pow(1.0 - NdotL, 5.0));
+    float view_scatter = 1.0 + (fd90_minus_one * pow(1.0 - NdotV, 5.0));
 
     return light_scatter * view_scatter * energy_factor;
+
+    // float energy_bias = mix(0, 0.5, linear_roughness);
+    // float energy_factor = mix(1.0, 1.0 / 1.51, linear_roughness);
+
+    // float fd90 = energy_bias + 2.0 * LdotH * LdotH * linear_roughness;
+    // vec3 f0 = vec3(1.0);
+    // float light_scatter = F_Schlick(f0, fd90, NdotL).r;
+    // float view_scatter = F_Schlick(f0, fd90, NdotV).r;
+
+    // return light_scatter * view_scatter * energy_factor;
 }
 
 void main()
@@ -175,20 +185,21 @@ void main()
     const vec3 H = normalize(V + L);
 
     float NdotL = ClampedDot(N, L);
-    float NdotV = ClampedDot(N, V);
+    float NdotV = abs(dot(N, V)) + 1e-5f;
     float NdotH = ClampedDot(N, H);
     float LdotH = ClampedDot(L, H);
 
     float light_distance = length(local_light_pos);
-    float attenuation = 1.0 / (light_distance * light_distance);
-    // float attenuation = 1.0 / (light_distance * light_distance + 1.0);
 
-    vec3 radiance = a_PC.LightColor.rgb * attenuation;
+    const float light_intensity = 2.0f;
+
+    float attenuation = light_intensity * (1.0 / max(light_distance * light_distance, 1e-4));
+
+    // vec3 light_radiance = albedo *
 
     vec3 F = F_Schlick(F0, 1.0, LdotH);
 
-    // !!!TEMP!!!
-    float diffuse_reflectance = 1.0 - metallic;
+    vec3 diffuse_reflectance = albedo * (1.0 - metallic);
 
     float D = D_GGX(NdotH, roughness);
     float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
@@ -199,11 +210,11 @@ void main()
 
     float linear_roughness = sqrt(roughness);
 
-    float Fd = Fr_DisneyDiffuse(NdotV, NdotL, LdotH, linear_roughness) * ONE_OVER_PI;
+    vec3 Fd = diffuse_reflectance * (Fr_DisneyDiffuse(NdotV, NdotL, LdotH, linear_roughness) * ONE_OVER_PI * NdotL);
 
-    vec3 diffuse_c = vec3(Fd) * albedo;
+    // float light_power =
 
-    v_Color = vec4(diffuse_c + Fr, 1.0f);
+    v_Color = vec4((Fd + Fr) * attenuation, 1.0f);
 
     // v_Color = vec4(vec3(attenuation), 1.0);
     // v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, normal_rgba.a);
