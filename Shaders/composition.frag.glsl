@@ -51,8 +51,15 @@ void main()
     const float gamma = 2.2;
     base_color_with_lighting = pow(base_color_with_lighting, vec3(1.0 / gamma));
 
-    vec3 final_color = mix(base_color, base_color_with_lighting, lights.a);
+    if (lights.a <= 1e-5) {
+        v_Color = vec4(base_color, 1.0);
+    }
+    else {
+        v_Color = vec4(base_color_with_lighting, 1.0);
+    }
+
+    // vec3 final_color = mix(base_color, base_color_with_lighting, lights.a);
     // vec3 final_color = base_color_with_lighting;
 
-    v_Color = vec4(final_color, 1.0);
+    // v_Color = vec4(final_color, 1.0);
 }

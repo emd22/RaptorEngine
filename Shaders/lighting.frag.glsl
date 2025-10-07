@@ -212,9 +212,7 @@ void main()
 
     float Fd = Fr_DisneyDiffuse(NdotV, NdotL, LdotH, linear_roughness);
 
-    // float light_power =
-
-    v_Color = vec4((Fd * albedo + Fr) * a_PC.LightColor.rgb * NdotL * ONE_OVER_PI, 1.0f);
+    v_Color = vec4(attenuation * (Fd * albedo + Fr) * a_PC.LightColor.rgb * NdotL * ONE_OVER_PI, normal_rgba.a);
 
     // v_Color = vec4(vec3(attenuation), 1.0);
     // v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, normal_rgba.a);
