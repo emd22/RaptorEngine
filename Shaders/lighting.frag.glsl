@@ -167,7 +167,7 @@ void main()
     vec3 world_pos = WorldPosFromDepth(screen_uv, depth);
 
     const float roughness = 0.1;
-    const float metallic = 0.1;
+    const float metallic = 0.9;
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
@@ -191,7 +191,7 @@ void main()
 
     float light_distance = length(local_light_pos);
 
-    const float light_intensity = 2.0f;
+    const float light_intensity = 1.0f;
 
     float attenuation = light_intensity * (1.0 / max(light_distance * light_distance, 1e-4));
 
@@ -208,13 +208,13 @@ void main()
 
     vec3 Fr = D * F * Vis * ONE_OVER_PI;
 
-    float linear_roughness = sqrt(roughness);
+    float linear_roughness = roughness * roughness;
 
-    vec3 Fd = diffuse_reflectance * (Fr_DisneyDiffuse(NdotV, NdotL, LdotH, linear_roughness) * ONE_OVER_PI * NdotL);
+    float Fd = Fr_DisneyDiffuse(NdotV, NdotL, LdotH, linear_roughness);
 
     // float light_power =
 
-    v_Color = vec4((Fd + Fr) * attenuation, 1.0f);
+    v_Color = vec4((Fd * albedo + Fr) * a_PC.LightColor.rgb * NdotL * ONE_OVER_PI, 1.0f);
 
     // v_Color = vec4(vec3(attenuation), 1.0);
     // v_Color = vec4((kD * albedo / PI + specular) * radiance * NdotL, normal_rgba.a);
