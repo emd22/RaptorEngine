@@ -91,7 +91,11 @@ void FxObject::Render(const FxCamera& camera)
 
     FxDrawPushConstants push_constants {};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.ModelMatrix, GetNormalMatrix().RawData, sizeof(FxMat4f));
+
+    // Copy the normal matrix to the vertex shader
+    GetNormalMatrix().CopyAsMat3To(push_constants.NormalMatrix);
+
+    // memcpy(push_constants.NormalMatrix, , sizeof(FxMat4f));
 
     if (Material) {
         push_constants.MaterialIndex = Material->GetMaterialIndex();

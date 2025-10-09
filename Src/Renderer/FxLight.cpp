@@ -90,7 +90,6 @@ void FxLight::Render(const FxCamera& camera)
     FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
     FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
-    MVP.FlipY();
 
     mpLightPipeline->Bind(frame->LightCommandBuffer);
 
@@ -146,11 +145,13 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
     FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
     FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
-    MVP.FlipY();
 
     FxDrawPushConstants push_constants {};
     memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
+
+    GetNormalMatrix().CopyAsMat3To(push_constants.NormalMatrix);
+
+    // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(push_constants), &push_constants);

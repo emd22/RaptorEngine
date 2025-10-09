@@ -61,13 +61,6 @@ public:
 
     static FxMat4f AsRotation(const FxQuat& quat);
 
-    void FlipY()
-    {
-        //         Vec4f& col = Columns[1];
-        //         col.Y *= -1;
-        //         col.W *= -1;
-    }
-
     void Rotate(FxVec3f rotation);
 
     void LookAt(FxVec3f position, FxVec3f target, FxVec3f up);
@@ -123,6 +116,9 @@ public:
 
     FxMat4f Inverse();
     FxMat4f Transposed();
+    FxMat4f TransposeMat3();
+
+    void CopyAsMat3To(float* dest) const;
 
     FxMat4f operator*(const FxMat4f& other) const;
 

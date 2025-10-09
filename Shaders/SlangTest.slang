@@ -18,7 +18,7 @@ struct VSIn
 struct VSPushConsts
 {
     float4x4 mMVP;
-    float4x4 mNormalMatrix;
+    float3x3 mNormalMatrix;
     uint uiMaterialIndex;
 };
 
@@ -32,8 +32,7 @@ VSOut VertexMain(VSIn in)
 
     out.vPosition = mul(float4(in.vPosition, 1.0), VSConst.mMVP);
 
-    float3x3 normal_matrix = float3x3(VSConst.mNormalMatrix);
-    out.vNormal = mul(in.vNormal, normal_matrix);
+    out.vNormal = mul(in.vNormal, VSConst.mNormalMatrix);
     out.vUV = in.vUV;
     out.uiMaterialIndex = VSConst.uiMaterialIndex;
 

@@ -328,6 +328,23 @@ FxMat4f FxMat4f::Transposed()
     return result;
 }
 
+FxMat4f FxMat4f::TransposeMat3()
+{
+    float32x4x2_t tmp1 = vzipq_f32(Columns[0].mIntrin, Columns[2].mIntrin);
+    float32x4x2_t tmp2 = vzipq_f32(Columns[1].mIntrin, vdupq_n_f32(0));
+    float32x4x2_t tmp3 = vzipq_f32(tmp1.val[0], tmp2.val[0]);
+    float32x4x2_t tmp4 = vzipq_f32(tmp1.val[1], tmp2.val[1]);
+
+    FxMat4f result;
+    result.Columns[0].mIntrin = tmp3.val[0];
+    result.Columns[1].mIntrin = tmp3.val[1];
+    result.Columns[2].mIntrin = tmp4.val[0];
+
+    return result;
+}
+
+void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
+
 void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
 {
     FxVec3f forward = (target - position).Normalize();
