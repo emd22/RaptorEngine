@@ -77,6 +77,10 @@ static void PrintSlangDiagnostics(Slang::ComPtr<slang::IBlob>& diagnostic_blob)
 
 void FxShaderCompiler::Compile(const char* path, const char* output_path)
 {
+    bool has_vertex_shader = false;
+    bool has_fragment_shader = false;
+
+
     slang::IModule* module = nullptr;
     Slang::ComPtr<slang::ISession>& session = GetSlangSession();
 
@@ -93,8 +97,8 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path)
     Slang::ComPtr<slang::IEntryPoint> vertex_entry_point;
     Slang::ComPtr<slang::IEntryPoint> fragment_entry_point;
 
-    module->findEntryPointByName("FragmentMain", vertex_entry_point.writeRef());
-    module->findEntryPointByName("VertexMain", fragment_entry_point.writeRef());
+    module->findEntryPointByName("VertexMain", vertex_entry_point.writeRef());
+    module->findEntryPointByName("FragmentMain", fragment_entry_point.writeRef());
 
     FxStackArray<slang::IComponentType*, 3> component_types;
     component_types.Insert(module);
@@ -102,10 +106,12 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path)
     // Add each entry point if they are defined
     if (vertex_entry_point.get()) {
         component_types.Insert(vertex_entry_point);
+        has_vertex_shader = true;
     }
 
     if (fragment_entry_point.get()) {
         component_types.Insert(fragment_entry_point);
+        has_fragment_shader = true;
     }
 
     Slang::ComPtr<slang::IComponentType> composed_program;
@@ -119,20 +125,54 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path)
 
     Slang::ComPtr<slang::IBlob> spirv_code;
 
-    result = composed_program->getEntryPointCode(0, 0, spirv_code.writeRef(), diagnostic_blob.writeRef());
+    // Write the vertex shader code
+    if (has_vertex_shader) {
+        result = composed_program->getEntryPointCode(0, 0, spirv_code.writeRef(), diagnostic_blob.writeRef());
 
-    if (SLANG_FAILED(result)) {
-        FxLogError("Could not get shader compiled SPIRV(Path={})", path);
-        PrintSlangDiagnostics(diagnostic_blob);
-        return;
+        if (SLANG_FAILED(result)) {
+            FxLogError("Could not get vertex shader compiled SPIRV(Path={})", path);
+            PrintSlangDiagnostics(diagnostic_blob);
+            return;
+        }
+
+        {
+            std::string vertex_path = output_path;
+            vertex_path += "_vs";
+
+            FxFile output_file(vertex_path.c_str(), "wb");
+
+            output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+
+            output_file.Close();
+        }
+
+        FxLogInfo("Compiled vertex shader {}", path);
     }
 
-    {
-        FxFile output_file(output_path, "wb");
+    // Clear the spirv_code
+    spirv_code.setNull();
 
-        output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+    // Write the fragment shader code
+    if (has_fragment_shader) {
+        result = composed_program->getEntryPointCode(1, 0, spirv_code.writeRef(), diagnostic_blob.writeRef());
 
-        output_file.Close();
+        if (SLANG_FAILED(result)) {
+            FxLogError("Could not get fragment shader compiled SPIRV(Path={})", path);
+            PrintSlangDiagnostics(diagnostic_blob);
+            return;
+        }
+
+        {
+            std::string fragment_path = output_path;
+            fragment_path += "_fs";
+
+            FxFile output_file(fragment_path.c_str(), "wb");
+
+            output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+
+            output_file.Close();
+        }
+        FxLogInfo("Compiled fragment shader {}", path);
     }
 }
 
