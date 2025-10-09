@@ -1,11 +1,13 @@
 #pragma once
 
+#include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxRef.hpp>
 #include <FxPhysicsJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 extern RxRenderBackend* gRenderer;
 extern FxPhysicsJolt* gPhysics;
+extern FxShaderCompiler* gShaderCompiler;
 
 inline constexpr const char* gPipelineGeometryName = "Geometry";
 inline constexpr FxHash gPipelineGeometry = FxHashStr(gPipelineGeometryName);

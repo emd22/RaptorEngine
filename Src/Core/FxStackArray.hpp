@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FxPanic.hpp"
 #include "FxTypes.hpp"
 
 #include <stdexcept>
@@ -9,6 +10,19 @@ class FxStackArray
 {
 public:
     FxStackArray() = default;
+
+    FxStackArray(const std::initializer_list<T>& list)
+    {
+        const size_t list_size = list.size();
+        if (list_size > Capacity) {
+            FxPanic("FxStackArray", "Stack array cannot be resized! {} > {}", list_size, Capacity);
+            return;
+        }
+
+        for (const T& obj : list) {
+            Insert(obj);
+        }
+    }
 
     T* Insert(const T& value)
     {

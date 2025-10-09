@@ -227,7 +227,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     ShaderList shader_list;
 
-    RxShader vertex_shader("../shaders/main.vert.spv", RxShaderType::Vertex);
+    RxShader vertex_shader("../Shaders/Spirv/Geometry.spv", RxShaderType::Vertex);
     RxShader fragment_shader("../shaders/main.frag.spv", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;

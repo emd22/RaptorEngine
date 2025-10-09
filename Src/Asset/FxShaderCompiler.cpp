@@ -1,0 +1,144 @@
+#include "FxShaderCompiler.hpp"
+
+#include <ThirdParty/Slang/slang-com-ptr.h>
+#include <ThirdParty/Slang/slang.h>
+
+#include <Core/FxFile.hpp>
+#include <Core/FxStackArray.hpp>
+#include <string>
+
+
+static Slang::ComPtr<slang::IGlobalSession>& GetSlangGlobalSession()
+{
+    thread_local Slang::ComPtr<slang::IGlobalSession> global_session;
+
+    // If the session has not been created, create it
+    if (!global_session.get()) {
+        slang::createGlobalSession(global_session.writeRef());
+    }
+
+    return global_session;
+}
+
+static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
+{
+    Slang::ComPtr<slang::IGlobalSession>& global_session = GetSlangGlobalSession();
+
+    slang::TargetDesc target_desc {
+        .format = SLANG_SPIRV,
+        .profile = global_session->findProfile("spirv_1_5"),
+    };
+
+    FxStackArray<slang::PreprocessorMacroDesc, 0> preprocessor_macros = {};
+
+    FxStackArray<slang::CompilerOptionEntry, 2> compiler_options = {
+        {
+            slang::CompilerOptionName::EmitSpirvDirectly,
+            { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr },
+        },
+        {
+            slang::CompilerOptionName::LanguageVersion,
+            { slang::CompilerOptionValueKind::String, 0, 0, "2026", nullptr },
+        }
+    };
+
+    slang::SessionDesc session_desc {
+        .targets = &target_desc,
+        .targetCount = 1,
+
+        .preprocessorMacros = preprocessor_macros.Data,
+        .preprocessorMacroCount = preprocessor_macros.Size,
+
+        .compilerOptionEntries = compiler_options.Data,
+        .compilerOptionEntryCount = compiler_options.Size,
+    };
+
+    global_session->createSession(session_desc, local_session.writeRef());
+}
+
+static Slang::ComPtr<slang::ISession>& GetSlangSession()
+{
+    thread_local Slang::ComPtr<slang::ISession> local_session;
+
+    if (!local_session.get()) {
+        CreateSlangSession(local_session);
+    }
+
+    return local_session;
+}
+
+static void PrintSlangDiagnostics(Slang::ComPtr<slang::IBlob>& diagnostic_blob)
+{
+    if (diagnostic_blob != nullptr) {
+        FxLogError("Diagnostic Info: {}", diagnostic_blob->getBufferPointer());
+    }
+}
+
+
+void FxShaderCompiler::Compile(const char* path, const char* output_path)
+{
+    slang::IModule* module = nullptr;
+    Slang::ComPtr<slang::ISession>& session = GetSlangSession();
+
+    Slang::ComPtr<slang::IBlob> diagnostic_blob;
+
+    module = session->loadModule(path, diagnostic_blob.writeRef());
+
+    if (diagnostic_blob != nullptr) {
+        FxLogError("Error loading Slang module for {}", path);
+        PrintSlangDiagnostics(diagnostic_blob);
+        return;
+    }
+
+    Slang::ComPtr<slang::IEntryPoint> vertex_entry_point;
+    Slang::ComPtr<slang::IEntryPoint> fragment_entry_point;
+
+    module->findEntryPointByName("FragmentMain", vertex_entry_point.writeRef());
+    module->findEntryPointByName("VertexMain", fragment_entry_point.writeRef());
+
+    FxStackArray<slang::IComponentType*, 3> component_types;
+    component_types.Insert(module);
+
+    // Add each entry point if they are defined
+    if (vertex_entry_point.get()) {
+        component_types.Insert(vertex_entry_point);
+    }
+
+    if (fragment_entry_point.get()) {
+        component_types.Insert(fragment_entry_point);
+    }
+
+    Slang::ComPtr<slang::IComponentType> composed_program;
+
+    SlangResult result = session->createCompositeComponentType(component_types.Data, component_types.Size,
+                                                               composed_program.writeRef(), diagnostic_blob.writeRef());
+
+    if (SLANG_FAILED(result) || diagnostic_blob != nullptr) {
+        PrintSlangDiagnostics(diagnostic_blob);
+    }
+
+    Slang::ComPtr<slang::IBlob> spirv_code;
+
+    result = composed_program->getEntryPointCode(0, 0, spirv_code.writeRef(), diagnostic_blob.writeRef());
+
+    if (SLANG_FAILED(result)) {
+        FxLogError("Could not get shader compiled SPIRV(Path={})", path);
+        PrintSlangDiagnostics(diagnostic_blob);
+        return;
+    }
+
+    {
+        FxFile output_file(output_path, "wb");
+
+        output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+
+        output_file.Close();
+    }
+}
+
+
+void FxShaderCompiler::Destroy()
+{
+    GetSlangSession().setNull();
+    GetSlangGlobalSession().setNull();
+}

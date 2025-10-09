@@ -188,6 +188,8 @@ void TestQuatFromEuler()
 }
 
 
+#include <Asset/FxShaderCompiler.hpp>
+
 int main()
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
@@ -210,6 +212,9 @@ int main()
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
+
+    FxShaderCompiler shader_compiler;
+    shader_compiler.Compile("../Shaders/SlangTest.slang", "../Shaders/Spirv/Geometry.spv");
 
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {

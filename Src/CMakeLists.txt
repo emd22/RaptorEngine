@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.26)
 project(ThirdPartyLib)
 
 set(CMAKE_CXX_STANDARD 20)
-
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 link_directories(../Lib)
 include_directories(ThirdParty)
@@ -13,6 +13,7 @@ include_directories(ThirdParty)
 # add third party sources to static library
 file (GLOB_RECURSE THIRD_PARTY_SOURCES "ThirdParty/*.cpp" "ThirdParty/*.h" "ThirdParty/*.hpp" "ThirdParty/*.inl")
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
+target_link_libraries(ThirdPartyLib slang)
 
 target_compile_definitions(
     ThirdPartyLib

@@ -75,6 +75,7 @@
 #define FX_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
+#include <type_traits>
 
 #define FX_ENUM_AS_BITS(EnumType_, value_) static_cast<std::underlying_type_t<EnumType_>>(value_)
 

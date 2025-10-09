@@ -35,6 +35,13 @@ public:
         Size = other.Size;
     }
 
+    template <typename TOtherType>
+    FxSlice(const FxSlice<TOtherType>& other)
+    {
+        Ptr = reinterpret_cast<T*>(other);
+        Size = other.Size;
+    }
+
     FxSlice& operator=(T* value) = delete;
 
     bool operator==(nullptr_t np) { return Ptr == nullptr; }

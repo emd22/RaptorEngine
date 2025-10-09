@@ -35,6 +35,7 @@ public:
     void SetModelMatrix(const FxMat4f& other);
 
     FxMat4f& GetModelMatrix();
+    const FxMat4f& GetNormalMatrix();
 
     const FxVec3f& GetPosition() const { return mPosition; }
 
@@ -65,6 +66,7 @@ protected:
     bool mbMatrixOutOfDate : 1 = false;
 
     FxMat4f mModelMatrix = FxMat4f::Identity;
+    FxMat4f mNormalMatrix = FxMat4f::Identity;
 };
 
 class FxEntityManager

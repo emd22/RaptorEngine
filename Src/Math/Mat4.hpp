@@ -122,6 +122,7 @@ public:
     }
 
     FxMat4f Inverse();
+    FxMat4f Transposed();
 
     FxMat4f operator*(const FxMat4f& other) const;
 

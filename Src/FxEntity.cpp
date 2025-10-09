@@ -56,6 +56,15 @@ void FxEntity::SetModelMatrix(const FxMat4f& other)
     mModelMatrix = other;
 }
 
+const FxMat4f& FxEntity::GetNormalMatrix()
+{
+    if (mbMatrixOutOfDate) {
+        RecalculateModelMatrix();
+    }
+
+    return mNormalMatrix;
+}
+
 FxMat4f& FxEntity::GetModelMatrix()
 {
     if (mbMatrixOutOfDate) {
@@ -68,5 +77,6 @@ FxMat4f& FxEntity::GetModelMatrix()
 void FxEntity::RecalculateModelMatrix()
 {
     mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsRotation(mRotation) * FxMat4f::AsTranslation(mPosition);
+    mNormalMatrix = mModelMatrix.Inverse().Transposed();
     mbMatrixOutOfDate = false;
 }
