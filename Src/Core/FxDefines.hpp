@@ -38,6 +38,8 @@
 
 #ifdef __APPLE__
 #define FX_PLATFORM_MACOS 1
+#elif __linux__
+#define FX_PLATFORM_LINUX 1
 #elif _WIN64
 #define FX_PLATFORM_WINDOWS 1
 #else

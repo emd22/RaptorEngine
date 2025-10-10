@@ -189,6 +189,7 @@ void TestQuatFromEuler()
 
 
 #include <Asset/FxShaderCompiler.hpp>
+#include <Core/FxBasicDb.hpp>
 
 int main()
 {

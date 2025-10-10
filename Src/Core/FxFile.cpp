@@ -29,15 +29,15 @@ uint64 FxFile::GetFileSize()
         return 0;
     }
 
-    if (mFileSize != 0) {
-        return mFileSize;
+    if (mbSizeOutOfDate) {
+        uint64 current_seek = ftell(pFileHandle);
+
+        SeekToEnd();
+        mFileSize = ftell(pFileHandle);
+        SeekTo(current_seek);
+
+        mbSizeOutOfDate = false;
     }
-
-    // TODO: Use OS file size functions for an estimated size (inaccurate on some platforms)
-
-    fseek(pFileHandle, 0, SEEK_END);
-    mFileSize = ftell(pFileHandle);
-    rewind(pFileHandle);
 
     return mFileSize;
 }
@@ -57,10 +57,31 @@ FxSlice<char> FxFile::ReadRaw()
 void FxFile::WriteRaw(const void* data, uint64 size)
 {
     if (!pFileHandle) {
+        FxLogWarning("Cannot write to file as it has not been opened!");
         return;
     }
 
     fwrite(data, 1, size, pFileHandle);
+}
+
+void FxFile::SeekTo(uint64 index) { fseek(pFileHandle, index, SEEK_SET); }
+void FxFile::SeekToEnd() { fseek(pFileHandle, 0, SEEK_END); }
+void FxFile::SeekBy(uint32 by) { fseek(pFileHandle, by, SEEK_CUR); }
+
+void FxFile::Flush()
+{
+    if (!pFileHandle) {
+        return;
+    }
+    fflush(pFileHandle);
+}
+
+void FxFile::Write(char ch)
+{
+    if (!pFileHandle) {
+        return;
+    }
+    fputc(ch, pFileHandle);
 }
 
 void FxFile::Close()
@@ -71,4 +92,12 @@ void FxFile::Close()
 
     fclose(pFileHandle);
     pFileHandle = nullptr;
+}
+
+#include <filesystem>
+
+
+std::filesystem::file_time_type FxFile::GetLastModifiedTime(const std::string& path)
+{
+    return std::filesystem::last_write_time(path);
 }

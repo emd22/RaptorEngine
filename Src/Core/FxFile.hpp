@@ -4,6 +4,7 @@
 
 #include <Core/FxSlice.hpp>
 #include <Core/FxTypes.hpp>
+#include <filesystem>
 
 class FxFile
 {
@@ -11,6 +12,9 @@ public:
 public:
     FxFile() {}
     FxFile(const char* path, const char* mode);
+
+
+    static std::filesystem::file_time_type GetLastModifiedTime(const std::string& path);
 
     void Open(const char* path, const char* mode);
     uint64 GetFileSize();
@@ -31,6 +35,16 @@ public:
         WriteRaw(reinterpret_cast<const void*>(data), size);
     }
 
+    bool IsFileOpen() const { return (pFileHandle != nullptr); }
+
+    void Write(char ch);
+    void Flush();
+
+    void SeekTo(uint64 index);
+    void SeekBy(uint32 by);
+    void SeekToEnd();
+
+
     void Close();
 
     ~FxFile() { Close(); }
@@ -40,4 +54,5 @@ public:
 
 private:
     uint64 mFileSize = 0;
+    bool mbSizeOutOfDate : 1 = true;
 };

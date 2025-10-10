@@ -3,10 +3,12 @@
 #include <ThirdParty/Slang/slang-com-ptr.h>
 #include <ThirdParty/Slang/slang.h>
 
+#include <Core/FxBasicDb.hpp>
 #include <Core/FxFile.hpp>
 #include <Core/FxStackArray.hpp>
 #include <string>
 
+static FxBasicDb sShaderCompileDb;
 
 static Slang::ComPtr<slang::IGlobalSession>& GetSlangGlobalSession()
 {
@@ -74,12 +76,47 @@ static void PrintSlangDiagnostics(Slang::ComPtr<slang::IBlob>& diagnostic_blob)
     }
 }
 
+void RecordShaderCompileTime(const char* path)
+{
+    FxLogInfo("Logging compile time for {}", path);
+
+    uint64 modification_time = FxFile::GetLastModifiedTime(path).time_since_epoch().count();
+    sShaderCompileDb.WriteEntry(
+        FxBasicDbEntry { .KeyHash = FxHashStr(path), .Value = std::to_string(modification_time) });
+
+    sShaderCompileDb.SaveToFile();
+}
+
+bool IsShaderUpToDate(const char* path)
+{
+    FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(FxHashStr(path));
+    if (!entry) {
+        return false;
+    }
+
+    uint64 latest_modification_time = FxFile::GetLastModifiedTime(path).time_since_epoch().count();
+
+    if (std::stol(entry->Value) != latest_modification_time) {
+        return false;
+    }
+
+    return true;
+}
+
 
 void FxShaderCompiler::Compile(const char* path, const char* output_path)
 {
+    if (!sShaderCompileDb.IsOpen()) {
+        sShaderCompileDb.Open("../Shaders/ShaderCompileDb.fxdb");
+    }
+
+    if (IsShaderUpToDate(path)) {
+        FxLogInfo("Shader {} is up to date!", path);
+        return;
+    }
+
     bool has_vertex_shader = false;
     bool has_fragment_shader = false;
-
 
     slang::IModule* module = nullptr;
     Slang::ComPtr<slang::ISession>& session = GetSlangSession();
@@ -172,13 +209,17 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path)
 
             output_file.Close();
         }
+
         FxLogInfo("Compiled fragment shader {}", path);
     }
-}
 
+    RecordShaderCompileTime(path);
+}
 
 void FxShaderCompiler::Destroy()
 {
+    sShaderCompileDb.Close();
+
     GetSlangSession().setNull();
     GetSlangGlobalSession().setNull();
 }
