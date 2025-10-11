@@ -5,6 +5,7 @@
 #include "RxCommands.hpp"
 
 #include <Core/FxPanic.hpp>
+#include <Core/FxStackArray.hpp>
 #include <FxEngine.hpp>
 #include <Renderer/RxDeferred.hpp>
 
@@ -255,39 +256,53 @@ void RxGraphicsPipeline::Destroy()
 }
 
 
-VkPipelineLayout RxGraphicsPipeline::CreateLayout(uint32 vert_push_consts_size, uint32 frag_push_consts_size,
+VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
                                                   const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
     if (mDevice == nullptr) {
         mDevice = gRenderer->GetDevice();
     }
 
-    VkPushConstantRange pc_ranges[2];
-    uint32 pc_ranges_count = 0;
+    FxStackArray<VkPushConstantRange, 3> push_const_ranges;
 
-    if (vert_push_consts_size) {
-        VkPushConstantRange& range = pc_ranges[0];
-        range.size = vert_push_consts_size;
-        range.offset = 0;
-        range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        ++pc_ranges_count;
+    // VkPushConstantRange pc_ranges[3];
+    // uint32 pc_ranges_count = 0;
+    //
+    uint32 current_pc_offset = 0;
+
+    for (int i = 0; i < push_constant_defs.Size; i++) {
+        const RxPushConstants& pc_def = push_constant_defs[i];
+
+        VkPushConstantRange range { .size = pc_def.Size, .offset = current_pc_offset, .stageFlags = pc_def.StageFlags };
+        push_const_ranges.Insert(range);
+
+        current_pc_offset += pc_def.Size;
     }
 
-    if (frag_push_consts_size) {
-        VkPushConstantRange& range = pc_ranges[pc_ranges_count];
-        range.size = frag_push_consts_size;
-        range.offset = vert_push_consts_size ? vert_push_consts_size : 0;
-        range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        ++pc_ranges_count;
-    }
+
+    // if (vert_push_consts_size) {
+    //     VkPushConstantRange& range = pc_ranges[0];
+    //     range.size = vert_push_consts_size;
+    //     range.offset = 0;
+    //     range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    //     ++pc_ranges_count;
+    // }
+
+    // if (frag_push_consts_size) {
+    //     VkPushConstantRange& range = pc_ranges[pc_ranges_count];
+    //     range.size = frag_push_consts_size;
+    //     range.offset = vert_push_consts_size ? vert_push_consts_size : 0;
+    //     range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    //     ++pc_ranges_count;
+    // }
 
     VkPipelineLayoutCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = descriptor_set_layouts.Size,
         .pSetLayouts = descriptor_set_layouts.Ptr,
 
-        .pushConstantRangeCount = pc_ranges_count,
-        .pPushConstantRanges = pc_ranges,
+        .pushConstantRangeCount = push_const_ranges.Size,
+        .pPushConstantRanges = push_const_ranges.Data,
     };
 
     VkResult status = vkCreatePipelineLayout(mDevice->Device, &create_info, nullptr, &Layout);

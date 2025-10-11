@@ -476,8 +476,9 @@ RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
 
     FxDrawPushConstants push_constants {};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.PlGeometry.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                       sizeof(push_constants), &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.PlGeometry.Layout,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
+                       &push_constants);
 
     return RxFrameResult::Success;
 }

@@ -164,7 +164,11 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         //        DsLayoutGPassVertex,
     };
 
-    VkPipelineLayout layout = PlGeometry.CreateLayout(sizeof(FxDrawPushConstants), 0,
+    FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxDrawPushConstants),
+                                                                       .StageFlags = VK_SHADER_STAGE_VERTEX_BIT |
+                                                                                     VK_SHADER_STAGE_FRAGMENT_BIT } };
+
+    VkPipelineLayout layout = PlGeometry.CreateLayout(FxSlice(push_consts),
                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
@@ -228,7 +232,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
     ShaderList shader_list;
 
     RxShader vertex_shader("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
-    RxShader fragment_shader("../shaders/main.frag.spv", RxShaderType::Fragment);
+    RxShader fragment_shader("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
@@ -341,10 +345,13 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
         DsLayoutLightingMaterialProperties,
     };
 
-    VkPipelineLayout layout = PlLightingOutsideVolume.CreateLayout(
-        sizeof(FxLightVertPushConstants), // Vertex push constants
-        sizeof(FxLightFragPushConstants), // Fragment push constants
-        FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    FxStackArray<RxPushConstants, 2> push_consts = {
+        RxPushConstants { .Size = sizeof(FxLightVertPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
+        RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
+    };
+
+    VkPipelineLayout layout = PlLightingOutsideVolume.CreateLayout(FxSlice(push_consts),
+                                                                   FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -503,7 +510,10 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
         DsLayoutCompFrag,
     };
 
-    VkPipelineLayout layout = PlComposition.CreateLayout(0, sizeof(FxCompositionPushConstants),
+    FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxCompositionPushConstants),
+                                                                       .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
+
+    VkPipelineLayout layout = PlComposition.CreateLayout(FxSlice(push_consts),
                                                          FxMakeSlice(layouts, FxSizeofArray(layouts)));
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 

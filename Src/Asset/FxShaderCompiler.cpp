@@ -73,7 +73,7 @@ static Slang::ComPtr<slang::ISession>& GetSlangSession()
 static void PrintSlangDiagnostics(Slang::ComPtr<slang::IBlob>& diagnostic_blob)
 {
     if (diagnostic_blob != nullptr) {
-        FxLogError("Diagnostic Info: {}", diagnostic_blob->getBufferPointer());
+        FxLogError("Diagnostic Info:\n {}", reinterpret_cast<const char*>(diagnostic_blob->getBufferPointer()));
     }
 }
 

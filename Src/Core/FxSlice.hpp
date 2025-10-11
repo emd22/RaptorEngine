@@ -21,7 +21,7 @@ public:
     FxSlice(const FxSizedArray<T>& sized_arr) : Ptr(sized_arr.Data), Size(sized_arr.Size) {}
 
     template <uint32 TSize>
-    FxSlice(const FxStackArray<T, TSize>& stack_arr) : Ptr(stack_arr.Data), Size(stack_arr.Size)
+    FxSlice(FxStackArray<T, TSize>& stack_arr) : Ptr(stack_arr.Data), Size(stack_arr.Size)
     {
     }
 
@@ -38,7 +38,7 @@ public:
     template <typename TOtherType>
     FxSlice(const FxSlice<TOtherType>& other)
     {
-        Ptr = reinterpret_cast<T*>(other);
+        Ptr = reinterpret_cast<T*>(other.Ptr);
         Size = other.Size;
     }
 

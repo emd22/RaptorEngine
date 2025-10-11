@@ -153,8 +153,9 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
 
     // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                       sizeof(push_constants), &push_constants);
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
+                       &push_constants);
 
     mDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
 }
