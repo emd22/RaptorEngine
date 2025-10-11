@@ -5,6 +5,7 @@
 
 #include <Core/FxBasicDb.hpp>
 #include <Core/FxFile.hpp>
+#include <Core/FxFilesystemIO.hpp>
 #include <Core/FxStackArray.hpp>
 #include <string>
 
@@ -80,7 +81,7 @@ void RecordShaderCompileTime(const char* path)
 {
     FxLogInfo("Logging compile time for {}", path);
 
-    uint64 modification_time = FxFile::GetLastModifiedTime(path).time_since_epoch().count();
+    uint64 modification_time = FxFilesystemIO::FileGetLastModified(path);
     sShaderCompileDb.WriteEntry(
         FxBasicDbEntry { .KeyHash = FxHashStr(path), .Value = std::to_string(modification_time) });
 
@@ -94,7 +95,7 @@ bool IsShaderUpToDate(const char* path)
         return false;
     }
 
-    uint64 latest_modification_time = FxFile::GetLastModifiedTime(path).time_since_epoch().count();
+    uint64 latest_modification_time = FxFilesystemIO::FileGetLastModified(path);
 
     if (std::stol(entry->Value) != latest_modification_time) {
         return false;
@@ -103,6 +104,20 @@ bool IsShaderUpToDate(const char* path)
     return true;
 }
 
+void FxShaderCompiler::CompileAllShaders(const char* folder_path)
+{
+    FxPagedArray<std::string> shader_paths = FxFilesystemIO::DirListIfHasExtension(folder_path, ".slang", true);
+
+    if (shader_paths.IsEmpty()) {
+        return;
+    }
+
+    for (const std::string& shader_path : shader_paths) {
+        const std::string path_to_compile = std::format("{}{}.slang", folder_path, shader_path);
+        const std::string output_path = std::format("{}Spirv/{}.spv", folder_path, shader_path);
+        FxShaderCompiler::Compile(path_to_compile.c_str(), output_path.c_str());
+    }
+}
 
 void FxShaderCompiler::Compile(const char* path, const char* output_path)
 {

@@ -80,22 +80,10 @@ public:
 
     FxPagedArray() = default;
 
+    FxPagedArray(const FxPagedArray& other) = delete;
     FxPagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
 
-    FxPagedArray& operator=(const FxPagedArray& other)
-    {
-        FirstPage = other.FirstPage;
-        CurrentPage = other.CurrentPage;
-
-        PageNodeCapacity = other.PageNodeCapacity;
-        CurrentPageIndex = other.CurrentPageIndex;
-
-        TrackedSize = other.TrackedSize;
-
-        return *this;
-    }
-
-    FxPagedArray& operator=(FxPagedArray&& other)
+    FxPagedArray(FxPagedArray&& other)
     {
         FirstPage = other.FirstPage;
         CurrentPage = other.CurrentPage;
@@ -113,8 +101,42 @@ public:
 
         other.TrackedSize = 0;
 
+        // return *this;
+    }
+
+    FxPagedArray& operator=(const FxPagedArray& other)
+    {
+        FirstPage = other.FirstPage;
+        CurrentPage = other.CurrentPage;
+
+        PageNodeCapacity = other.PageNodeCapacity;
+        CurrentPageIndex = other.CurrentPageIndex;
+
+        TrackedSize = other.TrackedSize;
+
         return *this;
     }
+
+    // FxPagedArray& operator=(FxPagedArray&& other)
+    // {
+    //     FirstPage = other.FirstPage;
+    //     CurrentPage = other.CurrentPage;
+
+    //     PageNodeCapacity = other.PageNodeCapacity;
+    //     CurrentPageIndex = other.CurrentPageIndex;
+
+    //     TrackedSize = other.TrackedSize;
+
+    //     other.FirstPage = nullptr;
+    //     other.CurrentPage = nullptr;
+
+    //     other.PageNodeCapacity = 0;
+    //     other.CurrentPageIndex = 0;
+
+    //     other.TrackedSize = 0;
+
+    //     return *this;
+    // }
 
     Iterator begin() const { return Iterator(FirstPage, 0); }
 

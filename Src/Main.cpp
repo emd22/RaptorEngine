@@ -29,6 +29,7 @@
 #include <Asset/FxAssetManager.hpp>
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxMeshGen.hpp>
+#include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxBitset.hpp>
 #include <Core/FxLog.hpp>
 #include <Core/FxTypes.hpp>
@@ -188,9 +189,6 @@ void TestQuatFromEuler()
 }
 
 
-#include <Asset/FxShaderCompiler.hpp>
-#include <Core/FxBasicDb.hpp>
-
 int main()
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
@@ -208,15 +206,14 @@ int main()
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
+
     // TestScript();
     // return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
 
-    FxShaderCompiler shader_compiler;
-    shader_compiler.Compile("../Shaders/SlangTest.slang", "../Shaders/Spirv/Geometry.spv");
-
+    FxShaderCompiler::CompileAllShaders("../Shaders/");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
