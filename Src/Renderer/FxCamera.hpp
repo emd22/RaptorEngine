@@ -50,6 +50,10 @@ public:
         mAngleX += angle_x;
         mAngleY += angle_y;
 
+        constexpr float cOffset = 0.01;
+
+        mAngleY = fmin(fmax(mAngleY, -M_PI_2 + cOffset), M_PI_2 - cOffset);
+
         RequireUpdate();
     }
 

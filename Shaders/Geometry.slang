@@ -3,7 +3,7 @@ module Geometry;
 
 struct VSOut
 {
-    float4 vPosition : SV_Position;
+    float4 vPosition : SV_POSITION;
     float3 vNormal   : NORMAL;
     float2 vUV       : TEXCOORD0;
 };
@@ -42,8 +42,8 @@ VSOut VertexMain(VSIn in)
 #include "./MaterialProperties.slang.inc"
 
 struct FSOut {
-    float4 vAlbedo : SV_Target0;
-    float4 vNormal : SV_Target1;
+    float4 vAlbedo : SV_TARGET0;
+    float4 vNormal : SV_TARGET1;
 
 };
 
