@@ -201,6 +201,10 @@ public:
     {
         Type* ptr = static_cast<Type*>(AllocRaw(size, nullptr));
 
+        if (reinterpret_cast<void*>(ptr) == reinterpret_cast<void*>(0x144804e40)) {
+            FX_BREAKPOINT;
+        }
+
         // Use a placement new if the object is constructable with the provided arguments
         if constexpr (std::is_constructible_v<Type, Args...>) {
             new (ptr) Type(std::forward<Args>(args)...);
@@ -258,6 +262,8 @@ public:
 #endif
         FreeRaw(static_cast<void*>(ptr), pool);
     }
+
+    bool IsEmpty() const { return mPoolPages.IsEmpty(); }
 
     static void PrintAllocations();
 

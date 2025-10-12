@@ -21,7 +21,7 @@ target_compile_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
 )
-target_compile_options(ThirdPartyLib PRIVATE -Wno-nullability-extension)
+target_compile_options(ThirdPartyLib PRIVATE -Wno-nullability-extension -Wno-nullability-completeness)
 
 
 project(cr CXX)

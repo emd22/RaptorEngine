@@ -76,13 +76,17 @@ void FxPhysicsObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f
 
 void FxPhysicsObject::DestroyPhysicsBody()
 {
-    if (!mbHasPhysicsBody && mpPhysicsBody != nullptr) {
+    if (!mbHasPhysicsBody || mpPhysicsBody != nullptr) {
         return;
     }
 
-    gPhysics->PhysicsSystem.GetBodyInterface().DestroyBody(GetBodyId());
+    JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
+
+    body_interface.RemoveBody(GetBodyId());
+    // body_interface.DestroyBody(GetBodyId());
 
     mpPhysicsBody = nullptr;
+    mbHasPhysicsBody = false;
 }
 
 

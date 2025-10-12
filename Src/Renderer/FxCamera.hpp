@@ -52,7 +52,10 @@ public:
 
         constexpr float cOffset = 0.01;
 
-        mAngleY = fmin(fmax(mAngleY, -M_PI_2 + cOffset), M_PI_2 - cOffset);
+        constexpr float cMinY = -M_PI_2 + cOffset;
+        constexpr float cMaxY = M_PI_2 - cOffset;
+
+        mAngleY = FxMath::Clamp(mAngleY, cMinY, cMaxY);
 
         RequireUpdate();
     }

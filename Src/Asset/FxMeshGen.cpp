@@ -42,7 +42,7 @@ FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::A
 {
     FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> mesh =
         FxMakeRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>>();
-    mesh->IsReference = true;
+    // mesh->IsReference = true;
 
     FxSizedArray<RxVertex<FxVertexPosition>> points(Positions.Size);
 
@@ -72,7 +72,7 @@ FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
 {
     // Create a mesh using the default vertex format (positions, normals, uvs)
     FxRef<FxPrimitiveMesh<>> mesh = FxMakeRef<FxPrimitiveMesh<>>();
-    mesh->IsReference = true;
+    // mesh->IsReference = true;
 
     mesh->UploadIndices(Indices);
 

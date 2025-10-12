@@ -1,5 +1,8 @@
 module Geometry;
 
+//////////////////////////////////
+// Vertex shader
+//////////////////////////////////
 
 struct VSOut
 {
@@ -38,6 +41,9 @@ VSOut VertexMain(VSIn in)
     return out;
 }
 
+//////////////////////////////////
+// Fragment shader
+//////////////////////////////////
 
 #include "./MaterialProperties.slang.inc"
 

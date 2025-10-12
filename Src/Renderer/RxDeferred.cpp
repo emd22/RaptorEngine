@@ -388,8 +388,8 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     ShaderList shader_list;
 
-    RxShader vertex_shader("../shaders/lighting.vert.spv", RxShaderType::Vertex);
-    RxShader fragment_shader("../shaders/lighting.frag.spv", RxShaderType::Fragment);
+    RxShader vertex_shader("../Shaders/Spirv/Lighting.spv_vs", RxShaderType::Vertex);
+    RxShader fragment_shader("../Shaders/Spirv/Lighting.spv_fs", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;

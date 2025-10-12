@@ -188,6 +188,10 @@ void TestQuatFromEuler()
     FxLogInfo("Returned angles: {}", quat.GetEulerAngles());
 }
 
+struct DeleteOnExit
+{
+    ~DeleteOnExit() { FxEngineGlobalsDestroy(); }
+};
 
 int main()
 {
@@ -220,6 +224,8 @@ int main()
     }
 
     FxEngineGlobalsInit();
+
+    DeleteOnExit doe;
 
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };
@@ -283,7 +289,8 @@ int main()
 
     gRenderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
 
-    gRenderer->DeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, generated_cube->AsLightVolume());
+    auto skybox_mesh = generated_cube->AsLightVolume();
+    gRenderer->DeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, skybox_mesh);
 
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
@@ -485,13 +492,22 @@ int main()
     material_manager.Destroy();
     asset_manager.Shutdown();
 
+    ground_object.Destroy();
+
+    skybox_mesh->IsReference = false;
+    skybox_mesh->Destroy();
+
+    gRenderer->DeferredRenderer->SkyboxRenderer.Destroy();
+
     deferred_renderer->Destroy();
 
-    FxEngineGlobalsDestroy();
-
     // composition_pipeline.Destroy();
+    //
+    generated_cube->Destroy();
+    generated_sphere->Destroy();
 
     //    ground_object->Destroy();
+    //
 
     return 0;
 }

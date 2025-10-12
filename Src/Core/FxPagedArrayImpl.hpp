@@ -4,10 +4,12 @@
 
 #ifndef FX_PAGED_ARRAY_ALLOC
 #warning "FX_PAGED_ARRAY_ALLOC is not defined!"
+#define FX_PAGED_ARRAY_ALLOC(type_, size_) (0)
 #endif
 
 #ifndef FX_PAGED_ARRAY_FREE
 #warning "FX_PAGED_ARRAY_FREE is not defined!"
+#define FX_PAGED_ARRAY_FREE(type_, ptr_)
 #endif
 
 template <typename TElementType>
