@@ -118,16 +118,16 @@ inline void CheckKeyForContinuedPress(FxControl* key)
     // is a continued keypress.
 
     // This is already a continued press, ignore.
-    if (!key->IsKeyDown() || key->mContinuedPress) {
+    if (!key->IsKeyDown() || key->mbContinuedPress) {
         return;
     }
 
     // Get the value of the "off" frame.
-    const bool key_next_frame = !key->mTickBit;
+    const bool key_next_frame = !key->mbTickBit;
 
     // If we are currently on the "off" frame, then we know this is continued.
     if (key_next_frame == FxControlManager::GetInstance().mThisTick) {
-        key->mContinuedPress = true;
+        key->mbContinuedPress = true;
     }
 }
 
@@ -213,12 +213,12 @@ void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event* event)
     }
 
     if (event->key.down != false && !button->IsKeyDown()) {
-        button->mTickBit = GetInstance().mThisTick;
-        button->mKeyDown = true;
+        button->mbTickBit = GetInstance().mThisTick;
+        button->mbKeyDown = true;
     }
     else if (!event->key.down != false && button->IsKeyDown()) {
-        button->mKeyDown = false;
-        button->mContinuedPress = false;
+        button->mbKeyDown = false;
+        button->mbContinuedPress = false;
     }
 }
 

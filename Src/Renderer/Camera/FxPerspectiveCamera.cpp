@@ -56,13 +56,16 @@ void FxPerspectiveCamera::Update()
         return;
     }
 
+    FxVec3f adjusted_position = (Position);
+
+
     // TODO: add sincos() implementation
-    Direction.Set(sin(mAngleX), mAngleY, cos(mAngleX));
+    Direction.Set((cos(mAngleY) * sin(mAngleX)), sin(mAngleY), (cos(mAngleY) * cos(mAngleX)));
     Direction = Direction.Normalize();
 
-    const FxVec3f target = Position + Direction;
+    FxVec3f target = adjusted_position - Direction;
 
-    ViewMatrix.LookAt(Position, target, FxVec3f::sUp);
+    ViewMatrix.LookAt(adjusted_position, target, FxVec3f::sUp);
 
     FxMat4f PM = ProjectionMatrix;
 

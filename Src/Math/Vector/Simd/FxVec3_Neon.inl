@@ -4,25 +4,18 @@
 
 #ifdef FX_USE_NEON
 
-FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 threshold) const
+FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {
-    // Get the absolute difference between the vectors
-    const float32x4_t diff = vabdq_f32(mIntrin, other.mIntrin);
-
-    // Is the difference greater than our threshhold?
-    const uint32x4_t lt = vcgtq_f32(diff, vdupq_n_f32(threshold));
-
-    // If any components are true, return false.
-    return vmaxvq_u32(lt) == 0;
+    return IsCloseTo(other.mIntrin);
 }
 
-FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const float32x4_t& other, const float32 threshold) const
+FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const float32x4_t& other, const float32 tolerance) const
 {
     // Get the absolute difference between the vectors
     const float32x4_t diff = vabdq_f32(mIntrin, other);
 
     // Is the difference greater than our threshhold?
-    const uint32x4_t lt = vcgtq_f32(diff, vdupq_n_f32(threshold));
+    const uint32x4_t lt = vcgtq_f32(diff, vdupq_n_f32(tolerance));
 
     // If any components are true, return false.
     return vmaxvq_u32(lt) == 0;
@@ -48,7 +41,6 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Max(const FxVec3f& a, const FxVec3f& b)
 {
     return FxVec3f(vmaxq_f32(a.mIntrin, b.mIntrin));
 }
-
 
 //////////////////////////////
 // Operator Overloads

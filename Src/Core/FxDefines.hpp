@@ -15,6 +15,10 @@
 #define FX_MEMPOOL_WARN_SLOW_ALLOC
 #define FX_MEMPOOL_NEXT_FIT
 
+// #define FX_DEBUG_REF
+
+// #define FX_DEBUG_VMA_LOG_ERRORS
+
 // #define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
@@ -38,6 +42,8 @@
 
 #ifdef __APPLE__
 #define FX_PLATFORM_MACOS 1
+#elif __linux__
+#define FX_PLATFORM_LINUX 1
 #elif _WIN64
 #define FX_PLATFORM_WINDOWS 1
 #else
@@ -75,6 +81,7 @@
 #define FX_FORCE_INLINE inline __attribute__((always_inline))
 #endif
 
+#include <type_traits>
 
 #define FX_ENUM_AS_BITS(EnumType_, value_) static_cast<std::underlying_type_t<EnumType_>>(value_)
 

@@ -496,6 +496,10 @@ FxMemPoolPage* FxMemPool::FindPtrInPage(void* ptr)
     // Iterate in reverse as most allocations being freed are likely to be closer to the most recent allocation.
     size_t num_pages = mPoolPages.Size();
 
+    if (num_pages == 0) {
+        FxLogError("Cannot find ptr in page when there are no pages in memory pool!");
+    }
+
     for (int32 i = num_pages - 1; i >= 0; --i) {
         FxMemPoolPage* page = &mPoolPages[i];
 
@@ -525,6 +529,16 @@ void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
     }
 
     if (ptr == nullptr) {
+        return;
+    }
+
+    // If there are no pages the memory has 100% been freed already. freeing a ptr
+    // after the mempool is freed is super jank, but fine I guess lol
+    if (pool->mPoolPages.IsEmpty()) {
+#ifdef FX_BUILD_DEBUG
+        FxLogWarning("Attempting to free a ptr {:p} after mempool is destroyed", ptr);
+        // FX_BREAKPOINT;
+#endif
         return;
     }
 

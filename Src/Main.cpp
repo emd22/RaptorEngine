@@ -29,6 +29,7 @@
 #include <Asset/FxAssetManager.hpp>
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxMeshGen.hpp>
+#include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxBitset.hpp>
 #include <Core/FxLog.hpp>
 #include <Core/FxTypes.hpp>
@@ -187,6 +188,10 @@ void TestQuatFromEuler()
     FxLogInfo("Returned angles: {}", quat.GetEulerAngles());
 }
 
+struct DeleteOnExit
+{
+    ~DeleteOnExit() { FxEngineGlobalsDestroy(); }
+};
 
 int main()
 {
@@ -205,18 +210,22 @@ int main()
 
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
+
     // TestScript();
     // return 0;
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
 
+    FxShaderCompiler::CompileAllShaders("../Shaders/");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
     }
 
     FxEngineGlobalsInit();
+
+    DeleteOnExit doe;
 
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };
@@ -280,7 +289,8 @@ int main()
 
     gRenderer->DeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
 
-    gRenderer->DeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, generated_cube->AsLightVolume());
+    auto skybox_mesh = generated_cube->AsLightVolume();
+    gRenderer->DeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, skybox_mesh);
 
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
@@ -296,7 +306,7 @@ int main()
     FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material",
                                                            &deferred_renderer->PlGeometryWireframe);
 
-    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 100, 100, 255);
+    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
     cube_material->DiffuseComponent.Texture = FxAssetImage::GetEmptyImage();
 
     FxRef<FxPrimitiveMesh<>> generated_cube_mesh = generated_cube->AsMesh();
@@ -305,15 +315,21 @@ int main()
     ground_object.Create(generated_cube_mesh, cube_material);
     // ground_object.Scale(FxVec3f(10, 1, 10));
     ground_object.MoveBy(FxVec3f(0, -20, 0));
+    ground_object.Scale(FxVec3f(10, 1.0, 10));
 
-    ground_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(FxObject::PF_CreateInactive),
-                                    FxObject::PhysicsType::Static, {});
+    ground_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
+                                      FxPhysicsObject::PhysicsType::Static, {});
 
-    FxObject cube_object;
-    cube_object.Create(generated_cube_mesh, cube_material);
-    cube_object.MoveBy(FxVec3f(0, 10, 0));
+    FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../models/DamagedHelmet.glb");
+    helmet_object->MoveBy(FxVec3f(5, 0, 0));
+    helmet_object->RotateX(M_PI_2);
+    // FxObject cube_object;
+    // cube_object.Create(generated_cube_mesh, cube_material);
+    // cube_object.MoveBy(FxVec3f(5, 10, 0));
 
-    cube_object.CreatePhysicsBody(static_cast<FxObject::PhysicsFlags>(0), FxObject::PhysicsType::Dynamic, {});
+    // cube_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
+    // FxPhysicsObject::PhysicsType::Dynamic, {});
+    // cube_object.SetPhysicsEnabled(false);
 
     gPhysics->OptimizeBroadPhase();
 
@@ -328,17 +344,20 @@ int main()
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light.Scale(FxVec3f(25));
 
+    light.Color = FxVec3f(1.0, 0.1, 0.1);
+
+    FxLight light2;
+    light2.SetLightVolume(generated_sphere, true);
+
+    light.Scale(FxVec3f(25));
+    light2.MoveBy(FxVec3f(1, 0, -0.5));
+
     light.Color = FxVec3f(0.6, 0.7, 0.6);
 
-    FxDirectionalLight light2;
-    light2.SetLightVolume(generated_quad, false);
-
-    light2.MoveBy(FxVec3f(1, 0, -0.5));
     // light2.Scale(FxVec3f(25));
 
-    bool second_light_on = false;
-
-    gPhysics->bPhysicsPaused = true;
+    bool second_light_on = true;
+    // gPhysics->bPhysicsPaused = true;
 
 
     while (Running) {
@@ -350,8 +369,8 @@ int main()
 
         if (FxControlManager::IsMouseLocked()) {
             FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
-            mouse_delta.SetX(DeltaTime * mouse_delta.GetX() * -0.001);
-            mouse_delta.SetY(DeltaTime * mouse_delta.GetY() * 0.001);
+            mouse_delta.SetX(DeltaTime * mouse_delta.GetX() * 0.001);
+            mouse_delta.SetY(DeltaTime * mouse_delta.GetY() * -0.001);
 
             camera.Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         }
@@ -369,26 +388,6 @@ int main()
             camera.Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
         }
 
-
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_U)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_J)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_H)) {
-        //     cube_object.MoveBy(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_K)) {
-        //     cube_object.MoveBy(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Y)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * -0.01f, 0.0f));
-        // }
-        // if (FxControlManager::IsKeyDown(FxKey::FX_KEY_I)) {
-        //     cube_object.MoveBy(FxVec3f(0.0f, DeltaTime * 0.01f, 0.0f));
-        // }
-
         if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
             gRenderer->DeferredRenderer->ToggleWireframe(true);
         }
@@ -399,7 +398,12 @@ int main()
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
             light.MoveTo(camera.Position);
 
+            // camera.Position.Print();
             light.mPosition.Print();
+        }
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
+            second_light_on = !second_light_on;
         }
 
         // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
@@ -410,15 +414,26 @@ int main()
         //     FxMemPool::GetGlobalPool().PrintAllocations();
         // }
 
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_F)) {
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_R)) {
             // second_light_on = !second_light_on;
 
-            cube_object.RotateY(DeltaTime * 0.01f);
+            // cube_object.MoveBy(FxVec3f(DeltaTime * 0.001f, 0, 0));
+        }
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_E)) {
+            // second_light_on = !second_light_on;
+
+            // cube_object.MoveBy(FxVec3f(DeltaTime * -0.001f, 0, 0));
+        }
+
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_0)) {
+            // cube_object.SetPhysicsEnabled(false);
+            // cube_object.MoveTo(FxVec3f(5, 10, 0));
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
             // gRenderer->DeferredRenderer->RebuildLightingPipeline();
-            gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
+            // gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
+            // cube_object.SetPhysicsEnabled(!cube_object.GetPhysicsEnabled());
             // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 
@@ -443,10 +458,13 @@ int main()
         //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));
 
+        // cube_object.MoveTo(camera.Position + camera.Direction);
 
         // fireplace_object->Render(camera);
-        cube_object.Update();
-        cube_object.Render(camera);
+        // cube_object.Update();
+        // cube_object.Render(camera);
+        //
+        helmet_object->Render(camera);
 
         // ground_object.Update();
         ground_object.Render(camera);
@@ -456,14 +474,13 @@ int main()
 
         if (second_light_on) {
             // light2.mModelMatrix = camera.VPMatrix;
-            light2.SetModelMatrix(camera.VPMatrix);
+            // light2.SetModelMatrix(camera.VPMatrix);
+            light2.MoveTo(camera.Position + (camera.Direction * 1.0));
 
             light2.Render(camera);
         }
 
         light.Render(camera);
-        //        light2.Render(camera);
-        // light2.Render(camera);
 
         gRenderer->DoComposition(camera);
 
@@ -475,13 +492,22 @@ int main()
     material_manager.Destroy();
     asset_manager.Shutdown();
 
+    ground_object.Destroy();
+
+    skybox_mesh->IsReference = false;
+    skybox_mesh->Destroy();
+
+    gRenderer->DeferredRenderer->SkyboxRenderer.Destroy();
+
     deferred_renderer->Destroy();
 
-    FxEngineGlobalsDestroy();
-
     // composition_pipeline.Destroy();
+    //
+    generated_cube->Destroy();
+    generated_sphere->Destroy();
 
     //    ground_object->Destroy();
+    //
 
     return 0;
 }

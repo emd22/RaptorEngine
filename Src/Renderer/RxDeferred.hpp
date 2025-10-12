@@ -84,7 +84,9 @@ public:
     VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
     VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
 
-    RxGraphicsPipeline PlLighting;
+    RxGraphicsPipeline PlLightingOutsideVolume;
+    RxGraphicsPipeline PlLightingInsideVolume;
+
     RxRenderPass RpLighting;
 
     FxSizedArray<RxDeferredLightingPass> LightingPasses;

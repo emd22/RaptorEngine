@@ -50,6 +50,13 @@ public:
         mAngleX += angle_x;
         mAngleY += angle_y;
 
+        constexpr float cOffset = 0.01;
+
+        constexpr float cMinY = -M_PI_2 + cOffset;
+        constexpr float cMaxY = M_PI_2 - cOffset;
+
+        mAngleY = FxMath::Clamp(mAngleY, cMinY, cMaxY);
+
         RequireUpdate();
     }
 
@@ -62,7 +69,7 @@ public:
 
     inline void Move(const FxVec3f& offset)
     {
-        const FxVec3f forward = Direction * -offset.Z;
+        const FxVec3f forward = Direction * offset.Z;
         const FxVec3f right = Direction.Cross(FxVec3f::sUp) * offset.X;
 
         MoveBy(forward + right);

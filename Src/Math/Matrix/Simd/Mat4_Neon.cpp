@@ -313,16 +313,48 @@ FxMat4f FxMat4f::GetWithoutTranslation() const
     return mat;
 }
 
+FxMat4f FxMat4f::Transposed()
+{
+    float32x4x2_t tmp1 = vzipq_f32(Columns[0].mIntrin, Columns[2].mIntrin);
+    float32x4x2_t tmp2 = vzipq_f32(Columns[1].mIntrin, Columns[3].mIntrin);
+    float32x4x2_t tmp3 = vzipq_f32(tmp1.val[0], tmp2.val[0]);
+    float32x4x2_t tmp4 = vzipq_f32(tmp1.val[1], tmp2.val[1]);
+
+    FxMat4f result;
+    result.Columns[0].mIntrin = tmp3.val[0];
+    result.Columns[1].mIntrin = tmp3.val[1];
+    result.Columns[2].mIntrin = tmp4.val[0];
+    result.Columns[3].mIntrin = tmp4.val[1];
+    return result;
+}
+
+FxMat4f FxMat4f::TransposeMat3()
+{
+    float32x4x2_t tmp1 = vzipq_f32(Columns[0].mIntrin, Columns[2].mIntrin);
+    float32x4x2_t tmp2 = vzipq_f32(Columns[1].mIntrin, vdupq_n_f32(0));
+    float32x4x2_t tmp3 = vzipq_f32(tmp1.val[0], tmp2.val[0]);
+    float32x4x2_t tmp4 = vzipq_f32(tmp1.val[1], tmp2.val[1]);
+
+    FxMat4f result;
+    result.Columns[0].mIntrin = tmp3.val[0];
+    result.Columns[1].mIntrin = tmp3.val[1];
+    result.Columns[2].mIntrin = tmp4.val[0];
+
+    return result;
+}
+
+void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
+
 void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
 {
-    const FxVec3f forward = (target - position).Normalize();
-    const FxVec3f right = upvec.Cross(forward).Normalize();
-    const FxVec3f up = forward.Cross(right);
+    FxVec3f forward = (target - position).Normalize();
+    const FxVec3f right = forward.Cross(upvec).Normalize();
+    const FxVec3f up = right.Cross(forward);
 
     Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
     Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
     Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
-    Columns[3].Load4(-right.Dot(position), -up.Dot(position), -forward.Dot(position), 1.0f);
+    Columns[3].Load4(-position.Dot(right), -position.Dot(up), -position.Dot(forward), 1.0f);
 
     // Columns[0].Load4(right.GetX(),   right.GetY(),   right.GetZ(),   -right.Dot(position));
     // Columns[1].Load4(up.GetX(),      up.GetY(),      up.GetZ(),      -up.Dot(position));

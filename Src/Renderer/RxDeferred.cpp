@@ -164,7 +164,11 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         //        DsLayoutGPassVertex,
     };
 
-    VkPipelineLayout layout = PlGeometry.CreateLayout(sizeof(FxDrawPushConstants), 0,
+    FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxDrawPushConstants),
+                                                                       .StageFlags = VK_SHADER_STAGE_VERTEX_BIT |
+                                                                                     VK_SHADER_STAGE_FRAGMENT_BIT } };
+
+    VkPipelineLayout layout = PlGeometry.CreateLayout(FxSlice(push_consts),
                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
@@ -227,8 +231,8 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     ShaderList shader_list;
 
-    RxShader vertex_shader("../shaders/main.vert.spv", RxShaderType::Vertex);
-    RxShader fragment_shader("../shaders/main.frag.spv", RxShaderType::Fragment);
+    RxShader vertex_shader("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
+    RxShader fragment_shader("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
@@ -245,15 +249,14 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     PlGeometry.Create("Geometry", shader_list, color_attachments,
                       FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
-                      RpGeometry,
-                      { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE });
+                      RpGeometry, { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 
     PlGeometryWireframe.Layout = PlGeometry.Layout;
     PlGeometryWireframe.Create("Geometry Wireframe", shader_list, color_attachments,
                                FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
                                RpGeometry,
                                { .CullMode = VK_CULL_MODE_BACK_BIT,
-                                 .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+                                 .WindingOrder = VK_FRONT_FACE_CLOCKWISE,
                                  .PolygonMode = VK_POLYGON_MODE_LINE });
 
     pGeometryPipeline = &PlGeometry;
@@ -342,9 +345,13 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
         DsLayoutLightingMaterialProperties,
     };
 
-    VkPipelineLayout layout = PlLighting.CreateLayout(sizeof(FxLightVertPushConstants), // Vertex push constants
-                                                      sizeof(FxLightFragPushConstants), // Fragment push constants
-                                                      FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    FxStackArray<RxPushConstants, 2> push_consts = {
+        RxPushConstants { .Size = sizeof(FxLightVertPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
+        RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
+    };
+
+    VkPipelineLayout layout = PlLightingOutsideVolume.CreateLayout(FxSlice(push_consts),
+                                                                   FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -368,7 +375,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     VkAttachmentDescription color_attachments_list[] = {
         // Combined output
         VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .format = VK_FORMAT_R16G16B16A16_SFLOAT,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -381,8 +388,8 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     ShaderList shader_list;
 
-    RxShader vertex_shader("../shaders/lighting.vert.spv", RxShaderType::Vertex);
-    RxShader fragment_shader("../shaders/lighting.frag.spv", RxShaderType::Fragment);
+    RxShader vertex_shader("../Shaders/Spirv/Lighting.spv_vs", RxShaderType::Vertex);
+    RxShader fragment_shader("../Shaders/Spirv/Lighting.spv_fs", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
@@ -400,16 +407,23 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     RpLighting.Create2(color_attachments);
 
-    PlLighting.Create("Lighting", shader_list, color_attachments,
-                      FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vertex_info,
-                      RpLighting, { .CullMode = VK_CULL_MODE_FRONT_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
+    PlLightingOutsideVolume.Create("Lighting(Inside Volume)", shader_list, color_attachments,
+                                   FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
+                                   &vertex_info, RpLighting,
+                                   { .CullMode = VK_CULL_MODE_FRONT_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
+
+    PlLightingInsideVolume.Layout = PlLightingOutsideVolume.Layout;
+    PlLightingInsideVolume.Create("Lighting (Outside Volume)", shader_list, color_attachments,
+                                  FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
+                                  &vertex_info, RpLighting,
+                                  { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 }
 
 void RxDeferredRenderer::RebuildLightingPipeline()
 {
-    RxGraphicsPipeline old_pipeline = PlLighting;
-    CreateLightingPipeline();
-    old_pipeline.Destroy();
+    // RxGraphicsPipeline old_pipeline = PlLightingInsideVolume;
+    // CreateLightingPipeline();
+    // old_pipeline.Destroy();
 }
 
 void RxDeferredRenderer::DestroyLightingPipeline()
@@ -427,8 +441,10 @@ void RxDeferredRenderer::DestroyLightingPipeline()
         DsLayoutLightingMaterialProperties = nullptr;
     }
 
+    PlLightingOutsideVolume.Destroy();
 
-    PlLighting.Destroy();
+    PlLightingInsideVolume.Layout = nullptr;
+    PlLightingInsideVolume.Destroy();
 }
 
 //////////////////////////////////////////
@@ -494,7 +510,10 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
         DsLayoutCompFrag,
     };
 
-    VkPipelineLayout layout = PlComposition.CreateLayout(0, sizeof(FxCompositionPushConstants),
+    FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxCompositionPushConstants),
+                                                                       .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
+
+    VkPipelineLayout layout = PlComposition.CreateLayout(FxSlice(push_consts),
                                                          FxMakeSlice(layouts, FxSizeofArray(layouts)));
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -514,7 +533,7 @@ void RxDeferredRenderer::CreateCompPipeline()
     VkAttachmentDescription attachments[] = {
         // Combined output
         VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
+            .format = gRenderer->Swapchain.SurfaceFormat.format,
             .samples = VK_SAMPLE_COUNT_1_BIT,
             .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -527,8 +546,8 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     ShaderList shader_list;
 
-    RxShader vertex_shader("../shaders/composition.vert.spv", RxShaderType::Vertex);
-    RxShader fragment_shader("../shaders/composition.frag.spv", RxShaderType::Fragment);
+    RxShader vertex_shader("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
+    RxShader fragment_shader("../Shaders/Spirv/Composition.spv_fs", RxShaderType::Fragment);
 
     shader_list.Vertex = vertex_shader.ShaderModule;
     shader_list.Fragment = fragment_shader.ShaderModule;
@@ -699,7 +718,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
 {
     mRendererInst = renderer;
     mRenderPass = &mRendererInst->RpLighting;
-    mPlLighting = &mRendererInst->PlLighting;
+    mPlLighting = &mRendererInst->PlLightingOutsideVolume;
 
     // Albedo sampler
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
@@ -709,7 +728,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
     DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
-    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     FxSizedArray image_views = { ColorAttachment.View };

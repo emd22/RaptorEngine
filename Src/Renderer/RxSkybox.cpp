@@ -139,7 +139,11 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
     VkDescriptorSetLayout layouts[] = { DsLayoutSkyboxFragment };
 
 
-    VkPipelineLayout layout = SkyboxPipeline.CreateLayout(sizeof(RxSkyboxPushConstants), 0,
+    FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(RxSkyboxPushConstants),
+                                                                       .StageFlags = VK_SHADER_STAGE_VERTEX_BIT } };
+
+
+    VkPipelineLayout layout = SkyboxPipeline.CreateLayout(FxSlice(push_consts),
                                                           FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
 
@@ -156,10 +160,22 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
     return layout;
 }
 
+void RxSkyboxRenderer::Destroy()
+{
+    if (DsLayoutSkyboxFragment) {
+        vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, DsLayoutSkyboxFragment, nullptr);
+    }
+
+    mDescriptorPool.Destroy();
+
+    SkyboxPipeline.Destroy();
+    mSkyboxMesh->Destroy();
+
+    DsLayoutSkyboxFragment = nullptr;
+}
+
 void RxSkyboxRenderer::BuildDescriptorSets(uint32 frame_index)
 {
-    
-    
     const int binding_index = 0;
 
     const VkDescriptorImageInfo positions_image_info {

@@ -21,7 +21,11 @@ public:
         FxRef<FxPrimitiveMesh<LightVolumeVertex>> AsLightVolume();
         FxRef<FxPrimitiveMesh<>> AsMesh();
 
-        void Destroy() {}
+        void Destroy()
+        {
+            Positions.Free();
+            Indices.Free();
+        }
     };
 
 public:

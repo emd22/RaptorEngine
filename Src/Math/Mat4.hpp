@@ -47,7 +47,7 @@ public:
 
     static FxMat4f AsTranslation(FxVec3f position)
     {
-        return FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, position.X, position.Y, -position.Z, 1 });
+        return FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, position.X, position.Y, position.Z, 1 });
     }
 
     static FxMat4f AsScale(FxVec3f scale)
@@ -60,13 +60,6 @@ public:
     static FxMat4f AsRotationZ(float rad);
 
     static FxMat4f AsRotation(const FxQuat& quat);
-
-    void FlipY()
-    {
-        //         Vec4f& col = Columns[1];
-        //         col.Y *= -1;
-        //         col.W *= -1;
-    }
 
     void Rotate(FxVec3f rotation);
 
@@ -122,6 +115,10 @@ public:
     }
 
     FxMat4f Inverse();
+    FxMat4f Transposed();
+    FxMat4f TransposeMat3();
+
+    void CopyAsMat3To(float* dest) const;
 
     FxMat4f operator*(const FxMat4f& other) const;
 

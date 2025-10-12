@@ -20,9 +20,9 @@ FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
     mIntrin = vld1q_f32(values);
 }
 
-FxVec3f::FxVec3f(float32* values)
+FxVec3f::FxVec3f(const float32* values)
 {
-    float32 values4[4] = { values[0], values[1], values[2], 0 };
+    const float32 values4[4] = { values[0], values[1], values[2], 0 };
     mIntrin = vld1q_f32(values4);
 }
 
@@ -105,9 +105,9 @@ float32 FxVec3f::Dot(const FxVec3f& other) const
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
 void FxVec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }
 
-bool FxVec3f::IsCloseTo(const JPH::Vec3& other, const float32 threshold) const
+bool FxVec3f::IsCloseTo(const JPH::Vec3& other, const float32 tolerance) const
 {
-    return IsCloseTo(other.mValue, threshold);
+    return IsCloseTo(other.mValue, tolerance);
 }
 
 

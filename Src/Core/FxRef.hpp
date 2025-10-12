@@ -1,12 +1,16 @@
 #pragma once
 
+#include "FxDefines.hpp"
 #include "FxMemory.hpp"
 #include "FxPanic.hpp"
 #include "FxTypes.hpp"
 
+#ifdef FX_DEBUG_REF
+#include <Core/FxLog.hpp>
+#endif
+
 #include <atomic>
 #include <cstddef>
-
 
 /** The internal reference count for `FxRef`. */
 struct FxRefCount
@@ -40,6 +44,11 @@ public:
         mRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
 
         mPtr = ptr;
+
+#ifdef FX_DEBUG_REF
+        FxLogDebug("Created FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mPtr),
+                   reinterpret_cast<void*>(mRefCnt));
+#endif
     }
 
     /**
@@ -214,6 +223,11 @@ private:
 
         // If the reference count is zero, we can free the ptr as it is not being used by any other objects.
         if (mRefCnt->Dec() == 0) {
+#ifdef FX_DEBUG_REF
+            FxLogDebug("Destroying FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mPtr),
+                       reinterpret_cast<void*>(mRefCnt));
+#endif
+
             // Free the ptr
             if (mPtr) {
                 FxMemPool::Free<T>(mPtr);

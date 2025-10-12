@@ -4,10 +4,12 @@
 
 #ifndef FX_PAGED_ARRAY_ALLOC
 #warning "FX_PAGED_ARRAY_ALLOC is not defined!"
+#define FX_PAGED_ARRAY_ALLOC(type_, size_) (0)
 #endif
 
 #ifndef FX_PAGED_ARRAY_FREE
 #warning "FX_PAGED_ARRAY_FREE is not defined!"
+#define FX_PAGED_ARRAY_FREE(type_, ptr_)
 #endif
 
 template <typename TElementType>
@@ -80,22 +82,10 @@ public:
 
     FxPagedArray() = default;
 
+    FxPagedArray(const FxPagedArray& other) = delete;
     FxPagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
 
-    FxPagedArray& operator=(const FxPagedArray& other)
-    {
-        FirstPage = other.FirstPage;
-        CurrentPage = other.CurrentPage;
-
-        PageNodeCapacity = other.PageNodeCapacity;
-        CurrentPageIndex = other.CurrentPageIndex;
-
-        TrackedSize = other.TrackedSize;
-
-        return *this;
-    }
-
-    FxPagedArray& operator=(FxPagedArray&& other)
+    FxPagedArray(FxPagedArray&& other)
     {
         FirstPage = other.FirstPage;
         CurrentPage = other.CurrentPage;
@@ -113,8 +103,42 @@ public:
 
         other.TrackedSize = 0;
 
+        // return *this;
+    }
+
+    FxPagedArray& operator=(const FxPagedArray& other)
+    {
+        FirstPage = other.FirstPage;
+        CurrentPage = other.CurrentPage;
+
+        PageNodeCapacity = other.PageNodeCapacity;
+        CurrentPageIndex = other.CurrentPageIndex;
+
+        TrackedSize = other.TrackedSize;
+
         return *this;
     }
+
+    // FxPagedArray& operator=(FxPagedArray&& other)
+    // {
+    //     FirstPage = other.FirstPage;
+    //     CurrentPage = other.CurrentPage;
+
+    //     PageNodeCapacity = other.PageNodeCapacity;
+    //     CurrentPageIndex = other.CurrentPageIndex;
+
+    //     TrackedSize = other.TrackedSize;
+
+    //     other.FirstPage = nullptr;
+    //     other.CurrentPage = nullptr;
+
+    //     other.PageNodeCapacity = 0;
+    //     other.CurrentPageIndex = 0;
+
+    //     other.TrackedSize = 0;
+
+    //     return *this;
+    // }
 
     Iterator begin() const { return Iterator(FirstPage, 0); }
 

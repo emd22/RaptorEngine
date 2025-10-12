@@ -2,8 +2,6 @@
 
 #include <Core/FxRef.hpp>
 
-static FxRef<FxAssetImage> sEmptyImage { nullptr };
-
 
 void FxAssetImage::Destroy()
 {
@@ -19,6 +17,8 @@ void FxAssetImage::Destroy()
 
 FxRef<FxAssetImage> FxAssetImage::GetEmptyImage()
 {
+    static FxRef<FxAssetImage> sEmptyImage { nullptr };
+
     if (sEmptyImage) {
         return sEmptyImage;
     }

@@ -22,7 +22,7 @@ struct FxVertexInfo
 struct alignas(16) FxDrawPushConstants
 {
     float32 MVPMatrix[16];
-    float32 ModelMatrix[16];
+    float32 NormalMatrix[12];
     uint32 MaterialIndex = 0;
 };
 
@@ -58,6 +58,12 @@ struct RxGraphicsPipelineProperties
     bool ForceNoDepthTest = false;
 };
 
+struct RxPushConstants
+{
+    uint32 Size;
+    VkShaderStageFlags StageFlags;
+};
+
 
 class RxGraphicsPipeline
 {
@@ -71,7 +77,7 @@ public:
 
     // VkPipelineLayout CreateCompLayout();
 
-    VkPipelineLayout CreateLayout(uint32 vert_push_consts_size, uint32 frag_push_consts_size,
+    VkPipelineLayout CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
                                   const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
 
     void Destroy();

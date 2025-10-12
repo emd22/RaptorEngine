@@ -41,9 +41,25 @@ void main()
     // vec3 final_color = WorldPosFromDepth(depth);
     // vec3 final_color = WorldPosFromDepth(depth);
     vec3 base_color = (albedo.rgb);
-    vec3 base_color_with_lighting = base_color * lights.rgb;
 
-    vec3 final_color = mix(base_color, base_color_with_lighting, lights.a);
+    // vec3 base_color_with_lighting = base_color * lights.rgb;
+    vec3 base_color_with_lighting = lights.rgb;
 
-    v_Color = vec4(final_color, 1.0);
+    // HDR tonemapping
+    base_color_with_lighting = base_color_with_lighting / (base_color_with_lighting + vec3(1.0));
+    // gamma correct
+    const float gamma = 2.2;
+    base_color_with_lighting = pow(base_color_with_lighting, vec3(1.0 / gamma));
+
+    if (lights.a <= 1e-5) {
+        v_Color = vec4(base_color, 1.0);
+    }
+    else {
+        v_Color = vec4(base_color_with_lighting, 1.0);
+    }
+
+    // vec3 final_color = mix(base_color, base_color_with_lighting, lights.a);
+    // vec3 final_color = base_color_with_lighting;
+
+    // v_Color = vec4(final_color, 1.0);
 }

@@ -38,6 +38,8 @@ public:
     void MoveBy(const FxVec3f& offset) override;
     void MoveBy(const FxVec3f& position, bool force_move_mesh);
 
+    void Scale(const FxVec3f& scale) override;
+
     // Force move the mesh
     void MoveLightVolumeTo(const FxVec3f& position);
 
@@ -56,6 +58,8 @@ private:
 
 protected:
     FxVec3f mLightPosition = FxVec3f::sZero;
+
+    RxGraphicsPipeline* mpLightPipeline = nullptr;
 };
 
 

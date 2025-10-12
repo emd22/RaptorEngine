@@ -22,6 +22,7 @@ public:
 public:
     FxQuat() = default;
     FxQuat(float32 x, float32 y, float32 z, float32 w);
+    FxQuat(const JPH::Quat& other);
 
     static FxQuat FromAxisAngle(FxVec3f axis, float32 angle);
 
@@ -35,11 +36,17 @@ public:
     void FromJoltQuaternion(const JPH::Quat& quat);
     void ToJoltQuaternion(JPH::Quat& quat);
 
+    FX_FORCE_INLINE bool IsCloseTo(const FxQuat& other, const float32 tolerance = 0.0001) const;
+    bool IsCloseTo(const JPH::Quat& other, const float32 tolerance = 0.0001) const;
+
 #ifdef FX_USE_NEON
     FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
     FX_FORCE_INLINE float32 GetW() const { return vgetq_lane_f32(mIntrin, 3); }
+
+    FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 tolerance = 0.0001) const;
+
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
@@ -50,12 +57,7 @@ public:
 #ifdef FX_USE_NEON
     explicit FxQuat(float32x4_t intrin) : mIntrin(intrin) {}
 
-    FxQuat& operator=(const float32x4_t& other)
-    {
-        mIntrin = other;
-        return *this;
-    }
-
+    FX_FORCE_INLINE FxQuat& operator=(const float32x4_t& other);
 
     operator float32x4_t() const { return mIntrin; }
 
@@ -85,3 +87,5 @@ struct std::formatter<FxQuat>
         return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
     }
 };
+
+#include "Quaternion/FxQuat_Neon.inl"
