@@ -106,12 +106,12 @@ void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComp
     uint8* goober_buffer = FxMemPool::Alloc<uint8>(image_buffer_size);
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
-    component.DataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
+    component.pDataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 
 void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component)
 {
-    component.Texture = FxAssetImage::GetEmptyImage();
+    component.pTexture = FxAssetImage::GetEmptyImage();
     // FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
 
     // component.Texture = FxMakeRef<FxAssetImage>();
@@ -139,16 +139,17 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
 
         if (!texture_view.texture) {
             MakeEmptyMaterialTexture(material, material->DiffuseComponent);
-            material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+            material->Properties.BaseColor = FxColor::FromFloats(
+                gltf_material->pbr_metallic_roughness.base_color_factor);
         }
         else {
             MakeMaterialTextureForPrimitive(material, material->DiffuseComponent, texture_view);
-            material->Properties.BaseColor = FxColorFromRGBA(1, 1, 1, 1);
+            material->Properties.BaseColor = FxColor::FromRGBA(1, 1, 1, 1);
         }
     }
     // There is no albedo texture on the model, use the base colour.
     else {
-        material->Properties.BaseColor = FxColorFromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+        material->Properties.BaseColor = FxColor::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
     }
 
     object->Material = material;

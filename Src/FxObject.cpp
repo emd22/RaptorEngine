@@ -77,7 +77,7 @@ void FxObject::Render(const FxCamera& camera)
     //        return;
     //    }
 
-    if (Material && !Material->IsBuilt) {
+    if (Material && !Material->bIsBuilt) {
         Material->Build();
         return;
     }
@@ -113,7 +113,7 @@ void FxObject::Render(const FxCamera& camera)
         //        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         //        *Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
-        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, Material->Pipeline->Layout,
+        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, Material->pPipeline->Layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                            &push_constants);
 
@@ -132,7 +132,7 @@ void FxObject::Render(const FxCamera& camera)
             continue;
         }
 
-        if (!obj->Material->IsBuilt) {
+        if (!obj->Material->bIsBuilt) {
             obj->Material->Build();
         }
 
@@ -166,7 +166,7 @@ void FxObject::Render(const FxCamera& camera)
         //        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         //        *obj->Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
-        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->Material->Pipeline->Layout,
+        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->Material->pPipeline->Layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                            &push_constants);
 
@@ -192,7 +192,7 @@ void FxObject::RenderMesh()
     Material->Bind(&cmd);
 
     if (Mesh) {
-        Mesh->Render(cmd, *Material->Pipeline);
+        Mesh->Render(cmd, *Material->pPipeline);
     }
 }
 

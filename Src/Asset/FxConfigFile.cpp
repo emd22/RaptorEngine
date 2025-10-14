@@ -85,6 +85,8 @@ static FxConfigEntry::ValueType GetValueTokenType(const FxTokenizer::Token& toke
 
 void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
 {
+    mConfigEntries.Create(32);
+
     FxConfigEntry entry;
 
     const uint32 tokens_size = tokens.Size();
@@ -133,6 +135,6 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
             break;
         }
 
-        mConfigEntries.emplace_back(entry);
+        mConfigEntries.Insert(entry);
     }
 }

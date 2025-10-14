@@ -3,12 +3,13 @@
 #include "FxEngine.hpp"
 #include "ShaderList.hpp"
 
+#include <Core/FxFile.hpp>
 #include <Core/FxTypes.hpp>
 #include <Core/Log.hpp>
-#include <fstream>
-#include <ios>
-#include <iostream>
-
+#include <Core/MemPool/FxMemPool.hpp>
+// #include <fstream>
+// #include <ios>
+// #include <iostream>
 
 void RxShader::Load(const char* path, RxShaderType type)
 {
@@ -16,31 +17,34 @@ void RxShader::Load(const char* path, RxShaderType type)
 
     // TODO: add to asset loading thread
 
-    std::ifstream file;
-    file.open(path, std::iostream::binary);
+    FxFile spirv_file(path, "rb");
 
-    if (!file.is_open()) {
-        OldLog::Error("Could not open shader file [%s]", path);
+    // std::ifstream file;
+    // file.open(path, std::iostream::binary);
+
+    if (!spirv_file.IsFileOpen()) {
+        FxLogError("Error opening shader SPIRV file!");
         return;
     }
 
-    file.seekg(0, std::ios::end);
-    const auto file_size = file.tellg();
-    file.seekg(0, std::ios::beg);
+    // if (!file.is_open()) {
+    //     OldLog::Error("Could not open shader file [%s]", path);
+    //     return;
+    // }
 
-    // as we are aliging to uint32* (4 bytes), we should ensure there
-    // is enough memory allocated
-    const auto buffer_size = ((file_size / sizeof(uint32)) + 1) * sizeof(uint32);
 
-    // TODO: use pooled memory!
-    char* file_buffer = new char[buffer_size];
+    // file.seekg(0, std::ios::end);
+    // const auto file_size = file.tellg();
+    // file.seekg(0, std::ios::beg);
+    char* file_buffer = spirv_file.Read<char>();
 
-    file.read(file_buffer, file_size);
-    file.close();
+    // file.read(file_buffer, file_size);
+    // file.close();
 
-    CreateShaderModule(file_size, (uint32*)file_buffer);
+    CreateShaderModule(spirv_file.GetFileSize(), reinterpret_cast<uint32*>(file_buffer));
+    spirv_file.Close();
 
-    delete[] file_buffer;
+    FxMemPool::Free(file_buffer);
 }
 
 void RxShader::Destroy()

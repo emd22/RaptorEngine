@@ -24,7 +24,7 @@ public:
     using VertexType = RxVertex<FxVertexPosition>;
 
 public:
-    FxLight(FxLightFlags flags = FxLF_None) : Flags(flags) {}
+    FxLight(FxLightFlags flags = FxLF_None) : Flags(flags) { this->Type = FxEntityType::Light; }
 
     void SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume);
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);

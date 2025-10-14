@@ -111,9 +111,6 @@ unsigned int operator&(T lhs, T rhs)
     return static_cast<unsigned int>(lhs) & static_cast<unsigned int>(rhs);
 }
 
-uint32 FxColorFromRGBA(uint8 r, uint8 g, uint8 b, uint8 a);
-uint32 FxColorFromFloats(float32 rgba[4]);
-
 // https://en.cppreference.com/w/cpp/types/remove_reference
 // template <class T> struct RemoveReference { typedef T type; };
 // template <class T> struct RemoveReference<T &> { typedef T type; };

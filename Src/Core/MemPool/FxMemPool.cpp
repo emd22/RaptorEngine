@@ -16,13 +16,13 @@ void FxMemPoolPage::Create(uint64 size)
     FxSpinThreadGuard guard(&mInUse);
 #endif
 
-    if (mMem || mSize) {
+    if (mMem || mCapacity) {
         FxPanic("FxMemPool", "Memory pool has already been initialized!");
     }
 
-    mSize = size;
+    mCapacity = size;
 
-    void* allocated_ptr = std::malloc(mSize);
+    void* allocated_ptr = std::malloc(mCapacity);
     if (allocated_ptr == nullptr) {
         FxPanic("FxMemPool", "Error allocating buffer for memory pool!");
     }
@@ -115,7 +115,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
     const uint64 bytes_used_in_page = static_cast<uint64>(new_block_ptr - mMem);
 
     // Our potential allocation fits, return our entry!
-    if (bytes_used_in_page < GetAlignedValue(mSize)) {
+    if (bytes_used_in_page < GetAlignedValue(mCapacity)) {
         // Create a new block entry for the allocation
         FxMemPoolPage::MemBlock new_block { .Size = aligned_size, .Start = GetAlignedPtr(new_block_ptr) };
 
@@ -204,77 +204,77 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
 }
 #endif
 
-#ifdef FX_MEMPOOL_FIRST_FIT
-auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
-{
-    auto* node = mMemBlocks.Head;
+// #ifdef FX_MEMPOOL_FIRST_FIT
+// auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
+// {
+//     auto* node = mMemBlocks.Head;
 
-    // Check to see if there is space at the start of the list
-    if (node && node == mMemBlocks.Head && node->Data.Start != mMem) {
-        const uint64 gap_size = (node->Data.Start) - mMem;
-        const uint64 aligned_size = GetAlignedValue(requested_size);
+//     // Check to see if there is space at the start of the list
+//     if (node && node == mMemBlocks.Head && node->Data.Start != mMem) {
+//         const uint64 gap_size = (node->Data.Start) - mMem;
+//         const uint64 aligned_size = GetAlignedValue(requested_size);
 
-        // There is a gap, we can get our memory block here
-        if (gap_size >= aligned_size) {
-            FxMemPoolPage::MemBlock new_block { .Size = aligned_size, .Start = mMem };
+//         // There is a gap, we can get our memory block here
+//         if (gap_size >= aligned_size) {
+//             FxMemPoolPage::MemBlock new_block { .Size = aligned_size, .Start = mMem };
 
-            return mMemBlocks.InsertFirst(new_block);
-        }
-    }
+//             return mMemBlocks.InsertFirst(new_block);
+//         }
+//     }
 
-    // Walk through currently allocated blocks. If there is a gap, check to see if it is large enough.
-    while (node != nullptr) {
-        FxMemPoolPage::MemBlock& block = node->Data;
+//     // Walk through currently allocated blocks. If there is a gap, check to see if it is large enough.
+//     while (node != nullptr) {
+//         FxMemPoolPage::MemBlock& block = node->Data;
 
-        // If there is no node next, break as we won't find a gap. This means we will fallthrough
-        // to below, adding a new block to the end of the list.
-        if (node->Next == nullptr) {
-            break;
-        }
+//         // If there is no node next, break as we won't find a gap. This means we will fallthrough
+//         // to below, adding a new block to the end of the list.
+//         if (node->Next == nullptr) {
+//             break;
+//         }
 
-        FxMemPoolPage::MemBlock& next_block = node->Next->Data;
+//         FxMemPoolPage::MemBlock& next_block = node->Next->Data;
 
-        uint8* current_block_end = block.Start + block.Size;
-        const int64 gap_size = next_block.Start - current_block_end;
+//         uint8* current_block_end = block.Start + block.Size;
+//         const int64 gap_size = next_block.Start - current_block_end;
 
-        // The gap is large enough for our buffer, take it
-        if (gap_size >= requested_size) {
-            FxMemPoolPage::MemBlock new_block { .Size = GetAlignedValue(requested_size),
-                                                .Start = GetAlignedPtr(current_block_end) };
+//         // The gap is large enough for our buffer, take it
+//         if (gap_size >= requested_size) {
+//             FxMemPoolPage::MemBlock new_block { .Size = GetAlignedValue(requested_size),
+//                                                 .Start = GetAlignedPtr(current_block_end) };
 
-            // Track that the block is now allocated
-            return mMemBlocks.InsertAfterNode(new_block, node);
-        }
+//             // Track that the block is now allocated
+//             return mMemBlocks.InsertAfterNode(new_block, node);
+//         }
 
-        node = node->Next;
-    }
+//         node = node->Next;
+//     }
 
-    // There are no gaps between the allocated blocks, create a new block.
-    uint8* new_block_ptr = mMem;
+//     // There are no gaps between the allocated blocks, create a new block.
+//     uint8* new_block_ptr = mMem;
 
-    // If there are previous allocations (there is a tail), then we can find the furthest pointer
-    // along and allocate after that. If there have not been previous allocations, we will use the
-    // start of the pool as defined above.
-    if (mMemBlocks.Tail) {
-        const FxMemPoolPage::MemBlock& last_block = mMemBlocks.Tail->Data;
-        new_block_ptr = last_block.Start + last_block.Size;
+//     // If there are previous allocations (there is a tail), then we can find the furthest pointer
+//     // along and allocate after that. If there have not been previous allocations, we will use the
+//     // start of the pool as defined above.
+//     if (mMemBlocks.Tail) {
+//         const FxMemPoolPage::MemBlock& last_block = mMemBlocks.Tail->Data;
+//         new_block_ptr = last_block.Start + last_block.Size;
 
-        // Check to make sure there is space left in the pool
-        if (static_cast<uint64>(new_block_ptr - mMem) > GetAlignedValue(mSize)) {
-            // FxPanic("FxMemPool", "Could not resize memory pool! (Not implemented)", 0);
-            return nullptr;
-        }
-    }
+//         // Check to make sure there is space left in the pool
+//         if (static_cast<uint64>(new_block_ptr - mMem) > GetAlignedValue(mSize)) {
+//             // FxPanic("FxMemPool", "Could not resize memory pool! (Not implemented)", 0);
+//             return nullptr;
+//         }
+//     }
 
-    // Create a new block entry for the allocation
-    FxMemPoolPage::MemBlock new_block { .Size = GetAlignedValue(requested_size),
-                                        .Start = GetAlignedPtr(new_block_ptr) };
+//     // Create a new block entry for the allocation
+//     FxMemPoolPage::MemBlock new_block { .Size = GetAlignedValue(requested_size),
+//                                         .Start = GetAlignedPtr(new_block_ptr) };
 
-    auto* new_node = mMemBlocks.InsertLast(std::move(new_block));
+//     auto* new_node = mMemBlocks.InsertLast(std::move(new_block));
 
-    return new_node;
-}
-#endif
+//     return new_node;
+// }
+// #endif
 
 auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
@@ -303,17 +303,37 @@ FxMemPool& FxMemPool::GetGlobalPool()
     return global_pool;
 }
 
+#ifdef FX_MEMPOOL_TRACK_STATISTICS
+#define ALLOC_UPDATE_STATS                                                                                             \
+    if (mBytesInUse > mStats.BytesAllocatedPeak) {                                                                     \
+        mStats.BytesAllocatedPeak = mBytesInUse;                                                                       \
+    }                                                                                                                  \
+    ++mStats.TotalAllocs;
+#else
+#define ALLOC_UPDATE_STATS
+#endif
+
+#define ALLOC_RETURN_NEW_ALLOCATION                                                                                    \
+    mBytesInUse += node->Data.Size;                                                                                    \
+    ALLOC_UPDATE_STATS;                                                                                                \
+    return node;
+
+
 auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
     FxSpinThreadGuard guard(&mbInUse);
 
     auto* node = mpCurrentPage->AllocateMemory(requested_size);
 
-    // If we could not allocate any memory in the current page, try to allocate in one of the previous pages.
-
     // Check all pages except the current page.
     const uint32 pool_pages_count = mPoolPages.Size() - 1;
 
+    // If our node was successfully allocated, return it!
+    if (node != nullptr) {
+        ALLOC_RETURN_NEW_ALLOCATION;
+    }
+
+    // If we could not allocate any memory in the current page, try to allocate in one of the previous pages.
     for (int i = 0; i < pool_pages_count; i++) {
         FxMemPoolPage& page = mPoolPages[i];
 
@@ -321,16 +341,17 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoo
         if (page.HasFreeSpace()) {
             node = page.AllocateMemory(requested_size);
         }
+
         // If the allocation was successful, exit with our new block
         if (node != nullptr) {
-            return node;
+            ALLOC_RETURN_NEW_ALLOCATION;
         }
     }
 
     // There are no previous pages that have free space, allocate a new one!
 
     if (node == nullptr) {
-        printf("Allocating new MemPool!\n");
+        printf("Allocating new MemPool page!\n");
         AllocateNewPage();
         node = mpCurrentPage->AllocateMemory(requested_size);
     }
@@ -341,17 +362,16 @@ auto FxMemPool::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoo
         FxPanic("FxMemPool", "Allocation is too large for memory pool page size!");
     }
 
-#ifdef FX_MEMPOOL_TRACK_STATISTICS
-    ++mStats.TotalAllocs;
-#endif
-
-    return node;
+    ALLOC_RETURN_NEW_ALLOCATION;
 }
 
 
 void* FxMemPoolPage::Realloc(void* ptr, uint32 new_size)
 {
     auto* node = GetNodeFromPtr(ptr);
+
+    // Adjust the count of bytes allocated
+    // int64 change_in_size = static_cast<int64>(new_size) - node->Data.Size;
 
     FxMemPoolPage::MemBlock& block = node->Data;
 
@@ -388,8 +408,8 @@ void FxMemPoolPage::PrintAllocations() const
     auto* node = mMemBlocks.Head;
 
     FxLogDebug("");
-    FxLogDebug("=== MemStat [size={:d}, start={:p}, end={:p}, freed={:d}] ===", mSize, reinterpret_cast<void*>(mMem),
-               reinterpret_cast<void*>(mMem + mSize), mFreedTotalSize);
+    FxLogDebug("=== MemStat [size={:d}, start={:p}, end={:p}, freed={:d}] ===", mCapacity,
+               reinterpret_cast<void*>(mMem), reinterpret_cast<void*>(mMem + mCapacity), mFreedTotalSize);
 
     while (node != nullptr) {
         FxMemPoolPage::MemBlock& block = node->Data;
@@ -424,7 +444,7 @@ void FxMemPoolPage::PrintAllocations() const
 void FxMemPoolPage::Destroy()
 {
     std::free(mMem);
-    mSize = 0;
+    mCapacity = 0;
 }
 
 
@@ -436,7 +456,7 @@ void FxMemPool::Create(uint64 page_size, uint64 size_unit)
 {
     FxSpinThreadGuard guard(&mbInUse);
     {
-        mPageSize = page_size * size_unit;
+        mPageCapacity = page_size * size_unit;
 
         mPoolPages.Create(8);
 #ifdef FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
@@ -481,7 +501,7 @@ void* FxMemPool::AllocRaw(uint32 size, FxMemPool* pool)
 bool FxMemPool::IsPtrInPage(void* ptr, FxMemPoolPage* page) const
 {
     const uint8* start_ptr = page->mMem;
-    const uint8* end_ptr = start_ptr + mPageSize;
+    const uint8* end_ptr = start_ptr + mPageCapacity;
 
     // If the ptr is within the bounds of the page, return the page
     if (ptr >= start_ptr && ptr <= end_ptr) {
@@ -517,7 +537,7 @@ void FxMemPool::AllocateNewPage()
     FxMemPoolPage* page = mPoolPages.Insert();
 
     mpCurrentPage = page;
-    mpCurrentPage->Create(mPageSize);
+    mpCurrentPage->Create(mPageCapacity);
 
     FxLogInfo("Allocating a new memory page!");
 }
@@ -547,9 +567,14 @@ void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
 
     if (page == nullptr) {
         FxLogError("FxMemPool::Free: Pointer {:p} not found! Has it been freed already?", ptr);
+
+#ifdef FX_BUILD_DEBUG
         FX_BREAKPOINT;
+#endif
+
         return;
     }
 
-    page->Free(ptr);
+    const uint32 bytes_freed = page->Free(ptr);
+    pool->mBytesInUse -= bytes_freed;
 }

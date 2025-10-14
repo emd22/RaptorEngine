@@ -6,6 +6,7 @@
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Core/Log.hpp>
+#include <FxColor.hpp>
 #include <Renderer/Backend/RxDescriptors.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
 
@@ -22,8 +23,8 @@ public:
     };
 
 public:
-    FxRef<FxAssetImage> Texture { nullptr };
-    FxSlice<const uint8> DataToLoad { nullptr };
+    FxRef<FxAssetImage> pTexture { nullptr };
+    FxSlice<const uint8> pDataToLoad { nullptr };
 
     ~FxMaterialComponent() = default;
 
@@ -36,7 +37,7 @@ private:
 
 struct FxMaterialProperties
 {
-    alignas(16) uint32 BaseColor = 0xFFFFFFFF;
+    alignas(16) FxColor BaseColor = 0xFFFFFFFFu;
 };
 
 class FxMaterial
@@ -56,7 +57,7 @@ public:
     {
         switch (type) {
         case ResourceType::Diffuse:
-            DiffuseComponent.Texture = image;
+            DiffuseComponent.pTexture = image;
             break;
         default:
             FxLogError("Unsupported resource type to attach to material!");
@@ -95,9 +96,9 @@ public:
 
     RxDescriptorSet mDescriptorSet {};
 
-    RxGraphicsPipeline* Pipeline = nullptr;
+    RxGraphicsPipeline* pPipeline = nullptr;
 
-    std::atomic_bool IsBuilt { false };
+    std::atomic_bool bIsBuilt { false };
 
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
@@ -112,9 +113,8 @@ private:
      */
     // VkDescriptorSetLayout mMaterialPropertiesLayoutDS = nullptr;
 
-    bool mIsReady = false;
+    bool mbIsReady : 1 = false;
 };
-
 
 class FxMaterialManager
 {
@@ -134,7 +134,7 @@ public:
     ~FxMaterialManager() { Destroy(); }
 
 public:
-    FxRef<RxSampler> AlbedoSampler { nullptr };
+    FxRef<RxSampler> pAlbedoSampler { nullptr };
     // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**
@@ -152,5 +152,5 @@ private:
     FxPagedArray<FxMaterial> mMaterials;
     RxDescriptorPool mDescriptorPool;
 
-    bool mInitialized = false;
+    bool mbInitialized : 1 = false;
 };
