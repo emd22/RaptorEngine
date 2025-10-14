@@ -306,8 +306,8 @@ int main()
     FxRef<FxMaterial> cube_material = material_manager.New("Cube Test Material",
                                                            &deferred_renderer->PlGeometryWireframe);
 
-    cube_material->Properties.BaseColor = FxColorFromRGBA(255, 255, 255, 255);
-    cube_material->DiffuseComponent.Texture = FxAssetImage::GetEmptyImage();
+    cube_material->Properties.BaseColor = FxColor::FromRGBA(255, 255, 255, 255);
+    cube_material->DiffuseComponent.pTexture = FxAssetImage::GetEmptyImage();
 
     FxRef<FxPrimitiveMesh<>> generated_cube_mesh = generated_cube->AsMesh();
 
@@ -320,9 +320,15 @@ int main()
     ground_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
                                       FxPhysicsObject::PhysicsType::Static, {});
 
-    FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../models/DamagedHelmet.glb");
+    FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../models/DamagedHelmet.glb", { .KeepInMemory = true });
     helmet_object->MoveBy(FxVec3f(5, 0, 0));
     helmet_object->RotateX(M_PI_2);
+
+    helmet_object->WaitUntilLoaded();
+
+    helmet_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
+                                       FxPhysicsObject::PhysicsType::Dynamic, {});
+    helmet_object->SetPhysicsEnabled(false);
     // FxObject cube_object;
     // cube_object.Create(generated_cube_mesh, cube_material);
     // cube_object.MoveBy(FxVec3f(5, 10, 0));
@@ -395,6 +401,29 @@ int main()
             gRenderer->DeferredRenderer->ToggleWireframe(false);
         }
 
+        if (FxControlManager::IsKeyPressed(FX_KEY_O)) {
+            // Print out memory pool statistics
+            FxLogInfo("=== Memory Pool Stats ====");
+
+            FxMemPool& global_pool = FxMemPool::GetGlobalPool();
+
+            const double total_used = static_cast<double>(global_pool.GetTotalUsed()) / FxUnitMebibyte;
+            const double total_capacity = static_cast<double>(global_pool.GetTotalCapacity()) / FxUnitMebibyte;
+
+            float usage_percent = (total_used / total_capacity) * 100.0f;
+            FxLogInfo("Usage: {:.02f} MiB / {:.02f} MiB ({:.02f}% In Use)", total_used, total_capacity, usage_percent);
+
+            const FxMemPoolStatistics& stats = global_pool.GetStatistics();
+
+            FxLogInfo("Peak Used: {:.02f} MiB", (static_cast<double>(stats.BytesAllocatedPeak) / FxUnitMebibyte));
+            FxLogInfo("");
+            FxLogInfo("Total Allocs: {}", stats.TotalAllocs);
+            FxLogInfo("Total Frees:  {}", stats.TotalFrees);
+
+
+            FxLogInfo("");
+        }
+
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
             light.MoveTo(camera.Position);
 
@@ -431,6 +460,7 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
+            helmet_object->SetPhysicsEnabled(!helmet_object->GetPhysicsEnabled());
             // gRenderer->DeferredRenderer->RebuildLightingPipeline();
             // gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
             // cube_object.SetPhysicsEnabled(!cube_object.GetPhysicsEnabled());
@@ -454,6 +484,8 @@ int main()
 
 
         deferred_renderer->pGeometryPipeline->Bind(gRenderer->GetFrame()->CommandBuffer);
+
+        helmet_object->Update();
 
         //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
         //         helmet_object.Translate(FxVec3f(0, 0, 0));

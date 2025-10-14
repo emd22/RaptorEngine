@@ -7,6 +7,15 @@
 #include <Math/Vector.hpp>
 #include <Renderer/FxCamera.hpp>
 
+enum class FxEntityType
+{
+    Unknown,
+    Object,
+    // Camera,
+    Light
+};
+
+
 class FxEntity
 {
 public:
@@ -60,6 +69,7 @@ public:
 
     std::vector<FxRef<FxEntity>> Children;
 
+    FxEntityType Type = FxEntityType::Unknown;
 
 protected:
     bool mbPhysicsTransformOutOfDate : 1 = false;

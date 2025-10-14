@@ -2,6 +2,7 @@
 
 #include <Core/FxHash.hpp>
 #include <Core/FxMemory.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <Core/FxTypes.hpp>
 #include <Util/FxTokenizer.hpp>
 #include <string>
@@ -96,7 +97,7 @@ public:
     FxConfigFile() = default;
 
     void Load(const std::string& path);
-    std::vector<FxConfigEntry>& GetEntries() { return mConfigEntries; }
+    FxPagedArray<FxConfigEntry>& GetEntries() { return mConfigEntries; }
 
     const FxConfigEntry* GetEntry(uint32 requested_name_hash) const
     {
@@ -124,10 +125,9 @@ public:
         return GetValue<T>(FxHashStr(entry_name));
     }
 
-
 private:
     void ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens);
 
 private:
-    std::vector<FxConfigEntry> mConfigEntries;
+    FxPagedArray<FxConfigEntry> mConfigEntries;
 };

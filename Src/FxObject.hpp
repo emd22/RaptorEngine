@@ -18,7 +18,7 @@ class FxObject : public FxAssetBase, public FxEntity
     friend class FxAssetManager;
 
 public:
-    FxObject() = default;
+    FxObject() { this->Type = FxEntityType::Object; }
 
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 

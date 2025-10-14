@@ -87,7 +87,7 @@ void FxLight::Render(const FxCamera& camera)
     }
 
     RxFrameData* frame = gRenderer->GetFrame();
-    FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
+    // FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
     FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
 

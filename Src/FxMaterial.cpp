@@ -20,7 +20,7 @@ FxMaterialManager& FxMaterialManager::GetGlobalManager()
 
 void FxMaterialManager::Create(uint32 entities_per_page)
 {
-    if (mInitialized) {
+    if (mbInitialized) {
         return;
     }
 
@@ -38,8 +38,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     // Material properties buffer descriptors
 
 
-    AlbedoSampler = FxMakeRef<RxSampler>();
-    AlbedoSampler->Create();
+    pAlbedoSampler = FxMakeRef<RxSampler>();
+    pAlbedoSampler->Create();
 
 
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
@@ -57,7 +57,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 
     {
-//        FxStackArray<VkWriteDescriptorSet, 1> write_descriptor_sets;
+        //        FxStackArray<VkWriteDescriptorSet, 1> write_descriptor_sets;
 
         VkDescriptorBufferInfo info {
             .buffer = MaterialPropertiesBuffer.Buffer,
@@ -75,13 +75,12 @@ void FxMaterialManager::Create(uint32 entities_per_page)
             .pBufferInfo = &info,
         };
 
-        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &buffer_write,
-                               0, nullptr);
+        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &buffer_write, 0, nullptr);
     }
 
     RxUtil::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Set);
 
-    mInitialized = true;
+    mbInitialized = true;
 }
 
 FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipeline* pipeline)
@@ -96,18 +95,18 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipe
 
     ref->NameHash = FxHashStr(name.c_str());
     ref->Name = name;
-    ref->Pipeline = pipeline;
+    ref->pPipeline = pipeline;
 
     return ref;
 }
 
 void FxMaterialManager::Destroy()
 {
-    if (!mInitialized) {
+    if (!mbInitialized) {
         return;
     }
 
-    AlbedoSampler->Destroy();
+    pAlbedoSampler->Destroy();
 
     MaterialPropertiesBuffer.Destroy();
 
@@ -117,7 +116,7 @@ void FxMaterialManager::Destroy()
     //
     mDescriptorPool.Destroy();
 
-    mInitialized = false;
+    mbInitialized = false;
 }
 
 
@@ -151,20 +150,20 @@ void FxMaterialManager::Destroy()
 //
 bool FxMaterial::IsReady()
 {
-    if (mIsReady) {
+    if (mbIsReady) {
         return true;
     }
 
-    if (!DiffuseComponent.Texture || !DiffuseComponent.Texture->IsLoaded()) {
+    if (!DiffuseComponent.pTexture || !DiffuseComponent.pTexture->IsLoaded()) {
         return false;
     }
 
-    return (mIsReady = true);
+    return (mbIsReady = true);
 }
 
 bool FxMaterial::Bind(RxCommandBuffer* cmd)
 {
-    if (!IsBuilt.load()) {
+    if (!bIsBuilt.load()) {
         Build();
     }
 
@@ -185,7 +184,7 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
 
     uint32 dynamic_offsets[] = { properties_offset };
 
-    RxDescriptorSet::BindMultipleOffset(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline,
+    RxDescriptorSet::BindMultipleOffset(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
                                         FxMakeSlice(sets_to_bind, num_sets), FxMakeSlice(dynamic_offsets, 1));
     // mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
 
@@ -196,17 +195,17 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
 
 void FxMaterial::Destroy()
 {
-    if (IsBuilt) {
+    if (bIsBuilt) {
         // if (mSetLayout) {
         //     vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, mSetLayout, nullptr);
         // }
 
-        IsBuilt.store(false);
+        bIsBuilt.store(false);
     }
 
     // TODO: figure out why the FxRef isn't destroying the object...
-    if (DiffuseComponent.Texture) {
-        DiffuseComponent.Texture->Destroy();
+    if (DiffuseComponent.pTexture) {
+        DiffuseComponent.pTexture->Destroy();
     }
 }
 
@@ -216,15 +215,15 @@ bool FxMaterialComponent::CheckIfReady()
 {
     // If there is data passed in and the image has not been loaded yet, load it using the
     // asset manager. This will be validated on the next call of this function. (when attempting to build the material)
-    if (!Texture && DataToLoad) {
-        FxSlice<const uint8>& image_data = DataToLoad;
+    if (!pTexture && pDataToLoad) {
+        FxSlice<const uint8>& image_data = pDataToLoad;
 
-        Texture = FxAssetManager::LoadImageFromMemory(image_data.Ptr, image_data.Size);
+        pTexture = FxAssetManager::LoadImageFromMemory(image_data.Ptr, image_data.Size);
         return false;
     }
 
     // If there is no texture and we are not loaded, return not loaded.
-    if (!Texture || !Texture->IsLoaded()) {
+    if (!pTexture || !pTexture->IsLoaded()) {
         return false;
     }
 
@@ -233,24 +232,25 @@ bool FxMaterialComponent::CheckIfReady()
 
 bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
 {
-    if (!component.Texture && component.DataToLoad) {
-        FxSlice<const uint8>& image_data = component.DataToLoad;
+    if (!component.pTexture && component.pDataToLoad) {
+        FxSlice<const uint8>& image_data = component.pDataToLoad;
 
-        component.Texture = FxAssetManager::LoadImageFromMemory(image_data.Ptr, image_data.Size);
+        component.pTexture = FxAssetManager::LoadImageFromMemory(image_data.Ptr, image_data.Size);
         return false;
     }
 
-    if (!component.Texture || !component.Texture->IsLoaded()) {
+    if (!component.pTexture || !component.pTexture->IsLoaded()) {
         return false;
     }
+
     return true;
 }
 
 FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& sampler)
 {
     // There is no texture provided, we will use the base colours passed in and a dummy texture
-    if (!Texture && !DataToLoad) {
-        Texture = FxAssetImage::GetEmptyImage();
+    if (!pTexture && !pDataToLoad) {
+        pTexture = FxAssetImage::GetEmptyImage();
     }
 
     if (!CheckIfReady()) {
@@ -259,7 +259,7 @@ FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& s
     }
 
 
-    Texture->Texture.SetSampler(sampler);
+    pTexture->Texture.SetSampler(sampler);
 
     return Status::Ready;
 }
@@ -267,19 +267,19 @@ FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& s
 
 #define PUSH_IMAGE_IF_SET(img, binding)                                                                                \
     if (img != nullptr) {                                                                                              \
-        const VkDescriptorImageInfo image_info {                                                                             \
+        const VkDescriptorImageInfo image_info {                                                                       \
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                                                   \
             .imageView = img->Texture.Image.View,                                                                      \
             .sampler = img->Texture.Sampler->Sampler,                                                                  \
-        };                                                                                                  \
-        const VkWriteDescriptorSet image_write {                                                                             \
+        };                                                                                                             \
+        const VkWriteDescriptorSet image_write {                                                                       \
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,                                                           \
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,                                               \
             .descriptorCount = 1,                                                                                      \
             .dstSet = descriptor_set.Set,                                                                              \
             .dstBinding = binding,                                                                                     \
             .dstArrayElement = 0,                                                                                      \
-            .pImageInfo = write_image_infos.Insert(image_info),                                                                                 \
+            .pImageInfo = write_image_infos.Insert(image_info),                                                        \
         };                                                                                                             \
         write_descriptor_sets.Insert(image_write);                                                                     \
     }
@@ -299,7 +299,7 @@ void FxMaterial::Build()
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     // Build components
-    BUILD_MATERIAL_COMPONENT(DiffuseComponent, manager.AlbedoSampler);
+    BUILD_MATERIAL_COMPONENT(DiffuseComponent, manager.pAlbedoSampler);
 
     // Update the material descriptor
     {
@@ -310,7 +310,7 @@ void FxMaterial::Build()
         RxDescriptorSet& descriptor_set = mDescriptorSet;
 
         // Push material textures
-        PUSH_IMAGE_IF_SET(DiffuseComponent.Texture, 0);
+        PUSH_IMAGE_IF_SET(DiffuseComponent.pTexture, 0);
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data,
                                0, nullptr);
@@ -323,10 +323,10 @@ void FxMaterial::Build()
 
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
-    printf("Base colour: %u\n", Properties.BaseColor);
+    printf("Base colour: %u\n", Properties.BaseColor.Value);
 
     // material->BaseColor = ;
 
     // Mark material as built
-    IsBuilt.store(true);
+    bIsBuilt.store(true);
 }

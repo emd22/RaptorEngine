@@ -7,16 +7,15 @@
 #include "FxMPLinkedList.hpp"
 
 #include <type_traits>
-// #include <vector>
 
-// #define FX_MEMPOOL_USE_ATOMIC_LOCKING 1
-// #define FX_MEMPOOL_TRACK_STATISTICS   1
+// NOTE: Option macros are defined in FxDefines.hpp
 
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
 #include <atomic>
 #endif
 
 #if !defined(FX_MEMPOOL_USE_ATOMIC_LOCKING) && !defined(FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP)
+// If we are not using atomic locking, check for thread ownership to prevent race conditions
 #define FX_MEMPOOL_DEBUG_CHECK_THREAD_OWNERSHIP
 #endif
 
@@ -29,6 +28,8 @@ struct FxMemPoolStatistics
 {
     uint32 TotalAllocs = 0;
     uint32 TotalFrees = 0;
+
+    uint64 BytesAllocatedPeak = 0;
 };
 
 class FxMemPoolPage
@@ -46,12 +47,12 @@ public:
 
     FxMemPoolPage(FxMemPoolPage&& other) noexcept
     {
-        mSize = other.mSize;
+        mCapacity = other.mCapacity;
         mMem = other.mMem;
         mMemBlocks = std::move(other.mMemBlocks);
 
         other.mMem = nullptr;
-        other.mSize = 0;
+        other.mCapacity = 0;
     }
 
     void Create(uint64 size);
@@ -63,7 +64,6 @@ public:
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
         FxSpinThreadGuard guard(&mInUse);
 #endif
-
         MemBlock& block = AllocateMemory(size)->Data;
 
         return static_cast<ElementType*>(block.Start);
@@ -80,24 +80,29 @@ public:
         return static_cast<Type*>(Realloc(static_cast<void*>(ptr), new_size));
     }
 
-    /** Frees an allocated pointer */
+    /**
+     * @brief Frees an allocated pointer from a memory pool page.
+     * @returns The size of the allocation that was freed.
+     */
     template <typename ElementType>
-    void Free(ElementType* ptr)
+    uint32 Free(ElementType* ptr)
     {
         if (ptr == nullptr) {
-            return;
+            return 0;
         }
 
 
         auto* node = GetNodeFromPtr(static_cast<void*>(ptr));
         if (node == nullptr) {
             FxLogError("FxMemPoolPage::Free: Could not find ptr {:p} in memory page!", ptr);
-            return;
+            return 0;
         }
 
 #ifdef FX_MEMPOOL_USE_ATOMIC_LOCKING
         FxSpinThreadGuard guard(&mInUse);
 #endif
+
+        const uint32 block_size = node->Data.Size;
 
         // Do not mark as a freed block when we are at the end of the page as it is ambiguous
         // on whether the end is a previously freed block or has not been previously allocated.
@@ -106,28 +111,32 @@ public:
         // There is a check in `HasFreeSpace()` that covers the case of freed space at the end.
 
         if (node != mMemBlocks.Tail) {
-            mFreedTotalSize += node->Data.Size;
+            mFreedTotalSize += block_size;
         }
 
         mMemBlocks.DeleteNode(node);
+
+        return block_size;
     }
 
-    template <bool OnlyCheckFreedBlocks = false>
+    template <bool TOnlyCheckPreviouslyFreedBlocks = false>
     bool HasFreeSpace() const
     {
         if (mFreedTotalSize > 0) {
             return true;
         }
-        // For `AllocateMemory()` where it already tests for free memory at the end. We can
+
+        // For `AllocateMemory()` where it already tests for free memory at the end of the page. We can
         // skip the extraneous checks
-        if constexpr (OnlyCheckFreedBlocks) {
+        if constexpr (TOnlyCheckPreviouslyFreedBlocks) {
             return false;
         }
 
+        // Checks if there is space remaining at the end of the page
         const auto& final_block = mMemBlocks.Tail->Data;
         uint64 current_page_size = static_cast<uint64>((final_block.Start + final_block.Size) - mMem);
 
-        if (current_page_size < mSize) {
+        if (current_page_size < mCapacity) {
             return true;
         }
 
@@ -139,7 +148,7 @@ public:
     void Destroy();
     ~FxMemPoolPage() { Destroy(); }
 
-    inline bool IsInited() const { return (mMem != nullptr && mSize > 0); }
+    inline bool IsInited() const { return (mMem != nullptr && mCapacity > 0); }
 
 private:
     auto AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*;
@@ -156,7 +165,7 @@ private:
     /**
      * @brief The allocated capacity of the page
      */
-    uint64 mSize = 0;
+    uint64 mCapacity = 0;
 
     /**
      * @brief The total amount of bytes that have been freed in the page
@@ -182,7 +191,8 @@ public:
 
     /**
      * Creates a new memory pool with paging.
-     * @param page_size_kb The size of each page in kilobytes.
+     * @param page_capacity The size of each page in `size_unit` units.
+     * @param size_unit The unit to multiply the `page_capacity` by (ex: `FxUnitMebibyte`)
      */
     void Create(uint64 page_size, uint64 size_unit);
 
@@ -200,10 +210,6 @@ public:
     static Type* Alloc(uint32 size, Args&&... args)
     {
         Type* ptr = static_cast<Type*>(AllocRaw(size, nullptr));
-
-        if (reinterpret_cast<void*>(ptr) == reinterpret_cast<void*>(0x144804e40)) {
-            FX_BREAKPOINT;
-        }
 
         // Use a placement new if the object is constructable with the provided arguments
         if constexpr (std::is_constructible_v<Type, Args...>) {
@@ -234,6 +240,16 @@ public:
         return ptr;
     }
 
+    /**
+     * @brief Gets the total capacity in bytes of the memory pool.
+     */
+    FX_FORCE_INLINE uint64 GetTotalCapacity() const { return (mPageCapacity * mPoolPages.Size()); }
+
+    /**
+     * @brief Calculates the total amount of bytes in use across all pages in the memory pool.
+     */
+    FX_FORCE_INLINE uint64 GetTotalUsed() const { return mBytesInUse; }
+
     /** Frees an allocated pointer on the global memory pool */
     static void FreeRaw(void* ptr, FxMemPool* pool = nullptr);
 
@@ -255,13 +271,17 @@ public:
         if constexpr (std::is_destructible_v<Type>) {
             ptr->~Type();
         }
+
         FxSpinThreadGuard guard(&pool->mbInUse);
 
 #ifdef FX_MEMPOOL_TRACK_STATISTICS
         ++pool->mStats.TotalFrees;
 #endif
+
         FreeRaw(static_cast<void*>(ptr), pool);
     }
+
+    const FxMemPoolStatistics& GetStatistics() const { return mStats; }
 
     bool IsEmpty() const { return mPoolPages.IsEmpty(); }
 
@@ -277,7 +297,12 @@ private:
 
 private:
     FxMemPoolPage* mpCurrentPage = nullptr;
-    uint64 mPageSize = 0;
+    uint64 mPageCapacity = 0;
+
+    /**
+     * @brief The total amount of bytes in use by memory blocks
+     */
+    uint64 mBytesInUse = 0;
 
     FxPagedArray<FxMemPoolPage> mPoolPages;
 
@@ -287,9 +312,7 @@ private:
     std::thread::id mCreatedThreadId;
 #endif
 
-#ifdef FX_MEMPOOL_TRACK_STATISTICS
     FxMemPoolStatistics mStats;
-#endif
 };
 
 #undef FX_PAGED_ARRAY_USE_MALLOC
