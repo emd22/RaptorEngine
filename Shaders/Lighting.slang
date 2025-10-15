@@ -48,9 +48,9 @@ struct FSPushConsts
     float4x4 mInvView;
     float4x4 mInvProjection;
     float4 vLightPosition;
-    float4 vLightColour;
     float4 vEyePosition;
     float fLightRadius;
+    uint uiLightColor;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
@@ -165,7 +165,9 @@ FSOut FragmentMain(FSIn in)
 
     float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, (roughness * roughness));
 
-    out.vColor = float4(attenuation * (Fd * albedo + Fr) * FSConst.vLightColour.rgb * NdotL * FX_MATH_1_OVER_PI, normal_rgba.a);
+    float4 light_color = unpackUnorm4x8ToFloat(FSConst.uiLightColor);
+
+    out.vColor = float4(attenuation * (Fd * albedo + Fr) * light_color.rgb * NdotL * FX_MATH_1_OVER_PI, normal_rgba.a);
 
     return out;
 }

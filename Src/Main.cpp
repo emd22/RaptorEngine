@@ -350,7 +350,7 @@ int main()
     light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light.Scale(FxVec3f(25));
 
-    light.Color = FxVec3f(1.0, 0.1, 0.1);
+    light.Color = FxColor::FromRGBA(255, 10, 10, 255);
 
     FxLight light2;
     light2.SetLightVolume(generated_sphere, true);
@@ -358,7 +358,7 @@ int main()
     light.Scale(FxVec3f(25));
     light2.MoveBy(FxVec3f(1, 0, -0.5));
 
-    light.Color = FxVec3f(0.6, 0.7, 0.6);
+    light.Color = FxColor::sWhite;
 
     // light2.Scale(FxVec3f(25));
 

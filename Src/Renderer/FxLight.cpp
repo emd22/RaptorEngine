@@ -118,10 +118,12 @@ void FxLight::Render(const FxCamera& camera)
             memcpy(push_constants.LightPos, light_positions, sizeof(float32) * 4);
         }
 
-        push_constants.LightColor[0] = Color.X;
-        push_constants.LightColor[1] = Color.Y;
-        push_constants.LightColor[2] = Color.Z;
-        push_constants.LightColor[3] = 1.0;
+        // push_constants.LightColor[0] = Color.X;
+        // push_constants.LightColor[1] = Color.Y;
+        // push_constants.LightColor[2] = Color.Z;
+        // push_constants.LightColor[3] = 1.0;
+        //
+        push_constants.LightColor = Color.Value;
 
         memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 4);
         push_constants.LightRadius = Radius;
