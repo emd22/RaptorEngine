@@ -41,7 +41,7 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
         },
         {
             slang::CompilerOptionName::LanguageVersion,
-            { slang::CompilerOptionValueKind::String, 0, 0, "2026", nullptr },
+            { slang::CompilerOptionValueKind::String, 2026, 0, nullptr, nullptr },
         }
     };
 
@@ -235,6 +235,6 @@ void FxShaderCompiler::Destroy()
 {
     sShaderCompileDb.Close();
 
-    GetSlangSession().setNull();
-    GetSlangGlobalSession().setNull();
+    // GetSlangSession().setNull();
+    // GetSlangGlobalSession().setNull();
 }

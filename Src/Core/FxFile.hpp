@@ -4,6 +4,7 @@
 
 #include <Core/FxSlice.hpp>
 #include <Core/FxTypes.hpp>
+#include <Math/FxMathUtil.hpp>
 #include <filesystem>
 
 class FxFile
@@ -19,12 +20,32 @@ public:
     void Open(const char* path, const char* mode);
     uint64 GetFileSize();
 
-    FxSlice<char> ReadRaw();
+    template <typename TDataType>
+    FxSlice<TDataType> Read(const FxSlice<TDataType>& out_buffer)
+    {
+        if (!pFileHandle) {
+            return nullptr;
+        }
+
+        constexpr uint32 type_size = sizeof(TDataType);
+
+        const uint64 n_to_read = std::fmin(GetFileSize() / type_size, out_buffer.Size);
+        uint64 items_read = fread(out_buffer.Ptr, type_size, n_to_read, pFileHandle);
+
+        return FxMakeSlice<TDataType>(out_buffer.Ptr, items_read);
+    }
 
     template <typename TDataType>
     FxSlice<TDataType> Read()
     {
-        return FxSlice(ReadRaw());
+        if (!pFileHandle) {
+            return nullptr;
+        }
+
+        const uint64 buffer_size = FxMath::AlignValue<sizeof(TDataType)>(GetFileSize());
+        TDataType* buffer = FxMemPool::Alloc<TDataType>(buffer_size);
+
+        return Read(FxMakeSlice(buffer, buffer_size));
     }
 
     void WriteRaw(const void* data, uint64 size);

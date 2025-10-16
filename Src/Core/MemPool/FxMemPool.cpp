@@ -7,6 +7,8 @@
 #include "../FxPanic.hpp"
 #include "../FxTypes.hpp"
 
+#include <Math/FxMathUtil.hpp>
+
 // #define FX_MEMPOOL_WARN_SLOW_ALLOC 1
 // #define FX_MEMPOOL_NEXT_FIT        1
 
@@ -34,35 +36,35 @@ void FxMemPoolPage::Create(uint64 size)
     mMemBlocks.Create(num_mem_blocks);
 }
 
-static inline uint64 GetAlignedValue(uint64 value)
-{
-    // The byte boundary to align to
-    const uint16 align_to_bytes = 16;
+// static inline uint64 GetAlignedValue(uint64 value)
+// {
+//     // The byte boundary to align to
+//     const uint16 align_to_bytes = 16;
 
-    if constexpr (align_to_bytes == 16) {
-        // Get the bottom four bits (value % 16)
-        const uint8 remainder = (value & 0x0F);
+//     if constexpr (align_to_bytes == 16) {
+//         // Get the bottom four bits (value % 16)
+//         const uint8 remainder = (value & 0x0F);
 
-        if (remainder != 0) {
-            value += (16 - remainder);
-        }
+//         if (remainder != 0) {
+//             value += (16 - remainder);
+//         }
 
-        return value;
-    }
+//         return value;
+//     }
 
-    const uint16 remainder = (value % align_to_bytes);
+//     const uint16 remainder = (value % align_to_bytes);
 
-    // If the value is not aligned(there is a remainder in the division), offset our value by the missing bytes
-    if (remainder != 0) {
-        value += (align_to_bytes - remainder);
-    }
+//     // If the value is not aligned(there is a remainder in the division), offset our value by the missing bytes
+//     if (remainder != 0) {
+//         value += (align_to_bytes - remainder);
+//     }
 
-    return value;
-}
+//     return value;
+// }
 
 static inline uint8* GetAlignedPtr(uint8* ptr)
 {
-    return reinterpret_cast<uint8*>(GetAlignedValue(reinterpret_cast<uintptr_t>(ptr)));
+    return reinterpret_cast<uint8*>(FxMath::AlignValue<16>(reinterpret_cast<uintptr_t>(ptr)));
 }
 
 
@@ -91,7 +93,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
 
     uint8* new_block_ptr = mMem;
 
-    const uint64 aligned_size = GetAlignedValue(requested_size);
+    const uint64 aligned_size = FxMath::AlignValue<16>(requested_size);
 
     // If there are no allocations currently, allocate at start and exit early
     if (!mMemBlocks.Tail) {
@@ -115,7 +117,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
     const uint64 bytes_used_in_page = static_cast<uint64>(new_block_ptr - mMem);
 
     // Our potential allocation fits, return our entry!
-    if (bytes_used_in_page < GetAlignedValue(mCapacity)) {
+    if (bytes_used_in_page < FxMath::AlignValue<16>(mCapacity)) {
         // Create a new block entry for the allocation
         FxMemPoolPage::MemBlock new_block { .Size = aligned_size, .Start = GetAlignedPtr(new_block_ptr) };
 
@@ -377,7 +379,7 @@ void* FxMemPoolPage::Realloc(void* ptr, uint32 new_size)
 
     // Node is at end of block list, simply increase size
     if (node->Next == nullptr) {
-        node->Data.Size = GetAlignedValue(new_size);
+        node->Data.Size = FxMath::AlignValue<16>(new_size);
         return node->Data.Start;
     }
     // There is a node after this, check the gap
@@ -387,7 +389,7 @@ void* FxMemPoolPage::Realloc(void* ptr, uint32 new_size)
 
     // There is enough space between the nodes, reallocate in place
     if (gap_size >= new_size) {
-        node->Data.Size = GetAlignedValue(new_size);
+        node->Data.Size = FxMath::AlignValue<16>(new_size);
         return node->Data.Start;
     }
 

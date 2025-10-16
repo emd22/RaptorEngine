@@ -35,9 +35,10 @@ struct alignas(16) FxLightFragPushConstants
 {
     float32 InvView[16];
     float32 InvProj[16];
-    float32 LightPos[4];
-    float32 PlayerPos[4];
+
+    float32 EyePosition[3];
     float32 LightRadius;
+    float32 LightPosition[3];
     uint32 LightColor;
 };
 

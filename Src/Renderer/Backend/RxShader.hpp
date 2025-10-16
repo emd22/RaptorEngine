@@ -21,7 +21,7 @@ public:
     operator VkShaderModule() { return ShaderModule; }
 
 private:
-    void CreateShaderModule(std::ios::pos_type file_size, uint32* shader_data);
+    void CreateShaderModule(uint32 file_size, uint32* shader_data);
 
 public:
     VkShaderModule ShaderModule = nullptr;

@@ -11,6 +11,8 @@
 // #include <ios>
 // #include <iostream>
 
+#include <Math/FxMathUtil.hpp>
+
 void RxShader::Load(const char* path, RxShaderType type)
 {
     Type = type;
@@ -36,15 +38,22 @@ void RxShader::Load(const char* path, RxShaderType type)
     // file.seekg(0, std::ios::end);
     // const auto file_size = file.tellg();
     // file.seekg(0, std::ios::beg);
-    char* file_buffer = spirv_file.Read<char>();
+    uint32 buffer_size = FxMath::AlignValue<4>(spirv_file.GetFileSize());
+    FxLogInfo("buffer size: {}", buffer_size);
+
+    uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
+
+    FxSlice<uint32> file_buffer = spirv_file.Read<uint32>(FxMakeSlice(buffer, buffer_size));
 
     // file.read(file_buffer, file_size);
     // file.close();
 
-    CreateShaderModule(spirv_file.GetFileSize(), reinterpret_cast<uint32*>(file_buffer));
+    // Use buffer_size(not file_buffer.Size) as we are using the total buffer size, not the amount
+    // of bytes read.)
+    CreateShaderModule(buffer_size, file_buffer.Ptr);
     spirv_file.Close();
 
-    FxMemPool::Free(file_buffer);
+    FxMemPool::Free(file_buffer.Ptr);
 }
 
 void RxShader::Destroy()
@@ -57,12 +66,12 @@ void RxShader::Destroy()
     vkDestroyShaderModule(device->Device, ShaderModule, nullptr);
 }
 
-void RxShader::CreateShaderModule(std::ios::pos_type file_size, uint32* shader_data)
+void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data)
 {
     const VkShaderModuleCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = (uint32)file_size,
-        .pCode = (uint32_t*)shader_data,
+        .codeSize = file_size,
+        .pCode = shader_data,
     };
 
     RxGpuDevice* device = gRenderer->GetDevice();

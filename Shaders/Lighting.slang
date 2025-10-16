@@ -47,9 +47,9 @@ struct FSPushConsts
     [[vk::offset(64)]]
     float4x4 mInvView;
     float4x4 mInvProjection;
-    float4 vLightPosition;
-    float4 vEyePosition;
+    float3 vEyePosition;
     float fLightRadius;
+    float3 vLightPosition;
     uint uiLightColor;
 };
 
@@ -140,10 +140,10 @@ FSOut FragmentMain(FSIn in)
     F0 = lerp(F0, albedo, metallic);
 
 
-    float3 light_position_local = FSConst.vLightPosition.xyz - world_position;
+    float3 light_position_local = FSConst.vLightPosition - world_position;
 
     float3 N = normalize(normal_rgba.rgb);
-    float3 V = normalize(FSConst.vEyePosition.xyz - world_position);
+    float3 V = normalize(FSConst.vEyePosition - world_position);
     float3 L = normalize(light_position_local);
     float3 H = normalize(V + L);
 

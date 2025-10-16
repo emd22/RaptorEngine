@@ -42,18 +42,6 @@ uint64 FxFile::GetFileSize()
     return mFileSize;
 }
 
-FxSlice<char> FxFile::ReadRaw()
-{
-    if (!pFileHandle) {
-        return nullptr;
-    }
-
-    char* buffer = FxMemPool::Alloc<char>(GetFileSize());
-    uint64 bytes_read = fread(buffer, 1, GetFileSize(), pFileHandle);
-
-    return FxMakeSlice<char>(buffer, bytes_read);
-}
-
 void FxFile::WriteRaw(const void* data, uint64 size)
 {
     if (!pFileHandle) {

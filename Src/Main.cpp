@@ -365,7 +365,6 @@ int main()
     bool second_light_on = true;
     // gPhysics->bPhysicsPaused = true;
 
-
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
 

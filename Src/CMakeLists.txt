@@ -52,14 +52,14 @@ add_compile_options(
     -g
     -Wall
     # -Wpedantic
-    # -fsanitize=address
+    -fsanitize=address
     -Wno-nullability-extension
     # -O2
 )
 
 
 add_link_options(
-    # -fsanitize=address
+    -fsanitize=address
 )
 
 include_directories(
