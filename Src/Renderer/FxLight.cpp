@@ -79,6 +79,10 @@ void FxLight::MoveLightVolumeTo(const FxVec3f& position) { this->FxEntity::MoveT
 
 void FxLight::Render(const FxCamera& camera)
 {
+    if (!bEnabled) {
+        return;
+    }
+
     if (camera.Position.IntersectsSphere(mPosition, Radius)) {
         mpLightPipeline = &gRenderer->DeferredRenderer->PlLightingInsideVolume;
     }

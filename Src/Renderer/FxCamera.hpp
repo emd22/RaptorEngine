@@ -9,6 +9,8 @@ class FxCamera
 public:
     virtual void Update() = 0;
 
+    virtual ~FxCamera() {}
+
 public:
     FxVec3f Position = FxVec3f(0.0f);
 
@@ -85,6 +87,8 @@ public:
     void Update() override;
 
     inline void RequireUpdate() { mRequiresUpdate = true; }
+
+    ~FxPerspectiveCamera() override {}
 
 public:
     FxVec3f Direction = FxVec3f(0.0f);

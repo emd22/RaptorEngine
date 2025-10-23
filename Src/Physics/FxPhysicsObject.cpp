@@ -1,5 +1,7 @@
 #include "FxPhysicsObject.hpp"
 
+#include "FxPhysicsJolt.hpp"
+
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
 #include <ThirdParty/Jolt/Physics/Body/MotionType.h>
@@ -7,7 +9,6 @@
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <FxEngine.hpp>
-#include <FxPhysicsJolt.hpp>
 
 void FxPhysicsObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f& initial_position,
                                         FxPhysicsObject::PhysicsFlags flags, FxPhysicsObject::PhysicsType type,

@@ -2,7 +2,7 @@
 
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxRef.hpp>
-#include <FxPhysicsJolt.hpp>
+#include <Physics/FxPhysicsJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 extern RxRenderBackend* gRenderer;

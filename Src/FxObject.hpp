@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FxPhysicsObject.hpp"
+#include "Physics/FxPhysicsObject.hpp"
 
 // #include <ThirdParty/Jolt/Jolt.h>
 // #include <ThirdParty/Jolt/Physics/Body/Body.h>
@@ -9,7 +9,6 @@
 #include <Core/MemPool/FxMPPagedArray.hpp>
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
-#include <FxPhysicsObject.hpp>
 
 
 class FxObject : public FxAssetBase, public FxEntity

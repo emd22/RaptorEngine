@@ -34,6 +34,7 @@
 #include <Core/FxLog.hpp>
 #include <Core/FxTypes.hpp>
 #include <FxObject.hpp>
+#include <FxScene.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/FxWindow.hpp>
@@ -68,8 +69,6 @@ void CheckGeneralControls()
     }
 }
 
-static FxPerspectiveCamera* current_camera = nullptr;
-
 #pragma clang optimize off
 
 template <typename FuncType>
@@ -96,84 +95,6 @@ void FxSpeedTest(FuncType ft, int iterations)
 
 #pragma clang optimize on
 
-
-void TestScript()
-{
-    FxConfigScript script;
-    script.LoadFile("../Scripts/Default.fxS");
-
-    // Define an external variable that can be used in our script
-    // script.DefineExternalVar("int", "eExternalVar", FxScriptValue(FxScriptValue::INT, 42));
-
-    FxScriptVM vm;
-
-    script.Execute(vm);
-
-
-    // std::string command = "";
-
-    // printf(
-    //     "\nFoxtrot Script\nVersion %d.%d.%d\n",
-    //     FX_SCRIPT_VERSION_MAJOR,
-    //     FX_SCRIPT_VERSION_MINOR,
-    //     FX_SCRIPT_VERSION_PATCH
-    // );
-
-    // while (true) {
-    //     printf(" -> ");
-    //     fflush(stdout);
-
-    //     std::getline(std::cin, command);
-
-    //     if (command == "quit") {
-    //         break;
-    //     }
-
-    //     if (!command.ends_with(';')) {
-    //         command += ';';
-    //     }
-
-    //     //printf("Executing command {%s}\n", command.c_str());
-
-    //     script.ExecuteUserCommand(command.c_str(), interpreter);
-    // }
-}
-
-#ifdef FX_USE_NEON
-
-#include <Math/FxNeonUtil.hpp>
-#include <Math/FxQuat.hpp>
-
-void TestNeonSin()
-{
-    {
-        float32 sv, cv;
-        const float32 angle = 0.1f;
-
-        FxMath::SinCos(angle, &sv, &cv);
-
-        FxLogInfo("Angle: {}, Sin: {}, Cos: {}", angle, sv, cv);
-    }
-
-
-    // FxVec4f angles(0.1f, -0.2f, 0.3f, 0.0f);
-
-    // const float32x4_t v = angles.mIntrin;
-
-    // float32x4_t sv = v;
-    // float32x4_t cv = v;
-
-    // FxNeon::SinCos4(v, &sv, &cv);
-
-    // FxVec4f s_result(sv);
-    // FxVec4f c_result(cv);
-
-    // FxLogInfo("Sin Result: {}", s_result);
-    // FxLogInfo("Cos Result: {}", c_result);
-}
-
-#endif
-
 void TestQuatFromEuler()
 {
     FxVec3f angles(0.1, 0.0, 0.2);
@@ -195,6 +116,8 @@ struct DeleteOnExit
 
 int main()
 {
+    FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
+
 #ifdef FX_LOG_OUTPUT_TO_FILE
     FxLogCreateFile("FoxtrotLog.log");
 #endif
@@ -207,8 +130,6 @@ int main()
 
     // TestNeonSin();
     // return 0;
-
-    FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
 
     // TestScript();
@@ -266,11 +187,13 @@ int main()
     asset_manager.Start(2);
     material_manager.Create();
 
-    FxPerspectiveCamera camera;
-    current_camera = &camera;
+    FxRef<FxPerspectiveCamera> camera = FxMakeRef<FxPerspectiveCamera>();
 
     // FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
     // fireplace_object->WaitUntilLoaded();
+
+    FxScene main_scene;
+
 
     FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
@@ -295,10 +218,12 @@ int main()
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
-    camera.SetAspectRatio(((float32)window_width) / (float32)window_height);
+    camera->SetAspectRatio(((float32)window_width) / (float32)window_height);
 
-    camera.Position.Z += 5.0f;
-    camera.Position.Y += 4.0f;
+    camera->Position.Z += 5.0f;
+    camera->Position.Y += 4.0f;
+
+    main_scene.SelectCamera(camera);
 
     // Mat4f model_matrix = Mat4f::AsTranslation(FxVec3f(0, 0, 0));
     //
@@ -311,17 +236,18 @@ int main()
 
     FxRef<FxPrimitiveMesh<>> generated_cube_mesh = generated_cube->AsMesh();
 
-    FxObject ground_object;
-    ground_object.Create(generated_cube_mesh, cube_material);
+    FxRef<FxObject> ground_object = FxMakeRef<FxObject>();
+    ground_object->Create(generated_cube_mesh, cube_material);
     // ground_object.Scale(FxVec3f(10, 1, 10));
-    ground_object.MoveBy(FxVec3f(0, -20, 0));
-    ground_object.Scale(FxVec3f(10, 1.0, 10));
+    ground_object->MoveBy(FxVec3f(0, -8, 0));
+    ground_object->Scale(FxVec3f(10, 1.0, 10));
 
-    ground_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
-                                      FxPhysicsObject::PhysicsType::Static, {});
+    ground_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
+                                       FxPhysicsObject::PhysicsType::Static, {});
+    main_scene.Attach(ground_object);
 
     FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../models/DamagedHelmet.glb", { .KeepInMemory = true });
-    helmet_object->MoveBy(FxVec3f(5, 0, 0));
+    helmet_object->MoveBy(FxVec3f(0, 0, 0));
     helmet_object->RotateX(M_PI_2);
 
     helmet_object->WaitUntilLoaded();
@@ -329,13 +255,7 @@ int main()
     helmet_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
                                        FxPhysicsObject::PhysicsType::Dynamic, {});
     helmet_object->SetPhysicsEnabled(false);
-    // FxObject cube_object;
-    // cube_object.Create(generated_cube_mesh, cube_material);
-    // cube_object.MoveBy(FxVec3f(5, 10, 0));
-
-    // cube_object.PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
-    // FxPhysicsObject::PhysicsType::Dynamic, {});
-    // cube_object.SetPhysicsEnabled(false);
+    main_scene.Attach(helmet_object);
 
     gPhysics->OptimizeBroadPhase();
 
@@ -344,25 +264,21 @@ int main()
     FxSizedArray<VkDescriptorSet> sets_to_bind;
     sets_to_bind.InitSize(2);
 
-    FxLight light;
-    light.SetLightVolume(generated_sphere, true);
+    FxRef<FxLight> light = FxMakeRef<FxLight>();
+    light->SetLightVolume(generated_sphere, true);
+    light->MoveBy(FxVec3f(0.0, 2.80, 1.20));
+    light->Scale(FxVec3f(25));
+    light->Color = FxColor::FromRGBA(255, 10, 10, 255);
 
-    light.MoveBy(FxVec3f(0.0, 2.80, 1.20));
-    light.Scale(FxVec3f(25));
+    main_scene.Attach(light);
 
-    light.Color = FxColor::FromRGBA(255, 10, 10, 255);
+    FxRef<FxLight> light2 = FxMakeRef<FxLight>();
+    light2->SetLightVolume(generated_sphere, true);
+    light2->Scale(FxVec3f(25));
+    light2->MoveBy(FxVec3f(1, 0, -0.5));
+    light2->Color = FxColor::sWhite;
 
-    FxLight light2;
-    light2.SetLightVolume(generated_sphere, true);
-
-    light.Scale(FxVec3f(25));
-    light2.MoveBy(FxVec3f(1, 0, -0.5));
-
-    light.Color = FxColor::sWhite;
-
-    // light2.Scale(FxVec3f(25));
-
-    bool second_light_on = true;
+    main_scene.Attach(light2);
     // gPhysics->bPhysicsPaused = true;
 
     while (Running) {
@@ -377,20 +293,20 @@ int main()
             mouse_delta.SetX(DeltaTime * mouse_delta.GetX() * 0.001);
             mouse_delta.SetY(DeltaTime * mouse_delta.GetY() * -0.001);
 
-            camera.Rotate(mouse_delta.GetX(), mouse_delta.GetY());
+            camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         }
 
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            camera.Move(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
+            camera->Move(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            camera.Move(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
+            camera->Move(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-            camera.Move(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
+            camera->Move(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-            camera.Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
+            camera->Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
         }
 
         if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
@@ -424,14 +340,14 @@ int main()
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
-            light.MoveTo(camera.Position);
+            light->MoveTo(camera->Position);
 
             // camera.Position.Print();
-            light.mPosition.Print();
+            // light.mPosition.Print();
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
-            second_light_on = !second_light_on;
+            light2->bEnabled = !light2->bEnabled;
         }
 
         // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
@@ -468,52 +384,23 @@ int main()
 
         CheckGeneralControls();
 
-        camera.Update();
+        camera->Update();
 
         gPhysics->Update();
-
-        //        helmet_object.RotateY(0.001 * DeltaTime);
-
 
         if (gRenderer->BeginFrame(*deferred_renderer) != RxFrameResult::Success) {
             continue;
         }
 
-        deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *current_camera);
+        // deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *camera);
 
-
-        deferred_renderer->pGeometryPipeline->Bind(gRenderer->GetFrame()->CommandBuffer);
-
-        helmet_object->Update();
-
-        //         helmet_object.mPosition.X = sin((0.05 * gRenderer->GetElapsedFrameCount())) * 0.01;
-        //         helmet_object.Translate(FxVec3f(0, 0, 0));
-
-        // cube_object.MoveTo(camera.Position + camera.Direction);
-
-        // fireplace_object->Render(camera);
-        // cube_object.Update();
-        // cube_object.Render(camera);
-        //
-        helmet_object->Render(camera);
-
-        // ground_object.Update();
-        ground_object.Render(camera);
-
-
-        gRenderer->BeginLighting();
-
-        if (second_light_on) {
-            // light2.mModelMatrix = camera.VPMatrix;
-            // light2.SetModelMatrix(camera.VPMatrix);
-            light2.MoveTo(camera.Position + (camera.Direction * 1.0));
-
-            light2.Render(camera);
+        if (light2->bEnabled) {
+            light2->MoveTo(camera->Position + (camera->Direction * 1.0));
         }
 
-        light.Render(camera);
+        main_scene.Render();
 
-        gRenderer->DoComposition(camera);
+        gRenderer->DoComposition(*camera);
 
         LastTick = CurrentTick;
     }
@@ -522,8 +409,6 @@ int main()
 
     material_manager.Destroy();
     asset_manager.Shutdown();
-
-    ground_object.Destroy();
 
     skybox_mesh->IsReference = false;
     skybox_mesh->Destroy();
@@ -536,9 +421,6 @@ int main()
     //
     generated_cube->Destroy();
     generated_sphere->Destroy();
-
-    //    ground_object->Destroy();
-    //
 
     return 0;
 }

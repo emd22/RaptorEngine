@@ -185,7 +185,7 @@ public:
     {
         // Create a new item and initialize it
         TElementType* element = &CurrentPage->Data[CurrentPage->Size];
-        new (element) TElementType;
+        ::new (element) TElementType;
 
         // Move to the next index
         ++CurrentPage->Size;
@@ -211,7 +211,7 @@ public:
     void Insert(const TElementType& element)
     {
         TElementType* new_element = &CurrentPage->Data[CurrentPage->Size];
-        new (new_element) TElementType(element);
+        ::new (new_element) TElementType(element);
 
         ++CurrentPage->Size;
 

@@ -17,36 +17,17 @@ void RxShader::Load(const char* path, RxShaderType type)
 {
     Type = type;
 
-    // TODO: add to asset loading thread
-
     FxFile spirv_file(path, "rb");
-
-    // std::ifstream file;
-    // file.open(path, std::iostream::binary);
 
     if (!spirv_file.IsFileOpen()) {
         FxLogError("Error opening shader SPIRV file!");
         return;
     }
 
-    // if (!file.is_open()) {
-    //     OldLog::Error("Could not open shader file [%s]", path);
-    //     return;
-    // }
-
-
-    // file.seekg(0, std::ios::end);
-    // const auto file_size = file.tellg();
-    // file.seekg(0, std::ios::beg);
     uint32 buffer_size = FxMath::AlignValue<4>(spirv_file.GetFileSize());
-    FxLogInfo("buffer size: {}", buffer_size);
-
     uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
 
     FxSlice<uint32> file_buffer = spirv_file.Read<uint32>(FxMakeSlice(buffer, buffer_size));
-
-    // file.read(file_buffer, file_size);
-    // file.close();
 
     // Use buffer_size(not file_buffer.Size) as we are using the total buffer size, not the amount
     // of bytes read.)
@@ -68,7 +49,7 @@ void RxShader::Destroy()
 
 void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data)
 {
-    const VkShaderModuleCreateInfo create_info = {
+    const VkShaderModuleCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = file_size,
         .pCode = shader_data,

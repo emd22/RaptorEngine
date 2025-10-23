@@ -103,6 +103,8 @@ public:
 #endif
     }
 
+    void Unlock() noexcept {}
+
     ~FxSpinThreadGuard() noexcept
     {
 #ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
@@ -132,7 +134,7 @@ struct FxMemberRef
     template <typename... TArgTypes>
     inline void InitRef(TArgTypes... args)
     {
-        pPtr = new TPtrType(std::forward<TArgTypes>(args)...);
+        pPtr = ::new TPtrType(std::forward<TArgTypes>(args)...);
     }
 
     inline void Destroy()
@@ -141,7 +143,7 @@ struct FxMemberRef
             return;
         }
 
-        delete pPtr;
+        ::delete pPtr;
 
         pPtr = nullptr;
     }

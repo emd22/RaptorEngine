@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Asset/FxAssetManager.hpp>
 #include <Core/FxDefines.hpp>
 #include <Core/FxStackArray.hpp>
 #include <FxEngine.hpp>
@@ -9,6 +10,7 @@
 #include <Renderer/Backend/RxDevice.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
 #include <Renderer/RxDeferred.hpp>
+
 
 FX_SET_MODULE_NAME("FxMaterial")
 
@@ -209,7 +211,6 @@ void FxMaterial::Destroy()
     }
 }
 
-#include <Asset/FxAssetManager.hpp>
 
 bool FxMaterialComponent::CheckIfReady()
 {

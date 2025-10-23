@@ -54,6 +54,8 @@ public:
 
     FxLightFlags Flags = FxLF_None;
 
+    bool bEnabled = true;
+
 private:
     FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
 

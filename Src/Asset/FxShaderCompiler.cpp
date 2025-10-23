@@ -29,7 +29,7 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
 
     slang::TargetDesc target_desc {
         .format = SLANG_SPIRV,
-        .profile = global_session->findProfile("spirv_1_5"),
+        .profile = global_session->findProfile("spirv_1_4"),
     };
 
     FxStackArray<slang::PreprocessorMacroDesc, 0> preprocessor_macros = {};
@@ -41,7 +41,7 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
         },
         {
             slang::CompilerOptionName::LanguageVersion,
-            { slang::CompilerOptionValueKind::String, 2026, 0, nullptr, nullptr },
+            { slang::CompilerOptionValueKind::Int, 2026, 0, nullptr, nullptr },
         }
     };
 
