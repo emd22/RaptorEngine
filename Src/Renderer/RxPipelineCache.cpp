@@ -1,6 +1,6 @@
 #include "RxPipelineCache.hpp"
 
-void RxPipelineCache::CreatePipeline(const char* name, ShaderList shader_list,
+void RxPipelineCache::CreatePipeline(const char* name, const FxSlice<RxShader>& shader_list,
                                      const FxSlice<VkAttachmentDescription>& attachments,
                                      const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                                      FxVertexInfo* vertex_info, const RxRenderPass& render_pass,

@@ -2,7 +2,6 @@
 
 #include "../RxVertex.hpp"
 #include "RxRenderPass.hpp"
-#include "ShaderList.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -16,6 +15,8 @@ struct FxVertexInfo
 {
     VkVertexInputBindingDescription binding;
     FxSizedArray<VkVertexInputAttributeDescription> attributes;
+
+    bool bIsInited : 1 = false;
 };
 
 
@@ -65,11 +66,14 @@ struct RxPushConstants
     VkShaderStageFlags StageFlags;
 };
 
+#include "RxShader.hpp"
+#include "ShaderList.hpp"
 
 class RxGraphicsPipeline
 {
 public:
-    void Create(const std::string& name, ShaderList shader_list, const FxSlice<VkAttachmentDescription>& attachments,
+    void Create(const std::string& name, const FxSlice<RxShader>& shaders,
+                const FxSlice<VkAttachmentDescription>& attachments,
                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, FxVertexInfo* vertex_info,
                 const RxRenderPass& render_pass, const RxGraphicsPipelineProperties& properties);
 
@@ -105,82 +109,4 @@ public:
 private:
     RxGpuDevice* mDevice = nullptr;
     ShaderList mShaders;
-};
-
-
-using RxColorComponentFlags = uint32;
-enum RxColorComponent : uint32
-{
-    RxColorComponent_None = 0x0000,
-
-    RxColorComponent_R = VK_COLOR_COMPONENT_R_BIT,
-    RxColorComponent_G = VK_COLOR_COMPONENT_G_BIT,
-    RxColorComponent_B = VK_COLOR_COMPONENT_B_BIT,
-    RxColorComponent_A = VK_COLOR_COMPONENT_A_BIT,
-
-    RxColorComponent_RG = (RxColorComponent_R | RxColorComponent_G),
-    RxColorComponent_RGB = (RxColorComponent_RG | RxColorComponent_B),
-    RxColorComponent_RGBA = (RxColorComponent_RGB | RxColorComponent_A),
-};
-
-
-using RxBlendOpFlags = uint32;
-enum RxBlendOp : uint32
-{
-    RxBlendOp_Add = VK_BLEND_OP_ADD,
-    RxBlendOp_Subtract = VK_BLEND_OP_SUBTRACT,
-};
-
-using RxBlendFactorFlags = uint32;
-enum RxBlendFactor : uint32
-{
-    RxBlendFactorSrc_Zero = (VK_BLEND_FACTOR_ZERO << 8),
-    RxBlendFactorSrc_One = (VK_BLEND_FACTOR_ONE << 8),
-    RxBlendFactorSrc_SrcAlpha = (VK_BLEND_FACTOR_SRC_ALPHA << 8),
-    RxBlendFactorSrc_DstAlpha = (VK_BLEND_FACTOR_DST_ALPHA << 8),
-
-    RxBlendFactorDst_Zero = (VK_BLEND_FACTOR_ZERO & 0xFF),
-    RxBlendFactorDst_One = (VK_BLEND_FACTOR_ONE & 0xFF),
-    RxBlendFactorDst_SrcAlpha = (VK_BLEND_FACTOR_SRC_ALPHA & 0xFF),
-    RxBlendFactorDst_DstAlpha = (VK_BLEND_FACTOR_DST_ALPHA & 0xFF),
-};
-
-
-class RxGraphicsPipelineBuilder
-{
-public:
-    RxGraphicsPipelineBuilder() = default;
-
-    template <typename... TAttachments>
-    RxGraphicsPipeline& AddBlendAttachments(TAttachments... attachments)
-    {
-    }
-
-    VkPipelineColorBlendAttachmentState BlendAttachment(RxColorComponentFlags color_write_mask = RxColorComponent_RGBA)
-    {
-        return VkPipelineColorBlendAttachmentState { .colorWriteMask = color_write_mask, .blendEnable = false };
-    }
-
-    static inline VkPipelineColorBlendAttachmentState
-    BlendAttachment(RxColorComponentFlags color_write_mask, RxBlendOpFlags color_op, RxBlendOpFlags alpha_op,
-                    RxBlendFactorFlags alpha_blend_factors = (RxBlendFactorSrc_Zero | RxBlendFactorDst_Zero),
-                    RxBlendFactorFlags color_blend_factors = (RxBlendFactorSrc_Zero | RxBlendFactorDst_Zero))
-    {
-        const uint16 src_alpha = (alpha_blend_factors >> 8);
-        const uint16 dst_alpha = (alpha_blend_factors & 0xFF);
-
-        const uint16 src_color = (color_blend_factors >> 8);
-        const uint16 dst_color = (color_blend_factors & 0xFF);
-
-        return VkPipelineColorBlendAttachmentState {
-            .colorWriteMask = color_write_mask,
-            .blendEnable = true,
-            .colorBlendOp = static_cast<VkBlendOp>(color_op),
-            .alphaBlendOp = static_cast<VkBlendOp>(alpha_op),
-            .srcAlphaBlendFactor = static_cast<VkBlendFactor>(src_alpha),
-            .dstAlphaBlendFactor = static_cast<VkBlendFactor>(dst_alpha),
-            .srcColorBlendFactor = static_cast<VkBlendFactor>(src_color),
-            .dstColorBlendFactor = static_cast<VkBlendFactor>(dst_color),
-        };
-    }
 };

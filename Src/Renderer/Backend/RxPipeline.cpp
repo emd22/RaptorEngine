@@ -31,7 +31,7 @@ FxVertexInfo FxMakeVertexInfo()
 
     FxLogDebug("Amount of attributes: {:d}", attribs.Size);
 
-    return { binding_desc, std::move(attribs) };
+    return { binding_desc, std::move(attribs), .bIsInited = true };
 }
 
 FxVertexInfo FxMakeLightVertexInfo()
@@ -48,10 +48,10 @@ FxVertexInfo FxMakeLightVertexInfo()
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
     };
 
-    return { binding_desc, std::move(attribs) };
+    return { binding_desc, std::move(attribs), .bIsInited = true };
 }
 
-void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
+void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<RxShader>& shaders,
                                 const FxSlice<VkAttachmentDescription>& attachments,
                                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                                 FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
@@ -76,14 +76,13 @@ void RxGraphicsPipeline::Create(const std::string& name, ShaderList shader_list,
     };
 
     // Shaders
-    FxSizedArray<ShaderInfo> shader_stages = shader_list.GetShaderStages();
-    FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shader_stages.Size);
+    FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shaders.Size);
 
-    for (ShaderInfo stage : shader_stages) {
+    for (const RxShader& shader_stage : shaders) {
         const VkPipelineShaderStageCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = stage.GetStageBit(),
-            .module = stage.ShaderModule,
+            .stage = shader_stage.GetStageBit(),
+            .module = shader_stage.ShaderModule,
             .pName = "main",
             .pSpecializationInfo = &specialization_info,
         };

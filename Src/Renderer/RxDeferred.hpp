@@ -5,6 +5,7 @@
 #include "Backend/RxFramebuffer.hpp"
 #include "Backend/RxImage.hpp"
 #include "Backend/RxSampler.hpp"
+#include "RxPipelineList.hpp"
 #include "RxSkybox.hpp"
 
 struct RxFrameData;

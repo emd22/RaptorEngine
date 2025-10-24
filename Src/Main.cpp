@@ -2,15 +2,13 @@
 #define VMA_DEBUG_LOG(...) FxLogWarning(__VA_ARGS__)
 
 #include "Core/FxDefines.hpp"
-#include "Renderer/Backend/ShaderList.hpp"
 #include "Renderer/FxCamera.hpp"
 #include "Renderer/FxLight.hpp"
-#include "Renderer/Renderer.hpp"
-
 
 /* Vulkan Memory Allocator */
 #include <ThirdParty/vk_mem_alloc.h>
 
+#include <Core/FxDefer.hpp>
 #include <Core/FxLinkedList.hpp>
 #include <Core/FxMemory.hpp>
 #include <FxEngine.hpp>
@@ -19,7 +17,6 @@
 
 #define SDL_DISABLE_OLD_NAMES
 #include "FxControls.hpp"
-#include "FxEntity.hpp"
 #include "FxMaterial.hpp"
 
 #include <SDL3/SDL.h>
@@ -43,7 +40,6 @@
 #include <Script/FxScript.hpp>
 #include <chrono>
 #include <csignal>
-#include <iostream>
 
 
 FX_SET_MODULE_NAME("Main")
@@ -109,10 +105,10 @@ void TestQuatFromEuler()
     FxLogInfo("Returned angles: {}", quat.GetEulerAngles());
 }
 
-struct DeleteOnExit
-{
-    ~DeleteOnExit() { FxEngineGlobalsDestroy(); }
-};
+// struct DeleteOnExit
+// {
+//     ~DeleteOnExit() { FxEngineGlobalsDestroy(); }
+// };
 
 int main()
 {
@@ -145,8 +141,8 @@ int main()
     }
 
     FxEngineGlobalsInit();
-
-    DeleteOnExit doe;
+    // Destroy the engine's globals at the end of scope
+    FxDefer([] { FxEngineGlobalsDestroy(); });
 
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { Running = false; };

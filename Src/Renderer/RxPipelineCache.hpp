@@ -15,7 +15,8 @@ public:
 public:
     RxPipelineCache() = default;
 
-    void CreatePipeline(const char* name, ShaderList shader_list, const FxSlice<VkAttachmentDescription>& attachments,
+    void CreatePipeline(const char* name, const FxSlice<RxShader>& shader_list,
+                        const FxSlice<VkAttachmentDescription>& attachments,
                         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                         FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
                         const RxGraphicsPipelineProperties& properties);

@@ -3,11 +3,13 @@
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxRef.hpp>
 #include <Physics/FxPhysicsJolt.hpp>
+#include <Renderer/RxPipelineList.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 extern RxRenderBackend* gRenderer;
 extern FxPhysicsJolt* gPhysics;
 extern FxShaderCompiler* gShaderCompiler;
+extern RxPipelineList* gPipelines;
 
 inline constexpr const char* gPipelineGeometryName = "Geometry";
 inline constexpr FxHash gPipelineGeometry = FxHashStr(gPipelineGeometryName);

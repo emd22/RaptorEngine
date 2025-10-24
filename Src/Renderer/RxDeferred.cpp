@@ -229,13 +229,18 @@ void RxDeferredRenderer::CreateGPassPipeline()
         },
     };
 
-    ShaderList shader_list;
+    // ShaderList shader_list;
 
-    RxShader vertex_shader("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
-    RxShader fragment_shader("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
+    // FxStackArray<RxShader, 2> shader_list;
+    // RxShader vertex_shader("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
+    // RxShader fragment_shader("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
 
-    shader_list.Vertex = vertex_shader.ShaderModule;
-    shader_list.Fragment = fragment_shader.ShaderModule;
+    // RxShader raw_shader_list[2] = { vertex_shader, fragment_shader };
+    // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
+
+    FxStackArray<RxShader, 2> shader_list;
+    shader_list.Insert()->Load("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
+    shader_list.Insert()->Load("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
 
     // Create the layout for the GPass pipeline
     CreateGPassPipelineLayout();
@@ -386,13 +391,20 @@ void RxDeferredRenderer::CreateLightingPipeline()
         },
     };
 
-    ShaderList shader_list;
+    // ShaderList shader_list;
 
-    RxShader vertex_shader("../Shaders/Spirv/Lighting.spv_vs", RxShaderType::Vertex);
-    RxShader fragment_shader("../Shaders/Spirv/Lighting.spv_fs", RxShaderType::Fragment);
+    // RxShader vertex_shader("../Shaders/Spirv/Lighting.spv_vs", RxShaderType::Vertex);
+    // RxShader fragment_shader("../Shaders/Spirv/Lighting.spv_fs", RxShaderType::Fragment);
 
-    shader_list.Vertex = vertex_shader.ShaderModule;
-    shader_list.Fragment = fragment_shader.ShaderModule;
+    // shader_list.Vertex = vertex_shader.ShaderModule;
+    // shader_list.Fragment = fragment_shader.ShaderModule;
+
+    // RxShader raw_shader_list[2] = { vertex_shader, fragment_shader };
+    // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
+    //
+    FxStackArray<RxShader, 2> shader_list;
+    shader_list.Insert()->Load("../Shaders/Spirv/Lighting.spv_vs", RxShaderType::Vertex);
+    shader_list.Insert()->Load("../Shaders/Spirv/Lighting.spv_fs", RxShaderType::Fragment);
 
     if (DsLayoutLightingFrag == nullptr) {
         CreateLightingDSLayout();
@@ -544,13 +556,19 @@ void RxDeferredRenderer::CreateCompPipeline()
         },
     };
 
-    ShaderList shader_list;
+    // ShaderList shader_list;
 
-    RxShader vertex_shader("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
-    RxShader fragment_shader("../Shaders/Spirv/Composition.spv_fs", RxShaderType::Fragment);
+    // RxShader vertex_shader("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
+    // RxShader fragment_shader("../Shaders/Spirv/Composition.spv_fs", RxShaderType::Fragment);
 
-    shader_list.Vertex = vertex_shader.ShaderModule;
-    shader_list.Fragment = fragment_shader.ShaderModule;
+    // RxShader raw_shader_list[2]{};
+    FxStackArray<RxShader, 2> shader_list;
+    shader_list.Insert()->Load("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
+    shader_list.Insert()->Load("../Shaders/Spirv/Composition.spv_fs", RxShaderType::Fragment);
+    // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
+
+    // shader_list.Vertex = vertex_shader.ShaderModule;
+    // shader_list.Fragment = fragment_shader.ShaderModule;
 
     CreateCompPipelineLayout();
 

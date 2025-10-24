@@ -24,6 +24,8 @@ class FxSizedArray
 public:
     static constexpr int64 scItemNotFound = -1;
 
+    using SizeType = size_t;
+
 public:
     struct Iterator
     {
@@ -207,6 +209,14 @@ public:
         memcpy(Data, other.Data, other.GetSizeInBytes());
     }
 
+    void InitAsCopyOf(const FxSizedArray<TElementType>& other, SizeType copy_capacity)
+    {
+        InitCapacity(max(other.Capacity, copy_capacity));
+        Size = other.Size;
+
+        memcpy(Data, other.Data, other.GetSizeInBytes());
+    }
+
     void Clear() { Size = 0; }
 
     inline bool IsEmpty() const { return Size == 0; }
@@ -371,8 +381,8 @@ protected:
     }
 
 public:
-    size_t Size = 0;
-    size_t Capacity = 0;
+    SizeType Size = 0;
+    SizeType Capacity = 0;
 
     TElementType* Data = nullptr;
 
