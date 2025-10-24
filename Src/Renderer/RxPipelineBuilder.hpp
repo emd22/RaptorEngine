@@ -2,6 +2,7 @@
 
 #include "Backend/RxPipeline.hpp"
 #include "Backend/RxShader.hpp"
+#include "RxAttachment.hpp"
 
 #include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
@@ -48,40 +49,11 @@ union RxPipelineBlendOp
 
 struct RxPipelineBlendAttachment
 {
-    bool Enabled = false;
+    bool Enabled = true;
     RxColorComponentFlags Mask = RxColorComponent_RGBA;
     RxPipelineBlendOp BlendOp {};
     RxPipelineBlendFactor AlphaBlend {};
     RxPipelineBlendFactor ColorBlend {};
-};
-
-enum class RxPipelineLoadOp
-{
-    Clear = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    Load = VK_ATTACHMENT_LOAD_OP_LOAD,
-    DontCare = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-};
-
-enum class RxPipelineStoreOp
-{
-    None = VK_ATTACHMENT_STORE_OP_NONE,
-    Store = VK_ATTACHMENT_STORE_OP_STORE,
-    DontCare = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-};
-
-struct RxPipelineAttachment
-{
-    VkFormat Format = VK_FORMAT_B8G8R8A8_UNORM;
-    VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT;
-
-    RxPipelineLoadOp LoadOp = RxPipelineLoadOp::Clear;
-    RxPipelineStoreOp StoreOp = RxPipelineStoreOp::Store;
-
-    RxPipelineLoadOp StencilLoadOp = RxPipelineLoadOp::Clear;
-    RxPipelineStoreOp StencilStoreOp = RxPipelineStoreOp::Store;
-
-    VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 };
 
 
@@ -106,12 +78,13 @@ struct RxPipelineAttachment
 //     RxBlendFactorDst_DstAlpha = (VK_BLEND_FACTOR_DST_ALPHA & 0xFF),
 // };
 
+
 class RxPipelineBuilder
 {
     static constexpr uint32 scMinAttachmentCount = 10;
 
 public:
-    RxPipelineBuilder() = default;
+    RxPipelineBuilder() {}
 
     static RxPipelineBuilder Make() { return {}; }
 
@@ -126,13 +99,9 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& AddAttachment(const RxPipelineAttachment& attachment)
+    FX_FORCE_INLINE RxPipelineBuilder& SetAttachments(RxAttachmentList* attachment_list)
     {
-        if (mAttachments == nullptr) {
-            mAttachments.InitCapacity(scMinAttachmentCount);
-        }
-
-        mAttachments.Insert(attachment);
+        mpAttachmentList = attachment_list;
 
         return *this;
     }
@@ -145,18 +114,29 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& SetVertexInfo(FxVertexInfo&& vertex_info)
+    FX_FORCE_INLINE RxPipelineBuilder& SetVertexInfo(FxVertexInfo* vertex_info)
     {
-        mVertexInfo = std::move(vertex_info);
+        mVertexInfo = vertex_info;
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& SetRenderPass(const FxRef<RxRenderPass>& render_pass)
+    FX_FORCE_INLINE RxPipelineBuilder& SetLayout(VkPipelineLayout layout)
+    {
+        mLayout = layout;
+        return *this;
+    }
+
+    FX_FORCE_INLINE RxPipelineBuilder& SetRenderPass(RxRenderPass* render_pass)
     {
         mRenderPass = render_pass;
         return *this;
     }
 
+    FX_FORCE_INLINE RxPipelineBuilder& SetName(const std::string& name)
+    {
+        mPipelineName = name;
+        return *this;
+    }
 
     /////////////////////////////
     // Properties setters
@@ -187,10 +167,9 @@ public:
         return *this;
     }
 
-    RxGraphicsPipeline Build()
-    {
-        RxGraphicsPipeline pipeline;
 
+    void Build(RxGraphicsPipeline& pipeline)
+    {
         FxSizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments;
 
         // Make vulkan blend attachments
@@ -211,59 +190,30 @@ public:
             }
         }
 
-        FxStackArray<RxShader, 3> shader_list;
-
-        if (mVertexShader) {
-            shader_list.Insert(*mVertexShader);
-        }
-        if (mFragmentShader) {
-            shader_list.Insert(*mFragmentShader);
-        }
-
-        FxSizedArray<VkAttachmentDescription> vk_attachments;
-
+        FxSizedArray<FxRef<RxShader>> shader_list = { mVertexShader, mFragmentShader };
 
         // Make vulkan blend attachments
-        {
-            vk_attachments.InitCapacity(mAttachments.Size);
 
-            for (const RxPipelineAttachment& am : mAttachments) {
-                vk_attachments.Insert(VkAttachmentDescription {
-                    .format = am.Format,
-                    .samples = am.Samples,
+        pipeline.Layout = mLayout;
 
-                    .loadOp = static_cast<VkAttachmentLoadOp>(am.LoadOp),
-                    .storeOp = static_cast<VkAttachmentStoreOp>(am.StoreOp),
-
-                    .stencilLoadOp = static_cast<VkAttachmentLoadOp>(am.StencilLoadOp),
-                    .stencilStoreOp = static_cast<VkAttachmentStoreOp>(am.StencilStoreOp),
-
-                    .initialLayout = am.InitialLayout,
-                    .finalLayout = am.FinalLayout,
-                });
-            }
-        }
-
-        if (!mVertexInfo.bIsInited) {
-            mVertexInfo = FxMakeVertexInfo();
-        }
-
-        pipeline.Create(mPipelineName, shader_list, vk_attachments, vk_blend_attachments, &mVertexInfo, *mRenderPass,
-                        mProperties);
-
-        return pipeline;
+        FxLogInfo("Creating pipeline '{}'", mPipelineName);
+        pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetBuiltAttachments(), vk_blend_attachments,
+                        mVertexInfo, *mRenderPass, mProperties);
     }
 
 private:
     FxSizedArray<RxPipelineBlendAttachment> mBlendAttachments;
-    FxSizedArray<RxPipelineAttachment> mAttachments;
+    RxAttachmentList* mpAttachmentList = nullptr;
+
+    VkPipelineLayout mLayout = nullptr;
+
     std::string mPipelineName = "Unnamed Pipeline";
 
     FxRef<RxShader> mVertexShader { nullptr };
     FxRef<RxShader> mFragmentShader { nullptr };
 
-    FxRef<RxRenderPass> mRenderPass { nullptr };
+    RxRenderPass* mRenderPass { nullptr };
 
-    FxVertexInfo mVertexInfo;
+    FxVertexInfo* mVertexInfo { nullptr };
     RxGraphicsPipelineProperties mProperties;
 };

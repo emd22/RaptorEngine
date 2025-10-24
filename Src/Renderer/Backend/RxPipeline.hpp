@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxSlice.hpp>
 #include <Math/Mat4.hpp>
@@ -72,18 +73,20 @@ struct RxPushConstants
 class RxGraphicsPipeline
 {
 public:
-    void Create(const std::string& name, const FxSlice<RxShader>& shaders,
+    void Create(const std::string& name, const FxSlice<FxRef<RxShader>>& shaders,
                 const FxSlice<VkAttachmentDescription>& attachments,
                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, FxVertexInfo* vertex_info,
                 const RxRenderPass& render_pass, const RxGraphicsPipelineProperties& properties);
+
+    FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout) { Layout = layout; }
 
     // void CreateComp(ShaderList shader_list, VkPipelineLayout layout, const
     // FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, bool is_comp);
 
     // VkPipelineLayout CreateCompLayout();
 
-    VkPipelineLayout CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
-                                  const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
+    static VkPipelineLayout CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
+                                         const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
 
     void Destroy();
 

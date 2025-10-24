@@ -89,24 +89,25 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
 
     // ShaderList shader_list;
 
-    // RxShader vertex_shader("../shaders/Skybox.vs.spv", RxShaderType::Vertex);
-    // RxShader fragment_shader("../shaders/Skybox.fs.spv", RxShaderType::Fragment);
+    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("../shaders/Skybox.vs.spv", RxShaderType::Vertex);
+    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("../shaders/Skybox.fs.spv", RxShaderType::Fragment);
 
 
     // RxShader raw_shader_list[2] = { vertex_shader, fragment_shader };
     // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
 
 
-    FxStackArray<RxShader, 2> shader_list;
-    shader_list.Insert()->Load("../Shaders/Skybox.vs.spv", RxShaderType::Vertex);
-    shader_list.Insert()->Load("../Shaders/Skybox.fs.spv", RxShaderType::Fragment);
+    FxSizedArray<FxRef<RxShader>> shader_list = { vertex_shader, fragment_shader };
+    // shader_list.Insert()->Load("../Shaders/Skybox.vs.spv", RxShaderType::Vertex);
+    // shader_list.Insert()->Load("../Shaders/Skybox.fs.spv", RxShaderType::Fragment);
 
     // shader_list.Vertex = vertex_shader.ShaderModule;
     // shader_list.Fragment = fragment_shader.ShaderModule;
 
-    CreateSkyboxPipelineLayout();
 
     FxVertexInfo vert_info = FxMakeLightVertexInfo();
+
+    SkyboxPipeline.Layout = CreateSkyboxPipelineLayout();
 
     SkyboxPipeline.Create(
         "Skybox", shader_list, FxMakeSlice(attachments, FxSizeofArray(attachments)),
@@ -165,6 +166,8 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
 
         DsSkyboxFragments.Insert(descriptor_set);
     }
+
+    SkyboxPipeline.SetLayout(layout);
 
     return layout;
 }
