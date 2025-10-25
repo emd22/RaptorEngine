@@ -623,47 +623,6 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 
 void RxDeferredRenderer::CreateCompPipeline()
 {
-    // VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-    //     VkPipelineColorBlendAttachmentState {
-    //         .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-    //                           VK_COLOR_COMPONENT_A_BIT,
-    //         .blendEnable = VK_FALSE,
-    //     },
-    // };
-
-    // VkAttachmentDescription attachments[] = {
-    //     // Combined output
-    //     VkAttachmentDescription {
-    //         .format = gRenderer->Swapchain.SurfaceFormat.format,
-    //         .samples = VK_SAMPLE_COUNT_1_BIT,
-    //         .loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    //         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-    //         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    //         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-    //         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-    //         .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    //     },
-    // };
-
-    // ShaderList shader_list;
-
-    // RxShader vertex_shader("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
-    // RxShader fragment_shader("../Shaders/Spirv/Composition.spv_fs", RxShaderType::Fragment);
-
-    // RxShader raw_shader_list[2]{};
-    // FxStackArray<RxShader, 2> shader_list;
-    // shader_list.Insert()->Load("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
-    // shader_list.Insert()->Load("../Shaders/Spirv/Composition.spv_fs", RxShaderType::Fragment);
-    // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
-
-    // shader_list.Vertex = vertex_shader.ShaderModule;
-    // shader_list.Fragment = fragment_shader.ShaderModule;
-
-    ;
-
-    // FxSlice<VkAttachmentDescription> color_attachments = FxMakeSlice(attachments, FxSizeofArray(attachments));
-
-
     RxAttachmentList attachment_list;
     attachment_list.Add({
         .Format = gRenderer->Swapchain.SurfaceFormat.format,
@@ -673,15 +632,9 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     RpComposition.Create2(attachment_list);
 
-    // PlComposition.Create("Composition", shader_list, color_attachments,
-    //                      FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), nullptr,
-    //                      RpComposition, { .CullMode = VK_CULL_MODE_NONE, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
-
-
     FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
     FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Composition.spv_fs",
                                                           RxShaderType::Fragment);
-
 
     RxPipelineBuilder builder;
 

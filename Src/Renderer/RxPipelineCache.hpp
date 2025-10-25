@@ -3,14 +3,18 @@
 #include <Core/FxItemCache.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
 
-struct RxPipelineCacheSection : public FxItemCacheSection<RxGraphicsPipeline>
+using RxPipelineCacheKey = FxHash;
+
+struct RxPipelineCacheSection : public FxItemCacheSection_MultiItem<RxGraphicsPipeline>
 {
 };
 
-class RxPipelineCache : public FxItemCache<RxGraphicsPipeline, RxPipelineCacheSection>
+using RxPipelineCacheType = FxItemCache<RxPipelineCacheKey, RxGraphicsPipeline, RxPipelineCacheSection>;
+
+class RxPipelineCache : public RxPipelineCacheType
 {
 public:
-    using Handle = FxItemCacheHandle<RxGraphicsPipeline, RxPipelineCacheSection>;
+    using Handle = FxItemCacheHandle<RxPipelineCacheKey, RxGraphicsPipeline, RxPipelineCacheType>;
 
 public:
     RxPipelineCache() = default;
@@ -24,5 +28,5 @@ public:
     Handle RequestPipeline(const FxHash name_hash);
     void ReleasePipeline(const FxHash name_hash, RxGraphicsPipeline* pipeline);
 
-    ~RxPipelineCache() override { Destroy(); }
+    ~RxPipelineCache() override {}
 };

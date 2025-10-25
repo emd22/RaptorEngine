@@ -5,11 +5,13 @@
 #include <Physics/FxPhysicsJolt.hpp>
 #include <Renderer/RxPipelineList.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/RxRenderPassCache.hpp>
 
 extern RxRenderBackend* gRenderer;
 extern FxPhysicsJolt* gPhysics;
 extern FxShaderCompiler* gShaderCompiler;
 extern RxPipelineList* gPipelines;
+extern RxRenderPassCache* gRenderPassCache;
 
 inline constexpr const char* gPipelineGeometryName = "Geometry";
 inline constexpr FxHash gPipelineGeometry = FxHashStr(gPipelineGeometryName);

@@ -30,6 +30,13 @@ constexpr uint64 FxUnitGibibyte = FxUnitMebibyte * 1024;
 
 #include <Core/FxPanic.hpp>
 
+template <typename T, typename... TTypes>
+concept C_IsAnyOf = (std::is_same_v<T, TTypes> || ...);
+
+
+template <typename T, typename... TTypes>
+concept C_IsAnyBaseOf = (std::is_base_of_v<TTypes, T> || ...);
+
 
 // template <typename ValueType>
 // class Optional {
