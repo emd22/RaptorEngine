@@ -34,7 +34,7 @@ public:
     FxQuat operator*(const FxQuat& other) const;
 
     void FromJoltQuaternion(const JPH::Quat& quat);
-    void ToJoltQuaternion(JPH::Quat& quat);
+    void ToJoltQuaternion(JPH::Quat& quat) const;
 
     FX_FORCE_INLINE bool IsCloseTo(const FxQuat& other, const float32 tolerance = 0.0001) const;
     bool IsCloseTo(const JPH::Quat& other, const float32 tolerance = 0.0001) const;

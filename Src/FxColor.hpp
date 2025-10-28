@@ -5,6 +5,16 @@
 struct FxColor
 {
 public:
+    // Colour definitions
+    static const FxColor sNone;
+
+    static const FxColor sWhite;
+    static const FxColor sBlack;
+    static const FxColor sRed;
+    static const FxColor sBlue;
+    static const FxColor sGreen;
+
+public:
     FxColor() {}
     FxColor(uint32 value) : Value(value) {}
 

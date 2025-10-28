@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Asset/FxMeshGen.hpp>
+#include <FxColor.hpp>
 #include <FxEntity.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
@@ -47,11 +48,13 @@ public:
     FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };
     FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen { nullptr };
 
-    FxVec3f Color = FxVec3f::sOne;
+    FxColor Color = FxColor::sWhite;
 
     float Radius = 2.0f;
 
     FxLightFlags Flags = FxLF_None;
+
+    bool bEnabled = true;
 
 private:
     FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };

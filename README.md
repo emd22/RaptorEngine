@@ -15,3 +15,9 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 
 ## Platforms
 Currently Foxtrot **only supports macOS and arm64**. There will be x86_64 and Windows support in the future, but I am currently focusing my time on other parts of the engine.
+
+## Screenshots
+
+**PBR Lighting**
+<!--<img src="Screenshots/00_PbrLitHelmet.png" width="300">-->
+![Damaged helmet model with red and white lights lighting it](Screenshots/00_PbrLitHelmet.png)

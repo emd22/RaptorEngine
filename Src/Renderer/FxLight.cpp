@@ -79,6 +79,10 @@ void FxLight::MoveLightVolumeTo(const FxVec3f& position) { this->FxEntity::MoveT
 
 void FxLight::Render(const FxCamera& camera)
 {
+    if (!bEnabled) {
+        return;
+    }
+
     if (camera.Position.IntersectsSphere(mPosition, Radius)) {
         mpLightPipeline = &gRenderer->DeferredRenderer->PlLightingInsideVolume;
     }
@@ -115,15 +119,17 @@ void FxLight::Render(const FxCamera& camera)
                 light_positions = mLightPosition.mData;
             }
 
-            memcpy(push_constants.LightPos, light_positions, sizeof(float32) * 4);
+            memcpy(push_constants.LightPosition, light_positions, sizeof(float32) * 3);
         }
 
-        push_constants.LightColor[0] = Color.X;
-        push_constants.LightColor[1] = Color.Y;
-        push_constants.LightColor[2] = Color.Z;
-        push_constants.LightColor[3] = 1.0;
+        // push_constants.LightColor[0] = Color.X;
+        // push_constants.LightColor[1] = Color.Y;
+        // push_constants.LightColor[2] = Color.Z;
+        // push_constants.LightColor[3] = 1.0;
+        //
+        push_constants.LightColor = Color.Value;
 
-        memcpy(push_constants.PlayerPos, camera.Position.mData, sizeof(float32) * 4);
+        memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
         push_constants.LightRadius = Radius;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, mpLightPipeline->Layout,

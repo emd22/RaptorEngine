@@ -16,10 +16,16 @@
 class FxUtil
 {
 public:
-    template <typename EnumClass>
-    static constexpr std::underlying_type<EnumClass>::type EnumToInt(EnumClass value)
+    template <typename TEnumClass>
+    static constexpr std::underlying_type<TEnumClass>::type EnumToInt(TEnumClass value)
     {
-        return static_cast<typename std::underlying_type<EnumClass>::type>(value);
+        return static_cast<typename std::underlying_type<TEnumClass>::type>(value);
+    }
+
+    template <typename TEnumClass, typename TOutputType>
+    static constexpr TOutputType EnumToInt(TEnumClass value)
+    {
+        return static_cast<TOutputType>(value);
     }
 
     static FILE* FileOpen(const char* path, const char* mode)

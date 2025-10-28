@@ -7,8 +7,14 @@
 #include "../FxPanic.hpp"
 #include "../FxTypes.hpp"
 
-// #define FX_MEMPOOL_WARN_SLOW_ALLOC 1
-// #define FX_MEMPOOL_NEXT_FIT        1
+#include <Math/FxMathUtil.hpp>
+
+// Align allocations to 16 bytes
+static constexpr uint32 scAlignToBytes = 16;
+
+// Allocates enough nodes given all allocations are approximately `scPredictedAllocSize`. This is
+// just to prevent additional calls to `malloc` during calls to our `Alloc` functions.
+static constexpr uint32 scPredictedAllocSize = 64;
 
 void FxMemPoolPage::Create(uint64 size)
 {
@@ -30,39 +36,15 @@ void FxMemPoolPage::Create(uint64 size)
     mMem = static_cast<uint8*>(allocated_ptr);
 
     // This should allocate enough items to avoid resizing the paged arrays / linked list
-    const uint32 num_mem_blocks = size / 64;
+    const uint32 num_mem_blocks = size / scPredictedAllocSize;
     mMemBlocks.Create(num_mem_blocks);
-}
 
-static inline uint64 GetAlignedValue(uint64 value)
-{
-    // The byte boundary to align to
-    const uint16 align_to_bytes = 16;
-
-    if constexpr (align_to_bytes == 16) {
-        // Get the bottom four bits (value % 16)
-        const uint8 remainder = (value & 0x0F);
-
-        if (remainder != 0) {
-            value += (16 - remainder);
-        }
-
-        return value;
-    }
-
-    const uint16 remainder = (value % align_to_bytes);
-
-    // If the value is not aligned(there is a remainder in the division), offset our value by the missing bytes
-    if (remainder != 0) {
-        value += (align_to_bytes - remainder);
-    }
-
-    return value;
+    FxLogDebug("Allocated {} mem block slots!", num_mem_blocks);
 }
 
 static inline uint8* GetAlignedPtr(uint8* ptr)
 {
-    return reinterpret_cast<uint8*>(GetAlignedValue(reinterpret_cast<uintptr_t>(ptr)));
+    return reinterpret_cast<uint8*>(FxMath::AlignValue<scAlignToBytes>(reinterpret_cast<uintptr_t>(ptr)));
 }
 
 
@@ -91,7 +73,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
 
     uint8* new_block_ptr = mMem;
 
-    const uint64 aligned_size = GetAlignedValue(requested_size);
+    const uint64 aligned_size = FxMath::AlignValue<scAlignToBytes>(requested_size);
 
     // If there are no allocations currently, allocate at start and exit early
     if (!mMemBlocks.Tail) {
@@ -115,7 +97,7 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
     const uint64 bytes_used_in_page = static_cast<uint64>(new_block_ptr - mMem);
 
     // Our potential allocation fits, return our entry!
-    if (bytes_used_in_page < GetAlignedValue(mCapacity)) {
+    if (bytes_used_in_page < FxMath::AlignValue<scAlignToBytes>(mCapacity)) {
         // Create a new block entry for the allocation
         FxMemPoolPage::MemBlock new_block { .Size = aligned_size, .Start = GetAlignedPtr(new_block_ptr) };
 
@@ -203,78 +185,6 @@ auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMe
     return nullptr;
 }
 #endif
-
-// #ifdef FX_MEMPOOL_FIRST_FIT
-// auto FxMemPoolPage::AllocateMemory(uint64 requested_size) -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
-// {
-//     auto* node = mMemBlocks.Head;
-
-//     // Check to see if there is space at the start of the list
-//     if (node && node == mMemBlocks.Head && node->Data.Start != mMem) {
-//         const uint64 gap_size = (node->Data.Start) - mMem;
-//         const uint64 aligned_size = GetAlignedValue(requested_size);
-
-//         // There is a gap, we can get our memory block here
-//         if (gap_size >= aligned_size) {
-//             FxMemPoolPage::MemBlock new_block { .Size = aligned_size, .Start = mMem };
-
-//             return mMemBlocks.InsertFirst(new_block);
-//         }
-//     }
-
-//     // Walk through currently allocated blocks. If there is a gap, check to see if it is large enough.
-//     while (node != nullptr) {
-//         FxMemPoolPage::MemBlock& block = node->Data;
-
-//         // If there is no node next, break as we won't find a gap. This means we will fallthrough
-//         // to below, adding a new block to the end of the list.
-//         if (node->Next == nullptr) {
-//             break;
-//         }
-
-//         FxMemPoolPage::MemBlock& next_block = node->Next->Data;
-
-//         uint8* current_block_end = block.Start + block.Size;
-//         const int64 gap_size = next_block.Start - current_block_end;
-
-//         // The gap is large enough for our buffer, take it
-//         if (gap_size >= requested_size) {
-//             FxMemPoolPage::MemBlock new_block { .Size = GetAlignedValue(requested_size),
-//                                                 .Start = GetAlignedPtr(current_block_end) };
-
-//             // Track that the block is now allocated
-//             return mMemBlocks.InsertAfterNode(new_block, node);
-//         }
-
-//         node = node->Next;
-//     }
-
-//     // There are no gaps between the allocated blocks, create a new block.
-//     uint8* new_block_ptr = mMem;
-
-//     // If there are previous allocations (there is a tail), then we can find the furthest pointer
-//     // along and allocate after that. If there have not been previous allocations, we will use the
-//     // start of the pool as defined above.
-//     if (mMemBlocks.Tail) {
-//         const FxMemPoolPage::MemBlock& last_block = mMemBlocks.Tail->Data;
-//         new_block_ptr = last_block.Start + last_block.Size;
-
-//         // Check to make sure there is space left in the pool
-//         if (static_cast<uint64>(new_block_ptr - mMem) > GetAlignedValue(mSize)) {
-//             // FxPanic("FxMemPool", "Could not resize memory pool! (Not implemented)", 0);
-//             return nullptr;
-//         }
-//     }
-
-//     // Create a new block entry for the allocation
-//     FxMemPoolPage::MemBlock new_block { .Size = GetAlignedValue(requested_size),
-//                                         .Start = GetAlignedPtr(new_block_ptr) };
-
-//     auto* new_node = mMemBlocks.InsertLast(std::move(new_block));
-
-//     return new_node;
-// }
-// #endif
 
 auto FxMemPoolPage::GetNodeFromPtr(void* ptr) const -> FxMPLinkedList<FxMemPoolPage::MemBlock>::Node*
 {
@@ -377,7 +287,7 @@ void* FxMemPoolPage::Realloc(void* ptr, uint32 new_size)
 
     // Node is at end of block list, simply increase size
     if (node->Next == nullptr) {
-        node->Data.Size = GetAlignedValue(new_size);
+        node->Data.Size = FxMath::AlignValue<scAlignToBytes>(new_size);
         return node->Data.Start;
     }
     // There is a node after this, check the gap
@@ -387,7 +297,7 @@ void* FxMemPoolPage::Realloc(void* ptr, uint32 new_size)
 
     // There is enough space between the nodes, reallocate in place
     if (gap_size >= new_size) {
-        node->Data.Size = GetAlignedValue(new_size);
+        node->Data.Size = FxMath::AlignValue<scAlignToBytes>(new_size);
         return node->Data.Start;
     }
 

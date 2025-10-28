@@ -213,11 +213,11 @@ public:
 
         // Use a placement new if the object is constructable with the provided arguments
         if constexpr (std::is_constructible_v<Type, Args...>) {
-            new (ptr) Type(std::forward<Args>(args)...);
+            ::new (ptr) Type(std::forward<Args>(args)...);
         }
-        else {
-            printf("Not constructable %s\n", typeid(Type).name());
-        }
+        // else {
+        // printf("Not constructable %s\n", typeid(Type).name());
+        // }
 
         return ptr;
     }
@@ -234,7 +234,7 @@ public:
 
         // Use a placement new if the object is constructable with the provided arguments
         if constexpr (std::is_constructible_v<Type, Args...>) {
-            new (ptr) Type(std::forward<Args>(args)...);
+            ::new (ptr) Type(std::forward<Args>(args)...);
         }
 
         return ptr;
@@ -249,9 +249,6 @@ public:
      * @brief Calculates the total amount of bytes in use across all pages in the memory pool.
      */
     FX_FORCE_INLINE uint64 GetTotalUsed() const { return mBytesInUse; }
-
-    /** Frees an allocated pointer on the global memory pool */
-    static void FreeRaw(void* ptr, FxMemPool* pool = nullptr);
 
     template <typename Type>
     static void Free(Type* ptr, FxMemPool* pool = nullptr)
@@ -294,6 +291,10 @@ private:
     inline bool IsPtrInPage(void* ptr, FxMemPoolPage* page) const;
 
     void AllocateNewPage();
+
+
+    /** Frees an allocated pointer on the global memory pool */
+    static void FreeRaw(void* ptr, FxMemPool* pool = nullptr);
 
 private:
     FxMemPoolPage* mpCurrentPage = nullptr;

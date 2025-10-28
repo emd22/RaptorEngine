@@ -20,6 +20,7 @@ void FxBasicDb::Open(const char* path)
     }
 
     mInFile.SeekTo(0);
+
     mpData = mInFile.Read<char>();
 
     Parse();

@@ -7,7 +7,9 @@
 class FxCamera
 {
 public:
-    virtual void Update() = 0;
+    virtual void Update(const FxVec3f& direction) = 0;
+
+    virtual ~FxCamera() {}
 
 public:
     FxVec3f Position = FxVec3f(0.0f);
@@ -62,17 +64,14 @@ public:
 
     inline void MoveBy(const FxVec3f& offset)
     {
-        Position += FxVec3f(offset.X, offset.Y, offset.Z);
-
+        Position += offset;
         RequireUpdate();
     }
 
-    inline void Move(const FxVec3f& offset)
+    FX_FORCE_INLINE void MoveTo(const FxVec3f& position)
     {
-        const FxVec3f forward = Direction * offset.Z;
-        const FxVec3f right = Direction.Cross(FxVec3f::sUp) * offset.X;
-
-        MoveBy(forward + right);
+        Position = position;
+        RequireUpdate();
     }
 
     inline void SetAspectRatio(float32 aspect_ratio)
@@ -82,18 +81,22 @@ public:
         UpdateProjectionMatrix();
     }
 
-    void Update() override;
+    void Update(const FxVec3f& direction) override;
+
+    void UpdateViewMatrix(const FxVec3f& direction);
 
     inline void RequireUpdate() { mRequiresUpdate = true; }
 
-public:
-    FxVec3f Direction = FxVec3f(0.0f);
+    ~FxPerspectiveCamera() override {}
 
-private:
-    bool mRequiresUpdate = true;
+public:
+    // FxVec3f Direction = FxVec3f(0.0f);
 
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
+
+private:
+    bool mRequiresUpdate = true;
 
     float32 mFovRad = FxDegToRad(80.0f);
 

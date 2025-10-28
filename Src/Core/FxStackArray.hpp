@@ -33,6 +33,12 @@ public:
         return &Data[Size - 1];
     }
 
+    T* Insert()
+    {
+        ++Size;
+        return &Data[Size - 1];
+    }
+
     const T& operator[](size_t index) const
     {
         if (index > Capacity) {

@@ -45,7 +45,7 @@ void FxPhysicsJolt::Update()
     // simulation stable. Do 1 collision step per 1 / 60th of a second (round up).
     const int collision_steps = 1;
 
-    PhysicsSystem.Update(mDeltaTime, collision_steps, mpTempAllocator.pPtr, mpJobSystem.pPtr);
+    PhysicsSystem.Update(cDeltaTime, collision_steps, pTempAllocator.pPtr, pJobSystem.pPtr);
 }
 
 void FxPhysicsJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
@@ -64,9 +64,9 @@ void FxPhysicsJolt::Create()
 
     JPH::RegisterTypes();
 
-    mpTempAllocator.InitRef(10 * FxUnitMebibyte);
+    pTempAllocator.InitRef(10 * FxUnitMebibyte);
 
-    mpJobSystem.InitRef(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, JPH::thread::hardware_concurrency() - 1);
+    pJobSystem.InitRef(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, JPH::thread::hardware_concurrency() - 1);
 
     const uint32 max_bodies = 1024;
     const uint32 num_body_mutexes = 0;

@@ -11,6 +11,9 @@
 
 static FxBasicDb sShaderCompileDb;
 
+static const char* scVertexEntrypoint = "VertexMain";
+static const char* scFragmentEntrypoint = "FragmentMain";
+
 static Slang::ComPtr<slang::IGlobalSession>& GetSlangGlobalSession()
 {
     thread_local Slang::ComPtr<slang::IGlobalSession> global_session;
@@ -29,7 +32,7 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
 
     slang::TargetDesc target_desc {
         .format = SLANG_SPIRV,
-        .profile = global_session->findProfile("spirv_1_5"),
+        .profile = global_session->findProfile("spirv_1_4"),
     };
 
     FxStackArray<slang::PreprocessorMacroDesc, 0> preprocessor_macros = {};
@@ -41,7 +44,7 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
         },
         {
             slang::CompilerOptionName::LanguageVersion,
-            { slang::CompilerOptionValueKind::String, 0, 0, "2026", nullptr },
+            { slang::CompilerOptionValueKind::Int, 2026, 0, nullptr, nullptr },
         }
     };
 
@@ -149,8 +152,8 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path)
     Slang::ComPtr<slang::IEntryPoint> vertex_entry_point;
     Slang::ComPtr<slang::IEntryPoint> fragment_entry_point;
 
-    module->findEntryPointByName("VertexMain", vertex_entry_point.writeRef());
-    module->findEntryPointByName("FragmentMain", fragment_entry_point.writeRef());
+    module->findEntryPointByName(scVertexEntrypoint, vertex_entry_point.writeRef());
+    module->findEntryPointByName(scFragmentEntrypoint, fragment_entry_point.writeRef());
 
     FxStackArray<slang::IComponentType*, 3> component_types;
     component_types.Insert(module);
@@ -235,6 +238,6 @@ void FxShaderCompiler::Destroy()
 {
     sShaderCompileDb.Close();
 
-    GetSlangSession().setNull();
-    GetSlangGlobalSession().setNull();
+    // GetSlangSession().setNull();
+    // GetSlangGlobalSession().setNull();
 }

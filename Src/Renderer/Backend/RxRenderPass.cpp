@@ -10,17 +10,17 @@
 
 FX_SET_MODULE_NAME("RxRenderPass")
 
-void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
+void RxRenderPass::Create2(RxAttachmentList& attachments)
 {
     mDevice = gRenderer->GetDevice();
 
-    FxSizedArray<VkAttachmentReference> color_refs(attachments.Size);
+    FxSizedArray<VkAttachmentReference> color_refs(attachments.Attachments.Size);
 
     bool has_depth_attachment = false;
     VkAttachmentReference depth_attachment_ref {};
 
-    for (int i = 0; i < attachments.Size; i++) {
-        VkAttachmentDescription& attachment = attachments[i];
+    for (int i = 0; i < attachments.Attachments.Size; i++) {
+        const VkAttachmentDescription& attachment = attachments.Attachments[i].Build();
 
         if (RxUtil::IsFormatDepth(attachment.format)) {
             has_depth_attachment = true;
@@ -112,8 +112,8 @@ void RxRenderPass::Create2(const FxSlice<VkAttachmentDescription>& attachments)
 
     VkRenderPassCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = static_cast<uint32>(attachments.Size),
-        .pAttachments = attachments.Ptr,
+        .attachmentCount = static_cast<uint32>(attachments.Attachments.Size),
+        .pAttachments = attachments.GetBuiltAttachments(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
         .dependencyCount = sizeof(subpass_dependencies) / sizeof(subpass_dependencies[0]),

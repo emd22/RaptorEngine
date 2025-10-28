@@ -1,6 +1,6 @@
 #include "RxPipelineCache.hpp"
 
-void RxPipelineCache::CreatePipeline(const char* name, ShaderList shader_list,
+void RxPipelineCache::CreatePipeline(const char* name, const FxSlice<RxShader>& shader_list,
                                      const FxSlice<VkAttachmentDescription>& attachments,
                                      const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                                      FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
@@ -13,7 +13,7 @@ void RxPipelineCache::CreatePipeline(const char* name, ShaderList shader_list,
         return;
     }
 
-    RxGraphicsPipeline* pipeline = RequestItemFromHash(pipeline_hash);
+    RxGraphicsPipeline* pipeline = RequestGenericItem(pipeline_hash);
 
     pipeline->Create(name, shader_list, attachments, color_blend_attachments, vertex_info, render_pass, properties);
 
@@ -23,12 +23,12 @@ void RxPipelineCache::CreatePipeline(const char* name, ShaderList shader_list,
         item = (*pipeline);
     }
 
-    ReleaseItemFromHash(pipeline_hash, pipeline);
+    ReleaseGenericItem(pipeline_hash, pipeline);
 }
 
 RxPipelineCache::Handle RxPipelineCache::RequestPipeline(const FxHash name_hash)
 {
-    RxGraphicsPipeline* pipeline = RequestItemFromHash(name_hash);
+    RxGraphicsPipeline* pipeline = RequestGenericItem(name_hash);
     FxDebugAssert(pipeline->Pipeline != nullptr);
 
     return RxPipelineCache::Handle(this, pipeline, name_hash);
@@ -36,5 +36,5 @@ RxPipelineCache::Handle RxPipelineCache::RequestPipeline(const FxHash name_hash)
 
 void RxPipelineCache::ReleasePipeline(const FxHash name_hash, RxGraphicsPipeline* pipeline)
 {
-    ReleaseItemFromHash(name_hash, pipeline);
+    ReleaseGenericItem(name_hash, pipeline);
 }

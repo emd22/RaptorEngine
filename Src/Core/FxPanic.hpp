@@ -7,7 +7,11 @@
 #include <Core/Log.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
 
-#define FX_BREAKPOINT __builtin_trap()
+#ifdef FX_PLATFORM_WINDOWS
+#define FX_BREAKPOINT __debugbreak()
+#elif FX_PLATFORM_MACOS
+#define FX_BREAKPOINT __builtin_debugtrap()
+#endif
 
 template <typename... TTypes>
 void FxPanic(const char* module, const char* fmt, TTypes&&... items)
