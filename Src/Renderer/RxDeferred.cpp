@@ -53,7 +53,7 @@ void RxDeferredRenderer::Destroy()
     DestroyGPassPipeline();
     DestroyLightingPipeline();
 
-    RpGeometry.Destroy();
+    // RpGeometry.Destroy();
     RpLighting.Destroy();
     RpComposition.Destroy();
 
@@ -293,9 +293,13 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     FxVertexInfo vertex_info = FxMakeVertexInfo();
 
+    // RpGeometryId = gRenderPassCache->CreateRenderPass(attachments);
+
     RpGeometry.Create2(attachments);
 
     RxPipelineBuilder builder;
+
+    // RxRenderPassCache::Handle rp = gRenderPassCache->Request(RpGeometryId);
 
     builder.SetLayout(CreateGPassPipelineLayout())
         .SetName("Geometry Pipeline")
@@ -303,7 +307,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
         .AddBlendAttachment({ .Enabled = false })
         .SetAttachments(&attachments)
         .AddShaders(vertex_shader, fragment_shader)
-        .SetRenderPass(&RpGeometry)
+        .SetRenderPass(&RpGeometry) // .SetRenderPass(rp.Item)
         .SetVertexInfo(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
@@ -311,6 +315,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
     builder.SetPolygonMode(VK_POLYGON_MODE_FILL).Build(PlGeometry);
     builder.SetPolygonMode(VK_POLYGON_MODE_LINE).Build(PlGeometryWireframe);
 
+    // rp.Release();
 
     // PlGeometry.Create("Geometry", shader_list, &attachments,
     //                   FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
@@ -494,7 +499,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     FxVertexInfo vertex_info = FxMakeLightVertexInfo();
 
-    auto builder = RxPipelineBuilder::Make();
+    RxPipelineBuilder builder {};
     builder.SetLayout(CreateLightingPipelineLayout())
         .SetName("Lighting Pipeline")
         .AddBlendAttachment({
@@ -698,6 +703,9 @@ void RxDeferredGPass::BuildDescriptorSets()
 void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent)
 {
     mRendererInst = renderer;
+
+    // RxRenderPassCache::Handle rp_handle = gRenderPassCache->Request(mRendererInst->RpGeometryId);
+    // mRenderPass = rp_handle.Item;
     mRenderPass = &mRendererInst->RpGeometry;
     mPlGeometry = &mRendererInst->PlGeometry;
 

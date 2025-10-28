@@ -11,17 +11,17 @@
 template <typename TItemType>
 struct FxItemCacheSection_MultiItem
 {
-    FxBitset ItemsInUse;
-    FxSizedArray<TItemType> Items;
+    FxBitset ItemsInUse {};
+    FxSizedArray<TItemType> Items {};
 
 public:
     void Create(uint32 max_items)
     {
-        Items.Create(max_items);
+        Items.InitCapacity(max_items);
         ItemsInUse.InitZero(max_items);
     }
 
-    TItemType* RequestNewItem()
+    TItemType* Request()
     {
         int index = ItemsInUse.FindNextFreeBit();
 
@@ -29,18 +29,30 @@ public:
             return nullptr;
         }
 
+
         ItemsInUse.Set(index);
 
-        return &Items[index];
+        FxLogDebug("Request item at index {}, preallocated capacity of {}", index, Items.Capacity);
+
+        TItemType* item = &Items[index];
+
+        FxLogDebug("After");
+
+        return item;
     }
 
-    void ReleaseItem(TItemType* item)
+    void Release(TItemType* item)
     {
         auto item_index = Items.GetItemIndex(item);
+
+        FxLogDebug("Release item");
 
         // If the item was found, clear the bit
         if (item_index != FxSizedArray<TItemType>::scItemNotFound) {
             ItemsInUse.Unset(item_index);
+        }
+        else {
+            FxLogDebug("Could not find cache item!");
         }
     }
 };
@@ -60,7 +72,7 @@ struct FxItemCacheSection_SingleItem
 public:
     void Create(uint32 max_items) { pItem = FxMemPool::Alloc<TItemType>(sizeof(TItemType)); }
 
-    TItemType* RequestNewItem()
+    TItemType* Request()
     {
         if (bInUse) {
             return nullptr;
@@ -71,7 +83,7 @@ public:
         return pItem;
     }
 
-    void ReleaseItem(TItemType* item)
+    void Release(TItemType* item)
     {
         if (pItem != item) {
             return;
@@ -110,8 +122,8 @@ public:
         auto section_it = mCache.find(key);
 
         if (section_it == mCache.end()) {
-            CreateCacheSection(key, mItemsPerSection);
-            auto section_it = mCache.find(key);
+            CreateCacheSection(key);
+            section_it = mCache.find(key);
 
             // Could not find the newly created cache section, return error
             if (section_it == mCache.end()) {
@@ -129,15 +141,17 @@ public:
         auto section_it = mCache.find(key);
 
         if (section_it == mCache.end()) {
-            CreateCacheSection(key, mItemsPerSection);
-            auto section_it = mCache.find(key);
+            CreateCacheSection(key);
+            section_it = mCache.find(key);
 
             FxAssert(section_it != mCache.end());
         }
 
+        FxLogInfo("Request new item!");
+
         TCacheSectionType& section = section_it->second;
 
-        return section.RequestNewItem();
+        return section.Request();
     }
 
     void ReleaseGenericItem(TKeyType key, TItemType* item)
@@ -151,7 +165,7 @@ public:
 
         TCacheSectionType& section = section_it->second;
 
-        section.ReleaseItem(item);
+        section.Release(item);
 
         // auto item_index = section.Items.GetItemIndex(item);
 
@@ -165,14 +179,19 @@ public:
     virtual ~FxItemCache() {}
 
 protected:
-    TCacheSectionType& CreateCacheSection(TKeyType key, uint32 number_of_items)
+    TCacheSectionType& CreateCacheSection(TKeyType key)
     {
+        FxLogDebug("Create Cache section! {}", mItemsPerSection);
         TCacheSectionType cache_section {};
 
-        cache_section.Items.InitCapacity(number_of_items);
-        cache_section.ItemsInUse.InitZero(number_of_items);
+        // cache_section.Create(mItemsPerSection);
+
+        // cache_section.Items.InitCapacity(number_of_items);
+        // cache_section.ItemsInUse.InitZero(number_of_items);
 
         auto iter = mCache.insert({ key, std::move(cache_section) });
+
+        iter.first->second.Create(mItemsPerSection);
 
         return iter.first->second;
     }

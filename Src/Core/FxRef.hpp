@@ -37,11 +37,16 @@ public:
     /**
      * Constructs a new FxRef from a pointer.
      */
-    FxRef(T* ptr)
+    FxRef(T* ptr) : FxRef(ptr, FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount))) {}
+
+    /**
+     * Constructs a new FxRef from a pointer and a pre-allocated ref count.
+     */
+    FxRef(T* ptr, FxRefCount* cnt)
     {
         FxSpinThreadGuard guard(&IsBusy);
 
-        mRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
+        mRefCnt = cnt;
 
         mPtr = ptr;
 
@@ -106,6 +111,7 @@ public:
         }
     }
 
+
     FxRef(FxRef&& other)
     {
         FxSpinThreadGuard other_guard(&other.IsBusy);
@@ -135,8 +141,19 @@ public:
     template <typename... Args>
     static FxRef<T> New(Args... args)
     {
-        T* ptr = FxMemPool::Alloc<T>(sizeof(T), std::forward<Args>(args)...);
-        return FxRef<T>(ptr);
+        void* raw_ptr = FxMemPool::Alloc<void>(sizeof(FxRefCount) + sizeof(T));
+        T* obj_ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(raw_ptr) + sizeof(FxRefCount));
+
+        // Construct the ref count
+        ::new (raw_ptr) FxRefCount();
+
+        // Construct the Ref object
+        if constexpr (std::is_constructible_v<T, Args...>) {
+            ::new (obj_ptr) T(std::forward<Args>(args)...);
+        }
+
+        // T* ptr = FxMemPool::Alloc<T>(sizeof(T), std::forward<Args>(args)...);
+        return FxRef<T>(obj_ptr, reinterpret_cast<FxRefCount*>(raw_ptr));
     }
 
     /** Retrieves the internal usage count for the reference. */
@@ -209,6 +226,49 @@ public:
     }
 
 private:
+    FX_FORCE_INLINE void DestroyRef()
+    {
+        if (mPtr) {
+            // The pointer if the ref count and ptr are allocated together.
+            // +========+==========+======
+            // | RefCnt | Obj Ptr  | . . .
+            // +========+==========+======
+
+            uint8* bundled_ptr = reinterpret_cast<uint8*>(mPtr) - sizeof(FxRefCount);
+
+            // Check if they were allocated together
+            if (reinterpret_cast<uint8*>(mRefCnt) == bundled_ptr) {
+                // Call the destructor manually (we remove the type info so the MemPool::Free call won't call it)
+                if constexpr (std::is_destructible_v<T>) {
+                    mPtr->~T();
+                }
+                // Call the destructor on the ref count
+                mRefCnt->~FxRefCount();
+
+                // Free the bundled memory
+                FxMemPool::Free(bundled_ptr);
+
+                // Null our stuff out here
+                mRefCnt = nullptr;
+                mPtr = nullptr;
+
+                return;
+            }
+
+            // The pointer exists but the ref count ptr != the bundled ptr, so we will free the
+            // ptr normally.
+            FxMemPool::Free<T>(mPtr);
+            mPtr = nullptr;
+        }
+
+
+        if (mRefCnt) {
+            // Free the ref count
+            FxMemPool::Free<FxRefCount>(mRefCnt);
+            mRefCnt = nullptr;
+        }
+    }
+
     /**
      * Decrements the reference count and destroys the object if there are no other references to it.
      */
@@ -227,18 +287,8 @@ private:
             FxLogDebug("Destroying FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mPtr),
                        reinterpret_cast<void*>(mRefCnt));
 #endif
-
-            // Free the ptr
-            if (mPtr) {
-                FxMemPool::Free<T>(mPtr);
-                mPtr = nullptr;
-            }
-
-            if (mRefCnt) {
-                // Free the ref count
-                FxMemPool::Free<FxRefCount>(mRefCnt);
-                mRefCnt = nullptr;
-            }
+            // Destroy the reference
+            DestroyRef();
         }
     }
 

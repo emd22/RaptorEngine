@@ -15,7 +15,7 @@ public:
     FxPhysicsProperties() = default;
 
     float32 ConvexRadius = 0.01f;
-    float32 Friction = 0.5f;
+    float32 Friction = 0.01f;
     float32 Restitution = 0.3f;
 };
 

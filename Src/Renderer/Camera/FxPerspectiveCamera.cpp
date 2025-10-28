@@ -50,31 +50,30 @@ void FxPerspectiveCamera::UpdateProjectionMatrix()
  *
  */
 
-void FxPerspectiveCamera::Update()
+
+void FxPerspectiveCamera::UpdateViewMatrix(const FxVec3f& direction)
+{
+    FxVec3f target = Position - direction;
+    ViewMatrix.LookAt(Position, target, FxVec3f::sUp);
+
+    VPMatrix = ViewMatrix * ProjectionMatrix;
+
+    InvViewMatrix = ViewMatrix.Inverse();
+    InvProjectionMatrix = ProjectionMatrix.Inverse();
+}
+
+void FxPerspectiveCamera::Update(const FxVec3f& direction)
 {
     if (!mRequiresUpdate) {
         return;
     }
 
-    FxVec3f adjusted_position = (Position);
-
-
     // TODO: add sincos() implementation
-    Direction.Set((cos(mAngleY) * sin(mAngleX)), sin(mAngleY), (cos(mAngleY) * cos(mAngleX)));
-    Direction = Direction.Normalize();
+    // Direction.Set((cos(mAngleY) * sin(mAngleX)), sin(mAngleY), (cos(mAngleY) * cos(mAngleX)));
+    // Direction = Direction.Normalize();
 
-    FxVec3f target = adjusted_position - Direction;
-
-    ViewMatrix.LookAt(adjusted_position, target, FxVec3f::sUp);
-
-    FxMat4f PM = ProjectionMatrix;
-
-    VPMatrix = ViewMatrix * PM;
-
-    InvViewMatrix = ViewMatrix.Inverse();
-    InvProjectionMatrix = ProjectionMatrix.Inverse();
-
-    // VPMatrix =  ProjectionMatrix * ViewMatrix;
+    // FxVec3f target = adjusted_position - Direction;
+    UpdateViewMatrix(direction);
 
     mRequiresUpdate = false;
 }

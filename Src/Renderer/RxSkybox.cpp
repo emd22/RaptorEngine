@@ -5,6 +5,7 @@
 
 #include <Core/FxPanic.hpp>
 #include <Renderer/FxCamera.hpp>
+#include <Renderer/RxPipelineBuilder.hpp>
 
 FX_SET_MODULE_NAME("RxSkybox");
 
@@ -62,30 +63,40 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
         },
     };
 
-    VkAttachmentDescription attachments[] = {
-        // Frag colour output
-        VkAttachmentDescription {
-            .format = VK_FORMAT_B8G8R8A8_UNORM,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        },
+    RxAttachmentList attachments;
+    attachments
+        .Add({
+            .Format = VK_FORMAT_B8G8R8A8_UNORM,
+        })
+        .Add({
+            .Format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+            .FinalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+        });
 
-        VkAttachmentDescription {
-            .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
-            .samples = VK_SAMPLE_COUNT_1_BIT,
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-        },
-    };
+    // VkAttachmentDescription attachments[] = {
+    //     // Frag colour output
+    //     VkAttachmentDescription {
+    //         .format = VK_FORMAT_B8G8R8A8_UNORM,
+    //         .samples = VK_SAMPLE_COUNT_1_BIT,
+    //         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    //         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    //         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    //         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    //         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    //         .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    //     },
+
+    //     VkAttachmentDescription {
+    //         .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
+    //         .samples = VK_SAMPLE_COUNT_1_BIT,
+    //         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    //         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    //         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    //         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    //         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    //         .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+    //     },
+    // };
 
     // ShaderList shader_list;
 
@@ -97,7 +108,7 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
     // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
 
 
-    FxSizedArray<FxRef<RxShader>> shader_list = { vertex_shader, fragment_shader };
+    // FxSizedArray<FxRef<RxShader>> shader_list = { vertex_shader, fragment_shader };
     // shader_list.Insert()->Load("../Shaders/Skybox.vs.spv", RxShaderType::Vertex);
     // shader_list.Insert()->Load("../Shaders/Skybox.fs.spv", RxShaderType::Fragment);
 
@@ -107,13 +118,31 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
 
     FxVertexInfo vert_info = FxMakeLightVertexInfo();
 
-    SkyboxPipeline.Layout = CreateSkyboxPipelineLayout();
+    // RxRenderPassCache::Handle rp_handle = gRenderPassCache->Request(gRenderPassCache->GetRenderPassId(attachments));
 
-    SkyboxPipeline.Create(
-        "Skybox", shader_list, FxMakeSlice(attachments, FxSizeofArray(attachments)),
-        FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
-        gRenderer->DeferredRenderer->RpGeometry,
-        { .CullMode = VK_CULL_MODE_NONE, .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE, .ForceNoDepthTest = true });
+
+    RxPipelineBuilder builder;
+    builder.SetLayout(CreateSkyboxPipelineLayout())
+        .SetName("Skybox Pipeline")
+        .AddBlendAttachment({ .Enabled = false })
+        .AddBlendAttachment({ .Enabled = false })
+        .SetAttachments(&attachments)
+        .AddShaders(vertex_shader, fragment_shader)
+        .SetRenderPass(&mDeferredRenderer->RpGeometry)
+        // .SetRenderPass(rp_handle.Item)
+        .SetProperties({
+            .CullMode = VK_CULL_MODE_NONE,
+            .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+            .ForceNoDepthTest = true,
+        });
+
+
+    // SkyboxPipeline.Create(
+    //     "Skybox", shader_list, FxMakeSlice(attachments, FxSizeofArray(attachments)),
+    //     FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
+    //     gRenderer->DeferredRenderer->RpGeometry,
+    //     { .CullMode = VK_CULL_MODE_NONE, .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE, .ForceNoDepthTest = true
+    //     });
 }
 
 VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()

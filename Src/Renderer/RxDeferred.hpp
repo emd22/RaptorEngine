@@ -6,6 +6,7 @@
 #include "Backend/RxImage.hpp"
 #include "Backend/RxSampler.hpp"
 #include "RxPipelineList.hpp"
+#include "RxRenderPassCache.hpp"
 #include "RxSkybox.hpp"
 
 struct RxFrameData;
@@ -75,6 +76,7 @@ public:
     RxGraphicsPipeline* pGeometryPipeline = nullptr;
 
     RxRenderPass RpGeometry;
+    // RxRenderPassId RpGeometryId = 0;
 
     FxSizedArray<RxDeferredGPass> GPasses;
 

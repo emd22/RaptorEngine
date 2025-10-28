@@ -9,6 +9,9 @@
 
 namespace FxMath {
 
+constexpr float32 DegreesToRadians(float32 degrees) { return ((degrees) * (M_PI / 180.0f)); }
+constexpr float32 RadiansToDegrees(float32 radians) { return ((radians) * (180.0f / M_PI)); }
+
 void SinCos(float32 rad, float32* out_sine, float32* out_cosine);
 
 static FX_FORCE_INLINE float32 Clamp(float32 value, float32 lower, float32 upper)

@@ -46,7 +46,7 @@ public:
     }
 
 
-    void CreateRenderPass(RxAttachmentList& attachment_list);
+    RxRenderPassId CreateRenderPass(RxAttachmentList& attachment_list);
     Handle Request(RxRenderPassId id);
     void Release(RxRenderPassId id, RxRenderPass* render_pass);
 

@@ -31,6 +31,7 @@
 #include <Core/FxLog.hpp>
 #include <Core/FxTypes.hpp>
 #include <FxObject.hpp>
+#include <FxPlayer.hpp>
 #include <FxScene.hpp>
 #include <Math/Mat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
@@ -114,10 +115,10 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
 
+
 #ifdef FX_LOG_OUTPUT_TO_FILE
     FxLogCreateFile("FoxtrotLog.log");
 #endif
-
     // TestQuatFromEuler();
     // FxQuat quat = FxQuat::FromEulerAngles(FxVec3f(1.24, 1.24, 0));
 
@@ -130,6 +131,7 @@ int main()
 
     // TestScript();
     // return 0;
+
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
@@ -183,13 +185,14 @@ int main()
     asset_manager.Start(2);
     material_manager.Create();
 
-    FxRef<FxPerspectiveCamera> camera = FxMakeRef<FxPerspectiveCamera>();
+    // FxRef<FxPerspectiveCamera> camera = FxMakeRef<FxPerspectiveCamera>();
+    FxPlayer player;
 
+    FxRef<FxPerspectiveCamera> camera = player.pCamera;
     // FxRef<FxObject> fireplace_object = FxAssetManager::LoadObject("../models/FireplaceRoom.glb");
     // fireplace_object->WaitUntilLoaded();
 
     FxScene main_scene;
-
 
     FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
@@ -214,10 +217,13 @@ int main()
 
     auto generated_sphere = FxMeshGen::MakeIcoSphere(2);
 
+
     camera->SetAspectRatio(((float32)window_width) / (float32)window_height);
 
-    camera->Position.Z += 5.0f;
-    camera->Position.Y += 4.0f;
+    // player.Position.Z += 5.0f;
+    // player.Position.Y += 4.0f;
+
+    player.TeleportBy(FxVec3f(0.0, 4.0, -5.0));
 
     main_scene.SelectCamera(camera);
 
@@ -276,6 +282,10 @@ int main()
 
     main_scene.Attach(light2);
     // gPhysics->bPhysicsPaused = true;
+    //
+    player.Physics.Teleport(player.pCamera->Position);
+
+    FxVec3f movement = FxVec3f::sZero;
 
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
@@ -286,24 +296,35 @@ int main()
 
         if (FxControlManager::IsMouseLocked()) {
             FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
-            mouse_delta.SetX(DeltaTime * mouse_delta.GetX() * 0.001);
-            mouse_delta.SetY(DeltaTime * mouse_delta.GetY() * -0.001);
+            mouse_delta.X = (DeltaTime * mouse_delta.X * 0.001);
+            mouse_delta.Y = (DeltaTime * mouse_delta.Y * -0.001);
 
-            camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
+            // camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
+            player.RotateHead(mouse_delta);
         }
+
+        movement = FxVec3f::sZero;
 
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            camera->Move(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
+            movement.Z = 1.0f;
+            // player.Move(FxVec3f(0.0f, 0.0f, DeltaTime * 0.01f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            camera->Move(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
+            movement.Z = -1.0f;
+            // player.Move(FxVec3f(0.0f, 0.0f, DeltaTime * -0.01f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-            camera->Move(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
+            movement.X = 1.0f;
+            // player.Move(FxVec3f(DeltaTime * 0.01f, 0.0f, 0.0f));
         }
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-            camera->Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
+            movement.X = -1.0f;
+            // player.Move(FxVec3f(DeltaTime * -0.01f, 0.0f, 0.0f));
         }
+
+        // player.Physics.ApplyMovement(movement);
+        player.Move(movement);
+
 
         if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
             gRenderer->DeferredRenderer->ToggleWireframe(true);
@@ -330,7 +351,6 @@ int main()
             FxLogInfo("");
             FxLogInfo("Total Allocs: {}", stats.TotalAllocs);
             FxLogInfo("Total Frees:  {}", stats.TotalFrees);
-
 
             FxLogInfo("");
         }
@@ -380,7 +400,8 @@ int main()
 
         CheckGeneralControls();
 
-        camera->Update();
+        player.Update(DeltaTime);
+        // camera->Update();
 
         gPhysics->Update();
 
@@ -391,7 +412,7 @@ int main()
         // deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *camera);
 
         if (light2->bEnabled) {
-            light2->MoveTo(camera->Position + (camera->Direction * 1.0));
+            light2->MoveTo(camera->Position + (player.Direction * 1.0));
         }
 
         main_scene.Render();

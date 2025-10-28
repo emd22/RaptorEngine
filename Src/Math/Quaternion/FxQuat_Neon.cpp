@@ -34,7 +34,7 @@ bool FxQuat::IsCloseTo(const JPH::Quat& other, const float32 tolerance) const { 
 
 
 void FxQuat::FromJoltQuaternion(const JPH::Quat& quat) { mIntrin = quat.mValue.mValue; }
-void FxQuat::ToJoltQuaternion(JPH::Quat& quat) { quat.mValue.mValue = mIntrin; }
+void FxQuat::ToJoltQuaternion(JPH::Quat& quat) const { quat.mValue.mValue = mIntrin; }
 
 FxQuat FxQuat::FromEulerAngles(FxVec3f angles)
 {

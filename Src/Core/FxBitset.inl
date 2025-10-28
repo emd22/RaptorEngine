@@ -1,8 +1,7 @@
 #pragma once
 
+#include "FxBitUtil.hpp"
 #include "FxBitset.hpp"
-
-#include <bit>
 
 FX_FORCE_INLINE void FxBitset::Set(uint32 index)
 {
@@ -53,7 +52,8 @@ FX_FORCE_INLINE int FxBitset::FindNextFreeBit() const
         // Find bit in chunk (R to L) and return the index in the bitset.
         // This is returning (current_byte_n * 64) + index_in_byte.
 
-        return (i << 6) + std::countr_zero(chunk);
+        return (i << 6) + FxBit::FindFirstZero<uint64>(chunk);
+        // return (i << 6) + std::countr_zero(chunk);
     }
 
     return scNoFreeBits;

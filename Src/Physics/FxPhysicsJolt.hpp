@@ -175,11 +175,12 @@ public:
     JPH::PhysicsSystem PhysicsSystem;
 
     bool bPhysicsPaused = false;
+    const float cDeltaTime = 1.0f / 60.0f;
+
+    FxMemberRef<JPH::TempAllocatorImpl> pTempAllocator;
+    FxMemberRef<JPH::JobSystemThreadPool> pJobSystem;
 
 private:
-    FxMemberRef<JPH::TempAllocatorImpl> mpTempAllocator;
-    FxMemberRef<JPH::JobSystemThreadPool> mpJobSystem;
-
     FxPhysicsBPLayerInterfaceImpl mBroadPhaseInterface;
     FxPhysicsObjectVsBPLayerFilter mObjectVsBPLayerFilter;
 
@@ -187,7 +188,6 @@ private:
     FxPhysicsContactListener mContactListener;
     FxPhysicsObjectLayerPairFilterImpl mObjectLayerPairFilter;
 
-    const float mDeltaTime = 1.0f / 60.0f;
 
     bool mbIsInited = false;
 };

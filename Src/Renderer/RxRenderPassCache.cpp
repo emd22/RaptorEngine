@@ -1,6 +1,6 @@
 #include "RxRenderPassCache.hpp"
 
-void RxRenderPassCache::CreateRenderPass(RxAttachmentList& attachment_list)
+RxRenderPassId RxRenderPassCache::CreateRenderPass(RxAttachmentList& attachment_list)
 {
     RxRenderPassId id = GetRenderPassId(attachment_list);
 
@@ -9,11 +9,13 @@ void RxRenderPassCache::CreateRenderPass(RxAttachmentList& attachment_list)
     // Cache section could not be created
     if (!cs) {
         FxLogError("Error creating render pass cache section!");
-        return;
+        return id;
     }
 
     RxRenderPass* rp = cs->Items.Insert();
     rp->Create2(attachment_list);
+
+    return id;
 }
 
 RxRenderPassCache::Handle RxRenderPassCache::Request(RxRenderPassId id)

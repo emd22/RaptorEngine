@@ -12,15 +12,15 @@ void FxEngineGlobalsInit()
     gRenderer = new RxRenderBackend;
     gPhysics = new FxPhysicsJolt;
     gShaderCompiler = new FxShaderCompiler;
+    // gRenderPassCache = new RxRenderPassCache;
     gPipelines = new RxPipelineList;
-    gRenderPassCache = new RxRenderPassCache;
 }
 
 void FxEngineGlobalsDestroy()
 {
     delete gRenderer;
-    delete gRenderPassCache;
     delete gPhysics;
     delete gShaderCompiler;
     delete gPipelines;
+    // delete gRenderPassCache;
 }

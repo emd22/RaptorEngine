@@ -9,6 +9,9 @@ public:
     static constexpr int scNoFreeBits = -1;
 
 public:
+    FxBitset() = default;
+    explicit FxBitset(uint32 max_bits) { InitZero(max_bits); }
+
     void InitZero(uint32 max_bits);
     void InitOne(uint32 max_bits);
 
