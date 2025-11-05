@@ -580,6 +580,8 @@ void RxRenderBackend::BeginLighting()
 
 #include <Renderer/FxCamera.hpp>
 
+static_assert(RendererFramesInFlight == 3);
+
 void RxRenderBackend::DoComposition(FxCamera& render_cam)
 {
     RxFrameData* frame = GetFrame();
@@ -621,8 +623,7 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 
     mInternalFrameCounter++;
 
-    // better to do one division per frame as opposed to one every GetFrameNumber()
-    mFrameNumber = (mInternalFrameCounter) % RendererFramesInFlight;
+    mFrameNumber = (mInternalFrameCounter % RendererFramesInFlight);
 }
 
 RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)

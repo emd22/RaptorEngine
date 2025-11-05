@@ -8,7 +8,11 @@
 
 class FxPlayer
 {
-    const FxVec3f cMovementSpeed = FxVec3f(5.0f);
+    const FxVec3f cMaxWalkSpeed = FxVec3f(2.3f);
+    const FxVec3f cMaxSprintSpeed = FxVec3f(3.5f);
+
+    const float32 cMovementLerpSpeed = 0.025f;
+    const float32 cJumpForceReduction = 0.010f;
 
 public:
     FxPlayer();
@@ -24,15 +28,7 @@ public:
         Physics.Teleport(Position);
     }
 
-    FX_FORCE_INLINE void Move(const FxVec3f& offset)
-    {
-        const FxVec3f forward = Direction * offset.Z;
-        const FxVec3f right = Direction.Cross(FxVec3f::sUp) * offset.X;
-
-        Physics.ApplyMovement((forward + right) * FxVec3f(1, 0, 1) * cMovementSpeed);
-
-        // MoveBy();
-    }
+    void Move(float delta_time, const FxVec3f& offset);
 
     void RotateHead(const FxVec2f& xy)
     {
@@ -50,6 +46,9 @@ private:
         mbUpdateDirection = true;
         RequirePhysicsUpdate();
     }
+
+    FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
+
     FX_FORCE_INLINE void RequirePhysicsUpdate() { mbUpdatePhysicsTransform = true; }
 
     FX_FORCE_INLINE void UpdateDirection()
@@ -82,9 +81,15 @@ public:
     FxVec3f Direction = FxVec3f::sZero;
     FxVec3f Position = FxVec3f::sZero;
 
+    bool bIsSprinting = false;
+    float JumpForce = 0.0f;
+
 private:
     FxVec3f mCameraOffset = FxVec3f::sZero;
 
+    FxVec3f mUserForce = FxVec3f::sZero;
+
     bool mbUpdateDirection : 1 = true;
+    bool mbIsApplyingUserForce : 1 = false;
     bool mbUpdatePhysicsTransform : 1 = true;
 };

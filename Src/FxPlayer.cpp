@@ -11,14 +11,43 @@ FxPlayer::FxPlayer()
 
     Physics.Create();
 
+    // Since the physics position is the center of the capsule, we will use standing height / 2.
     mCameraOffset = FxVec3f(0, FxPhysicsPlayer::scStandingHeight / 2.0f, 0);
 }
-
 
 void FxPlayer::MoveBy(const FxVec3f& by)
 {
     Position += by;
     RequireUpdate();
+}
+
+void FxPlayer::Move(float delta_time, const FxVec3f& offset)
+{
+    const FxVec3f forward = Direction * offset.Z;
+    const FxVec3f right = Direction.Cross(FxVec3f::sUp) * offset.X;
+
+    FxVec3f movement_goal = (forward + right);
+
+    if (movement_goal.Length() > 0.001) {
+        movement_goal.NormalizeIP();
+    }
+
+
+    mUserForce = FxVec3f::Lerp(mUserForce, movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed),
+                               cMovementLerpSpeed * delta_time);
+
+    mUserForce.Y = JumpForce;
+    JumpForce = std::lerp(JumpForce, 0.0, cJumpForceReduction * delta_time);
+
+
+    Physics.ApplyMovement(mUserForce);
+
+    // mUserForce += offset;
+    // const FxVec3f max_speed = FxVec3f(cMaxWalkSpeed);
+    // mUserForce = FxVec3f::Min(FxVec3f::Max(mUserForce, -max_speed), max_speed);
+
+    // MarkApplyingUserForce();
+    // MoveBy();
 }
 
 void FxPlayer::Update(float32 delta_time)
@@ -34,7 +63,11 @@ void FxPlayer::Update(float32 delta_time)
 
     // Physics.ApplyMovement(Direction * FxVec3f(1.0, 0.0, 1.0));
 
-    pCamera->MoveTo(mCameraOffset + Position);
+    FxVec3f camera_updated_position = mCameraOffset;
+    camera_updated_position += Position;
+    camera_updated_position.Y -= Physics.HeadRecoveryYOffset;
+
+    pCamera->MoveTo(camera_updated_position);
 
     mbUpdatePhysicsTransform = false;
 }

@@ -131,7 +131,7 @@ public:
     virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
                                     const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
     {
-        FxLogInfo("A contact was persisted");
+        // FxLogInfo("A contact was persisted");
     }
 
     virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override

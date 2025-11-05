@@ -13,6 +13,8 @@
 static constexpr float32 scMaxSlopeAngle = FxMath::DegreesToRadians(45.0f);
 static constexpr float32 scPlayerRadius = 0.3f;
 
+static constexpr float32 scMaxHeadRecovery = 10.0f;
+
 using namespace JPH;
 
 void FxPhysicsPlayer::Create()
@@ -28,7 +30,8 @@ void FxPhysicsPlayer::Create()
     settings->mMaxSlopeAngle = scMaxSlopeAngle;
     settings->mShape = pPhysicsShape;
 
-    settings->mMaxStrength = 100.0f;
+    settings->mMaxStrength = 400.0f;
+    settings->mMass = 80.0f;
     settings->mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
     settings->mSupportingVolume = Plane(Vec3::sAxisY(), -scPlayerRadius);
     settings->mInnerBodyLayer = FxPhysicsLayer::Dynamic;
@@ -48,6 +51,7 @@ void FxPhysicsPlayer::ApplyMovement(const FxVec3f& by)
 {
     Vec3 jolt_dir;
     by.ToJoltVec3(jolt_dir);
+
     mMovementVector = jolt_dir;
     // pPlayerVirt->SetLinearVelocity(jolt_dir);
 }
@@ -64,10 +68,26 @@ void FxPhysicsPlayer::Update(float32 delta_time)
     Vec3 velocity;
 
     if (pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround) {
+        if (!bIsGrounded) {
+            HeadRecoveryYOffset = min(-velocity.GetY() * 10.0f, scMaxHeadRecovery);
+        }
+
         velocity = Vec3::sZero();
+
+        bIsGrounded = true;
     }
     else {
-        velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp() + phys.GetGravity() * gPhysics->cDeltaTime;
+        velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp() +
+                   phys.GetGravity() * 0.91 * gPhysics->cDeltaTime;
+
+        bIsGrounded = false;
+    }
+
+    if (abs(HeadRecoveryYOffset) > 1e-5) {
+        HeadRecoveryYOffset = std::lerp(HeadRecoveryYOffset, 0.0, 0.001 * delta_time);
+    }
+    else {
+        HeadRecoveryYOffset = 0.0f;
     }
 
     velocity += mMovementVector;

@@ -62,6 +62,7 @@ public:
     FX_FORCE_INLINE FxVec3f operator-() const;
 
     FX_FORCE_INLINE FxVec3f& operator+=(const FxVec3f& other);
+    FX_FORCE_INLINE FxVec3f& operator-=(float32 scalar);
     FX_FORCE_INLINE FxVec3f& operator-=(const FxVec3f& other);
     FX_FORCE_INLINE FxVec3f& operator*=(const FxVec3f& other);
 
@@ -78,6 +79,8 @@ public:
     FX_FORCE_INLINE bool operator==(const FxVec3f& other) const;
     bool operator==(const JPH::Vec3& other) const;
 
+    FX_FORCE_INLINE bool IsZero() const;
+    FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
     FX_FORCE_INLINE bool IsCloseTo(const FxVec3f& other, const float32 tolerance = 0.00001) const;
     bool IsCloseTo(const JPH::Vec3& other, const float32 threshold = 0.001) const;
 
@@ -92,6 +95,9 @@ public:
 
     FX_FORCE_INLINE static FxVec3f Min(const FxVec3f& a, const FxVec3f& b);
     FX_FORCE_INLINE static FxVec3f Max(const FxVec3f& a, const FxVec3f& b);
+    FX_FORCE_INLINE static FxVec3f Clamp(const FxVec3f& v, const FxVec3f& min, const FxVec3f& max);
+
+    FX_FORCE_INLINE static FxVec3f Lerp(const FxVec3f& a, const FxVec3f& b, const float f);
 
     void Print() const;
 

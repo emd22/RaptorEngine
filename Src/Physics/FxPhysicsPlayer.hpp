@@ -10,7 +10,7 @@
 class FxPhysicsPlayer
 {
 public:
-    static constexpr float32 scStandingHeight = 1.65f;
+    static constexpr float32 scStandingHeight = 1.72f;
 
 public:
     FxPhysicsPlayer() {}
@@ -27,5 +27,8 @@ public:
 
     JPH::Vec3 mMovementVector = JPH::Vec3::sZero();
 
+    float32 HeadRecoveryYOffset = 0.0f;
     float mTime = 0.01f;
+
+    bool bIsGrounded : 1 = false;
 };

@@ -9,8 +9,6 @@ static constexpr float32 sConst3HalfPi = sConstHalfPi * 3.0f;
 static constexpr float32 sConst2Pi = M_PI * 2.0;
 static constexpr float32 sConstInv2Pi = 1.0f / sConst2Pi;
 
-// Implementation based on Cephes math library (https://www.moshier.net/index.html#Cephes)
-// And the modified algorithm from http://gruntthepeon.free.fr/ssemath/sse_mathfun.h.
 
 #define c_minus_cephes_DP1 -0.78515625
 #define c_minus_cephes_DP2 -2.4187564849853515625e-4
@@ -93,15 +91,14 @@ void SinCos4_Fast(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_co
     (*out_sine) = vmulq_f32(sine_multiplier, Sqrt(vsubq_f32(v_f32_one, vmulq_f32(result, result))));
 }
 
+// Implementation based on Cephes math library (https://www.moshier.net/index.html#Cephes)
+// And the modified algorithm from http://gruntthepeon.free.fr/ssemath/sse_mathfun.h.
 
 void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
 {
     float32x4_t x, y;
 
     uint32x4_t emm2;
-
-    // const uint32x4_t v_u32_one = vdupq_n_f32(1);
-    const float32x4_t v_f32_zero = vdupq_n_f32(0);
 
     uint32x4_t sine_sign;
 
@@ -125,16 +122,8 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
         y = vcvtq_f32_u32(emm2);
     }
 
-    /* get the polynom selection mask
-     *     there is one polynom for 0 <= x <= Pi/4
-     *     and another one for Pi/4<x<=Pi/2
-     *
-     *     Both branches will be computed.
-     */
     uint32x4_t poly_mask = vtstq_u32(emm2, vdupq_n_u32(2));
 
-    /* The magic pass: "Extended precision modular arithmetic"
-     *     x = ((x - y * DP1) - y * DP2) - y * DP3; */
     x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP1));
     x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP2));
     x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP3));
@@ -142,8 +131,6 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
     sine_sign = veorq_u32(sine_sign, vtstq_u32(emm2, vdupq_n_u32(4)));
     float32x4_t cosine_sign = vtstq_u32(vsubq_u32(emm2, vdupq_n_u32(2)), vdupq_n_u32(4));
 
-    /* Evaluate the first polynom  (0 <= x <= Pi/4) in y1,
-     *     and the second polynom      (Pi/4 <= x <= 0) in y2 */
     float32x4_t z = vmulq_f32(x, x);
     float32x4_t y1, y2;
 
@@ -163,7 +150,6 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
 
     y1 = vaddq_f32(y1, vdupq_n_f32(1));
 
-    /* select the correct result from the two polynoms */
     float32x4_t ys = vbslq_f32(poly_mask, y1, y2);
     float32x4_t yc = vbslq_f32(poly_mask, y2, y1);
     *ysin = vbslq_f32(sine_sign, vnegq_f32(ys), ys);

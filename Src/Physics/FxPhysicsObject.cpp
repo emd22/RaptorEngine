@@ -51,7 +51,11 @@ void FxPhysicsObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f
 
     FxLogDebug("Creating physics body of dimensions {}", dimensions);
 
+    // JPH::RefConst<JPH::PhysicsMaterial> material = new JPH::PhysicsMaterial;
+
     JPH::BoxShapeSettings box_shape_settings(box_dimensions);
+    // box_shape_settings.mMaterial =
+    box_shape_settings.SetDensity(properties.Density);
     box_shape_settings.mConvexRadius = properties.ConvexRadius;
 
     // box_shape_settings.SetEmbedded();

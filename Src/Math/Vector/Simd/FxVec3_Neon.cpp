@@ -49,6 +49,7 @@ FxVec3f FxVec3f::Normalize() const
 {
     // Calculate length
     const float32 len = Length();
+
     // Splat to register
     const float32x4_t len_v = vdupq_n_f32(len);
 
