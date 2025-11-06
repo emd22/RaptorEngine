@@ -9,6 +9,6 @@ public:
 
     static void CompileAllShaders(const char* folder_path);
 
-    static void Compile(const char* path, const char* output_path);
+    static void Compile(const char* path, const char* output_path, bool do_db_flush = true);
     static void Destroy();
 };

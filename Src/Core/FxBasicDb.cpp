@@ -4,14 +4,14 @@ void FxBasicDb::Open(const char* path)
 {
     mPath = path;
 
-    mInFile.Open(path, "r+");
+    mInFile.Open(path, "r");
 
     // Error opening file, create it instead
     if (!mInFile.IsFileOpen()) {
         mInFile.Open(path, "w");
         mInFile.Close();
 
-        mInFile.Open(path, "r+");
+        mInFile.Open(path, "r");
     }
 
     // Eh, something else is wrong here
@@ -50,10 +50,7 @@ void FxBasicDb::SaveToFile()
         return;
     }
 
-    if (!mOutFile.IsFileOpen()) {
-        mOutFile.Open(mPath.c_str(), "w");
-    }
-
+    mOutFile.Open(mPath.c_str(), "w");
 
     for (const FxBasicDbEntry& entry : mEntryMarkers) {
         std::string key_str = std::to_string(entry.KeyHash);

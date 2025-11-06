@@ -15,8 +15,8 @@ public:
     FxPhysicsProperties() = default;
 
     float32 ConvexRadius = 0.01f;
-    float32 Friction = 0.01f;
-    float32 Restitution = 0.3f;
+    float32 Friction = 0.3f;
+    float32 Restitution = 0.1f;
 
     /**
      * @brief Density of the physics material in kg / m^3

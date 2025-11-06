@@ -248,18 +248,21 @@ int main()
     FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../models/Platform.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
+
     ground_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
                                        FxPhysicsObject::PhysicsType::Static, {});
     main_scene.Attach(ground_object);
 
     FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../models/DamagedHelmet.glb", { .KeepInMemory = true });
     helmet_object->RotateX(M_PI_2);
+    helmet_object->Scale(FxVec3f(0.5));
+
 
     helmet_object->WaitUntilLoaded();
 
+    helmet_object->MoveBy(FxVec3f(0, 3, 0));
     helmet_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
                                        FxPhysicsObject::PhysicsType::Dynamic, {});
-    helmet_object->MoveBy(FxVec3f(0, 3, 0));
     helmet_object->SetPhysicsEnabled(false);
 
     main_scene.Attach(helmet_object);
@@ -334,8 +337,8 @@ int main()
             player.bIsSprinting = false;
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_SPACE)) {
-            player.JumpForce = 0.5f;
+        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_SPACE)) {
+            player.Jump();
         }
 
         // player.Physics.ApplyMovement(movement);
@@ -390,8 +393,9 @@ int main()
         //     FxMemPool::GetGlobalPool().PrintAllocations();
         // }
 
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_R)) {
+        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
             // second_light_on = !second_light_on;
+            FxLogInfo("Recompiling shaders...");
             FxShaderCompiler::CompileAllShaders("../Shaders/");
             // cube_object.MoveBy(FxVec3f(DeltaTime * 0.001f, 0, 0));
         }

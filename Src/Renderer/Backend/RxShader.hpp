@@ -4,6 +4,29 @@
 
 #include <Core/FxTypes.hpp>
 
+
+enum class RxShaderType
+{
+    Unknown,
+    Vertex,
+    Fragment,
+};
+
+constexpr FX_FORCE_INLINE VkShaderStageFlagBits RxShaderTypeToVkShaderStage(RxShaderType type)
+{
+    switch (type) {
+    case RxShaderType::Unknown:
+        FxLogError("Shader stage is RxShaderType::Unknown!");
+        [[fallthrough]];
+    case RxShaderType::Vertex:
+        return VK_SHADER_STAGE_VERTEX_BIT;
+    case RxShaderType::Fragment:
+        return VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
+
+    return VK_SHADER_STAGE_VERTEX_BIT;
+}
+
 class RxShader
 {
 public:

@@ -20,6 +20,8 @@ public:
     void Update(float32 delta_time);
     void MoveBy(const FxVec3f& by);
 
+    void Jump();
+
     void TeleportBy(const FxVec3f& by)
     {
         SyncPhysicsToPlayer();

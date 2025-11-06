@@ -7,8 +7,19 @@ FxFile::FxFile(const char* path, const char* mode) { Open(path, mode); }
 
 void FxFile::Open(const char* path, const char* mode)
 {
+    // If the file handle is already set, reopen it with the new path or mode.
     if (pFileHandle != nullptr) {
-        Close();
+#ifdef FX_PLATFORM_WINDOWS
+        errno_t result = freopen_s(&pFileHandle, path, mode, pFileHandle);
+        if (!result) {
+            pFileHandle = nullptr;
+        }
+
+        return;
+#else
+        freopen(path, mode, pFileHandle);
+        return;
+#endif
     }
 
 #ifdef FX_PLATFORM_WINDOWS

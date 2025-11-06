@@ -87,8 +87,6 @@ void RecordShaderCompileTime(const char* path)
     uint64 modification_time = FxFilesystemIO::FileGetLastModified(path);
     sShaderCompileDb.WriteEntry(
         FxBasicDbEntry { .KeyHash = FxHashStr(path), .Value = std::to_string(modification_time) });
-
-    sShaderCompileDb.SaveToFile();
 }
 
 bool IsShaderUpToDate(const char* path)
@@ -118,11 +116,13 @@ void FxShaderCompiler::CompileAllShaders(const char* folder_path)
     for (const std::string& shader_path : shader_paths) {
         const std::string path_to_compile = std::format("{}{}.slang", folder_path, shader_path);
         const std::string output_path = std::format("{}Spirv/{}.spv", folder_path, shader_path);
-        FxShaderCompiler::Compile(path_to_compile.c_str(), output_path.c_str());
+        FxShaderCompiler::Compile(path_to_compile.c_str(), output_path.c_str(), false);
     }
+
+    sShaderCompileDb.SaveToFile();
 }
 
-void FxShaderCompiler::Compile(const char* path, const char* output_path)
+void FxShaderCompiler::Compile(const char* path, const char* output_path, bool do_db_flush)
 {
     if (!sShaderCompileDb.IsOpen()) {
         sShaderCompileDb.Open("../Shaders/ShaderCompileDb.fxdb");
@@ -232,6 +232,10 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path)
     }
 
     RecordShaderCompileTime(path);
+
+    if (do_db_flush) {
+        sShaderCompileDb.SaveToFile();
+    }
 }
 
 void FxShaderCompiler::Destroy()

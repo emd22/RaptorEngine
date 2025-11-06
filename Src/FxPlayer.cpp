@@ -21,6 +21,13 @@ void FxPlayer::MoveBy(const FxVec3f& by)
     RequireUpdate();
 }
 
+void FxPlayer::Jump()
+{
+    if (Physics.bIsGrounded) {
+        JumpForce = 0.5f;
+    }
+}
+
 void FxPlayer::Move(float delta_time, const FxVec3f& offset)
 {
     const FxVec3f forward = Direction * offset.Z;

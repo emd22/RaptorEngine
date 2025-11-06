@@ -1,7 +1,7 @@
 #include "RxDeferred.hpp"
 
+#include "Backend/RxDsLayoutBuilder.hpp"
 #include "Backend/RxShader.hpp"
-#include "Backend/ShaderList.hpp"
 #include "FxEngine.hpp"
 
 #include <Renderer/RxDeferred.hpp>
@@ -89,187 +89,39 @@ RxDeferredGPass* RxDeferredRenderer::GetCurrentGPass() { return &GPasses[gRender
 
 VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 {
-    RxGpuDevice* device = gRenderer->GetDevice();
-
-    // Material properties buffer DS
-
+    // Material descriptor set
     {
-        VkDescriptorSetLayoutBinding material_properties_binding {
-            .binding = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
-
-        VkDescriptorSetLayoutCreateInfo ds_material_info { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-                                                           .bindingCount = 1,
-                                                           .pBindings = &material_properties_binding };
-
-        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_material_info, nullptr,
-                                                      &DsLayoutLightingMaterialProperties);
-        if (status != VK_SUCCESS) {
-            FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
-        }
+        // Create material properties DS layout
+        RxDsLayoutBuilder builder {};
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RxShaderType::Fragment);
+        DsLayoutLightingMaterialProperties = builder.Build();
     }
 
-    // Vertex DS
-    //    {
-    //        VkDescriptorSetLayoutBinding ubo_layout_binding {
-    //            .binding = 0,
-    //            .descriptorCount = 1,
-    //            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    //            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-    //            .pImmutableSamplers = nullptr,
-    //        };
-    //
-    //        VkDescriptorSetLayoutCreateInfo ds_layout_info {
-    //            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-    //            .bindingCount = 1,
-    //            .pBindings = &ubo_layout_binding,
-    //        };
-    //
-    //        VkResult status = vkCreateDescriptorSetLayout(device->Device,
-    //        &ds_layout_info, nullptr, &DsLayoutGPassVertex); if (status !=
-    //        VK_SUCCESS) {
-    //            FxModulePanic("Failed to create pipeline descriptor set layout",
-    //            status);
-    //        }
-    //    }
-
-    // Fragment DS
+    // Fragment descriptor set
     {
-        // Albedo texture
-        VkDescriptorSetLayoutBinding albedo_layout_binding {
-            .binding = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
-
-        VkDescriptorSetLayoutCreateInfo ds_layout_info {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = 1,
-            .pBindings = &albedo_layout_binding,
-        };
-
-        VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr, &DsLayoutGPassMaterial);
-        if (status != VK_SUCCESS) {
-            FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
-        }
+        RxDsLayoutBuilder builder {};
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment);
+        DsLayoutGPassMaterial = builder.Build();
     }
 
-    VkDescriptorSetLayout layouts[] = {
-        DsLayoutGPassMaterial, DsLayoutLightingMaterialProperties,
-        //        DsLayoutGPassVertex,
+    FxStackArray<VkDescriptorSetLayout, 2> layouts = {
+        DsLayoutGPassMaterial,
+        DsLayoutLightingMaterialProperties,
     };
 
-    FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxDrawPushConstants),
-                                                                       .StageFlags = VK_SHADER_STAGE_VERTEX_BIT |
-                                                                                     VK_SHADER_STAGE_FRAGMENT_BIT } };
+    FxStackArray<RxPushConstants, 1> push_consts = {
+        RxPushConstants {
+            .Size = sizeof(FxDrawPushConstants),
+            .StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        },
+    };
 
-    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts),
-                                                               FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts), FxSlice(layouts));
 
     RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
-    PlGeometry.SetLayout(layout);
-    PlGeometryWireframe.SetLayout(layout);
-
-
     return layout;
 }
-
-// void RxDeferredRenderer::CreateGPassPipeline()
-// {
-//     VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
-//         // Color
-//         VkPipelineColorBlendAttachmentState {
-//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-//                               VK_COLOR_COMPONENT_A_BIT,
-//             .blendEnable = VK_FALSE,
-//         },
-//         // Normals
-//         VkPipelineColorBlendAttachmentState {
-//             .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-//                               VK_COLOR_COMPONENT_A_BIT,
-//             .blendEnable = VK_FALSE,
-//         },
-//     };
-
-//     VkAttachmentDescription color_attachments_list[] = {
-//         // Albedo output
-//         VkAttachmentDescription {
-//             .format = VK_FORMAT_B8G8R8A8_UNORM,
-//             .samples = VK_SAMPLE_COUNT_1_BIT,
-//             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-//             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-//             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-//             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-//             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-//             .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-//         },
-//         // Normals output
-//         VkAttachmentDescription {
-//             .format = VK_FORMAT_R16G16B16A16_SFLOAT,
-//             .samples = VK_SAMPLE_COUNT_1_BIT,
-//             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-//             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-//             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-//             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-//             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-//             .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-//         },
-
-//         VkAttachmentDescription {
-//             .format = VK_FORMAT_D32_SFLOAT_S8_UINT,
-//             .samples = VK_SAMPLE_COUNT_1_BIT,
-//             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-//             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-//             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-//             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-//             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-//             .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-//         },
-//     };
-
-//     // ShaderList shader_list;
-
-//     // FxStackArray<RxShader, 2> shader_list;
-//     // RxShader vertex_shader("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
-//     // RxShader fragment_shader("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
-
-//     // RxShader raw_shader_list[2] = { vertex_shader, fragment_shader };
-//     // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
-
-//     FxStackArray<RxShader, 2> shader_list;
-//     shader_list.Insert()->Load("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
-//     shader_list.Insert()->Load("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
-
-//     // Create the layout for the GPass pipeline
-//     CreateGPassPipelineLayout();
-
-//     FxVertexInfo vert_info = FxMakeVertexInfo();
-
-//     const FxSlice<VkAttachmentDescription> color_attachments = FxMakeSlice(color_attachments_list,
-//                                                                            FxSizeofArray(color_attachments_list));
-
-//     RpGeometry.Create2(color_attachments);
-
-//     PlGeometry.Create("Geometry", shader_list, color_attachments,
-//                       FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
-//                       RpGeometry, { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
-
-//     PlGeometryWireframe.Layout = PlGeometry.Layout;
-//     PlGeometryWireframe.Create("Geometry Wireframe", shader_list, color_attachments,
-//                                FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-//                                &vert_info, RpGeometry, { .CullMode = VK_CULL_MODE_BACK_BIT,
-//                                  .WindingOrder = VK_FRONT_FACE_CLOCKWISE,
-//                                  .PolygonMode = VK_POLYGON_MODE_LINE });
-
-//     pGeometryPipeline = &PlGeometry;
-// }
 
 
 void RxDeferredRenderer::CreateGPassPipeline()
@@ -314,20 +166,6 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     builder.SetPolygonMode(VK_POLYGON_MODE_FILL).Build(PlGeometry);
     builder.SetPolygonMode(VK_POLYGON_MODE_LINE).Build(PlGeometryWireframe);
-
-    // rp.Release();
-
-    // PlGeometry.Create("Geometry", shader_list, &attachments,
-    //                   FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)), &vert_info,
-    //                   RpGeometry, { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE
-    //                   });
-
-    // PlGeometryWireframe.Layout = PlGeometry.Layout;
-    // PlGeometryWireframe.Create("Geometry Wireframe", shader_list, color_attachments,
-    //                            FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-    //                            &vert_info, RpGeometry, { .CullMode = VK_CULL_MODE_BACK_BIT,
-    //                              .WindingOrder = VK_FRONT_FACE_CLOCKWISE,
-    //                              .PolygonMode = VK_POLYGON_MODE_LINE });
 
     pGeometryPipeline = &PlGeometry;
 }
@@ -562,52 +400,14 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
     RxGpuDevice* device = gRenderer->GetDevice();
 
     {
-        VkDescriptorSetLayoutBinding positions_layout_binding {
-            .binding = 1,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
+        RxDsLayoutBuilder builder {};
 
-        VkDescriptorSetLayoutBinding albedo_layout_binding {
-            .binding = 2,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
+        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment)
+            .AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment)
+            .AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment)
+            .AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment);
 
-        VkDescriptorSetLayoutBinding normals_layout_binding {
-            .binding = 3,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
-
-        VkDescriptorSetLayoutBinding lights_layout_binding {
-            .binding = 4,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = nullptr,
-        };
-
-        VkDescriptorSetLayoutBinding bindings[] = { positions_layout_binding, albedo_layout_binding,
-                                                    normals_layout_binding, lights_layout_binding };
-
-        VkDescriptorSetLayoutCreateInfo comp_layout_info {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = FxSizeofArray(bindings),
-            .pBindings = bindings,
-        };
-
-        VkResult status;
-        status = vkCreateDescriptorSetLayout(device->Device, &comp_layout_info, nullptr, &DsLayoutCompFrag);
-        if (status != VK_SUCCESS) {
-            FxModulePanicVulkan("Failed to create pipeline descriptor set layout", status);
-        }
+        DsLayoutCompFrag = builder.Build();
     }
 
     VkDescriptorSetLayout layouts[] = {

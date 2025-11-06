@@ -111,5 +111,5 @@ public:
 
 private:
     RxGpuDevice* mDevice = nullptr;
-    ShaderList mShaders;
+    // ShaderList mShaders;
 };
