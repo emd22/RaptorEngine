@@ -101,6 +101,7 @@ public:
     VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
     RxGraphicsPipeline PlComposition;
+    RxGraphicsPipeline PlCompositionUnlit;
     RxRenderPass RpComposition;
 
     FxSizedArray<RxFramebuffer> OutputFramebuffers;

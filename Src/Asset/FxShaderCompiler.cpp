@@ -26,7 +26,7 @@ static Slang::ComPtr<slang::IGlobalSession>& GetSlangGlobalSession()
     return global_session;
 }
 
-static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
+static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session, const FxSizedArray<FxShaderMacro>& macros)
 {
     Slang::ComPtr<slang::IGlobalSession>& global_session = GetSlangGlobalSession();
 
@@ -35,7 +35,14 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
         .profile = global_session->findProfile("spirv_1_4"),
     };
 
-    FxStackArray<slang::PreprocessorMacroDesc, 0> preprocessor_macros = {};
+    FxSizedArray<slang::PreprocessorMacroDesc> preprocessor_macros {};
+
+    if (macros.IsNotEmpty()) {
+        preprocessor_macros.InitSize(macros.Size);
+        for (const FxShaderMacro& macro : macros) {
+            preprocessor_macros.Insert({ .name = macro.pcName, .value = macro.pcValue });
+        }
+    }
 
     FxStackArray<slang::CompilerOptionEntry, 2> compiler_options = {
         {
@@ -53,7 +60,7 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
         .targetCount = 1,
 
         .preprocessorMacros = preprocessor_macros.Data,
-        .preprocessorMacroCount = preprocessor_macros.Size,
+        .preprocessorMacroCount = static_cast<SlangInt>(preprocessor_macros.Size),
 
         .compilerOptionEntries = compiler_options.Data,
         .compilerOptionEntryCount = compiler_options.Size,
@@ -62,12 +69,12 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session)
     global_session->createSession(session_desc, local_session.writeRef());
 }
 
-static Slang::ComPtr<slang::ISession>& GetSlangSession()
+static Slang::ComPtr<slang::ISession>& GetDefaultSlangSession()
 {
     thread_local Slang::ComPtr<slang::ISession> local_session;
 
     if (!local_session.get()) {
-        CreateSlangSession(local_session);
+        CreateSlangSession(local_session, {});
     }
 
     return local_session;
@@ -122,7 +129,8 @@ void FxShaderCompiler::CompileAllShaders(const char* folder_path)
     sShaderCompileDb.SaveToFile();
 }
 
-void FxShaderCompiler::Compile(const char* path, const char* output_path, bool do_db_flush)
+void FxShaderCompiler::Compile(const char* path, const char* output_path, const FxSizedArray<FxShaderMacro>& macros,
+                               bool do_db_flush)
 {
     if (!sShaderCompileDb.IsOpen()) {
         sShaderCompileDb.Open("../Shaders/ShaderCompileDb.fxdb");
@@ -137,7 +145,12 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path, bool d
     bool has_fragment_shader = false;
 
     slang::IModule* module = nullptr;
-    Slang::ComPtr<slang::ISession>& session = GetSlangSession();
+    Slang::ComPtr<slang::ISession>& session = GetDefaultSlangSession();
+
+    // Create a new slang session with those macros defined
+    if (macros.IsNotEmpty()) {
+        CreateSlangSession(session, macros);
+    }
 
     Slang::ComPtr<slang::IBlob> diagnostic_blob;
 

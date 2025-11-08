@@ -106,7 +106,7 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& AddShaders(const FxRef<RxShader>& vertex, const FxRef<RxShader>& fragment)
+    FX_FORCE_INLINE RxPipelineBuilder& SetShaders(const FxRef<RxShader>& vertex, const FxRef<RxShader>& fragment)
     {
         mVertexShader = vertex;
         mFragmentShader = fragment;

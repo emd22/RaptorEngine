@@ -19,5 +19,5 @@ public:
 public:
     RxShader Shader;
 
-    RxShaderType ShaderType = RxShaderType::Unknown;
+    RxShaderType ShaderType = RxShaderType::eUnknown;
 };

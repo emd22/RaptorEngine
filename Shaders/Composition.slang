@@ -57,6 +57,11 @@ FSOut FragmentMain(FSIn in)
     FSOut out;
 
     float4 albedo = sAlbedo.Sample(in.vUV);
+
+#ifdef RENDER_UNLIT
+    return albedo;
+#else
+
     float4 lighting = sLighting.Sample(in.vUV);
 
     float3 lit_color = lighting.rgb;
@@ -75,4 +80,6 @@ FSOut FragmentMain(FSIn in)
     }
 
     return out;
+#endif
+
 }

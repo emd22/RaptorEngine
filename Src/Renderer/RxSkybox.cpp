@@ -100,8 +100,10 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
 
     // ShaderList shader_list;
 
-    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("../shaders/Skybox.vs.spv", RxShaderType::Vertex);
-    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("../shaders/Skybox.fs.spv", RxShaderType::Fragment);
+    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("Skybox", RxShaderType::eVertex,
+                                                        FxSizedArray<FxShaderMacro> {});
+    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("Skybox", RxShaderType::eFragment,
+                                                          FxSizedArray<FxShaderMacro> {});
 
 
     // RxShader raw_shader_list[2] = { vertex_shader, fragment_shader };
@@ -127,7 +129,7 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
         .AddBlendAttachment({ .Enabled = false })
         .AddBlendAttachment({ .Enabled = false })
         .SetAttachments(&attachments)
-        .AddShaders(vertex_shader, fragment_shader)
+        .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&mDeferredRenderer->RpGeometry)
         // .SetRenderPass(rp_handle.Item)
         .SetProperties({

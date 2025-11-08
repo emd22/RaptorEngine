@@ -142,9 +142,9 @@ public:
         Size = 0;
     }
 
-    Iterator begin() { return Iterator(Data, 0); }
+    Iterator begin() const { return Iterator(Data, 0); }
 
-    Iterator end() { return Iterator(Data, Size); }
+    Iterator end() const { return Iterator(Data, Size); }
 
     operator TElementType*() const { return Data; }
 

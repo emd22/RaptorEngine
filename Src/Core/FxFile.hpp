@@ -65,7 +65,6 @@ public:
     void SeekBy(uint32 by);
     void SeekToEnd();
 
-
     void Close();
 
     ~FxFile() { Close(); }

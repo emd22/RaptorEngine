@@ -2,12 +2,14 @@
 
 #include <filesystem>
 
-uint64 FxFilesystemIO::FileGetLastModified(const char* path)
+namespace FxFilesystemIO {
+
+uint64 FileGetLastModified(const char* path)
 {
     return std::filesystem::last_write_time(path).time_since_epoch().count();
 }
 
-FxPagedArray<std::string> FxFilesystemIO::DirList(const char* path, const char* ends_with)
+FxPagedArray<std::string> DirList(const char* path, const char* ends_with)
 {
     const std::filesystem::directory_iterator& dir_iterator = std::filesystem::directory_iterator(path);
 
@@ -30,8 +32,10 @@ FxPagedArray<std::string> FxFilesystemIO::DirList(const char* path, const char* 
     return file_paths;
 }
 
-FxPagedArray<std::string> FxFilesystemIO::DirListIfHasExtension(const char* path, const std::string& required_extension,
-                                                                bool return_filename_only)
+std::string DirCurrent() { return std::filesystem::current_path().string(); }
+
+FxPagedArray<std::string> DirListIfHasExtension(const char* path, const std::string& required_extension,
+                                                bool return_filename_only)
 {
     const std::filesystem::directory_iterator& dir_iterator = std::filesystem::directory_iterator(path);
 
@@ -52,3 +56,5 @@ FxPagedArray<std::string> FxFilesystemIO::DirListIfHasExtension(const char* path
 
     return file_paths;
 }
+
+}; // namespace FxFilesystemIO

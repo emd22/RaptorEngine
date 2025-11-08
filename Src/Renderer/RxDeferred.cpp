@@ -93,14 +93,14 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
     {
         // Create material properties DS layout
         RxDsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RxShaderType::Fragment);
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RxShaderType::eFragment);
         DsLayoutLightingMaterialProperties = builder.Build();
     }
 
     // Fragment descriptor set
     {
         RxDsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment);
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
         DsLayoutGPassMaterial = builder.Build();
     }
 
@@ -133,8 +133,10 @@ void RxDeferredRenderer::CreateGPassPipeline()
         .Add({ .Format = VK_FORMAT_D32_SFLOAT_S8_UINT });
 
 
-    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Geometry.spv_vs", RxShaderType::Vertex);
-    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Geometry.spv_fs", RxShaderType::Fragment);
+    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("Geometry", RxShaderType::eVertex,
+                                                        FxSizedArray<FxShaderMacro> {});
+    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("Geometry", RxShaderType::eFragment,
+                                                          FxSizedArray<FxShaderMacro> {});
 
 
     // FxStackArray<RxShader, 2> shader_list;
@@ -158,7 +160,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
         .AddBlendAttachment({ .Enabled = false })
         .AddBlendAttachment({ .Enabled = false })
         .SetAttachments(&attachments)
-        .AddShaders(vertex_shader, fragment_shader)
+        .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&RpGeometry) // .SetRenderPass(rp.Item)
         .SetVertexInfo(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
@@ -332,8 +334,10 @@ void RxDeferredRenderer::CreateLightingPipeline()
     //                               { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 
 
-    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Lighting.spv_vs", RxShaderType::Vertex);
-    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Lighting.spv_fs", RxShaderType::Fragment);
+    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("Lighting", RxShaderType::eVertex,
+                                                        FxSizedArray<FxShaderMacro> {});
+    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("Lighting", RxShaderType::eFragment,
+                                                          FxSizedArray<FxShaderMacro> {});
 
     FxVertexInfo vertex_info = FxMakeLightVertexInfo();
 
@@ -352,7 +356,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
             },
         })
         .SetAttachments(&attachment_list)
-        .AddShaders(vertex_shader, fragment_shader)
+        .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&RpLighting)
         .SetVertexInfo(&vertex_info)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
@@ -402,10 +406,10 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
     {
         RxDsLayoutBuilder builder {};
 
-        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment)
-            .AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment)
-            .AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment)
-            .AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::Fragment);
+        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment)
+            .AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment)
+            .AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment)
+            .AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
 
         DsLayoutCompFrag = builder.Build();
     }
@@ -437,9 +441,10 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     RpComposition.Create2(attachment_list);
 
-    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Composition.spv_vs", RxShaderType::Vertex);
-    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("../Shaders/Spirv/Composition.spv_fs",
-                                                          RxShaderType::Fragment);
+    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("Composition", RxShaderType::eVertex,
+                                                        FxSizedArray<FxShaderMacro> {});
+    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("Composition", RxShaderType::eFragment,
+                                                          FxSizedArray<FxShaderMacro> {});
 
     RxPipelineBuilder builder;
 
@@ -447,13 +452,20 @@ void RxDeferredRenderer::CreateCompPipeline()
         .SetName("Composition Pipeline")
         .AddBlendAttachment({ .Enabled = false })
         .SetAttachments(&attachment_list)
-        .AddShaders(vertex_shader, fragment_shader)
+        .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&RpComposition)
         .SetVertexInfo(nullptr)
         .SetCullMode(VK_CULL_MODE_NONE)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
     builder.Build(PlComposition);
+
+    fragment_shader = FxMakeRef<RxShader>(
+        "Composition", RxShaderType::eFragment,
+        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
+
+
+    builder.SetShaders(vertex_shader, fragment_shader).Build(PlCompositionUnlit);
 }
 
 void RxDeferredRenderer::DestroyCompPipeline()
