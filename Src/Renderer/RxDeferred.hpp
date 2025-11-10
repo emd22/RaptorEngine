@@ -72,6 +72,7 @@ public:
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
     RxGraphicsPipeline PlGeometry;
+    RxGraphicsPipeline PlGeometryNoDepthTest;
     RxGraphicsPipeline PlGeometryWireframe;
     RxGraphicsPipeline* pGeometryPipeline = nullptr;
 

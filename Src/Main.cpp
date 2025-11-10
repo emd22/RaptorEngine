@@ -113,6 +113,7 @@ void TestQuatFromEuler()
 
 static constexpr float scMouseSensitivity = 0.0005;
 
+
 int main()
 {
     FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
@@ -121,23 +122,10 @@ int main()
 #ifdef FX_LOG_OUTPUT_TO_FILE
     FxLogCreateFile("FoxtrotLog.log");
 #endif
-    // TestQuatFromEuler();
-    // FxQuat quat = FxQuat::FromEulerAngles(FxVec3f(1.24, 1.24, 0));
-
-    // FxLogInfo("Quat result: {}", quat);
-
-
-    // TestNeonSin();
-    // return 0;
-
-
-    // TestScript();
-    // return 0;
 
 
     FxConfigFile config;
     config.Load("../Config/Main.conf");
-
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
@@ -245,7 +233,7 @@ int main()
     // ground_object->MoveBy(FxVec3f(0, -8, 0));
     // ground_object->Scale(FxVec3f(10, 1.0, 10));
 
-    FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../models/Platform.glb", { .KeepInMemory = true });
+    FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../Models/Platform.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
 
@@ -253,7 +241,11 @@ int main()
                                        FxPhysicsObject::PhysicsType::Static, {});
     main_scene.Attach(ground_object);
 
-    FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../models/DamagedHelmet.glb", { .KeepInMemory = true });
+
+    // pistol_object->Scale(FxVec3f(2));
+
+
+    FxRef<FxObject> helmet_object = FxAssetManager::LoadObject("../Models/DamagedHelmet.glb", { .KeepInMemory = true });
     helmet_object->RotateX(M_PI_2);
     helmet_object->Scale(FxVec3f(0.5));
 
@@ -269,6 +261,14 @@ int main()
 
     gPhysics->OptimizeBroadPhase();
 
+
+    FxRef<FxObject> pistol_object = FxAssetManager::LoadObject("../Models/PistolTextured.glb",
+                                                               { .KeepInMemory = true });
+    pistol_object->WaitUntilLoaded();
+    // pistol_object->SetGraphicsPipeline(&gRenderer->DeferredRenderer->PlGeometryNoDepthTest);
+
+    main_scene.Attach(pistol_object);
+
     // fireplace_object->RotateX(M_PI_2);
 
     FxSizedArray<VkDescriptorSet> sets_to_bind;
@@ -278,7 +278,7 @@ int main()
     light->SetLightVolume(generated_sphere, true);
     light->MoveBy(FxVec3f(0.0, 2.80, 1.20));
     light->Scale(FxVec3f(25));
-    light->Color = FxColor::sWhite;
+    light->Color = FxColor(0x888888FF);
 
     main_scene.Attach(light);
 
@@ -286,12 +286,13 @@ int main()
     light2->SetLightVolume(generated_sphere, true);
     light2->Scale(FxVec3f(25));
     light2->MoveBy(FxVec3f(1, 0, -0.5));
-    light2->Color = FxColor::sWhite;
+    light2->bEnabled = false;
+    light2->Color = FxColor(0x888888FF);
 
     main_scene.Attach(light2);
     // gPhysics->bPhysicsPaused = true;
     //
-    player.Physics.Teleport(player.pCamera->Position);
+    // player.Physics.Teleport(player.pCamera->Position);
 
     FxVec3f movement = FxVec3f::sZero;
 
@@ -306,6 +307,7 @@ int main()
             FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
             mouse_delta.X = (DeltaTime * mouse_delta.X * scMouseSensitivity);
             mouse_delta.Y = (DeltaTime * mouse_delta.Y * -scMouseSensitivity);
+
 
             // camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
             player.RotateHead(mouse_delta);
@@ -422,6 +424,14 @@ int main()
 
         player.Update(DeltaTime);
         // camera->Update();
+        // pistol_object->mRotation = FxQuat::FromAxisAngle(FxVec3f::sUp, player.pCamera->mAngleX) *
+        //                            FxQuat::FromAxisAngle(FxVec3f::sRight, player.pCamera->mAngleY);
+        pistol_object->mRotation = FxQuat::FromEulerAngles(
+            FxVec3f(-player.pCamera->mAngleY, player.pCamera->mAngleX, 0));
+
+        pistol_object->MoveTo(camera->Position + (player.Direction * FxVec3f(0.4)));
+        pistol_object->MoveBy(player.GetRight() * FxVec3f(0.20) + (player.GetUp() * FxVec3f(0.1)));
+
 
         gPhysics->Update();
 

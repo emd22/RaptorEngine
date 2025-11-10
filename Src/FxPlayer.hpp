@@ -40,6 +40,12 @@ public:
         // UpdateDirection();
     }
 
+
+    FX_FORCE_INLINE FxVec3f GetForward() { return FxVec3f(pCamera->ViewMatrix.Columns[2]).NormalizeIP(); }
+
+    FX_FORCE_INLINE FxVec3f GetRight() { return GetForward().Cross(FxVec3f::sUp); }
+    FX_FORCE_INLINE FxVec3f GetUp() { return GetRight().Cross(Direction); }
+
     ~FxPlayer();
 
 private:

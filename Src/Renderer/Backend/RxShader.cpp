@@ -52,6 +52,14 @@ static const char* ShaderTypeToExtension(RxShaderType type)
     return "";
 }
 
+static std::string MakeMacrosIdentifier(const FxSizedArray<FxShaderMacro>& macros)
+{
+    std::string identifier;
+
+    for (const FxShaderMacro& macro : macros) {
+    }
+}
+
 
 void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {

@@ -58,7 +58,9 @@ struct RxGraphicsPipelineProperties
     VkCullModeFlags CullMode = VK_CULL_MODE_NONE;
     VkFrontFace WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     VkPolygonMode PolygonMode = VK_POLYGON_MODE_FILL;
-    bool ForceNoDepthTest = false;
+
+    bool bDisableDepthTest : 1 = false;
+    bool bDisableDepthWrite : 1 = false;
 };
 
 struct RxPushConstants

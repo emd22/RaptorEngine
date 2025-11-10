@@ -64,6 +64,17 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Lerp(const FxVec3f& a, const FxVec3f& b, const 
     return FxVec3f(vaddq_f32(a, vmulq_n_f32(d, f)));
 }
 
+FX_FORCE_INLINE FxVec3f& FxVec3f::NormalizeIP()
+{
+    // Calculate length and splat to register
+    const float32x4_t len_v = vdupq_n_f32(Length());
+
+    // Divide vector by length
+    mIntrin = vdivq_f32(mIntrin, len_v);
+
+    return *this;
+}
+
 //////////////////////////////
 // Operator Overloads
 //////////////////////////////

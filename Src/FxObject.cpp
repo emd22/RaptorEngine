@@ -10,8 +10,8 @@
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
 {
-    Mesh = mesh;
-    Material = material;
+    pMesh = mesh;
+    pMaterial = material;
 }
 
 bool FxObject::CheckIfReady()
@@ -23,11 +23,11 @@ bool FxObject::CheckIfReady()
     // If this is a container object, check that the attached nodes are ready
     if (!AttachedNodes.IsEmpty()) {
         // If there is a mesh attached to the container as well, check it
-        if (Mesh && !Mesh->IsReady) {
+        if (pMesh && !pMesh->IsReady) {
             return (mbReadyToRender = false);
         }
 
-        if (Material && !Material->IsReady()) {
+        if (pMaterial && !pMaterial->IsReady()) {
             return (mbReadyToRender = false);
         }
 
@@ -40,16 +40,16 @@ bool FxObject::CheckIfReady()
         return (mbReadyToRender = true);
     }
 
-    if (!Mesh) {
+    if (!pMesh) {
         FX_BREAKPOINT;
     }
 
-    if (!Material || !Material->IsReady()) {
+    if (!pMaterial || !pMaterial->IsReady()) {
         return (mbReadyToRender = false);
     }
 
     // This is not a container object, just check that the mesh is loaded
-    if (!Mesh || !Mesh->IsReady.load()) {
+    if (!pMesh || !pMesh->IsReady.load()) {
         return (mbReadyToRender = false);
     }
 
@@ -60,12 +60,32 @@ bool FxObject::CheckIfReady()
 void FxObject::PhysicsObjectCreate(FxPhysicsObject::PhysicsFlags flags, FxPhysicsObject::PhysicsType type,
                                    const FxPhysicsProperties& properties)
 {
-    Dimensions = Mesh->VertexList.CalculateDimensionsFromPositions();
+    Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
 
     FxVec3f scaled_dimensions = Dimensions * (mScale * 0.5);
 
     Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+}
+
+void FxObject::SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children)
+{
+    // TODO: replace this with a callback system
+    WaitUntilLoaded();
+
+    if (pMaterial) {
+        pMaterial->pPipeline = pipeline;
+    }
+
+    if (update_children) {
+        for (FxRef<FxObject>& node : AttachedNodes) {
+            if (!node->pMaterial) {
+                continue;
+            }
+
+            node->pMaterial->pPipeline = pipeline;
+        }
+    }
 }
 
 
@@ -77,8 +97,8 @@ void FxObject::Render(const FxCamera& camera)
     //        return;
     //    }
 
-    if (Material && !Material->bIsBuilt) {
-        Material->Build();
+    if (pMaterial && !pMaterial->bIsBuilt) {
+        pMaterial->Build();
         return;
     }
 
@@ -97,13 +117,14 @@ void FxObject::Render(const FxCamera& camera)
 
     // memcpy(push_constants.NormalMatrix, , sizeof(FxMat4f));
 
-    if (Material) {
-        push_constants.MaterialIndex = Material->GetMaterialIndex();
+    if (pMaterial) {
+        push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
     }
 
     // mModel->Render(*mMaterial->Pipeline);
 
-    if (Material && CheckIfReady()) {
+
+    if (pMaterial && CheckIfReady()) {
         //        VkDescriptorSet sets_to_bind[] = {
         ////            gRenderer->CurrentGPass->DescriptorSet.Set,
         //
@@ -113,7 +134,7 @@ void FxObject::Render(const FxCamera& camera)
         //        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         //        *Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
-        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, Material->pPipeline->Layout,
+        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                            &push_constants);
 
@@ -128,12 +149,12 @@ void FxObject::Render(const FxCamera& camera)
     // If there are attached objects, then iterate through each and render each
     // This will use the MVP and uniforms from above
     for (FxRef<FxObject>& obj : AttachedNodes) {
-        if (!obj->Material) {
+        if (!obj->pMaterial) {
             continue;
         }
 
-        if (!obj->Material->bIsBuilt) {
-            obj->Material->Build();
+        if (!obj->pMaterial->bIsBuilt) {
+            obj->pMaterial->Build();
         }
 
         //        VkDescriptorSet sets_to_bind[] = {
@@ -166,7 +187,7 @@ void FxObject::Render(const FxCamera& camera)
         //        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         //        *obj->Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
-        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->Material->pPipeline->Layout,
+        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->pMaterial->pPipeline->Layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                            &push_constants);
 
@@ -181,7 +202,7 @@ void FxObject::RenderMesh()
         return;
     }
 
-    if (!Material) {
+    if (!pMaterial) {
         return;
     }
 
@@ -189,10 +210,10 @@ void FxObject::RenderMesh()
 
     RxCommandBuffer& cmd = frame->CommandBuffer;
 
-    Material->Bind(&cmd);
+    pMaterial->Bind(&cmd);
 
-    if (Mesh) {
-        Mesh->Render(cmd, *Material->pPipeline);
+    if (pMesh) {
+        pMesh->Render(cmd, *pMaterial->pPipeline);
     }
 }
 
@@ -253,11 +274,11 @@ void FxObject::SetPhysicsEnabled(bool enabled)
 
 void FxObject::Destroy()
 {
-    if (Mesh) {
-        Mesh->Destroy();
+    if (pMesh) {
+        pMesh->Destroy();
     }
-    if (Material) {
-        Material->Destroy();
+    if (pMaterial) {
+        pMaterial->Destroy();
     }
 
     Physics.DestroyPhysicsBody();

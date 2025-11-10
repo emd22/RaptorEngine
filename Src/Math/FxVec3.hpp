@@ -8,6 +8,8 @@
 #include <arm_neon.h>
 #endif
 
+#include "FxVec4.hpp"
+
 namespace JPH {
 class Vec3;
 using RVec3 = Vec3;
@@ -28,6 +30,12 @@ public:
     FxVec3f(float32 x, float32 y, float32 z);
     FxVec3f(const float32* values);
     FxVec3f(const JPH::Vec3& other);
+
+#ifdef FX_USE_NEON
+    FxVec3f(const FxVec4f& other) : mIntrin(other.mIntrin) {}
+#else
+    FxVec3f(const FxVec4f& other) : X(other.X), Y(other.Y), Z(other.Z) {}
+#endif
 
     explicit FxVec3f(float32 scalar);
 
@@ -85,7 +93,12 @@ public:
     bool IsCloseTo(const JPH::Vec3& other, const float32 threshold = 0.001) const;
 
     FxVec3f Normalize() const;
-    void NormalizeIP();
+
+    /**
+     * Normalizes the vector in place (modifies the source vector.)
+     * @returns The modified vector.
+     */
+    FX_FORCE_INLINE FxVec3f& NormalizeIP();
 
     float32 Length() const;
     FxVec3f Cross(const FxVec3f& other) const;

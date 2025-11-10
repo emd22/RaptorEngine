@@ -41,7 +41,7 @@ public:
 
 public:
     FxAssetQueueItem Item;
-    FxLoaderBase::Status LoadStatus = FxLoaderBase::Status::None;
+    FxLoaderBase::Status LoadStatus = FxLoaderBase::Status::eNone;
 
     FxDataNotifier ItemReady;
 

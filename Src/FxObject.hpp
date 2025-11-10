@@ -27,6 +27,8 @@ public:
     void AttachObject(const FxRef<FxObject>& object);
     void Update();
 
+    void SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children = true);
+
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
 
@@ -42,8 +44,8 @@ private:
     void SyncObjectWithPhysics();
 
 public:
-    FxRef<FxPrimitiveMesh<>> Mesh { nullptr };
-    FxRef<FxMaterial> Material { nullptr };
+    FxRef<FxPrimitiveMesh<>> pMesh { nullptr };
+    FxRef<FxMaterial> pMaterial { nullptr };
 
     FxPagedArray<FxRef<FxObject>> AttachedNodes;
 

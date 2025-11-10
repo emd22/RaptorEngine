@@ -12,23 +12,19 @@ class FxLoaderBase
 public:
     enum class Status
     {
-        None,
-        Success,
-        Error,
+        eNone,
+        eSuccess,
+        eError,
     };
 
-    FxLoaderBase()
-    {
-    }
+    FxLoaderBase() {}
 
     virtual Status LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path) = 0;
     virtual Status LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size) = 0;
 
     virtual void Destroy(FxRef<FxAssetBase>& asset) = 0;
 
-    virtual ~FxLoaderBase()
-    {
-    }
+    virtual ~FxLoaderBase() {}
 
     virtual void CreateGpuResource(FxRef<FxAssetBase>& asset) = 0;
 

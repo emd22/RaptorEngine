@@ -46,15 +46,6 @@ FxVec3f FxVec3f::Normalize() const
     return FxVec3f(X / len, Y / len, Z / len);
 }
 
-void FxVec3f::NormalizeIP()
-{
-    const float32 len = Length();
-
-    X /= len;
-    Y /= len;
-    Z /= len;
-}
-
 FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const { return Cross(other); }
 
 FxVec3f FxVec3f::Cross(const FxVec3f& other) const

@@ -61,15 +61,6 @@ FxVec3f FxVec3f::Normalize() const
     return FxVec3f(v);
 }
 
-void FxVec3f::NormalizeIP()
-{
-    // Calculate length and splat to register
-    const float32x4_t len_v = vdupq_n_f32(Length());
-
-    // Divide vector by length
-    mIntrin = vdivq_f32(mIntrin, len_v);
-}
-
 FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const
 {
     const float32 ax = mData[0];

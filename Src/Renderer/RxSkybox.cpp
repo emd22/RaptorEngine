@@ -135,7 +135,8 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
         .SetProperties({
             .CullMode = VK_CULL_MODE_NONE,
             .WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-            .ForceNoDepthTest = true,
+            .bDisableDepthTest = true,
+            .bDisableDepthWrite = true,
         });
 
 

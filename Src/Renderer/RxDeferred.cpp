@@ -168,6 +168,9 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     builder.SetPolygonMode(VK_POLYGON_MODE_FILL).Build(PlGeometry);
     builder.SetPolygonMode(VK_POLYGON_MODE_LINE).Build(PlGeometryWireframe);
+    builder
+        .SetProperties(RxGraphicsPipelineProperties { .PolygonMode = VK_POLYGON_MODE_FILL, .bDisableDepthTest = true })
+        .Build(PlGeometryNoDepthTest);
 
     pGeometryPipeline = &PlGeometry;
 }

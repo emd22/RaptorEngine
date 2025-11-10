@@ -48,6 +48,18 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Min(const FxVec3f& a, const FxVec3f& b)
     return FxVec3f(max(a.X, b.X), max(a.Y, b.Y), max(a.Z, b.Z));
 }
 
+FX_FORCE_INLINE FxVec3f& FxVec3f::NormalizeIP()
+{
+    const float32 len = Length();
+
+    X /= len;
+    Y /= len;
+    Z /= len;
+
+    return *this;
+}
+
+
 FX_FORCE_INLINE FxVec3f FxVec3f::operator+(const FxVec3f& other) const
 {
     return FxVec3f(X + other.X, Y + other.Y, Z + other.Z);

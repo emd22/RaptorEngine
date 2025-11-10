@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Math/FxMathUtil.hpp>
+#include <Math/FxQuat.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/Mat4.hpp>
 
@@ -49,8 +50,8 @@ public:
 
     inline void Rotate(float32 angle_x, float32 angle_y)
     {
-        mAngleX += angle_x;
-        mAngleY += angle_y;
+        mAngleX = LimitRotation(mAngleX + angle_x);
+        mAngleY = LimitRotation(mAngleY + angle_y);
 
         constexpr float cOffset = 0.01;
 
@@ -85,9 +86,25 @@ public:
 
     void UpdateViewMatrix(const FxVec3f& direction);
 
+    FX_FORCE_INLINE FxVec3f GetRotation() { return FxVec3f(mAngleY, mAngleX, 0); }
+
     inline void RequireUpdate() { mRequiresUpdate = true; }
 
     ~FxPerspectiveCamera() override {}
+
+private:
+    inline float32 LimitRotation(float32 v)
+    {
+        constexpr float32 cf2Pi = M_PI * 2.0f;
+
+        if (v < -cf2Pi) {
+            return cf2Pi - 1e-5;
+        }
+        else if (v > cf2Pi) {
+            return -cf2Pi + 1e-5;
+        }
+        return v;
+    }
 
 public:
     // FxVec3f Direction = FxVec3f(0.0f);

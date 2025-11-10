@@ -39,12 +39,12 @@ Status FxLoaderSlang::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& 
 
     shader_file.Close();
 
-    return Status::Success;
+    return Status::eSuccess;
 }
 
 Status FxLoaderSlang::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
 {
-    return Status::Success;
+    return Status::eSuccess;
 }
 
 void FxLoaderSlang::CreateGpuResource(FxRef<FxAssetBase>& asset) {}

@@ -230,7 +230,7 @@ void FxAssetManager::CheckForUploadableData()
         auto& loaded_item = worker.Item;
 
         // The asset was successfully loaded, upload to GPU
-        if (worker.LoadStatus == FxLoaderBase::Status::Success) {
+        if (worker.LoadStatus == FxLoaderBase::Status::eSuccess) {
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
 
@@ -256,7 +256,7 @@ void FxAssetManager::CheckForUploadableData()
             // Destroy the loader(clearing the loading buffers)
             loaded_item.Loader->Destroy(loaded_item.Asset);
         }
-        else if (worker.LoadStatus == FxLoaderBase::Status::Error) {
+        else if (worker.LoadStatus == FxLoaderBase::Status::eError) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
 
             // There was an error, call the OnError callback if it was registered
@@ -264,7 +264,7 @@ void FxAssetManager::CheckForUploadableData()
                 loaded_item.Asset->mOnErrorCallback(loaded_item.Asset);
             }
         }
-        else if (worker.LoadStatus == FxLoaderBase::Status::None) {
+        else if (worker.LoadStatus == FxLoaderBase::Status::eNone) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
 
             FxPanic("FxAssetManager", "Worker status is none!");
@@ -272,7 +272,7 @@ void FxAssetManager::CheckForUploadableData()
 
         ItemsEnqueued.clear();
         worker.IsBusy.clear();
-        worker.LoadStatus = FxLoaderBase::Status::None;
+        worker.LoadStatus = FxLoaderBase::Status::eNone;
 
         worker.DataPendingUpload.clear();
     }

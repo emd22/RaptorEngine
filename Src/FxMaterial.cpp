@@ -93,7 +93,7 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipe
         gm.Create();
     }
 
-    FxRef<FxMaterial> ref = FxRef<FxMaterial>::New();
+    FxRef<FxMaterial> ref = FxMakeRef<FxMaterial>();
 
     ref->NameHash = FxHashStr(name.c_str());
     ref->Name = name;
@@ -175,6 +175,10 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
 
     if (!cmd) {
         cmd = &gRenderer->GetFrame()->CommandBuffer;
+    }
+
+    if (pPipeline) {
+        pPipeline->Bind(*cmd);
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();

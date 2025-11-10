@@ -19,7 +19,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
 
     if (!fp) {
         FxLogError("Could not find JPEG file at '{:s}'", c_path);
-        return FxLoaderJpeg::Status::Error;
+        return FxLoaderJpeg::Status::eError;
     }
 
     struct jpeg_error_mgr error_mgr;
@@ -56,7 +56,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
 
     fclose(fp);
 
-    return Status::Success;
+    return Status::eSuccess;
 }
 
 FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
@@ -100,7 +100,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
 
     jpeg_finish_decompress(&mJpegInfo);
 
-    return Status::Success;
+    return Status::eSuccess;
 }
 
 void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)

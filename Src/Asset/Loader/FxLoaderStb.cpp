@@ -22,10 +22,10 @@ FxLoaderStb::Status FxLoaderStb::LoadFromFile(FxRef<FxAssetBase> asset, const st
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, requested_channels);
     if (mImageData == nullptr) {
         FxLogError("Could not load image file at '{:d}'", c_path);
-        return FxLoaderStb::Status::Error;
+        return FxLoaderStb::Status::eError;
     }
 
-    return FxLoaderStb::Status::Success;
+    return FxLoaderStb::Status::eSuccess;
 }
 
 FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
@@ -36,7 +36,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         FxLogError("Could not retrieve info from image in memory! (Size:{u})", size);
-        return FxLoaderStb::Status::Error;
+        return FxLoaderStb::Status::eError;
     }
 
     mChannels = requested_channels;
@@ -51,10 +51,10 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
 
     if (mImageData == nullptr) {
         FxLogError("Could not load image file from memory!");
-        return FxLoaderStb::Status::Error;
+        return FxLoaderStb::Status::eError;
     }
 
-    return FxLoaderStb::Status::Success;
+    return FxLoaderStb::Status::eSuccess;
 }
 
 void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)

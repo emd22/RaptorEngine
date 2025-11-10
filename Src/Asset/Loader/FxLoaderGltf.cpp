@@ -144,7 +144,7 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         }
         else {
             MakeMaterialTextureForPrimitive(material, material->DiffuseComponent, texture_view);
-            material->Properties.BaseColor = FxColor::FromRGBA(1, 1, 1, 1);
+            material->Properties.BaseColor = FxColor::FromRGBA(1, 1, 1, 255);
         }
     }
     // There is no albedo texture on the model, use the base colour.
@@ -152,7 +152,7 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         material->Properties.BaseColor = FxColor::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
     }
 
-    object->Material = material;
+    object->pMaterial = material;
 }
 
 void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index)
@@ -212,7 +212,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
         //        MaterialsToLoad.push_back(material);
 
-        current_object->Mesh = primitive_mesh;
+        current_object->pMesh = primitive_mesh;
 
         if (has_multiple_primitives) {
             // Attach the current object to the object container (our output)
@@ -270,14 +270,14 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
     if (status != cgltf_result_success) {
         FxLogError("Error parsing GLTF file! (path: {:s})", path);
-        return FxLoaderGltf::Status::Error;
+        return FxLoaderGltf::Status::eError;
     }
 
     status = cgltf_load_buffers(&options, mGltfData, path.c_str());
     if (status != cgltf_result_success) {
         FxLogError("Error loading buffers from GLTF file! (path: {:s})", path);
 
-        return FxLoaderGltf::Status::Error;
+        return FxLoaderGltf::Status::eError;
     }
 
 
@@ -302,7 +302,7 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromFile(FxRef<FxAssetBase> asset, const 
     //     }
     // }
 
-    return FxLoaderGltf::Status::Success;
+    return FxLoaderGltf::Status::eSuccess;
 }
 
 FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
@@ -315,7 +315,7 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     cgltf_result status = cgltf_parse(&options, data, size, &mGltfData);
     if (status != cgltf_result_success) {
         FxLogError("Error parsing GLTF file from data");
-        return FxLoaderGltf::Status::Error;
+        return FxLoaderGltf::Status::eError;
     }
 
     std::cout << "cgltf textures; " << mGltfData->textures_count << '\n';
@@ -336,7 +336,7 @@ FxLoaderGltf::Status FxLoaderGltf::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     //     }
     // }
 
-    return FxLoaderGltf::Status::Success;
+    return FxLoaderGltf::Status::eSuccess;
 }
 
 void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
@@ -353,6 +353,8 @@ void FxLoaderGltf::CreateGpuResource(FxRef<FxAssetBase>& asset)
     if (has_multiple_meshes) {
         current_object = FxMakeRef<FxObject>();
     }
+
+    FxLogInfo("Unpacking GLTF object with {} meshes", mGltfData->meshes_count);
 
     for (int mesh_index = 0; mesh_index < mGltfData->meshes_count; mesh_index++) {
         cgltf_mesh* mesh = &mGltfData->meshes[mesh_index];

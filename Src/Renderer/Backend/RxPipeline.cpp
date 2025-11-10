@@ -11,7 +11,7 @@
 
 FX_SET_MODULE_NAME("Pipeline")
 
-static VkPipeline spBoundPipeline = nullptr;
+static RxGraphicsPipeline* spBoundPipeline = nullptr;
 
 FxVertexInfo FxMakeVertexInfo()
 {
@@ -171,17 +171,21 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
 
     // RenderPass->Create2(attachments);
 
-    VkBool32 use_depth = VK_TRUE;
+    VkBool32 depth_test_enabled = VK_TRUE;
+    VkBool32 depth_write_enabled = VK_TRUE;
 
-    if (properties.ForceNoDepthTest) {
-        use_depth = VK_FALSE;
+    if (properties.bDisableDepthTest) {
+        depth_test_enabled = VK_FALSE;
+    }
+    if (properties.bDisableDepthWrite) {
+        depth_write_enabled = VK_FALSE;
     }
 
     // Unused if has_depth_attachment is false
     const VkPipelineDepthStencilStateCreateInfo depth_stencil_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthTestEnable = use_depth,
-        .depthWriteEnable = use_depth,
+        .depthTestEnable = depth_test_enabled,
+        .depthWriteEnable = depth_write_enabled,
         .depthCompareOp = VK_COMPARE_OP_GREATER,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
@@ -220,13 +224,13 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
 
 void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
 {
-    if (Pipeline == spBoundPipeline) {
+    if (this == spBoundPipeline) {
         return;
     }
 
     vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-    spBoundPipeline = Pipeline;
+    spBoundPipeline = this;
 }
 
 void RxGraphicsPipeline::Destroy()

@@ -15,10 +15,10 @@ void FxScene::Render()
 {
     const FxCamera& camera = *mpCurrentCamera;
 
-    const FxRef<RxDeferredRenderer>& deferred_renderer = gRenderer->DeferredRenderer;
+    // const FxRef<RxDeferredRenderer>& deferred_renderer = gRenderer->DeferredRenderer;
 
     // Render Geometry
-    deferred_renderer->pGeometryPipeline->Bind(gRenderer->GetFrame()->CommandBuffer);
+    // deferred_renderer->pGeometryPipeline->Bind(gRenderer->GetFrame()->CommandBuffer);
 
     for (const FxRef<FxObject>& obj : mObjects) {
         obj->Update();
