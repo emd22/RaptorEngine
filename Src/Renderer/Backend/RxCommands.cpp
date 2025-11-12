@@ -4,6 +4,8 @@
 
 #include <Core/FxPanic.hpp>
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+
 
 FX_SET_MODULE_NAME("RxCommandBuffer")
 

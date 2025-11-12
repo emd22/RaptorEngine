@@ -3,6 +3,9 @@
 #include "FxCamera.hpp"
 #include "FxEngine.hpp"
 
+#include <Renderer/RxRenderBackend.hpp>
+
+
 using VertexType = FxLight::VertexType;
 
 void FxLight::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { LightVolume = volume; }

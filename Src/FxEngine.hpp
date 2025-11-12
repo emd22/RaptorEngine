@@ -1,17 +1,18 @@
 #pragma once
 
-#include <Asset/FxShaderCompiler.hpp>
-#include <Core/FxRef.hpp>
-#include <Physics/FxPhysicsJolt.hpp>
-#include <Renderer/RxPipelineList.hpp>
-#include <Renderer/RxRenderBackend.hpp>
-#include <Renderer/RxRenderPassCache.hpp>
+#include <Core/FxHash.hpp>
+
+class RxRenderBackend;
+class FxPhysicsJolt;
+class FxShaderCompiler;
+class RxPipelineList;
+class RxRenderPassCache;
 
 extern RxRenderBackend* gRenderer;
 extern FxPhysicsJolt* gPhysics;
 extern FxShaderCompiler* gShaderCompiler;
 extern RxPipelineList* gPipelines;
-extern RxRenderPassCache* gRenderPassCache;
+// extern RxRenderPassCache* gRenderPassCache;
 
 inline constexpr const char* gPipelineGeometryName = "Geometry";
 inline constexpr FxHash gPipelineGeometry = FxHashStr(gPipelineGeometryName);

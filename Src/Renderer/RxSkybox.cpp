@@ -6,6 +6,8 @@
 #include <Core/FxPanic.hpp>
 #include <Renderer/FxCamera.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+
 
 FX_SET_MODULE_NAME("RxSkybox");
 

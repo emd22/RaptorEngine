@@ -3,6 +3,7 @@
 enum class FxAssetPathQuery
 {
     eShaders,
+    eDataPacks,
 };
 
 

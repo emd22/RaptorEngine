@@ -10,7 +10,7 @@
 #include <Renderer/Backend/RxDevice.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
 #include <Renderer/RxDeferred.hpp>
-
+#include <Renderer/RxRenderBackend.hpp>
 
 FX_SET_MODULE_NAME("FxMaterial")
 

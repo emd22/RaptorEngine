@@ -92,7 +92,7 @@ public:
     FX_FORCE_INLINE bool IsCloseTo(const FxVec3f& other, const float32 tolerance = 0.00001) const;
     bool IsCloseTo(const JPH::Vec3& other, const float32 threshold = 0.001) const;
 
-    FxVec3f Normalize() const;
+    FX_FORCE_INLINE FxVec3f Normalize() const;
 
     /**
      * Normalizes the vector in place (modifies the source vector.)
@@ -100,11 +100,14 @@ public:
      */
     FX_FORCE_INLINE FxVec3f& NormalizeIP();
 
-    float32 Length() const;
+    FX_FORCE_INLINE float32 Length() const;
     FxVec3f Cross(const FxVec3f& other) const;
     FxVec3f CrossSlow(const FxVec3f& other) const;
 
-    float32 Dot(const FxVec3f& other) const;
+    FX_FORCE_INLINE float32 Dot(const FxVec3f& other) const;
+#ifdef FX_USE_NEON
+    FX_FORCE_INLINE float32 Dot(float32x4_t other) const;
+#endif
 
     FX_FORCE_INLINE static FxVec3f Min(const FxVec3f& a, const FxVec3f& b);
     FX_FORCE_INLINE static FxVec3f Max(const FxVec3f& a, const FxVec3f& b);

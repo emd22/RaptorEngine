@@ -3,6 +3,7 @@
 #include "FxEngine.hpp"
 
 #include <Core/FxUtil.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 FX_SET_MODULE_NAME("RxSamplerCache")
 

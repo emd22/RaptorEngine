@@ -6,6 +6,8 @@
 
 #include <Renderer/RxDeferred.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+
 
 FX_SET_MODULE_NAME("DeferredRenderer")
 

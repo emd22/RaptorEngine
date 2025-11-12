@@ -7,6 +7,8 @@
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <FxEngine.hpp>
+#include <Physics/FxPhysicsJolt.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
 {

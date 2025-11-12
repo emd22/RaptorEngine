@@ -4,6 +4,7 @@
 #include <ThirdParty/Jolt/Math/Real.h>
 #include <arm_neon.h>
 
+#include <Math/FxMathUtil.hpp>
 #include <Math/FxNeonUtil.hpp>
 #include <Math/FxVec3.hpp>
 
@@ -33,33 +34,17 @@ FxVec3f::FxVec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
 
 void FxVec3f::Print() const { FxLogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
 
-float32 FxVec3f::Length() const
-{
-    float32x4_t vec = mIntrin;
+// float32 FxVec3f::Length() const
+// {
+//     // float32x4_t vec = mIntrin;
 
-    // Square the vector
-    vec = vmulq_f32(vec, vec);
-    // Add all components (horizontal add)
-    float32 len2 = vaddvq_f32(vec);
+//     // Square the vector
+//     // vec = vmulq_f32(vec, vec);
+//     // Add all components (horizontal add)
+//     // float32 len2 = vaddvq_f32(vec);
 
-    return sqrtf(len2);
-}
-
-FxVec3f FxVec3f::Normalize() const
-{
-    // Calculate length
-    const float32 len = Length();
-
-    // Splat to register
-    const float32x4_t len_v = vdupq_n_f32(len);
-
-    // Load vector into register
-    float32x4_t v = mIntrin;
-    // Divide vector by length
-    v = vdivq_f32(v, len_v);
-
-    return FxVec3f(v);
-}
+//     return sqrtf(Dot(mIntrin));
+// }
 
 FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const
 {
@@ -86,12 +71,6 @@ FxVec3f FxVec3f::Cross(const FxVec3f& other) const
     const float32x4_t result_yzxw = vsubq_f32(vmulq_f32(a, b_yzxw), vmulq_f32(a_yzxw, b));
 
     return FxVec3f(FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));
-}
-
-float32 FxVec3f::Dot(const FxVec3f& other) const
-{
-    float32x4_t prod = vmulq_f32(mIntrin, other.mIntrin);
-    return vaddvq_f32(prod);
 }
 
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }

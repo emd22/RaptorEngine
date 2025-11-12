@@ -1,15 +1,15 @@
 #include "FxLoaderGltf.hpp"
 
-#include "Asset/FxAssetBase.hpp"
-#include "Renderer/FxPrimitiveMesh.hpp"
-
 #include <ThirdParty/cgltf.h>
 
+#include <Asset/FxAssetBase.hpp>
 #include <Asset/FxAssetManager.hpp>
 #include <Core/FxRef.hpp>
 #include <FxEngine.hpp>
 #include <FxMaterial.hpp>
 #include <FxObject.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 #include <iostream>
 
 FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);

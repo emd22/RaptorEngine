@@ -8,6 +8,7 @@
 #include <Core/FxTypes.hpp>
 #include <Core/Log.hpp>
 #include <Core/MemPool/FxMemPool.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 // #include <fstream>
 // #include <ios>
 // #include <iostream>
@@ -52,13 +53,13 @@ static const char* ShaderTypeToExtension(RxShaderType type)
     return "";
 }
 
-static std::string MakeMacrosIdentifier(const FxSizedArray<FxShaderMacro>& macros)
-{
-    std::string identifier;
+// static std::string MakeMacrosIdentifier(const FxSizedArray<FxShaderMacro>& macros)
+// {
+//     std::string identifier;
 
-    for (const FxShaderMacro& macro : macros) {
-    }
-}
+//     for (const FxShaderMacro& macro : macros) {
+//     }
+// }
 
 
 void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)

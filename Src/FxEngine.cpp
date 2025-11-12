@@ -1,5 +1,11 @@
 #include "FxEngine.hpp"
 
+#include <Asset/FxShaderCompiler.hpp>
+#include <Core/FxRef.hpp>
+#include <Physics/FxPhysicsJolt.hpp>
+#include <Renderer/RxPipelineList.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/RxRenderPassCache.hpp>
 
 RxRenderBackend* gRenderer = nullptr;
 FxPhysicsJolt* gPhysics = nullptr;

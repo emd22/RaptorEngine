@@ -6,6 +6,7 @@
 
 #include <Core/FxLog.hpp>
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 /** Converts an SDL scancode to its corresponding FxKey ID. */
 static inline FxKey ConvertScancodeToFxKey(int32 sdl_scancode)

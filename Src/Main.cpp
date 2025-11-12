@@ -12,8 +12,10 @@
 #include <Core/FxLinkedList.hpp>
 #include <Core/FxMemory.hpp>
 #include <FxEngine.hpp>
+#include <Physics/FxPhysicsJolt.hpp>
 #include <Renderer/Backend/RxFrameData.hpp>
 #include <Renderer/Backend/RxShader.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 #define SDL_DISABLE_OLD_NAMES
 #include "FxControls.hpp"
@@ -112,6 +114,26 @@ void TestQuatFromEuler()
 // };
 
 static constexpr float scMouseSensitivity = 0.0005;
+
+static FX_FORCE_INLINE FxVec3f GetMovementVector()
+{
+    FxVec3f movement = FxVec3f::sZero;
+
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
+        movement.Z = 1.0f;
+    }
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
+        movement.Z = -1.0f;
+    }
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
+        movement.X = 1.0f;
+    }
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
+        movement.X = -1.0f;
+    }
+
+    return movement;
+}
 
 
 int main()
@@ -294,8 +316,6 @@ int main()
     //
     // player.Physics.Teleport(player.pCamera->Position);
 
-    FxVec3f movement = FxVec3f::sZero;
-
     while (Running) {
         const uint64 CurrentTick = SDL_GetTicksNS();
 
@@ -313,25 +333,6 @@ int main()
             player.RotateHead(mouse_delta);
         }
 
-        movement = FxVec3f::sZero;
-
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-            movement.Z = 1.0f;
-            // player.Move(FxVec3f(0.0f, 0.0f, DeltaTime * 1.0f));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-            movement.Z = -1.0f;
-            // player.Move(FxVec3f(0.0f, 0.0f, DeltaTime * -1.0f));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-            movement.X = 1.0f;
-            // player.Move(FxVec3f(DeltaTime * 1.0f, 0.0f, 0.0f));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-            movement.X = -1.0f;
-            // player.Move(FxVec3f(DeltaTime * -1.0f, 0.0f, 0.0f));
-        }
-
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_LSHIFT)) {
             player.bIsSprinting = true;
         }
@@ -342,10 +343,6 @@ int main()
         if (FxControlManager::IsKeyDown(FxKey::FX_KEY_SPACE)) {
             player.Jump();
         }
-
-        // player.Physics.ApplyMovement(movement);
-        player.Move(DeltaTime, movement);
-
 
         if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
             gRenderer->DeferredRenderer->ToggleWireframe(true);
@@ -376,61 +373,26 @@ int main()
             FxLogInfo("");
         }
 
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_L)) {
-            light->MoveTo(camera->Position);
-
-            // camera.Position.Print();
-            // light.mPosition.Print();
-        }
-
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_F)) {
-            light2->bEnabled = !light2->bEnabled;
-        }
-
-        // if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Y)) {
-        //     // FxAssetManager::LoadAsset(helmet_model, "../models/FireplaceRoom.glb");
-
-        //     // helmet_object.Attach(helmet_model);
-        //     // helmet_object.Attach(cheese_material);
-        //     FxMemPool::GetGlobalPool().PrintAllocations();
-        // }
-
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-            // second_light_on = !second_light_on;
             FxLogInfo("Recompiling shaders...");
             FxShaderCompiler::CompileAllShaders("../Shaders/");
-            // cube_object.MoveBy(FxVec3f(DeltaTime * 0.001f, 0, 0));
-        }
-        if (FxControlManager::IsKeyDown(FxKey::FX_KEY_E)) {
-            // second_light_on = !second_light_on;
-
-            // cube_object.MoveBy(FxVec3f(DeltaTime * -0.001f, 0, 0));
-        }
-
-        if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_0)) {
-            // cube_object.SetPhysicsEnabled(false);
-            // cube_object.MoveTo(FxVec3f(5, 10, 0));
         }
 
         if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
             helmet_object->SetPhysicsEnabled(!helmet_object->GetPhysicsEnabled());
-            // gRenderer->DeferredRenderer->RebuildLightingPipeline();
-            // gPhysics->bPhysicsPaused = !gPhysics->bPhysicsPaused;
-            // cube_object.SetPhysicsEnabled(!cube_object.GetPhysicsEnabled());
-            // FxLogInfo("Fireplace dimensions: {}", fireplace_object->Dimensions);
         }
 
         CheckGeneralControls();
 
+        player.Move(DeltaTime, GetMovementVector());
+
         player.Update(DeltaTime);
-        // camera->Update();
-        // pistol_object->mRotation = FxQuat::FromAxisAngle(FxVec3f::sUp, player.pCamera->mAngleX) *
-        //                            FxQuat::FromAxisAngle(FxVec3f::sRight, player.pCamera->mAngleY);
+
         pistol_object->mRotation = FxQuat::FromEulerAngles(
             FxVec3f(-player.pCamera->mAngleY, player.pCamera->mAngleX, 0));
 
-        pistol_object->MoveTo(camera->Position + (player.Direction * FxVec3f(0.4)));
-        pistol_object->MoveBy(player.GetRight() * FxVec3f(0.20) + (player.GetUp() * FxVec3f(0.1)));
+        pistol_object->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.4)));
+        pistol_object->MoveBy(camera->GetRightVector() * FxVec3f(0.20) + (camera->GetUpVector() * FxVec3f(0.1)));
 
 
         gPhysics->Update();
@@ -440,10 +402,6 @@ int main()
         }
 
         // deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *camera);
-
-        if (light2->bEnabled) {
-            light2->MoveTo(camera->Position + (player.Direction * 1.0));
-        }
 
         main_scene.Render();
 

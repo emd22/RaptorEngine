@@ -18,7 +18,7 @@ FxPlayer::FxPlayer()
 void FxPlayer::MoveBy(const FxVec3f& by)
 {
     Position += by;
-    RequireUpdate();
+    RequirePhysicsUpdate();
 }
 
 void FxPlayer::Jump()
@@ -30,15 +30,16 @@ void FxPlayer::Jump()
 
 void FxPlayer::Move(float delta_time, const FxVec3f& offset)
 {
-    const FxVec3f forward = Direction * offset.Z;
-    const FxVec3f right = Direction.Cross(FxVec3f::sUp) * offset.X;
+    const FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
+
+    const FxVec3f forward = new_direction * offset.Z;
+    const FxVec3f right = new_direction.Cross(FxVec3f::sUp) * offset.X;
 
     FxVec3f movement_goal = (forward + right);
 
-    if (movement_goal.Length() > 0.001) {
+    if (movement_goal.Length() > 1e-3) {
         movement_goal.NormalizeIP();
     }
-
 
     mUserForce = FxVec3f::Lerp(mUserForce, movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed),
                                cMovementLerpSpeed * delta_time);
@@ -61,9 +62,9 @@ void FxPlayer::Update(float32 delta_time)
 {
     UpdateDirection();
 
-    if (!mbUpdatePhysicsTransform) {
-        return;
-    }
+    // if (!mbUpdatePhysicsTransform) {
+    //     return;
+    // }
 
     Physics.Update(delta_time);
     SyncPhysicsToPlayer();
@@ -75,6 +76,8 @@ void FxPlayer::Update(float32 delta_time)
     camera_updated_position.Y -= Physics.HeadRecoveryYOffset;
 
     pCamera->MoveTo(camera_updated_position);
+
+    pCamera->Update();
 
     mbUpdatePhysicsTransform = false;
 }

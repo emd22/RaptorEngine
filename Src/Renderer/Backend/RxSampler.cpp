@@ -1,6 +1,8 @@
 #include "RxSampler.hpp"
 
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+
 
 static constexpr VkSamplerMipmapMode FilterToMipmapMode(RxSamplerFilter filter)
 {

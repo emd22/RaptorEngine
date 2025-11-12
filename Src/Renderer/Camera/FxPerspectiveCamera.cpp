@@ -1,6 +1,5 @@
 #include <Renderer/FxCamera.hpp>
 
-
 void FxPerspectiveCamera::UpdateProjectionMatrix()
 {
     ProjectionMatrix.LoadIdentity();
@@ -51,9 +50,9 @@ void FxPerspectiveCamera::UpdateProjectionMatrix()
  */
 
 
-void FxPerspectiveCamera::UpdateViewMatrix(const FxVec3f& direction)
+void FxPerspectiveCamera::UpdateViewMatrix()
 {
-    FxVec3f target = Position - direction;
+    FxVec3f target = Position - Direction;
     ViewMatrix.LookAt(Position, target, FxVec3f::sUp);
 
     VPMatrix = ViewMatrix * ProjectionMatrix;
@@ -62,18 +61,21 @@ void FxPerspectiveCamera::UpdateViewMatrix(const FxVec3f& direction)
     InvProjectionMatrix = ProjectionMatrix.Inverse();
 }
 
-void FxPerspectiveCamera::Update(const FxVec3f& direction)
+void FxPerspectiveCamera::Update()
 {
-    if (!mRequiresUpdate) {
+    if (!mbUpdateTransform) {
         return;
     }
 
-    // TODO: add sincos() implementation
-    // Direction.Set((cos(mAngleY) * sin(mAngleX)), sin(mAngleY), (cos(mAngleY) * cos(mAngleX)));
-    // Direction = Direction.Normalize();
+    const float32 c_angley = std::cos(mAngleY);
+    const float32 c_anglex = std::cos(mAngleX);
+    const float32 s_angley = std::sin(mAngleY);
+    const float32 s_anglex = std::sin(mAngleX);
 
-    // FxVec3f target = adjusted_position - Direction;
-    UpdateViewMatrix(direction);
+    Direction.Set(c_angley * s_anglex, s_angley, c_angley * c_anglex);
+    Direction.NormalizeIP();
 
-    mRequiresUpdate = false;
+    UpdateViewMatrix();
+
+    mbUpdateTransform = false;
 }

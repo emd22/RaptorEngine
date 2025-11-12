@@ -1,6 +1,7 @@
 #include "FxScene.hpp"
 
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 void FxScene::Create()
 {

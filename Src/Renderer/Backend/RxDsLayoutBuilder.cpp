@@ -1,6 +1,8 @@
 #include "RxDsLayoutBuilder.hpp"
 
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+
 
 RxDsLayoutBuilder& RxDsLayoutBuilder::AddBinding(int binding, VkDescriptorType type, RxShaderType stage, int count)
 {

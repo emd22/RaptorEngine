@@ -14,7 +14,7 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const float32x4_t& other, const float32 
     // Get the absolute difference between the vectors
     const float32x4_t diff = vabdq_f32(mIntrin, other);
 
-    // Is the difference greater than our threshhold?
+    // Is the difference greater than our threshold?
     const uint32x4_t lt = vcgtq_f32(diff, vdupq_n_f32(tolerance));
 
     // If any components are true, return false.
@@ -58,7 +58,6 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Clamp(const FxVec3f& v, const FxVec3f& min, con
 FX_FORCE_INLINE FxVec3f FxVec3f::Lerp(const FxVec3f& a, const FxVec3f& b, const float f)
 {
     // a + f * (b - a);
-
     float32x4_t d = vsubq_f32(b, a);
 
     return FxVec3f(vaddq_f32(a, vmulq_n_f32(d, f)));
@@ -74,6 +73,28 @@ FX_FORCE_INLINE FxVec3f& FxVec3f::NormalizeIP()
 
     return *this;
 }
+
+FX_FORCE_INLINE FxVec3f FxVec3f::Normalize() const
+{
+    // Calculate length and splat to register
+    const float32x4_t len_v = vdupq_n_f32(Length());
+
+    return FxVec3f(vdivq_f32(mIntrin, len_v));
+}
+
+
+FX_FORCE_INLINE float32 FxVec3f::Length() const
+{
+    float32x4_t v = mIntrin;
+    return sqrtf(Dot(v));
+}
+
+FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const
+{
+    return vaddvq_f32(vmulq_f32(mIntrin, other.mIntrin));
+}
+
+FX_FORCE_INLINE float32 FxVec3f::Dot(float32x4_t other) const { return vaddvq_f32(vmulq_f32(mIntrin, other)); }
 
 //////////////////////////////
 // Operator Overloads

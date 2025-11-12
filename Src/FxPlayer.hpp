@@ -36,48 +36,36 @@ public:
     {
         pCamera->Rotate(xy.X, xy.Y);
 
-        RequireUpdate();
-        // UpdateDirection();
+        RequireDirectionUpdate();
     }
-
-
-    FX_FORCE_INLINE FxVec3f GetForward() { return FxVec3f(pCamera->ViewMatrix.Columns[2]).NormalizeIP(); }
-
-    FX_FORCE_INLINE FxVec3f GetRight() { return GetForward().Cross(FxVec3f::sUp); }
-    FX_FORCE_INLINE FxVec3f GetUp() { return GetRight().Cross(Direction); }
 
     ~FxPlayer();
 
 private:
-    FX_FORCE_INLINE void RequireUpdate()
-    {
-        mbUpdateDirection = true;
-        RequirePhysicsUpdate();
-    }
+    FX_FORCE_INLINE void RequireDirectionUpdate() { mbUpdateDirection = true; }
+    FX_FORCE_INLINE void RequirePhysicsUpdate() { mbUpdatePhysicsTransform = true; }
 
     FX_FORCE_INLINE void MarkApplyingUserForce() { mbIsApplyingUserForce = true; }
 
-    FX_FORCE_INLINE void RequirePhysicsUpdate() { mbUpdatePhysicsTransform = true; }
-
     FX_FORCE_INLINE void UpdateDirection()
     {
-        // if (!mbUpdateDirection) {
-        //     return;
-        // }
+        if (!mbUpdateDirection) {
+            return;
+        }
 
         const float32 c_angley = std::cos(pCamera->mAngleY);
         const float32 c_anglex = std::cos(pCamera->mAngleX);
         const float32 s_angley = std::sin(pCamera->mAngleY);
         const float32 s_anglex = std::sin(pCamera->mAngleX);
 
-        Direction.Set(c_angley * s_anglex, s_angley, c_angley * c_anglex);
-        Direction.NormalizeIP();
+        MovementDirection.Set(s_anglex, 1.0f, c_anglex);
+        // CameraDirection = FxVec3f(c_angley, s_angley, c_angley) * MovementDirection;
+        // Clear the movement direction's Y. This is because sin(mAngleY) = 0 when mAngleY is zero.
+        MovementDirection.Y = 0.0f;
 
-        // pCamera->Position = Position;
+        // CameraDirection.NormalizeIP();
 
-        pCamera->UpdateViewMatrix(Direction);
-
-        // mbUpdateDirection = false;
+        mbUpdateDirection = false;
     }
 
     FX_FORCE_INLINE void SyncPhysicsToPlayer() { Position.FromJoltVec3(Physics.pPlayerVirt->GetPosition()); }
@@ -86,7 +74,12 @@ public:
     FxPhysicsPlayer Physics;
     FxRef<FxPerspectiveCamera> pCamera { nullptr };
 
-    FxVec3f Direction = FxVec3f::sZero;
+    /**
+     * @brief The direction that the player is facing. This is the direction the player moves in and disregards the
+     * pitch of the camera.
+     */
+    FxVec3f MovementDirection = FxVec3f::sForward;
+
     FxVec3f Position = FxVec3f::sZero;
 
     bool bIsSprinting = false;
@@ -97,7 +90,7 @@ private:
 
     FxVec3f mUserForce = FxVec3f::sZero;
 
-    bool mbUpdateDirection : 1 = true;
     bool mbIsApplyingUserForce : 1 = false;
+    bool mbUpdateDirection : 1 = true;
     bool mbUpdatePhysicsTransform : 1 = true;
 };

@@ -8,7 +8,7 @@
 class FxCamera
 {
 public:
-    virtual void Update(const FxVec3f& direction) = 0;
+    virtual void Update() = 0;
 
     virtual ~FxCamera() {}
 
@@ -26,12 +26,13 @@ public:
 class FxPerspectiveCamera : public FxCamera
 {
 public:
-    FxPerspectiveCamera() = default;
+    FxPerspectiveCamera() { Update(); }
 
     FxPerspectiveCamera(float32 fov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
         : mAspectRatio(aspect_ratio), mNearPlane(near_plane), mFarPlane(far_plane)
     {
         SetFov(fov);
+        Update();
     }
 
     void UpdateProjectionMatrix();
@@ -48,47 +49,52 @@ public:
     }
 
 
+    FX_FORCE_INLINE FxVec3f GetForwardVector() { return FxVec3f(ViewMatrix.Columns[2]).NormalizeIP(); }
+    FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp); }
+    FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction); }
+
+
     inline void Rotate(float32 angle_x, float32 angle_y)
     {
         mAngleX = LimitRotation(mAngleX + angle_x);
         mAngleY = LimitRotation(mAngleY + angle_y);
 
-        constexpr float cOffset = 0.01;
+        constexpr float cOffset = 0.01f;
 
         constexpr float cMinY = -M_PI_2 + cOffset;
         constexpr float cMaxY = M_PI_2 - cOffset;
 
         mAngleY = FxMath::Clamp(mAngleY, cMinY, cMaxY);
 
-        RequireUpdate();
+        RequireTransformUpdate();
     }
 
-    inline void MoveBy(const FxVec3f& offset)
+    FX_FORCE_INLINE void MoveBy(const FxVec3f& offset)
     {
         Position += offset;
-        RequireUpdate();
+        RequireTransformUpdate();
     }
 
     FX_FORCE_INLINE void MoveTo(const FxVec3f& position)
     {
         Position = position;
-        RequireUpdate();
+        RequireTransformUpdate();
     }
 
-    inline void SetAspectRatio(float32 aspect_ratio)
+    FX_FORCE_INLINE void SetAspectRatio(float32 aspect_ratio)
     {
         mAspectRatio = aspect_ratio;
 
         UpdateProjectionMatrix();
     }
 
-    void Update(const FxVec3f& direction) override;
+    void Update() override;
 
-    void UpdateViewMatrix(const FxVec3f& direction);
+    void UpdateViewMatrix();
 
     FX_FORCE_INLINE FxVec3f GetRotation() { return FxVec3f(mAngleY, mAngleX, 0); }
 
-    inline void RequireUpdate() { mRequiresUpdate = true; }
+    inline void RequireTransformUpdate() { mbUpdateTransform = true; }
 
     ~FxPerspectiveCamera() override {}
 
@@ -112,12 +118,14 @@ public:
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
 
-private:
-    bool mRequiresUpdate = true;
+    FxVec3f Direction = FxVec3f::sForward;
 
+private:
     float32 mFovRad = FxDegToRad(80.0f);
 
     float32 mAspectRatio = 1.0f;
     float32 mNearPlane = 1000.0f;
     float32 mFarPlane = 0.01f;
+
+    bool mbUpdateTransform : 1 = true;
 };

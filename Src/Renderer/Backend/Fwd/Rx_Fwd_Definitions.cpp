@@ -5,6 +5,7 @@
 #include "Rx_Fwd_SubmitUploadGpuCmd.hpp"
 
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 /* Rx_Fwd_GetFrame.hpp */
 RxFrameData* Rx_Fwd_GetFrame() { return gRenderer->GetFrame(); }

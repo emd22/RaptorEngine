@@ -87,7 +87,7 @@ static void PrintSlangDiagnostics(Slang::ComPtr<slang::IBlob>& diagnostic_blob)
     }
 }
 
-void RecordShaderCompileTime(const char* path)
+static void RecordShaderCompileTime(const char* path)
 {
     FxLogInfo("Logging compile time for {}", path);
 
@@ -96,7 +96,7 @@ void RecordShaderCompileTime(const char* path)
         FxBasicDbEntry { .KeyHash = FxHashStr(path), .Value = std::to_string(modification_time) });
 }
 
-bool IsShaderUpToDate(const char* path)
+static bool IsShaderUpToDate(const char* path)
 {
     FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(FxHashStr(path));
     if (!entry) {

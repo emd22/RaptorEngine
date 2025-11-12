@@ -6,6 +6,8 @@
 #include <Core/FxPanic.hpp>
 #include <Core/FxTypes.hpp>
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+
 
 FX_SET_MODULE_NAME("Framebuffer")
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/FxDefines.hpp>
 #include <Core/FxTypes.hpp>
 
 #define FxDegToRad(deg) ((deg) * (M_PI / 180.0f))
@@ -14,10 +15,9 @@ constexpr float32 RadiansToDegrees(float32 radians) { return ((radians) * (180.0
 
 void SinCos(float32 rad, float32* out_sine, float32* out_cosine);
 
-static FX_FORCE_INLINE float32 Clamp(float32 value, float32 lower, float32 upper)
-{
-    return fmin(fmax(value, lower), upper);
-}
+FX_FORCE_INLINE float32 RSqrt(float32 x);
+
+FX_FORCE_INLINE float32 Clamp(float32 value, float32 lower, float32 upper) { return fmin(fmax(value, lower), upper); }
 
 template <uint16 TAlignTo>
 FX_FORCE_INLINE uint64 AlignValue(uint64 value)
@@ -101,4 +101,7 @@ FX_FORCE_INLINE uint64 AlignValue<32>(uint64 value)
     return value;
 }
 
+
 } // namespace FxMath
+
+#include "FxMathUtil.inl"

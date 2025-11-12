@@ -3,6 +3,7 @@
 #include "RxExtensionHandles.hpp"
 
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 void RxUtil::SetDebugLabel_(const char* name, VkObjectType object_type, unsigned long long obj_handle)
 {
