@@ -87,7 +87,7 @@ public:
     Type Width() const { return GetX(); }
     Type Height() const { return GetY(); }
 
-    static const FxVec2Base<Type> Zero;
+    static const FxVec2Base<Type> sZero;
 
 public:
     union alignas(16)
@@ -101,12 +101,58 @@ public:
     };
 };
 
-// Declaration of Vec2::Zero
+// Declaration of Vec2::sZero
 template <typename Type>
-const FxVec2Base<Type> FxVec2Base<Type>::Zero = FxVec2Base<Type>(0, 0);
+const FxVec2Base<Type> FxVec2Base<Type>::sZero = FxVec2Base<Type>(0, 0);
 
 using FxVec2f = FxVec2Base<float32>;
 using FxVec2d = FxVec2Base<float64>;
 
 using FxVec2i = FxVec2Base<int32>;
 using FxVec2u = FxVec2Base<uint32>;
+
+
+template <>
+struct std::formatter<FxVec2i>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    constexpr auto format(const FxVec2i& obj, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
+    }
+};
+
+template <>
+struct std::formatter<FxVec2u>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    constexpr auto format(const FxVec2u& obj, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
+    }
+};
+
+template <>
+struct std::formatter<FxVec2f>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    constexpr auto format(const FxVec2f& obj, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
+    }
+};
+
+
+template <>
+struct std::formatter<FxVec2d>
+{
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    constexpr auto format(const FxVec2d& obj, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
+    }
+};

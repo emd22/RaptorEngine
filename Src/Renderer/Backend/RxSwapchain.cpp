@@ -1,6 +1,5 @@
 #include "RxSwapchain.hpp"
 
-#include "../Renderer.hpp"
 #include "RxDevice.hpp"
 
 #include <vulkan/vulkan.h>

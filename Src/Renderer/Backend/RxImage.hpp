@@ -61,7 +61,7 @@ public:
     ~RxImage() { Destroy(); }
 
 public:
-    FxVec2u Size = FxVec2u::Zero;
+    FxVec2u Size = FxVec2u::sZero;
 
     VkImage Image = nullptr;
     VkImageView View = nullptr;

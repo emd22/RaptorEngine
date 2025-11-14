@@ -18,6 +18,9 @@ public:
     void SelectCamera(const FxRef<FxCamera>& camera) { mpCurrentCamera = camera; }
     void Render();
 
+    const FxPagedArray<FxRef<FxLight>>& GetAllLights() { return mLights; }
+    const FxPagedArray<FxRef<FxObject>>& GetAllObjects() { return mObjects; }
+
     void Destroy();
 
     ~FxScene() { Destroy(); }

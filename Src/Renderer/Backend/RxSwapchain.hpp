@@ -1,18 +1,19 @@
 #pragma once
 
-#include "RxPipeline.hpp"
-#include "RxImage.hpp"
 #include "RxFramebuffer.hpp"
+#include "RxImage.hpp"
+#include "RxPipeline.hpp"
 #include "RxSampler.hpp"
+
+#include <vulkan/vulkan.h>
 
 #include <Core/FxSizedArray.hpp>
 #include <Math/Vector.hpp>
 
-#include <vulkan/vulkan.h>
-
 class RxGpuDevice;
 
-class RxSwapchain {
+class RxSwapchain
+{
 public:
     RxSwapchain() = default;
     ~RxSwapchain();
@@ -25,7 +26,7 @@ public:
     void Destroy();
 
 private:
-    void CreateSwapchain(FxVec2u size, VkSurfaceKHR &surface);
+    void CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface);
     void CreateSwapchainImages();
     void CreateImageViews();
 
@@ -49,14 +50,14 @@ public:
     // FxSizedArray<RxFramebuffer> GPassFramebuffers;
     // FxSizedArray<RxFramebuffer> CompFramebuffers;
 
-    FxVec2u Extent = FxVec2u::Zero;
+    FxVec2u Extent = FxVec2u::sZero;
 
     VkSurfaceFormatKHR SurfaceFormat;
 
     bool Initialized = false;
 
 private:
-    RxGpuDevice *mDevice = nullptr;
+    RxGpuDevice* mDevice = nullptr;
     // RxGraphicsPipeline* mPipeline = nullptr;
     // RxGraphicsPipeline* mCompPipeline = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;

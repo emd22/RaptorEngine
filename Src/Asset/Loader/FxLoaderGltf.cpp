@@ -122,7 +122,6 @@ void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMater
     // component.Texture->mIsLoaded.store(true);
 }
 
-
 void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive)
 {
     cgltf_material* gltf_material = primitive->material;
@@ -131,25 +130,29 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         return;
     }
 
-    FxRef<FxMaterial> material = FxMaterialManager::New("Fireplace", &gRenderer->DeferredRenderer->PlGeometry);
+    FxRef<FxMaterial> material = FxMaterialManager::New("Fireplace", &gRenderer->pDeferredRenderer->PlGeometry);
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
         cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
 
         if (!texture_view.texture) {
-            MakeEmptyMaterialTexture(material, material->DiffuseComponent);
+            MakeEmptyMaterialTexture(material, material->Diffuse);
             material->Properties.BaseColor = FxColor::FromFloats(
                 gltf_material->pbr_metallic_roughness.base_color_factor);
         }
         else {
-            MakeMaterialTextureForPrimitive(material, material->DiffuseComponent, texture_view);
+            MakeMaterialTextureForPrimitive(material, material->Diffuse, texture_view);
             material->Properties.BaseColor = FxColor::FromRGBA(1, 1, 1, 255);
         }
     }
     // There is no albedo texture on the model, use the base colour.
     else {
         material->Properties.BaseColor = FxColor::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+    }
+
+    if (gltf_material->normal_texture.texture != nullptr) {
+        MakeMaterialTextureForPrimitive(material, material->Normal, gltf_material->normal_texture);
     }
 
     object->pMaterial = material;

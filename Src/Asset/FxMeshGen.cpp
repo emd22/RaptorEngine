@@ -38,10 +38,9 @@ static const int32 IcoIndex[] = {
 };
 
 
-FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> FxMeshGen::GeneratedMesh::AsLightVolume()
+FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> FxMeshGen::GeneratedMesh::AsPositionsMesh()
 {
-    FxRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>> mesh =
-        FxMakeRef<FxPrimitiveMesh<FxMeshGen::LightVolumeVertex>>();
+    FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> mesh = FxMakeRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>>();
     // mesh->IsReference = true;
 
     FxSizedArray<RxVertex<FxVertexPosition>> points(Positions.Size);

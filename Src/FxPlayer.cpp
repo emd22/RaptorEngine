@@ -1,6 +1,6 @@
 #include "FxPlayer.hpp"
 
-FxPlayer::FxPlayer()
+void FxPlayer::Create()
 {
     pCamera = FxMakeRef<FxPerspectiveCamera>();
 

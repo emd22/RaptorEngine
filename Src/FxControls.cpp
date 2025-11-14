@@ -176,7 +176,7 @@ void FxControlManager::Update()
 {
     FxControlManager& inst = GetInstance();
 
-    inst.mMouseDelta = FxVec2f::Zero;
+    inst.mMouseDelta = FxVec2f::sZero;
     inst.mThisTick++;
 
     SDL_Event event;

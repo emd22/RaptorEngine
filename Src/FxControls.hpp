@@ -117,8 +117,8 @@ private:
     FxSizedArray<FxControl> mKeyMap;
     bool mMouseCaptured = false;
 
-    FxVec2f mMouseDelta = FxVec2f::Zero;
-    FxVec2f mCapturedMousePos = FxVec2f::Zero;
+    FxVec2f mMouseDelta = FxVec2f::sZero;
+    FxVec2f mCapturedMousePos = FxVec2f::sZero;
 
     uint8 mThisTick : 1 = 0;
 };

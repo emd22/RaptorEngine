@@ -13,7 +13,7 @@ void FxLight::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) {
 void FxLight::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh)
 {
     LightVolumeGen = volume_gen;
-    LightVolume = volume_gen->AsLightVolume();
+    LightVolume = volume_gen->AsPositionsMesh();
     // Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
     Radius = 10.0f;
 
@@ -87,10 +87,10 @@ void FxLight::Render(const FxCamera& camera)
     }
 
     if (camera.Position.IntersectsSphere(mPosition, Radius)) {
-        mpLightPipeline = &gRenderer->DeferredRenderer->PlLightingInsideVolume;
+        mpLightPipeline = &gRenderer->pDeferredRenderer->PlLightingInsideVolume;
     }
     else {
-        mpLightPipeline = &gRenderer->DeferredRenderer->PlLightingOutsideVolume;
+        mpLightPipeline = &gRenderer->pDeferredRenderer->PlLightingOutsideVolume;
     }
 
     RxFrameData* frame = gRenderer->GetFrame();
@@ -151,7 +151,7 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
     }
 
     RxFrameData* frame = gRenderer->GetFrame();
-    FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
+    FxRef<RxDeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
     FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
 

@@ -28,7 +28,7 @@ public:
     uint32 NumComponents = 3;
 
     RxImageType ImageType = RxImageType::Image;
-    FxVec2u Size = FxVec2u::Zero;
+    FxVec2u Size = FxVec2u::sZero;
 
 private:
     // bool mImageReady = false;

@@ -34,18 +34,18 @@ public:
     /** Returns the raw pointer representation of the mapped data. */
     operator void*()
     {
-        if (!mGpuBuffer->MappedBuffer) {
+        if (!mGpuBuffer->pMappedBuffer) {
             return nullptr;
         }
 
-        return mGpuBuffer->MappedBuffer;
+        return mGpuBuffer->pMappedBuffer;
     }
 
     /** Returns the pointer representation of the mapped data. */
     ElementType* GetPtr()
     {
-        FxDebugAssert(mGpuBuffer->MappedBuffer != nullptr);
-        return static_cast<ElementType*>(mGpuBuffer->MappedBuffer);
+        FxDebugAssert(mGpuBuffer->pMappedBuffer != nullptr);
+        return static_cast<ElementType*>(mGpuBuffer->pMappedBuffer);
     }
 
     ~RxGpuBufferMapContext() { mGpuBuffer->UnMap(); }
@@ -121,7 +121,7 @@ public:
 
         if ((mBufferFlags & RxGpuBufferFlags::PersistentMapped) != 0) {
             // Get the pointer from VMA for the mapped GPU buffer
-            MappedBuffer = allocation_info.pMappedData;
+            pMappedBuffer = allocation_info.pMappedData;
         }
 
 #ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
@@ -161,7 +161,7 @@ public:
             return;
         }
 
-        const VkResult status = vmaMapMemory(Fx_Fwd_GetGpuAllocator(), Allocation, &MappedBuffer);
+        const VkResult status = vmaMapMemory(Fx_Fwd_GetGpuAllocator(), Allocation, &pMappedBuffer);
 
         if (status != VK_SUCCESS) {
             FxLogError("Could not map GPU memory to main memory! (Usage: 0x{:x})", mUsageFlags);
@@ -169,7 +169,7 @@ public:
         }
     }
 
-    bool IsMapped() const { return MappedBuffer != nullptr; }
+    bool IsMapped() const { return pMappedBuffer != nullptr; }
 
     void UnMap()
     {
@@ -178,7 +178,7 @@ public:
         }
 
         vmaUnmapMemory(Fx_Fwd_GetGpuAllocator(), Allocation);
-        MappedBuffer = nullptr;
+        pMappedBuffer = nullptr;
     }
 
     void Upload(const FxSizedArray<ElementType>& data)
@@ -213,7 +213,7 @@ public:
     VkBuffer Buffer = nullptr;
     VmaAllocation Allocation = nullptr;
 
-    void* MappedBuffer = nullptr;
+    void* pMappedBuffer = nullptr;
 
     std::atomic_bool Initialized = false;
     uint64 Size = 0;

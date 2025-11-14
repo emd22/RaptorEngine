@@ -16,7 +16,7 @@ void RxSkyboxRenderer::Create(const FxVec2u& extent,
 {
     CreateSkyboxPipeline();
 
-    mDeferredRenderer = gRenderer->DeferredRenderer.mPtr;
+    mDeferredRenderer = gRenderer->pDeferredRenderer.mPtr;
     mSkyboxMesh = skybox_mesh;
 
     // SkyboxAttachment.Create(RxImageType::Cubemap, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,

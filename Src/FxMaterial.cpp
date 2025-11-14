@@ -43,6 +43,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     pAlbedoSampler = FxMakeRef<RxSampler>();
     pAlbedoSampler->Create();
 
+    pNormalSampler = FxMakeRef<RxSampler>();
+    pNormalSampler->Create();
 
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
@@ -53,8 +55,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 
     if (!mMaterialPropertiesDS.IsInited()) {
-        assert(gRenderer->DeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
-        mMaterialPropertiesDS.Create(dp, gRenderer->DeferredRenderer->DsLayoutLightingMaterialProperties);
+        assert(gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
+        mMaterialPropertiesDS.Create(dp, gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties);
     }
 
 
@@ -109,6 +111,7 @@ void FxMaterialManager::Destroy()
     }
 
     pAlbedoSampler->Destroy();
+    pNormalSampler->Destroy();
 
     MaterialPropertiesBuffer.Destroy();
 
@@ -156,7 +159,7 @@ bool FxMaterial::IsReady()
         return true;
     }
 
-    if (!DiffuseComponent.pTexture || !DiffuseComponent.pTexture->IsLoaded()) {
+    if (!Diffuse.pTexture || !Diffuse.pTexture->IsLoaded()) {
         return false;
     }
 
@@ -210,8 +213,8 @@ void FxMaterial::Destroy()
     }
 
     // TODO: figure out why the FxRef isn't destroying the object...
-    if (DiffuseComponent.pTexture) {
-        DiffuseComponent.pTexture->Destroy();
+    if (Diffuse.pTexture) {
+        Diffuse.pTexture->Destroy();
     }
 }
 
@@ -298,24 +301,26 @@ void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
         mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(),
-                              gRenderer->DeferredRenderer->DsLayoutGPassMaterial);
+                              gRenderer->pDeferredRenderer->DsLayoutGPassMaterial);
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     // Build components
-    BUILD_MATERIAL_COMPONENT(DiffuseComponent, manager.pAlbedoSampler);
+    BUILD_MATERIAL_COMPONENT(Diffuse, manager.pAlbedoSampler);
+    BUILD_MATERIAL_COMPONENT(Diffuse, manager.pNormalSampler);
 
     // Update the material descriptor
     {
-        constexpr int max_images = static_cast<int>(FxMaterial::ResourceType::MaxImages);
+        constexpr int max_images = static_cast<int>(FxMaterial::ResourceType::eMaxImages);
         FxStackArray<VkDescriptorImageInfo, max_images> write_image_infos;
         FxStackArray<VkWriteDescriptorSet, max_images> write_descriptor_sets;
 
         RxDescriptorSet& descriptor_set = mDescriptorSet;
 
         // Push material textures
-        PUSH_IMAGE_IF_SET(DiffuseComponent.pTexture, 0);
+        PUSH_IMAGE_IF_SET(Diffuse.pTexture, 0);
+        PUSH_IMAGE_IF_SET(Normal.pTexture, 0);
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data,
                                0, nullptr);
@@ -324,7 +329,7 @@ void FxMaterial::Build()
     mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++ /* * RendererFramesInFlight */);
 
     FxMaterialProperties* materials_buffer = reinterpret_cast<FxMaterialProperties*>(
-        manager.MaterialPropertiesBuffer.MappedBuffer);
+        manager.MaterialPropertiesBuffer.pMappedBuffer);
 
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;

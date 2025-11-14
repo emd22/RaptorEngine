@@ -43,11 +43,12 @@ struct FxMaterialProperties
 class FxMaterial
 {
 public:
-    enum ResourceType
+    enum class ResourceType
     {
-        Diffuse,
+        eDiffuse,
+        eNormal,
 
-        MaxImages,
+        eMaxImages,
     };
 
 public:
@@ -56,9 +57,13 @@ public:
     void Attach(ResourceType type, const FxRef<FxAssetImage>& image)
     {
         switch (type) {
-        case ResourceType::Diffuse:
-            DiffuseComponent.pTexture = image;
+        case ResourceType::eDiffuse:
+            Diffuse.pTexture = image;
             break;
+        case ResourceType::eNormal:
+            Normal.pTexture = image;
+            break;
+
         default:
             FxLogError("Unsupported resource type to attach to material!");
             break;
@@ -87,7 +92,8 @@ private:
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent DiffuseComponent;
+    FxMaterialComponent Diffuse;
+    FxMaterialComponent Normal;
 
     FxMaterialProperties Properties {};
 
@@ -135,6 +141,7 @@ public:
 
 public:
     FxRef<RxSampler> pAlbedoSampler { nullptr };
+    FxRef<RxSampler> pNormalSampler { nullptr };
     // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**

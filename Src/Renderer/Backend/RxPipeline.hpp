@@ -2,6 +2,7 @@
 
 #include "../RxVertex.hpp"
 #include "RxRenderPass.hpp"
+#include "RxShader.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -69,8 +70,6 @@ struct RxPushConstants
     VkShaderStageFlags StageFlags;
 };
 
-#include "RxShader.hpp"
-#include "ShaderList.hpp"
 
 class RxGraphicsPipeline
 {

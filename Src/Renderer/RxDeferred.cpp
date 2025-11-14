@@ -601,7 +601,7 @@ void RxDeferredGPass::Submit()
 
 void RxDeferredGPass::SubmitUniforms(const RxUniformBufferObject& ubo)
 {
-    memcpy(UniformBuffer.MappedBuffer, &ubo, sizeof(RxUniformBufferObject));
+    memcpy(UniformBuffer.pMappedBuffer, &ubo, sizeof(RxUniformBufferObject));
 }
 
 void RxDeferredGPass::Destroy()

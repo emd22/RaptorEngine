@@ -1,39 +1,36 @@
 #pragma once
 
-#include <SDL3/SDL.h>
-
-#include <Core/FxPanic.hpp>
 #include <Core/FxRef.hpp>
-#include <Core/FxTypes.hpp>
-#include <memory>
+#include <Math/FxVec2.hpp>
+
+struct SDL_Window;
 
 class FxWindow
 {
 public:
+    static FxRef<FxWindow> New(const char* title, const FxVec2i& size) { return FxRef<FxWindow>::New(title, size); }
+
+public:
     FxWindow() = default;
+    FxWindow(const FxWindow& other) = delete;
+    FxWindow(const char* title, const FxVec2i& size) { Create(title, size); }
 
-    FxWindow(const char* title, int32 width, int32 height) { Create(title, width, height); }
+    void Create(const char* title, const FxVec2i& size);
 
-    void Create(const char* title, int32 width, int32 height)
+    FxVec2i GetSize();
+
+    float32 GetAspectRatio()
     {
-        const uint64 window_flags = SDL_WINDOW_VULKAN;
-
-        mWindow = SDL_CreateWindow(title, width, height, window_flags);
-
-        if (mWindow == nullptr) {
-            FxPanic("Window", "Could not create SDL window (SDL err: {})", SDL_GetError());
-        }
-    }
-
-    static FxRef<FxWindow> New(const char* title, int32 width, int32 height)
-    {
-        return FxRef<FxWindow>::New(title, width, height);
+        FxVec2i size = GetSize();
+        return static_cast<float32>(size.X) / (size.Y);
     }
 
     SDL_Window* GetWindow() { return mWindow; }
 
-    ~FxWindow() { SDL_DestroyWindow(mWindow); }
+    ~FxWindow();
 
+public:
 private:
+    FxVec2i mSize = FxVec2i::sZero;
     SDL_Window* mWindow;
 };

@@ -55,13 +55,13 @@ public:
     void Init(FxVec2u window_size);
     void Destroy();
 
-    RxFrameResult BeginFrame(RxDeferredRenderer& renderer);
+    RxFrameResult BeginFrame();
     void BeginLighting();
     void DoComposition(FxCamera& render_cam);
 
-    void SelectWindow(const FxRef<FxWindow>& window) { mWindow = window; }
+    void SelectWindow(const FxRef<FxWindow>& window) { mpWindow = window; }
 
-    FX_FORCE_INLINE FxRef<FxWindow> GetWindow() { return mWindow; }
+    FX_FORCE_INLINE FxRef<FxWindow> GetWindow() { return mpWindow; }
 
     FX_FORCE_INLINE RxGpuDevice* GetDevice() { return &mDevice; }
 
@@ -181,13 +181,13 @@ public:
 
     RxGpuUploadContext UploadContext;
 
-    bool Initialized = false;
+    bool bInitialized = false;
 
-    RxDeferredGPass* CurrentGPass = nullptr;
-    RxDeferredCompPass* CurrentCompPass = nullptr;
-    RxDeferredLightingPass* CurrentLightingPass = nullptr;
+    RxDeferredGPass* pCurrentGPass = nullptr;
+    RxDeferredCompPass* pCurrentCompPass = nullptr;
+    RxDeferredLightingPass* pCurrentLightingPass = nullptr;
 
-    FxRef<RxDeferredRenderer> DeferredRenderer { nullptr };
+    FxRef<RxDeferredRenderer> pDeferredRenderer { nullptr };
 
     // RxSamplerCache SamplerCache;
 
@@ -199,7 +199,7 @@ private:
     VkInstance mInstance = nullptr;
     VkSurfaceKHR mWindowSurface = nullptr;
 
-    FxRef<FxWindow> mWindow = nullptr;
+    FxRef<FxWindow> mpWindow = nullptr;
     RxGpuDevice mDevice;
 
     VkDebugUtilsMessengerEXT mDebugMessenger;

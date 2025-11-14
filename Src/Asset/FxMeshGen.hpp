@@ -11,14 +11,14 @@ struct FxMeshGenOptions
 class FxMeshGen
 {
 public:
-    using LightVolumeVertex = RxVertex<FxVertexPosition>;
+    using PositionVertex = RxVertex<FxVertexPosition>;
 
     struct GeneratedMesh
     {
         FxSizedArray<FxVec3f> Positions;
         FxSizedArray<uint32> Indices;
 
-        FxRef<FxPrimitiveMesh<LightVolumeVertex>> AsLightVolume();
+        FxRef<FxPrimitiveMesh<PositionVertex>> AsPositionsMesh();
         FxRef<FxPrimitiveMesh<>> AsMesh();
 
         void Destroy()
@@ -26,6 +26,8 @@ public:
             Positions.Free();
             Indices.Free();
         }
+
+        ~GeneratedMesh() { Destroy(); }
     };
 
 public:

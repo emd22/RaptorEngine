@@ -86,7 +86,12 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     // SamplerCache.Create();
 
-    Initialized = true;
+    Swapchain.CreateSwapchainFramebuffers();
+
+    pDeferredRenderer = FxMakeRef<RxDeferredRenderer>();
+    pDeferredRenderer->Create(Swapchain.Extent);
+
+    bInitialized = true;
 }
 
 void RxRenderBackend::InitUploadContext()
@@ -215,7 +220,7 @@ void RxRenderBackend::InitVulkan()
     }
 #endif
 
-    Initialized = true;
+    bInitialized = true;
 }
 
 uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, uint32 type,
@@ -428,13 +433,13 @@ void RxRenderBackend::SubmitOneTimeCmd(RxRenderBackend::SubmitFunc submit_func)
 }
 
 
-RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
+RxFrameResult RxRenderBackend::BeginFrame()
 {
     RxFrameData* frame = GetFrame();
 
-    CurrentGPass = renderer.GetCurrentGPass();
-    CurrentCompPass = renderer.GetCurrentCompPass();
-    CurrentLightingPass = renderer.GetCurrentLightingPass();
+    pCurrentGPass = pDeferredRenderer->GetCurrentGPass();
+    pCurrentCompPass = pDeferredRenderer->GetCurrentCompPass();
+    pCurrentLightingPass = pDeferredRenderer->GetCurrentLightingPass();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -453,7 +458,7 @@ RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
     // pipeline.RenderPass.Begin();
     // pipeline.Bind(frame->CommandBuffer);
 
-    CurrentGPass->Begin();
+    pCurrentGPass->Begin();
 
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
@@ -476,7 +481,7 @@ RxFrameResult RxRenderBackend::BeginFrame(RxDeferredRenderer& renderer)
 
     FxDrawPushConstants push_constants {};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, renderer.PlGeometry.Layout,
+    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pDeferredRenderer->PlGeometry.Layout,
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                        &push_constants);
 
@@ -547,16 +552,16 @@ void RxRenderBackend::BeginLighting()
 {
     RxFrameData* frame = GetFrame();
 
-    CurrentGPass->End();
+    pCurrentGPass->End();
 
-    CurrentGPass->DepthAttachment.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
+    pCurrentGPass->DepthAttachment.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
 
     frame->CommandBuffer.End();
 
     frame->LightCommandBuffer.Reset();
     frame->LightCommandBuffer.Record();
 
-    CurrentLightingPass->Begin();
+    pCurrentLightingPass->Begin();
 
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
@@ -587,10 +592,10 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
     RxFrameData* frame = GetFrame();
 
 
-    CurrentLightingPass->End();
+    pCurrentLightingPass->End();
     frame->LightCommandBuffer.End();
 
-    CurrentCompPass->Begin();
+    pCurrentCompPass->Begin();
 
     const int32 width = Swapchain.Extent.Width();
     const int32 height = Swapchain.Extent.Height();
@@ -612,11 +617,11 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
     vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
 
-    CurrentCompPass->DoCompPass(render_cam);
+    pCurrentCompPass->DoCompPass(render_cam);
 
-    CurrentGPass->Submit();
+    pCurrentGPass->Submit();
 
-    CurrentLightingPass->Submit();
+    pCurrentLightingPass->Submit();
     PresentFrame();
 
     ProcessDeletionQueue();
@@ -655,11 +660,11 @@ inline RxUniformBufferObject& RxRenderBackend::GetUbo()
 
 void RxRenderBackend::CreateSurfaceFromWindow()
 {
-    if (mWindow == nullptr) {
+    if (mpWindow == nullptr) {
         FxModulePanic("No window attached! use FxRenderBackend::SelectWindow()");
     }
 
-    bool success = SDL_Vulkan_CreateSurface(mWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
+    bool success = SDL_Vulkan_CreateSurface(mpWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
 
     if (!success) {
         FxModulePanic("Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
@@ -701,7 +706,7 @@ void RxRenderBackend::Destroy()
     DestroyDebugMessenger(mInstance, mDebugMessenger);
     vkDestroyInstance(mInstance, nullptr);
 
-    Initialized = false;
+    bInitialized = false;
 }
 
 RxFrameData* RxRenderBackend::GetFrame() { return &Frames[GetFrameNumber()]; }

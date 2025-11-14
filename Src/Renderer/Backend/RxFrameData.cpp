@@ -2,9 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Renderer/Renderer.hpp>
 
-void RxFrameData::Create(RxGpuDevice *device)
+void RxFrameData::Create(RxGpuDevice* device)
 {
     ImageAvailable.Create(device);
     RenderFinished.Create(device);
@@ -17,7 +16,7 @@ void RxFrameData::Create(RxGpuDevice *device)
     // Ubo.Map();
 }
 
-void RxFrameData::SubmitUbo(const RxUniformBufferObject & ubo)
+void RxFrameData::SubmitUbo(const RxUniformBufferObject& ubo)
 {
     // memcpy(Ubo.MappedBuffer, &ubo, sizeof(RxUniformBufferObject));
 }

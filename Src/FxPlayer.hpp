@@ -15,7 +15,9 @@ class FxPlayer
     const float32 cJumpForceReduction = 0.010f;
 
 public:
-    FxPlayer();
+    FxPlayer() = default;
+
+    void Create();
 
     void Update(float32 delta_time);
     void MoveBy(const FxVec3f& by);

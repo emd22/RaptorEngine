@@ -1,6 +1,5 @@
 #include "FxEntity.hpp"
 
-#include <Renderer/Renderer.hpp>
 #include <Renderer/RxDeferred.hpp>
 
 FxEntityManager& FxEntityManager::GetGlobalManager()

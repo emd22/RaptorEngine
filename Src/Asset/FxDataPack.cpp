@@ -24,7 +24,10 @@ void FxDataPack::AddEntry(const FxSlice<uint8>& identifier, const FxSlice<uint8>
 
 void FxDataPack::WriteHeader() {}
 
-void FxDataPack::WriteToFile(const char* name) { FxFile file(std::string(FxAssetPath(FxAssetPathQuery::eDataPacks))); }
+void FxDataPack::WriteToFile(const char* name)
+{
+    // FxFile file(std::string(FxAssetPath(FxAssetPathQuery::eDataPacks)), "wb");
+}
 
 
 FxDataPack::~FxDataPack()
