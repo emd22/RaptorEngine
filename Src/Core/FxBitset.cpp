@@ -63,7 +63,7 @@ void FxBitset::Print()
     uint32 size = static_cast<uint32>(mBits.Size);
 
     for (int i = 0; i < size; i++) {
-        uint64 value = mBits.Data[i];
+        uint64 value = mBits.pData[i];
 
         printf("Bits(%d): ", i + 1);
 

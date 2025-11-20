@@ -3,10 +3,39 @@
 #include <Core/FxDefines.hpp>
 #include <Core/MemPool/FxMemPool.hpp>
 
-FxFile::FxFile(const char* path, const char* mode) { Open(path, mode); }
+using DataType = FxFile::DataType;
+using ModType = FxFile::ModType;
 
-void FxFile::Open(const char* path, const char* mode)
+FxFile::FxFile(const char* path, FxFile::ModType mt, FxFile::DataType dt) { Open(path, mt, dt); }
+
+static const char* MakeModeStr(FxFile::ModType mt, FxFile::DataType dt)
 {
+    if (dt == DataType::eBinary) {
+        if (mt == ModType::eRead) {
+            return "rb";
+        }
+        else if (mt == ModType::eWrite) {
+            return "wb";
+        }
+    }
+
+    if (mt == ModType::eRead) {
+        return "r";
+    }
+    else if (mt == ModType::eWrite) {
+        return "w";
+    }
+
+    return "r";
+}
+
+void FxFile::Open(const char* path, FxFile::ModType mt, DataType dt)
+{
+    mModType = mt;
+    mDataType = dt;
+
+    const char* mode = MakeModeStr(mt, dt);
+
     // If the file handle is already set, reopen it with the new path or mode.
     if (pFileHandle != nullptr) {
 #ifdef FX_PLATFORM_WINDOWS
@@ -53,10 +82,20 @@ uint64 FxFile::GetFileSize()
     return mFileSize;
 }
 
+void FxFile::Write(const char* str)
+{
+    if (!pFileHandle) {
+        FxLogWarning(spcErrCannotWriteUnopened);
+        return;
+    }
+
+    fputs(str, pFileHandle);
+}
+
 void FxFile::WriteRaw(const void* data, uint64 size)
 {
     if (!pFileHandle) {
-        FxLogWarning("Cannot write to file as it has not been opened!");
+        FxLogWarning(spcErrCannotWriteUnopened);
         return;
     }
 
@@ -66,6 +105,9 @@ void FxFile::WriteRaw(const void* data, uint64 size)
 void FxFile::SeekTo(uint64 index) { fseek(pFileHandle, index, SEEK_SET); }
 void FxFile::SeekToEnd() { fseek(pFileHandle, 0, SEEK_END); }
 void FxFile::SeekBy(uint32 by) { fseek(pFileHandle, by, SEEK_CUR); }
+
+uint64 FxFile::GetPosition() const { return ftell(pFileHandle); }
+
 
 void FxFile::Flush()
 {

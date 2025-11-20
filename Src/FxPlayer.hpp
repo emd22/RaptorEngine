@@ -55,9 +55,7 @@ private:
             return;
         }
 
-        const float32 c_angley = std::cos(pCamera->mAngleY);
         const float32 c_anglex = std::cos(pCamera->mAngleX);
-        const float32 s_angley = std::sin(pCamera->mAngleY);
         const float32 s_anglex = std::sin(pCamera->mAngleX);
 
         MovementDirection.Set(s_anglex, 1.0f, c_anglex);

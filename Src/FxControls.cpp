@@ -43,7 +43,7 @@ void FxControlManager::Init()
     FxControlManager& inst = GetInstance();
 
     inst.mKeyMap.InitSize(MaxKeys);
-    memset(inst.mKeyMap.Data, 0, inst.mKeyMap.GetSizeInBytes());
+    memset(inst.mKeyMap.pData, 0, inst.mKeyMap.GetSizeInBytes());
 }
 
 FxControlManager& FxControlManager::GetInstance()

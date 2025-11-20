@@ -18,10 +18,10 @@ public:
 
     Iterator end() const { return Ptr + Size; }
 
-    FxSlice(const FxSizedArray<T>& sized_arr) : Ptr(sized_arr.Data), Size(sized_arr.Size) {}
+    FxSlice(const FxSizedArray<T>& sized_arr) : Ptr(sized_arr.pData), Size(sized_arr.Size) {}
 
     template <uint32 TSize>
-    FxSlice(FxStackArray<T, TSize>& stack_arr) : Ptr(stack_arr.Data), Size(stack_arr.Size)
+    FxSlice(FxStackArray<T, TSize>& stack_arr) : Ptr(stack_arr.pData), Size(stack_arr.Size)
     {
     }
 

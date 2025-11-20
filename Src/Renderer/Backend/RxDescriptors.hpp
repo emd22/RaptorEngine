@@ -86,7 +86,7 @@ public:
 
     void SubmitWrites(FxSizedArray<VkWriteDescriptorSet>& to_write)
     {
-        vkUpdateDescriptorSets(mDevice->Device, to_write.Size, to_write.Data, 0, nullptr);
+        vkUpdateDescriptorSets(mDevice->Device, to_write.Size, to_write.pData, 0, nullptr);
         // mDescriptorWrites.Clear();
     }
 

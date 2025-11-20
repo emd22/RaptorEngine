@@ -29,14 +29,14 @@ public:
         if (Size + 1 > Capacity) {
             throw std::out_of_range("FxStackArray insert out of range");
         }
-        Data[Size++] = value;
-        return &Data[Size - 1];
+        pData[Size++] = value;
+        return &pData[Size - 1];
     }
 
     T* Insert()
     {
         ++Size;
-        return &Data[Size - 1];
+        return &pData[Size - 1];
     }
 
     const T& operator[](size_t index) const
@@ -44,7 +44,7 @@ public:
         if (index > Capacity) {
             throw std::out_of_range("FxStackArray access out of range");
         }
-        return Data[index];
+        return pData[index];
     }
 
     T& operator[](size_t index)
@@ -52,18 +52,18 @@ public:
         if (index > Capacity) {
             throw std::out_of_range("FxStackArray access out of range");
         }
-        return Data[index];
+        return pData[index];
     }
 
-    T& Last() { return Data[Size]; }
+    T& Last() { return pData[Size]; }
 
-    operator T*() noexcept { return Data; }
+    operator T*() noexcept { return pData; }
 
-    operator const T*() const noexcept { return Data; }
+    operator const T*() const noexcept { return pData; }
 
 public:
     uint32 Size = 0;
     const uint32 Capacity = TCapacity;
 
-    T Data[TCapacity];
+    T pData[TCapacity];
 };

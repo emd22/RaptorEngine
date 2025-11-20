@@ -185,7 +185,10 @@ public:
     {
         // Create a new item and initialize it
         TElementType* element = &CurrentPage->Data[CurrentPage->Size];
+
+        // if constexpr (std::is_copy_constructible_v<TElementType>) {
         ::new (element) TElementType;
+        // }
 
         // Move to the next index
         ++CurrentPage->Size;
@@ -208,10 +211,16 @@ public:
         return element;
     }
 
-    void Insert(const TElementType& element)
+    TElementType& Insert(const TElementType& element)
     {
         TElementType* new_element = &CurrentPage->Data[CurrentPage->Size];
-        ::new (new_element) TElementType(element);
+
+        if constexpr (std::is_copy_constructible_v<TElementType>) {
+            ::new (new_element) TElementType(element);
+        }
+        else {
+            memcpy(new_element, &element, sizeof(TElementType));
+        }
 
         ++CurrentPage->Size;
 
@@ -229,6 +238,8 @@ public:
 
             FxLogDebug("Allocating new page for FxPagedArray");
         }
+
+        return *new_element;
     }
 
     Page* FindPageForElement(TElementType* value)

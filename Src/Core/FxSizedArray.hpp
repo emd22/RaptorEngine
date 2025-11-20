@@ -53,7 +53,29 @@ public:
         size_t mIndex;
     };
 
-    FxSizedArray(TElementType* ptr, size_t size) : Data(ptr), Size(size), Capacity(size) {}
+
+public:
+    static FxSizedArray<TElementType> CreateCopyOf(const TElementType* ptr, SizeType size)
+    {
+        FxSizedArray<TElementType> arr;
+        arr.InitSize(size);
+        memcpy(arr.pData, ptr, sizeof(TElementType) * size);
+
+        return arr;
+    }
+
+    static FxSizedArray<TElementType> CreateAsSize(SizeType size)
+    {
+        FxSizedArray<TElementType> arr;
+        arr.InitSize(size);
+
+        return arr;
+    }
+
+    static FxSizedArray<TElementType> CreateEmpty() { return FxSizedArray<TElementType>(nullptr, 0); }
+
+public:
+    FxSizedArray(TElementType* ptr, size_t size) : pData(ptr), Size(size), Capacity(size) {}
 
     FxSizedArray(size_t element_count) : Capacity(element_count)
     {
@@ -62,8 +84,8 @@ public:
 #endif
 
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
-        Data = FxMemPool::Alloc<TElementType>(static_cast<uint32>(sizeof(TElementType)) * element_count);
-        if (Data == nullptr) {
+        pData = FxMemPool::Alloc<TElementType>(static_cast<uint32>(sizeof(TElementType)) * element_count);
+        if (pData == nullptr) {
             NoMemError();
         }
 #else
@@ -95,8 +117,8 @@ public:
 
     FxSizedArray(FxSizedArray<TElementType>&& other)
     {
-        Data = std::move(other.Data);
-        other.Data = nullptr;
+        pData = std::move(other.pData);
+        other.pData = nullptr;
 
         Capacity = other.Capacity;
         Size = other.Size;
@@ -109,19 +131,20 @@ public:
 
     ~FxSizedArray() { FxSizedArray::Free(); }
 
-    virtual void Free()
+
+    void Free()
     {
-        if (Data == nullptr || DoNotDestroy) {
+        if (pData == nullptr || DoNotDestroy) {
             return;
         }
 
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (size_t i = 0; i < Size; i++) {
-            TElementType& element = Data[i];
+            TElementType& element = pData[i];
             element.~TElementType();
         }
 
-        FxMemPool::Free(static_cast<void*>(Data));
+        FxMemPool::Free(static_cast<void*>(pData));
 #else
         delete[] Data;
 #endif
@@ -137,25 +160,25 @@ public:
         // std::free(Data);
 
 
-        Data = nullptr;
+        pData = nullptr;
         Capacity = 0;
         Size = 0;
     }
 
-    Iterator begin() const { return Iterator(Data, 0); }
+    Iterator begin() const { return Iterator(pData, 0); }
 
-    Iterator end() const { return Iterator(Data, Size); }
+    Iterator end() const { return Iterator(pData, Size); }
 
-    operator TElementType*() const { return Data; }
+    operator TElementType*() const { return pData; }
 
-    operator TElementType&() const { return *Data; }
+    operator TElementType&() const { return *pData; }
 
     const TElementType& operator[](size_t index) const
     {
         if (index >= Size) {
             throw std::out_of_range("FxSizedArray access out of range");
         }
-        return Data[index];
+        return pData[index];
     }
 
     TElementType& operator[](size_t index)
@@ -163,7 +186,7 @@ public:
         if (index >= Size) {
             throw std::out_of_range("FxSizedArray access out of range");
         }
-        return Data[index];
+        return pData[index];
     }
 
     FxSizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
@@ -185,12 +208,12 @@ public:
 
     FxSizedArray<TElementType>& operator=(FxSizedArray<TElementType>&& other)
     {
-        if (Data) {
+        if (pData) {
             Free();
         }
 
-        Data = other.Data;
-        other.Data = nullptr;
+        pData = other.pData;
+        other.pData = nullptr;
 
         Size = other.Size;
         Capacity = other.Capacity;
@@ -206,7 +229,7 @@ public:
         InitCapacity(other.Capacity);
         Size = other.Size;
 
-        memcpy(Data, other.Data, other.GetSizeInBytes());
+        memcpy(pData, other.pData, other.GetSizeInBytes());
     }
 
     void InitAsCopyOf(const FxSizedArray<TElementType>& other, SizeType copy_capacity)
@@ -214,7 +237,7 @@ public:
         InitCapacity(max(other.Capacity, copy_capacity));
         Size = other.Size;
 
-        memcpy(Data, other.Data, other.GetSizeInBytes());
+        memcpy(pData, other.pData, other.GetSizeInBytes());
     }
 
     void Clear() { Size = 0; }
@@ -229,7 +252,7 @@ public:
             throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
         }
 
-        TElementType* element = &Data[Size++];
+        TElementType* element = &pData[Size++];
 
         new (element) TElementType(object);
     }
@@ -241,7 +264,7 @@ public:
             throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
         }
 
-        TElementType* element = &Data[Size++];
+        TElementType* element = &pData[Size++];
 
         new (element) TElementType(std::move(object));
     }
@@ -254,7 +277,7 @@ public:
             throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
         }
 
-        TElementType* element = &Data[Size++];
+        TElementType* element = &pData[Size++];
 
         new (element) TElementType;
 
@@ -263,7 +286,7 @@ public:
 
     void InitCapacity(size_t element_count)
     {
-        if (Data != nullptr) {
+        if (pData != nullptr) {
             throw std::runtime_error("FxSizedArray has already been previously initialized, cannot InitCapacity!");
         }
 
@@ -272,11 +295,13 @@ public:
         Capacity = element_count;
     }
 
+    void MarkFull() { Size = Capacity; }
+
     bool ContainsItem(TElementType* ptr) const
     {
-        const TElementType* end_ptr = (Data + Size);
+        const TElementType* end_ptr = (pData + Size);
 
-        if (ptr >= Data && ptr <= end_ptr) {
+        if (ptr >= pData && ptr <= end_ptr) {
             return true;
         }
 
@@ -285,15 +310,15 @@ public:
 
     int64 GetItemIndex(TElementType* ptr) const
     {
-        const TElementType* end_ptr = (Data + Size);
+        const TElementType* end_ptr = (pData + Size);
 
-        if (ptr < Data || ptr > end_ptr) {
+        if (ptr < pData || ptr > end_ptr) {
             return scItemNotFound;
         }
 
-        FxAssert(ptr >= Data);
+        FxAssert(ptr >= pData);
 
-        return ptr - Data;
+        return ptr - pData;
     }
 
     /**
@@ -318,7 +343,7 @@ public:
 
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (uint64 i = 0; i < Size; i++) {
-            new (&Data[i]) TElementType;
+            new (&pData[i]) TElementType;
         }
 #endif
     }
@@ -355,14 +380,14 @@ public:
 
 
 protected:
-    virtual void InternalAllocateArray(size_t element_count)
+    void InternalAllocateArray(size_t element_count)
     {
 #ifdef FX_SIZED_ARRAY_DEBUG
         FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", element_count, typeid(ElementType).name());
 #endif
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
-        Data = FxMemPool::Alloc<TElementType>(sizeof(TElementType) * element_count);
-        if (Data == nullptr) {
+        pData = FxMemPool::Alloc<TElementType>(sizeof(TElementType) * element_count);
+        if (pData == nullptr) {
             NoMemError();
         }
 #else
@@ -381,10 +406,10 @@ protected:
     }
 
 public:
+    TElementType* pData = nullptr;
     SizeType Size = 0;
     SizeType Capacity = 0;
 
-    TElementType* Data = nullptr;
 
     bool DoNotDestroy = false;
 };

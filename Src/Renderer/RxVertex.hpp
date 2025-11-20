@@ -76,7 +76,7 @@ struct std::formatter<RxVertexDefault>
 #define RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(component_, member_name_, component_n_)                                \
     if constexpr (can_output_##member_name_) {                                                                         \
         if (has_##member_name_) {                                                                                      \
-            memcpy(&component_, &member_name_.Data[i * component_n_], sizeof(float32) * component_n_);                 \
+            memcpy(&component_, &member_name_.pData[i * component_n_], sizeof(float32) * component_n_);                \
         }                                                                                                              \
         else {                                                                                                         \
             memset(&component_, 0, sizeof(float32) * component_n_);                                                    \
@@ -86,7 +86,7 @@ struct std::formatter<RxVertexDefault>
 #define RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(component_, member_name_, component_n_)                           \
     if constexpr (can_output_##member_name_) {                                                                         \
         if (has_##member_name_) {                                                                                      \
-            memcpy(&component_, member_name_.Data[i].mData, sizeof(float32) * component_n_);                           \
+            memcpy(&component_, member_name_.pData[i].mData, sizeof(float32) * component_n_);                          \
         }                                                                                                              \
         else {                                                                                                         \
             memset(&component_, 0, sizeof(float32) * component_n_);                                                    \
@@ -132,7 +132,7 @@ public:
         for (int i = 0; i < LocalBuffer.Capacity; i++) {
             TVertexType vertex;
 
-            memcpy(&vertex.Position, &positions.Data[i * 3], sizeof(float32) * 3);
+            memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
 
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Normal, normals, 3);
             // if constexpr (can_output_normals) {
@@ -176,7 +176,7 @@ public:
         for (int i = 0; i < LocalBuffer.Capacity; i++) {
             TVertexType vertex;
 
-            memcpy(&vertex.Position, &positions.Data[i].mData, sizeof(float32) * 3);
+            memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
 
             // If the normals are available (passed in and not null), then output them to the vertex object. If not,
             // zero them.

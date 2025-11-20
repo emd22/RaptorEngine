@@ -171,9 +171,9 @@ public:
 
         for (uint32 index = 0; index < num_faces; index++) {
             // Indices for each vertex of the triangle
-            const uint32 index_a = mLocalIndexBuffer.Data[index];
-            const uint32 index_b = mLocalIndexBuffer.Data[index + 1];
-            const uint32 index_c = mLocalIndexBuffer.Data[index + 2];
+            const uint32 index_a = mLocalIndexBuffer.pData[index];
+            const uint32 index_b = mLocalIndexBuffer.pData[index + 1];
+            const uint32 index_c = mLocalIndexBuffer.pData[index + 2];
 
             /*
                         A
@@ -191,9 +191,9 @@ public:
              */
 
 
-            RxVertexDefault& vertex_a = vertices.Data[index_a];
-            RxVertexDefault& vertex_b = vertices.Data[index_b];
-            RxVertexDefault& vertex_c = vertices.Data[index_c];
+            RxVertexDefault& vertex_a = vertices.pData[index_a];
+            RxVertexDefault& vertex_b = vertices.pData[index_b];
+            RxVertexDefault& vertex_c = vertices.pData[index_c];
 
             const FxVec3f edge_a = FxVec3f::FromDifference(vertex_a.Position, vertex_b.Position);
             const FxVec3f edge_b = FxVec3f::FromDifference(vertex_c.Position, vertex_b.Position);

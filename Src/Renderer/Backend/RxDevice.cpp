@@ -60,7 +60,7 @@ void RxQueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurf
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, nullptr);
 
     RawFamilies.InitSize(family_count);
-    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, RawFamilies.Data);
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, RawFamilies.pData);
 
     FxLogInfo("Amount of queue families: {:d}", family_count);
 
@@ -303,7 +303,7 @@ void RxGpuDevice::PickPhysicalDevice()
     FxSizedArray<VkPhysicalDevice> physical_devices;
     physical_devices.InitSize(device_count);
 
-    VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.Data),
+    VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.pData),
           "Could not enumerate physical devices");
 
     for (VkPhysicalDevice& device : physical_devices) {

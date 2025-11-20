@@ -136,7 +136,7 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
         vertex_input_info.vertexBindingDescriptionCount = 1;
         vertex_input_info.pVertexBindingDescriptions = &vertex_info->binding;
         vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->attributes.Size);
-        vertex_input_info.pVertexAttributeDescriptions = vertex_info->attributes.Data;
+        vertex_input_info.pVertexAttributeDescriptions = vertex_info->attributes.pData;
     }
 
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
@@ -303,7 +303,7 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushCons
         .pSetLayouts = descriptor_set_layouts.Ptr,
 
         .pushConstantRangeCount = push_const_ranges.Size,
-        .pPushConstantRanges = push_const_ranges.Data,
+        .pPushConstantRanges = push_const_ranges.pData,
     };
 
     VkPipelineLayout layout;

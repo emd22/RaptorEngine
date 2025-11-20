@@ -73,7 +73,7 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
     std::string spirv_folder = std::string(FxAssetPath(FxAssetPathQuery::eShaders)) + "Spirv/";
     std::string spirv_path = (spirv_folder + shader_name + spirv_ext);
 
-    FxFile spirv_file(spirv_path.c_str(), "rb");
+    FxFile spirv_file(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
 
     // SPIRV file could not be opened, try to compile it
     if (!spirv_file.IsFileOpen()) {
@@ -88,7 +88,7 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
         FxShaderCompiler::Compile(slang_path.c_str(), output_path.c_str(), macros);
 
         // Try to open SPIRV file again
-        spirv_file.Open(spirv_path.c_str(), "rb");
+        spirv_file.Open(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
 
         // Still erroring when trying to open SPIRV, print an error and break out
         if (!spirv_file.IsFileOpen()) {

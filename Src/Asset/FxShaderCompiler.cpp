@@ -59,10 +59,10 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session, co
         .targets = &target_desc,
         .targetCount = 1,
 
-        .preprocessorMacros = preprocessor_macros.Data,
+        .preprocessorMacros = preprocessor_macros.pData,
         .preprocessorMacroCount = static_cast<SlangInt>(preprocessor_macros.Size),
 
-        .compilerOptionEntries = compiler_options.Data,
+        .compilerOptionEntries = compiler_options.pData,
         .compilerOptionEntryCount = compiler_options.Size,
     };
 
@@ -184,7 +184,7 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path, const 
 
     Slang::ComPtr<slang::IComponentType> composed_program;
 
-    SlangResult result = session->createCompositeComponentType(component_types.Data, component_types.Size,
+    SlangResult result = session->createCompositeComponentType(component_types.pData, component_types.Size,
                                                                composed_program.writeRef(), diagnostic_blob.writeRef());
 
     if (SLANG_FAILED(result) || diagnostic_blob != nullptr) {
@@ -207,7 +207,7 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path, const 
             std::string vertex_path = output_path;
             vertex_path += "_vs";
 
-            FxFile output_file(vertex_path.c_str(), "wb");
+            FxFile output_file(vertex_path.c_str(), FxFile::eWrite, FxFile::eBinary);
 
             output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
 
@@ -234,7 +234,7 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path, const 
             std::string fragment_path = output_path;
             fragment_path += "_fs";
 
-            FxFile output_file(fragment_path.c_str(), "wb");
+            FxFile output_file(fragment_path.c_str(), FxFile::eWrite, FxFile::eBinary);
 
             output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
 

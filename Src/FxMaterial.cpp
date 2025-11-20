@@ -322,13 +322,13 @@ void FxMaterial::Build()
         PUSH_IMAGE_IF_SET(Diffuse.pTexture, 0);
         PUSH_IMAGE_IF_SET(Normal.pTexture, 0);
 
-        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.Data,
+        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
                                0, nullptr);
     }
 
     mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++ /* * RendererFramesInFlight */);
 
-    FxMaterialProperties* materials_buffer = reinterpret_cast<FxMaterialProperties*>(
+    FxMaterialProperties* materials_buffer = static_cast<FxMaterialProperties*>(
         manager.MaterialPropertiesBuffer.pMappedBuffer);
 
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];

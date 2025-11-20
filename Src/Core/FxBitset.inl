@@ -11,7 +11,7 @@ FX_FORCE_INLINE void FxBitset::Set(uint32 index)
     // The mask for the bit that we are querying
     const uint64 mask = (1ULL << (index & 0x3F));
 
-    mBits.Data[int_index] |= mask;
+    mBits.pData[int_index] |= mask;
 }
 
 
@@ -23,7 +23,7 @@ FX_FORCE_INLINE bool FxBitset::Get(uint32 index)
     // The mask for the bit that we are querying
     const uint64 mask = (1ULL << (index & 0x3F));
 
-    return (mBits.Data[int_index] & mask);
+    return (mBits.pData[int_index] & mask);
 }
 
 FX_FORCE_INLINE void FxBitset::Unset(uint32 index)
@@ -34,7 +34,7 @@ FX_FORCE_INLINE void FxBitset::Unset(uint32 index)
     // The mask for the bit that we are querying
     const uint64 mask = (1ULL << (index & 0x3F));
 
-    mBits.Data[int_index] &= (~mask);
+    mBits.pData[int_index] &= (~mask);
 }
 
 FX_FORCE_INLINE int FxBitset::FindNextFreeBit() const

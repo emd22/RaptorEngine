@@ -130,12 +130,15 @@ void FoxtrotGame::CreateGame()
     pHelmetObject = FxAssetManager::LoadObject("../Models/DamagedHelmet.glb", { .KeepInMemory = true });
     pHelmetObject->RotateX(M_PI_2);
     pHelmetObject->Scale(FxVec3f(0.5));
+    pHelmetObject->MoveBy(FxVec3f(0, 2, 0));
     pHelmetObject->WaitUntilLoaded();
     pHelmetObject->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
                                        FxPhysicsObject::PhysicsType::Dynamic, {});
     // Disable physics by default, turn on physics with the keypress 'P'
     pHelmetObject->SetPhysicsEnabled(false);
     gPhysics->OptimizeBroadPhase();
+
+    mMainScene.Attach(pHelmetObject);
 
 
     pPistolObject = FxAssetManager::LoadObject("../Models/PistolTextured.glb", { .KeepInMemory = true });

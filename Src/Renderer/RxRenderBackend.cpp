@@ -62,7 +62,7 @@ FxSizedArray<VkLayerProperties> RxRenderBackend::GetAvailableValidationLayers()
     FxSizedArray<VkLayerProperties> validation_layers;
     validation_layers.InitSize(layer_count);
 
-    vkEnumerateInstanceLayerProperties(&layer_count, validation_layers.Data);
+    vkEnumerateInstanceLayerProperties(&layer_count, validation_layers.pData);
 
     return validation_layers;
 }
@@ -119,7 +119,7 @@ void RxRenderBackend::InitFrames()
     RxGpuDevice* device = GetDevice();
 
     for (int i = 0; i < Frames.Size; i++) {
-        RxFrameData& frame = Frames.Data[i];
+        RxFrameData& frame = Frames.pData[i];
         frame.CommandPool.Create(device, graphics_family);
         frame.CommandBuffer.Create(&frame.CommandPool);
         frame.CompCommandBuffer.Create(&frame.CommandPool);
@@ -363,7 +363,7 @@ ExtensionList& RxRenderBackend::QueryInstanceExtensions(bool invalidate_previous
     mAvailableExtensions.InitSize(extension_count);
 
     // Get the available instance extensions
-    result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, mAvailableExtensions.Data);
+    result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, mAvailableExtensions.pData);
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Could not query instance extensions!");
     }

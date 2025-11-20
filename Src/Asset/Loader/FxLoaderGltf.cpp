@@ -29,21 +29,21 @@ void FxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
 
             // Create our vertex position buffer
             positions.InitSize(data_size);
-            cgltf_accessor_unpack_floats(attribute->data, positions.Data, data_size);
+            cgltf_accessor_unpack_floats(attribute->data, positions.pData, data_size);
         }
         else if (attribute->type == cgltf_attribute_type_normal) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
             // Create our vertex normal buffer
             normals.InitSize(data_size);
-            cgltf_accessor_unpack_floats(attribute->data, normals.Data, data_size);
+            cgltf_accessor_unpack_floats(attribute->data, normals.pData, data_size);
         }
         else if (attribute->type == cgltf_attribute_type_texcoord) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
             // Create our vertex normal buffer
             uvs.InitSize(data_size);
-            cgltf_accessor_unpack_floats(attribute->data, uvs.Data, data_size);
+            cgltf_accessor_unpack_floats(attribute->data, uvs.pData, data_size);
         }
     }
 
@@ -185,7 +185,7 @@ void FxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
         if (primitive->indices != nullptr) {
             indices.InitSize(primitive->indices->count);
 
-            cgltf_accessor_unpack_indices(primitive->indices, indices.Data, sizeof(uint32), primitive->indices->count);
+            cgltf_accessor_unpack_indices(primitive->indices, indices.pData, sizeof(uint32), primitive->indices->count);
 
             // FxLogDebug("Indices:");
 

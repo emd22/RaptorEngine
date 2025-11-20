@@ -67,7 +67,7 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
     // we need to set this flag to prevent it from attemping to be freed.
     data_arr.DoNotDestroy = true;
 
-    data_arr.Data = mImageData;
+    data_arr.pData = mImageData;
     data_arr.Size = mDataSize;
     data_arr.Capacity = mDataSize;
 

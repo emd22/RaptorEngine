@@ -184,11 +184,11 @@ public:
     void Upload(const FxSizedArray<ElementType>& data)
     {
         FxDebugAssert(data.Size > 0);
-        FxDebugAssert(data.Data != nullptr);
+        FxDebugAssert(data.pData != nullptr);
 
         auto buffer = GetMappedContext();
         const size_t size_in_bytes = data.GetSizeInBytes();
-        memcpy(buffer.GetPtr(), data.Data, size_in_bytes);
+        memcpy(buffer.GetPtr(), data.pData, size_in_bytes);
     }
 
     void Destroy()

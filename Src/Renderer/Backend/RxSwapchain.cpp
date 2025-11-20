@@ -30,7 +30,7 @@ void RxSwapchain::CreateSwapchainImages()
     FxSizedArray<VkImage> raw_images;
     raw_images.InitSize(image_count);
 
-    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.Data);
+    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.pData);
 
     OutputImages.InitCapacity(image_count);
 

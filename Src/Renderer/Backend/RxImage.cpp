@@ -341,7 +341,7 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_for
             TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 6);
 
             vkCmdCopyImage(cmd.CommandBuffer, cubemap.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.Data);
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.pData);
 
             // VkBufferImageCopy copy {
             //     .bufferOffset = 0,

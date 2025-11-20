@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <Core/FxSlice.hpp>
 #include <Core/FxTypes.hpp>
@@ -9,15 +10,30 @@
 
 class FxFile
 {
+private:
+    static constexpr const char* spcErrCannotWriteUnopened = "Cannot write to file as it has not been opened!";
+    static constexpr const char* spcErrCannotReadUnopened = "Cannot read from file as it has not been opened!";
+
 public:
+    enum DataType
+    {
+        eText = 0,
+        eBinary,
+    };
+
+    enum ModType
+    {
+        eRead = 0,
+        eWrite,
+    };
+
 public:
     FxFile() {}
-    FxFile(const char* path, const char* mode);
-
+    FxFile(const char* path, ModType mt, DataType dt);
 
     static std::filesystem::file_time_type GetLastModifiedTime(const std::string& path);
 
-    void Open(const char* path, const char* mode);
+    void Open(const char* path, ModType mt, DataType dt);
     uint64 GetFileSize();
 
     template <typename TDataType>
@@ -39,6 +55,7 @@ public:
     FxSlice<TDataType> Read()
     {
         if (!pFileHandle) {
+            FxLogWarning(spcErrCannotReadUnopened);
             return nullptr;
         }
 
@@ -50,8 +67,34 @@ public:
 
     void WriteRaw(const void* data, uint64 size);
 
-    template <typename TDataType>
-    void Write(TDataType* data, uint64 size)
+    void Write(const char* str);
+
+    template <typename... TTypes>
+    void Write(TTypes... values)
+    {
+        (Write(values), ...);
+    }
+
+    template <typename TType>
+        requires std::is_integral_v<TType>
+    void Write(TType value)
+    {
+        if (!pFileHandle) {
+            FxLogWarning(spcErrCannotWriteUnopened);
+            return;
+        }
+
+        if (mDataType == eBinary) {
+            fwrite(&value, sizeof(value), 1, pFileHandle);
+        }
+        else {
+            std::string str_value = std::to_string(value);
+            fputs(str_value.c_str(), pFileHandle);
+        }
+    }
+
+    template <typename TType>
+    void Write(TType* data, uint64 size)
     {
         WriteRaw(reinterpret_cast<const void*>(data), size);
     }
@@ -64,6 +107,7 @@ public:
     void SeekTo(uint64 index);
     void SeekBy(uint32 by);
     void SeekToEnd();
+    uint64 GetPosition() const;
 
     void Close();
 
@@ -73,6 +117,9 @@ public:
     FILE* pFileHandle = nullptr;
 
 private:
+    ModType mModType = ModType::eRead;
+    DataType mDataType = DataType::eText;
+
     uint64 mFileSize = 0;
     bool mbSizeOutOfDate : 1 = true;
 };

@@ -48,7 +48,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
     uint8* ptr_list[1];
 
     while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
-        ptr_list[0] = (mImageData.Data + (row_stride * mJpegInfo.output_scanline));
+        ptr_list[0] = (mImageData.pData + (row_stride * mJpegInfo.output_scanline));
         jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
     }
 
@@ -94,7 +94,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     uint8* ptr_list[1];
 
     while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
-        ptr_list[0] = (mImageData.Data + (row_stride * mJpegInfo.output_scanline));
+        ptr_list[0] = (mImageData.pData + (row_stride * mJpegInfo.output_scanline));
         jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
     }
 

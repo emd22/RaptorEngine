@@ -774,7 +774,7 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         write_infos.Insert(normals_write);
     }
 
-    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
 }
 
 void RxDeferredLightingPass::Destroy()
@@ -923,7 +923,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
         write_infos.Insert(lights_write);
     }
 
-    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.Data, 0, nullptr);
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
 }
 
 void RxDeferredCompPass::Begin()

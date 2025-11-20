@@ -41,7 +41,7 @@ void RxRenderPass::Create2(RxAttachmentList& attachments)
     VkSubpassDescription subpass {
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount = static_cast<uint32>(color_refs.Size),
-        .pColorAttachments = color_refs.Data,
+        .pColorAttachments = color_refs.pData,
         .pDepthStencilAttachment = has_depth_attachment ? &depth_attachment_ref : nullptr,
         .pResolveAttachments = nullptr,
     };

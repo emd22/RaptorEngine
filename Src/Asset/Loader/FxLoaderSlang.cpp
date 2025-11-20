@@ -24,7 +24,7 @@ Status FxLoaderSlang::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& 
 {
     FxRef<FxAssetShader> shader(asset);
 
-    FxFile shader_file(path.c_str(), "rb");
+    FxFile shader_file(path.c_str(), FxFile::eRead, FxFile::eText);
 
     // glslang::TShader glsl_shader(RxShaderTypeToShLanguage(shader->ShaderType));
 
