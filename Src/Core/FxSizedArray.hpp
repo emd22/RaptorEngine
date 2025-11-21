@@ -59,7 +59,7 @@ public:
     {
         FxSizedArray<TElementType> arr;
         arr.InitSize(size);
-        memcpy(arr.pData, ptr, sizeof(TElementType) * size);
+        memcpy(arr.pData, ptr, arr.GetSizeInBytes());
 
         return arr;
     }

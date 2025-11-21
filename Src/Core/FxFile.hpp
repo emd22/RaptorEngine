@@ -70,7 +70,7 @@ public:
     void Write(const char* str);
 
     template <typename... TTypes>
-    void Write(TTypes... values)
+    void WriteMulti(TTypes... values)
     {
         (Write(values), ...);
     }

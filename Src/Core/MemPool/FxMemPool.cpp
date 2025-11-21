@@ -14,7 +14,7 @@ static constexpr uint32 scAlignToBytes = 16;
 
 // Allocates enough nodes given all allocations are approximately `scPredictedAllocSize`. This is
 // just to prevent additional calls to `malloc` during calls to our `Alloc` functions.
-static constexpr uint32 scPredictedAllocSize = 64;
+static constexpr uint32 scPredictedAllocSize = 512;
 
 void FxMemPoolPage::Create(uint64 size)
 {

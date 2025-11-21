@@ -18,20 +18,27 @@ void FxDataPack::AddEntry(const FxSlice<uint8>& identifier, const FxSlice<uint8>
         Entries.Create(16);
     }
 
+    FxLogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<char*>(data.Ptr),
+              static_cast<uint32>(data.Size));
+
     Entries.Insert(FxDataPackEntry {
-        FxSizedArray<uint8>::CreateCopyOf(identifier.Ptr, identifier.Size),
+        FxHashStr(reinterpret_cast<char*>(identifier.Ptr), identifier.Size),
         FxSizedArray<uint8>::CreateCopyOf(data.Ptr, data.Size),
     });
 }
 
 
-void FxDataPack::TextReadHeader(FxFile& file)
+void FxDataPack::TextReadHeader()
 {
+    if (!Entries.IsInited()) {
+        Entries.Create(16);
+    }
+
     char* line = nullptr;
     size_t line_size = 0;
 
     // Skip header start
-    getline(&line, &line_size, file.pFileHandle);
+    getline(&line, &line_size, File.pFileHandle);
 
     char temp[128];
     char ch;
@@ -61,7 +68,7 @@ void FxDataPack::TextReadHeader(FxFile& file)
     while (1) {
         line_index = 0;
 
-        getline(&line, &line_size, file.pFileHandle);
+        getline(&line, &line_size, File.pFileHandle);
 
         // Check for end of header
         if (line[0] == '[') {
@@ -76,36 +83,49 @@ void FxDataPack::TextReadHeader(FxFile& file)
 
         FxLogInfo("Hash: {}, Offset: {}, Size: {}", hash, data_offset, data_size);
 
-        Entries.Insert(
-            FxDataPackEntry { FxSizedArray<uint8>::CreateEmpty(), hash, FxSizedArray<uint8>::CreateAsSize(data_size) });
+        Entries.Insert(FxDataPackEntry { hash, FxSizedArray<uint8>::CreateAsSize(data_size), data_offset, data_size });
     }
 
+    // Free the getline allocated string
+    free(line);
+}
+
+void FxDataPack::TextReadAllData()
+{
+    char* line = nullptr;
+    size_t line_size = 0;
+    int line_index = 0;
+
+    char ch;
+
     while (1) {
-        line_index = 0;
+        // Read a line from the file
+        getline(&line, &line_size, File.pFileHandle);
 
-        getline(&line, &line_size, file.pFileHandle);
-
-        // Check for end of header
+        // Skip until there are no entries.
+        // Each entry begins with [ENTRY {identifier}], so we can read that and then consume the next
+        // 'n' bytes of data to consume the entry.
         if (line[0] != '[') {
             break;
         }
 
-        char temp[128];
-        int temp_index = 0;
+        char hash_buffer[128];
+        int hash_index = 0;
 
         // Skip to the hash
         while (!isnumber(ch = line[++line_index]))
             ;
 
+        // Read the hash in
         while (isnumber(ch = line[line_index])) {
-            temp[temp_index++] = ch;
+            hash_buffer[hash_index++] = ch;
             ++line_index;
         }
 
-        temp[temp_index] = 0;
-        ++temp_index;
+        hash_buffer[hash_index] = 0;
+        ++hash_index;
 
-        FxHash hash = atoi(temp);
+        FxHash hash = atoi(hash_buffer);
 
         FxDataPackEntry* found_entry = nullptr;
         for (FxDataPackEntry& entry : Entries) {
@@ -119,76 +139,122 @@ void FxDataPack::TextReadHeader(FxFile& file)
             return;
         }
 
-        uint64 file_index = file.GetPosition();
+        uint64 file_index = File.GetPosition();
         FxLogInfo("Index: {}", file_index);
 
-        fread(found_entry->Data.pData, 1, found_entry->Data.Size, file.pFileHandle);
+        fread(found_entry->Data.pData, 1, found_entry->Data.Size, File.pFileHandle);
 
 
         FxLogInfo("Hash: {}", hash);
-
-
-        FxLogInfo("Data {}", found_entry->Data.pData[1]);
-
-        FxLogInfo("Data({}), {:.{}}", static_cast<uint32>(found_entry->Data.Size),
-                  reinterpret_cast<char*>(found_entry->Data.pData), static_cast<uint32>(found_entry->Data.Size));
     }
 
-    // Load the data sections
+    // Free the getline allocated string
+    free(line);
 }
 
-void FxDataPack::TextWriteHeader(FxFile& file)
+void FxDataPack::JumpToEntry(FxHash id)
+{
+    FxDataPackEntry* found_entry = nullptr;
+    for (FxDataPackEntry& entry : Entries) {
+        if (entry.IdentifierHash == id) {
+            found_entry = &entry;
+        }
+    }
+
+    if (!found_entry) {
+        FxLogError("Could not find entry {} in FxDataPack", id);
+        return;
+    }
+}
+
+void FxDataPack::TextWriteHeader()
 {
     uint32 header_size = 0;
-    for (const FxDataPackEntry& entry : Entries) {
-        header_size += entry.Identifier.Size;
-        header_size += sizeof(uint32);
+    for (FxDataPackEntry& _ : Entries) {
+        constexpr int cSizeOfEntry = 10 + 1 + 10 + 1 + 10 + 1; // identifier_hash,offset,data_size\n
+        header_size += cSizeOfEntry;
     }
+
+    header_size += strlen(spcStrHeaderStart) + 1;
+    header_size += strlen(spcStrHeaderEnd) + 1;
 
     uint32 offset = header_size;
 
-    file.Write(spcStrHeaderEnd, '\n');
+    File.WriteMulti(spcStrHeaderStart, '\n');
     for (FxDataPackEntry& entry : Entries) {
-        entry.IdentifierHash = FxHashStr(reinterpret_cast<char*>(entry.Identifier.pData), entry.Identifier.Size);
+        std::string entry_marker = std::format("[ENTRY {:010}]\n", entry.IdentifierHash);
+        offset += entry_marker.length();
 
-        file.Write(entry.IdentifierHash, ',', offset, ',', entry.Data.Size, '\n');
+        std::string header_entry = std::format("{:010},{:010},{:010}\n", entry.IdentifierHash, offset, entry.Data.Size);
+        File.Write(header_entry.c_str());
 
-        offset += entry.Data.Size;
+        offset += entry.Data.Size + 1; // Where +1 is for the extra newline appended (in text mode)
     }
 
-    file.Write("[HEADER END]\n");
+    File.Write("[HEADER END]\n");
 }
 
 
-void FxDataPack::TextWriteData(FxFile& file)
+void FxDataPack::TextWriteData()
 {
     for (const FxDataPackEntry& entry : Entries) {
-        std::string name = std::string("[ENTRY ") + std::to_string(entry.IdentifierHash) + "]\n";
-        file.Write(name.c_str());
-        file.Write(entry.Data.pData, entry.Data.Size);
-        file.Write('\n');
+        std::string entry_header = std::format("[ENTRY {:010}]\n", entry.IdentifierHash);
+        File.Write(entry_header.c_str());
+        File.Write(entry.Data.pData, entry.Data.Size);
+
+        FxLogInfo("WRITE ({}), {:.{}}", static_cast<uint32>(entry.Data.Size), reinterpret_cast<char*>(entry.Data.pData),
+                  static_cast<uint32>(entry.Data.Size));
+
+        File.Write('\n');
     }
+}
+
+FxDataPackEntry* FxDataPack::QuerySection(FxHash id) const
+{
+    // TODO: replace with ordered map query
+
+    FxDataPackEntry* found_entry = nullptr;
+    for (FxDataPackEntry& entry : Entries) {
+        if (entry.IdentifierHash == id) {
+            found_entry = &entry;
+            break;
+        }
+    }
+
+    return found_entry;
 }
 
 void FxDataPack::WriteToFile(const char* name)
 {
-    FxFile file(name, FxFile::eWrite, FxFile::eText);
+    File.Open(name, FxFile::eWrite, FxFile::eText);
 
-    TextWriteHeader(file);
-    TextWriteData(file);
+    if (!File.IsFileOpen()) {
+        return;
+    }
 
-    file.Close();
+
+    TextWriteHeader();
+    TextWriteData();
+
+    File.Close();
 }
 
 
 void FxDataPack::ReadFromFile(const char* name)
 {
-    FxFile file(name, FxFile::eRead, FxFile::eText);
+    File.Open(name, FxFile::eRead, FxFile::eText);
+    if (!File.IsFileOpen()) {
+        return;
+    }
 
-    TextReadHeader(file);
-
-    file.Close();
+    TextReadHeader();
+    // TextReadAllData(file);
 }
 
 
-FxDataPack::~FxDataPack() {}
+FxDataPack::~FxDataPack()
+{
+    if (File.IsFileOpen()) {
+        File.Close();
+    }
+}
