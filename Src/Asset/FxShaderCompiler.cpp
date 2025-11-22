@@ -235,7 +235,8 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
 
             pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashVS), aligned_buffer);
 
-            FxMemPool::Free(aligned_buffer.pData);
+
+            // FxMemPool::Free(aligned_buffer.pData);
 
             // std::string vertex_path = output_path;
             // vertex_path += "_vs";
@@ -264,6 +265,10 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         }
 
         {
+            FxFile out_data("testdataf.bin", FxFile::eWrite, FxFile::eBinary);
+            out_data.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+            out_data.Close();
+
             constexpr FxHash64 sPrefixHashFS = FxHashStr64("FS");
 
 
@@ -274,7 +279,8 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
 
             pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashFS), aligned_buffer);
 
-            FxMemPool::Free(aligned_buffer.pData);
+            // FxMemPool::Free(aligned_buffer.pData);
+
 
             // std::string fragment_path = output_path;
             // fragment_path += "_fs";

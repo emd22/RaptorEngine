@@ -149,11 +149,6 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
 
     shader_pack.ReadSection(entry, buffer_slice);
 
-    FxFile out_data("testdata.bin", FxFile::eWrite, FxFile::eBinary);
-    out_data.Write(buffer_slice.pData, buffer_slice.Size);
-
-    out_data.Close();
-
     // FxSlice<uint32> file_buffer = spirv_file.Read<uint32>(FxMakeSlice(buffer, buffer_size));
 
     // Use buffer_size(not file_buffer.Size) as we are using the total buffer size, not the amount
