@@ -146,7 +146,7 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
         .renderArea.offset = { 0, 0 },
         .renderArea.extent = { (uint32)extent.Width(), (uint32)extent.Height() },
         .clearValueCount = clear_values.Size,
-        .pClearValues = clear_values.Ptr,
+        .pClearValues = clear_values.pData,
     };
 
     vkCmdBeginRenderPass(cmd->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);

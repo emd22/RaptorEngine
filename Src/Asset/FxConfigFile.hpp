@@ -12,7 +12,7 @@ struct FxConfigEntry
 {
     FxConfigEntry() = default;
 
-    FxHash NameHash;
+    FxHash32 NameHash;
     std::string Name = "";
 
     void Print()
@@ -122,7 +122,7 @@ public:
     template <typename T>
     constexpr T GetValue(const char* entry_name) const
     {
-        return GetValue<T>(FxHashStr(entry_name));
+        return GetValue<T>(FxHashStr32(entry_name));
     }
 
 private:

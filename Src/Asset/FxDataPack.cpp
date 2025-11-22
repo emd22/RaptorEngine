@@ -6,25 +6,27 @@
 #include <Core/MemPool/FxMemPool.hpp>
 #include <Math/FxMathUtil.hpp>
 
-static const char* spcStrHeaderStart = "[HEADER START]";
-static const char* spcStrHeaderEnd = "[HEADER END]";
+static const char* spcStrHeaderStart = "[HEADER START]\n";
+static const char* spcStrHeaderEnd = "[HEADER END]\n";
 
 static constexpr uint16 scByteAlignment = 16;
 static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
 
 void FxDataPack::AddEntry(const FxSlice<uint8>& identifier, const FxSlice<uint8>& data)
 {
+    AddEntry(FxHashData64(FxMakeSlice<uint8>(identifier.pData, identifier.Size)), data);
+}
+
+void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
+{
     if (!Entries.IsInited()) {
         Entries.Create(16);
     }
 
-    FxLogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<char*>(data.Ptr),
+    FxLogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<char*>(data.pData),
               static_cast<uint32>(data.Size));
 
-    Entries.Insert(FxDataPackEntry {
-        FxHashStr(reinterpret_cast<char*>(identifier.Ptr), identifier.Size),
-        FxSizedArray<uint8>::CreateCopyOf(data.Ptr, data.Size),
-    });
+    Entries.Insert(FxDataPackEntry { id, FxSizedArray<uint8>::CreateCopyOf(data.pData, data.Size) });
 }
 
 
@@ -46,7 +48,29 @@ void FxDataPack::TextReadHeader()
     // The current index in the line.
     int line_index = 0;
 
-    auto GetNextField = [&]()
+    auto GetNextField64 = [&]()
+    {
+        // Index for the temp buffer
+        int temp_index = 0;
+
+        while ((ch = line[line_index])) {
+            if (ch == ',' || ch == 0) {
+                break;
+            }
+
+            line_index++;
+            temp[temp_index++] = ch;
+        }
+
+
+        temp[temp_index] = 0;
+
+
+        char* end = temp + temp_index;
+        return static_cast<FxHash64>(std::strtoull(temp, &end, 10));
+    };
+
+    auto GetNextField32 = [&]()
     {
         // Index for the temp buffer
         int temp_index = 0;
@@ -62,7 +86,7 @@ void FxDataPack::TextReadHeader()
 
         temp[temp_index] = 0;
 
-        return std::atoi(temp);
+        return static_cast<uint32>(std::atol(temp));
     };
 
     while (1) {
@@ -75,11 +99,11 @@ void FxDataPack::TextReadHeader()
             break;
         }
 
-        FxHash hash = GetNextField();
+        FxHash64 hash = GetNextField64();
         line_index++; // Skip comma
-        uint32 data_offset = GetNextField();
+        uint32 data_offset = GetNextField32();
         line_index++;
-        uint32 data_size = GetNextField();
+        uint32 data_size = GetNextField32();
 
         FxLogInfo("Hash: {}, Offset: {}, Size: {}", hash, data_offset, data_size);
 
@@ -125,11 +149,12 @@ void FxDataPack::TextReadAllData()
         hash_buffer[hash_index] = 0;
         ++hash_index;
 
-        FxHash hash = atoi(hash_buffer);
+        char* end = hash_buffer + hash_index;
+        FxHash64 hash = static_cast<uint64>(static_cast<FxHash64>(std::strtoull(hash_buffer, &end, 10)));
 
         FxDataPackEntry* found_entry = nullptr;
         for (FxDataPackEntry& entry : Entries) {
-            if (entry.IdentifierHash == hash) {
+            if (entry.Id == hash) {
                 found_entry = &entry;
             }
         }
@@ -144,7 +169,6 @@ void FxDataPack::TextReadAllData()
 
         fread(found_entry->Data.pData, 1, found_entry->Data.Size, File.pFileHandle);
 
-
         FxLogInfo("Hash: {}", hash);
     }
 
@@ -152,11 +176,11 @@ void FxDataPack::TextReadAllData()
     free(line);
 }
 
-void FxDataPack::JumpToEntry(FxHash id)
+void FxDataPack::JumpToEntry(FxHash64 id)
 {
     FxDataPackEntry* found_entry = nullptr;
     for (FxDataPackEntry& entry : Entries) {
-        if (entry.IdentifierHash == id) {
+        if (entry.Id == id) {
             found_entry = &entry;
         }
     }
@@ -171,34 +195,37 @@ void FxDataPack::TextWriteHeader()
 {
     uint32 header_size = 0;
     for (FxDataPackEntry& _ : Entries) {
-        constexpr int cSizeOfEntry = 10 + 1 + 10 + 1 + 10 + 1; // identifier_hash,offset,data_size\n
+        constexpr int cSizeOfEntry = 20 + 1 + 10 + 1 + 10 + 1; // identifier_hash,offset,data_size\n
         header_size += cSizeOfEntry;
     }
 
-    header_size += strlen(spcStrHeaderStart) + 1;
-    header_size += strlen(spcStrHeaderEnd) + 1;
+    header_size += strlen(spcStrHeaderStart);
+    header_size += strlen(spcStrHeaderEnd);
 
     uint32 offset = header_size;
 
-    File.WriteMulti(spcStrHeaderStart, '\n');
-    for (FxDataPackEntry& entry : Entries) {
-        std::string entry_marker = std::format("[ENTRY {:010}]\n", entry.IdentifierHash);
-        offset += entry_marker.length();
+    File.Write(spcStrHeaderStart);
 
-        std::string header_entry = std::format("{:010},{:010},{:010}\n", entry.IdentifierHash, offset, entry.Data.Size);
+    for (FxDataPackEntry& entry : Entries) {
+        // [ENTRY 00000000000000000000]\n
+        constexpr int cEntryMarkerLength = 29;
+
+        offset += cEntryMarkerLength;
+
+        std::string header_entry = std::format("{:020},{:010},{:010}\n", entry.Id, offset, entry.Data.Size);
         File.Write(header_entry.c_str());
 
         offset += entry.Data.Size + 1; // Where +1 is for the extra newline appended (in text mode)
     }
 
-    File.Write("[HEADER END]\n");
+    File.Write(spcStrHeaderEnd);
 }
 
 
 void FxDataPack::TextWriteData()
 {
     for (const FxDataPackEntry& entry : Entries) {
-        std::string entry_header = std::format("[ENTRY {:010}]\n", entry.IdentifierHash);
+        std::string entry_header = std::format("[ENTRY {:020}]\n", entry.Id);
         File.Write(entry_header.c_str());
         File.Write(entry.Data.pData, entry.Data.Size);
 
@@ -209,13 +236,14 @@ void FxDataPack::TextWriteData()
     }
 }
 
-FxDataPackEntry* FxDataPack::QuerySection(FxHash id) const
+FxDataPackEntry* FxDataPack::QuerySection(FxHash64 id) const
 {
     // TODO: replace with ordered map query
 
     FxDataPackEntry* found_entry = nullptr;
     for (FxDataPackEntry& entry : Entries) {
-        if (entry.IdentifierHash == id) {
+        FxLogDebug("Check Entry: {:020}, {:020}", entry.Id, id);
+        if (entry.Id == id) {
             found_entry = &entry;
             break;
         }

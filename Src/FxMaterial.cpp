@@ -97,7 +97,7 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipe
 
     FxRef<FxMaterial> ref = FxMakeRef<FxMaterial>();
 
-    ref->NameHash = FxHashStr(name.c_str());
+    ref->NameHash = FxHashStr32(name.c_str());
     ref->Name = name;
     ref->pPipeline = pipeline;
 
@@ -226,7 +226,7 @@ bool FxMaterialComponent::CheckIfReady()
     if (!pTexture && pDataToLoad) {
         FxSlice<const uint8>& image_data = pDataToLoad;
 
-        pTexture = FxAssetManager::LoadImageFromMemory(image_data.Ptr, image_data.Size);
+        pTexture = FxAssetManager::LoadImageFromMemory(image_data.pData, image_data.Size);
         return false;
     }
 
@@ -243,7 +243,7 @@ bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
     if (!component.pTexture && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pTexture = FxAssetManager::LoadImageFromMemory(image_data.Ptr, image_data.Size);
+        component.pTexture = FxAssetManager::LoadImageFromMemory(image_data.pData, image_data.Size);
         return false;
     }
 

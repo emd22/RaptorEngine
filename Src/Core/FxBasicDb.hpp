@@ -6,7 +6,7 @@
 
 struct FxBasicDbEntry
 {
-    FxHash KeyHash;
+    FxHash32 KeyHash;
     std::string Value;
 };
 
@@ -18,7 +18,7 @@ public:
     void Open(const char* path);
 
     void WriteEntry(const FxBasicDbEntry& entry);
-    FxBasicDbEntry* FindEntry(FxHash key);
+    FxBasicDbEntry* FindEntry(FxHash32 key);
 
     void SaveToFile();
 

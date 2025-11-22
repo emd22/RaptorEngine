@@ -102,7 +102,7 @@ public:
         char* Start = nullptr;
         char* End = nullptr;
 
-        FxHash Hash = 0;
+        FxHash32 Hash = 0;
         TokenType Type = TokenType::Unknown;
         uint32 Length = 0;
 
@@ -133,12 +133,12 @@ public:
             return str;
         }
 
-        FxHash GetHash()
+        FxHash32 GetHash()
         {
             if (Hash != 0) {
                 return Hash;
             }
-            return (Hash = FxHashStr(Start, Length));
+            return (Hash = FxHashStr32(Start, Length));
         }
 
         IsNumericResult IsNumeric() const

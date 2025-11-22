@@ -3,6 +3,7 @@
 #include <ThirdParty/Slang/slang-com-ptr.h>
 #include <ThirdParty/Slang/slang.h>
 
+#include <Asset/FxDataPack.hpp>
 #include <Core/FxBasicDb.hpp>
 #include <Core/FxFile.hpp>
 #include <Core/FxFilesystemIO.hpp>
@@ -93,12 +94,12 @@ static void RecordShaderCompileTime(const char* path)
 
     uint64 modification_time = FxFilesystemIO::FileGetLastModified(path);
     sShaderCompileDb.WriteEntry(
-        FxBasicDbEntry { .KeyHash = FxHashStr(path), .Value = std::to_string(modification_time) });
+        FxBasicDbEntry { .KeyHash = FxHashStr32(path), .Value = std::to_string(modification_time) });
 }
 
 static bool IsShaderUpToDate(const char* path)
 {
-    FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(FxHashStr(path));
+    FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(FxHashStr32(path));
     if (!entry) {
         return false;
     }
@@ -212,6 +213,8 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path, const 
             output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
 
             output_file.Close();
+
+            FxDataPack pack {};
         }
 
         FxLogInfo("Compiled vertex shader {}", path);

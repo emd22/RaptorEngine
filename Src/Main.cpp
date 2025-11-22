@@ -11,42 +11,41 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
 
-    {
-        FxDataPack pack {};
-        {
-            std::string test_section = "Test";
-            std::string data_section = "Test data";
+    // {
+    //     FxDataPack pack {};
+    //     {
+    //         std::string test_section = "Test";
+    //         std::string data_section = "Test data";
 
-            FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
-                                                            test_section.length());
-            FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
-                                                           data_section.length());
+    //         FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
+    //                                                         test_section.length());
+    //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
+    //                                                        data_section.length());
 
-            pack.AddEntry(ident_slice, data_slice);
-        }
-        {
-            std::string test_section = "Test2";
-            std::string data_section = "Apple, Pear, Orange";
+    //         pack.AddEntry(ident_slice, data_slice);
+    //     }
+    //     {
+    //         std::string test_section = "Test2";
+    //         std::string data_section = "Apple, Pear, Orange";
 
-            FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
-                                                            test_section.length());
-            FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
-                                                           data_section.length());
+    //         FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
+    //                                                         test_section.length());
+    //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
+    //                                                        data_section.length());
 
-            pack.AddEntry(ident_slice, data_slice);
-        }
-        pack.WriteToFile("Test.fdat");
-    }
-
+    //         pack.AddEntry(ident_slice, data_slice);
+    //     }
+    //     pack.WriteToFile("Test.fdat");
+    // }
 
     FxDataPack pack {};
 
     pack.ReadFromFile("Test.fdat");
 
+    FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
 
-    FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr("Test2")));
-
+    // FxLogInfo("Data: {}", data.Size);
     FxLogInfo("Data: {:.{}}", data.pData, data.Size);
 
-    FoxtrotGame game {};
+    // FoxtrotGame game {};
 }

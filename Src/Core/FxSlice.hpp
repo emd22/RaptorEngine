@@ -7,53 +7,53 @@
 template <typename T>
 struct FxSlice
 {
-    T* Ptr = nullptr;
+    T* pData = nullptr;
     uint32 Size;
 
 public:
     using Iterator = T*;
     using ConstIterator = T*;
 
-    Iterator begin() const { return Ptr; }
+    Iterator begin() const { return pData; }
 
-    Iterator end() const { return Ptr + Size; }
+    Iterator end() const { return pData + Size; }
 
-    FxSlice(const FxSizedArray<T>& sized_arr) : Ptr(sized_arr.pData), Size(sized_arr.Size) {}
+    FxSlice(const FxSizedArray<T>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
 
     template <uint32 TSize>
-    FxSlice(FxStackArray<T, TSize>& stack_arr) : Ptr(stack_arr.pData), Size(stack_arr.Size)
+    FxSlice(FxStackArray<T, TSize>& stack_arr) : pData(stack_arr.pData), Size(stack_arr.Size)
     {
     }
 
-    FxSlice(T* ptr, uint32 size) : Ptr(ptr), Size(size) {}
+    FxSlice(T* ptr, uint32 size) : pData(ptr), Size(size) {}
 
-    FxSlice(nullptr_t np) : Ptr(nullptr), Size(0) {}
+    FxSlice(nullptr_t np) : pData(nullptr), Size(0) {}
 
     FxSlice(const FxSlice& other)
     {
-        Ptr = other.Ptr;
+        pData = other.pData;
         Size = other.Size;
     }
 
     template <typename TOtherType>
     FxSlice(const FxSlice<TOtherType>& other)
     {
-        Ptr = reinterpret_cast<T*>(other.Ptr);
+        pData = reinterpret_cast<T*>(other.pData);
         Size = other.Size;
     }
 
     FxSlice& operator=(T* value) = delete;
 
-    bool operator==(nullptr_t np) { return Ptr == nullptr; }
+    bool operator==(nullptr_t np) { return pData == nullptr; }
 
-    operator T*() const { return Ptr; }
+    operator T*() const { return pData; }
 
     T& operator[](size_t index)
     {
         if (index > Size) {
             FxPanic("FxSlice", "Index out of range! ({:d} > {:d})\n", index, Size);
         }
-        return Ptr[index];
+        return pData[index];
     }
 };
 

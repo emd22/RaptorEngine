@@ -46,9 +46,9 @@ public:
         constexpr uint32 type_size = sizeof(TDataType);
 
         const uint64 n_to_read = std::fmin(GetFileSize() / type_size, out_buffer.Size);
-        uint64 items_read = fread(out_buffer.Ptr, type_size, n_to_read, pFileHandle);
+        uint64 items_read = fread(out_buffer.pData, type_size, n_to_read, pFileHandle);
 
-        return FxMakeSlice<TDataType>(out_buffer.Ptr, items_read);
+        return FxMakeSlice<TDataType>(out_buffer.pData, items_read);
     }
 
     template <typename TDataType>

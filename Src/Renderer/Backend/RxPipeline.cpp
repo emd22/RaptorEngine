@@ -300,7 +300,7 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushCons
     VkPipelineLayoutCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = descriptor_set_layouts.Size,
-        .pSetLayouts = descriptor_set_layouts.Ptr,
+        .pSetLayouts = descriptor_set_layouts.pData,
 
         .pushConstantRangeCount = push_const_ranges.Size,
         .pPushConstantRanges = push_const_ranges.pData,

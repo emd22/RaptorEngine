@@ -130,7 +130,7 @@ void FxBasicDb::Parse()
     FxMemPool::Free(mpData);
 }
 
-FxBasicDbEntry* FxBasicDb::FindEntry(FxHash key)
+FxBasicDbEntry* FxBasicDb::FindEntry(FxHash32 key)
 {
     for (FxBasicDbEntry& entry : mEntryMarkers) {
         if (entry.KeyHash == key) {

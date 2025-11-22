@@ -132,22 +132,22 @@ FxAstNode* FxConfigScript::TryParseKeyword()
     }
 
     Token& tk = GetToken();
-    FxHash hash = tk.GetHash();
+    FxHash32 hash = tk.GetHash();
 
     // action [name] ( < [arg type] [arg name] ...> ) { <statements...> }
-    constexpr FxHash kw_action = FxHashStr("action");
+    constexpr FxHash32 kw_action = FxHashStr32("action");
 
     // local [type] [name] <?assignment> ;
-    constexpr FxHash kw_local = FxHashStr("local");
+    constexpr FxHash32 kw_local = FxHashStr32("local");
 
     // global [type] [name] <?assignment> ;
-    constexpr FxHash kw_global = FxHashStr("global");
+    constexpr FxHash32 kw_global = FxHashStr32("global");
 
     // return ;
-    constexpr FxHash kw_return = FxHashStr("return");
+    constexpr FxHash32 kw_return = FxHashStr32("return");
 
     // help [name of action] ;
-    constexpr FxHash kw_help = FxHashStr("help");
+    constexpr FxHash32 kw_help = FxHashStr32("help");
 
     if (hash == kw_action) {
         EatToken(TT::Identifier);
@@ -249,7 +249,7 @@ FxAstVarDecl* FxConfigScript::ParseVarDeclare(FxScriptScope* scope)
 //     return mCurrentScope->Vars.GetLast();
 // }
 
-FxScriptVar* FxConfigScript::FindVar(FxHash hashed_name)
+FxScriptVar* FxConfigScript::FindVar(FxHash32 hashed_name)
 {
     FxScriptScope* scope = mCurrentScope;
 
@@ -265,7 +265,7 @@ FxScriptVar* FxConfigScript::FindVar(FxHash hashed_name)
     return nullptr;
 }
 
-FxScriptExternalFunc* FxConfigScript::FindExternalAction(FxHash hashed_name)
+FxScriptExternalFunc* FxConfigScript::FindExternalAction(FxHash32 hashed_name)
 {
     for (FxScriptExternalFunc& func : mExternalFuncs) {
         if (func.HashedName == hashed_name) {
@@ -276,7 +276,7 @@ FxScriptExternalFunc* FxConfigScript::FindExternalAction(FxHash hashed_name)
     return nullptr;
 }
 
-FxScriptAction* FxConfigScript::FindAction(FxHash hashed_name)
+FxScriptAction* FxConfigScript::FindAction(FxHash32 hashed_name)
 {
     FxScriptScope* scope = mCurrentScope;
 
@@ -883,7 +883,7 @@ FxAstActionDecl* FxConfigScript::ParseActionDeclare()
     return node;
 }
 
-// FxScriptValue FxConfigScript::TryCallInternalFunc(FxHash func_name,
+// FxScriptValue FxConfigScript::TryCallInternalFunc(FxHash32 func_name,
 // std::vector<FxScriptValue>& params)
 //{
 //     FxScriptValue return_value;
@@ -1046,7 +1046,7 @@ void FxScriptInterpreter::PopScope()
     mCurrentScope = new_scope;
 }
 
-FxScriptVar* FxScriptInterpreter::FindVar(FxHash hashed_name)
+FxScriptVar* FxScriptInterpreter::FindVar(FxHash32 hashed_name)
 {
     FxScriptScope* scope = mCurrentScope;
 
@@ -1062,7 +1062,7 @@ FxScriptVar* FxScriptInterpreter::FindVar(FxHash hashed_name)
     return nullptr;
 }
 
-FxScriptAction* FxScriptInterpreter::FindAction(FxHash hashed_name)
+FxScriptAction* FxScriptInterpreter::FindAction(FxHash32 hashed_name)
 {
     FxScriptScope* scope = mCurrentScope;
 
@@ -1078,7 +1078,7 @@ FxScriptAction* FxScriptInterpreter::FindAction(FxHash hashed_name)
     return nullptr;
 }
 
-FxScriptExternalFunc* FxScriptInterpreter::FindExternalAction(FxHash hashed_name)
+FxScriptExternalFunc* FxScriptInterpreter::FindExternalAction(FxHash32 hashed_name)
 {
     for (FxScriptExternalFunc& func : mExternalFuncs) {
         if (func.HashedName == hashed_name) {
@@ -1256,7 +1256,7 @@ void FxConfigScript::DefineDefaultExternalFunctions()
 {
     // log([int | float | string | ref] args...)
     RegisterExternalFunc(
-        FxHashStr("log"), {}, // Do not check argument types as we handle it here
+        FxHashStr32("log"), {}, // Do not check argument types as we handle it here
         [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue* return_value)
         {
             printf("[SCRIPT]: ");
@@ -1295,7 +1295,7 @@ void FxConfigScript::DefineDefaultExternalFunctions()
 
     // listvars()
     // RegisterExternalFunc(
-    //    FxHashStr("__listvars__"),
+    //    FxHashStr32("__listvars__"),
     //    {},
     //    [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue*
     //    return_value)
@@ -1316,7 +1316,7 @@ void FxConfigScript::DefineDefaultExternalFunctions()
 
     // listactions()
     // RegisterExternalFunc(
-    //    FxHashStr("__listactions__"),
+    //    FxHashStr32("__listactions__"),
     //    {},
     //    [](FxScriptVM* vm, std::vector<FxScriptValue>& args, FxScriptValue*
     //    return_value)
@@ -1393,17 +1393,17 @@ void FxScriptInterpreter::VisitAssignment(FxAstAssign* assign)
         return;
     }
 
-    constexpr FxHash builtin_int = FxHashStr("int");
-    constexpr FxHash builtin_playerid = FxHashStr("playerid");
-    constexpr FxHash builtin_float = FxHashStr("float");
-    constexpr FxHash builtin_string = FxHashStr("string");
+    constexpr FxHash32 builtin_int = FxHashStr32("int");
+    constexpr FxHash32 builtin_playerid = FxHashStr32("playerid");
+    constexpr FxHash32 builtin_float = FxHashStr32("float");
+    constexpr FxHash32 builtin_string = FxHashStr32("string");
 
     FxScriptValue rhs_value = VisitRhs(assign->Rhs);
     const FxScriptValue& new_value = GetImmediateValue(rhs_value);
 
     FxScriptValue::ValueType var_type = FxScriptValue::NONETYPE;
 
-    FxHash type_hash = var->Type->GetHash();
+    FxHash32 type_hash = var->Type->GetHash();
 
     switch (type_hash) {
     case builtin_playerid:
@@ -1570,7 +1570,7 @@ const FxScriptValue& FxScriptInterpreter::GetImmediateValue(const FxScriptValue&
 
 // #endif
 
-void FxConfigScript::RegisterExternalFunc(FxHash func_name, std::vector<FxScriptValue::ValueType> param_types,
+void FxConfigScript::RegisterExternalFunc(FxHash32 func_name, std::vector<FxScriptValue::ValueType> param_types,
                                           FxScriptExternalFunc::FuncType callback, bool is_variadic)
 {
     FxScriptExternalFunc func {
@@ -1638,7 +1638,7 @@ void FxScriptBCEmitter::Emit(FxAstNode* node)
     }
 }
 
-FxScriptBytecodeVarHandle* FxScriptBCEmitter::FindVarHandle(FxHash hashed_name)
+FxScriptBytecodeVarHandle* FxScriptBCEmitter::FindVarHandle(FxHash32 hashed_name)
 {
     for (FxScriptBytecodeVarHandle& handle : VarHandles) {
         if (handle.HashedName == hashed_name) {
@@ -1648,7 +1648,7 @@ FxScriptBytecodeVarHandle* FxScriptBCEmitter::FindVarHandle(FxHash hashed_name)
     return nullptr;
 }
 
-FxScriptBytecodeActionHandle* FxScriptBCEmitter::FindActionHandle(FxHash hashed_name)
+FxScriptBytecodeActionHandle* FxScriptBCEmitter::FindActionHandle(FxHash32 hashed_name)
 {
     for (FxScriptBytecodeActionHandle& handle : ActionHandles) {
         if (handle.HashedName == hashed_name) {
@@ -1924,7 +1924,7 @@ void FxScriptBCEmitter::EmitJumpCallAbsolute(uint32 position)
     Write32(position);
 }
 
-void FxScriptBCEmitter::EmitJumpCallExternal(FxHash hashed_name)
+void FxScriptBCEmitter::EmitJumpCallExternal(FxHash32 hashed_name)
 {
     printf("callext %u\n", hashed_name);
 
@@ -2311,10 +2311,10 @@ FxScriptBytecodeVarHandle* FxScriptBCEmitter::DoVarDeclare(FxAstVarDecl* decl, V
 
     const uint16 size_of_type = static_cast<uint16>(sizeof(int32));
 
-    const FxHash type_int = FxHashStr("int");
-    const FxHash type_string = FxHashStr("string");
+    const FxHash32 type_int = FxHashStr32("int");
+    const FxHash32 type_string = FxHashStr32("string");
 
-    FxHash decl_hash = decl->Name->GetHash();
+    FxHash32 decl_hash = decl->Name->GetHash();
 
     FxScriptValue::ValueType value_type = FxScriptValue::INT;
 
@@ -2884,7 +2884,7 @@ FxScriptVMCallFrame* FxScriptVM::GetCurrentCallFrame()
     return &mCallFrames[mCallFrameIndex - 1];
 }
 
-FxScriptExternalFunc* FxScriptVM::FindExternalAction(FxHash hashed_name)
+FxScriptExternalFunc* FxScriptVM::FindExternalAction(FxHash32 hashed_name)
 {
     for (FxScriptExternalFunc& func : mExternalFuncs) {
         if (func.HashedName == hashed_name) {

@@ -242,7 +242,7 @@ struct FxAstActionCall : public FxAstNode
     FxAstActionCall() { this->NodeType = FX_AST_ACTIONCALL; }
 
     FxScriptAction* Action = nullptr;
-    FxHash HashedName = 0;
+    FxHash32 HashedName = 0;
     std::vector<FxAstNode*> Params {}; // FxAstLiteral or FxAstVarRef
 };
 
@@ -256,7 +256,7 @@ struct FxAstReturn : public FxAstNode
  */
 struct FxScriptLabelledData
 {
-    FxHash HashedName = 0;
+    FxHash32 HashedName = 0;
     FxTokenizer::Token* Name = nullptr;
 
     FxScriptScope* Scope = nullptr;
@@ -354,7 +354,7 @@ struct FxScriptExternalFunc
 
     using FuncType = void (*)(FxScriptVM* vm, std::vector<FxScriptValue>& params, FxScriptValue* return_value);
 
-    FxHash HashedName = 0;
+    FxHash32 HashedName = 0;
     FuncType Function = nullptr;
 
     std::vector<FxScriptValue::ValueType> ParameterTypes;
@@ -380,13 +380,13 @@ struct FxScriptScope
         }
     }
 
-    FxScriptVar* FindVarInScope(FxHash hashed_name) { return FindInScope<FxScriptVar>(hashed_name, Vars); }
+    FxScriptVar* FindVarInScope(FxHash32 hashed_name) { return FindInScope<FxScriptVar>(hashed_name, Vars); }
 
-    FxScriptAction* FindActionInScope(FxHash hashed_name) { return FindInScope<FxScriptAction>(hashed_name, Actions); }
+    FxScriptAction* FindActionInScope(FxHash32 hashed_name) { return FindInScope<FxScriptAction>(hashed_name, Actions); }
 
     template <typename T>
         requires std::is_base_of_v<FxScriptLabelledData, T>
-    T* FindInScope(FxHash hashed_name, const FxPagedArray<T>& buffer)
+    T* FindInScope(FxHash32 hashed_name, const FxPagedArray<T>& buffer)
     {
         for (T& var : buffer) {
             if (var.HashedName == hashed_name) {
@@ -413,10 +413,10 @@ public:
     void PushScope();
     void PopScope();
 
-    FxScriptVar* FindVar(FxHash hashed_name);
+    FxScriptVar* FindVar(FxHash32 hashed_name);
 
-    FxScriptAction* FindAction(FxHash hashed_name);
-    FxScriptExternalFunc* FindExternalAction(FxHash hashed_name);
+    FxScriptAction* FindAction(FxHash32 hashed_name);
+    FxScriptExternalFunc* FindExternalAction(FxHash32 hashed_name);
 
     FxAstNode* TryParseKeyword();
 
@@ -454,7 +454,7 @@ public:
     Token& GetToken(int offset = 0);
     Token& EatToken(TT token_type);
 
-    void RegisterExternalFunc(FxHash func_name, std::vector<FxScriptValue::ValueType> param_types,
+    void RegisterExternalFunc(FxHash32 func_name, std::vector<FxScriptValue::ValueType> param_types,
                               FxScriptExternalFunc::FuncType func, bool is_variadic);
 
     void DefineExternalVar(const char* type, const char* name, const FxScriptValue& value);
@@ -462,7 +462,7 @@ public:
 private:
     template <typename T>
         requires std::is_base_of_v<FxScriptLabelledData, T>
-    T* FindLabelledData(FxHash hashed_name, FxPagedArray<T>& buffer)
+    T* FindLabelledData(FxHash32 hashed_name, FxPagedArray<T>& buffer)
     {
         FxScriptScope* scope = mCurrentScope;
 
@@ -657,7 +657,7 @@ inline FxScriptRegisterFlag operator&(FxScriptRegisterFlag a, FxScriptRegisterFl
 
 struct FxScriptBytecodeVarHandle
 {
-    FxHash HashedName = 0;
+    FxHash32 HashedName = 0;
     FxScriptValue::ValueType Type = FxScriptValue::INT;
     int64 Offset = 0;
 
@@ -667,7 +667,7 @@ struct FxScriptBytecodeVarHandle
 
 struct FxScriptBytecodeActionHandle
 {
-    FxHash HashedName = 0;
+    FxHash32 HashedName = 0;
     uint32 BytecodeIndex = 0;
 };
 
@@ -739,7 +739,7 @@ private:
     void EmitJumpAbsoluteReg32(FxScriptRegister reg);
     void EmitJumpCallAbsolute(uint32 position);
     void EmitJumpReturnToCaller();
-    void EmitJumpCallExternal(FxHash hashed_name);
+    void EmitJumpCallExternal(FxHash32 hashed_name);
 
     void EmitMoveInt32(FxScriptRegister reg, uint32 value);
 
@@ -762,8 +762,8 @@ private:
 
     FxScriptRegister FindFreeRegister();
 
-    FxScriptBytecodeVarHandle* FindVarHandle(FxHash hashed_name);
-    FxScriptBytecodeActionHandle* FindActionHandle(FxHash hashed_name);
+    FxScriptBytecodeVarHandle* FindVarHandle(FxHash32 hashed_name);
+    FxScriptBytecodeActionHandle* FindActionHandle(FxHash32 hashed_name);
 
     void PrintBytecode();
 
@@ -874,7 +874,7 @@ private:
     FxScriptVMCallFrame* GetCurrentCallFrame();
     void PopCallFrame();
 
-    FxScriptExternalFunc* FindExternalAction(FxHash hashed_name);
+    FxScriptExternalFunc* FindExternalAction(FxHash32 hashed_name);
 
 public:
     // NONE, X0, X1, X2, X3, RA, XR, SP
@@ -913,9 +913,9 @@ public:
     void PushScope();
     void PopScope();
 
-    FxScriptVar* FindVar(FxHash hashed_name);
-    FxScriptAction* FindAction(FxHash hashed_name);
-    FxScriptExternalFunc* FindExternalAction(FxHash hashed_name);
+    FxScriptVar* FindVar(FxHash32 hashed_name);
+    FxScriptAction* FindAction(FxHash32 hashed_name);
+    FxScriptExternalFunc* FindExternalAction(FxHash32 hashed_name);
 
     /**
      * @brief Evaluates and gets the immediate value if `value` is a reference, or returns the value if it is already

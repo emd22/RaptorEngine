@@ -104,10 +104,10 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
 
     // Use buffer_size(not file_buffer.Size) as we are using the total buffer size, not the amount
     // of bytes read.)
-    CreateShaderModule(buffer_size, file_buffer.Ptr);
+    CreateShaderModule(buffer_size, file_buffer.pData);
     spirv_file.Close();
 
-    FxMemPool::Free(file_buffer.Ptr);
+    FxMemPool::Free(file_buffer.pData);
 }
 
 void RxShader::Destroy()

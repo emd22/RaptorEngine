@@ -3,7 +3,7 @@
 #include <Core/FxItemCache.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
 
-using RxPipelineCacheKey = FxHash;
+using RxPipelineCacheKey = FxHash32;
 
 struct RxPipelineCacheSection : public FxItemCacheSection_MultiItem<RxGraphicsPipeline>
 {
@@ -25,8 +25,8 @@ public:
                         FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
                         const RxGraphicsPipelineProperties& properties);
 
-    Handle RequestPipeline(const FxHash name_hash);
-    void ReleasePipeline(const FxHash name_hash, RxGraphicsPipeline* pipeline);
+    Handle RequestPipeline(const FxHash32 name_hash);
+    void ReleasePipeline(const FxHash32 name_hash, RxGraphicsPipeline* pipeline);
 
     ~RxPipelineCache() override {}
 };

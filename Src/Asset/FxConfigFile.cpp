@@ -94,7 +94,7 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
     for (uint32 i = 0; i < tokens_size; i++) {
         const FxTokenizer::Token& token = tokens[i];
 
-        entry.NameHash = FxHashStr(token.Start, token.Length);
+        entry.NameHash = FxHashStr32(token.Start, token.Length);
         entry.Name = token.GetStr();
 
         // Eat the equals token

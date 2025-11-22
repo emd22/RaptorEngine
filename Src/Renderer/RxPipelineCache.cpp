@@ -6,7 +6,7 @@ void RxPipelineCache::CreatePipeline(const char* name, const FxSlice<RxShader>& 
                                      FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
                                      const RxGraphicsPipelineProperties& properties)
 {
-    const FxHash pipeline_hash = FxHashStr(name);
+    const FxHash32 pipeline_hash = FxHashStr32(name);
 
     if (IsItemInCache(pipeline_hash)) {
         FxLogWarning("Pipeline '{}' has already been registered in the pipeline cache!");
@@ -26,7 +26,7 @@ void RxPipelineCache::CreatePipeline(const char* name, const FxSlice<RxShader>& 
     ReleaseGenericItem(pipeline_hash, pipeline);
 }
 
-RxPipelineCache::Handle RxPipelineCache::RequestPipeline(const FxHash name_hash)
+RxPipelineCache::Handle RxPipelineCache::RequestPipeline(const FxHash32 name_hash)
 {
     RxGraphicsPipeline* pipeline = RequestGenericItem(name_hash);
     FxDebugAssert(pipeline->Pipeline != nullptr);
@@ -34,7 +34,7 @@ RxPipelineCache::Handle RxPipelineCache::RequestPipeline(const FxHash name_hash)
     return RxPipelineCache::Handle(this, pipeline, name_hash);
 }
 
-void RxPipelineCache::ReleasePipeline(const FxHash name_hash, RxGraphicsPipeline* pipeline)
+void RxPipelineCache::ReleasePipeline(const FxHash32 name_hash, RxGraphicsPipeline* pipeline)
 {
     ReleaseGenericItem(name_hash, pipeline);
 }

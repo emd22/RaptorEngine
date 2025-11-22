@@ -97,7 +97,7 @@ public:
 
     FxMaterialProperties Properties {};
 
-    FxHash NameHash { 0 };
+    FxHash32 NameHash { 0 };
     std::string Name = "";
 
     RxDescriptorSet mDescriptorSet {};
