@@ -9,26 +9,65 @@
 static const char* spcStrHeaderStart = "[HEADER START]\n";
 static const char* spcStrHeaderEnd = "[HEADER END]\n";
 
+static const uint16 scBinHeaderStart = 0xA1B2;
+static const uint16 scBinHeaderEnd = 0x2B1A;
+
+
 static constexpr uint16 scByteAlignment = 16;
 static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
 
-void FxDataPack::AddEntry(const FxSlice<uint8>& identifier, const FxSlice<uint8>& data)
-{
-    AddEntry(FxHashData64(FxMakeSlice<uint8>(identifier.pData, identifier.Size)), data);
-}
+// void FxDataPack::AddEntry(const FxSlice<uint8>& identifier, const FxSlice<uint8>& data)
+// {
+//     AddEntry(FxHashData64(FxMakeSlice<uint8>(identifier.pData, identifier.Size)), data);
+// }
 
-void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
+void FxDataPack::AddEntry(FxHash64 id, const FxSlice<const uint8>& data)
 {
     if (!Entries.IsInited()) {
         Entries.Create(16);
     }
 
-    FxLogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<char*>(data.pData),
-              static_cast<uint32>(data.Size));
+    // FxLogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<const char*>(data.pData),
+    //           static_cast<uint32>(data.Size));
 
     Entries.Insert(FxDataPackEntry { id, FxSizedArray<uint8>::CreateCopyOf(data.pData, data.Size) });
 }
 
+
+void FxDataPack::BinaryReadHeader()
+{
+    uint16 header_start = 0;
+    File.Read<uint16>(FxMakeSlice(&header_start, 1));
+
+    uint16 number_of_entries;
+    File.Read<uint16>(FxMakeSlice(&number_of_entries, 1));
+
+    if (!Entries.IsInited()) {
+        Entries.Create(number_of_entries);
+    }
+
+    FxAssert(header_start == scBinHeaderStart);
+
+    for (int index = 0; index < number_of_entries; index++) {
+        FxHash64 id;
+        File.Read<uint64>(FxMakeSlice(&id, 1));
+
+        uint32 offset;
+        File.Read<uint32>(FxMakeSlice(&offset, 1));
+
+        uint32 size;
+        File.Read<uint32>(FxMakeSlice(&size, 1));
+
+
+        FxLogInfo("Hash: {}, Offset: {}, Size: {}", id, offset, size);
+
+        Entries.Insert(FxDataPackEntry { id, FxSizedArray<uint8>::CreateAsSize(size), offset, size });
+    }
+
+    uint16 header_end;
+    File.Read<uint16>(FxMakeSlice(&header_end, 1));
+    FxAssert(header_end == scBinHeaderEnd);
+}
 
 void FxDataPack::TextReadHeader()
 {
@@ -114,6 +153,99 @@ void FxDataPack::TextReadHeader()
     free(line);
 }
 
+void FxDataPack::BinaryWriteHeader()
+{
+    uint32 header_size = 0;
+    for (FxDataPackEntry& _ : Entries) {
+        constexpr int cSizeOfEntry = sizeof(uint64) + sizeof(uint32) +
+                                     sizeof(uint32); // identifier_hash, offset, data_size
+        header_size += cSizeOfEntry;
+    }
+
+    // Header start(uint16), entry count (uint16), header end(uint16)
+    header_size += 6;
+
+    uint32 offset = header_size;
+
+    File.Write(scBinHeaderStart);
+    File.Write<uint16>(static_cast<uint16>(Entries.Size()));
+
+    for (FxDataPackEntry& entry : Entries) {
+        File.Write<uint64>(entry.Id);
+        File.Write<uint32>(offset);
+        File.Write<uint32>(entry.Data.Size);
+
+        offset += entry.Data.Size;
+    }
+
+    File.Write(scBinHeaderEnd);
+}
+
+
+void FxDataPack::TextWriteHeader()
+{
+    uint32 header_size = 0;
+    for (FxDataPackEntry& _ : Entries) {
+        constexpr int cSizeOfEntry = 20 + 1 + 10 + 1 + 10 + 1; // identifier_hash,offset,data_size\n
+        header_size += cSizeOfEntry;
+    }
+
+    header_size += strlen(spcStrHeaderStart);
+    header_size += strlen(spcStrHeaderEnd);
+
+    uint32 offset = header_size;
+
+    File.Write(spcStrHeaderStart);
+
+    for (FxDataPackEntry& entry : Entries) {
+        // [ENTRY 00000000000000000000]\n
+        constexpr int cEntryMarkerLength = 29;
+
+        offset += cEntryMarkerLength;
+
+        std::string header_entry = std::format("{:020},{:010},{:010}\n", entry.Id, offset, entry.Data.Size);
+        File.Write(header_entry.c_str());
+
+        offset += entry.Data.Size + 1; // Where +1 is for the extra newline appended (in text mode)
+    }
+
+    File.Write(spcStrHeaderEnd);
+}
+
+
+void FxDataPack::BinaryWriteData()
+{
+    for (const FxDataPackEntry& entry : Entries) {
+        File.Write(entry.Data.pData, entry.Data.Size);
+    }
+}
+
+void FxDataPack::TextWriteData()
+{
+    for (const FxDataPackEntry& entry : Entries) {
+        std::string entry_header = std::format("[ENTRY {:020}]\n", entry.Id);
+        File.Write(entry_header.c_str());
+        File.Write(entry.Data.pData, entry.Data.Size);
+
+        FxLogInfo("WRITE ({}), {:.{}}", static_cast<uint32>(entry.Data.Size), reinterpret_cast<char*>(entry.Data.pData),
+                  static_cast<uint32>(entry.Data.Size));
+
+        File.Write('\n');
+    }
+}
+
+void FxDataPack::BinaryReadAllData()
+{
+    if (Entries.IsEmpty()) {
+        BinaryReadHeader();
+    }
+
+    for (FxDataPackEntry& entry : Entries) {
+        entry.Data = ReadSection<uint8>(&entry);
+    }
+}
+
+
 void FxDataPack::TextReadAllData()
 {
     char* line = nullptr;
@@ -191,51 +323,6 @@ void FxDataPack::JumpToEntry(FxHash64 id)
     }
 }
 
-void FxDataPack::TextWriteHeader()
-{
-    uint32 header_size = 0;
-    for (FxDataPackEntry& _ : Entries) {
-        constexpr int cSizeOfEntry = 20 + 1 + 10 + 1 + 10 + 1; // identifier_hash,offset,data_size\n
-        header_size += cSizeOfEntry;
-    }
-
-    header_size += strlen(spcStrHeaderStart);
-    header_size += strlen(spcStrHeaderEnd);
-
-    uint32 offset = header_size;
-
-    File.Write(spcStrHeaderStart);
-
-    for (FxDataPackEntry& entry : Entries) {
-        // [ENTRY 00000000000000000000]\n
-        constexpr int cEntryMarkerLength = 29;
-
-        offset += cEntryMarkerLength;
-
-        std::string header_entry = std::format("{:020},{:010},{:010}\n", entry.Id, offset, entry.Data.Size);
-        File.Write(header_entry.c_str());
-
-        offset += entry.Data.Size + 1; // Where +1 is for the extra newline appended (in text mode)
-    }
-
-    File.Write(spcStrHeaderEnd);
-}
-
-
-void FxDataPack::TextWriteData()
-{
-    for (const FxDataPackEntry& entry : Entries) {
-        std::string entry_header = std::format("[ENTRY {:020}]\n", entry.Id);
-        File.Write(entry_header.c_str());
-        File.Write(entry.Data.pData, entry.Data.Size);
-
-        FxLogInfo("WRITE ({}), {:.{}}", static_cast<uint32>(entry.Data.Size), reinterpret_cast<char*>(entry.Data.pData),
-                  static_cast<uint32>(entry.Data.Size));
-
-        File.Write('\n');
-    }
-}
-
 FxDataPackEntry* FxDataPack::QuerySection(FxHash64 id) const
 {
     // TODO: replace with ordered map query
@@ -254,29 +341,52 @@ FxDataPackEntry* FxDataPack::QuerySection(FxHash64 id) const
 
 void FxDataPack::WriteToFile(const char* name)
 {
-    File.Open(name, FxFile::eWrite, FxFile::eText);
+    if (File.IsFileOpen()) {
+        File.Flush();
+        File.Close();
+    }
+    File.Open(name, FxFile::eWrite, sbcBinaryFile ? FxFile::eBinary : FxFile::eText);
 
     if (!File.IsFileOpen()) {
         return;
     }
 
 
-    TextWriteHeader();
-    TextWriteData();
+    if (!sbcBinaryFile) {
+        TextWriteHeader();
+        TextWriteData();
+    }
+    else {
+        BinaryWriteHeader();
+        BinaryWriteData();
+    }
 
-    File.Close();
+    // File.Close();
 }
 
 
-void FxDataPack::ReadFromFile(const char* name)
+bool FxDataPack::ReadFromFile(const char* name)
 {
-    File.Open(name, FxFile::eRead, FxFile::eText);
-    if (!File.IsFileOpen()) {
-        return;
+    if (File.IsFileOpen()) {
+        File.Flush();
+        File.Close();
+        Entries.Clear();
     }
 
-    TextReadHeader();
-    // TextReadAllData(file);
+    File.Open(name, FxFile::eRead, sbcBinaryFile ? FxFile::eBinary : FxFile::eText);
+
+    if (!File.IsFileOpen()) {
+        return false;
+    }
+
+    if (!sbcBinaryFile) {
+        TextReadHeader();
+    }
+    else {
+        BinaryReadHeader();
+    }
+
+    return true;
 }
 
 

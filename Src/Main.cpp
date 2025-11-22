@@ -11,39 +11,37 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
 
+    // FxDataPack pack {};
     // {
-    //     FxDataPack pack {};
     //     {
-    //         std::string test_section = "Test";
     //         std::string data_section = "Test data";
 
-    //         FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
-    //                                                         test_section.length());
+    //         constexpr FxHash64 id = FxHashStr64("Test");
     //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
     //                                                        data_section.length());
 
-    //         pack.AddEntry(ident_slice, data_slice);
+    //         pack.AddEntry(id, data_slice);
     //     }
     //     {
-    //         std::string test_section = "Test2";
     //         std::string data_section = "Apple, Pear, Orange";
 
-    //         FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
-    //                                                         test_section.length());
+    //         constexpr FxHash64 id = FxHashStr64("Test2");
     //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
     //                                                        data_section.length());
 
-    //         pack.AddEntry(ident_slice, data_slice);
+    //         pack.AddEntry(id, data_slice);
     //     }
     //     pack.WriteToFile("Test.fdat");
     // }
 
-    // FxDataPack pack {};
+    // // FxDataPack pack {};
 
     // pack.ReadFromFile("Test.fdat");
 
     // FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
-    // FxLogInfo("Data: {:.{}}", data.pData, data.Size);
+    // if (data.IsNotEmpty()) {
+    //     FxLogInfo("Data: {:.{}}", data.pData, data.Size);
+    // }
 
     FoxtrotGame game {};
 }

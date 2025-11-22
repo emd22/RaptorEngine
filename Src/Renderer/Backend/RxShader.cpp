@@ -61,53 +61,107 @@ static const char* ShaderTypeToExtension(RxShaderType type)
 //     }
 // }
 
+static FxHash64 BuildEntryId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
+{
+    FxHash64 hash = FX_HASH64_FNV1A_INIT;
+
+    constexpr FxHash64 cPrefixHashFS = FxHashStr64("FS");
+    constexpr FxHash64 cPrefixHashVS = FxHashStr64("VS");
+
+    if (type == RxShaderType::eFragment) {
+        hash = cPrefixHashFS;
+    }
+    else if (type == RxShaderType::eVertex) {
+        hash = cPrefixHashVS;
+    }
+
+    return FxHashData64(FxSlice<FxShaderMacro>(macros), hash);
+}
+
 
 void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {
     Type = type;
 
-    const char* spirv_ext = ShaderTypeToExtension(type);
+    // const char* spirv_ext = ShaderTypeToExtension(type);
+    const char* spirv_ext = ".spack";
 
     std::string path = FxAssetPath(FxAssetPathQuery::eShaders) + std::string(shader_name);
 
     std::string spirv_folder = std::string(FxAssetPath(FxAssetPathQuery::eShaders)) + "Spirv/";
     std::string spirv_path = (spirv_folder + shader_name + spirv_ext);
 
-    FxFile spirv_file(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
+    // FxFile spirv_file(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
+    FxDataPack shader_pack;
+
+    FxHash64 entry_id = BuildEntryId(type, macros);
+
+    bool pack_exists = shader_pack.ReadFromFile(spirv_path.c_str());
 
     // SPIRV file could not be opened, try to compile it
-    if (!spirv_file.IsFileOpen()) {
+    if (!pack_exists || !shader_pack.QuerySection(entry_id)) {
         std::string slang_path = path + ".slang";
 
         FxLogInfo("Shader SPIRV not found at {}. Compiling {}...", spirv_path, slang_path);
 
         FxLogInfo("Compiled folder: {}", spirv_folder);
 
-        std::string output_path = spirv_folder + shader_name + ".spv";
+        // std::string output_path = spirv_folder + shader_name + spirv_ext;
 
-        FxShaderCompiler::Compile(slang_path.c_str(), output_path.c_str(), macros);
+        // If the pack already exists read the existing entries in.
+        // if (pack_exists) {
+        //     shader_pack.TextReadAllData();
+        // }
+
+        // Compile to the shader pack
+        FxShaderCompiler::Compile(slang_path.c_str(), shader_pack, macros);
+
+        // Write back to disk
+        shader_pack.WriteToFile(spirv_path.c_str());
+
+        shader_pack.File.Flush();
 
         // Try to open SPIRV file again
-        spirv_file.Open(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
+        // spirv_file.Open(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
 
         // Still erroring when trying to open SPIRV, print an error and break out
-        if (!spirv_file.IsFileOpen()) {
-            FxLogError("Error opening shader SPIRV file!");
-            return;
-        }
+        // if (!shader_pack.ReadFromFile(output_path.c_str())) {
+        //     FxLogError("Error opening shader pack!");
+        //     return;
+        // }
     }
 
-    uint32 buffer_size = FxMath::AlignValue<4>(spirv_file.GetFileSize());
+    shader_pack.ReadFromFile(spirv_path.c_str());
+
+    FxDataPackEntry* entry = shader_pack.QuerySection(entry_id);
+
+    if (!entry) {
+        FxLogError("Could not find shader pack entry! (ID={})", entry_id);
+        return;
+    }
+
+    FxLogInfo("Shader Data({}) @ {}", entry->DataSize, entry->DataOffset);
+
+    uint32 buffer_size = FxMath::AlignValue<4>(entry->DataSize);
     uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
 
-    FxSlice<uint32> file_buffer = spirv_file.Read<uint32>(FxMakeSlice(buffer, buffer_size));
+    FxSlice<uint8> buffer_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
+
+    shader_pack.ReadSection(entry, buffer_slice);
+
+    FxFile out_data("testdata.bin", FxFile::eWrite, FxFile::eBinary);
+    out_data.Write(buffer_slice.pData, buffer_slice.Size);
+
+    out_data.Close();
+
+    // FxSlice<uint32> file_buffer = spirv_file.Read<uint32>(FxMakeSlice(buffer, buffer_size));
 
     // Use buffer_size(not file_buffer.Size) as we are using the total buffer size, not the amount
     // of bytes read.)
-    CreateShaderModule(buffer_size, file_buffer.pData);
-    spirv_file.Close();
+    CreateShaderModule(buffer_size, reinterpret_cast<uint32*>(buffer_slice.pData));
+    // spirv_file.Close();
 
-    FxMemPool::Free(file_buffer.pData);
+    FxMemPool::Free(buffer_slice.pData);
 }
 
 void RxShader::Destroy()

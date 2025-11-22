@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Asset/FxDataPack.hpp>
 #include <Core/FxSizedArray.hpp>
 
 struct FxShaderMacro
@@ -15,7 +16,7 @@ public:
 
     static void CompileAllShaders(const char* folder_path);
 
-    static void Compile(const char* path, const char* output_path, const FxSizedArray<FxShaderMacro>& macros,
+    static void Compile(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros,
                         bool do_db_flush = true);
 
     static void Destroy();

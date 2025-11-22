@@ -115,22 +115,41 @@ static bool IsShaderUpToDate(const char* path)
 
 void FxShaderCompiler::CompileAllShaders(const char* folder_path)
 {
-    FxPagedArray<std::string> shader_paths = FxFilesystemIO::DirListIfHasExtension(folder_path, ".slang", true);
+    // FxPagedArray<std::string> shader_paths = FxFilesystemIO::DirListIfHasExtension(folder_path, ".slang", true);
 
-    if (shader_paths.IsEmpty()) {
-        return;
-    }
+    // if (shader_paths.IsEmpty()) {
+    //     return;
+    // }
 
-    for (const std::string& shader_path : shader_paths) {
-        const std::string path_to_compile = std::format("{}{}.slang", folder_path, shader_path);
-        const std::string output_path = std::format("{}Spirv/{}.spv", folder_path, shader_path);
-        FxShaderCompiler::Compile(path_to_compile.c_str(), output_path.c_str(), false);
-    }
 
-    sShaderCompileDb.SaveToFile();
+    // for (const std::string& shader_path : shader_paths) {
+    //     const std::string path_to_compile = std::format("{}{}.slang", folder_path, shader_path);
+    //     const std::string output_path = std::format("{}Spirv/{}.spv", folder_path, shader_path);
+
+    //     FxDataPack shader_pack;
+    //     FxShaderCompiler::Compile(path_to_compile.c_str(), shader_pack, false);
+    // }
+
+    // sShaderCompileDb.SaveToFile();
 }
 
-void FxShaderCompiler::Compile(const char* path, const char* output_path, const FxSizedArray<FxShaderMacro>& macros,
+static FxSlice<uint8> CreateAlignedBufferForSpirv(const Slang::ComPtr<slang::IBlob>& spirv_code)
+{
+    uint32 unaligned_size = spirv_code->getBufferSize();
+    uint32 buffer_size = FxMath::AlignValue<4>(unaligned_size);
+
+    uint8* buffer = FxMemPool::Alloc<uint8>(buffer_size);
+
+    memcpy(buffer, spirv_code->getBufferPointer(), unaligned_size);
+
+    if (unaligned_size < buffer_size) {
+        memset(buffer + unaligned_size, 0, buffer_size - unaligned_size);
+    }
+
+    return FxMakeSlice(buffer, buffer_size);
+}
+
+void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros,
                                bool do_db_flush)
 {
     if (!sShaderCompileDb.IsOpen()) {
@@ -205,16 +224,27 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path, const 
         }
 
         {
-            std::string vertex_path = output_path;
-            vertex_path += "_vs";
+            constexpr FxHash64 sPrefixHashVS = FxHashStr64("VS");
 
-            FxFile output_file(vertex_path.c_str(), FxFile::eWrite, FxFile::eBinary);
+            // FxSlice<const uint8> buffer_slice = FxMakeSlice<const uint8>(
+            // reinterpret_cast<const uint8*>(spirv_code->getBufferPointer()), spirv_code->getBufferSize());
 
-            output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
 
-            output_file.Close();
+            FxLogInfo("COMPILE Data({})", aligned_buffer.Size);
 
-            FxDataPack pack {};
+            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashVS), aligned_buffer);
+
+            FxMemPool::Free(aligned_buffer.pData);
+
+            // std::string vertex_path = output_path;
+            // vertex_path += "_vs";
+
+            // FxFile output_file(vertex_path.c_str(), FxFile::eWrite, FxFile::eBinary);
+
+            // output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+
+            // output_file.Close();
         }
 
         FxLogInfo("Compiled vertex shader {}", path);
@@ -234,14 +264,26 @@ void FxShaderCompiler::Compile(const char* path, const char* output_path, const 
         }
 
         {
-            std::string fragment_path = output_path;
-            fragment_path += "_fs";
+            constexpr FxHash64 sPrefixHashFS = FxHashStr64("FS");
 
-            FxFile output_file(fragment_path.c_str(), FxFile::eWrite, FxFile::eBinary);
 
-            output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+            // FxSlice<const uint8> buffer_slice = FxMakeSlice<const uint8>(
+            // reinterpret_cast<const uint8*>(spirv_code->getBufferPointer()), spirv_code->getBufferSize());
 
-            output_file.Close();
+            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
+
+            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashFS), aligned_buffer);
+
+            FxMemPool::Free(aligned_buffer.pData);
+
+            // std::string fragment_path = output_path;
+            // fragment_path += "_fs";
+
+            // FxFile output_file(fragment_path.c_str(), FxFile::eWrite, FxFile::eBinary);
+
+            // output_file.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+
+            // output_file.Close();
         }
 
         FxLogInfo("Compiled fragment shader {}", path);
