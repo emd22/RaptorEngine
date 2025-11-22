@@ -38,14 +38,12 @@ int main()
     //     pack.WriteToFile("Test.fdat");
     // }
 
-    FxDataPack pack {};
+    // FxDataPack pack {};
 
-    pack.ReadFromFile("Test.fdat");
+    // pack.ReadFromFile("Test.fdat");
 
-    FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
+    // FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
+    // FxLogInfo("Data: {:.{}}", data.pData, data.Size);
 
-    // FxLogInfo("Data: {}", data.Size);
-    FxLogInfo("Data: {:.{}}", data.pData, data.Size);
-
-    // FoxtrotGame game {};
+    FoxtrotGame game {};
 }
