@@ -18,8 +18,25 @@ struct FxDataPackEntry
     {
         Data = std::move(other.Data);
         Id = other.Id;
+        DataOffset = other.DataOffset;
+        DataSize = other.DataSize;
     }
 
+    FxDataPackEntry& operator=(FxDataPackEntry&& other)
+    {
+        Data = std::move(other.Data);
+        Id = other.Id;
+        DataOffset = other.DataOffset;
+        DataSize = other.DataSize;
+
+        return *this;
+    }
+
+
+    FxDataPackEntry(const FxDataPackEntry& other) = delete;
+    FxDataPackEntry& operator=(const FxDataPackEntry& other) = delete;
+
+public:
     FxHash64 Id = 0;
     uint32 DataOffset = 0;
     uint32 DataSize = 0;
@@ -35,9 +52,7 @@ public:
     FxDataPack() = default;
     FxDataPack(const FxDataPack& other) = delete;
 
-
-    // void AddEntry(const FxSlice<uint8>& identifier, const FxSlice<const uint8>& data);
-    void AddEntry(FxHash64 id, const FxSlice<const uint8>& data);
+    void AddEntry(FxHash64 id, const FxSlice<uint8>& data);
 
     void WriteToFile(const char* name);
     bool ReadFromFile(const char* name);
@@ -63,8 +78,10 @@ public:
         return std::move(arr);
     }
 
+    void PrintInfo() const;
+
     template <typename TDataType>
-    void ReadSection(FxDataPackEntry* entry, FxSlice<TDataType>& buffer)
+    void ReadSection(FxDataPackEntry* entry, const FxSlice<TDataType>& buffer)
     {
         if (!entry) {
             FxLogWarning("Cannot read section of null entry!");

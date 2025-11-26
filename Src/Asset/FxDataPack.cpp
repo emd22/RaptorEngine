@@ -21,7 +21,7 @@ static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
 //     AddEntry(FxHashData64(FxMakeSlice<uint8>(identifier.pData, identifier.Size)), data);
 // }
 
-void FxDataPack::AddEntry(FxHash64 id, const FxSlice<const uint8>& data)
+void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
 {
     if (!Entries.IsInited()) {
         Entries.Create(16);
@@ -30,7 +30,10 @@ void FxDataPack::AddEntry(FxHash64 id, const FxSlice<const uint8>& data)
     // FxLogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<const char*>(data.pData),
     //           static_cast<uint32>(data.Size));
 
-    Entries.Insert(FxDataPackEntry { id, FxSizedArray<uint8>::CreateCopyOf(data.pData, data.Size) });
+    FxSizedArray<uint8> data_arr;
+    data_arr.InitAsCopyOf(data.pData, data.Size);
+    FxDataPackEntry pack { id, std::move(data_arr) };
+    Entries.Insert(std::move(pack));
 }
 
 
@@ -61,7 +64,11 @@ void FxDataPack::BinaryReadHeader()
 
         FxLogInfo("Hash: {}, Offset: {}, Size: {}", id, offset, size);
 
-        Entries.Insert(FxDataPackEntry { id, FxSizedArray<uint8>::CreateAsSize(size), offset, size });
+        FxSizedArray<uint8> data;
+        data.InitSize(size);
+
+        FxDataPackEntry entry { id, std::move(data), offset, size };
+        Entries.Insert(std::move(entry));
     }
 
     uint16 header_end;
@@ -144,9 +151,13 @@ void FxDataPack::TextReadHeader()
         line_index++;
         uint32 data_size = GetNextField32();
 
-        FxLogInfo("Hash: {}, Offset: {}, Size: {}", hash, data_offset, data_size);
+        FxLogInfo("TEXT Hash: {}, Offset: {}, Size: {}", hash, data_offset, data_size);
 
-        Entries.Insert(FxDataPackEntry { hash, FxSizedArray<uint8>::CreateAsSize(data_size), data_offset, data_size });
+        FxSizedArray<uint8> entry_data;
+        entry_data.InitSize(data_size);
+        FxDataPackEntry data_pack { hash, std::move(entry_data), data_offset, data_size };
+
+        Entries.Insert(std::move(data_pack));
     }
 
     // Free the getline allocated string
@@ -240,6 +251,7 @@ void FxDataPack::BinaryReadAllData()
         BinaryReadHeader();
     }
 
+    FxLogDebug("Reading all data...\n");
     for (FxDataPackEntry& entry : Entries) {
         entry.Data = ReadSection<uint8>(&entry);
     }
@@ -308,6 +320,20 @@ void FxDataPack::TextReadAllData()
     free(line);
 }
 
+void FxDataPack::PrintInfo() const
+{
+    FxLogInfo("");
+    FxLogInfo("=== DataPack ===");
+
+
+    for (const FxDataPackEntry& entry : Entries) {
+        FxLogInfo("Entry {:20} => Offset={}, Size={}", entry.Id, entry.DataOffset, entry.DataSize);
+    }
+
+    FxLogInfo("================");
+    FxLogInfo("");
+}
+
 void FxDataPack::JumpToEntry(FxHash64 id)
 {
     FxDataPackEntry* found_entry = nullptr;
@@ -329,7 +355,7 @@ FxDataPackEntry* FxDataPack::QuerySection(FxHash64 id) const
 
     FxDataPackEntry* found_entry = nullptr;
     for (FxDataPackEntry& entry : Entries) {
-        FxLogDebug("Check Entry: {:020}, {:020}", entry.Id, id);
+        FxLogDebug("Check Entry: {:20}, {:20}", entry.Id, id);
         if (entry.Id == id) {
             found_entry = &entry;
             break;
@@ -370,6 +396,8 @@ bool FxDataPack::ReadFromFile(const char* name)
     if (File.IsFileOpen()) {
         File.Flush();
         File.Close();
+    }
+    if (!Entries.IsEmpty()) {
         Entries.Clear();
     }
 

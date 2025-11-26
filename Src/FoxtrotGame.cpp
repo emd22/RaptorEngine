@@ -98,8 +98,8 @@ void FoxtrotGame::CreateLights()
             FxRef<FxLight> light = FxMakeRef<FxLight>();
             FxVec3f position = FxVec3f((scDistanceX * x) - scOffsetX, scHeight, (scDistanceY * y) - scOffsetY);
             light->MoveTo(position);
-            light->SetLightVolume(light_volume, true);
-            light->Color = FxColor(0x666666FF);
+            light->SetLightVolume(light_volume, false);
+            light->Color = FxColor(0x76a6a6FF);
 
             light->Scale(FxVec3f(25));
 

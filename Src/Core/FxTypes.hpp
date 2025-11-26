@@ -37,6 +37,8 @@ concept C_IsAnyOf = (std::is_same_v<T, TTypes> || ...);
 template <typename T, typename... TTypes>
 concept C_IsAnyBaseOf = (std::is_base_of_v<TTypes, T> || ...);
 
+template <typename TPossiblyConst, typename TNonConst>
+concept C_IsSameOrConst = std::is_same_v<typename std::remove_const<TPossiblyConst>::type, TNonConst>;
 
 // template <typename ValueType>
 // class Optional {

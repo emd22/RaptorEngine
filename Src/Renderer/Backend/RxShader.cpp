@@ -65,8 +65,8 @@ static FxHash64 BuildEntryId(RxShaderType type, const FxSizedArray<FxShaderMacro
 {
     FxHash64 hash = FX_HASH64_FNV1A_INIT;
 
-    constexpr FxHash64 cPrefixHashFS = FxHashStr64("FS");
-    constexpr FxHash64 cPrefixHashVS = FxHashStr64("VS");
+    constexpr FxHash64 cPrefixHashFS = FxHashStr64("FRAGSHADER");
+    constexpr FxHash64 cPrefixHashVS = FxHashStr64("VERTSHADER");
 
     if (type == RxShaderType::eFragment) {
         hash = cPrefixHashFS;
@@ -92,9 +92,16 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
     std::string spirv_path = (spirv_folder + shader_name + spirv_ext);
 
     // FxFile spirv_file(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
-    FxDataPack shader_pack;
+    FxDataPack shader_pack {};
 
     FxHash64 entry_id = BuildEntryId(type, macros);
+
+    if (type == RxShaderType::eFragment) {
+        FxLogDebug("LOADING FRAGMENT SHADER");
+    }
+    else {
+        FxLogDebug("LOADING VERTEX SHADER");
+    }
 
     bool pack_exists = shader_pack.ReadFromFile(spirv_path.c_str());
 
@@ -156,7 +163,7 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
     CreateShaderModule(buffer_size, reinterpret_cast<uint32*>(buffer_slice.pData));
     // spirv_file.Close();
 
-    FxMemPool::Free(buffer_slice.pData);
+    FxMemPool::Free(buffer);
 }
 
 void RxShader::Destroy()

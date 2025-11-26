@@ -57,11 +57,12 @@ public:
 public:
     static FxSizedArray<TElementType> CreateCopyOf(const TElementType* ptr, SizeType size)
     {
-        FxSizedArray<TElementType> arr;
-        arr.InitSize(size);
+        FxSizedArray<TElementType> arr(size);
+        arr.MarkFull();
+
         memcpy(arr.pData, ptr, arr.GetSizeInBytes());
 
-        return arr;
+        return std::move(arr);
     }
 
     static FxSizedArray<TElementType> CreateAsSize(SizeType size)
@@ -69,7 +70,7 @@ public:
         FxSizedArray<TElementType> arr;
         arr.InitSize(size);
 
-        return arr;
+        return std::move(arr);
     }
 
     static FxSizedArray<TElementType> CreateEmpty() { return FxSizedArray<TElementType>(nullptr, 0); }
@@ -80,7 +81,7 @@ public:
     FxSizedArray(size_t element_count) : Capacity(element_count)
     {
 #ifdef FX_SIZED_ARRAY_DEBUG
-        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", Capacity, typeid(ElementType).name());
+        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", Capacity, typeid(TElementType).name());
 #endif
 
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
@@ -89,14 +90,15 @@ public:
             NoMemError();
         }
 #else
+        TElementType* allocated_ptr;
         try {
-            ElementType* allocated_ptr = new ElementType[element_count];
+            allocated_ptr = new TElementType[element_count];
         }
         catch (const std::bad_alloc& e) {
             NoMemError();
         }
 
-        Data = static_cast<ElementType*>(allocated_ptr);
+        pData = static_cast<TElementType*>(allocated_ptr);
 #endif
 
         Size = 0;
@@ -146,19 +148,17 @@ public:
 
         FxMemPool::Free(static_cast<void*>(pData));
 #else
-        delete[] Data;
+        delete[] pData;
 #endif
 
+
+        // if (Size == 2012) {
+        //     FX_BREAKPOINT;
+        // }
 
 #ifdef FX_SIZED_ARRAY_DEBUG
-        FxLogDebug("Freeing FxSizedArray of size {:d} (type: {:s})", Size, typeid(ElementType).name());
+        FxLogDebug("Freeing FxSizedArray of size {:d} (type: {:s})", Size, typeid(TElementType).name());
 #endif
-
-        //
-        // delete[] Data;
-        //
-        // std::free(Data);
-
 
         pData = nullptr;
         Capacity = 0;
@@ -224,7 +224,9 @@ public:
         return *this;
     }
 
-    void InitAsCopyOf(const FxSizedArray<TElementType>& other)
+    template <typename T>
+        requires C_IsSameOrConst<T, TElementType>
+    void InitAsCopyOf(const FxSizedArray<T>& other)
     {
         InitCapacity(other.Capacity);
         Size = other.Size;
@@ -232,12 +234,20 @@ public:
         memcpy(pData, other.pData, other.GetSizeInBytes());
     }
 
-    void InitAsCopyOf(const FxSizedArray<TElementType>& other, SizeType copy_capacity)
+    template <typename T>
+        requires std::is_same_v<typename std::remove_const<T>::type, TElementType>
+    void InitAsCopyOf(const FxSizedArray<T>& other, SizeType copy_capacity)
     {
         InitCapacity(max(other.Capacity, copy_capacity));
         Size = other.Size;
 
         memcpy(pData, other.pData, other.GetSizeInBytes());
+    }
+
+    void InitAsCopyOf(const TElementType* ptr, SizeType size)
+    {
+        InitSize(size);
+        memcpy(pData, ptr, GetSizeInBytes());
     }
 
     void Clear() { Size = 0; }
@@ -383,7 +393,7 @@ protected:
     void InternalAllocateArray(size_t element_count)
     {
 #ifdef FX_SIZED_ARRAY_DEBUG
-        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", element_count, typeid(ElementType).name());
+        FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", element_count, typeid(TElementType).name());
 #endif
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         pData = FxMemPool::Alloc<TElementType>(sizeof(TElementType) * element_count);
@@ -391,10 +401,9 @@ protected:
             NoMemError();
         }
 #else
-        try {
-            Data = new TElementType[element_count];
-        }
-        catch (const std::bad_alloc& e) {
+        pData = new TElementType[element_count];
+
+        if (pData == nullptr) {
             NoMemError();
         }
 

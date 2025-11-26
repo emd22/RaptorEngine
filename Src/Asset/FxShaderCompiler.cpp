@@ -224,17 +224,24 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         }
 
         {
-            constexpr FxHash64 sPrefixHashVS = FxHashStr64("VS");
+            FxFile out_data("testdataf.bin", FxFile::eWrite, FxFile::eBinary);
+            out_data.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+            out_data.Close();
+
+            constexpr FxHash64 sPrefixHashVS = FxHashStr64("VERTSHADER");
 
             // FxSlice<const uint8> buffer_slice = FxMakeSlice<const uint8>(
             // reinterpret_cast<const uint8*>(spirv_code->getBufferPointer()), spirv_code->getBufferSize());
 
-            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
+            // FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
 
-            FxLogInfo("COMPILE Data({})", aligned_buffer.Size);
+            // FxLogInfo("COMPILE Data({})", aligned_buffer.Size);
 
-            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashVS), aligned_buffer);
 
+            const void* data_ptr = spirv_code->getBufferPointer();
+            FxSlice<uint8> data_slice = FxMakeSlice<uint8>(static_cast<uint8*>(const_cast<void*>(data_ptr)),
+                                                           spirv_code->getBufferSize());
+            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashVS), data_slice);
 
             // FxMemPool::Free(aligned_buffer.pData);
 
@@ -248,7 +255,7 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
             // output_file.Close();
         }
 
-        FxLogInfo("Compiled vertex shader {}", path);
+        FxLogInfo("Compiled vertex shader {} (Size={})", path, spirv_code->getBufferSize());
     }
 
     // Clear the spirv_code
@@ -265,19 +272,20 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         }
 
         {
-            FxFile out_data("testdataf.bin", FxFile::eWrite, FxFile::eBinary);
-            out_data.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
-            out_data.Close();
-
-            constexpr FxHash64 sPrefixHashFS = FxHashStr64("FS");
+            constexpr FxHash64 sPrefixHashFS = FxHashStr64("FRAGSHADER");
 
 
             // FxSlice<const uint8> buffer_slice = FxMakeSlice<const uint8>(
             // reinterpret_cast<const uint8*>(spirv_code->getBufferPointer()), spirv_code->getBufferSize());
 
-            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
+            // FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
 
-            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashFS), aligned_buffer);
+
+            const void* data_ptr = spirv_code->getBufferPointer();
+            FxSlice<uint8> data_slice = FxMakeSlice<uint8>(static_cast<uint8*>(const_cast<void*>(data_ptr)),
+                                                           spirv_code->getBufferSize());
+
+            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashFS), data_slice);
 
             // FxMemPool::Free(aligned_buffer.pData);
 
@@ -292,7 +300,7 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
             // output_file.Close();
         }
 
-        FxLogInfo("Compiled fragment shader {}", path);
+        FxLogInfo("Compiled fragment shader {} (Size={})", path, spirv_code->getBufferSize());
     }
 
     RecordShaderCompileTime(path);

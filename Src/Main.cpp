@@ -11,36 +11,34 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
 
+    // char buffer_a[256];
+
     // FxDataPack pack {};
-    // {
-    //     {
-    //         std::string data_section = "Test data";
 
-    //         constexpr FxHash64 id = FxHashStr64("Test");
-    //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
-    //                                                        data_section.length());
+    // int numbers[3] = { 1, 2, 3 };
+    // const std::string str = "Hello, World!";
 
-    //         pack.AddEntry(id, data_slice);
-    //     }
-    //     {
-    //         std::string data_section = "Apple, Pear, Orange";
+    // pack.AddEntry(FxHashStr64("Test1"), FxMakeSlice<uint8>(reinterpret_cast<uint8*>(numbers), 3 * sizeof(int)));
+    // pack.AddEntry(FxHashStr64("Test2"),
+    //               FxMakeSlice<uint8>(reinterpret_cast<uint8*>(const_cast<char*>(str.data())), str.length()));
 
-    //         constexpr FxHash64 id = FxHashStr64("Test2");
-    //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
-    //                                                        data_section.length());
-
-    //         pack.AddEntry(id, data_slice);
-    //     }
-    //     pack.WriteToFile("Test.fdat");
-    // }
+    // pack.WriteToFile("Test.fdat");
 
     // // FxDataPack pack {};
 
     // pack.ReadFromFile("Test.fdat");
 
-    // FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
+    // FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test1")));
     // if (data.IsNotEmpty()) {
-    //     FxLogInfo("Data: {:.{}}", data.pData, data.Size);
+    //     for (char v : data) {
+    //         FxLogInfo("{:02X}", v);
+    //     }
+    // }
+
+    // FxSizedArray<char> data2 = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
+
+    // if (data2.IsNotEmpty()) {
+    //     FxLogInfo("Value: {:.{}}", data2.pData, data2.Size);
     // }
 
     FoxtrotGame game {};

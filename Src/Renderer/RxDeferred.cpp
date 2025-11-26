@@ -465,12 +465,12 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     builder.Build(PlComposition);
 
-    fragment_shader = FxMakeRef<RxShader>(
-        "Composition", RxShaderType::eFragment,
-        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
+    // fragment_shader = FxMakeRef<RxShader>(
+    //     "Composition", RxShaderType::eFragment,
+    //     FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
 
 
-    builder.SetShaders(vertex_shader, fragment_shader).Build(PlCompositionUnlit);
+    // builder.SetShaders(vertex_shader, fragment_shader).Build(PlCompositionUnlit);
 }
 
 void RxDeferredRenderer::DestroyCompPipeline()

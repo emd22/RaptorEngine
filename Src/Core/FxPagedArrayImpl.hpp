@@ -242,6 +242,37 @@ public:
         return *new_element;
     }
 
+    TElementType& Insert(TElementType&& element)
+    {
+        TElementType* new_element = &CurrentPage->Data[CurrentPage->Size];
+
+        if constexpr (std::is_move_constructible_v<TElementType>) {
+            ::new (new_element) TElementType(std::move(element));
+        }
+        else {
+            memcpy(new_element, &element, sizeof(TElementType));
+        }
+
+        ++CurrentPage->Size;
+
+        ++TrackedSize;
+
+        // There are no free slots left in the page, allocate a new page
+        if (CurrentPage->Size >= PageNodeCapacity) {
+            // Since the size will be N + 1, decrement by one
+            --CurrentPage->Size;
+
+            Page* new_page = AllocateNewPage(CurrentPage, nullptr);
+
+            CurrentPage->Next = new_page;
+            CurrentPage = new_page;
+
+            FxLogDebug("Allocating new page for FxPagedArray");
+        }
+
+        return *new_element;
+    }
+
     Page* FindPageForElement(TElementType* value)
     {
         Page* current_page = CurrentPage;
@@ -307,8 +338,8 @@ public:
             Page* this_page = CurrentPage;
             CurrentPage = CurrentPage->Prev;
 
-            std::free(this_page->Data);
-            std::free(this_page);
+            FX_PAGED_ARRAY_FREE(TElementType, this_page->Data);
+            FX_PAGED_ARRAY_FREE(Page, this_page);
 
             CurrentPage->Next = nullptr;
 
@@ -381,10 +412,10 @@ public:
             Page* next_page = current_page->Next;
 
             if (current_page->Data) {
-                std::free(static_cast<void*>(current_page->Data));
+                FX_PAGED_ARRAY_FREE(TElementType, current_page->Data);
             }
 
-            std::free(static_cast<void*>(current_page));
+            FX_PAGED_ARRAY_FREE(Page, current_page);
 
             current_page = next_page;
         }

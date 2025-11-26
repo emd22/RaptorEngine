@@ -32,6 +32,7 @@ template <typename T>
 class FxRef
 {
 public:
+    FxRef() : mRefCnt(nullptr), mPtr(nullptr) {}
     FxRef(nullptr_t np) : mRefCnt(nullptr), mPtr(nullptr) {}
 
     /**

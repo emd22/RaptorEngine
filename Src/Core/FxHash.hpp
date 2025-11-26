@@ -53,11 +53,8 @@ inline constexpr FxHash32 FxHashStr32(const char* str, uint32 length)
 }
 
 template <typename TObj>
-inline constexpr FxHash64 FxHashData64(const FxSlice<TObj>& slice, uint64 hval = FX_HASH64_FNV1A_INIT)
+inline constexpr FxHash64 FxHashData64(const FxSlice<TObj>& slice, uint64 thash = FX_HASH64_FNV1A_INIT)
 {
-    // FxHash64 hv {};
-    FxHash64 thash = hval;
-
     uint8* buffer_start = reinterpret_cast<uint8*>(slice.pData);
     uint8* buffer_end = buffer_start + slice.Size;
 
@@ -77,10 +74,8 @@ inline constexpr FxHash64 FxHashData64(const FxSlice<TObj>& slice, uint64 hval =
     return thash;
 }
 
-inline constexpr FxHash64 FxHashStr64(const char* str, uint64 hval = FX_HASH64_FNV1A_INIT)
+inline constexpr FxHash64 FxHashStr64(const char* str, uint64 thash = FX_HASH64_FNV1A_INIT)
 {
-    FxHash64 thash = hval;
-
     uint8 ch = 0;
     while ((ch = *str)) {
         /* xor the bottom with the current octet */
