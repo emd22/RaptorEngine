@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Asset/Fwd/Fx_Fwd_AssetManager.hpp>
 #include <Asset/FxAssetImage.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
@@ -10,29 +11,64 @@
 #include <Renderer/Backend/RxDescriptors.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
 
-// TODO: Replace this, make dynamic
 #define FX_MAX_MATERIALS 256
 
+enum class FxMaterialComponentStatus
+{
+    eReady,
+    eNotReady,
+};
+
+template <VkFormat TFormat>
 struct FxMaterialComponent
 {
 public:
-    enum class Status
-    {
-        Ready,
-        NotReady,
-    };
-
 public:
     FxRef<FxAssetImage> pImage { nullptr };
     FxSlice<const uint8> pDataToLoad { nullptr };
-    VkFormat Format;
+
+    using Status = FxMaterialComponentStatus;
 
 public:
-    Status Build(const FxRef<RxSampler>& sampler);
+    FxMaterialComponent::Status Build(const FxRef<RxSampler>& sampler)
+    {
+        // There is no texture provided, we will use the base colours passed in and a dummy texture
+        if (!pImage && !pDataToLoad) {
+            pImage = FxAssetImage::GetEmptyImage<TFormat, RxUtil::GetFormatPixelSize(TFormat)>();
+        }
+
+        if (!CheckIfReady()) {
+            // The texture is not ready, return the status to the material build function
+            return Status::eNotReady;
+        }
+
+        pImage->Texture.SetSampler(sampler);
+
+        return Status::eReady;
+    }
     ~FxMaterialComponent() = default;
 
 private:
-    bool CheckIfReady();
+    bool CheckIfReady()
+    {
+        // If there is data passed in and the image has not been loaded yet, load it using the
+        // asset manager. This will be validated on the next call of this function. (when attempting to build the
+        // material)
+        if (!pImage && pDataToLoad) {
+            FxSlice<const uint8>& image_data = pDataToLoad;
+
+            pImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, image_data.pData, image_data.Size);
+            // pImage = FxAssetManager::LoadImageFromMemory(Format, image_data.pData, image_data.Size);
+            return false;
+        }
+
+        // If there is no texture and we are not loaded, return not loaded.
+        if (!pImage || !pImage->IsLoaded()) {
+            return false;
+        }
+
+        return true;
+    }
 };
 
 struct FxMaterialProperties
@@ -52,11 +88,7 @@ public:
     };
 
 public:
-    FxMaterial()
-    {
-        Diffuse.Format = VK_FORMAT_R8G8B8A8_SRGB;
-        NormalMap.Format = VK_FORMAT_R8G8B8A8_SRGB;
-    }
+    FxMaterial() = default;
 
     void Attach(ResourceType type, const FxRef<FxAssetImage>& image)
     {
@@ -92,12 +124,12 @@ public:
 private:
     VkDescriptorSetLayout BuildLayout();
 
-    bool CheckComponentTextureLoaded(FxMaterialComponent& component);
+    // bool CheckComponentTextureLoaded(FxMaterialComponent& component);
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent Diffuse;
-    FxMaterialComponent NormalMap;
+    FxMaterialComponent<VK_FORMAT_R8G8B8A8_SRGB> Diffuse;
+    FxMaterialComponent<VK_FORMAT_R8G8B8A8_SRGB> NormalMap;
 
     FxMaterialProperties Properties {};
 

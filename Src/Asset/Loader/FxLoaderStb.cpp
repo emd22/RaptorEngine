@@ -72,7 +72,6 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
     data_arr.Capacity = mDataSize;
 
     FxLogInfo("NUM COMPONENTS: {}", ImageNumComponents);
-    FxAssert(ImageNumComponents == 4);
     image->Texture.Create(image->ImageType, data_arr, image->Size, ImageFormat, ImageNumComponents);
 
     asset = image;

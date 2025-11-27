@@ -222,26 +222,8 @@ void FxMaterial::Destroy()
 }
 
 
-bool FxMaterialComponent::CheckIfReady()
-{
-    // If there is data passed in and the image has not been loaded yet, load it using the
-    // asset manager. This will be validated on the next call of this function. (when attempting to build the material)
-    if (!pImage && pDataToLoad) {
-        FxSlice<const uint8>& image_data = pDataToLoad;
-
-        pImage = FxAssetManager::LoadImageFromMemory(Format, image_data.pData, image_data.Size);
-        return false;
-    }
-
-    // If there is no texture and we are not loaded, return not loaded.
-    if (!pImage || !pImage->IsLoaded()) {
-        return false;
-    }
-
-    return true;
-}
-
-bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
+template <VkFormat TFormat>
+static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 {
     if (!component.pImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
@@ -255,23 +237,6 @@ bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
     }
 
     return true;
-}
-
-FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& sampler)
-{
-    // There is no texture provided, we will use the base colours passed in and a dummy texture
-    if (!pImage && !pDataToLoad) {
-        pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
-    }
-
-    if (!CheckIfReady()) {
-        // The texture is not ready, return the status to the material build function
-        return Status::NotReady;
-    }
-
-    pImage->Texture.SetSampler(sampler);
-
-    return Status::Ready;
 }
 
 
@@ -296,7 +261,7 @@ FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& s
 
 #define BUILD_MATERIAL_COMPONENT(component_, sampler_)                                                                 \
     {                                                                                                                  \
-        if (component_.Build(sampler_) == FxMaterialComponent::Status::NotReady) {                                     \
+        if (component_.Build(sampler_) == FxMaterialComponentStatus::eNotReady) {                                      \
             return;                                                                                                    \
         }                                                                                                              \
     }

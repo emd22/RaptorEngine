@@ -92,8 +92,9 @@ void FxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
 //     }
 // }
 
-void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent& component,
-                                     cgltf_texture_view& texture_view)
+template <VkFormat TFormat>
+static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
+                                            cgltf_texture_view& texture_view)
 {
     if (!texture_view.texture) {
         return;
