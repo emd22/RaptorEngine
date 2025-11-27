@@ -103,6 +103,7 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
     {
         RxDsLayoutBuilder builder {};
         builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
         DsLayoutGPassMaterial = builder.Build();
     }
 

@@ -109,18 +109,18 @@ void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComp
     component.pDataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 
-void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component)
-{
-    component.pTexture = FxAssetImage::GetEmptyImage();
-    // FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
+// void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component)
+// {
+// component.pTexture = FxAssetImage::GetEmptyImage();
+// FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
 
-    // component.Texture = FxMakeRef<FxAssetImage>();
-    // component.Texture->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
-    // component.Texture->IsFinishedNotifier.SignalDataWritten();
-    // component.Texture->bIsUploadedToGpu = true;
-    // component.Texture->bIsUploadedToGpu.notify_all();
-    // component.Texture->mIsLoaded.store(true);
-}
+// component.Texture = FxMakeRef<FxAssetImage>();
+// component.Texture->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
+// component.Texture->IsFinishedNotifier.SignalDataWritten();
+// component.Texture->bIsUploadedToGpu = true;
+// component.Texture->bIsUploadedToGpu.notify_all();
+// component.Texture->mIsLoaded.store(true);
+// }
 
 void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive)
 {
@@ -137,7 +137,9 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
 
         if (!texture_view.texture) {
-            MakeEmptyMaterialTexture(material, material->Diffuse);
+            // MakeEmptyMaterialTexture(material, material->Diffuse);
+            material->Diffuse.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
+
             material->Properties.BaseColor = FxColor::FromFloats(
                 gltf_material->pbr_metallic_roughness.base_color_factor);
         }
@@ -153,6 +155,10 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
 
     if (gltf_material->normal_texture.texture != nullptr) {
         MakeMaterialTextureForPrimitive(material, material->Normal, gltf_material->normal_texture);
+    }
+    else {
+        material->Normal.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
+        // MakeEmptyMaterialTexture(material, material->Normal);
     }
 
     object->pMaterial = material;

@@ -23,7 +23,7 @@ public:
     };
 
 public:
-    FxRef<FxAssetImage> pTexture { nullptr };
+    FxRef<FxAssetImage> pImage { nullptr };
     FxSlice<const uint8> pDataToLoad { nullptr };
 
     ~FxMaterialComponent() = default;
@@ -58,10 +58,10 @@ public:
     {
         switch (type) {
         case ResourceType::eDiffuse:
-            Diffuse.pTexture = image;
+            Diffuse.pImage = image;
             break;
         case ResourceType::eNormal:
-            Normal.pTexture = image;
+            Normal.pImage = image;
             break;
 
         default:

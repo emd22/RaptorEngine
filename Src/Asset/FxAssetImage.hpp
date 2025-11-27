@@ -15,7 +15,32 @@ public:
 
 
 public:
-    static FxRef<FxAssetImage> GetEmptyImage();
+    // static FxRef<FxAssetImage> GetEmptyImage(VkFormat format, int32 num_channels);
+
+    template <VkFormat TFormat, int32 TNumChannels>
+    static FxRef<FxAssetImage> GetEmptyImage()
+    {
+        static FxRef<FxAssetImage> sEmptyImage { nullptr };
+
+        if (sEmptyImage) {
+            return sEmptyImage;
+        }
+
+        FxSizedArray<uint8> image_data(TNumChannels);
+        memset(image_data.pData, 1, TNumChannels);
+        image_data.MarkFull();
+
+        sEmptyImage = FxMakeRef<FxAssetImage>();
+
+        sEmptyImage->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), TFormat, TNumChannels);
+        sEmptyImage->IsFinishedNotifier.SignalDataWritten();
+        sEmptyImage->bIsUploadedToGpu = true;
+        sEmptyImage->bIsUploadedToGpu.notify_all();
+        sEmptyImage->mIsLoaded.store(true);
+
+        return sEmptyImage;
+    }
+
 
     ~FxAssetImage() override { Destroy(); }
 

@@ -60,6 +60,7 @@ struct FSIn
 };
 
 layout(set = 0, binding = 0) Sampler2D sAlbedo;
+layout(set = 0, binding = 1) Sampler2D sNormalMap;
 layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
 
 [shader("fragment")]
@@ -69,7 +70,7 @@ FSOut FragmentMain(FSIn in)
     FSOut out;
 
     float4 material_color = unpackUnorm4x8ToFloat(bMaterialBuffer[VSConst.uiMaterialIndex].uiBaseColor);
-    out.vAlbedo = float4(sAlbedo.Sample(in.vUV).rgb, 1.0) + material_color;
+    out.vAlbedo = float4(sNormalMap.Sample(in.vUV).rgb, 1.0) + material_color;
     out.vNormal = float4(in.vNormal, 1.0f);
 
     return out;

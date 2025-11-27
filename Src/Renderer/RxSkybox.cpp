@@ -158,19 +158,30 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
     mDescriptorPool.Create(gRenderer->GetDevice());
 
     {
+        FxStackArray<VkDescriptorSetLayoutBinding, 2> layout_bindings;
+
         // Albedo texture
-        VkDescriptorSetLayoutBinding skybox_layout_binding {
+        layout_bindings.Insert(VkDescriptorSetLayoutBinding {
             .binding = 0,
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
             .pImmutableSamplers = nullptr,
-        };
+        });
+
+        // Albedo texture
+        layout_bindings.Insert(VkDescriptorSetLayoutBinding {
+            .binding = 1,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = nullptr,
+        });
 
         VkDescriptorSetLayoutCreateInfo ds_layout_info {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            .bindingCount = 1,
-            .pBindings = &skybox_layout_binding,
+            .bindingCount = layout_bindings.Size,
+            .pBindings = layout_bindings.pData,
         };
 
         VkResult status = vkCreateDescriptorSetLayout(device->Device, &ds_layout_info, nullptr,
@@ -230,7 +241,10 @@ void RxSkyboxRenderer::BuildDescriptorSets(uint32 frame_index)
         .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
     };
 
-    const VkWriteDescriptorSet positions_write {
+    FxStackArray<VkWriteDescriptorSet, 2> write_descs;
+
+
+    write_descs.Insert(VkWriteDescriptorSet {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .descriptorCount = 1,
@@ -238,7 +252,17 @@ void RxSkyboxRenderer::BuildDescriptorSets(uint32 frame_index)
         .dstBinding = binding_index,
         .dstArrayElement = 0,
         .pImageInfo = &positions_image_info,
-    };
+    });
 
-    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &positions_write, 0, nullptr);
+    write_descs.Insert(VkWriteDescriptorSet {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
+        .dstSet = DsSkyboxFragments[frame_index].Set,
+        .dstBinding = binding_index + 1,
+        .dstArrayElement = 0,
+        .pImageInfo = &positions_image_info,
+    });
+
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descs.Size, write_descs.pData, 0, nullptr);
 }
