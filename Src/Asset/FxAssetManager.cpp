@@ -180,32 +180,39 @@ void FxAssetManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* d
 }
 
 
-void FxAssetManager::LoadImage(RxImageType image_type, FxRef<FxAssetImage>& asset, const std::string& path)
+void FxAssetManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset,
+                               const std::string& path)
 {
     bool is_jpeg = IsFileJpeg(path);
 
     if (is_jpeg) {
         FxRef<FxLoaderJpeg> loader = FxRef<FxLoaderJpeg>::New();
         loader->ImageType = image_type;
+        loader->ImageFormat = format;
+        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, loader, path);
     }
     else {
         FxRef<FxLoaderStb> loader = FxRef<FxLoaderStb>::New();
         loader->ImageType = image_type;
+        loader->ImageFormat = format;
+        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, loader, path);
     }
 }
 
 
-void FxAssetManager::LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data,
-                                         uint32 data_size)
+void FxAssetManager::LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset,
+                                         const uint8* data, uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
         FxRef<FxLoaderJpeg> loader = FxRef<FxLoaderJpeg>::New();
         loader->ImageType = image_type;
+        loader->ImageFormat = format;
+        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, loader, "", data, data_size);
     }
@@ -213,6 +220,8 @@ void FxAssetManager::LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetIm
         // Load the image using stb_image
         FxRef<FxLoaderStb> loader = FxRef<FxLoaderStb>::New();
         loader->ImageType = image_type;
+        loader->ImageFormat = format;
+        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, loader, "", data, data_size);
     }

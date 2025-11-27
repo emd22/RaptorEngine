@@ -42,8 +42,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     pAlbedoSampler = FxMakeRef<RxSampler>();
     pAlbedoSampler->Create();
 
-    pNormalSampler = FxMakeRef<RxSampler>();
-    pNormalSampler->Create();
+    pNormalMapSampler = FxMakeRef<RxSampler>();
+    pNormalMapSampler->Create();
 
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
@@ -110,7 +110,7 @@ void FxMaterialManager::Destroy()
     }
 
     pAlbedoSampler->Destroy();
-    pNormalSampler->Destroy();
+    pNormalMapSampler->Destroy();
 
     MaterialPropertiesBuffer.Destroy();
 
@@ -164,7 +164,7 @@ bool FxMaterial::IsReady()
     }
 
     CHECK_COMPONENT_READY(Diffuse);
-    CHECK_COMPONENT_READY(Normal);
+    CHECK_COMPONENT_READY(NormalMap);
 
     return (mbIsReady = true);
 }
@@ -229,7 +229,7 @@ bool FxMaterialComponent::CheckIfReady()
     if (!pImage && pDataToLoad) {
         FxSlice<const uint8>& image_data = pDataToLoad;
 
-        pImage = FxAssetManager::LoadImageFromMemory(image_data.pData, image_data.Size);
+        pImage = FxAssetManager::LoadImageFromMemory(Format, image_data.pData, image_data.Size);
         return false;
     }
 
@@ -246,7 +246,7 @@ bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
     if (!component.pImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pImage = FxAssetManager::LoadImageFromMemory(image_data.pData, image_data.Size);
+        component.pImage = FxAssetManager::LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
         return false;
     }
 
@@ -315,7 +315,7 @@ void FxMaterial::Build()
 
     // if (Normal.Build(manager.pNormalSampler) == FxMaterialComponent::Status::NotReady) {
     // }
-    BUILD_MATERIAL_COMPONENT(Normal, manager.pNormalSampler);
+    BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
 
     // Update the material descriptor
     {
@@ -327,7 +327,7 @@ void FxMaterial::Build()
 
         // Push material textures
         PUSH_IMAGE_IF_SET(Diffuse.pImage, 0);
-        PUSH_IMAGE_IF_SET(Normal.pImage, 1);
+        PUSH_IMAGE_IF_SET(NormalMap.pImage, 1);
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
                                0, nullptr);

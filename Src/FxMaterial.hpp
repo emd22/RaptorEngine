@@ -25,11 +25,11 @@ public:
 public:
     FxRef<FxAssetImage> pImage { nullptr };
     FxSlice<const uint8> pDataToLoad { nullptr };
-
-    ~FxMaterialComponent() = default;
+    VkFormat Format;
 
 public:
     Status Build(const FxRef<RxSampler>& sampler);
+    ~FxMaterialComponent() = default;
 
 private:
     bool CheckIfReady();
@@ -52,7 +52,11 @@ public:
     };
 
 public:
-    FxMaterial() = default;
+    FxMaterial()
+    {
+        Diffuse.Format = VK_FORMAT_R8G8B8A8_SRGB;
+        NormalMap.Format = VK_FORMAT_R8G8B8A8_SRGB;
+    }
 
     void Attach(ResourceType type, const FxRef<FxAssetImage>& image)
     {
@@ -61,7 +65,7 @@ public:
             Diffuse.pImage = image;
             break;
         case ResourceType::eNormal:
-            Normal.pImage = image;
+            NormalMap.pImage = image;
             break;
 
         default:
@@ -93,7 +97,7 @@ private:
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
     FxMaterialComponent Diffuse;
-    FxMaterialComponent Normal;
+    FxMaterialComponent NormalMap;
 
     FxMaterialProperties Properties {};
 
@@ -141,7 +145,7 @@ public:
 
 public:
     FxRef<RxSampler> pAlbedoSampler { nullptr };
-    FxRef<RxSampler> pNormalSampler { nullptr };
+    FxRef<RxSampler> pNormalMapSampler { nullptr };
     // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**

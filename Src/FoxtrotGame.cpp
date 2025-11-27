@@ -287,13 +287,15 @@ void FoxtrotGame::Tick()
 
 void FoxtrotGame::CreateSkybox()
 {
+    const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     // Load the cubemap as a 2d image
-    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
+    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, format,
+                                                                   "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
 
     // Create the layers 2d image to use in the renderer
     RxImage cubemap_image;
-    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
+    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, format);
 
     auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 

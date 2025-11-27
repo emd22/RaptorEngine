@@ -154,10 +154,10 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
     }
 
     if (gltf_material->normal_texture.texture != nullptr) {
-        MakeMaterialTextureForPrimitive(material, material->Normal, gltf_material->normal_texture);
+        MakeMaterialTextureForPrimitive(material, material->NormalMap, gltf_material->normal_texture);
     }
     else {
-        material->Normal.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
+        material->NormalMap.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
         // MakeEmptyMaterialTexture(material, material->Normal);
     }
 
