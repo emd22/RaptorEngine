@@ -36,12 +36,15 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session, co
         .profile = global_session->findProfile("spirv_1_4"),
     };
 
-    FxSizedArray<slang::PreprocessorMacroDesc> preprocessor_macros {};
+    FxSizedArray<slang::PreprocessorMacroDesc> preprocessor_macros;
 
     if (macros.IsNotEmpty()) {
-        preprocessor_macros.InitSize(macros.Size);
+        FxLogDebug("Creating preprocessor list of {} macros", macros.Size);
+        preprocessor_macros.InitCapacity(macros.Size);
         for (const FxShaderMacro& macro : macros) {
-            preprocessor_macros.Insert({ .name = macro.pcName, .value = macro.pcValue });
+            slang::PreprocessorMacroDesc* ppmacro = preprocessor_macros.Insert();
+            ppmacro->name = macro.pcName;
+            ppmacro->value = macro.pcValue;
         }
     }
 
@@ -211,6 +214,8 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         PrintSlangDiagnostics(diagnostic_blob);
     }
 
+    FxLogInfo("COMPILING SHADER WITH {} MACROS", macros.Size);
+
     Slang::ComPtr<slang::IBlob> spirv_code;
 
     // Write the vertex shader code
@@ -285,7 +290,8 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
             FxSlice<uint8> data_slice = FxMakeSlice<uint8>(static_cast<uint8*>(const_cast<void*>(data_ptr)),
                                                            spirv_code->getBufferSize());
 
-            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashFS), data_slice);
+            FxSlice<FxShaderMacro> macros_slice = FxSlice<FxShaderMacro>(macros);
+            pack.AddEntry(FxHashData64(macros_slice, sPrefixHashFS), data_slice);
 
             // FxMemPool::Free(aligned_buffer.pData);
 

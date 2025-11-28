@@ -20,6 +20,7 @@ void FxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
     FxSizedArray<float32> positions;
     FxSizedArray<float32> normals;
     FxSizedArray<float32> uvs;
+    FxSizedArray<float32> tangents;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto* attribute = &primitive->attributes[i];
@@ -45,6 +46,14 @@ void FxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
             uvs.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, uvs.pData, data_size);
         }
+        else if (attribute->type == cgltf_attribute_type_tangent) {
+            cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
+
+            FxLogInfo("Model contains tangents!");
+            // Create our vertex normal buffer
+            tangents.InitSize(data_size);
+            cgltf_accessor_unpack_floats(attribute->data, tangents.pData, data_size);
+        }
     }
 
     // FxLogInfo("Positions:");
@@ -61,7 +70,7 @@ void FxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
     // Upload the vertices to the primtive mesh
     // mesh->UploadVertices(std::move(combined_vertices));
 
-    mesh->VertexList.CreateFrom(positions, normals, uvs);
+    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents);
     mesh->UploadVertices();
 
     mesh->IsReady = true;
@@ -158,7 +167,7 @@ void FxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         MakeMaterialTextureForPrimitive(material, material->NormalMap, gltf_material->normal_texture);
     }
     else {
-        material->NormalMap.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
+        material->NormalMap.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_UNORM, 4>();
         // MakeEmptyMaterialTexture(material, material->Normal);
     }
 

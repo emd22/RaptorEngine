@@ -127,15 +127,15 @@ void FoxtrotGame::CreateGame()
                                        FxPhysicsObject::PhysicsType::Static, {});
     mMainScene.Attach(ground_object);
 
-    pHelmetObject = FxAssetManager::LoadObject("../Models/DamagedHelmet.glb", { .KeepInMemory = true });
-    pHelmetObject->RotateX(M_PI_2);
-    pHelmetObject->Scale(FxVec3f(0.5));
-    pHelmetObject->MoveBy(FxVec3f(0, 2, 0));
+    pHelmetObject = FxAssetManager::LoadObject("../Models/BrickTest.glb", { .KeepInMemory = true });
+    // pHelmetObject->RotateX(M_PI_2);
+    // pHelmetObject->Scale(FxVec3f(0.5));
+    pHelmetObject->MoveBy(FxVec3f(0, 1, 0));
     pHelmetObject->WaitUntilLoaded();
-    pHelmetObject->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
-                                       FxPhysicsObject::PhysicsType::Dynamic, {});
+    // pHelmetObject->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
+    //                                    FxPhysicsObject::PhysicsType::Dynamic, {});
     // Disable physics by default, turn on physics with the keypress 'P'
-    pHelmetObject->SetPhysicsEnabled(false);
+    // pHelmetObject->SetPhysicsEnabled(false);
     gPhysics->OptimizeBroadPhase();
 
     mMainScene.Attach(pHelmetObject);
@@ -220,6 +220,7 @@ void FoxtrotGame::ProcessControls()
         gRenderer->pDeferredRenderer->ToggleWireframe(false);
     }
 
+
     if (FxControlManager::IsKeyPressed(FX_KEY_O)) {
         // Print out memory pool statistics
         FxLogInfo("=== Memory Pool Stats ====");
@@ -270,6 +271,8 @@ void FoxtrotGame::Tick()
     pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.4)));
     pPistolObject->MoveBy(camera->GetRightVector() * FxVec3f(0.20) + (camera->GetUpVector() * FxVec3f(0.1)));
 
+    // pHelmetObject->RotateY(DeltaTime * 0.0005f);
+
     gPhysics->Update();
 
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
@@ -287,15 +290,14 @@ void FoxtrotGame::Tick()
 
 void FoxtrotGame::CreateSkybox()
 {
-    const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     // Load the cubemap as a 2d image
-    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, format,
+    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, VK_FORMAT_R8G8B8A8_SRGB,
                                                                    "../Textures/TestCubemap.png");
     skybox_texture->WaitUntilLoaded();
 
     // Create the layers 2d image to use in the renderer
     RxImage cubemap_image;
-    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, format);
+    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
 
     auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 

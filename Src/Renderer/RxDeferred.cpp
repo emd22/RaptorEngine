@@ -447,10 +447,13 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     RpComposition.Create2(attachment_list);
 
-    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("Composition", RxShaderType::eVertex,
-                                                        FxSizedArray<FxShaderMacro> {});
-    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("Composition", RxShaderType::eFragment,
-                                                          FxSizedArray<FxShaderMacro> {});
+    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>(
+        "Composition", RxShaderType::eVertex,
+        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
+
+    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>(
+        "Composition", RxShaderType::eFragment,
+        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
 
     RxPipelineBuilder builder;
 

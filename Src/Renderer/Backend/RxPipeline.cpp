@@ -17,7 +17,7 @@ static RxGraphicsPipeline* spBoundPipeline = nullptr;
 
 FxVertexInfo FxMakeVertexInfo()
 {
-    using VertexType = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
+    using VertexType = RxVertexDefault;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
@@ -29,6 +29,7 @@ FxVertexInfo FxMakeVertexInfo()
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
         { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
         { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
+        { .location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Tangent) },
     };
 
     FxLogDebug("Amount of attributes: {:d}", attribs.Size);

@@ -49,7 +49,7 @@ public:
 
     bool KeepInMemory = false;
 
-    FxSizedArray<RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>> VertexBuffer;
+    FxSizedArray<RxVertexDefault> VertexBuffer;
     FxSizedArray<uint32> IndexBuffer;
 
 protected:

@@ -75,6 +75,8 @@ static FxHash64 BuildEntryId(RxShaderType type, const FxSizedArray<FxShaderMacro
         hash = cPrefixHashVS;
     }
 
+    FxLogInfo("BUILDING ENTRY ID WITH {} MACROS", macros.Size);
+
     return FxHashData64(FxSlice<FxShaderMacro>(macros), hash);
 }
 
@@ -93,6 +95,8 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
 
     // FxFile spirv_file(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
     FxDataPack shader_pack {};
+
+    FxLogInfo("LOADING SHADER WITH {} MACROS", macros.Size);
 
     FxHash64 entry_id = BuildEntryId(type, macros);
 

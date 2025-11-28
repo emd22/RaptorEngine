@@ -129,7 +129,7 @@ private:
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
     FxMaterialComponent<VK_FORMAT_R8G8B8A8_SRGB> Diffuse;
-    FxMaterialComponent<VK_FORMAT_R8G8B8A8_SRGB> NormalMap;
+    FxMaterialComponent<VK_FORMAT_R8G8B8A8_UNORM> NormalMap;
 
     FxMaterialProperties Properties {};
 

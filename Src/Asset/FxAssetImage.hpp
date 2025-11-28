@@ -5,6 +5,19 @@
 #include <Core/FxRef.hpp>
 #include <Renderer/Backend/RxTexture.hpp>
 
+// struct FxAssetImageTransform
+// {
+//     enum class Type
+//     {
+//         eNone,
+//         eTruncatePixels,
+//     };
+
+// public:
+
+//     Type TransformType = Type::eNone;
+// };
+
 class FxAssetImage : public FxAssetBase
 {
 protected:
