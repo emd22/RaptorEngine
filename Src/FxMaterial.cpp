@@ -273,6 +273,8 @@ void FxMaterial::Build()
                               gRenderer->pDeferredRenderer->DsLayoutGPassMaterial, 2);
     }
 
+    bool has_normal_map = false;
+
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     // Build components
@@ -280,6 +282,11 @@ void FxMaterial::Build()
 
     // if (Normal.Build(manager.pNormalSampler) == FxMaterialComponent::Status::NotReady) {
     // }
+    if (NormalMap.pImage) {
+        has_normal_map = true;
+
+        BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
+    }
     BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
 
     // Update the material descriptor
@@ -306,6 +313,10 @@ void FxMaterial::Build()
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
     printf("Base colour: %u\n", Properties.BaseColor.Value);
+
+    if (has_normal_map) {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
+    }
 
     // material->BaseColor = ;
 

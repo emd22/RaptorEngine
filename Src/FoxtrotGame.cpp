@@ -112,7 +112,7 @@ void FoxtrotGame::CreateGame()
 {
     Player.Create();
 
-    CreateSkybox();
+    // CreateSkybox();
 
     Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     // Move the player up and behind the other objects
@@ -290,28 +290,28 @@ void FoxtrotGame::Tick()
 
 void FoxtrotGame::CreateSkybox()
 {
-    // Load the cubemap as a 2d image
-    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, VK_FORMAT_R8G8B8A8_SRGB,
-                                                                   "../Textures/TestCubemap.png");
-    skybox_texture->WaitUntilLoaded();
+    // // Load the cubemap as a 2d image
+    // FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, VK_FORMAT_R8G8B8A8_SRGB,
+    //                                                                "../Textures/TestCubemap.png");
+    // skybox_texture->WaitUntilLoaded();
 
-    // Create the layers 2d image to use in the renderer
-    RxImage cubemap_image;
-    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
+    // // Create the layers 2d image to use in the renderer
+    // RxImage cubemap_image;
+    // cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
 
-    auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
+    // auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 
-    for (int i = 0; i < RendererFramesInFlight; i++) {
-        RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
-        gRenderer->pDeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
-    }
+    // for (int i = 0; i < RendererFramesInFlight; i++) {
+    //     RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
+    //     gRenderer->pDeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
+    // }
 
-    gRenderer->pDeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
+    // gRenderer->pDeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
 
-    pSkyboxMesh = generated_cube->AsPositionsMesh();
-    gRenderer->pDeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, pSkyboxMesh);
+    // pSkyboxMesh = generated_cube->AsPositionsMesh();
+    // gRenderer->pDeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, pSkyboxMesh);
 
-    pSkyboxMesh->IsReference = false;
+    // pSkyboxMesh->IsReference = false;
 }
 
 void FoxtrotGame::DestroyGame()
@@ -321,10 +321,10 @@ void FoxtrotGame::DestroyGame()
     FxMaterialManager::GetGlobalManager().Destroy();
     FxAssetManager::GetInstance().Shutdown();
 
-    pSkyboxMesh->IsReference = false;
-    pSkyboxMesh->Destroy();
+    // pSkyboxMesh->IsReference = false;
+    // pSkyboxMesh->Destroy();
 
-    gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
+    // gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
 
     gRenderer->pDeferredRenderer->Destroy();
 }

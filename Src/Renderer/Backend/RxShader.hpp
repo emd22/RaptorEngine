@@ -29,6 +29,9 @@ constexpr FX_FORCE_INLINE VkShaderStageFlagBits RxShaderTypeToVkShaderStage(RxSh
 class RxShader
 {
 public:
+    static FxHash64 GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
+
+
     RxShader() = default;
     RxShader(nullptr_t np) : ShaderModule(nullptr), Type(RxShaderType::eUnknown) {}
 

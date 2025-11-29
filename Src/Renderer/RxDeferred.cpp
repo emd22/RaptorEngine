@@ -158,6 +158,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     // RxRenderPassCache::Handle rp = gRenderPassCache->Request(RpGeometryId);
 
+
     builder.SetLayout(CreateGPassPipelineLayout())
         .SetName("Geometry Pipeline")
         .AddBlendAttachment({ .Enabled = false })
@@ -171,9 +172,21 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     builder.SetPolygonMode(VK_POLYGON_MODE_FILL).Build(PlGeometry);
     builder.SetPolygonMode(VK_POLYGON_MODE_LINE).Build(PlGeometryWireframe);
-    builder
-        .SetProperties(RxGraphicsPipelineProperties { .PolygonMode = VK_POLYGON_MODE_FILL, .bDisableDepthTest = true })
-        .Build(PlGeometryNoDepthTest);
+
+    FxRef<RxShader> normal_mapped_vertex_shader = FxMakeRef<RxShader>(
+        "Geometry", RxShaderType::eVertex, FxSizedArray<FxShaderMacro> { FxShaderMacro { "USE_NORMAL_MAPS", "1" } });
+    FxRef<RxShader> normal_mapped_fragment_shader = FxMakeRef<RxShader>(
+        "Geometry", RxShaderType::eFragment, FxSizedArray<FxShaderMacro> { FxShaderMacro { "USE_NORMAL_MAPS", "1" } });
+
+    builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
+        .SetShaders(normal_mapped_vertex_shader, normal_mapped_fragment_shader)
+        .Build(PlGeometryWithNormalMaps);
+
+
+    //     builder
+    // .SetProperties(RxGraphicsPipelineProperties { .PolygonMode = VK_POLYGON_MODE_FILL, .bDisableDepthTest = true })
+    // .Build(PlGeometryNoDepthTest);
+
 
     pGeometryPipeline = &PlGeometry;
 }
@@ -447,13 +460,11 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     RpComposition.Create2(attachment_list);
 
-    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>(
-        "Composition", RxShaderType::eVertex,
-        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
+    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("Composition", RxShaderType::eVertex,
+                                                        FxSizedArray<FxShaderMacro> {});
 
-    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>(
-        "Composition", RxShaderType::eFragment,
-        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
+    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("Composition", RxShaderType::eFragment,
+                                                          FxSizedArray<FxShaderMacro> {});
 
     RxPipelineBuilder builder;
 
@@ -469,12 +480,15 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     builder.Build(PlComposition);
 
-    // fragment_shader = FxMakeRef<RxShader>(
-    //     "Composition", RxShaderType::eFragment,
-    //     FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
+    FxRef<RxShader> unlit_vertex_shader = FxMakeRef<RxShader>(
+        "Composition", RxShaderType::eVertex,
+        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
 
+    FxRef<RxShader> unlit_fragment_shader = FxMakeRef<RxShader>(
+        "Composition", RxShaderType::eFragment,
+        FxSizedArray<FxShaderMacro> { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } });
 
-    // builder.SetShaders(vertex_shader, fragment_shader).Build(PlCompositionUnlit);
+    builder.SetShaders(unlit_vertex_shader, unlit_fragment_shader).Build(PlCompositionUnlit);
 }
 
 void RxDeferredRenderer::DestroyCompPipeline()

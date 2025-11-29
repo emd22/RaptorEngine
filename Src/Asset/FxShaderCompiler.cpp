@@ -8,6 +8,7 @@
 #include <Core/FxFile.hpp>
 #include <Core/FxFilesystemIO.hpp>
 #include <Core/FxStackArray.hpp>
+#include <Renderer/Backend/RxShader.hpp>
 #include <string>
 
 static FxBasicDb sShaderCompileDb;
@@ -91,25 +92,24 @@ static void PrintSlangDiagnostics(Slang::ComPtr<slang::IBlob>& diagnostic_blob)
     }
 }
 
-static void RecordShaderCompileTime(const char* path)
+static void RecordShaderCompileTime(FxHash64 entry_id, const char* path)
 {
-    FxLogInfo("Logging compile time for {}", path);
+    FxLogInfo("Logging compile time for {} ({})", path, entry_id);
 
     uint64 modification_time = FxFilesystemIO::FileGetLastModified(path);
-    sShaderCompileDb.WriteEntry(
-        FxBasicDbEntry { .KeyHash = FxHashStr32(path), .Value = std::to_string(modification_time) });
+    sShaderCompileDb.WriteEntry(FxBasicDbEntry { .KeyHash = entry_id, .Value = std::to_string(modification_time) });
 }
 
-static bool IsShaderUpToDate(const char* path)
+static bool IsShaderUpToDate(FxHash64 entry_id, const char* path)
 {
-    FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(FxHashStr32(path));
+    FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
     if (!entry) {
         return false;
     }
 
     uint64 latest_modification_time = FxFilesystemIO::FileGetLastModified(path);
 
-    if (std::stol(entry->Value) != latest_modification_time) {
+    if (std::stoull(entry->Value) != latest_modification_time) {
         return false;
     }
 
@@ -159,7 +159,9 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         sShaderCompileDb.Open("../Shaders/ShaderCompileDb.fxdb");
     }
 
-    if (IsShaderUpToDate(path)) {
+    FxHash64 compile_entry_id = FxHashStr64(path, FxHashData64(FxSlice<FxShaderMacro>(macros)));
+
+    if (IsShaderUpToDate(compile_entry_id, path)) {
         FxLogInfo("Shader {} is up to date!", path);
         return;
     }
@@ -229,9 +231,9 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         }
 
         {
-            FxFile out_data("testdataf.bin", FxFile::eWrite, FxFile::eBinary);
-            out_data.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
-            out_data.Close();
+            // FxFile out_data("testdataf.bin", FxFile::eWrite, FxFile::eBinary);
+            // out_data.Write(spirv_code->getBufferPointer(), spirv_code->getBufferSize());
+            // out_data.Close();
 
             constexpr FxHash64 sPrefixHashVS = FxHashStr64("VERTSHADER");
 
@@ -309,7 +311,7 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         FxLogInfo("Compiled fragment shader {} (Size={})", path, spirv_code->getBufferSize());
     }
 
-    RecordShaderCompileTime(path);
+    RecordShaderCompileTime(compile_entry_id, path);
 
     if (do_db_flush) {
         sShaderCompileDb.SaveToFile();

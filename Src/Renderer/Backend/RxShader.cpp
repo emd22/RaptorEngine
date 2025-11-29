@@ -61,7 +61,7 @@ static const char* ShaderTypeToExtension(RxShaderType type)
 //     }
 // }
 
-static FxHash64 BuildEntryId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
+FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {
     FxHash64 hash = FX_HASH64_FNV1A_INIT;
 
@@ -98,7 +98,7 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
 
     FxLogInfo("LOADING SHADER WITH {} MACROS", macros.Size);
 
-    FxHash64 entry_id = BuildEntryId(type, macros);
+    FxHash64 entry_id = RxShader::GenerateShaderId(type, macros);
 
     if (type == RxShaderType::eFragment) {
         FxLogDebug("LOADING FRAGMENT SHADER");
@@ -109,13 +109,20 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
 
     bool pack_exists = shader_pack.ReadFromFile(spirv_path.c_str());
 
+
     // SPIRV file could not be opened, try to compile it
-    if (!pack_exists || !shader_pack.QuerySection(entry_id)) {
+    if (!pack_exists || shader_pack.QuerySection(entry_id) == nullptr) {
         std::string slang_path = path + ".slang";
 
         FxLogInfo("Shader SPIRV not found at {}. Compiling {}...", spirv_path, slang_path);
 
         FxLogInfo("Compiled folder: {}", spirv_folder);
+
+
+        if (pack_exists) {
+            FxLogInfo("Reading previous entries in");
+            shader_pack.ReadAllEntries();
+        }
 
         // std::string output_path = spirv_folder + shader_name + spirv_ext;
 
@@ -129,8 +136,6 @@ void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArr
 
         // Write back to disk
         shader_pack.WriteToFile(spirv_path.c_str());
-
-        shader_pack.File.Flush();
 
         // Try to open SPIRV file again
         // spirv_file.Open(spirv_path.c_str(), FxFile::eRead, FxFile::eText);

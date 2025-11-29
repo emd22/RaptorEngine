@@ -74,6 +74,8 @@ public:
     RxGraphicsPipeline PlGeometry;
     RxGraphicsPipeline PlGeometryNoDepthTest;
     RxGraphicsPipeline PlGeometryWireframe;
+    RxGraphicsPipeline PlGeometryWithNormalMaps;
+
     RxGraphicsPipeline* pGeometryPipeline = nullptr;
 
     RxRenderPass RpGeometry;
@@ -110,7 +112,7 @@ public:
     FxSizedArray<RxDeferredCompPass> CompPasses;
 
 
-    RxSkyboxRenderer SkyboxRenderer;
+    // RxSkyboxRenderer SkyboxRenderer;
 };
 
 

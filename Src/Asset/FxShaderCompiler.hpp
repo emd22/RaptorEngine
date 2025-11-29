@@ -14,6 +14,7 @@ class FxShaderCompiler
 public:
     FxShaderCompiler() = default;
 
+
     static void CompileAllShaders(const char* folder_path);
 
     static void Compile(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros,
