@@ -98,8 +98,8 @@ void FoxtrotGame::CreateLights()
             FxRef<FxLight> light = FxMakeRef<FxLight>();
             FxVec3f position = FxVec3f((scDistanceX * x) - scOffsetX, scHeight, (scDistanceY * y) - scOffsetY);
             light->MoveTo(position);
-            light->SetLightVolume(light_volume, true);
-            light->Color = FxColor(0x666666FF);
+            light->SetLightVolume(light_volume, false);
+            light->Color = FxColor(0x76a6a6FF);
 
             light->Scale(FxVec3f(25));
 
@@ -112,7 +112,7 @@ void FoxtrotGame::CreateGame()
 {
     Player.Create();
 
-    CreateSkybox();
+    // CreateSkybox();
 
     Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     // Move the player up and behind the other objects
@@ -127,15 +127,15 @@ void FoxtrotGame::CreateGame()
                                        FxPhysicsObject::PhysicsType::Static, {});
     mMainScene.Attach(ground_object);
 
-    pHelmetObject = FxAssetManager::LoadObject("../Models/DamagedHelmet.glb", { .KeepInMemory = true });
-    pHelmetObject->RotateX(M_PI_2);
-    pHelmetObject->Scale(FxVec3f(0.5));
-    pHelmetObject->MoveBy(FxVec3f(0, 2, 0));
+    pHelmetObject = FxAssetManager::LoadObject("../Models/BrickTest.glb", { .KeepInMemory = true });
+    // pHelmetObject->RotateX(M_PI_2);
+    // pHelmetObject->Scale(FxVec3f(0.5));
+    pHelmetObject->MoveBy(FxVec3f(0, 1, 0));
     pHelmetObject->WaitUntilLoaded();
-    pHelmetObject->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
-                                       FxPhysicsObject::PhysicsType::Dynamic, {});
+    // pHelmetObject->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
+    //                                    FxPhysicsObject::PhysicsType::Dynamic, {});
     // Disable physics by default, turn on physics with the keypress 'P'
-    pHelmetObject->SetPhysicsEnabled(false);
+    // pHelmetObject->SetPhysicsEnabled(false);
     gPhysics->OptimizeBroadPhase();
 
     mMainScene.Attach(pHelmetObject);
@@ -152,8 +152,6 @@ void FoxtrotGame::CreateGame()
     while (sbRunning) {
         Tick();
     }
-
-    DestroyGame();
 }
 
 
@@ -220,6 +218,7 @@ void FoxtrotGame::ProcessControls()
         gRenderer->pDeferredRenderer->ToggleWireframe(false);
     }
 
+
     if (FxControlManager::IsKeyPressed(FX_KEY_O)) {
         // Print out memory pool statistics
         FxLogInfo("=== Memory Pool Stats ====");
@@ -270,6 +269,8 @@ void FoxtrotGame::Tick()
     pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.4)));
     pPistolObject->MoveBy(camera->GetRightVector() * FxVec3f(0.20) + (camera->GetUpVector() * FxVec3f(0.1)));
 
+    // pHelmetObject->RotateY(DeltaTime * 0.0005f);
+
     gPhysics->Update();
 
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
@@ -287,43 +288,49 @@ void FoxtrotGame::Tick()
 
 void FoxtrotGame::CreateSkybox()
 {
-    // Load the cubemap as a 2d image
-    FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, "../Textures/TestCubemap.png");
-    skybox_texture->WaitUntilLoaded();
+    // // Load the cubemap as a 2d image
+    // FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, VK_FORMAT_R8G8B8A8_SRGB,
+    //                                                                "../Textures/TestCubemap.png");
+    // skybox_texture->WaitUntilLoaded();
 
-    // Create the layers 2d image to use in the renderer
-    RxImage cubemap_image;
-    cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
+    // // Create the layers 2d image to use in the renderer
+    // RxImage cubemap_image;
+    // cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
 
-    auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
+    // auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
 
-    for (int i = 0; i < RendererFramesInFlight; i++) {
-        RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
-        gRenderer->pDeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
-    }
+    // for (int i = 0; i < RendererFramesInFlight; i++) {
+    //     RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
+    //     gRenderer->pDeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
+    // }
 
-    gRenderer->pDeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
+    // gRenderer->pDeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
 
-    pSkyboxMesh = generated_cube->AsPositionsMesh();
-    gRenderer->pDeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, pSkyboxMesh);
+    // pSkyboxMesh = generated_cube->AsPositionsMesh();
+    // gRenderer->pDeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, pSkyboxMesh);
 
-    pSkyboxMesh->IsReference = false;
+    // pSkyboxMesh->IsReference = false;
 }
 
 void FoxtrotGame::DestroyGame()
 {
     gRenderer->GetDevice()->WaitForIdle();
 
+    // FxMaterialManager::GetGlobalManager().Destroy();
     FxMaterialManager::GetGlobalManager().Destroy();
     FxAssetManager::GetInstance().Shutdown();
 
-    pSkyboxMesh->IsReference = false;
-    pSkyboxMesh->Destroy();
+    // pSkyboxMesh->IsReference = false;
+    // pSkyboxMesh->Destroy();
 
-    gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
+    // gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
 
     gRenderer->pDeferredRenderer->Destroy();
 }
 
 
-FoxtrotGame::~FoxtrotGame() { FxEngineGlobalsDestroy(); }
+FoxtrotGame::~FoxtrotGame()
+{
+    DestroyGame();
+    mMainScene.Destroy();
+}

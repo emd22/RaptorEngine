@@ -18,13 +18,33 @@ class FxPagedArray
 public:
     struct Page
     {
-        TElementType* Data;
+        TElementType* Data = nullptr;
 
         /** The number of elements in use in `Data` */
         uint32 Size;
 
         Page* Next;
         Page* Prev;
+
+    public:
+        void Destroy()
+        {
+            if (!Data) {
+                return;
+            }
+
+            // Call the destructor for each item in the page
+            if constexpr (std::is_destructible_v<TElementType>) {
+                for (uint32 i = 0; i < Size; i++) {
+                    Data[i].~TElementType();
+                }
+            }
+
+            // Since we have already called the destructors on each object, we don't want to call the
+            // destructor on the ptr of the object. Free the page without calling the destructor
+            FX_PAGED_ARRAY_FREE(void, (reinterpret_cast<void*>(Data)));
+            Data = nullptr;
+        }
     };
 
 public:
@@ -242,6 +262,37 @@ public:
         return *new_element;
     }
 
+    TElementType& Insert(TElementType&& element)
+    {
+        TElementType* new_element = &CurrentPage->Data[CurrentPage->Size];
+
+        if constexpr (std::is_move_constructible_v<TElementType>) {
+            ::new (new_element) TElementType(std::move(element));
+        }
+        else {
+            memcpy(new_element, &element, sizeof(TElementType));
+        }
+
+        ++CurrentPage->Size;
+
+        ++TrackedSize;
+
+        // There are no free slots left in the page, allocate a new page
+        if (CurrentPage->Size >= PageNodeCapacity) {
+            // Since the size will be N + 1, decrement by one
+            --CurrentPage->Size;
+
+            Page* new_page = AllocateNewPage(CurrentPage, nullptr);
+
+            CurrentPage->Next = new_page;
+            CurrentPage = new_page;
+
+            FxLogDebug("Allocating new page for FxPagedArray");
+        }
+
+        return *new_element;
+    }
+
     Page* FindPageForElement(TElementType* value)
     {
         Page* current_page = CurrentPage;
@@ -281,8 +332,11 @@ public:
             CurrentPage = page_to_remove->Prev;
             CurrentPage->Next = nullptr;
 
-            std::free(page_to_remove->Data);
-            std::free(page_to_remove);
+            if (page_to_remove != nullptr) {
+                page_to_remove->Destroy();
+            }
+
+            FX_PAGED_ARRAY_FREE(Page, page_to_remove);
 
             --CurrentPageIndex;
 
@@ -302,23 +356,8 @@ public:
 
     void Clear()
     {
-        // Free all pages that are not the first page
-        while (CurrentPage->Prev != nullptr) {
-            Page* this_page = CurrentPage;
-            CurrentPage = CurrentPage->Prev;
-
-            std::free(this_page->Data);
-            std::free(this_page);
-
-            CurrentPage->Next = nullptr;
-
-            --CurrentPageIndex;
-        }
-
-        FirstPage->Next = nullptr;
-        FirstPage->Size = 0;
-
-        TrackedSize = 0;
+        Destroy();
+        Create(PageNodeCapacity);
     }
 
     inline bool IsEmpty() const
@@ -380,11 +419,11 @@ public:
         while (current_page != nullptr) {
             Page* next_page = current_page->Next;
 
-            if (current_page->Data) {
-                std::free(static_cast<void*>(current_page->Data));
+            if (current_page != nullptr) {
+                current_page->Destroy();
             }
 
-            std::free(static_cast<void*>(current_page));
+            FX_PAGED_ARRAY_FREE(Page, current_page);
 
             current_page = next_page;
         }

@@ -11,4 +11,6 @@ public:
 
 public:
     RxImageType ImageType;
+    VkFormat ImageFormat = VK_FORMAT_UNDEFINED;
+    int16 ImageNumComponents = 0;
 };

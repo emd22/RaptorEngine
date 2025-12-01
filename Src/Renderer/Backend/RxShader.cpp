@@ -61,66 +61,132 @@ static const char* ShaderTypeToExtension(RxShaderType type)
 //     }
 // }
 
-
-void RxShader::Load(const char* shader_name, RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
+FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {
-    Type = type;
+    FxHash64 hash = FX_HASH64_FNV1A_INIT;
 
-    const char* spirv_ext = ShaderTypeToExtension(type);
+    constexpr FxHash64 cPrefixHashFS = FxHashStr64("FRAGSHADER");
+    constexpr FxHash64 cPrefixHashVS = FxHashStr64("VERTSHADER");
 
-    std::string path = FxAssetPath(FxAssetPathQuery::eShaders) + std::string(shader_name);
+    if (type == RxShaderType::eFragment) {
+        hash = cPrefixHashFS;
+    }
+    else if (type == RxShaderType::eVertex) {
+        hash = cPrefixHashVS;
+    }
 
-    std::string spirv_folder = std::string(FxAssetPath(FxAssetPathQuery::eShaders)) + "Spirv/";
-    std::string spirv_path = (spirv_folder + shader_name + spirv_ext);
+    FxLogInfo("Building entry ID with {} macros", macros.Size);
 
-    FxFile spirv_file(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
+    return FxHashData64(FxSlice<FxShaderMacro>(macros), hash);
+}
 
-    // SPIRV file could not be opened, try to compile it
-    if (!spirv_file.IsFileOpen()) {
-        std::string slang_path = path + ".slang";
+bool RxShader::PreloadCompiledPrograms(const std::string& pack_path)
+{
+    bool did_read = mDataPack.ReadFromFile(pack_path.c_str());
 
-        FxLogInfo("Shader SPIRV not found at {}. Compiling {}...", spirv_path, slang_path);
+    FxLogInfo("Read header for data pack");
 
-        FxLogInfo("Compiled folder: {}", spirv_folder);
+    if (!did_read) {
+        FxLogInfo("Could not read compiled shader from {}. Recompiling...", pack_path);
+        return false;
+    }
+    FxLogInfo("Read ALL ENTRIES for data pack");
 
-        std::string output_path = spirv_folder + shader_name + ".spv";
 
-        FxShaderCompiler::Compile(slang_path.c_str(), output_path.c_str(), macros);
+    mDataPack.ReadAllEntries();
 
-        // Try to open SPIRV file again
-        spirv_file.Open(spirv_path.c_str(), FxFile::eRead, FxFile::eText);
+    return true;
+}
 
-        // Still erroring when trying to open SPIRV, print an error and break out
-        if (!spirv_file.IsFileOpen()) {
-            FxLogError("Error opening shader SPIRV file!");
-            return;
+void RxShader::Load(const char* shader_name)
+{
+    Name = shader_name;
+
+    std::string program_path = GetProgramPath();
+
+    PreloadCompiledPrograms(program_path.c_str());
+}
+
+
+const std::string RxShader::GetSourcePath() const { return FxAssetPath(FxAssetPathQuery::eShaders) + Name + ".slang"; }
+const std::string RxShader::GetProgramPath() const
+{
+    std::string compiled_folder = std::string(FxAssetPath(FxAssetPathQuery::eShaders)) + "Spirv/";
+    std::string compiled_path = (compiled_folder + Name + ".spack");
+
+    return compiled_path;
+}
+
+FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros)
+{
+    FxLogDebug("Getting program from {}", Name);
+    FxHash64 program_id = RxShader::GenerateShaderId(shader_type, macros);
+
+    FxDataPackEntry* program_entry = mDataPack.QuerySection(program_id);
+
+    FxRef<RxShaderProgram> program = FxMakeRef<RxShaderProgram>();
+
+    // The program is not compiled currently, compile it!
+    if (!program_entry) {
+        std::string program_path = GetProgramPath();
+        RecompileShader(GetSourcePath(), program_path, macros);
+
+        program_entry = mDataPack.QuerySection(program_id);
+
+        // There must be an issue during compilation or a bug in the shader compiler, return the empty program
+        if (program_entry == nullptr) {
+            FxLogError("Pack entry does not exist after compilation! (ID={})", program_id);
+            return program;
         }
     }
 
-    uint32 buffer_size = FxMath::AlignValue<4>(spirv_file.GetFileSize());
-    uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
+    program->ShaderType = shader_type;
 
-    FxSlice<uint32> file_buffer = spirv_file.Read<uint32>(FxMakeSlice(buffer, buffer_size));
+    if (program_entry && program_entry->Data.IsNotEmpty()) {
+        const FxSizedArray<uint8>& program_data = program_entry->Data;
 
-    // Use buffer_size(not file_buffer.Size) as we are using the total buffer size, not the amount
-    // of bytes read.)
-    CreateShaderModule(buffer_size, file_buffer.pData);
-    spirv_file.Close();
+        FxDebugAssert(program_data.Size == FxMath::AlignValue<4>(program_data.Size));
 
-    FxMemPool::Free(file_buffer.pData);
+        CreateShaderModule(program_data.Size, reinterpret_cast<uint32*>(program_data.pData), program->pShader);
+    }
+    // The program has not been loaded from the datapack yet, load only that section
+    else {
+        uint32 buffer_size = FxMath::AlignValue<4>(program_entry->DataSize);
+        uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
+        FxSlice<uint8> buffer_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
+
+        mDataPack.ReadSection(program_entry, buffer_slice);
+
+        CreateShaderModule(buffer_size, buffer, program->pShader);
+    }
+
+    return program;
 }
 
-void RxShader::Destroy()
+void RxShader::RecompileShader(const std::string& source_path, const std::string& compiled_path,
+                               const FxSizedArray<FxShaderMacro>& macros)
 {
-    if (ShaderModule == nullptr) {
+    // The previous programs are loaded in already from `PreloadCompiledPrograms()`
+
+    // Compile to the shader pack
+    FxShaderCompiler::Compile(source_path.c_str(), mDataPack, macros);
+
+    // Write the programs back to disk
+    mDataPack.WriteToFile(compiled_path.c_str());
+}
+
+
+void RxShaderProgram::Destroy()
+{
+    if (pShader == nullptr) {
         return;
     }
 
     RxGpuDevice* device = gRenderer->GetDevice();
-    vkDestroyShaderModule(device->Device, ShaderModule, nullptr);
+    vkDestroyShaderModule(device->Device, pShader, nullptr);
 }
 
-void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data)
+void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module)
 {
     const VkShaderModuleCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -130,7 +196,7 @@ void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data)
 
     RxGpuDevice* device = gRenderer->GetDevice();
 
-    const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &ShaderModule);
+    const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &shader_module);
 
     if (status != VK_SUCCESS) {
         OldLog::Error("Could not create vulkan shader module...");

@@ -59,7 +59,8 @@ FSOut FragmentMain(FSIn in)
     float4 albedo = sAlbedo.Sample(in.vUV);
 
 #ifdef RENDER_UNLIT
-    return albedo;
+    out.vColor = float4(albedo.rgb, 1.0);
+
 #else
 
     float4 lighting = sLighting.Sample(in.vUV);
@@ -78,8 +79,8 @@ FSOut FragmentMain(FSIn in)
     else {
         out.vColor = float4(lit_color, 1.0);
     }
+#endif
 
     return out;
-#endif
 
 }

@@ -39,12 +39,11 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     // Material properties buffer descriptors
 
-
     pAlbedoSampler = FxMakeRef<RxSampler>();
     pAlbedoSampler->Create();
 
-    pNormalSampler = FxMakeRef<RxSampler>();
-    pNormalSampler->Create();
+    pNormalMapSampler = FxMakeRef<RxSampler>();
+    pNormalMapSampler->Create();
 
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
@@ -111,7 +110,8 @@ void FxMaterialManager::Destroy()
     }
 
     pAlbedoSampler->Destroy();
-    pNormalSampler->Destroy();
+
+    pNormalMapSampler->Destroy();
 
     MaterialPropertiesBuffer.Destroy();
 
@@ -152,16 +152,20 @@ void FxMaterialManager::Destroy()
 
 //     return mSetLayout;
 // }
-//
+
+#define CHECK_COMPONENT_READY(component_)                                                                              \
+    if (!component_.pImage || !component_.pImage->IsLoaded()) {                                                        \
+        return false;                                                                                                  \
+    }
+
 bool FxMaterial::IsReady()
 {
     if (mbIsReady) {
         return true;
     }
 
-    if (!Diffuse.pTexture || !Diffuse.pTexture->IsLoaded()) {
-        return false;
-    }
+    CHECK_COMPONENT_READY(Diffuse);
+    CHECK_COMPONENT_READY(NormalMap);
 
     return (mbIsReady = true);
 }
@@ -213,63 +217,27 @@ void FxMaterial::Destroy()
     }
 
     // TODO: figure out why the FxRef isn't destroying the object...
-    if (Diffuse.pTexture) {
-        Diffuse.pTexture->Destroy();
-    }
+    // if (Diffuse.pImage) {
+    //     Diffuse.pImage->Destroy();
+    // }
 }
 
 
-bool FxMaterialComponent::CheckIfReady()
+template <VkFormat TFormat>
+static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 {
-    // If there is data passed in and the image has not been loaded yet, load it using the
-    // asset manager. This will be validated on the next call of this function. (when attempting to build the material)
-    if (!pTexture && pDataToLoad) {
-        FxSlice<const uint8>& image_data = pDataToLoad;
-
-        pTexture = FxAssetManager::LoadImageFromMemory(image_data.pData, image_data.Size);
-        return false;
-    }
-
-    // If there is no texture and we are not loaded, return not loaded.
-    if (!pTexture || !pTexture->IsLoaded()) {
-        return false;
-    }
-
-    return true;
-}
-
-bool FxMaterial::CheckComponentTextureLoaded(FxMaterialComponent& component)
-{
-    if (!component.pTexture && component.pDataToLoad) {
+    if (!component.pImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pTexture = FxAssetManager::LoadImageFromMemory(image_data.pData, image_data.Size);
+        component.pImage = FxAssetManager::LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
         return false;
     }
 
-    if (!component.pTexture || !component.pTexture->IsLoaded()) {
+    if (!component.pImage || !component.pImage->IsLoaded()) {
         return false;
     }
 
     return true;
-}
-
-FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& sampler)
-{
-    // There is no texture provided, we will use the base colours passed in and a dummy texture
-    if (!pTexture && !pDataToLoad) {
-        pTexture = FxAssetImage::GetEmptyImage();
-    }
-
-    if (!CheckIfReady()) {
-        // The texture is not ready, return the status to the material build function
-        return Status::NotReady;
-    }
-
-
-    pTexture->Texture.SetSampler(sampler);
-
-    return Status::Ready;
 }
 
 
@@ -293,22 +261,34 @@ FxMaterialComponent::Status FxMaterialComponent::Build(const FxRef<RxSampler>& s
     }
 
 #define BUILD_MATERIAL_COMPONENT(component_, sampler_)                                                                 \
-    if (component_.Build(sampler_) == FxMaterialComponent::Status::NotReady) {                                         \
-        return;                                                                                                        \
+    {                                                                                                                  \
+        if (component_.Build(sampler_) == FxMaterialComponentStatus::eNotReady) {                                      \
+            return;                                                                                                    \
+        }                                                                                                              \
     }
 
 void FxMaterial::Build()
 {
     if (!mDescriptorSet.IsInited()) {
         mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(),
-                              gRenderer->pDeferredRenderer->DsLayoutGPassMaterial);
+                              gRenderer->pDeferredRenderer->DsLayoutGPassMaterial, 2);
     }
+
+    bool has_normal_map = false;
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     // Build components
     BUILD_MATERIAL_COMPONENT(Diffuse, manager.pAlbedoSampler);
-    BUILD_MATERIAL_COMPONENT(Diffuse, manager.pNormalSampler);
+
+    // if (Normal.Build(manager.pNormalSampler) == FxMaterialComponent::Status::NotReady) {
+    // }
+    if (NormalMap.pImage) {
+        has_normal_map = true;
+
+        BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
+    }
+    BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
 
     // Update the material descriptor
     {
@@ -319,8 +299,8 @@ void FxMaterial::Build()
         RxDescriptorSet& descriptor_set = mDescriptorSet;
 
         // Push material textures
-        PUSH_IMAGE_IF_SET(Diffuse.pTexture, 0);
-        PUSH_IMAGE_IF_SET(Normal.pTexture, 0);
+        PUSH_IMAGE_IF_SET(Diffuse.pImage, 0);
+        PUSH_IMAGE_IF_SET(NormalMap.pImage, 1);
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
                                0, nullptr);
@@ -334,6 +314,13 @@ void FxMaterial::Build()
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
     printf("Base colour: %u\n", Properties.BaseColor.Value);
+
+    if (has_normal_map) {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
+    }
+    else {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
+    }
 
     // material->BaseColor = ;
 

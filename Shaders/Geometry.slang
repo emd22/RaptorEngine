@@ -7,15 +7,20 @@ module Geometry;
 struct VSOut
 {
     float4 vPosition : SV_POSITION;
-    float3 vNormal   : NORMAL;
+    float3 vNormalWS   : NORMAL;
     float2 vUV       : TEXCOORD0;
+#ifdef USE_NORMAL_MAPS
+    float3 vTangentWS : TANGENT;
+    float3 vBitangentWS : BITANGENT;
+#endif
 };
 
 struct VSIn
 {
-    float3 vPosition : ATTR0;
-    float3 vNormal : ATTR1;
-    float2 vUV : ATTR2;
+    float3 vPosition : POSITION;
+    float3 vNormal : NORMAL;
+    float2 vUV : TEXCOORD0;
+    float3 vTangent : TANGENT;
 };
 
 struct VSPushConsts
@@ -35,7 +40,13 @@ VSOut VertexMain(VSIn in)
 
     out.vPosition = mul(float4(in.vPosition, 1.0), VSConst.mMVP);
 
-    out.vNormal = mul(in.vNormal, VSConst.mNormalMatrix);
+    out.vNormalWS = normalize(mul(in.vNormal, VSConst.mNormalMatrix));
+
+#ifdef USE_NORMAL_MAPS
+    out.vTangentWS = normalize(mul(in.vTangent, VSConst.mNormalMatrix));
+    out.vBitangentWS =  cross(out.vNormalWS, out.vTangentWS);
+#endif
+
     out.vUV = in.vUV;
 
     return out;
@@ -55,11 +66,21 @@ struct FSOut {
 
 struct FSIn
 {
-    float3 vNormal : NORMAL;
+    float3 vNormalWS : NORMAL;
     float2 vUV : TEXCOORD0;
+
+#ifdef USE_NORMAL_MAPS
+    float3 vTangentWS : TANGENT;
+    float3 vBitangentWS : BITANGENT;
+#endif
 };
 
 layout(set = 0, binding = 0) Sampler2D sAlbedo;
+
+// #ifdef USE_NORMAL_MAPS
+layout(set = 0, binding = 1) Sampler2D sNormalMap;
+// #endif
+
 layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
 
 [shader("fragment")]
@@ -70,7 +91,20 @@ FSOut FragmentMain(FSIn in)
 
     float4 material_color = unpackUnorm4x8ToFloat(bMaterialBuffer[VSConst.uiMaterialIndex].uiBaseColor);
     out.vAlbedo = float4(sAlbedo.Sample(in.vUV).rgb, 1.0) + material_color;
-    out.vNormal = float4(in.vNormal, 1.0f);
+
+#ifdef USE_NORMAL_MAPS
+    float3 normal_ts = sNormalMap.Sample(in.vUV).rgb;
+    normal_ts = normal_ts * 2.0 - 1.0;
+
+    float3x3 TBN = float3x3(in.vTangentWS, in.vBitangentWS, in.vNormalWS);
+
+    float3 normal_ws = mul(normal_ts, TBN);
+    out.vNormal = float4(normalize(normal_ws), 1.0);
+
+#else
+    out.vNormal = float4(in.vNormalWS, 1.0f);
+#endif
+
 
     return out;
 }

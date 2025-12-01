@@ -9,7 +9,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromFile(FxRef<FxAssetBase> asset, const st
 
     const char* c_path = path.c_str();
 
-    const int requested_channels = 4; /* RGBA */
+    const int requested_channels = ImageNumComponents; /* RGBA */
 
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
@@ -32,7 +32,7 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
 {
     FxRef<FxAssetImage> image(asset);
 
-    const int requested_channels = 4; /* RGBA */
+    const int requested_channels = ImageNumComponents;
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         FxLogError("Could not retrieve info from image in memory! (Size:{u})", size);
@@ -71,7 +71,8 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
     data_arr.Size = mDataSize;
     data_arr.Capacity = mDataSize;
 
-    image->Texture.Create(image->ImageType, data_arr, image->Size, VK_FORMAT_R8G8B8A8_SRGB, 4);
+    FxLogInfo("NUM COMPONENTS: {}", ImageNumComponents);
+    image->Texture.Create(image->ImageType, data_arr, image->Size, ImageFormat, ImageNumComponents);
 
     asset = image;
 

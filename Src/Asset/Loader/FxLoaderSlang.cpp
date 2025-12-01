@@ -22,9 +22,9 @@ using Status = FxLoaderSlang::Status;
 
 Status FxLoaderSlang::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
 {
-    FxRef<FxAssetShader> shader(asset);
+    // FxRef<FxAssetShader> shader(asset);
 
-    FxFile shader_file(path.c_str(), FxFile::eRead, FxFile::eText);
+    // FxFile shader_file(path.c_str(), FxFile::eRead, FxFile::eText);
 
     // glslang::TShader glsl_shader(RxShaderTypeToShLanguage(shader->ShaderType));
 
@@ -37,7 +37,7 @@ Status FxLoaderSlang::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& 
 
     // glsl_shader.addSourceText(file_data.Ptr, file_data.Size);
 
-    shader_file.Close();
+    // shader_file.Close();
 
     return Status::eSuccess;
 }

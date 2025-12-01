@@ -32,6 +32,7 @@ template <typename T>
 class FxRef
 {
 public:
+    FxRef() : mRefCnt(nullptr), mPtr(nullptr) {}
     FxRef(nullptr_t np) : mRefCnt(nullptr), mPtr(nullptr) {}
 
     /**
@@ -223,6 +224,12 @@ public:
         FxSpinThreadGuard guard(&IsBusy);
 
         return mPtr != nullptr;
+    }
+
+    void SetNull()
+    {
+        mPtr = nullptr;
+        mRefCnt = nullptr;
     }
 
 private:

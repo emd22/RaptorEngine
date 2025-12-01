@@ -74,16 +74,22 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
 
     jpeg_read_header(&mJpegInfo, true);
 
-    mJpegInfo.out_color_space = JCS_EXT_RGBA;
-    uint32 requested_components = 4;
+    J_COLOR_SPACE color_space = JCS_EXT_RGBA;
+    if (ImageNumComponents == 4) {
+        color_space = JCS_EXT_RGBA;
+    }
+    else if (ImageNumComponents == 3) {
+        color_space = JCS_EXT_RGB;
+    }
+
+    mJpegInfo.out_color_space = color_space;
 
     jpeg_start_decompress(&mJpegInfo);
 
-    printf("Image has %d components.\n", mJpegInfo.output_components);
+    printf("Image has %d components\n", mJpegInfo.output_components);
     image->NumComponents = mJpegInfo.output_components;
-    FxDebugAssert(image->NumComponents == requested_components)
 
-        printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
+    printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
     image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
@@ -107,7 +113,7 @@ void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
 {
     FxRef<FxAssetImage> image(asset);
 
-    image->Texture.Create(image->ImageType, mImageData, image->Size, VK_FORMAT_R8G8B8A8_SRGB, 4);
+    image->Texture.Create(image->ImageType, mImageData, image->Size, ImageFormat, ImageNumComponents);
 
     asset->bIsUploadedToGpu = true;
     asset->bIsUploadedToGpu.notify_all();

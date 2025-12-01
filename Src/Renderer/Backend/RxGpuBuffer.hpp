@@ -193,6 +193,7 @@ public:
 
     void Destroy()
     {
+        // FxLogInfo("Destroying GPU buffer of size {}", Size);
         if (!(Initialized.load()) || Allocation == nullptr || Buffer == nullptr) {
             return;
         }

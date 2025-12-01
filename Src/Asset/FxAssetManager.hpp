@@ -107,31 +107,35 @@ public:
         return asset;
     }
 
-    static FxRef<FxAssetImage> LoadImage(RxImageType image_type, const std::string& path)
+    static FxRef<FxAssetImage> LoadImage(RxImageType image_type, VkFormat format, const std::string& path)
     {
         FxRef<FxAssetImage> asset = FxRef<FxAssetImage>::New();
-        LoadImage(image_type, asset, path);
+        LoadImage(image_type, format, asset, path);
 
         return asset;
     }
 
-    static inline FxRef<FxAssetImage> LoadImage(const std::string& path) { return LoadImage(RxImageType::Image, path); }
+    static inline FxRef<FxAssetImage> LoadImage(const std::string& path, VkFormat format)
+    {
+        return LoadImage(RxImageType::Image, format, path);
+    }
 
     /**
      * @brief Creates a new `FxObject` and loads the asset into it from
      * the data provided.
      */
-    static FxRef<FxAssetImage> LoadImageFromMemory(RxImageType image_type, const uint8* data, uint32 data_size)
+    static FxRef<FxAssetImage> LoadImageFromMemory(RxImageType image_type, VkFormat format, const uint8* data,
+                                                   uint32 data_size)
     {
         FxRef<FxAssetImage> asset = FxRef<FxAssetImage>::New();
-        LoadImageFromMemory(image_type, asset, data, data_size);
+        LoadImageFromMemory(image_type, format, asset, data, data_size);
 
         return asset;
     }
 
-    static inline FxRef<FxAssetImage> LoadImageFromMemory(const uint8* data, uint32 data_size)
+    static inline FxRef<FxAssetImage> LoadImageFromMemory(VkFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::Image, data, data_size);
+        return LoadImageFromMemory(RxImageType::Image, format, data, data_size);
     }
 
 
@@ -149,26 +153,26 @@ public:
      */
     static void LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size);
 
-    static void LoadImage(RxImageType image_type, FxRef<FxAssetImage>& asset, const std::string& path);
+    static void LoadImage(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset, const std::string& path);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    static inline void LoadImage(FxRef<FxAssetImage>& asset, const std::string& path)
+    static inline void LoadImage(FxRef<FxAssetImage>& asset, VkFormat format, const std::string& path)
     {
-        return LoadImage(RxImageType::Image, asset, path);
+        return LoadImage(RxImageType::Image, format, asset, path);
     }
 
 
-    static void LoadImageFromMemory(RxImageType image_type, FxRef<FxAssetImage>& asset, const uint8* data,
-                                    uint32 data_size);
+    static void LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset,
+                                    const uint8* data, uint32 data_size);
 
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
-    static void LoadImageFromMemory(FxRef<FxAssetImage>& asset, const uint8* data, uint32 data_size)
+    static void LoadImageFromMemory(FxRef<FxAssetImage>& asset, VkFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::Image, asset, data, data_size);
+        return LoadImageFromMemory(RxImageType::Image, format, asset, data, data_size);
     }
 
 

@@ -6,7 +6,7 @@
 
 struct FxBasicDbEntry
 {
-    FxHash32 KeyHash;
+    FxHash64 KeyHash;
     std::string Value;
 };
 

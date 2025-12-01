@@ -4,6 +4,7 @@
 #include "FoxtrotGame.hpp"
 
 #include <Asset/FxDataPack.hpp>
+#include <FxEngine.hpp>
 
 FX_SET_MODULE_NAME("Main")
 
@@ -11,39 +12,41 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
 
-    // {
-    //     FxDataPack pack {};
-    //     {
-    //         std::string test_section = "Test";
-    //         std::string data_section = "Test data";
 
-    //         FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
-    //                                                         test_section.length());
-    //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
-    //                                                        data_section.length());
-
-    //         pack.AddEntry(ident_slice, data_slice);
-    //     }
-    //     {
-    //         std::string test_section = "Test2";
-    //         std::string data_section = "Apple, Pear, Orange";
-
-    //         FxSlice<uint8> ident_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(test_section.data()),
-    //                                                         test_section.length());
-    //         FxSlice<uint8> data_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(data_section.data()),
-    //                                                        data_section.length());
-
-    //         pack.AddEntry(ident_slice, data_slice);
-    //     }
-    //     pack.WriteToFile("Test.fdat");
-    // }
+    // char buffer_a[256];
 
     // FxDataPack pack {};
 
+    // int numbers[3] = { 1, 2, 3 };
+    // const std::string str = "Hello, World!";
+
+    // pack.AddEntry(FxHashStr64("Test1"), FxMakeSlice<uint8>(reinterpret_cast<uint8*>(numbers), 3 * sizeof(int)));
+    // pack.AddEntry(FxHashStr64("Test2"),
+    //               FxMakeSlice<uint8>(reinterpret_cast<uint8*>(const_cast<char*>(str.data())), str.length()));
+
+    // pack.WriteToFile("Test.fdat");
+
+    // // FxDataPack pack {};
+
     // pack.ReadFromFile("Test.fdat");
 
-    // FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
-    // FxLogInfo("Data: {:.{}}", data.pData, data.Size);
+    // FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test1")));
+    // if (data.IsNotEmpty()) {
+    //     for (char v : data) {
+    //         FxLogInfo("{:02X}", v);
+    //     }
+    // }
 
-    FoxtrotGame game {};
+    // FxSizedArray<char> data2 = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
+
+    // if (data2.IsNotEmpty()) {
+    //     FxLogInfo("Value: {:.{}}", data2.pData, data2.Size);
+    // }
+    {
+        FoxtrotGame game {};
+
+        // game.Destroy();
+    }
+
+    FxEngineGlobalsDestroy();
 }

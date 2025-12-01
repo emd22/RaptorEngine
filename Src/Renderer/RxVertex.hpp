@@ -12,6 +12,7 @@ enum FxVertexFlags : int8
     FxVertexPosition = 0x01,
     FxVertexNormal = 0x02,
     FxVertexUV = 0x04,
+    FxVertexTangent = 0x08,
 };
 
 FX_DEFINE_ENUM_AS_FLAGS(FxVertexFlags);
@@ -50,10 +51,21 @@ struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
     float32 UV[2];
 } __attribute__((packed));
 
+template <>
+struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent>
+{
+    static constexpr FxVertexFlags Components = (FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent);
+
+    float32 Position[3];
+    float32 Normal[3];
+    float32 UV[2];
+    float32 Tangent[3];
+} __attribute__((packed));
+
 // End packing structs
 #pragma pack(pop)
 
-using RxVertexDefault = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
+using RxVertexDefault = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent>;
 
 template <>
 struct std::formatter<RxVertexDefault>
@@ -61,7 +73,7 @@ struct std::formatter<RxVertexDefault>
     constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
     template <typename FmtContext>
-    constexpr auto format(const RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>& obj, FmtContext& ctx) const
+    constexpr auto format(const RxVertexDefault& obj, FmtContext& ctx) const
     {
         return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
                               static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));
@@ -103,7 +115,7 @@ public:
     RxVertexList() = default;
 
     void CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
-                    const FxSizedArray<float32>& uvs)
+                    const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents)
     {
         if (normals.IsNotEmpty()) {
             FxAssert((normals.Size == positions.Size));
@@ -111,9 +123,11 @@ public:
 
         const bool has_normals = (normals.IsNotEmpty());
         const bool has_uvs = (uvs.IsNotEmpty());
+        const bool has_tangents = (tangents.IsNotEmpty());
 
         constexpr bool can_output_normals = (TVertexType::Components & FxVertexNormal);
         constexpr bool can_output_uvs = (TVertexType::Components & FxVertexUV);
+        constexpr bool can_output_tangents = (TVertexType::Components & FxVertexTangent);
 
         // Create the local (cpu-side) buffer to store our vertices
         LocalBuffer.InitCapacity(positions.Size / 3);
@@ -122,11 +136,16 @@ public:
             FxLogWarning("Vertex list does not contain UV coordinates", 0);
         }
 
+        // Note that if can_output_* is true but has_* is false, that field will be zeroed out.
+
         if (has_normals) {
             bContainsNormals = true;
         }
         if (has_uvs) {
             bContainsUVs = true;
+        }
+        if (has_tangents) {
+            bContainsTangents = true;
         }
 
         for (int i = 0; i < LocalBuffer.Capacity; i++) {
@@ -148,13 +167,14 @@ public:
             // If the normals are available (passed in and not null), then output them to the vertex object. If not,
             // zero them.
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.UV, uvs, 2);
+            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Tangent, tangents, 3);
 
             LocalBuffer.Insert(vertex);
         }
     }
 
     void CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
-                    const FxSizedArray<FxVec2f>& uvs)
+                    const FxSizedArray<FxVec2f>& uvs, const FxSizedArray<FxVec3f>& tangents)
     {
         if (normals.IsNotEmpty()) {
             FxAssert((normals.Size == positions.Size));
@@ -162,9 +182,11 @@ public:
 
         const bool has_normals = (normals.IsNotEmpty());
         const bool has_uvs = (uvs.IsNotEmpty());
+        const bool has_tangents = (tangents.IsNotEmpty());
 
         constexpr bool can_output_normals = (TVertexType::Components & FxVertexNormal);
         constexpr bool can_output_uvs = (TVertexType::Components & FxVertexUV);
+        constexpr bool can_output_tangents = (TVertexType::Components & FxVertexTangent);
 
         // Create the local (cpu-side) buffer to store our vertices
         LocalBuffer.InitCapacity(positions.Size);
@@ -182,13 +204,14 @@ public:
             // zero them.
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Normal, normals, 3);
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.UV, uvs, 2);
+            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Tangent, tangents, 3);
 
             LocalBuffer.Insert(vertex);
         }
     }
 
-    void CreateFrom(const FxSizedArray<float32>& positions) { CreateFrom(positions, {}, {}); }
-    void CreateFrom(const FxSizedArray<FxVec3f>& positions) { CreateFrom(positions, {}, {}); }
+    void CreateFrom(const FxSizedArray<float32>& positions) { CreateFrom(positions, {}, {}, {}); }
+    void CreateFrom(const FxSizedArray<FxVec3f>& positions) { CreateFrom(positions, {}, {}, {}); }
 
     void UploadToGpu()
     {
@@ -225,8 +248,6 @@ public:
     void DestroyLocalBuffer() { LocalBuffer.Free(); }
     void Destroy()
     {
-        FxLogInfo("Destroying RxVertexList");
-
         GpuBuffer.Destroy();
 
         DestroyLocalBuffer();
@@ -243,6 +264,7 @@ public:
 
     bool bContainsNormals : 1 = false;
     bool bContainsUVs : 1 = false;
+    bool bContainsTangents : 1 = false;
 };
 
 #undef RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE

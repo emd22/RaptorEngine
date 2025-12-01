@@ -26,6 +26,38 @@ public:
         return (format >= depths_start && format <= depths_end);
     }
 
+    static constexpr int GetFormatPixelSize(VkFormat format)
+    {
+        if ((format >= VK_FORMAT_R8G8B8A8_UNORM && format <= VK_FORMAT_B8G8R8A8_SRGB) ||
+            (format >= VK_FORMAT_R16G16_UNORM && format <= VK_FORMAT_R16G16_SINT)) {
+            return 4;
+        }
+
+        if (format >= VK_FORMAT_R8G8B8_UNORM && format <= VK_FORMAT_B8G8R8_SRGB) {
+            return 3;
+        }
+
+        if ((format >= VK_FORMAT_R8G8_UNORM && format <= VK_FORMAT_R8G8_SRGB) ||
+            (format >= VK_FORMAT_R16_UNORM && format <= VK_FORMAT_R16_SFLOAT)) {
+            return 2;
+        }
+
+        if (format >= VK_FORMAT_R8_UNORM && format <= VK_FORMAT_R8_SRGB) {
+            return 1;
+        }
+
+
+        switch (format) {
+        case VK_FORMAT_D16_UNORM:
+            return 2;
+        case VK_FORMAT_D16_UNORM_S8_UINT:
+            return 3;
+
+        default:
+            return -1;
+        }
+    }
+
     static const char* ResultToStr(VkResult result)
     {
         switch (result) {

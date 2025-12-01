@@ -6772,9 +6772,9 @@ VmaDedicatedAllocationList::~VmaDedicatedAllocationList() {
                          m_AllocationList.GetCount());
     VmaAllocation_T *alloc = m_AllocationList.Front();
     do {
-      printf("Allocation '%s' of size %zu\n", alloc->GetName(),
+      printf("Allocation '%s' of size %llu\n", alloc->GetName(),
              alloc->GetSize());
-    } while (alloc = VmaDedicatedAllocationListItemTraits::GetNext(alloc));
+    } while ((alloc = VmaDedicatedAllocationListItemTraits::GetNext(alloc)));
 
     VMA_ASSERT_LEAK(false && "Unfreed dedicated allocations found!");
   }

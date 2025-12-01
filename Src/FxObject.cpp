@@ -258,17 +258,18 @@ void FxObject::SyncObjectWithPhysics()
 
 void FxObject::SetPhysicsEnabled(bool enabled)
 {
-    if (Physics.mbHasPhysicsBody) {
-        if (enabled) {
-            FxLogDebug("Activate body");
-            gPhysics->GetBodyInterface().ActivateBody(Physics.GetBodyId());
-        }
-        else {
-            FxLogDebug("Deactivate body");
-            gPhysics->GetBodyInterface().DeactivateBody(Physics.GetBodyId());
-        }
+    if (!Physics.mbHasPhysicsBody) {
+        return;
     }
 
+    if (enabled) {
+        FxLogDebug("Activate body");
+        gPhysics->GetBodyInterface().ActivateBody(Physics.GetBodyId());
+    }
+    else {
+        FxLogDebug("Deactivate body");
+        gPhysics->GetBodyInterface().DeactivateBody(Physics.GetBodyId());
+    }
 
     mbPhysicsEnabled = enabled;
 }
@@ -293,6 +294,4 @@ void FxObject::Destroy()
 
     mbReadyToRender = false;
     bIsUploadedToGpu = false;
-
-    FxLogDebug("Destroying object");
 }

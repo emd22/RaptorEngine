@@ -37,7 +37,7 @@ public:
     ~FxLoaderGltf() override = default;
 
 private:
-    void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
+    // void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
     void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive);
 
     void UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh<>>& mesh,
@@ -49,7 +49,7 @@ public:
 
     bool KeepInMemory = false;
 
-    FxSizedArray<RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>> VertexBuffer;
+    FxSizedArray<RxVertexDefault> VertexBuffer;
     FxSizedArray<uint32> IndexBuffer;
 
 protected:

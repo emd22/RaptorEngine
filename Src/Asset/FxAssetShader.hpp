@@ -5,19 +5,19 @@
 #include <Core/FxRef.hpp>
 #include <Renderer/Backend/RxShader.hpp>
 
-class FxAssetShader : public FxAssetBase
-{
-public:
-    FxAssetShader() {}
+// class FxAssetShader : public FxAssetBase
+// {
+// public:
+//     FxAssetShader() {}
 
-    ~FxAssetShader() override { Destroy(); }
+//     ~FxAssetShader() override { Destroy(); }
 
-    void Destroy() override;
+//     void Destroy() override;
 
-    friend class FxAssetManager;
+//     friend class FxAssetManager;
 
-public:
-    RxShader Shader;
+// public:
+//     RxShader Shader;
 
-    RxShaderType ShaderType = RxShaderType::eUnknown;
-};
+//     RxShaderType ShaderType = RxShaderType::eUnknown;
+// };

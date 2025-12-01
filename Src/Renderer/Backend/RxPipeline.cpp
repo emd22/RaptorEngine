@@ -17,7 +17,7 @@ static RxGraphicsPipeline* spBoundPipeline = nullptr;
 
 FxVertexInfo FxMakeVertexInfo()
 {
-    using VertexType = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>;
+    using VertexType = RxVertexDefault;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
@@ -29,6 +29,7 @@ FxVertexInfo FxMakeVertexInfo()
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
         { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
         { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
+        { .location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Tangent) },
     };
 
     FxLogDebug("Amount of attributes: {:d}", attribs.Size);
@@ -53,7 +54,7 @@ FxVertexInfo FxMakeLightVertexInfo()
     return { binding_desc, std::move(attribs), .bIsInited = true };
 }
 
-void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShader>>& shaders,
+void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                                 const FxSlice<VkAttachmentDescription>& attachments,
                                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                                 FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
@@ -80,11 +81,11 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
     // Shaders
     FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shaders.Size);
 
-    for (const FxRef<RxShader>& shader_stage : shaders) {
+    for (const FxRef<RxShaderProgram>& shader_stage : shaders) {
         const VkPipelineShaderStageCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = shader_stage->GetStageBit(),
-            .module = shader_stage->ShaderModule,
+            .module = shader_stage->pShader,
             .pName = "main",
             .pSpecializationInfo = &specialization_info,
         };
@@ -247,7 +248,7 @@ void RxGraphicsPipeline::Destroy()
         vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);
         Pipeline = nullptr;
     }
-    if (Layout) {
+    if (Layout || mbDoNotDestroyLayout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
         Layout = nullptr;
     }
@@ -312,6 +313,8 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushCons
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Failed to create pipeline layout", status);
     }
+
+    FxLogDebug("Creating pipeline layout {:p}", reinterpret_cast<void*>(layout));
 
     return layout;
 }

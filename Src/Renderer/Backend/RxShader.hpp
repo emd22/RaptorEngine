@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Asset/FxShaderCompiler.hpp>
+#include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxTypes.hpp>
 
@@ -26,24 +27,25 @@ constexpr FX_FORCE_INLINE VkShaderStageFlagBits RxShaderTypeToVkShaderStage(RxSh
     return VK_SHADER_STAGE_VERTEX_BIT;
 }
 
-class RxShader
+class RxShaderProgram
 {
 public:
-    RxShader() = default;
-    RxShader(nullptr_t np) : ShaderModule(nullptr), Type(RxShaderType::eUnknown) {}
+    RxShaderProgram() = default;
+    RxShaderProgram(nullptr_t np) : pShader(nullptr), ShaderType(RxShaderType::eUnknown) {}
 
-    RxShader(const char* path, RxShaderType type, const FxSizedArray<FxShaderMacro>& macros) : Type(type)
+    RxShaderProgram(RxShaderProgram&& other)
     {
-        Load(path, type, macros);
+        pShader = other.pShader;
+        ShaderType = other.ShaderType;
+
+        other.pShader = nullptr;
+        other.ShaderType = RxShaderType::eUnknown;
     }
 
-    void Load(const char* path, RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
-
-    FX_FORCE_INLINE bool operator==(nullptr_t np) const { return ShaderModule == nullptr; }
 
     FX_FORCE_INLINE VkShaderStageFlagBits GetStageBit() const
     {
-        switch (Type) {
+        switch (ShaderType) {
         case RxShaderType::eUnknown:
             FxLogError("Shader stage is RxShaderType::Unknown!");
             [[fallthrough]];
@@ -57,13 +59,45 @@ public:
     }
 
     void Destroy();
+    ~RxShaderProgram() { Destroy(); }
 
-    ~RxShader() { Destroy(); }
+    FX_FORCE_INLINE bool operator==(nullptr_t np) const { return pShader == nullptr; }
 
 private:
-    void CreateShaderModule(uint32 file_size, uint32* shader_data);
-
 public:
-    VkShaderModule ShaderModule = nullptr;
-    RxShaderType Type = RxShaderType::eUnknown;
+    VkShaderModule pShader = nullptr;
+    RxShaderType ShaderType = RxShaderType::eUnknown;
+};
+
+class RxShader
+{
+public:
+    static FxHash64 GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
+
+    RxShader() = delete;
+    RxShader(const char* path) { Load(path); }
+
+    FxRef<RxShaderProgram> GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros);
+
+    void Load(const char* path);
+
+
+private:
+    void CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module);
+
+    /**
+     * @brief Fetches all compiled shader permutations from the datapack if the pack exists.
+     */
+    bool PreloadCompiledPrograms(const std::string& pack_path);
+
+    void RecompileShader(const std::string& source_path, const std::string& output_path,
+                         const FxSizedArray<FxShaderMacro>& macros);
+
+    const std::string GetSourcePath() const;
+    const std::string GetProgramPath() const;
+
+private:
+    std::string Name = "Unknown";
+
+    FxDataPack mDataPack;
 };

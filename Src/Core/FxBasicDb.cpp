@@ -98,7 +98,7 @@ void FxBasicDb::Parse()
             FxLogInfo("token index: {}", token_index);
             tmp_buffer[token_index] = '\0';
 
-            marker.KeyHash = std::stol(std::string(tmp_buffer, token_index));
+            marker.KeyHash = std::stoull(std::string(tmp_buffer, token_index));
 
             token_index = 0;
         }
