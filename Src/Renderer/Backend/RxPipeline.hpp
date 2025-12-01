@@ -74,7 +74,7 @@ struct RxPushConstants
 class RxGraphicsPipeline
 {
 public:
-    void Create(const std::string& name, const FxSlice<FxRef<RxShader>>& shaders,
+    void Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                 const FxSlice<VkAttachmentDescription>& attachments,
                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, FxVertexInfo* vertex_info,
                 const RxRenderPass& render_pass, const RxGraphicsPipelineProperties& properties);

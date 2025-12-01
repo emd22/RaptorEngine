@@ -4,6 +4,7 @@
 #include "FoxtrotGame.hpp"
 
 #include <Asset/FxDataPack.hpp>
+#include <FxEngine.hpp>
 
 FX_SET_MODULE_NAME("Main")
 
@@ -41,6 +42,12 @@ int main()
     // if (data2.IsNotEmpty()) {
     //     FxLogInfo("Value: {:.{}}", data2.pData, data2.Size);
     // }
+    {
+        FoxtrotGame game {};
 
-    FoxtrotGame game {};
+        // game.Destroy();
+    }
+
+    FxLogInfo("Next");
+    FxEngineGlobalsDestroy();
 }

@@ -98,6 +98,20 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
     }
 
 
+#ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
+    static uint32 allocation_number = 0;
+    allocation_number += 1;
+
+    std::string allocation_name = "";
+    // typeid(ElementType).name();
+
+    char name_buffer[256];
+
+    snprintf(name_buffer, 128, "Img(%u,%u){%u}", size.Width(), size.Height(), allocation_number);
+
+    vmaSetAllocationName(Fx_Fwd_GetGpuAllocator(), Allocation, name_buffer);
+#endif
+
     const VkImageViewCreateInfo view_create_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = Image,

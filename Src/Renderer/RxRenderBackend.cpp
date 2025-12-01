@@ -680,6 +680,7 @@ void RxRenderBackend::Destroy()
     DestroyFrames();
 
     while (!mDeletionQueue.empty()) {
+        FxLogInfo("Processing deletion queue...");
         ProcessDeletionQueue(true);
         // insert a small delay to avoid the processor spinning out while
         // waiting for an object. this allows handing the core off to other threads.

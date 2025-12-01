@@ -237,11 +237,7 @@ public:
 
     void Destroy()
     {
-        if (IsReference) {
-            return;
-        }
-
-        if (IsReady.load() == false) {
+        if (IsReference || !IsReady.load()) {
             return;
         }
 

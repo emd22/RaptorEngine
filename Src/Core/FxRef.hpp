@@ -226,6 +226,12 @@ public:
         return mPtr != nullptr;
     }
 
+    void SetNull()
+    {
+        mPtr = nullptr;
+        mRefCnt = nullptr;
+    }
+
 private:
     FX_FORCE_INLINE void DestroyRef()
     {

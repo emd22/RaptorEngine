@@ -44,6 +44,8 @@ public:
     // Force move the mesh
     void MoveLightVolumeTo(const FxVec3f& position);
 
+    ~FxLight() {}
+
 public:
     FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };
     FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen { nullptr };

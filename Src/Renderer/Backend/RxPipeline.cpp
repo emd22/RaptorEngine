@@ -54,7 +54,7 @@ FxVertexInfo FxMakeLightVertexInfo()
     return { binding_desc, std::move(attribs), .bIsInited = true };
 }
 
-void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShader>>& shaders,
+void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                                 const FxSlice<VkAttachmentDescription>& attachments,
                                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                                 FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
@@ -81,11 +81,11 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
     // Shaders
     FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shaders.Size);
 
-    for (const FxRef<RxShader>& shader_stage : shaders) {
+    for (const FxRef<RxShaderProgram>& shader_stage : shaders) {
         const VkPipelineShaderStageCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = shader_stage->GetStageBit(),
-            .module = shader_stage->ShaderModule,
+            .module = shader_stage->pShader,
             .pName = "main",
             .pSpecializationInfo = &specialization_info,
         };

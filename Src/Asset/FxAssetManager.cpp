@@ -91,6 +91,16 @@ void FxAssetManager::Shutdown()
         return;
     }
 
+    // Cleanup all permutations of "empty images" that were created. Because there is one
+    // image created for each format that requires one.
+    FxPagedArray<FxRef<FxAssetImage>>& empty_images_list = FxAssetImage::GetEmptyImagesArray();
+    if (empty_images_list.IsInited()) {
+        for (FxRef<FxAssetImage>& image_ref : empty_images_list) {
+            image_ref->Destroy();
+            image_ref.SetNull();
+        }
+    }
+
     mActive.clear();
     ItemsEnqueuedNotifier.Kill();
 

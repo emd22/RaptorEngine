@@ -96,32 +96,15 @@ public:
         File.Read(FxSlice<TDataType>(buffer.pData, read_size));
     }
 
-    void ReadAllEntries()
-    {
-        if (!sbcBinaryFile) {
-            TextReadAllData();
-        }
-        else {
-            BinaryReadAllData();
-        }
-    }
+    void ReadAllEntries() { BinaryReadAllData(); }
 
     ~FxDataPack();
 
 private:
     void BinaryWriteHeader();
     void BinaryWriteData();
-
     void BinaryReadHeader();
-
-
     void BinaryReadAllData();
-    void TextReadAllData();
-
-    void TextWriteHeader();
-    void TextWriteData();
-
-    void TextReadHeader();
 
     void JumpToEntry(FxHash64 id);
 

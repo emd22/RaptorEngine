@@ -106,7 +106,8 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& SetShaders(const FxRef<RxShader>& vertex, const FxRef<RxShader>& fragment)
+    FX_FORCE_INLINE RxPipelineBuilder& SetShaders(const FxRef<RxShaderProgram>& vertex,
+                                                  const FxRef<RxShaderProgram>& fragment)
     {
         mVertexShader = vertex;
         mFragmentShader = fragment;
@@ -190,7 +191,7 @@ public:
             }
         }
 
-        FxSizedArray<FxRef<RxShader>> shader_list = { mVertexShader, mFragmentShader };
+        FxSizedArray<FxRef<RxShaderProgram>> shader_list = { mVertexShader, mFragmentShader };
 
         // Make vulkan blend attachments
 
@@ -209,8 +210,8 @@ private:
 
     std::string mPipelineName = "Unnamed Pipeline";
 
-    FxRef<RxShader> mVertexShader { nullptr };
-    FxRef<RxShader> mFragmentShader { nullptr };
+    FxRef<RxShaderProgram> mVertexShader { nullptr };
+    FxRef<RxShaderProgram> mFragmentShader { nullptr };
 
     RxRenderPass* mRenderPass { nullptr };
 

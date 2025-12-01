@@ -102,11 +102,10 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
 
     // ShaderList shader_list;
 
-    FxRef<RxShader> vertex_shader = FxMakeRef<RxShader>("Skybox", RxShaderType::eVertex,
-                                                        FxSizedArray<FxShaderMacro> {});
-    FxRef<RxShader> fragment_shader = FxMakeRef<RxShader>("Skybox", RxShaderType::eFragment,
-                                                          FxSizedArray<FxShaderMacro> {});
+    RxShader shader_skybox("Skybox");
 
+    FxRef<RxShaderProgram> vertex_shader = shader_skybox.GetProgram(RxShaderType::eVertex, {});
+    FxRef<RxShaderProgram> fragment_shader = shader_skybox.GetProgram(RxShaderType::eFragment, {});
 
     // RxShader raw_shader_list[2] = { vertex_shader, fragment_shader };
     // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);

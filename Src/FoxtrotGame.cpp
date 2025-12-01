@@ -152,8 +152,6 @@ void FoxtrotGame::CreateGame()
     while (sbRunning) {
         Tick();
     }
-
-    DestroyGame();
 }
 
 
@@ -318,16 +316,23 @@ void FoxtrotGame::DestroyGame()
 {
     gRenderer->GetDevice()->WaitForIdle();
 
+    // FxMaterialManager::GetGlobalManager().Destroy();
     FxMaterialManager::GetGlobalManager().Destroy();
     FxAssetManager::GetInstance().Shutdown();
 
     // pSkyboxMesh->IsReference = false;
     // pSkyboxMesh->Destroy();
 
-    // gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
-
     gRenderer->pDeferredRenderer->Destroy();
+
+    // gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
 }
 
 
-FoxtrotGame::~FoxtrotGame() { FxEngineGlobalsDestroy(); }
+FoxtrotGame::~FoxtrotGame()
+{
+    FxLogInfo("Destroying foxtrotgame");
+    mMainScene.Destroy();
+
+    DestroyGame();
+}

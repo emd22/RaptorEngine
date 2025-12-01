@@ -23,7 +23,11 @@ public:
 
     void Destroy();
 
-    ~FxScene() { Destroy(); }
+    ~FxScene()
+    {
+        FxLogInfo("DESTROY SCENE");
+        Destroy();
+    }
 
 private:
     FxPagedArray<FxRef<FxObject>> mObjects;

@@ -18,6 +18,7 @@
 //     Type TransformType = Type::eNone;
 // };
 
+
 class FxAssetImage : public FxAssetBase
 {
 protected:
@@ -30,6 +31,8 @@ public:
 public:
     // static FxRef<FxAssetImage> GetEmptyImage(VkFormat format, int32 num_channels);
 
+    static FxPagedArray<FxRef<FxAssetImage>>& GetEmptyImagesArray();
+
     template <VkFormat TFormat, int32 TNumChannels>
     static FxRef<FxAssetImage> GetEmptyImage()
     {
@@ -37,6 +40,12 @@ public:
 
         if (sEmptyImage) {
             return sEmptyImage;
+        }
+
+        FxPagedArray<FxRef<FxAssetImage>>& empty_images = GetEmptyImagesArray();
+
+        if (!empty_images.IsInited()) {
+            empty_images.Create(8);
         }
 
         FxSizedArray<uint8> image_data(TNumChannels);
@@ -50,6 +59,8 @@ public:
         sEmptyImage->bIsUploadedToGpu = true;
         sEmptyImage->bIsUploadedToGpu.notify_all();
         sEmptyImage->mIsLoaded.store(true);
+
+        empty_images.Insert(sEmptyImage);
 
         return sEmptyImage;
     }

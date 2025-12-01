@@ -11,6 +11,7 @@ public:
 
     void CreateGame();
 
+
     ~FoxtrotGame();
 
 private:
@@ -24,6 +25,7 @@ private:
 
 
     void DestroyGame();
+
 
 public:
     FxPlayer Player {};

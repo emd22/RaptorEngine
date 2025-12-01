@@ -240,17 +240,17 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
             // FxSlice<const uint8> buffer_slice = FxMakeSlice<const uint8>(
             // reinterpret_cast<const uint8*>(spirv_code->getBufferPointer()), spirv_code->getBufferSize());
 
-            // FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
+            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
 
             // FxLogInfo("COMPILE Data({})", aligned_buffer.Size);
 
 
-            const void* data_ptr = spirv_code->getBufferPointer();
-            FxSlice<uint8> data_slice = FxMakeSlice<uint8>(static_cast<uint8*>(const_cast<void*>(data_ptr)),
-                                                           spirv_code->getBufferSize());
-            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashVS), data_slice);
+            // const void* data_ptr = spirv_code->getBufferPointer();
+            // FxSlice<uint8> data_slice = FxMakeSlice<uint8>(static_cast<uint8*>(const_cast<void*>(data_ptr)),
+            //                                                spirv_code->getBufferSize());
+            pack.AddEntry(FxHashData64(FxSlice<FxShaderMacro>(macros), sPrefixHashVS), aligned_buffer);
 
-            // FxMemPool::Free(aligned_buffer.pData);
+            FxMemPool::Free(aligned_buffer.pData);
 
             // std::string vertex_path = output_path;
             // vertex_path += "_vs";
@@ -285,17 +285,17 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
             // FxSlice<const uint8> buffer_slice = FxMakeSlice<const uint8>(
             // reinterpret_cast<const uint8*>(spirv_code->getBufferPointer()), spirv_code->getBufferSize());
 
-            // FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
+            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
 
 
-            const void* data_ptr = spirv_code->getBufferPointer();
-            FxSlice<uint8> data_slice = FxMakeSlice<uint8>(static_cast<uint8*>(const_cast<void*>(data_ptr)),
-                                                           spirv_code->getBufferSize());
+            // const void* data_ptr = spirv_code->getBufferPointer();
+            // FxSlice<uint8> data_slice = FxMakeSlice<uint8>(static_cast<uint8*>(const_cast<void*>(data_ptr)),
+            //                                                spirv_code->getBufferSize());
 
             FxSlice<FxShaderMacro> macros_slice = FxSlice<FxShaderMacro>(macros);
-            pack.AddEntry(FxHashData64(macros_slice, sPrefixHashFS), data_slice);
+            pack.AddEntry(FxHashData64(macros_slice, sPrefixHashFS), aligned_buffer);
 
-            // FxMemPool::Free(aligned_buffer.pData);
+            FxMemPool::Free(aligned_buffer.pData);
 
 
             // std::string fragment_path = output_path;

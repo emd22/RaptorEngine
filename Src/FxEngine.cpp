@@ -2,6 +2,7 @@
 
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxRef.hpp>
+#include <FxMaterial.hpp>
 #include <Physics/FxPhysicsJolt.hpp>
 #include <Renderer/RxPipelineList.hpp>
 #include <Renderer/RxRenderBackend.hpp>
@@ -28,5 +29,6 @@ void FxEngineGlobalsDestroy()
     delete gPhysics;
     delete gShaderCompiler;
     delete gPipelines;
+
     // delete gRenderPassCache;
 }
