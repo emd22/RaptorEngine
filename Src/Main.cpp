@@ -48,6 +48,5 @@ int main()
         // game.Destroy();
     }
 
-    FxLogInfo("Next");
     FxEngineGlobalsDestroy();
 }

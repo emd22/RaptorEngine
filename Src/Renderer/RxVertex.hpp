@@ -248,8 +248,6 @@ public:
     void DestroyLocalBuffer() { LocalBuffer.Free(); }
     void Destroy()
     {
-        FxLogInfo("Destroying RxVertexList");
-
         GpuBuffer.Destroy();
 
         DestroyLocalBuffer();

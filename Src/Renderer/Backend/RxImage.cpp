@@ -7,6 +7,7 @@
 #include <Core/FxPanic.hpp>
 #include <Core/FxStackArray.hpp>
 #include <FxEngine.hpp>
+#include <Renderer/Backend/RxUtil.hpp>
 
 FX_SET_MODULE_NAME("RxImage")
 
@@ -99,17 +100,19 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
 
 
 #ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
-    static uint32 allocation_number = 0;
-    allocation_number += 1;
+    {
+        static uint32 allocation_number = 0;
+        allocation_number += 1;
 
-    std::string allocation_name = "";
-    // typeid(ElementType).name();
+        std::string allocation_name = "";
+        // typeid(ElementType).name();
 
-    char name_buffer[256];
+        char name_buffer[256];
 
-    snprintf(name_buffer, 128, "Img(%u,%u){%u}", size.Width(), size.Height(), allocation_number);
+        snprintf(name_buffer, 128, "Img(%u,%u){%u}", size.Width(), size.Height(), allocation_number);
 
-    vmaSetAllocationName(Fx_Fwd_GetGpuAllocator(), Allocation, name_buffer);
+        vmaSetAllocationName(Fx_Fwd_GetGpuAllocator(), Allocation, name_buffer);
+    }
 #endif
 
     const VkImageViewCreateInfo view_create_info = {
@@ -138,6 +141,22 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Could not create swapchain image view", status);
     }
+
+    std::string image_view_name = "";
+    // typeid(ElementType).name();
+
+#ifdef FX_DEBUG_IMAGE_VIEWS
+    {
+        static int view_allocation_number = 0;
+        view_allocation_number++;
+
+        char name_buffer[256];
+
+        snprintf(name_buffer, 128, "View(%u,%u){%u}", size.Width(), size.Height(), view_allocation_number);
+
+        RxUtil::SetDebugLabel(name_buffer, VK_OBJECT_TYPE_IMAGE_VIEW, View);
+    }
+#endif
 }
 
 void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageUsageFlags usage,

@@ -248,7 +248,7 @@ void RxGraphicsPipeline::Destroy()
         vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);
         Pipeline = nullptr;
     }
-    if (Layout) {
+    if (Layout || mbDoNotDestroyLayout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
         Layout = nullptr;
     }
@@ -313,6 +313,8 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushCons
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Failed to create pipeline layout", status);
     }
+
+    FxLogDebug("Creating pipeline layout {:p}", reinterpret_cast<void*>(layout));
 
     return layout;
 }

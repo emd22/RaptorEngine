@@ -28,6 +28,8 @@
 // #define FX_SIZED_ARRAY_DEBUG
 #define FX_SIZED_ARRAY_NO_MEMPOOL
 
+#define FX_DEBUG_IMAGE_VIEWS 1
+
 // #define FX_NO_DEBUG_ASSERTS
 
 ////////////////////////////////

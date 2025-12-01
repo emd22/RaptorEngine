@@ -110,6 +110,7 @@ void FxMaterialManager::Destroy()
     }
 
     pAlbedoSampler->Destroy();
+
     pNormalMapSampler->Destroy();
 
     MaterialPropertiesBuffer.Destroy();
@@ -216,9 +217,9 @@ void FxMaterial::Destroy()
     }
 
     // TODO: figure out why the FxRef isn't destroying the object...
-    if (Diffuse.pImage) {
-        Diffuse.pImage->Destroy();
-    }
+    // if (Diffuse.pImage) {
+    //     Diffuse.pImage->Destroy();
+    // }
 }
 
 
@@ -316,6 +317,9 @@ void FxMaterial::Build()
 
     if (has_normal_map) {
         pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
+    }
+    else {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
     }
 
     // material->BaseColor = ;

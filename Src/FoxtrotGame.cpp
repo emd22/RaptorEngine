@@ -323,16 +323,14 @@ void FoxtrotGame::DestroyGame()
     // pSkyboxMesh->IsReference = false;
     // pSkyboxMesh->Destroy();
 
-    gRenderer->pDeferredRenderer->Destroy();
-
     // gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
+
+    gRenderer->pDeferredRenderer->Destroy();
 }
 
 
 FoxtrotGame::~FoxtrotGame()
 {
-    FxLogInfo("Destroying foxtrotgame");
-    mMainScene.Destroy();
-
     DestroyGame();
+    mMainScene.Destroy();
 }

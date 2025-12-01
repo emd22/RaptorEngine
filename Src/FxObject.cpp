@@ -294,6 +294,4 @@ void FxObject::Destroy()
 
     mbReadyToRender = false;
     bIsUploadedToGpu = false;
-
-    FxLogDebug("Destroying object");
 }

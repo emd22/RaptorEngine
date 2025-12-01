@@ -200,6 +200,12 @@ public:
         FxLogInfo("Creating pipeline '{}'", mPipelineName);
         pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetBuiltAttachments(), vk_blend_attachments,
                         mVertexInfo, *mRenderPass, mProperties);
+
+        if (mbDidFirstBuild) {
+            pipeline.mbDoNotDestroyLayout = true;
+        }
+
+        mbDidFirstBuild = true;
     }
 
 private:
@@ -217,4 +223,6 @@ private:
 
     FxVertexInfo* mVertexInfo { nullptr };
     RxGraphicsPipelineProperties mProperties;
+
+    bool mbDidFirstBuild = false;
 };

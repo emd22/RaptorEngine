@@ -112,5 +112,10 @@ public:
 
 private:
     RxGpuDevice* mDevice = nullptr;
+
+protected:
+    friend class RxPipelineBuilder;
+
+    bool mbDoNotDestroyLayout = false;
     // ShaderList mShaders;
 };

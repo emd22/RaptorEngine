@@ -116,6 +116,7 @@ static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMater
     uint8* goober_buffer = FxMemPool::Alloc<uint8>(image_buffer_size);
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
+    // Submit as data to be loaded later by the asset manager
     component.pDataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 

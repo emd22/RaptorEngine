@@ -193,6 +193,8 @@ void RxDeferredRenderer::DestroyGPassPipeline()
     }
 
     PlGeometry.Destroy();
+
+    PlGeometryWithNormalMaps.Layout = nullptr;
     PlGeometryWithNormalMaps.Destroy();
 
     PlGeometryWireframe.Layout = nullptr;
@@ -485,6 +487,7 @@ void RxDeferredRenderer::DestroyCompPipeline()
     }
 
     PlComposition.Destroy();
+    PlCompositionUnlit.Layout = nullptr;
     PlCompositionUnlit.Destroy();
 }
 
