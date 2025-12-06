@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Physics/FxPhysicsObject.hpp"
+#include "Physics/PhObject.hpp"
 
 // #include <ThirdParty/Jolt/Jolt.h>
 // #include <ThirdParty/Jolt/Physics/Body/Body.h>
@@ -11,10 +11,10 @@
 #include <FxMaterial.hpp>
 
 
-class FxObject : public FxAssetBase, public FxEntity
+class FxObject : public AxBase, public FxEntity
 {
-    friend class FxLoaderGltf;
-    friend class FxAssetManager;
+    friend class AxLoaderGltf;
+    friend class AxManager;
 
 public:
     FxObject() { this->Type = FxEntityType::Object; }
@@ -32,8 +32,7 @@ public:
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
 
-    void PhysicsObjectCreate(FxPhysicsObject::PhysicsFlags flags, FxPhysicsObject::PhysicsType type,
-                             const FxPhysicsProperties& properties);
+    void PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type, const PhProperties& properties);
 
     void Destroy() override;
     ~FxObject() override { Destroy(); }
@@ -51,7 +50,7 @@ public:
 
     FxVec3f Dimensions = FxVec3f::sZero;
 
-    FxPhysicsObject Physics;
+    PhObject Physics;
 
 private:
     RxUniformBufferObject mUbo;

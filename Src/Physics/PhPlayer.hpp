@@ -7,13 +7,13 @@
 #include <Math/FxQuat.hpp>
 #include <Math/FxVec3.hpp>
 
-class FxPhysicsPlayer
+class PhPlayer
 {
 public:
     static constexpr float32 scStandingHeight = 1.72f;
 
 public:
-    FxPhysicsPlayer() {}
+    PhPlayer() {}
 
     void Create();
     void Teleport(const FxVec3f& position);

@@ -3,13 +3,13 @@
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxRef.hpp>
 #include <FxMaterial.hpp>
-#include <Physics/FxPhysicsJolt.hpp>
+#include <Physics/PhJolt.hpp>
 #include <Renderer/RxPipelineList.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/RxRenderPassCache.hpp>
 
 RxRenderBackend* gRenderer = nullptr;
-FxPhysicsJolt* gPhysics = nullptr;
+PhJolt* gPhysics = nullptr;
 FxShaderCompiler* gShaderCompiler = nullptr;
 RxPipelineList* gPipelines = nullptr;
 RxRenderPassCache* gRenderPassCache = nullptr;
@@ -17,7 +17,7 @@ RxRenderPassCache* gRenderPassCache = nullptr;
 void FxEngineGlobalsInit()
 {
     gRenderer = new RxRenderBackend;
-    gPhysics = new FxPhysicsJolt;
+    gPhysics = new PhJolt;
     gShaderCompiler = new FxShaderCompiler;
     // gRenderPassCache = new RxRenderPassCache;
     gPipelines = new RxPipelineList;

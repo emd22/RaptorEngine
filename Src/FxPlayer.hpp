@@ -3,16 +3,16 @@
 #include <Core/FxRef.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxVec2.hpp>
-#include <Physics/FxPhysicsPlayer.hpp>
+#include <Physics/PhPlayer.hpp>
 #include <Renderer/FxCamera.hpp>
 
 class FxPlayer
 {
     const FxVec3f cMaxWalkSpeed = FxVec3f(2.3f);
-    const FxVec3f cMaxSprintSpeed = FxVec3f(3.5f);
+    const FxVec3f cMaxSprintSpeed = FxVec3f(3.0f);
 
     const float32 cMovementLerpSpeed = 0.025f;
-    const float32 cJumpForceReduction = 0.010f;
+    const float32 cJumpForceReduction = 0.012f;
 
 public:
     FxPlayer() = default;
@@ -71,7 +71,7 @@ private:
     FX_FORCE_INLINE void SyncPhysicsToPlayer() { Position.FromJoltVec3(Physics.pPlayerVirt->GetPosition()); }
 
 public:
-    FxPhysicsPlayer Physics;
+    PhPlayer Physics;
     FxRef<FxPerspectiveCamera> pCamera { nullptr };
 
     /**

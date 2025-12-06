@@ -7,7 +7,7 @@
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <FxEngine.hpp>
-#include <Physics/FxPhysicsJolt.hpp>
+#include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
@@ -59,8 +59,8 @@ bool FxObject::CheckIfReady()
 }
 
 
-void FxObject::PhysicsObjectCreate(FxPhysicsObject::PhysicsFlags flags, FxPhysicsObject::PhysicsType type,
-                                   const FxPhysicsProperties& properties)
+void FxObject::PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type,
+                                   const PhProperties& properties)
 {
     Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Asset/FxAssetImage.hpp>
+#include <Asset/AxImage.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/Mat4.hpp>
@@ -13,6 +13,12 @@ enum class FxEntityType
     Object,
     // Camera,
     Light
+};
+
+enum class FxTransformMode
+{
+    eDefault,
+    eTransformFromOrigin
 };
 
 
@@ -55,6 +61,13 @@ public:
         MarkMatrixOutOfDate();
     }
 
+    FX_FORCE_INLINE void SetRotationOrigin(const FxVec3f& origin)
+    {
+        RotationOrigin = origin;
+        TransformMode = FxTransformMode::eTransformFromOrigin;
+        MarkMatrixOutOfDate();
+    }
+
     FX_FORCE_INLINE void MarkMatrixOutOfDate() { mbMatrixOutOfDate = true; }
 
     virtual ~FxEntity() {}
@@ -66,6 +79,10 @@ public:
     FxVec3f mPosition = FxVec3f::sZero;
     FxQuat mRotation = FxQuat::sIdentity;
     FxVec3f mScale = FxVec3f::sOne;
+
+    FxVec3f RotationOrigin = FxVec3f::sZero;
+
+    FxTransformMode TransformMode = FxTransformMode::eDefault;
 
     std::vector<FxRef<FxEntity>> Children;
 

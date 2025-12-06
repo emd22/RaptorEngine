@@ -1,11 +1,11 @@
-#include "FxAssetManager.hpp"
+#include "AxManager.hpp"
 
+#include "AxImage.hpp"
 #include "Core/FxPanic.hpp"
 #include "Core/FxSizedArray.hpp"
-#include "FxAssetImage.hpp"
-#include "Loader/FxLoaderGltf.hpp"
-#include "Loader/FxLoaderJpeg.hpp"
-#include "Loader/FxLoaderStb.hpp"
+#include "Loader/AxLoaderGltf.hpp"
+#include "Loader/AxLoaderJpeg.hpp"
+#include "Loader/AxLoaderStb.hpp"
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxTypes.hpp>
@@ -19,7 +19,7 @@
 // Asset Worker
 ////////////////////////////////////
 
-void FxAssetWorker::Create()
+void AxWorker::Create()
 {
     while (Running.test_and_set(std::memory_order_acquire)) {
         Running.wait(true, std::memory_order_relaxed);
@@ -28,7 +28,7 @@ void FxAssetWorker::Create()
     Thread = std::thread([this]() { this->Update(); });
 }
 
-void FxAssetWorker::Update()
+void AxWorker::Update()
 {
     // FxAssetManager& manager = FxAssetManager::GetInstance();
 
@@ -65,7 +65,7 @@ void FxAssetWorker::Update()
 ////////////////////////////////////
 
 
-void FxAssetManager::Start(int32 thread_count)
+void AxManager::Start(int32 thread_count)
 {
     mThreadCount = thread_count;
     mActive.test_and_set();
@@ -75,17 +75,17 @@ void FxAssetManager::Start(int32 thread_count)
 
     for (int32 i = 0; i < thread_count; i++) {
         // 'Insert' a new worker and get its pointer
-        FxAssetWorker* worker = mWorkerThreads.Insert();
+        AxWorker* worker = mWorkerThreads.Insert();
 
         // Create the worker from the newly inserted pointer
         worker->Create();
     }
 
-    std::thread* thread = new std::thread([this]() { FxAssetManager::AssetManagerUpdate(); });
+    std::thread* thread = new std::thread([this]() { AxManager::AssetManagerUpdate(); });
     mAssetManagerThread = thread;
 }
 
-void FxAssetManager::Shutdown()
+void AxManager::Shutdown()
 {
     if (!mActive.test()) {
         return;
@@ -116,9 +116,9 @@ void FxAssetManager::Shutdown()
 
     // Cleanup all permutations of "empty images" that were created. Because there is one
     // image created for each format that requires one.
-    FxPagedArray<FxRef<FxAssetImage>>& empty_images_list = FxAssetImage::GetEmptyImagesArray();
+    FxPagedArray<FxRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
     if (empty_images_list.IsInited()) {
-        for (FxRef<FxAssetImage>& image_ref : empty_images_list) {
+        for (FxRef<AxImage>& image_ref : empty_images_list) {
             image_ref->Destroy();
             image_ref.SetNull();
         }
@@ -174,72 +174,71 @@ inline bool IsFileJpeg(const std::string& path)
     return false;
 }
 
-void FxAssetManager::LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options)
+void AxManager::LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options)
 {
-    FxRef<FxLoaderGltf> loader = FxRef<FxLoaderGltf>::New();
+    FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
     loader->KeepInMemory = options.KeepInMemory;
 
-    SubmitAssetToLoad<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, loader, path);
+    SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::Object>(asset, loader, path);
 }
 
 
-void FxAssetManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size)
+void AxManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size)
 {
-    FxRef<FxLoaderGltf> loader = FxRef<FxLoaderGltf>::New();
+    FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
 
-    SubmitAssetToLoad<FxObject, FxLoaderGltf, FxAssetType::Object>(asset, loader, "", data, data_size);
+    SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::Object>(asset, loader, "", data, data_size);
 }
 
 
-void FxAssetManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset,
-                               const std::string& path)
+void AxManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const std::string& path)
 {
     bool is_jpeg = IsFileJpeg(path);
 
     if (is_jpeg) {
-        FxRef<FxLoaderJpeg> loader = FxRef<FxLoaderJpeg>::New();
+        FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
         loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
-        SubmitAssetToLoad<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, path);
     }
     else {
-        FxRef<FxLoaderStb> loader = FxRef<FxLoaderStb>::New();
+        FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
         loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
-        SubmitAssetToLoad<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, path);
     }
 }
 
 
-void FxAssetManager::LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset,
-                                         const uint8* data, uint32 data_size)
+void AxManager::LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const uint8* data,
+                                    uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
-        FxRef<FxLoaderJpeg> loader = FxRef<FxLoaderJpeg>::New();
+        FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
         loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
-        SubmitAssetToLoad<FxAssetImage, FxLoaderJpeg, FxAssetType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, "", data, data_size);
     }
     else {
         // Load the image using stb_image
-        FxRef<FxLoaderStb> loader = FxRef<FxLoaderStb>::New();
+        FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
         loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
-        SubmitAssetToLoad<FxAssetImage, FxLoaderStb, FxAssetType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, "", data, data_size);
     }
 }
 
 
-void FxAssetManager::CheckForUploadableData()
+void AxManager::CheckForUploadableData()
 {
     for (auto& worker : mWorkerThreads) {
         // If there are no uploads pending, skip the worker
@@ -250,7 +249,7 @@ void FxAssetManager::CheckForUploadableData()
         auto& loaded_item = worker.Item;
 
         // The asset was successfully loaded, upload to GPU
-        if (worker.LoadStatus == FxLoaderBase::Status::eSuccess) {
+        if (worker.LoadStatus == AxLoaderBase::Status::eSuccess) {
             // Load the resouce into GPU memory
             loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
 
@@ -276,7 +275,7 @@ void FxAssetManager::CheckForUploadableData()
             // Destroy the loader(clearing the loading buffers)
             loaded_item.Loader->Destroy(loaded_item.Asset);
         }
-        else if (worker.LoadStatus == FxLoaderBase::Status::eError) {
+        else if (worker.LoadStatus == AxLoaderBase::Status::eError) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
 
             // There was an error, call the OnError callback if it was registered
@@ -284,7 +283,7 @@ void FxAssetManager::CheckForUploadableData()
                 loaded_item.Asset->mOnErrorCallback(loaded_item.Asset);
             }
         }
-        else if (worker.LoadStatus == FxLoaderBase::Status::eNone) {
+        else if (worker.LoadStatus == AxLoaderBase::Status::eNone) {
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
 
             FxPanic("FxAssetManager", "Worker status is none!");
@@ -292,13 +291,13 @@ void FxAssetManager::CheckForUploadableData()
 
         ItemsEnqueued.clear();
         worker.IsBusy.clear();
-        worker.LoadStatus = FxLoaderBase::Status::eNone;
+        worker.LoadStatus = AxLoaderBase::Status::eNone;
 
         worker.DataPendingUpload.clear();
     }
 }
 
-bool FxAssetManager::CheckWorkersBusy()
+bool AxManager::CheckWorkersBusy()
 {
     for (auto& worker : mWorkerThreads) {
         if (worker.IsBusy.test()) {
@@ -308,15 +307,15 @@ bool FxAssetManager::CheckWorkersBusy()
     return false;
 }
 
-void FxAssetManager::CheckForItemsToLoad()
+void AxManager::CheckForItemsToLoad()
 {
-    FxAssetQueueItem item;
+    AxQueueItem item;
     if (!mLoadQueue.PopIfAvailable(&item)) {
         // The load queue is currently in use(uploaded to), skip for now.
         return;
     }
 
-    FxAssetWorker* worker = FindWorkerThread();
+    AxWorker* worker = FindWorkerThread();
 
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
@@ -331,7 +330,7 @@ void FxAssetManager::CheckForItemsToLoad()
     worker->SubmitItemToLoad(item);
 }
 
-void FxAssetManager::AssetManagerUpdate()
+void AxManager::AssetManagerUpdate()
 {
     while (mActive.test()) {
         bool is_busy = CheckWorkersBusy();
@@ -363,9 +362,9 @@ void FxAssetManager::AssetManagerUpdate()
     }
 }
 
-FxAssetWorker* FxAssetManager::FindWorkerThread()
+AxWorker* AxManager::FindWorkerThread()
 {
-    for (FxAssetWorker& worker : mWorkerThreads) {
+    for (AxWorker& worker : mWorkerThreads) {
         if (!worker.IsBusy.test()) {
             return &worker;
         }
@@ -373,9 +372,9 @@ FxAssetWorker* FxAssetManager::FindWorkerThread()
     return nullptr;
 }
 
-FxAssetManager& FxAssetManager::GetInstance()
+AxManager& AxManager::GetInstance()
 {
-    static FxAssetManager AssetManager;
+    static AxManager AssetManager;
 
     return AssetManager;
 }

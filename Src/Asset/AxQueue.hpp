@@ -1,16 +1,16 @@
 #pragma once
 
-#include <mutex>
+#include "AxQueueItem.hpp"
+
 #include <deque>
+#include <mutex>
 
-#include "FxAssetQueueItem.hpp"
-
-class FxAssetQueue
+class AxQueue
 {
 public:
-    FxAssetQueue() = default;
+    AxQueue() = default;
 
-    void Push(FxAssetQueueItem &value)
+    void Push(AxQueueItem& value)
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
@@ -31,7 +31,7 @@ public:
     //     mQueue.push_back(value);
     // }
 
-    bool PopIfAvailable(FxAssetQueueItem *item)
+    bool PopIfAvailable(AxQueueItem* item)
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
@@ -39,7 +39,7 @@ public:
             return false;
         }
 
-        FxAssetQueueItem &queue_item = mQueue.front();
+        AxQueueItem& queue_item = mQueue.front();
         (*item) = std::move(queue_item);
 
         mQueue.pop_front();
@@ -55,7 +55,7 @@ public:
     }
 
 private:
-    std::deque<FxAssetQueueItem> mQueue;
+    std::deque<AxQueueItem> mQueue;
 
     std::mutex mMutex;
 };

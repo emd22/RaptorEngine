@@ -6,7 +6,7 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_revision.h>
 
-#include <Asset/FxAssetManager.hpp>
+#include <Asset/AxManager.hpp>
 #include <Asset/FxConfigFile.hpp>
 #include <Core/FxDefer.hpp>
 #include <Core/FxPanic.hpp>
@@ -14,7 +14,7 @@
 #include <FxControls.hpp>
 #include <FxEngine.hpp>
 #include <FxMaterial.hpp>
-#include <Physics/FxPhysicsJolt.hpp>
+#include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
@@ -67,7 +67,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    FxAssetManager& asset_manager = FxAssetManager::GetInstance();
+    AxManager& asset_manager = AxManager::GetInstance();
     asset_manager.Start(2);
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
@@ -120,28 +120,28 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../Models/Platform.glb", { .KeepInMemory = true });
+    FxRef<FxObject> ground_object = AxManager::LoadObject("../Models/Platform.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
-    ground_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
-                                       FxPhysicsObject::PhysicsType::Static, {});
+    ground_object->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(PhObject::PF_CreateInactive),
+                                       PhObject::PhysicsType::Static, {});
     mMainScene.Attach(ground_object);
 
-    pHelmetObject = FxAssetManager::LoadObject("../Models/BrickTest.glb", { .KeepInMemory = true });
+    pHelmetObject = AxManager::LoadObject("../Models/BrickTest.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
     // pHelmetObject->Scale(FxVec3f(0.5));
-    pHelmetObject->MoveBy(FxVec3f(0, 1, 0));
     pHelmetObject->WaitUntilLoaded();
-    // pHelmetObject->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
-    //                                    FxPhysicsObject::PhysicsType::Dynamic, {});
-    // Disable physics by default, turn on physics with the keypress 'P'
-    // pHelmetObject->SetPhysicsEnabled(false);
+    pHelmetObject->MoveBy(FxVec3f(0, 0, 3.5));
+
+    pHelmetObject->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(0), PhObject::PhysicsType::Static, {});
+
     gPhysics->OptimizeBroadPhase();
+
 
     mMainScene.Attach(pHelmetObject);
 
 
-    pPistolObject = FxAssetManager::LoadObject("../Models/PistolTextured.glb", { .KeepInMemory = true });
+    pPistolObject = AxManager::LoadObject("../Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
 
     mMainScene.Attach(pPistolObject);
@@ -266,10 +266,9 @@ void FoxtrotGame::Tick()
 
     pPistolObject->mRotation = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.4)));
-    pPistolObject->MoveBy(camera->GetRightVector() * FxVec3f(0.20) + (camera->GetUpVector() * FxVec3f(0.1)));
-
-    // pHelmetObject->RotateY(DeltaTime * 0.0005f);
+    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.4)) -
+                          camera->GetRightVector() * FxVec3f(0.15) - camera->GetUpVector() * FxVec3f(0.1));
+    // pPistolObject->MoveBy();
 
     gPhysics->Update();
 
@@ -318,7 +317,7 @@ void FoxtrotGame::DestroyGame()
 
     // FxMaterialManager::GetGlobalManager().Destroy();
     FxMaterialManager::GetGlobalManager().Destroy();
-    FxAssetManager::GetInstance().Shutdown();
+    AxManager::GetInstance().Shutdown();
 
     // pSkyboxMesh->IsReference = false;
     // pSkyboxMesh->Destroy();

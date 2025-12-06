@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FxAssetBase.hpp"
+#include "AxBase.hpp"
 
 #include <Core/FxRef.hpp>
 #include <Renderer/Backend/RxShader.hpp>
@@ -14,7 +14,7 @@
 
 //     void Destroy() override;
 
-//     friend class FxAssetManager;
+//     friend class AxManager;
 
 // public:
 //     RxShader Shader;

@@ -49,9 +49,9 @@ public:
     }
 
 
-    FX_FORCE_INLINE FxVec3f GetForwardVector() { return FxVec3f(ViewMatrix.Columns[2]).NormalizeIP(); }
-    FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp); }
-    FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction); }
+    FX_FORCE_INLINE FxVec3f GetForwardVector() { return Direction; }
+    FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp).Normalize(); }
+    FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
 
 
     inline void Rotate(float32 angle_x, float32 angle_y)

@@ -1,13 +1,13 @@
 #pragma once
 
-#include "FxLoaderBase.hpp"
+#include "AxLoaderBase.hpp"
 
 #include <Renderer/Backend/RxImage.hpp>
 
-class FxLoaderImageBase : public FxLoaderBase
+class AxLoaderImageBase : public AxLoaderBase
 {
 public:
-    using Status = FxLoaderBase::Status;
+    using Status = AxLoaderBase::Status;
 
 public:
     RxImageType ImageType;
