@@ -20,4 +20,5 @@ Currently Foxtrot **only supports macOS and arm64**. There will be x86_64 and Wi
 
 **PBR Lighting**
 <!--<img src="Screenshots/00_PbrLitHelmet.png" width="300">-->
+![Normalmapped cube](Screenshots/01_NormalmappedCube.png)
 ![Damaged helmet model with red and white lights lighting it](Screenshots/00_PbrLitHelmet.png)
