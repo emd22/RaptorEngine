@@ -53,6 +53,11 @@ void FxPanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&
         FxPanic(__func__, "Assertion failed!", 0);                                                                     \
     }
 
+#ifndef assert(cond_)
+#define assert FxAssert(cond_)
+#endif
+
+
 #if defined(FX_BUILD_DEBUG) && !defined(FX_NO_DEBUG_ASSERTS)
 #define FxDebugAssert(cond)                                                                                            \
     {                                                                                                                  \

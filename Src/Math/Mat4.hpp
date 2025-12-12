@@ -3,8 +3,10 @@
 #include "FxVec3.hpp"
 #include "FxVec4.hpp"
 
-#ifdef FX_USE_NEON
+#if FX_USE_NEON
 #include <arm_neon.h>
+#elif FX_USE_SSE
+#include <immintrin.h>
 #endif
 
 class FxQuat;
@@ -47,12 +49,28 @@ public:
 
     static FxMat4f AsTranslation(FxVec3f position)
     {
-        return FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, position.X, position.Y, position.Z, 1 });
+        FxMat4f result = FxMat4f::Identity;
+        result.Columns[3].Load4(position.X, position.Y, position.Z, 1.0f);
+        return result;
+
+        /*return FxMat4f((float32[16]) { 
+            1, 0, 0, 0, 
+            0, 1, 0, 0,
+            0, 0, 1, 0, 
+            position.X, position.Y, position.Z, 1 });*/
     }
 
     static FxMat4f AsScale(FxVec3f scale)
     {
-        return FxMat4f((float32[16]) { scale.X, 0, 0, 0, 0, scale.Y, 0, 0, 0, 0, scale.Z, 0, 0, 0, 0, 1 });
+        FxMat4f result = FxMat4f::Identity;
+
+        result.Columns[0] *= scale.X;
+        result.Columns[1] *= scale.Y;
+        result.Columns[2] *= scale.Z;
+        
+        return result;
+
+        //return FxMat4f((float32[16]) { scale.X, 0, 0, 0, 0, scale.Y, 0, 0, 0, 0, scale.Z, 0, 0, 0, 0, 1 });
     }
 
     static FxMat4f AsRotationX(float rad);
@@ -137,8 +155,12 @@ public:
 
     FxMat4f GetWithoutTranslation() const;
 
-private:
+public:
+#if FX_USE_NEON
     float32x4_t MultiplyVec4f_Neon(FxVec4f& vec);
+#elif FX_USE_SSE
+    __m128 MultiplyVec4f_SSE(const FxVec4f& vec);
+#endif
 
 public:
     union

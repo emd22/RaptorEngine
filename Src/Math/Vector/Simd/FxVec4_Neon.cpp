@@ -1,3 +1,5 @@
+#include <Core/FxDefines.hpp>
+
 #ifdef FX_USE_NEON
 
 #include <arm_neon.h>
@@ -29,65 +31,6 @@ void FxVec4f::Set(float32 x, float32 y, float32 z, float32 w)
 {
     const float32 values[4] = { x, y, z, w };
     this->mIntrin = vld1q_f32(values);
-}
-
-
-///////////////////////////////
-// Vec + Vec Operators
-///////////////////////////////
-
-FxVec4f FxVec4f::operator+(const FxVec4f& other) const { return FxVec4f(vaddq_f32(mIntrin, other.mIntrin)); }
-
-FxVec4f FxVec4f::operator-(const FxVec4f& other) const { return FxVec4f(vsubq_f32(mIntrin, other.mIntrin)); }
-
-FxVec4f FxVec4f::operator*(const FxVec4f& other) const { return FxVec4f(vmulq_f32(mIntrin, other.mIntrin)); }
-
-FxVec4f FxVec4f::operator/(const FxVec4f& other) const { return FxVec4f(vdivq_f32(mIntrin, other.mIntrin)); }
-
-
-///////////////////////////////
-// Vec + Scalar Operators
-///////////////////////////////
-
-FxVec4f FxVec4f::operator*(float scalar) const
-{
-    return FxVec4f(vmulq_n_f32(mIntrin, scalar));
-
-    // const float32x4_t rvalue = vdupq_n_f32(scalar);
-    // return FxVec4f(vmulq_f32(mIntrin, rvalue));
-}
-
-FxVec4f FxVec4f::operator/(float scalar) const
-{
-    const float32x4_t rvalue = vdupq_n_f32(scalar);
-    return FxVec4f(vdivq_f32(mIntrin, rvalue));
-}
-
-FxVec4f FxVec4f::operator-() const { return FxVec4f(vnegq_f32(mIntrin)); }
-
-
-FxVec4f& FxVec4f::operator+=(const FxVec4f& other)
-{
-    this->mIntrin = vaddq_f32(this->mIntrin, other);
-    return *this;
-}
-
-FxVec4f& FxVec4f::operator-=(const FxVec4f& other)
-{
-    this->mIntrin = vsubq_f32(this->mIntrin, other);
-    return *this;
-}
-
-FxVec4f& FxVec4f::operator*=(const FxVec4f& other)
-{
-    this->mIntrin = vmulq_f32(this->mIntrin, other);
-    return *this;
-}
-
-FxVec4f& FxVec4f::operator=(const FxVec4f& other)
-{
-    this->mIntrin = other.mIntrin;
-    return *this;
 }
 
 

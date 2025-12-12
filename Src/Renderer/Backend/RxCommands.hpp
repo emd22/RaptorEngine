@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RxDevice.hpp"
+#include <Core/FxTypes.hpp>
 
 #include <vulkan/vulkan.h>
 

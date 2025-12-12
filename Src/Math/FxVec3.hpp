@@ -4,9 +4,12 @@
 
 #ifdef FX_USE_NEON
 #include "FxNeonUtil.hpp"
-
 #include <arm_neon.h>
+#elif defined(FX_USE_SSE)
+#include "FxSSEUtil.hpp"
+#include <immintrin.h>
 #endif
+
 
 #include "FxVec4.hpp"
 
@@ -122,14 +125,25 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
 
-    FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 tolerance = 0.00001) const;
+    FX_FORCE_INLINE bool IsCloseTo(const float32x4_t other, const float32 tolerance = 0.00001) const;
 
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         return FxVec3f(FxNeon::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
     }
+#elif FX_USE_SSE
+    FX_FORCE_INLINE float32 GetX() const { return X; }
+    FX_FORCE_INLINE float32 GetY() const { return Y; }
+    FX_FORCE_INLINE float32 GetZ() const { return Z; }
 
+    FX_FORCE_INLINE bool IsCloseTo(const __m128 other, const float32 tolerance = 0.00001) const;
+
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    {
+        return FxVec3f(FxSSE::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
+    }
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
@@ -175,9 +189,21 @@ public:
 
         struct
         {
-            float32 X, Y, Z, mPadding0;
+            float32 X, Y, Z, W;
         };
     };
+#elif defined(FX_USE_SSE)
+    union alignas(16)
+    {
+        __m128 mIntrin;
+        float32 mData[4];
+
+        struct
+        {
+            float32 X, Y, Z, W;
+        };
+    };
+
 
 #else
     struct

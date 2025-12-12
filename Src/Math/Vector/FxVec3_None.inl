@@ -2,9 +2,7 @@
 
 #include <Math/FxVec3.hpp>
 
-#ifdef FX_USE_NEON
-// Do nothing, FxVec3_Neon.inl will be included instead
-#else
+#ifdef FX_NO_SIMD
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 threshold)
 {

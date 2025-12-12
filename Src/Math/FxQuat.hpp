@@ -6,13 +6,13 @@
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
-
+#elif FX_USE_SSE
+#include <immintrin.h>
 #endif
 
 namespace JPH {
 class Quat;
 }
-
 
 class FxQuat
 {
@@ -46,7 +46,13 @@ public:
     FX_FORCE_INLINE float32 GetW() const { return vgetq_lane_f32(mIntrin, 3); }
 
     FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 tolerance = 0.0001) const;
+#elif defined FX_USE_SSE
+    FX_FORCE_INLINE float32 GetX() const { return X; }
+    FX_FORCE_INLINE float32 GetY() const { return Y; }
+    FX_FORCE_INLINE float32 GetZ() const { return Z; }
+    FX_FORCE_INLINE float32 GetW() const { return W; }
 
+    FX_FORCE_INLINE bool IsCloseTo(const __m128 other, const float32 tolerance = 0.0001) const;
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
@@ -60,6 +66,10 @@ public:
     FX_FORCE_INLINE FxQuat& operator=(const float32x4_t& other);
 
     operator float32x4_t() const { return mIntrin; }
+#elif FX_USE_SSE
+    explicit FxQuat(__m128 intrin) : mIntrin(intrin) {}
+
+    FX_FORCE_INLINE FxQuat &operator=(const __m128 &other);
 
 #endif
 public:
@@ -70,6 +80,15 @@ public:
         float32 mData[4];
         struct
         {
+            float32 X, Y, Z, W;
+        };
+    };
+#elif defined(FX_USE_SSE)
+    union alignas(16)
+    {
+        __m128 mIntrin;
+        float32 mData[4];
+        struct {
             float32 X, Y, Z, W;
         };
     };
