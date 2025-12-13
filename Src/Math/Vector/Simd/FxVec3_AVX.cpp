@@ -1,6 +1,6 @@
 #include <Core/FxDefines.hpp>
 
-#ifdef FX_USE_SSE
+#ifdef FX_USE_AVX
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Math/Real.h>

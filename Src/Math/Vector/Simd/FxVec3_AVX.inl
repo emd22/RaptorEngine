@@ -2,7 +2,7 @@
 
 #include <Core/FxDefines.hpp>
 
-#ifdef FX_USE_SSE
+#ifdef FX_USE_AVX
 
 #include <Math/FxVec3.hpp>
 #include <immintrin.h>
@@ -163,4 +163,4 @@ FX_FORCE_INLINE FxVec3f& FxVec3f::operator*=(const FxVec3f& other)
 
 
 
-#endif // #ifdef FX_USE_SSE
+#endif // #ifdef FX_USE_AVX

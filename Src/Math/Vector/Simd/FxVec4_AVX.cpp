@@ -1,6 +1,6 @@
 #include <Core/FxDefines.hpp>
 
-#ifdef FX_USE_SSE
+#ifdef FX_USE_AVX
 
 #include <nmmintrin.h>
 
@@ -32,7 +32,7 @@ void FxVec4f::Set(float32 x, float32 y, float32 z, float32 w)
     mIntrin = _mm_load_ps(values);
 }
 
-void FxVec4f::Load4Ptr(float32* values) { mIntrin = _mm_load_ps(values); }
+void FxVec4f::Load4Ptr(const float32* values) { mIntrin = _mm_load_ps(values); }
 
 void FxVec4f::Load1(float32 value) { mIntrin = _mm_set1_ps(value); }
 
@@ -45,4 +45,4 @@ void FxVec4f::Load4(float32 x, float32 y, float32 z, float32 w)
 
 
 
-#endif // #ifdef FX_USE_SSE
+#endif // #ifdef FX_USE_AVX

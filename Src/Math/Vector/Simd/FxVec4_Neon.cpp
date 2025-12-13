@@ -34,7 +34,7 @@ void FxVec4f::Set(float32 x, float32 y, float32 z, float32 w)
 }
 
 
-void FxVec4f::Load4Ptr(float32* values) { this->mIntrin = vld1q_f32(values); }
+void FxVec4f::Load4Ptr(const float32* values) { this->mIntrin = vld1q_f32(values); }
 
 void FxVec4f::Load1(float32 value) { this->mIntrin = vdupq_n_f32(value); }
 

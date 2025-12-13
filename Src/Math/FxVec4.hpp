@@ -4,7 +4,7 @@
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
-#elif defined(FX_USE_SSE)
+#elif defined(FX_USE_AVX)
 #include <immintrin.h>
 #endif
 
@@ -51,7 +51,7 @@ public:
     /**
      * Loads 4 values into the vector from a pointer.
      */
-    void Load4Ptr(float32* values);
+    void Load4Ptr(const float32* values);
 
     /**
      * Loads a single value into the vector to all components.
@@ -85,7 +85,7 @@ public:
     }
 
     operator float32x4_t() const { return mIntrin; }
-#elif FX_USE_SSE
+#elif FX_USE_AVX
     explicit FxVec4f(__m128 intrin) : mIntrin(intrin) {}
 
     FxVec4f& operator=(const __m128 other)
@@ -108,7 +108,7 @@ public:
             float32 X, Y, Z, W;
         };
     };
-#elif FX_USE_SSE
+#elif FX_USE_AVX
     union alignas(16)
     {
         __m128 mIntrin;
@@ -138,4 +138,4 @@ struct std::formatter<FxVec4f>
 /* Definitions for inline functions */
 #include "Vector/FxVec4_None.inl"
 #include "Vector/Simd/FxVec4_Neon.inl"
-#include "Vector/Simd/FxVec4_SSE.inl"
+#include "Vector/Simd/FxVec4_AVX.inl"

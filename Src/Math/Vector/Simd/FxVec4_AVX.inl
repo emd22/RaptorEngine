@@ -4,7 +4,7 @@
 
 #include <Core/FxDefines.hpp>
 
-#ifdef FX_USE_SSE
+#ifdef FX_USE_AVX
 
 #include <immintrin.h>
 
@@ -77,4 +77,4 @@ FX_FORCE_INLINE FxVec4f& FxVec4f::operator=(const FxVec4f& other)
     return *this;
 }
 
-#endif // #ifdef FX_USE_SSE
+#endif // #ifdef FX_USE_AVX

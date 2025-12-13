@@ -2,9 +2,9 @@
 
 #include <Math/FxQuat.hpp>
 
-#ifdef FX_USE_SSE
+#ifdef FX_USE_AVX
 
-#include <Math/FxSSEUtil.hpp>
+#include <Math/FxAVXUtil.hpp>
 
 FX_FORCE_INLINE bool FxQuat::IsCloseTo(const __m128 other, const float32 tolerance) const
 {

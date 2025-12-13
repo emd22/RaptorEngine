@@ -2,7 +2,7 @@
 
 #include <Core/FxDefines.hpp>
 
-#ifdef FX_USE_SSE
+#ifdef FX_USE_AVX
 
 #include <immintrin.h>
 

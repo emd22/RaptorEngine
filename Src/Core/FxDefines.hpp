@@ -63,8 +63,8 @@
 #define FX_USE_NEON 1
 #define FX_USE_SIMD 1
 
-#elif defined __SSE4_1__ || defined FX_PLATFORM_WINDOWS
-#define FX_USE_SSE 1
+#elif defined __AVX2__ || defined FX_PLATFORM_WINDOWS
+#define FX_USE_AVX 1
 #define FX_USE_SIMD 1
 
 #else

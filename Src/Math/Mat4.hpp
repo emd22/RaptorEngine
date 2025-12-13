@@ -5,7 +5,7 @@
 
 #if FX_USE_NEON
 #include <arm_neon.h>
-#elif FX_USE_SSE
+#elif FX_USE_AVX
 #include <immintrin.h>
 #endif
 
@@ -28,7 +28,7 @@ public:
         Columns[3].Load1(0);
     }
 
-    FxMat4f(float data[16]) noexcept
+    FxMat4f(const float data[16]) noexcept
     {
         Columns[0].Load4Ptr(data);
         Columns[1].Load4Ptr(data + 4);
@@ -156,9 +156,9 @@ public:
     FxMat4f GetWithoutTranslation() const;
 
 public:
-#if FX_USE_NEON
+#if defined(FX_USE_NEON)
     float32x4_t MultiplyVec4f_Neon(FxVec4f& vec);
-#elif FX_USE_SSE
+#elif defined(FX_USE_AVX)
     __m128 MultiplyVec4f_SSE(const FxVec4f& vec);
 #endif
 
@@ -168,7 +168,6 @@ public:
         FxVec4f Columns[4];
         float32 RawData[16];
     };
-
 
     friend class FxVec4f;
 

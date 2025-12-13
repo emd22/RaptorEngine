@@ -6,7 +6,7 @@
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
-#elif FX_USE_SSE
+#elif FX_USE_AVX
 #include <immintrin.h>
 #endif
 
@@ -46,7 +46,7 @@ public:
     FX_FORCE_INLINE float32 GetW() const { return vgetq_lane_f32(mIntrin, 3); }
 
     FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 tolerance = 0.0001) const;
-#elif defined FX_USE_SSE
+#elif defined(FX_USE_AVX)
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
     FX_FORCE_INLINE float32 GetZ() const { return Z; }
@@ -66,7 +66,7 @@ public:
     FX_FORCE_INLINE FxQuat& operator=(const float32x4_t& other);
 
     operator float32x4_t() const { return mIntrin; }
-#elif FX_USE_SSE
+#elif defined(FX_USE_AVX)
     explicit FxQuat(__m128 intrin) : mIntrin(intrin) {}
 
     FX_FORCE_INLINE FxQuat &operator=(const __m128 &other);
@@ -83,7 +83,7 @@ public:
             float32 X, Y, Z, W;
         };
     };
-#elif defined(FX_USE_SSE)
+#elif defined(FX_USE_AVX)
     union alignas(16)
     {
         __m128 mIntrin;
@@ -108,3 +108,4 @@ struct std::formatter<FxQuat>
 };
 
 #include "Quaternion/FxQuat_Neon.inl"
+#include "Quaternion/FxQuat_AVX.inl"
