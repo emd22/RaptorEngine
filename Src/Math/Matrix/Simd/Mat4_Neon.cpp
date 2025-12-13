@@ -1,6 +1,7 @@
+#include <Core/FxDefines.hpp>
 
-#include <arm_neon.h>
 #ifdef FX_USE_NEON
+#include <arm_neon.h>
 
 #include <Math/FxQuat.hpp>
 #include <Math/Mat4.hpp>

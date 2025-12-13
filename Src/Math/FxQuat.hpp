@@ -99,9 +99,9 @@ public:
 template <>
 struct std::formatter<FxQuat>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxQuat& obj, std::format_context& ctx) const
+    auto format(const FxQuat& obj, std::format_context& ctx) const
     {
         return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
     }

@@ -16,7 +16,7 @@ int FxUtil::DemangleName(const char* mangled_name, char* buffer, size_t buffer_s
     return status;
 #else
     // Should we print a warning about this?
-    strcpy(mangled_name, buffer);
+    strcpy(buffer, mangled_name);
     return 0;
 #endif
 }

@@ -17,11 +17,12 @@ else()
 link_directories(${CMAKE_SOURCE_DIR}/Lib/macos)
 endif()
 
-include_directories(ThirdParty)
 
 # add third party sources to static library
 file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.h" "Src/ThirdParty/*.hpp" "Src/ThirdParty/*.inl")
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
+target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
+
 target_link_libraries(ThirdPartyLib slang)
 
 target_compile_definitions(
@@ -30,7 +31,7 @@ target_compile_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
 )
-target_compile_options(ThirdPartyLib PRIVATE -Wno-nullability-extension -Wno-nullability-completeness)
+target_compile_options(ThirdPartyLib PRIVATE)
 
 
 project(cr CXX)
@@ -57,6 +58,8 @@ endif()
 add_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
+	
+	-D_USE_MATH_DEFINES
     # -DFX_DEBUG_STATIC_ARRAY
 )
 
@@ -78,6 +81,7 @@ endif()
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/Src
+	${CMAKE_SOURCE_DIR}/Src/ThirdParty
     ${Vulkan_INCLUDE_DIRS}
     # ${SDL3_INCLUDE_DIRS}
 )

@@ -116,10 +116,10 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 
-        .presentMode = present_mode,
         .preTransform = capabilities.currentTransform,
-
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+
+        .presentMode = present_mode,
         .clipped = VK_TRUE,
         // mSwapchain is null if not initialized
         .oldSwapchain = mSwapchain,

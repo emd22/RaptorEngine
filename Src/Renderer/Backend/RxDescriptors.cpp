@@ -45,18 +45,18 @@ VkWriteDescriptorSet RxDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest, 
                                                               VkImageLayout layout, VkDescriptorType type)
 {
     VkDescriptorImageInfo image_info {
-        .imageLayout = layout,
-        .imageView = texture.Image.View,
         .sampler = texture.Sampler->Sampler,
+        .imageView = texture.Image.View,
+        .imageLayout = layout,
     };
 
     VkWriteDescriptorSet write {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .descriptorType = type,
-        .descriptorCount = 1,
         .dstSet = Set,
         .dstBinding = bind_dest,
         .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = type,
         .pImageInfo = &image_info,
     };
 

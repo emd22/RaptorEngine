@@ -11,10 +11,7 @@
 FX_FORCE_INLINE float32 FxVec4f::LengthSquared() const
 {
     //__m128 sq = _mm_mul_ps(mIntrin, mIntrin);
-    
-    __m128 r_v = _mm_dp_ps(mIntrin, mIntrin, 0xFF);
-
-
+    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, mIntrin, 0xF1));
 }
 
 
@@ -46,7 +43,7 @@ FX_FORCE_INLINE FxVec4f FxVec4f::operator/(float32 scalar) const
     return FxVec4f(_mm_div_ps(mIntrin, scalar_v));
 }
 
-FX_FORCE_INLINE FxVec4f FxVec4f::operator-() const { return FxVec4f(_mm_xor_ps(mIntrin, _mm_set1_ps(-0.0))); }
+FX_FORCE_INLINE FxVec4f FxVec4f::operator-() const { return FxVec4f(_mm_xor_ps(mIntrin, _mm_set1_ps(-0.0f))); }
 
 
 FX_FORCE_INLINE FxVec4f& FxVec4f::operator+=(const FxVec4f& other)
@@ -71,6 +68,7 @@ FX_FORCE_INLINE FxVec4f& FxVec4f::operator*=(float32 scalar)
 {
     const __m128 scalar_v = _mm_set1_ps(scalar);
     mIntrin = _mm_mul_ps(mIntrin, scalar_v);
+    return *this;
 }
 
 FX_FORCE_INLINE FxVec4f& FxVec4f::operator=(const FxVec4f& other)

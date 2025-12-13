@@ -2,7 +2,7 @@
 
 #include "Asset/FxAssetBase.hpp"
 
-#include <jpeglib.h>
+#include <TurboJPEG/jpeglib.h>
 
 #include <Asset/FxAssetImage.hpp>
 #include <Core/FxMemory.hpp>
@@ -68,7 +68,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     mJpegInfo.err = jpeg_std_error(&error_mgr);
     jpeg_create_decompress(&mJpegInfo);
 
-    assert(data != nullptr);
+    FxAssert(data != nullptr);
 
     jpeg_mem_src(&mJpegInfo, data, size);
 

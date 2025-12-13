@@ -61,8 +61,12 @@
 // FX_NO_SIMD defined
 #elif defined(__ARM_NEON__)
 #define FX_USE_NEON 1
+#define FX_USE_SIMD 1
+
 #elif defined __SSE4_1__ || defined FX_PLATFORM_WINDOWS
 #define FX_USE_SSE 1
+#define FX_USE_SIMD 1
+
 #else
 #define FX_NO_SIMD 1
 #endif

@@ -17,6 +17,8 @@
 #include <Physics/FxPhysicsJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+#include <csignal>
+
 FX_SET_MODULE_NAME("FoxtrotGame");
 
 static constexpr float scMouseSensitivity = 0.0005;

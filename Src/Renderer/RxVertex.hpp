@@ -70,10 +70,10 @@ using RxVertexDefault = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV 
 template <>
 struct std::formatter<RxVertexDefault>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
     template <typename FmtContext>
-    constexpr auto format(const RxVertexDefault& obj, FmtContext& ctx) const
+    auto format(const RxVertexDefault& obj, FmtContext& ctx) const
     {
         return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
                               static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));

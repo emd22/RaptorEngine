@@ -77,10 +77,10 @@ public:
         mInDeletionQueue.store(true);
 
         mDeletionQueue.push_back(FxDeletionObject {
+            .Buffer = buffer,
+            .Allocation = allocation,
             .DeletionFrameNumber = mInternalFrameCounter + DeletionFrameSpacing,
             .IsGpuBuffer = true,
-            .Allocation = allocation,
-            .Buffer = buffer,
         });
 
         mInDeletionQueue.store(false);

@@ -54,26 +54,29 @@ void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, R
 
     VkSamplerCreateInfo sampler_info {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .minFilter = FilterToVkFilter(min_filter),
+
         .magFilter = FilterToVkFilter(mag_filter),
+        .minFilter = FilterToVkFilter(min_filter),
+
+        .mipmapMode = FilterToMipmapMode(mipmap_filter),
 
         .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
         .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 
+        .mipLodBias = 0.0f,
+
         .anisotropyEnable = VK_FALSE,
         // .maxAnisotropy = 0,
 
-        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
-
         .compareEnable = VK_FALSE,
         .compareOp = VK_COMPARE_OP_ALWAYS,
-
-        .mipmapMode = FilterToMipmapMode(mipmap_filter),
-        .mipLodBias = 0.0f,
+        
         .minLod = 0.0f,
         .maxLod = 0.0f,
+        
+        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
     };
 
     VkResult result = vkCreateSampler(mDevice->Device, &sampler_info, nullptr, &Sampler);

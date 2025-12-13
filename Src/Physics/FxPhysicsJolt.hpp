@@ -24,7 +24,7 @@ namespace FxPhysicsBroadPhaseLayer {
 using Type = JPH::BroadPhaseLayer;
 static constexpr JPH::BroadPhaseLayer Static(0);
 static constexpr JPH::BroadPhaseLayer Dynamic(1);
-static constexpr uint NumLayers(2);
+static constexpr uint32 NumLayers(2);
 }; // namespace FxPhysicsBroadPhaseLayer
 
 
@@ -40,7 +40,7 @@ public:
         mObjectToBroadPhase[FxPhysicsLayer::Dynamic] = FxPhysicsBroadPhaseLayer::Dynamic;
     }
 
-    virtual uint GetNumBroadPhaseLayers() const override { return FxPhysicsBroadPhaseLayer::NumLayers; }
+    virtual uint32 GetNumBroadPhaseLayers() const override { return FxPhysicsBroadPhaseLayer::NumLayers; }
 
     virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
     {

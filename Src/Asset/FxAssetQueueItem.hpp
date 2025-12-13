@@ -19,19 +19,20 @@ struct FxAssetQueueItem
 {
     FxAssetQueueItem() = default;
 
-    template <typename LoaderType, typename AssetType>
-    FxAssetQueueItem(const FxRef<LoaderType>& loader, const FxRef<AssetType>& asset, FxAssetType type,
+    template <typename TLoaderType, typename TAssetType>
+    FxAssetQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, FxAssetType type,
                      const std::string& path)
         : Path(path), Loader(loader), Asset(asset), RawData(nullptr), DataSize(0), AssetType(type)
     {
     }
 
-    template <typename LoaderType, typename AssetType>
-    FxAssetQueueItem(const FxRef<LoaderType>& loader, const FxRef<AssetType>& asset, FxAssetType type,
+    template <typename TLoaderType, typename TAssetType>
+    FxAssetQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, FxAssetType type,
                      const uint8* data, uint32 data_size)
         : Path(""), Loader(loader), Asset(asset), RawData(data), DataSize(data_size), AssetType(type)
     {
     }
+
     std::string Path;
 
     FxRef<FxLoaderBase> Loader { nullptr };

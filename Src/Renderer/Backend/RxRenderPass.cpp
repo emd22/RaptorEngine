@@ -42,8 +42,8 @@ void RxRenderPass::Create2(RxAttachmentList& attachments)
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount = static_cast<uint32>(color_refs.Size),
         .pColorAttachments = color_refs.pData,
-        .pDepthStencilAttachment = has_depth_attachment ? &depth_attachment_ref : nullptr,
         .pResolveAttachments = nullptr,
+        .pDepthStencilAttachment = has_depth_attachment ? &depth_attachment_ref : nullptr,
     };
 
     // VkSubpassDependency subpass_dependencies[] = {
@@ -143,8 +143,10 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = RenderPass,
         .framebuffer = framebuffer,
-        .renderArea.offset = { 0, 0 },
-        .renderArea.extent = { (uint32)extent.Width(), (uint32)extent.Height() },
+        .renderArea = {
+            .offset = { .x = 0, .y = 0 },
+            .extent = { .width = static_cast<uint32>(extent.Width()), .height = static_cast<uint32>(extent.Height()) }
+        },
         .clearValueCount = clear_values.Size,
         .pClearValues = clear_values.pData,
     };

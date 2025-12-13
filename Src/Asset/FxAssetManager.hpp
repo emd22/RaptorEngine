@@ -188,9 +188,9 @@ private:
 
     void AssetManagerUpdate();
 
-    template <typename AssetType, typename LoaderType, FxAssetType EnumValue>
-        requires C_IsAsset<AssetType>
-    static void SubmitAssetToLoad(const FxRef<AssetType>& asset, FxRef<LoaderType>& loader, const std::string& path,
+    template <typename TAssetType, typename TLoaderType, FxAssetType TEnumValue>
+        requires C_IsAsset<TAssetType>
+    static void SubmitAssetToLoad(const FxRef<TAssetType>& asset, FxRef<TLoaderType>& loader, const std::string& path,
                                   const uint8* data = nullptr, uint32 data_size = 0)
     {
         if (asset->bIsUploadedToGpu) {
@@ -203,11 +203,11 @@ private:
         FxAssetManager& mgr = GetInstance();
 
         if (data != nullptr) {
-            FxAssetQueueItem queue_item((loader), asset, EnumValue, data, data_size);
+            FxAssetQueueItem queue_item((loader), asset, TEnumValue, data, data_size);
             mgr.mLoadQueue.Push(queue_item);
         }
         else {
-            FxAssetQueueItem queue_item((loader), asset, EnumValue, path);
+            FxAssetQueueItem queue_item((loader), asset, TEnumValue, path);
             mgr.mLoadQueue.Push(queue_item);
         }
 

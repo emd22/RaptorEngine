@@ -103,12 +103,12 @@ public:
         }
 
         const VkBufferCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                                                 .flags = 0,
                                                  .size = buffer_size,
                                                  .usage = mUsageFlags,
-                                                 .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-                                                 .flags = 0 };
+                                                 .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
 
-        const VmaAllocationCreateInfo alloc_create_info = { .usage = memory_usage, .flags = vma_create_flags };
+        const VmaAllocationCreateInfo alloc_create_info = { .flags = vma_create_flags, .usage = memory_usage };
 
         VmaAllocationInfo allocation_info;
         const VkResult status = vmaCreateBuffer(Fx_Fwd_GetGpuAllocator(), &create_info, &alloc_create_info, &Buffer,
@@ -256,7 +256,7 @@ public:
         Fx_Fwd_SubmitUploadCmd(
             [&](RxCommandBuffer& cmd)
             {
-                VkBufferCopy copy = { .dstOffset = 0, .srcOffset = 0, .size = buffer_size };
+                VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = buffer_size };
                 vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
             });
 

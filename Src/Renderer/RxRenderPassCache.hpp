@@ -38,8 +38,8 @@ public:
 
             uint64 Value;
         } id = {
-            .Count = static_cast<uint8>(ab.Size),
             .Hash = FxHashStr32(reinterpret_cast<char*>(ab.pData), ab.GetSizeInBytes()),
+            .Count = static_cast<uint8>(ab.Size)
         };
 
         return id.Value;
