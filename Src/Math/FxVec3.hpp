@@ -192,7 +192,7 @@ public:
 #if defined(FX_USE_SIMD)
     union alignas(16)
     {
-        SimdType mIntrin;
+        SimdType alignas(16) mIntrin;
         float32 mData[4];
 
         struct

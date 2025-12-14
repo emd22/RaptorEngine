@@ -1,8 +1,10 @@
+
+
 cmake_minimum_required(VERSION 3.23)
 
 project(ThirdPartyLib)
 
-# set(CMAKE_TOOLCHAIN_FILE, "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+set(CMAKE_TOOLCHAIN_FILE, "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -10,11 +12,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 if (WIN32)
 message("${CMAKE_SOURCE_DIR}")
 link_directories(${CMAKE_SOURCE_DIR}/Lib/win32)
+include_directories(${CMAKE_SOURCE_DIR}/Lib/win32/Include)
 else()
 link_directories(${CMAKE_SOURCE_DIR}/Lib/macos)
 endif()
-
-include_directories(${CMAKE_SOURCE_DIR}/Lib/Include)
 
 find_package(libjpeg-turbo REQUIRED)
 find_package(SDL3 REQUIRED)
@@ -28,7 +29,7 @@ file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
-target_link_libraries(ThirdPartyLib slang SDL3::SDL3 jpeg)
+target_link_libraries(ThirdPartyLib slang SDL3::SDL3 turbojpeg jpeg)
 
 target_compile_definitions(
     ThirdPartyLib
@@ -58,7 +59,7 @@ find_package(Vulkan REQUIRED)
 add_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
-
+	
 	-D_USE_MATH_DEFINES
 	-DFX_BASE_DIR="${CMAKE_SOURCE_DIR}"
     # -DFX_DEBUG_STATIC_ARRAY
@@ -81,7 +82,7 @@ add_link_options(
 endif()
 
 if(MSVC)
-	add_compile_options("/MP")
+	add_compile_options("/MP /Oi /arch:AVX2")
 endif()
 
 include_directories(
@@ -93,4 +94,4 @@ include_directories(
 
 add_executable(cr ${SOURCES} ${HEADERS})
 
-target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} SDL3::SDL3)
+target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} SDL3::SDL3 turbojpeg jpeg)

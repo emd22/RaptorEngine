@@ -80,7 +80,7 @@ void FxLight::Scale(const FxVec3f& scale)
 
 void FxLight::MoveLightVolumeTo(const FxVec3f& position) { this->FxEntity::MoveTo(position); }
 
-void FxLight::Render(const FxCamera& camera)
+void FxLight::Render(const FxPerspectiveCamera& camera)
 {
     if (!bEnabled) {
         return;
@@ -144,7 +144,7 @@ void FxLight::Render(const FxCamera& camera)
 }
 
 
-void FxLight::RenderDebugMesh(const FxCamera& camera)
+void FxLight::RenderDebugMesh(const FxPerspectiveCamera& camera)
 {
     if (!mDebugMesh) {
         return;

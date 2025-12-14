@@ -14,7 +14,7 @@ namespace JPH {
 class Quat;
 }
 
-class FxQuat
+class alignas(16) FxQuat
 {
 public:
     static const FxQuat sIdentity;

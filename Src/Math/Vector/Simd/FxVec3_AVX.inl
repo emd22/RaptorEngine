@@ -39,8 +39,7 @@ FX_FORCE_INLINE bool FxVec3f::operator==(const FxVec3f& other) const
 
 FX_FORCE_INLINE void FxVec3f::Set(float32 x, float32 y, float32 z)
 {
-    const float32 v[] = { x, y, z, 0 };
-    mIntrin = _mm_load_ps(v);
+    mIntrin = _mm_setr_ps(x, y, z, 0.0f);
 }
 
 

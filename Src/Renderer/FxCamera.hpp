@@ -13,7 +13,6 @@ public:
     virtual ~FxCamera() {}
 
 public:
-    FxVec3f Position = FxVec3f::sZero;
 
     FxMat4f ViewMatrix = FxMat4f::Identity;
     FxMat4f ProjectionMatrix = FxMat4f::Identity;
@@ -21,6 +20,7 @@ public:
 
     FxMat4f InvViewMatrix = FxMat4f::Identity;
     FxMat4f InvProjectionMatrix = FxMat4f::Identity;
+
 };
 
 class FxPerspectiveCamera : public FxCamera
@@ -118,6 +118,7 @@ public:
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
 
+    FxVec3f Position = FxVec3f::sZero;
 
     FxVec3f Direction = FxVec3f::sForward;
 

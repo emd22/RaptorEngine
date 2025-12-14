@@ -30,8 +30,8 @@ public:
     void SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume);
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
 
-    void Render(const FxCamera& camera);
-    void RenderDebugMesh(const FxCamera& camera);
+    void Render(const FxPerspectiveCamera& camera);
+    void RenderDebugMesh(const FxPerspectiveCamera& camera);
 
     void MoveTo(const FxVec3f& position) override;
     void MoveTo(const FxVec3f& position, bool force_move_mesh);
