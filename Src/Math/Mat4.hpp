@@ -136,6 +136,8 @@ public:
     FxMat4f Transposed();
     FxMat4f TransposeMat3();
 
+    void LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane);
+
     void CopyAsMat3To(float* dest) const;
 
     FxMat4f operator*(const FxMat4f& other) const;

@@ -4,18 +4,13 @@
 
 #include <immintrin.h>
 
-#include <Math/Mat4.hpp>
-#include <Math/FxAVXUtil.hpp>
-
-#include <Math/FxQuat.hpp>
 #include <Core/FxTypes.hpp>
+#include <Math/FxAVXUtil.hpp>
+#include <Math/FxQuat.hpp>
+#include <Math/Mat4.hpp>
 
-static const float32 scIdentityData[16] = {
-    1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 1.0f
-};
+static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+                                            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
 const FxMat4f FxMat4f::Identity = FxMat4f(scIdentityData);
 
@@ -34,7 +29,7 @@ __m128 FxMat4f::MultiplyVec4f_SSE(const FxVec4f& vec)
      5*X,  6*Y,  7*Z,  8*W,
      9*X, 10*Y, 11*Z, 12*W,
     13*X, 14*Y, 15*Z, 16*W,
-    
+
     */
 
     // Multiply each lane (component) from the vector to each column in the matrix.
@@ -51,10 +46,10 @@ __m128 FxMat4f::MultiplyVec4f_SSE(const FxVec4f& vec)
     result = _mm_mul_ps(result, a3);
     result = _mm_add_ps(result, FxSSE::Permute4<FxShuffle_AW, FxShuffle_AW, FxShuffle_AW, FxShuffle_AW>(vec.mIntrin));*/
 
-    //result = vfmaq_laneq_f32(result, a0, vec.mIntrin, 0);
-    //result = vfmaq_laneq_f32(result, a1, vec.mIntrin, 1);
-    //result = vfmaq_laneq_f32(result, a2, vec.mIntrin, 2);
-    //result = vfmaq_laneq_f32(result, a3, vec.mIntrin, 3);
+    // result = vfmaq_laneq_f32(result, a0, vec.mIntrin, 0);
+    // result = vfmaq_laneq_f32(result, a1, vec.mIntrin, 1);
+    // result = vfmaq_laneq_f32(result, a2, vec.mIntrin, 2);
+    // result = vfmaq_laneq_f32(result, a3, vec.mIntrin, 3);
 
     return result;
 }
@@ -90,6 +85,39 @@ FxMat4f FxMat4f::AsRotation(const FxQuat& quat)
                    FxVec4f(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
+void FxMat4f::LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+{
+    LoadIdentity();
+
+    const float32 Sv = 1.0f / tan(hfov * 0.5f);
+    const float32 Sa = Sv / aspect_ratio;
+
+    // const float32 plane_diff = mNearPlane - mFarPlane;
+
+    const float32 a = near_plane / (far_plane - near_plane);
+    // const float32 a = (mFarPlane + mNearPlane) / plane_diff;
+    // const float32 b = (2.0f * mFarPlane * mNearPlane) / plane_diff;
+    const float32 b = far_plane * a;
+
+    /*
+    Column 0    1    2    3
+    ------------------------
+           Sa,   0,   0,   0,
+           0,  -Sv,   0,   0,
+           0,    0,   a,   b,
+           0,    0,  -1,   0
+    */
+
+    Columns[0].X = (Sa);
+    Columns[1].Y = (-Sv);
+
+    Columns[2].Z = (a);
+    Columns[2].W = (-1);
+
+    Columns[3].Z = (b);
+    Columns[3].W = (0);
+}
+
 
 FxMat4f FxMat4f::AsRotationX(float rad)
 {
@@ -112,16 +140,15 @@ FxMat4f FxMat4f::AsRotationX(float rad)
     result.Columns[1].mIntrin = c1;
 
     // {0, sin(x), cos(x), 0}
-    //const float32x4_t c2 = vrev64q_f32(result.Columns[1].mIntrin);
-
+    // const float32x4_t c2 = vrev64q_f32(result.Columns[1].mIntrin);
 
 
     //// {0, sin(x)}, {cos(x), 0}
-    //const float32x2_t c2_lo = vget_low_f32(c2);
-    //const float32x2_t c2_hi = vget_high_f32(c2);
+    // const float32x2_t c2_lo = vget_low_f32(c2);
+    // const float32x2_t c2_hi = vget_high_f32(c2);
 
     //// {0, -sin(x), cos(x), 0}
-    //result.Columns[2].mIntrin = vcombine_f32(vmul_f32(c2_hi, vdup_n_f32(-1)), c2_lo);
+    // result.Columns[2].mIntrin = vcombine_f32(vmul_f32(c2_hi, vdup_n_f32(-1)), c2_lo);
 
     __m128 c2 = FxSSE::Permute4<FxShuffle_AX, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AW>(c1);
     c2 = FxSSE::SetSign<1, -1, 1, 1>(c2);
@@ -160,10 +187,10 @@ FxMat4f FxMat4f::AsRotationY(float rad)
     result.Columns[2].mIntrin = c2;
 
     // {0, 1, 0, 0}
-    result.Columns[1].mIntrin =  FxSSE::Permute4<FxShuffle_AY, FxShuffle_AX, FxShuffle_AZ, FxShuffle_AW>(one_zzz);
+    result.Columns[1].mIntrin = FxSSE::Permute4<FxShuffle_AY, FxShuffle_AX, FxShuffle_AZ, FxShuffle_AW>(one_zzz);
     // {0, 0, 0, 1}
     result.Columns[3].mIntrin = FxSSE::Permute4<FxShuffle_AW, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX>(one_zzz);
-    
+
     // {cos(x), 0, -sin(x), 0}
 
     const __m128 c0 = FxSSE::Permute4<FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX, FxShuffle_AW>(c2);
@@ -192,24 +219,24 @@ FxMat4f FxMat4f::AsRotationZ(float rad)
     const float cr = cos(rad);
     const float sr = sin(rad);
 
-    //float32x4_t zero = vdupq_n_f32(0);
+    // float32x4_t zero = vdupq_n_f32(0);
 
     // {cos(x), sin(x), 0, 0}
-    //float c0_low_v[2] = { cr, sr };
-    //float32x4_t c0 = vcombine_f32(vld1_f32(c0_low_v), vget_low_f32(zero));
-    //result.Columns[0].mIntrin = c0;
+    // float c0_low_v[2] = { cr, sr };
+    // float32x4_t c0 = vcombine_f32(vld1_f32(c0_low_v), vget_low_f32(zero));
+    // result.Columns[0].mIntrin = c0;
 
     //// {-1, 1}
-    //float32x2_t nmask = vset_lane_f32(-1, vdup_n_f32(1), 0);
+    // float32x2_t nmask = vset_lane_f32(-1, vdup_n_f32(1), 0);
 
     //// {-sin(x), cos(x), 0, 0}
-    //result.Columns[1].mIntrin = vcombine_f32(vmul_f32(vrev64_f32(vget_low_f32(c0)), nmask), vget_high_f32(c0));
+    // result.Columns[1].mIntrin = vcombine_f32(vmul_f32(vrev64_f32(vget_low_f32(c0)), nmask), vget_high_f32(c0));
 
     //// {0, 0, 1, 0}
-    //result.Columns[2].mIntrin = vsetq_lane_f32(1, zero, 2);
+    // result.Columns[2].mIntrin = vsetq_lane_f32(1, zero, 2);
 
     //// {0, 0, 0, 1}
-    //result.Columns[3].mIntrin = vsetq_lane_f32(1, zero, 3);
+    // result.Columns[3].mIntrin = vsetq_lane_f32(1, zero, 3);
 
     /*
      CX = cos(x), SX = sin(x)
@@ -234,7 +261,8 @@ FxMat4f FxMat4f::AsRotationZ(float rad)
     creg_ = vfmaq_laneq_f32(creg_, a3, breg_, 3);
 
 
-// AVX implementation adapted from DirectXMath: https://github.com/microsoft/DirectXMath/blob/main/Inc/DirectXMathMatrix.inl
+// AVX implementation adapted from DirectXMath:
+// https://github.com/microsoft/DirectXMath/blob/main/Inc/DirectXMathMatrix.inl
 FxMat4f FxMat4f::operator*(const FxMat4f& other) const
 {
     /*
@@ -244,7 +272,7 @@ FxMat4f FxMat4f::operator*(const FxMat4f& other) const
      [   2    6   10   14   ]
      [   3    7   11   15   ]
      [   4    8   12   16   ]
-        ^^^^^^^   ^^^^^^^ 
+        ^^^^^^^   ^^^^^^^
         ahalf0    ahalf1
     */
 
@@ -281,13 +309,13 @@ FxMat4f FxMat4f::operator*(const FxMat4f& other) const
 
     temp0_l = _mm256_shuffle_ps(ahalf0, ahalf0, _MM_SHUFFLE(1, 1, 1, 1));
     temp0_r = _mm256_shuffle_ps(ahalf1, ahalf1, _MM_SHUFFLE(1, 1, 1, 1));
-    
+
     // Reverse the order of the 128 bit components ([Lo][Hi] -> [Hi][Lo])
     temp1 = _mm256_permute2f128_ps(bhalf0, bhalf0, 0x11);
     __m256 r1_l = _mm256_fmadd_ps(temp0_l, temp1, r0_l);
     __m256 r1_r = _mm256_fmadd_ps(temp0_r, temp1, r0_r);
 
-    
+
     temp0_l = _mm256_shuffle_ps(ahalf0, ahalf0, _MM_SHUFFLE(2, 2, 2, 2));
     temp0_r = _mm256_shuffle_ps(ahalf1, ahalf1, _MM_SHUFFLE(2, 2, 2, 2));
     __m256 b1 = _mm256_permute2f128_ps(bhalf1, bhalf1, 0x00);
@@ -302,7 +330,7 @@ FxMat4f FxMat4f::operator*(const FxMat4f& other) const
 
     temp0_l = _mm256_add_ps(r1_l, c6);
     temp0_r = _mm256_add_ps(r1_r, c7);
-    
+
     FxMat4f result;
 
     // Convert back to 128 bit vectors and return the matrix
@@ -433,7 +461,7 @@ FxMat4f FxMat4f::Transposed()
 
     temp0 = _mm256_unpacklo_ps(ahalf0, ahalf1);
     temp1 = _mm256_unpackhi_ps(ahalf0, ahalf1);
-    
+
     ahalf0 = _mm256_permute2f128_ps(temp0, temp1, 0x20);
     ahalf1 = _mm256_permute2f128_ps(temp0, temp1, 0x31);
 
@@ -447,10 +475,7 @@ FxMat4f FxMat4f::Transposed()
     return result;
 }
 
-FxMat4f FxMat4f::TransposeMat3()
-{
-    return Transposed();
-}
+FxMat4f FxMat4f::TransposeMat3() { return Transposed(); }
 
 void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
@@ -479,8 +504,4 @@ void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
 // }
 
 
-
-
-
 #endif
-

@@ -6,9 +6,9 @@
 const char* FxAssetPath(AxPathQuery query)
 {
     switch (query) {
-    case FxAssetPathQuery::eShaders:
+    case AxPathQuery::eShaders:
         return FX_BASE_DIR "/Shaders/";
-    case FxAssetPathQuery::eDataPacks:
+    case AxPathQuery::eDataPacks:
         return FX_BASE_DIR "/build/";
     }
 }

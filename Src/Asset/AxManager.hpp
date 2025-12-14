@@ -188,7 +188,7 @@ private:
 
     void AssetManagerUpdate();
 
-    template <typename TAssetType, typename TLoaderType, FxAssetType TEnumValue>
+    template <typename TAssetType, typename TLoaderType, AxType TEnumValue>
         requires C_IsAsset<TAssetType>
     static void SubmitAssetToLoad(const FxRef<TAssetType>& asset, FxRef<TLoaderType>& loader, const std::string& path,
                                   const uint8* data = nullptr, uint32 data_size = 0)
@@ -203,11 +203,11 @@ private:
         AxManager& mgr = GetInstance();
 
         if (data != nullptr) {
-            FxAssetQueueItem queue_item((loader), asset, TEnumValue, data, data_size);
+            AxQueueItem queue_item((loader), asset, TEnumValue, data, data_size);
             mgr.mLoadQueue.Push(queue_item);
         }
         else {
-            FxAssetQueueItem queue_item((loader), asset, TEnumValue, path);
+            AxQueueItem queue_item((loader), asset, TEnumValue, path);
             mgr.mLoadQueue.Push(queue_item);
         }
 

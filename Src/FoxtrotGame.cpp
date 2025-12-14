@@ -120,15 +120,14 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb",
-                                                               { .KeepInMemory = true });
+    FxRef<FxObject> ground_object = AxManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
     ground_object->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(PhObject::PF_CreateInactive),
                                        PhObject::PhysicsType::Static, {});
     mMainScene.Attach(ground_object);
 
-    pHelmetObject = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
+    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
     // pHelmetObject->Scale(FxVec3f(0.5));
     pHelmetObject->WaitUntilLoaded();
@@ -142,7 +141,7 @@ void FoxtrotGame::CreateGame()
     mMainScene.Attach(pHelmetObject);
 
 
-    pPistolObject = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
+    pPistolObject = AxManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
 
     pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);

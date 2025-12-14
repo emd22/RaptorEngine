@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.23)
 
 project(ThirdPartyLib)
 
-set(CMAKE_TOOLCHAIN_FILE, "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+# set(CMAKE_TOOLCHAIN_FILE, "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -28,7 +28,7 @@ file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
-target_link_libraries(ThirdPartyLib slang SDL3::SDL3 turbojpeg jpeg)
+target_link_libraries(ThirdPartyLib slang SDL3::SDL3 jpeg)
 
 target_compile_definitions(
     ThirdPartyLib
