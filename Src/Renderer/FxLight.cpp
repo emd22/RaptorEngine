@@ -156,9 +156,10 @@ void FxLight::RenderDebugMesh(const FxCamera& camera)
     FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
 
     FxDrawPushConstants push_constants {};
-    memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.VPMatrix, MVP.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
-    GetNormalMatrix().CopyAsMat3To(push_constants.NormalMatrix);
+    // GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
 
     // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 

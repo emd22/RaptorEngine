@@ -137,6 +137,8 @@ public:
 
     FxMat4f GetWithoutTranslation() const;
 
+    void LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane);
+
 private:
     float32x4_t MultiplyVec4f_Neon(FxVec4f& vec);
 

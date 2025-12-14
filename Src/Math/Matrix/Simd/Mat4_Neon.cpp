@@ -362,6 +362,39 @@ void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
     // Columns[3].Load4(0,              0,              0,              1.0f);
 }
 
+void FxMat4f::LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+{
+    LoadIdentity();
+
+    const float32 Sv = 1.0f / tan(hfov * 0.5f);
+    const float32 Sa = Sv / aspect_ratio;
+
+    // const float32 plane_diff = mNearPlane - mFarPlane;
+
+    const float32 a = near_plane / (far_plane - near_plane);
+    // const float32 a = (mFarPlane + mNearPlane) / plane_diff;
+    // const float32 b = (2.0f * mFarPlane * mNearPlane) / plane_diff;
+    const float32 b = far_plane * a;
+
+    /*
+    Column 0    1    2    3
+    ------------------------
+           Sa,   0,   0,   0,
+           0,  -Sv,   0,   0,
+           0,    0,   a,   b,
+           0,    0,  -1,   0
+    */
+
+    Columns[0].X = (Sa);
+    Columns[1].Y = (-Sv);
+
+    Columns[2].Z = (a);
+    Columns[2].W = (-1);
+
+    Columns[3].Z = (b);
+    Columns[3].W = (0);
+}
+
 // Mat4f Mat4f::Multiply(Mat4f &other)
 // {
 //     Mat4f result;

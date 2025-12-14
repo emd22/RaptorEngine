@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Asset/FxAssetImage.hpp>
+#include <Asset/AxImage.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/Mat4.hpp>
@@ -13,6 +13,12 @@ enum class FxEntityType
     Object,
     // Camera,
     Light
+};
+
+enum class FxTransformMode
+{
+    eDefault,
+    eTransformFromOrigin
 };
 
 
@@ -44,7 +50,7 @@ public:
     void SetModelMatrix(const FxMat4f& other);
 
     FxMat4f& GetModelMatrix();
-    const FxMat4f& GetNormalMatrix();
+    // const FxMat4f& GetNormalMatrix();
 
     const FxVec3f& GetPosition() const { return mPosition; }
 
@@ -52,6 +58,13 @@ public:
     {
         // Note that this is handled and acted on by FxObject
         mbPhysicsTransformOutOfDate = true;
+        MarkMatrixOutOfDate();
+    }
+
+    FX_FORCE_INLINE void SetRotationOrigin(const FxVec3f& origin)
+    {
+        RotationOrigin = origin;
+        TransformMode = FxTransformMode::eTransformFromOrigin;
         MarkMatrixOutOfDate();
     }
 
@@ -67,6 +80,10 @@ public:
     FxQuat mRotation = FxQuat::sIdentity;
     FxVec3f mScale = FxVec3f::sOne;
 
+    FxVec3f RotationOrigin = FxVec3f::sZero;
+
+    FxTransformMode TransformMode = FxTransformMode::eDefault;
+
     std::vector<FxRef<FxEntity>> Children;
 
     FxEntityType Type = FxEntityType::Unknown;
@@ -76,7 +93,7 @@ protected:
     bool mbMatrixOutOfDate : 1 = false;
 
     FxMat4f mModelMatrix = FxMat4f::Identity;
-    FxMat4f mNormalMatrix = FxMat4f::Identity;
+    // FxMat4f mNormalMatrix = FxMat4f::Identity;
 };
 
 class FxEntityManager

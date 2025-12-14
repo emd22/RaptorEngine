@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FxLoaderBase.hpp"
+#include "AxLoaderBase.hpp"
 
 #include <FxMaterial.hpp>
 #include <FxObject.hpp>
@@ -12,7 +12,7 @@ struct cgltf_mesh;
 struct cgltf_texture_view;
 struct cgltf_primitive;
 
-struct FxGltfMaterialToLoad
+struct AxGltfMaterialToLoad
 {
     //    cgltf_material* GltfMaterial = nullptr;
     FxRef<FxObject> Object { nullptr };
@@ -20,21 +20,21 @@ struct FxGltfMaterialToLoad
     int MeshIndex = 0;
 };
 
-class FxLoaderGltf : public FxLoaderBase
+class AxLoaderGltf : public AxLoaderBase
 {
 public:
-    using Status = FxLoaderBase::Status;
+    using Status = AxLoaderBase::Status;
 
-    FxLoaderGltf() = default;
+    AxLoaderGltf() = default;
 
-    Status LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path) override;
-    Status LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(FxRef<AxBase> asset, const std::string& path) override;
+    Status LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size) override;
 
     void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index);
 
-    void Destroy(FxRef<FxAssetBase>& asset) override;
+    void Destroy(FxRef<AxBase>& asset) override;
 
-    ~FxLoaderGltf() override = default;
+    ~AxLoaderGltf() override = default;
 
 private:
     // void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
@@ -45,7 +45,7 @@ private:
 
 
 public:
-    std::vector<FxGltfMaterialToLoad> MaterialsToLoad;
+    std::vector<AxGltfMaterialToLoad> MaterialsToLoad;
 
     bool KeepInMemory = false;
 
@@ -53,7 +53,7 @@ public:
     FxSizedArray<uint32> IndexBuffer;
 
 protected:
-    void CreateGpuResource(FxRef<FxAssetBase>& asset) override;
+    void CreateGpuResource(FxRef<AxBase>& asset) override;
 
     // void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primitive);
 

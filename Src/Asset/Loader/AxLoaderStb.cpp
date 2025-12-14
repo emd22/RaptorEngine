@@ -1,11 +1,11 @@
-#include "FxLoaderStb.hpp"
+#include "AxLoaderStb.hpp"
 
-#include <Asset/FxAssetBase.hpp>
-#include <Asset/FxAssetImage.hpp>
+#include <Asset/AxBase.hpp>
+#include <Asset/AxImage.hpp>
 
-FxLoaderStb::Status FxLoaderStb::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
+AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
 {
-    FxRef<FxAssetImage> image(asset);
+    FxRef<AxImage> image(asset);
 
     const char* c_path = path.c_str();
 
@@ -22,21 +22,21 @@ FxLoaderStb::Status FxLoaderStb::LoadFromFile(FxRef<FxAssetBase> asset, const st
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, requested_channels);
     if (mImageData == nullptr) {
         FxLogError("Could not load image file at '{:d}'", c_path);
-        return FxLoaderStb::Status::eError;
+        return AxLoaderStb::Status::eError;
     }
 
-    return FxLoaderStb::Status::eSuccess;
+    return AxLoaderStb::Status::eSuccess;
 }
 
-FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
+AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size)
 {
-    FxRef<FxAssetImage> image(asset);
+    FxRef<AxImage> image(asset);
 
     const int requested_channels = ImageNumComponents;
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         FxLogError("Could not retrieve info from image in memory! (Size:{u})", size);
-        return FxLoaderStb::Status::eError;
+        return AxLoaderStb::Status::eError;
     }
 
     mChannels = requested_channels;
@@ -51,15 +51,15 @@ FxLoaderStb::Status FxLoaderStb::LoadFromMemory(FxRef<FxAssetBase> asset, const 
 
     if (mImageData == nullptr) {
         FxLogError("Could not load image file from memory!");
-        return FxLoaderStb::Status::eError;
+        return AxLoaderStb::Status::eError;
     }
 
-    return FxLoaderStb::Status::eSuccess;
+    return AxLoaderStb::Status::eSuccess;
 }
 
-void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
+void AxLoaderStb::CreateGpuResource(FxRef<AxBase>& asset)
 {
-    FxRef<FxAssetImage> image(asset);
+    FxRef<AxImage> image(asset);
 
     FxSizedArray<uint8> data_arr;
 
@@ -109,7 +109,7 @@ void FxLoaderStb::CreateGpuResource(FxRef<FxAssetBase>& asset)
 //     FxStackArray<VkImageCopy, 6> image_copy_infos;
 // }
 
-void FxLoaderStb::Destroy(FxRef<FxAssetBase>& asset)
+void AxLoaderStb::Destroy(FxRef<AxBase>& asset)
 {
     // while (!asset->bIsUploadedToGpu) {
     //     asset->bIsUploadedToGpu.wait(true);

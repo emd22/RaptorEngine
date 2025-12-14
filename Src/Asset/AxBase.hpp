@@ -11,10 +11,10 @@
  *
  * @see FxModel
  */
-class FxAssetBase
+class AxBase
 {
 protected:
-    FxAssetBase() {}
+    AxBase() {}
 
 
     // template <typename T>
@@ -22,8 +22,8 @@ protected:
 
 public:
     // using OnLoadFunc = void (*)(FxRef<FxBaseAsset> asset);
-    using OnLoadFunc = std::function<void(FxRef<FxAssetBase>)>;
-    using OnErrorFunc = void (*)(FxRef<FxAssetBase> asset);
+    using OnLoadFunc = std::function<void(FxRef<AxBase>)>;
+    using OnErrorFunc = void (*)(FxRef<AxBase> asset);
 
     virtual void WaitUntilLoaded()
     {
@@ -40,7 +40,7 @@ public:
 
     virtual void Destroy() = 0;
 
-    virtual ~FxAssetBase() {}
+    virtual ~AxBase() {}
 
     /**
      * Attaches a new callback for when the Asset is finished being loaded by the AssetManager.
@@ -76,12 +76,12 @@ public:
     std::atomic_bool bIsUploadedToGpu = false;
 
 protected:
-    friend class FxLoaderGltf;
+    friend class AxLoaderGltf;
 
     std::vector<OnLoadFunc> mOnLoadedCallbacks;
     // OnLoadFunc mOnLoadedCallback = nullptr;
     OnErrorFunc mOnErrorCallback = nullptr;
     std::atomic_bool mIsLoaded = false;
 
-    friend class FxAssetManager;
+    friend class AxManager;
 };

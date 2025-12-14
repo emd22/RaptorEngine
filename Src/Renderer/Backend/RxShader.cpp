@@ -2,7 +2,7 @@
 
 #include "FxEngine.hpp"
 
-#include <Asset/FxAssetPaths.hpp>
+#include <Asset/AxPaths.hpp>
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxFile.hpp>
 #include <Core/FxTypes.hpp>
@@ -108,10 +108,10 @@ void RxShader::Load(const char* shader_name)
 }
 
 
-const std::string RxShader::GetSourcePath() const { return FxAssetPath(FxAssetPathQuery::eShaders) + Name + ".slang"; }
+const std::string RxShader::GetSourcePath() const { return FxAssetPath(AxPathQuery::eShaders) + Name + ".slang"; }
 const std::string RxShader::GetProgramPath() const
 {
-    std::string compiled_folder = std::string(FxAssetPath(FxAssetPathQuery::eShaders)) + "Spirv/";
+    std::string compiled_folder = std::string(FxAssetPath(AxPathQuery::eShaders)) + "Spirv/";
     std::string compiled_path = (compiled_folder + Name + ".spack");
 
     return compiled_path;

@@ -139,7 +139,6 @@ FSOut FragmentMain(FSIn in)
     float3 F0 = float3(0.04);
     F0 = lerp(F0, albedo, metallic);
 
-
     float3 light_position_local = FSConst.vLightPosition - world_position;
 
     float3 N = normalize(normal_rgba.rgb);
@@ -167,7 +166,7 @@ FSOut FragmentMain(FSIn in)
 
     float4 light_color = unpackUnorm4x8ToFloat(FSConst.uiLightColor);
 
-    out.vColor = float4(attenuation * (Fd * albedo + Fr) * light_color.rgb * NdotL * FX_MATH_1_OVER_PI, normal_rgba.a);
+    out.vColor = float4(attenuation * (Fd * albedo + Fr) * light_color.rgb * NdotL * FX_MATH_1_OVER_PI, 1.0);
 
     return out;
 }

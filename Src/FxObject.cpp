@@ -7,7 +7,7 @@
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <FxEngine.hpp>
-#include <Physics/FxPhysicsJolt.hpp>
+#include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
@@ -59,8 +59,8 @@ bool FxObject::CheckIfReady()
 }
 
 
-void FxObject::PhysicsObjectCreate(FxPhysicsObject::PhysicsFlags flags, FxPhysicsObject::PhysicsType type,
-                                   const FxPhysicsProperties& properties)
+void FxObject::PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type,
+                                   const PhProperties& properties)
 {
     Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
 
@@ -91,7 +91,7 @@ void FxObject::SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_chi
 }
 
 
-void FxObject::Render(const FxCamera& camera)
+void FxObject::Render(const FxPerspectiveCamera& camera)
 {
     RxFrameData* frame = gRenderer->GetFrame();
     //
@@ -105,17 +105,24 @@ void FxObject::Render(const FxCamera& camera)
     }
 
     FxMat4f VP = camera.VPMatrix;
-    FxMat4f MVP = GetModelMatrix() * VP;
+    // FxMat4f MVP = GetModelMatrix() * VP;
 
-    memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
-
-    frame->SubmitUbo(mUbo);
+    // memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
+    //
+    // frame->SubmitUbo(mUbo);
 
     FxDrawPushConstants push_constants {};
-    memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
 
+    if (mObjectLayer == FxObjectLayer::eWorldLayer) {
+        memcpy(push_constants.VPMatrix, VP.RawData, sizeof(FxMat4f));
+    }
+    else if (mObjectLayer == FxObjectLayer::ePlayerLayer) {
+        memcpy(push_constants.VPMatrix, camera.WeaponVPMatrix.RawData, sizeof(FxMat4f));
+    }
+
+    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
     // Copy the normal matrix to the vertex shader
-    GetNormalMatrix().CopyAsMat3To(push_constants.NormalMatrix);
+    // GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
 
     // memcpy(push_constants.NormalMatrix, , sizeof(FxMat4f));
 

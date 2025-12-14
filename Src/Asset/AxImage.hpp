@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FxAssetBase.hpp"
+#include "AxBase.hpp"
 
 #include <Core/FxRef.hpp>
 #include <Renderer/Backend/RxTexture.hpp>
@@ -19,30 +19,30 @@
 // };
 
 
-class FxAssetImage : public FxAssetBase
+class AxImage : public AxBase
 {
 protected:
 public:
-    FxAssetImage() {}
+    AxImage() {}
 
-    friend class FxAssetManager;
+    friend class AxManager;
 
 
 public:
     // static FxRef<FxAssetImage> GetEmptyImage(VkFormat format, int32 num_channels);
 
-    static FxPagedArray<FxRef<FxAssetImage>>& GetEmptyImagesArray();
+    static FxPagedArray<FxRef<AxImage>>& GetEmptyImagesArray();
 
     template <VkFormat TFormat, int32 TNumChannels>
-    static FxRef<FxAssetImage> GetEmptyImage()
+    static FxRef<AxImage> GetEmptyImage()
     {
-        static FxRef<FxAssetImage> sEmptyImage { nullptr };
+        static FxRef<AxImage> sEmptyImage { nullptr };
 
         if (sEmptyImage) {
             return sEmptyImage;
         }
 
-        FxPagedArray<FxRef<FxAssetImage>>& empty_images = GetEmptyImagesArray();
+        FxPagedArray<FxRef<AxImage>>& empty_images = GetEmptyImagesArray();
 
         if (!empty_images.IsInited()) {
             empty_images.Create(8);
@@ -52,7 +52,7 @@ public:
         memset(image_data.pData, 1, TNumChannels);
         image_data.MarkFull();
 
-        sEmptyImage = FxMakeRef<FxAssetImage>();
+        sEmptyImage = FxMakeRef<AxImage>();
 
         sEmptyImage->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), TFormat, TNumChannels);
         sEmptyImage->IsFinishedNotifier.SignalDataWritten();
@@ -66,7 +66,7 @@ public:
     }
 
 
-    ~FxAssetImage() override { Destroy(); }
+    ~AxImage() override { Destroy(); }
 
     // private:
     void Destroy() override;

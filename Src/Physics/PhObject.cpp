@@ -1,6 +1,6 @@
-#include "FxPhysicsObject.hpp"
+#include "PhObject.hpp"
 
-#include "FxPhysicsJolt.hpp"
+#include "PhJolt.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
@@ -10,9 +10,9 @@
 
 #include <FxEngine.hpp>
 
-void FxPhysicsObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f& initial_position,
-                                        FxPhysicsObject::PhysicsFlags flags, FxPhysicsObject::PhysicsType type,
-                                        const FxPhysicsProperties& properties)
+void PhObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f& initial_position,
+                                 PhObject::PhysicsFlags flags, PhObject::PhysicsType type,
+                                 const PhProperties& properties)
 {
     if (mbHasPhysicsBody) {
         FxLogWarning("Attempting to create physics body when one is already created!");
@@ -22,22 +22,22 @@ void FxPhysicsObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f
 
     JPH::EActivation activation_mode = JPH::EActivation::Activate;
 
-    if (flags & FxPhysicsObject::PF_CreateInactive) {
+    if (flags & PhObject::PF_CreateInactive) {
         activation_mode = JPH::EActivation::DontActivate;
     }
 
     JPH::EMotionType motion_type = JPH::EMotionType::Static;
 
-    FxPhysicsLayer::Type object_layer = FxPhysicsLayer::Static;
+    PhLayer::Type object_layer = PhLayer::Static;
 
     switch (type) {
-    case FxPhysicsObject::PhysicsType::Static:
+    case PhObject::PhysicsType::Static:
         motion_type = JPH::EMotionType::Static;
-        object_layer = FxPhysicsLayer::Static;
+        object_layer = PhLayer::Static;
         break;
-    case FxPhysicsObject::PhysicsType::Dynamic:
+    case PhObject::PhysicsType::Dynamic:
         motion_type = JPH::EMotionType::Dynamic;
-        object_layer = FxPhysicsLayer::Dynamic;
+        object_layer = PhLayer::Dynamic;
         break;
     default:
         break;
@@ -79,7 +79,7 @@ void FxPhysicsObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f
 }
 
 
-void FxPhysicsObject::DestroyPhysicsBody()
+void PhObject::DestroyPhysicsBody()
 {
     if (!mbHasPhysicsBody || mpPhysicsBody != nullptr) {
         return;
@@ -95,7 +95,7 @@ void FxPhysicsObject::DestroyPhysicsBody()
 }
 
 
-void FxPhysicsObject::Teleport(FxVec3f position, FxQuat rotation)
+void PhObject::Teleport(FxVec3f position, FxQuat rotation)
 {
     if (!mbHasPhysicsBody) {
         return;

@@ -3,13 +3,13 @@
 #include <Core/FxHash.hpp>
 
 class RxRenderBackend;
-class FxPhysicsJolt;
+class PhJolt;
 class FxShaderCompiler;
 class RxPipelineList;
 class RxRenderPassCache;
 
 extern RxRenderBackend* gRenderer;
-extern FxPhysicsJolt* gPhysics;
+extern PhJolt* gPhysics;
 extern FxShaderCompiler* gShaderCompiler;
 extern RxPipelineList* gPipelines;
 // extern RxRenderPassCache* gRenderPassCache;

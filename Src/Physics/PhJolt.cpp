@@ -1,4 +1,4 @@
-#include "FxPhysicsJolt.hpp"
+#include "PhJolt.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 
@@ -35,7 +35,7 @@ static void JoltTrace(const char* fmt, ...)
 using namespace JPH::literals;
 
 
-void FxPhysicsJolt::Update()
+void PhJolt::Update()
 {
     if (bPhysicsPaused) {
         return;
@@ -48,12 +48,12 @@ void FxPhysicsJolt::Update()
     PhysicsSystem.Update(cDeltaTime, collision_steps, pTempAllocator.pPtr, pJobSystem.pPtr);
 }
 
-void FxPhysicsJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
+void PhJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
 
-void FxPhysicsJolt::Create()
+void PhJolt::Create()
 {
     if (mbIsInited) {
-        FxLogWarning("FxPhysicsJolt is already initialized!");
+        FxLogWarning("PhJolt is already initialized!");
         return;
     }
 
@@ -111,7 +111,7 @@ void FxPhysicsJolt::Create()
     // /
     // // friction.
     // JPH::BodyCreationSettings floor_settings(floor_shape, JPH::RVec3(0.0_r, -1.0_r, 0.0_r), JPH::Quat::sIdentity(),
-    //                                          JPH::EMotionType::Static, FxPhysicsLayer::Static);
+    //                                          JPH::EMotionType::Static, PhLayer::Static);
 
     // // Create the actual rigid body
     // JPH::Body* floor = body_interface.CreateBody(
@@ -124,7 +124,7 @@ void FxPhysicsJolt::Create()
     // // Note that this uses the shorthand version of creating and adding a body to the world
     // JPH::BodyCreationSettings sphere_settings(new JPH::SphereShape(0.5f), JPH::RVec3(0.0_r, 2.0_r, 0.0_r),
     //                                           JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic,
-    //                                           FxPhysicsLayer::Dynamic);
+    //                                           PhLayer::Dynamic);
     // JPH::BodyID sphere_id = body_interface.CreateAndAddBody(sphere_settings, JPH::EActivation::Activate);
 
     // Now you can interact with the dynamic body, in this case we're going to give it a velocity.
@@ -141,7 +141,7 @@ void FxPhysicsJolt::Create()
     mbIsInited = true;
 }
 
-void FxPhysicsJolt::Destroy()
+void PhJolt::Destroy()
 {
     if (!mbIsInited) {
         return;
@@ -153,9 +153,9 @@ void FxPhysicsJolt::Destroy()
     JPH::Factory::sInstance = nullptr;
 }
 
-FxPhysicsJolt::FxPhysicsJolt() {}
+PhJolt::PhJolt() {}
 
-FxPhysicsJolt::~FxPhysicsJolt()
+PhJolt::~PhJolt()
 {
     Destroy();
 

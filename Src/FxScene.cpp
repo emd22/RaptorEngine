@@ -14,7 +14,7 @@ void FxScene::Attach(const FxRef<FxLight>& light) { mLights.Insert(light); }
 
 void FxScene::Render()
 {
-    const FxCamera& camera = *mpCurrentCamera;
+    const FxPerspectiveCamera& camera = *mpCurrentCamera;
 
     // const FxRef<RxDeferredRenderer>& deferred_renderer = gRenderer->DeferredRenderer;
 
