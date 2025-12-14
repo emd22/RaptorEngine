@@ -234,16 +234,9 @@ FxMat4f FxMat4f::AsRotationZ(float rad)
     creg_ = vfmaq_laneq_f32(creg_, a3, breg_, 3);
 
 
+// AVX implementation adapted from DirectXMath: https://github.com/microsoft/DirectXMath/blob/main/Inc/DirectXMathMatrix.inl
 FxMat4f FxMat4f::operator*(const FxMat4f& other) const
 {
-    // Since we will be reusing a[0-3] a lot, this ensures the values
-    // are loaded into the q registers.
-    const __m128 a0 = other.Columns[0].mIntrin;
-    const __m128 a1 = other.Columns[1].mIntrin;
-    const __m128 a2 = other.Columns[2].mIntrin;
-    const __m128 a3 = other.Columns[3].mIntrin;
-
-
     /*
      Col 0    1    2    3
      -------------------------
@@ -274,42 +267,49 @@ FxMat4f FxMat4f::operator*(const FxMat4f& other) const
     bhalf1 = _mm256_insertf128_ps(bhalf1, other.Columns[3].mIntrin, 1);
 
 
+    __m256 temp0_l, temp0_r;
+    __m256 temp1;
 
+    // Splat A1, A5, A9, A13 down to rest of column.
+    temp0_l = _mm256_shuffle_ps(ahalf0, ahalf0, _MM_SHUFFLE(0, 0, 0, 0));
+    temp0_r = _mm256_shuffle_ps(ahalf1, ahalf1, _MM_SHUFFLE(0, 0, 0, 0));
 
+    // Permute to include only the low 128 bits ([Lo][Hi] -> [Lo][Lo])
+    temp1 = _mm256_permute2f128_ps(bhalf0, bhalf0, 0x00);
+    __m256 r0_l = _mm256_mul_ps(temp0_l, temp1);
+    __m256 r0_r = _mm256_mul_ps(temp0_r, temp1);
 
+    temp0_l = _mm256_shuffle_ps(ahalf0, ahalf0, _MM_SHUFFLE(1, 1, 1, 1));
+    temp0_r = _mm256_shuffle_ps(ahalf1, ahalf1, _MM_SHUFFLE(1, 1, 1, 1));
+    
+    // Reverse the order of the 128 bit components ([Lo][Hi] -> [Hi][Lo])
+    temp1 = _mm256_permute2f128_ps(bhalf0, bhalf0, 0x11);
+    __m256 r1_l = _mm256_fmadd_ps(temp0_l, temp1, r0_l);
+    __m256 r1_r = _mm256_fmadd_ps(temp0_r, temp1, r0_r);
 
+    
+    temp0_l = _mm256_shuffle_ps(ahalf0, ahalf0, _MM_SHUFFLE(2, 2, 2, 2));
+    temp0_r = _mm256_shuffle_ps(ahalf1, ahalf1, _MM_SHUFFLE(2, 2, 2, 2));
+    __m256 b1 = _mm256_permute2f128_ps(bhalf1, bhalf1, 0x00);
+    __m256 r2_l = _mm256_mul_ps(temp0_l, b1);
+    __m256 r2_r = _mm256_mul_ps(temp0_r, b1);
 
+    temp0_l = _mm256_shuffle_ps(ahalf0, ahalf0, _MM_SHUFFLE(3, 3, 3, 3));
+    temp0_r = _mm256_shuffle_ps(ahalf1, ahalf1, _MM_SHUFFLE(3, 3, 3, 3));
+    b1 = _mm256_permute2f128_ps(bhalf1, bhalf1, 0x11);
+    __m256 c6 = _mm256_fmadd_ps(temp0_l, b1, r2_l);
+    __m256 c7 = _mm256_fmadd_ps(temp0_r, b1, r2_r);
 
-    __m128 c0 = _mm_setzero_ps();
-    __m128 c1 = _mm_setzero_ps();
-    __m128 c2 = _mm_setzero_ps();
-    __m128 c3 = _mm_setzero_ps();
-
+    temp0_l = _mm256_add_ps(r1_l, c6);
+    temp0_r = _mm256_add_ps(r1_r, c7);
+    
     FxMat4f result;
-    {
-        const __m128 b0 = Columns[0].mIntrin;
-        // Accumulate to c0
-        MulVecFma(c0, b0);
-        result.Columns[0].mIntrin = c0;
-    }
-    {
-        const __m128 b1 = Columns[1].mIntrin;
-        // Accumulate to c1
-        MulVecFma(c1, b1);
-        result.Columns[1].mIntrin = c1;
-    }
-    {
-        const __m128 b2 = Columns[2].mIntrin;
-        // Accumulate to c2
-        MulVecFma(c2, b2);
-        result.Columns[2].mIntrin = c2;
-    }
-    {
-        const __m128 b3 = Columns[3].mIntrin;
-        // Accumulate to c3
-        MulVecFma(c3, b3);
-        result.Columns[3].mIntrin = c3;
-    }
+
+    // Convert back to 128 bit vectors and return the matrix
+    result.Columns[0].mIntrin = _mm256_castps256_ps128(temp0_l);
+    result.Columns[1].mIntrin = _mm256_extractf128_ps(temp0_l, 1);
+    result.Columns[2].mIntrin = _mm256_castps256_ps128(temp0_r);
+    result.Columns[3].mIntrin = _mm256_extractf128_ps(temp0_r, 1);
 
     return result;
 }
@@ -389,39 +389,67 @@ FxMat4f FxMat4f::Inverse()
 FxMat4f FxMat4f::GetWithoutTranslation() const
 {
     FxMat4f mat = *this;
-    mat.Columns[3].mIntrin = vsetq_lane_f32(1, vdupq_n_f32(0), 3);
+
+    __m128 single1 = _mm_set_ss(1.0f);
+
+    // Set column 3 to identity (Z component to 1.0f)
+    mat.Columns[3].mIntrin = _mm_shuffle_ps(single1, single1, _MM_SHUFFLE(1, 0, 1, 1));
 
     return mat;
 }
 
 FxMat4f FxMat4f::Transposed()
 {
-    float32x4x2_t tmp1 = vzipq_f32(Columns[0].mIntrin, Columns[2].mIntrin);
-    float32x4x2_t tmp2 = vzipq_f32(Columns[1].mIntrin, Columns[3].mIntrin);
-    float32x4x2_t tmp3 = vzipq_f32(tmp1.val[0], tmp2.val[0]);
-    float32x4x2_t tmp4 = vzipq_f32(tmp1.val[1], tmp2.val[1]);
+    /*
+        [ A E I M ]
+        [ B F J N ]
+        [ C G K O ]
+        [ D H L P ]
 
+        Transposed:
+
+        [ A B C D ]
+        [ E F G H ]
+        [ I J K L ]
+        [ M N O P ]
+    */
+
+    // Build a AVX vector for each half of the matrix
+    __m256 ahalf0 = _mm256_castps128_ps256(Columns[0].mIntrin);
+    ahalf0 = _mm256_insertf128_ps(ahalf0, Columns[1].mIntrin, 1);
+    __m256 ahalf1 = _mm256_castps128_ps256(Columns[2].mIntrin);
+    ahalf1 = _mm256_insertf128_ps(ahalf1, Columns[3].mIntrin, 1);
+
+    // Unpack (and interleave) the low 64 bits for each half of the matrix.
+    // E.g the low 64 bit chunks {A, E} and {B, F} will give us {A, B, E, F}.
+    __m256 temp0 = _mm256_unpacklo_ps(ahalf0, ahalf1);
+
+    // Unpack and interleave the high 64 bits of each half of the matrix.
+    // E.g the high 64 bit chunks {I, M} and {J, N} will give us {I, J, M, N}.
+    __m256 temp1 = _mm256_unpackhi_ps(ahalf0, ahalf1);
+
+    ahalf0 = _mm256_permute2f128_ps(temp0, temp1, 0x20);
+    ahalf1 = _mm256_permute2f128_ps(temp0, temp1, 0x31);
+
+    temp0 = _mm256_unpacklo_ps(ahalf0, ahalf1);
+    temp1 = _mm256_unpackhi_ps(ahalf0, ahalf1);
+    
+    ahalf0 = _mm256_permute2f128_ps(temp0, temp1, 0x20);
+    ahalf1 = _mm256_permute2f128_ps(temp0, temp1, 0x31);
+
+    // Unpack the columns from the AVX vectors
     FxMat4f result;
-    result.Columns[0].mIntrin = tmp3.val[0];
-    result.Columns[1].mIntrin = tmp3.val[1];
-    result.Columns[2].mIntrin = tmp4.val[0];
-    result.Columns[3].mIntrin = tmp4.val[1];
+    result.Columns[0].mIntrin = _mm256_castps256_ps128(ahalf0);
+    result.Columns[1].mIntrin = _mm256_extractf128_ps(ahalf0, 1);
+    result.Columns[2].mIntrin = _mm256_castps256_ps128(ahalf1);
+    result.Columns[3].mIntrin = _mm256_extractf128_ps(ahalf1, 1);
+
     return result;
 }
 
 FxMat4f FxMat4f::TransposeMat3()
 {
-    float32x4x2_t tmp1 = vzipq_f32(Columns[0].mIntrin, Columns[2].mIntrin);
-    float32x4x2_t tmp2 = vzipq_f32(Columns[1].mIntrin, vdupq_n_f32(0));
-    float32x4x2_t tmp3 = vzipq_f32(tmp1.val[0], tmp2.val[0]);
-    float32x4x2_t tmp4 = vzipq_f32(tmp1.val[1], tmp2.val[1]);
-
-    FxMat4f result;
-    result.Columns[0].mIntrin = tmp3.val[0];
-    result.Columns[1].mIntrin = tmp3.val[1];
-    result.Columns[2].mIntrin = tmp4.val[0];
-
-    return result;
+    return Transposed();
 }
 
 void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }

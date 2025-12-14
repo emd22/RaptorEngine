@@ -5,6 +5,8 @@
 #include <Core/FxSizedArray.hpp>
 #include <map>
 
+#include <unordered_map>
+
 /**
  * @brief Cache section that can hold any number of items.
  */

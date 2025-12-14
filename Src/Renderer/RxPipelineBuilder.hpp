@@ -56,7 +56,7 @@ struct RxPipelineBlendAttachment
             .Alpha = VK_BLEND_OP_ADD,
             .Color = VK_BLEND_OP_ADD
         }
-    }
+    };
 
     RxPipelineBlendFactor AlphaBlend = {
         .Ops = {
@@ -196,14 +196,14 @@ public:
 
             for (const RxPipelineBlendAttachment& am : mBlendAttachments) {
                 vk_blend_attachments.Insert(VkPipelineColorBlendAttachmentState {
-                    .colorWriteMask = am.Mask,
                     .blendEnable = am.Enabled ? 1U : 0U,
-                    .alphaBlendOp = am.BlendOp.Alpha,
-                    .colorBlendOp = am.BlendOp.Color,
-                    .srcAlphaBlendFactor = am.AlphaBlend.Src,
-                    .dstAlphaBlendFactor = am.AlphaBlend.Dst,
-                    .srcColorBlendFactor = am.ColorBlend.Src,
-                    .dstColorBlendFactor = am.ColorBlend.Dst,
+                    .srcColorBlendFactor = am.ColorBlend.Ops.Src,
+                    .dstColorBlendFactor = am.ColorBlend.Ops.Dst,
+                    .colorBlendOp = am.BlendOp.Ops.Color,
+                    .srcAlphaBlendFactor = am.AlphaBlend.Ops.Src,
+                    .dstAlphaBlendFactor = am.AlphaBlend.Ops.Dst,
+                    .alphaBlendOp = am.BlendOp.Ops.Alpha,
+                    .colorWriteMask = am.Mask,
                 });
             }
         }

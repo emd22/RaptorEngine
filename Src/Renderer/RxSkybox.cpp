@@ -151,8 +151,8 @@ void RxSkyboxRenderer::CreateSkyboxPipeline()
     //     });
 }
 
-VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
-{
+//VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
+//{
     //     RxGpuDevice* device = gRenderer->GetDevice();
 
     //     mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
@@ -217,7 +217,7 @@ VkPipelineLayout RxSkyboxRenderer::CreateSkyboxPipelineLayout()
     //     SkyboxPipeline.SetLayout(layout);
 
     //     return layout;
-}
+//}
 
 void RxSkyboxRenderer::Destroy()
 {
