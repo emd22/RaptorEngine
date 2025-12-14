@@ -8,10 +8,11 @@
 
 #include <immintrin.h>
 
+#include <Math/FxAVXUtil.hpp>
+
 FX_FORCE_INLINE float32 FxVec4f::LengthSquared() const
 {
-    //__m128 sq = _mm_mul_ps(mIntrin, mIntrin);
-    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, mIntrin, 0xF1));
+    return FxSSE::LengthSquared(mIntrin);
 }
 
 

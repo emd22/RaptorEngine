@@ -9,3 +9,5 @@ Src/out/**/*
 # Exclusions for .*
 !.gitignore
 !.gitattributes
+!.clangd
+!.clang-tidy

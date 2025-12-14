@@ -69,7 +69,7 @@ public:
 #elif defined(FX_USE_AVX)
     explicit FxQuat(__m128 intrin) : mIntrin(intrin) {}
 
-    FX_FORCE_INLINE FxQuat &operator=(const __m128 &other);
+    FX_FORCE_INLINE FxQuat& operator=(const __m128 other);
 
 #endif
 public:

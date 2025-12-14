@@ -6,6 +6,8 @@
 
 #include <immintrin.h>
 
+#include <Core/FxTypes.hpp>
+
 enum FxShuffleComponent
 {
     /* A Vector */
@@ -61,6 +63,24 @@ FX_FORCE_INLINE __m128 Permute4(__m128 a)
     constexpr uint8 permute = _MM_SHUFFLE(TComp4, TComp3, TComp2, TComp1);
     return _mm_shuffle_ps(a, a, permute);
 }
+
+FX_FORCE_INLINE float32 LengthSquared(__m128 vec)
+{
+    return _mm_cvtss_f32(_mm_dp_ps(vec, vec, 0xF1));
+}
+
+FX_FORCE_INLINE float32 Length(__m128 vec) { return sqrtf(LengthSquared(vec)); }
+
+FX_FORCE_INLINE __m128 Normalize(__m128 vec)
+{
+    // Calculate length and splat to register
+    const __m128 len_v = _mm_set1_ps(Length(vec));
+
+    // Divide vector by length and return
+    return _mm_div_ps(vec, len_v);
+}
+
+void SinCos4(__m128 x, __m128* ysin, __m128* ycos);
 
 }; // namespace FxSSE
 

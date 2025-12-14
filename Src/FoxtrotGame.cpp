@@ -3,7 +3,6 @@
 #define SDL_DISABLE_OLD_NAMES
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
 #include <SDL3/SDL_revision.h>
 
 #include <Asset/FxAssetManager.hpp>

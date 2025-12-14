@@ -12,7 +12,7 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tole
     return IsCloseTo(other.mIntrin);
 }
 
-FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const __m128 other, const float32 tolerance) const
+FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const float32 tolerance) const
 {
     // Get the absolute difference
     const __m128 diff = FxSSE::RemoveSign(_mm_sub_ps(mIntrin, other));
@@ -24,6 +24,10 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const __m128 other, const float32 tolera
     return static_cast<bool>(_mm_testz_si128(cmp_v, cmp_v));
 }
 
+FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const
+{
+    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other.mIntrin, 0xFF));
+}
 
 FX_FORCE_INLINE bool FxVec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 
@@ -41,7 +45,7 @@ FX_FORCE_INLINE void FxVec3f::Set(float32 x, float32 y, float32 z)
 
 
 
-FX_FORCE_INLINE float32 FxVec3f::Dot(__m128 other) const 
+FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const 
 {
      return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0xFF));
 }

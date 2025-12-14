@@ -1,10 +1,22 @@
 #pragma once
 
-#include <Math/FxQuat.hpp>
+#include <Core/FxDefines.hpp>
 
 #ifdef FX_USE_AVX
 
+#include <Math/FxQuat.hpp>
 #include <Math/FxAVXUtil.hpp>
+
+FX_FORCE_INLINE FxQuat& FxQuat::operator=(const __m128 other)
+{
+    mIntrin = other;
+    return *this;
+}
+
+FX_FORCE_INLINE bool FxQuat::IsCloseTo(const FxQuat& other, const float32 tolerance) const
+{
+    return IsCloseTo(other.mIntrin, tolerance);
+}
 
 FX_FORCE_INLINE bool FxQuat::IsCloseTo(const __m128 other, const float32 tolerance) const
 {
@@ -17,6 +29,7 @@ FX_FORCE_INLINE bool FxQuat::IsCloseTo(const __m128 other, const float32 toleran
     // If any components are, return true
     return static_cast<bool>(_mm_testz_si128(cmp_v, cmp_v));
 }
+
 
 
 #endif

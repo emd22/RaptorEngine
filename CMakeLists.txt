@@ -17,13 +17,14 @@ else()
 link_directories(${CMAKE_SOURCE_DIR}/Lib/macos)
 endif()
 
+find_package(libjpeg-turbo REQUIRED)
 
 # add third party sources to static library
 file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.h" "Src/ThirdParty/*.hpp" "Src/ThirdParty/*.inl")
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
-target_link_libraries(ThirdPartyLib slang)
+target_link_libraries(ThirdPartyLib slang ${SDL3_LIBRARIES} turbojpeg jpeg)
 
 target_compile_definitions(
     ThirdPartyLib
@@ -49,10 +50,7 @@ list(FILTER HEADERS EXCLUDE REGEX "Src/ThirdParty/.*")
 
 find_package(Vulkan REQUIRED)
 
-if (APPLE)
 find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
-find_package(libjpeg-turbo CONFIG REQUIRED)
-endif()
 
 
 add_definitions(
@@ -88,4 +86,4 @@ include_directories(
 
 add_executable(cr ${SOURCES} ${HEADERS})
 
-target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} ${SDL3_LIBRARIES} ${JPEG_LIBRARIES})
+target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} ${SDL3_LIBRARIES} turbojpeg jpeg)
