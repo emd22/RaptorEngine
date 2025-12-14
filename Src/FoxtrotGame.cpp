@@ -88,7 +88,7 @@ void FoxtrotGame::CreateLights()
     constexpr float32 scOffsetX = scAreaX / 2.0f;
     constexpr float32 scOffsetY = scAreaY / 2.0f;
 
-    constexpr float32 scHeight = 8.0f;
+    constexpr float32 scHeight = 5.0f;
 
     auto light_volume = FxMeshGen::MakeIcoSphere(2);
 
@@ -143,6 +143,10 @@ void FoxtrotGame::CreateGame()
 
     pPistolObject = AxManager::LoadObject("../Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
+
+    pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);
+
+    PistolRotationGoal = pPistolObject->mRotation;
 
     mMainScene.Attach(pPistolObject);
 
@@ -264,10 +268,12 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-    pPistolObject->mRotation = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
+    PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.4)) -
-                          camera->GetRightVector() * FxVec3f(0.15) - camera->GetUpVector() * FxVec3f(0.1));
+    pPistolObject->mRotation.LerpIP(PistolRotationGoal, 0.06 * DeltaTime);
+
+    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
+                          camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));
     // pPistolObject->MoveBy();
 
     gPhysics->Update();

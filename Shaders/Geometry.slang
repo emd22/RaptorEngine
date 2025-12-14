@@ -25,8 +25,8 @@ struct VSIn
 
 struct VSPushConsts
 {
-    float4x4 mMVP;
-    float3x3 mNormalMatrix;
+    float4x4 mViewProjection;
+    float4x4 mModelMatrix;
     uint uiMaterialIndex;
 };
 
@@ -38,12 +38,14 @@ VSOut VertexMain(VSIn in)
 {
     VSOut out;
 
-    out.vPosition = mul(float4(in.vPosition, 1.0), VSConst.mMVP);
+    float4x4 MVP = mul(VSConst.mModelMatrix, VSConst.mViewProjection);
 
-    out.vNormalWS = normalize(mul(in.vNormal, VSConst.mNormalMatrix));
+    out.vPosition = mul(float4(in.vPosition, 1.0), MVP);
+
+    out.vNormalWS = normalize(mul(in.vNormal, float3x3(VSConst.mModelMatrix)));
 
 #ifdef USE_NORMAL_MAPS
-    out.vTangentWS = normalize(mul(in.vTangent, VSConst.mNormalMatrix));
+    out.vTangentWS = normalize(mul(in.vTangent, float3x3(VSConst.mModelMatrix)));
     out.vBitangentWS =  cross(out.vNormalWS, out.vTangentWS);
 #endif
 
@@ -61,7 +63,6 @@ VSOut VertexMain(VSIn in)
 struct FSOut {
     float4 vAlbedo : SV_TARGET0;
     float4 vNormal : SV_TARGET1;
-
 };
 
 struct FSIn

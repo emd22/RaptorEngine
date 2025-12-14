@@ -10,6 +10,11 @@
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
 
+enum class FxObjectLayer
+{
+    eWorldLayer,
+    ePlayerLayer,
+};
 
 class FxObject : public AxBase, public FxEntity
 {
@@ -21,7 +26,7 @@ public:
 
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
-    void Render(const FxCamera& camera);
+    void Render(const FxPerspectiveCamera& camera);
     bool CheckIfReady();
 
     void AttachObject(const FxRef<FxObject>& object);
@@ -33,6 +38,9 @@ public:
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
 
     void PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type, const PhProperties& properties);
+
+    FX_FORCE_INLINE void SetObjectLayer(FxObjectLayer layer) { mObjectLayer = layer; }
+    FX_FORCE_INLINE FxObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
     void Destroy() override;
     ~FxObject() override { Destroy(); }
@@ -57,4 +65,6 @@ private:
 
     bool mbReadyToRender : 1 = false;
     bool mbPhysicsEnabled : 1 = false;
+
+    FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };

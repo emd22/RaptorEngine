@@ -34,6 +34,8 @@ public:
     FxRef<FxObject> pPistolObject { nullptr };
     FxRef<FxObject> pHelmetObject { nullptr };
 
+    FxQuat PistolRotationGoal = FxQuat::sIdentity;
+
     FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> pSkyboxMesh { nullptr };
     float DeltaTime = 1.0f;
 

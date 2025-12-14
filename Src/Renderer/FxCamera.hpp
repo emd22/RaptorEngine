@@ -35,7 +35,7 @@ public:
         Update();
     }
 
-    void UpdateProjectionMatrix();
+    virtual void UpdateProjectionMatrix();
 
     float32 GetFov() const { return FxRadToDeg(mFovRad); }
     float32 GetFovRad() const { return mFovRad; }
@@ -118,10 +118,16 @@ public:
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
 
+
     FxVec3f Direction = FxVec3f::sForward;
+
+    FxMat4f WeaponVPMatrix = FxMat4f::Identity;
+    FxMat4f WeaponProjectionMatrix = FxMat4f::Identity;
 
 private:
     float32 mFovRad = FxDegToRad(80.0f);
+    float32 mWeaponFov = FxDegToRad(70.0f);
+
 
     float32 mAspectRatio = 1.0f;
     float32 mNearPlane = 1000.0f;

@@ -27,4 +27,12 @@ FX_FORCE_INLINE bool FxQuat::IsCloseTo(const float32x4_t& other, const float32 t
     return vmaxvq_u32(lt) == 0;
 }
 
+FX_FORCE_INLINE void FxQuat::LerpIP(const FxQuat& dest, float32 step)
+{
+    const float32x4_t inv_step_v = vdupq_n_f32(1.0 - step);
+    const float32x4_t step_v = vdupq_n_f32(step);
+
+    mIntrin = vaddq_f32(vmulq_f32(inv_step_v, mIntrin), vmulq_f32(step_v, dest.mIntrin));
+}
+
 #endif
