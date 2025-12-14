@@ -29,7 +29,7 @@ BreakBeforeBinaryOperators: None
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
-BreakTemplateDeclarations: Yes
+#BreakTemplateDeclarations: Yes
 BreakAfterReturnType: Automatic
 
 # Spacing

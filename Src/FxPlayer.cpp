@@ -24,7 +24,7 @@ void FxPlayer::MoveBy(const FxVec3f& by)
 void FxPlayer::Jump()
 {
     if (Physics.bIsGrounded) {
-        JumpForce = 0.5f;
+        JumpForce = 1.5f;
     }
 }
 
@@ -73,7 +73,7 @@ void FxPlayer::Update(float32 delta_time)
 
     FxVec3f camera_updated_position = mCameraOffset;
     camera_updated_position += Position;
-    camera_updated_position.Y -= Physics.HeadRecoveryYOffset;
+    //camera_updated_position.Y += Physics.HeadRecoveryYOffset;
 
     pCamera->MoveTo(camera_updated_position);
 

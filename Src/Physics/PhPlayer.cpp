@@ -65,7 +65,7 @@ void PhPlayer::Update(float32 delta_time)
     PhysicsSystem& phys = gPhysics->PhysicsSystem;
 
     // Apply gravity
-    Vec3 velocity;
+    Vec3 velocity = Vec3::sZero();
 
     if (pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround) {
         if (!bIsGrounded) {
@@ -78,7 +78,7 @@ void PhPlayer::Update(float32 delta_time)
     }
     else {
         velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp() +
-                   phys.GetGravity() * 0.99 * gPhysics->cDeltaTime;
+                   phys.GetGravity() * 1.8 * gPhysics->cDeltaTime;
 
         bIsGrounded = false;
     }

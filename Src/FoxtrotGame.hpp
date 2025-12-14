@@ -37,7 +37,7 @@ public:
     FxQuat PistolRotationGoal = FxQuat::sIdentity;
 
     FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> pSkyboxMesh { nullptr };
-    float DeltaTime = 1.0f;
+    double DeltaTime = 1.0f;
 
 private:
     uint64 mLastTick = 0;

@@ -205,7 +205,9 @@ void RxRenderBackend::InitVulkan()
     instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
     instance_info.ppEnabledLayerNames = requested_validation_layers.data();
     instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.size());
+#ifdef FX_PLATFORM_MACOS
     instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
 
     VkResult result = vkCreateInstance(&instance_info, nullptr, &mInstance);
 

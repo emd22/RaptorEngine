@@ -19,7 +19,9 @@
 
 FX_SET_MODULE_NAME("FoxtrotGame");
 
-static constexpr float scMouseSensitivity = 0.0005;
+static constexpr float scMouseSensitivity = 0.25;
+
+static double sClockFreq = 1.0f;
 
 static bool sbRunning = true;
 
@@ -44,6 +46,8 @@ void FoxtrotGame::InitEngine()
 
     // Create the global engine variables
     FxEngineGlobalsInit();
+
+    sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
@@ -257,8 +261,8 @@ void FoxtrotGame::ProcessControls()
 
 void FoxtrotGame::Tick()
 {
-    const uint64 current_tick = SDL_GetTicksNS();
-    DeltaTime = static_cast<float>(current_tick - mLastTick) / 1'000'000.0f;
+    const uint64 current_tick = SDL_GetPerformanceCounter();
+    DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
 
     FxControlManager::Update();
     ProcessControls();
@@ -270,7 +274,7 @@ void FoxtrotGame::Tick()
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->mRotation.LerpIP(PistolRotationGoal, 0.06 * DeltaTime);
+    pPistolObject->mRotation.LerpIP(PistolRotationGoal, 25.0 * DeltaTime);
 
     pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
                           camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));
