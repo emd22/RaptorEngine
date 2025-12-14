@@ -18,13 +18,18 @@ link_directories(${CMAKE_SOURCE_DIR}/Lib/macos)
 endif()
 
 find_package(libjpeg-turbo REQUIRED)
+find_package(SDL3 REQUIRED)
+
+if(MSVC)
+add_compile_options("/MP")
+endif()
 
 # add third party sources to static library
 file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.h" "Src/ThirdParty/*.hpp" "Src/ThirdParty/*.inl")
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
-target_link_libraries(ThirdPartyLib slang ${SDL3_LIBRARIES} turbojpeg jpeg)
+target_link_libraries(ThirdPartyLib slang SDL3::SDL3 turbojpeg jpeg)
 
 target_compile_definitions(
     ThirdPartyLib
@@ -50,14 +55,13 @@ list(FILTER HEADERS EXCLUDE REGEX "Src/ThirdParty/.*")
 
 find_package(Vulkan REQUIRED)
 
-find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
-
 
 add_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
 	
 	-D_USE_MATH_DEFINES
+	-DFX_BASE_DIR="${CMAKE_SOURCE_DIR}"
     # -DFX_DEBUG_STATIC_ARRAY
 )
 
@@ -77,6 +81,10 @@ add_link_options(
 
 endif()
 
+if(MSVC)
+	add_compile_options("/MP")
+endif()
+
 include_directories(
     ${CMAKE_SOURCE_DIR}/Src
 	${CMAKE_SOURCE_DIR}/Src/ThirdParty
@@ -86,4 +94,4 @@ include_directories(
 
 add_executable(cr ${SOURCES} ${HEADERS})
 
-target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} ${SDL3_LIBRARIES} turbojpeg jpeg)
+target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} SDL3::SDL3 turbojpeg jpeg)

@@ -163,7 +163,7 @@ public:
 #endif
 
 public:
-    union
+    union alignas(16)
     {
         FxVec4f Columns[4];
         float32 RawData[16];

@@ -37,7 +37,7 @@ void FoxtrotGame::InitEngine()
 #endif
 
     FxConfigFile config;
-    config.Load("../Config/Main.conf");
+    config.Load(FX_BASE_DIR "/Config/Main.conf");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
@@ -121,14 +121,14 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = FxAssetManager::LoadObject("../Models/Platform.glb", { .KeepInMemory = true });
+    FxRef<FxObject> ground_object = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
     ground_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
                                        FxPhysicsObject::PhysicsType::Static, {});
     mMainScene.Attach(ground_object);
 
-    pHelmetObject = FxAssetManager::LoadObject("../Models/BrickTest.glb", { .KeepInMemory = true });
+    pHelmetObject = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
     // pHelmetObject->Scale(FxVec3f(0.5));
     pHelmetObject->MoveBy(FxVec3f(0, 1, 0));
@@ -142,7 +142,7 @@ void FoxtrotGame::CreateGame()
     mMainScene.Attach(pHelmetObject);
 
 
-    pPistolObject = FxAssetManager::LoadObject("../Models/PistolTextured.glb", { .KeepInMemory = true });
+    pPistolObject = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
 
     mMainScene.Attach(pPistolObject);
@@ -244,7 +244,7 @@ void FoxtrotGame::ProcessControls()
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
         FxLogInfo("Recompiling shaders...");
-        FxShaderCompiler::CompileAllShaders("../Shaders/");
+        FxShaderCompiler::CompileAllShaders(FX_BASE_DIR "/Shaders/");
     }
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {

@@ -40,7 +40,7 @@ void FxFile::Open(const char* path, FxFile::ModType mt, DataType dt)
     if (pFileHandle != nullptr) {
 #ifdef FX_PLATFORM_WINDOWS
         errno_t result = freopen_s(&pFileHandle, path, mode, pFileHandle);
-        if (!result) {
+        if (result) {
             pFileHandle = nullptr;
         }
 
@@ -54,7 +54,7 @@ void FxFile::Open(const char* path, FxFile::ModType mt, DataType dt)
 #ifdef FX_PLATFORM_WINDOWS
     errno_t result = fopen_s(&pFileHandle, path, mode);
 
-    if (!result) {
+    if (result) {
         pFileHandle = nullptr;
     }
 

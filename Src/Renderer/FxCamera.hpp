@@ -5,7 +5,7 @@
 #include <Math/FxVec3.hpp>
 #include <Math/Mat4.hpp>
 
-class FxCamera
+class FxCamera 
 {
 public:
     virtual void Update() = 0;
@@ -13,7 +13,7 @@ public:
     virtual ~FxCamera() {}
 
 public:
-    FxVec3f Position = FxVec3f(0.0f);
+    FxVec3f Position = FxVec3f::sZero;
 
     FxMat4f ViewMatrix = FxMat4f::Identity;
     FxMat4f ProjectionMatrix = FxMat4f::Identity;
