@@ -4,9 +4,11 @@
 
 #ifdef FX_USE_NEON
 #include "FxNeonUtil.hpp"
+
 #include <arm_neon.h>
 #elif defined(FX_USE_AVX)
 #include "FxAVXUtil.hpp"
+
 #include <immintrin.h>
 #endif
 
@@ -21,7 +23,7 @@ class alignas(16) FxVec3f
 {
 private:
 #if defined(FX_USE_NEON)
-    using SimdType = float4x4_t;
+    using SimdType = float32x4_t;
 #elif defined(FX_USE_AVX)
     using SimdType = __m128;
 #endif
@@ -40,9 +42,7 @@ public:
     FxVec3f(const float32* values);
     FxVec3f(const JPH::Vec3& other);
 
-#ifdef FX_USE_NEON
-    FxVec3f(const FxVec4f& other);
-#elif FX_USE_AVX
+#ifdef FX_USE_SIMD
     FxVec3f(const FxVec4f& other);
 #else
     FxVec3f(const FxVec4f& other) : X(other.X), Y(other.Y), Z(other.Z) {}
@@ -221,5 +221,5 @@ struct std::formatter<FxVec3f>
 
 
 #include "Vector/FxVec3_None.inl"
-#include "Vector/Simd/FxVec3_Neon.inl"
 #include "Vector/Simd/FxVec3_AVX.inl"
+#include "Vector/Simd/FxVec3_Neon.inl"

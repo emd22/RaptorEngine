@@ -1,15 +1,16 @@
 #pragma once
 
-#include <Math/FxVec3.hpp>
+#include <Core/FxDefines.hpp>
 
 #ifdef FX_USE_NEON
+#include <Math/FxVec3.hpp>
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {
     return IsCloseTo(other.mIntrin);
 }
 
-FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const float32x4_t& other, const float32 tolerance) const
+FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const float32 tolerance) const
 {
     // Get the absolute difference between the vectors
     const float32x4_t diff = vabdq_f32(mIntrin, other);
@@ -94,7 +95,7 @@ FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const
     return vaddvq_f32(vmulq_f32(mIntrin, other.mIntrin));
 }
 
-FX_FORCE_INLINE float32 FxVec3f::Dot(float32x4_t other) const { return vaddvq_f32(vmulq_f32(mIntrin, other)); }
+FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const { return vaddvq_f32(vmulq_f32(mIntrin, other)); }
 
 //////////////////////////////
 // Operator Overloads

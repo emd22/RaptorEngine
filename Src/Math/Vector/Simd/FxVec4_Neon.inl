@@ -33,12 +33,11 @@ FxVec4f FxVec4f::operator/(const FxVec4f& other) const { return FxVec4f(vdivq_f3
 // Vec + Scalar Operators
 ///////////////////////////////
 
-FX_FORCE_INLINE FxVec4f FxVec4f::operator*(float scalar) const
+FX_FORCE_INLINE FxVec4f FxVec4f::operator*(float scalar) const { return FxVec4f(vmulq_n_f32(mIntrin, scalar)); }
+FX_FORCE_INLINE FxVec4f& FxVec4f::operator*=(float scalar)
 {
-    return FxVec4f(vmulq_n_f32(mIntrin, scalar));
-
-    // const float32x4_t rvalue = vdupq_n_f32(scalar);
-    // return FxVec4f(vmulq_f32(mIntrin, rvalue));
+    mIntrin = vmulq_n_f32(mIntrin, scalar);
+    return *this;
 }
 
 FX_FORCE_INLINE FxVec4f FxVec4f::operator/(float scalar) const

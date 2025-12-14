@@ -1,5 +1,3 @@
-
-
 cmake_minimum_required(VERSION 3.23)
 
 project(ThirdPartyLib)
@@ -12,10 +10,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 if (WIN32)
 message("${CMAKE_SOURCE_DIR}")
 link_directories(${CMAKE_SOURCE_DIR}/Lib/win32)
-include_directories(${CMAKE_SOURCE_DIR}/Lib/win32/Include)
 else()
 link_directories(${CMAKE_SOURCE_DIR}/Lib/macos)
 endif()
+
+include_directories(${CMAKE_SOURCE_DIR}/Lib/Include)
 
 find_package(libjpeg-turbo REQUIRED)
 find_package(SDL3 REQUIRED)
@@ -59,7 +58,7 @@ find_package(Vulkan REQUIRED)
 add_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
-	
+
 	-D_USE_MATH_DEFINES
 	-DFX_BASE_DIR="${CMAKE_SOURCE_DIR}"
     # -DFX_DEBUG_STATIC_ARRAY
@@ -94,4 +93,4 @@ include_directories(
 
 add_executable(cr ${SOURCES} ${HEADERS})
 
-target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} SDL3::SDL3 turbojpeg jpeg)
+target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} SDL3::SDL3)
