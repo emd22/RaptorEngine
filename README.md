@@ -4,7 +4,7 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 
 ## Features
 - Fast math library using SIMD
-	- **NOTE**: This currently only supports ARM Neon, but SSE will be supported soon.
+	- Supports Arm NEON and SSE/AVX.
 - Vulkan rendering backend
 - Super fast custom memory pool
 - Multithreaded and extensible asset manager that works seamlessly in the background
@@ -14,7 +14,8 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 - Deferred rendering with light volumes
 
 ## Platforms
-Currently Foxtrot **only supports macOS and arm64**. There will be x86_64 and Windows support in the future, but I am currently focusing my time on other parts of the engine.
+- Windows (x86_64)
+- macOS (aarch64)
 
 ## Screenshots
 **PBR Lighting**
