@@ -218,24 +218,24 @@ void RxDeferredRenderer::CreateLightingDSLayout()
 
     VkDescriptorSetLayoutBinding positions_layout_binding {
         .binding = 1,
-        .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .pImmutableSamplers = nullptr,
     };
 
     VkDescriptorSetLayoutBinding albedo_layout_binding {
         .binding = 2,
-        .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .pImmutableSamplers = nullptr,
     };
 
     VkDescriptorSetLayoutBinding normals_layout_binding {
         .binding = 3,
-        .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .pImmutableSamplers = nullptr,
     };
@@ -354,12 +354,16 @@ void RxDeferredRenderer::CreateLightingPipeline()
         .AddBlendAttachment({
             .Enabled = true,
             .AlphaBlend {
-                .Src = VK_BLEND_FACTOR_ONE,
-                .Dst = VK_BLEND_FACTOR_ZERO,
+                .Ops {
+                    .Src = VK_BLEND_FACTOR_ONE,
+                    .Dst = VK_BLEND_FACTOR_ZERO,
+                }
             },
             .ColorBlend {
-                .Src = VK_BLEND_FACTOR_SRC_ALPHA,
-                .Dst = VK_BLEND_FACTOR_ONE,
+                .Ops {
+                    .Src = VK_BLEND_FACTOR_SRC_ALPHA,
+                    .Dst = VK_BLEND_FACTOR_ONE
+                }
             },
         })
         .SetAttachments(&attachment_list)
@@ -715,17 +719,19 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 1;
 
-        const VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                           .imageView = gpass.DepthAttachment.View,
-                                                           .sampler = gRenderer->Swapchain.DepthSampler.Sampler };
+        const VkDescriptorImageInfo positions_image_info { 
+            .sampler = gRenderer->Swapchain.DepthSampler.Sampler,
+            .imageView = gpass.DepthAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
 
         const VkWriteDescriptorSet positions_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(positions_image_info),
 
         };
@@ -737,17 +743,19 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 2;
 
-        const VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                       .imageView = gpass.ColorAttachment.View,
-                                                       .sampler = gRenderer->Swapchain.ColorSampler.Sampler };
+        const VkDescriptorImageInfo color_image_info { 
+            .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
+            .imageView = gpass.ColorAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
 
         const VkWriteDescriptorSet color_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(color_image_info),
 
         };
@@ -760,20 +768,19 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         const int binding_index = 3;
 
         const VkDescriptorImageInfo normals_image_info {
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .imageView = gpass.NormalsAttachment.View,
             .sampler = gRenderer->Swapchain.NormalsSampler.Sampler,
+            .imageView = gpass.NormalsAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 
         const VkWriteDescriptorSet normals_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(normals_image_info),
-
         };
 
         write_infos.Insert(normals_write);
@@ -842,17 +849,19 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 1;
 
-        const VkDescriptorImageInfo positions_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                           .imageView = gpass.DepthAttachment.View,
-                                                           .sampler = gRenderer->Swapchain.DepthSampler.Sampler };
+        const VkDescriptorImageInfo positions_image_info { 
+            .sampler = gRenderer->Swapchain.DepthSampler.Sampler,
+            .imageView = gpass.DepthAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
 
         const VkWriteDescriptorSet positions_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(positions_image_info),
 
         };
@@ -864,19 +873,20 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 2;
 
-        const VkDescriptorImageInfo color_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                       .imageView = gpass.ColorAttachment.View,
-                                                       .sampler = gRenderer->Swapchain.ColorSampler.Sampler };
+        const VkDescriptorImageInfo color_image_info { 
+            .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
+            .imageView = gpass.ColorAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
 
         const VkWriteDescriptorSet color_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(color_image_info),
-
         };
 
         write_infos.Insert(color_write);
@@ -886,19 +896,20 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 3;
 
-        const VkDescriptorImageInfo normals_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                         .imageView = gpass.NormalsAttachment.View,
-                                                         .sampler = gRenderer->Swapchain.NormalsSampler.Sampler };
+        const VkDescriptorImageInfo normals_image_info { 
+            .sampler = gRenderer->Swapchain.NormalsSampler.Sampler,
+            .imageView = gpass.NormalsAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
 
         const VkWriteDescriptorSet normals_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(normals_image_info),
-
         };
 
         write_infos.Insert(normals_write);
@@ -910,19 +921,20 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         RxDeferredLightingPass& light_pass = mRendererInst->LightingPasses[frame_index];
 
-        const VkDescriptorImageInfo lights_image_info { .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                        .imageView = light_pass.ColorAttachment.View,
-                                                        .sampler = gRenderer->Swapchain.LightsSampler.Sampler };
+        const VkDescriptorImageInfo lights_image_info { 
+            .sampler = gRenderer->Swapchain.LightsSampler.Sampler,
+            .imageView = light_pass.ColorAttachment.View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
 
         const VkWriteDescriptorSet lights_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
             .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(lights_image_info),
-
         };
 
         write_infos.Insert(lights_write);
@@ -951,7 +963,7 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 
     VkClearValue clear_values[] = {
         // Output colour
-        // VkClearValue { .color = { { 0.0f, 0.3f, 0.0f, 1.0f } } },
+         VkClearValue { .color = { { 0.0f, 0.3f, 0.0f, 1.0f } } },
     };
 
     FxSlice<VkClearValue> slice(clear_values, FxSizeofArray(clear_values));

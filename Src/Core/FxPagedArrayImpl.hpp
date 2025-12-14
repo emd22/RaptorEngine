@@ -2,6 +2,8 @@
 
 #include <Core/FxTypes.hpp>
 
+#include <Core/FxPanic.hpp>
+
 #ifndef FX_PAGED_ARRAY_ALLOC
 #warning "FX_PAGED_ARRAY_ALLOC is not defined!"
 #define FX_PAGED_ARRAY_ALLOC(type_, size_) (0)
@@ -174,7 +176,7 @@ public:
             page = page->Next;
         }
 
-        assert(size == TrackedSize);
+        FxAssert(size == TrackedSize);
 
         return size;
     }

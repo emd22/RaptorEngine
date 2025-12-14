@@ -4,6 +4,8 @@
 
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
+#elif defined(FX_USE_AVX)
+#include <immintrin.h>
 #endif
 
 class alignas(16) FxVec4f
@@ -23,19 +25,21 @@ public:
 
     void Set(float32 x, float32 y, float32 z, float32 w);
 
-    FxVec4f operator+(const FxVec4f& other) const;
-    FxVec4f operator-(const FxVec4f& other) const;
-    FxVec4f operator*(const FxVec4f& other) const;
-    FxVec4f operator/(const FxVec4f& other) const;
+    FX_FORCE_INLINE FxVec4f operator+(const FxVec4f& other) const;
+    FX_FORCE_INLINE FxVec4f operator-(const FxVec4f& other) const;
+    FX_FORCE_INLINE FxVec4f operator*(const FxVec4f& other) const;
+    FX_FORCE_INLINE FxVec4f operator/(const FxVec4f& other) const;
 
-    FxVec4f operator*(float32 scalar) const;
-    FxVec4f operator/(float32 scalar) const;
+    FX_FORCE_INLINE FxVec4f operator*(float32 scalar) const;
+    FX_FORCE_INLINE FxVec4f operator/(float32 scalar) const;
 
     FxVec4f operator-() const;
 
     FxVec4f& operator+=(const FxVec4f& other);
     FxVec4f& operator-=(const FxVec4f& other);
     FxVec4f& operator*=(const FxVec4f& other);
+
+    FX_FORCE_INLINE FxVec4f& operator*=(float32 scalar);
 
     FxVec4f& operator=(const FxVec4f& other);
 
@@ -47,7 +51,7 @@ public:
     /**
      * Loads 4 values into the vector from a pointer.
      */
-    void Load4Ptr(float32* values);
+    void Load4Ptr(const float32* values);
 
     /**
      * Loads a single value into the vector to all components.
@@ -63,8 +67,6 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
     FX_FORCE_INLINE float32 GetW() const { return vgetq_lane_f32(mIntrin, 3); }
-
-
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
@@ -83,10 +85,20 @@ public:
     }
 
     operator float32x4_t() const { return mIntrin; }
+#elif FX_USE_AVX
+    explicit FxVec4f(__m128 intrin) : mIntrin(intrin) {}
+
+    FxVec4f& operator=(const __m128 other)
+    {
+        mIntrin = other;
+        return *this;
+    }
+
+    explicit operator __m128() const { return mIntrin; }
 #endif
 
 public:
-#if defined(FX_USE_NEON)
+#if FX_USE_NEON
     union alignas(16)
     {
         float32x4_t mIntrin;
@@ -96,7 +108,16 @@ public:
             float32 X, Y, Z, W;
         };
     };
-
+#elif FX_USE_AVX
+    union alignas(16)
+    {
+        __m128 mIntrin;
+        float32 mData[4];
+        struct
+        {
+            float32 X, Y, Z, W;
+        };
+    };
 #else
     float32 X, Y, Z, W;
 #endif
@@ -106,9 +127,9 @@ public:
 template <>
 struct std::formatter<FxVec4f>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxVec4f& obj, std::format_context& ctx) const
+    auto format(const FxVec4f& obj, std::format_context& ctx) const
     {
         return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z, obj.W);
     }
@@ -117,3 +138,4 @@ struct std::formatter<FxVec4f>
 /* Definitions for inline functions */
 #include "Vector/FxVec4_None.inl"
 #include "Vector/Simd/FxVec4_Neon.inl"
+#include "Vector/Simd/FxVec4_AVX.inl"

@@ -29,9 +29,9 @@ union RxPipelineBlendFactor
 {
     struct
     {
-        VkBlendFactor Src : 8 = VK_BLEND_FACTOR_ZERO;
-        VkBlendFactor Dst : 8 = VK_BLEND_FACTOR_ZERO;
-    };
+        VkBlendFactor Src : 8;
+        VkBlendFactor Dst : 8;
+    } Ops;
 
     uint16 Value;
 };
@@ -40,9 +40,9 @@ union RxPipelineBlendOp
 {
     struct
     {
-        VkBlendOp Alpha : 8 = VK_BLEND_OP_ADD;
-        VkBlendOp Color : 8 = VK_BLEND_OP_ADD;
-    };
+        VkBlendOp Alpha : 8;
+        VkBlendOp Color : 8;
+    } Ops;
 
     uint16 Value;
 };
@@ -51,9 +51,26 @@ struct RxPipelineBlendAttachment
 {
     bool Enabled = true;
     RxColorComponentFlags Mask = RxColorComponent_RGBA;
-    RxPipelineBlendOp BlendOp {};
-    RxPipelineBlendFactor AlphaBlend {};
-    RxPipelineBlendFactor ColorBlend {};
+    RxPipelineBlendOp BlendOp = {
+        .Ops = {
+            .Alpha = VK_BLEND_OP_ADD,
+            .Color = VK_BLEND_OP_ADD
+        }
+    };
+
+    RxPipelineBlendFactor AlphaBlend = {
+        .Ops = {
+            .Src = VK_BLEND_FACTOR_ZERO,
+            .Dst = VK_BLEND_FACTOR_ZERO
+        }
+    };
+
+    RxPipelineBlendFactor ColorBlend = {
+        .Ops = {
+            .Src = VK_BLEND_FACTOR_ZERO,
+            .Dst = VK_BLEND_FACTOR_ZERO
+        }
+    };
 };
 
 
@@ -179,14 +196,14 @@ public:
 
             for (const RxPipelineBlendAttachment& am : mBlendAttachments) {
                 vk_blend_attachments.Insert(VkPipelineColorBlendAttachmentState {
-                    .colorWriteMask = am.Mask,
                     .blendEnable = am.Enabled ? 1U : 0U,
-                    .alphaBlendOp = am.BlendOp.Alpha,
-                    .colorBlendOp = am.BlendOp.Color,
-                    .srcAlphaBlendFactor = am.AlphaBlend.Src,
-                    .dstAlphaBlendFactor = am.AlphaBlend.Dst,
-                    .srcColorBlendFactor = am.ColorBlend.Src,
-                    .dstColorBlendFactor = am.ColorBlend.Dst,
+                    .srcColorBlendFactor = am.ColorBlend.Ops.Src,
+                    .dstColorBlendFactor = am.ColorBlend.Ops.Dst,
+                    .colorBlendOp = am.BlendOp.Ops.Color,
+                    .srcAlphaBlendFactor = am.AlphaBlend.Ops.Src,
+                    .dstAlphaBlendFactor = am.AlphaBlend.Ops.Dst,
+                    .alphaBlendOp = am.BlendOp.Ops.Alpha,
+                    .colorWriteMask = am.Mask,
                 });
             }
         }

@@ -158,7 +158,7 @@ void RxRenderBackend::InitVulkan()
     app_info.apiVersion = VK_MAKE_VERSION(1, 3, 261);
 
     ExtensionNames requested_extensions = {
-        VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
+        //VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
     };
 
     ExtensionNames all_extensions = MakeInstanceExtensionList(requested_extensions);

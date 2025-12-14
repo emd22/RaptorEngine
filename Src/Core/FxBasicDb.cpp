@@ -16,6 +16,7 @@ void FxBasicDb::Open(const char* path)
 
     // Eh, something else is wrong here
     if (!mInFile.IsFileOpen()) {
+        FxLogError("Could not open basic db at {}!", path);
         return;
     }
 
@@ -132,6 +133,9 @@ void FxBasicDb::Parse()
 
 FxBasicDbEntry* FxBasicDb::FindEntry(FxHash32 key)
 {
+    if (!mEntryMarkers.IsInited()) {
+        return nullptr;
+    }
     for (FxBasicDbEntry& entry : mEntryMarkers) {
         if (entry.KeyHash == key) {
             return &entry;

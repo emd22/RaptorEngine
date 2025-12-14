@@ -30,7 +30,7 @@ struct RxVertex<FxVertexPosition>
     static constexpr FxVertexFlags Components = FxVertexPosition;
 
     float32 Position[3];
-} __attribute__((packed));
+};
 
 template <>
 struct RxVertex<FxVertexPosition | FxVertexNormal>
@@ -39,7 +39,7 @@ struct RxVertex<FxVertexPosition | FxVertexNormal>
 
     float32 Position[3];
     float32 Normal[3];
-} __attribute__((packed));
+};
 
 template <>
 struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
@@ -49,7 +49,7 @@ struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
     float32 Position[3];
     float32 Normal[3];
     float32 UV[2];
-} __attribute__((packed));
+};
 
 template <>
 struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent>
@@ -60,7 +60,7 @@ struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent
     float32 Normal[3];
     float32 UV[2];
     float32 Tangent[3];
-} __attribute__((packed));
+};
 
 // End packing structs
 #pragma pack(pop)
@@ -70,10 +70,10 @@ using RxVertexDefault = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV 
 template <>
 struct std::formatter<RxVertexDefault>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
     template <typename FmtContext>
-    constexpr auto format(const RxVertexDefault& obj, FmtContext& ctx) const
+    auto format(const RxVertexDefault& obj, FmtContext& ctx) const
     {
         return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
                               static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));

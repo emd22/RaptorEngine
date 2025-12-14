@@ -34,7 +34,7 @@ FxVertexInfo FxMakeVertexInfo()
 
     FxLogDebug("Amount of attributes: {:d}", attribs.Size);
 
-    return { binding_desc, std::move(attribs), .bIsInited = true };
+    return { binding_desc, std::move(attribs), true };
 }
 
 FxVertexInfo FxMakeLightVertexInfo()
@@ -51,7 +51,7 @@ FxVertexInfo FxMakeLightVertexInfo()
         { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
     };
 
-    return { binding_desc, std::move(attribs), .bIsInited = true };
+    return { binding_desc, std::move(attribs), true };
 }
 
 void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
@@ -151,17 +151,17 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
         .depthClampEnable = VK_FALSE,
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = properties.PolygonMode,
-        .lineWidth = 1.0f,
         .cullMode = properties.CullMode,
         .frontFace = properties.WindingOrder,
         .depthBiasEnable = VK_FALSE,
+        .lineWidth = 1.0f,
     };
 
 
     const VkPipelineMultisampleStateCreateInfo multisampling_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .sampleShadingEnable = VK_FALSE,
         .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+        .sampleShadingEnable = VK_FALSE,
     };
 
 
@@ -205,8 +205,8 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
         .pViewportState = &viewport_state_info,
         .pRasterizationState = &rasterizer_info,
         .pMultisampleState = &multisampling_info,
-        .pColorBlendState = &color_blend_info,
         .pDepthStencilState = has_depth_attachment ? &depth_stencil_info : nullptr,
+        .pColorBlendState = &color_blend_info,
 
         .pDynamicState = &dynamic_state_info,
 
@@ -275,7 +275,11 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushCons
     for (int i = 0; i < push_constant_defs.Size; i++) {
         const RxPushConstants& pc_def = push_constant_defs[i];
 
-        VkPushConstantRange range { .size = pc_def.Size, .offset = current_pc_offset, .stageFlags = pc_def.StageFlags };
+        VkPushConstantRange range { 
+            .stageFlags = pc_def.StageFlags,
+            .offset = current_pc_offset, 
+            .size = pc_def.Size, 
+        };
         push_const_ranges.Insert(range);
 
         current_pc_offset += pc_def.Size;

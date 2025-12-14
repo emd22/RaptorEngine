@@ -251,7 +251,6 @@ FX_FORCE_INLINE float32x4_t And(float32x4_t a, float32x4_t b)
 template <int TX, int TY, int TZ, int TW>
 FX_FORCE_INLINE float32x4_t SetSign(float32x4_t v)
 {
-    // (this is such a cool idea)
     constexpr float32 signs[4] = {
         TX > 0 ? 0.0f : -0.0f,
         TY > 0 ? 0.0f : -0.0f,

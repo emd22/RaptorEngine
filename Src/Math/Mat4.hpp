@@ -3,8 +3,10 @@
 #include "FxVec3.hpp"
 #include "FxVec4.hpp"
 
-#ifdef FX_USE_NEON
+#if FX_USE_NEON
 #include <arm_neon.h>
+#elif FX_USE_AVX
+#include <immintrin.h>
 #endif
 
 class FxQuat;
@@ -26,7 +28,7 @@ public:
         Columns[3].Load1(0);
     }
 
-    FxMat4f(float data[16]) noexcept
+    FxMat4f(const float data[16]) noexcept
     {
         Columns[0].Load4Ptr(data);
         Columns[1].Load4Ptr(data + 4);
@@ -47,12 +49,28 @@ public:
 
     static FxMat4f AsTranslation(FxVec3f position)
     {
-        return FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, position.X, position.Y, position.Z, 1 });
+        FxMat4f result = FxMat4f::Identity;
+        result.Columns[3].Load4(position.X, position.Y, position.Z, 1.0f);
+        return result;
+
+        /*return FxMat4f((float32[16]) {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            position.X, position.Y, position.Z, 1 });*/
     }
 
     static FxMat4f AsScale(FxVec3f scale)
     {
-        return FxMat4f((float32[16]) { scale.X, 0, 0, 0, 0, scale.Y, 0, 0, 0, 0, scale.Z, 0, 0, 0, 0, 1 });
+        FxMat4f result = FxMat4f::Identity;
+
+        result.Columns[0] *= scale.X;
+        result.Columns[1] *= scale.Y;
+        result.Columns[2] *= scale.Z;
+
+        return result;
+
+        // return FxMat4f((float32[16]) { scale.X, 0, 0, 0, 0, scale.Y, 0, 0, 0, 0, scale.Z, 0, 0, 0, 0, 1 });
     }
 
     static FxMat4f AsRotationX(float rad);
@@ -118,6 +136,8 @@ public:
     FxMat4f Transposed();
     FxMat4f TransposeMat3();
 
+    void LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane);
+
     void CopyAsMat3To(float* dest) const;
 
     FxMat4f operator*(const FxMat4f& other) const;
@@ -137,18 +157,19 @@ public:
 
     FxMat4f GetWithoutTranslation() const;
 
-    void LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane);
-
-private:
+public:
+#if defined(FX_USE_NEON)
     float32x4_t MultiplyVec4f_Neon(FxVec4f& vec);
+#elif defined(FX_USE_AVX)
+    __m128 MultiplyVec4f_SSE(const FxVec4f& vec);
+#endif
 
 public:
-    union
+    union alignas(16)
     {
         FxVec4f Columns[4];
         float32 RawData[16];
     };
-
 
     friend class FxVec4f;
 

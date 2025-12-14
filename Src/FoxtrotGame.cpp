@@ -3,7 +3,6 @@
 #define SDL_DISABLE_OLD_NAMES
 
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
 #include <SDL3/SDL_revision.h>
 
 #include <Asset/AxManager.hpp>
@@ -16,6 +15,7 @@
 #include <FxMaterial.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
 
@@ -36,7 +36,7 @@ void FoxtrotGame::InitEngine()
 #endif
 
     FxConfigFile config;
-    config.Load("../Config/Main.conf");
+    config.Load(FX_BASE_DIR "/Config/Main.conf");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
@@ -120,14 +120,14 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = AxManager::LoadObject("../Models/Platform.glb", { .KeepInMemory = true });
+    FxRef<FxObject> ground_object = AxManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
     ground_object->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(PhObject::PF_CreateInactive),
                                        PhObject::PhysicsType::Static, {});
     mMainScene.Attach(ground_object);
 
-    pHelmetObject = AxManager::LoadObject("../Models/BrickTest.glb", { .KeepInMemory = true });
+    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
     // pHelmetObject->Scale(FxVec3f(0.5));
     pHelmetObject->WaitUntilLoaded();
@@ -141,7 +141,7 @@ void FoxtrotGame::CreateGame()
     mMainScene.Attach(pHelmetObject);
 
 
-    pPistolObject = AxManager::LoadObject("../Models/PistolTextured.glb", { .KeepInMemory = true });
+    pPistolObject = AxManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
 
     pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);
@@ -247,7 +247,7 @@ void FoxtrotGame::ProcessControls()
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
         FxLogInfo("Recompiling shaders...");
-        FxShaderCompiler::CompileAllShaders("../Shaders/");
+        FxShaderCompiler::CompileAllShaders(FX_BASE_DIR "/Shaders/");
     }
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {

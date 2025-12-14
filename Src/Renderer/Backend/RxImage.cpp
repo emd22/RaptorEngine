@@ -68,28 +68,33 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
     // Create the vulkan image
     VkImageCreateInfo image_info {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .flags = image_create_flags,
+        
         .imageType = VK_IMAGE_TYPE_2D,
 
-        // Dimensions
-        .extent.width = size.Width(),
-        .extent.height = size.Height(),
-        .extent.depth = 1,
+        .format = format,
+
+        .extent = {
+            .width = size.Width(),
+            .height = size.Height(),
+            .depth = 1
+        },
 
         .mipLevels = 1,
         .arrayLayers = image_type_props.LayerCount,
-        .format = format,
-        .tiling = tiling,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .usage = usage,
         .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = tiling,
+        
+        .usage = usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 
-        .flags = image_create_flags,
     };
 
     VmaAllocationCreateInfo create_info {
-        .usage = VMA_MEMORY_USAGE_AUTO,
         .flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+        .usage = VMA_MEMORY_USAGE_AUTO,
         .priority = 1.0f,
     };
 
@@ -171,13 +176,18 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
 
     VkImageMemoryBarrier barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        
+        .srcAccessMask = static_cast<VkAccessFlags>((mIsDepthTexture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
+        .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
+        
         .oldLayout = ImageLayout,
         .newLayout = new_layout,
+        
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        
         .image = Image,
-        .srcAccessMask = (mIsDepthTexture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        
         .subresourceRange =
             {
                 .aspectMask = (mIsDepthTexture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
@@ -307,10 +317,9 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_for
     FxStackArray<VkImageCopy, 6> copy_infos;
 
     VkImageCopy copy_info {
+        .srcSubresource = { .aspectMask = image_aspect_flag, .baseArrayLayer = 0, .layerCount = 1, },
+        .dstSubresource = { .aspectMask = image_aspect_flag, .baseArrayLayer = 0, .layerCount = 1, },
         .dstOffset = { .x = 0, .y = 0 },
-        .srcSubresource = { .baseArrayLayer = 0, .layerCount = 1, .aspectMask = image_aspect_flag, },
-        .dstSubresource = { .baseArrayLayer = 0, .layerCount = 1, .aspectMask = image_aspect_flag, },
-
         .extent = { .width = tile_width, .height = tile_height, .depth = 1 },
     };
 

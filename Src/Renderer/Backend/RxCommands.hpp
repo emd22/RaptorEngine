@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RxDevice.hpp"
+#include <Core/FxTypes.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -13,8 +14,9 @@ public:
 
         const VkCommandPoolCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .queueFamilyIndex = queue_family,
+            .pNext = nullptr,
             .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            .queueFamilyIndex = queue_family,
         };
 
         mDevice = device;

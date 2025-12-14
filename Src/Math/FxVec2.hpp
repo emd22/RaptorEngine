@@ -115,9 +115,9 @@ using FxVec2u = FxVec2Base<uint32>;
 template <>
 struct std::formatter<FxVec2i>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxVec2i& obj, std::format_context& ctx) const
+    auto format(const FxVec2i& obj, std::format_context& ctx) const
     {
         return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
     }
@@ -126,9 +126,9 @@ struct std::formatter<FxVec2i>
 template <>
 struct std::formatter<FxVec2u>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxVec2u& obj, std::format_context& ctx) const
+    auto format(const FxVec2u& obj, std::format_context& ctx) const
     {
         return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
     }
@@ -137,9 +137,9 @@ struct std::formatter<FxVec2u>
 template <>
 struct std::formatter<FxVec2f>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxVec2f& obj, std::format_context& ctx) const
+    auto format(const FxVec2f& obj, std::format_context& ctx) const
     {
         return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
     }
@@ -149,9 +149,9 @@ struct std::formatter<FxVec2f>
 template <>
 struct std::formatter<FxVec2d>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxVec2d& obj, std::format_context& ctx) const
+    auto format(const FxVec2d& obj, std::format_context& ctx) const
     {
         return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
     }

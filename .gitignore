@@ -2,9 +2,14 @@ build/*
 build/**/*
 xcbuild/*
 xcbuild/**/*
+Src/out/**/*
 
 .*
 
 # Exclusions for .*
 !.gitignore
 !.gitattributes
+
+!.clangd
+!.clang-format
+!.clang-tidy

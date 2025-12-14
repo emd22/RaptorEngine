@@ -221,17 +221,19 @@ void RxGpuDevice::CreateLogicalDevice()
 
     const VkDeviceCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pQueueCreateInfos = queue_create_infos.data(),
+        
         .queueCreateInfoCount = (uint32)queue_create_infos.size(),
-        .pEnabledFeatures = &device_features,
-
-        // device specific extensions
-        .enabledExtensionCount = sizeof(device_extensions) / sizeof(device_extensions[0]),
-        .ppEnabledExtensionNames = device_extensions,
+        .pQueueCreateInfos = queue_create_infos.data(),
 
         // device specific layers (not used in modern vulkan)
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = nullptr,
+        
+        // device specific extensions
+        .enabledExtensionCount = sizeof(device_extensions) / sizeof(device_extensions[0]),
+
+        .ppEnabledExtensionNames = device_extensions,
+        .pEnabledFeatures = &device_features,
     };
 
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);

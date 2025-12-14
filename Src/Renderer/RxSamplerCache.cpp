@@ -123,8 +123,8 @@ void RxSamplerCache::CreateSamplerDsLayout()
 {
     VkDescriptorSetLayoutBinding sampler_binding {
         .binding = 0,
-        .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+        .descriptorCount = 1,
         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
         .pImmutableSamplers = nullptr,
     };

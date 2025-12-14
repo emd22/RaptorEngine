@@ -6,9 +6,13 @@
 #include "FxNeonUtil.hpp"
 
 #include <arm_neon.h>
+#elif defined(FX_USE_AVX)
+#include "FxAVXUtil.hpp"
+
+#include <immintrin.h>
 #endif
 
-#include "FxVec4.hpp"
+class FxVec4f;
 
 namespace JPH {
 class Vec3;
@@ -17,6 +21,13 @@ using RVec3 = Vec3;
 
 class alignas(16) FxVec3f
 {
+private:
+#if defined(FX_USE_NEON)
+    using SimdType = float32x4_t;
+#elif defined(FX_USE_AVX)
+    using SimdType = __m128;
+#endif
+
 public:
     static const FxVec3f sZero;
     static const FxVec3f sOne;
@@ -31,8 +42,8 @@ public:
     FxVec3f(const float32* values);
     FxVec3f(const JPH::Vec3& other);
 
-#ifdef FX_USE_NEON
-    FxVec3f(const FxVec4f& other) : mIntrin(other.mIntrin) {}
+#ifdef FX_USE_SIMD
+    FxVec3f(const FxVec4f& other);
 #else
     FxVec3f(const FxVec4f& other) : X(other.X), Y(other.Y), Z(other.Z) {}
 #endif
@@ -105,8 +116,8 @@ public:
     FxVec3f CrossSlow(const FxVec3f& other) const;
 
     FX_FORCE_INLINE float32 Dot(const FxVec3f& other) const;
-#ifdef FX_USE_NEON
-    FX_FORCE_INLINE float32 Dot(float32x4_t other) const;
+#ifdef FX_USE_SIMD
+    FX_FORCE_INLINE float32 Dot(SimdType other) const;
 #endif
 
     FX_FORCE_INLINE static FxVec3f Min(const FxVec3f& a, const FxVec3f& b);
@@ -117,19 +128,30 @@ public:
 
     void Print() const;
 
+#ifdef FX_USE_SIMD
+    FX_FORCE_INLINE bool IsCloseTo(const SimdType other, const float32 tolerance = 0.00001) const;
+#endif
+
 #ifdef FX_USE_NEON
     FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
-
-    FX_FORCE_INLINE bool IsCloseTo(const float32x4_t& other, const float32 tolerance = 0.00001) const;
 
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         return FxVec3f(FxNeon::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
     }
+#elif FX_USE_AVX
+    FX_FORCE_INLINE float32 GetX() const { return X; }
+    FX_FORCE_INLINE float32 GetY() const { return Y; }
+    FX_FORCE_INLINE float32 GetZ() const { return Z; }
 
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    {
+        return FxVec3f(FxSSE::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
+    }
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
@@ -148,37 +170,36 @@ public:
 
 #endif
 
-#ifdef FX_USE_NEON
-    explicit FxVec3f(float32x4_t intrin) : mIntrin(intrin) {}
+#ifdef FX_USE_SIMD
+    explicit FxVec3f(SimdType intrin) : mIntrin(intrin) {}
 
-    FxVec3f& operator=(const float32x4_t& other)
+    FxVec3f& operator=(const SimdType& other)
     {
         mIntrin = other;
         return *this;
     }
 
-    FxVec3f& operator=(const float32x4_t other)
+    FxVec3f& operator=(const SimdType other)
     {
         mIntrin = other;
         return *this;
     }
 
-    operator float32x4_t() const { return mIntrin; }
+    operator SimdType() const { return mIntrin; }
 #endif
 
 public:
-#if defined(FX_USE_NEON)
+#if defined(FX_USE_SIMD)
     union alignas(16)
     {
-        float32x4_t mIntrin;
+        SimdType mIntrin;
         float32 mData[4];
 
         struct
         {
-            float32 X, Y, Z, mPadding0;
+            float32 X, Y, Z, W;
         };
     };
-
 #else
     struct
     {
@@ -190,9 +211,9 @@ public:
 template <>
 struct std::formatter<FxVec3f>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxVec3f& obj, std::format_context& ctx) const
+    auto format(const FxVec3f& obj, std::format_context& ctx) const
     {
         return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z);
     }
@@ -200,4 +221,5 @@ struct std::formatter<FxVec3f>
 
 
 #include "Vector/FxVec3_None.inl"
+#include "Vector/Simd/FxVec3_AVX.inl"
 #include "Vector/Simd/FxVec3_Neon.inl"

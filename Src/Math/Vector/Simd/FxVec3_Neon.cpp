@@ -1,3 +1,5 @@
+#include <Core/FxDefines.hpp>
+
 #ifdef FX_USE_NEON
 
 #include <ThirdParty/Jolt/Jolt.h>
@@ -7,6 +9,7 @@
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxNeonUtil.hpp>
 #include <Math/FxVec3.hpp>
+#include <Math/FxVec4.hpp>
 
 const FxVec3f FxVec3f::sZero = FxVec3f(0.0f, 0.0f, 0.0f);
 const FxVec3f FxVec3f::sOne = FxVec3f(1.0f, 1.0f, 1.0f);
@@ -30,6 +33,9 @@ FxVec3f::FxVec3f(const float32* values)
 FxVec3f::FxVec3f(float32 scalar) { mIntrin = vdupq_n_f32(scalar); }
 
 FxVec3f::FxVec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
+
+
+FxVec3f::FxVec3f(const FxVec4f& other) { mIntrin = other.mIntrin; }
 
 
 void FxVec3f::Print() const { FxLogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }

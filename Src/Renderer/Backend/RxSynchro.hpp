@@ -13,8 +13,8 @@ public:
     void Create(RxGpuDevice* device)
     {
         const VkFenceCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-                                                .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-                                                .pNext = nullptr };
+                                                .pNext = nullptr,
+                                                .flags = VK_FENCE_CREATE_SIGNALED_BIT };
 
         mDevice = device;
 
@@ -64,8 +64,8 @@ public:
     {
         const VkSemaphoreCreateInfo create_info {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-            .flags = 0,
             .pNext = nullptr,
+            .flags = 0
         };
 
         mDevice = device;

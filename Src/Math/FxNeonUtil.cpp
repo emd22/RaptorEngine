@@ -1,3 +1,7 @@
+#include <Core/FxDefines.hpp>
+
+#ifdef FX_USE_NEON
+
 #include "FxNeonUtil.hpp"
 
 static constexpr uint32 sConstSignMask = 0x80000000;
@@ -156,3 +160,5 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
     *ycos = vbslq_f32(cosine_sign, yc, vnegq_f32(yc));
 }
 }; // namespace FxNeon
+
+#endif // #ifdef FX_USE_NEON

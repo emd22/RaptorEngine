@@ -1,8 +1,6 @@
 #include <Core/FxDefines.hpp>
 
-#ifdef FX_USE_NEON
-// Do nothing
-#else
+#ifdef FX_NO_SIMD
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Math/Real.h>

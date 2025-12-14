@@ -33,7 +33,7 @@ public:
 
 private:
     void CreateSkyboxPipeline();
-    VkPipelineLayout CreateSkyboxPipelineLayout();
+    //VkPipelineLayout CreateSkyboxPipelineLayout();
     void BuildDescriptorSets(uint32 frame_index);
 
 public:

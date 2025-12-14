@@ -2,8 +2,7 @@
 
 #include <Math/FxQuat.hpp>
 
-#ifdef FX_USE_NEON
-#else
+#ifdef FX_NO_SIMD
 
 FX_FORCE_INLINE bool FxQuat::IsCloseTo(const FxQuat& other, const float32 threshold)
 {

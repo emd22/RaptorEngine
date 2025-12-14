@@ -54,7 +54,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 
     if (!mMaterialPropertiesDS.IsInited()) {
-        assert(gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
+        FxAssert(gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
         mMaterialPropertiesDS.Create(dp, gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties);
     }
 
@@ -70,11 +70,11 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
         VkWriteDescriptorSet buffer_write {
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-            .descriptorCount = 1,
             .dstSet = mMaterialPropertiesDS.Set,
             .dstBinding = 0,
             .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
             .pBufferInfo = &info,
         };
 
@@ -244,17 +244,17 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 #define PUSH_IMAGE_IF_SET(img, binding)                                                                                \
     if (img != nullptr) {                                                                                              \
         const VkDescriptorImageInfo image_info {                                                                       \
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                                                   \
-            .imageView = img->Texture.Image.View,                                                                      \
             .sampler = img->Texture.Sampler->Sampler,                                                                  \
+            .imageView = img->Texture.Image.View,                                                                      \
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                                                   \
         };                                                                                                             \
         const VkWriteDescriptorSet image_write {                                                                       \
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,                                                           \
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,                                               \
-            .descriptorCount = 1,                                                                                      \
             .dstSet = descriptor_set.Set,                                                                              \
             .dstBinding = binding,                                                                                     \
             .dstArrayElement = 0,                                                                                      \
+            .descriptorCount = 1,                                                                                      \
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,                                               \
             .pImageInfo = write_image_infos.Insert(image_info),                                                        \
         };                                                                                                             \
         write_descriptor_sets.Insert(image_write);                                                                     \

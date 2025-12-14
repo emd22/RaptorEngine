@@ -156,7 +156,7 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
                                bool do_db_flush)
 {
     if (!sShaderCompileDb.IsOpen()) {
-        sShaderCompileDb.Open("../Shaders/ShaderCompileDb.fxdb");
+        sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/ShaderCompileDb.fxdb");
     }
 
     FxHash64 compile_entry_id = FxHashStr64(path, FxHashData64(FxSlice<FxShaderMacro>(macros)));

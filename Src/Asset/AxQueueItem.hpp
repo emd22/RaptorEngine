@@ -19,18 +19,19 @@ struct AxQueueItem
 {
     AxQueueItem() = default;
 
-    template <typename LoaderType, typename AssetType>
-    AxQueueItem(const FxRef<LoaderType>& loader, const FxRef<AssetType>& asset, AxType type, const std::string& path)
+    template <typename TLoaderType, typename TAssetType>
+    AxQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, AxType type, const std::string& path)
         : Path(path), Loader(loader), Asset(asset), RawData(nullptr), DataSize(0), AssetType(type)
     {
     }
 
-    template <typename LoaderType, typename AssetType>
-    AxQueueItem(const FxRef<LoaderType>& loader, const FxRef<AssetType>& asset, AxType type, const uint8* data,
+    template <typename TLoaderType, typename TAssetType>
+    AxQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, AxType type, const uint8* data,
                 uint32 data_size)
         : Path(""), Loader(loader), Asset(asset), RawData(data), DataSize(data_size), AssetType(type)
     {
     }
+
     std::string Path;
 
     FxRef<AxLoaderBase> Loader { nullptr };

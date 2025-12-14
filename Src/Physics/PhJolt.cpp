@@ -17,6 +17,8 @@
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
 #include <ThirdParty/Jolt/RegisterTypes.h>
 
+#include <cstdarg>
+
 // Callback for traces, connect this to your own trace function if you have one
 static void JoltTrace(const char* fmt, ...)
 {
