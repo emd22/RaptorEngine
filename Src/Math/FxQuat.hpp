@@ -39,6 +39,8 @@ public:
     FX_FORCE_INLINE bool IsCloseTo(const FxQuat& other, const float32 tolerance = 0.0001) const;
     bool IsCloseTo(const JPH::Quat& other, const float32 tolerance = 0.0001) const;
 
+    FX_FORCE_INLINE void LerpIP(const FxQuat& dest, float step);
+
 #ifdef FX_USE_NEON
     FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
@@ -88,7 +90,8 @@ public:
     {
         __m128 mIntrin;
         float32 mData[4];
-        struct {
+        struct
+        {
             float32 X, Y, Z, W;
         };
     };
@@ -107,5 +110,5 @@ struct std::formatter<FxQuat>
     }
 };
 
-#include "Quaternion/FxQuat_Neon.inl"
 #include "Quaternion/FxQuat_AVX.inl"
+#include "Quaternion/FxQuat_Neon.inl"

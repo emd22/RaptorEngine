@@ -1,17 +1,17 @@
-#include "FxLoaderJpeg.hpp"
+#include "AxLoaderJpeg.hpp"
 
-#include "Asset/FxAssetBase.hpp"
+#include "Asset/AxBase.hpp"
 
 #include <TurboJPEG/jpeglib.h>
 
-#include <Asset/FxAssetImage.hpp>
+#include <Asset/AxImage.hpp>
 #include <Core/FxMemory.hpp>
 #include <Core/FxRef.hpp>
 #include <Core/Log.hpp>
 
-FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
+AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
 {
-    FxRef<FxAssetImage> image(asset);
+    FxRef<AxImage> image(asset);
 
     const char* c_path = path.c_str();
 
@@ -19,7 +19,7 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
 
     if (!fp) {
         FxLogError("Could not find JPEG file at '{:s}'", c_path);
-        return FxLoaderJpeg::Status::eError;
+        return AxLoaderJpeg::Status::eError;
     }
 
     struct jpeg_error_mgr error_mgr;
@@ -59,9 +59,9 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromFile(FxRef<FxAssetBase> asset, const 
     return Status::eSuccess;
 }
 
-FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
+AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size)
 {
-    FxRef<FxAssetImage> image(asset);
+    FxRef<AxImage> image(asset);
 
     struct jpeg_error_mgr error_mgr;
 
@@ -109,9 +109,9 @@ FxLoaderJpeg::Status FxLoaderJpeg::LoadFromMemory(FxRef<FxAssetBase> asset, cons
     return Status::eSuccess;
 }
 
-void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
+void AxLoaderJpeg::CreateGpuResource(FxRef<AxBase>& asset)
 {
-    FxRef<FxAssetImage> image(asset);
+    FxRef<AxImage> image(asset);
 
     image->Texture.Create(image->ImageType, mImageData, image->Size, ImageFormat, ImageNumComponents);
 
@@ -119,7 +119,7 @@ void FxLoaderJpeg::CreateGpuResource(FxRef<FxAssetBase>& asset)
     asset->bIsUploadedToGpu.notify_all();
 }
 
-void FxLoaderJpeg::Destroy(FxRef<FxAssetBase>& asset)
+void AxLoaderJpeg::Destroy(FxRef<AxBase>& asset)
 {
     //    while (!asset->bIsUploadedToGpu) {
     //        asset->bIsUploadedToGpu.wait(true);

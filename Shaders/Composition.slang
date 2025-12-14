@@ -73,12 +73,7 @@ FSOut FragmentMain(FSIn in)
     let cfGamma : float = 1.0 / 2.2;
     lit_color = pow(lit_color, float3(cfGamma));
 
-    if (lighting.a <= 1e-5) {
-        out.vColor = float4(albedo.rgb, 1.0);
-    }
-    else {
-        out.vColor = float4(lit_color, 1.0);
-    }
+    out.vColor = float4(lit_color, 1.0);
 #endif
 
     return out;

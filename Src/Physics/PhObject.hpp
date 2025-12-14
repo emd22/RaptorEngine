@@ -9,12 +9,12 @@
 #include <FxMaterial.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
-struct FxPhysicsProperties
+struct PhProperties
 {
 public:
-    FxPhysicsProperties() = default;
+    PhProperties() = default;
 
-    float32 ConvexRadius = 0.01f;
+    float32 ConvexRadius = 0.005f;
     float32 Friction = 0.2f;
     float32 Restitution = 0.1f;
 
@@ -26,7 +26,7 @@ public:
 };
 
 
-class FxPhysicsObject
+class PhObject
 {
 public:
     enum PhysicsFlags
@@ -42,7 +42,7 @@ public:
 
 public:
     void CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f& initial_position, PhysicsFlags flags,
-                           PhysicsType type, const FxPhysicsProperties& properties);
+                           PhysicsType type, const PhProperties& properties);
     void DestroyPhysicsBody();
 
     void Teleport(FxVec3f position, FxQuat rotation);

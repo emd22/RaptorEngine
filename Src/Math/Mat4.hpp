@@ -53,10 +53,10 @@ public:
         result.Columns[3].Load4(position.X, position.Y, position.Z, 1.0f);
         return result;
 
-        /*return FxMat4f((float32[16]) { 
-            1, 0, 0, 0, 
+        /*return FxMat4f((float32[16]) {
+            1, 0, 0, 0,
             0, 1, 0, 0,
-            0, 0, 1, 0, 
+            0, 0, 1, 0,
             position.X, position.Y, position.Z, 1 });*/
     }
 
@@ -67,10 +67,10 @@ public:
         result.Columns[0] *= scale.X;
         result.Columns[1] *= scale.Y;
         result.Columns[2] *= scale.Z;
-        
+
         return result;
 
-        //return FxMat4f((float32[16]) { scale.X, 0, 0, 0, 0, scale.Y, 0, 0, 0, 0, scale.Z, 0, 0, 0, 0, 1 });
+        // return FxMat4f((float32[16]) { scale.X, 0, 0, 0, 0, scale.Y, 0, 0, 0, 0, scale.Z, 0, 0, 0, 0, 1 });
     }
 
     static FxMat4f AsRotationX(float rad);

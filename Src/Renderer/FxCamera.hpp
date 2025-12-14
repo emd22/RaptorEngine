@@ -5,7 +5,7 @@
 #include <Math/FxVec3.hpp>
 #include <Math/Mat4.hpp>
 
-class FxCamera 
+class FxCamera
 {
 public:
     virtual void Update() = 0;
@@ -35,7 +35,7 @@ public:
         Update();
     }
 
-    void UpdateProjectionMatrix();
+    virtual void UpdateProjectionMatrix();
 
     float32 GetFov() const { return FxRadToDeg(mFovRad); }
     float32 GetFovRad() const { return mFovRad; }
@@ -49,9 +49,9 @@ public:
     }
 
 
-    FX_FORCE_INLINE FxVec3f GetForwardVector() { return FxVec3f(ViewMatrix.Columns[2]).NormalizeIP(); }
-    FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp); }
-    FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction); }
+    FX_FORCE_INLINE FxVec3f GetForwardVector() { return Direction; }
+    FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp).Normalize(); }
+    FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
 
 
     inline void Rotate(float32 angle_x, float32 angle_y)
@@ -118,10 +118,16 @@ public:
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
 
+
     FxVec3f Direction = FxVec3f::sForward;
+
+    FxMat4f WeaponVPMatrix = FxMat4f::Identity;
+    FxMat4f WeaponProjectionMatrix = FxMat4f::Identity;
 
 private:
     float32 mFovRad = FxDegToRad(80.0f);
+    float32 mWeaponFov = FxDegToRad(70.0f);
+
 
     float32 mAspectRatio = 1.0f;
     float32 mNearPlane = 1000.0f;

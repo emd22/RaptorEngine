@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Asset/FxAssetQueue.hpp"
-#include "Asset/FxAssetQueueItem.hpp"
-#include "FxAssetImage.hpp"
+#include "Asset/AxQueue.hpp"
+#include "Asset/AxQueueItem.hpp"
+#include "AxImage.hpp"
 #include "FxObject.hpp"
 
 #include <Core/FxDataNotifier.hpp>
@@ -12,19 +12,19 @@
 #include <thread>
 
 template <typename T>
-concept C_IsAsset = std::is_base_of_v<FxAssetBase, T>;
+concept C_IsAsset = std::is_base_of_v<AxBase, T>;
 
 /**
  * Worker thread that waits and processes individual asset loading.
  */
-class FxAssetWorker
+class AxWorker
 {
 public:
-    FxAssetWorker() = default;
+    AxWorker() = default;
 
     void Create();
 
-    void SubmitItemToLoad(const FxAssetQueueItem& item)
+    void SubmitItemToLoad(const AxQueueItem& item)
     {
         // Wait for item to no longer be busy
         while (IsBusy.test()) {
@@ -40,8 +40,8 @@ public:
     void Update();
 
 public:
-    FxAssetQueueItem Item;
-    FxLoaderBase::Status LoadStatus = FxLoaderBase::Status::eNone;
+    AxQueueItem Item;
+    AxLoaderBase::Status LoadStatus = AxLoaderBase::Status::eNone;
 
     FxDataNotifier ItemReady;
 
@@ -58,17 +58,17 @@ struct FxLoadObjectOptions
     bool KeepInMemory = false;
 };
 
-class FxAssetManager
+class AxManager
 {
 public:
-    FxAssetManager() = default;
+    AxManager() = default;
 
     void Start(int32 thread_count);
     void Shutdown();
 
     void WorkerUpdate();
 
-    static FxAssetManager& GetInstance();
+    static AxManager& GetInstance();
 
     template <typename T>
         requires C_IsAsset<T>
@@ -107,15 +107,15 @@ public:
         return asset;
     }
 
-    static FxRef<FxAssetImage> LoadImage(RxImageType image_type, VkFormat format, const std::string& path)
+    static FxRef<AxImage> LoadImage(RxImageType image_type, VkFormat format, const std::string& path)
     {
-        FxRef<FxAssetImage> asset = FxRef<FxAssetImage>::New();
+        FxRef<AxImage> asset = FxRef<AxImage>::New();
         LoadImage(image_type, format, asset, path);
 
         return asset;
     }
 
-    static inline FxRef<FxAssetImage> LoadImage(const std::string& path, VkFormat format)
+    static inline FxRef<AxImage> LoadImage(const std::string& path, VkFormat format)
     {
         return LoadImage(RxImageType::Image, format, path);
     }
@@ -124,16 +124,16 @@ public:
      * @brief Creates a new `FxObject` and loads the asset into it from
      * the data provided.
      */
-    static FxRef<FxAssetImage> LoadImageFromMemory(RxImageType image_type, VkFormat format, const uint8* data,
-                                                   uint32 data_size)
+    static FxRef<AxImage> LoadImageFromMemory(RxImageType image_type, VkFormat format, const uint8* data,
+                                              uint32 data_size)
     {
-        FxRef<FxAssetImage> asset = FxRef<FxAssetImage>::New();
+        FxRef<AxImage> asset = FxRef<AxImage>::New();
         LoadImageFromMemory(image_type, format, asset, data, data_size);
 
         return asset;
     }
 
-    static inline FxRef<FxAssetImage> LoadImageFromMemory(VkFormat format, const uint8* data, uint32 data_size)
+    static inline FxRef<AxImage> LoadImageFromMemory(VkFormat format, const uint8* data, uint32 data_size)
     {
         return LoadImageFromMemory(RxImageType::Image, format, data, data_size);
     }
@@ -153,33 +153,33 @@ public:
      */
     static void LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size);
 
-    static void LoadImage(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset, const std::string& path);
+    static void LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const std::string& path);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    static inline void LoadImage(FxRef<FxAssetImage>& asset, VkFormat format, const std::string& path)
+    static inline void LoadImage(FxRef<AxImage>& asset, VkFormat format, const std::string& path)
     {
         return LoadImage(RxImageType::Image, format, asset, path);
     }
 
 
-    static void LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<FxAssetImage>& asset,
-                                    const uint8* data, uint32 data_size);
+    static void LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const uint8* data,
+                                    uint32 data_size);
 
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
-    static void LoadImageFromMemory(FxRef<FxAssetImage>& asset, VkFormat format, const uint8* data, uint32 data_size)
+    static void LoadImageFromMemory(FxRef<AxImage>& asset, VkFormat format, const uint8* data, uint32 data_size)
     {
         return LoadImageFromMemory(RxImageType::Image, format, asset, data, data_size);
     }
 
 
-    ~FxAssetManager() { Shutdown(); }
+    ~AxManager() { Shutdown(); }
 
 private:
-    FxAssetWorker* FindWorkerThread();
+    AxWorker* FindWorkerThread();
 
     void CheckForUploadableData();
     void CheckForItemsToLoad();
@@ -200,7 +200,7 @@ private:
 
         // FxRef<LoaderType> loader = FxRef<LoaderType>::New();
 
-        FxAssetManager& mgr = GetInstance();
+        AxManager& mgr = GetInstance();
 
         if (data != nullptr) {
             FxAssetQueueItem queue_item((loader), asset, TEnumValue, data, data_size);
@@ -218,7 +218,7 @@ private:
 public:
     //    FxDataNotifier DataLoaded;
 private:
-    FxAssetQueue mLoadQueue;
+    AxQueue mLoadQueue;
 
     std::atomic_flag mActive;
 
@@ -227,6 +227,6 @@ private:
 
     int32 mThreadCount = 2;
     // FxSizedArray<std::thread *> mWorkerThreads;
-    FxSizedArray<FxAssetWorker> mWorkerThreads;
+    FxSizedArray<AxWorker> mWorkerThreads;
     std::thread* mAssetManagerThread;
 };

@@ -13,14 +13,14 @@ class JobSystemThreadPool;
 class TempAllocatorImpl;
 }; // namespace JPH
 
-namespace FxPhysicsLayer {
+namespace PhLayer {
 using Type = JPH::ObjectLayer;
 static constexpr JPH::ObjectLayer Static = 0;
 static constexpr JPH::ObjectLayer Dynamic = 1;
 static constexpr JPH::ObjectLayer NumLayers = 2;
-}; // namespace FxPhysicsLayer
+}; // namespace PhLayer
 
-namespace FxPhysicsBroadPhaseLayer {
+namespace PhBroadPhaseLayer {
 using Type = JPH::BroadPhaseLayer;
 static constexpr JPH::BroadPhaseLayer Static(0);
 static constexpr JPH::BroadPhaseLayer Dynamic(1);
@@ -30,21 +30,21 @@ static constexpr uint32 NumLayers(2);
 
 // BroadPhaseLayerInterface implementation
 // This defines a mapping between object and broadphase layers.
-class FxPhysicsBPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
+class PhBPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
 {
 public:
-    FxPhysicsBPLayerInterfaceImpl()
+    PhBPLayerInterfaceImpl()
     {
         // Create a mapping table from object to broad phase layer
-        mObjectToBroadPhase[FxPhysicsLayer::Static] = FxPhysicsBroadPhaseLayer::Static;
-        mObjectToBroadPhase[FxPhysicsLayer::Dynamic] = FxPhysicsBroadPhaseLayer::Dynamic;
+        mObjectToBroadPhase[PhLayer::Static] = PhBroadPhaseLayer::Static;
+        mObjectToBroadPhase[PhLayer::Dynamic] = PhBroadPhaseLayer::Dynamic;
     }
 
     virtual uint32 GetNumBroadPhaseLayers() const override { return FxPhysicsBroadPhaseLayer::NumLayers; }
 
     virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
     {
-        JPH_ASSERT(inLayer < FxPhysicsLayer::NumLayers);
+        JPH_ASSERT(inLayer < PhLayer::NumLayers);
         return mObjectToBroadPhase[inLayer];
     }
 
@@ -52,9 +52,9 @@ public:
     virtual const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer inLayer) const override
     {
         switch ((JPH::BroadPhaseLayer::Type)inLayer) {
-        case (JPH::BroadPhaseLayer::Type)FxPhysicsBroadPhaseLayer::Static:
+        case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Static:
             return "Static";
-        case (JPH::BroadPhaseLayer::Type)FxPhysicsBroadPhaseLayer::Dynamic:
+        case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Dynamic:
             return "Dynamic";
         default:
             JPH_ASSERT(false);
@@ -64,19 +64,19 @@ public:
 #endif // JPH_EXTERNAL_PROFILE || JPH_PROFILE_ENABLED
 
 private:
-    JPH::BroadPhaseLayer mObjectToBroadPhase[FxPhysicsLayer::NumLayers];
+    JPH::BroadPhaseLayer mObjectToBroadPhase[PhLayer::NumLayers];
 };
 
 /// Class that determines if an object layer can collide with a broadphase layer
-class FxPhysicsObjectVsBPLayerFilter : public JPH::ObjectVsBroadPhaseLayerFilter
+class PhObjectVsBPLayerFilter : public JPH::ObjectVsBroadPhaseLayerFilter
 {
 public:
     virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
     {
         switch (inLayer1) {
-        case FxPhysicsLayer::Static:
-            return inLayer2 == FxPhysicsBroadPhaseLayer::Dynamic;
-        case FxPhysicsLayer::Dynamic:
+        case PhLayer::Static:
+            return inLayer2 == PhBroadPhaseLayer::Dynamic;
+        case PhLayer::Dynamic:
             return true;
         default:
             JPH_ASSERT(false);
@@ -87,15 +87,15 @@ public:
 
 
 /// Class that determines if two object layers can collide
-class FxPhysicsObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
+class PhObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
 {
 public:
     virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
     {
         switch (inObject1) {
-        case FxPhysicsLayer::Static:
-            return inObject2 == FxPhysicsLayer::Dynamic; // Non moving only collides with moving
-        case FxPhysicsLayer::Dynamic:
+        case PhLayer::Static:
+            return inObject2 == PhLayer::Dynamic; // Non moving only collides with moving
+        case PhLayer::Dynamic:
             return true; // Moving collides with everything
         default:
             JPH_ASSERT(false);
@@ -106,7 +106,7 @@ public:
 
 
 // An example contact listener
-class FxPhysicsContactListener : public JPH::ContactListener
+class PhContactListener : public JPH::ContactListener
 {
 public:
     // See: ContactListener
@@ -141,7 +141,7 @@ public:
 };
 
 // An example activation listener
-class FxPhysicsBodyActivationListener : public JPH::BodyActivationListener
+class PhBodyActivationListener : public JPH::BodyActivationListener
 {
 public:
     virtual void OnBodyActivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override
@@ -156,10 +156,10 @@ public:
 };
 
 
-class FxPhysicsJolt
+class PhJolt
 {
 public:
-    FxPhysicsJolt();
+    PhJolt();
 
     void Create();
     void Update();
@@ -169,7 +169,7 @@ public:
 
     FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 
-    ~FxPhysicsJolt();
+    ~PhJolt();
 
 public:
     JPH::PhysicsSystem PhysicsSystem;
@@ -181,12 +181,12 @@ public:
     FxMemberRef<JPH::JobSystemThreadPool> pJobSystem;
 
 private:
-    FxPhysicsBPLayerInterfaceImpl mBroadPhaseInterface;
-    FxPhysicsObjectVsBPLayerFilter mObjectVsBPLayerFilter;
+    PhBPLayerInterfaceImpl mBroadPhaseInterface;
+    PhObjectVsBPLayerFilter mObjectVsBPLayerFilter;
 
-    FxPhysicsBodyActivationListener mBodyActivationListener;
-    FxPhysicsContactListener mContactListener;
-    FxPhysicsObjectLayerPairFilterImpl mObjectLayerPairFilter;
+    PhBodyActivationListener mBodyActivationListener;
+    PhContactListener mContactListener;
+    PhObjectLayerPairFilterImpl mObjectLayerPairFilter;
 
 
     bool mbIsInited = false;

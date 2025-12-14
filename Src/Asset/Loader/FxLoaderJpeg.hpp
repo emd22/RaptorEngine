@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FxLoaderImageBase.hpp"
+#include "AxLoaderImageBase.hpp"
 
 #include <TurboJPEG/jpeglib.h>
 

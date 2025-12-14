@@ -2,8 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Asset/Fwd/Fx_Fwd_AssetManager.hpp>
-#include <Asset/FxAssetImage.hpp>
+#include <Asset/AxImage.hpp>
+#include <Asset/Fwd/Ax_Fwd_Manager.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Core/Log.hpp>
@@ -24,7 +24,7 @@ struct FxMaterialComponent
 {
 public:
 public:
-    FxRef<FxAssetImage> pImage { nullptr };
+    FxRef<AxImage> pImage { nullptr };
     FxSlice<const uint8> pDataToLoad { nullptr };
 
     using Status = FxMaterialComponentStatus;
@@ -34,7 +34,7 @@ public:
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pImage && !pDataToLoad) {
-            pImage = FxAssetImage::GetEmptyImage<TFormat, RxUtil::GetFormatPixelSize(TFormat)>();
+            pImage = AxImage::GetEmptyImage<TFormat, RxUtil::GetFormatPixelSize(TFormat)>();
         }
 
         if (!CheckIfReady()) {
@@ -90,7 +90,7 @@ public:
 public:
     FxMaterial() = default;
 
-    void Attach(ResourceType type, const FxRef<FxAssetImage>& image)
+    void Attach(ResourceType type, const FxRef<AxImage>& image)
     {
         switch (type) {
         case ResourceType::eDiffuse:

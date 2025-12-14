@@ -1,6 +1,6 @@
-#include "FxPhysicsPlayer.hpp"
+#include "PhPlayer.hpp"
 
-#include "FxPhysicsJolt.hpp"
+#include "PhJolt.hpp"
 
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
@@ -17,7 +17,7 @@ static constexpr float32 scMaxHeadRecovery = 10.0f;
 
 using namespace JPH;
 
-void FxPhysicsPlayer::Create()
+void PhPlayer::Create()
 {
     Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
 
@@ -30,16 +30,16 @@ void FxPhysicsPlayer::Create()
     settings->mMaxSlopeAngle = scMaxSlopeAngle;
     settings->mShape = pPhysicsShape;
 
-    settings->mMaxStrength = 400.0f;
-    settings->mMass = 80.0f;
+    settings->mMaxStrength = 100.0f;
+    settings->mMass = 90.0f;
     settings->mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
     settings->mSupportingVolume = Plane(Vec3::sAxisY(), -scPlayerRadius);
-    settings->mInnerBodyLayer = FxPhysicsLayer::Dynamic;
+    settings->mInnerBodyLayer = PhLayer::Dynamic;
 
     pPlayerVirt = new CharacterVirtual(settings, RVec3::sZero(), Quat::sIdentity(), 0, &gPhysics->PhysicsSystem);
 }
 
-void FxPhysicsPlayer::Teleport(const FxVec3f& position)
+void PhPlayer::Teleport(const FxVec3f& position)
 {
     JPH::RVec3 jolt_position;
     position.ToJoltVec3(jolt_position);
@@ -47,7 +47,7 @@ void FxPhysicsPlayer::Teleport(const FxVec3f& position)
     pPlayerVirt->SetPosition(jolt_position);
 }
 
-void FxPhysicsPlayer::ApplyMovement(const FxVec3f& by)
+void PhPlayer::ApplyMovement(const FxVec3f& by)
 {
     Vec3 jolt_dir;
     by.ToJoltVec3(jolt_dir);
@@ -56,7 +56,7 @@ void FxPhysicsPlayer::ApplyMovement(const FxVec3f& by)
     // pPlayerVirt->SetLinearVelocity(jolt_dir);
 }
 
-void FxPhysicsPlayer::Update(float32 delta_time)
+void PhPlayer::Update(float32 delta_time)
 {
     mTime += delta_time;
 
@@ -78,7 +78,7 @@ void FxPhysicsPlayer::Update(float32 delta_time)
     }
     else {
         velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp() +
-                   phys.GetGravity() * 0.91 * gPhysics->cDeltaTime;
+                   phys.GetGravity() * 0.99 * gPhysics->cDeltaTime;
 
         bIsGrounded = false;
     }
@@ -101,6 +101,6 @@ void FxPhysicsPlayer::Update(float32 delta_time)
     //                           mPhysicsSystem->GetDefaultLayerFilter(Layers::MOVING), {}, {}, *mTempAllocator);
 
     pPlayerVirt->ExtendedUpdate(gPhysics->cDeltaTime, phys.GetGravity(), settings,
-                                phys.GetDefaultBroadPhaseLayerFilter(FxPhysicsLayer::Dynamic),
-                                phys.GetDefaultLayerFilter(FxPhysicsLayer::Dynamic), {}, {}, *gPhysics->pTempAllocator);
+                                phys.GetDefaultBroadPhaseLayerFilter(PhLayer::Dynamic),
+                                phys.GetDefaultLayerFilter(PhLayer::Dynamic), {}, {}, *gPhysics->pTempAllocator);
 }

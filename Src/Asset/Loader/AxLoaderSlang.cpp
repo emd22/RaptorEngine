@@ -1,11 +1,11 @@
-#include "FxLoaderSlang.hpp"
+#include "AxLoaderSlang.hpp"
 
 #include <ThirdParty/Slang/slang.h>
 
-#include <Asset/FxAssetShader.hpp>
+#include <Asset/AxShader.hpp>
 #include <Core/FxFile.hpp>
 
-using Status = FxLoaderSlang::Status;
+using Status = AxLoaderSlang::Status;
 
 // static EShLanguage RxShaderTypeToShLanguage(RxShaderType type)
 // {
@@ -20,7 +20,7 @@ using Status = FxLoaderSlang::Status;
 //     }
 // }
 
-Status FxLoaderSlang::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& path)
+Status AxLoaderSlang::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
 {
     // FxRef<FxAssetShader> shader(asset);
 
@@ -42,11 +42,8 @@ Status FxLoaderSlang::LoadFromFile(FxRef<FxAssetBase> asset, const std::string& 
     return Status::eSuccess;
 }
 
-Status FxLoaderSlang::LoadFromMemory(FxRef<FxAssetBase> asset, const uint8* data, uint32 size)
-{
-    return Status::eSuccess;
-}
+Status AxLoaderSlang::LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size) { return Status::eSuccess; }
 
-void FxLoaderSlang::CreateGpuResource(FxRef<FxAssetBase>& asset) {}
+void AxLoaderSlang::CreateGpuResource(FxRef<AxBase>& asset) {}
 
-void FxLoaderSlang::Destroy(FxRef<FxAssetBase>& asset) {}
+void AxLoaderSlang::Destroy(FxRef<AxBase>& asset) {}

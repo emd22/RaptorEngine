@@ -1,12 +1,12 @@
 #pragma once
 
-#include "FxAssetBase.hpp"
-#include "Loader/FxLoaderBase.hpp"
+#include "AxBase.hpp"
+#include "Loader/AxLoaderBase.hpp"
 
 #include <Core/FxRef.hpp>
 #include <string>
 
-enum class FxAssetType
+enum class AxType
 {
     None,
     Binary,
@@ -15,9 +15,9 @@ enum class FxAssetType
     Image,
 };
 
-struct FxAssetQueueItem
+struct AxQueueItem
 {
-    FxAssetQueueItem() = default;
+    AxQueueItem() = default;
 
     template <typename TLoaderType, typename TAssetType>
     FxAssetQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, FxAssetType type,
@@ -35,12 +35,12 @@ struct FxAssetQueueItem
 
     std::string Path;
 
-    FxRef<FxLoaderBase> Loader { nullptr };
-    FxRef<FxAssetBase> Asset { nullptr };
+    FxRef<AxLoaderBase> Loader { nullptr };
+    FxRef<AxBase> Asset { nullptr };
 
     // Data for loading from memory
     const uint8* RawData = nullptr;
     uint32 DataSize = 0;
 
-    FxAssetType AssetType;
+    AxType AssetType;
 };

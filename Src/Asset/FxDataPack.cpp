@@ -1,6 +1,6 @@
 #include "FxDataPack.hpp"
 
-#include <Asset/FxAssetPaths.hpp>
+#include <Asset/AxPaths.hpp>
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/MemPool/FxMemPool.hpp>

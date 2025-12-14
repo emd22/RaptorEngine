@@ -5,7 +5,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_revision.h>
 
-#include <Asset/FxAssetManager.hpp>
+#include <Asset/AxManager.hpp>
 #include <Asset/FxConfigFile.hpp>
 #include <Core/FxDefer.hpp>
 #include <Core/FxPanic.hpp>
@@ -13,9 +13,8 @@
 #include <FxControls.hpp>
 #include <FxEngine.hpp>
 #include <FxMaterial.hpp>
-#include <Physics/FxPhysicsJolt.hpp>
+#include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
-
 #include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
@@ -68,7 +67,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    FxAssetManager& asset_manager = FxAssetManager::GetInstance();
+    AxManager& asset_manager = AxManager::GetInstance();
     asset_manager.Start(2);
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
@@ -89,7 +88,7 @@ void FoxtrotGame::CreateLights()
     constexpr float32 scOffsetX = scAreaX / 2.0f;
     constexpr float32 scOffsetY = scAreaY / 2.0f;
 
-    constexpr float32 scHeight = 8.0f;
+    constexpr float32 scHeight = 5.0f;
 
     auto light_volume = FxMeshGen::MakeIcoSphere(2);
 
@@ -121,29 +120,34 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb", { .KeepInMemory = true });
+    FxRef<FxObject> ground_object = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb",
+                                                               { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
-    ground_object->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(FxPhysicsObject::PF_CreateInactive),
-                                       FxPhysicsObject::PhysicsType::Static, {});
+    ground_object->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(PhObject::PF_CreateInactive),
+                                       PhObject::PhysicsType::Static, {});
     mMainScene.Attach(ground_object);
 
     pHelmetObject = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
     // pHelmetObject->Scale(FxVec3f(0.5));
-    pHelmetObject->MoveBy(FxVec3f(0, 1, 0));
     pHelmetObject->WaitUntilLoaded();
-    // pHelmetObject->PhysicsObjectCreate(static_cast<FxPhysicsObject::PhysicsFlags>(0),
-    //                                    FxPhysicsObject::PhysicsType::Dynamic, {});
-    // Disable physics by default, turn on physics with the keypress 'P'
-    // pHelmetObject->SetPhysicsEnabled(false);
+    pHelmetObject->MoveBy(FxVec3f(0, 0, 3.5));
+
+    pHelmetObject->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(0), PhObject::PhysicsType::Static, {});
+
     gPhysics->OptimizeBroadPhase();
+
 
     mMainScene.Attach(pHelmetObject);
 
 
     pPistolObject = FxAssetManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
+
+    pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);
+
+    PistolRotationGoal = pPistolObject->mRotation;
 
     mMainScene.Attach(pPistolObject);
 
@@ -265,12 +269,13 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-    pPistolObject->mRotation = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
+    PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.4)));
-    pPistolObject->MoveBy(camera->GetRightVector() * FxVec3f(0.20) + (camera->GetUpVector() * FxVec3f(0.1)));
+    pPistolObject->mRotation.LerpIP(PistolRotationGoal, 0.06 * DeltaTime);
 
-    // pHelmetObject->RotateY(DeltaTime * 0.0005f);
+    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
+                          camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));
+    // pPistolObject->MoveBy();
 
     gPhysics->Update();
 
@@ -319,7 +324,7 @@ void FoxtrotGame::DestroyGame()
 
     // FxMaterialManager::GetGlobalManager().Destroy();
     FxMaterialManager::GetGlobalManager().Destroy();
-    FxAssetManager::GetInstance().Shutdown();
+    AxManager::GetInstance().Shutdown();
 
     // pSkyboxMesh->IsReference = false;
     // pSkyboxMesh->Destroy();

@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Asset/FxAssetManager.hpp>
+#include <Asset/AxManager.hpp>
 #include <Core/FxDefines.hpp>
 #include <Core/FxStackArray.hpp>
 #include <FxEngine.hpp>
@@ -229,7 +229,7 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
     if (!component.pImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pImage = FxAssetManager::LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
+        component.pImage = AxManager::LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
         return false;
     }
 

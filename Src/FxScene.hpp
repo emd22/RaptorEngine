@@ -33,5 +33,5 @@ private:
     FxPagedArray<FxRef<FxObject>> mObjects;
     FxPagedArray<FxRef<FxLight>> mLights;
 
-    FxRef<FxCamera> mpCurrentCamera { nullptr };
+    FxRef<FxPerspectiveCamera> mpCurrentCamera { nullptr };
 };
