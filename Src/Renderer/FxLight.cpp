@@ -3,6 +3,8 @@
 #include "FxCamera.hpp"
 #include "FxEngine.hpp"
 
+#include <Asset/AxManager.hpp>
+
 #include <Renderer/RxRenderBackend.hpp>
 
 
@@ -157,7 +159,9 @@ void FxLight::RenderDebugMesh(const FxPerspectiveCamera& camera)
 
     FxDrawPushConstants push_constants {};
     memcpy(push_constants.VPMatrix, MVP.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
+    push_constants.ObjectId = AxManager::GenerateObjectId();
+
+    //memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
     // GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
 

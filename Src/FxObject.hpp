@@ -16,6 +16,11 @@ enum class FxObjectLayer
     ePlayerLayer,
 };
 
+struct FxObjectGpuEntry
+{
+    float ModelMatrix[16];
+};
+
 class FxObject : public AxBase, public FxEntity
 {
     friend class AxLoaderGltf;

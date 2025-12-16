@@ -5,6 +5,10 @@
 #include <Renderer/FxCamera.hpp>
 #include <Renderer/FxLight.hpp>
 
+#include <Renderer/Backend/RxGpuBuffer.hpp>
+
+#define FX_MAX_GPU_OBJECTS 128
+
 class FxScene
 {
 public:
@@ -32,6 +36,8 @@ public:
 private:
     FxPagedArray<FxRef<FxObject>> mObjects;
     FxPagedArray<FxRef<FxLight>> mLights;
+
+    RxRawGpuBuffer<FxObjectGpuEntry> mObjectGpuBuffer;
 
     FxRef<FxPerspectiveCamera> mpCurrentCamera { nullptr };
 };

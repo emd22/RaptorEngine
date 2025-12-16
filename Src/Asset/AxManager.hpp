@@ -69,6 +69,7 @@ public:
     void WorkerUpdate();
 
     static AxManager& GetInstance();
+    static uint32 GenerateObjectId();
 
     template <typename T>
         requires C_IsAsset<T>
@@ -175,8 +176,8 @@ public:
         return LoadImageFromMemory(RxImageType::Image, format, asset, data, data_size);
     }
 
-
     ~AxManager() { Shutdown(); }
+
 
 private:
     AxWorker* FindWorkerThread();

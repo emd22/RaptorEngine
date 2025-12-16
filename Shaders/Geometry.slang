@@ -26,9 +26,16 @@ struct VSIn
 struct VSPushConsts
 {
     float4x4 mViewProjection;
-    float4x4 mModelMatrix;
+	uint uiObjectIndex;
     uint uiMaterialIndex;
 };
+
+struct Object
+{
+	float4x4 mModel; 
+}
+
+layout(set = 0, binding = 0) StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
 

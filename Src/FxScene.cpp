@@ -7,6 +7,11 @@ void FxScene::Create()
 {
     mObjects.Create(32);
     mLights.Create(32);
+
+    mObjectGpuBuffer.Create(
+        FX_MAX_GPU_OBJECTS, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, 
+        VMA_MEMORY_USAGE_CPU_TO_GPU, RxGpuBufferFlags::PersistentMapped
+    );
 }
 
 void FxScene::Attach(const FxRef<FxObject>& object) { mObjects.Insert(object); }

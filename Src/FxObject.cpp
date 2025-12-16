@@ -9,6 +9,7 @@
 #include <FxEngine.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <Asset/AxManager.hpp>
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
 {
@@ -120,7 +121,9 @@ void FxObject::Render(const FxPerspectiveCamera& camera)
         memcpy(push_constants.VPMatrix, camera.WeaponVPMatrix.RawData, sizeof(FxMat4f));
     }
 
-    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
+    push_constants.ObjectId = AxManager::GenerateObjectId();
+
+    //memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
     // Copy the normal matrix to the vertex shader
     // GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
 
