@@ -8,6 +8,8 @@
 #include "RxDevice.hpp"
 #include "RxGpuBuffer.hpp"
 
+#include <optional>
+
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include <Math/FxVec2.hpp>
@@ -32,6 +34,12 @@ enum class RxImageAspectFlag
 
 };
 
+struct RxTransitionLayoutOverrides
+{
+    std::optional<VkPipelineStageFlagBits> DstStage = std::nullopt;
+    std::optional<VkAccessFlags> DstAccessMask = std::nullopt;
+};
+
 struct RxImageCubemapOptions
 {
     RxImageAspectFlag AspectFlag = RxImageAspectFlag::Auto;
@@ -50,12 +58,12 @@ public:
     void Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageUsageFlags usage,
                 VkImageAspectFlags aspect_flags);
 
-    void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1);
+    void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1, std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
 
     void CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout final_layout, FxVec2u size,
                         uint32 base_layer = 0);
 
-    void CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_format, RxImageCubemapOptions options = {});
+    void CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_format, RxImageCubemapOptions options);
     void Destroy();
 
     ~RxImage() { Destroy(); }

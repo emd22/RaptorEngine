@@ -82,6 +82,14 @@ void RxRenderBackend::Init(FxVec2u window_size)
     InitFrames();
     InitUploadContext();
 
+    // Create final submission semaphores. Note that there is one submission semaphore
+    // per Swapchain image, not frame in flight.
+    mSubmitSemaphores.InitSize(Swapchain.OutputImages.Size);
+    for (RxSemaphore& sem : mSubmitSemaphores) {
+        sem.Create(&mDevice);
+    }
+
+
     // PipelineCache.Create(RendererFramesInFlight);
 
     // SamplerCache.Create();
@@ -126,6 +134,16 @@ void RxRenderBackend::InitFrames()
         frame.LightCommandBuffer.Create(&frame.CommandPool);
 
         frame.Create(device);
+
+        auto synchro_label = std::format("Frame {} I.A.", i);
+        RxUtil::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.ImageAvailable.Semaphore);
+        
+        synchro_label = std::format("Frame {} G.P", i);
+        RxUtil::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.OffscreenSem.Semaphore);
+
+        synchro_label = std::format("Frame {} R.F", i);
+        RxUtil::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Semaphore);
+        
     }
 }
 
@@ -446,13 +464,13 @@ RxFrameResult RxRenderBackend::BeginFrame()
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
     frame->InFlight.WaitFor();
+    frame->InFlight.Reset();
+
 
     RxFrameResult result = GetNextSwapchainImage(frame);
     if (result != RxFrameResult::Success) {
         return result;
     }
-
-    frame->InFlight.Reset();
 
     frame->CommandBuffer.Reset();
     frame->CommandBuffer.Record();
@@ -498,21 +516,21 @@ void RxRenderBackend::PresentFrame()
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
     };
 
-    const VkSubmitInfo submit_info = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    VkSemaphore* submit_semaphore = &mSubmitSemaphores[mImageIndex].Semaphore;
 
-                                       .waitSemaphoreCount = 1,
-                                       .pWaitSemaphores = &frame->LightingSem.Semaphore,
-                                       .pWaitDstStageMask = wait_stages,
+    const VkSubmitInfo submit_info = { 
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
-                                       // command buffers
-                                       .commandBufferCount = 1,
-                                       .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &frame->LightingSem.Semaphore,
+        .pWaitDstStageMask = wait_stages,
 
-                                       // signal semaphores
-                                       .signalSemaphoreCount = 1,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
 
-                                       // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-                                       .pSignalSemaphores = &frame->RenderFinished.Semaphore };
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = submit_semaphore,
+    };
 
     VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
           "Error submitting draw buffer");
@@ -528,7 +546,7 @@ void RxRenderBackend::PresentFrame()
     const VkPresentInfoKHR present_info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->RenderFinished.Semaphore,
+        .pWaitSemaphores = submit_semaphore,
 
         .swapchainCount = 1,
         .pSwapchains = swapchains,
@@ -593,7 +611,6 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 {
     RxFrameData* frame = GetFrame();
 
-
     pCurrentLightingPass->End();
     frame->LightCommandBuffer.End();
 
@@ -640,10 +657,14 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
     const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
                                                   frame->ImageAvailable.Semaphore, nullptr, &mImageIndex);
 
-    if (result == VK_SUCCESS) {
+
+
+    //FxLogInfo("Retrieve {}", mImageIndex);
+
+    if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
         return RxFrameResult::Success;
     }
-    else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         // Swapchain.Rebuild()..
         return RxFrameResult::GraphicsOutOfDate;
     }
@@ -680,6 +701,10 @@ void RxRenderBackend::Destroy()
 
     DestroyUploadContext();
     DestroyFrames();
+
+    for (RxSemaphore& sem : mSubmitSemaphores) {
+        sem.Destroy();
+    }
 
     while (!mDeletionQueue.empty()) {
         ProcessDeletionQueue(true);

@@ -189,6 +189,10 @@ void FoxtrotGame::ProcessControls()
         sbRunning = false;
     }
 
+    if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT)) {
+        printf("MOUSE DOWN\n");
+    }
+
     // Click to lock mouse
     if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT) && !FxControlManager::IsMouseLocked()) {
         FxControlManager::CaptureMouse();
@@ -283,6 +287,7 @@ void FoxtrotGame::Tick()
     gPhysics->Update();
 
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
+        mLastTick = current_tick;
         return;
     }
 

@@ -90,7 +90,7 @@ public:
 
     RxFrameData* GetFrame();
 
-    uint32 GetImageIndex() { return mImageIndex; }
+    uint32 GetImageIndex() const { return mImageIndex; }
     VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
 
     void SubmitUploadCmd(SubmitFunc func);
@@ -135,7 +135,7 @@ public:
 
     void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
-        FxLogInfo("Adding object to deletion queue at frame %d", mInternalFrameCounter);
+        FxLogInfo("Adding object to deletion queue at frame {}", mInternalFrameCounter);
 
         mDeletionQueue.push_back(FxDeletionObject {
             .DeletionFrameNumber = mInternalFrameCounter,
@@ -205,6 +205,8 @@ private:
     VkDebugUtilsMessengerEXT mDebugMessenger;
 
     ExtensionList mAvailableExtensions;
+
+    FxSizedArray<RxSemaphore> mSubmitSemaphores;
 
     uint32 mImageIndex = 0;
 

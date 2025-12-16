@@ -21,7 +21,7 @@ public:
     void Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device);
     void CreateSwapchainFramebuffers();
 
-    VkSwapchainKHR GetSwapchain() { return mSwapchain; }
+    VkSwapchainKHR GetSwapchain() const { return mSwapchain; }
 
     void Destroy();
 

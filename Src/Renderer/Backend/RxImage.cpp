@@ -170,7 +170,8 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
     Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect_flags);
 }
 
-void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count)
+
+void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count, std::optional<RxTransitionLayoutOverrides> overrides)
 {
     VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
@@ -221,6 +222,15 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
         src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
+    
+    if (overrides.has_value()) {
+        if (overrides->DstStage.has_value()) {
+            dest_stage = overrides->DstStage.value();
+        }
+        if (overrides->DstAccessMask.has_value()) {
+            barrier.dstAccessMask = overrides->DstAccessMask.value();
+        }
+    }
 
     vkCmdPipelineBarrier(cmd, src_stage, dest_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
@@ -234,7 +244,7 @@ void RxImage::CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout 
     Fx_Fwd_SubmitUploadCmd(
         [&](RxCommandBuffer& cmd)
         {
-            TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd);
+            TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1, RxTransitionLayoutOverrides{.DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT, .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT});
 
             VkBufferImageCopy copy {
                 .bufferOffset = 0,
@@ -256,7 +266,7 @@ void RxImage::CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout 
 
             vkCmdCopyBufferToImage(cmd, buffer.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
-            TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd);
+            TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1, RxTransitionLayoutOverrides{.DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT, .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT});
         });
 }
 

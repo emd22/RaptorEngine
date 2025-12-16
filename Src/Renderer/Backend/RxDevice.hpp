@@ -32,9 +32,9 @@ public:
         });
     }
 
-    uint32 GetGraphicsFamily() { return mGraphicsIndex; }
-    uint32 GetPresentFamily() { return mPresentIndex; }
-    uint32 GetTransferFamily() { return mTransferIndex; }
+    uint32 GetGraphicsFamily() const { return mGraphicsIndex; }
+    uint32 GetPresentFamily() const { return mPresentIndex; }
+    uint32 GetTransferFamily() const { return mTransferIndex; }
 
 private:
     void FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR surface);
