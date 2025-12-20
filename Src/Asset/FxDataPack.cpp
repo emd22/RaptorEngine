@@ -62,8 +62,6 @@ void FxDataPack::BinaryReadHeader()
         File.Read<uint32>(FxMakeSlice(&size, 1));
 
 
-        FxLogInfo("Hash: {}, Offset: {}, Size: {}", id, offset, size);
-
         FxSizedArray<uint8> data;
         data.InitSize(size);
 
@@ -159,7 +157,6 @@ FxDataPackEntry* FxDataPack::QuerySection(FxHash64 id) const
 
     FxDataPackEntry* found_entry = nullptr;
     for (FxDataPackEntry& entry : Entries) {
-        FxLogDebug("Check Entry: {:20}, {:20}", entry.Id, id);
         if (entry.Id == id) {
             found_entry = &entry;
             break;

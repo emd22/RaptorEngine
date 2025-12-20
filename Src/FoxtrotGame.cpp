@@ -81,36 +81,41 @@ void FoxtrotGame::InitEngine()
 
 void FoxtrotGame::CreateLights()
 {
-    constexpr float32 scNumLightsX = 4;
-    constexpr float32 scNumLightsY = 4;
+    // constexpr float32 scNumLightsX = 4;
+    // constexpr float32 scNumLightsY = 4;
 
-    constexpr float32 scAreaX = 20.0f;
-    constexpr float32 scAreaY = 20.0f;
+    // constexpr float32 scAreaX = 20.0f;
+    // constexpr float32 scAreaY = 20.0f;
 
-    constexpr float32 scDistanceX = scAreaX / scNumLightsX;
-    constexpr float32 scDistanceY = scAreaY / scNumLightsY;
+    // constexpr float32 scDistanceX = scAreaX / scNumLightsX;
+    // constexpr float32 scDistanceY = scAreaY / scNumLightsY;
 
-    constexpr float32 scOffsetX = scAreaX / 2.0f;
-    constexpr float32 scOffsetY = scAreaY / 2.0f;
+    // constexpr float32 scOffsetX = scAreaX / 2.0f;
+    // constexpr float32 scOffsetY = scAreaY / 2.0f;
 
-    constexpr float32 scHeight = 5.0f;
+    // constexpr float32 scHeight = 5.0f;
 
-    auto light_volume = FxMeshGen::MakeIcoSphere(2);
+    // auto light_volume = FxMeshGen::MakeIcoSphere(2);
 
 
-    for (int y = 0; y < scNumLightsY; y++) {
-        for (int x = 0; x < scNumLightsX; x++) {
-            FxRef<FxLight> light = FxMakeRef<FxLight>();
-            FxVec3f position = FxVec3f((scDistanceX * x) - scOffsetX, scHeight, (scDistanceY * y) - scOffsetY);
-            light->MoveTo(position);
-            light->SetLightVolume(light_volume, false);
-            light->Color = FxColor(0x76a6a6FF);
+    // for (int y = 0; y < scNumLightsY; y++) {
+    //     for (int x = 0; x < scNumLightsX; x++) {
+    //         FxRef<FxLight> light = FxMakeRef<FxLight>();
+    //         FxVec3f position = FxVec3f((scDistanceX * x) - scOffsetX, scHeight, (scDistanceY * y) - scOffsetY);
+    //         light->MoveTo(position);
+    //         light->SetLightVolume(light_volume, false);
+    //         light->Color = FxColor(0x76a6a6FF);
 
-            light->Scale(FxVec3f(25));
+    //         light->Scale(FxVec3f(25));
 
-            mMainScene.Attach(light);
-        }
-    }
+    //         mMainScene.Attach(light);
+    //     }
+    // }
+
+
+    FxRef<FxLight> sun = FxMakeRef<FxLight>();
+
+    sun->MoveTo(FxVec3f(20, 20, 20));
 }
 
 void FoxtrotGame::CreateGame()
@@ -302,7 +307,7 @@ void FoxtrotGame::Tick()
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->mRotation.SmoothFollow(PistolRotationGoal, 25.0, DeltaTime);
+    pPistolObject->mRotation.SmoothFollow(PistolRotationGoal, 50.0, DeltaTime);
 
     pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
                           camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));

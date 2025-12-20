@@ -110,12 +110,13 @@ static bool IsShaderUpToDate(FxHash64 entry_id, const char* path)
 {
     FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
     if (!entry) {
+        FxLogWarning("Cannot find entry for shader!");
         return false;
     }
 
     uint64 latest_modification_time = FxFilesystemIO::FileGetLastModified(path);
 
-    if (std::stoull(entry->Value) != latest_modification_time) {
+    if (std::stoull(entry->Value) < latest_modification_time) {
         return false;
     }
 
@@ -158,6 +159,28 @@ static FxSlice<uint8> CreateAlignedBufferForSpirv(const Slang::ComPtr<slang::IBl
     return FxMakeSlice(buffer, buffer_size);
 }
 
+
+bool FxShaderCompiler::IsOutOfDate(const char* path, const FxSizedArray<FxShaderMacro>& macros)
+{
+    if (!sShaderCompileDb.IsOpen()) {
+        sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/ShaderCompileDb.fxdb");
+    }
+
+    FxHash64 compile_entry_id = FxHashStr64(path);
+
+    return !IsShaderUpToDate(compile_entry_id, path);
+}
+
+bool FxShaderCompiler::CompileIfOutOfDate(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros)
+{
+    bool out_of_date = IsOutOfDate(path, macros);
+
+    if (out_of_date) {
+        Compile(path, pack, macros);
+    }
+
+    return out_of_date;
+}
 void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros,
                                bool do_db_flush)
 {
@@ -165,12 +188,9 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
         sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/ShaderCompileDb.fxdb");
     }
 
-    FxHash64 compile_entry_id = FxHashStr64(path, FxHashData64(FxSlice<FxShaderMacro>(macros)));
+    FxLogInfo("Compiling shader {} with {} macros", path, macros.Size);
 
-    if (IsShaderUpToDate(compile_entry_id, path)) {
-        FxLogInfo("Shader {} is up to date!", path);
-        return;
-    }
+    FxHash64 compile_entry_id = FxHashStr64(path);
 
     bool has_vertex_shader = false;
     bool has_fragment_shader = false;

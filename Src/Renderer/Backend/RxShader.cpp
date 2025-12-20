@@ -84,13 +84,10 @@ bool RxShader::PreloadCompiledPrograms(const std::string& pack_path)
 {
     bool did_read = mDataPack.ReadFromFile(pack_path.c_str());
 
-    FxLogInfo("Read header for data pack");
-
     if (!did_read) {
         FxLogInfo("Could not read compiled shader from {}. Recompiling...", pack_path);
         return false;
     }
-    FxLogInfo("Read ALL ENTRIES for data pack");
 
 
     mDataPack.ReadAllEntries();
@@ -119,6 +116,17 @@ const std::string RxShader::GetProgramPath() const
 
 FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros)
 {
+    std::string source_path = GetSourcePath();
+    const char* c_source_path = source_path.c_str();
+
+    if (FxShaderCompiler::IsOutOfDate(c_source_path, macros)) {
+        FxLogWarning("Shader {} is out of date!", c_source_path);
+        // Shader is out of date, compile it
+        FxShaderCompiler::Compile(c_source_path, mDataPack, macros);
+        // Save the program back to the datapack
+        mDataPack.WriteToFile(GetProgramPath().c_str());
+    }
+
     FxLogDebug("Getting program from {}", Name);
     FxHash64 program_id = RxShader::GenerateShaderId(shader_type, macros);
 

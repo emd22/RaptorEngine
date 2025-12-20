@@ -2,7 +2,7 @@
 
 #include "FxFile.hpp"
 #include "FxHash.hpp"
-#include "FxPagedArray.hpp"
+// #include "FxPagedArray.hpp"
 
 struct FxBasicDbEntry
 {
@@ -18,7 +18,7 @@ public:
     void Open(const char* path);
 
     void WriteEntry(const FxBasicDbEntry& entry);
-    FxBasicDbEntry* FindEntry(FxHash32 key);
+    FxBasicDbEntry* FindEntry(FxHash64 key);
 
     void SaveToFile();
 
