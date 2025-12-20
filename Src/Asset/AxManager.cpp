@@ -378,8 +378,3 @@ AxManager& AxManager::GetInstance()
 
     return AssetManager;
 }
-
-uint32 AxManager::GenerateObjectId() { 
-    static uint32 sObjectId = 0;
-    return (sObjectId++);
-}

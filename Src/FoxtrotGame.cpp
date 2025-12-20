@@ -14,6 +14,7 @@
 #include <FxEngine.hpp>
 #include <FxMaterial.hpp>
 #include <Physics/PhJolt.hpp>
+#include <Renderer/Backend/RxGpuBuffer.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 #include <csignal>
 
@@ -191,6 +192,29 @@ void FoxtrotGame::ProcessControls()
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT)) {
         printf("MOUSE DOWN\n");
+    }
+
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
+        FxLogInfo("Normal:");
+
+        FxMat4f& model0 = pHelmetObject->GetModelMatrix();
+        for (int j = 0; j < 4; j++) {
+            FxLogInfo("[{}, {}, {}, {}]", model0.RawData[j * 4 + 0], model0.RawData[j * 4 + 1],
+                      model0.RawData[j * 4 + 2], model0.RawData[j * 4 + 3]);
+        }
+
+        FxLogInfo("");
+
+        FxObjectGpuEntry* buffer = reinterpret_cast<FxObjectGpuEntry*>(gObjectManager->mObjectGpuBuffer.pMappedBuffer);
+        FxObjectGpuEntry* gpu_entry = &(buffer[pHelmetObject->ObjectId]);
+
+        float* model1 = gpu_entry->ModelMatrix;
+
+        for (int j = 0; j < 4; j++) {
+            FxLogInfo("[{}, {}, {}, {}]", model1[j * 4 + 0], model1[j * 4 + 1], model1[j * 4 + 2], model1[j * 4 + 3]);
+        }
+
+        FxLogInfo("");
     }
 
     // Click to lock mouse

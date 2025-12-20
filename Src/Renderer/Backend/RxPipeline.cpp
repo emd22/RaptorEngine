@@ -275,10 +275,12 @@ VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushCons
     for (int i = 0; i < push_constant_defs.Size; i++) {
         const RxPushConstants& pc_def = push_constant_defs[i];
 
-        VkPushConstantRange range { 
+        FxLogDebug("Adding push constant (Off={}, Sz={})", current_pc_offset, pc_def.Size);
+
+        VkPushConstantRange range {
             .stageFlags = pc_def.StageFlags,
-            .offset = current_pc_offset, 
-            .size = pc_def.Size, 
+            .offset = current_pc_offset,
+            .size = pc_def.Size,
         };
         push_const_ranges.Insert(range);
 

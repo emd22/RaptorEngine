@@ -69,7 +69,6 @@ public:
     void WorkerUpdate();
 
     static AxManager& GetInstance();
-    static uint32 GenerateObjectId();
 
     template <typename T>
         requires C_IsAsset<T>

@@ -1,13 +1,11 @@
 #pragma once
 
+#include "FxObjectManager.hpp"
+
 #include <FxEntity.hpp>
 #include <FxObject.hpp>
 #include <Renderer/FxCamera.hpp>
 #include <Renderer/FxLight.hpp>
-
-#include <Renderer/Backend/RxGpuBuffer.hpp>
-
-#define FX_MAX_GPU_OBJECTS 128
 
 class FxScene
 {
@@ -33,11 +31,12 @@ public:
         Destroy();
     }
 
+public:
+    FxObjectManager ObjectManager;
+
 private:
     FxPagedArray<FxRef<FxObject>> mObjects;
     FxPagedArray<FxRef<FxLight>> mLights;
-
-    RxRawGpuBuffer<FxObjectGpuEntry> mObjectGpuBuffer;
 
     FxRef<FxPerspectiveCamera> mpCurrentCamera { nullptr };
 };

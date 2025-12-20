@@ -13,11 +13,9 @@
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
-template <typename ElementType>
-class RxRawGpuBuffer;
+template <typename ElementType> class RxRawGpuBuffer;
 
-template <typename ElementType>
-class RxGpuBuffer;
+template <typename ElementType> class RxGpuBuffer;
 
 enum class RxBufferUsageType
 {
@@ -25,8 +23,7 @@ enum class RxBufferUsageType
     Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 };
 
-template <typename ElementType>
-class RxGpuBufferMapContext
+template <typename ElementType> class RxGpuBufferMapContext
 {
 public:
     RxGpuBufferMapContext(RxRawGpuBuffer<ElementType>* buffer) : mGpuBuffer(buffer) { mGpuBuffer->Map(); }
@@ -74,8 +71,7 @@ enum class RxGpuBufferFlags : uint16
 /**
  * @brief Provides a GPU buffer that can be created with more complex parameters without staging.
  */
-template <typename ElementType>
-class RxRawGpuBuffer
+template <typename ElementType> class RxRawGpuBuffer
 {
 public:
     const int32 ElementSize = sizeof(ElementType);
@@ -143,6 +139,11 @@ public:
 #endif
 
         Initialized = true;
+    }
+
+    void FlushToGpu(uint32 offset, uint32 size)
+    {
+        vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
     }
 
 
@@ -229,8 +230,7 @@ private:
  * A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
  * buffer type.
  */
-template <typename ElementType>
-class RxGpuBuffer : public RxRawGpuBuffer<ElementType>
+template <typename ElementType> class RxGpuBuffer : public RxRawGpuBuffer<ElementType>
 {
 private:
     using RxRawGpuBuffer<ElementType>::Create;

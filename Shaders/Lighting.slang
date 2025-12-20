@@ -1,5 +1,7 @@
 module Lighting;
 
+#include "./Object.slang.inc"
+
 //////////////////////////////////
 // Vertex shader
 //////////////////////////////////
@@ -12,16 +14,20 @@ struct VSIn
 
 struct VSPushConsts
 {
-    float4x4 mMVP;
+    float4x4 mViewProjection;
+    uint uiObjectIndex;
 };
 
 [[vk::push_constant]] VSPushConsts VSConst;
+
+layout(binding = 4) StructuredBuffer<Object> bObjectBuffer;
 
 [shader("vertex")]
 
 float4 VertexMain(VSIn in) : SV_POSITION
 {
-    return mul(float4(in.vPosition, 1.0), VSConst.mMVP);
+    float4x4 MVP = mul(VSConst.mViewProjection, bObjectBuffer[VSConst.uiObjectIndex].mModel);
+    return mul(MVP, float4(in.vPosition, 1.0));
 }
 
 //////////////////////////////////
@@ -44,7 +50,7 @@ layout(binding = 3) Sampler2D sNormal;
 
 struct FSPushConsts
 {
-    [[vk::offset(64)]]
+    [[vk::offset(80)]]
     float4x4 mInvView;
     float4x4 mInvProjection;
     float3 vEyePosition;
@@ -110,8 +116,8 @@ float3 WorldPosFromDepth(float2 uv, float depth)
 {
     float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
 
-    float4 clip = mul(ndc, FSConst.mInvProjection);
-    float4 view = mul((clip / clip.w), FSConst.mInvView);
+    float4 clip = mul(FSConst.mInvProjection, ndc);
+    float4 view = mul(FSConst.mInvView, (clip / clip.w));
 
     return view.xyz;
 }

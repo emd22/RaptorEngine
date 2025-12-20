@@ -25,14 +25,16 @@ struct FxVertexInfo
 struct alignas(16) FxDrawPushConstants
 {
     float32 VPMatrix[16];
-    //float32 ModelMatrix[12];
+    // float32 ModelMatrix[12];
     uint32 ObjectId = 0;
     uint32 MaterialIndex = 0;
 };
 
 struct alignas(16) FxLightVertPushConstants
 {
-    float32 MVPMatrix[16];
+    float32 VPMatrix[16];
+
+    uint32 ObjectId = 0;
 };
 
 struct alignas(16) FxLightFragPushConstants

@@ -4,7 +4,6 @@ module Composition;
 // Vertex shader
 //////////////////////////////////
 
-
 struct VSIn
 {
     int iVertexIndex : SV_VertexID;

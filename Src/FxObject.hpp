@@ -9,6 +9,7 @@
 #include <Core/MemPool/FxMPPagedArray.hpp>
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
+#include <FxObjectManager.hpp>
 
 enum class FxObjectLayer
 {
@@ -16,10 +17,6 @@ enum class FxObjectLayer
     ePlayerLayer,
 };
 
-struct FxObjectGpuEntry
-{
-    float ModelMatrix[16];
-};
 
 class FxObject : public AxBase, public FxEntity
 {
@@ -27,7 +24,10 @@ class FxObject : public AxBase, public FxEntity
     friend class AxManager;
 
 public:
-    FxObject() { this->Type = FxEntityType::Object; }
+    static const FxObjectId sNone = UINT32_MAX;
+
+public:
+    FxObject();
 
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
@@ -48,7 +48,7 @@ public:
     FX_FORCE_INLINE FxObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
     void Destroy() override;
-    ~FxObject() override { Destroy(); }
+    ~FxObject() override;
 
 private:
     void RenderMesh();

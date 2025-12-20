@@ -3,12 +3,20 @@
 #include "FxCamera.hpp"
 #include "FxEngine.hpp"
 
-#include <Asset/AxManager.hpp>
-
+#include <FxObjectManager.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 
 using VertexType = FxLight::VertexType;
+
+FxLight::FxLight(FxLightFlags flags) : Flags(flags)
+{
+    ObjectId = gObjectManager->GenerateObjectId();
+
+    this->Type = FxEntityType::Light;
+
+    FxLogDebug("Creating light (id={})", ObjectId);
+}
 
 void FxLight::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { LightVolume = volume; }
 
@@ -98,13 +106,16 @@ void FxLight::Render(const FxPerspectiveCamera& camera)
     RxFrameData* frame = gRenderer->GetFrame();
     // FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
 
-    FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
+    // FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
+    UpdateIfOutOfDate();
 
     mpLightPipeline->Bind(frame->LightCommandBuffer);
 
+
     {
         FxLightVertPushConstants push_constants {};
-        memcpy(push_constants.MVPMatrix, MVP.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+        push_constants.ObjectId = ObjectId;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, mpLightPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT,
                            0, sizeof(push_constants), &push_constants);
@@ -155,13 +166,13 @@ void FxLight::RenderDebugMesh(const FxPerspectiveCamera& camera)
     RxFrameData* frame = gRenderer->GetFrame();
     FxRef<RxDeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
-    FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
+    // FxMat4f MVP = camera.VPMatrix;
 
     FxDrawPushConstants push_constants {};
-    memcpy(push_constants.VPMatrix, MVP.RawData, sizeof(FxMat4f));
-    push_constants.ObjectId = AxManager::GenerateObjectId();
+    memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+    push_constants.ObjectId = ObjectId;
 
-    //memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
+    // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
     // GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
 
@@ -173,3 +184,5 @@ void FxLight::RenderDebugMesh(const FxPerspectiveCamera& camera)
 
     mDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
 }
+
+FxLight::~FxLight() { gObjectManager->FreeObjectId(ObjectId); }

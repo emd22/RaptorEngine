@@ -7,11 +7,15 @@ class PhJolt;
 class FxShaderCompiler;
 class RxPipelineList;
 class RxRenderPassCache;
+class FxObjectManager;
 
 extern RxRenderBackend* gRenderer;
 extern PhJolt* gPhysics;
 extern FxShaderCompiler* gShaderCompiler;
 extern RxPipelineList* gPipelines;
+
+extern FxObjectManager* gObjectManager;
+
 // extern RxRenderPassCache* gRenderPassCache;
 
 inline constexpr const char* gPipelineGeometryName = "Geometry";
