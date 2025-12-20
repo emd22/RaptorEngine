@@ -1,2 +1,2 @@
 src/ThirdParty/* linguist-vendored
-Lib/* linguist-vendored
+Lib/** linguist-vendored
