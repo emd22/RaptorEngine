@@ -68,6 +68,13 @@ public:
         MarkMatrixOutOfDate();
     }
 
+    void UpdateIfOutOfDate()
+    {
+        if (mbMatrixOutOfDate) {
+            RecalculateModelMatrix();
+        }
+    }
+
     FX_FORCE_INLINE void MarkMatrixOutOfDate() { mbMatrixOutOfDate = true; }
 
     virtual ~FxEntity() {}
@@ -76,6 +83,8 @@ protected:
     void RecalculateModelMatrix();
 
 public:
+    uint32 ObjectId = UINT32_MAX;
+
     FxVec3f mPosition = FxVec3f::sZero;
     FxQuat mRotation = FxQuat::sIdentity;
     FxVec3f mScale = FxVec3f::sOne;
@@ -89,8 +98,8 @@ public:
     FxEntityType Type = FxEntityType::Unknown;
 
 protected:
-    bool mbPhysicsTransformOutOfDate : 1 = false;
-    bool mbMatrixOutOfDate : 1 = false;
+    bool mbPhysicsTransformOutOfDate : 1 = true;
+    bool mbMatrixOutOfDate : 1 = true;
 
     FxMat4f mModelMatrix = FxMat4f::Identity;
     // FxMat4f mNormalMatrix = FxMat4f::Identity;

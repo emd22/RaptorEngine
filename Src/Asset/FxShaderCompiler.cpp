@@ -49,14 +49,20 @@ static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session, co
         }
     }
 
-    FxStackArray<slang::CompilerOptionEntry, 2> compiler_options = {
+    FxStackArray<slang::CompilerOptionEntry, 3> compiler_options = {
         {
             slang::CompilerOptionName::EmitSpirvDirectly,
             { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr },
         },
         {
+            // Use "slang 2026" profile to warn for legacy code
             slang::CompilerOptionName::LanguageVersion,
             { slang::CompilerOptionValueKind::Int, 2026, 0, nullptr, nullptr },
+        },
+        {
+            // Column-major matrices
+            slang::CompilerOptionName::MatrixLayoutColumn,
+            { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr },
         }
     };
 

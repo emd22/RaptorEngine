@@ -6,6 +6,7 @@
 #include <Core/FxDefines.hpp>
 #include <Core/FxStackArray.hpp>
 #include <FxEngine.hpp>
+#include <FxObjectManager.hpp>
 #include <Renderer/Backend/RxCommands.hpp>
 #include <Renderer/Backend/RxDevice.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
@@ -32,7 +33,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 3);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3);
         dp.Create(gRenderer->GetDevice(), MaxMaterials);
     }
 
@@ -60,25 +61,31 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 
     {
-        //        FxStackArray<VkWriteDescriptorSet, 1> write_descriptor_sets;
+        FxStackArray<VkWriteDescriptorSet, 2> write_descriptor_sets;
+        FxStackArray<VkDescriptorBufferInfo, 2> write_buffer_infos;
 
-        VkDescriptorBufferInfo info {
-            .buffer = MaterialPropertiesBuffer.Buffer,
-            .offset = 0,
-            .range = sizeof(FxMaterialProperties),
-        };
+        {
+            VkDescriptorBufferInfo info {
+                .buffer = MaterialPropertiesBuffer.Buffer,
+                .offset = 0,
+                .range = VK_WHOLE_SIZE,
+            };
 
-        VkWriteDescriptorSet buffer_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = mMaterialPropertiesDS.Set,
-            .dstBinding = 0,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-            .pBufferInfo = &info,
-        };
+            VkWriteDescriptorSet buffer_write {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = mMaterialPropertiesDS.Set,
+                .dstBinding = 0,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .pBufferInfo = write_buffer_infos.Insert(info),
+            };
 
-        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &buffer_write, 0, nullptr);
+            write_descriptor_sets.Insert(buffer_write);
+        }
+
+        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
+                               0, nullptr);
     }
 
     RxUtil::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Set);
@@ -190,15 +197,17 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
-    VkDescriptorSet sets_to_bind[] = { mDescriptorSet.Set, manager.mMaterialPropertiesDS.Set };
+    VkDescriptorSet sets_to_bind[] = {
+        mDescriptorSet.Set,
+        manager.mMaterialPropertiesDS.Set,
+    };
 
-    const uint32 num_sets = FxSizeofArray(sets_to_bind);
-    const uint32 properties_offset = static_cast<uint32>(mMaterialPropertiesIndex * sizeof(FxMaterialProperties));
+    // const uint32 properties_offset = static_cast<uint32>(mMaterialPropertiesIndex * sizeof(FxMaterialProperties));
 
-    uint32 dynamic_offsets[] = { properties_offset };
+    // uint32 dynamic_offsets[] = { properties_offset, 0 };
 
-    RxDescriptorSet::BindMultipleOffset(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
-                                        FxMakeSlice(sets_to_bind, num_sets), FxMakeSlice(dynamic_offsets, 1));
+    RxDescriptorSet::BindMultiple(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
+                                  FxMakeSlice(sets_to_bind, FxSizeofArray(sets_to_bind)));
     // mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
 
     // mMaterialPropertiesDS.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gRenderer->DeferredgRenderer->GPassPipeline);
@@ -223,8 +232,7 @@ void FxMaterial::Destroy()
 }
 
 
-template <VkFormat TFormat>
-static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
+template <VkFormat TFormat> static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 {
     if (!component.pImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
@@ -293,14 +301,37 @@ void FxMaterial::Build()
     // Update the material descriptor
     {
         constexpr int max_images = static_cast<int>(FxMaterial::ResourceType::eMaxImages);
+        constexpr int max_buffers = 1;
+
         FxStackArray<VkDescriptorImageInfo, max_images> write_image_infos;
-        FxStackArray<VkWriteDescriptorSet, max_images> write_descriptor_sets;
+        FxStackArray<VkDescriptorBufferInfo, max_buffers> write_buffer_infos;
+        FxStackArray<VkWriteDescriptorSet, (max_images + max_buffers)> write_descriptor_sets;
 
         RxDescriptorSet& descriptor_set = mDescriptorSet;
 
         // Push material textures
         PUSH_IMAGE_IF_SET(Diffuse.pImage, 0);
         PUSH_IMAGE_IF_SET(NormalMap.pImage, 1);
+
+        {
+            VkDescriptorBufferInfo info {
+                .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
+                .offset = 0,
+                .range = VK_WHOLE_SIZE,
+            };
+
+            VkWriteDescriptorSet buffer_write {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = descriptor_set.Set,
+                .dstBinding = 2,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .pBufferInfo = write_buffer_infos.Insert(info),
+            };
+
+            write_descriptor_sets.Insert(buffer_write);
+        }
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
                                0, nullptr);

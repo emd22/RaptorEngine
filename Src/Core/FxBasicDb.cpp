@@ -96,7 +96,6 @@ void FxBasicDb::Parse()
             }
 
             memcpy(tmp_buffer, token, token_index);
-            FxLogInfo("token index: {}", token_index);
             tmp_buffer[token_index] = '\0';
 
             marker.KeyHash = std::stoull(std::string(tmp_buffer, token_index));
@@ -118,8 +117,6 @@ void FxBasicDb::Parse()
             token_index = 0;
 
             mEntryMarkers.Insert(marker);
-
-            FxLogInfo("Found entry {} = {}", marker.KeyHash, marker.Value);
         }
         else {
             token[token_index++] = ch;

@@ -175,8 +175,8 @@ public:
         return LoadImageFromMemory(RxImageType::Image, format, asset, data, data_size);
     }
 
-
     ~AxManager() { Shutdown(); }
+
 
 private:
     AxWorker* FindWorkerThread();

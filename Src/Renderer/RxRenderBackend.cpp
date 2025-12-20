@@ -5,6 +5,8 @@
 #include "Backend/RxSynchro.hpp"
 #include "Backend/RxUtil.hpp"
 #include "Constants.hpp"
+#include "FxEngine.hpp"
+#include "FxObjectManager.hpp"
 #include "RxDeferred.hpp"
 
 #include <SDL3/SDL.h>
@@ -96,6 +98,8 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     Swapchain.CreateSwapchainFramebuffers();
 
+    gObjectManager->Create();
+
     pDeferredRenderer = FxMakeRef<RxDeferredRenderer>();
     pDeferredRenderer->Create(Swapchain.Extent);
 
@@ -137,13 +141,12 @@ void RxRenderBackend::InitFrames()
 
         auto synchro_label = std::format("Frame {} I.A.", i);
         RxUtil::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.ImageAvailable.Semaphore);
-        
+
         synchro_label = std::format("Frame {} G.P", i);
         RxUtil::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.OffscreenSem.Semaphore);
 
         synchro_label = std::format("Frame {} R.F", i);
         RxUtil::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Semaphore);
-        
     }
 }
 
@@ -176,7 +179,7 @@ void RxRenderBackend::InitVulkan()
     app_info.apiVersion = VK_MAKE_VERSION(1, 3, 261);
 
     ExtensionNames requested_extensions = {
-        //VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
+        // VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
     };
 
     ExtensionNames all_extensions = MakeInstanceExtensionList(requested_extensions);
@@ -518,7 +521,7 @@ void RxRenderBackend::PresentFrame()
 
     VkSemaphore* submit_semaphore = &mSubmitSemaphores[mImageIndex].Semaphore;
 
-    const VkSubmitInfo submit_info = { 
+    const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .waitSemaphoreCount = 1,
@@ -658,8 +661,7 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
                                                   frame->ImageAvailable.Semaphore, nullptr, &mImageIndex);
 
 
-
-    //FxLogInfo("Retrieve {}", mImageIndex);
+    // FxLogInfo("Retrieve {}", mImageIndex);
 
     if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
         return RxFrameResult::Success;
@@ -712,6 +714,8 @@ void RxRenderBackend::Destroy()
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
+
+    gObjectManager->Destroy();
 
     // SamplerCache.Destroy();
 

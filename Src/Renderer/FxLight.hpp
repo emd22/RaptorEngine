@@ -25,7 +25,7 @@ public:
     using VertexType = RxVertex<FxVertexPosition>;
 
 public:
-    FxLight(FxLightFlags flags = FxLF_None) : Flags(flags) { this->Type = FxEntityType::Light; }
+    FxLight(FxLightFlags flags = FxLF_None);
 
     void SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume);
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
@@ -44,7 +44,7 @@ public:
     // Force move the mesh
     void MoveLightVolumeTo(const FxVec3f& position);
 
-    ~FxLight() {}
+    ~FxLight();
 
 public:
     FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };

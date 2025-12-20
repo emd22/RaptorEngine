@@ -7,8 +7,16 @@
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <FxEngine.hpp>
+#include <FxObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+
+FxObject::FxObject()
+{
+    ObjectId = gObjectManager->GenerateObjectId();
+
+    this->Type = FxEntityType::Object;
+}
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
 {
@@ -104,8 +112,9 @@ void FxObject::Render(const FxPerspectiveCamera& camera)
         return;
     }
 
-    FxMat4f VP = camera.VPMatrix;
+    // FxMat4f VP = camera.VPMatrix;
     // FxMat4f MVP = GetModelMatrix() * VP;
+    UpdateIfOutOfDate();
 
     // memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
     //
@@ -113,16 +122,18 @@ void FxObject::Render(const FxPerspectiveCamera& camera)
 
     FxDrawPushConstants push_constants {};
 
+    push_constants.ObjectId = ObjectId;
+
     if (mObjectLayer == FxObjectLayer::eWorldLayer) {
-        memcpy(push_constants.VPMatrix, VP.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
     }
     else if (mObjectLayer == FxObjectLayer::ePlayerLayer) {
         memcpy(push_constants.VPMatrix, camera.WeaponVPMatrix.RawData, sizeof(FxMat4f));
     }
 
-    memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
-    // Copy the normal matrix to the vertex shader
-    // GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
+    // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
+    //  Copy the normal matrix to the vertex shader
+    //  GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
 
     // memcpy(push_constants.NormalMatrix, , sizeof(FxMat4f));
 
@@ -165,6 +176,8 @@ void FxObject::Render(const FxPerspectiveCamera& camera)
         if (!obj->pMaterial->bIsBuilt) {
             obj->pMaterial->Build();
         }
+
+        push_constants.ObjectId = ObjectId;
 
         //        VkDescriptorSet sets_to_bind[] = {
         //            gRenderer->CurrentGPass->DescriptorSet.Set,
@@ -284,6 +297,8 @@ void FxObject::SetPhysicsEnabled(bool enabled)
 
 void FxObject::Destroy()
 {
+    gObjectManager->FreeObjectId(ObjectId);
+
     if (pMesh) {
         pMesh->Destroy();
     }
@@ -301,4 +316,10 @@ void FxObject::Destroy()
 
     mbReadyToRender = false;
     bIsUploadedToGpu = false;
+}
+
+FxObject::~FxObject()
+{
+    gObjectManager->FreeObjectId(ObjectId);
+    Destroy();
 }

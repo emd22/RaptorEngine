@@ -5,6 +5,10 @@
 
 FX_FORCE_INLINE void FxBitset::Set(uint32 index)
 {
+    if (mBits.IsEmpty()) {
+        return;
+    }
+
     // The index into the int array (index / 64)
     const uint16 int_index = (index >> 6);
 
@@ -17,6 +21,10 @@ FX_FORCE_INLINE void FxBitset::Set(uint32 index)
 
 FX_FORCE_INLINE bool FxBitset::Get(uint32 index)
 {
+    if (mBits.IsEmpty()) {
+        return false;
+    }
+
     // The index into the int array (index / 64)
     const uint16 int_index = (index >> 6);
 
@@ -28,6 +36,10 @@ FX_FORCE_INLINE bool FxBitset::Get(uint32 index)
 
 FX_FORCE_INLINE void FxBitset::Unset(uint32 index)
 {
+    if (mBits.IsEmpty()) {
+        return;
+    }
+
     // The index into the int array (index / 64)
     const uint16 int_index = (index >> 6);
 

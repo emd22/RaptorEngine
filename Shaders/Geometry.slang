@@ -1,5 +1,7 @@
 module Geometry;
 
+#include "./Object.slang.inc"
+
 //////////////////////////////////
 // Vertex shader
 //////////////////////////////////
@@ -26,9 +28,11 @@ struct VSIn
 struct VSPushConsts
 {
     float4x4 mViewProjection;
-    float4x4 mModelMatrix;
+	uint uiObjectIndex;
     uint uiMaterialIndex;
 };
+
+layout(binding = 2) StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
@@ -38,15 +42,16 @@ VSOut VertexMain(VSIn in)
 {
     VSOut out;
 
-    float4x4 MVP = mul(VSConst.mModelMatrix, VSConst.mViewProjection);
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex].mModel;
 
-    out.vPosition = mul(float4(in.vPosition, 1.0), MVP);
+    float4x4 MVP = mul(VSConst.mViewProjection, model_matrix);
 
-    out.vNormalWS = normalize(mul(in.vNormal, float3x3(VSConst.mModelMatrix)));
+    out.vPosition = mul(MVP, float4(in.vPosition, 1.0));
+    out.vNormalWS = normalize(mul(float3x3(model_matrix), in.vNormal));
 
 #ifdef USE_NORMAL_MAPS
-    out.vTangentWS = normalize(mul(in.vTangent, float3x3(VSConst.mModelMatrix)));
-    out.vBitangentWS =  cross(out.vNormalWS, out.vTangentWS);
+    out.vTangentWS = normalize(mul(float3x3(model_matrix), in.vTangent));
+    out.vBitangentWS = cross(out.vNormalWS, out.vTangentWS);
 #endif
 
     out.vUV = in.vUV;

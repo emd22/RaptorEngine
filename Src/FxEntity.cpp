@@ -1,5 +1,7 @@
 #include "FxEntity.hpp"
 
+#include <FxEngine.hpp>
+#include <FxObjectManager.hpp>
 #include <Renderer/RxDeferred.hpp>
 
 FxEntityManager& FxEntityManager::GetGlobalManager()
@@ -53,6 +55,10 @@ void FxEntity::SetModelMatrix(const FxMat4f& other)
     mbMatrixOutOfDate = false;
 
     mModelMatrix = other;
+
+    if (ObjectId != UINT32_MAX) {
+        gObjectManager->Submit(ObjectId, mModelMatrix);
+    }
 }
 
 // const FxMat4f& FxEntity::GetNormalMatrix()
@@ -82,6 +88,10 @@ void FxEntity::RecalculateModelMatrix()
         mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(RotationOrigin) *
                        FxMat4f::AsRotation(mRotation) * FxMat4f::AsTranslation(-RotationOrigin) *
                        FxMat4f::AsTranslation(mPosition);
+    }
+
+    if (ObjectId != UINT32_MAX) {
+        gObjectManager->Submit(ObjectId, mModelMatrix);
     }
 
     // mNormalMatrix = mModelMatrix.Inverse().Transposed();

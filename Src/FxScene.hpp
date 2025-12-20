@@ -1,5 +1,7 @@
 #pragma once
 
+#include "FxObjectManager.hpp"
+
 #include <FxEntity.hpp>
 #include <FxObject.hpp>
 #include <Renderer/FxCamera.hpp>
@@ -28,6 +30,9 @@ public:
         FxLogInfo("DESTROY SCENE");
         Destroy();
     }
+
+public:
+    FxObjectManager ObjectManager;
 
 private:
     FxPagedArray<FxRef<FxObject>> mObjects;

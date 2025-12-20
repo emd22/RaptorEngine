@@ -1,5 +1,7 @@
 #pragma once
 
+#include "FxObjectManager.hpp"
+
 #include <FxObject.hpp>
 #include <FxPlayer.hpp>
 #include <FxScene.hpp>
@@ -38,6 +40,8 @@ public:
 
     FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> pSkyboxMesh { nullptr };
     double DeltaTime = 1.0f;
+
+    FxObjectManager ObjectManager;
 
 private:
     uint64 mLastTick = 0;
