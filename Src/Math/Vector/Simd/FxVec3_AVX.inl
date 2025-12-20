@@ -4,8 +4,9 @@
 
 #ifdef FX_USE_AVX
 
-#include <Math/FxVec3.hpp>
 #include <immintrin.h>
+
+#include <Math/FxVec3.hpp>
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {
@@ -19,7 +20,7 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const flo
 
     // Check if any absolute difference is > tolerance
     __m128i cmp_v = _mm_castps_si128(_mm_cmpgt_ps(diff, _mm_set1_ps(tolerance)));
-    
+
     // If any components are, return true
     return static_cast<bool>(_mm_testz_si128(cmp_v, cmp_v));
 }
@@ -37,16 +38,12 @@ FX_FORCE_INLINE bool FxVec3f::operator==(const FxVec3f& other) const
     return static_cast<bool>(_mm_test_all_ones(cmp_v));
 }
 
-FX_FORCE_INLINE void FxVec3f::Set(float32 x, float32 y, float32 z)
+FX_FORCE_INLINE void FxVec3f::Set(float32 x, float32 y, float32 z) { mIntrin = _mm_setr_ps(x, y, z, 0.0f); }
+
+
+FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const
 {
-    mIntrin = _mm_setr_ps(x, y, z, 0.0f);
-}
-
-
-
-FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const 
-{
-     return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0xFF));
+    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0xFF));
 }
 
 FX_FORCE_INLINE FxVec3f FxVec3f::Min(const FxVec3f& a, const FxVec3f& b)
@@ -68,10 +65,21 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Lerp(const FxVec3f& a, const FxVec3f& b, const 
 {
     // a + f * (b - a);
     __m128 d = _mm_sub_ps(b, a);
-
     const __m128 f_v = _mm_set1_ps(f);
 
     return FxVec3f(_mm_add_ps(a, _mm_mul_ps(d, f_v)));
+}
+
+
+FX_FORCE_INLINE FxVec3f& FxVec3f::LerpIP(const FxVec3f& dest, const float step)
+{
+    // a + f * (b - a);
+    __m128 d = _mm_sub_ps(dest, mIntrin);
+    const __m128 f_v = _mm_set1_ps(step);
+
+    mIntrin = _mm_add_ps(mIntrin, _mm_mul_ps(d, f_v));
+
+    return *this;
 }
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::NormalizeIP()
@@ -163,7 +171,6 @@ FX_FORCE_INLINE FxVec3f& FxVec3f::operator*=(const FxVec3f& other)
     mIntrin = _mm_mul_ps(mIntrin, other);
     return *this;
 }
-
 
 
 #endif // #ifdef FX_USE_AVX

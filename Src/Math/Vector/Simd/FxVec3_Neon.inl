@@ -64,6 +64,17 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Lerp(const FxVec3f& a, const FxVec3f& b, const 
     return FxVec3f(vaddq_f32(a, vmulq_n_f32(d, f)));
 }
 
+FX_FORCE_INLINE FxVec3f& FxVec3f::LerpIP(const FxVec3f& dest, const float step)
+{
+    // a + f * (b - a);
+    float32x4_t d = vsubq_f32(dest, mIntrin);
+
+    mIntrin = vaddq_f32(mIntrin, vmulq_n_f32(d, step));
+
+    return *this;
+}
+
+
 FX_FORCE_INLINE FxVec3f& FxVec3f::NormalizeIP()
 {
     // Calculate length and splat to register
@@ -90,12 +101,9 @@ FX_FORCE_INLINE float32 FxVec3f::Length() const
     return sqrtf(Dot(v));
 }
 
-FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const
-{
-    return vaddvq_f32(vmulq_f32(mIntrin, other.mIntrin));
-}
+FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const { return FxNeon::Dot(mIntrin, other.mIntrin); }
 
-FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const { return vaddvq_f32(vmulq_f32(mIntrin, other)); }
+FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const { return FxNeon::Dot(mIntrin, other); }
 
 //////////////////////////////
 // Operator Overloads

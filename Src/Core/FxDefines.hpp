@@ -64,7 +64,7 @@
 #define FX_USE_SIMD 1
 
 #elif defined __AVX2__ || defined FX_PLATFORM_WINDOWS
-#define FX_USE_AVX 1
+#define FX_USE_AVX  1
 #define FX_USE_SIMD 1
 
 #else
@@ -85,7 +85,7 @@
 
 
 #ifdef _WIN64
-#define FX_FORCE_INLINE inline
+#define FX_FORCE_INLINE __forceinline
 #else
 #define FX_FORCE_INLINE inline __attribute__((always_inline))
 #endif

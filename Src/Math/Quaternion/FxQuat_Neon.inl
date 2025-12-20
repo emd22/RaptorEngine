@@ -27,12 +27,31 @@ FX_FORCE_INLINE bool FxQuat::IsCloseTo(const float32x4_t& other, const float32 t
     return vmaxvq_u32(lt) == 0;
 }
 
-FX_FORCE_INLINE void FxQuat::LerpIP(const FxQuat& dest, float32 step)
+FX_FORCE_INLINE void FxQuat::NLerpIP(const FxQuat& dest, float32 time)
 {
-    const float32x4_t inv_step_v = vdupq_n_f32(1.0 - step);
-    const float32x4_t step_v = vdupq_n_f32(step);
+    // We can change (A + (B - A) * time) to ((1 - time) * A + time * B) to reduce floating point errors.
 
-    mIntrin = vaddq_f32(vmulq_f32(inv_step_v, mIntrin), vmulq_f32(step_v, dest.mIntrin));
+    float32x4_t dest_v = dest.mIntrin;
+
+    if (FxNeon::Dot(mIntrin, dest.mIntrin) < 0.0f) {
+        dest_v = FxNeon::SetSigns<-1>(dest_v);
+    }
+
+    const float32x4_t inv_time_v = vdupq_n_f32(1.0 - time);
+    const float32x4_t time_v = vdupq_n_f32(time);
+
+    // (1 - time) * A
+    float32x4_t temp = vmulq_f32(inv_time_v, mIntrin);
+    // ... + time * B
+    mIntrin = vfmaq_f32(temp, time_v, dest_v);
+
+    // Quaternion lerp is always normalized!
+    mIntrin = FxNeon::Normalize(mIntrin);
+}
+
+FX_FORCE_INLINE void FxQuat::SLerpIP(const FxQuat& dest, float32 step)
+{
+    // Dot product
 }
 
 #endif

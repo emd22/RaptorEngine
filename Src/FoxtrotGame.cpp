@@ -302,7 +302,7 @@ void FoxtrotGame::Tick()
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->mRotation.LerpIP(PistolRotationGoal, 25.0 * DeltaTime);
+    pPistolObject->mRotation.SmoothFollow(PistolRotationGoal, 25.0, DeltaTime);
 
     pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
                           camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));

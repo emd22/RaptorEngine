@@ -125,6 +125,13 @@ public:
     FX_FORCE_INLINE static FxVec3f Clamp(const FxVec3f& v, const FxVec3f& min, const FxVec3f& max);
 
     FX_FORCE_INLINE static FxVec3f Lerp(const FxVec3f& a, const FxVec3f& b, const float f);
+    FX_FORCE_INLINE FxVec3f& LerpIP(const FxVec3f& dest, const float step);
+
+    FX_FORCE_INLINE FxVec3f& InterpolateTo(const FxVec3f& dest, const float speed, const float delta_time)
+    {
+        LerpIP(dest, 1.0f - pow(speed, delta_time));
+        return *this;
+    }
 
     void Print() const;
 
@@ -137,18 +144,16 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
 
-    template <int TX, int TY, int TZ, int TW>
-    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    template <int TX, int TY, int TZ, int TW> FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
-        return FxVec3f(FxNeon::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
+        return FxVec3f(FxNeon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
 #elif FX_USE_AVX
     FX_FORCE_INLINE float32 GetX() const { return X; }
     FX_FORCE_INLINE float32 GetY() const { return Y; }
     FX_FORCE_INLINE float32 GetZ() const { return Z; }
 
-    template <int TX, int TY, int TZ, int TW>
-    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    template <int TX, int TY, int TZ, int TW> FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         return FxVec3f(FxSSE::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
     }
@@ -157,8 +162,7 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return Y; }
     FX_FORCE_INLINE float32 GetZ() const { return Z; }
 
-    template <int TX, int TY, int TZ, int TW>
-    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    template <int TX, int TY, int TZ, int TW> FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
         constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
@@ -208,8 +212,7 @@ public:
 #endif
 };
 
-template <>
-struct std::formatter<FxVec3f>
+template <> struct std::formatter<FxVec3f>
 {
     auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
