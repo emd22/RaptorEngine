@@ -119,16 +119,16 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
     std::string source_path = GetSourcePath();
     const char* c_source_path = source_path.c_str();
 
-    if (FxShaderCompiler::IsOutOfDate(c_source_path, macros)) {
-        FxLogWarning("Shader {} is out of date!", c_source_path);
+    if (FxShaderCompiler::IsOutOfDate(c_source_path)) {
+        FxLogWarning("Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
         // Shader is out of date, compile it
         FxShaderCompiler::Compile(c_source_path, mDataPack, macros);
         // Save the program back to the datapack
         mDataPack.WriteToFile(GetProgramPath().c_str());
     }
 
-    FxLogDebug("Getting program from {}", Name);
     FxHash64 program_id = RxShader::GenerateShaderId(shader_type, macros);
+    FxLogDebug("Getting program from {} (Id={})", Name, program_id);
 
     FxDataPackEntry* program_entry = mDataPack.QuerySection(program_id);
 
@@ -143,7 +143,7 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
 
         // There must be an issue during compilation or a bug in the shader compiler, return the empty program
         if (program_entry == nullptr) {
-            FxLogError("Pack entry does not exist after compilation! (ID={})", program_id);
+            FxLogError("Pack entry does not exist after compilation! (Id={})", program_id);
             return program;
         }
     }

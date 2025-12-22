@@ -23,9 +23,11 @@ FxRef<FxEntity> FxEntityManager::New()
     return FxRef<FxEntity>::New(global_manager.mEntityPool.Insert());
 }
 
-void FxEntity::Scale(const FxVec3f& scale)
+void FxEntity::Scale(const float scale) { SetScale(mScale * scale); }
+
+void FxEntity::SetScale(const float scale)
 {
-    mScale *= scale;
+    mScale = scale;
     MarkTransformOutOfDate();
 }
 
@@ -82,10 +84,11 @@ FxMat4f& FxEntity::GetModelMatrix()
 void FxEntity::RecalculateModelMatrix()
 {
     if (TransformMode == FxTransformMode::eDefault) {
-        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsRotation(mRotation) * FxMat4f::AsTranslation(mPosition);
+        mModelMatrix = FxMat4f::AsScale(FxVec3f(mScale)) * FxMat4f::AsRotation(mRotation) *
+                       FxMat4f::AsTranslation(mPosition);
     }
     else if (TransformMode == FxTransformMode::eTransformFromOrigin) {
-        mModelMatrix = FxMat4f::AsScale(mScale) * FxMat4f::AsTranslation(RotationOrigin) *
+        mModelMatrix = FxMat4f::AsScale(FxVec3f(mScale)) * FxMat4f::AsTranslation(RotationOrigin) *
                        FxMat4f::AsRotation(mRotation) * FxMat4f::AsTranslation(-RotationOrigin) *
                        FxMat4f::AsTranslation(mPosition);
     }

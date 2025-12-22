@@ -35,6 +35,8 @@ public:
     void SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume);
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
 
+    void SetRadius(const float radius);
+
     virtual void Render(const FxPerspectiveCamera& camera);
     virtual void RenderDebugMesh(const FxPerspectiveCamera& camera);
 
@@ -48,7 +50,6 @@ public:
     RxGraphicsPipeline* pPipelineOutside = nullptr;
 
     FxColor Color = FxColor::sWhite;
-    float32 Radius = 2.0f;
 
     FxLightFlags Flags = FxLF_None;
 
@@ -57,6 +58,8 @@ public:
 protected:
     FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
     RxGraphicsPipeline* pPipeline = nullptr;
+
+    float32 mRadius = 1.0f;
 };
 
 

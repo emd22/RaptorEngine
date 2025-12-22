@@ -23,7 +23,6 @@ void FxLightBase::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_g
     LightVolumeGen = volume_gen;
     LightVolume = volume_gen->AsPositionsMesh();
     // Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
-    Radius = 10.0f;
 
     if (create_debug_mesh) {
         mDebugMesh = volume_gen->AsMesh();
@@ -92,7 +91,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera)
         return;
     }
 
-    if (camera.Position.IntersectsSphere(mPosition, Radius)) {
+    if (camera.Position.IntersectsSphere(mPosition, mRadius)) {
         pPipeline = pPipelineInside;
     }
     else {
@@ -125,7 +124,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera)
         push_constants.LightColor = Color.Value;
 
         memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
-        push_constants.LightRadius = Radius;
+        push_constants.LightRadius = mRadius;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT,
                            sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
@@ -155,6 +154,12 @@ void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
     mDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
 }
 
+
+void FxLightBase::SetRadius(const float radius)
+{
+    mRadius = radius;
+    SetScale(mRadius * 2);
+}
 
 FxLightPoint::FxLightPoint()
 {
@@ -195,7 +200,7 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera)
         push_constants.LightColor = Color.Value;
 
         memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
-        push_constants.LightRadius = Radius;
+        push_constants.LightRadius = mRadius;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT,
                            sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);

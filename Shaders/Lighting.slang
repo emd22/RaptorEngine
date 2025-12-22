@@ -131,6 +131,15 @@ float3 WorldPosFromDepth(float2 uv, float depth)
     return world_space.xyz;
 }
 
+float AttenuationSmooth(float distance_sq, float inv_radius_sq)
+{
+    float factor = distance_sq * inv_radius_sq;
+    float smooth_factor = saturate(1.0 - factor * factor);
+
+    return (smooth_factor * smooth_factor) / max(distance_sq, 1e-4);
+
+}
+
 
 [shader("fragment")]
 
@@ -146,10 +155,13 @@ FSOut FragmentMain(FSIn in)
 
     float3 world_position = WorldPosFromDepth(screen_uv, depth);
 
+    float4 light_color = unpackUnorm4x8ToFloat(FSConst.uiLightColor);
+    // float4 light_color = float4(1, 0, 0, 1);
+
     let roughness : float = 0.1;
     let metallic : float = 0.9;
 
-    let light_intensity : float = 50.0;
+    float light_intensity = 50.0f;
 
     float3 F0 = float3(0.04);
     F0 = lerp(F0, albedo, metallic);
@@ -172,8 +184,12 @@ FSOut FragmentMain(FSIn in)
 #ifdef FX_LIGHT_DIRECTIONAL
     let attenuation: float = 1.0f;
 #else
-    float light_distance = length(light_position_local);
-    float attenuation = light_intensity * (1.0 / max(light_distance * light_distance, 1e-5));
+    float dist_sq = dot(light_position_local, light_position_local);
+    float light_distance = sqrt(dist_sq);
+
+    float inv_radius_sq = 1.0 / (FSConst.fLightRadius * FSConst.fLightRadius);
+    float attenuation = light_intensity * AttenuationSmooth(dist_sq, inv_radius_sq);
+    // float attenuation = light_intensity * (1.0 / max(light_distance * light_distance, 1e-5));
 #endif
 
     float3 F = F_Schlick(F0, 1.0, LdotH);
@@ -185,9 +201,10 @@ FSOut FragmentMain(FSIn in)
 
     float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, (roughness * roughness));
 
-    float4 light_color = unpackUnorm4x8ToFloat(FSConst.uiLightColor);
+    float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
+    float3 specular_term = Fr;
 
-    out.vColor = float4(attenuation * (Fd * albedo + Fr) * light_color.rgb * NdotL * FX_MATH_1_OVER_PI, 1.0);
+    out.vColor = float4(attenuation * (diffuse_term + specular_term) * light_color.rgb * NdotL, 1.0);
 
     return out;
 }

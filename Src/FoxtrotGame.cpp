@@ -113,10 +113,10 @@ void FoxtrotGame::CreateLights()
     // }
 
 
-    FxRef<FxLightDirectional> sun = FxMakeRef<FxLightDirectional>();
-    sun->MoveTo(FxVec3f(5));
+    FxRef<FxLightPoint> sun = FxMakeRef<FxLightPoint>();
+    sun->MoveTo(FxVec3f(0, 5, 0));
     sun->SetLightVolume(light_volume);
-    sun->Scale(FxVec3f(25));
+    sun->SetRadius(20);
     mMainScene.Attach(sun);
 }
 
@@ -132,7 +132,7 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = AxManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb", { .KeepInMemory = true });
+    FxRef<FxObject> ground_object = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
     ground_object->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(PhObject::PF_CreateInactive),
@@ -151,7 +151,6 @@ void FoxtrotGame::CreateGame()
 
 
     mMainScene.Attach(pHelmetObject);
-
 
     pPistolObject = AxManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();

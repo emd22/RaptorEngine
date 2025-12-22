@@ -42,6 +42,7 @@ void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
         if (found_entry) {
             found_entry->Data.Free();
             found_entry->Data.InitAsCopyOf(data.pData, data.Size);
+            FxLogInfo("Updating data pack entry {}", id);
             return;
         }
     }

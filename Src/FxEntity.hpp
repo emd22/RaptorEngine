@@ -42,7 +42,8 @@ public:
         MarkTransformOutOfDate();
     }
 
-    virtual void Scale(const FxVec3f& scale);
+    virtual void Scale(const float scale);
+    virtual void SetScale(const float scale);
 
     void RotateX(float32 rad);
     void RotateY(float32 rad);
@@ -88,7 +89,7 @@ public:
 
     FxVec3f mPosition = FxVec3f::sZero;
     FxQuat mRotation = FxQuat::sIdentity;
-    FxVec3f mScale = FxVec3f::sOne;
+    float mScale = 1.0f;
 
     FxVec3f RotationOrigin = FxVec3f::sZero;
 

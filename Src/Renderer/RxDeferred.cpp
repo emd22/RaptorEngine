@@ -328,7 +328,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
         RxPipelineBuilder builder {};
         builder.SetLayout(CreateLightingPipelineLayout())
-            .SetName("Point Lighting")
+            .SetName("Lighting(Point)")
             .AddBlendAttachment({
                 .Enabled = true,
                 .AlphaBlend { .Ops {
@@ -343,7 +343,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
             .SetVertexInfo(&vertex_info)
             .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
-        builder.SetCullMode(VK_CULL_MODE_FRONT_BIT).Build(PlLightingOutsideVolume);
+        builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingOutsideVolume);
         builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
     }
     {
@@ -356,7 +356,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
         RxPipelineBuilder builder {};
 
         builder.SetLayout(CreateLightingPipelineLayout())
-            .SetName("Directional Lighting")
+            .SetName("Lighting(Directional)")
             .AddBlendAttachment({
                 .Enabled = true,
                 .AlphaBlend { .Ops {

@@ -144,7 +144,8 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
 
-    template <int TX, int TY, int TZ, int TW> FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         return FxVec3f(FxNeon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
@@ -153,7 +154,8 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return Y; }
     FX_FORCE_INLINE float32 GetZ() const { return Z; }
 
-    template <int TX, int TY, int TZ, int TW> FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         return FxVec3f(FxSSE::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
     }
@@ -162,7 +164,8 @@ public:
     FX_FORCE_INLINE float32 GetY() const { return Y; }
     FX_FORCE_INLINE float32 GetZ() const { return Z; }
 
-    template <int TX, int TY, int TZ, int TW> FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
         constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
@@ -212,7 +215,8 @@ public:
 #endif
 };
 
-template <> struct std::formatter<FxVec3f>
+template <>
+struct std::formatter<FxVec3f>
 {
     auto parse(format_parse_context& ctx) { return ctx.begin(); }
 

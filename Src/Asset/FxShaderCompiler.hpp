@@ -22,7 +22,7 @@ public:
 
     static bool CompileIfOutOfDate(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros);
 
-    static bool IsOutOfDate(const char* path, const FxSizedArray<FxShaderMacro>& macros);
+    static bool IsOutOfDate(const char* path);
 
     static void Destroy();
 };
