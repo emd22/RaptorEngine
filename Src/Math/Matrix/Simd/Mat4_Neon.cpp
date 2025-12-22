@@ -6,7 +6,7 @@
 #include <Math/FxQuat.hpp>
 #include <Math/Mat4.hpp>
 
-const FxMat4f FxMat4f::Identity = FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
+const FxMat4f FxMat4f::sIdentity = FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
 
 float32x4_t FxMat4f::MultiplyVec4f_Neon(FxVec4f& vec)
 {

@@ -45,11 +45,11 @@ public:
                        FxVec4f(data[2], data[6], data[10], data[14]), FxVec4f(data[3], data[7], data[11], data[15]));
     }
 
-    static const FxMat4f Identity;
+    static const FxMat4f sIdentity;
 
     static FxMat4f AsTranslation(FxVec3f position)
     {
-        FxMat4f result = FxMat4f::Identity;
+        FxMat4f result = FxMat4f::sIdentity;
         result.Columns[3].Load4(position.X, position.Y, position.Z, 1.0f);
         return result;
 
@@ -62,7 +62,7 @@ public:
 
     static FxMat4f AsScale(FxVec3f scale)
     {
-        FxMat4f result = FxMat4f::Identity;
+        FxMat4f result = FxMat4f::sIdentity;
 
         result.Columns[0] *= scale.X;
         result.Columns[1] *= scale.Y;

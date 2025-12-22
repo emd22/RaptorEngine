@@ -8,7 +8,11 @@ module Lighting;
 
 struct VSIn
 {
+#ifdef FX_LIGHT_DIRECTIONAL
+    int iVertexIndex : SV_VertexID;
+#else
     float3 vPosition : ATTR0;
+#endif
 };
 
 
@@ -26,8 +30,13 @@ layout(binding = 4) StructuredBuffer<Object> bObjectBuffer;
 
 float4 VertexMain(VSIn in) : SV_POSITION
 {
+#ifdef FX_LIGHT_DIRECTIONAL
+    float2 out_uv = float2((in.iVertexIndex << 1) & 2, in.iVertexIndex & 2);
+    return float4(out_uv * 2.0 - 1.0, 0.0, 1.0);
+#else
     float4x4 MVP = mul(VSConst.mViewProjection, bObjectBuffer[VSConst.uiObjectIndex].mModel);
     return mul(MVP, float4(in.vPosition, 1.0));
+#endif
 }
 
 //////////////////////////////////
@@ -116,11 +125,12 @@ float3 WorldPosFromDepth(float2 uv, float depth)
 {
     float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
 
-    float4 clip = mul(FSConst.mInvProjection, ndc);
-    float4 view = mul(FSConst.mInvView, (clip / clip.w));
+    float4 view_space = mul(FSConst.mInvProjection, ndc);
+    float4 world_space = mul(FSConst.mInvView, (view_space / view_space.w));
 
-    return view.xyz;
+    return world_space.xyz;
 }
+
 
 [shader("fragment")]
 
@@ -141,15 +151,17 @@ FSOut FragmentMain(FSIn in)
 
     let light_intensity : float = 50.0;
 
-
     float3 F0 = float3(0.04);
     F0 = lerp(F0, albedo, metallic);
 
+#ifdef FX_LIGHT_DIRECTIONAL
+    float3 L = normalize(FSConst.vLightPosition);
+#else
     float3 light_position_local = FSConst.vLightPosition - world_position;
-
+    float3 L = normalize(light_position_local);
+#endif
     float3 N = normalize(normal_rgba.rgb);
     float3 V = normalize(FSConst.vEyePosition - world_position);
-    float3 L = normalize(light_position_local);
     float3 H = normalize(V + L);
 
     float NdotL = DotC(N, L);
@@ -157,9 +169,12 @@ FSOut FragmentMain(FSIn in)
     float NdotH = DotC(N, H);
     float LdotH = DotC(L, H);
 
+#ifdef FX_LIGHT_DIRECTIONAL
+    let attenuation: float = 1.0f;
+#else
     float light_distance = length(light_position_local);
-
     float attenuation = light_intensity * (1.0 / max(light_distance * light_distance, 1e-5));
+#endif
 
     float3 F = F_Schlick(F0, 1.0, LdotH);
     float3 diffuse_reflectance = albedo * (1.0 - metallic);

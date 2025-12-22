@@ -15,12 +15,12 @@ public:
     void Create();
 
     void Attach(const FxRef<FxObject>& object);
-    void Attach(const FxRef<FxLight>& light);
+    void Attach(const FxRef<FxLightBase>& light);
 
     void SelectCamera(const FxRef<FxCamera>& camera) { mpCurrentCamera = camera; }
     void Render();
 
-    const FxPagedArray<FxRef<FxLight>>& GetAllLights() { return mLights; }
+    const FxPagedArray<FxRef<FxLightBase>>& GetAllLights() { return mLights; }
     const FxPagedArray<FxRef<FxObject>>& GetAllObjects() { return mObjects; }
 
     void Destroy();
@@ -36,7 +36,7 @@ public:
 
 private:
     FxPagedArray<FxRef<FxObject>> mObjects;
-    FxPagedArray<FxRef<FxLight>> mLights;
+    FxPagedArray<FxRef<FxLightBase>> mLights;
 
     FxRef<FxPerspectiveCamera> mpCurrentCamera { nullptr };
 };

@@ -17,7 +17,6 @@ enum class FxObjectLayer
     ePlayerLayer,
 };
 
-
 class FxObject : public AxBase, public FxEntity
 {
     friend class AxLoaderGltf;
@@ -25,6 +24,8 @@ class FxObject : public AxBase, public FxEntity
 
 public:
     static const FxObjectId sNone = UINT32_MAX;
+
+    static constexpr FxEntityType scEntityType = FxEntityType::eObject;
 
 public:
     FxObject();
@@ -48,7 +49,7 @@ public:
     FX_FORCE_INLINE FxObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
     void Destroy() override;
-    ~FxObject() override;
+    ~FxObject();
 
 private:
     void RenderMesh();
@@ -73,3 +74,6 @@ private:
 
     FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };
+
+
+FX_VALIDATE_ENTITY_TYPE(FxObject)

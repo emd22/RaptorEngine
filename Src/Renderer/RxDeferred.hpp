@@ -95,6 +95,8 @@ public:
     RxGraphicsPipeline PlLightingOutsideVolume;
     RxGraphicsPipeline PlLightingInsideVolume;
 
+    RxGraphicsPipeline PlLightingDirectional;
+
     RxRenderPass RpLighting;
 
     FxSizedArray<RxDeferredLightingPass> LightingPasses;

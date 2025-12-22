@@ -30,8 +30,25 @@ void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
     // FxLogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<const char*>(data.pData),
     //           static_cast<uint32>(data.Size));
 
+    // Check to see if the entry exists and update it if it does
+    if (!Entries.IsEmpty()) {
+        FxDataPackEntry* found_entry = nullptr;
+        for (FxDataPackEntry& entry : Entries) {
+            if (entry.Id == id) {
+                found_entry = &entry;
+            }
+        }
+
+        if (found_entry) {
+            found_entry->Data.Free();
+            found_entry->Data.InitAsCopyOf(data.pData, data.Size);
+            return;
+        }
+    }
+
     FxSizedArray<uint8> data_arr;
     data_arr.InitAsCopyOf(data.pData, data.Size);
+
     FxDataPackEntry pack { id, std::move(data_arr) };
     Entries.Insert(std::move(pack));
 }

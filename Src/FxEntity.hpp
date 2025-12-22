@@ -7,12 +7,13 @@
 #include <Math/Vector.hpp>
 #include <Renderer/FxCamera.hpp>
 
+#define FX_VALIDATE_ENTITY_TYPE(TType_) static_assert(C_IsEntity<TType_>);
+
 enum class FxEntityType
 {
-    Unknown,
-    Object,
-    // Camera,
-    Light
+    eUnknown,
+    eObject,
+    eLight
 };
 
 enum class FxTransformMode
@@ -77,7 +78,7 @@ public:
 
     FX_FORCE_INLINE void MarkMatrixOutOfDate() { mbMatrixOutOfDate = true; }
 
-    virtual ~FxEntity() {}
+    virtual ~FxEntity();
 
 protected:
     void RecalculateModelMatrix();
@@ -95,13 +96,11 @@ public:
 
     std::vector<FxRef<FxEntity>> Children;
 
-    FxEntityType Type = FxEntityType::Unknown;
-
 protected:
     bool mbPhysicsTransformOutOfDate : 1 = true;
     bool mbMatrixOutOfDate : 1 = true;
 
-    FxMat4f mModelMatrix = FxMat4f::Identity;
+    FxMat4f mModelMatrix = FxMat4f::sIdentity;
     // FxMat4f mNormalMatrix = FxMat4f::Identity;
 };
 
@@ -116,4 +115,14 @@ public:
 
 private:
     FxPagedArray<FxEntity> mEntityPool;
+};
+
+
+template <typename TEntityType>
+concept C_IsEntity = requires() {
+    // Ensure that there is a const(expr) scEntity type parameter
+    requires std::is_same_v<const FxEntityType, decltype(TEntityType::scEntityType)>;
+
+    // TEntity type is derived from FxEntity
+    requires std::is_base_of_v<FxEntity, TEntityType>;
 };

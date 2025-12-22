@@ -13,14 +13,12 @@ public:
     virtual ~FxCamera() {}
 
 public:
+    FxMat4f ViewMatrix = FxMat4f::sIdentity;
+    FxMat4f ProjectionMatrix = FxMat4f::sIdentity;
+    FxMat4f VPMatrix = FxMat4f::sIdentity;
 
-    FxMat4f ViewMatrix = FxMat4f::Identity;
-    FxMat4f ProjectionMatrix = FxMat4f::Identity;
-    FxMat4f VPMatrix = FxMat4f::Identity;
-
-    FxMat4f InvViewMatrix = FxMat4f::Identity;
-    FxMat4f InvProjectionMatrix = FxMat4f::Identity;
-
+    FxMat4f InvViewMatrix = FxMat4f::sIdentity;
+    FxMat4f InvProjectionMatrix = FxMat4f::sIdentity;
 };
 
 class FxPerspectiveCamera : public FxCamera
@@ -122,8 +120,8 @@ public:
 
     FxVec3f Direction = FxVec3f::sForward;
 
-    FxMat4f WeaponVPMatrix = FxMat4f::Identity;
-    FxMat4f WeaponProjectionMatrix = FxMat4f::Identity;
+    FxMat4f WeaponVPMatrix = FxMat4f::sIdentity;
+    FxMat4f WeaponProjectionMatrix = FxMat4f::sIdentity;
 
 private:
     float32 mFovRad = FxDegToRad(80.0f);

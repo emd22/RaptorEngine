@@ -97,3 +97,5 @@ void FxEntity::RecalculateModelMatrix()
     // mNormalMatrix = mModelMatrix.Inverse().Transposed();
     mbMatrixOutOfDate = false;
 }
+
+FxEntity::~FxEntity() { gObjectManager->FreeObjectId(ObjectId); }

@@ -308,6 +308,8 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     RpLighting.Create2(attachment_list);
 
+    RxShader lighting_shader("Lighting");
+
     // PlLightingOutsideVolume.Create("Lighting(Inside Volume)", shader_list, color_attachments,
     //                                FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
     //                                &vertex_info, RpLighting,
@@ -318,31 +320,59 @@ void RxDeferredRenderer::CreateLightingPipeline()
     //                               &vertex_info, RpLighting,
     //                               { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 
-    RxShader lighting_shader("Lighting");
-    FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
+    {
+        FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
+        FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
 
-    FxVertexInfo vertex_info = FxMakeLightVertexInfo();
+        FxVertexInfo vertex_info = FxMakeLightVertexInfo();
 
-    RxPipelineBuilder builder {};
-    builder.SetLayout(CreateLightingPipelineLayout())
-        .SetName("Lighting Pipeline")
-        .AddBlendAttachment({
-            .Enabled = true,
-            .AlphaBlend { .Ops {
-                .Src = VK_BLEND_FACTOR_ONE,
-                .Dst = VK_BLEND_FACTOR_ZERO,
-            } },
-            .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-        })
-        .SetAttachments(&attachment_list)
-        .SetShaders(vertex_shader, fragment_shader)
-        .SetRenderPass(&RpLighting)
-        .SetVertexInfo(&vertex_info)
-        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+        RxPipelineBuilder builder {};
+        builder.SetLayout(CreateLightingPipelineLayout())
+            .SetName("Point Lighting")
+            .AddBlendAttachment({
+                .Enabled = true,
+                .AlphaBlend { .Ops {
+                    .Src = VK_BLEND_FACTOR_ONE,
+                    .Dst = VK_BLEND_FACTOR_ZERO,
+                } },
+                .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+            })
+            .SetAttachments(&attachment_list)
+            .SetShaders(vertex_shader, fragment_shader)
+            .SetRenderPass(&RpLighting)
+            .SetVertexInfo(&vertex_info)
+            .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
-    builder.SetCullMode(VK_CULL_MODE_FRONT_BIT).Build(PlLightingOutsideVolume);
-    builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
+        builder.SetCullMode(VK_CULL_MODE_FRONT_BIT).Build(PlLightingOutsideVolume);
+        builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
+    }
+    {
+        FxSizedArray<FxShaderMacro> directional_macros { FxShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
+
+        FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, directional_macros);
+        FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment,
+                                                                            directional_macros);
+
+        RxPipelineBuilder builder {};
+
+        builder.SetLayout(CreateLightingPipelineLayout())
+            .SetName("Directional Lighting")
+            .AddBlendAttachment({
+                .Enabled = true,
+                .AlphaBlend { .Ops {
+                    .Src = VK_BLEND_FACTOR_ONE,
+                    .Dst = VK_BLEND_FACTOR_ZERO,
+                } },
+                .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+            })
+            .SetAttachments(&attachment_list)
+            .SetShaders(vertex_shader, fragment_shader)
+            .SetRenderPass(&RpLighting)
+            .SetVertexInfo(nullptr)
+            .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+
+        builder.Build(PlLightingDirectional);
+    }
 }
 
 void RxDeferredRenderer::RebuildLightingPipeline()
@@ -974,6 +1004,8 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 
     DescriptorSet.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mRendererInst->PlComposition);
     mPlComposition->Bind(cmd);
+    // Use single triangle instead of two triangles as it removes the overlapping quads the gpu
+    // renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html
     vkCmdDraw(cmd.CommandBuffer, 3, 1, 0, 0);
 
     mRenderPass->End();

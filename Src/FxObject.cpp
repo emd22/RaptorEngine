@@ -11,12 +11,7 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-FxObject::FxObject()
-{
-    ObjectId = gObjectManager->GenerateObjectId();
-
-    this->Type = FxEntityType::Object;
-}
+FxObject::FxObject() { ObjectId = gObjectManager->GenerateObjectId(); }
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
 {
@@ -297,8 +292,6 @@ void FxObject::SetPhysicsEnabled(bool enabled)
 
 void FxObject::Destroy()
 {
-    gObjectManager->FreeObjectId(ObjectId);
-
     if (pMesh) {
         pMesh->Destroy();
     }
@@ -318,8 +311,4 @@ void FxObject::Destroy()
     bIsUploadedToGpu = false;
 }
 
-FxObject::~FxObject()
-{
-    gObjectManager->FreeObjectId(ObjectId);
-    Destroy();
-}
+FxObject::~FxObject() { Destroy(); }

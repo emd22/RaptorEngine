@@ -10,7 +10,7 @@ void FxScene::Create()
 }
 
 void FxScene::Attach(const FxRef<FxObject>& object) { mObjects.Insert(object); }
-void FxScene::Attach(const FxRef<FxLight>& light) { mLights.Insert(light); }
+void FxScene::Attach(const FxRef<FxLightBase>& light) { mLights.Insert(light); }
 
 void FxScene::Render()
 {
@@ -29,7 +29,7 @@ void FxScene::Render()
     // Render lights
     gRenderer->BeginLighting();
 
-    for (const FxRef<FxLight>& light : mLights) {
+    for (const FxRef<FxLightBase>& light : mLights) {
         light->Render(camera);
     }
 }

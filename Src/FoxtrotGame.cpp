@@ -95,7 +95,7 @@ void FoxtrotGame::CreateLights()
 
     // constexpr float32 scHeight = 5.0f;
 
-    // auto light_volume = FxMeshGen::MakeIcoSphere(2);
+    FxRef<FxMeshGen::GeneratedMesh> light_volume = FxMeshGen::MakeIcoSphere(2);
 
 
     // for (int y = 0; y < scNumLightsY; y++) {
@@ -113,9 +113,11 @@ void FoxtrotGame::CreateLights()
     // }
 
 
-    FxRef<FxLight> sun = FxMakeRef<FxLight>();
-
-    sun->MoveTo(FxVec3f(20, 20, 20));
+    FxRef<FxLightDirectional> sun = FxMakeRef<FxLightDirectional>();
+    sun->MoveTo(FxVec3f(5));
+    sun->SetLightVolume(light_volume);
+    sun->Scale(FxVec3f(25));
+    mMainScene.Attach(sun);
 }
 
 void FoxtrotGame::CreateGame()
