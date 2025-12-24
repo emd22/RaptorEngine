@@ -19,7 +19,8 @@ enum class FxMaterialComponentStatus
     eNotReady,
 };
 
-template <VkFormat TFormat> struct FxMaterialComponent
+template <VkFormat TFormat>
+struct FxMaterialComponent
 {
 public:
 public:

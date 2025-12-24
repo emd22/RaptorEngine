@@ -161,12 +161,14 @@ FSOut FragmentMain(FSIn in)
     let roughness : float = 0.1;
     let metallic : float = 0.9;
 
-    float light_intensity = 50.0f;
+    float light_intensity = 15;
 
     float3 F0 = float3(0.04);
     F0 = lerp(F0, albedo, metallic);
 
 #ifdef FX_LIGHT_DIRECTIONAL
+// float3 light_position_local = FSConst.vLightPosition - world_position;
+
     float3 L = normalize(FSConst.vLightPosition);
 #else
     float3 light_position_local = FSConst.vLightPosition - world_position;
@@ -182,7 +184,7 @@ FSOut FragmentMain(FSIn in)
     float LdotH = DotC(L, H);
 
 #ifdef FX_LIGHT_DIRECTIONAL
-    let attenuation: float = 1.0f;
+    let attenuation: float = light_intensity;
 #else
     float dist_sq = dot(light_position_local, light_position_local);
     float light_distance = sqrt(dist_sq);

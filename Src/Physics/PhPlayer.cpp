@@ -31,7 +31,7 @@ void PhPlayer::Create()
     settings->mShape = pPhysicsShape;
 
     settings->mMaxStrength = 100.0f;
-    settings->mMass = 90.0f;
+    settings->mMass = 75.0f;
     settings->mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
     settings->mSupportingVolume = Plane(Vec3::sAxisY(), -scPlayerRadius);
     settings->mInnerBodyLayer = PhLayer::Dynamic;
@@ -77,18 +77,20 @@ void PhPlayer::Update(float32 delta_time)
         bIsGrounded = true;
     }
     else {
-        velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp() +
-                   phys.GetGravity() * 1.8 * gPhysics->cDeltaTime;
+        velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
+        if (!bDisableGravity) {
+            velocity += phys.GetGravity() * gPhysics->cDeltaTime;
+        }
 
         bIsGrounded = false;
     }
 
-    if (abs(HeadRecoveryYOffset) > 1e-5) {
-        HeadRecoveryYOffset = std::lerp(HeadRecoveryYOffset, 0.0, 0.001 * delta_time);
-    }
-    else {
-        HeadRecoveryYOffset = 0.0f;
-    }
+    // if (abs(HeadRecoveryYOffset) > 1e-5) {
+    //     HeadRecoveryYOffset = std::lerp(HeadRecoveryYOffset, 0.0, 0.001 * delta_time);
+    // }
+    // else {
+    //     HeadRecoveryYOffset = 0.0f;
+    // }
 
     velocity += mMovementVector;
 

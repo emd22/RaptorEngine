@@ -48,7 +48,6 @@ void FoxtrotGame::InitEngine()
     // Create the global engine variables
     FxEngineGlobalsInit();
 
-    sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
@@ -77,6 +76,8 @@ void FoxtrotGame::InitEngine()
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
     material_manager.Create();
+
+    sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 }
 
 void FoxtrotGame::CreateLights()
@@ -113,10 +114,13 @@ void FoxtrotGame::CreateLights()
     // }
 
 
-    FxRef<FxLightPoint> sun = FxMakeRef<FxLightPoint>();
-    sun->MoveTo(FxVec3f(0, 5, 0));
-    sun->SetLightVolume(light_volume);
-    sun->SetRadius(20);
+    FxRef<FxLightDirectional> sun = FxMakeRef<FxLightDirectional>();
+    sun->MoveTo(FxVec3f(2, 5, 2));
+    sun->Color = FxColor(0xFAF8E3, 15);
+
+    FxLogInfo("Color: {:x}", sun->Color.Value);
+    // sun->SetLightVolume(light_volume);
+    // sun->SetRadius(20);
     mMainScene.Attach(sun);
 }
 
@@ -128,15 +132,19 @@ void FoxtrotGame::CreateGame()
 
     Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     // Move the player up and behind the other objects
-    Player.TeleportBy(FxVec3f(0.0f, 4.0f, -5.0f));
+    Player.TeleportBy(FxVec3f(0.0f, 4.0f, -4.0f));
 
     mMainScene.SelectCamera(Player.pCamera);
 
     FxRef<FxObject> ground_object = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom.glb", { .KeepInMemory = true });
     ground_object->WaitUntilLoaded();
 
-    ground_object->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(PhObject::PF_CreateInactive),
-                                       PhObject::PhysicsType::Static, {});
+    ground_object->PhysicsCreateMesh(*ground_object->pMesh, PhMotionType::eStatic, {});
+
+    // ground_object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(20, 1, 20), PhMotionType::eStatic, {});
+
+    // ground_object->PhysicsObjectCreate(static_cast<PhObject::Flags>(PhObject::eCreateInactive),
+    //                                    PhObject::PhysicsType::eStatic, {});
     mMainScene.Attach(ground_object);
 
     pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
@@ -145,7 +153,7 @@ void FoxtrotGame::CreateGame()
     pHelmetObject->WaitUntilLoaded();
     pHelmetObject->MoveBy(FxVec3f(0, 0, 3.5));
 
-    pHelmetObject->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(0), PhObject::PhysicsType::Static, {});
+    // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
 
     gPhysics->OptimizeBroadPhase();
 
@@ -162,6 +170,8 @@ void FoxtrotGame::CreateGame()
     mMainScene.Attach(pPistolObject);
 
     CreateLights();
+
+    Player.Physics.bDisableGravity = true;
 
 
     while (sbRunning) {
@@ -198,29 +208,6 @@ void FoxtrotGame::ProcessControls()
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT)) {
         printf("MOUSE DOWN\n");
-    }
-
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
-        FxLogInfo("Normal:");
-
-        FxMat4f& model0 = pHelmetObject->GetModelMatrix();
-        for (int j = 0; j < 4; j++) {
-            FxLogInfo("[{}, {}, {}, {}]", model0.RawData[j * 4 + 0], model0.RawData[j * 4 + 1],
-                      model0.RawData[j * 4 + 2], model0.RawData[j * 4 + 3]);
-        }
-
-        FxLogInfo("");
-
-        FxObjectGpuEntry* buffer = reinterpret_cast<FxObjectGpuEntry*>(gObjectManager->mObjectGpuBuffer.pMappedBuffer);
-        FxObjectGpuEntry* gpu_entry = &(buffer[pHelmetObject->ObjectId]);
-
-        float* model1 = gpu_entry->ModelMatrix;
-
-        for (int j = 0; j < 4; j++) {
-            FxLogInfo("[{}, {}, {}, {}]", model1[j * 4 + 0], model1[j * 4 + 1], model1[j * 4 + 2], model1[j * 4 + 3]);
-        }
-
-        FxLogInfo("");
     }
 
     // Click to lock mouse
@@ -283,19 +270,20 @@ void FoxtrotGame::ProcessControls()
         FxLogInfo("");
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-        FxLogInfo("Recompiling shaders...");
-        FxShaderCompiler::CompileAllShaders(FX_BASE_DIR "/Shaders/");
-    }
-
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
         pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
+    }
+
+
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_N)) {
+        Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
     }
 }
 
 void FoxtrotGame::Tick()
 {
     const uint64 current_tick = SDL_GetPerformanceCounter();
+
     DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
 
     FxControlManager::Update();
@@ -308,7 +296,7 @@ void FoxtrotGame::Tick()
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->mRotation.SmoothFollow(PistolRotationGoal, 50.0, DeltaTime);
+    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
 
     pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
                           camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));

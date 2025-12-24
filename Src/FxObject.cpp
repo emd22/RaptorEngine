@@ -9,6 +9,7 @@
 #include <FxEngine.hpp>
 #include <FxObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 FxObject::FxObject() { ObjectId = gObjectManager->GenerateObjectId(); }
@@ -62,16 +63,31 @@ bool FxObject::CheckIfReady()
 }
 
 
-void FxObject::PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type,
-                                   const PhProperties& properties)
+void FxObject::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions,
+                                      PhMotionType motion_type, const PhProperties& physics_properties)
 {
-    Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
-
-    FxVec3f scaled_dimensions = Dimensions * (mScale * 0.5);
-
-    Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
+    Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
 }
+
+
+void FxObject::PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotionType motion_type,
+                                 const PhProperties& physics_properties)
+{
+    Physics.CreateMeshBody(physics_mesh, motion_type, physics_properties);
+    mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+}
+
+
+// void FxObject::PhysicsCreate(PhObject::Flags flags, PhMotionType moititype, const PhProperties& properties)
+// {
+//     Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
+
+//     FxVec3f scaled_dimensions = Dimensions * (mScale * 0.5);
+
+//     Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
+//     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+// }
 
 void FxObject::SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children)
 {

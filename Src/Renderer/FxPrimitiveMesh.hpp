@@ -23,7 +23,7 @@ public:
     FxPrimitiveMesh(FxPrimitiveMesh<T>& other)
     {
         VertexList = other.VertexList;
-        mGpuIndexBuffer = other.mGpuIndexBuffer;
+        GpuIndexBuffer = other.GpuIndexBuffer;
 
         IsReady = other.IsReady;
     }
@@ -92,10 +92,10 @@ public:
     void UploadIndices(const FxSizedArray<uint32>& indices)
     {
         // if (KeepInMemory) {
-        mLocalIndexBuffer.InitAsCopyOf(indices);
+        LocalIndexBuffer.InitAsCopyOf(indices);
         // }
 
-        mGpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
+        GpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
     }
 
     /**
@@ -104,10 +104,10 @@ public:
      */
     void UploadIndices(FxSizedArray<uint32>&& indices)
     {
-        mGpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
+        GpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
 
         // if (KeepInMemory) {
-        mLocalIndexBuffer = std::move(indices);
+        LocalIndexBuffer = std::move(indices);
         // }
     }
 
@@ -128,13 +128,13 @@ public:
         }
 
         // This will return an empty FxSizedArray if `KeepInMemory` is false!
-        return mLocalIndexBuffer;
+        return LocalIndexBuffer;
     }
 
-    bool IsWritable() { return (VertexList.GpuBuffer.Initialized && mGpuIndexBuffer.Initialized); }
+    bool IsWritable() { return (VertexList.GpuBuffer.Initialized && GpuIndexBuffer.Initialized); }
 
     RxGpuBuffer<TVertexType>& GetVertexBuffer() { return VertexList.GpuBuffer; }
-    RxGpuBuffer<uint32>& GetIndexBuffer() { return mGpuIndexBuffer; }
+    RxGpuBuffer<uint32>& GetIndexBuffer() { return GpuIndexBuffer; }
 
     void Render(const RxCommandBuffer& cmd, const RxGraphicsPipeline& pipeline)
     {
@@ -142,14 +142,14 @@ public:
         //        RxFrameData* frame = Rx_Fwd_GetFrame();
 
         vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
-        vkCmdBindIndexBuffer(cmd.CommandBuffer, mGpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(cmd.CommandBuffer, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mGpuIndexBuffer.Size), 1, 0, 0, 0);
+        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(GpuIndexBuffer.Size), 1, 0, 0, 0);
     }
 
     void RecalculateNormals()
     {
-        if (mLocalIndexBuffer.IsEmpty()) {
+        if (LocalIndexBuffer.IsEmpty()) {
             FxLogWarning("Cannot recalculate normals as a local indices are missing!");
             return;
         }
@@ -171,9 +171,9 @@ public:
 
         for (uint32 index = 0; index < num_faces; index++) {
             // Indices for each vertex of the triangle
-            const uint32 index_a = mLocalIndexBuffer.pData[index];
-            const uint32 index_b = mLocalIndexBuffer.pData[index + 1];
-            const uint32 index_c = mLocalIndexBuffer.pData[index + 2];
+            const uint32 index_a = LocalIndexBuffer.pData[index];
+            const uint32 index_b = LocalIndexBuffer.pData[index + 1];
+            const uint32 index_c = LocalIndexBuffer.pData[index + 2];
 
             /*
                         A
@@ -245,8 +245,8 @@ public:
 
         VertexList.Destroy();
 
-        mGpuIndexBuffer.Destroy();
-        mLocalIndexBuffer.Free();
+        GpuIndexBuffer.Destroy();
+        LocalIndexBuffer.Free();
     }
 
     ~FxPrimitiveMesh() { Destroy(); }
@@ -260,7 +260,6 @@ public:
     bool IsReference = false;
     bool KeepInMemory = false;
 
-protected:
-    RxGpuBuffer<uint32> mGpuIndexBuffer;
-    FxSizedArray<uint32> mLocalIndexBuffer;
+    RxGpuBuffer<uint32> GpuIndexBuffer;
+    FxSizedArray<uint32> LocalIndexBuffer;
 };

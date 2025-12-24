@@ -42,10 +42,12 @@ public:
     FX_FORCE_INLINE void SLerpIP(const FxQuat& dest, const float speed);
     FX_FORCE_INLINE void NLerpIP(const FxQuat& dest, float step);
 
-    FX_FORCE_INLINE void SmoothFollow(const FxQuat& dest, const float speed, const float delta_time)
+    FX_FORCE_INLINE FxQuat& SmoothInterpolate(const FxQuat& dest, const float speed, const float delta_time)
     {
         // Lerp with exp decay
         NLerpIP(dest, 1.0 - expf(-speed * delta_time));
+
+        return *this;
     }
 
 #ifdef FX_USE_NEON
@@ -106,7 +108,8 @@ public:
 };
 
 
-template <> struct std::formatter<FxQuat>
+template <>
+struct std::formatter<FxQuat>
 {
     auto parse(format_parse_context& ctx) { return ctx.begin(); }
 

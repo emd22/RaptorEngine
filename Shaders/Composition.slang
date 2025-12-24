@@ -49,6 +49,16 @@ layout(binding = 2) Sampler2D sAlbedo;
 layout(binding = 3) Sampler2D sNormal;
 layout(binding = 4) Sampler2D sLighting;
 
+float3 ACESFilm(float3 x)
+{
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+}
+
 [shader("fragment")]
 
 FSOut FragmentMain(FSIn in)
@@ -62,17 +72,20 @@ FSOut FragmentMain(FSIn in)
 
 #else
 
+    let exposure: float = 1.1;
+
     float4 lighting = sLighting.Sample(in.vUV);
+    float3 lit_color = lighting.rgb * exposure;
 
-    float3 lit_color = lighting.rgb;
+    // float3 hdr_recip =  1.0 / (lit_color + float3(1.0));
+    // lit_color = lit_color * hdr_recip;
 
-    float3 hdr_recip =  1.0 / (lit_color + float3(1.0));
-    lit_color = lit_color * hdr_recip;
+    lit_color = ACESFilm(lit_color);
 
     let cfGamma : float = 1.0 / 2.2;
     lit_color = pow(lit_color, float3(cfGamma));
 
-    out.vColor = float4(lit_color, 1.0);
+    out.vColor = float4(lerp(lit_color, albedo.rgb, 0.25), 1.0);
 #endif
 
     return out;

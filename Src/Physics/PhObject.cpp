@@ -1,18 +1,56 @@
 #include "PhObject.hpp"
 
 #include "PhJolt.hpp"
+#include "PhMesh.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
 #include <ThirdParty/Jolt/Physics/Body/MotionType.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
 #include <FxEngine.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 
-void PhObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f& initial_position,
-                                 PhObject::PhysicsFlags flags, PhObject::PhysicsType type,
-                                 const PhProperties& properties)
+/*
+ Object->CreateBody(PhBodyType::eBox, FxVec3f(1, 2, 3), PhObject::PhysicsType::eStatic);
+ */
+
+void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+                                   const PhProperties& object_properties)
+{
+    switch (primitive_type) {
+    case PhPrimitiveType::eBox: {
+        JPH::RVec3 jolt_dimensions;
+        dimensions.ToJoltVec3(jolt_dimensions);
+
+        JPH::BoxShapeSettings box_shape_settings(jolt_dimensions);
+        box_shape_settings.SetDensity(object_properties.Density);
+        box_shape_settings.mConvexRadius = object_properties.ConvexRadius;
+
+        JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
+        JPH::ShapeRefC box_shape = box_shape_result.Get();
+
+        CreateJoltBody(box_shape, {}, motion_type, object_properties);
+    }
+    }
+}
+
+void PhObject::CreateMeshBody(const FxPrimitiveMesh<>& mesh, PhMotionType motion_type,
+                              const PhProperties& object_properties)
+{
+    PhMesh physics_mesh(mesh);
+
+    JPH::ShapeSettings::ShapeResult mesh_shape_result = physics_mesh.GetShapeResult();
+    JPH::ShapeRefC box_shape = mesh_shape_result.Get();
+
+    CreateJoltBody(box_shape, {}, motion_type, object_properties);
+}
+
+
+void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMotionType motion_type,
+                              const PhProperties& properties)
 {
     if (mbHasPhysicsBody) {
         FxLogWarning("Attempting to create physics body when one is already created!");
@@ -22,60 +60,39 @@ void PhObject::CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f& initi
 
     JPH::EActivation activation_mode = JPH::EActivation::Activate;
 
-    if (flags & PhObject::PF_CreateInactive) {
+    if (flags & PhObject::Flags::eCreateInactive) {
         activation_mode = JPH::EActivation::DontActivate;
     }
 
-    JPH::EMotionType motion_type = JPH::EMotionType::Static;
+    JPH::EMotionType jolt_motion_type = JPH::EMotionType::Static;
 
     PhLayer::Type object_layer = PhLayer::Static;
 
-    switch (type) {
-    case PhObject::PhysicsType::Static:
-        motion_type = JPH::EMotionType::Static;
+    switch (motion_type) {
+    case PhMotionType::eStatic:
+        jolt_motion_type = JPH::EMotionType::Static;
         object_layer = PhLayer::Static;
         break;
-    case PhObject::PhysicsType::Dynamic:
-        motion_type = JPH::EMotionType::Dynamic;
+    case PhMotionType::eDynamic:
+        jolt_motion_type = JPH::EMotionType::Dynamic;
         object_layer = PhLayer::Dynamic;
         break;
     default:
         break;
     }
 
-    JPH::RVec3 box_position;
-    initial_position.ToJoltVec3(box_position);
+    JPH::BodyCreationSettings body_settings(shape, JPH::Vec3::sZero(), JPH::Quat::sIdentity(), jolt_motion_type,
+                                            object_layer);
 
-    JPH::RVec3 box_dimensions;
-    dimensions.ToJoltVec3(box_dimensions);
-
-    FxLogDebug("Creating physics body of dimensions {}", dimensions);
-
-    // JPH::RefConst<JPH::PhysicsMaterial> material = new JPH::PhysicsMaterial;
-
-    JPH::BoxShapeSettings box_shape_settings(box_dimensions);
-    // box_shape_settings.mMaterial =
-    box_shape_settings.SetDensity(properties.Density);
-    box_shape_settings.mConvexRadius = properties.ConvexRadius;
-
-    // box_shape_settings.SetEmbedded();
-
-    JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
-    JPH::ShapeRefC box_shape = box_shape_result.Get();
-
-    JPH::BodyCreationSettings body_settings(box_shape, box_position, JPH::Quat::sIdentity(), motion_type, object_layer);
     body_settings.mFriction = properties.Friction;
     body_settings.mRestitution = properties.Restitution;
 
     JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
 
     mpPhysicsBody = body_interface.CreateBody(body_settings);
-
     body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
 
     mbHasPhysicsBody = true;
-
-    // body_interface.CreateAndAddBody(body_settings, activation_mode);
 }
 
 

@@ -17,6 +17,11 @@ public:
 public:
     FxColor() {}
     FxColor(uint32 value) : Value(value) {}
+    FxColor(uint32 value, uint8 brightness)
+    {
+        Value = value;
+        A = brightness;
+    }
 
     static FX_FORCE_INLINE FxColor FromRGBA(uint8 r, uint8 g, uint8 b, uint8 a);
     static FX_FORCE_INLINE FxColor FromFloats(float32 rgba[4]);

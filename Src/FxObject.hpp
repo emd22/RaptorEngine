@@ -11,6 +11,9 @@
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
 
+template <typename T>
+class FxPrimitiveMesh;
+
 enum class FxObjectLayer
 {
     eWorldLayer,
@@ -40,10 +43,14 @@ public:
 
     void SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children = true);
 
+    void PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+                                const PhProperties& physics_properties);
+
+    void PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotionType motion_type,
+                           const PhProperties& physics_properties);
+
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
-
-    void PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type, const PhProperties& properties);
 
     FX_FORCE_INLINE void SetObjectLayer(FxObjectLayer layer) { mObjectLayer = layer; }
     FX_FORCE_INLINE FxObjectLayer GetObjectLayer() const { return mObjectLayer; }

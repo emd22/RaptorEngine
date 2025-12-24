@@ -31,4 +31,6 @@ public:
     float mTime = 0.01f;
 
     bool bIsGrounded : 1 = false;
+
+    bool bDisableGravity = false;
 };

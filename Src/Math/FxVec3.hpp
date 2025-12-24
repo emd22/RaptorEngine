@@ -12,6 +12,8 @@
 #include <immintrin.h>
 #endif
 
+#include <cmath>
+
 class FxVec4f;
 
 namespace JPH {
@@ -127,9 +129,9 @@ public:
     FX_FORCE_INLINE static FxVec3f Lerp(const FxVec3f& a, const FxVec3f& b, const float f);
     FX_FORCE_INLINE FxVec3f& LerpIP(const FxVec3f& dest, const float step);
 
-    FX_FORCE_INLINE FxVec3f& InterpolateTo(const FxVec3f& dest, const float speed, const float delta_time)
+    FX_FORCE_INLINE FxVec3f& SmoothInterpolate(const FxVec3f& dest, const float speed, const float delta_time)
     {
-        LerpIP(dest, 1.0f - pow(speed, delta_time));
+        LerpIP(dest, 1.0f - expf(-speed * delta_time));
         return *this;
     }
 
