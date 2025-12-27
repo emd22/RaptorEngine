@@ -9,9 +9,6 @@
 
 #include <Core/FxTypes.hpp>
 
-
-typedef float32x4_t float128;
-
 enum FxShuffleComponent
 {
     /* A Vector */
@@ -29,6 +26,8 @@ enum FxShuffleComponent
 
 namespace FxNeon {
 
+
+constexpr uint32 scSignMask32 = 0x80000000;
 
 template <FxShuffleComponent TA, FxShuffleComponent TB, FxShuffleComponent TC, FxShuffleComponent TD>
 concept C_SinglePermute = (TA <= FxShuffle_AW) && (TB <= FxShuffle_AW) && (TC <= FxShuffle_AW) && (TD <= FxShuffle_AW);
@@ -109,43 +108,51 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
 // Specializations
 
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AW, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AW, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX>(float32x4_t a)
 {
     return vcombine_f32(vrev64_f32(vget_high_f32(a)), vrev64_f32(vget_low_f32(a)));
 }
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AW>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AW>(float32x4_t a)
 {
     return a;
 }
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AZ>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AZ, FxShuffle_AZ>(float32x4_t a)
 {
     return vcombine_f32(vget_low_f32(a), vdup_lane_f32(vget_high_f32(a), 0));
 }
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AW, FxShuffle_AW>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AX, FxShuffle_AY, FxShuffle_AW, FxShuffle_AW>(float32x4_t a)
 {
     return vcombine_f32(vget_low_f32(a), vdup_lane_f32(vget_high_f32(a), 1));
 }
 
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AX, FxShuffle_AW, FxShuffle_AZ>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AX, FxShuffle_AW, FxShuffle_AZ>(float32x4_t a)
 {
     return vcombine_f32(vrev64_f32(vget_low_f32(a)), vrev64_f32(vget_high_f32(a)));
 }
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX>(float32x4_t a)
 {
     return vcombine_f32(vdup_lane_f32(vget_high_f32(a), 0), vrev64_f32(vget_low_f32(a)));
 }
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AW, FxShuffle_AX, FxShuffle_AY>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AZ, FxShuffle_AW, FxShuffle_AX, FxShuffle_AY>(float32x4_t a)
 {
     return vcombine_f32(vget_high_f32(a), vget_low_f32(a));
 }
 
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AX>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AX>(float32x4_t a)
 {
     static uint8x16_t table = { 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
                                 0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03 };
@@ -155,7 +162,8 @@ template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxS
 /**
  * @brief Returns the vector A rearranged to the components {Y, Z, X, W}.
  */
-template <> FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(float32x4_t a)
+template <>
+FX_FORCE_INLINE float32x4_t Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(float32x4_t a)
 {
     // Extend vector (XYZW -> YZWX)
     a = vextq_f32(a, a, 1);
@@ -244,7 +252,8 @@ FX_FORCE_INLINE float32x4_t And(float32x4_t a, float32x4_t b)
  * @brief Set the signs of all components of `v` to the sign of `TSign`.
  * @tparam TSign A value (e.g. 1.0 or -1.0) to specify the sign.
  */
-template <int TSign> FX_FORCE_INLINE float32x4_t SetSigns(float32x4_t v)
+template <int TSign>
+FX_FORCE_INLINE float32x4_t SetSigns(float32x4_t v)
 {
     // Same as -0.0f, only the sign bit
     const uint32x4_t sign_v = vdupq_n_u32(0x80000000);
@@ -259,7 +268,8 @@ template <int TSign> FX_FORCE_INLINE float32x4_t SetSigns(float32x4_t v)
     return vreinterpretq_f32_u32(vorrq_u32(vreinterpretq_u32_f32(v), sign_v));
 }
 
-template <int TX, int TY, int TZ, int TW> FX_FORCE_INLINE float32x4_t FlipSigns(float32x4_t v)
+template <int TX, int TY, int TZ, int TW>
+FX_FORCE_INLINE float32x4_t FlipSigns(float32x4_t v)
 {
     constexpr float32 signs[4] = {
         TX > 0 ? 0.0f : -0.0f,

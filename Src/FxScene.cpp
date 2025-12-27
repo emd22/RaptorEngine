@@ -9,8 +9,16 @@ void FxScene::Create()
     mLights.Create(32);
 }
 
-void FxScene::Attach(const FxRef<FxObject>& object) { mObjects.Insert(object); }
-void FxScene::Attach(const FxRef<FxLightBase>& light) { mLights.Insert(light); }
+void FxScene::Attach(const FxRef<FxObject>& object)
+{
+    mObjects.Insert(object);
+    object->OnAttached(this);
+}
+void FxScene::Attach(const FxRef<FxLightBase>& light)
+{
+    mLights.Insert(light);
+    light->OnAttached(this);
+}
 
 void FxScene::Render()
 {

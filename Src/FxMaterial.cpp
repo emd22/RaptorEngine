@@ -29,6 +29,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     GetGlobalManager().mMaterials.Create(entities_per_page);
 
+    MaterialsInUse.InitZero(FX_MAX_MATERIALS);
+
     RxDescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
@@ -36,7 +38,6 @@ void FxMaterialManager::Create(uint32 entities_per_page)
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3);
         dp.Create(gRenderer->GetDevice(), MaxMaterials);
     }
-
 
     // Material properties buffer descriptors
 
@@ -101,11 +102,17 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipe
         gm.Create();
     }
 
+    int free_material_index = gm.MaterialsInUse.FindNextFreeBit();
+    FxAssert(free_material_index != FxBitset::scNoFreeBits);
+
     FxRef<FxMaterial> ref = FxMakeRef<FxMaterial>();
 
     ref->NameHash = FxHashStr32(name.c_str());
     ref->Name = name;
     ref->pPipeline = pipeline;
+    ref->mMaterialPropertiesIndex = free_material_index;
+
+    gm.MaterialsInUse.Set(free_material_index);
 
     return ref;
 }
@@ -225,6 +232,10 @@ void FxMaterial::Destroy()
         bIsBuilt.store(false);
     }
 
+    if (mMaterialPropertiesIndex != UINT32_MAX) {
+        FxMaterialManager::GetGlobalManager().MaterialsInUse.Unset(mMaterialPropertiesIndex);
+    }
+
     // TODO: figure out why the FxRef isn't destroying the object...
     // if (Diffuse.pImage) {
     //     Diffuse.pImage->Destroy();
@@ -232,7 +243,8 @@ void FxMaterial::Destroy()
 }
 
 
-template <VkFormat TFormat> static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
+template <VkFormat TFormat>
+static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 {
     if (!component.pImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
@@ -294,8 +306,9 @@ void FxMaterial::Build()
     if (NormalMap.pImage) {
         has_normal_map = true;
 
-        BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
+        // BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
     }
+
     BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
 
     // Update the material descriptor
@@ -337,7 +350,9 @@ void FxMaterial::Build()
                                0, nullptr);
     }
 
-    mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++ /* * RendererFramesInFlight */);
+    // mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++);
+
+    FxAssert(mMaterialPropertiesIndex != UINT32_MAX);
 
     FxMaterialProperties* materials_buffer = static_cast<FxMaterialProperties*>(
         manager.MaterialPropertiesBuffer.pMappedBuffer);
@@ -352,6 +367,7 @@ void FxMaterial::Build()
     else {
         pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
     }
+
 
     // material->BaseColor = ;
 

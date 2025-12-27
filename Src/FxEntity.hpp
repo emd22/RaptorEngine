@@ -9,6 +9,8 @@
 
 #define FX_VALIDATE_ENTITY_TYPE(TType_) static_assert(C_IsEntity<TType_>);
 
+class FxScene;
+
 enum class FxEntityType
 {
     eUnknown,
@@ -44,6 +46,8 @@ public:
 
     virtual void Scale(const float scale);
     virtual void SetScale(const float scale);
+
+    virtual void OnAttached(FxScene* scene) {}
 
     void RotateX(float32 rad);
     void RotateY(float32 rad);

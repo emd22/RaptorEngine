@@ -4,6 +4,7 @@
 
 #include <Asset/AxImage.hpp>
 #include <Asset/Fwd/Ax_Fwd_Manager.hpp>
+#include <Core/FxBitset.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Core/Log.hpp>
@@ -145,7 +146,7 @@ public:
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
      */
-    uint32 mMaterialPropertiesIndex = 0;
+    uint32 mMaterialPropertiesIndex = UINT32_MAX;
 
 private:
     // VkDescriptorSetLayout mSetLayout = nullptr;
@@ -185,6 +186,8 @@ public:
      */
     RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesBuffer;
     uint32 NumMaterialsInBuffer = 0;
+
+    FxBitset MaterialsInUse;
 
     /**
      * @brief Descriptor set for material properties. Used in the light pass.

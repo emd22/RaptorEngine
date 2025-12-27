@@ -8,6 +8,7 @@
 
 #include <FxEngine.hpp>
 #include <FxObjectManager.hpp>
+#include <FxScene.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/RxRenderBackend.hpp>
@@ -67,7 +68,6 @@ void FxObject::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVe
                                       PhMotionType motion_type, const PhProperties& physics_properties)
 {
     Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
-    mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
 }
 
 
@@ -75,7 +75,14 @@ void FxObject::PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotion
                                  const PhProperties& physics_properties)
 {
     Physics.CreateMeshBody(physics_mesh, motion_type, physics_properties);
-    mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+}
+
+void FxObject::OnAttached(FxScene* scene)
+{
+    // When the object is attached to the scene, enable physics if the physics object is active.
+    if (Physics.mbHasPhysicsBody) {
+        mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+    }
 }
 
 
@@ -110,7 +117,7 @@ void FxObject::SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_chi
 }
 
 
-void FxObject::Render(const FxPerspectiveCamera& camera)
+void FxObject::Render(const FxCamera& camera)
 {
     RxFrameData* frame = gRenderer->GetFrame();
     //
@@ -135,11 +142,13 @@ void FxObject::Render(const FxPerspectiveCamera& camera)
 
     push_constants.ObjectId = ObjectId;
 
-    if (mObjectLayer == FxObjectLayer::eWorldLayer) {
-        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+    // Use the separate VP matrix for the player's objects if the object is marked for the player layer
+    if (mObjectLayer == FxObjectLayer::ePlayerLayer && camera.scType == FxCameraType::ePerspective) {
+        memcpy(push_constants.VPMatrix, static_cast<const FxPerspectiveCamera&>(camera).WeaponVPMatrix.RawData,
+               sizeof(FxMat4f));
     }
-    else if (mObjectLayer == FxObjectLayer::ePlayerLayer) {
-        memcpy(push_constants.VPMatrix, camera.WeaponVPMatrix.RawData, sizeof(FxMat4f));
+    else if (mObjectLayer == FxObjectLayer::eWorldLayer || camera.scType != FxCameraType::ePerspective) {
+        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
     }
 
     // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));

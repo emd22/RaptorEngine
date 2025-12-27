@@ -363,7 +363,7 @@ void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
     // Columns[3].Load4(0,              0,              0,              1.0f);
 }
 
-void FxMat4f::LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 {
     LoadIdentity();
 
@@ -394,6 +394,48 @@ void FxMat4f::LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 n
 
     Columns[3].Z = (b);
     Columns[3].W = (0);
+}
+
+void FxMat4f::LoadOrthographicMatrix(float32 left, float32 right, float32 top, float32 bottom, float32 near_plane,
+                                     float32 far_plane)
+{
+    float32x4_t diff_result;
+    uint32x4_t sign_mask;
+
+    // Column 3:
+    //
+    //    right + left       top + bottom        far + near
+    // - -------------- , - --------------- , - ------------  , + 1.0
+    //    right - left       top - bottom        far - near
+
+    float32 a_values[] = { right, top, far_plane, 1.0f };
+    float32 b_values[] = { left, bottom, near_plane, 0.0f };
+    const float32x4_t a_v = vld1q_f32(a_values);
+    const float32x4_t b_v = vld1q_f32(b_values);
+
+    uint32 mask_values[] = { FxNeon::scSignMask32, FxNeon::scSignMask32, FxNeon::scSignMask32, 0 };
+    sign_mask = vld1q_u32(mask_values);
+
+    diff_result = vsubq_f32(a_v, b_v);
+
+    // Divide (a_v + b_v) by (a_v - b_v)
+    Columns[3].mIntrin = vdivq_f32(vaddq_f32(a_v, b_v), diff_result);
+
+    // Given {X, Y, Z, W}, negate X, Y, Z and keep W positive (1.0)
+    // {-X, -Y, -Z, +W}
+    Columns[3].mIntrin = vreinterpretq_f32_u32(veorq_u32(vreinterpretq_u32_f32(Columns[3].mIntrin), sign_mask));
+
+    // {0, 0, 0x80000000, 0} -> {+X, +Y, -Z, +W}
+    sign_mask = vsetq_lane_u32(FxNeon::scSignMask32, vdupq_n_u32(0.0), 2);
+    float32x4_t numerator = vreinterpretq_f32_u32(vorrq_u32(vreinterpretq_u32_f32(vdupq_n_f32(2.0f)), sign_mask));
+    float32x4_t values = vdivq_f32(numerator, diff_result);
+
+    // First column, [2 / (r - l), 0, 0, 0]
+    Columns[0].mIntrin = vcopyq_lane_f32(vdupq_n_f32(0.0), 0, vget_low_f32(values), 0);
+    // Second column, [0, 2 / (t - b), 0, 0]
+    Columns[1].mIntrin = vcopyq_lane_f32(vdupq_n_f32(0.0), 1, vget_low_f32(values), 1);
+    // Third column, [0, 0, -2 / (f - n), 0]
+    Columns[2].mIntrin = vcopyq_lane_f32(vdupq_n_f32(0.0), 0, vget_high_f32(values), 0);
 }
 
 // Mat4f Mat4f::Multiply(Mat4f &other)

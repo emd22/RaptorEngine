@@ -117,8 +117,6 @@ void FoxtrotGame::CreateLights()
     FxRef<FxLightDirectional> sun = FxMakeRef<FxLightDirectional>();
     sun->MoveTo(FxVec3f(2, 5, 2));
     sun->Color = FxColor(0xFAF8E3, 15);
-
-    FxLogInfo("Color: {:x}", sun->Color.Value);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
     mMainScene.Attach(sun);

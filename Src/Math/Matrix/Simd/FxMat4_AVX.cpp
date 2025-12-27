@@ -85,7 +85,7 @@ FxMat4f FxMat4f::AsRotation(const FxQuat& quat)
                    FxVec4f(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-void FxMat4f::LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 {
     LoadIdentity();
 

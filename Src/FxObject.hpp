@@ -35,11 +35,13 @@ public:
 
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
-    void Render(const FxPerspectiveCamera& camera);
+    void Render(const FxCamera& camera);
     bool CheckIfReady();
 
     void AttachObject(const FxRef<FxObject>& object);
     void Update();
+
+    void OnAttached(FxScene* scene) override;
 
     void SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children = true);
 
