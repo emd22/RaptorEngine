@@ -5,6 +5,8 @@
 
 #include <Asset/FxDataPack.hpp>
 #include <FxEngine.hpp>
+#include <Math/FxMathConsts.hpp>
+#include <Math/FxMathUtil.hpp>
 
 FX_SET_MODULE_NAME("Main")
 
@@ -12,40 +14,30 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
 
+    // float32 angle = FX_PI_2;
 
-    // char buffer_a[256];
+    // {
+    //     float32 sine_sanity = std::sin(angle);
+    //     float32 cosine_sanity = std::cos(angle);
 
-    // FxDataPack pack {};
-
-    // int numbers[3] = { 1, 2, 3 };
-    // const std::string str = "Hello, World!";
-
-    // pack.AddEntry(FxHashStr64("Test1"), FxMakeSlice<uint8>(reinterpret_cast<uint8*>(numbers), 3 * sizeof(int)));
-    // pack.AddEntry(FxHashStr64("Test2"),
-    //               FxMakeSlice<uint8>(reinterpret_cast<uint8*>(const_cast<char*>(str.data())), str.length()));
-
-    // pack.WriteToFile("Test.fdat");
-
-    // // FxDataPack pack {};
-
-    // pack.ReadFromFile("Test.fdat");
-
-    // FxSizedArray<char> data = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test1")));
-    // if (data.IsNotEmpty()) {
-    //     for (char v : data) {
-    //         FxLogInfo("{:02X}", v);
-    //     }
+    //     FxLogInfo("Sanity:");
+    //     FxLogInfo("Sine: {}, Cosine:{}", sine_sanity, cosine_sanity);
+    //     FxLogInfo("");
     // }
 
-    // FxSizedArray<char> data2 = pack.ReadSection<char>(pack.QuerySection(FxHashStr64("Test2")));
+    // {
+    //     float32 sine = 0.0f, cosine = 0.0f;
 
-    // if (data2.IsNotEmpty()) {
-    //     FxLogInfo("Value: {:.{}}", data2.pData, data2.Size);
+    //     FxMath::SinCos(angle, &sine, &cosine);
+
+    //     FxLogInfo("Results:");
+    //     FxLogInfo("Sine: {}, Cosine:{}", sine, cosine);
+    //     FxLogInfo("");
     // }
+
+
     {
         FoxtrotGame game {};
-
-        // game.Destroy();
     }
 
     FxEngineGlobalsDestroy();

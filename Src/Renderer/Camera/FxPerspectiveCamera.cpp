@@ -39,10 +39,11 @@ void FxPerspectiveCamera::Update()
         return;
     }
 
-    const float32 c_angley = std::cos(mAngleY);
-    const float32 c_anglex = std::cos(mAngleX);
-    const float32 s_angley = std::sin(mAngleY);
-    const float32 s_anglex = std::sin(mAngleX);
+    float32 s_anglex, c_anglex;
+    float32 s_angley, c_angley;
+
+    FxMath::SinCos(mAngleX, &s_anglex, &c_anglex);
+    FxMath::SinCos(mAngleY, &s_angley, &c_angley);
 
     Direction.Set(c_angley * s_anglex, s_angley, c_angley * c_anglex);
     Direction.NormalizeIP();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxVec3.hpp>
@@ -109,8 +110,8 @@ public:
 
         constexpr float cOffset = 0.01f;
 
-        constexpr float cMinY = -M_PI_2 + cOffset;
-        constexpr float cMaxY = M_PI_2 - cOffset;
+        constexpr float cMinY = -FX_HALF_PI + cOffset;
+        constexpr float cMaxY = FX_HALF_PI - cOffset;
 
         mAngleY = FxMath::Clamp(mAngleY, cMinY, cMaxY);
 
@@ -135,7 +136,7 @@ public:
 private:
     inline float32 LimitRotation(float32 v)
     {
-        constexpr float32 cf2Pi = M_PI * 2.0f;
+        constexpr float32 cf2Pi = FX_2PI;
 
         if (v < -cf2Pi) {
             return cf2Pi - 1e-5;

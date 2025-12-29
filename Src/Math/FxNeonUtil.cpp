@@ -2,15 +2,16 @@
 
 #ifdef FX_USE_NEON
 
+#include "FxMathConsts.hpp"
 #include "FxNeonUtil.hpp"
 
 static constexpr uint32 sConstSignMask = 0x80000000;
 
-static constexpr float32 sConstHalfPi = M_PI_2;
-static constexpr float32 sConstPi = M_PI;
+static constexpr float32 sConstHalfPi = FX_HALF_PI;
+static constexpr float32 sConstPi = FX_PI;
 static constexpr float32 sConst3HalfPi = sConstHalfPi * 3.0f;
 
-static constexpr float32 sConst2Pi = M_PI * 2.0;
+static constexpr float32 sConst2Pi = FX_PI * 2.0;
 static constexpr float32 sConstInv2Pi = 1.0f / sConst2Pi;
 
 

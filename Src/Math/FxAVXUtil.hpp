@@ -25,10 +25,12 @@ enum FxShuffleComponent
 
 namespace FxSSE {
 
+constexpr uint32 scSignMask32 = 0x80000000;
+
 FX_FORCE_INLINE __m128 RemoveSign(__m128 vec)
 {
     // Based off of https://fastcpp.blogspot.com/2011/03/changing-sign-of-float-values-using-sse.html
-    
+
     const __m128 sign_mask = _mm_set1_ps(-0.0);
     return _mm_andnot_ps(vec, sign_mask);
 }
@@ -37,7 +39,7 @@ template <int TX, int TY, int TZ, int TW>
 FX_FORCE_INLINE __m128 SetSign(__m128 v)
 {
     // [sign][exponent][  mantissa    ]
-    // 
+    //
     // We can represent just the sign bit using -0.0f
     constexpr float32 signs[4] = {
         TX > 0 ? 0.0f : -0.0f,
@@ -64,10 +66,7 @@ FX_FORCE_INLINE __m128 Permute4(__m128 a)
     return _mm_shuffle_ps(a, a, permute);
 }
 
-FX_FORCE_INLINE float32 LengthSquared(__m128 vec)
-{
-    return _mm_cvtss_f32(_mm_dp_ps(vec, vec, 0xF1));
-}
+FX_FORCE_INLINE float32 LengthSquared(__m128 vec) { return _mm_cvtss_f32(_mm_dp_ps(vec, vec, 0xF1)); }
 
 FX_FORCE_INLINE float32 Length(__m128 vec) { return sqrtf(LengthSquared(vec)); }
 
