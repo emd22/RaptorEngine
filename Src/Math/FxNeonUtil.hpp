@@ -26,7 +26,6 @@ enum FxShuffleComponent
 
 namespace FxNeon {
 
-
 constexpr uint32 scSignMask32 = 0x80000000;
 
 template <FxShuffleComponent TA, FxShuffleComponent TB, FxShuffleComponent TC, FxShuffleComponent TD>

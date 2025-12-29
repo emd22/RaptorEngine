@@ -34,6 +34,7 @@ static constexpr float32 scCosineCoeff0_3 = -0.5f;
 void SinCos(float32 in_angle, float32* out_sine, float32* out_cosine)
 {
     static constexpr float32 scPi = FX_PI;
+    static constexpr float32 scHalfPi = FX_HALF_PI;
 
     if (in_angle > FX_2PI) {
         in_angle = -FX_2PI;
@@ -47,7 +48,7 @@ void SinCos(float32 in_angle, float32* out_sine, float32* out_cosine)
     // Pi if the sign is positive, -Pi if the sign is negative.
     float32 pi_or_neg_pi = AsFloat(AsUInt(scPi) | angle_sign);
 
-    uint32 cmp_result = (float32((~angle_sign) & AsUInt(in_angle)) <= float32(FX_HALF_PI)) ? 0xFFFFFFFF : 0x00000000;
+    uint32 cmp_result = (float32((~angle_sign) & AsUInt(in_angle)) <= float32(scHalfPi)) ? 0xFFFFFFFF : 0x00000000;
 
     uint32 sel0 = (cmp_result & AsUInt(in_angle));
     uint32 sel1 = ((~cmp_result) & AsUInt((pi_or_neg_pi - in_angle)));
@@ -70,6 +71,7 @@ void SinCos(float32 in_angle, float32* out_sine, float32* out_cosine)
 
     (*out_sine) = result;
 
+    // Cosine approximation
     result = std::fmaf(scCosineCoeff1, angle_sq, scCosineCoeff0_0);
     result = std::fmaf(result, angle_sq, scCosineCoeff0_1);
     result = std::fmaf(result, angle_sq, scCosineCoeff0_2);
