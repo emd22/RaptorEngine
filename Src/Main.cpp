@@ -35,7 +35,6 @@ int main()
     //     FxLogInfo("");
     // }
 
-
     {
         FoxtrotGame game {};
     }

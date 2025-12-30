@@ -142,14 +142,7 @@ void FxObject::Render(const FxCamera& camera)
 
     push_constants.ObjectId = ObjectId;
 
-    // Use the separate VP matrix for the player's objects if the object is marked for the player layer
-    if (mObjectLayer == FxObjectLayer::ePlayerLayer && camera.scType == FxCameraType::ePerspective) {
-        memcpy(push_constants.VPMatrix, static_cast<const FxPerspectiveCamera&>(camera).WeaponVPMatrix.RawData,
-               sizeof(FxMat4f));
-    }
-    else if (mObjectLayer == FxObjectLayer::eWorldLayer || camera.scType != FxCameraType::ePerspective) {
-        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
-    }
+    memcpy(push_constants.VPMatrix, camera.GetMatrix(mObjectLayer).RawData, sizeof(FxMat4f));
 
     // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
     //  Copy the normal matrix to the vertex shader

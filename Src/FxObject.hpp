@@ -14,12 +14,6 @@
 template <typename T>
 class FxPrimitiveMesh;
 
-enum class FxObjectLayer
-{
-    eWorldLayer,
-    ePlayerLayer,
-};
-
 class FxObject : public AxBase, public FxEntity
 {
     friend class AxLoaderGltf;

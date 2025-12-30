@@ -1,5 +1,6 @@
 #pragma once
 
+#include <FxObjectLayer.hpp>
 #include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
@@ -16,9 +17,6 @@ enum class FxCameraType
 class FxCamera
 {
 public:
-    static constexpr FxCameraType scType = FxCameraType::eNone;
-
-public:
     virtual void Update() = 0;
 
     virtual void UpdateProjectionMatrix() = 0;
@@ -27,6 +25,7 @@ public:
     FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp).Normalize(); }
     FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
 
+    virtual const FxMat4f& GetMatrix(FxObjectLayer layer) const { return ProjectionMatrix; }
 
     FX_FORCE_INLINE void MoveBy(const FxVec3f& offset)
     {
@@ -131,6 +130,16 @@ public:
 
     FX_FORCE_INLINE FxVec3f GetRotation() { return FxVec3f(mAngleY, mAngleX, 0); }
 
+    const FxMat4f& GetMatrix(FxObjectLayer layer) const override
+    {
+        switch (layer) {
+        case FxObjectLayer::eWorldLayer:
+            return VPMatrix;
+        case FxObjectLayer::ePlayerLayer:
+            return PlayerVPMatrix;
+        }
+    }
+
     ~FxPerspectiveCamera() override {}
 
 private:
@@ -151,12 +160,12 @@ public:
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
 
-    FxMat4f WeaponVPMatrix = FxMat4f::sIdentity;
-    FxMat4f WeaponProjectionMatrix = FxMat4f::sIdentity;
+    FxMat4f PlayerVPMatrix = FxMat4f::sIdentity;
+    FxMat4f PlayerProjectionMatrix = FxMat4f::sIdentity;
 
 private:
     float32 mFovRad = FxDegToRad(80.0f);
-    float32 mWeaponFov = FxDegToRad(70.0f);
+    float32 mPlayerLayerFov = FxDegToRad(70.0f);
 
     float32 mAspectRatio = 1.0f;
 };

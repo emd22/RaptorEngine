@@ -2,8 +2,11 @@
 
 void FxPerspectiveCamera::UpdateProjectionMatrix()
 {
+    float value = 0.5f;
     ProjectionMatrix.LoadPerspectiveMatrix(mFovRad, mAspectRatio, mNearPlane, mFarPlane);
-    WeaponProjectionMatrix.LoadPerspectiveMatrix(mWeaponFov, mAspectRatio, mNearPlane, mFarPlane);
+    // ProjectionMatrix.LoadOrthographicMatrix(-value, value, -value, value, mNearPlane, mFarPlane);
+    PlayerProjectionMatrix.LoadOrthographicMatrix(-value, value, -value, value, mNearPlane, mFarPlane);
+    // PlayerProjectionMatrix.LoadPerspectiveMatrix(mWeaponFov, mAspectRatio, mNearPlane, mFarPlane);
 }
 
 /*
@@ -27,7 +30,7 @@ void FxPerspectiveCamera::UpdateViewMatrix()
     ViewMatrix.LookAt(Position, target, FxVec3f::sUp);
 
     VPMatrix = ViewMatrix * ProjectionMatrix;
-    WeaponVPMatrix = ViewMatrix * WeaponProjectionMatrix;
+    PlayerVPMatrix = ViewMatrix * PlayerProjectionMatrix;
 
     InvViewMatrix = ViewMatrix.Inverse();
     InvProjectionMatrix = ProjectionMatrix.Inverse();
