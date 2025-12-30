@@ -8,11 +8,10 @@
 #include "RxDevice.hpp"
 #include "RxGpuBuffer.hpp"
 
-#include <optional>
-
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include <Math/FxVec2.hpp>
+#include <optional>
 
 struct RxImageTypeProperties
 {
@@ -22,15 +21,15 @@ struct RxImageTypeProperties
 
 enum class RxImageType
 {
-    Image,
-    Cubemap,
+    eImage,
+    eCubemap,
 };
 
 enum class RxImageAspectFlag
 {
-    Auto,
-    Color = VK_IMAGE_ASPECT_COLOR_BIT,
-    Depth = VK_IMAGE_ASPECT_DEPTH_BIT,
+    eAuto,
+    eColor = VK_IMAGE_ASPECT_COLOR_BIT,
+    eDepth = VK_IMAGE_ASPECT_DEPTH_BIT,
 
 };
 
@@ -42,7 +41,7 @@ struct RxTransitionLayoutOverrides
 
 struct RxImageCubemapOptions
 {
-    RxImageAspectFlag AspectFlag = RxImageAspectFlag::Auto;
+    RxImageAspectFlag AspectFlag = RxImageAspectFlag::eAuto;
 };
 
 const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type);
@@ -58,7 +57,8 @@ public:
     void Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageUsageFlags usage,
                 VkImageAspectFlags aspect_flags);
 
-    void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1, std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
+    void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1,
+                          std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
 
     void CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout final_layout, FxVec2u size,
                         uint32 base_layer = 0);
@@ -82,6 +82,6 @@ public:
 private:
     RxGpuDevice* mDevice = nullptr;
 
-    RxImageType mViewType = RxImageType::Image;
+    RxImageType mViewType = RxImageType::eImage;
     bool mIsDepthTexture = false;
 };

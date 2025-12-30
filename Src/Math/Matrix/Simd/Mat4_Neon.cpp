@@ -356,11 +356,6 @@ void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
     Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
     Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
     Columns[3].Load4(-position.Dot(right), -position.Dot(up), -position.Dot(forward), 1.0f);
-
-    // Columns[0].Load4(right.GetX(),   right.GetY(),   right.GetZ(),   -right.Dot(position));
-    // Columns[1].Load4(up.GetX(),      up.GetY(),      up.GetZ(),      -up.Dot(position));
-    // Columns[2].Load4(forward.GetX(), forward.GetY(), forward.GetZ(), -forward.Dot(position));
-    // Columns[3].Load4(0,              0,              0,              1.0f);
 }
 
 void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
@@ -370,11 +365,7 @@ void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 
     const float32 Sv = 1.0f / tan(hfov * 0.5f);
     const float32 Sa = Sv / aspect_ratio;
 
-    // const float32 plane_diff = mNearPlane - mFarPlane;
-
     const float32 a = near_plane / (far_plane - near_plane);
-    // const float32 a = (mFarPlane + mNearPlane) / plane_diff;
-    // const float32 b = (2.0f * mFarPlane * mNearPlane) / plane_diff;
     const float32 b = far_plane * a;
 
     /*
@@ -399,64 +390,65 @@ void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 
 void FxMat4f::LoadOrthographicMatrix(float32 left, float32 right, float32 bottom, float32 top, float32 near_plane,
                                      float32 far_plane)
 {
-    const float32 width = right - left;
-    const float32 height = top - bottom;
-    const float32 depth = (near_plane - far_plane);
+    // const float32 width = right - left;
+    // const float32 height = top - bottom;
+    // const float32 depth = (near_plane - far_plane);
 
-    Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
-    Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
-    Columns[2].Load4(0.0f, 0.0f, -1.0f / depth, 0.0f);
+    // Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
+    // Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
+    // Columns[2].Load4(0.0f, 0.0f, -1.0f / depth, 0.0f);
 
-    Columns[3].Load4(             //
-        -(right + left) / width,  // x
-        -(top + bottom) / height, // y
-        -(far_plane) / depth,     // z
-        1.0f                      // w
-    );
+    // Columns[3].Load4(             //
+    //     -(right + left) / width,  // x
+    //     -(top + bottom) / height, // y
+    //     -(far_plane) / depth,     // z
+    //     1.0f                      // w
+    // );
+
+    // Print();
+
+    float32x4_t zero_v = vdupq_n_f32(0.0f);
+    float32x4_t one_v = vdupq_n_f32(1.0f);
+
+    float32x4_t scale_v = { 2.0, -2.0, -1.0, 1.0 };
+
+    float32x4_t x = { right, top, near_plane, 1.0 };
+    float32x4_t y = { left, bottom, far_plane, 0.0f };
+
+    // Reciprocal of { width (right - left), height (top - bottom), depth (far_plane - near_plane), 1.0 }
+
+    float32x4_t divmod_v = vdivq_f32(one_v, vsubq_f32(x, y));
+
+    float32x4_t result = vmulq_f32(scale_v, divmod_v);
+
+    uint32x4_t mask = { 0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000 };
+    Columns[0].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+
+    // { 0x00000000, 0xFFFFFFFF, 0x00000000, 0x00000000 }
+    mask = vcombine_f32(vrev64_f32(vget_low_f32(mask)), vget_high_f32(mask));
+    Columns[1].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+
+    // { 0x00000000, 0x00000000, 0xFFFFFFFF, 0x00000000 }
+    mask = vcombine_f32(vget_high_f32(mask), vrev64_f32(vget_low_f32(mask)));
+    Columns[2].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+
+    // Clear near_plane as we want -(far_plane) / (near_plane - far_plane)
+    // Note that mask is currently { 00000000h, 00000000h, FFFFFFFFh, 00000000h }
+    // and BIC ANDs x with NOT mask.
+    x = vreinterpretq_f32_u32(vbicq_u32(x, mask));
+
+    // -(right + left) * recip of width
+    // -(top + bottom) * recip of height
+    // -(0.0f + far_plane) * recip of depth
+    // 1.0f
+    result = vmulq_f32(vnegq_f32(vaddq_f32(x, y)), divmod_v);
+
+    // Set W to 1.0f
+    result = vsetq_lane_f32(1.0f, result, 3);
+
+    Columns[3].mIntrin = result;
 
     Print();
-
-    // float32x4_t diff_result;
-    // uint32x4_t sign_mask;
-
-    // // Column 3:
-    // //
-    // //    right + left       top + bottom        far + near
-    // // - -------------- , - --------------- , - ------------  , + 1.0
-    // //    right - left       top - bottom        far - near
-
-    // float32 a_values[] = { right, top, far_plane, 1.0f };
-    // float32 b_values[] = { left, bottom, near_plane, 0.0f };
-    // const float32x4_t a_v = vld1q_f32(a_values);
-    // const float32x4_t b_v = vld1q_f32(b_values);
-
-    // uint32 mask_values[] = { FxNeon::scSignMask32, FxNeon::scSignMask32, FxNeon::scSignMask32, 0 };
-    // sign_mask = vld1q_u32(mask_values);
-
-    // const float32x4_t zero_v = vdupq_n_f32(0.0f);
-
-    // diff_result = vsubq_f32(a_v, b_v);
-
-    // // Divide (a_v + b_v) by (a_v - b_v)
-    // Columns[3].mIntrin = vdivq_f32(vaddq_f32(a_v, b_v), diff_result);
-
-    // // Given {X, Y, Z, W}, negate X, Y, Z and keep W positive (1.0)
-    // // {-X, -Y, -Z, +W}
-    // Columns[3].mIntrin = vreinterpretq_f32_u32(veorq_u32(vreinterpretq_u32_f32(Columns[3].mIntrin), sign_mask));
-
-    // // {0, 0, 0x80000000, 0} -> {+X, +Y, -Z, +W}
-    // sign_mask = vsetq_lane_u32(FxNeon::scSignMask32, vdupq_n_u32(0.0), 2);
-
-    // // Use the sign mask so the numerator is either 2.0 or -2.0. This will return {2, 2, -2, 2}.
-    // float32x4_t numerator = vreinterpretq_f32_u32(vorrq_u32(vreinterpretq_u32_f32(vdupq_n_f32(2.0f)), sign_mask));
-    // float32x4_t values = vdivq_f32(numerator, diff_result);
-
-    // // First column, [2 / (r - l), 0, 0, 0]
-    // Columns[0].mIntrin = vcopyq_lane_f32(zero_v, 0, vget_low_f32(values), 0);
-    // // Second column, [0, 2 / (t - b), 0, 0]
-    // Columns[1].mIntrin = vcopyq_lane_f32(zero_v, 1, vget_low_f32(values), 1);
-    // // Third column, [0, 0, -2 / (f - n), 0]
-    // Columns[2].mIntrin = vcopyq_lane_f32(zero_v, 2, vget_high_f32(values), 0);
 }
 
 // Mat4f Mat4f::Multiply(Mat4f &other)

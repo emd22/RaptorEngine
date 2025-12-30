@@ -106,7 +106,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera)
 
     {
         FxLightVertPushConstants push_constants {};
-        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
         push_constants.ObjectId = ObjectId;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
@@ -144,7 +144,7 @@ void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
     FxRef<RxDeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
     FxDrawPushConstants push_constants {};
-    memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
     push_constants.ObjectId = ObjectId;
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout,
@@ -183,7 +183,7 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera)
 
     {
         FxLightVertPushConstants push_constants {};
-        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
         push_constants.ObjectId = ObjectId;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,

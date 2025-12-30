@@ -12,7 +12,7 @@
 
 FX_SET_MODULE_NAME("RxRenderPass")
 
-void RxRenderPass::Create2(RxAttachmentList& attachments)
+void RxRenderPass::Create(RxAttachmentList& attachments)
 {
     mDevice = gRenderer->GetDevice();
 
@@ -143,10 +143,9 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = RenderPass,
         .framebuffer = framebuffer,
-        .renderArea = {
-            .offset = { .x = 0, .y = 0 },
-            .extent = { .width = static_cast<uint32>(extent.Width()), .height = static_cast<uint32>(extent.Height()) }
-        },
+        .renderArea = { .offset = { .x = 0, .y = 0 },
+                        .extent = { .width = static_cast<uint32>(extent.Width()),
+                                    .height = static_cast<uint32>(extent.Height()) } },
         .clearValueCount = clear_values.Size,
         .pClearValues = clear_values.pData,
     };

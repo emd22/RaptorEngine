@@ -46,8 +46,8 @@ public:
     FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };
     FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen { nullptr };
 
-    RxGraphicsPipeline* pPipelineInside = nullptr;
-    RxGraphicsPipeline* pPipelineOutside = nullptr;
+    RxPipeline* pPipelineInside = nullptr;
+    RxPipeline* pPipelineOutside = nullptr;
 
     FxColor Color = FxColor::sWhite;
 
@@ -57,7 +57,7 @@ public:
 
 protected:
     FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
-    RxGraphicsPipeline* pPipeline = nullptr;
+    RxPipeline* pPipeline = nullptr;
 
     float32 mRadius = 1.0f;
 };

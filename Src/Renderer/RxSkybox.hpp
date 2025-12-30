@@ -42,7 +42,7 @@ public:
 
     FxStackArray<RxDescriptorSet, RendererFramesInFlight> DsSkyboxFragments {};
 
-    RxGraphicsPipeline SkyboxPipeline;
+    RxPipeline SkyboxPipeline;
 
     FxStackArray<RxImage*, RendererFramesInFlight> SkyboxAttachments;
 

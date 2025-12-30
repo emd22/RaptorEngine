@@ -94,7 +94,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     mbInitialized = true;
 }
 
-FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipeline* pipeline)
+FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline)
 {
     FxMaterialManager& gm = GetGlobalManager();
 

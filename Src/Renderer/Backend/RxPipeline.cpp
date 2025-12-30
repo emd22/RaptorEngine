@@ -13,7 +13,7 @@
 
 FX_SET_MODULE_NAME("Pipeline")
 
-static RxGraphicsPipeline* spBoundPipeline = nullptr;
+static RxPipeline* spBoundPipeline = nullptr;
 
 FxVertexInfo FxMakeVertexInfo()
 {
@@ -54,7 +54,7 @@ FxVertexInfo FxMakeLightVertexInfo()
     return { binding_desc, std::move(attribs), true };
 }
 
-void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
+void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                                 const FxSlice<VkAttachmentDescription>& attachments,
                                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                                 FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
@@ -225,7 +225,7 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 }
 
-void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
+void RxPipeline::Bind(const RxCommandBuffer& command_buffer)
 {
     if (this == spBoundPipeline) {
         return;
@@ -236,7 +236,7 @@ void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
     spBoundPipeline = this;
 }
 
-void RxGraphicsPipeline::Destroy()
+void RxPipeline::Destroy()
 {
     if (!mDevice || !mDevice->Device) {
         return;
@@ -262,7 +262,7 @@ void RxGraphicsPipeline::Destroy()
 }
 
 
-VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
+VkPipelineLayout RxPipeline::CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
                                                   const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
     FxStackArray<VkPushConstantRange, 3> push_const_ranges;

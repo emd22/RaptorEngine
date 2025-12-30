@@ -15,11 +15,11 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
 {
     RxImageTypeProperties props {};
 
-    if (image_type == RxImageType::Image) {
+    if (image_type == RxImageType::eImage) {
         props.ViewType = VK_IMAGE_VIEW_TYPE_2D;
         props.LayerCount = 1;
     }
-    else if (image_type == RxImageType::Cubemap) {
+    else if (image_type == RxImageType::eCubemap) {
         props.ViewType = VK_IMAGE_VIEW_TYPE_CUBE;
         props.LayerCount = 6;
     }
@@ -61,7 +61,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
 
     VkImageCreateFlags image_create_flags = 0;
 
-    if (image_type == RxImageType::Cubemap) {
+    if (image_type == RxImageType::eCubemap) {
         image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     }
 
@@ -69,25 +69,21 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
     VkImageCreateInfo image_info {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .flags = image_create_flags,
-        
+
         .imageType = VK_IMAGE_TYPE_2D,
 
         .format = format,
 
-        .extent = {
-            .width = size.Width(),
-            .height = size.Height(),
-            .depth = 1
-        },
+        .extent = { .width = size.Width(), .height = size.Height(), .depth = 1 },
 
         .mipLevels = 1,
         .arrayLayers = image_type_props.LayerCount,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = tiling,
-        
+
         .usage = usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        
+
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 
     };
@@ -171,24 +167,25 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
 }
 
 
-void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count, std::optional<RxTransitionLayoutOverrides> overrides)
+void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count,
+                               std::optional<RxTransitionLayoutOverrides> overrides)
 {
     VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
     VkImageMemoryBarrier barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        
+
         .srcAccessMask = static_cast<VkAccessFlags>((mIsDepthTexture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
         .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
-        
+
         .oldLayout = ImageLayout,
         .newLayout = new_layout,
-        
+
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        
+
         .image = Image,
-        
+
         .subresourceRange =
             {
                 .aspectMask = (mIsDepthTexture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
@@ -222,7 +219,7 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
         src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
-    
+
     if (overrides.has_value()) {
         if (overrides->DstStage.has_value()) {
             dest_stage = overrides->DstStage.value();
@@ -244,7 +241,9 @@ void RxImage::CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout 
     Fx_Fwd_SubmitUploadCmd(
         [&](RxCommandBuffer& cmd)
         {
-            TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1, RxTransitionLayoutOverrides{.DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT, .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT});
+            TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1,
+                             RxTransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                           .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 
             VkBufferImageCopy copy {
                 .bufferOffset = 0,
@@ -266,7 +265,9 @@ void RxImage::CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout 
 
             vkCmdCopyBufferToImage(cmd, buffer.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
-            TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1, RxTransitionLayoutOverrides{.DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT, .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT});
+            TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
+                             RxTransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                           .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
         });
 }
 
@@ -284,12 +285,12 @@ enum CubemapLayer
 
 inline VkImageAspectFlags GetVulkanAspectFlag(RxImageAspectFlag rx_flag, VkFormat image_format)
 {
-    if (rx_flag == RxImageAspectFlag::Auto) {
+    if (rx_flag == RxImageAspectFlag::eAuto) {
         if (RxUtil::IsFormatDepth(image_format)) {
-            rx_flag = RxImageAspectFlag::Depth;
+            rx_flag = RxImageAspectFlag::eDepth;
         }
 
-        rx_flag = RxImageAspectFlag::Color;
+        rx_flag = RxImageAspectFlag::eColor;
     }
 
     return static_cast<VkImageAspectFlags>(rx_flag);
@@ -321,7 +322,7 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_for
     VkImageAspectFlags image_aspect_flag = GetVulkanAspectFlag(options.AspectFlag, image_format);
 
 
-    Create(RxImageType::Cubemap, FxVec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
+    Create(RxImageType::eCubemap, FxVec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, image_aspect_flag);
 
     FxStackArray<VkImageCopy, 6> copy_infos;

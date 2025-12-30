@@ -68,7 +68,7 @@ void RxDeferredRenderer::Destroy()
 
 void RxDeferredRenderer::ToggleWireframe(bool enable)
 {
-    RxGraphicsPipeline* new_pipeline = &PlGeometry;
+    RxPipeline* new_pipeline = &PlGeometry;
     if (enable) {
         new_pipeline = &PlGeometryWireframe;
         FxLogInfo("Enabling wireframe");
@@ -130,7 +130,7 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
     FxSlice<VkDescriptorSetLayout> layouts2 = FxSlice<VkDescriptorSetLayout>(layouts);
     FxLogWarning("Layouts: {}", layouts2.Size);
 
-    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts), FxSlice(layouts));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(layouts));
 
     RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -153,7 +153,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     FxVertexInfo vertex_info = FxMakeVertexInfo();
 
-    RpGeometry.Create2(attachments);
+    RpGeometry.Create(attachments);
 
     RxPipelineBuilder builder;
 
@@ -245,7 +245,7 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
         RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
-    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts),
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
                                                                FxMakeSlice(layouts, FxSizeofArray(layouts)));
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -306,7 +306,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     RxAttachmentList attachment_list;
     attachment_list.Add({ .Format = VK_FORMAT_R16G16B16A16_SFLOAT });
 
-    RpLighting.Create2(attachment_list);
+    RpLighting.Create(attachment_list);
 
     RxShader lighting_shader("Lighting");
 
@@ -437,7 +437,7 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
     FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxCompositionPushConstants),
                                                                        .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
 
-    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts),
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
                                                                FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
@@ -455,7 +455,7 @@ void RxDeferredRenderer::CreateCompPipeline()
         .FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     });
 
-    RpComposition.Create2(attachment_list);
+    RpComposition.Create(attachment_list);
 
     RxShader shader_composition("Composition");
 
@@ -547,14 +547,14 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
     DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
-    DepthAttachment.Create(RxImageType::Image, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    DepthAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    NormalsAttachment.Create(RxImageType::Image, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+    NormalsAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
                              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -656,7 +656,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
-    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     FxSizedArray image_views = { ColorAttachment.View };

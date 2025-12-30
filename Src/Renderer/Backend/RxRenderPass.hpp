@@ -15,7 +15,7 @@ public:
     // void Create(RxGpuDevice &device, RxSwapchain &swapchain);
     // void CreateComp(RxGpuDevice& device, RxSwapchain& swapchain);
 
-    void Create2(RxAttachmentList& color_attachments);
+    void Create(RxAttachmentList& color_attachments);
 
     void Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_colors);
     // void BeginComp(RxCommandBuffer* cmd);

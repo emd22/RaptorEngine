@@ -46,7 +46,7 @@ struct RxSamplerHandle
     RxSamplerPackedPropertiesType PackedProperties = 0;
 
 public:
-    void Bind(const RxCommandBuffer& cmd, const RxGraphicsPipeline& pipeline);
+    void Bind(const RxCommandBuffer& cmd, const RxPipeline& pipeline);
 };
 
 

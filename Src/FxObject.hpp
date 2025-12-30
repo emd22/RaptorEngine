@@ -37,7 +37,7 @@ public:
 
     void OnAttached(FxScene* scene) override;
 
-    void SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children = true);
+    void SetGraphicsPipeline(RxPipeline* pipeline, bool update_children = true);
 
     void PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
                                 const PhProperties& physics_properties);

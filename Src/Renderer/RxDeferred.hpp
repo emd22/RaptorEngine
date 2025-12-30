@@ -73,12 +73,12 @@ public:
 
     // VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
 
-    RxGraphicsPipeline PlGeometry;
-    RxGraphicsPipeline PlGeometryNoDepthTest;
-    RxGraphicsPipeline PlGeometryWireframe;
-    RxGraphicsPipeline PlGeometryWithNormalMaps;
+    RxPipeline PlGeometry;
+    RxPipeline PlGeometryNoDepthTest;
+    RxPipeline PlGeometryWireframe;
+    RxPipeline PlGeometryWithNormalMaps;
 
-    RxGraphicsPipeline* pGeometryPipeline = nullptr;
+    RxPipeline* pGeometryPipeline = nullptr;
 
     RxRenderPass RpGeometry;
     // RxRenderPassId RpGeometryId = 0;
@@ -92,10 +92,10 @@ public:
     VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
     VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
 
-    RxGraphicsPipeline PlLightingOutsideVolume;
-    RxGraphicsPipeline PlLightingInsideVolume;
+    RxPipeline PlLightingOutsideVolume;
+    RxPipeline PlLightingInsideVolume;
 
-    RxGraphicsPipeline PlLightingDirectional;
+    RxPipeline PlLightingDirectional;
 
     RxRenderPass RpLighting;
 
@@ -107,8 +107,8 @@ public:
 
     VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
-    RxGraphicsPipeline PlComposition;
-    RxGraphicsPipeline PlCompositionUnlit;
+    RxPipeline PlComposition;
+    RxPipeline PlCompositionUnlit;
     RxRenderPass RpComposition;
 
     FxSizedArray<RxFramebuffer> OutputFramebuffers;
@@ -160,7 +160,7 @@ public:
 
 
 private:
-    RxGraphicsPipeline* mPlGeometry = nullptr;
+    RxPipeline* mPlGeometry = nullptr;
     RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 };
@@ -190,7 +190,7 @@ public:
     RxDescriptorSet DescriptorSet;
 
 private:
-    RxGraphicsPipeline* mPlLighting = nullptr;
+    RxPipeline* mPlLighting = nullptr;
     RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 };
@@ -222,7 +222,7 @@ public:
     RxDescriptorSet DescriptorSet;
 
 private:
-    RxGraphicsPipeline* mPlComposition = nullptr;
+    RxPipeline* mPlComposition = nullptr;
     RxRenderPass* mRenderPass = nullptr;
     RxDeferredRenderer* mRendererInst = nullptr;
 

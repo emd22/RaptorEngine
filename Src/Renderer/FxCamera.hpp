@@ -17,15 +17,19 @@ enum class FxCameraType
 class FxCamera
 {
 public:
-    virtual void Update() = 0;
-
-    virtual void UpdateProjectionMatrix() = 0;
+    void Update();
 
     FX_FORCE_INLINE FxVec3f GetForwardVector() { return Direction; }
     FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp).Normalize(); }
     FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
 
-    virtual const FxMat4f& GetMatrix(FxObjectLayer layer) const { return ProjectionMatrix; }
+    virtual const FxMat4f& GetCameraMatrix(FxObjectLayer layer) const { return ProjectionMatrix; }
+
+    FX_FORCE_INLINE void SetNearPlane(float32 near)
+    {
+        RequireMatrixUpdate();
+        mNearPlane = near;
+    }
 
     FX_FORCE_INLINE void MoveBy(const FxVec3f& offset)
     {
@@ -39,14 +43,32 @@ public:
         RequireTransformUpdate();
     }
 
+
     inline void RequireTransformUpdate() { mbUpdateTransform = true; }
 
+    /**
+     * @brief Notify that values for the projection matrix have changed and the matrix is out of date.
+     * This is used to defer recalculating the matrix until all modifications have been made.
+     */
+    inline void RequireMatrixUpdate() { mbRequireMatrixUpdate = true; }
+
     virtual ~FxCamera() {}
+
+private:
+    void UpdateViewMatrix();
+
+
+protected:
+    virtual void UpdateProjectionMatrix() = 0;
+
+    /**
+     * @brief Updates and calculates the final matrix to be presented to the renderer.
+     */
+    virtual void UpdateCameraMatrix() = 0;
 
 public:
     FxMat4f ViewMatrix = FxMat4f::sIdentity;
     FxMat4f ProjectionMatrix = FxMat4f::sIdentity;
-    FxMat4f VPMatrix = FxMat4f::sIdentity;
 
     FxMat4f InvViewMatrix = FxMat4f::sIdentity;
     FxMat4f InvProjectionMatrix = FxMat4f::sIdentity;
@@ -54,42 +76,79 @@ public:
     FxVec3f Position = FxVec3f::sZero;
     FxVec3f Direction = FxVec3f::sForward;
 
+    float mAngleX = 0.0f;
+    float mAngleY = 0.0f;
+
     bool mbUpdateTransform : 1 = true;
+    bool mbRequireMatrixUpdate : 1 = true;
 
     float32 mNearPlane = 1000.0f;
     float32 mFarPlane = 0.01f;
+
+protected:
+    FxMat4f mCameraMatrix = FxMat4f::sIdentity;
 };
 
-class FxOrthoCamera : public FxCamera
+///////////////////////////////////////////////
+// Orthographic Camera
+///////////////////////////////////////////////
+
+class FxOrthoCamera final : public FxCamera
 {
 public:
     static constexpr FxCameraType scType = FxCameraType::eOrthographic;
 
 public:
+    FxOrthoCamera(float32 left, float32 right, float32 bottom, float32 top) {}
     FxOrthoCamera() { Update(); }
 
-    void Update() override;
+    void UpdateProjectionMatrix() override;
+    void UpdateCameraMatrix() override;
+
+    FX_FORCE_INLINE void SetBounds(float32 left, float32 right, float32 bottom, float32 top)
+    {
+        mLeft = left;
+        mRight = right;
+        mBottom = bottom;
+        mTop = top;
+
+        RequireMatrixUpdate();
+    }
+
+    ~FxOrthoCamera() override {}
+
+private:
+    float32 mLeft = -1.0f, mRight = 1.0f;
+    float32 mBottom = -1.0f, mTop = 1.0f;
 };
 
-class FxPerspectiveCamera : public FxCamera
+///////////////////////////////////////////////
+// Perspective Camera
+///////////////////////////////////////////////
+
+class FxPerspectiveCamera final : public FxCamera
 {
 public:
     static constexpr FxCameraType scType = FxCameraType::ePerspective;
 
+    static constexpr float32 scWeaponFarPlane = 0.01f;
+    static constexpr float32 scWeaponNearPlane = 20.0f;
+
 public:
     FxPerspectiveCamera() { Update(); }
 
-    FxPerspectiveCamera(float32 fov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
-        : mAspectRatio(aspect_ratio)
+    FxPerspectiveCamera(float32 fov_degrees, float32 aspect_ratio, float32 near_plane, float32 far_plane)
     {
-        SetFov(fov);
-        Update();
-
         mNearPlane = near_plane;
         mFarPlane = far_plane;
+        SetFov(fov_degrees);
+        SetAspectRatio(aspect_ratio);
+
+        Update();
     }
 
     void UpdateProjectionMatrix() override;
+    void UpdateCameraMatrix() override;
 
     float32 GetFov() const { return FxRadToDeg(mFovRad); }
     float32 GetFovRad() const { return mFovRad; }
@@ -99,7 +158,8 @@ public:
     void SetFovRad(float32 fov_rad)
     {
         mFovRad = fov_rad;
-        UpdateProjectionMatrix();
+
+        RequireMatrixUpdate();
     }
 
     inline void Rotate(float32 angle_x, float32 angle_y)
@@ -122,21 +182,18 @@ public:
     {
         mAspectRatio = aspect_ratio;
 
-        UpdateProjectionMatrix();
+        RequireMatrixUpdate();
     }
-
-    void Update() override;
-    void UpdateViewMatrix();
 
     FX_FORCE_INLINE FxVec3f GetRotation() { return FxVec3f(mAngleY, mAngleX, 0); }
 
-    const FxMat4f& GetMatrix(FxObjectLayer layer) const override
+    const FxMat4f& GetCameraMatrix(FxObjectLayer layer) const override
     {
         switch (layer) {
         case FxObjectLayer::eWorldLayer:
-            return VPMatrix;
+            return mCameraMatrix;
         case FxObjectLayer::ePlayerLayer:
-            return PlayerVPMatrix;
+            return mWeaponCameraMatrix;
         }
     }
 
@@ -156,16 +213,17 @@ private:
         return v;
     }
 
-public:
-    float mAngleX = 0.0f;
-    float mAngleY = 0.0f;
-
-    FxMat4f PlayerVPMatrix = FxMat4f::sIdentity;
-    FxMat4f PlayerProjectionMatrix = FxMat4f::sIdentity;
-
 private:
     float32 mFovRad = FxDegToRad(80.0f);
-    float32 mPlayerLayerFov = FxDegToRad(70.0f);
 
     float32 mAspectRatio = 1.0f;
+
+    /**
+     * @brief A separate matrix for objects rendered from the perspective of the player.
+     * Weapons, body, or additional attached objects use this.
+     */
+    FxMat4f mWeaponCameraMatrix = FxMat4f::sIdentity;
+    FxMat4f mWeaponProjectionMatrix = FxMat4f::sIdentity;
+
+    float32 mWeaponFov = FxDegToRad(70.0f);
 };

@@ -13,7 +13,7 @@ RxRenderPassId RxRenderPassCache::CreateRenderPass(RxAttachmentList& attachment_
     }
 
     RxRenderPass* rp = cs->Items.Insert();
-    rp->Create2(attachment_list);
+    rp->Create(attachment_list);
 
     return id;
 }

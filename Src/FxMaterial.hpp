@@ -139,7 +139,7 @@ public:
 
     RxDescriptorSet mDescriptorSet {};
 
-    RxGraphicsPipeline* pPipeline = nullptr;
+    RxPipeline* pPipeline = nullptr;
 
     std::atomic_bool bIsBuilt { false };
 
@@ -168,7 +168,7 @@ public:
     static FxMaterialManager& GetGlobalManager();
 
     void Create(uint32 materials_per_page = 64);
-    static FxRef<FxMaterial> New(const std::string& name, RxGraphicsPipeline* pipeline);
+    static FxRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
 
     static RxDescriptorPool& GetDescriptorPool() { return GetGlobalManager().mDescriptorPool; }
 

@@ -186,7 +186,7 @@ public:
     }
 
 
-    void Build(RxGraphicsPipeline& pipeline)
+    void Build(RxPipeline& pipeline)
     {
         FxSizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments;
 

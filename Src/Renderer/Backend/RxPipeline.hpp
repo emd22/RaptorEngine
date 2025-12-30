@@ -74,7 +74,7 @@ struct RxPushConstants
 };
 
 
-class RxGraphicsPipeline
+class RxPipeline
 {
 public:
     void Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
@@ -96,7 +96,7 @@ public:
 
     void Bind(const RxCommandBuffer& command_buffer);
 
-    ~RxGraphicsPipeline() { Destroy(); }
+    ~RxPipeline() { Destroy(); }
 
 private:
 public:

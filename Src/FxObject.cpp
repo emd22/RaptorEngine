@@ -96,7 +96,7 @@ void FxObject::OnAttached(FxScene* scene)
 //     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
 // }
 
-void FxObject::SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children)
+void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
 {
     // TODO: replace this with a callback system
     WaitUntilLoaded();
@@ -142,7 +142,7 @@ void FxObject::Render(const FxCamera& camera)
 
     push_constants.ObjectId = ObjectId;
 
-    memcpy(push_constants.VPMatrix, camera.GetMatrix(mObjectLayer).RawData, sizeof(FxMat4f));
+    memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(FxMat4f));
 
     // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
     //  Copy the normal matrix to the vertex shader

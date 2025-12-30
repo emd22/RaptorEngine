@@ -136,7 +136,7 @@ public:
     RxGpuBuffer<TVertexType>& GetVertexBuffer() { return VertexList.GpuBuffer; }
     RxGpuBuffer<uint32>& GetIndexBuffer() { return GpuIndexBuffer; }
 
-    void Render(const RxCommandBuffer& cmd, const RxGraphicsPipeline& pipeline)
+    void Render(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
     {
         const VkDeviceSize offset = 0;
         //        RxFrameData* frame = Rx_Fwd_GetFrame();

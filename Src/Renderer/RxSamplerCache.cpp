@@ -181,7 +181,7 @@ void RxSamplerCache::Destroy()
 }
 
 
-void RxSamplerHandle::Bind(const RxCommandBuffer& cmd, const RxGraphicsPipeline& pipeline)
+void RxSamplerHandle::Bind(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
 {
     Sampler->mDescriptorSet.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
