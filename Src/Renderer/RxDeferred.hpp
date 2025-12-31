@@ -71,6 +71,7 @@ public:
     VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
+
     // VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
 
     RxPipeline PlGeometry;
@@ -157,7 +158,6 @@ public:
     //    RxDescriptorSet DescriptorSet;
 
     RxRawGpuBuffer<RxUniformBufferObject> UniformBuffer;
-
 
 private:
     RxPipeline* mPlGeometry = nullptr;

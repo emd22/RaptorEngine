@@ -1,11 +1,9 @@
 #pragma once
 
-#include "RxSynchro.hpp"
-
 #include "RxCommands.hpp"
 #include "RxDescriptors.hpp"
+#include "RxSynchro.hpp"
 
-#include "RxGpuBuffer.hpp"
 #include <Math/Mat4.hpp>
 
 
@@ -18,12 +16,14 @@ struct alignas(16) RxUniformBufferObject
 struct RxFrameData
 {
 public:
-    void Create(RxGpuDevice *device);
+    void Create(RxGpuDevice* device);
     void SubmitUbo(const RxUniformBufferObject& ubo);
     void Destroy();
+
 public:
     RxCommandPool CommandPool;
     RxCommandBuffer CommandBuffer;
+    RxCommandBuffer ShadowCommandBuffer;
     RxCommandBuffer LightCommandBuffer;
     RxCommandBuffer CompCommandBuffer;
 
@@ -34,6 +34,7 @@ public:
 
     RxSemaphore OffscreenSem;
     RxSemaphore LightingSem;
+    RxSemaphore ShadowsSem;
 
     RxSemaphore ImageAvailable;
     RxSemaphore RenderFinished;

@@ -55,10 +55,10 @@ FxVertexInfo FxMakeLightVertexInfo()
 }
 
 void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
-                                const FxSlice<VkAttachmentDescription>& attachments,
-                                const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-                                FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
-                                const RxGraphicsPipelineProperties& properties)
+                        const FxSlice<VkAttachmentDescription>& attachments,
+                        const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
+                        FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
+                        const RxGraphicsPipelineProperties& properties)
 {
     mDevice = gRenderer->GetDevice();
 
@@ -96,7 +96,7 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     }
 
     // Dynamic states (scissor & viewport updates dynamically)
-    FxSizedArray<VkDynamicState> dynamic_states = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    FxSizedArray<VkDynamicState> dynamic_states = {};
 
     const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -263,7 +263,7 @@ void RxPipeline::Destroy()
 
 
 VkPipelineLayout RxPipeline::CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
-                                                  const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
+                                          const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
     FxStackArray<VkPushConstantRange, 3> push_const_ranges;
 

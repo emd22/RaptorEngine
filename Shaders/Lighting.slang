@@ -24,7 +24,7 @@ struct VSPushConsts
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
-layout(binding = 4) StructuredBuffer<Object> bObjectBuffer;
+layout(set = 2, binding = 0) StructuredBuffer<Object> bObjectBuffer;
 
 [shader("vertex")]
 

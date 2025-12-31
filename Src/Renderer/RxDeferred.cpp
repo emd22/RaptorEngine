@@ -102,8 +102,6 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 
     {
         // Create object buffer DS layout
-        // RxDsLayoutBuilder builder {};
-        // DsLayoutObjectBuffer = builder.Build();
     }
 
     // Fragment descriptor set
@@ -111,13 +109,14 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         RxDsLayoutBuilder builder {};
         builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
         builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
-        builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
+        // builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
         DsLayoutGPassMaterial = builder.Build();
     }
 
     FxStackArray<VkDescriptorSetLayout, 3> layouts = {
-        DsLayoutGPassMaterial, DsLayoutLightingMaterialProperties,
-        // DsLayoutObjectBuffer,
+        DsLayoutGPassMaterial,
+        DsLayoutLightingMaterialProperties,
+        gObjectManager->DsLayoutObjectBuffer,
     };
 
     FxStackArray<RxPushConstants, 1> push_consts = {
@@ -153,7 +152,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     FxVertexInfo vertex_info = FxMakeVertexInfo();
 
-    RpGeometry.Create(attachments);
+    RpGeometry.Create(attachments, gRenderer->Swapchain.Extent);
 
     RxPipelineBuilder builder;
 
@@ -229,15 +228,16 @@ void RxDeferredRenderer::CreateLightingDSLayout()
     builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
     builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
     builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
-    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
+    // builder.AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
     DsLayoutLightingFrag = builder.Build();
 }
 
 VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
 {
     VkDescriptorSetLayout layouts[] = {
-        DsLayoutLightingFrag, DsLayoutLightingMaterialProperties,
-        // DsLayoutObjectBuffer,
+        DsLayoutLightingFrag,
+        DsLayoutLightingMaterialProperties,
+        gObjectManager->DsLayoutObjectBuffer,
     };
 
     FxStackArray<RxPushConstants, 2> push_consts = {
@@ -246,7 +246,7 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
     };
 
     VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
-                                                               FxMakeSlice(layouts, FxSizeofArray(layouts)));
+                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
     PlLightingOutsideVolume.SetLayout(layout);
@@ -306,7 +306,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     RxAttachmentList attachment_list;
     attachment_list.Add({ .Format = VK_FORMAT_R16G16B16A16_SFLOAT });
 
-    RpLighting.Create(attachment_list);
+    RpLighting.Create(attachment_list, gRenderer->Swapchain.Extent);
 
     RxShader lighting_shader("Lighting");
 
@@ -417,8 +417,6 @@ RxDeferredCompPass* RxDeferredRenderer::GetCurrentCompPass() { return &CompPasse
 
 VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 {
-    RxGpuDevice* device = gRenderer->GetDevice();
-
     {
         RxDsLayoutBuilder builder {};
 
@@ -438,7 +436,7 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
                                                                        .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
 
     VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
-                                                               FxMakeSlice(layouts, FxSizeofArray(layouts)));
+                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
     PlComposition.SetLayout(layout);
@@ -455,7 +453,7 @@ void RxDeferredRenderer::CreateCompPipeline()
         .FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     });
 
-    RpComposition.Create(attachment_list);
+    RpComposition.Create(attachment_list, gRenderer->Swapchain.Extent, FxVec2u::sZero);
 
     RxShader shader_composition("Composition");
 
@@ -598,7 +596,7 @@ void RxDeferredGPass::Submit()
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
+        .pWaitSemaphores = &frame->ShadowsSem.Semaphore,
         .pWaitDstStageMask = wait_stages,
         // command buffers
         .commandBufferCount = 1,
@@ -792,25 +790,25 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         write_infos.Insert(normals_write);
     }
 
-    {
-        VkDescriptorBufferInfo info {
-            .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
-            .offset = 0,
-            .range = VK_WHOLE_SIZE,
-        };
+    // {
+    //     VkDescriptorBufferInfo info {
+    //         .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
+    //         .offset = 0,
+    //         .range = VK_WHOLE_SIZE,
+    //     };
 
-        VkWriteDescriptorSet buffer_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = DescriptorSet.Set,
-            .dstBinding = 4,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .pBufferInfo = write_buffer_infos.Insert(info),
-        };
+    //     VkWriteDescriptorSet buffer_write {
+    //         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    //         .dstSet = DescriptorSet.Set,
+    //         .dstBinding = 0,
+    //         .dstArrayElement = 0,
+    //         .descriptorCount = 1,
+    //         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    //         .pBufferInfo = write_buffer_infos.Insert(info),
+    //     };
 
-        write_infos.Insert(buffer_write);
-    }
+    //     write_infos.Insert(buffer_write);
+    // }
 
 
     vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);

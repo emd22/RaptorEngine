@@ -16,6 +16,7 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/RxShadowDirectional.hpp>
 #include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
@@ -114,12 +115,12 @@ void FoxtrotGame::CreateLights()
     // }
 
 
-    FxRef<FxLightDirectional> sun = FxMakeRef<FxLightDirectional>();
-    sun->MoveTo(FxVec3f(2, 5, 2));
-    sun->Color = FxColor(0xFAF8E3, 15);
+    pSun = FxMakeRef<FxLightDirectional>();
+    pSun->MoveTo(FxVec3f(2, 5, -2));
+    pSun->Color = FxColor(0xFAF8E3, 15);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
-    mMainScene.Attach(sun);
+    mMainScene.Attach(pSun);
 }
 
 void FoxtrotGame::CreateGame()
@@ -134,16 +135,16 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom.glb", { .KeepInMemory = true });
-    ground_object->WaitUntilLoaded();
+    pLevelObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom.glb", { .KeepInMemory = true });
+    pLevelObject->WaitUntilLoaded();
 
-    ground_object->PhysicsCreateMesh(*ground_object->pMesh, PhMotionType::eStatic, {});
+    pLevelObject->PhysicsCreateMesh(*pLevelObject->pMesh, PhMotionType::eStatic, {});
 
     // ground_object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(20, 1, 20), PhMotionType::eStatic, {});
 
     // ground_object->PhysicsObjectCreate(static_cast<PhObject::Flags>(PhObject::eCreateInactive),
     //                                    PhObject::PhysicsType::eStatic, {});
-    mMainScene.Attach(ground_object);
+    mMainScene.Attach(pLevelObject);
 
     pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
@@ -171,6 +172,11 @@ void FoxtrotGame::CreateGame()
 
     Player.Physics.bDisableGravity = true;
 
+    ShadowRenderer = FxMakeRef<RxShadowDirectional>(FxVec2u(512, 512));
+    // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
+    ShadowRenderer->ShadowCamera.ViewMatrix.LookAt(pSun->mPosition, FxVec3f(0, 0, 0), FxVec3f(0, 1, 0));
+    ShadowRenderer->ShadowCamera.UpdateCameraMatrix();
+    ShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
     while (sbRunning) {
         Tick();
@@ -302,10 +308,29 @@ void FoxtrotGame::Tick()
 
     gPhysics->Update();
 
+
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
         mLastTick = current_tick;
         return;
     }
+
+
+    ShadowRenderer->Begin();
+
+    RxShadowPushConstants consts;
+    memcpy(consts.CameraMatrix, ShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+           sizeof(float32) * 16);
+    consts.ObjectId = pLevelObject->ObjectId;
+
+    vkCmdPushConstants(ShadowRenderer->GetCommandBuffer()->CommandBuffer, ShadowRenderer->GetPipeline().Layout,
+                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
+
+    pLevelObject->pMesh->Render(*ShadowRenderer->GetCommandBuffer(), ShadowRenderer->GetPipeline());
+
+    ShadowRenderer->End();
+
+
+    gRenderer->BeginGeometry();
 
     // deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *camera);
 

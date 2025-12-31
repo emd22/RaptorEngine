@@ -205,8 +205,9 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     VkDescriptorSet sets_to_bind[] = {
-        mDescriptorSet.Set,
-        manager.mMaterialPropertiesDS.Set,
+        mDescriptorSet.Set,                  // Set 0
+        manager.mMaterialPropertiesDS.Set,   // Set 1: Material Properties Buffer
+        gObjectManager->mObjectBufferDS.Set, // Set 2: Object Properties Buffer
     };
 
     // const uint32 properties_offset = static_cast<uint32>(mMaterialPropertiesIndex * sizeof(FxMaterialProperties));
@@ -327,23 +328,23 @@ void FxMaterial::Build()
         PUSH_IMAGE_IF_SET(NormalMap.pImage, 1);
 
         {
-            VkDescriptorBufferInfo info {
-                .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            };
+            // VkDescriptorBufferInfo info {
+            //     .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
+            //     .offset = 0,
+            //     .range = VK_WHOLE_SIZE,
+            // };
 
-            VkWriteDescriptorSet buffer_write {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = descriptor_set.Set,
-                .dstBinding = 2,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                .pBufferInfo = write_buffer_infos.Insert(info),
-            };
+            // VkWriteDescriptorSet buffer_write {
+            //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            //     .dstSet = descriptor_set.Set,
+            //     .dstBinding = 2,
+            //     .dstArrayElement = 0,
+            //     .descriptorCount = 1,
+            //     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            //     .pBufferInfo = write_buffer_infos.Insert(info),
+            // };
 
-            write_descriptor_sets.Insert(buffer_write);
+            // write_descriptor_sets.Insert(buffer_write);
         }
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,

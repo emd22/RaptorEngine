@@ -12,8 +12,13 @@
 
 FX_SET_MODULE_NAME("RxRenderPass")
 
-void RxRenderPass::Create(RxAttachmentList& attachments)
+void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, const FxVec2u& offset)
 {
+    Size = size;
+    Offset = offset;
+
+    FxAssert(size.X > 0.0f && size.Y > 0.0f);
+
     mDevice = gRenderer->GetDevice();
 
     FxSizedArray<VkAttachmentReference> color_refs(attachments.Attachments.Size);
@@ -137,15 +142,13 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
         FxModulePanic("Render pass has not been previously created", 0);
     }
 
-    const auto extent = gRenderer->Swapchain.Extent;
-
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = RenderPass,
         .framebuffer = framebuffer,
-        .renderArea = { .offset = { .x = 0, .y = 0 },
-                        .extent = { .width = static_cast<uint32>(extent.Width()),
-                                    .height = static_cast<uint32>(extent.Height()) } },
+        .renderArea = { .offset = { .x = static_cast<int32>(Offset.X), .y = static_cast<int32>(Offset.Y) },
+                        .extent = { .width = Size.Width(), .height = Size.Height() } },
+
         .clearValueCount = clear_values.Size,
         .pClearValues = clear_values.pData,
     };

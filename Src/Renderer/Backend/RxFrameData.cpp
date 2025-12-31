@@ -9,6 +9,7 @@ void RxFrameData::Create(RxGpuDevice* device)
     RenderFinished.Create(device);
     OffscreenSem.Create(device);
     LightingSem.Create(device);
+    ShadowsSem.Create(device);
 
     InFlight.Create(device);
 
@@ -27,6 +28,7 @@ void RxFrameData::Destroy()
     RenderFinished.Destroy();
     OffscreenSem.Destroy();
     LightingSem.Destroy();
+    ShadowsSem.Destroy();
 
     InFlight.Destroy();
 

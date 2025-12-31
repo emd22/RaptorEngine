@@ -8,6 +8,12 @@
 #include <Renderer/Backend/RxRenderPass.hpp>
 #include <Renderer/FxCamera.hpp>
 
+
+struct alignas(16) RxShadowPushConstants
+{
+    float32 CameraMatrix[16];
+    uint32 ObjectId = 0;
+};
 class RxShadowDirectional
 {
 public:
@@ -18,18 +24,23 @@ public:
 
     void End();
 
+    FX_FORCE_INLINE RxPipeline& GetPipeline() { return mPipeline; }
+    FX_FORCE_INLINE RxCommandBuffer* GetCommandBuffer() { return mCommandBuffer; }
+
 public:
     FxOrthoCamera ShadowCamera;
+    RxCommandBuffer* mCommandBuffer;
 
 private:
     RxFramebuffer mFramebuffer;
     RxImage mAttachment;
 
     RxRenderPass mRenderPass;
-
-    RxCommandBuffer mCommandBuffer;
-
     RxPipeline mPipeline;
 
+
     VkDescriptorSetLayout mDsLayout;
+    RxDescriptorSet mDescriptorSet;
+
+    RxDescriptorPool mDescriptorPool;
 };
