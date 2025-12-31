@@ -1,5 +1,9 @@
 module Composition;
 
+// #ifndef RENDER_UNLIT
+// #define RENDER_UNLIT
+// #endif
+
 //////////////////////////////////
 // Vertex shader
 //////////////////////////////////

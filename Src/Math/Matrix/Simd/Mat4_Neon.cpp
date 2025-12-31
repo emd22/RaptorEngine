@@ -348,7 +348,7 @@ void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(flo
 
 void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
 {
-    FxVec3f forward = (target - position).Normalize();
+    FxVec3f forward = (position - target).Normalize();
     const FxVec3f right = forward.Cross(upvec).Normalize();
     const FxVec3f up = right.Cross(forward);
 

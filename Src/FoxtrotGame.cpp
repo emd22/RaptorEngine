@@ -116,7 +116,7 @@ void FoxtrotGame::CreateLights()
 
 
     pSun = FxMakeRef<FxLightDirectional>();
-    pSun->MoveTo(FxVec3f(2, 5, -2));
+    pSun->MoveTo(FxVec3f(2, 15, -2));
     pSun->Color = FxColor(0xFAF8E3, 15);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
@@ -174,9 +174,15 @@ void FoxtrotGame::CreateGame()
 
     ShadowRenderer = FxMakeRef<RxShadowDirectional>(FxVec2u(512, 512));
     // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
-    ShadowRenderer->ShadowCamera.ViewMatrix.LookAt(pSun->mPosition, FxVec3f(0, 0, 0), FxVec3f(0, 1, 0));
+    ShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 15, 15), FxVec3f(0.0f, 3.0f, -4.0f), FxVec3f(0, 1, 0));
     ShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     ShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
+    // ShadowRenderer->ShadowCamera.SetNearPlane(100.0f);
+
+    // Player.pCamera->ViewMatrix = ShadowRenderer->ShadowCamera.ViewMatrix;
+    // Player.pCamera->UpdateProjectionMatrix();
+    // Player.pCamera->UpdateCameraMatrix();
+
 
     while (sbRunning) {
         Tick();

@@ -23,7 +23,7 @@ public:
     FX_FORCE_INLINE FxVec3f GetRightVector() { return GetForwardVector().Cross(FxVec3f::sUp).Normalize(); }
     FX_FORCE_INLINE FxVec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
 
-    virtual const FxMat4f& GetCameraMatrix(FxObjectLayer layer) const { return ProjectionMatrix; }
+    virtual const FxMat4f& GetCameraMatrix(FxObjectLayer layer) const { return mCameraMatrix; }
 
     FX_FORCE_INLINE void SetNearPlane(float32 near)
     {
@@ -118,8 +118,8 @@ public:
     ~FxOrthoCamera() override {}
 
 private:
-    float32 mLeft = -1.0f, mRight = 1.0f;
-    float32 mBottom = -1.0f, mTop = 1.0f;
+    float32 mLeft = -25.0f, mRight = 25.0f;
+    float32 mBottom = -25.0f, mTop = 25.0f;
 };
 
 ///////////////////////////////////////////////
