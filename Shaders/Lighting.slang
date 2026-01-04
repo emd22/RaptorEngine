@@ -6,6 +6,11 @@ module Lighting;
 // Vertex shader
 //////////////////////////////////
 
+struct VSOut
+{
+    float4 vPosition : SV_POSITION;
+};
+
 struct VSIn
 {
 #ifdef FX_LIGHT_DIRECTIONAL
@@ -18,7 +23,7 @@ struct VSIn
 
 struct VSPushConsts
 {
-    float4x4 mViewProjection;
+    float4x4 CameraMatrix;
     uint uiObjectIndex;
 };
 
@@ -28,15 +33,20 @@ layout(set = 2, binding = 0) StructuredBuffer<Object> bObjectBuffer;
 
 [shader("vertex")]
 
-float4 VertexMain(VSIn in) : SV_POSITION
+VSOut VertexMain(VSIn in)
 {
+    VSOut out;
+
 #ifdef FX_LIGHT_DIRECTIONAL
+
     float2 out_uv = float2((in.iVertexIndex << 1) & 2, in.iVertexIndex & 2);
-    return float4(out_uv * 2.0 - 1.0, 0.0, 1.0);
+    out.vPosition = float4(out_uv * 2.0 - 1.0, 0.0, 1.0);
 #else
-    float4x4 MVP = mul(VSConst.mViewProjection, bObjectBuffer[VSConst.uiObjectIndex].mModel);
-    return mul(MVP, float4(in.vPosition, 1.0));
+    float4x4 mvp = mul(VSConst.CameraMatrix, bObjectBuffer[VSConst.uiObjectIndex].mModel);
+    out.vPosition = mul(mvp, float4(in.vPosition, 1.0));
 #endif
+
+    return out;
 }
 
 //////////////////////////////////
@@ -46,6 +56,9 @@ float4 VertexMain(VSIn in) : SV_POSITION
 struct FSIn
 {
     float4 vPosition: SV_POSITION;
+#ifdef FX_LIGHT_DIRECTIONAL
+    float4 vShadowPosition: ATTR0;
+#endif
 };
 
 struct FSOut
@@ -56,10 +69,12 @@ struct FSOut
 layout(binding = 1) Sampler2D sDepth;
 layout(binding = 2) Sampler2D sAlbedo;
 layout(binding = 3) Sampler2D sNormal;
+layout(binding = 4) Sampler2D sShadowDepth;
 
 struct FSPushConsts
 {
     [[vk::offset(80)]]
+    float4x4 LightCameraMatrix;
     float4x4 mInvView;
     float4x4 mInvProjection;
     float3 vEyePosition;
@@ -125,10 +140,9 @@ float3 WorldPosFromDepth(float2 uv, float depth)
 {
     float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
 
-    float4 view_space = mul(FSConst.mInvProjection, ndc);
-    float4 world_space = mul(FSConst.mInvView, (view_space / view_space.w));
+    float4 world_space = mul(mul(FSConst.mInvView, FSConst.mInvProjection), ndc);
 
-    return world_space.xyz;
+    return world_space.xyz / world_space.w;
 }
 
 float AttenuationSmooth(float distance_sq, float inv_radius_sq)
@@ -166,8 +180,26 @@ FSOut FragmentMain(FSIn in)
     float3 F0 = float3(0.04);
     F0 = lerp(F0, albedo, metallic);
 
+    float visibility = 1.0f;
+
 #ifdef FX_LIGHT_DIRECTIONAL
-// float3 light_position_local = FSConst.vLightPosition - world_position;
+    float4 shadow_pos = mul(FSConst.LightCameraMatrix, float4(world_position, 1.0));
+
+    float3 coords = shadow_pos.xyz / shadow_pos.w;
+
+    float2 shadow_uv = coords.xy * 0.5 + 0.5;
+    // shadow_uv.y = 1.0 - shadow_uv.y;
+
+    float shadow_depth = sShadowDepth.Sample(shadow_uv).r;
+
+    float bias = 0.005;
+
+    if (any(shadow_uv < 0.0) || any(shadow_uv > 1.0)) {
+        visibility = 1.0f;
+    }
+    else if (shadow_depth > coords.z + 0.0005) {
+        visibility = 0.1;
+    }
 
     float3 L = normalize(FSConst.vLightPosition);
 #else
@@ -206,7 +238,11 @@ FSOut FragmentMain(FSIn in)
     float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
     float3 specular_term = Fr;
 
-    out.vColor = float4(attenuation * (diffuse_term + specular_term) * light_color.rgb * NdotL, 1.0);
+    out.vColor = float4(visibility * attenuation * (diffuse_term + specular_term) * light_color.rgb * NdotL, 1.0);
+
+#ifdef FX_LIGHT_DIRECTIONAL
+    out.vColor = float4(float3(visibility), 1.0f);
+#endif
 
     return out;
 }

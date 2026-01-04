@@ -8,6 +8,7 @@ class FxShaderCompiler;
 class RxPipelineList;
 class RxRenderPassCache;
 class FxObjectManager;
+class RxShadowDirectional;
 
 extern RxRenderBackend* gRenderer;
 extern PhJolt* gPhysics;
@@ -15,6 +16,10 @@ extern FxShaderCompiler* gShaderCompiler;
 extern RxPipelineList* gPipelines;
 
 extern FxObjectManager* gObjectManager;
+
+// XXX: TEMPORARY
+extern RxShadowDirectional* gShadowRenderer;
+
 
 // extern RxRenderPassCache* gRenderPassCache;
 

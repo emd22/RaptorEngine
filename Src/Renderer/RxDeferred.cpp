@@ -225,10 +225,16 @@ void RxDeferredRenderer::CreateLightingDSLayout()
     // Fragment DS
 
     RxDsLayoutBuilder builder {};
+
+    // sDepth
     builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    // sAlbedo
     builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    // sNormal
     builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
-    // builder.AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
+    // sShadowDepth
+    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+
     DsLayoutLightingFrag = builder.Build();
 }
 
@@ -715,9 +721,9 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     RxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
 
 
-    FxStackArray<VkDescriptorImageInfo, 3> write_image_infos;
+    FxStackArray<VkDescriptorImageInfo, 4> write_image_infos;
     FxStackArray<VkDescriptorBufferInfo, 1> write_buffer_infos;
-    FxStackArray<VkWriteDescriptorSet, 4> write_infos;
+    FxStackArray<VkWriteDescriptorSet, 5> write_infos;
 
     // Depth image descriptor
     {
@@ -789,6 +795,7 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 
         write_infos.Insert(normals_write);
     }
+
 
     // {
     //     VkDescriptorBufferInfo info {

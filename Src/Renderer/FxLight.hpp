@@ -37,7 +37,7 @@ public:
 
     void SetRadius(const float radius);
 
-    virtual void Render(const FxPerspectiveCamera& camera);
+    virtual void Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera);
     virtual void RenderDebugMesh(const FxPerspectiveCamera& camera);
 
     virtual ~FxLightBase() {}
@@ -86,7 +86,7 @@ public:
 public:
     FxLightDirectional();
 
-    void Render(const FxPerspectiveCamera& camera) override;
+    void Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera) override;
 };
 
 ////////////////////////////////////

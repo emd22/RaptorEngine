@@ -18,7 +18,7 @@ public:
     void Attach(const FxRef<FxLightBase>& light);
 
     void SelectCamera(const FxRef<FxCamera>& camera) { mpCurrentCamera = camera; }
-    void Render();
+    void Render(FxCamera* shadow_camera);
 
     const FxPagedArray<FxRef<FxLightBase>>& GetAllLights() { return mLights; }
     const FxPagedArray<FxRef<FxObject>>& GetAllObjects() { return mObjects; }

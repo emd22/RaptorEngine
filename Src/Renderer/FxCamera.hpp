@@ -31,6 +31,12 @@ public:
         mNearPlane = near;
     }
 
+    FX_FORCE_INLINE void SetFarPlane(float32 far)
+    {
+        RequireMatrixUpdate();
+        mFarPlane = far;
+    }
+
     FX_FORCE_INLINE void MoveBy(const FxVec3f& offset)
     {
         Position += offset;
@@ -118,8 +124,8 @@ public:
     ~FxOrthoCamera() override {}
 
 private:
-    float32 mLeft = -25.0f, mRight = 25.0f;
-    float32 mBottom = -25.0f, mTop = 25.0f;
+    float32 mLeft = -30.0f, mRight = 30.0f;
+    float32 mBottom = -30.0f, mTop = 30.0f;
 };
 
 ///////////////////////////////////////////////

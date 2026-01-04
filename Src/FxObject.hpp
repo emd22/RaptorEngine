@@ -29,7 +29,12 @@ public:
 
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
+    /**
+     * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
+     */
+    void RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pipeline);
     void Render(const FxCamera& camera);
+
     bool CheckIfReady();
 
     void AttachObject(const FxRef<FxObject>& object);

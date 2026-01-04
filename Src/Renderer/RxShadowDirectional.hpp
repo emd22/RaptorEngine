@@ -8,6 +8,7 @@
 #include <Renderer/Backend/RxRenderPass.hpp>
 #include <Renderer/FxCamera.hpp>
 
+class RxDeferredLightingPass;
 
 struct alignas(16) RxShadowPushConstants
 {
@@ -27,13 +28,16 @@ public:
     FX_FORCE_INLINE RxPipeline& GetPipeline() { return mPipeline; }
     FX_FORCE_INLINE RxCommandBuffer* GetCommandBuffer() { return mCommandBuffer; }
 
+private:
+    void UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass);
+
 public:
     FxOrthoCamera ShadowCamera;
     RxCommandBuffer* mCommandBuffer;
+    FxStackArray<RxImage, RendererFramesInFlight> mAttachments;
 
 private:
-    RxFramebuffer mFramebuffer;
-    RxImage mAttachment;
+    FxStackArray<RxFramebuffer, RendererFramesInFlight> mFramebuffers;
 
     RxRenderPass mRenderPass;
     RxPipeline mPipeline;

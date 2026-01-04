@@ -255,7 +255,7 @@ FxMat4f::FxMat4f(float data[4][4]) noexcept
 
 // Implementation taken from linmath, https://github.com/datenwolf/linmath.h/blob/master/linmath.h
 // TODO: NEON accelerated version of matrix inversion!
-FxMat4f FxMat4f::Inverse()
+FxMat4f FxMat4f::Inverse() const
 {
     float M[4][4];
     for (int i = 0; i < 4; i++) {
@@ -390,65 +390,63 @@ void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 
 void FxMat4f::LoadOrthographicMatrix(float32 left, float32 right, float32 bottom, float32 top, float32 near_plane,
                                      float32 far_plane)
 {
-    // const float32 width = right - left;
-    // const float32 height = top - bottom;
-    // const float32 depth = (near_plane - far_plane);
+    const float32 width = right - left;
+    const float32 height = top - bottom;
+    const float32 depth = (far_plane - near_plane);
 
-    // Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
-    // Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
-    // Columns[2].Load4(0.0f, 0.0f, -1.0f / depth, 0.0f);
+    Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
+    Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
+    Columns[2].Load4(0.0f, 0.0f, -1.0f / depth, 0.0f);
 
-    // Columns[3].Load4(             //
-    //     -(right + left) / width,  // x
-    //     -(top + bottom) / height, // y
-    //     -(far_plane) / depth,     // z
-    //     1.0f                      // w
-    // );
+    Columns[3].Load4(            //
+        -(right + left) / width, // x
+        (top + bottom) / height, // y
+        (far_plane) / depth,     // z
+        1.0f                     // w
+    );
 
     // Print();
 
-    float32x4_t zero_v = vdupq_n_f32(0.0f);
-    float32x4_t one_v = vdupq_n_f32(1.0f);
+    // float32x4_t zero_v = vdupq_n_f32(0.0f);
+    // float32x4_t one_v = vdupq_n_f32(1.0f);
 
-    float32x4_t scale_v = { 2.0, -2.0, -1.0, 1.0 };
+    // float32x4_t scale_v = { 2.0, -2.0, -1.0, 1.0 };
 
-    float32x4_t x = { right, top, near_plane, 1.0 };
-    float32x4_t y = { left, bottom, far_plane, 0.0f };
+    // float32x4_t x = { right, top, near_plane, 1.0 };
+    // float32x4_t y = { left, bottom, far_plane, 0.0f };
 
-    // Reciprocal of { width (right - left), height (top - bottom), depth (far_plane - near_plane), 1.0 }
+    // // Reciprocal of { width (right - left), height (top - bottom), depth (far_plane - near_plane), 1.0 }
 
-    float32x4_t divmod_v = vdivq_f32(one_v, vsubq_f32(x, y));
+    // float32x4_t divmod_v = vdivq_f32(one_v, vsubq_f32(x, y));
 
-    float32x4_t result = vmulq_f32(scale_v, divmod_v);
+    // float32x4_t result = vmulq_f32(scale_v, divmod_v);
 
-    uint32x4_t mask = { 0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000 };
-    Columns[0].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+    // uint32x4_t mask = { 0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000 };
+    // Columns[0].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
 
-    // { 0x00000000, 0xFFFFFFFF, 0x00000000, 0x00000000 }
-    mask = vcombine_f32(vrev64_f32(vget_low_f32(mask)), vget_high_f32(mask));
-    Columns[1].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+    // // { 0x00000000, 0xFFFFFFFF, 0x00000000, 0x00000000 }
+    // mask = vcombine_f32(vrev64_f32(vget_low_f32(mask)), vget_high_f32(mask));
+    // Columns[1].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
 
-    // { 0x00000000, 0x00000000, 0xFFFFFFFF, 0x00000000 }
-    mask = vcombine_f32(vget_high_f32(mask), vrev64_f32(vget_low_f32(mask)));
-    Columns[2].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+    // // { 0x00000000, 0x00000000, 0xFFFFFFFF, 0x00000000 }
+    // mask = vcombine_f32(vget_high_f32(mask), vrev64_f32(vget_low_f32(mask)));
+    // Columns[2].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
 
-    // Clear near_plane as we want -(far_plane) / (near_plane - far_plane)
-    // Note that mask is currently { 00000000h, 00000000h, FFFFFFFFh, 00000000h }
-    // and BIC ANDs x with NOT mask.
-    x = vreinterpretq_f32_u32(vbicq_u32(x, mask));
+    // // Clear near_plane as we want -(far_plane) / (near_plane - far_plane)
+    // // Note that mask is currently { 00000000h, 00000000h, FFFFFFFFh, 00000000h }
+    // // and BIC ANDs x with NOT mask.
+    // x = vreinterpretq_f32_u32(vbicq_u32(x, mask));
 
-    // -(right + left) * recip of width
-    // -(top + bottom) * recip of height
-    // -(0.0f + far_plane) * recip of depth
-    // 1.0f
-    result = vmulq_f32(vnegq_f32(vaddq_f32(x, y)), divmod_v);
+    // // -(right + left) * recip of width
+    // // -(top + bottom) * recip of height
+    // // -(0.0f + far_plane) * recip of depth
+    // // 1.0f
+    // result = vmulq_f32(vnegq_f32(vaddq_f32(x, y)), divmod_v);
 
-    // Set W to 1.0f
-    result = vsetq_lane_f32(1.0f, result, 3);
+    // // Set W to 1.0f
+    // result = vsetq_lane_f32(1.0f, result, 3);
 
-    Columns[3].mIntrin = result;
-
-    Print();
+    // Columns[3].mIntrin = result;
 }
 
 // Mat4f Mat4f::Multiply(Mat4f &other)

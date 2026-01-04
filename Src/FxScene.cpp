@@ -20,7 +20,7 @@ void FxScene::Attach(const FxRef<FxLightBase>& light)
     light->OnAttached(this);
 }
 
-void FxScene::Render()
+void FxScene::Render(FxCamera* shadow_camera)
 {
     const FxPerspectiveCamera& camera = *mpCurrentCamera;
 
@@ -38,7 +38,7 @@ void FxScene::Render()
     gRenderer->BeginLighting();
 
     for (const FxRef<FxLightBase>& light : mLights) {
-        light->Render(camera);
+        light->Render(camera, shadow_camera);
     }
 }
 void FxScene::Destroy()

@@ -4,6 +4,8 @@ void FxPerspectiveCamera::UpdateProjectionMatrix()
 {
     ProjectionMatrix.LoadPerspectiveMatrix(mFovRad, mAspectRatio, mNearPlane, mFarPlane);
     mWeaponProjectionMatrix.LoadPerspectiveMatrix(mWeaponFov, mAspectRatio, scWeaponNearPlane, scWeaponFarPlane);
+
+    mbRequireMatrixUpdate = false;
 }
 
 void FxPerspectiveCamera::UpdateCameraMatrix()

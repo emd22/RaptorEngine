@@ -85,7 +85,7 @@ void FxLightBase::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_g
 //     Radius *= scale.X;
 // }
 
-void FxLightBase::Render(const FxPerspectiveCamera& camera)
+void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera)
 {
     if (!bEnabled) {
         return;
@@ -106,7 +106,10 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera)
 
     {
         FxLightVertPushConstants push_constants {};
-        memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+               sizeof(FxMat4f));
+
+
         push_constants.ObjectId = ObjectId;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
@@ -114,8 +117,13 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera)
     }
     {
         FxLightFragPushConstants push_constants {};
+
+        memcpy(push_constants.LightCameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+               sizeof(FxMat4f));
+
         memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
         memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+
 
         // Copy the light positions to the push constants
         memcpy(push_constants.LightPosition, mPosition.mData, sizeof(float32) * 3);
@@ -170,7 +178,7 @@ FxLightPoint::FxLightPoint()
 
 FxLightDirectional::FxLightDirectional() { pPipeline = &gRenderer->pDeferredRenderer->PlLightingDirectional; }
 
-void FxLightDirectional::Render(const FxPerspectiveCamera& camera)
+void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera)
 {
     if (!bEnabled) {
         return;
@@ -183,7 +191,9 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera)
 
     {
         FxLightVertPushConstants push_constants {};
-        memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+               sizeof(FxMat4f));
+
         push_constants.ObjectId = ObjectId;
 
         vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
@@ -191,6 +201,12 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera)
     }
     {
         FxLightFragPushConstants push_constants {};
+
+        if (shadow_camera) {
+            // FxMat4f new_camera_matrix = mModelMatrix * shadow_camera->ProjectionMatrix;
+            memcpy(push_constants.LightCameraMatrix, shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+                   sizeof(FxMat4f));
+        }
         memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
         memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 

@@ -8,6 +8,7 @@
 #include <Renderer/RxPipelineList.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/RxRenderPassCache.hpp>
+#include <Renderer/RxShadowDirectional.hpp>
 
 RxRenderBackend* gRenderer = nullptr;
 PhJolt* gPhysics = nullptr;
@@ -15,7 +16,7 @@ FxShaderCompiler* gShaderCompiler = nullptr;
 RxPipelineList* gPipelines = nullptr;
 RxRenderPassCache* gRenderPassCache = nullptr;
 FxObjectManager* gObjectManager = nullptr;
-
+RxShadowDirectional* gShadowRenderer = nullptr;
 
 void FxEngineGlobalsInit()
 {

@@ -34,8 +34,6 @@ private:
 public:
     FxPlayer Player {};
 
-    FxRef<RxShadowDirectional> ShadowRenderer { nullptr };
-
     FxRef<FxLightDirectional> pSun { nullptr };
 
     // TODO: Player attachment system

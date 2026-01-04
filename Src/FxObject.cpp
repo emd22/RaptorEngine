@@ -116,6 +116,23 @@ void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
     }
 }
 
+void FxObject::RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
+{
+    if (pMesh) {
+        pMesh->Render(cmd, pipeline);
+    }
+
+    if (AttachedNodes.IsEmpty()) {
+        return;
+    }
+
+    for (const FxRef<FxObject>& node : AttachedNodes) {
+        if (node->pMesh) {
+            node->pMesh->Render(cmd, pipeline);
+        }
+    }
+}
+
 
 void FxObject::Render(const FxCamera& camera)
 {

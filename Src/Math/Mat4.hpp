@@ -132,7 +132,7 @@ public:
         return *this;
     }
 
-    FxMat4f Inverse();
+    FxMat4f Inverse() const;
     FxMat4f Transposed();
     FxMat4f TransposeMat3();
 

@@ -4,6 +4,7 @@
 #include <FxObjectManager.hpp>
 #include <Renderer/Backend/RxDsLayoutBuilder.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
+#include <Renderer/RxDeferred.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
@@ -16,11 +17,12 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
     attachment_list.Add({ .Format = VK_FORMAT_D32_SFLOAT_S8_UINT });
     mRenderPass.Create(attachment_list, size);
 
-    mAttachment.Create(RxImageType::eImage, size, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
-                       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                       VK_IMAGE_ASPECT_DEPTH_BIT);
-    mFramebuffer.Create({ mAttachment.View }, mRenderPass, size);
-
+    for (int i = 0; i < RendererFramesInFlight; i++) {
+        mAttachments[i].Create(RxImageType::eImage, size, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
+                               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                               VK_IMAGE_ASPECT_DEPTH_BIT);
+        mFramebuffers[i].Create({ mAttachments[i].View }, mRenderPass, size);
+    }
     ShadowCamera.Update();
 
     mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
@@ -60,6 +62,11 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
     builder.Build(mPipeline);
+
+    for (int i = 0; i < RendererFramesInFlight; i++) {
+        const RxDeferredLightingPass& lighting_pass = gRenderer->pDeferredRenderer->LightingPasses[i];
+        UpdateDescriptorSet(i, lighting_pass);
+    }
 }
 
 void RxShadowDirectional::Begin()
@@ -74,7 +81,8 @@ void RxShadowDirectional::Begin()
     mCommandBuffer->Reset();
     mCommandBuffer->Record();
 
-    mRenderPass.Begin(mCommandBuffer, mFramebuffer.Framebuffer, FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
+    mRenderPass.Begin(mCommandBuffer, mFramebuffers[gRenderer->GetFrameNumber()].Framebuffer,
+                      FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
 
 
     VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
@@ -111,4 +119,35 @@ void RxShadowDirectional::End()
 
     VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
           "Error submitting draw buffer");
+}
+
+void RxShadowDirectional::UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass)
+{
+    FxStackArray<VkDescriptorImageInfo, 4> write_image_infos;
+    FxStackArray<VkWriteDescriptorSet, 5> write_infos;
+
+    // Shadow Depth image descriptor
+    {
+        const int binding_index = 4;
+
+        const VkDescriptorImageInfo depth_image_info {
+            .sampler = gRenderer->Swapchain.ShadowDepthSampler.Sampler,
+            .imageView = mAttachments[index].View,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
+
+        const VkWriteDescriptorSet depth_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = lighting_pass.DescriptorSet.Set,
+            .dstBinding = binding_index,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo = write_image_infos.Insert(depth_image_info),
+        };
+
+        write_infos.Insert(depth_write);
+
+        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
+    }
 }

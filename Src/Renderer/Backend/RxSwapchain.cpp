@@ -151,7 +151,9 @@ void RxSwapchain::CreateSwapchainFramebuffers()
     }
 
     ColorSampler.Create();
-    DepthSampler.Create(RxSamplerFilter::Nearest, RxSamplerFilter::Nearest, RxSamplerFilter::Nearest);
+    DepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest);
+    ShadowDepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest,
+                              RxSamplerAddressMode::eClampToBorder, RxSamplerBorderColor::eFloatWhite);
     NormalsSampler.Create();
     LightsSampler.Create();
 
@@ -171,6 +173,7 @@ void RxSwapchain::DestroyFramebuffersAndImageViews()
 
     ColorSampler.Destroy();
     DepthSampler.Destroy();
+    ShadowDepthSampler.Destroy();
     NormalsSampler.Destroy();
     LightsSampler.Destroy();
 
