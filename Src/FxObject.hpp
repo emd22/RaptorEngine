@@ -11,12 +11,8 @@
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
 
-enum class FxObjectLayer
-{
-    eWorldLayer,
-    ePlayerLayer,
-};
-
+template <typename T>
+class FxPrimitiveMesh;
 
 class FxObject : public AxBase, public FxEntity
 {
@@ -26,29 +22,42 @@ class FxObject : public AxBase, public FxEntity
 public:
     static const FxObjectId sNone = UINT32_MAX;
 
+    static constexpr FxEntityType scEntityType = FxEntityType::eObject;
+
 public:
     FxObject();
 
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
-    void Render(const FxPerspectiveCamera& camera);
+    /**
+     * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
+     */
+    void RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pipeline);
+    void Render(const FxCamera& camera);
+
     bool CheckIfReady();
 
     void AttachObject(const FxRef<FxObject>& object);
     void Update();
 
-    void SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children = true);
+    void OnAttached(FxScene* scene) override;
+
+    void SetGraphicsPipeline(RxPipeline* pipeline, bool update_children = true);
+
+    void PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+                                const PhProperties& physics_properties);
+
+    void PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotionType motion_type,
+                           const PhProperties& physics_properties);
 
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
-
-    void PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type, const PhProperties& properties);
 
     FX_FORCE_INLINE void SetObjectLayer(FxObjectLayer layer) { mObjectLayer = layer; }
     FX_FORCE_INLINE FxObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
     void Destroy() override;
-    ~FxObject() override;
+    ~FxObject();
 
 private:
     void RenderMesh();
@@ -73,3 +82,6 @@ private:
 
     FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };
+
+
+FX_VALIDATE_ENTITY_TYPE(FxObject)

@@ -29,6 +29,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     GetGlobalManager().mMaterials.Create(entities_per_page);
 
+    MaterialsInUse.InitZero(FX_MAX_MATERIALS);
+
     RxDescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
@@ -36,7 +38,6 @@ void FxMaterialManager::Create(uint32 entities_per_page)
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3);
         dp.Create(gRenderer->GetDevice(), MaxMaterials);
     }
-
 
     // Material properties buffer descriptors
 
@@ -93,7 +94,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     mbInitialized = true;
 }
 
-FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipeline* pipeline)
+FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline)
 {
     FxMaterialManager& gm = GetGlobalManager();
 
@@ -101,11 +102,17 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxGraphicsPipe
         gm.Create();
     }
 
+    int free_material_index = gm.MaterialsInUse.FindNextFreeBit();
+    FxAssert(free_material_index != FxBitset::scNoFreeBits);
+
     FxRef<FxMaterial> ref = FxMakeRef<FxMaterial>();
 
     ref->NameHash = FxHashStr32(name.c_str());
     ref->Name = name;
     ref->pPipeline = pipeline;
+    ref->mMaterialPropertiesIndex = free_material_index;
+
+    gm.MaterialsInUse.Set(free_material_index);
 
     return ref;
 }
@@ -198,8 +205,9 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     VkDescriptorSet sets_to_bind[] = {
-        mDescriptorSet.Set,
-        manager.mMaterialPropertiesDS.Set,
+        mDescriptorSet.Set,                  // Set 0
+        manager.mMaterialPropertiesDS.Set,   // Set 1: Material Properties Buffer
+        gObjectManager->mObjectBufferDS.Set, // Set 2: Object Properties Buffer
     };
 
     // const uint32 properties_offset = static_cast<uint32>(mMaterialPropertiesIndex * sizeof(FxMaterialProperties));
@@ -225,6 +233,10 @@ void FxMaterial::Destroy()
         bIsBuilt.store(false);
     }
 
+    if (mMaterialPropertiesIndex != UINT32_MAX) {
+        FxMaterialManager::GetGlobalManager().MaterialsInUse.Unset(mMaterialPropertiesIndex);
+    }
+
     // TODO: figure out why the FxRef isn't destroying the object...
     // if (Diffuse.pImage) {
     //     Diffuse.pImage->Destroy();
@@ -232,7 +244,8 @@ void FxMaterial::Destroy()
 }
 
 
-template <VkFormat TFormat> static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
+template <VkFormat TFormat>
+static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 {
     if (!component.pImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
@@ -294,8 +307,9 @@ void FxMaterial::Build()
     if (NormalMap.pImage) {
         has_normal_map = true;
 
-        BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
+        // BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
     }
+
     BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
 
     // Update the material descriptor
@@ -314,30 +328,32 @@ void FxMaterial::Build()
         PUSH_IMAGE_IF_SET(NormalMap.pImage, 1);
 
         {
-            VkDescriptorBufferInfo info {
-                .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            };
+            // VkDescriptorBufferInfo info {
+            //     .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
+            //     .offset = 0,
+            //     .range = VK_WHOLE_SIZE,
+            // };
 
-            VkWriteDescriptorSet buffer_write {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = descriptor_set.Set,
-                .dstBinding = 2,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                .pBufferInfo = write_buffer_infos.Insert(info),
-            };
+            // VkWriteDescriptorSet buffer_write {
+            //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            //     .dstSet = descriptor_set.Set,
+            //     .dstBinding = 2,
+            //     .dstArrayElement = 0,
+            //     .descriptorCount = 1,
+            //     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            //     .pBufferInfo = write_buffer_infos.Insert(info),
+            // };
 
-            write_descriptor_sets.Insert(buffer_write);
+            // write_descriptor_sets.Insert(buffer_write);
         }
 
         vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
                                0, nullptr);
     }
 
-    mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++ /* * RendererFramesInFlight */);
+    // mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++);
+
+    FxAssert(mMaterialPropertiesIndex != UINT32_MAX);
 
     FxMaterialProperties* materials_buffer = static_cast<FxMaterialProperties*>(
         manager.MaterialPropertiesBuffer.pMappedBuffer);
@@ -352,6 +368,7 @@ void FxMaterial::Build()
     else {
         pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
     }
+
 
     // material->BaseColor = ;
 

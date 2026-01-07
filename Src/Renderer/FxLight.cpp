@@ -7,25 +7,22 @@
 #include <Renderer/RxRenderBackend.hpp>
 
 
-using VertexType = FxLight::VertexType;
+using VertexType = FxLightBase::VertexType;
 
-FxLight::FxLight(FxLightFlags flags) : Flags(flags)
+FxLightBase::FxLightBase(FxLightFlags flags) : Flags(flags)
 {
     ObjectId = gObjectManager->GenerateObjectId();
-
-    this->Type = FxEntityType::Light;
 
     FxLogDebug("Creating light (id={})", ObjectId);
 }
 
-void FxLight::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { LightVolume = volume; }
+void FxLightBase::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { LightVolume = volume; }
 
-void FxLight::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh)
+void FxLightBase::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh)
 {
     LightVolumeGen = volume_gen;
     LightVolume = volume_gen->AsPositionsMesh();
     // Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
-    Radius = 10.0f;
 
     if (create_debug_mesh) {
         mDebugMesh = volume_gen->AsMesh();
@@ -33,131 +30,119 @@ void FxLight::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, 
 }
 
 
-void FxLight::MoveTo(const FxVec3f& position)
-{
-    if ((Flags & FxLF_IndependentMeshPosition)) {
-        mLightPosition = position;
+// void FxLightBase::MoveTo(const FxVec3f& position)
+// {
+//     if ((Flags & FxLF_IndependentMeshPosition)) {
+//         mLightPosition = position;
 
-        // The model matrix does not need to be updated as we won't move the mesh
-        return;
-    }
+//         // The model matrix does not need to be updated as we won't move the mesh
+//         return;
+//     }
 
-    this->FxEntity::MoveTo(position);
-    mLightPosition = mPosition;
-}
-
-
-void FxLight::MoveTo(const FxVec3f& position, bool force_move_mesh)
-{
-    this->MoveTo(position);
-
-    if (force_move_mesh && !(Flags & FxLF_IndependentMeshPosition)) {
-        this->FxEntity::MoveTo(position);
-        mLightPosition = mPosition;
-    }
-}
+//     this->FxEntity::MoveTo(position);
+//     mLightPosition = mPosition;
+// }
 
 
-void FxLight::MoveBy(const FxVec3f& offset)
-{
-    if ((Flags & FxLF_IndependentMeshPosition)) {
-        mLightPosition += offset;
+// void FxLightBase::MoveTo(const FxVec3f& position, bool force_move_mesh)
+// {
+//     this->MoveTo(position);
 
-        // The model matrix does not need to be updated as we won't move the mesh
-        return;
-    }
-
-    this->FxEntity::MoveBy(offset);
-    mLightPosition = mPosition;
-}
+//     if (force_move_mesh && !(Flags & FxLF_IndependentMeshPosition)) {
+//         this->FxEntity::MoveTo(position);
+//         mLightPosition = mPosition;
+//     }
+// }
 
 
-void FxLight::MoveBy(const FxVec3f& offset, bool force_move_mesh)
-{
-    this->MoveBy(offset);
+// void FxLightBase::MoveBy(const FxVec3f& offset)
+// {
+//     if ((Flags & FxLF_IndependentMeshPosition)) {
+//         mLightPosition += offset;
 
-    if (force_move_mesh && !(Flags & FxLF_IndependentMeshPosition)) {
-        this->FxEntity::MoveBy(offset);
-        mLightPosition = mPosition;
-    }
-}
+//         // The model matrix does not need to be updated as we won't move the mesh
+//         return;
+//     }
 
-void FxLight::Scale(const FxVec3f& scale)
-{
-    this->FxEntity::Scale(scale);
-    Radius *= scale.X;
-}
+//     this->FxEntity::MoveBy(offset);
+//     mLightPosition = mPosition;
+// }
 
-void FxLight::MoveLightVolumeTo(const FxVec3f& position) { this->FxEntity::MoveTo(position); }
 
-void FxLight::Render(const FxPerspectiveCamera& camera)
+// void FxLightBase::MoveBy(const FxVec3f& offset, bool force_move_mesh)
+// {
+//     this->MoveBy(offset);
+
+//     if (force_move_mesh && !(Flags & FxLF_IndependentMeshPosition)) {
+//         this->FxEntity::MoveBy(offset);
+//         mLightPosition = mPosition;
+//     }
+// }
+
+// void FxLightBase::Scale(const FxVec3f& scale)
+// {
+//     this->FxEntity::Scale(scale);
+//     Radius *= scale.X;
+// }
+
+void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera)
 {
     if (!bEnabled) {
         return;
     }
 
-    if (camera.Position.IntersectsSphere(mPosition, Radius)) {
-        mpLightPipeline = &gRenderer->pDeferredRenderer->PlLightingInsideVolume;
+    if (camera.Position.IntersectsSphere(mPosition, mRadius)) {
+        pPipeline = pPipelineInside;
     }
     else {
-        mpLightPipeline = &gRenderer->pDeferredRenderer->PlLightingOutsideVolume;
+        pPipeline = pPipelineOutside;
     }
 
     RxFrameData* frame = gRenderer->GetFrame();
-    // FxRef<RxDeferredRenderer>& deferred = gRenderer->DeferredRenderer;
-
-    // FxMat4f MVP = GetModelMatrix() * camera.VPMatrix;
     UpdateIfOutOfDate();
 
-    mpLightPipeline->Bind(frame->LightCommandBuffer);
+    pPipeline->Bind(frame->LightCommandBuffer);
 
 
     {
         FxLightVertPushConstants push_constants {};
-        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+               sizeof(FxMat4f));
+
+
         push_constants.ObjectId = ObjectId;
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, mpLightPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT,
-                           0, sizeof(push_constants), &push_constants);
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                           sizeof(push_constants), &push_constants);
     }
     {
         FxLightFragPushConstants push_constants {};
+
+        memcpy(push_constants.LightCameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+               sizeof(FxMat4f));
+
         memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
         memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
+
         // Copy the light positions to the push constants
-        {
-            const float* light_positions = mPosition.mData;
+        memcpy(push_constants.LightPosition, mPosition.mData, sizeof(float32) * 3);
 
-            // If the light type needs separate positions for the light and mesh, pass the separate light positions to
-            // the shader
-            if ((Flags & FxLF_IndependentMeshPosition)) {
-                light_positions = mLightPosition.mData;
-            }
 
-            memcpy(push_constants.LightPosition, light_positions, sizeof(float32) * 3);
-        }
-
-        // push_constants.LightColor[0] = Color.X;
-        // push_constants.LightColor[1] = Color.Y;
-        // push_constants.LightColor[2] = Color.Z;
-        // push_constants.LightColor[3] = 1.0;
-        //
         push_constants.LightColor = Color.Value;
 
         memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
-        push_constants.LightRadius = Radius;
+        push_constants.LightRadius = mRadius;
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, mpLightPipeline->Layout,
-                           VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(FxLightVertPushConstants),
-                           sizeof(FxLightFragPushConstants), &push_constants);
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
     }
 
-    LightVolume->Render(frame->LightCommandBuffer, *mpLightPipeline);
+    LightVolume->Render(frame->LightCommandBuffer, *pPipeline);
 }
 
 
-void FxLight::RenderDebugMesh(const FxPerspectiveCamera& camera)
+void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
 {
     if (!mDebugMesh) {
         return;
@@ -166,17 +151,9 @@ void FxLight::RenderDebugMesh(const FxPerspectiveCamera& camera)
     RxFrameData* frame = gRenderer->GetFrame();
     FxRef<RxDeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
-    // FxMat4f MVP = camera.VPMatrix;
-
     FxDrawPushConstants push_constants {};
-    memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
+    memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
     push_constants.ObjectId = ObjectId;
-
-    // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
-
-    // GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
-
-    // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout,
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
@@ -185,4 +162,65 @@ void FxLight::RenderDebugMesh(const FxPerspectiveCamera& camera)
     mDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
 }
 
-FxLight::~FxLight() { gObjectManager->FreeObjectId(ObjectId); }
+
+void FxLightBase::SetRadius(const float radius)
+{
+    mRadius = radius;
+    SetScale(mRadius * 2);
+}
+
+FxLightPoint::FxLightPoint()
+{
+    pPipelineInside = &gRenderer->pDeferredRenderer->PlLightingInsideVolume;
+    pPipelineOutside = &gRenderer->pDeferredRenderer->PlLightingOutsideVolume;
+}
+
+
+FxLightDirectional::FxLightDirectional() { pPipeline = &gRenderer->pDeferredRenderer->PlLightingDirectional; }
+
+void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera)
+{
+    if (!bEnabled) {
+        return;
+    }
+
+    RxFrameData* frame = gRenderer->GetFrame();
+    UpdateIfOutOfDate();
+
+    pPipeline->Bind(frame->LightCommandBuffer);
+
+    {
+        FxLightVertPushConstants push_constants {};
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+               sizeof(FxMat4f));
+
+        push_constants.ObjectId = ObjectId;
+
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                           sizeof(push_constants), &push_constants);
+    }
+    {
+        FxLightFragPushConstants push_constants {};
+
+        if (shadow_camera) {
+            // FxMat4f new_camera_matrix = mModelMatrix * shadow_camera->ProjectionMatrix;
+            memcpy(push_constants.LightCameraMatrix, shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+                   sizeof(FxMat4f));
+        }
+        memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
+        memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+
+        // Copy the light positions to the push constants
+        memcpy(push_constants.LightPosition, mPosition.mData, sizeof(float32) * 3);
+
+        push_constants.LightColor = Color.Value;
+
+        memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
+        push_constants.LightRadius = mRadius;
+
+        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
+    }
+
+    vkCmdDraw(frame->LightCommandBuffer.CommandBuffer, 3, 1, 0, 0);
+}

@@ -117,7 +117,7 @@ public:
 
     static inline FxRef<AxImage> LoadImage(const std::string& path, VkFormat format)
     {
-        return LoadImage(RxImageType::Image, format, path);
+        return LoadImage(RxImageType::eImage, format, path);
     }
 
     /**
@@ -135,7 +135,7 @@ public:
 
     static inline FxRef<AxImage> LoadImageFromMemory(VkFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::Image, format, data, data_size);
+        return LoadImageFromMemory(RxImageType::eImage, format, data, data_size);
     }
 
 
@@ -160,7 +160,7 @@ public:
      */
     static inline void LoadImage(FxRef<AxImage>& asset, VkFormat format, const std::string& path)
     {
-        return LoadImage(RxImageType::Image, format, asset, path);
+        return LoadImage(RxImageType::eImage, format, asset, path);
     }
 
 
@@ -172,7 +172,7 @@ public:
      */
     static void LoadImageFromMemory(FxRef<AxImage>& asset, VkFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::Image, format, asset, data, data_size);
+        return LoadImageFromMemory(RxImageType::eImage, format, asset, data, data_size);
     }
 
     ~AxManager() { Shutdown(); }

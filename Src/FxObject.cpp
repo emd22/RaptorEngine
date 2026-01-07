@@ -8,15 +8,12 @@
 
 #include <FxEngine.hpp>
 #include <FxObjectManager.hpp>
+#include <FxScene.hpp>
 #include <Physics/PhJolt.hpp>
+#include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-FxObject::FxObject()
-{
-    ObjectId = gObjectManager->GenerateObjectId();
-
-    this->Type = FxEntityType::Object;
-}
+FxObject::FxObject() { ObjectId = gObjectManager->GenerateObjectId(); }
 
 void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
 {
@@ -67,18 +64,39 @@ bool FxObject::CheckIfReady()
 }
 
 
-void FxObject::PhysicsObjectCreate(PhObject::PhysicsFlags flags, PhObject::PhysicsType type,
-                                   const PhProperties& properties)
+void FxObject::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions,
+                                      PhMotionType motion_type, const PhProperties& physics_properties)
 {
-    Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
-
-    FxVec3f scaled_dimensions = Dimensions * (mScale * 0.5);
-
-    Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
-    mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+    Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
 }
 
-void FxObject::SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_children)
+
+void FxObject::PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotionType motion_type,
+                                 const PhProperties& physics_properties)
+{
+    Physics.CreateMeshBody(physics_mesh, motion_type, physics_properties);
+}
+
+void FxObject::OnAttached(FxScene* scene)
+{
+    // When the object is attached to the scene, enable physics if the physics object is active.
+    if (Physics.mbHasPhysicsBody) {
+        mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+    }
+}
+
+
+// void FxObject::PhysicsCreate(PhObject::Flags flags, PhMotionType moititype, const PhProperties& properties)
+// {
+//     Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
+
+//     FxVec3f scaled_dimensions = Dimensions * (mScale * 0.5);
+
+//     Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
+//     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+// }
+
+void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
 {
     // TODO: replace this with a callback system
     WaitUntilLoaded();
@@ -98,62 +116,46 @@ void FxObject::SetGraphicsPipeline(RxGraphicsPipeline* pipeline, bool update_chi
     }
 }
 
+void FxObject::RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
+{
+    if (pMesh) {
+        pMesh->Render(cmd, pipeline);
+    }
 
-void FxObject::Render(const FxPerspectiveCamera& camera)
+    if (AttachedNodes.IsEmpty()) {
+        return;
+    }
+
+    for (const FxRef<FxObject>& node : AttachedNodes) {
+        if (node->pMesh) {
+            node->pMesh->Render(cmd, pipeline);
+        }
+    }
+}
+
+
+void FxObject::Render(const FxCamera& camera)
 {
     RxFrameData* frame = gRenderer->GetFrame();
-    //
-    //    if (!Material || !CheckIfReady()) {
-    //        return;
-    //    }
 
     if (pMaterial && !pMaterial->bIsBuilt) {
         pMaterial->Build();
         return;
     }
 
-    // FxMat4f VP = camera.VPMatrix;
-    // FxMat4f MVP = GetModelMatrix() * VP;
     UpdateIfOutOfDate();
-
-    // memcpy(mUbo.MvpMatrix.RawData, MVP.RawData, sizeof(FxMat4f));
-    //
-    // frame->SubmitUbo(mUbo);
 
     FxDrawPushConstants push_constants {};
 
     push_constants.ObjectId = ObjectId;
 
-    if (mObjectLayer == FxObjectLayer::eWorldLayer) {
-        memcpy(push_constants.VPMatrix, camera.VPMatrix.RawData, sizeof(FxMat4f));
-    }
-    else if (mObjectLayer == FxObjectLayer::ePlayerLayer) {
-        memcpy(push_constants.VPMatrix, camera.WeaponVPMatrix.RawData, sizeof(FxMat4f));
-    }
-
-    // memcpy(push_constants.ModelMatrix, GetModelMatrix().RawData, sizeof(FxMat4f));
-    //  Copy the normal matrix to the vertex shader
-    //  GetModelMatrix().CopyAsMat3To(push_constants.ModelMatrix);
-
-    // memcpy(push_constants.NormalMatrix, , sizeof(FxMat4f));
+    memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(FxMat4f));
 
     if (pMaterial) {
         push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
     }
 
-    // mModel->Render(*mMaterial->Pipeline);
-
-
     if (pMaterial && CheckIfReady()) {
-        //        VkDescriptorSet sets_to_bind[] = {
-        ////            gRenderer->CurrentGPass->DescriptorSet.Set,
-        //
-        //            Material->mDescriptorSet.Set
-        //            Material->
-        //        };
-        //        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        //        *Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
-
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                            &push_constants);
@@ -178,36 +180,6 @@ void FxObject::Render(const FxPerspectiveCamera& camera)
         }
 
         push_constants.ObjectId = ObjectId;
-
-        //        VkDescriptorSet sets_to_bind[] = {
-        //            gRenderer->CurrentGPass->DescriptorSet.Set,
-        //            obj->Material->mDescriptorSet.Set,
-        //            obj->Material->mMaterialPropertiesDS.Set
-
-        //        };
-
-
-        //        const uint32 num_sets = FxSizeofArray(sets_to_bind);
-        //        const uint32 properties_offset = static_cast<uint32>(obj->Material->mMaterialPropertiesIndex *
-        //        sizeof(FxMaterialProperties));
-
-        //        uint32 dynamic_offsets[] = {
-        //            0,
-        //            properties_offset
-        //        };
-
-        //        RxCommandBuffer& cmd = frame->CommandBuffer;
-        //
-        //        RxDescriptorSet::BindMultipleOffset(
-        //            cmd,
-        //            VK_PIPELINE_BIND_POINT_GRAPHICS,
-        //            *obj->Material->Pipeline,
-        //            FxMakeSlice(sets_to_bind, num_sets),
-        //            FxMakeSlice(dynamic_offsets, num_sets)
-        //        );
-        //
-        //        RxDescriptorSet::BindMultiple(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-        //        *obj->Material->Pipeline, sets_to_bind, sizeof(sets_to_bind) / sizeof(sets_to_bind[0]));
 
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->pMaterial->pPipeline->Layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
@@ -297,8 +269,6 @@ void FxObject::SetPhysicsEnabled(bool enabled)
 
 void FxObject::Destroy()
 {
-    gObjectManager->FreeObjectId(ObjectId);
-
     if (pMesh) {
         pMesh->Destroy();
     }
@@ -318,8 +288,4 @@ void FxObject::Destroy()
     bIsUploadedToGpu = false;
 }
 
-FxObject::~FxObject()
-{
-    gObjectManager->FreeObjectId(ObjectId);
-    Destroy();
-}
+FxObject::~FxObject() { Destroy(); }

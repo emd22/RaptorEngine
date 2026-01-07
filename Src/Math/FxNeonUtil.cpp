@@ -2,163 +2,85 @@
 
 #ifdef FX_USE_NEON
 
+#include "FxMathConsts.hpp"
 #include "FxNeonUtil.hpp"
-
-static constexpr uint32 sConstSignMask = 0x80000000;
-
-static constexpr float32 sConstHalfPi = M_PI_2;
-static constexpr float32 sConstPi = M_PI;
-static constexpr float32 sConst3HalfPi = sConstHalfPi * 3.0f;
-
-static constexpr float32 sConst2Pi = M_PI * 2.0;
-static constexpr float32 sConstInv2Pi = 1.0f / sConst2Pi;
-
-
-#define c_minus_cephes_DP1 -0.78515625
-#define c_minus_cephes_DP2 -2.4187564849853515625e-4
-#define c_minus_cephes_DP3 -3.77489497744594108e-8
-#define c_sincof_p0        -1.9515295891E-4
-#define c_sincof_p1        8.3321608736E-3
-#define c_sincof_p2        -1.6666654611E-1
-#define c_coscof_p0        2.443315711809948E-005
-#define c_coscof_p1        -1.388731625493765E-003
-#define c_coscof_p2        4.166664568298827E-002
-#define c_cephes_FOPI      1.27323954473516 // 4 / M_PI
 
 namespace FxNeon {
 
-/**
- * @brief Fast limited precision polynomial cosine approximation.
- *
- */
-FX_FORCE_INLINE static float32x4_t CosFastApprox(float32x4_t angle)
-{
-    // Algorithm adapted from https://www.ganssle.com/item/approximations-for-trig-c-code.htm and FastTrigo.
+#define AsFloat(value_) vreinterpretq_u32_f32(value_)
+#define AsUInt(value_)  vreinterpretq_f32_u32(value_)
 
-    const float32x4_t c1 = vdupq_n_f32(0.99940307f);
-    const float32x4_t c2 = vdupq_n_f32(-0.49558072f);
-    const float32x4_t c3 = vdupq_n_f32(0.03679168f);
-
-    const float32x4_t angle_sq = vmulq_f32(angle, angle);
-
-    return vaddq_f32(c1, vmulq_f32(angle_sq, vaddq_f32(c2, vmulq_f32(c3, angle_sq))));
-}
-
-
-void SinCos4_Fast(float32x4_t angles, float32x4_t* out_sine, float32x4_t* out_cosine)
-{
-    // Sine/cosine algorithm based on the SSE implementation in FastTrigo at https://github.com/divideconcept/FastTrigo.
-
-    const float32x4_t v_f32_one = vdupq_n_f32(1.0f);
-    const float32x4_t v_signmask = vreinterpretq_f32_u32(vdupq_n_u32(sConstSignMask));
-
-
-    // 1 / (2 * Pi)
-    const float32x4_t v_inv_2pi = vdupq_n_f32(sConstInv2Pi);
-
-    const float32x4_t v_pi = vdupq_n_f32(sConstPi);
-    const float32x4_t v_halfpi = vdupq_n_f32(sConstHalfPi);
-
-    // 2 * Pi
-    const float32x4_t v_2pi = vdupq_n_f32(sConst2Pi);
-
-    const float32x4_t v_3halfpi = vdupq_n_f32(sConst3HalfPi);
-
-    uint32x4_t angle_signs = vorrq_u32(ReinterpretAsUInt(v_f32_one), vandq_u32(v_signmask, ReinterpretAsUInt(angles)));
-
-    // Remove the sign bit
-    angles = AndNot(v_signmask, angles);
-    angles = vsubq_f32(angles, vmulq_f32(Floor(vmulq_f32(angles, v_inv_2pi)), v_2pi));
-
-
-    float32x4_t cos_angles = angles;
-
-    cos_angles = Xor(cos_angles,
-                     And(ReinterpretAsFloat(vcgeq_f32(angles, v_halfpi)), Xor(cos_angles, vsubq_f32(v_pi, angles))));
-    cos_angles = Xor(cos_angles, And(ReinterpretAsFloat(vcgeq_f32(angles, v_pi)), v_signmask));
-    cos_angles = Xor(cos_angles,
-                     And(ReinterpretAsFloat(vcgeq_f32(angles, v_3halfpi)), Xor(cos_angles, vsubq_f32(v_2pi, angles))));
-
-    float32x4_t result = CosFastApprox(cos_angles);
-
-    // Calculate the cosine result
-    result = Xor(result, And(And(ReinterpretAsFloat(vcgeq_f32(angles, v_halfpi)),
-                                 ReinterpretAsFloat(vcltq_f32(angles, v_3halfpi))),
-                             v_signmask));
-
-    (*out_cosine) = result;
-
-    const float32x4_t sine_multiplier = vmulq_f32(
-        angle_signs,
-        ReinterpretAsFloat(vorrq_u32(ReinterpretAsUInt(v_f32_one), vandq_u32(vcgtq_f32(angles, v_pi), v_signmask))));
-
-    (*out_sine) = vmulq_f32(sine_multiplier, Sqrt(vsubq_f32(v_f32_one, vmulq_f32(result, result))));
-}
-
-// Implementation based on Cephes math library (https://www.moshier.net/index.html#Cephes)
-// And the modified algorithm from http://gruntthepeon.free.fr/ssemath/sse_mathfun.h.
-
+// Modified algorithm based off of the SSE version at FxSSEUtil, which is originally based off of DirectXMath's
+// implementation. Uses minimax algorithm for accuracy at small angles, with angles above 2pi(or below -2pi) being
+// truncated.
 void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
 {
-    float32x4_t x, y;
+    const float32x4_t cvPi = vdupq_n_f32(FX_PI);
+    const float32x4_t cvHalfPi = vdupq_n_f32(FX_HALF_PI);
+    const float32x4_t cvOne = vdupq_n_f32(1.0f);
 
-    uint32x4_t emm2;
+    // Ensure that in_values are between -2pi and 2pi.
 
-    uint32x4_t sine_sign;
-
+    // x mod y = x - (round(x / y) * y)
+    // Since we know the limit (2pi), we can replace (x / y) with (x * (1 / y)), or (x * (1 / 2pi)).
     {
-        const uint32x4_t v_high_sign = vdupq_n_u32(0x80000000U);
+        const float32x4_t cvOneOver2Pi = vdupq_n_f32(FX_1_OVER_2PI);
 
-        sine_sign = vandq_u32(ReinterpretAsUInt(in_values), v_high_sign);
-        x = Xor(in_values, sine_sign);
+        float32x4_t r0 = vrndnq_f32(vmulq_f32(in_values, cvOneOver2Pi));
+
+        // Note that vld/vdup incur latency (pipeline stalls) as the values need to be transferred into the NEON
+        // registers, so for one-time use things like this it can be faster(or more reliably fast) to calculate the same
+        // value over loading.
+        in_values = vfmsq_f32(in_values, r0, vmulq_n_f32(cvPi, 2.0f));
     }
 
-    {
-        const float32x4_t c_f32_fopi = vdupq_n_f32(c_cephes_FOPI);
-        y = vmulq_f32(x, c_f32_fopi);
+    const uint32x4_t cvSignMask = vdupq_n_u32(FxNeon::scSignMask32);
 
-        // Store the integer part of y
-        emm2 = vcvtq_u32_f32(y);
+    const float32x4_t cvSineCoeff1 = vdupq_n_f32(-2.3889859e-08f);
+    const float32x4_t cvSineCoeff0 = { -0.16666667f, +0.0083333310f, -0.00019840874f, +2.7525562e-06f };
 
-        // j=(j+1) & (~1) (see the cephes sources)
-        emm2 = vaddq_u32(emm2, vdupq_n_u32(1));
-        emm2 = vandq_u32(emm2, vdupq_n_u32(~1));
-        y = vcvtq_f32_u32(emm2);
-    }
+    const float32x4_t cvCosineCoeff1 = vdupq_n_f32(-2.6051615e-07f);
+    const float32x4_t cvCosineCoeff0 = { -0.5f, +0.041666638f, -0.0013888378f, +2.4760495e-05f };
 
-    uint32x4_t poly_mask = vtstq_u32(emm2, vdupq_n_u32(2));
+    // Extract sign bit
+    uint32x4_t sign = vandq_u32(in_values, cvSignMask);
 
-    x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP1));
-    x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP2));
-    x = vmlaq_f32(x, y, vdupq_n_f32(c_minus_cephes_DP3));
+    float32x4_t pi_or_neg_pi = AsFloat(vorrq_u32(cvPi, sign));
 
-    sine_sign = veorq_u32(sine_sign, vtstq_u32(emm2, vdupq_n_u32(4)));
-    float32x4_t cosine_sign = vtstq_u32(vsubq_u32(emm2, vdupq_n_u32(2)), vdupq_n_u32(4));
+    // Compare |in_values| <= pi / 2.
+    // If the result is true, the component will be 0xFFFFFFFF, and 0x00000000 otherwise.
+    // We use this as a mask and use bitwise select to select values based on this mask.
+    uint32x4_t cmp_result = vcleq_f32(vabsq_f32(in_values), cvHalfPi);
 
-    float32x4_t z = vmulq_f32(x, x);
-    float32x4_t y1, y2;
+    in_values = vbslq_f32(cmp_result, in_values, vsubq_f32(pi_or_neg_pi, in_values));
 
-    y1 = vmlaq_f32(vdupq_n_f32(c_coscof_p1), z, vdupq_n_f32(c_coscof_p0));
-    y2 = vmlaq_f32(vdupq_n_f32(c_sincof_p1), z, vdupq_n_f32(c_sincof_p0));
+    float32x4_t one_or_sign = AsFloat(vorrq_u32(AsUInt(cvOne), cvSignMask));
+    sign = vbslq_f32(cmp_result, cvOne, one_or_sign);
 
-    y1 = vmlaq_f32(vdupq_n_f32(c_coscof_p2), y1, z);
-    y2 = vmlaq_f32(vdupq_n_f32(c_sincof_p2), y2, z);
+    float32x4_t values_sq = vmulq_f32(in_values, in_values);
 
-    y1 = vmulq_f32(y1, z);
-    y2 = vmulq_f32(y2, z);
+    float32x4_t result;
 
-    y1 = vmulq_f32(y1, z);
-    y1 = vmlsq_f32(y1, z, vdupq_n_f32(0.5f));
+    // Sine approximation (evaluated using Horner's method)
+    result = vfmaq_f32(vdupq_laneq_f32(cvSineCoeff0, 3), cvSineCoeff1, values_sq);
+    result = vfmaq_f32(vdupq_laneq_f32(cvSineCoeff0, 2), result, values_sq);
+    result = vfmaq_f32(vdupq_laneq_f32(cvSineCoeff0, 1), result, values_sq);
+    result = vfmaq_f32(vdupq_laneq_f32(cvSineCoeff0, 0), result, values_sq);
+    result = vfmaq_f32(cvOne, result, values_sq);
 
-    y2 = vmlaq_f32(x, y2, x);
+    *ysin = vmulq_f32(result, in_values);
 
-    y1 = vaddq_f32(y1, vdupq_n_f32(1));
+    // Cosine approximation
+    result = vfmaq_f32(vdupq_laneq_f32(cvCosineCoeff0, 3), cvCosineCoeff1, values_sq);
+    result = vfmaq_f32(vdupq_laneq_f32(cvCosineCoeff0, 2), result, values_sq);
+    result = vfmaq_f32(vdupq_laneq_f32(cvCosineCoeff0, 1), result, values_sq);
+    result = vfmaq_f32(vdupq_laneq_f32(cvCosineCoeff0, 0), result, values_sq);
+    result = vfmaq_f32(cvOne, result, values_sq);
 
-    float32x4_t ys = vbslq_f32(poly_mask, y1, y2);
-    float32x4_t yc = vbslq_f32(poly_mask, y2, y1);
-    *ysin = vbslq_f32(sine_sign, vnegq_f32(ys), ys);
-    *ycos = vbslq_f32(cosine_sign, yc, vnegq_f32(yc));
+    *ycos = vmulq_f32(result, sign);
 }
+
+
 }; // namespace FxNeon
 
 #endif // #ifdef FX_USE_NEON

@@ -1,104 +1,90 @@
 #include "FxMathUtil.hpp"
 
+#include "FxMathConsts.hpp"
+
+#include <cmath>
+
+// Should we warn if FP_FAST_FMAF is not defined?
+//
+// #ifndef FP_FAST_FMAF
+// #endif
+
 namespace FxMath {
 
-#define c_minus_cephes_DP1 -0.78515625
-#define c_minus_cephes_DP2 -2.4187564849853515625e-4
-#define c_minus_cephes_DP3 -3.77489497744594108e-8
-#define c_sincof_p0        -1.9515295891E-4
-#define c_sincof_p1        8.3321608736E-3
-#define c_sincof_p2        -1.6666654611E-1
-#define c_coscof_p0        2.443315711809948E-005
-#define c_coscof_p1        -1.388731625493765E-003
-#define c_coscof_p2        4.166664568298827E-002
-#define c_cephes_FOPI      1.27323954473516 // 4 / M_PI
+static constexpr uint32 scSignMask = 0x80000000;
 
+// Basic reinterpret casts
+#define AsUInt(value_)  std::bit_cast<uint32>(value_)
+#define AsFloat(value_) std::bit_cast<float32>(value_)
 
-FX_FORCE_INLINE static uint32 TstU32(uint32 a, uint32 b) { return (a & b) ? (~0) : 0; }
+static constexpr float32 scSineCoeff1 = -2.3889859e-08f;
 
+static constexpr float32 scSineCoeff0_0 = +2.7525562e-06f;
+static constexpr float32 scSineCoeff0_1 = -0.00019840874f;
+static constexpr float32 scSineCoeff0_2 = +0.0083333310f;
+static constexpr float32 scSineCoeff0_3 = -0.16666667f;
+
+static constexpr float32 scCosineCoeff1 = -2.6051615e-07f;
+
+static constexpr float32 scCosineCoeff0_0 = +2.4760495e-05f;
+static constexpr float32 scCosineCoeff0_1 = -0.0013888378f;
+static constexpr float32 scCosineCoeff0_2 = +0.041666638f;
+static constexpr float32 scCosineCoeff0_3 = -0.5f;
 
 void SinCos(float32 in_angle, float32* out_sine, float32* out_cosine)
 {
-    // TODO: Clean up this function to be more tailored to scalar
+    (*out_sine) = sin(in_angle);
+    (*out_cosine) = cos(in_angle);
 
-    float32 x, y;
+    return;
 
-    uint32 emm2;
-    uint32 sine_sign;
+    static constexpr float32 scPi = FX_PI;
+    static constexpr float32 scHalfPi = FX_HALF_PI;
 
-    {
-        const uint32 v_high_sign = (0x80000000U);
-
-        sine_sign = (std::bit_cast<uint32>(in_angle) & v_high_sign);
-        x = std::bit_cast<float32>(std::bit_cast<uint32>(in_angle) ^ sine_sign);
+    if (in_angle > FX_2PI) {
+        in_angle = -FX_2PI;
+    }
+    else if (in_angle < -FX_2PI) {
+        in_angle = FX_2PI;
     }
 
-    {
-        y = (x * c_cephes_FOPI);
+    uint32 angle_sign = AsUInt(in_angle) & scSignMask;
 
-        // Store the integer part of y
-        emm2 = static_cast<uint32>(y);
+    // Pi if the sign is positive, -Pi if the sign is negative.
+    float32 pi_or_neg_pi = AsFloat(AsUInt(scPi) | angle_sign);
 
-        // j=(j+1) & (~1) (see the cephes sources)
-        emm2 += 1;
-        emm2 &= (~1);
+    uint32 cmp_result = (float32((~angle_sign) & AsUInt(in_angle)) <= float32(scHalfPi)) ? 0xFFFFFFFF : 0x00000000;
 
-        // emm2 = ((emm2 + 1) & (~1));
+    uint32 sel0 = (cmp_result & AsUInt(in_angle));
+    uint32 sel1 = ((~cmp_result) & AsUInt((pi_or_neg_pi - in_angle)));
 
-        y = static_cast<float32>(emm2);
-    }
+    in_angle = AsFloat(sel0 | sel1);
 
-    /* get the polynom selection mask
-     *     there is one polynom for 0 <= x <= Pi/4
-     *     and another one for Pi/4<x<=Pi/2
-     *
-     *     Both branches will be computed.
-     */
-    uint32 poly_mask = TstU32(emm2, 2);
+    sel0 = cmp_result & AsUInt(1.0f);
+    sel1 = ((~cmp_result) & AsUInt(-1.0f));
+    angle_sign = (sel0 | sel1);
 
-    /* The magic pass: "Extended precision modular arithmetic"
-     *     x = ((x - y * DP1) - y * DP2) - y * DP3; */
-    x += y * (c_minus_cephes_DP1);
-    x += y * (c_minus_cephes_DP2);
-    x += y * (c_minus_cephes_DP3);
+    float32 angle_sq = (in_angle * in_angle);
 
-    sine_sign = sine_sign ^ TstU32(emm2, 4);
-    float32 cosine_sign = TstU32((emm2 - 2), 4);
+    // Sine approximation
+    float32 result = std::fmaf(scSineCoeff1, angle_sq, scSineCoeff0_0);
+    result = std::fmaf(result, angle_sq, scSineCoeff0_1);
+    result = std::fmaf(result, angle_sq, scSineCoeff0_2);
+    result = std::fmaf(result, angle_sq, scSineCoeff0_3);
+    result = std::fmaf(result, angle_sq, 1.0f);
+    result *= in_angle;
 
-    /* Evaluate the first polynom  (0 <= x <= Pi/4) in y1,
-     *     and the second polynom      (Pi/4 <= x <= 0) in y2 */
-    float32 z = x * x;
-    float32 y1, y2;
+    (*out_sine) = result;
 
-    y1 = (c_coscof_p1 + z * c_coscof_p0);
-    y2 = (c_sincof_p1 + z * c_sincof_p0);
+    // Cosine approximation
+    result = std::fmaf(scCosineCoeff1, angle_sq, scCosineCoeff0_0);
+    result = std::fmaf(result, angle_sq, scCosineCoeff0_1);
+    result = std::fmaf(result, angle_sq, scCosineCoeff0_2);
+    result = std::fmaf(result, angle_sq, scCosineCoeff0_3);
+    result = std::fmaf(result, angle_sq, 1.0f);
+    result = result * AsFloat(angle_sign);
 
-    y1 = (c_coscof_p2 + y1 * z);
-    y2 = (c_sincof_p2 + y2 * z);
-
-    y1 = y1 * z;
-    y2 = y2 * z;
-
-    y1 = y1 * z;
-    y1 = (y1 - (z * 0.5f));
-
-    y2 = x + (y2 * x);
-
-    y1 += 1.0f;
-
-    float32 ys = (poly_mask) ? y1 : y2;
-    float32 yc = (poly_mask) ? y2 : y1;
-
-    /* select the correct result from the two polynoms */
-    // float32 ys = vbslq_f32(poly_mask, y1, y2);
-    // float32x4_t yc = vbslq_f32(poly_mask, y2, y1);
-
-    (*out_sine) = (sine_sign) ? (-ys) : ys;
-    (*out_cosine) = (cosine_sign) ? (yc) : -yc;
-
-    // *ysin = vbslq_f32(sine_sign, vnegq_f32(ys), ys);
-    // *ycos = vbslq_f32(cosine_sign, yc, vnegq_f32(yc));
+    (*out_cosine) = result;
 }
-
 
 } // namespace FxMath

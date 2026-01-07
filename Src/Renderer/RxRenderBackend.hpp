@@ -56,6 +56,7 @@ public:
     void Destroy();
 
     RxFrameResult BeginFrame();
+    void BeginGeometry();
     void BeginLighting();
     void DoComposition(FxCamera& render_cam);
 

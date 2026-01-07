@@ -24,12 +24,11 @@ BraceWrapping:
     BeforeElse: true
     BeforeLambdaBody: true
 
-
 BreakBeforeBinaryOperators: None
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
-#BreakTemplateDeclarations: Yes
+BreakTemplateDeclarations: Yes
 BreakAfterReturnType: Automatic
 
 # Spacing
@@ -75,14 +74,14 @@ AllowShortLoopsOnASingleLine: false
 IncludeBlocks: Regroup
 SortIncludes: true
 IncludeCategories:
-  - Regex: '^".*\.hpp"$'
-    Priority: 1
-  - Regex: '^<.*\.h>'
-    Priority: 2
-  - Regex: '^<.*>'
-    Priority: 3
-  - Regex: '.*'
-    Priority: 4
+    - Regex: '^".*\.hpp"$'
+      Priority: 1
+    - Regex: '^<.*\.h>'
+      Priority: 2
+    - Regex: "^<.*>"
+      Priority: 3
+    - Regex: ".*"
+      Priority: 4
 
 # Other formatting options
 BinPackArguments: true
@@ -108,5 +107,5 @@ PenaltyReturnTypeOnItsOwnLine: 60
 
 # Macro handling
 IndentPPDirectives: None
-MacroBlockBegin: ''
-MacroBlockEnd: ''
+MacroBlockBegin: ""
+MacroBlockEnd: ""

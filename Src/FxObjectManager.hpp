@@ -35,4 +35,7 @@ public:
 public:
     RxRawGpuBuffer<FxObjectGpuEntry> mObjectGpuBuffer;
     FxBitset mObjectSlotsInUse;
+
+    RxDescriptorSet mObjectBufferDS {};
+    VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
 };

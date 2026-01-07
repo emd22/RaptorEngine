@@ -32,7 +32,7 @@ struct VSPushConsts
     uint uiMaterialIndex;
 };
 
-layout(binding = 2) StructuredBuffer<Object> bObjectBuffer;
+layout(set = 2, binding = 0) StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
 

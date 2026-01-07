@@ -9,9 +9,6 @@
 
 #include <Core/FxTypes.hpp>
 
-
-typedef float32x4_t float128;
-
 enum FxShuffleComponent
 {
     /* A Vector */
@@ -29,6 +26,7 @@ enum FxShuffleComponent
 
 namespace FxNeon {
 
+constexpr uint32 scSignMask32 = 0x80000000;
 
 template <FxShuffleComponent TA, FxShuffleComponent TB, FxShuffleComponent TC, FxShuffleComponent TD>
 concept C_SinglePermute = (TA <= FxShuffle_AW) && (TB <= FxShuffle_AW) && (TC <= FxShuffle_AW) && (TD <= FxShuffle_AW);
@@ -186,6 +184,8 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
     return vdupq_laneq_f32(a, TComp1);
 }
 
+FX_FORCE_INLINE float32 Dot(float32x4_t a, float32x4_t b) { return vaddvq_f32(vmulq_f32(a, b)); }
+
 /**
  * @brief Returns a vector containing elements across both vectors A and B, in the order of the template parameters.
  *
@@ -247,9 +247,28 @@ FX_FORCE_INLINE float32x4_t And(float32x4_t a, float32x4_t b)
     return vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(a), vreinterpretq_u32_f32(b)));
 }
 
-// Implementation based on `Vec4::FlipSign` from Jolt physics!
+/**
+ * @brief Set the signs of all components of `v` to the sign of `TSign`.
+ * @tparam TSign A value (e.g. 1.0 or -1.0) to specify the sign.
+ */
+template <int TSign>
+FX_FORCE_INLINE float32x4_t SetSigns(float32x4_t v)
+{
+    // Same as -0.0f, only the sign bit
+    const uint32x4_t sign_v = vdupq_n_u32(0x80000000);
+
+    // TSign is +ve,
+    if constexpr (TSign > 0.0) {
+        // We just return AND v, NOT sign
+        // Missing the ol' SSE _mm_andnot_ps here
+        return vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(v), vmvnq_u32(sign_v)));
+    }
+    // TSign is -ve, add the sign bit if its not already there
+    return vreinterpretq_f32_u32(vorrq_u32(vreinterpretq_u32_f32(v), sign_v));
+}
+
 template <int TX, int TY, int TZ, int TW>
-FX_FORCE_INLINE float32x4_t SetSign(float32x4_t v)
+FX_FORCE_INLINE float32x4_t FlipSigns(float32x4_t v)
 {
     constexpr float32 signs[4] = {
         TX > 0 ? 0.0f : -0.0f,
@@ -259,9 +278,9 @@ FX_FORCE_INLINE float32x4_t SetSign(float32x4_t v)
     };
 
     const float32x4_t sign_v = vld1q_f32(signs);
-
     return Xor(v, sign_v);
 }
+
 
 FX_FORCE_INLINE float32x4_t Sqrt(float32x4_t vec) { return vsqrtq_f32(vec); }
 

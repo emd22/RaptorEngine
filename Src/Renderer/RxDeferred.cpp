@@ -68,7 +68,7 @@ void RxDeferredRenderer::Destroy()
 
 void RxDeferredRenderer::ToggleWireframe(bool enable)
 {
-    RxGraphicsPipeline* new_pipeline = &PlGeometry;
+    RxPipeline* new_pipeline = &PlGeometry;
     if (enable) {
         new_pipeline = &PlGeometryWireframe;
         FxLogInfo("Enabling wireframe");
@@ -102,8 +102,6 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 
     {
         // Create object buffer DS layout
-        // RxDsLayoutBuilder builder {};
-        // DsLayoutObjectBuffer = builder.Build();
     }
 
     // Fragment descriptor set
@@ -111,13 +109,14 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         RxDsLayoutBuilder builder {};
         builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
         builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
-        builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
+        // builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
         DsLayoutGPassMaterial = builder.Build();
     }
 
     FxStackArray<VkDescriptorSetLayout, 3> layouts = {
-        DsLayoutGPassMaterial, DsLayoutLightingMaterialProperties,
-        // DsLayoutObjectBuffer,
+        DsLayoutGPassMaterial,
+        DsLayoutLightingMaterialProperties,
+        gObjectManager->DsLayoutObjectBuffer,
     };
 
     FxStackArray<RxPushConstants, 1> push_consts = {
@@ -130,7 +129,7 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
     FxSlice<VkDescriptorSetLayout> layouts2 = FxSlice<VkDescriptorSetLayout>(layouts);
     FxLogWarning("Layouts: {}", layouts2.Size);
 
-    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts), FxSlice(layouts));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(layouts));
 
     RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -153,7 +152,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     FxVertexInfo vertex_info = FxMakeVertexInfo();
 
-    RpGeometry.Create2(attachments);
+    RpGeometry.Create(attachments, gRenderer->Swapchain.Extent);
 
     RxPipelineBuilder builder;
 
@@ -226,18 +225,25 @@ void RxDeferredRenderer::CreateLightingDSLayout()
     // Fragment DS
 
     RxDsLayoutBuilder builder {};
+
+    // sDepth
     builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    // sAlbedo
     builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    // sNormal
     builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
-    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
+    // sShadowDepth
+    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+
     DsLayoutLightingFrag = builder.Build();
 }
 
 VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
 {
     VkDescriptorSetLayout layouts[] = {
-        DsLayoutLightingFrag, DsLayoutLightingMaterialProperties,
-        // DsLayoutObjectBuffer,
+        DsLayoutLightingFrag,
+        DsLayoutLightingMaterialProperties,
+        gObjectManager->DsLayoutObjectBuffer,
     };
 
     FxStackArray<RxPushConstants, 2> push_consts = {
@@ -245,8 +251,8 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
         RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
-    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts),
-                                                               FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
+                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
     PlLightingOutsideVolume.SetLayout(layout);
@@ -306,7 +312,9 @@ void RxDeferredRenderer::CreateLightingPipeline()
     RxAttachmentList attachment_list;
     attachment_list.Add({ .Format = VK_FORMAT_R16G16B16A16_SFLOAT });
 
-    RpLighting.Create2(attachment_list);
+    RpLighting.Create(attachment_list, gRenderer->Swapchain.Extent);
+
+    RxShader lighting_shader("Lighting");
 
     // PlLightingOutsideVolume.Create("Lighting(Inside Volume)", shader_list, color_attachments,
     //                                FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
@@ -318,31 +326,59 @@ void RxDeferredRenderer::CreateLightingPipeline()
     //                               &vertex_info, RpLighting,
     //                               { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 
-    RxShader lighting_shader("Lighting");
-    FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
+    {
+        FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
+        FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
 
-    FxVertexInfo vertex_info = FxMakeLightVertexInfo();
+        FxVertexInfo vertex_info = FxMakeLightVertexInfo();
 
-    RxPipelineBuilder builder {};
-    builder.SetLayout(CreateLightingPipelineLayout())
-        .SetName("Lighting Pipeline")
-        .AddBlendAttachment({
-            .Enabled = true,
-            .AlphaBlend { .Ops {
-                .Src = VK_BLEND_FACTOR_ONE,
-                .Dst = VK_BLEND_FACTOR_ZERO,
-            } },
-            .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-        })
-        .SetAttachments(&attachment_list)
-        .SetShaders(vertex_shader, fragment_shader)
-        .SetRenderPass(&RpLighting)
-        .SetVertexInfo(&vertex_info)
-        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+        RxPipelineBuilder builder {};
+        builder.SetLayout(CreateLightingPipelineLayout())
+            .SetName("Lighting(Point)")
+            .AddBlendAttachment({
+                .Enabled = true,
+                .AlphaBlend { .Ops {
+                    .Src = VK_BLEND_FACTOR_ONE,
+                    .Dst = VK_BLEND_FACTOR_ZERO,
+                } },
+                .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+            })
+            .SetAttachments(&attachment_list)
+            .SetShaders(vertex_shader, fragment_shader)
+            .SetRenderPass(&RpLighting)
+            .SetVertexInfo(&vertex_info)
+            .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
-    builder.SetCullMode(VK_CULL_MODE_FRONT_BIT).Build(PlLightingOutsideVolume);
-    builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
+        builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingOutsideVolume);
+        builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
+    }
+    {
+        FxSizedArray<FxShaderMacro> directional_macros { FxShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
+
+        FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, directional_macros);
+        FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment,
+                                                                            directional_macros);
+
+        RxPipelineBuilder builder {};
+
+        builder.SetLayout(CreateLightingPipelineLayout())
+            .SetName("Lighting(Directional)")
+            .AddBlendAttachment({
+                .Enabled = true,
+                .AlphaBlend { .Ops {
+                    .Src = VK_BLEND_FACTOR_ONE,
+                    .Dst = VK_BLEND_FACTOR_ZERO,
+                } },
+                .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+            })
+            .SetAttachments(&attachment_list)
+            .SetShaders(vertex_shader, fragment_shader)
+            .SetRenderPass(&RpLighting)
+            .SetVertexInfo(nullptr)
+            .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+
+        builder.Build(PlLightingDirectional);
+    }
 }
 
 void RxDeferredRenderer::RebuildLightingPipeline()
@@ -387,8 +423,6 @@ RxDeferredCompPass* RxDeferredRenderer::GetCurrentCompPass() { return &CompPasse
 
 VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 {
-    RxGpuDevice* device = gRenderer->GetDevice();
-
     {
         RxDsLayoutBuilder builder {};
 
@@ -407,8 +441,8 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
     FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxCompositionPushConstants),
                                                                        .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
 
-    VkPipelineLayout layout = RxGraphicsPipeline::CreateLayout(FxSlice(push_consts),
-                                                               FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
+                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
 
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
     PlComposition.SetLayout(layout);
@@ -425,7 +459,7 @@ void RxDeferredRenderer::CreateCompPipeline()
         .FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     });
 
-    RpComposition.Create2(attachment_list);
+    RpComposition.Create(attachment_list, gRenderer->Swapchain.Extent, FxVec2u::sZero);
 
     RxShader shader_composition("Composition");
 
@@ -517,14 +551,14 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
     DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
-    DepthAttachment.Create(RxImageType::Image, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    DepthAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    NormalsAttachment.Create(RxImageType::Image, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+    NormalsAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
                              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -568,7 +602,7 @@ void RxDeferredGPass::Submit()
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
+        .pWaitSemaphores = &frame->ShadowsSem.Semaphore,
         .pWaitDstStageMask = wait_stages,
         // command buffers
         .commandBufferCount = 1,
@@ -626,7 +660,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
 
-    ColorAttachment.Create(RxImageType::Image, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     FxSizedArray image_views = { ColorAttachment.View };
@@ -687,9 +721,9 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     RxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
 
 
-    FxStackArray<VkDescriptorImageInfo, 3> write_image_infos;
+    FxStackArray<VkDescriptorImageInfo, 4> write_image_infos;
     FxStackArray<VkDescriptorBufferInfo, 1> write_buffer_infos;
-    FxStackArray<VkWriteDescriptorSet, 4> write_infos;
+    FxStackArray<VkWriteDescriptorSet, 5> write_infos;
 
     // Depth image descriptor
     {
@@ -762,25 +796,26 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
         write_infos.Insert(normals_write);
     }
 
-    {
-        VkDescriptorBufferInfo info {
-            .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
-            .offset = 0,
-            .range = VK_WHOLE_SIZE,
-        };
 
-        VkWriteDescriptorSet buffer_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = DescriptorSet.Set,
-            .dstBinding = 4,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .pBufferInfo = write_buffer_infos.Insert(info),
-        };
+    // {
+    //     VkDescriptorBufferInfo info {
+    //         .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
+    //         .offset = 0,
+    //         .range = VK_WHOLE_SIZE,
+    //     };
 
-        write_infos.Insert(buffer_write);
-    }
+    //     VkWriteDescriptorSet buffer_write {
+    //         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    //         .dstSet = DescriptorSet.Set,
+    //         .dstBinding = 0,
+    //         .dstArrayElement = 0,
+    //         .descriptorCount = 1,
+    //         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    //         .pBufferInfo = write_buffer_infos.Insert(info),
+    //     };
+
+    //     write_infos.Insert(buffer_write);
+    // }
 
 
     vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
@@ -974,6 +1009,8 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 
     DescriptorSet.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mRendererInst->PlComposition);
     mPlComposition->Bind(cmd);
+    // Use single triangle instead of two triangles as it removes the overlapping quads the gpu
+    // renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html
     vkCmdDraw(cmd.CommandBuffer, 3, 1, 0, 0);
 
     mRenderPass->End();

@@ -134,6 +134,7 @@ void RxRenderBackend::InitFrames()
         RxFrameData& frame = Frames.pData[i];
         frame.CommandPool.Create(device, graphics_family);
         frame.CommandBuffer.Create(&frame.CommandPool);
+        frame.ShadowCommandBuffer.Create(&frame.CommandPool);
         frame.CompCommandBuffer.Create(&frame.CommandPool);
         frame.LightCommandBuffer.Create(&frame.CommandPool);
 
@@ -159,6 +160,7 @@ void RxRenderBackend::DestroyFrames()
         frame.CompDescriptorSet.Destroy();
 
         frame.CommandBuffer.Destroy();
+        frame.ShadowCommandBuffer.Destroy();
         frame.CompCommandBuffer.Destroy();
         frame.LightCommandBuffer.Destroy();
         frame.CommandPool.Destroy();
@@ -475,6 +477,13 @@ RxFrameResult RxRenderBackend::BeginFrame()
         return result;
     }
 
+    return RxFrameResult::Success;
+}
+
+void RxRenderBackend::BeginGeometry()
+{
+    RxFrameData* frame = GetFrame();
+
     frame->CommandBuffer.Reset();
     frame->CommandBuffer.Record();
 
@@ -483,32 +492,30 @@ RxFrameResult RxRenderBackend::BeginFrame()
 
     pCurrentGPass->Begin();
 
-    const int32 width = Swapchain.Extent.Width();
-    const int32 height = Swapchain.Extent.Height();
+    // const int32 width = Swapchain.Extent.Width();
+    // const int32 height = Swapchain.Extent.Height();
 
-    const VkViewport viewport = {
-        .x = 0,
-        .y = 0,
-        .width = (float32)width,
-        .height = (float32)height,
-        .minDepth = 1.0,
-        .maxDepth = 0.0,
-    };
+    // const VkViewport viewport = {
+    //     .x = 0,
+    //     .y = 0,
+    //     .width = (float32)width,
+    //     .height = (float32)height,
+    //     .minDepth = 1.0,
+    //     .maxDepth = 0.0,
+    // };
 
-    vkCmdSetViewport(frame->CommandBuffer.CommandBuffer, 0, 1, &viewport);
+    // vkCmdSetViewport(frame->CommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
-                               .extent = { .width = (uint32)width, .height = (uint32)height } };
+    // const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+    //                            .extent = { .width = (uint32)width, .height = (uint32)height } };
 
-    vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
+    // vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
 
     FxDrawPushConstants push_constants {};
     // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pDeferredRenderer->PlGeometry.Layout,
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                        &push_constants);
-
-    return RxFrameResult::Success;
 }
 
 void RxRenderBackend::PresentFrame()
@@ -586,24 +593,24 @@ void RxRenderBackend::BeginLighting()
 
     pCurrentLightingPass->Begin();
 
-    const int32 width = Swapchain.Extent.Width();
-    const int32 height = Swapchain.Extent.Height();
+    // const int32 width = Swapchain.Extent.Width();
+    // const int32 height = Swapchain.Extent.Height();
 
-    const VkViewport viewport = {
-        .x = 0,
-        .y = 0,
-        .width = (float32)width,
-        .height = (float32)height,
-        .minDepth = 1.0,
-        .maxDepth = 0.0,
-    };
+    // const VkViewport viewport = {
+    //     .x = 0,
+    //     .y = 0,
+    //     .width = (float32)width,
+    //     .height = (float32)height,
+    //     .minDepth = 1.0,
+    //     .maxDepth = 0.0,
+    // };
 
-    vkCmdSetViewport(frame->LightCommandBuffer.CommandBuffer, 0, 1, &viewport);
+    // vkCmdSetViewport(frame->LightCommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
-                               .extent = { .width = (uint32)width, .height = (uint32)height } };
+    // const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+    //                            .extent = { .width = (uint32)width, .height = (uint32)height } };
 
-    vkCmdSetScissor(frame->LightCommandBuffer.CommandBuffer, 0, 1, &scissor);
+    // vkCmdSetScissor(frame->LightCommandBuffer.CommandBuffer, 0, 1, &scissor);
 }
 
 #include <Renderer/FxCamera.hpp>
@@ -619,24 +626,24 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 
     pCurrentCompPass->Begin();
 
-    const int32 width = Swapchain.Extent.Width();
-    const int32 height = Swapchain.Extent.Height();
+    // const int32 width = Swapchain.Extent.Width();
+    // const int32 height = Swapchain.Extent.Height();
 
-    const VkViewport viewport = {
-        .x = 0,
-        .y = 0,
-        .width = (float32)width,
-        .height = (float32)height,
-        .minDepth = 1.0,
-        .maxDepth = 0.0,
-    };
+    // const VkViewport viewport = {
+    //     .x = 0,
+    //     .y = 0,
+    //     .width = (float32)width,
+    //     .height = (float32)height,
+    //     .minDepth = 1.0,
+    //     .maxDepth = 0.0,
+    // };
 
-    vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
+    // vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
 
-    const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
-                               .extent = { .width = (uint32)width, .height = (uint32)height } };
+    // const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
+    //                            .extent = { .width = (uint32)width, .height = (uint32)height } };
 
-    vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
+    // vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
 
 
     pCurrentCompPass->DoCompPass(render_cam);

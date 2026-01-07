@@ -13,14 +13,14 @@ public:
 
     ~RxPipelineList() = default;
 
-    FX_FORCE_INLINE RxPipelineId Insert(RxGraphicsPipeline&& pipeline)
+    FX_FORCE_INLINE RxPipelineId Insert(RxPipeline&& pipeline)
     {
         Pipelines.Insert(std::move(pipeline));
         // Return the last inserted pipeline's index
         return static_cast<RxPipelineId>(Pipelines.Size - 1);
     }
 
-    FX_FORCE_INLINE RxGraphicsPipeline* Get(RxPipelineId id)
+    FX_FORCE_INLINE RxPipeline* Get(RxPipelineId id)
     {
         if (id > Pipelines.Size) {
             FxLogError("Pipeline id out of range!");
@@ -31,5 +31,5 @@ public:
     }
 
 public:
-    FxSizedArray<RxGraphicsPipeline> Pipelines;
+    FxSizedArray<RxPipeline> Pipelines;
 };

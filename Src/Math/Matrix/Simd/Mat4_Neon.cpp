@@ -6,7 +6,7 @@
 #include <Math/FxQuat.hpp>
 #include <Math/Mat4.hpp>
 
-const FxMat4f FxMat4f::Identity = FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
+const FxMat4f FxMat4f::sIdentity = FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
 
 float32x4_t FxMat4f::MultiplyVec4f_Neon(FxVec4f& vec)
 {
@@ -255,7 +255,7 @@ FxMat4f::FxMat4f(float data[4][4]) noexcept
 
 // Implementation taken from linmath, https://github.com/datenwolf/linmath.h/blob/master/linmath.h
 // TODO: NEON accelerated version of matrix inversion!
-FxMat4f FxMat4f::Inverse()
+FxMat4f FxMat4f::Inverse() const
 {
     float M[4][4];
     for (int i = 0; i < 4; i++) {
@@ -346,36 +346,34 @@ FxMat4f FxMat4f::TransposeMat3()
 
 void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
+void FxMat4f::LookAt(FxVec3f eye, FxVec3f target, FxVec3f upvec)
 {
-    FxVec3f forward = (target - position).Normalize();
-    const FxVec3f right = forward.Cross(upvec).Normalize();
-    const FxVec3f up = right.Cross(forward);
+    const FxVec3f direction = (target - eye);
+
+    FxVec3f forward = direction;
+    forward.NormalizeIP();
+
+    FxVec3f right = upvec.Cross(forward);
+    right.NormalizeIP();
+
+    const FxVec3f up = forward.Cross(right);
+
+    FxVec3f neg_eye = -eye;
 
     Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
     Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
     Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
-    Columns[3].Load4(-position.Dot(right), -position.Dot(up), -position.Dot(forward), 1.0f);
-
-    // Columns[0].Load4(right.GetX(),   right.GetY(),   right.GetZ(),   -right.Dot(position));
-    // Columns[1].Load4(up.GetX(),      up.GetY(),      up.GetZ(),      -up.Dot(position));
-    // Columns[2].Load4(forward.GetX(), forward.GetY(), forward.GetZ(), -forward.Dot(position));
-    // Columns[3].Load4(0,              0,              0,              1.0f);
+    Columns[3].Load4(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
 }
 
-void FxMat4f::LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+void FxMat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 {
     LoadIdentity();
 
-    const float32 Sv = 1.0f / tan(hfov * 0.5f);
-    const float32 Sa = Sv / aspect_ratio;
+    const float32 height = 1.0f / tan(yfov * 0.5f);
+    const float32 width = height / aspect_ratio;
 
-    // const float32 plane_diff = mNearPlane - mFarPlane;
-
-    const float32 a = near_plane / (far_plane - near_plane);
-    // const float32 a = (mFarPlane + mNearPlane) / plane_diff;
-    // const float32 b = (2.0f * mFarPlane * mNearPlane) / plane_diff;
-    const float32 b = far_plane * a;
+    const float32 depth_range = near_plane / (far_plane - near_plane);
 
     /*
     Column 0    1    2    3
@@ -386,14 +384,86 @@ void FxMat4f::LoadProjectionMatrix(float32 hfov, float32 aspect_ratio, float32 n
            0,    0,  -1,   0
     */
 
-    Columns[0].X = (Sa);
-    Columns[1].Y = (-Sv);
+    Columns[0].X = (width);
+    Columns[1].Y = (-height);
 
-    Columns[2].Z = (a);
-    Columns[2].W = (-1);
+    Columns[2].Z = (-depth_range);
+    Columns[2].W = (1.0);
 
-    Columns[3].Z = (b);
+    Columns[3].Z = far_plane * depth_range;
     Columns[3].W = (0);
+}
+
+void FxMat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane)
+{
+    FxAssert(near_plane > 0.0f && far_plane > 0.0f);
+    // const float32 width = right - left;
+    // const float32 height = bottom - top;
+    // const float32 far_range = 1.0 / (far_plane - near_plane);
+
+    // Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
+    // Columns[1].Load4(0.0f, 2.0f / height, 0.0f, 0.0f);
+    // Columns[2].Load4(0.0f, 0.0f, far_range, 0.0f);
+
+    // Columns[3].Load4( //
+    //     0, 0,
+    //     // (right + left) / width,   // x
+    //     // -(top + bottom) / height, // y
+    //     -far_range * near_plane, // z
+    //     1.0f                     // w
+    // );
+
+    const float32 depth_range = 1.0f / (far_plane - near_plane);
+
+
+    Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
+    Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
+    Columns[2].Load4(0.0f, 0.0f, depth_range, 0.0f);
+    Columns[3].Load4(0.0f, 0.0f, -depth_range * near_plane, 1.0f);
+
+
+    // Print();
+
+    // float32x4_t zero_v = vdupq_n_f32(0.0f);
+    // float32x4_t one_v = vdupq_n_f32(1.0f);
+
+    // float32x4_t scale_v = { 2.0, -2.0, -1.0, 1.0 };
+
+    // float32x4_t x = { right, top, near_plane, 1.0 };
+    // float32x4_t y = { left, bottom, far_plane, 0.0f };
+
+    // // Reciprocal of { width (right - left), height (top - bottom), depth (far_plane - near_plane), 1.0 }
+
+    // float32x4_t divmod_v = vdivq_f32(one_v, vsubq_f32(x, y));
+
+    // float32x4_t result = vmulq_f32(scale_v, divmod_v);
+
+    // uint32x4_t mask = { 0xFFFFFFFF, 0x00000000, 0x00000000, 0x00000000 };
+    // Columns[0].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+
+    // // { 0x00000000, 0xFFFFFFFF, 0x00000000, 0x00000000 }
+    // mask = vcombine_f32(vrev64_f32(vget_low_f32(mask)), vget_high_f32(mask));
+    // Columns[1].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+
+    // // { 0x00000000, 0x00000000, 0xFFFFFFFF, 0x00000000 }
+    // mask = vcombine_f32(vget_high_f32(mask), vrev64_f32(vget_low_f32(mask)));
+    // Columns[2].mIntrin = vreinterpretq_f32_u32(vandq_u32(result, mask));
+
+    // // Clear near_plane as we want -(far_plane) / (near_plane - far_plane)
+    // // Note that mask is currently { 00000000h, 00000000h, FFFFFFFFh, 00000000h }
+    // // and BIC ANDs x with NOT mask.
+    // x = vreinterpretq_f32_u32(vbicq_u32(x, mask));
+
+    // // -(right + left) * recip of width
+    // // -(top + bottom) * recip of height
+    // // -(0.0f + far_plane) * recip of depth
+    // // 1.0f
+    // result = vmulq_f32(vnegq_f32(vaddq_f32(x, y)), divmod_v);
+
+    // // Set W to 1.0f
+    // result = vsetq_lane_f32(1.0f, result, 3);
+
+    // Columns[3].mIntrin = result;
 }
 
 // Mat4f Mat4f::Multiply(Mat4f &other)

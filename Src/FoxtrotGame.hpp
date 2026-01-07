@@ -6,6 +6,8 @@
 #include <FxPlayer.hpp>
 #include <FxScene.hpp>
 
+class RxShadowDirectional;
+
 class FoxtrotGame
 {
 public:
@@ -32,9 +34,12 @@ private:
 public:
     FxPlayer Player {};
 
+    FxRef<FxLightDirectional> pSun { nullptr };
+
     // TODO: Player attachment system
     FxRef<FxObject> pPistolObject { nullptr };
     FxRef<FxObject> pHelmetObject { nullptr };
+    FxRef<FxObject> pLevelObject { nullptr };
 
     FxQuat PistolRotationGoal = FxQuat::sIdentity;
 

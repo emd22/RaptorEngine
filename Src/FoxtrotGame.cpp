@@ -16,6 +16,7 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/RxShadowDirectional.hpp>
 #include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
@@ -25,6 +26,8 @@ static constexpr float scMouseSensitivity = 0.25;
 static double sClockFreq = 1.0f;
 
 static bool sbRunning = true;
+
+static bool sbShowShadowCam = false;
 
 FoxtrotGame::FoxtrotGame()
 {
@@ -48,7 +51,6 @@ void FoxtrotGame::InitEngine()
     // Create the global engine variables
     FxEngineGlobalsInit();
 
-    sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
     FxControlManager::Init();
     FxControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
@@ -77,40 +79,50 @@ void FoxtrotGame::InitEngine()
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
     material_manager.Create();
+
+    sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 }
 
 void FoxtrotGame::CreateLights()
 {
-    constexpr float32 scNumLightsX = 4;
-    constexpr float32 scNumLightsY = 4;
+    // constexpr float32 scNumLightsX = 4;
+    // constexpr float32 scNumLightsY = 4;
 
-    constexpr float32 scAreaX = 20.0f;
-    constexpr float32 scAreaY = 20.0f;
+    // constexpr float32 scAreaX = 20.0f;
+    // constexpr float32 scAreaY = 20.0f;
 
-    constexpr float32 scDistanceX = scAreaX / scNumLightsX;
-    constexpr float32 scDistanceY = scAreaY / scNumLightsY;
+    // constexpr float32 scDistanceX = scAreaX / scNumLightsX;
+    // constexpr float32 scDistanceY = scAreaY / scNumLightsY;
 
-    constexpr float32 scOffsetX = scAreaX / 2.0f;
-    constexpr float32 scOffsetY = scAreaY / 2.0f;
+    // constexpr float32 scOffsetX = scAreaX / 2.0f;
+    // constexpr float32 scOffsetY = scAreaY / 2.0f;
 
-    constexpr float32 scHeight = 5.0f;
+    // constexpr float32 scHeight = 5.0f;
 
-    auto light_volume = FxMeshGen::MakeIcoSphere(2);
+    FxRef<FxMeshGen::GeneratedMesh> light_volume = FxMeshGen::MakeIcoSphere(2);
 
 
-    for (int y = 0; y < scNumLightsY; y++) {
-        for (int x = 0; x < scNumLightsX; x++) {
-            FxRef<FxLight> light = FxMakeRef<FxLight>();
-            FxVec3f position = FxVec3f((scDistanceX * x) - scOffsetX, scHeight, (scDistanceY * y) - scOffsetY);
-            light->MoveTo(position);
-            light->SetLightVolume(light_volume, false);
-            light->Color = FxColor(0x76a6a6FF);
+    // for (int y = 0; y < scNumLightsY; y++) {
+    //     for (int x = 0; x < scNumLightsX; x++) {
+    //         FxRef<FxLight> light = FxMakeRef<FxLight>();
+    //         FxVec3f position = FxVec3f((scDistanceX * x) - scOffsetX, scHeight, (scDistanceY * y) - scOffsetY);
+    //         light->MoveTo(position);
+    //         light->SetLightVolume(light_volume, false);
+    //         light->Color = FxColor(0x76a6a6FF);
 
-            light->Scale(FxVec3f(25));
+    //         light->Scale(FxVec3f(25));
 
-            mMainScene.Attach(light);
-        }
-    }
+    //         mMainScene.Attach(light);
+    //     }
+    // }
+
+
+    pSun = FxMakeRef<FxLightDirectional>();
+    pSun->MoveTo(FxVec3f(0, 8, -5));
+    pSun->Color = FxColor(0xFAF8E3, 15);
+    // sun->SetLightVolume(light_volume);
+    // sun->SetRadius(20);
+    mMainScene.Attach(pSun);
 }
 
 void FoxtrotGame::CreateGame()
@@ -121,30 +133,33 @@ void FoxtrotGame::CreateGame()
 
     Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     // Move the player up and behind the other objects
-    Player.TeleportBy(FxVec3f(0.0f, 4.0f, -5.0f));
+    Player.TeleportBy(FxVec3f(0.0f, 4.0f, -4.0f));
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxRef<FxObject> ground_object = AxManager::LoadObject(FX_BASE_DIR "/Models/Platform.glb", { .KeepInMemory = true });
-    ground_object->WaitUntilLoaded();
+    pLevelObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
+    pLevelObject->WaitUntilLoaded();
 
-    ground_object->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(PhObject::PF_CreateInactive),
-                                       PhObject::PhysicsType::Static, {});
-    mMainScene.Attach(ground_object);
+    pLevelObject->PhysicsCreateMesh(*pLevelObject->pMesh, PhMotionType::eStatic, {});
 
-    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
+    // ground_object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(20, 1, 20), PhMotionType::eStatic, {});
+
+    // ground_object->PhysicsObjectCreate(static_cast<PhObject::Flags>(PhObject::eCreateInactive),
+    //                                    PhObject::PhysicsType::eStatic, {});
+    mMainScene.Attach(pLevelObject);
+
+    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DamagedHelmet.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
     // pHelmetObject->Scale(FxVec3f(0.5));
     pHelmetObject->WaitUntilLoaded();
-    pHelmetObject->MoveBy(FxVec3f(0, 0, 3.5));
+    pHelmetObject->MoveBy(FxVec3f(0, 2, 3.5));
 
-    pHelmetObject->PhysicsObjectCreate(static_cast<PhObject::PhysicsFlags>(0), PhObject::PhysicsType::Static, {});
+    // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
 
     gPhysics->OptimizeBroadPhase();
 
 
     mMainScene.Attach(pHelmetObject);
-
 
     pPistolObject = AxManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
@@ -156,6 +171,21 @@ void FoxtrotGame::CreateGame()
     mMainScene.Attach(pPistolObject);
 
     CreateLights();
+
+    Player.Physics.bDisableGravity = true;
+
+    gShadowRenderer = new RxShadowDirectional(FxVec2u(1024, 1024));
+    // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
+    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 3.0f, -4.0f), FxVec3f(0, 1, 0));
+    gShadowRenderer->ShadowCamera.SetFarPlane(100.0f);
+    gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
+    gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
+    gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
+    gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
+
+    // Player.pCamera->ViewMatrix = ShadowRenderer->ShadowCamera.ViewMatrix;
+    // Player.pCamera->UpdateProjectionMatrix();
+    // Player.pCamera->UpdateCameraMatrix();
 
 
     while (sbRunning) {
@@ -194,29 +224,6 @@ void FoxtrotGame::ProcessControls()
         printf("MOUSE DOWN\n");
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_I)) {
-        FxLogInfo("Normal:");
-
-        FxMat4f& model0 = pHelmetObject->GetModelMatrix();
-        for (int j = 0; j < 4; j++) {
-            FxLogInfo("[{}, {}, {}, {}]", model0.RawData[j * 4 + 0], model0.RawData[j * 4 + 1],
-                      model0.RawData[j * 4 + 2], model0.RawData[j * 4 + 3]);
-        }
-
-        FxLogInfo("");
-
-        FxObjectGpuEntry* buffer = reinterpret_cast<FxObjectGpuEntry*>(gObjectManager->mObjectGpuBuffer.pMappedBuffer);
-        FxObjectGpuEntry* gpu_entry = &(buffer[pHelmetObject->ObjectId]);
-
-        float* model1 = gpu_entry->ModelMatrix;
-
-        for (int j = 0; j < 4; j++) {
-            FxLogInfo("[{}, {}, {}, {}]", model1[j * 4 + 0], model1[j * 4 + 1], model1[j * 4 + 2], model1[j * 4 + 3]);
-        }
-
-        FxLogInfo("");
-    }
-
     // Click to lock mouse
     if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT) && !FxControlManager::IsMouseLocked()) {
         FxControlManager::CaptureMouse();
@@ -224,6 +231,21 @@ void FoxtrotGame::ProcessControls()
     // Escape to unlock mouse
     else if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_ESCAPE) && FxControlManager::IsMouseLocked()) {
         FxControlManager::ReleaseMouse();
+    }
+
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_8)) {
+        sbShowShadowCam = !sbShowShadowCam;
+
+
+        if (sbShowShadowCam) {
+            Player.pCamera->ProjectionMatrix = gShadowRenderer->ShadowCamera.ProjectionMatrix;
+            Player.pCamera->ViewMatrix = gShadowRenderer->ShadowCamera.ViewMatrix;
+            Player.pCamera->UpdateCameraMatrix();
+        }
+        else {
+            Player.pCamera->UpdateProjectionMatrix();
+            Player.pCamera->UpdateCameraMatrix();
+        }
     }
 
     if (FxControlManager::IsMouseLocked()) {
@@ -277,32 +299,35 @@ void FoxtrotGame::ProcessControls()
         FxLogInfo("");
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_R)) {
-        FxLogInfo("Recompiling shaders...");
-        FxShaderCompiler::CompileAllShaders(FX_BASE_DIR "/Shaders/");
-    }
-
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
         pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
+    }
+
+
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_N)) {
+        Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
     }
 }
 
 void FoxtrotGame::Tick()
 {
     const uint64 current_tick = SDL_GetPerformanceCounter();
+
     DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
 
     FxControlManager::Update();
     ProcessControls();
 
-    Player.Move(DeltaTime, GetMovementVector());
-    Player.Update(DeltaTime);
+    if (!sbShowShadowCam) {
+        Player.Move(DeltaTime, GetMovementVector());
+        Player.Update(DeltaTime);
+    }
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->mRotation.LerpIP(PistolRotationGoal, 25.0 * DeltaTime);
+    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
 
     pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
                           camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));
@@ -310,14 +335,67 @@ void FoxtrotGame::Tick()
 
     gPhysics->Update();
 
+
+    // FxVec3f shadow_pos = FxVec3f(0, 10, 5);
+    // FxVec3f target = FxVec3f(0.0f, 0.0f, 0.0f);
+
+    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
+    gShadowRenderer->ShadowCamera.ResolveViewToTexels(1024);
+    // gShadowRenderer->ShadowCamera.Position.Y *= -1.0f;
+
+    // target.Y *= -1.0f;
+
+    FxVec3f target = Player.Position;
+
+    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, FxVec3f(0, 1, 0));
+    // FxLogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);
+    gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
+    gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
+
+
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
         mLastTick = current_tick;
         return;
     }
 
+    gShadowRenderer->Begin();
+
+    RxShadowPushConstants consts;
+    // memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+    //        sizeof(float32) * 16);
+    // consts.ObjectId = pLevelObject->ObjectId;
+
+    // vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
+    //                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
+
+    // pLevelObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
+
+    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+           sizeof(float32) * 16);
+    consts.ObjectId = pHelmetObject->ObjectId;
+
+    vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
+                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
+
+    pHelmetObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
+
+    // memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+    //        sizeof(float32) * 16);
+    // consts.ObjectId = pPistolObject->ObjectId;
+
+    // vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
+    //                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
+
+    // pPistolObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
+
+    gShadowRenderer->End();
+
+
+    gRenderer->BeginGeometry();
+
     // deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *camera);
 
-    mMainScene.Render();
+    mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
     gRenderer->DoComposition(*camera);
 

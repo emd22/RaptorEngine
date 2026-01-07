@@ -12,6 +12,8 @@
 #include <immintrin.h>
 #endif
 
+#include <cmath>
+
 class FxVec4f;
 
 namespace JPH {
@@ -125,6 +127,13 @@ public:
     FX_FORCE_INLINE static FxVec3f Clamp(const FxVec3f& v, const FxVec3f& min, const FxVec3f& max);
 
     FX_FORCE_INLINE static FxVec3f Lerp(const FxVec3f& a, const FxVec3f& b, const float f);
+    FX_FORCE_INLINE FxVec3f& LerpIP(const FxVec3f& dest, const float step);
+
+    FX_FORCE_INLINE FxVec3f& SmoothInterpolate(const FxVec3f& dest, const float speed, const float delta_time)
+    {
+        LerpIP(dest, 1.0f - expf(-speed * delta_time));
+        return *this;
+    }
 
     void Print() const;
 
@@ -140,7 +149,7 @@ public:
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
-        return FxVec3f(FxNeon::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
+        return FxVec3f(FxNeon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
 #elif FX_USE_AVX
     FX_FORCE_INLINE float32 GetX() const { return X; }

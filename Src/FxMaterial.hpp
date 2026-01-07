@@ -4,6 +4,7 @@
 
 #include <Asset/AxImage.hpp>
 #include <Asset/Fwd/Ax_Fwd_Manager.hpp>
+#include <Core/FxBitset.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Core/Log.hpp>
@@ -19,7 +20,8 @@ enum class FxMaterialComponentStatus
     eNotReady,
 };
 
-template <VkFormat TFormat> struct FxMaterialComponent
+template <VkFormat TFormat>
+struct FxMaterialComponent
 {
 public:
 public:
@@ -137,14 +139,14 @@ public:
 
     RxDescriptorSet mDescriptorSet {};
 
-    RxGraphicsPipeline* pPipeline = nullptr;
+    RxPipeline* pPipeline = nullptr;
 
     std::atomic_bool bIsBuilt { false };
 
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
      */
-    uint32 mMaterialPropertiesIndex = 0;
+    uint32 mMaterialPropertiesIndex = UINT32_MAX;
 
 private:
     // VkDescriptorSetLayout mSetLayout = nullptr;
@@ -166,7 +168,7 @@ public:
     static FxMaterialManager& GetGlobalManager();
 
     void Create(uint32 materials_per_page = 64);
-    static FxRef<FxMaterial> New(const std::string& name, RxGraphicsPipeline* pipeline);
+    static FxRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
 
     static RxDescriptorPool& GetDescriptorPool() { return GetGlobalManager().mDescriptorPool; }
 
@@ -184,6 +186,8 @@ public:
      */
     RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesBuffer;
     uint32 NumMaterialsInBuffer = 0;
+
+    FxBitset MaterialsInUse;
 
     /**
      * @brief Descriptor set for material properties. Used in the light pass.

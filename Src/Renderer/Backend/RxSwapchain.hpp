@@ -44,6 +44,7 @@ public:
 
     RxSampler ColorSampler;
     RxSampler DepthSampler;
+    RxSampler ShadowDepthSampler;
     RxSampler NormalsSampler;
     RxSampler LightsSampler;
 

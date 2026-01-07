@@ -9,6 +9,9 @@
 #include <FxMaterial.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
+template <typename T>
+class FxPrimitiveMesh;
+
 struct PhProperties
 {
 public:
@@ -26,23 +29,33 @@ public:
 };
 
 
+enum class PhMotionType
+{
+    eStatic,
+    eDynamic,
+};
+
+enum class PhPrimitiveType
+{
+    eBox,
+};
+
+
 class PhObject
 {
 public:
-    enum PhysicsFlags
+    enum Flags
     {
-        PF_CreateInactive = 0x01,
+        eCreateInactive = 0x01,
     };
 
-    enum class PhysicsType
-    {
-        Static,
-        Dynamic,
-    };
 
 public:
-    void CreatePhysicsBody(const FxVec3f& dimensions, const FxVec3f& initial_position, PhysicsFlags flags,
-                           PhysicsType type, const PhProperties& properties);
+    void CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+                             const PhProperties& object_properties);
+
+    void CreateMeshBody(const FxPrimitiveMesh<>& mesh, PhMotionType motion_type, const PhProperties& object_properties);
+
     void DestroyPhysicsBody();
 
     void Teleport(FxVec3f position, FxQuat rotation);
@@ -52,6 +65,9 @@ public:
 
     FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
     FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
+
+private:
+    void CreateJoltBody(JPH::ShapeRefC shape, Flags flags, PhMotionType type, const PhProperties& properties);
 
 public:
     JPH::Body* mpPhysicsBody = nullptr;

@@ -110,6 +110,7 @@ public:
     bool bInWriteMode = true;
 };
 
+
 #define FX_SERIALIZABLE_MEMBERS(...)                                                                                   \
     template <typename... TMemberTypes>                                                                                \
     void SerializerDefineRecursive(FxSerializer& s, TMemberTypes&... types)                                            \

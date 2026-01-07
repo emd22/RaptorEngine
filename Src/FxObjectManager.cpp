@@ -2,6 +2,7 @@
 
 #include <FxEngine.hpp>
 #include <FxObject.hpp>
+#include <Renderer/Backend/RxDsLayoutBuilder.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 void FxObjectManager::Create()
@@ -11,16 +12,39 @@ void FxObjectManager::Create()
         mDescriptorPool.Create(gRenderer->GetDevice(), 2);
     }
 
+    RxDsLayoutBuilder builder {};
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
+    DsLayoutObjectBuffer = builder.Build();
+
+    RxUtil::SetDebugLabel("Object Buffer", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, DsLayoutObjectBuffer);
+
     mObjectGpuBuffer.Create(FX_MAX_GPU_OBJECTS, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU,
                             RxGpuBufferFlags::PersistentMapped);
     mObjectSlotsInUse.InitZero(FX_MAX_GPU_OBJECTS);
 
+    if (!mObjectBufferDS.IsInited()) {
+        FxAssert(DsLayoutObjectBuffer != nullptr);
+        mObjectBufferDS.Create(mDescriptorPool, DsLayoutObjectBuffer);
+    }
 
-    // if (!mObjectBufferDS.IsInited()) {
-    // FxAssert(gRenderer->pDeferredRenderer->DsLayoutObjectBuffer != nullptr);
-    //     mObjectBufferDS.Create(mDescriptorPool, gRenderer->pDeferredRenderer->DsLayoutObjectBuffer);
-    // }
+    VkDescriptorBufferInfo info {
+        .buffer = mObjectGpuBuffer.Buffer,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
 
+    VkWriteDescriptorSet buffer_write {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = mObjectBufferDS.Set,
+        .dstBinding = 0,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .pBufferInfo = &info,
+    };
+
+
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &buffer_write, 0, nullptr);
 
     // FxStackArray<VkWriteDescriptorSet, 2> write_descriptor_sets;
     // FxStackArray<VkDescriptorBufferInfo, 2> write_buffer_infos;

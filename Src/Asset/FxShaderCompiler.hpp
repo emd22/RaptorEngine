@@ -20,5 +20,9 @@ public:
     static void Compile(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros,
                         bool do_db_flush = true);
 
+    static bool CompileIfOutOfDate(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros);
+
+    static bool IsOutOfDate(const char* path);
+
     static void Destroy();
 };

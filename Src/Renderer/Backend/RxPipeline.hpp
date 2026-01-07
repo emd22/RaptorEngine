@@ -32,13 +32,14 @@ struct alignas(16) FxDrawPushConstants
 
 struct alignas(16) FxLightVertPushConstants
 {
-    float32 VPMatrix[16];
+    float32 CameraMatrix[16];
 
     uint32 ObjectId = 0;
 };
 
 struct alignas(16) FxLightFragPushConstants
 {
+    float32 LightCameraMatrix[16];
     float32 InvView[16];
     float32 InvProj[16];
 
@@ -57,7 +58,7 @@ struct alignas(16) FxCompositionPushConstants
 FxVertexInfo FxMakeVertexInfo();
 FxVertexInfo FxMakeLightVertexInfo();
 
-struct RxGraphicsPipelineProperties
+struct RxPipelineProperties
 {
     VkCullModeFlags CullMode = VK_CULL_MODE_NONE;
     VkFrontFace WindingOrder = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -65,6 +66,9 @@ struct RxGraphicsPipelineProperties
 
     bool bDisableDepthTest : 1 = false;
     bool bDisableDepthWrite : 1 = false;
+
+    FxVec2u ViewportSize = FxVec2u::sZero;
+    VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 };
 
 struct RxPushConstants
@@ -74,13 +78,13 @@ struct RxPushConstants
 };
 
 
-class RxGraphicsPipeline
+class RxPipeline
 {
 public:
     void Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                 const FxSlice<VkAttachmentDescription>& attachments,
                 const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, FxVertexInfo* vertex_info,
-                const RxRenderPass& render_pass, const RxGraphicsPipelineProperties& properties);
+                const RxRenderPass& render_pass, const RxPipelineProperties& properties);
 
     FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout) { Layout = layout; }
 
@@ -96,7 +100,7 @@ public:
 
     void Bind(const RxCommandBuffer& command_buffer);
 
-    ~RxGraphicsPipeline() { Destroy(); }
+    ~RxPipeline() { Destroy(); }
 
 private:
 public:

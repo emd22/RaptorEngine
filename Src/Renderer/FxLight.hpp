@@ -11,73 +11,86 @@ class FxCamera;
 enum FxLightFlags : uint16
 {
     FxLF_None = 0x0000,
-    /**
-     * @brief Sets whether the mesh position is separate from the light position sent to the shader.
-     */
-    FxLF_IndependentMeshPosition = 0x0001,
+};
+
+enum class FxLightType
+{
+    eUnknown,
+    eDirectional,
+    ePoint,
 };
 
 FX_DEFINE_ENUM_AS_FLAGS(FxLightFlags);
 
-class FxLight : public FxEntity
+class FxLightBase : public FxEntity
 {
 public:
     using VertexType = RxVertex<FxVertexPosition>;
 
+    static constexpr FxEntityType scEntityType = FxEntityType::eLight;
+
 public:
-    FxLight(FxLightFlags flags = FxLF_None);
+    FxLightBase(FxLightFlags flags = FxLF_None);
 
     void SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume);
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
 
-    void Render(const FxPerspectiveCamera& camera);
-    void RenderDebugMesh(const FxPerspectiveCamera& camera);
+    void SetRadius(const float radius);
 
-    void MoveTo(const FxVec3f& position) override;
-    void MoveTo(const FxVec3f& position, bool force_move_mesh);
+    virtual void Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera);
+    virtual void RenderDebugMesh(const FxPerspectiveCamera& camera);
 
-    void MoveBy(const FxVec3f& offset) override;
-    void MoveBy(const FxVec3f& position, bool force_move_mesh);
-
-    void Scale(const FxVec3f& scale) override;
-
-    // Force move the mesh
-    void MoveLightVolumeTo(const FxVec3f& position);
-
-    ~FxLight();
+    virtual ~FxLightBase() {}
 
 public:
     FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };
     FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen { nullptr };
 
-    FxColor Color = FxColor::sWhite;
+    RxPipeline* pPipelineInside = nullptr;
+    RxPipeline* pPipelineOutside = nullptr;
 
-    float Radius = 2.0f;
+    FxColor Color = FxColor::sWhite;
 
     FxLightFlags Flags = FxLF_None;
 
     bool bEnabled = true;
 
-private:
-    FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
-
 protected:
-    FxVec3f mLightPosition = FxVec3f::sZero;
+    FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
+    RxPipeline* pPipeline = nullptr;
 
-    RxGraphicsPipeline* mpLightPipeline = nullptr;
+    float32 mRadius = 1.0f;
 };
 
 
-class FxPointLight : public FxLight
-{
-};
-
-class FxDirectionalLight : public FxLight
+/**
+ * @brief
+ */
+class FxLightPoint : public FxLightBase
 {
 public:
-    FxDirectionalLight()
-    {
-        this->Radius = 0.0f;
-        this->Flags |= FxLF_IndependentMeshPosition;
-    }
+    static constexpr FxLightType scLightType = FxLightType::ePoint;
+
+public:
+    FxLightPoint();
 };
+
+/**
+ * @brief
+ */
+class FxLightDirectional : public FxLightBase
+{
+public:
+    static constexpr FxLightType scLightType = FxLightType::eDirectional;
+
+public:
+    FxLightDirectional();
+
+    void Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera) override;
+};
+
+////////////////////////////////////
+// Entity Validations
+////////////////////////////////////
+
+FX_VALIDATE_ENTITY_TYPE(FxLightBase)

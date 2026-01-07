@@ -3,10 +3,10 @@
 #include "Core/FxDefines.hpp"
 #include "Core/FxSizedArray.hpp"
 
+#include <vulkan/vulkan.h>
+
 #include <Core/FxPanic.hpp>
 #include <Core/Log.hpp>
-
-#include "vulkan/vulkan_core.h"
 
 FX_SET_MODULE_NAME("Device")
 
@@ -162,35 +162,6 @@ void RxGpuDevice::CreateLogicalDevice()
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     queue_create_infos.reserve(queue_family_indices.size());
 
-    // float queue_priorities[] = { 1.0f };
-
-    // int index = 0;
-
-    // for (const auto family_index : queue_family_indices) {
-    //     if (family_index == QueueFamilies::QueueNull) {
-    //         continue;
-    //     }
-
-    //     queue_create_infos.push_back(VkDeviceQueueCreateInfo{
-    //         .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-    //         .queueFamilyIndex = family_index,
-    //         .queueCount = 1,
-    //         .pQueuePriorities = queue_priorities
-    //     });
-
-    //     // check if our queue family index's are the same
-    //     {
-    //         const uint32 next_index = index + 1;
-    //         // if the next queue family (presentation) is the same as the current one, return as we
-    //         // do not need to create a new queue family
-    //         if (next_index < queue_family_indices.size() && family_index == queue_family_indices[next_index]) {
-    //             break;
-    //         }
-    //     }
-
-    //     index++;
-    // }
-
     const float graphics_priorities[] = { 1.0f };
     float transfer_priorities[] = { 1.0f };
 
@@ -214,26 +185,41 @@ void RxGpuDevice::CreateLogicalDevice()
 
     const char* device_extensions[] = {
 #ifdef FX_PLATFORM_MACOS
-        "VK_KHR_portability_subset",
+        VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
 #endif
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
+#ifdef FX_PLATFORM_MACOS
+
+    // List of features that may not be available on all devices
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PORTABILITY_SUBSET_FEATURES_KHR,
+        .mutableComparisonSamplers = VK_TRUE, // For samplers that use compareOp's / SampleCmp in shaders
+    };
+
+#endif
+
+
     const VkDeviceCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        
+
         .queueCreateInfoCount = (uint32)queue_create_infos.size(),
         .pQueueCreateInfos = queue_create_infos.data(),
 
         // device specific layers (not used in modern vulkan)
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = nullptr,
-        
+
         // device specific extensions
         .enabledExtensionCount = sizeof(device_extensions) / sizeof(device_extensions[0]),
 
         .ppEnabledExtensionNames = device_extensions,
         .pEnabledFeatures = &device_features,
+
+#ifdef FX_PLATFORM_MACOS
+        .pNext = &portability_features,
+#endif
     };
 
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);

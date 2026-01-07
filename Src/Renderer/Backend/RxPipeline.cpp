@@ -13,7 +13,7 @@
 
 FX_SET_MODULE_NAME("Pipeline")
 
-static RxGraphicsPipeline* spBoundPipeline = nullptr;
+static RxPipeline* spBoundPipeline = nullptr;
 
 FxVertexInfo FxMakeVertexInfo()
 {
@@ -54,11 +54,11 @@ FxVertexInfo FxMakeLightVertexInfo()
     return { binding_desc, std::move(attribs), true };
 }
 
-void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
-                                const FxSlice<VkAttachmentDescription>& attachments,
-                                const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-                                FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
-                                const RxGraphicsPipelineProperties& properties)
+void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
+                        const FxSlice<VkAttachmentDescription>& attachments,
+                        const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
+                        FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
+                        const RxPipelineProperties& properties)
 {
     mDevice = gRenderer->GetDevice();
 
@@ -96,7 +96,7 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
     }
 
     // Dynamic states (scissor & viewport updates dynamically)
-    FxSizedArray<VkDynamicState> dynamic_states = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    FxSizedArray<VkDynamicState> dynamic_states = {};
 
     const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -104,20 +104,26 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
         .pDynamicStates = dynamic_states,
     };
 
-    const FxVec2u extent = gRenderer->Swapchain.Extent;
+    FxVec2u viewport_size = properties.ViewportSize;
+
+    // If there is no viewport size passed in, assume the swapchain size.
+    if (properties.ViewportSize.X == 0 || properties.ViewportSize.Y == 0) {
+        viewport_size = gRenderer->Swapchain.Extent;
+    }
+
 
     VkViewport viewport = {
         .x = 0.0f,
         .y = 0.0f,
-        .width = static_cast<float32>(extent.X),
-        .height = static_cast<float32>(extent.Y),
+        .width = static_cast<float32>(viewport_size.X),
+        .height = static_cast<float32>(viewport_size.Y),
         .minDepth = 1.0f,
         .maxDepth = 0.0f,
     };
 
     VkRect2D scissor = {
         .offset = { 0, 0 },
-        .extent = { .width = static_cast<uint32>(extent.X), .height = static_cast<uint32>(extent.Y) },
+        .extent = { .width = viewport_size.X, .height = viewport_size.Y },
     };
 
     const VkPipelineViewportStateCreateInfo viewport_state_info = {
@@ -189,7 +195,7 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .depthTestEnable = depth_test_enabled,
         .depthWriteEnable = depth_write_enabled,
-        .depthCompareOp = VK_COMPARE_OP_GREATER,
+        .depthCompareOp = properties.DepthCompareOp,
         .depthBoundsTestEnable = VK_FALSE,
         .stencilTestEnable = VK_FALSE,
     };
@@ -225,7 +231,7 @@ void RxGraphicsPipeline::Create(const std::string& name, const FxSlice<FxRef<RxS
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 }
 
-void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
+void RxPipeline::Bind(const RxCommandBuffer& command_buffer)
 {
     if (this == spBoundPipeline) {
         return;
@@ -236,7 +242,7 @@ void RxGraphicsPipeline::Bind(const RxCommandBuffer& command_buffer)
     spBoundPipeline = this;
 }
 
-void RxGraphicsPipeline::Destroy()
+void RxPipeline::Destroy()
 {
     if (!mDevice || !mDevice->Device) {
         return;
@@ -262,8 +268,8 @@ void RxGraphicsPipeline::Destroy()
 }
 
 
-VkPipelineLayout RxGraphicsPipeline::CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
-                                                  const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
+VkPipelineLayout RxPipeline::CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
+                                          const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
     FxStackArray<VkPushConstantRange, 3> push_const_ranges;
 

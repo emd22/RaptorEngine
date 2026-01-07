@@ -128,16 +128,18 @@ void FxBasicDb::Parse()
     FxMemPool::Free(mpData);
 }
 
-FxBasicDbEntry* FxBasicDb::FindEntry(FxHash32 key)
+FxBasicDbEntry* FxBasicDb::FindEntry(FxHash64 key)
 {
     if (!mEntryMarkers.IsInited()) {
         return nullptr;
     }
+
     for (FxBasicDbEntry& entry : mEntryMarkers) {
         if (entry.KeyHash == key) {
             return &entry;
         }
     }
+
     return nullptr;
 }
 

@@ -24,7 +24,7 @@ void FxPlayer::MoveBy(const FxVec3f& by)
 void FxPlayer::Jump()
 {
     if (Physics.bIsGrounded) {
-        JumpForce = 1.5f;
+        JumpForce = 350.0f;
     }
 }
 
@@ -41,14 +41,13 @@ void FxPlayer::Move(float delta_time, const FxVec3f& offset)
         movement_goal.NormalizeIP();
     }
 
-    mUserForce = FxVec3f::Lerp(mUserForce, movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed),
-                               cMovementLerpSpeed * delta_time);
+    mUserForce = mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed),
+                                              cMovementLerpSpeed, delta_time);
 
     mUserForce.Y = JumpForce;
-    JumpForce = std::lerp(JumpForce, 0.0, cJumpForceReduction * delta_time);
+    JumpForce = 0;
 
-
-    Physics.ApplyMovement(mUserForce);
+    Physics.ApplyMovement(mUserForce * delta_time);
 
     // mUserForce += offset;
     // const FxVec3f max_speed = FxVec3f(cMaxWalkSpeed);
@@ -73,7 +72,7 @@ void FxPlayer::Update(float32 delta_time)
 
     FxVec3f camera_updated_position = mCameraOffset;
     camera_updated_position += Position;
-    //camera_updated_position.Y += Physics.HeadRecoveryYOffset;
+    // camera_updated_position.Y += Physics.HeadRecoveryYOffset;
 
     pCamera->MoveTo(camera_updated_position);
 

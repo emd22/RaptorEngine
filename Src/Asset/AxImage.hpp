@@ -54,7 +54,7 @@ public:
 
         sEmptyImage = FxMakeRef<AxImage>();
 
-        sEmptyImage->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), TFormat, TNumChannels);
+        sEmptyImage->Texture.Create(RxImageType::eImage, image_data, FxVec2u(1, 1), TFormat, TNumChannels);
         sEmptyImage->IsFinishedNotifier.SignalDataWritten();
         sEmptyImage->bIsUploadedToGpu = true;
         sEmptyImage->bIsUploadedToGpu.notify_all();
@@ -76,7 +76,7 @@ public:
 
     uint32 NumComponents = 3;
 
-    RxImageType ImageType = RxImageType::Image;
+    RxImageType ImageType = RxImageType::eImage;
     FxVec2u Size = FxVec2u::sZero;
 
 private:

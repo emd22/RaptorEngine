@@ -6,6 +6,7 @@
 #include <ThirdParty/Jolt/Physics/Collision/ObjectLayer.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
 
+#include <Core/FxMemberRef.hpp>
 #include <Core/FxTypes.hpp>
 
 namespace JPH {
