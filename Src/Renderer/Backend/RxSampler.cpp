@@ -58,6 +58,24 @@ static FX_FORCE_INLINE VkSamplerAddressMode GetVkAddressMode(RxSamplerAddressMod
     }
 }
 
+static FX_FORCE_INLINE VkCompareOp GetVkCompareOp(RxSamplerCompareOp op)
+{
+    switch (op) {
+    case RxSamplerCompareOp::eNone:
+        return VK_COMPARE_OP_NEVER;
+    case RxSamplerCompareOp::eEqual:
+        return VK_COMPARE_OP_EQUAL;
+    case RxSamplerCompareOp::eLess:
+        return VK_COMPARE_OP_LESS;
+    case RxSamplerCompareOp::eGreater:
+        return VK_COMPARE_OP_GREATER;
+    case RxSamplerCompareOp::eLessOrEqual:
+        return VK_COMPARE_OP_LESS_OR_EQUAL;
+    case RxSamplerCompareOp::eGreaterOrEqual:
+        return VK_COMPARE_OP_GREATER_OR_EQUAL;
+    }
+}
+
 RxSampler::RxSampler(RxSampler&& other)
 {
     Sampler = other.Sampler;
@@ -68,13 +86,15 @@ RxSampler::RxSampler(RxSampler&& other)
 }
 
 RxSampler::RxSampler(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
-                     RxSamplerAddressMode address_mode, RxSamplerBorderColor border_color)
+                     RxSamplerAddressMode address_mode, RxSamplerBorderColor border_color,
+                     RxSamplerCompareOp compare_op)
 {
-    Create(min_filter, mag_filter, mipmap_filter, address_mode, border_color);
+    Create(min_filter, mag_filter, mipmap_filter, address_mode, border_color, compare_op);
 }
 
 void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
-                       RxSamplerAddressMode address_mode, RxSamplerBorderColor border_color)
+                       RxSamplerAddressMode address_mode, RxSamplerBorderColor border_color,
+                       RxSamplerCompareOp compare_op)
 {
     if (Sampler) {
         OldLog::Warning("Sampler has been previously initialized!", 0);
@@ -103,8 +123,8 @@ void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, R
         .anisotropyEnable = VK_FALSE,
         // .maxAnisotropy = 0,
 
-        .compareEnable = VK_FALSE,
-        .compareOp = VK_COMPARE_OP_ALWAYS,
+        .compareEnable = static_cast<VkBool32>(compare_op != RxSamplerCompareOp::eNone),
+        .compareOp = GetVkCompareOp(compare_op),
 
         .minLod = 0.0f,
         .maxLod = 0.0f,

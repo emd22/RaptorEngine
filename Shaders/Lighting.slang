@@ -69,7 +69,7 @@ struct FSOut
 layout(binding = 1) Sampler2D sDepth;
 layout(binding = 2) Sampler2D sAlbedo;
 layout(binding = 3) Sampler2D sNormal;
-layout(binding = 4) Sampler2D sShadowDepth;
+layout(binding = 4) Sampler2DShadow sShadowDepth;
 
 struct FSPushConsts
 {
@@ -154,7 +154,6 @@ float AttenuationSmooth(float distance_sq, float inv_radius_sq)
 
 }
 
-
 [shader("fragment")]
 
 FSOut FragmentMain(FSIn in)
@@ -183,13 +182,6 @@ FSOut FragmentMain(FSIn in)
     float visibility = 1.0f;
 
 #ifdef FX_LIGHT_DIRECTIONAL
-    // float4x4 bias_mat = float4x4(
-    // 	0.5, 0.0, 0.0, 0.5,
-    // 	0.0, 0.5, 0.0, 0.5,
-    // 	0.0, 0.0, 0.5, 0.5,
-    // 	0.0, 0.0, 0.0, 1.0
-    // );
-
     float4 shadow_pos_light_space = mul(FSConst.LightCameraMatrix, float4(world_position, 1.0));
 
     float2 shadow_uv;
@@ -201,13 +193,7 @@ FSOut FragmentMain(FSIn in)
 
     // Check that the UV values are greater than 0.0 and less than 1.0
     if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
-        float shadow_depth = sShadowDepth.Sample(shadow_uv).r;
-
-        float bias = 0.005;
-
-        if (shadow_depth > shadow_z) {
-            visibility = 0.01f;
-        }
+        visibility = sShadowDepth.SampleCmpLevelZero(shadow_uv, shadow_z - 0.001);
     }
 
     float3 L = normalize(FSConst.vLightPosition);

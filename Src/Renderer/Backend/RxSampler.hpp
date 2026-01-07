@@ -28,6 +28,16 @@ enum class RxSamplerBorderColor
     eFloatTransparent,
 };
 
+enum class RxSamplerCompareOp
+{
+    eNone,
+    eEqual,
+    eLess,
+    eGreater,
+    eLessOrEqual,
+    eGreaterOrEqual,
+};
+
 
 class RxSampler
 {
@@ -35,13 +45,15 @@ public:
     RxSampler() = default;
     RxSampler(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
               RxSamplerAddressMode address_mode = RxSamplerAddressMode::eRepeat,
-              RxSamplerBorderColor border_color = RxSamplerBorderColor::eIntBlack);
+              RxSamplerBorderColor border_color = RxSamplerBorderColor::eIntBlack,
+              RxSamplerCompareOp = RxSamplerCompareOp::eNone);
 
     RxSampler(RxSampler&& other);
 
     void Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
                 RxSamplerAddressMode address_mode = RxSamplerAddressMode::eRepeat,
-                RxSamplerBorderColor border_color = RxSamplerBorderColor::eIntBlack);
+                RxSamplerBorderColor border_color = RxSamplerBorderColor::eIntBlack,
+                RxSamplerCompareOp compare_op = RxSamplerCompareOp::eNone);
 
     void Create();
 
