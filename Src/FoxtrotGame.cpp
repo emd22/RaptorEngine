@@ -340,10 +340,12 @@ void FoxtrotGame::Tick()
     // FxVec3f target = FxVec3f(0.0f, 0.0f, 0.0f);
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
+    gShadowRenderer->ShadowCamera.ResolveViewToTexels(1024);
     // gShadowRenderer->ShadowCamera.Position.Y *= -1.0f;
 
-    FxVec3f target = Player.Position;
     // target.Y *= -1.0f;
+
+    FxVec3f target = Player.Position;
 
     gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, FxVec3f(0, 1, 0));
     // FxLogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);

@@ -65,7 +65,7 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&mRenderPass)
         .SetVertexInfo(&vertex_info)
-        .SetCullMode(VK_CULL_MODE_FRONT_BIT)
+        .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
     builder.Build(mPipeline);
