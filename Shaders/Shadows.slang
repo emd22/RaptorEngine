@@ -36,7 +36,8 @@ layout(set = 0, binding = 0) StructuredBuffer<Object> bObjectBuffer;
 VSOut VertexMain(VSIn in) : SV_POSITION
 {
     VSOut out;
-    float4x4 MVP = mul(VSConst.mCameraMatrix, bObjectBuffer[VSConst.uiObjectIndex].mModel);
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex].mModel;
+    float4x4 MVP = mul(VSConst.mCameraMatrix, model_matrix);
     out.vPosition = mul(MVP, float4(in.vPosition, 1.0));
     return out;
 }

@@ -51,26 +51,11 @@ struct RxPipelineBlendAttachment
 {
     bool Enabled = true;
     RxColorComponentFlags Mask = RxColorComponent_RGBA;
-    RxPipelineBlendOp BlendOp = {
-        .Ops = {
-            .Alpha = VK_BLEND_OP_ADD,
-            .Color = VK_BLEND_OP_ADD
-        }
-    };
+    RxPipelineBlendOp BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } };
 
-    RxPipelineBlendFactor AlphaBlend = {
-        .Ops = {
-            .Src = VK_BLEND_FACTOR_ZERO,
-            .Dst = VK_BLEND_FACTOR_ZERO
-        }
-    };
+    RxPipelineBlendFactor AlphaBlend = { .Ops = { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ZERO } };
 
-    RxPipelineBlendFactor ColorBlend = {
-        .Ops = {
-            .Src = VK_BLEND_FACTOR_ZERO,
-            .Dst = VK_BLEND_FACTOR_ZERO
-        }
-    };
+    RxPipelineBlendFactor ColorBlend = { .Ops = { .Src = VK_BLEND_FACTOR_ZERO, .Dst = VK_BLEND_FACTOR_ZERO } };
 };
 
 
@@ -161,7 +146,7 @@ public:
     /////////////////////////////
 
 
-    FX_FORCE_INLINE RxPipelineBuilder& SetProperties(const RxGraphicsPipelineProperties& properties)
+    FX_FORCE_INLINE RxPipelineBuilder& SetProperties(const RxPipelineProperties& properties)
     {
         mProperties = properties;
         return *this;
@@ -239,7 +224,7 @@ private:
     RxRenderPass* mRenderPass { nullptr };
 
     FxVertexInfo* mVertexInfo { nullptr };
-    RxGraphicsPipelineProperties mProperties;
+    RxPipelineProperties mProperties;
 
     bool mbDidFirstBuild = false;
 };

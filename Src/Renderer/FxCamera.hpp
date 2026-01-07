@@ -4,6 +4,7 @@
 #include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
+#include <Math/FxVec2.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/Mat4.hpp>
 
@@ -111,12 +112,12 @@ public:
     void UpdateProjectionMatrix() override;
     void UpdateCameraMatrix() override;
 
-    FX_FORCE_INLINE void SetBounds(float32 left, float32 right, float32 bottom, float32 top)
+    void ResolveViewToTexels(float32 texture_res);
+
+    FX_FORCE_INLINE void SetBounds(float32 width, float32 height)
     {
-        mLeft = left;
-        mRight = right;
-        mBottom = bottom;
-        mTop = top;
+        mWidth = width;
+        mHeight = height;
 
         RequireMatrixUpdate();
     }
@@ -124,8 +125,8 @@ public:
     ~FxOrthoCamera() override {}
 
 private:
-    float32 mLeft = -30.0f, mRight = 30.0f;
-    float32 mBottom = -30.0f, mTop = 30.0f;
+    float32 mWidth = 60.0f;
+    float32 mHeight = 60.0f;
 };
 
 ///////////////////////////////////////////////

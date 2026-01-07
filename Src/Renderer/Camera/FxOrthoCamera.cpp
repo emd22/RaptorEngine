@@ -2,7 +2,7 @@
 
 void FxOrthoCamera::UpdateProjectionMatrix()
 {
-    ProjectionMatrix.LoadOrthographicMatrix(mLeft, mRight, mBottom, mTop, mNearPlane, mFarPlane);
+    ProjectionMatrix.LoadOrthographicMatrix(mWidth, mHeight, mNearPlane, mFarPlane);
 }
 
 void FxOrthoCamera::UpdateCameraMatrix()
@@ -11,4 +11,18 @@ void FxOrthoCamera::UpdateCameraMatrix()
 
     InvViewMatrix = ViewMatrix.Inverse();
     InvProjectionMatrix = ProjectionMatrix.Inverse();
+}
+
+void FxOrthoCamera::ResolveViewToTexels(float32 texture_res)
+{
+    FxAssert(texture_res > 0.0f);
+
+    const float32 texel_size = mWidth / texture_res;
+    // const float32 texel_size_recip = 1.0 / texel_size;
+
+    float32 snapped_x = floor(Position.X / texel_size) * texel_size;
+    float32 snapped_y = floor(Position.Y / texel_size) * texel_size;
+
+    ViewMatrix.Columns[3].X += (snapped_x - Position.X);
+    ViewMatrix.Columns[3].Y += (snapped_y - Position.Z);
 }

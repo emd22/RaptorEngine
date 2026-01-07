@@ -183,22 +183,31 @@ FSOut FragmentMain(FSIn in)
     float visibility = 1.0f;
 
 #ifdef FX_LIGHT_DIRECTIONAL
-    float4 shadow_pos = mul(FSConst.LightCameraMatrix, float4(world_position, 1.0));
+    // float4x4 bias_mat = float4x4(
+    // 	0.5, 0.0, 0.0, 0.5,
+    // 	0.0, 0.5, 0.0, 0.5,
+    // 	0.0, 0.0, 0.5, 0.5,
+    // 	0.0, 0.0, 0.0, 1.0
+    // );
 
-    float3 coords = shadow_pos.xyz / shadow_pos.w;
+    float4 shadow_pos_light_space = mul(FSConst.LightCameraMatrix, float4(world_position, 1.0));
 
-    float2 shadow_uv = coords.xy * 0.5 + 0.5;
-    // shadow_uv.y = 1.0 - shadow_uv.y;
+    float2 shadow_uv;
+    shadow_uv.x = 0.5f + (shadow_pos_light_space.x / shadow_pos_light_space.w * 0.5f);
+    shadow_uv.y = 0.5f - (shadow_pos_light_space.y / shadow_pos_light_space.w * 0.5f);
+    shadow_uv.y = 1.0 - shadow_uv.y;
 
-    float shadow_depth = sShadowDepth.Sample(shadow_uv).r;
+    float shadow_z = shadow_pos_light_space.z / shadow_pos_light_space.w;
 
-    float bias = 0.005;
+    // Check that the UV values are greater than 0.0 and less than 1.0
+    if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
+        float shadow_depth = sShadowDepth.Sample(shadow_uv).r;
 
-    if (any(shadow_uv < 0.0) || any(shadow_uv > 1.0)) {
-        visibility = 1.0f;
-    }
-    else if (shadow_depth > coords.z + 0.0005) {
-        visibility = 0.1;
+        float bias = 0.005;
+
+        if (shadow_depth > shadow_z) {
+            visibility = 0.01f;
+        }
     }
 
     float3 L = normalize(FSConst.vLightPosition);
@@ -238,10 +247,10 @@ FSOut FragmentMain(FSIn in)
     float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
     float3 specular_term = Fr;
 
-    out.vColor = float4(visibility * attenuation * (diffuse_term + specular_term) * light_color.rgb * NdotL, 1.0);
+    out.vColor = float4(attenuation *  (visibility *diffuse_term + visibility *specular_term) * light_color.rgb * NdotL, 1.0);
 
 #ifdef FX_LIGHT_DIRECTIONAL
-    out.vColor = float4(float3(visibility), 1.0f);
+    // out.vColor = float4(float3(visibility), 1.0f);
 #endif
 
     return out;

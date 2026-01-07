@@ -23,7 +23,7 @@ public:
                         const FxSlice<VkAttachmentDescription>& attachments,
                         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                         FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
-                        const RxGraphicsPipelineProperties& properties);
+                        const RxPipelineProperties& properties);
 
     Handle RequestPipeline(const FxHash32 name_hash);
     void ReleasePipeline(const FxHash32 name_hash, RxPipeline* pipeline);

@@ -50,15 +50,22 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
     FxVertexInfo vertex_info = FxMakeVertexInfo();
 
+    RxPipelineProperties pipeline_properties {
+        .ViewportSize = size,
+        .DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL,
+    };
+
+
     RxPipelineBuilder builder {};
     builder.SetLayout(pipeline_layout)
         .SetName("Shadow Pipeline")
         .AddBlendAttachment({ .Enabled = false })
+        .SetProperties(pipeline_properties)
         .SetAttachments(&attachment_list)
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&mRenderPass)
         .SetVertexInfo(&vertex_info)
-        .SetCullMode(VK_CULL_MODE_BACK_BIT)
+        .SetCullMode(VK_CULL_MODE_FRONT_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
     builder.Build(mPipeline);

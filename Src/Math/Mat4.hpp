@@ -137,8 +137,7 @@ public:
     FxMat4f TransposeMat3();
 
     void LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane);
-    void LoadOrthographicMatrix(float32 left, float32 right, float32 top, float32 bottom, float32 near_plane,
-                                float32 far_plane);
+    void LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane);
 
     void CopyAsMat3To(float* dest) const;
 

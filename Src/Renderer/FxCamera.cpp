@@ -27,8 +27,6 @@ void FxCamera::Update()
 
 void FxCamera::UpdateViewMatrix()
 {
-    FxVec3f target = Position + Direction;
-    ViewMatrix.LookAt(Position, target, FxVec3f::sUp);
-
+    ViewMatrix.LookAt(Position, Position + Direction, FxVec3f::sUp);
     UpdateCameraMatrix();
 }

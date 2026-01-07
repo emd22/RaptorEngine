@@ -118,7 +118,7 @@ void FoxtrotGame::CreateLights()
 
 
     pSun = FxMakeRef<FxLightDirectional>();
-    pSun->MoveTo(FxVec3f(0, 15, 5));
+    pSun->MoveTo(FxVec3f(0, 8, -5));
     pSun->Color = FxColor(0xFAF8E3, 15);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
@@ -148,7 +148,7 @@ void FoxtrotGame::CreateGame()
     //                                    PhObject::PhysicsType::eStatic, {});
     mMainScene.Attach(pLevelObject);
 
-    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/BrickTest.glb", { .KeepInMemory = true });
+    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DamagedHelmet.glb", { .KeepInMemory = true });
     // pHelmetObject->RotateX(M_PI_2);
     // pHelmetObject->Scale(FxVec3f(0.5));
     pHelmetObject->WaitUntilLoaded();
@@ -177,8 +177,8 @@ void FoxtrotGame::CreateGame()
     gShadowRenderer = new RxShadowDirectional(FxVec2u(1024, 1024));
     // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
     gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 3.0f, -4.0f), FxVec3f(0, 1, 0));
-    gShadowRenderer->ShadowCamera.SetFarPlane(-40.0f);
-    gShadowRenderer->ShadowCamera.SetNearPlane(40.0f);
+    gShadowRenderer->ShadowCamera.SetFarPlane(100.0f);
+    gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
     gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
@@ -335,12 +335,18 @@ void FoxtrotGame::Tick()
 
     gPhysics->Update();
 
-    FxVec3f shadow_pos = (Player.Position - ((pSun->mPosition.Normalize()) * FxVec3f(4.0)));
-    FxVec3f target = Player.Position;
+
     // FxVec3f shadow_pos = FxVec3f(0, 10, 5);
     // FxVec3f target = FxVec3f(0.0f, 0.0f, 0.0f);
 
-    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(shadow_pos, target, FxVec3f(0, 1, 0));
+    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
+    // gShadowRenderer->ShadowCamera.Position.Y *= -1.0f;
+
+    FxVec3f target = Player.Position;
+    // target.Y *= -1.0f;
+
+    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, FxVec3f(0, 1, 0));
+    // FxLogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 

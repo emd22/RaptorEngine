@@ -346,27 +346,34 @@ FxMat4f FxMat4f::TransposeMat3()
 
 void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
+void FxMat4f::LookAt(FxVec3f eye, FxVec3f target, FxVec3f upvec)
 {
-    FxVec3f forward = (position - target).Normalize();
-    const FxVec3f right = forward.Cross(upvec).Normalize();
-    const FxVec3f up = right.Cross(forward);
+    const FxVec3f direction = (target - eye);
+
+    FxVec3f forward = direction;
+    forward.NormalizeIP();
+
+    FxVec3f right = upvec.Cross(forward);
+    right.NormalizeIP();
+
+    const FxVec3f up = forward.Cross(right);
+
+    FxVec3f neg_eye = -eye;
 
     Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
     Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
     Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
-    Columns[3].Load4(-position.Dot(right), -position.Dot(up), -position.Dot(forward), 1.0f);
+    Columns[3].Load4(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
 }
 
-void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+void FxMat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 {
     LoadIdentity();
 
-    const float32 Sv = 1.0f / tan(hfov * 0.5f);
-    const float32 Sa = Sv / aspect_ratio;
+    const float32 height = 1.0f / tan(yfov * 0.5f);
+    const float32 width = height / aspect_ratio;
 
-    const float32 a = near_plane / (far_plane - near_plane);
-    const float32 b = far_plane * a;
+    const float32 depth_range = near_plane / (far_plane - near_plane);
 
     /*
     Column 0    1    2    3
@@ -377,33 +384,43 @@ void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 
            0,    0,  -1,   0
     */
 
-    Columns[0].X = (Sa);
-    Columns[1].Y = (-Sv);
+    Columns[0].X = (width);
+    Columns[1].Y = (-height);
 
-    Columns[2].Z = (a);
-    Columns[2].W = (-1);
+    Columns[2].Z = (-depth_range);
+    Columns[2].W = (1.0);
 
-    Columns[3].Z = (b);
+    Columns[3].Z = far_plane * depth_range;
     Columns[3].W = (0);
 }
 
-void FxMat4f::LoadOrthographicMatrix(float32 left, float32 right, float32 bottom, float32 top, float32 near_plane,
-                                     float32 far_plane)
+void FxMat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane)
 {
-    const float32 width = right - left;
-    const float32 height = top - bottom;
-    const float32 depth = (far_plane - near_plane);
+    FxAssert(near_plane > 0.0f && far_plane > 0.0f);
+    // const float32 width = right - left;
+    // const float32 height = bottom - top;
+    // const float32 far_range = 1.0 / (far_plane - near_plane);
+
+    // Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
+    // Columns[1].Load4(0.0f, 2.0f / height, 0.0f, 0.0f);
+    // Columns[2].Load4(0.0f, 0.0f, far_range, 0.0f);
+
+    // Columns[3].Load4( //
+    //     0, 0,
+    //     // (right + left) / width,   // x
+    //     // -(top + bottom) / height, // y
+    //     -far_range * near_plane, // z
+    //     1.0f                     // w
+    // );
+
+    const float32 depth_range = 1.0f / (far_plane - near_plane);
+
 
     Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
     Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
-    Columns[2].Load4(0.0f, 0.0f, -1.0f / depth, 0.0f);
+    Columns[2].Load4(0.0f, 0.0f, depth_range, 0.0f);
+    Columns[3].Load4(0.0f, 0.0f, -depth_range * near_plane, 1.0f);
 
-    Columns[3].Load4(            //
-        -(right + left) / width, // x
-        (top + bottom) / height, // y
-        (far_plane) / depth,     // z
-        1.0f                     // w
-    );
 
     // Print();
 

@@ -4,7 +4,7 @@ void RxPipelineCache::CreatePipeline(const char* name, const FxSlice<RxShaderPro
                                      const FxSlice<VkAttachmentDescription>& attachments,
                                      const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                                      FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
-                                     const RxGraphicsPipelineProperties& properties)
+                                     const RxPipelineProperties& properties)
 {
     const FxHash32 pipeline_hash = FxHashStr32(name);
 
