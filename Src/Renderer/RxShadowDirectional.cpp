@@ -52,7 +52,7 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
     RxPipelineProperties pipeline_properties {
         .ViewportSize = size,
-        .DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL,
+        .DepthCompareOp = VK_COMPARE_OP_GREATER,
     };
 
 

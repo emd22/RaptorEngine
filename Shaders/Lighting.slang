@@ -189,11 +189,11 @@ FSOut FragmentMain(FSIn in)
     shadow_uv.y = 0.5f - (shadow_pos_light_space.y / shadow_pos_light_space.w * 0.5f);
     shadow_uv.y = 1.0 - shadow_uv.y;
 
-    float shadow_z = shadow_pos_light_space.z / shadow_pos_light_space.w;
+    float shadow_z = 1.0 - shadow_pos_light_space.z / shadow_pos_light_space.w;
 
     // Check that the UV values are greater than 0.0 and less than 1.0
     if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
-        visibility = sShadowDepth.SampleCmpLevelZero(shadow_uv, shadow_z - 0.001);
+        visibility = sShadowDepth.SampleCmpLevelZero(shadow_uv, shadow_z + 0.001);
     }
 
     float3 L = normalize(FSConst.vLightPosition);

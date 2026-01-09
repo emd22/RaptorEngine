@@ -154,7 +154,7 @@ void RxSwapchain::CreateSwapchainFramebuffers()
     DepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest);
     ShadowDepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest,
                               RxSamplerAddressMode::eClampToBorder, RxSamplerBorderColor::eFloatWhite,
-                              RxSamplerCompareOp::eLess);
+                              RxSamplerCompareOp::eGreater);
     NormalsSampler.Create();
     LightsSampler.Create();
 
