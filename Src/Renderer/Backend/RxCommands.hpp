@@ -20,25 +20,25 @@ public:
             .queueFamilyIndex = queue_family,
         };
 
-        mDevice = device;
+        mpDevice = device;
 
-        const VkResult status = vkCreateCommandPool(mDevice->Device, &create_info, nullptr, &CommandPool);
+        const VkResult status = vkCreateCommandPool(mpDevice->Device, &create_info, nullptr, &CommandPool);
 
         if (status != VK_SUCCESS) {
             FxPanicVulkan("FxCommandPool", "Error creating command pool", status);
         }
     }
 
-    void Reset() { vkResetCommandPool(mDevice->Device, CommandPool, 0); }
+    void Reset() { vkResetCommandPool(mpDevice->Device, CommandPool, 0); }
 
-    void Destroy() { vkDestroyCommandPool(mDevice->Device, CommandPool, nullptr); }
+    void Destroy() { vkDestroyCommandPool(mpDevice->Device, CommandPool, nullptr); }
 
 public:
     VkCommandPool CommandPool = nullptr;
     uint32 QueueFamilyIndex = 0;
 
 private:
-    RxGpuDevice* mDevice = nullptr;
+    RxGpuDevice* mpDevice = nullptr;
 };
 
 class RxCommandBuffer
@@ -54,7 +54,7 @@ public:
 
     operator VkCommandBuffer() const { return CommandBuffer; }
 
-    bool IsInitialized() const { return mInitialized; }
+    bool IsInitialized() const { return mbInitialized; }
 
 private:
     void CheckInitialized() const;
@@ -63,7 +63,7 @@ public:
     VkCommandBuffer CommandBuffer = nullptr;
 
 private:
-    bool mInitialized = false;
-    RxCommandPool* mCommandPool = nullptr;
-    RxGpuDevice* mDevice = nullptr;
+    bool mbInitialized = false;
+    RxCommandPool* mpCommandPool = nullptr;
+    RxGpuDevice* mpDevice = nullptr;
 };

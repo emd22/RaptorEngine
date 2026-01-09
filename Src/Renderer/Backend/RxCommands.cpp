@@ -11,7 +11,7 @@ FX_SET_MODULE_NAME("RxCommandBuffer")
 
 void RxCommandBuffer::Create(RxCommandPool* pool)
 {
-    mCommandPool = pool;
+    mpCommandPool = pool;
 
     const VkCommandBufferAllocateInfo buffer_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -20,9 +20,9 @@ void RxCommandBuffer::Create(RxCommandPool* pool)
         .commandBufferCount = 1,
     };
 
-    mDevice = gRenderer->GetDevice();
+    mpDevice = gRenderer->GetDevice();
 
-    const VkResult status = vkAllocateCommandBuffers(mDevice->Device, &buffer_info, &CommandBuffer);
+    const VkResult status = vkAllocateCommandBuffers(mpDevice->Device, &buffer_info, &CommandBuffer);
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Could not allocate command buffer", status);
     }
@@ -30,7 +30,7 @@ void RxCommandBuffer::Create(RxCommandPool* pool)
     FxLogDebug("Creating Command buffer 0x{:p} from queue family {:d}", reinterpret_cast<void*>(CommandBuffer),
                pool->QueueFamilyIndex);
 
-    mInitialized = true;
+    mbInitialized = true;
 }
 
 inline void RxCommandBuffer::CheckInitialized() const
@@ -73,4 +73,7 @@ void RxCommandBuffer::End()
     }
 }
 
-void RxCommandBuffer::Destroy() { vkFreeCommandBuffers(mDevice->Device, mCommandPool->CommandPool, 1, &CommandBuffer); }
+void RxCommandBuffer::Destroy()
+{
+    vkFreeCommandBuffers(mpDevice->Device, mpCommandPool->CommandPool, 1, &CommandBuffer);
+}

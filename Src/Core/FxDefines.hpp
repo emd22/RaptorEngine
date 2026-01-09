@@ -28,9 +28,16 @@
 // #define FX_SIZED_ARRAY_DEBUG
 #define FX_SIZED_ARRAY_NO_MEMPOOL
 
-#define FX_DEBUG_IMAGE_VIEWS 1
+
+/// Warn that a paged array has not been called with .Init() before inserting. This can be useful if the default
+/// initalization size is too low (leading to more memory allocation calls), or too high (bad fitment of possibly large
+/// objects.)
+// #define FX_WARN_PAGED_ARRAY_AUTO_INIT 1
+
+// #define FX_DEBUG_IMAGE_VIEWS 1
 
 // #define FX_NO_DEBUG_ASSERTS
+
 
 ////////////////////////////////
 // Platform/Compiler macros

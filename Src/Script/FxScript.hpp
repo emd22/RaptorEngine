@@ -382,7 +382,10 @@ struct FxScriptScope
 
     FxScriptVar* FindVarInScope(FxHash32 hashed_name) { return FindInScope<FxScriptVar>(hashed_name, Vars); }
 
-    FxScriptAction* FindActionInScope(FxHash32 hashed_name) { return FindInScope<FxScriptAction>(hashed_name, Actions); }
+    FxScriptAction* FindActionInScope(FxHash32 hashed_name)
+    {
+        return FindInScope<FxScriptAction>(hashed_name, Actions);
+    }
 
     template <typename T>
         requires std::is_base_of_v<FxScriptLabelledData, T>
@@ -789,7 +792,7 @@ public:
     FxScriptBCPrinter(FxPagedArray<uint8>& bytecode)
     {
         mBytecode = bytecode;
-        mBytecode.DoNotDestroy = true;
+        mBytecode.bDoNotDestroy = true;
     }
 
     void Print();

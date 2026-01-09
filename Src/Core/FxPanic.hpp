@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
-
 #include <Core/FxDefines.hpp>
 #include <Core/FxLog.hpp>
 #include <Core/Log.hpp>
