@@ -132,9 +132,9 @@ bool RxGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice& physical)
 
     FxLogInfo("Device not suitable: (Vk: {}.{}.{}), Graphics?: {}, Present?: {}, Xfer?: {}, IsComplete?: {}",
               VK_VERSION_MAJOR(version), VK_VERSION_MINOR(version), VK_VERSION_PATCH(version),
-              (new_families.GetGraphicsFamily() != RxQueueFamilies::QueueNull),
-              (new_families.GetPresentFamily() != RxQueueFamilies::QueueNull),
-              (new_families.GetTransferFamily() != RxQueueFamilies::QueueNull), (new_families.IsComplete()));
+              (new_families.GetGraphicsFamily() != RxQueueFamilies::scNullQueue),
+              (new_families.GetPresentFamily() != RxQueueFamilies::scNullQueue),
+              (new_families.GetTransferFamily() != RxQueueFamilies::scNullQueue), (new_families.IsComplete()));
 
     return false;
 }
@@ -254,17 +254,19 @@ void RxGpuDevice::Destroy()
     Device = nullptr;
 }
 
-VkSurfaceFormatKHR RxGpuDevice::GetBestSurfaceFormat()
+VkSurfaceFormatKHR RxGpuDevice::GetSurfaceFormat()
 {
     uint32 format_count;
     vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, nullptr);
 
-    std::vector<VkSurfaceFormatKHR> surface_formats(format_count);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, surface_formats.data());
+    FxSizedArray<VkSurfaceFormatKHR> surface_formats;
+    surface_formats.InitSize(format_count);
+
+    vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, surface_formats.pData);
 
     VkSurfaceFormatKHR backup_format = surface_formats[0];
 
-    for (const auto& format : surface_formats) {
+    for (const VkSurfaceFormatKHR& format : surface_formats) {
         if (format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
             return format;
         }

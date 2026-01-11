@@ -12,7 +12,7 @@
 #include <Renderer/Backend/RxDescriptors.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
 
-#define FX_MAX_MATERIALS 256
+#define FX_MAX_MATERIALS 128
 
 enum class FxMaterialComponentStatus
 {
@@ -20,7 +20,7 @@ enum class FxMaterialComponentStatus
     eNotReady,
 };
 
-template <VkFormat TFormat>
+template <RxImageFormat TFormat>
 struct FxMaterialComponent
 {
 public:
@@ -35,7 +35,7 @@ public:
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pImage && !pDataToLoad) {
-            pImage = AxImage::GetEmptyImage<TFormat, RxUtil::GetFormatPixelSize(TFormat)>();
+            pImage = AxImage::GetEmptyImage<TFormat, RxImageFormatUtil::GetSize(TFormat)>();
         }
 
         if (!CheckIfReady()) {
@@ -129,8 +129,8 @@ private:
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent<VK_FORMAT_R8G8B8A8_SRGB> Diffuse;
-    FxMaterialComponent<VK_FORMAT_R8G8B8A8_UNORM> NormalMap;
+    FxMaterialComponent<RxImageFormat::eRGBA8_SRGB> Diffuse;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap;
 
     FxMaterialProperties Properties {};
 
@@ -161,9 +161,6 @@ private:
 
 class FxMaterialManager
 {
-    // TODO: replace with a calculated material count
-    const uint32 MaxMaterials = 64;
-
 public:
     static FxMaterialManager& GetGlobalManager();
 

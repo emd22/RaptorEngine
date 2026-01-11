@@ -36,7 +36,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3);
-        dp.Create(gRenderer->GetDevice(), MaxMaterials);
+        dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
 
     // Material properties buffer descriptors
@@ -244,7 +244,7 @@ void FxMaterial::Destroy()
 }
 
 
-template <VkFormat TFormat>
+template <RxImageFormat TFormat>
 static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 {
     if (!component.pImage && component.pDataToLoad) {

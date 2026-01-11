@@ -9,6 +9,21 @@
 #include <Core/FxRef.hpp>
 #include <Core/Log.hpp>
 
+static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(RxImageFormat format)
+{
+    switch (format) {
+    case RxImageFormat::eBGRA8_UNorm:
+        return JCS_EXT_BGRA;
+    case RxImageFormat::eRGBA8_UNorm:
+    case RxImageFormat::eRGBA8_SRGB:
+        return JCS_EXT_RGBA;
+    default:;
+    }
+
+    return JCS_EXT_RGBA;
+}
+
+
 AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
 {
     FxRef<AxImage> image(asset);
@@ -30,20 +45,20 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxRef<AxBase> asset, const std::
     jpeg_stdio_src(&mJpegInfo, fp);
     jpeg_read_header(&mJpegInfo, true);
 
-    mJpegInfo.out_color_space = JCS_EXT_RGBA;
+    mJpegInfo.out_color_space = GetJpegColorspaceForFormat(ImageFormat);
 
     jpeg_start_decompress(&mJpegInfo);
 
     printf("Image has %d components.\n", mJpegInfo.output_components);
-    image->NumComponents = mJpegInfo.output_components;
+    int32 num_jpeg_components = mJpegInfo.output_components;
 
     printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
     image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
-    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * image->NumComponents;
+    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_jpeg_components;
     mImageData.InitSize(data_size);
 
-    const uint32 row_stride = image->NumComponents * mJpegInfo.output_width;
+    const uint32 row_stride = num_jpeg_components * mJpegInfo.output_width;
 
     uint8* ptr_list[1];
 

@@ -545,7 +545,7 @@ void RxRenderBackend::PresentFrame()
     VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
           "Error submitting draw buffer");
 
-    if (Swapchain.Initialized != true) {
+    if (Swapchain.bInitialized != true) {
         FxModulePanic("Swapchain not initialized!");
     }
 

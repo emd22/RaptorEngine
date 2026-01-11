@@ -6,9 +6,6 @@
 #include <Core/MemPool/FxMemPool.hpp>
 #include <Math/FxMathUtil.hpp>
 
-static const char* spcStrHeaderStart = "[HEADER START]\n";
-static const char* spcStrHeaderEnd = "[HEADER END]\n";
-
 static const uint16 scBinHeaderStart = 0xA1B2;
 static const uint16 scBinHeaderEnd = 0x2B1A;
 

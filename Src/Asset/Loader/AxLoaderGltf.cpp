@@ -101,7 +101,7 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
 //     }
 // }
 
-template <VkFormat TFormat>
+template <RxImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
@@ -149,7 +149,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
 
         if (!texture_view.texture) {
             // MakeEmptyMaterialTexture(material, material->Diffuse);
-            material->Diffuse.pImage = AxImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
+            material->Diffuse.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
 
             material->Properties.BaseColor = FxColor::FromFloats(
                 gltf_material->pbr_metallic_roughness.base_color_factor);

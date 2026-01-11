@@ -30,7 +30,7 @@ public:
     VkImageUsageFlags Usage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    VkFormat Format = VK_FORMAT_B8G8R8A8_UNORM;
+    RxImageFormat Format = RxImageFormat::eNone;
     VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT;
 
     RxLoadOp LoadOp = RxLoadOp::eClear;
@@ -45,8 +45,10 @@ public:
 public:
     VkAttachmentDescription BuildDescription() const
     {
+        FxAssert(Format != RxImageFormat::eNone);
+
         return VkAttachmentDescription {
-            .format = Format,
+            .format = RxImageFormatUtil::ToUnderlying(Format),
             .samples = Samples,
 
             .loadOp = static_cast<VkAttachmentLoadOp>(LoadOp),

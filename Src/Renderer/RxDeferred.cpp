@@ -141,9 +141,9 @@ void RxDeferredRenderer::CreateGPassPipeline()
 {
     RxAttachmentList attachments;
 
-    attachments.Add({ .Format = VK_FORMAT_B8G8R8A8_UNORM })
-        .Add({ .Format = VK_FORMAT_R16G16B16A16_SFLOAT })
-        .Add({ .Format = VK_FORMAT_D32_SFLOAT_S8_UINT });
+    attachments.Add({ .Format = RxImageFormat::eBGRA8_UNorm })
+        .Add({ .Format = RxImageFormat::eRGBA16_Float })
+        .Add({ .Format = RxImageFormat::eD32_Float_S8_UInt });
 
 
     RxShader shader_geometry("Geometry");
@@ -310,7 +310,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     //                                                                        FxSizeofArray(color_attachments_list));
 
     RxAttachmentList attachment_list;
-    attachment_list.Add({ .Format = VK_FORMAT_R16G16B16A16_SFLOAT });
+    attachment_list.Add({ .Format = RxImageFormat::eRGBA16_Float });
 
     RpLighting.Create(attachment_list, gRenderer->Swapchain.Extent);
 
@@ -454,7 +454,7 @@ void RxDeferredRenderer::CreateCompPipeline()
 {
     RxAttachmentList attachment_list;
     attachment_list.Add({
-        .Format = gRenderer->Swapchain.SurfaceFormat.format,
+        .Format = gRenderer->Swapchain.Surface.Format,
         .LoadOp = RxLoadOp::eDontCare,
         .FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     });
@@ -551,7 +551,7 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
     DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 
-    DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float_S8_SInt, VK_IMAGE_TILING_OPTIMAL,
+    DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float_S8_UInt, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -842,7 +842,7 @@ void RxDeferredLightingPass::Destroy()
 
 void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
 {
-    FxAssert(gRenderer->Swapchain.Initialized == true);
+    FxAssert(gRenderer->Swapchain.bInitialized == true);
 
     mRendererInst = renderer;
     mPlComposition = &mRendererInst->PlComposition;

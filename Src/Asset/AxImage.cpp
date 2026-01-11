@@ -19,3 +19,13 @@ void AxImage::Destroy()
     // mImageReady = false;
     bIsUploadedToGpu = false;
 }
+
+void AxImage::MarkAndSignalLoaded()
+{
+    IsFinishedNotifier.SignalDataWritten();
+
+    bIsUploadedToGpu = true;
+    bIsUploadedToGpu.notify_all();
+
+    mIsLoaded.store(true);
+}

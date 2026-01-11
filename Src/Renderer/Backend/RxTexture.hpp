@@ -23,7 +23,7 @@ public:
     RxTexture() = default;
 
     void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions,
-                VkFormat format, uint32 components, const FxRef<RxSampler>& sampler)
+                RxImageFormat format, uint32 components, const FxRef<RxSampler>& sampler)
     {
         Sampler = sampler;
         Create(image_type, image_data, dimensions, format, components);
@@ -31,10 +31,8 @@ public:
 
     // TODO: update this and remove the format/color restrictions
     void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u dimensions,
-                VkFormat format, uint32 components)
+                RxImageFormat format, uint32 components)
     {
-        mDevice = Fx_Fwd_GetGpuDevice();
-
         // TODO: pass in stride for texture size
         const size_t data_size = dimensions.X * dimensions.Y * components;
         //        assert(image_data.Size == data_size);
@@ -97,7 +95,4 @@ public:
 public:
     RxImage Image;
     FxRef<RxSampler> Sampler { nullptr };
-
-private:
-    RxGpuDevice* mDevice = nullptr;
 };

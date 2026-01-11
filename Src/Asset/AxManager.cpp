@@ -191,7 +191,7 @@ void AxManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, 
 }
 
 
-void AxManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const std::string& path)
+void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset, const std::string& path)
 {
     bool is_jpeg = IsFileJpeg(path);
 
@@ -199,7 +199,7 @@ void AxManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
+        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, path);
     }
@@ -207,22 +207,22 @@ void AxManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
+        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, path);
     }
 }
 
 
-void AxManager::LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const uint8* data,
-                                    uint32 data_size)
+void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset,
+                                    const uint8* data, uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
+        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, "", data, data_size);
     }
@@ -231,7 +231,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, VkFormat format, FxR
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
+        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, "", data, data_size);
     }

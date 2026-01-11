@@ -53,9 +53,14 @@ public:
 
     FxVec2u Extent = FxVec2u::sZero;
 
-    VkSurfaceFormatKHR SurfaceFormat;
+    // VkSurfaceFormatKHR SurfaceFormat;
+    struct
+    {
+        RxImageFormat Format = RxImageFormat::eNone;
+        VkColorSpaceKHR ColorSpace;
+    } Surface;
 
-    bool Initialized = false;
+    bool bInitialized = false;
 
 private:
     RxGpuDevice* mDevice = nullptr;
