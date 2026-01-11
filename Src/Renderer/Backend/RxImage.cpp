@@ -15,7 +15,7 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
 {
     RxImageTypeProperties props {};
 
-    if (image_type == RxImageType::eImage) {
+    if (image_type == RxImageType::e2d) {
         props.ViewType = VK_IMAGE_VIEW_TYPE_2D;
         props.LayerCount = 1;
     }
@@ -30,31 +30,12 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
     return props;
 }
 
-RxGpuDevice* RxImage::GetDevice()
-{
-    // If the device has not been created with `::Create` then mDevice will not be
-    // set. I think this would be fine, there should probably be a `::Build` or
-    // `::Create` method that does this instead though.
-
-    if (mDevice == nullptr) {
-        mDevice = gRenderer->GetDevice();
-    }
-
-    return mDevice;
-}
-
-void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageTiling tiling,
+void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, VkImageAspectFlags aspect_flags)
 {
     Size = size;
     Format = format;
-    mViewType = image_type;
-    mDevice = gRenderer->GetDevice();
-
-    if (RxUtil::IsFormatDepth(format)) {
-        mIsDepthTexture = true;
-    }
-
+    ViewType = image_type;
 
     // Get the vulkan values for the image type
     RxImageTypeProperties image_type_props = RxImageTypeGetProperties(image_type);
@@ -72,7 +53,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
 
         .imageType = VK_IMAGE_TYPE_2D,
 
-        .format = format,
+        .format = RxImageFormatUtil::ToUnderlying(format),
 
         .extent = { .width = size.Width(), .height = size.Height(), .depth = 1 },
 
@@ -120,7 +101,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = Image,
         .viewType = image_type_props.ViewType,
-        .format = format,
+        .format = RxImageFormatUtil::ToUnderlying(format),
         .components =
             {
                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -138,7 +119,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
             },
     };
 
-    status = vkCreateImageView(GetDevice()->Device, &view_create_info, nullptr, &View);
+    status = vkCreateImageView(gRenderer->GetDevice()->Device, &view_create_info, nullptr, &View);
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Could not create swapchain image view", status);
     }
@@ -160,7 +141,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat forma
 #endif
 }
 
-void RxImage::Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageUsageFlags usage,
+void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageUsageFlags usage,
                      VkImageAspectFlags aspect_flags)
 {
     Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect_flags);
@@ -172,10 +153,12 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
 {
     VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 
+    bool is_depth_texture = RxImageFormatUtil::IsDepth(Format);
+
     VkImageMemoryBarrier barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 
-        .srcAccessMask = static_cast<VkAccessFlags>((mIsDepthTexture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
+        .srcAccessMask = static_cast<VkAccessFlags>((is_depth_texture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
         .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
 
         .oldLayout = ImageLayout,
@@ -188,7 +171,7 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
 
         .subresourceRange =
             {
-                .aspectMask = (mIsDepthTexture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = (is_depth_texture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -215,7 +198,7 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
         dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
 
-    if (mIsDepthTexture) {
+    if (is_depth_texture) {
         src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
         dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
@@ -283,20 +266,8 @@ enum CubemapLayer
     Back,
 };
 
-inline VkImageAspectFlags GetVulkanAspectFlag(RxImageAspectFlag rx_flag, VkFormat image_format)
-{
-    if (rx_flag == RxImageAspectFlag::eAuto) {
-        if (RxUtil::IsFormatDepth(image_format)) {
-            rx_flag = RxImageAspectFlag::eDepth;
-        }
-
-        rx_flag = RxImageAspectFlag::eColor;
-    }
-
-    return static_cast<VkImageAspectFlags>(rx_flag);
-}
-
-void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_format, RxImageCubemapOptions options)
+void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat image_format,
+                                            VkImageAspectFlags aspect_flags, RxImageCubemapOptions options)
 {
     // Here is the type of cubemap we will be reading here:
     //
@@ -319,17 +290,15 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_for
 
     FxAssert(tile_width == tile_height);
 
-    VkImageAspectFlags image_aspect_flag = GetVulkanAspectFlag(options.AspectFlag, image_format);
-
 
     Create(RxImageType::eCubemap, FxVec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
-           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, image_aspect_flag);
+           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, aspect_flags);
 
     FxStackArray<VkImageCopy, 6> copy_infos;
 
     VkImageCopy copy_info {
-        .srcSubresource = { .aspectMask = image_aspect_flag, .baseArrayLayer = 0, .layerCount = 1, },
-        .dstSubresource = { .aspectMask = image_aspect_flag, .baseArrayLayer = 0, .layerCount = 1, },
+        .srcSubresource = { .aspectMask = aspect_flags, .baseArrayLayer = 0, .layerCount = 1, },
+        .dstSubresource = { .aspectMask = aspect_flags, .baseArrayLayer = 0, .layerCount = 1, },
         .dstOffset = { .x = 0, .y = 0 },
         .extent = { .width = tile_width, .height = tile_height, .depth = 1 },
     };
@@ -426,7 +395,7 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_for
 void RxImage::Destroy()
 {
     if (View != nullptr) {
-        vkDestroyImageView(GetDevice()->Device, View, nullptr);
+        vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
     }
 
     if (Image != nullptr && Allocation != nullptr) {

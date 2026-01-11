@@ -15,7 +15,7 @@
 //
 class RxTexture;
 
-#include <Renderer/Constants.hpp>
+#include <Renderer/RxConstants.hpp>
 
 class RxDescriptorPool
 {
@@ -106,7 +106,8 @@ public:
                                           const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets,
                                           const FxSlice<uint32>& offsets)
     {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets.Size, sets.pData, offsets.Size, offsets.pData);
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets.Size, sets.pData, offsets.Size,
+                                offsets.pData);
     }
 
     void Bind(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline) const

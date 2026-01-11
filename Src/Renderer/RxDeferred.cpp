@@ -18,16 +18,16 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     CreateCompPipeline();
     CreateLightingPipeline();
 
-    GPasses.InitSize(RendererFramesInFlight);
-    LightingPasses.InitSize(RendererFramesInFlight);
-    CompPasses.InitSize(RendererFramesInFlight);
+    GPasses.InitSize(RxFramesInFlight);
+    LightingPasses.InitSize(RxFramesInFlight);
+    CompPasses.InitSize(RxFramesInFlight);
 
     FxSizedArray<VkImageView> temp_views;
     temp_views.InitSize(1);
 
-    OutputFramebuffers.InitSize(RendererFramesInFlight);
+    OutputFramebuffers.InitSize(RxFramesInFlight);
 
-    for (int frame_index = 0; frame_index < RendererFramesInFlight; frame_index++) {
+    for (int frame_index = 0; frame_index < RxFramesInFlight; frame_index++) {
         GPasses[frame_index].Create(this, extent);
 
         LightingPasses[frame_index].Create(this, frame_index, extent);
@@ -45,7 +45,7 @@ void RxDeferredRenderer::Destroy()
         return;
     }
 
-    for (int i = 0; i < RendererFramesInFlight; i++) {
+    for (int i = 0; i < RxFramesInFlight; i++) {
         GPasses[i].Destroy();
         LightingPasses[i].Destroy();
         CompPasses[i].Destroy();
@@ -455,7 +455,7 @@ void RxDeferredRenderer::CreateCompPipeline()
     RxAttachmentList attachment_list;
     attachment_list.Add({
         .Format = gRenderer->Swapchain.SurfaceFormat.format,
-        .LoadOp = RxLoadOp::DontCare,
+        .LoadOp = RxLoadOp::eDontCare,
         .FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     });
 
@@ -549,16 +549,16 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     //    RendererFramesInFlight);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
-    DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
+    DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 
-    DepthAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float_S8_SInt, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    ColorAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eBGRA8_UNorm, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    NormalsAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+    NormalsAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
                              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -652,15 +652,17 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     mPlLighting = &mRendererInst->PlLightingOutsideVolume;
 
     // Albedo sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
     // Positions sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
     // Normals sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
-    DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
 
-    ColorAttachment.Create(RxImageType::eImage, extent, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+
+    DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
+
+    ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     FxSizedArray image_views = { ColorAttachment.View };
@@ -847,14 +849,14 @@ void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index
     mRenderPass = &mRendererInst->RpComposition;
 
     // Albedo sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
     // Positions sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
     // Normals sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
     // Lights sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RendererFramesInFlight);
-    DescriptorPool.Create(gRenderer->GetDevice(), RendererFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
+    DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 
     // The output image renders to the swapchains output
     OutputImage = &gRenderer->Swapchain.OutputImages[frame_index];

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Backend/RxImage.hpp"
+
 #include <vulkan/vulkan.h>
 
 #include <Core/FxSizedArray.hpp>
@@ -7,35 +9,41 @@
 
 enum class RxLoadOp
 {
-    Clear = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    Load = VK_ATTACHMENT_LOAD_OP_LOAD,
-    DontCare = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    eClear = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    eLoad = VK_ATTACHMENT_LOAD_OP_LOAD,
+    eDontCare = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 };
 
 enum class RxStoreOp
 {
-    None = VK_ATTACHMENT_STORE_OP_NONE,
-    Store = VK_ATTACHMENT_STORE_OP_STORE,
-    DontCare = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    eNone = VK_ATTACHMENT_STORE_OP_NONE,
+    eStore = VK_ATTACHMENT_STORE_OP_STORE,
+    eDontCare = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 };
+
 
 struct RxAttachment
 {
 public:
+    RxImageType ImageType = RxImageType::e2d;
+
+    VkImageUsageFlags Usage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
     VkFormat Format = VK_FORMAT_B8G8R8A8_UNORM;
     VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT;
 
-    RxLoadOp LoadOp = RxLoadOp::Clear;
-    RxStoreOp StoreOp = RxStoreOp::Store;
+    RxLoadOp LoadOp = RxLoadOp::eClear;
+    RxStoreOp StoreOp = RxStoreOp::eStore;
 
-    RxLoadOp StencilLoadOp = RxLoadOp::Clear;
-    RxStoreOp StencilStoreOp = RxStoreOp::Store;
+    RxLoadOp StencilLoadOp = RxLoadOp::eClear;
+    RxStoreOp StencilStoreOp = RxStoreOp::eStore;
 
     VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 public:
-    VkAttachmentDescription Build() const
+    VkAttachmentDescription BuildDescription() const
     {
         return VkAttachmentDescription {
             .format = Format,
@@ -63,33 +71,10 @@ public:
 
     static RxAttachmentList New() { return {}; }
 
-    operator FxSlice<RxAttachment>() { return Attachments; }
+    RxAttachmentList& Add(const RxAttachment& attachment);
 
-    RxAttachmentList& Add(const RxAttachment& attachment)
-    {
-        CheckInited();
-        Attachments.Insert(attachment);
+    FxSizedArray<VkAttachmentDescription>& GetAttachmentDescriptions();
 
-        return *this;
-    }
-
-    FxSizedArray<VkAttachmentDescription>& GetBuiltAttachments()
-    {
-        if (mBuiltAttachments.Size == Attachments.Size) {
-            return mBuiltAttachments;
-        }
-
-        if (!mBuiltAttachments) {
-            mBuiltAttachments.InitCapacity(mMaxAttachments);
-        }
-
-        mBuiltAttachments.Clear();
-        for (const RxAttachment& at : Attachments) {
-            mBuiltAttachments.Insert(at.Build());
-        }
-
-        return mBuiltAttachments;
-    }
 
 private:
     FX_FORCE_INLINE void CheckInited()
@@ -105,6 +90,9 @@ public:
 
 
 private:
-    FxSizedArray<VkAttachmentDescription> mBuiltAttachments;
+    bool mbDescriptionsBuilt : 1 = false;
+    bool mbImagesBuilt : 1 = false;
+
+    FxSizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
     uint32 mMaxAttachments = 10;
 };

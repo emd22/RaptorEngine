@@ -17,8 +17,8 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
     attachment_list.Add({ .Format = VK_FORMAT_D32_SFLOAT_S8_UINT });
     mRenderPass.Create(attachment_list, size);
 
-    for (int i = 0; i < RendererFramesInFlight; i++) {
-        mAttachments[i].Create(RxImageType::eImage, size, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    for (int i = 0; i < RxFramesInFlight; i++) {
+        mAttachments[i].Create(RxImageType::e2d, size, RxImageFormat::eD32_Float_S8_SInt, VK_IMAGE_TILING_OPTIMAL,
                                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                                VK_IMAGE_ASPECT_DEPTH_BIT);
         mFramebuffers[i].Create({ mAttachments[i].View }, mRenderPass, size);
@@ -70,7 +70,7 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
     builder.Build(mPipeline);
 
-    for (int i = 0; i < RendererFramesInFlight; i++) {
+    for (int i = 0; i < RxFramesInFlight; i++) {
         const RxDeferredLightingPass& lighting_pass = gRenderer->pDeferredRenderer->LightingPasses[i];
         UpdateDescriptorSet(i, lighting_pass);
     }

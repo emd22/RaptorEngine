@@ -34,10 +34,10 @@ private:
 public:
     FxOrthoCamera ShadowCamera;
     RxCommandBuffer* mCommandBuffer;
-    FxStackArray<RxImage, RendererFramesInFlight> mAttachments;
+    FxStackArray<RxImage, RxFramesInFlight> mAttachments;
 
 private:
-    FxStackArray<RxFramebuffer, RendererFramesInFlight> mFramebuffers;
+    FxStackArray<RxFramebuffer, RxFramesInFlight> mFramebuffers;
 
     RxRenderPass mRenderPass;
     RxPipeline mPipeline;

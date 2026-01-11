@@ -4,9 +4,9 @@
 #include "Backend/RxPipeline.hpp"
 #include "Backend/RxSynchro.hpp"
 #include "Backend/RxUtil.hpp"
-#include "Constants.hpp"
 #include "FxEngine.hpp"
 #include "FxObjectManager.hpp"
+#include "RxConstants.hpp"
 #include "RxDeferred.hpp"
 
 #include <SDL3/SDL.h>
@@ -124,7 +124,7 @@ void RxRenderBackend::DestroyUploadContext()
 
 void RxRenderBackend::InitFrames()
 {
-    Frames.InitSize(RendererFramesInFlight);
+    Frames.InitSize(RxFramesInFlight);
 
     const uint32 graphics_family = GetDevice()->mQueueFamilies.GetGraphicsFamily();
 
@@ -615,7 +615,7 @@ void RxRenderBackend::BeginLighting()
 
 #include <Renderer/FxCamera.hpp>
 
-static_assert(RendererFramesInFlight == 3);
+static_assert(RxFramesInFlight == 3);
 
 void RxRenderBackend::DoComposition(FxCamera& render_cam)
 {
@@ -657,7 +657,7 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 
     mInternalFrameCounter++;
 
-    mFrameNumber = (mInternalFrameCounter % RendererFramesInFlight);
+    mFrameNumber = (mInternalFrameCounter % RxFramesInFlight);
 }
 
 RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)

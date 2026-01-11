@@ -1,23 +1,25 @@
 #pragma once
 
-#include <Core/FxPagedArray.hpp>
+#include "Backend/RxCommands.hpp"
 
-class RxCommandBuffer;
+#include <Core/FxPagedArray.hpp>
 
 enum class RxCommandUsage
 {
-    ePerFrame = 1,
-    eManual = 2,
+    eGraphics,
+    eTransfer
 };
 
+using RxCommandHandle = FxHandle;
 
 class RxCommandManager
 {
 public:
     RxCommandManager() {}
 
-    RxCommandBuffer& Request(RxCommandUsage usage);
+    RxCommandHandle Request(RxCommandUsage usage);
+
+    void Release(RxCommandHandle handle);
 
 private:
-    // FxPagedArray<>
 };

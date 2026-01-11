@@ -125,8 +125,8 @@ public:
     ~FxOrthoCamera() override {}
 
 private:
-    float32 mWidth = 60.0f;
-    float32 mHeight = 60.0f;
+    float32 mWidth = 30.0f;
+    float32 mHeight = 30.0f;
 };
 
 ///////////////////////////////////////////////

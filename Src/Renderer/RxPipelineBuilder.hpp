@@ -200,7 +200,7 @@ public:
         pipeline.Layout = mLayout;
 
         FxLogInfo("Creating pipeline '{}'", mPipelineName);
-        pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetBuiltAttachments(), vk_blend_attachments,
+        pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetAttachmentDescriptions(), vk_blend_attachments,
                         mVertexInfo, *mRenderPass, mProperties);
 
         if (mbDidFirstBuild) {

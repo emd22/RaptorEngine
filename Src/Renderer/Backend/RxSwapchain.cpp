@@ -163,7 +163,7 @@ void RxSwapchain::CreateSwapchainFramebuffers()
 
 void RxSwapchain::DestroyFramebuffersAndImageViews()
 {
-    for (int i = 0; i < RendererFramesInFlight; i++) {
+    for (int i = 0; i < RxFramesInFlight; i++) {
         // CompFramebuffers[i].Destroy();
 
         // Since the RxImage's `VkImage` is from the swapchain, we do not want to destroy it

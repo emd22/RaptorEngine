@@ -255,7 +255,7 @@ public:
     inline bool IsEmpty() const { return Size == 0; }
     inline bool IsNotEmpty() const { return !IsEmpty(); }
 
-    void Insert(const TElementType& object)
+    TElementType& Insert(const TElementType& object)
     {
         if (Size > Capacity) {
             printf("New Size(%zu) > Capacity(%zu)!\n", Size, Capacity);
@@ -265,6 +265,8 @@ public:
         TElementType* element = &pData[Size++];
 
         new (element) TElementType(object);
+
+        return *element;
     }
 
     void Insert(TElementType&& object)
