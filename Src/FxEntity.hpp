@@ -2,8 +2,8 @@
 
 #include <Asset/AxImage.hpp>
 #include <Core/FxPagedArray.hpp>
+#include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
-#include <Math/Mat4.hpp>
 #include <Math/Vector.hpp>
 #include <Renderer/FxCamera.hpp>
 

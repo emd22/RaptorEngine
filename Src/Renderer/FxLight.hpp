@@ -3,7 +3,7 @@
 #include <Asset/FxMeshGen.hpp>
 #include <FxColor.hpp>
 #include <FxEntity.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FxMat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
 class FxCamera;

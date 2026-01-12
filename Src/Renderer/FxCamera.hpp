@@ -1,12 +1,12 @@
 #pragma once
 
 #include <FxObjectLayer.hpp>
+#include <Math/FxMat4.hpp>
 #include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxVec2.hpp>
 #include <Math/FxVec3.hpp>
-#include <Math/Mat4.hpp>
 
 enum class FxCameraType
 {

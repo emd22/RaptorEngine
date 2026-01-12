@@ -3,8 +3,8 @@
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
 
+#include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
-#include <Math/Mat4.hpp>
 
 const FxMat4f FxMat4f::sIdentity = FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
 

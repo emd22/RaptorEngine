@@ -9,7 +9,7 @@
 #include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxSlice.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FxMat4.hpp>
 
 class RxCommandBuffer;
 

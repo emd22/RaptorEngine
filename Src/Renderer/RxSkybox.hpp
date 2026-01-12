@@ -54,6 +54,4 @@ private:
     RxDescriptorPool mDescriptorPool {};
 
     FxRef<FxPrimitiveMesh<VertexType>> mSkyboxMesh { nullptr };
-
-    RxDeferredRenderer* mDeferredRenderer = nullptr;
 };

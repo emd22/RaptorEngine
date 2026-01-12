@@ -19,7 +19,7 @@ void FxObjectManager::Create()
     RxUtil::SetDebugLabel("Object Buffer", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, DsLayoutObjectBuffer);
 
     mObjectGpuBuffer.Create(FX_MAX_GPU_OBJECTS, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU,
-                            RxGpuBufferFlags::PersistentMapped);
+                            RxGpuBufferFlags::ePersistentMapped);
     mObjectSlotsInUse.InitZero(FX_MAX_GPU_OBJECTS);
 
     if (!mObjectBufferDS.IsInited()) {

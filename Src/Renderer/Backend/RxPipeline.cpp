@@ -65,7 +65,7 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     bool has_depth_attachment = false;
 
     // Depth attachment is usually the last attachment, check last first
-    for (int32 i = attachments.Size - 1; i >= 0; --i) {
+    for (int32 i = attachments.Size - 1; i >= 0; i--) {
         if (RxUtil::IsFormatDepth(attachments[i].format)) {
             has_depth_attachment = true;
         }
@@ -81,11 +81,11 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     // Shaders
     FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shaders.Size);
 
-    for (const FxRef<RxShaderProgram>& shader_stage : shaders) {
+    for (const FxRef<RxShaderProgram>& shader_program : shaders) {
         const VkPipelineShaderStageCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = shader_stage->GetStageBit(),
-            .module = shader_stage->pShader,
+            .stage = RxShaderUtil::ToUnderlyingType(shader_program->ShaderType),
+            .module = shader_program->pShader,
             .pName = "main",
             .pSpecializationInfo = &specialization_info,
         };

@@ -13,9 +13,11 @@
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
-template <typename ElementType> class RxRawGpuBuffer;
+template <typename ElementType>
+class RxRawGpuBuffer;
 
-template <typename ElementType> class RxGpuBuffer;
+template <typename ElementType>
+class RxGpuBuffer;
 
 enum class RxBufferUsageType
 {
@@ -23,7 +25,8 @@ enum class RxBufferUsageType
     Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 };
 
-template <typename ElementType> class RxGpuBufferMapContext
+template <typename ElementType>
+class RxGpuBufferMapContext
 {
 public:
     RxGpuBufferMapContext(RxRawGpuBuffer<ElementType>* buffer) : mGpuBuffer(buffer) { mGpuBuffer->Map(); }
@@ -58,9 +61,9 @@ private:
 
 enum class RxGpuBufferFlags : uint16
 {
-    None = 0x00,
+    eNone = 0x00,
     /** The buffer is mapped for the lifetime of the buffer. */
-    PersistentMapped = 0x01,
+    ePersistentMapped = 0x01,
 
     FX_DEFINE_AS_FLAG_ENUM,
 };
@@ -71,7 +74,8 @@ enum class RxGpuBufferFlags : uint16
 /**
  * @brief Provides a GPU buffer that can be created with more complex parameters without staging.
  */
-template <typename ElementType> class RxRawGpuBuffer
+template <typename ElementType>
+class RxRawGpuBuffer
 {
 public:
     const int32 ElementSize = sizeof(ElementType);
@@ -84,7 +88,7 @@ public:
     RxRawGpuBuffer operator=(RxRawGpuBuffer<ElementType>& other) = delete;
 
     void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
-                RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::None)
+                RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::eNone)
     {
         Size = element_count;
         mUsageFlags = buffer_usage;
@@ -94,7 +98,7 @@ public:
 
         VmaAllocationCreateFlags vma_create_flags = 0;
 
-        if ((mBufferFlags & RxGpuBufferFlags::PersistentMapped) != 0) {
+        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped) != 0) {
             vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
         }
 
@@ -115,7 +119,7 @@ public:
         }
 
 
-        if ((mBufferFlags & RxGpuBufferFlags::PersistentMapped) != 0) {
+        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped) != 0) {
             // Get the pointer from VMA for the mapped GPU buffer
             pMappedBuffer = allocation_info.pMappedData;
         }
@@ -222,7 +226,7 @@ public:
 
 private:
     VkBufferUsageFlags mUsageFlags = 0;
-    RxGpuBufferFlags mBufferFlags = RxGpuBufferFlags::None;
+    RxGpuBufferFlags mBufferFlags = RxGpuBufferFlags::eNone;
 };
 
 
@@ -230,7 +234,8 @@ private:
  * A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
  * buffer type.
  */
-template <typename ElementType> class RxGpuBuffer : public RxRawGpuBuffer<ElementType>
+template <typename ElementType>
+class RxGpuBuffer : public RxRawGpuBuffer<ElementType>
 {
 private:
     using RxRawGpuBuffer<ElementType>::Create;

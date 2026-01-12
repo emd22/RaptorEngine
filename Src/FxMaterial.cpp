@@ -52,7 +52,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     FxLogInfo("Creating material buffer of size {:d}", material_buffer_size);
 
     MaterialPropertiesBuffer.Create(material_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                    VMA_MEMORY_USAGE_CPU_TO_GPU, RxGpuBufferFlags::PersistentMapped);
+                                    VMA_MEMORY_USAGE_CPU_TO_GPU, RxGpuBufferFlags::ePersistentMapped);
 
 
     if (!mMaterialPropertiesDS.IsInited()) {

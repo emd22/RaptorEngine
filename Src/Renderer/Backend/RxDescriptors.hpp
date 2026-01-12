@@ -22,12 +22,7 @@ class RxDescriptorPool
 public:
     void Create(RxGpuDevice* device, uint32 max_sets = 10);
 
-    void AddPoolSize(VkDescriptorType type, uint32_t count)
-    {
-        PoolSizes.push_back({ .type = type, .descriptorCount = count });
-    }
-
-    operator VkDescriptorPool() const { return Pool; }
+    void AddPoolSize(VkDescriptorType type, uint32_t count) { RemainingDescriptorCounts[type] = count; }
 
     void Destroy()
     {
@@ -43,13 +38,15 @@ public:
 
 public:
     VkDescriptorPool Pool = nullptr;
-    std::vector<VkDescriptorPoolSize> PoolSizes;
+
+    std::unordered_map<VkDescriptorType, uint32> RemainingDescriptorCounts;
 
 private:
     friend class RxDescriptorSet;
 
     RxGpuDevice* mDevice = nullptr;
 };
+
 
 class RxDescriptorSet
 {
@@ -131,4 +128,25 @@ public:
 
 private:
     RxGpuDevice* mDevice = nullptr;
+};
+
+
+struct RxDescriptorHandle
+{
+    RxDescriptorSet
+
+}
+
+class RxDescriptorManager
+{
+    static constexpr uint32 scMaxPools = 5;
+
+public:
+    RxDescriptorManager() = default;
+
+    void Create();
+    void Request();
+
+private:
+    FxStackArray<RxDescriptorPool, scMaxPools> mPools;
 };

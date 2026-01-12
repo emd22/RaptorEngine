@@ -12,20 +12,29 @@ enum class RxShaderType
     eFragment,
 };
 
-constexpr FX_FORCE_INLINE VkShaderStageFlagBits RxShaderTypeToVkShaderStage(RxShaderType type)
+class RxShaderUtil
 {
-    switch (type) {
-    case RxShaderType::eUnknown:
-        FxLogError("Shader stage is RxShaderType::eUnknown!");
-        [[fallthrough]];
-    case RxShaderType::eVertex:
-        return VK_SHADER_STAGE_VERTEX_BIT;
-    case RxShaderType::eFragment:
-        return VK_SHADER_STAGE_FRAGMENT_BIT;
-    }
+public:
+    /**
+     * @brief Get the underlying Vulkan shader stage bit for an RxShaderType.
+     */
+    static constexpr VkShaderStageFlagBits ToUnderlyingType(RxShaderType type)
+    {
+        switch (type) {
+        case RxShaderType::eUnknown:
+            FxLogError("Shader stage is RxShaderType::eUnknown!");
+            break;
 
-    return VK_SHADER_STAGE_VERTEX_BIT;
-}
+        case RxShaderType::eVertex:
+            return VK_SHADER_STAGE_VERTEX_BIT;
+        case RxShaderType::eFragment:
+            return VK_SHADER_STAGE_FRAGMENT_BIT;
+        }
+
+        return VK_SHADER_STAGE_VERTEX_BIT;
+    }
+};
+
 
 class RxShaderProgram
 {
@@ -40,22 +49,6 @@ public:
 
         other.pShader = nullptr;
         other.ShaderType = RxShaderType::eUnknown;
-    }
-
-
-    FX_FORCE_INLINE VkShaderStageFlagBits GetStageBit() const
-    {
-        switch (ShaderType) {
-        case RxShaderType::eUnknown:
-            FxLogError("Shader stage is RxShaderType::Unknown!");
-            [[fallthrough]];
-        case RxShaderType::eVertex:
-            return VK_SHADER_STAGE_VERTEX_BIT;
-        case RxShaderType::eFragment:
-            return VK_SHADER_STAGE_FRAGMENT_BIT;
-        }
-
-        return VK_SHADER_STAGE_VERTEX_BIT;
     }
 
     void Destroy();
@@ -80,7 +73,6 @@ public:
     FxRef<RxShaderProgram> GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros);
 
     void Load(const char* path);
-
 
 private:
     void CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module);

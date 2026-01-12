@@ -8,7 +8,7 @@ RxDsLayoutBuilder& RxDsLayoutBuilder::AddBinding(int binding, VkDescriptorType t
 {
     const VkSampler* pcImmutableSamplers = nullptr;
 
-    mLayoutBindings.emplace_back(binding, type, count, RxShaderTypeToVkShaderStage(stage), pcImmutableSamplers);
+    mLayoutBindings.emplace_back(binding, type, count, RxShaderUtil::ToUnderlyingType(stage), pcImmutableSamplers);
 
     return *this;
 }

@@ -6,8 +6,8 @@
 
 #include <Core/FxTypes.hpp>
 #include <Math/FxAVXUtil.hpp>
+#include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
-#include <Math/Mat4.hpp>
 
 static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                             0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
@@ -491,7 +491,7 @@ void FxMat4f::LookAt(FxVec3f eye, FxVec3f target, FxVec3f upvec)
 {
     FxVec3f forward = (target - eye);
     forward.NormalizeIP();
-    
+
     FxVec3f right = upvec.Cross(forward);
     right.NormalizeIP();
 
