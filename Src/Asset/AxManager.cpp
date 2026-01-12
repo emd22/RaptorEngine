@@ -199,16 +199,14 @@ void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxRef<Ax
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
-
+        
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, path);
     }
     else {
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
-
+        
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, path);
     }
 }
@@ -222,8 +220,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
-
+        
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, "", data, data_size);
     }
     else {
@@ -231,8 +228,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxImageFormatUtil::GetSize(format);
-
+        
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, "", data, data_size);
     }
 }

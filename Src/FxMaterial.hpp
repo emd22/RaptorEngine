@@ -35,7 +35,7 @@ public:
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pImage && !pDataToLoad) {
-            pImage = AxImage::GetEmptyImage<TFormat, RxImageFormatUtil::GetSize(TFormat)>();
+            pImage = AxImage::GetEmptyImage<TFormat>();
         }
 
         if (!CheckIfReady()) {
@@ -47,6 +47,7 @@ public:
 
         return Status::eReady;
     }
+
     ~FxMaterialComponent() = default;
 
 private:

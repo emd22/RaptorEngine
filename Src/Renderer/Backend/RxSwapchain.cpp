@@ -105,8 +105,15 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
 
         // For now we will enforce that RGBA16 is supported by the render device. This is the first chosen
         // if it is supported.
-        FxAssert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT);
-        Surface.Format = RxImageFormat::eRGBA16_Float;
+        FxAssert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT || surface_format.format == VK_FORMAT_R8G8B8A8_SRGB);
+        
+        if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+            Surface.Format = RxImageFormat::eRGBA16_Float;
+        }
+        else if (surface_format.format == VK_FORMAT_R8G8B8A8_SRGB) {
+            Surface.Format = RxImageFormat::eRGBA8_SRGB;
+        }
+
         Surface.ColorSpace = surface_format.colorSpace;
     }
 

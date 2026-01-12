@@ -133,7 +133,7 @@ public:
     }
 
     FxMat4f Inverse() const;
-    FxMat4f Transposed();
+    FxMat4f Transposed() const;
     FxMat4f TransposeMat3();
 
     void LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane);

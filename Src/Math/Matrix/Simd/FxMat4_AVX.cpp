@@ -12,7 +12,7 @@
 static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                             0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
-const FxMat4f FxMat4f::Identity = FxMat4f(scIdentityData);
+const FxMat4f FxMat4f::sIdentity = FxMat4f(scIdentityData);
 
 __m128 FxMat4f::MultiplyVec4f_SSE(const FxVec4f& vec)
 {
@@ -85,19 +85,14 @@ FxMat4f FxMat4f::AsRotation(const FxQuat& quat)
                    FxVec4f(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
+void FxMat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
 {
     LoadIdentity();
 
-    const float32 Sv = 1.0f / tan(hfov * 0.5f);
-    const float32 Sa = Sv / aspect_ratio;
+    const float32 height = 1.0f / tan(yfov * 0.5f);
+    const float32 width = height / aspect_ratio;
 
-    // const float32 plane_diff = mNearPlane - mFarPlane;
-
-    const float32 a = near_plane / (far_plane - near_plane);
-    // const float32 a = (mFarPlane + mNearPlane) / plane_diff;
-    // const float32 b = (2.0f * mFarPlane * mNearPlane) / plane_diff;
-    const float32 b = far_plane * a;
+    const float32 depth_range = near_plane / (far_plane - near_plane);
 
     /*
     Column 0    1    2    3
@@ -108,14 +103,27 @@ void FxMat4f::LoadPerspectiveMatrix(float32 hfov, float32 aspect_ratio, float32 
            0,    0,  -1,   0
     */
 
-    Columns[0].X = (Sa);
-    Columns[1].Y = (-Sv);
+    Columns[0].X = (width);
+    Columns[1].Y = (-height);
 
-    Columns[2].Z = (a);
-    Columns[2].W = (-1);
+    Columns[2].Z = (-depth_range);
+    Columns[2].W = (1.0f);
 
-    Columns[3].Z = (b);
+    Columns[3].Z = (far_plane * depth_range);
     Columns[3].W = (0);
+}
+
+
+void FxMat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near_plane, float32 far_plane)
+{
+    FxAssert(near_plane > 0.0f && far_plane > 0.0f);
+
+    const float32 depth_range = 1.0f / (far_plane - near_plane);
+
+    Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
+    Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
+    Columns[2].Load4(0.0f, 0.0f, depth_range, 0.0f);
+    Columns[3].Load4(0.0f, 0.0f, -depth_range * near_plane, 1.0f);
 }
 
 
@@ -151,7 +159,7 @@ FxMat4f FxMat4f::AsRotationX(float rad)
     // result.Columns[2].mIntrin = vcombine_f32(vmul_f32(c2_hi, vdup_n_f32(-1)), c2_lo);
 
     __m128 c2 = FxSSE::Permute4<FxShuffle_AX, FxShuffle_AZ, FxShuffle_AY, FxShuffle_AW>(c1);
-    c2 = FxSSE::SetSign<1, -1, 1, 1>(c2);
+    c2 = FxSSE::FlipSigns<1, -1, 1, 1>(c2);
     result.Columns[2].mIntrin = c2;
 
     // {0, 0, 0, 1}
@@ -194,7 +202,7 @@ FxMat4f FxMat4f::AsRotationY(float rad)
     // {cos(x), 0, -sin(x), 0}
 
     const __m128 c0 = FxSSE::Permute4<FxShuffle_AZ, FxShuffle_AY, FxShuffle_AX, FxShuffle_AW>(c2);
-    result.Columns[0].mIntrin = FxSSE::SetSign<1, 1, -1, 1>(c0);
+    result.Columns[0].mIntrin = FxSSE::FlipSigns<1, 1, -1, 1>(c0);
 
     /*
      CX = cos(x), SX = sin(x)
@@ -363,7 +371,7 @@ FxMat4f::FxMat4f(float data[4][4]) noexcept
 
 // Implementation taken from linmath, https://github.com/datenwolf/linmath.h/blob/master/linmath.h
 // TODO: NEON accelerated version of matrix inversion!
-FxMat4f FxMat4f::Inverse()
+FxMat4f FxMat4f::Inverse() const
 {
     float M[4][4];
     for (int i = 0; i < 4; i++) {
@@ -426,7 +434,7 @@ FxMat4f FxMat4f::GetWithoutTranslation() const
     return mat;
 }
 
-FxMat4f FxMat4f::Transposed()
+FxMat4f FxMat4f::Transposed() const
 {
     /*
         [ A E I M ]
@@ -479,16 +487,20 @@ FxMat4f FxMat4f::TransposeMat3() { return Transposed(); }
 
 void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void FxMat4f::LookAt(FxVec3f position, FxVec3f target, FxVec3f upvec)
+void FxMat4f::LookAt(FxVec3f eye, FxVec3f target, FxVec3f upvec)
 {
-    FxVec3f forward = (target - position).Normalize();
-    const FxVec3f right = forward.Cross(upvec).Normalize();
-    const FxVec3f up = right.Cross(forward);
+    FxVec3f forward = (target - eye);
+    forward.NormalizeIP();
+    
+    FxVec3f right = upvec.Cross(forward);
+    right.NormalizeIP();
+
+    const FxVec3f up = forward.Cross(right);
 
     Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
     Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
     Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
-    Columns[3].Load4(-position.Dot(right), -position.Dot(up), -position.Dot(forward), 1.0f);
+    Columns[3].Load4(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
 }
 
 // Mat4f Mat4f::Multiply(Mat4f &other)

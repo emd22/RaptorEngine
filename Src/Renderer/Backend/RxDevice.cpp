@@ -264,19 +264,19 @@ VkSurfaceFormatKHR RxGpuDevice::GetSurfaceFormat()
 
     vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, surface_formats.pData);
 
-    VkSurfaceFormatKHR backup_format = surface_formats[0];
+    VkSurfaceFormatKHR best_format = surface_formats[0];
 
-    for (const VkSurfaceFormatKHR& format : surface_formats) {
-        if (format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
-            return format;
+    for (VkSurfaceFormatKHR surface_format : surface_formats) {
+        if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+            return surface_format;
         }
 
-        if (format.format == VK_FORMAT_B8G8R8_SRGB) {
-            backup_format = format;
+        if (surface_format.format == VK_FORMAT_R8G8B8A8_SRGB) {
+            best_format = surface_format;
         }
     }
 
-    return backup_format;
+    return best_format;
 }
 
 void RxGpuDevice::PickPhysicalDevice()

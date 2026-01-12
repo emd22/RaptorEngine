@@ -41,9 +41,9 @@ FX_FORCE_INLINE void FxQuat::NLerpIP(const FxQuat& dest, float32 time)
     const float32x4_t time_v = vdupq_n_f32(time);
 
     // (1 - time) * A
-    float32x4_t temp = vmulq_f32(inv_time_v, mIntrin);
-    // ... + time * B
-    mIntrin = vfmaq_f32(temp, time_v, dest_v);
+    mIntrin = vmulq_f32(inv_time_v, mIntrin);
+    // ... + time * B -> vfmaq takes in (D, N, M); N and M are multiplied, and accumulated to D(destination).
+    mIntrin = vfmaq_f32(mIntrin, time_v, dest_v);
 
     // Quaternion lerp is always normalized!
     mIntrin = FxNeon::Normalize(mIntrin);

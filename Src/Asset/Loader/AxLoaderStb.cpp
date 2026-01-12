@@ -9,17 +9,18 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxRef<AxBase> asset, const std::st
 
     const char* c_path = path.c_str();
 
-    const int requested_channels = ImageNumComponents; /* RGBA */
-
+    const int pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
+    FxAssert(pixel_size > 0);
+   
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
-    image->NumComponents = mChannels;
+    //image->NumComponents = mChannels;
     image->Size = { uint32(mWidth), uint32(mHeight) };
 
-    uint32 data_size = mWidth * mHeight * requested_channels;
+    uint32 data_size = mWidth * mHeight * pixel_size;
     mDataSize = data_size;
 
-    mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, requested_channels);
+    mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
     if (mImageData == nullptr) {
         FxLogError("Could not load image file at '{:d}'", c_path);
         return AxLoaderStb::Status::eError;
@@ -32,22 +33,22 @@ AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxRef<AxBase> asset, const uint8
 {
     FxRef<AxImage> image(asset);
 
-    const int requested_channels = ImageNumComponents;
+    const int pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
+    FxAssert(pixel_size > 0);
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         FxLogError("Could not retrieve info from image in memory! (Size:{u})", size);
         return AxLoaderStb::Status::eError;
     }
 
-    mChannels = requested_channels;
+    mChannels = pixel_size;
 
-    uint32 data_size = mWidth * mHeight * (requested_channels * sizeof(uint8));
+    uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
     mDataSize = data_size;
 
-    image->NumComponents = mChannels;
     image->Size = { uint32(mWidth), uint32(mHeight) };
 
-    mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, requested_channels);
+    mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
     if (mImageData == nullptr) {
         FxLogError("Could not load image file from memory!");
@@ -71,8 +72,9 @@ void AxLoaderStb::CreateGpuResource(FxRef<AxBase>& asset)
     data_arr.Size = mDataSize;
     data_arr.Capacity = mDataSize;
 
-    FxLogInfo("NUM COMPONENTS: {}", ImageNumComponents);
-    image->Texture.Create(image->ImageType, data_arr, image->Size, ImageFormat, ImageNumComponents);
+    const uint32 pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
+
+    image->Texture.Create(image->ImageType, data_arr, image->Size, ImageFormat, pixel_size);
 
     asset = image;
 

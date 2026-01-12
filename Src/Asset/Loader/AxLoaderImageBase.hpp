@@ -12,5 +12,5 @@ public:
 public:
     RxImageType ImageType;
     RxImageFormat ImageFormat = RxImageFormat::eNone;
-    int16 ImageNumComponents = 0;
+    //int16 ImageNumComponents = 0;
 };

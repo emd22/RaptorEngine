@@ -159,7 +159,7 @@ public:
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
-        return FxVec3f(FxSSE::SetSign<TX, TY, TZ, TW>(vec.mIntrin));
+        return FxVec3f(FxSSE::SetSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
 #else
     FX_FORCE_INLINE float32 GetX() const { return X; }
