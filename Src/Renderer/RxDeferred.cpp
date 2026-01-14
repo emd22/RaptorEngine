@@ -235,6 +235,8 @@ void RxDeferredRenderer::CreateLightingDSLayout()
     // sShadowDepth
     builder.AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
 
+    builder.AddBinding(5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, RxShaderType::eFragment);
+
     DsLayoutLightingFrag = builder.Build();
 }
 
@@ -248,7 +250,7 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
 
     FxStackArray<RxPushConstants, 2> push_consts = {
         RxPushConstants { .Size = sizeof(FxLightVertPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
-        RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
+        // RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
     VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
@@ -659,6 +661,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
 
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1);
 
     DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 

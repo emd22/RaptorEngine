@@ -76,4 +76,4 @@ VkWriteDescriptorSet RxDescriptorSet::GetImageWriteDescriptor(uint32 bind_dest, 
 // RxDescriptorManager
 ///////////////////////////////////////
 
-void RxDescriptorManager::Create() {}
+// void RxDescriptorManager::Create() {}

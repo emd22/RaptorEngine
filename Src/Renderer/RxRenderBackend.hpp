@@ -9,6 +9,7 @@
 #include "FxWindow.hpp"
 #include "RxDeferred.hpp"
 #include "RxSamplerCache.hpp"
+#include "RxUniformBuffer.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
@@ -189,6 +190,8 @@ public:
     RxDeferredLightingPass* pCurrentLightingPass = nullptr;
 
     FxRef<RxDeferredRenderer> pDeferredRenderer { nullptr };
+
+    RxUniforms Uniforms;
 
     // RxSamplerCache SamplerCache;
 

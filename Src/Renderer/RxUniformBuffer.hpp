@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Backend/RxGpuBuffer.hpp"
-#include "Backend/RxShader.hpp"
 
 #include <Core/FxTypes.hpp>
+#include <cstdlib>
 
 
 class RxUniforms
@@ -16,12 +16,50 @@ public:
     void Create();
 
     /**
-     * @brief Resets the uniform buffer to overwrite values from the previous frame(s).
+     * @brief Retrieve the pointer that the buffer starts at relative to the current frame.
+     */
+    uint8* GetBufferBasePtr();
+
+    template <typename TValueType>
+    void Submit(const TValueType& value)
+    {
+        constexpr uint32 type_size = sizeof(TValueType);
+
+        SubmitPtr(&value, type_size);
+    }
+
+    template <typename TPtrType>
+    void SubmitPtr(const TPtrType* value, uint32 size)
+    {
+        FxAssert(mGpuBuffer.IsMapped());
+
+        if (mUniformIndex + size >= scUniformBufferSize) {
+            FxLogError("Could not submit uniform as uniform buffer is full!");
+            return;
+        }
+
+        uint8* dest_ptr = GetBufferBasePtr() + mUniformIndex;
+        std::memcpy(dest_ptr, value, size);
+
+        // Offset for the next value
+        mUniformIndex += size;
+    }
+
+    /**
+     * @brief Get the index for start of the buffer at the current frame.
+     */
+    uint32 GetBaseOffset() const;
+
+    /**
+     * @brief Resets the uniform buffer back to the start.
      */
     void Rewind();
 
-public:
+
+private:
     /// Gpu buffer that stores current uniform buffer data. Note that this is a continguous buffer that stores
     /// `RxFramesInFlight` number of uniform structures that are of size `scUniformBufferSize`.
-    RxRawGpuBuffer<uint32> mGpuBuffer;
+    RxRawGpuBuffer<uint8> mGpuBuffer;
+
+    uint32 mUniformIndex = 0;
 };

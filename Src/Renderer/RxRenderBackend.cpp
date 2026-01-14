@@ -462,6 +462,8 @@ RxFrameResult RxRenderBackend::BeginFrame()
 {
     RxFrameData* frame = GetFrame();
 
+    Uniforms.Rewind();
+
     pCurrentGPass = pDeferredRenderer->GetCurrentGPass();
     pCurrentCompPass = pDeferredRenderer->GetCurrentCompPass();
     pCurrentLightingPass = pDeferredRenderer->GetCurrentLightingPass();
@@ -684,11 +686,11 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
     return RxFrameResult::RenderError;
 }
 
-inline RxUniformBufferObject& RxRenderBackend::GetUbo()
-{
-    static RxUniformBufferObject ubo;
-    return ubo;
-}
+// inline RxUniformBufferObject& RxRenderBackend::GetUbo()
+// {
+//     static RxUniformBufferObject ubo;
+//     return ubo;
+// }
 
 void RxRenderBackend::CreateSurfaceFromWindow()
 {

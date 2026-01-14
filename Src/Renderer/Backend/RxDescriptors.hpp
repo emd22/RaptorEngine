@@ -8,7 +8,6 @@
 
 #include <Core/FxPanic.hpp>
 #include <Core/FxSizedArray.hpp>
-#include <vector>
 
 #include "vulkan/vulkan_core.h"
 // #include "RxTexture.hpp"
@@ -131,22 +130,16 @@ private:
 };
 
 
-struct RxDescriptorHandle
-{
-    RxDescriptorSet
+// class RxDescriptorManager
+// {
+//     static constexpr uint32 scMaxPools = 5;
 
-}
+// public:
+//     RxDescriptorManager() = default;
 
-class RxDescriptorManager
-{
-    static constexpr uint32 scMaxPools = 5;
+//     void Create();
+//     void Request();
 
-public:
-    RxDescriptorManager() = default;
-
-    void Create();
-    void Request();
-
-private:
-    FxStackArray<RxDescriptorPool, scMaxPools> mPools;
-};
+// private:
+//     FxStackArray<RxDescriptorPool, scMaxPools> mPools;
+// };
