@@ -106,6 +106,11 @@ public:
                                 offsets.pData);
     }
 
+    void BindWithOffset(const RxCommandBuffer &cmd, VkPipelineBindPoint bind_point, const RxPipeline &pipeline, uint32 offset) const
+    {
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 1, &offset);
+    }
+
     void Bind(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline) const
     {
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);

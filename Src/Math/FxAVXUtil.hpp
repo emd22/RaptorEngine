@@ -49,7 +49,7 @@ FX_FORCE_INLINE __m128 SetSigns(__m128 v)
     const __m128 sign_v = _mm_castsi128_ps(_mm_set1_epi32(scSignMask32));
     
     if constexpr (TSign > 0.0) {
-        return _mm_andnot_ps(v, sign_v);
+        return _mm_andnot_ps(sign_v, v);
     }
 
     return _mm_or_ps(v, sign_v);

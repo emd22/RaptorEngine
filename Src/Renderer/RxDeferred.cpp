@@ -143,7 +143,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     attachments.Add({ .Format = RxImageFormat::eBGRA8_UNorm })
         .Add({ .Format = RxImageFormat::eRGBA16_Float })
-        .Add({ .Format = RxImageFormat::eD32_Float_S8_UInt });
+        .Add({ .Format = RxImageFormat::eD32_Float });
 
 
     RxShader shader_geometry("Geometry");
@@ -553,7 +553,7 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
     DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 
-    DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float_S8_UInt, VK_IMAGE_TILING_OPTIMAL,
+    DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -663,7 +663,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1);
 
-    DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
+    DescriptorPool.Create(gRenderer->GetDevice(), 4);
 
     ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -688,7 +688,7 @@ void RxDeferredLightingPass::Begin()
                        FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
     mPlLighting->Bind(frame->LightCommandBuffer);
 
-    DescriptorSet.Bind(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting);
+    DescriptorSet.BindWithOffset(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting, gRenderer->Uniforms.GetBaseOffset());
 }
 
 void RxDeferredLightingPass::End() { mRenderPass->End(); }
@@ -707,10 +707,12 @@ void RxDeferredLightingPass::Submit()
         .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
 
         .pWaitDstStageMask = wait_stages,
-        // command buffers
+        
+        // Command buffers
         .commandBufferCount = 1,
         .pCommandBuffers = &frame->LightCommandBuffer.CommandBuffer,
-        // signal semaphores
+
+        // Signal semaphores
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = &frame->LightingSem.Semaphore,
     };
@@ -727,8 +729,8 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 
 
     FxStackArray<VkDescriptorImageInfo, 4> write_image_infos;
-    FxStackArray<VkDescriptorBufferInfo, 1> write_buffer_infos;
-    FxStackArray<VkWriteDescriptorSet, 5> write_infos;
+    FxStackArray<VkDescriptorBufferInfo, 2> write_buffer_infos;
+    FxStackArray<VkWriteDescriptorSet, 6> write_infos;
 
     // Depth image descriptor
     {
@@ -796,9 +798,39 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = write_image_infos.Insert(normals_image_info),
+            .pBufferInfo = nullptr
         };
 
         write_infos.Insert(normals_write);
+    }
+
+    // Note that the shadow texture is added in RxDirectionalShadow.hpp!
+
+    // Uniform buffer
+    {
+        const int binding_index = 5;
+
+        const VkDescriptorBufferInfo uniform_buffer_info { 
+            .buffer = gRenderer->Uniforms.GetGpuBuffer().Buffer,
+            .offset = 0,
+            .range = gRenderer->Uniforms.scUniformBufferSize
+        };
+
+        const VkWriteDescriptorSet uniform_write
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
+            .dstSet = DescriptorSet.Set, 
+            .dstBinding = binding_index,
+            .dstArrayElement = 0, 
+            .descriptorCount = 1, 
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            .pImageInfo = nullptr,
+            .pBufferInfo = write_buffer_infos.Insert(uniform_buffer_info),
+        };
+
+        write_infos.Insert(uniform_write);
+
+
     }
 
 

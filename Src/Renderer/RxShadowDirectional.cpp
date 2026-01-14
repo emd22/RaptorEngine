@@ -14,11 +14,11 @@ FX_SET_MODULE_NAME("RxShadowDirectional")
 RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 {
     RxAttachmentList attachment_list;
-    attachment_list.Add({ .Format = RxImageFormat::eD32_Float_S8_UInt });
+    attachment_list.Add({ .Format = RxImageFormat::eD32_Float });
     mRenderPass.Create(attachment_list, size);
 
     for (int i = 0; i < RxFramesInFlight; i++) {
-        mAttachments[i].Create(RxImageType::e2d, size, RxImageFormat::eD32_Float_S8_UInt, VK_IMAGE_TILING_OPTIMAL,
+        mAttachments[i].Create(RxImageType::e2d, size, RxImageFormat::eD32_Float, VK_IMAGE_TILING_OPTIMAL,
                                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                                VK_IMAGE_ASPECT_DEPTH_BIT);
         mFramebuffers[i].Create({ mAttachments[i].View }, mRenderPass, size);

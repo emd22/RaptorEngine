@@ -8,6 +8,7 @@
 
 class RxUniforms
 {
+public:
     static constexpr uint32 scUniformBufferSize = 512;
 
 public:
@@ -18,7 +19,14 @@ public:
     /**
      * @brief Retrieve the pointer that the buffer starts at relative to the current frame.
      */
-    uint8* GetBufferBasePtr();
+    uint8* GetCurrentBuffer();
+
+    RxRawGpuBuffer<uint8>& GetGpuBuffer()
+    { 
+        return mGpuBuffer;
+    }
+
+
 
     template <typename TValueType>
     void Submit(const TValueType& value)
@@ -38,7 +46,7 @@ public:
             return;
         }
 
-        uint8* dest_ptr = GetBufferBasePtr() + mUniformIndex;
+        uint8* dest_ptr = GetCurrentBuffer() + mUniformIndex;
         std::memcpy(dest_ptr, value, size);
 
         // Offset for the next value

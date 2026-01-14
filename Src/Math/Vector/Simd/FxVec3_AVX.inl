@@ -26,9 +26,7 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const flo
 }
 
 FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const
-{
-    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other.mIntrin, 0xFF));
-}
+{ return FxSSE::Dot(mIntrin, other.mIntrin); }
 
 FX_FORCE_INLINE bool FxVec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 

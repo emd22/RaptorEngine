@@ -11,4 +11,4 @@ void FxMemPool2::Create(void* buffer)
 }
 
 
-void* FxMemPool2::Allocate(uint32 size) {}
+void* FxMemPool2::Allocate(uint32 size) { return nullptr; }

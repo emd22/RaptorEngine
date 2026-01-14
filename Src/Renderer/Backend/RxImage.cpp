@@ -151,7 +151,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
 void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count,
                                std::optional<RxTransitionLayoutOverrides> overrides)
 {
-    VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT;
 
     bool is_depth_texture = RxImageFormatUtil::IsDepth(Format);
 

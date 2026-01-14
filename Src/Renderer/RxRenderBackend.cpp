@@ -100,6 +100,8 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     gObjectManager->Create();
 
+    Uniforms.Create();
+
     pDeferredRenderer = FxMakeRef<RxDeferredRenderer>();
     pDeferredRenderer->Create(Swapchain.Extent);
 

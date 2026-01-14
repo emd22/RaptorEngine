@@ -12,7 +12,7 @@ FX_SET_MODULE_NAME("Main")
 
 int main()
 {
-    FxMemPool::GetGlobalPool().Create(50, FxUnitMebibyte);
+    FxMemPool::GetGlobalPool().Create(200, FxUnitMebibyte);
 
     // float32 angle = FX_PI_2;
 

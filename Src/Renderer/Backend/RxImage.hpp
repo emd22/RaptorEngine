@@ -33,6 +33,7 @@ enum class RxImageFormat
     _eDepthFormatsBegin,
 
     eD16_UNorm_S8_UInt,
+    eD32_Float,
     eD32_Float_S8_UInt,
 
     /// DO NOT USE FORMAT: Marker for depth formats
@@ -81,6 +82,9 @@ struct RxImageFormatUtil
         case RxImageFormat::eD16_UNorm_S8_UInt:
             return 3;
 
+        case RxImageFormat::eD32_Float:
+            return 4;
+
         case RxImageFormat::eD32_Float_S8_UInt:
             return 5;
         }
@@ -117,6 +121,8 @@ struct RxImageFormatUtil
 
         case RxImageFormat::eD16_UNorm_S8_UInt:
             return VK_FORMAT_D16_UNORM_S8_UINT;
+        case RxImageFormat::eD32_Float:
+            return VK_FORMAT_D32_SFLOAT;
         case RxImageFormat::eD32_Float_S8_UInt:
             return VK_FORMAT_D32_SFLOAT_S8_UINT;
         }

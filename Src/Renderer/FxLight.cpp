@@ -16,16 +16,16 @@ FxLightBase::FxLightBase(FxLightFlags flags) : Flags(flags)
     FxLogDebug("Creating light (id={})", ObjectId);
 }
 
-void FxLightBase::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { LightVolume = volume; }
+void FxLightBase::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { pLightVolume = volume; }
 
 void FxLightBase::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh)
 {
-    LightVolumeGen = volume_gen;
-    LightVolume = volume_gen->AsPositionsMesh();
+    pLightVolumeGen = volume_gen;
+    pLightVolume = volume_gen->AsPositionsMesh();
     // Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
 
     if (create_debug_mesh) {
-        mDebugMesh = volume_gen->AsMesh();
+        mpDebugMesh = volume_gen->AsMesh();
     }
 }
 
@@ -101,6 +101,8 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
     RxFrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
+    gRenderer->Uniforms.Rewind();
+
     pPipeline->Bind(frame->LightCommandBuffer);
 
     {
@@ -150,13 +152,13 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
         //                    sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
     }
 
-    LightVolume->Render(frame->LightCommandBuffer, *pPipeline);
+    pLightVolume->Render(frame->LightCommandBuffer, *pPipeline);
 }
 
 
 void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
 {
-    if (!mDebugMesh) {
+    if (!mpDebugMesh) {
         return;
     }
 
@@ -171,7 +173,7 @@ void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                        &push_constants);
 
-    mDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
+    mpDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
 }
 
 
@@ -212,8 +214,15 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
                            sizeof(push_constants), &push_constants);
     }
 
+    gRenderer->Uniforms.Rewind();
 
-    gRenderer->Uniforms.SubmitPtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+    if (shadow_camera) {
+        gRenderer->Uniforms.SubmitPtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+    }
+    else {
+        gRenderer->Uniforms.SubmitPtr(camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+    }
+
     gRenderer->Uniforms.SubmitPtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
     gRenderer->Uniforms.SubmitPtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
