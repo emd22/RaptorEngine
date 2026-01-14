@@ -81,9 +81,9 @@ layout(binding = 5) cbuffer FSUniforms
     float4x4 mInvView;
     float4x4 mInvProjection;
     float3 vEyePosition;
-    float fLightRadius;
+    float1 fLightRadius;
     float3 vLightPosition;
-    uint uiLightColor;
+    uint1 uiLightColor;
 };
 
 #define FX_MATH_PI 3.14159265359

@@ -8,7 +8,7 @@
 void RxUniforms::Create()
 {
     static_assert((scUniformBufferSize % 2 == 0));
-    constexpr uint32 size_in_ints = (scUniformBufferSize) * RxFramesInFlight;
+    constexpr uint32 size_in_ints = (scUniformBufferSize)*RxFramesInFlight;
 
     mGpuBuffer.Create(size_in_ints, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU,
                       RxGpuBufferFlags::ePersistentMapped);
@@ -21,6 +21,6 @@ uint32 RxUniforms::GetBaseOffset() const { return scUniformBufferSize * gRendere
 
 uint8* RxUniforms::GetCurrentBuffer()
 {
-    // Offset by the frame currently "in flight"
+    // Offset by the frame currently in flight
     return reinterpret_cast<uint8*>(mGpuBuffer.pMappedBuffer) + GetBaseOffset();
 }

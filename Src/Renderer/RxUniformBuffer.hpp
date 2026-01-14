@@ -21,12 +21,7 @@ public:
      */
     uint8* GetCurrentBuffer();
 
-    RxRawGpuBuffer<uint8>& GetGpuBuffer()
-    { 
-        return mGpuBuffer;
-    }
-
-
+    RxRawGpuBuffer<uint8>& GetGpuBuffer() { return mGpuBuffer; }
 
     template <typename TValueType>
     void Submit(const TValueType& value)
@@ -52,6 +47,8 @@ public:
         // Offset for the next value
         mUniformIndex += size;
     }
+
+    void AssertSize(uint32 expected_size) { FxAssert(mUniformIndex == expected_size); }
 
     /**
      * @brief Get the index for start of the buffer at the current frame.

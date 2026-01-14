@@ -217,7 +217,8 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
     gRenderer->Uniforms.Rewind();
 
     if (shadow_camera) {
-        gRenderer->Uniforms.SubmitPtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+        gRenderer->Uniforms.SubmitPtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+                                      sizeof(FxMat4f));
     }
     else {
         gRenderer->Uniforms.SubmitPtr(camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
@@ -226,12 +227,14 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
     gRenderer->Uniforms.SubmitPtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
     gRenderer->Uniforms.SubmitPtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
-    // Note that the light position is packed with the light colour as the fourth component!
+    // // Note that the light position is packed with the light colour as the fourth component!
+    gRenderer->Uniforms.SubmitPtr(camera.Position.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Submit(mRadius);
+
     gRenderer->Uniforms.SubmitPtr(mPosition.mData, sizeof(float32) * 3);
     gRenderer->Uniforms.Submit(Color.Value);
 
-    gRenderer->Uniforms.SubmitPtr(camera.Position.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Submit(mRadius);
+    // gRenderer->Uniforms.AssertSize(sizeof(FxLightFragPushConstants));
 
     {
         // FxLightFragPushConstants push_constants {};
@@ -245,13 +248,15 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
         // memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
         // memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
-        // // Copy the light positions to the push constants
+        // Copy the light positions to the push constants
         // memcpy(push_constants.LightPosition, mPosition.mData, sizeof(float32) * 3);
 
         // push_constants.LightColor = Color.Value;
 
         // memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
         // push_constants.LightRadius = mRadius;
+
+        // gRenderer->Uniforms.Submit(push_constants);
 
         // vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT,
         //                    sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
