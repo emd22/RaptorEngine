@@ -31,6 +31,9 @@ public:
         Physics.Teleport(Position);
     }
 
+    void SetFlyMode(bool value);
+    bool IsFlyMode() const { return mbIsFlymode; };
+
     void Move(float delta_time, const FxVec3f& offset);
 
     void RotateHead(const FxVec2f& xy)
@@ -82,6 +85,7 @@ public:
     FxVec3f Position = FxVec3f::sZero;
 
     bool bIsSprinting = false;
+
     float JumpForce = 0.0f;
 
 private:
@@ -92,4 +96,6 @@ private:
     bool mbIsApplyingUserForce : 1 = false;
     bool mbUpdateDirection : 1 = true;
     bool mbUpdatePhysicsTransform : 1 = true;
+
+    bool mbIsFlymode : 1 = false;
 };

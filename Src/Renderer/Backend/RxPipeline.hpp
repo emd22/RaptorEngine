@@ -37,18 +37,6 @@ struct alignas(16) FxLightVertPushConstants
     uint32 ObjectId = 0;
 };
 
-struct alignas(16) FxLightFragPushConstants
-{
-    // float32 LightCameraMatrix[16];
-    // float32 InvView[16];
-    // float32 InvProj[16];
-
-    // float32 EyePosition[3];
-    // float32 LightRadius;
-    // float32 LightPosition[3];
-    // uint32 LightColor;
-};
-
 struct alignas(16) FxCompositionPushConstants
 {
     float32 ViewInverse[16];

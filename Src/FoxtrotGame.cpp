@@ -172,7 +172,8 @@ void FoxtrotGame::CreateGame()
 
     CreateLights();
 
-    Player.Physics.bDisableGravity = true;
+    // Player.Physics.bDisableGravity = true;
+    Player.SetFlyMode(true);
 
     gShadowRenderer = new RxShadowDirectional(FxVec2u(512, 512));
     // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
@@ -305,7 +306,8 @@ void FoxtrotGame::ProcessControls()
 
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_N)) {
-        Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
+        // Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
+        Player.SetFlyMode(!Player.IsFlyMode());
     }
 }
 
