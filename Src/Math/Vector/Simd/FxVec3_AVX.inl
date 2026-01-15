@@ -4,8 +4,7 @@
 
 #ifdef FX_USE_AVX
 
-#include <immintrin.h>
-
+#include <Math/FxSSE.hpp>
 #include <Math/FxVec3.hpp>
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
@@ -25,8 +24,7 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const flo
     return static_cast<bool>(_mm_testz_si128(cmp_v, cmp_v));
 }
 
-FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const
-{ return FxSSE::Dot(mIntrin, other.mIntrin); }
+FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const { return FxSSE::Dot(mIntrin, other.mIntrin); }
 
 FX_FORCE_INLINE bool FxVec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 

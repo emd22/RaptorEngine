@@ -8,8 +8,8 @@
 #include <arm_neon.h>
 #elif defined(FX_USE_AVX)
 #include "FxAVXUtil.hpp"
+#include "FxSSE.hpp"
 
-#include <immintrin.h>
 #endif
 
 #include <cmath>

@@ -5,8 +5,7 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Math/Real.h>
 
-#include <immintrin.h>
-
+#include <Math/FxSSE.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
 
@@ -98,11 +97,6 @@ bool FxVec3f::IsCloseTo(const JPH::Vec3& other, const float32 tolerance) const
 
 
 bool FxVec3f::operator==(const JPH::Vec3& other) const { return (*this) == FxVec3f(other.mValue); }
-
-
-
-
-
 
 
 #endif

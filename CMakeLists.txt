@@ -7,6 +7,10 @@ project(ThirdPartyLib)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
+# For testing SSE/AVX code on non x64 processors
+set(FX_USE_SIMDE TRUE)
+
+
 if (WIN32)
 	message("${CMAKE_SOURCE_DIR}")
 	link_directories(${CMAKE_SOURCE_DIR}/Lib/win32)
@@ -28,6 +32,7 @@ file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
+
 target_link_libraries(ThirdPartyLib slang SDL3::SDL3 jpeg)
 
 target_compile_definitions(
@@ -36,8 +41,8 @@ target_compile_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
 )
-target_compile_options(ThirdPartyLib PRIVATE)
 
+target_compile_options(ThirdPartyLib PRIVATE)
 
 project(cr CXX)
 
@@ -54,7 +59,6 @@ list(FILTER HEADERS EXCLUDE REGEX "Src/ThirdParty/.*")
 
 find_package(Vulkan REQUIRED)
 
-
 add_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
@@ -65,6 +69,12 @@ add_definitions(
 	-DFX_BASE_DIR="${CMAKE_SOURCE_DIR}"
     # -DFX_DEBUG_STATIC_ARRAY
 )
+
+
+
+if (FX_USE_SIMDE)
+    add_definitions(-DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES)
+endif()
 
 if (APPLE)
 	add_compile_options(

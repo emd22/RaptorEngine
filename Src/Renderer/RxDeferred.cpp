@@ -549,7 +549,7 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
 
     //    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
     //    RendererFramesInFlight);
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
     DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 
@@ -654,11 +654,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     mPlLighting = &mRendererInst->PlLightingOutsideVolume;
 
     // Albedo sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
-    // Positions sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
-    // Normals sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
 
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1);
@@ -688,7 +684,8 @@ void RxDeferredLightingPass::Begin()
                        FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
     mPlLighting->Bind(frame->LightCommandBuffer);
 
-    DescriptorSet.BindWithOffset(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting, gRenderer->Uniforms.GetBaseOffset());
+    DescriptorSet.BindWithOffset(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting,
+                                 gRenderer->Uniforms.GetBaseOffset());
 }
 
 void RxDeferredLightingPass::End() { mRenderPass->End(); }
@@ -707,7 +704,7 @@ void RxDeferredLightingPass::Submit()
         .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
 
         .pWaitDstStageMask = wait_stages,
-        
+
         // Command buffers
         .commandBufferCount = 1,
         .pCommandBuffers = &frame->LightCommandBuffer.CommandBuffer,
@@ -790,16 +787,14 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 
-        const VkWriteDescriptorSet normals_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = DescriptorSet.Set,
-            .dstBinding = binding_index,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo = write_image_infos.Insert(normals_image_info),
-            .pBufferInfo = nullptr
-        };
+        const VkWriteDescriptorSet normals_write { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                                   .dstSet = DescriptorSet.Set,
+                                                   .dstBinding = binding_index,
+                                                   .dstArrayElement = 0,
+                                                   .descriptorCount = 1,
+                                                   .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                   .pImageInfo = write_image_infos.Insert(normals_image_info),
+                                                   .pBufferInfo = nullptr };
 
         write_infos.Insert(normals_write);
     }
@@ -810,27 +805,22 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 5;
 
-        const VkDescriptorBufferInfo uniform_buffer_info { 
-            .buffer = gRenderer->Uniforms.GetGpuBuffer().Buffer,
-            .offset = 0,
-            .range = gRenderer->Uniforms.scUniformBufferSize
-        };
+        const VkDescriptorBufferInfo uniform_buffer_info { .buffer = gRenderer->Uniforms.GetGpuBuffer().Buffer,
+                                                           .offset = 0,
+                                                           .range = gRenderer->Uniforms.scUniformBufferSize };
 
-        const VkWriteDescriptorSet uniform_write
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
-            .dstSet = DescriptorSet.Set, 
+        const VkWriteDescriptorSet uniform_write {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = DescriptorSet.Set,
             .dstBinding = binding_index,
-            .dstArrayElement = 0, 
-            .descriptorCount = 1, 
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
             .pImageInfo = nullptr,
             .pBufferInfo = write_buffer_infos.Insert(uniform_buffer_info),
         };
 
         write_infos.Insert(uniform_write);
-
-
     }
 
 
@@ -884,13 +874,7 @@ void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index
     mRenderPass = &mRendererInst->RpComposition;
 
     // Albedo sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
-    // Positions sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
-    // Normals sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
-    // Lights sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
     DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 
     // The output image renders to the swapchains output

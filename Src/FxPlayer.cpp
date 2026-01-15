@@ -38,7 +38,7 @@ void FxPlayer::Move(float delta_time, const FxVec3f& offset)
 {
     FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
     if (mbIsFlymode) {
-        new_direction.Y = (pCamera->mAngleY);
+        // new_direction.Y = (pCamera->mAngleY);
     }
 
     const FxVec3f forward = new_direction * offset.Z;

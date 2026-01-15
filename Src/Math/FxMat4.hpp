@@ -6,7 +6,7 @@
 #if FX_USE_NEON
 #include <arm_neon.h>
 #elif FX_USE_AVX
-#include <immintrin.h>
+#include "FxSSE.hpp"
 #endif
 
 class FxQuat;

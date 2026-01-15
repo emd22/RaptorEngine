@@ -2,12 +2,11 @@
 
 #ifdef FX_USE_AVX
 
-#include <immintrin.h>
-
 #include <Core/FxTypes.hpp>
 #include <Math/FxAVXUtil.hpp>
 #include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
+#include <Math/FxSSE.hpp>
 
 static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                             0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };

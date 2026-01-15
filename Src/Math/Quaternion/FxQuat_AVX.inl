@@ -4,8 +4,9 @@
 
 #ifdef FX_USE_AVX
 
-#include <Math/FxQuat.hpp>
 #include <Math/FxAVXUtil.hpp>
+#include <Math/FxQuat.hpp>
+#include <Math/FxSSE.hpp>
 
 FX_FORCE_INLINE FxQuat& FxQuat::operator=(const __m128 other)
 {
@@ -25,21 +26,21 @@ FX_FORCE_INLINE bool FxQuat::IsCloseTo(const __m128 other, const float32 toleran
 
     // Check if any absolute difference is > tolerance
     __m128i cmp_v = _mm_castps_si128(_mm_cmpgt_ps(diff, _mm_set1_ps(tolerance)));
-    
+
     // If any components are, return true
     return static_cast<bool>(_mm_testz_si128(cmp_v, cmp_v));
 }
 
-//FX_FORCE_INLINE void FxQuat::LerpIP(const FxQuat& dest, float32 step)
+// FX_FORCE_INLINE void FxQuat::LerpIP(const FxQuat& dest, float32 step)
 //{
-//    const __m128 inv_step_v = _mm_set1_ps(1.0 - step);
-//    const __m128 step_v = _mm_set1_ps(step);
+//     const __m128 inv_step_v = _mm_set1_ps(1.0 - step);
+//     const __m128 step_v = _mm_set1_ps(step);
 //
-//    mIntrin = _mm_add_ps(_mm_mul_ps(inv_step_v, mIntrin), _mm_mul_ps(step_v, dest.mIntrin));
-//}
+//     mIntrin = _mm_add_ps(_mm_mul_ps(inv_step_v, mIntrin), _mm_mul_ps(step_v, dest.mIntrin));
+// }
 
 FX_FORCE_INLINE void FxQuat::NLerpIP(const FxQuat& dest, float32 time)
-{ 
+{
     __m128 dest_v = dest.mIntrin;
 
     if (FxSSE::Dot(mIntrin, dest.mIntrin) < 0.0f) {
