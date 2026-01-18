@@ -28,9 +28,8 @@ public:
     RxImageType ImageType = RxImageType::e2d;
 
     VkImageUsageFlags Usage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-    VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    RxImageAspectFlag Aspect = RxImageAspectFlag::eColor;
 
-    RxImageFormat Format = RxImageFormat::eNone;
     VkSampleCountFlagBits Samples = VK_SAMPLE_COUNT_1_BIT;
 
     RxLoadOp LoadOp = RxLoadOp::eClear;
@@ -42,13 +41,27 @@ public:
     VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+    RxImage Image;
+
 public:
+    RxAttachment() = default;
+
+    RxAttachment(RxImageFormat format) { Image.Format = format; }
+
+    RxAttachment(RxImageFormat format, RxLoadOp load_op, RxStoreOp store_op, VkImageLayout initial_layout,
+                 VkImageLayout final_layout)
+        : LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
+    {
+        Image.Format = format;
+    }
+
+
     VkAttachmentDescription BuildDescription() const
     {
-        FxAssert(Format != RxImageFormat::eNone);
+        FxAssert(Image.Format != RxImageFormat::eNone);
 
         return VkAttachmentDescription {
-            .format = RxImageFormatUtil::ToUnderlying(Format),
+            .format = RxImageFormatUtil::ToUnderlying(Image.Format),
             .samples = Samples,
 
             .loadOp = static_cast<VkAttachmentLoadOp>(LoadOp),
@@ -61,6 +74,9 @@ public:
             .finalLayout = FinalLayout,
         };
     }
+
+    RxImage& GetImage() { return Image; }
+    VkImageView& GetImageView() { return Image.View; }
 };
 
 class RxAttachmentList
@@ -70,6 +86,7 @@ public:
     RxAttachmentList(uint32 max_attachments) : mMaxAttachments(max_attachments) {}
     RxAttachmentList(const RxAttachmentList& other) { Attachments.InitAsCopyOf(other.Attachments); }
     RxAttachmentList(RxAttachmentList&& other) { Attachments = std::move(other.Attachments); }
+
 
     static RxAttachmentList New() { return {}; }
 
@@ -96,5 +113,6 @@ private:
     bool mbImagesBuilt : 1 = false;
 
     FxSizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
+
     uint32 mMaxAttachments = 10;
 };

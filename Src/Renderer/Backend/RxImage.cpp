@@ -31,8 +31,9 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
 }
 
 void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
-                     VkImageUsageFlags usage, VkImageAspectFlags aspect_flags)
+                     VkImageUsageFlags usage, RxImageAspectFlag aspect)
 {
+    Aspect = aspect;
     Size = size;
     Format = format;
     ViewType = image_type;
@@ -111,7 +112,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
             },
         .subresourceRange =
             {
-                .aspectMask = aspect_flags,
+                .aspectMask = static_cast<VkImageAspectFlags>(aspect),
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -142,9 +143,9 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
 }
 
 void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageUsageFlags usage,
-                     VkImageAspectFlags aspect_flags)
+                     RxImageAspectFlag aspect)
 {
-    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect_flags);
+    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect);
 }
 
 
@@ -292,7 +293,7 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat imag
 
 
     Create(RxImageType::eCubemap, FxVec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
-           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, aspect_flags);
+           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, Aspect);
 
     FxStackArray<VkImageCopy, 6> copy_infos;
 

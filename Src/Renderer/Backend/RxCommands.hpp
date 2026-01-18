@@ -35,6 +35,7 @@ public:
 
 public:
     VkCommandPool CommandPool = nullptr;
+
     uint32 QueueFamilyIndex = 0;
 
 private:

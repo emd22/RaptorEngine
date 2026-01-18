@@ -527,7 +527,7 @@ void RxRenderBackend::PresentFrame()
     RxFrameData* frame = GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
     };
 
     VkSemaphore* submit_semaphore = &mSubmitSemaphores[mImageIndex].Semaphore;

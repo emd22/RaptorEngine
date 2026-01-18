@@ -45,7 +45,7 @@ public:
         const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-        Image.Create(image_type, dimensions, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, VK_IMAGE_ASPECT_COLOR_BIT);
+        Image.Create(image_type, dimensions, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, RxImageAspectFlag::eColor);
 
         // RxImageTypeProperties type_properties = RxImageTypeGetProperties(image_type);
 

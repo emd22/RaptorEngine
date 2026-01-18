@@ -137,7 +137,6 @@ public:
     void End();
     void Submit();
 
-    void SubmitUniforms(const RxUniformBufferObject& ubo);
     void BuildDescriptorSets();
 
 public:
@@ -156,8 +155,6 @@ public:
 
     RxDescriptorPool DescriptorPool;
     //    RxDescriptorSet DescriptorSet;
-
-    RxRawGpuBuffer<RxUniformBufferObject> UniformBuffer;
 
 private:
     RxPipeline* mPlGeometry = nullptr;

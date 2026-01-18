@@ -146,10 +146,8 @@ enum class RxImageType
 
 enum class RxImageAspectFlag
 {
-    eAuto,
     eColor = VK_IMAGE_ASPECT_COLOR_BIT,
     eDepth = VK_IMAGE_ASPECT_DEPTH_BIT,
-
 };
 
 struct RxTransitionLayoutOverrides
@@ -160,7 +158,7 @@ struct RxTransitionLayoutOverrides
 
 struct RxImageCubemapOptions
 {
-    RxImageAspectFlag AspectFlag = RxImageAspectFlag::eAuto;
+    RxImageAspectFlag AspectFlag = RxImageAspectFlag::eColor;
 };
 
 const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type);
@@ -169,10 +167,10 @@ class RxImage
 {
 public:
     void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
-                VkImageUsageFlags usage, VkImageAspectFlags aspect_flags);
+                VkImageUsageFlags usage, RxImageAspectFlag aspect);
 
     void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageUsageFlags usage,
-                VkImageAspectFlags aspect_flags);
+                RxImageAspectFlag aspect);
 
     void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1,
                           std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
@@ -187,8 +185,11 @@ public:
 
     ~RxImage() { Destroy(); }
 
+
 public:
     FxVec2u Size = FxVec2u::sZero;
+
+    RxImageAspectFlag Aspect = RxImageAspectFlag::eColor;
 
     VkImage Image = nullptr;
     VkImageView View = nullptr;

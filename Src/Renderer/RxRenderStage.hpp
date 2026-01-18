@@ -17,7 +17,7 @@ public:
 
     void Create(RxAttachmentList& attachments, const FxVec2u& size);
 
-    void AddOutputTarget(RxImageType image_type, VkFormat format, VkImageUsageFlagBits usage);
+    void AddTarget(RxImageType image_type, VkFormat format, VkImageUsageFlagBits usage);
 
 private:
     /**
@@ -29,12 +29,11 @@ private:
 private:
     RxAttachmentList mInputAttachments;
 
-    /// Framebuffer per each swapchain image. Specifies the attachments for the renderpass.
-    FxSizedArray<RxFramebuffer> mFramebuffers;
+    RxFramebuffer mFramebuffer;
     FxSizedArray<RxAttachment> mOutputTargets;
     RxRenderPass mRenderPass;
 
     bool mbIsBuilt : 1 = false;
 
-    FxVec2u mSize;
+    FxVec2u mSize = FxVec2u::sZero;
 };

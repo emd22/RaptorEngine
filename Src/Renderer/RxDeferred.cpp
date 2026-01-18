@@ -141,9 +141,10 @@ void RxDeferredRenderer::CreateGPassPipeline()
 {
     RxAttachmentList attachments;
 
-    attachments.Add({ .Format = RxImageFormat::eBGRA8_UNorm })
-        .Add({ .Format = RxImageFormat::eRGBA16_Float })
-        .Add({ .Format = RxImageFormat::eD32_Float });
+    attachments
+        .Add(RxAttachment(RxImageFormat::eBGRA8_UNorm))  // Albedo
+        .Add(RxAttachment(RxImageFormat::eRGBA16_Float)) // Normals
+        .Add(RxAttachment(RxImageFormat::eD32_Float));   // Depth
 
 
     RxShader shader_geometry("Geometry");
@@ -312,7 +313,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     //                                                                        FxSizeofArray(color_attachments_list));
 
     RxAttachmentList attachment_list;
-    attachment_list.Add({ .Format = RxImageFormat::eRGBA16_Float });
+    attachment_list.Add(RxAttachment(RxImageFormat::eRGBA16_Float));
 
     RpLighting.Create(attachment_list, gRenderer->Swapchain.Extent);
 
@@ -455,11 +456,9 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 void RxDeferredRenderer::CreateCompPipeline()
 {
     RxAttachmentList attachment_list;
-    attachment_list.Add({
-        .Format = gRenderer->Swapchain.Surface.Format,
-        .LoadOp = RxLoadOp::eDontCare,
-        .FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    });
+
+    attachment_list.Add(RxAttachment(gRenderer->Swapchain.Surface.Format, RxLoadOp::eDontCare, RxStoreOp::eStore,
+                                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 
     RpComposition.Create(attachment_list, gRenderer->Swapchain.Extent, FxVec2u::sZero);
 
@@ -555,14 +554,14 @@ void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent
 
     DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float, VK_IMAGE_TILING_OPTIMAL,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                           VK_IMAGE_ASPECT_DEPTH_BIT);
+                           RxImageAspectFlag::eDepth);
 
     ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eBGRA8_UNorm, VK_IMAGE_TILING_OPTIMAL,
-                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
 
     NormalsAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
                              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                             VK_IMAGE_ASPECT_COLOR_BIT);
+                             RxImageAspectFlag::eColor);
 
     FxSizedArray image_views = { ColorAttachment.View, NormalsAttachment.View, DepthAttachment.View };
 
@@ -619,11 +618,6 @@ void RxDeferredGPass::Submit()
           "Error submitting draw buffer");
 }
 
-void RxDeferredGPass::SubmitUniforms(const RxUniformBufferObject& ubo)
-{
-    memcpy(UniformBuffer.pMappedBuffer, &ubo, sizeof(RxUniformBufferObject));
-}
-
 void RxDeferredGPass::Destroy()
 {
     if (mPlGeometry == nullptr) {
@@ -636,9 +630,6 @@ void RxDeferredGPass::Destroy()
     DescriptorPool.Destroy();
 
     Framebuffer.Destroy();
-
-    UniformBuffer.UnMap();
-    UniformBuffer.Destroy();
 
     mPlGeometry = nullptr;
 }
@@ -662,7 +653,7 @@ void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_i
     DescriptorPool.Create(gRenderer->GetDevice(), 4);
 
     ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
-                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
 
     FxSizedArray image_views = { ColorAttachment.View };
 
@@ -695,7 +686,7 @@ void RxDeferredLightingPass::Submit()
     RxFrameData* frame = gRenderer->GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
     };
 
     const VkSubmitInfo submit_info = {
