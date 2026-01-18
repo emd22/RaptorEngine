@@ -25,6 +25,24 @@ enum class RxStoreOp
 struct RxAttachment
 {
 public:
+    static constexpr FxVec2u scFullScreen = FxVec2u(0U); 
+
+public:
+    RxAttachment() = default;
+
+    RxAttachment(RxImageFormat format, const FxVec2u& size);
+    RxAttachment(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
+    RxAttachment(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
+                 VkImageLayout initial_layout, VkImageLayout final_layout);
+
+
+    VkAttachmentDescription BuildDescription() const;
+    void CreateImage();
+
+    RxImage& GetImage() { return Image; }
+    VkImageView& GetImageView() { return Image.View; }
+
+public:
     RxImageType ImageType = RxImageType::e2d;
 
     VkImageUsageFlags Usage = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
@@ -43,40 +61,6 @@ public:
 
     RxImage Image;
 
-public:
-    RxAttachment() = default;
-
-    RxAttachment(RxImageFormat format) { Image.Format = format; }
-
-    RxAttachment(RxImageFormat format, RxLoadOp load_op, RxStoreOp store_op, VkImageLayout initial_layout,
-                 VkImageLayout final_layout)
-        : LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
-    {
-        Image.Format = format;
-    }
-
-
-    VkAttachmentDescription BuildDescription() const
-    {
-        FxAssert(Image.Format != RxImageFormat::eNone);
-
-        return VkAttachmentDescription {
-            .format = RxImageFormatUtil::ToUnderlying(Image.Format),
-            .samples = Samples,
-
-            .loadOp = static_cast<VkAttachmentLoadOp>(LoadOp),
-            .storeOp = static_cast<VkAttachmentStoreOp>(StoreOp),
-
-            .stencilLoadOp = static_cast<VkAttachmentLoadOp>(StencilLoadOp),
-            .stencilStoreOp = static_cast<VkAttachmentStoreOp>(StencilStoreOp),
-
-            .initialLayout = InitialLayout,
-            .finalLayout = FinalLayout,
-        };
-    }
-
-    RxImage& GetImage() { return Image; }
-    VkImageView& GetImageView() { return Image.View; }
 };
 
 class RxAttachmentList
@@ -85,14 +69,16 @@ public:
     RxAttachmentList() = default;
     RxAttachmentList(uint32 max_attachments) : mMaxAttachments(max_attachments) {}
     RxAttachmentList(const RxAttachmentList& other) { Attachments.InitAsCopyOf(other.Attachments); }
-    RxAttachmentList(RxAttachmentList&& other) { Attachments = std::move(other.Attachments); }
+    RxAttachmentList(RxAttachmentList&& other) noexcept { Attachments = std::move(other.Attachments); }
 
 
     static RxAttachmentList New() { return {}; }
 
-    RxAttachmentList& Add(const RxAttachment& attachment);
+    RxAttachmentList& Add(RxAttachment&& attachment);
 
+    void CreateImages();
     FxSizedArray<VkAttachmentDescription>& GetAttachmentDescriptions();
+    FxSizedArray<VkImageView>& GetImageViews();
 
 
 private:
@@ -110,9 +96,11 @@ public:
 
 private:
     bool mbDescriptionsBuilt : 1 = false;
-    bool mbImagesBuilt : 1 = false;
+    bool mbImageViewsBuilt : 1 = false;
+    bool mbImagesCreated : 1 = false;
 
     FxSizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
+    FxSizedArray<VkImageView> mBuiltImageViews;
 
     uint32 mMaxAttachments = 10;
 };

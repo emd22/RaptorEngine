@@ -142,9 +142,9 @@ void RxDeferredRenderer::CreateGPassPipeline()
     RxAttachmentList attachments;
 
     attachments
-        .Add(RxAttachment(RxImageFormat::eBGRA8_UNorm))  // Albedo
-        .Add(RxAttachment(RxImageFormat::eRGBA16_Float)) // Normals
-        .Add(RxAttachment(RxImageFormat::eD32_Float));   // Depth
+        .Add(RxAttachment(RxImageFormat::eBGRA8_UNorm, RxAttachment::scFullScreen))  // Albedo
+        .Add(RxAttachment(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen)) // Normals
+        .Add(RxAttachment(RxImageFormat::eD32_Float, RxAttachment::scFullScreen));   // Depth
 
 
     RxShader shader_geometry("Geometry");
@@ -313,7 +313,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     //                                                                        FxSizeofArray(color_attachments_list));
 
     RxAttachmentList attachment_list;
-    attachment_list.Add(RxAttachment(RxImageFormat::eRGBA16_Float));
+    attachment_list.Add(RxAttachment(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen));
 
     RpLighting.Create(attachment_list, gRenderer->Swapchain.Extent);
 
@@ -457,7 +457,7 @@ void RxDeferredRenderer::CreateCompPipeline()
 {
     RxAttachmentList attachment_list;
 
-    attachment_list.Add(RxAttachment(gRenderer->Swapchain.Surface.Format, RxLoadOp::eDontCare, RxStoreOp::eStore,
+    attachment_list.Add(RxAttachment(gRenderer->Swapchain.Surface.Format, FxVec2u::sZero, RxLoadOp::eDontCare, RxStoreOp::eStore,
                                      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 
     RpComposition.Create(attachment_list, gRenderer->Swapchain.Extent, FxVec2u::sZero);

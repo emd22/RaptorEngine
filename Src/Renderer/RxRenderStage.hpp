@@ -15,9 +15,16 @@ class RxRenderStage
 public:
     RxRenderStage();
 
-    void Create(RxAttachmentList& attachments, const FxVec2u& size);
+    void Create(const FxVec2u& size);
 
-    void AddTarget(RxImageType image_type, VkFormat format, VkImageUsageFlagBits usage);
+
+    void AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
+
+    
+    RxAttachmentList& GetTargets()
+    {
+        return mOutputTargets;
+    }
 
 private:
     /**
@@ -26,11 +33,12 @@ private:
      */
     void BuildRenderStage();
 
-private:
-    RxAttachmentList mInputAttachments;
+    void CreateOutputTargets();
+
+private: 
+    RxAttachmentList mOutputTargets;
 
     RxFramebuffer mFramebuffer;
-    FxSizedArray<RxAttachment> mOutputTargets;
     RxRenderPass mRenderPass;
 
     bool mbIsBuilt : 1 = false;

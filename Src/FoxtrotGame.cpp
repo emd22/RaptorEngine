@@ -173,7 +173,7 @@ void FoxtrotGame::CreateGame()
     CreateLights();
 
     // Player.Physics.bDisableGravity = true;
-    Player.SetFlyMode(true);
+    Player.SetFlyMode(false);
 
     gShadowRenderer = new RxShadowDirectional(FxVec2u(512, 512));
     // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);

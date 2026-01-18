@@ -3,15 +3,20 @@
 
 RxRenderStage::RxRenderStage() {}
 
-void RxRenderStage::Create(RxAttachmentList& attachments, const FxVec2u& size)
+void RxRenderStage::Create(const FxVec2u& size)
 {
     mSize = size;
-
-    if (mOutputTargets.IsEmpty()) {
-        FxLogError("No output targets specified for RxRenderStage!");
-        return;
-    }
 }
+
+void RxRenderStage::AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect)
+{
+    mOutputTargets.Add(RxAttachment(format, size, usage, aspect));
+}
+
+
+
+void RxRenderStage::CreateOutputTargets()
+{ mOutputTargets.CreateImages(); }
 
 
 void RxRenderStage::BuildRenderStage()
@@ -20,8 +25,8 @@ void RxRenderStage::BuildRenderStage()
         return;
     }
 
-
-    // mRenderPass.Create(attachments, size);
+    mRenderPass.Create(mOutputTargets, mSize);
+    mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize);
 
     mbIsBuilt = true;
 }

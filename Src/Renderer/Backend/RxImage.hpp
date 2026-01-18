@@ -181,6 +181,9 @@ public:
     void CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat image_format, VkImageAspectFlags aspect_flags,
                                        RxImageCubemapOptions options);
 
+    FX_FORCE_INLINE bool IsInited() const
+    { return (Image != nullptr); }
+
     void Destroy();
 
     ~RxImage() { Destroy(); }

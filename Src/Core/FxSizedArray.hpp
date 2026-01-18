@@ -390,6 +390,8 @@ public:
         FxLogDirect(" }}\n");
     }
 
+    FX_FORCE_INLINE bool IsInited() const { return (pData != nullptr && Capacity > 0); }
+
 
 protected:
     void InternalAllocateArray(size_t element_count)
