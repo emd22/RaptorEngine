@@ -8,7 +8,7 @@
  *
  * This enum is based on a modified version of the SDL_Scancode enum.
  */
-enum FxKey
+enum class FxKey
 {
     FX_KEY_UNKNOWN = 0,
 
@@ -128,20 +128,20 @@ enum FxKey
     FX_KEYBOARD_STANDARD_END = 99,
 
     /* Special Keys */
-    FX_KEYBOARD_SPECIALS_START = 100, /* Offset by -FX_KEYBOARD_SPECIALS_OFFSET */
+    FX_KEYBOARD_MODIFIERS_START = 100, /* Offset by -FX_KEYBOARD_MODIFIERS_OFFSET */
 
-    /* Left special keys */
+    /* Left modifier keys */
     FX_KEY_LCTRL = 100,
     FX_KEY_LSHIFT = 101,
     FX_KEY_LALT = 102,
     FX_KEY_LMETA = 103,
-    /* Right special keys */
+    /* Right modifier keys */
     FX_KEY_RCTRL = 104,
     FX_KEY_RSHIFT = 105,
     FX_KEY_RALT = 106,
     FX_KEY_RMETA = 107,
 
-    FX_KEYBOARD_SPECIALS_END = 107,
+    FX_KEYBOARD_MODIFIERS_END = 107,
 
     FX_KEYBOARD_END = 107,
 
@@ -158,5 +158,9 @@ enum FxKey
     FX_KEY_MAX
 };
 
-#define FX_KEYBOARD_SPECIALS_OFFSET (124)
+/// The offset to get from the underlying key (SDL_SCANCODE_LCTRL, etc.) to our keycode. This only applies to
+/// The modifier keys.
+/// To convert to the underlying keycode, add this value, and vice versa to get our keycode.
+#define FX_KEYBOARD_MODIFIERS_OFFSET (124)
+
 #define FX_MOUSE_BUTTON_OFFSET (-FX_KEYBOARD_END)

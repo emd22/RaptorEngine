@@ -213,16 +213,14 @@ void FxObject::RenderMesh()
 
 void FxObject::Update()
 {
-    if (!mbPhysicsEnabled) {
-        return;
-    }
+    if (mbPhysicsEnabled) {
+        if (mbPhysicsTransformOutOfDate) {
+            Physics.Teleport(mPosition, mRotation);
+            mbPhysicsTransformOutOfDate = false;
+        }
 
-    if (mbPhysicsTransformOutOfDate) {
-        Physics.Teleport(mPosition, mRotation);
-        mbPhysicsTransformOutOfDate = false;
+        SyncObjectWithPhysics();
     }
-
-    SyncObjectWithPhysics();
 }
 
 

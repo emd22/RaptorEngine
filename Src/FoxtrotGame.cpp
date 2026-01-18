@@ -270,15 +270,15 @@ void FoxtrotGame::ProcessControls()
         Player.Jump();
     }
 
-    if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_EQUALS)) {
         gRenderer->pDeferredRenderer->ToggleWireframe(true);
     }
-    if (FxControlManager::IsKeyPressed(FX_KEY_MINUS)) {
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_MINUS)) {
         gRenderer->pDeferredRenderer->ToggleWireframe(false);
     }
 
 
-    if (FxControlManager::IsKeyPressed(FX_KEY_O)) {
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_O)) {
         // Print out memory pool statistics
         FxLogInfo("=== Memory Pool Stats ====");
 
@@ -325,18 +325,20 @@ void FoxtrotGame::Tick()
         Player.Update(DeltaTime);
     }
 
+    gPhysics->Update();
+
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
+    //pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
 
-    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
-                          camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));
+    pPistolObject->mRotation = PistolRotationGoal;
+
+    /*pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
+                          camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));*/
+    //pPistolObject->Update();
     // pPistolObject->MoveBy();
-
-    gPhysics->Update();
-
 
     // FxVec3f shadow_pos = FxVec3f(0, 10, 5);
     // FxVec3f target = FxVec3f(0.0f, 0.0f, 0.0f);

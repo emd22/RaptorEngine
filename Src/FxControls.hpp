@@ -16,7 +16,7 @@ private:
     friend void CheckKeyForContinuedPress(FxControl* key);
 
 public:
-    static const int MaxKeys = FxKey::FX_KEY_MAX;
+    static const uint32 scMaxKeys = static_cast<uint32>(FxKey::FX_KEY_MAX);
 
     FxControlManager() = default;
 
@@ -106,7 +106,7 @@ private:
     static void UpdateFromMouseMoveEvent(SDL_Event* event);
 
     // General, used by UpdateFromKeyboardEvent and UpdateFromMouseButtonEvent
-    static void UpdateButtonFromEvent(FxKey key_id, SDL_Event* event);
+    static void UpdateButtonFromEvent(FxKey key_id, bool is_now_down);
 
 public:
     using WindowEventFunc = void (*)();
@@ -130,17 +130,6 @@ private:
     friend class FxControlManager;
 
 public:
-    // enum StateFlag : uint8 {
-    //     NoState = (0),
-    //     ContinuedPress = (1 << 0),
-    //     KeyDown = (1 << 1),
-    //     FrameBit = (1 << 2), /* Flag for if this is the current frame or the previous frame. */
-    // };
-
-    enum Flag : uint8
-    {
-        NoFlag = (0),
-    };
 
 public:
     inline bool IsKeyDown() const { return mbKeyDown; }
@@ -150,32 +139,7 @@ public:
 
     bool IsKeyPressed() const { return (IsKeyDown() && !IsContinuedPress()); }
 
-    /**
-     * Set the flags of the control. These are defined by `Flag`.
-     * For example, to set a control to be a "toggle",
-     *
-     * ```cpp
-     * control->SetFlags(control->GetFlags() | FxControl::Flag::Toggle);
-     * ```
-     */
-    inline void SetFlags(uint8 flags) { mFlags = flags; }
-    inline void AddFlag(uint8 flag) { mFlags |= flag; }
-    inline void RemoveFlag(uint8 flag) { mFlags &= ~flag; }
-    inline bool HasFlag(uint8 flag) const { return (mFlags & flag); }
-    inline uint8 GetFlags() const { return mFlags; }
-
-    /**
-     * The current state of the control.
-     * The state is documented with a set of flags defined by `StateFlag`.
-     *
-     * These flags are normally accessed using helper functions such as
-     * `IsKeyDown`, `IsKeyUp`, and `IsToggled`.
-     */
-    // uint8 CurrentState = StateFlag::NoState;
-
 private:
-    uint8 mFlags = Flag::NoFlag;
-
     uint8 mbContinuedPress : 1 = 0;
     uint8 mbKeyDown : 1 = 0;
     uint8 mbTickBit : 1 = 0;

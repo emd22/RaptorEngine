@@ -20,8 +20,10 @@ endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/Lib/Include)
 
-find_package(libjpeg-turbo REQUIRED)
-find_package(SDL3 REQUIRED)
+if(MSVC)
+else()
+	find_package(libjpeg-turbo REQUIRED)
+endif()
 
 if(MSVC)
 	add_compile_options("/MP")
@@ -33,7 +35,7 @@ add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
 
-target_link_libraries(ThirdPartyLib slang SDL3::SDL3 jpeg)
+target_link_libraries(ThirdPartyLib slang SDL3 jpeg)
 
 target_compile_definitions(
     ThirdPartyLib
@@ -104,4 +106,4 @@ include_directories(
 
 add_executable(cr ${SOURCES} ${HEADERS})
 
-target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} SDL3::SDL3)
+target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES})

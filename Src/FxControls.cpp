@@ -11,14 +11,14 @@
 /** Converts an SDL scancode to its corresponding FxKey ID. */
 static inline FxKey ConvertScancodeToFxKey(int32 sdl_scancode)
 {
-    if (sdl_scancode <= FX_KEYBOARD_STANDARD_END) {
+    if (sdl_scancode <= static_cast<uint32>(FxKey::FX_KEYBOARD_STANDARD_END)) {
         // FxKey is the direct scancode
         return static_cast<FxKey>(sdl_scancode);
     }
     // Check for ctrl, alt, meta keys
-    else if (sdl_scancode >= FX_KEYBOARD_STANDARD_END &&
-             sdl_scancode <= FX_KEYBOARD_SPECIALS_END + FX_KEYBOARD_SPECIALS_OFFSET) {
-        return static_cast<FxKey>(sdl_scancode - FX_KEYBOARD_SPECIALS_OFFSET);
+    else if (sdl_scancode >= static_cast<uint32>(FxKey::FX_KEYBOARD_STANDARD_END) &&
+             sdl_scancode <= static_cast<uint32>(FxKey::FX_KEYBOARD_MODIFIERS_END) + FX_KEYBOARD_MODIFIERS_OFFSET) {
+        return static_cast<FxKey>(sdl_scancode - FX_KEYBOARD_MODIFIERS_OFFSET);
     }
 
     return FxKey::FX_KEY_UNKNOWN;
@@ -27,13 +27,16 @@ static inline FxKey ConvertScancodeToFxKey(int32 sdl_scancode)
 /** Converts an SDL mouse button index to its corresponding FxKey ID. */
 static inline FxKey ConvertMouseButtonToFxKey(int32 mouse_button)
 {
+    constexpr uint32 mouse_buttons_start = static_cast<uint32>(FxKey::FX_MOUSE_BUTTONS_START);
+    constexpr uint32 mouse_buttons_end = static_cast<uint32>(FxKey::FX_MOUSE_BUTTONS_END);
+
     // If the button is not defined in FxKey, return FX_KEY_UNKNOWN.
-    if (FxKey::FX_MOUSE_BUTTONS_START + mouse_button > FxKey::FX_MOUSE_BUTTONS_END) {
+    if (mouse_buttons_start + mouse_button > mouse_buttons_end) {
         return FxKey::FX_KEY_UNKNOWN;
     }
 
     // If it exists, get the mouse button Key ID.
-    return static_cast<FxKey>(FxKey::FX_MOUSE_BUTTONS_START + mouse_button);
+    return static_cast<FxKey>(mouse_buttons_start + mouse_button);
 }
 
 void FxControlManager::Init()
@@ -42,7 +45,7 @@ void FxControlManager::Init()
 
     FxControlManager& inst = GetInstance();
 
-    inst.mKeyMap.InitSize(MaxKeys);
+    inst.mKeyMap.InitSize(scMaxKeys);
     memset(inst.mKeyMap.pData, 0, inst.mKeyMap.GetSizeInBytes());
 }
 
@@ -84,10 +87,10 @@ FxVec2f& FxControlManager::GetMouseDelta() { return GetInstance().mMouseDelta; }
 
 static inline bool IsKeyInRange(FxKey key_id)
 {
-    bool in_range = (key_id >= 0 && key_id < FxControlManager::MaxKeys);
+    bool in_range = (static_cast<int32>(key_id) >= 0 && static_cast<int32>(key_id) < FxControlManager::scMaxKeys);
 
     if (!in_range) {
-        int max_keys = FxControlManager::MaxKeys;
+        int max_keys = FxControlManager::scMaxKeys;
         FxLogWarning("Invalid Control Key ID! (0 <= {:d} < {:d})", static_cast<int>(key_id), max_keys);
     }
 
@@ -101,7 +104,7 @@ FxControl* FxControlManager::GetKey(FxKey key_id)
         return nullptr;
     }
 
-    FxControl* key = &GetInstance().mKeyMap[key_id];
+    FxControl* key = &GetInstance().mKeyMap[static_cast<uint32>(key_id)];
 
     return key;
 }
@@ -206,18 +209,18 @@ void FxControlManager::Update()
     }
 }
 
-void FxControlManager::UpdateButtonFromEvent(FxKey key_id, SDL_Event* event)
+void FxControlManager::UpdateButtonFromEvent(FxKey key_id, bool is_now_down)
 {
     FxControl* button = GetInstance().GetKey(key_id);
     if (!button) {
         return;
     }
 
-    if (event->key.down != false && !button->IsKeyDown()) {
+    if (is_now_down && !button->IsKeyDown()) {
         button->mbTickBit = GetInstance().mThisTick;
         button->mbKeyDown = true;
     }
-    else if (!event->key.down != false && button->IsKeyDown()) {
+    else if (!is_now_down && button->IsKeyDown()) {
         button->mbKeyDown = false;
         button->mbContinuedPress = false;
     }
@@ -232,7 +235,7 @@ void FxControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
         return;
     }
 
-    UpdateButtonFromEvent(key_id, event);
+    UpdateButtonFromEvent(key_id, event->key.down);
 }
 
 void FxControlManager::UpdateFromMouseMoveEvent(SDL_Event* event)
@@ -248,5 +251,5 @@ void FxControlManager::UpdateFromMouseButtonEvent(SDL_Event* event)
         return;
     }
 
-    UpdateButtonFromEvent(key_id, event);
+    UpdateButtonFromEvent(key_id, event->button.down);
 }
