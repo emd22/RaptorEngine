@@ -202,6 +202,8 @@ public:
         case FxObjectLayer::ePlayerLayer:
             return mWeaponCameraMatrix;
         }
+
+        return mCameraMatrix;
     }
 
     ~FxPerspectiveCamera() override {}
@@ -232,5 +234,5 @@ private:
     FxMat4f mWeaponCameraMatrix = FxMat4f::sIdentity;
     FxMat4f mWeaponProjectionMatrix = FxMat4f::sIdentity;
 
-    float32 mWeaponFov = FxDegToRad(70.0f);
+    float32 mWeaponFov = FxDegToRad(80.0f);
 };

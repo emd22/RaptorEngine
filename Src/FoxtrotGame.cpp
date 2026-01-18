@@ -221,10 +221,6 @@ void FoxtrotGame::ProcessControls()
         sbRunning = false;
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT)) {
-        printf("MOUSE DOWN\n");
-    }
-
     // Click to lock mouse
     if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT) && !FxControlManager::IsMouseLocked()) {
         FxControlManager::CaptureMouse();
@@ -325,7 +321,6 @@ void FoxtrotGame::Tick()
         Player.Update(DeltaTime);
     }
 
-    gPhysics->Update();
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
@@ -333,10 +328,14 @@ void FoxtrotGame::Tick()
 
     //pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
 
-    pPistolObject->mRotation = PistolRotationGoal;
+    //pPistolObject->mRotation = PistolRotationGoal;
 
-    /*pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
-                          camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));*/
+    /*FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
+                                 camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);*/
+
+    FxVec3f pistol_destination = Player.Position;
+
+    pPistolObject->MoveTo(pistol_destination);
     //pPistolObject->Update();
     // pPistolObject->MoveBy();
 
@@ -355,6 +354,8 @@ void FoxtrotGame::Tick()
     // FxLogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
+
+    gPhysics->Update();
 
 
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {

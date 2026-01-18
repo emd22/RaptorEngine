@@ -24,7 +24,7 @@ void FxPlayer::MoveBy(const FxVec3f& by)
 void FxPlayer::Jump()
 {
     if (Physics.bIsGrounded) {
-        JumpForce = 350.0f;
+        JumpForce = 4.0f;
     }
 }
 
@@ -36,13 +36,13 @@ void FxPlayer::SetFlyMode(bool value)
 
 void FxPlayer::Move(float delta_time, const FxVec3f& offset)
 {
-    FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
+    //FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
     if (mbIsFlymode) {
         // new_direction.Y = (pCamera->mAngleY);
     }
 
-    const FxVec3f forward = new_direction * offset.Z;
-    const FxVec3f right = new_direction.Cross(FxVec3f::sUp) * offset.X;
+    const FxVec3f forward = MovementDirection * offset.Z;
+    const FxVec3f right = MovementDirection.Cross(FxVec3f::sUp) * offset.X;
 
     FxVec3f movement_goal = (forward + right);
 
@@ -61,7 +61,7 @@ void FxPlayer::Move(float delta_time, const FxVec3f& offset)
         JumpForce = 0;
     }
 
-    Physics.ApplyMovement(mUserForce * delta_time);
+    Physics.ApplyMovement(mUserForce);
 
     // mUserForce += offset;
     // const FxVec3f max_speed = FxVec3f(cMaxWalkSpeed);
@@ -75,21 +75,10 @@ void FxPlayer::Update(float32 delta_time)
 {
     UpdateDirection();
 
-    // if (!mbUpdatePhysicsTransform) {
-    //     return;
-    // }
-
     Physics.Update(delta_time);
     SyncPhysicsToPlayer();
 
-    // Physics.ApplyMovement(Direction * FxVec3f(1.0, 0.0, 1.0));
-
-    FxVec3f camera_updated_position = mCameraOffset;
-    camera_updated_position += Position;
-    // camera_updated_position.Y += Physics.HeadRecoveryYOffset;
-
-    pCamera->MoveTo(camera_updated_position);
-
+    pCamera->MoveTo(Position + mCameraOffset);
     pCamera->Update();
 
     mbUpdatePhysicsTransform = false;

@@ -240,7 +240,7 @@ void FxControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
 
 void FxControlManager::UpdateFromMouseMoveEvent(SDL_Event* event)
 {
-    GetInstance().mMouseDelta += { event->motion.xrel, event->motion.yrel };
+    GetInstance().mMouseDelta += FxVec2f(event->motion.xrel, event->motion.yrel);
 }
 
 void FxControlManager::UpdateFromMouseButtonEvent(SDL_Event* event)

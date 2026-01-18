@@ -47,10 +47,10 @@ void PhPlayer::Teleport(const FxVec3f& position)
     pPlayerVirt->SetPosition(jolt_position);
 }
 
-void PhPlayer::ApplyMovement(const FxVec3f& by)
+void PhPlayer::ApplyMovement(const FxVec3f& direction)
 {
     Vec3 jolt_dir;
-    by.ToJoltVec3(jolt_dir);
+    direction.ToJoltVec3(jolt_dir);
 
     mMovementVector = jolt_dir;
     // pPlayerVirt->SetLinearVelocity(jolt_dir);
