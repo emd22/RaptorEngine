@@ -14,7 +14,7 @@ FX_SET_MODULE_NAME("RxShadowDirectional")
 RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 {
     RxAttachmentList attachment_list;
-    attachment_list.Add(RxAttachment(RxImageFormat::eD32_Float));
+    attachment_list.Add(RxAttachment(RxImageFormat::eD32_Float, size));
 
     mRenderPass.Create(attachment_list, size);
 

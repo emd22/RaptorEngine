@@ -28,7 +28,7 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     OutputFramebuffers.InitSize(RxFramesInFlight);
 
     for (int frame_index = 0; frame_index < RxFramesInFlight; frame_index++) {
-        GPasses[frame_index].Create(this, extent);
+        //GPasses[frame_index].Create(this, extent);
 
         LightingPasses[frame_index].Create(this, frame_index, extent);
         // Pass in the current frame index to map to the swapchain's output images
@@ -46,7 +46,7 @@ void RxDeferredRenderer::Destroy()
     }
 
     for (int i = 0; i < RxFramesInFlight; i++) {
-        GPasses[i].Destroy();
+        //GPasses[i].Destroy();
         LightingPasses[i].Destroy();
         CompPasses[i].Destroy();
         OutputFramebuffers[i].Destroy();
@@ -56,7 +56,7 @@ void RxDeferredRenderer::Destroy()
     DestroyGPassPipeline();
     DestroyLightingPipeline();
 
-    RpGeometry.Destroy();
+    //RpGeometry.Destroy();
     RpLighting.Destroy();
     RpComposition.Destroy();
 
@@ -68,20 +68,51 @@ void RxDeferredRenderer::Destroy()
 
 void RxDeferredRenderer::ToggleWireframe(bool enable)
 {
-    RxPipeline* new_pipeline = &PlGeometry;
-    if (enable) {
-        new_pipeline = &PlGeometryWireframe;
-        FxLogInfo("Enabling wireframe");
-    }
-    else {
-        FxLogInfo("Disabling wireframe");
-    }
+    //RxPipeline* new_pipeline = &PlGeometry;
+    //if (enable) {
+    //    new_pipeline = &PlGeometryWireframe;
+    //    FxLogInfo("Enabling wireframe");
+    //}
+    //else {
+    //    FxLogInfo("Disabling wireframe");
+    //}
 
-    pGeometryPipeline = new_pipeline;
+    //pGeometryPipeline = new_pipeline;
 
-    for (RxDeferredGPass& gpass : GPasses) {
-        gpass.mPlGeometry = new_pipeline;
-    }
+    //for (RxDeferredGPass& gpass : GPasses) {
+    //    gpass.mPlGeometry = new_pipeline;
+    //}
+}
+
+void RxDeferredRenderer::CreateGPass() 
+{ 
+    GPass.Create(gRenderer->Swapchain.Extent);
+
+    // Albedo target
+    GPass.AddTarget(
+        RxImageFormat::eBGRA8_UNorm, 
+        RxAttachment::scFullScreen, 
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+        RxImageAspectFlag::eColor
+    );
+
+    // Normals target
+    GPass.AddTarget(
+        RxImageFormat::eRGBA16_Float, 
+        RxAttachment::scFullScreen, 
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+        RxImageAspectFlag::eColor
+    );
+
+    // Depth target
+    GPass.AddTarget(
+        RxImageFormat::eD32_Float, 
+        RxAttachment::scFullScreen, 
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+        RxImageAspectFlag::eDepth
+    );
+
+    GPass.BuildRenderStage();
 }
 
 /////////////////////////////////////
@@ -139,12 +170,12 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 
 void RxDeferredRenderer::CreateGPassPipeline()
 {
-    RxAttachmentList attachments;
+    //RxAttachmentList attachments;
 
-    attachments
-        .Add(RxAttachment(RxImageFormat::eBGRA8_UNorm, RxAttachment::scFullScreen))  // Albedo
-        .Add(RxAttachment(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen)) // Normals
-        .Add(RxAttachment(RxImageFormat::eD32_Float, RxAttachment::scFullScreen));   // Depth
+    //attachments
+    //    .Add(RxAttachment(RxImageFormat::eBGRA8_UNorm, RxAttachment::scFullScreen))  // Albedo
+    //    .Add(RxAttachment(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen)) // Normals
+    //    .Add(RxAttachment(RxImageFormat::eD32_Float, RxAttachment::scFullScreen));   // Depth
 
 
     RxShader shader_geometry("Geometry");
@@ -153,7 +184,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     FxVertexInfo vertex_info = FxMakeVertexInfo();
 
-    RpGeometry.Create(attachments, gRenderer->Swapchain.Extent);
+    //RpGeometry.Create(attachments, gRenderer->Swapchain.Extent);
 
     RxPipelineBuilder builder;
 
@@ -161,9 +192,9 @@ void RxDeferredRenderer::CreateGPassPipeline()
         .SetName("Geometry Pipeline")
         .AddBlendAttachment({ .Enabled = false })
         .AddBlendAttachment({ .Enabled = false })
-        .SetAttachments(&attachments)
+        .SetAttachments(&GPass.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)
-        .SetRenderPass(&RpGeometry)
+        .SetRenderPass(&GPass.GetRenderPass())
         .SetVertexInfo(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
@@ -536,103 +567,66 @@ void RxDeferredGPass::BuildDescriptorSets()
     //    sizeof(writes[0]), writes, 0, nullptr);
 }
 
-void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent)
-{
-    mRendererInst = renderer;
+//void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent)
+//{
+    //mRendererInst = renderer;
 
-    // RxRenderPassCache::Handle rp_handle = gRenderPassCache->Request(mRendererInst->RpGeometryId);
-    // mRenderPass = rp_handle.Item;
-    mRenderPass = &mRendererInst->RpGeometry;
-    mPlGeometry = &mRendererInst->PlGeometry;
-
-
-    //    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    //    RendererFramesInFlight);
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
-    DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
-
-    DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float, VK_IMAGE_TILING_OPTIMAL,
-                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                           RxImageAspectFlag::eDepth);
-
-    ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eBGRA8_UNorm, VK_IMAGE_TILING_OPTIMAL,
-                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
-
-    NormalsAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
-                             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                             RxImageAspectFlag::eColor);
-
-    FxSizedArray image_views = { ColorAttachment.View, NormalsAttachment.View, DepthAttachment.View };
-
-    Framebuffer.Create(image_views, *mRenderPass, extent);
-
-    //    UniformBuffer.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    //    VMA_MEMORY_USAGE_CPU_TO_GPU); UniformBuffer.Map();
-
-    BuildDescriptorSets();
-}
-
-void RxDeferredGPass::Begin()
-{
-    RxFrameData* frame = gRenderer->GetFrame();
-
-    VkClearValue clear_values[] = {
-        // Albedo
-        VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
-        // Normals
-        VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
-        VkClearValue { .depthStencil = { 0.0f, 0 } },
-    };
-
-    mRenderPass->Begin(&frame->CommandBuffer, Framebuffer.Framebuffer,
-                       FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
+    //// RxRenderPassCache::Handle rp_handle = gRenderPassCache->Request(mRendererInst->RpGeometryId);
+    //// mRenderPass = rp_handle.Item;
+    //mRenderPass = &mRendererInst->RpGeometry;
+    //mPlGeometry = &mRendererInst->PlGeometry;
 
 
-    mPlGeometry->Bind(frame->CommandBuffer);
-}
+    ////    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+    ////    RendererFramesInFlight);
+    //DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
+    //DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
+    //DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
 
-void RxDeferredGPass::End() { mRenderPass->End(); }
+    //DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float, VK_IMAGE_TILING_OPTIMAL,
+    //                       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    //                       RxImageAspectFlag::eDepth);
 
-void RxDeferredGPass::Submit()
-{
-    RxFrameData* frame = gRenderer->GetFrame();
+    //ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eBGRA8_UNorm, VK_IMAGE_TILING_OPTIMAL,
+    //                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
 
-    const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
+    //NormalsAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
+    //                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    //                         RxImageAspectFlag::eColor);
 
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->ShadowsSem.Semaphore,
-        .pWaitDstStageMask = wait_stages,
-        // command buffers
-        .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
-        // signal semaphores
-        .signalSemaphoreCount = 1,
-        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-        .pSignalSemaphores = &frame->OffscreenSem.Semaphore,
-    };
+    //FxSizedArray image_views = { ColorAttachment.View, NormalsAttachment.View, DepthAttachment.View };
 
-    VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-          "Error submitting draw buffer");
-}
+    //Framebuffer.Create(image_views, *mRenderPass, extent);
 
-void RxDeferredGPass::Destroy()
-{
-    if (mPlGeometry == nullptr) {
-        return;
-    }
+    ////    UniformBuffer.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    ////    VMA_MEMORY_USAGE_CPU_TO_GPU); UniformBuffer.Map();
 
-    DepthAttachment.Destroy();
-    ColorAttachment.Destroy();
+    //BuildDescriptorSets();
+//}
 
-    DescriptorPool.Destroy();
-
-    Framebuffer.Destroy();
-
-    mPlGeometry = nullptr;
-}
+//void RxDeferredGPass::Submit()
+//{
+//    RxFrameData* frame = gRenderer->GetFrame();
+//
+//    const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
+//
+//    const VkSubmitInfo submit_info = {
+//        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+//        .waitSemaphoreCount = 1,
+//        .pWaitSemaphores = &frame->ShadowsSem.Semaphore,
+//        .pWaitDstStageMask = wait_stages,
+//        // command buffers
+//        .commandBufferCount = 1,
+//        .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
+//        // signal semaphores
+//        .signalSemaphoreCount = 1,
+//        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
+//        .pSignalSemaphores = &frame->OffscreenSem.Semaphore,
+//    };
+//
+//    VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+//          "Error submitting draw buffer");
+//}
 
 /////////////////////////////////////
 // RxDeferredLightingPass Functions
@@ -724,9 +718,11 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 1;
 
+        VkImageView gpass_depth_view = mRendererInst->GPass.GetTarget(RxImageFormat::eD32_Float)->Image.View;
+
         const VkDescriptorImageInfo positions_image_info {
             .sampler = gRenderer->Swapchain.DepthSampler.Sampler,
-            .imageView = gpass.DepthAttachment.View,
+            .imageView = gpass_depth_view,
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 
@@ -748,9 +744,11 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 2;
 
+        VkImageView gpass_albedo_view = mRendererInst->GPass.GetTarget(RxImageFormat::eBGRA8_UNorm)->Image.View;
+
         const VkDescriptorImageInfo color_image_info {
             .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
-            .imageView = gpass.ColorAttachment.View,
+            .imageView = gpass_albedo_view,
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 
@@ -772,9 +770,11 @@ void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
     {
         const int binding_index = 3;
 
+        VkImageView gpass_normals_view = mRendererInst->GPass.GetTarget(RxImageFormat::eRGBA16_Float)->Image.View;
+
         const VkDescriptorImageInfo normals_image_info {
             .sampler = gRenderer->Swapchain.NormalsSampler.Sampler,
-            .imageView = gpass.NormalsAttachment.View,
+            .imageView = gpass_normals_view,
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 
@@ -895,7 +895,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         const VkDescriptorImageInfo positions_image_info {
             .sampler = gRenderer->Swapchain.DepthSampler.Sampler,
-            .imageView = gpass.DepthAttachment.View,
+            .imageView = mRendererInst->GPass.GetTarget(RxImageFormat::eD32_Float)->Image.View,
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 
@@ -919,7 +919,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         const VkDescriptorImageInfo color_image_info {
             .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
-            .imageView = gpass.ColorAttachment.View,
+            .imageView = mRendererInst->GPass.GetTarget(RxImageFormat::eBGRA8_UNorm)->Image.View,
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 
@@ -942,7 +942,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         const VkDescriptorImageInfo normals_image_info {
             .sampler = gRenderer->Swapchain.NormalsSampler.Sampler,
-            .imageView = gpass.NormalsAttachment.View,
+            .imageView = mRendererInst->GPass.GetTarget(RxImageFormat::eRGBA16_Float)->Image.View,
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 

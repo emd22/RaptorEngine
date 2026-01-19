@@ -494,7 +494,7 @@ void RxRenderBackend::BeginGeometry()
     // pipeline.RenderPass.Begin();
     // pipeline.Bind(frame->CommandBuffer);
 
-    pCurrentGPass->Begin();
+    pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
 
     // const int32 width = Swapchain.Extent.Width();
     // const int32 height = Swapchain.Extent.Height();
@@ -586,9 +586,12 @@ void RxRenderBackend::BeginLighting()
 {
     RxFrameData* frame = GetFrame();
 
-    pCurrentGPass->End();
+    pDeferredRenderer->GPass.End();
 
-    pCurrentGPass->DepthAttachment.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
+    RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);  
+    FxDebugAssert(depth_target != nullptr);
+
+    depth_target->Image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
 
     frame->CommandBuffer.End();
 
@@ -651,6 +654,8 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 
 
     pCurrentCompPass->DoCompPass(render_cam);
+
+    
 
     pCurrentGPass->Submit();
 

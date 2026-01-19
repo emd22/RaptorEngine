@@ -53,6 +53,10 @@ public:
     void Reset();
     void End();
 
+    FX_FORCE_INLINE VkCommandBuffer Get() const
+    { return CommandBuffer; }
+
+
     operator VkCommandBuffer() const { return CommandBuffer; }
 
     bool IsInitialized() const { return mbInitialized; }

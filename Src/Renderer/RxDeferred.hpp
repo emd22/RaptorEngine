@@ -7,6 +7,7 @@
 #include "Backend/RxSampler.hpp"
 #include "RxPipelineList.hpp"
 #include "RxRenderPassCache.hpp"
+#include "RxRenderStage.hpp"
 #include "RxSkybox.hpp"
 
 struct RxFrameData;
@@ -42,6 +43,8 @@ private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
+    void CreateGPass();
+
     VkPipelineLayout CreateGPassPipelineLayout();
 
     // Lighting
@@ -71,9 +74,8 @@ public:
     VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
-
-    // VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
-
+    RxRenderStage<3> GPass;
+    
     RxPipeline PlGeometry;
     RxPipeline PlGeometryNoDepthTest;
     RxPipeline PlGeometryWireframe;
@@ -81,7 +83,6 @@ public:
 
     RxPipeline* pGeometryPipeline = nullptr;
 
-    RxRenderPass RpGeometry;
     // RxRenderPassId RpGeometryId = 0;
 
     FxSizedArray<RxDeferredGPass> GPasses;
@@ -130,36 +131,29 @@ class RxDeferredGPass
     friend class RxDeferredRenderer;
 
 public:
-    void Create(RxDeferredRenderer* renderer, const FxVec2u& extent);
-    void Destroy();
-
-    void Begin();
-    void End();
-    void Submit();
-
     void BuildDescriptorSets();
 
 public:
     // G-Pass attachments
-    RxImage ColorAttachment;
+    /*RxImage ColorAttachment;
     RxImage PositionsAttachment;
-    RxImage NormalsAttachment;
+    RxImage NormalsAttachment;*/
 
-    RxImage DepthAttachment;
+    //RxImage DepthAttachment;
 
     // G-Pass samplers
-    RxSampler ColorSampler;
-    RxSampler PositionsSampler;
+    //RxSampler ColorSampler;
+    //RxSampler PositionsSampler;
 
-    RxFramebuffer Framebuffer;
+    //RxFramebuffer Framebuffer;
 
-    RxDescriptorPool DescriptorPool;
+    //RxDescriptorPool DescriptorPool;
     //    RxDescriptorSet DescriptorSet;
 
 private:
-    RxPipeline* mPlGeometry = nullptr;
-    RxRenderPass* mRenderPass = nullptr;
-    RxDeferredRenderer* mRendererInst = nullptr;
+    //RxPipeline* mPlGeometry = nullptr;
+    //RxRenderPass* mRenderPass = nullptr;
+    //RxDeferredRenderer* mRendererInst = nullptr;
 };
 
 ///////////////////////////////

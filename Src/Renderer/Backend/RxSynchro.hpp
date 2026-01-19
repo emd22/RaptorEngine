@@ -77,6 +77,8 @@ public:
         }
     }
 
+    FX_FORCE_INLINE VkSemaphore Get() const { return Semaphore; }
+
     void Destroy() { vkDestroySemaphore(mDevice->Device, Semaphore, nullptr); }
 
 public:
