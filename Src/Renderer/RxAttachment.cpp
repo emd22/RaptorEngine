@@ -1,7 +1,7 @@
 #include "RxAttachment.hpp"
 
-#include <Renderer/RxRenderBackend.hpp>
 #include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size)
 {
@@ -13,8 +13,8 @@ RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size)
     }
 }
 
-RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op, VkImageLayout initial_layout,
-                VkImageLayout final_layout)
+RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
+                           VkImageLayout initial_layout, VkImageLayout final_layout)
     : LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
     Image.Format = format;
@@ -38,8 +38,8 @@ RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size, VkImageUsa
 
 
 void RxAttachment::CreateImage()
-{ 
-    Image.Create(ImageType, Image.Size, Image.Format, VK_IMAGE_TILING_LINEAR,  Usage, Aspect);
+{
+    Image.Create(ImageType, Image.Size, Image.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect);
 }
 
 
@@ -63,11 +63,9 @@ VkAttachmentDescription RxAttachment::BuildDescription() const
 }
 
 
-
 ///////////////////////////////////
 // Attachment List Functions
 ///////////////////////////////////
-
 
 
 FxSizedArray<VkAttachmentDescription>& RxAttachmentList::GetAttachmentDescriptions()
@@ -97,7 +95,7 @@ RxAttachmentList& RxAttachmentList::Add(RxAttachment&& attachment)
 {
     CheckInited();
     Attachments.Insert(attachment);
-    
+
     mbImageViewsBuilt = false;
 
     return *this;
@@ -113,7 +111,7 @@ void RxAttachmentList::CreateImages()
 }
 
 FxSizedArray<VkImageView>& RxAttachmentList::GetImageViews()
-{ 
+{
     // Return the list of views if it is already populated
     if (mbImageViewsBuilt) {
         return mBuiltImageViews;
@@ -129,7 +127,7 @@ FxSizedArray<VkImageView>& RxAttachmentList::GetImageViews()
     for (RxAttachment& attachment : Attachments) {
         // Check to ensure that the image (and therefore the view) is created.
         if (!attachment.Image.IsInited()) {
-            continue;    
+            continue;
         }
 
         mBuiltImageViews.Insert(attachment.Image.View);

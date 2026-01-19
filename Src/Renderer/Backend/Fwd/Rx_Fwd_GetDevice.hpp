@@ -2,4 +2,4 @@
 
 #include "../RxDevice.hpp"
 
-RxGpuDevice* Fx_Fwd_GetGpuDevice();
+RxGpuDevice* Rx_Fwd_GetDevice();

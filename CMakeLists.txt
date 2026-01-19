@@ -13,16 +13,16 @@ set(FX_USE_SIMDE TRUE)
 
 if (WIN32)
 	message("${CMAKE_SOURCE_DIR}")
-	link_directories(${CMAKE_SOURCE_DIR}/Lib/win32)
+	link_directories(${CMAKE_SOURCE_DIR}/Lib/Win32)
 else()
-	link_directories(${CMAKE_SOURCE_DIR}/Lib/macos)
+	link_directories(${CMAKE_SOURCE_DIR}/Lib/macOS)
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/Lib/Include)
 
 if(MSVC)
 else()
-	find_package(libjpeg-turbo REQUIRED)
+	# find_package(libjpeg-turbo REQUIRED)
 endif()
 
 if(MSVC)
@@ -35,7 +35,7 @@ add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
 
-target_link_libraries(ThirdPartyLib slang SDL3 jpeg)
+target_link_libraries(ThirdPartyLib slang SDL3 turbojpeg)
 
 target_compile_definitions(
     ThirdPartyLib

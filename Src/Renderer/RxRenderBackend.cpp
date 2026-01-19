@@ -588,7 +588,7 @@ void RxRenderBackend::BeginLighting()
 
     pDeferredRenderer->GPass.End();
 
-    RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);  
+    RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
     FxDebugAssert(depth_target != nullptr);
 
     depth_target->Image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
@@ -655,9 +655,19 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 
     pCurrentCompPass->DoCompPass(render_cam);
 
-    
+    {
+        FxStackArray<RxCommandBuffer, 1> commands;
+        commands.Insert(frame->CommandBuffer);
 
-    pCurrentGPass->Submit();
+        FxStackArray<RxSemaphore, 1> wait_semaphores;
+        wait_semaphores.Insert(frame->ShadowsSem);
+
+        FxStackArray<RxSemaphore, 1> signal_semaphores;
+        signal_semaphores.Insert(frame->OffscreenSem);
+
+
+        pDeferredRenderer->GPass.Submit(FxSlice(commands), FxSlice(wait_semaphores), FxSlice(signal_semaphores));
+    }
 
     pCurrentLightingPass->Submit();
     PresentFrame();

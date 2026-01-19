@@ -16,8 +16,7 @@ void Fx_Fwd_SubmitUploadCmd(std::function<void(RxCommandBuffer&)> func) { gRende
 
 VmaAllocator Fx_Fwd_GetGpuAllocator() { return gRenderer->GpuAllocator; }
 
-RxGpuDevice* Fx_Fwd_GetGpuDevice() { return gRenderer->GetDevice(); }
-
+RxGpuDevice* Rx_Fwd_GetDevice() { return gRenderer->GetDevice(); }
 
 void Fx_Fwd_AddToDeletionQueue(const FxDeletionObject::FuncType& func) { gRenderer->AddToDeletionQueue(func); }
 
