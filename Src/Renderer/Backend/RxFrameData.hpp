@@ -22,10 +22,8 @@ public:
 
 public:
     RxCommandPool CommandPool;
+
     RxCommandBuffer CommandBuffer;
-    RxCommandBuffer ShadowCommandBuffer;
-    RxCommandBuffer LightCommandBuffer;
-    RxCommandBuffer CompCommandBuffer;
 
     // RxDescriptorSet DescriptorSet;
     RxDescriptorSet CompDescriptorSet;

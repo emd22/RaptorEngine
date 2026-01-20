@@ -103,7 +103,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
 
     gRenderer->Uniforms.Rewind();
 
-    pPipeline->Bind(frame->LightCommandBuffer);
+    pPipeline->Bind(frame->CommandBuffer);
 
     {
         FxLightVertPushConstants push_constants {};
@@ -113,7 +113,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
 
         push_constants.ObjectId = ObjectId;
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+        vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                            sizeof(push_constants), &push_constants);
     }
 
@@ -152,7 +152,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
         //                    sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
     }
 
-    pLightVolume->Render(frame->LightCommandBuffer, *pPipeline);
+    pLightVolume->Render(frame->CommandBuffer, *pPipeline);
 }
 
 
@@ -201,7 +201,7 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
     RxFrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
-    pPipeline->Bind(frame->LightCommandBuffer);
+    pPipeline->Bind(frame->CommandBuffer);
 
     {
         FxLightVertPushConstants push_constants {};
@@ -210,7 +210,7 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
 
         push_constants.ObjectId = ObjectId;
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+        vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                            sizeof(push_constants), &push_constants);
     }
 
@@ -236,5 +236,5 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
 
     // gRenderer->Uniforms.AssertSize(sizeof(FxLightFragPushConstants));
 
-    vkCmdDraw(frame->LightCommandBuffer.CommandBuffer, 3, 1, 0, 0);
+    vkCmdDraw(frame->CommandBuffer.Get(), 3, 1, 0, 0);
 }

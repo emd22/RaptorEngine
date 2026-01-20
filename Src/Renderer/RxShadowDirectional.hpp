@@ -26,14 +26,12 @@ public:
     void End();
 
     FX_FORCE_INLINE RxPipeline& GetPipeline() { return mPipeline; }
-    FX_FORCE_INLINE RxCommandBuffer* GetCommandBuffer() { return mCommandBuffer; }
 
 private:
     void UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass);
 
 public:
     FxOrthoCamera ShadowCamera;
-    RxCommandBuffer* mCommandBuffer;
     FxStackArray<RxImage, RxFramesInFlight> mAttachments;
 
 private:

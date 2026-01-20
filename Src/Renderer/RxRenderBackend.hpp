@@ -185,7 +185,6 @@ public:
 
     bool bInitialized = false;
 
-    RxDeferredGPass* pCurrentGPass = nullptr;
     RxDeferredCompPass* pCurrentCompPass = nullptr;
     RxDeferredLightingPass* pCurrentLightingPass = nullptr;
 

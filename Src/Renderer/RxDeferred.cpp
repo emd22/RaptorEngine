@@ -8,6 +8,7 @@
 #include <Renderer/RxDeferred.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/FxCamera.hpp>
 
 
 FX_SET_MODULE_NAME("DeferredRenderer")
@@ -18,7 +19,6 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     CreateCompPipeline();
     CreateLightingPipeline();
 
-    GPasses.InitSize(RxFramesInFlight);
     LightingPasses.InitSize(RxFramesInFlight);
     CompPasses.InitSize(RxFramesInFlight);
 
@@ -46,7 +46,6 @@ void RxDeferredRenderer::Destroy()
     }
 
     for (int i = 0; i < RxFramesInFlight; i++) {
-        // GPasses[i].Destroy();
         LightingPasses[i].Destroy();
         CompPasses[i].Destroy();
         OutputFramebuffers[i].Destroy();
@@ -60,7 +59,6 @@ void RxDeferredRenderer::Destroy()
     RpLighting.Destroy();
     RpComposition.Destroy();
 
-    GPasses.Free();
     LightingPasses.Free();
     CompPasses.Free();
     OutputFramebuffers.Free();
@@ -107,8 +105,6 @@ void RxDeferredRenderer::CreateGPass()
 /////////////////////////////////////
 // FxRenderer GPass Functions
 /////////////////////////////////////
-
-RxDeferredGPass* RxDeferredRenderer::GetCurrentGPass() { return &GPasses[gRenderer->GetFrameNumber()]; }
 
 VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 {
@@ -527,102 +523,6 @@ void RxDeferredRenderer::DestroyCompPipeline()
     PlCompositionUnlit.Destroy();
 }
 
-/////////////////////////////////////
-// RxDeferredGPass Functions
-/////////////////////////////////////
-
-void RxDeferredGPass::BuildDescriptorSets()
-{
-    //    DescriptorSet.Create(DescriptorPool,
-    //    mRendererInst->DsLayoutGPassVertex);
-    //
-    //    VkDescriptorBufferInfo ubo_info {
-    //        .buffer = UniformBuffer.Buffer,
-    //        .offset = 0,
-    //        .range = sizeof(RxUniformBufferObject)
-    //    };
-    //
-    //    VkWriteDescriptorSet ubo_write {
-    //        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-    //        .descriptorCount = 1,
-    //        .dstSet = DescriptorSet,
-    //        .dstBinding = 0,
-    //        .dstArrayElement = 0,
-    //        .pBufferInfo = &ubo_info,
-    //    };
-    //
-    //    const VkWriteDescriptorSet writes[] = { ubo_write };
-    //
-    //    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, sizeof(writes) /
-    //    sizeof(writes[0]), writes, 0, nullptr);
-}
-
-// void RxDeferredGPass::Create(RxDeferredRenderer* renderer, const FxVec2u& extent)
-//{
-// mRendererInst = renderer;
-
-//// RxRenderPassCache::Handle rp_handle = gRenderPassCache->Request(mRendererInst->RpGeometryId);
-//// mRenderPass = rp_handle.Item;
-// mRenderPass = &mRendererInst->RpGeometry;
-// mPlGeometry = &mRendererInst->PlGeometry;
-
-
-////    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-////    RendererFramesInFlight);
-// DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
-// DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2);
-// DescriptorPool.Create(gRenderer->GetDevice(), RxFramesInFlight);
-
-// DepthAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eD32_Float, VK_IMAGE_TILING_OPTIMAL,
-//                        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-//                        RxImageAspectFlag::eDepth);
-
-// ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eBGRA8_UNorm, VK_IMAGE_TILING_OPTIMAL,
-//                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
-
-// NormalsAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
-//                          VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-//                          RxImageAspectFlag::eColor);
-
-// FxSizedArray image_views = { ColorAttachment.View, NormalsAttachment.View, DepthAttachment.View };
-
-// Framebuffer.Create(image_views, *mRenderPass, extent);
-
-////    UniformBuffer.Create(1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-////    VMA_MEMORY_USAGE_CPU_TO_GPU); UniformBuffer.Map();
-
-// BuildDescriptorSets();
-//}
-
-// void RxDeferredGPass::Submit()
-//{
-//     RxFrameData* frame = gRenderer->GetFrame();
-//
-//     const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
-//
-//     const VkSubmitInfo submit_info = {
-//         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-//         .waitSemaphoreCount = 1,
-//         .pWaitSemaphores = &frame->ShadowsSem.Semaphore,
-//         .pWaitDstStageMask = wait_stages,
-//         // command buffers
-//         .commandBufferCount = 1,
-//         .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
-//         // signal semaphores
-//         .signalSemaphoreCount = 1,
-//         // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-//         .pSignalSemaphores = &frame->OffscreenSem.Semaphore,
-//     };
-//
-//     VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-//           "Error submitting draw buffer");
-// }
-
-/////////////////////////////////////
-// RxDeferredLightingPass Functions
-/////////////////////////////////////
-
 void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
 {
     mRendererInst = renderer;
@@ -656,14 +556,11 @@ void RxDeferredLightingPass::Begin()
         VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
     };
 
-    mRenderPass->Begin(&frame->LightCommandBuffer, Framebuffer.Framebuffer,
+    mRenderPass->Begin(&frame->CommandBuffer, Framebuffer.Framebuffer,
                        FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
-    mPlLighting->Bind(frame->LightCommandBuffer);
+    mPlLighting->Bind(frame->CommandBuffer);
 
-
-    FxLogDebug("Using uniforms from frame {}", gRenderer->Uniforms.GetBaseOffset() / RxUniforms::scUniformBufferSize);
-
-    DescriptorSet.BindWithOffset(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting,
+    DescriptorSet.BindWithOffset(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting,
                                  gRenderer->Uniforms.GetBaseOffset());
 }
 
@@ -671,37 +568,35 @@ void RxDeferredLightingPass::End() { mRenderPass->End(); }
 
 void RxDeferredLightingPass::Submit()
 {
-    RxFrameData* frame = gRenderer->GetFrame();
+    //RxFrameData* frame = gRenderer->GetFrame();
 
-    const VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-    };
+    //const VkPipelineStageFlags wait_stages[] = {
+    //    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+    //};
 
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
+    //const VkSubmitInfo submit_info = {
+    //    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    //    .waitSemaphoreCount = 1,
+    //    .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
 
-        .pWaitDstStageMask = wait_stages,
+    //    .pWaitDstStageMask = wait_stages,
 
-        // Command buffers
-        .commandBufferCount = 1,
-        .pCommandBuffers = &frame->LightCommandBuffer.CommandBuffer,
+    //    // Command buffers
+    //    .commandBufferCount = 1,
+    //    .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
 
-        // Signal semaphores
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &frame->LightingSem.Semaphore,
-    };
+    //    // Signal semaphores
+    //    .signalSemaphoreCount = 1,
+    //    .pSignalSemaphores = &frame->LightingSem.Semaphore,
+    //};
 
-    VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-          "Error submitting draw buffer");
+    //VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+    //      "Error submitting draw buffer");
 }
 
 void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
 {
     DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutLightingFrag);
-
-    RxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
 
 
     FxStackArray<VkDescriptorImageInfo, 4> write_image_infos;
@@ -876,8 +771,6 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 {
     DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutCompFrag);
 
-    RxDeferredGPass& gpass = mRendererInst->GPasses[frame_index];
-
     constexpr uint32 num_image_infos = 4;
 
     FxStackArray<VkDescriptorImageInfo, num_image_infos> write_image_infos;
@@ -984,11 +877,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 void RxDeferredCompPass::Begin()
 {
     mCurrentFrame = gRenderer->GetFrame();
-    mCurrentFrame->CompCommandBuffer.Reset();
-    mCurrentFrame->CompCommandBuffer.Record();
 }
-
-#include <Renderer/FxCamera.hpp>
 
 void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 {
@@ -996,7 +885,7 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
     memcpy(push_constants.ViewInverse, render_cam.InvViewMatrix.RawData, sizeof(FxMat4f));
     memcpy(push_constants.ProjInverse, render_cam.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
-    vkCmdPushConstants(mCurrentFrame->CompCommandBuffer.CommandBuffer, mPlComposition->Layout,
+    vkCmdPushConstants(mCurrentFrame->CommandBuffer.CommandBuffer, mPlComposition->Layout,
                        VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants), &push_constants);
 
     VkClearValue clear_values[] = {
@@ -1006,15 +895,14 @@ void RxDeferredCompPass::DoCompPass(FxCamera& render_cam)
 
     FxSlice<VkClearValue> slice(clear_values, FxSizeofArray(clear_values));
 
-    RxCommandBuffer& cmd = mCurrentFrame->CompCommandBuffer;
+    RxCommandBuffer& cmd = mCurrentFrame->CommandBuffer;
 
     VkFramebuffer framebuffer = mRendererInst->OutputFramebuffers[gRenderer->GetImageIndex()].Framebuffer;
-    mRenderPass->Begin(&mCurrentFrame->CompCommandBuffer, framebuffer, slice);
-
-    // mRendererInst->SkyboxRenderer.SkyboxAttachment = OutputImage;
+    mRenderPass->Begin(&mCurrentFrame->CommandBuffer, framebuffer, slice);
 
     DescriptorSet.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mRendererInst->PlComposition);
     mPlComposition->Bind(cmd);
+
     // Use single triangle instead of two triangles as it removes the overlapping quads the gpu
     // renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html
     vkCmdDraw(cmd.CommandBuffer, 3, 1, 0, 0);

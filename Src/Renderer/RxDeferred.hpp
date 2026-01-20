@@ -12,7 +12,6 @@
 
 struct RxFrameData;
 
-class RxDeferredGPass;
 class RxDeferredCompPass;
 class RxDeferredLightingPass;
 
@@ -32,7 +31,6 @@ public:
 
     void ToggleWireframe(bool enable);
 
-    RxDeferredGPass* GetCurrentGPass();
     RxDeferredCompPass* GetCurrentCompPass();
     RxDeferredLightingPass* GetCurrentLightingPass();
 
@@ -57,7 +55,6 @@ private:
     void DestroyLightingPipeline();
 
     VkPipelineLayout CreateLightingPipelineLayout();
-    VkPipelineLayout CreateLightPassPipelineLayout();
 
     // Composition
     void CreateCompPipeline();
@@ -82,10 +79,6 @@ public:
     RxPipeline PlGeometryWithNormalMaps;
 
     RxPipeline* pGeometryPipeline = nullptr;
-
-    // RxRenderPassId RpGeometryId = 0;
-
-    FxSizedArray<RxDeferredGPass> GPasses;
 
     //////////////////////
     // Lighting Pass
@@ -119,41 +112,6 @@ public:
 
 
     // RxSkyboxRenderer SkyboxRenderer;
-};
-
-
-///////////////////////////////
-// Geometry Pass (Per FIF)
-///////////////////////////////
-
-class RxDeferredGPass
-{
-    friend class RxDeferredRenderer;
-
-public:
-    void BuildDescriptorSets();
-
-public:
-    // G-Pass attachments
-    /*RxImage ColorAttachment;
-    RxImage PositionsAttachment;
-    RxImage NormalsAttachment;*/
-
-    //RxImage DepthAttachment;
-
-    // G-Pass samplers
-    //RxSampler ColorSampler;
-    //RxSampler PositionsSampler;
-
-    //RxFramebuffer Framebuffer;
-
-    //RxDescriptorPool DescriptorPool;
-    //    RxDescriptorSet DescriptorSet;
-
-private:
-    //RxPipeline* mPlGeometry = nullptr;
-    //RxRenderPass* mRenderPass = nullptr;
-    //RxDeferredRenderer* mRendererInst = nullptr;
 };
 
 ///////////////////////////////

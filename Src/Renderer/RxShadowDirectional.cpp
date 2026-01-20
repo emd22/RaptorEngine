@@ -29,8 +29,6 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
     mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
     mDescriptorPool.Create(gRenderer->GetDevice());
 
-    // mCommandBuffer.Create(&gRenderer->GetFrame()->CommandPool);
-
     RxDsLayoutBuilder ds_layout_builder {};
     mDsLayout = ds_layout_builder.Build();
     mDescriptorSet.Create(mDescriptorPool, mDsLayout);
@@ -84,49 +82,22 @@ void RxShadowDirectional::Begin()
         VkClearValue { .depthStencil = { 0.0f, 0 } },
     };
 
-    mCommandBuffer = &gRenderer->GetFrame()->ShadowCommandBuffer;
+    RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
 
-    mCommandBuffer->Reset();
-    mCommandBuffer->Record();
-
-    mRenderPass.Begin(mCommandBuffer, mFramebuffers[gRenderer->GetFrameNumber()].Framebuffer,
+    mRenderPass.Begin(&cmd, mFramebuffers[gRenderer->GetFrameNumber()].Framebuffer,
                       FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
 
 
-    VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
+    mPipeline.Bind(cmd);
 
-    RxDescriptorSet::BindMultiple(*mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline,
+    VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
+    RxDescriptorSet::BindMultiple(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline,
                                   FxSlice(desc_sets, FxSizeofArray(desc_sets)));
-    mPipeline.Bind(*mCommandBuffer);
 }
 
 void RxShadowDirectional::End()
 {
     mRenderPass.End();
-
-    mCommandBuffer->End();
-
-
-    RxFrameData* frame = gRenderer->GetFrame();
-
-    const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
-
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
-        .pWaitDstStageMask = wait_stages,
-        // command buffers
-        .commandBufferCount = 1,
-        .pCommandBuffers = &mCommandBuffer->CommandBuffer,
-        // signal semaphores
-        .signalSemaphoreCount = 1,
-        // .pSignalSemaphores = &frame->RenderFinished.Semaphore
-        .pSignalSemaphores = &frame->ShadowsSem.Semaphore,
-    };
-
-    VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-          "Error submitting draw buffer");
 }
 
 void RxShadowDirectional::UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass)

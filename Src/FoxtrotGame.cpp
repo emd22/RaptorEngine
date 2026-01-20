@@ -359,43 +359,29 @@ void FoxtrotGame::Tick()
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
-
-
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
         mLastTick = current_tick;
         return;
     }
 
+    RxFrameData* frame = gRenderer->GetFrame();
+
+    frame->CommandBuffer.Reset();
+    frame->CommandBuffer.Record();
+
     gShadowRenderer->Begin();
 
     RxShadowPushConstants consts;
-    // memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-    //        sizeof(float32) * 16);
-    // consts.ObjectId = pLevelObject->ObjectId;
-
-    // vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
-    //                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
-
-    // pLevelObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
-
+    
     memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
            sizeof(float32) * 16);
     consts.ObjectId = pHelmetObject->ObjectId;
 
-    vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
+    vkCmdPushConstants(gRenderer->GetFrame()->CommandBuffer.Get(), gShadowRenderer->GetPipeline().Layout,
                        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
 
-    pHelmetObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
-
-    // memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-    //        sizeof(float32) * 16);
-    // consts.ObjectId = pPistolObject->ObjectId;
-
-    // vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
-    //                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
-
-    // pPistolObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
-
+    pHelmetObject->RenderPrimitive(gRenderer->GetFrame()->CommandBuffer, gShadowRenderer->GetPipeline());
+    
     gShadowRenderer->End();
 
 
