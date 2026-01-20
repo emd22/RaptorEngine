@@ -154,6 +154,8 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
 {
     bool is_depth_texture = RxImageFormatUtil::IsDepth(Format);
 
+    VkImageAspectFlags aspect_flags = static_cast<VkImageAspectFlags>((is_depth_texture) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT);
+
     VkImageMemoryBarrier barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 
@@ -170,7 +172,7 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
 
         .subresourceRange =
             {
-                .aspectMask = (is_depth_texture) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = aspect_flags,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,

@@ -58,7 +58,7 @@ public:
     RxLoadOp StencilLoadOp = RxLoadOp::eClear;
     RxStoreOp StencilStoreOp = RxStoreOp::eStore;
 
-    VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     RxImage Image;

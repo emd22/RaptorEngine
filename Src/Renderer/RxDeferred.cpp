@@ -284,51 +284,11 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
 
 void RxDeferredRenderer::CreateLightingPipeline()
 {
-    // VkPipelineColorBlendAttachmentState color_blend_attachments[] = { VkPipelineColorBlendAttachmentState {
-    //     .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-    //                       VK_COLOR_COMPONENT_A_BIT,
-    //     .blendEnable = VK_TRUE,
-    //     .alphaBlendOp = VK_BLEND_OP_ADD,
-    //     .colorBlendOp = VK_BLEND_OP_ADD,
-    //     .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-    //     .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-    //     .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-    //     .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
-    // // } };
-
-    // VkAttachmentDescription color_attachments_list[] = {
-    //     // Combined output
-    //     VkAttachmentDescription {
-    //         .format = VK_FORMAT_R16G16B16A16_SFLOAT,
-    //         .samples = VK_SAMPLE_COUNT_1_BIT,
-    //         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-    //         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-    //         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    //         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-    //         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-    //         .finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //     },
-    // };
-
-    // ShaderList shader_list;
-
-    // RxShader vertex_shader("../Shaders/Spirv/Lighting.spv_vs", RxShaderType::Vertex);
-    // RxShader fragment_shader("../Shaders/Spirv/Lighting.spv_fs", RxShaderType::Fragment);
-
-    // shader_list.Vertex = vertex_shader.ShaderModule;
-    // shader_list.Fragment = fragment_shader.ShaderModule;
-
-    // RxShader raw_shader_list[2] = { vertex_shader, fragment_shader };
-    // FxSlice<RxShader> shader_list = FxMakeSlice<RxShader>(raw_shader_list, 2);
-    //
 
     if (DsLayoutLightingFrag == nullptr) {
         CreateLightingDSLayout();
     }
 
-
-    // const FxSlice<VkAttachmentDescription> color_attachments = FxMakeSlice(color_attachments_list,
-    //                                                                        FxSizeofArray(color_attachments_list));
 
     RxAttachmentList attachment_list;
     attachment_list.Add(RxAttachment(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen));
@@ -336,16 +296,6 @@ void RxDeferredRenderer::CreateLightingPipeline()
     RpLighting.Create(attachment_list, gRenderer->Swapchain.Extent);
 
     RxShader lighting_shader("Lighting");
-
-    // PlLightingOutsideVolume.Create("Lighting(Inside Volume)", shader_list, color_attachments,
-    //                                FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-    //                                &vertex_info, RpLighting,
-    //                                { .CullMode = VK_CULL_MODE_FRONT_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
-
-    // PlLightingInsideVolume.Create("Lighting (Outside Volume)", shader_list, color_attachments,
-    //                               FxMakeSlice(color_blend_attachments, FxSizeofArray(color_blend_attachments)),
-    //                               &vertex_info, RpLighting,
-    //                               { .CullMode = VK_CULL_MODE_BACK_BIT, .WindingOrder = VK_FRONT_FACE_CLOCKWISE });
 
     {
         FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
