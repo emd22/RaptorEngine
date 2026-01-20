@@ -562,7 +562,7 @@ void RxRenderBackend::BeginLighting()
 
 
     pDeferredRenderer->GPass.End();
-    depth_target->Image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
+    depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
     pCurrentLightingPass->Begin();
 }

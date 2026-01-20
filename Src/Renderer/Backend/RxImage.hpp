@@ -175,6 +175,9 @@ public:
     void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1,
                           std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
 
+    void TransitionDepthToShaderRO(RxCommandBuffer& cmd);
+
+
     void CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout final_layout, FxVec2u size,
                         uint32 base_layer = 0);
 
