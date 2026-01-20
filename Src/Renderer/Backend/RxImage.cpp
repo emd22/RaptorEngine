@@ -66,7 +66,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
         .usage = usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .initialLayout = ImageLayout,
 
     };
 
@@ -152,8 +152,6 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
 void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count,
                                std::optional<RxTransitionLayoutOverrides> overrides)
 {
-    VkImageAspectFlags depth_bits = VK_IMAGE_ASPECT_DEPTH_BIT;
-
     bool is_depth_texture = RxImageFormatUtil::IsDepth(Format);
 
     VkImageMemoryBarrier barrier {
@@ -172,7 +170,7 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
 
         .subresourceRange =
             {
-                .aspectMask = (is_depth_texture) ? depth_bits : VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = (is_depth_texture) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -180,8 +178,8 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
             },
     };
 
-    VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
     if (ImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
         barrier.srcAccessMask = 0;

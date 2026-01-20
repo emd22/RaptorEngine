@@ -41,10 +41,6 @@ public:
             return;
         }
 
-        FxLogDebug("Submitting to {}", GetBaseOffset() / RxUniforms::scUniformBufferSize);
-
-
-
         uint8* dest_ptr = GetCurrentBuffer() + mUniformIndex;
         std::memcpy(dest_ptr, value, size);
 

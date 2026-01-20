@@ -13,17 +13,14 @@ FX_SET_MODULE_NAME("RxShadowDirectional")
 
 RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 {
-    RxAttachmentList attachment_list;
-    attachment_list.Add(RxAttachment(RxImageFormat::eD32_Float, size));
+    RenderStage.Create(size);
 
-    mRenderPass.Create(attachment_list, size);
+    RenderStage.AddTarget(RxImageFormat::eD32_Float, size,
+                          VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                          RxImageAspectFlag::eDepth);
 
-    for (int i = 0; i < RxFramesInFlight; i++) {
-        mAttachments[i].Create(RxImageType::e2d, size, RxImageFormat::eD32_Float, VK_IMAGE_TILING_OPTIMAL,
-                               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                               RxImageAspectFlag::eDepth);
-        mFramebuffers[i].Create({ mAttachments[i].View }, mRenderPass, size);
-    }
+    RenderStage.BuildRenderStage();
+
     ShadowCamera.Update();
 
     mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
@@ -54,15 +51,14 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
         .DepthCompareOp = VK_COMPARE_OP_GREATER,
     };
 
-
     RxPipelineBuilder builder {};
     builder.SetLayout(pipeline_layout)
         .SetName("Shadow Pipeline")
         .AddBlendAttachment({ .Enabled = false })
         .SetProperties(pipeline_properties)
-        .SetAttachments(&attachment_list)
+        .SetAttachments(&RenderStage.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)
-        .SetRenderPass(&mRenderPass)
+        .SetRenderPass(&RenderStage.GetRenderPass())
         .SetVertexInfo(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
@@ -77,28 +73,16 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
 void RxShadowDirectional::Begin()
 {
-    VkClearValue clear_values[] = {
-        // Output color
-        VkClearValue { .depthStencil = { 0.0f, 0 } },
-    };
-
     RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
 
-    mRenderPass.Begin(&cmd, mFramebuffers[gRenderer->GetFrameNumber()].Framebuffer,
-                      FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
-
-
-    mPipeline.Bind(cmd);
+    RenderStage.Begin(cmd, mPipeline);
 
     VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
     RxDescriptorSet::BindMultiple(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline,
                                   FxSlice(desc_sets, FxSizeofArray(desc_sets)));
 }
 
-void RxShadowDirectional::End()
-{
-    mRenderPass.End();
-}
+void RxShadowDirectional::End() { RenderStage.End(); }
 
 void RxShadowDirectional::UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass)
 {
@@ -111,7 +95,7 @@ void RxShadowDirectional::UpdateDescriptorSet(int index, const RxDeferredLightin
 
         const VkDescriptorImageInfo depth_image_info {
             .sampler = gRenderer->Swapchain.ShadowDepthSampler.Sampler,
-            .imageView = mAttachments[index].View,
+            .imageView = RenderStage.GetTarget(RxImageFormat::eD32_Float, 0)->GetImageView(),
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 

@@ -7,6 +7,7 @@
 #include <Renderer/Backend/RxPipeline.hpp>
 #include <Renderer/Backend/RxRenderPass.hpp>
 #include <Renderer/FxCamera.hpp>
+#include <Renderer/RxRenderStage.hpp>
 
 class RxDeferredLightingPass;
 
@@ -32,14 +33,11 @@ private:
 
 public:
     FxOrthoCamera ShadowCamera;
-    FxStackArray<RxImage, RxFramesInFlight> mAttachments;
+
+    RxRenderStage<1> RenderStage;
 
 private:
-    FxStackArray<RxFramebuffer, RxFramesInFlight> mFramebuffers;
-
-    RxRenderPass mRenderPass;
     RxPipeline mPipeline;
-
 
     VkDescriptorSetLayout mDsLayout;
     RxDescriptorSet mDescriptorSet;

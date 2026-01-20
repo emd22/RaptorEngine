@@ -7,9 +7,6 @@ project(ThirdPartyLib)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-# For testing SSE/AVX code on non x64 processors
-set(FX_USE_SIMDE TRUE)
-
 
 if (WIN32)
 	message("${CMAKE_SOURCE_DIR}")
@@ -52,6 +49,9 @@ set(CMAKE_BUILD_TYPE Debug)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+
+# For testing SSE/AVX code on non x64 processors
+# set(FX_USE_SIMDE TRUE)
 
 file (GLOB_RECURSE SOURCES "Src/*.cpp" "Src/*.inl")
 list(FILTER SOURCES EXCLUDE REGEX "Src/ThirdParty/.*")

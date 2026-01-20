@@ -25,7 +25,7 @@ enum class RxStoreOp
 struct RxAttachment
 {
 public:
-    static constexpr FxVec2u scFullScreen = FxVec2u(0U); 
+    static constexpr FxVec2u scFullScreen = FxVec2u(0U);
 
 public:
     RxAttachment() = default;
@@ -42,6 +42,8 @@ public:
     RxImage& GetImage() { return Image; }
     VkImageView& GetImageView() { return Image.View; }
 
+    bool IsDepth() const { return Aspect == RxImageAspectFlag::eDepth; }
+
 public:
     RxImageType ImageType = RxImageType::e2d;
 
@@ -56,11 +58,10 @@ public:
     RxLoadOp StencilLoadOp = RxLoadOp::eClear;
     RxStoreOp StencilStoreOp = RxStoreOp::eStore;
 
-    VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     RxImage Image;
-
 };
 
 class RxAttachmentList

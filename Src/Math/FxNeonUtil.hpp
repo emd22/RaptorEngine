@@ -255,7 +255,7 @@ template <int TSign>
 FX_FORCE_INLINE float32x4_t SetSigns(float32x4_t v)
 {
     // Same as -0.0f, only the sign bit
-    const uint32x4_t sign_v = vdupq_n_u32(FxNeon::scSignMask);
+    const uint32x4_t sign_v = vdupq_n_u32(FxNeon::scSignMask32);
 
     // TSign is +ve,
     if constexpr (TSign > 0.0) {

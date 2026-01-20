@@ -20,10 +20,7 @@ public:
 
     void Create(const FxVec2u& size) { mSize = size; }
 
-    void AddWaitSemaphore()
-    {
-
-    }
+    void AddWaitSemaphore() {}
 
     void AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect)
     {
@@ -33,11 +30,11 @@ public:
 
     RxAttachmentList& GetTargets() { return mOutputTargets; }
 
-    RxAttachment* GetTarget(RxImageFormat format, int skip = 0)
+    RxAttachment* GetTarget(RxImageFormat format, int sub_index = 0)
     {
         for (RxAttachment& attachment : mOutputTargets.Attachments) {
             if (attachment.Image.Format == format) {
-                if ((skip--) > 0) {
+                if ((sub_index--) > 0) {
                     continue;
                 }
 
@@ -48,47 +45,46 @@ public:
         return nullptr;
     }
 
-    void Submit(const FxSlice<RxCommandBuffer>& cmd_buffers, const FxSlice<RxSemaphore>& wait_semaphores,
-                const FxSlice<RxSemaphore>& signal_semaphores)
-    {
-        const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
+    // void Submit(const FxSlice<RxCommandBuffer>& cmd_buffers, const FxSlice<RxSemaphore>& wait_semaphores,
+    //             const FxSlice<RxSemaphore>& signal_semaphores)
+    // {
+    //     const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
 
 
-        // Get the underlying command buffers
-        FxSizedArray<VkCommandBuffer> cmd_buffers_vk(cmd_buffers.Size);
-        for (const RxCommandBuffer& cmd : cmd_buffers) {
-            cmd_buffers_vk.Insert(cmd.Get());
-        }
+    //     // Get the underlying command buffers
+    //     FxSizedArray<VkCommandBuffer> cmd_buffers_vk(cmd_buffers.Size);
+    //     for (const RxCommandBuffer& cmd : cmd_buffers) {
+    //         cmd_buffers_vk.Insert(cmd.Get());
+    //     }
 
-        FxSizedArray<VkSemaphore> wait_semaphores_vk(wait_semaphores.Size);
-        for (const RxSemaphore& sem : wait_semaphores) {
-            wait_semaphores_vk.Insert(sem.Get());
-        }
+    //     FxSizedArray<VkSemaphore> wait_semaphores_vk(wait_semaphores.Size);
+    //     for (const RxSemaphore& sem : wait_semaphores) {
+    //         wait_semaphores_vk.Insert(sem.Get());
+    //     }
+
+    //     FxSizedArray<VkSemaphore> signal_semaphores_vk(signal_semaphores.Size);
+    //     for (const RxSemaphore& sem : signal_semaphores) {
+    //         signal_semaphores_vk.Insert(sem.Get());
+    //     }
 
 
-        FxSizedArray<VkSemaphore> signal_semaphores_vk(signal_semaphores.Size);
-        for (const RxSemaphore& sem : signal_semaphores) {
-            signal_semaphores_vk.Insert(sem.Get());
-        }
+    //     const VkSubmitInfo submit_info = {
+    //         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    //         .waitSemaphoreCount = static_cast<uint32>(wait_semaphores_vk.Size),
+    //         .pWaitSemaphores = wait_semaphores_vk.pData,
+    //         .pWaitDstStageMask = wait_stages,
 
+    //         .commandBufferCount = static_cast<uint32>(cmd_buffers_vk.Size),
+    //         .pCommandBuffers = cmd_buffers_vk.pData,
 
-        const VkSubmitInfo submit_info = {
-            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .waitSemaphoreCount = static_cast<uint32>(wait_semaphores_vk.Size),
-            .pWaitSemaphores = wait_semaphores_vk.pData,
-            .pWaitDstStageMask = wait_stages,
+    //         .signalSemaphoreCount = static_cast<uint32>(signal_semaphores_vk.Size),
+    //         .pSignalSemaphores = signal_semaphores_vk.pData,
+    //     };
 
-            .commandBufferCount = static_cast<uint32>(cmd_buffers_vk.Size),
-            .pCommandBuffers = cmd_buffers_vk.pData,
-
-            .signalSemaphoreCount = static_cast<uint32>(signal_semaphores_vk.Size),
-            .pSignalSemaphores = signal_semaphores_vk.pData,
-        };
-
-        if (vkQueueSubmit(Rx_Fwd_GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
-            FxLogError("Error submitting queue for render stage!");
-        }
-    }
+    //     if (vkQueueSubmit(Rx_Fwd_GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
+    //         FxLogError("Error submitting queue for render stage!");
+    //     }
+    // }
 
     RxRenderPass& GetRenderPass() { return mRenderPass; }
 

@@ -317,21 +317,19 @@ void FoxtrotGame::Tick()
     ProcessControls();
 
 
-
     if (!sbShowShadowCam) {
         Player.Move(DeltaTime, GetMovementVector());
         Player.Update(DeltaTime);
     }
 
 
-
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
-    //pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
+    // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
 
-    //pPistolObject->mRotation = PistolRotationGoal;
+    // pPistolObject->mRotation = PistolRotationGoal;
 
     /*FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
                                  camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);*/
@@ -372,7 +370,7 @@ void FoxtrotGame::Tick()
     gShadowRenderer->Begin();
 
     RxShadowPushConstants consts;
-    
+
     memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
            sizeof(float32) * 16);
     consts.ObjectId = pHelmetObject->ObjectId;
@@ -381,7 +379,7 @@ void FoxtrotGame::Tick()
                        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
 
     pHelmetObject->RenderPrimitive(gRenderer->GetFrame()->CommandBuffer, gShadowRenderer->GetPipeline());
-    
+
     gShadowRenderer->End();
 
 

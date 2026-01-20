@@ -27,9 +27,9 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
     VkAttachmentReference depth_attachment_ref {};
 
     for (int i = 0; i < attachments.Attachments.Size; i++) {
-        const VkAttachmentDescription& attachment = attachments.Attachments[i].BuildDescription();
+        const RxAttachment& attachment = attachments.Attachments[i];
 
-        if (RxUtil::IsFormatDepth(attachment.format)) {
+        if (attachment.IsDepth()) {
             has_depth_attachment = true;
 
             depth_attachment_ref.attachment = i;

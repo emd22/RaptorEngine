@@ -162,10 +162,6 @@ void RxRenderBackend::DestroyFrames()
         frame.CompDescriptorSet.Destroy();
 
         frame.CommandBuffer.Destroy();
-        /*frame.ShadowCommandBuffer.Destroy();
-        frame.CompCommandBuffer.Destroy();
-        frame.LightCommandBuffer.Destroy();
-        frame.CommandPool.Destroy();*/
 
         frame.Destroy();
     }
@@ -487,8 +483,6 @@ void RxRenderBackend::BeginGeometry()
 {
     RxFrameData* frame = GetFrame();
 
-    frame->CommandBuffer.Reset();
-    frame->CommandBuffer.Record();
 
     pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
 
@@ -563,11 +557,11 @@ void RxRenderBackend::BeginLighting()
 {
     RxFrameData* frame = GetFrame();
 
-    pDeferredRenderer->GPass.End();
-
     RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
     FxDebugAssert(depth_target != nullptr);
 
+
+    pDeferredRenderer->GPass.End();
     depth_target->Image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
 
     pCurrentLightingPass->Begin();
@@ -597,7 +591,7 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
         signal_semaphores.Insert(frame->OffscreenSem);*/
 
 
-        //pDeferredRenderer->GPass.Submit(FxSlice(commands), FxSlice(wait_semaphores), FxSlice(signal_semaphores));
+        // pDeferredRenderer->GPass.Submit(FxSlice(commands), FxSlice(wait_semaphores), FxSlice(signal_semaphores));
     }
 
     pCurrentLightingPass->Submit();

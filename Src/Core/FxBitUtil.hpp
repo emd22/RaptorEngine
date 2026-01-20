@@ -20,18 +20,18 @@ static constexpr uint32 scBitNotFound = UINT32_MAX;
 FX_FORCE_INLINE uint32 FindFirstOne64(uint64 value)
 {
 #if defined(FX_COMPILER_CLANG) || defined(FX_COMPILER_GCC)
-    uint32 index = static_cast<uint32>(__builtin_ffsll(value)) - 1U;
+    uint32 index = static_cast<uint32>(__builtin_ffsll(value));
 
     if (!index) {
         return scBitNotFound;
     }
 
-    return index;
+    return index - 1ULL;
 
 #else
     unsigned long index = 0;
     uint8 bit_found = _BitScanForward64(&index, value);
-    
+
     if (!bit_found) {
         return scBitNotFound;
     }
@@ -49,18 +49,17 @@ FX_FORCE_INLINE uint32 FindFirstOne64(uint64 value)
 FX_FORCE_INLINE uint32 FindFirstOne32(uint32 value)
 {
 #if defined(FX_COMPILER_CLANG) || defined(FX_COMPILER_GCC)
-    uint32 index = static_cast<uint32>(__builtin_ffs(value)) - 1U;
-
+    uint32 index = static_cast<uint32>(__builtin_ffs(value));
     if (!index) {
         return scBitNotFound;
     }
 
-    return index;
+    return index - 1U;
 
 #else
     unsigned long index = 0;
     uint8 bit_found = _BitScanForward(&index, value);
-    
+
     if (!bit_found) {
         return scBitNotFound;
     }
@@ -69,15 +68,9 @@ FX_FORCE_INLINE uint32 FindFirstOne32(uint32 value)
 #endif
 }
 
-FX_FORCE_INLINE uint32 FindFirstZero32(uint32 value)
-{
-    return FindFirstOne32(~value);
-}
+FX_FORCE_INLINE uint32 FindFirstZero32(uint32 value) { return FindFirstOne32(~value); }
 
-FX_FORCE_INLINE uint32 FindFirstZero64(uint64 value)
-{
-    return FindFirstOne64(~value);
-}
+FX_FORCE_INLINE uint32 FindFirstZero64(uint64 value) { return FindFirstOne64(~value); }
 
 
 } // namespace FxBit
