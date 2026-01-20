@@ -51,6 +51,13 @@ void FxPanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&
         FxPanic(__func__, "Assertion failed!", 0);                                                                     \
     }
 
+#define FxAssertMsg(cond_, msg_)                                                                                                 \
+    if (!(cond_)) {                                                                                                     \
+        FxLogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond_, __FILE__, __LINE__);                      \
+        FxLogFatal("Assertion Msg: {:s}", msg_);                                                                        \
+        FxPanic(__func__, "Assertion failed!", 0);                                                                      \
+    }
+
 #if defined(FX_BUILD_DEBUG) && !defined(FX_NO_DEBUG_ASSERTS)
 #define FxDebugAssert(cond)                                                                                            \
     {                                                                                                                  \

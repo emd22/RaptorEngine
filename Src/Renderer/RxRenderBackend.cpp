@@ -88,7 +88,7 @@ void RxRenderBackend::Init(FxVec2u window_size)
     // per Swapchain image, not frame in flight.
     mSubmitSemaphores.InitSize(Swapchain.OutputImages.Size);
     for (RxSemaphore& sem : mSubmitSemaphores) {
-        sem.Create(&mDevice);
+        sem.Create();
     }
 
 
@@ -113,7 +113,7 @@ void RxRenderBackend::InitUploadContext()
     UploadContext.CommandPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
     UploadContext.CommandBuffer.Create(&UploadContext.CommandPool);
 
-    UploadContext.UploadFence.Create(GetDevice());
+    UploadContext.UploadFence.Create();
     UploadContext.UploadFence.Reset();
 }
 

@@ -20,6 +20,11 @@ public:
 
     void Create(const FxVec2u& size) { mSize = size; }
 
+    void AddWaitSemaphore()
+    {
+
+    }
+
     void AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect)
     {
         mOutputTargets.Add(RxAttachment(format, size, usage, aspect));

@@ -6,7 +6,8 @@
 class FxBitset
 {
 public:
-    static constexpr int scNoFreeBits = -1;
+    static constexpr uint32 scNoFreeBits = UINT32_MAX;
+
 
 public:
     FxBitset() = default;
@@ -15,7 +16,11 @@ public:
     void InitZero(uint32 max_bits);
     void InitOne(uint32 max_bits);
 
-    FX_FORCE_INLINE int FindNextFreeBit() const;
+    /**
+     * @brief Finds the next zero bit in the bitset
+     * @return An index to the bit, or `FxBitset::scNoFreeBits` if there are none remaining.
+     */
+    FX_FORCE_INLINE uint32 FindNextFreeBit() const;
 
     FX_FORCE_INLINE void Set(uint32 index);
     FX_FORCE_INLINE bool Get(uint32 index);

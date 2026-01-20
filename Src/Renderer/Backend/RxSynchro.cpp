@@ -69,7 +69,11 @@ void RxSemaphore::Create()
     }
 }
 
-void RxSemaphore::Destroy() { vkDestroySemaphore(gRenderer->GetDevice()->Device, Semaphore, nullptr); }
+void RxSemaphore::Destroy()
+{ 
+    vkDestroySemaphore(gRenderer->GetDevice()->Device, Semaphore, nullptr);
+    Semaphore = nullptr;
+}
 
 
 
@@ -80,7 +84,45 @@ void RxSemaphore::Destroy() { vkDestroySemaphore(gRenderer->GetDevice()->Device,
 
 
 RxSemaphoreCache::RxSemaphoreCache()
-{
-
+{ 
+    mSemaphores.InitCapacity(scNumSemaphores);
+    mInUse.InitZero(scNumSemaphores);
 }
 
+RxSemaphore* RxSemaphoreCache::Request()
+{
+    uint32 next_free = mInUse.FindNextFreeBit();
+    
+    // No available semaphores, return null
+    if (next_free == FxBitset::scNoFreeBits) {
+        return nullptr;
+    }
+
+    RxSemaphore* semaphore = nullptr;
+
+    // If there are semaphores available but they have not been created yet, create one
+    if (next_free > mSemaphores.Size) {
+        semaphore = mSemaphores.Insert();
+        semaphore->Create();
+        semaphore->SetCacheId(next_free);
+    }
+    else {
+        semaphore = &mSemaphores[next_free];
+    }
+
+    return semaphore;
+}
+
+void RxSemaphoreCache::Release(RxSemaphore* semaphore) 
+{
+    mInUse.Unset(semaphore->GetCacheId());
+}
+
+RxSemaphoreCache::~RxSemaphoreCache()
+{
+    for (RxSemaphore& sem : mSemaphores) {
+        sem.Destroy();
+    }
+
+    mSemaphores.Free();
+}
