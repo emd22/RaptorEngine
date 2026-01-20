@@ -30,7 +30,8 @@ constexpr uint32 scSignMask32 = 0x80000000;
 FX_FORCE_INLINE __m128 RemoveSign(__m128 vec)
 {
     const __m128 sign_mask = _mm_castsi128_ps(_mm_set1_epi32(scSignMask32));
-    return _mm_andnot_ps(vec, sign_mask);
+    // Return the value with the sign bit removed
+    return _mm_andnot_ps(sign_mask, vec);
 }
 
 FX_FORCE_INLINE float32 Dot(__m128 a, __m128 b) { return _mm_cvtss_f32(_mm_dp_ps(a, b, 0xFF)); }
@@ -45,9 +46,11 @@ FX_FORCE_INLINE __m128 SetSigns(__m128 v)
     const __m128 sign_v = _mm_castsi128_ps(_mm_set1_epi32(scSignMask32));
 
     if constexpr (TSign > 0.0) {
+        // Return the value without the sign bit (always positive)
         return _mm_andnot_ps(sign_v, v);
     }
 
+    // Return the value with the sign bit (always negative)
     return _mm_or_ps(v, sign_v);
 }
 

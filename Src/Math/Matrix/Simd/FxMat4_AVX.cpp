@@ -22,6 +22,8 @@ __m128 FxMat4f::MultiplyVec4f_SSE(const FxVec4f& vec)
     __m128 a2 = Columns[2].mIntrin;
     __m128 a3 = Columns[3].mIntrin;
 
+    FxAssert(false);
+
     // {X, Y, Z, W}
     /*
      1*X,  2*Y,  3*Z,  4*W,

@@ -660,6 +660,9 @@ void RxDeferredLightingPass::Begin()
                        FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
     mPlLighting->Bind(frame->LightCommandBuffer);
 
+
+    FxLogDebug("Using uniforms from frame {}", gRenderer->Uniforms.GetBaseOffset() / RxUniforms::scUniformBufferSize);
+
     DescriptorSet.BindWithOffset(frame->LightCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting,
                                  gRenderer->Uniforms.GetBaseOffset());
 }

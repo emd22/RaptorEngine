@@ -200,16 +200,16 @@ static FX_FORCE_INLINE FxVec3f GetMovementVector()
     FxVec3f movement = FxVec3f::sZero;
 
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-        movement.Z = 1.0f;
+        movement.Z += 1.0f;
     }
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-        movement.Z = -1.0f;
+        movement.Z += -1.0f;
     }
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-        movement.X = 1.0f;
+        movement.X += 1.0f;
     }
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-        movement.X = -1.0f;
+        movement.X += -1.0f;
     }
 
     return movement;
@@ -316,10 +316,13 @@ void FoxtrotGame::Tick()
     FxControlManager::Update();
     ProcessControls();
 
+
+
     if (!sbShowShadowCam) {
         Player.Move(DeltaTime, GetMovementVector());
         Player.Update(DeltaTime);
     }
+
 
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
@@ -336,7 +339,8 @@ void FoxtrotGame::Tick()
     FxVec3f pistol_destination = Player.Position;
 
     pPistolObject->MoveTo(pistol_destination);
-    //pPistolObject->Update();
+    pPistolObject->Update();
+
     // pPistolObject->MoveBy();
 
     // FxVec3f shadow_pos = FxVec3f(0, 10, 5);
@@ -355,7 +359,6 @@ void FoxtrotGame::Tick()
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
-    gPhysics->Update();
 
 
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
@@ -403,6 +406,8 @@ void FoxtrotGame::Tick()
     mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
     gRenderer->DoComposition(*camera);
+
+    gPhysics->Update();
 
     mLastTick = current_tick;
 }

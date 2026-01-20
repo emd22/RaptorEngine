@@ -160,13 +160,13 @@ FX_FORCE_INLINE FxVec3f FxVec3f::operator/(float32 scalar) const
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator+=(const FxVec3f& other)
 {
-    mIntrin = _mm_add_ps(mIntrin, other);
+    mIntrin = _mm_add_ps(mIntrin, other.mIntrin);
     return *this;
 }
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator-=(const FxVec3f& other)
 {
-    mIntrin = _mm_sub_ps(mIntrin, other);
+    mIntrin = _mm_sub_ps(mIntrin, other.mIntrin);
     return *this;
 }
 
@@ -178,7 +178,7 @@ FX_FORCE_INLINE FxVec3f& FxVec3f::operator-=(float32 scalar)
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator*=(const FxVec3f& other)
 {
-    mIntrin = _mm_mul_ps(mIntrin, other);
+    mIntrin = _mm_mul_ps(mIntrin, other.mIntrin);
     return *this;
 }
 

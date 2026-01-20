@@ -18,7 +18,7 @@ const FxVec3f FxVec3f::sForward = FxVec3f(0.0f, 0.0f, 1.0f);
 
 FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
 {
-    const float32 values[4] = { x, y, z, 0 };
+    const float32 values[4] = {   x, y, z, 0 };
     mIntrin = _mm_load_ps(values);
 }
 
@@ -76,15 +76,6 @@ FxVec3f FxVec3f::Cross(const FxVec3f& other) const
     const __m128 result_yzxw = _mm_sub_ps(_mm_mul_ps(a, b_yzxw), _mm_mul_ps(a_yzxw, b));
 
     return FxVec3f(FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));
-
-    //__m128 a_yzxw = _mm_shuffle_ps(a, a, _MM_SHUFFLE(3, 0, 2, 1));
-
-    /*__m128 a_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
-    __m128 b_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
-
-    const float32x4_t result_yzxw = vsubq_f32(vmulq_f32(a, b_yzxw), vmulq_f32(a_yzxw, b));
-
-    return FxVec3f(FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));*/
 }
 
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
