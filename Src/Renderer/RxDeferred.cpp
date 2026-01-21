@@ -19,7 +19,10 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     CreateCompPipeline();
     CreateLightingPipeline();
 
-    LightingPasses.InitSize(RxFramesInFlight);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8);
+    DescriptorPool.Create(gRenderer->GetDevice(), 10);
+
+
     CompPasses.InitSize(RxFramesInFlight);
 
     FxSizedArray<VkImageView> temp_views;
@@ -28,9 +31,6 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     OutputFramebuffers.InitSize(RxFramesInFlight);
 
     for (int frame_index = 0; frame_index < RxFramesInFlight; frame_index++) {
-        // GPasses[frame_index].Create(this, extent);
-
-        LightingPasses[frame_index].Create(this, frame_index, extent);
         // Pass in the current frame index to map to the swapchain's output images
         CompPasses[frame_index].Create(this, frame_index, extent);
 
@@ -46,7 +46,6 @@ void RxDeferredRenderer::Destroy()
     }
 
     for (int i = 0; i < RxFramesInFlight; i++) {
-        LightingPasses[i].Destroy();
         CompPasses[i].Destroy();
         OutputFramebuffers[i].Destroy();
     }
@@ -56,10 +55,8 @@ void RxDeferredRenderer::Destroy()
     DestroyLightingPipeline();
 
     // RpGeometry.Destroy();
-    RpLighting.Destroy();
     RpComposition.Destroy();
 
-    LightingPasses.Free();
     CompPasses.Free();
     OutputFramebuffers.Free();
 }
@@ -230,14 +227,6 @@ void RxDeferredRenderer::DestroyGPassPipeline()
     PlGeometryWireframe.Destroy();
 }
 
-////////////////////////////////////////////////
-// RxDeferredRenderer LightingPass Functions
-////////////////////////////////////////////////
-
-RxDeferredLightingPass* RxDeferredRenderer::GetCurrentLightingPass()
-{
-    return &LightingPasses[gRenderer->GetFrameNumber()];
-}
 
 void RxDeferredRenderer::CreateLightingDSLayout()
 {
@@ -289,11 +278,9 @@ void RxDeferredRenderer::CreateLightingPipeline()
         CreateLightingDSLayout();
     }
 
-
-    RxAttachmentList attachment_list;
-    attachment_list.Add(RxAttachment(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen));
-
-    RpLighting.Create(attachment_list, gRenderer->Swapchain.Extent);
+    LightPass.Create(gRenderer->Swapchain.Extent);
+    LightPass.AddTarget(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
+    LightPass.BuildRenderStage();
 
     RxShader lighting_shader("Lighting");
 
@@ -314,9 +301,9 @@ void RxDeferredRenderer::CreateLightingPipeline()
                 } },
                 .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
             })
-            .SetAttachments(&attachment_list)
+            .SetAttachments(&LightPass.GetTargets())
             .SetShaders(vertex_shader, fragment_shader)
-            .SetRenderPass(&RpLighting)
+            .SetRenderPass(&LightPass.GetRenderPass())
             .SetVertexInfo(&vertex_info)
             .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
@@ -342,9 +329,9 @@ void RxDeferredRenderer::CreateLightingPipeline()
                 } },
                 .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
             })
-            .SetAttachments(&attachment_list)
+            .SetAttachments(&LightPass.GetTargets())
             .SetShaders(vertex_shader, fragment_shader)
-            .SetRenderPass(&RpLighting)
+            .SetRenderPass(&LightPass.GetRenderPass())
             .SetVertexInfo(nullptr)
             .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
@@ -473,223 +460,113 @@ void RxDeferredRenderer::DestroyCompPipeline()
     PlCompositionUnlit.Destroy();
 }
 
-void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
+//void RxDeferredLightingPass::Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent)
+//{
+//    mRendererInst = renderer;
+//    mRenderPass = &mRendererInst->RpLighting;
+//    mPlLighting = &mRendererInst->PlLightingOutsideVolume;
+//
+//    // Albedo sampler
+//    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
+//
+//    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+//    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1);
+//
+//    DescriptorPool.Create(gRenderer->GetDevice(), 4);
+//
+//    ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
+//                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
+//
+//    FxSizedArray image_views = { ColorAttachment.View };
+//
+//    Framebuffer.Create(image_views, *mRenderPass, extent);
+//
+//    BuildDescriptorSets(frame_index);
+//}
+//
+//void RxDeferredLightingPass::Begin()
+//{
+//    RxFrameData* frame = gRenderer->GetFrame();
+//
+//    VkClearValue clear_values[] = {
+//        // Output color
+//        VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
+//    };
+//
+//    mRenderPass->Begin(&frame->CommandBuffer, Framebuffer.Framebuffer,
+//                       FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
+//    mPlLighting->Bind(frame->CommandBuffer);
+//
+//    DescriptorSet.BindWithOffset(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting,
+//                                 gRenderer->Uniforms.GetBaseOffset());
+//}
+//
+//void RxDeferredLightingPass::End() { mRenderPass->End(); }
+//
+//void RxDeferredLightingPass::Submit()
+//{
+//    //RxFrameData* frame = gRenderer->GetFrame();
+//
+//    //const VkPipelineStageFlags wait_stages[] = {
+//    //    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+//    //};
+//
+//    //const VkSubmitInfo submit_info = {
+//    //    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+//    //    .waitSemaphoreCount = 1,
+//    //    .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
+//
+//    //    .pWaitDstStageMask = wait_stages,
+//
+//    //    // Command buffers
+//    //    .commandBufferCount = 1,
+//    //    .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
+//
+//    //    // Signal semaphores
+//    //    .signalSemaphoreCount = 1,
+//    //    .pSignalSemaphores = &frame->LightingSem.Semaphore,
+//    //};
+//
+//    //VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
+//    //      "Error submitting draw buffer");
+//}
+
+void RxDeferredRenderer::BuildLightDescriptors()
 {
-    mRendererInst = renderer;
-    mRenderPass = &mRendererInst->RpLighting;
-    mPlLighting = &mRendererInst->PlLightingOutsideVolume;
-
-    // Albedo sampler
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
-
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1);
-
-    DescriptorPool.Create(gRenderer->GetDevice(), 4);
-
-    ColorAttachment.Create(RxImageType::e2d, extent, RxImageFormat::eRGBA16_Float, VK_IMAGE_TILING_OPTIMAL,
-                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
-
-    FxSizedArray image_views = { ColorAttachment.View };
-
-    Framebuffer.Create(image_views, *mRenderPass, extent);
-
-    BuildDescriptorSets(frame_index);
-}
-
-void RxDeferredLightingPass::Begin()
-{
-    RxFrameData* frame = gRenderer->GetFrame();
-
-    VkClearValue clear_values[] = {
-        // Output color
-        VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } },
-    };
-
-    mRenderPass->Begin(&frame->CommandBuffer, Framebuffer.Framebuffer,
-                       FxMakeSlice(clear_values, FxSizeofArray(clear_values)));
-    mPlLighting->Bind(frame->CommandBuffer);
-
-    DescriptorSet.BindWithOffset(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *mPlLighting,
-                                 gRenderer->Uniforms.GetBaseOffset());
-}
-
-void RxDeferredLightingPass::End() { mRenderPass->End(); }
-
-void RxDeferredLightingPass::Submit()
-{
-    //RxFrameData* frame = gRenderer->GetFrame();
-
-    //const VkPipelineStageFlags wait_stages[] = {
-    //    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-    //};
-
-    //const VkSubmitInfo submit_info = {
-    //    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    //    .waitSemaphoreCount = 1,
-    //    .pWaitSemaphores = &frame->OffscreenSem.Semaphore,
-
-    //    .pWaitDstStageMask = wait_stages,
-
-    //    // Command buffers
-    //    .commandBufferCount = 1,
-    //    .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
-
-    //    // Signal semaphores
-    //    .signalSemaphoreCount = 1,
-    //    .pSignalSemaphores = &frame->LightingSem.Semaphore,
-    //};
-
-    //VkTry(vkQueueSubmit(gRenderer->GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE),
-    //      "Error submitting draw buffer");
-}
-
-void RxDeferredLightingPass::BuildDescriptorSets(uint16 frame_index)
-{
-    DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutLightingFrag);
+    DsLighting.Create(DescriptorPool, DsLayoutLightingFrag);
 
 
     FxStackArray<VkDescriptorImageInfo, 4> write_image_infos;
     FxStackArray<VkDescriptorBufferInfo, 2> write_buffer_infos;
     FxStackArray<VkWriteDescriptorSet, 6> write_infos;
 
-    // Depth image descriptor
-    {
-        const int binding_index = 1;
+    // Depth
+    LightPass.AddInputTarget(0, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+    // Albedo
+    LightPass.AddInputTarget(1, GPass.GetTarget(RxImageFormat::eBGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+    
+    // Normals
+    LightPass.AddInputTarget(2, GPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
+    
+    // Skip 3 for the shadow target, added by RxDirectionalShadows
 
-        VkImageView gpass_depth_view = mRendererInst->GPass.GetTarget(RxImageFormat::eD32_Float)->Image.View;
-
-        const VkDescriptorImageInfo positions_image_info {
-            .sampler = gRenderer->Swapchain.DepthSampler.Sampler,
-            .imageView = gpass_depth_view,
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        };
-
-        const VkWriteDescriptorSet positions_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = DescriptorSet.Set,
-            .dstBinding = binding_index,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo = write_image_infos.Insert(positions_image_info),
-
-        };
-
-        write_infos.Insert(positions_write);
-    }
-
-    // Color image descriptor
-    {
-        const int binding_index = 2;
-
-        VkImageView gpass_albedo_view = mRendererInst->GPass.GetTarget(RxImageFormat::eBGRA8_UNorm)->Image.View;
-
-        const VkDescriptorImageInfo color_image_info {
-            .sampler = gRenderer->Swapchain.ColorSampler.Sampler,
-            .imageView = gpass_albedo_view,
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        };
-
-        const VkWriteDescriptorSet color_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = DescriptorSet.Set,
-            .dstBinding = binding_index,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo = write_image_infos.Insert(color_image_info),
-
-        };
-
-        write_infos.Insert(color_write);
-    }
-
-    // Normals image descriptor
-    {
-        const int binding_index = 3;
-
-        VkImageView gpass_normals_view = mRendererInst->GPass.GetTarget(RxImageFormat::eRGBA16_Float)->Image.View;
-
-        const VkDescriptorImageInfo normals_image_info {
-            .sampler = gRenderer->Swapchain.NormalsSampler.Sampler,
-            .imageView = gpass_normals_view,
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        };
-
-        const VkWriteDescriptorSet normals_write { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                                   .dstSet = DescriptorSet.Set,
-                                                   .dstBinding = binding_index,
-                                                   .dstArrayElement = 0,
-                                                   .descriptorCount = 1,
-                                                   .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                   .pImageInfo = write_image_infos.Insert(normals_image_info),
-                                                   .pBufferInfo = nullptr };
-
-        write_infos.Insert(normals_write);
-    }
-
-    // Note that the shadow texture is added in RxDirectionalShadow.hpp!
-
-    // Uniform buffer
-    {
-        const int binding_index = 5;
-
-        const VkDescriptorBufferInfo uniform_buffer_info { .buffer = gRenderer->Uniforms.GetGpuBuffer().Buffer,
-                                                           .offset = 0,
-                                                           .range = gRenderer->Uniforms.scUniformBufferSize };
-
-        const VkWriteDescriptorSet uniform_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = DescriptorSet.Set,
-            .dstBinding = binding_index,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-            .pImageInfo = nullptr,
-            .pBufferInfo = write_buffer_infos.Insert(uniform_buffer_info),
-        };
-
-        write_infos.Insert(uniform_write);
-    }
-
-
-    // {
-    //     VkDescriptorBufferInfo info {
-    //         .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
-    //         .offset = 0,
-    //         .range = VK_WHOLE_SIZE,
-    //     };
-
-    //     VkWriteDescriptorSet buffer_write {
-    //         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //         .dstSet = DescriptorSet.Set,
-    //         .dstBinding = 0,
-    //         .dstArrayElement = 0,
-    //         .descriptorCount = 1,
-    //         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-    //         .pBufferInfo = write_buffer_infos.Insert(info),
-    //     };
-
-    //     write_infos.Insert(buffer_write);
-    // }
-
-
-    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
+    LightPass.AddInputBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.scUniformBufferSize);
+    
+    LightPass.BuildInputDescriptors(&DsLighting);
 }
 
-void RxDeferredLightingPass::Destroy()
-{
-    if (mPlLighting == nullptr) {
-        return;
-    }
-
-    ColorAttachment.Destroy();
-    DescriptorPool.Destroy();
-    Framebuffer.Destroy();
-
-    mPlLighting = nullptr;
-}
+//void RxDeferredLightingPass::Destroy()
+//{
+//    if (mPlLighting == nullptr) {
+//        return;
+//    }
+//
+//    ColorAttachment.Destroy();
+//    DescriptorPool.Destroy();
+//    Framebuffer.Destroy();
+//
+//    mPlLighting = nullptr;
+//}
 
 /////////////////////////////////////////
 // RxDeferredCompPass Functions
@@ -717,9 +594,9 @@ void RxDeferredCompPass::Create(RxDeferredRenderer* renderer, uint16 frame_index
     BuildDescriptorSets(frame_index);
 }
 
-void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
+void RxDeferredRenderer::BuildCompDescriptors()
 {
-    DescriptorSet.Create(DescriptorPool, mRendererInst->DsLayoutCompFrag);
+    DsLighting.Create(, mRendererInst->DsLayoutCompFrag);
 
     constexpr uint32 num_image_infos = 4;
 
@@ -804,7 +681,7 @@ void RxDeferredCompPass::BuildDescriptorSets(uint16 frame_index)
 
         const VkDescriptorImageInfo lights_image_info {
             .sampler = gRenderer->Swapchain.LightsSampler.Sampler,
-            .imageView = light_pass.ColorAttachment.View,
+            .imageView = LightPass.,
             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         };
 

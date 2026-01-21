@@ -62,8 +62,13 @@ private:
 
     VkPipelineLayout CreateCompPipelineLayout();
 
+    void BuildCompDescriptors();
+    void BuildLightDescriptors();
+
 
 public:
+    RxDescriptorPool DescriptorPool;
+
     /////////////////////
     // Geometry Pass
     /////////////////////
@@ -87,20 +92,23 @@ public:
     VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
     VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
 
+    RxDescriptorSet DsLighting;
+
+    RxRenderStage<1> LightPass;
+
     RxPipeline PlLightingOutsideVolume;
     RxPipeline PlLightingInsideVolume;
 
     RxPipeline PlLightingDirectional;
 
-    RxRenderPass RpLighting;
-
-    FxSizedArray<RxDeferredLightingPass> LightingPasses;
 
     //////////////////////
     // Composition Pass
     //////////////////////
 
     VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
+
+    RxRenderStage<1> CompPass;
 
     RxPipeline PlComposition;
     RxPipeline PlCompositionUnlit;
@@ -112,36 +120,6 @@ public:
 
 
     // RxSkyboxRenderer SkyboxRenderer;
-};
-
-///////////////////////////////
-// Lighting Pass (Per FIF)
-///////////////////////////////
-
-class RxDeferredLightingPass
-{
-public:
-    void Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
-    void Destroy();
-
-    void Begin();
-    void End();
-    void Submit();
-
-    void BuildDescriptorSets(uint16 frame_index);
-
-public:
-    RxImage ColorAttachment;
-
-    RxFramebuffer Framebuffer;
-
-    RxDescriptorPool DescriptorPool;
-    RxDescriptorSet DescriptorSet;
-
-private:
-    RxPipeline* mPlLighting = nullptr;
-    RxRenderPass* mRenderPass = nullptr;
-    RxDeferredRenderer* mRendererInst = nullptr;
 };
 
 

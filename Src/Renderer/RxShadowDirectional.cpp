@@ -91,7 +91,7 @@ void RxShadowDirectional::UpdateDescriptorSet(int index, const RxDeferredLightin
 
     // Shadow Depth image descriptor
     {
-        const int binding_index = 4;
+        const int binding_index = 3;
 
         const VkDescriptorImageInfo depth_image_info {
             .sampler = gRenderer->Swapchain.ShadowDepthSampler.Sampler,

@@ -116,6 +116,11 @@ public:
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);
     }
 
+    VkDescriptorSet Get()
+    { 
+        return Set;
+    }
+
     operator VkDescriptorSet() { return Set; }
 
     void Destroy() {}

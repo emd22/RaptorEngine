@@ -70,12 +70,12 @@ struct FSOutput
     float4 vColor : SV_TARGET0;
 };
 
-layout(binding = 1) Sampler2D sDepth;
-layout(binding = 2) Sampler2D sAlbedo;
-layout(binding = 3) Sampler2D sNormal;
-layout(binding = 4) Sampler2DShadow sShadowDepth;
+layout(binding = 0) Sampler2D sDepth;
+layout(binding = 1) Sampler2D sAlbedo;
+layout(binding = 2) Sampler2D sNormal;
+layout(binding = 3) Sampler2DShadow sShadowDepth;
 
-layout(binding = 5) cbuffer FSUniforms
+layout(binding = 4) cbuffer FSUniforms
 {
     float4x4 LightCameraMatrix;
     float4x4 mInvView;

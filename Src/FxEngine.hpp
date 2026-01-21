@@ -9,11 +9,13 @@ class RxPipelineList;
 class RxRenderPassCache;
 class FxObjectManager;
 class RxShadowDirectional;
+class RxSamplerCache;
 
 extern RxRenderBackend* gRenderer;
 extern PhJolt* gPhysics;
 extern FxShaderCompiler* gShaderCompiler;
 extern RxPipelineList* gPipelines;
+extern RxSamplerCache* gSamplerCache;
 
 extern FxObjectManager* gObjectManager;
 

@@ -9,6 +9,7 @@
 #include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/RxRenderPassCache.hpp>
 #include <Renderer/RxShadowDirectional.hpp>
+#include <Renderer/RxSamplerCache.hpp>
 
 RxRenderBackend* gRenderer = nullptr;
 PhJolt* gPhysics = nullptr;
@@ -17,6 +18,8 @@ RxPipelineList* gPipelines = nullptr;
 RxRenderPassCache* gRenderPassCache = nullptr;
 FxObjectManager* gObjectManager = nullptr;
 RxShadowDirectional* gShadowRenderer = nullptr;
+RxSamplerCache* gSamplerCache = nullptr;
+
 
 void FxEngineGlobalsInit()
 {
@@ -26,6 +29,7 @@ void FxEngineGlobalsInit()
     // gRenderPassCache = new RxRenderPassCache;
     gPipelines = new RxPipelineList;
     gObjectManager = new FxObjectManager;
+    gSamplerCache = new RxSamplerCache;
 }
 
 void FxEngineGlobalsDestroy()

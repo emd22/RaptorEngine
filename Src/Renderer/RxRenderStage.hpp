@@ -11,8 +11,18 @@
 template <uint32 TNumTargets>
 class RxRenderStage
 {
-    struct TargetOptions
+    static constexpr uint32 scMaxInputAttachments = 6;
+    static constexpr uint32 scMaxInputBuffers = 2;
+
+    struct InputTarget
     {
+        uint32 BindIndex = 0;
+        RxAttachment* pTarget = nullptr;
+        RxSampler* pSampler = nullptr;
+        RxGpuBuffer* pBuffer = nullptr;
+
+        uint32 BufferOffset = 0;
+        uint32 BufferRange = 0;
     };
 
 public:
@@ -45,46 +55,94 @@ public:
         return nullptr;
     }
 
-    // void Submit(const FxSlice<RxCommandBuffer>& cmd_buffers, const FxSlice<RxSemaphore>& wait_semaphores,
-    //             const FxSlice<RxSemaphore>& signal_semaphores)
-    // {
-    //     const VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT };
+    void AddInputBuffer(uint32 bind_index, RxGpuBuffer* buffer, uint32 offset, uint32 range)
+    { 
+        if (!mInputTargets.IsInited()) {
+            mInputTargets.InitCapacity(scMaxInputAttachments);
+        }
 
+        FxAssertMsg(buffer != nullptr, "Input target cannot be null!");
 
-    //     // Get the underlying command buffers
-    //     FxSizedArray<VkCommandBuffer> cmd_buffers_vk(cmd_buffers.Size);
-    //     for (const RxCommandBuffer& cmd : cmd_buffers) {
-    //         cmd_buffers_vk.Insert(cmd.Get());
-    //     }
+        InputTarget input_target {
+            .BindIndex = bind_index,
+            .pTarget = nullptr,
+            .pSampler = nullptr,
+            .pBuffer = buffer,
+            .BufferOffset = offset,
+            .BufferRange = range
+        };
 
-    //     FxSizedArray<VkSemaphore> wait_semaphores_vk(wait_semaphores.Size);
-    //     for (const RxSemaphore& sem : wait_semaphores) {
-    //         wait_semaphores_vk.Insert(sem.Get());
-    //     }
+        mInputTargets.Insert(input_target);
+    }
 
-    //     FxSizedArray<VkSemaphore> signal_semaphores_vk(signal_semaphores.Size);
-    //     for (const RxSemaphore& sem : signal_semaphores) {
-    //         signal_semaphores_vk.Insert(sem.Get());
-    //     }
+    void AddInputTarget(uint32 bind_index, RxAttachment* target, RxSampler* sampler)
+    { 
+        if (!mInputTargets.IsInited()) {
+            mInputTargets.InitCapacity(scMaxInputAttachments);
+        }
 
+        FxAssertMsg(target != nullptr, "Input target cannot be null!");
 
-    //     const VkSubmitInfo submit_info = {
-    //         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    //         .waitSemaphoreCount = static_cast<uint32>(wait_semaphores_vk.Size),
-    //         .pWaitSemaphores = wait_semaphores_vk.pData,
-    //         .pWaitDstStageMask = wait_stages,
+        InputTarget input_target {
+            .BindIndex = bind_index,
+            .pTarget = target,
+            .pSampler = sampler,
+            .pBuffer = nullptr,
+        };
 
-    //         .commandBufferCount = static_cast<uint32>(cmd_buffers_vk.Size),
-    //         .pCommandBuffers = cmd_buffers_vk.pData,
+        mInputTargets.Insert(input_target);
+    }
 
-    //         .signalSemaphoreCount = static_cast<uint32>(signal_semaphores_vk.Size),
-    //         .pSignalSemaphores = signal_semaphores_vk.pData,
-    //     };
+    void BuildInputDescriptors(RxDescriptorSet* out)
+    {
+        FxStackArray<VkDescriptorImageInfo, scMaxInputAttachments> image_infos;
+        FxStackArray<VkDescriptorBufferInfo, scMaxInputBuffers> buffer_infos;
+        FxStackArray<VkWriteDescriptorSet, scMaxInputAttachments + scMaxInputBuffers> write_infos;
 
-    //     if (vkQueueSubmit(Rx_Fwd_GetDevice()->GraphicsQueue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
-    //         FxLogError("Error submitting queue for render stage!");
-    //     }
-    // }
+        for (const InputTarget& target : mInputTargets) {
+            if (target.pTarget) {
+                VkDescriptorImageInfo image_info {
+                    .sampler = target.pSampler->Sampler,
+                    .imageView = target.pTarget->Image.View,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,    
+                };
+
+                const VkWriteDescriptorSet write {
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = out->Get(),
+                    .dstBinding = target.BindIndex,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .pImageInfo = image_infos.Insert(image_info),
+                };
+
+                write_infos.Insert(write);
+            }
+            else if (target.pBuffer) {
+                const VkDescriptorBufferInfo buffer_info { 
+                    .buffer = gRenderer->Uniforms.GetGpuBuffer().Buffer,
+                    .offset = target.BufferOffset,
+                    .range = target.BufferRange, 
+                };
+
+                const VkWriteDescriptorSet uniform_write {
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = DescriptorSet.Set,
+                    .dstBinding = binding_index,
+                    .dstArrayElement = 0,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                    .pImageInfo = nullptr,
+                    .pBufferInfo = buffer_infos.Insert(buffer_info),
+                };
+
+                write_infos.Insert(write);
+            }
+        }
+
+        vkUpdateDescriptorSets(Rx_Fwd_GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
+    }
 
     RxRenderPass& GetRenderPass() { return mRenderPass; }
 
@@ -141,6 +199,7 @@ public:
 
 private:
     RxAttachmentList mOutputTargets;
+    FxSizedArray<InputTarget> mInputTargets;
 
     RxFramebuffer mFramebuffer;
     RxRenderPass mRenderPass;
