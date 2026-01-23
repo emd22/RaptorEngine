@@ -29,18 +29,13 @@ public:
     FX_FORCE_INLINE RxPipeline& GetPipeline() { return mPipeline; }
 
 private:
-    void UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass);
+    void UpdateLightDescriptors();
 
 public:
     FxOrthoCamera ShadowCamera;
 
-    RxRenderStage<1> RenderStage;
+    RxRenderStage RenderStage;
 
 private:
     RxPipeline mPipeline;
-
-    VkDescriptorSetLayout mDsLayout;
-    RxDescriptorSet mDescriptorSet;
-
-    RxDescriptorPool mDescriptorPool;
 };

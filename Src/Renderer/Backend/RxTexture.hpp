@@ -37,7 +37,7 @@ public:
         const size_t data_size = dimensions.X * dimensions.Y * components;
         //        assert(image_data.Size == data_size);
 
-        RxRawGpuBuffer<uint8> staging_buffer;
+        RxRawGpuBuffer staging_buffer;
         staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                               VMA_MEMORY_USAGE_CPU_TO_GPU);
         staging_buffer.Upload(image_data);

@@ -21,7 +21,7 @@ public:
      */
     uint8* GetCurrentBuffer();
 
-    RxRawGpuBuffer<uint8>& GetGpuBuffer() { return mGpuBuffer; }
+    RxRawGpuBuffer& GetGpuBuffer() { return mGpuBuffer; }
 
     template <typename TValueType>
     void Submit(const TValueType& value)
@@ -64,7 +64,7 @@ public:
 private:
     /// Gpu buffer that stores current uniform buffer data. Note that this is a continguous buffer that stores
     /// `RxFramesInFlight` number of uniform structures that are of size `scUniformBufferSize`.
-    RxRawGpuBuffer<uint8> mGpuBuffer;
+    RxRawGpuBuffer mGpuBuffer;
 
     uint32 mUniformIndex = 0;
 };

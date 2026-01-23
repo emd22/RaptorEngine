@@ -261,7 +261,7 @@ public:
 public:
     FxVec3f Dimensions = FxVec3f::sZero;
 
-    RxGpuBuffer<TVertexType> GpuBuffer {};
+    RxGpuBuffer GpuBuffer {};
     FxSizedArray<TVertexType> LocalBuffer {};
 
     bool bContainsNormals : 1 = false;

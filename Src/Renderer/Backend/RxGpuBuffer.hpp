@@ -13,50 +13,13 @@
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
-template <typename ElementType>
 class RxRawGpuBuffer;
-
-template <typename ElementType>
 class RxGpuBuffer;
 
 enum class RxBufferUsageType
 {
     Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-};
-
-template <typename ElementType>
-class RxGpuBufferMapContext
-{
-public:
-    RxGpuBufferMapContext(RxRawGpuBuffer<ElementType>* buffer) : mGpuBuffer(buffer) { mGpuBuffer->Map(); }
-
-    /** Returns the raw pointer representation of the mapped data. */
-    operator void*()
-    {
-        if (!mGpuBuffer->pMappedBuffer) {
-            return nullptr;
-        }
-
-        return mGpuBuffer->pMappedBuffer;
-    }
-
-    /** Returns the pointer representation of the mapped data. */
-    ElementType* GetPtr()
-    {
-        FxDebugAssert(mGpuBuffer->pMappedBuffer != nullptr);
-        return static_cast<ElementType*>(mGpuBuffer->pMappedBuffer);
-    }
-
-    ~RxGpuBufferMapContext() { mGpuBuffer->UnMap(); }
-
-    /**
-     * Manually unmaps the buffer.
-     */
-    void UnMap() const { mGpuBuffer->UnMap(); }
-
-private:
-    RxRawGpuBuffer<ElementType>* mGpuBuffer = nullptr;
 };
 
 enum class RxGpuBufferFlags : uint16
@@ -74,27 +37,21 @@ enum class RxGpuBufferFlags : uint16
 /**
  * @brief Provides a GPU buffer that can be created with more complex parameters without staging.
  */
-template <typename ElementType>
 class RxRawGpuBuffer
 {
 public:
-    const int32 ElementSize = sizeof(ElementType);
-
-public:
     RxRawGpuBuffer() = default;
 
-    RxRawGpuBuffer(RxRawGpuBuffer<ElementType>& other) = delete;
+    RxRawGpuBuffer(RxRawGpuBuffer& other) = delete;
 
-    RxRawGpuBuffer operator=(RxRawGpuBuffer<ElementType>& other) = delete;
+    RxRawGpuBuffer operator=(RxRawGpuBuffer& other) = delete;
 
-    void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
+    void Create(uint64 size, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
                 RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::eNone)
     {
-        Size = element_count;
+        Size = size;
         mUsageFlags = buffer_usage;
         mBufferFlags = buffer_flags;
-
-        const uint64 buffer_size = ElementSize * Size;
 
         VmaAllocationCreateFlags vma_create_flags = 0;
 
@@ -104,7 +61,7 @@ public:
 
         const VkBufferCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                                                  .flags = 0,
-                                                 .size = buffer_size,
+                                                 .size = size,
                                                  .usage = mUsageFlags,
                                                  .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
 
@@ -124,24 +81,6 @@ public:
             pMappedBuffer = allocation_info.pMappedData;
         }
 
-#ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
-        static uint32 allocation_number = 0;
-
-        allocation_number += 1;
-
-        std::string allocation_name = "";
-        // typeid(ElementType).name();
-
-        char name_buffer[256];
-        char demangled_name_buffer[128];
-
-        FxUtil::DemangleName(typeid(ElementType).name(), demangled_name_buffer, 128);
-
-        snprintf(name_buffer, 128, "%s{%u}", demangled_name_buffer, allocation_number);
-
-        vmaSetAllocationName(Fx_Fwd_GetGpuAllocator(), Allocation, name_buffer);
-#endif
-
         Initialized = true;
     }
 
@@ -149,15 +88,6 @@ public:
     {
         vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
     }
-
-
-    /**
-     * Creates a new context that automatically maps and unmaps memory at the
-     * end of scope.
-     *
-     * To get the mapped buffer, either use `value.MappedBuffer`, or `value` when using the value as a pointer.
-     */
-    RxGpuBufferMapContext<ElementType> GetMappedContext() { return RxGpuBufferMapContext<ElementType>(this); }
 
     void Map()
     {
@@ -186,14 +116,18 @@ public:
         pMappedBuffer = nullptr;
     }
 
-    void Upload(const FxSizedArray<ElementType>& data)
+    template <typename TElementType>
+    void Upload(const FxSizedArray<TElementType>& data)
     {
         FxDebugAssert(data.Size > 0);
         FxDebugAssert(data.pData != nullptr);
 
-        auto buffer = GetMappedContext();
+        Map();
+
         const size_t size_in_bytes = data.GetSizeInBytes();
-        memcpy(buffer.GetPtr(), data.pData, size_in_bytes);
+        memcpy(pMappedBuffer, data.pData, size_in_bytes);
+
+        UnMap();
     }
 
     void Destroy()
@@ -230,28 +164,64 @@ private:
 };
 
 
+class RxGpuBufferMapContext
+{
+public:
+    RxGpuBufferMapContext(RxRawGpuBuffer* buffer) : mpGpuBuffer(buffer) { mpGpuBuffer->Map(); }
+
+    /** Returns the raw pointer representation of the mapped data. */
+    operator void*()
+    {
+        if (!mpGpuBuffer->pMappedBuffer) {
+            return nullptr;
+        }
+
+        return mpGpuBuffer->pMappedBuffer;
+    }
+
+    /** Returns the pointer representation of the mapped data. */
+    template <typename TElementType>
+    TElementType* GetPtr()
+    {
+        FxDebugAssert(mpGpuBuffer->pMappedBuffer != nullptr);
+        return static_cast<TElementType*>(mpGpuBuffer->pMappedBuffer);
+    }
+
+    ~RxGpuBufferMapContext() { mpGpuBuffer->UnMap(); }
+
+    /**
+     * Manually unmaps the buffer.
+     */
+    void UnMap() const { mpGpuBuffer->UnMap(); }
+
+private:
+    RxRawGpuBuffer* mpGpuBuffer = nullptr;
+};
+
+
 /**
  * A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
  * buffer type.
  */
-template <typename ElementType>
-class RxGpuBuffer : public RxRawGpuBuffer<ElementType>
+class RxGpuBuffer : public RxRawGpuBuffer
 {
 private:
-    using RxRawGpuBuffer<ElementType>::Create;
+    using RxRawGpuBuffer::Create;
 
 public:
     RxGpuBuffer() = default;
 
-    void Create(RxBufferUsageType usage, const FxSizedArray<ElementType>& data)
+    template <typename TElementType>
+    void Create(RxBufferUsageType usage, const FxSizedArray<TElementType>& data)
     {
         this->Size = data.Size;
         Usage = usage;
 
-        const uint64_t buffer_size = data.Size * sizeof(ElementType);
+        const uint64_t buffer_size = data.Size * sizeof(TElementType);
 
-        RxRawGpuBuffer<ElementType> staging_buffer;
-        staging_buffer.Create(this->Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        RxRawGpuBuffer staging_buffer;
+        staging_buffer.Create(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
         // Upload the data to the staging buffer
         staging_buffer.Upload(data);
 
@@ -270,7 +240,4 @@ public:
 
 public:
     RxBufferUsageType Usage;
-
-private:
-    size_t ElementSize = sizeof(ElementType);
 };

@@ -25,16 +25,10 @@ class RxDeferredRenderer
 public:
     void Create(const FxVec2u& extent);
 
+    void DoCompPass(FxCamera& camera);
+
     void Destroy();
-
     ~RxDeferredRenderer() { Destroy(); }
-
-    void ToggleWireframe(bool enable);
-
-    RxDeferredCompPass* GetCurrentCompPass();
-    RxDeferredLightingPass* GetCurrentLightingPass();
-
-    void RebuildLightingPipeline();
 
 private:
     // Geometry
@@ -62,7 +56,7 @@ private:
 
     VkPipelineLayout CreateCompPipelineLayout();
 
-    void BuildCompDescriptors();
+    void CreateCompPass();
     void BuildLightDescriptors();
 
 
@@ -76,8 +70,8 @@ public:
     VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
 
-    RxRenderStage<3> GPass;
-    
+    RxRenderStage GPass;
+
     RxPipeline PlGeometry;
     RxPipeline PlGeometryNoDepthTest;
     RxPipeline PlGeometryWireframe;
@@ -94,11 +88,10 @@ public:
 
     RxDescriptorSet DsLighting;
 
-    RxRenderStage<1> LightPass;
+    RxRenderStage LightPass;
 
     RxPipeline PlLightingOutsideVolume;
     RxPipeline PlLightingInsideVolume;
-
     RxPipeline PlLightingDirectional;
 
 
@@ -108,50 +101,10 @@ public:
 
     VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
-    RxRenderStage<1> CompPass;
+    RxDescriptorSet DsComposition;
+
+    RxRenderStage CompPass;
 
     RxPipeline PlComposition;
     RxPipeline PlCompositionUnlit;
-    RxRenderPass RpComposition;
-
-    FxSizedArray<RxFramebuffer> OutputFramebuffers;
-
-    FxSizedArray<RxDeferredCompPass> CompPasses;
-
-
-    // RxSkyboxRenderer SkyboxRenderer;
-};
-
-
-class FxCamera;
-
-///////////////////////////////
-// Composition Pass (Per FIF)
-///////////////////////////////
-
-class RxDeferredCompPass
-{
-public:
-    void Create(RxDeferredRenderer* renderer, uint16 frame_index, const FxVec2u& extent);
-    void Destroy();
-
-    void Begin();
-    void DoCompPass(FxCamera& render_cam);
-
-    void BuildDescriptorSets(uint16 frame_index);
-
-public:
-    RxFramebuffer Framebuffer;
-
-    RxImage* OutputImage;
-
-    RxDescriptorPool DescriptorPool;
-    RxDescriptorSet DescriptorSet;
-
-private:
-    RxPipeline* mPlComposition = nullptr;
-    RxRenderPass* mRenderPass = nullptr;
-    RxDeferredRenderer* mRendererInst = nullptr;
-
-    RxFrameData* mCurrentFrame = nullptr;
 };

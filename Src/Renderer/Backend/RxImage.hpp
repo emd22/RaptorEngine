@@ -178,14 +178,12 @@ public:
     void TransitionDepthToShaderRO(RxCommandBuffer& cmd);
 
 
-    void CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout final_layout, FxVec2u size,
-                        uint32 base_layer = 0);
+    void CopyFromBuffer(const RxRawGpuBuffer& buffer, VkImageLayout final_layout, FxVec2u size, uint32 base_layer = 0);
 
     void CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat image_format, VkImageAspectFlags aspect_flags,
                                        RxImageCubemapOptions options);
 
-    FX_FORCE_INLINE bool IsInited() const
-    { return (Image != nullptr); }
+    FX_FORCE_INLINE bool IsInited() const { return (Image != nullptr); }
 
     void Destroy();
 

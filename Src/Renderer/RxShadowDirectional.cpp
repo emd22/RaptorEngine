@@ -23,13 +23,6 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
     ShadowCamera.Update();
 
-    mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
-    mDescriptorPool.Create(gRenderer->GetDevice());
-
-    RxDsLayoutBuilder ds_layout_builder {};
-    mDsLayout = ds_layout_builder.Build();
-    mDescriptorSet.Create(mDescriptorPool, mDsLayout);
-
     FxStackArray<VkDescriptorSetLayout, 2> desc_sets = {
         gObjectManager->DsLayoutObjectBuffer,
     };
@@ -65,10 +58,7 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
     builder.Build(mPipeline);
 
-    for (int i = 0; i < RxFramesInFlight; i++) {
-        const RxDeferredLightingPass& lighting_pass = gRenderer->pDeferredRenderer->LightingPasses[i];
-        UpdateDescriptorSet(i, lighting_pass);
-    }
+    UpdateLightDescriptors();
 }
 
 void RxShadowDirectional::Begin()
@@ -84,33 +74,10 @@ void RxShadowDirectional::Begin()
 
 void RxShadowDirectional::End() { RenderStage.End(); }
 
-void RxShadowDirectional::UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass)
+void RxShadowDirectional::UpdateLightDescriptors()
 {
-    FxStackArray<VkDescriptorImageInfo, 4> write_image_infos;
-    FxStackArray<VkWriteDescriptorSet, 5> write_infos;
+    gRenderer->pDeferredRenderer->LightPass.AddInputTarget(2, RenderStage.GetTarget(RxImageFormat::eD32_Float, 0),
+                                                           &gRenderer->Swapchain.ShadowDepthSampler);
 
-    // Shadow Depth image descriptor
-    {
-        const int binding_index = 3;
-
-        const VkDescriptorImageInfo depth_image_info {
-            .sampler = gRenderer->Swapchain.ShadowDepthSampler.Sampler,
-            .imageView = RenderStage.GetTarget(RxImageFormat::eD32_Float, 0)->GetImageView(),
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        };
-
-        const VkWriteDescriptorSet depth_write {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = lighting_pass.DescriptorSet.Set,
-            .dstBinding = binding_index,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo = write_image_infos.Insert(depth_image_info),
-        };
-
-        write_infos.Insert(depth_write);
-
-        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
-    }
+    gRenderer->pDeferredRenderer->LightPass.BuildInputDescriptors(&gRenderer->pDeferredRenderer->DsLighting);
 }

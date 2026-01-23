@@ -266,13 +266,6 @@ void FoxtrotGame::ProcessControls()
         Player.Jump();
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_EQUALS)) {
-        gRenderer->pDeferredRenderer->ToggleWireframe(true);
-    }
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_MINUS)) {
-        gRenderer->pDeferredRenderer->ToggleWireframe(false);
-    }
-
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_O)) {
         // Print out memory pool statistics

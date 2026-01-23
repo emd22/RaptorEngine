@@ -59,8 +59,7 @@ public:
     // }
 
     template <typename T>
-    VkWriteDescriptorSet GetBufferWriteDescriptor(uint32 bind_dest, const RxRawGpuBuffer<T>& buffer,
-                                                  VkDescriptorType type)
+    VkWriteDescriptorSet GetBufferWriteDescriptor(uint32 bind_dest, const RxRawGpuBuffer& buffer, VkDescriptorType type)
     {
         VkDescriptorBufferInfo info { .buffer = buffer.Buffer, .offset = 0, .range = sizeof(T) };
 
@@ -106,7 +105,8 @@ public:
                                 offsets.pData);
     }
 
-    void BindWithOffset(const RxCommandBuffer &cmd, VkPipelineBindPoint bind_point, const RxPipeline &pipeline, uint32 offset) const
+    void BindWithOffset(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline,
+                        uint32 offset) const
     {
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 1, &offset);
     }
@@ -116,10 +116,7 @@ public:
         vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);
     }
 
-    VkDescriptorSet Get()
-    { 
-        return Set;
-    }
+    VkDescriptorSet Get() { return Set; }
 
     operator VkDescriptorSet() { return Set; }
 

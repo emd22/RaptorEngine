@@ -91,13 +91,6 @@ void RxRenderBackend::Init(FxVec2u window_size)
         sem.Create();
     }
 
-
-    // PipelineCache.Create(RendererFramesInFlight);
-
-    // SamplerCache.Create();
-
-    Swapchain.CreateSwapchainFramebuffers();
-
     gObjectManager->Create();
 
     Uniforms.Create();
@@ -462,9 +455,6 @@ RxFrameResult RxRenderBackend::BeginFrame()
 
     Uniforms.Rewind();
 
-    pCurrentCompPass = pDeferredRenderer->GetCurrentCompPass();
-    pCurrentLightingPass = pDeferredRenderer->GetCurrentLightingPass();
-
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
     frame->InFlight.WaitFor();
@@ -564,7 +554,7 @@ void RxRenderBackend::BeginLighting()
     pDeferredRenderer->GPass.End();
     depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
-    pCurrentLightingPass->Begin();
+    pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
 }
 
 #include <Renderer/FxCamera.hpp>
@@ -575,10 +565,10 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
 {
     RxFrameData* frame = GetFrame();
 
-    pCurrentLightingPass->End();
+    pDeferredRenderer->LightPass.End();
 
-    pCurrentCompPass->Begin();
-    pCurrentCompPass->DoCompPass(render_cam);
+    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlComposition);
+    pDeferredRenderer->DoCompPass(render_cam);
 
     {
         /*FxStackArray<RxCommandBuffer, 1> commands;
@@ -594,7 +584,7 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
         // pDeferredRenderer->GPass.Submit(FxSlice(commands), FxSlice(wait_semaphores), FxSlice(signal_semaphores));
     }
 
-    pCurrentLightingPass->Submit();
+
     PresentFrame();
 
     ProcessDeletionQueue();

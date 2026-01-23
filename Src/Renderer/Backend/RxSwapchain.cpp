@@ -15,8 +15,10 @@ void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device)
     mDevice = device;
 
     CreateSwapchain(size, surface);
+    CreateSamplers();
     CreateSwapchainImages();
     CreateImageViews();
+    CreateFramebuffers();
 
     bInitialized = true;
 }
@@ -43,6 +45,8 @@ void RxSwapchain::CreateSwapchainImages()
         image->Format = Surface.Format;
     }
 }
+
+void RxSwapchain::CreateFramebuffers() {}
 
 void RxSwapchain::CreateImageViews()
 {
@@ -105,8 +109,9 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
 
         // For now we will enforce that RGBA16 is supported by the render device. This is the first chosen
         // if it is supported.
-        FxAssert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT || surface_format.format == VK_FORMAT_R8G8B8A8_SRGB);
-        
+        FxAssert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
+                 surface_format.format == VK_FORMAT_R8G8B8A8_SRGB);
+
         if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
             Surface.Format = RxImageFormat::eRGBA16_Float;
         }
@@ -152,13 +157,25 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     }
 }
 
-void RxSwapchain::CreateSwapchainFramebuffers()
+void RxSwapchain::CreateSamplers()
 {
     ColorSampler.Create();
-    DepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest);
-    ShadowDepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest,
-                              RxSamplerAddressMode::eClampToBorder, RxSamplerBorderColor::eFloatWhite,
-                              RxSamplerCompareOp::eGreater);
+
+    DepthSampler.Create(RxSamplerProps {
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+    });
+
+    ShadowDepthSampler.Create(RxSamplerProps {
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+        RxSamplerAddressMode::eClampToBorder,
+        RxSamplerBorderColor::eFloatWhite,
+        RxSamplerCompareOp::eGreater,
+    });
+
     NormalsSampler.Create();
     LightsSampler.Create();
 }
