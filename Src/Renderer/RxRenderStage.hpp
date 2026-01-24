@@ -62,6 +62,8 @@ private:
     void MakeClearValues();
     void CreateFinalStageFramebuffers();
 
+    void AddPresentTarget();
+
 public:
     FxSizedArray<VkClearValue> ClearValues;
 

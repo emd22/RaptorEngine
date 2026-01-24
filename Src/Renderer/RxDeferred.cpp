@@ -372,12 +372,9 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 void RxDeferredRenderer::CreateCompPipeline()
 {
     VkPipelineLayout comp_layout = CreateCompPipelineLayout();
+
     CreateCompPass();
 
-    RxAttachmentList attachment_list;
-
-    attachment_list.Add(RxAttachment(gRenderer->Swapchain.Surface.Format, FxVec2u::sZero, RxLoadOp::eDontCare,
-                                     RxStoreOp::eStore, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 
     RxShader shader_composition("Composition");
 
@@ -389,7 +386,7 @@ void RxDeferredRenderer::CreateCompPipeline()
     builder.SetLayout(comp_layout)
         .SetName("Composition Pipeline")
         .AddBlendAttachment({ .Enabled = false })
-        .SetAttachments(&attachment_list)
+        .SetAttachments(&CompPass.GetTargets())
         .SetShaders(lit_vertex_shader, lit_fragment_shader)
         .SetRenderPass(&CompPass.GetRenderPass())
         .SetVertexInfo(nullptr)
@@ -436,7 +433,7 @@ void RxDeferredRenderer::CreateCompPass()
     CompPass.AddInputTarget(1, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
     CompPass.AddInputTarget(2, GPass.GetTarget(RxImageFormat::eBGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
     CompPass.AddInputTarget(3, GPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
-    CompPass.AddInputTarget(3, LightPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.LightsSampler);
+    CompPass.AddInputTarget(4, LightPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.LightsSampler);
 
 
     CompPass.BuildInputDescriptors(&DsComposition);
@@ -454,7 +451,7 @@ void RxDeferredRenderer::DoCompPass(FxCamera& camera)
     vkCmdPushConstants(cmd.Get(), PlComposition.Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                        &push_constants);
 
-    CompPass.Begin(cmd, PlComposition);
+    // CompPass.Begin(cmd, PlComposition);
 
     DsComposition.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PlComposition);
 

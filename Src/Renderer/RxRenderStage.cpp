@@ -112,6 +112,10 @@ void RxRenderStage::BuildRenderStage()
         return;
     }
 
+    if (mbIsFinalStage) {
+        AddPresentTarget();
+    }
+
     // If there are no clear values already defined, generate them
     if (ClearValues.Size == 0) {
         MakeClearValues();
@@ -189,4 +193,12 @@ void RxRenderStage::MarkFinalStage()
     FxAssertMsg(mbIsBuilt == false, "Cannot mark final -- Render stage was already built!");
 
     mbIsFinalStage = true;
+}
+
+
+void RxRenderStage::AddPresentTarget()
+{
+    mOutputTargets.Add(RxAttachment(gRenderer->Swapchain.Surface.Format, RxAttachment::scFullScreen,
+                                    RxLoadOp::eDontCare, RxStoreOp::eStore, VK_IMAGE_LAYOUT_UNDEFINED,
+                                    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 }
