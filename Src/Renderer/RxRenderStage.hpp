@@ -11,6 +11,7 @@
 class RxRenderStage
 {
     static constexpr uint32 scMaxInputAttachments = 6;
+    static constexpr uint32 scMaxOutputTargets = 8;
     static constexpr uint32 scMaxInputBuffers = 2;
 
     struct InputTarget
@@ -27,7 +28,11 @@ class RxRenderStage
 public:
     RxRenderStage() = default;
 
-    void Create(const FxVec2u& size) { mSize = size; }
+    void Create(const FxVec2u& size)
+    {
+        ClearValues.InitCapacity(scMaxOutputTargets);
+        mSize = size;
+    }
 
     void AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
 

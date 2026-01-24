@@ -39,7 +39,7 @@ void RxRenderStage::BuildInputDescriptors(RxDescriptorSet* out)
 
             const VkWriteDescriptorSet buffer_write {
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = out->Set,
+                .dstSet = out->Get(),
                 .dstBinding = target.BindIndex,
                 .dstArrayElement = 0,
                 .descriptorCount = 1,
@@ -94,7 +94,7 @@ void RxRenderStage::AddInputBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, ui
         mInputTargets.InitCapacity(scMaxInputAttachments);
     }
 
-    FxAssertMsg(buffer != nullptr, "Input target cannot be null!");
+    FxAssertMsg(buffer != nullptr, "Input buffer cannot be null!");
 
     InputTarget input_target { .BindIndex = bind_index,
                                .pTarget = nullptr,
@@ -157,10 +157,6 @@ void RxRenderStage::AddTarget(RxImageFormat format, const FxVec2u& size, VkImage
 
 void RxRenderStage::MakeClearValues()
 {
-    if (!ClearValues.IsInited()) {
-        ClearValues.InitCapacity(mOutputTargets.Attachments.Size);
-    }
-
     for (const RxAttachment& attachment : mOutputTargets.Attachments) {
         if (attachment.Aspect == RxImageAspectFlag::eDepth) {
             ClearValues.Insert(VkClearValue { .depthStencil = { 0.0f, 0U } });
@@ -176,7 +172,7 @@ void RxRenderStage::CreateFinalStageFramebuffers()
 {
     FxSizedArray<RxImage>& final_images = gRenderer->Swapchain.OutputImages;
 
-    mFinalStageFramebuffers.InitCapacity(final_images.Size);
+    mFinalStageFramebuffers.InitSize(final_images.Size);
 
     FxSizedArray<VkImageView> image_views;
     image_views.InitSize(1);
@@ -190,7 +186,7 @@ void RxRenderStage::CreateFinalStageFramebuffers()
 
 void RxRenderStage::MarkFinalStage()
 {
-    FxAssertMsg(mbIsBuilt, "Cannot mark final -- Render stage was already built!");
+    FxAssertMsg(mbIsBuilt == false, "Cannot mark final -- Render stage was already built!");
 
     mbIsFinalStage = true;
 }

@@ -555,6 +555,9 @@ void RxRenderBackend::BeginLighting()
     depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
     pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
+    pDeferredRenderer->DsLighting.BindWithOffset(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                 pDeferredRenderer->PlLightingDirectional,
+                                                 gRenderer->Uniforms.GetBaseOffset());
 }
 
 #include <Renderer/FxCamera.hpp>

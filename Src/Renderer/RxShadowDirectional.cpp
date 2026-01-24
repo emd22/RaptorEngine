@@ -76,7 +76,7 @@ void RxShadowDirectional::End() { RenderStage.End(); }
 
 void RxShadowDirectional::UpdateLightDescriptors()
 {
-    gRenderer->pDeferredRenderer->LightPass.AddInputTarget(2, RenderStage.GetTarget(RxImageFormat::eD32_Float, 0),
+    gRenderer->pDeferredRenderer->LightPass.AddInputTarget(3, RenderStage.GetTarget(RxImageFormat::eD32_Float, 0),
                                                            &gRenderer->Swapchain.ShadowDepthSampler);
 
     gRenderer->pDeferredRenderer->LightPass.BuildInputDescriptors(&gRenderer->pDeferredRenderer->DsLighting);

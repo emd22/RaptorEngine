@@ -15,12 +15,14 @@ FX_SET_MODULE_NAME("DeferredRenderer")
 
 void RxDeferredRenderer::Create(const FxVec2u& extent)
 {
-    CreateGPassPipeline();
-    CreateCompPipeline();
-    CreateLightingPipeline();
-
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2);
     DescriptorPool.Create(gRenderer->GetDevice(), 10);
+
+    CreateGPassPipeline();
+    CreateLightingPipeline();
+    CreateCompPipeline();
 }
 
 void RxDeferredRenderer::Destroy()
@@ -103,6 +105,7 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 
 void RxDeferredRenderer::CreateGPassPipeline()
 {
+    VkPipelineLayout gpass_layout = CreateGPassPipelineLayout();
     // RxAttachmentList attachments;
 
     // attachments
@@ -123,7 +126,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     RxPipelineBuilder builder;
 
-    builder.SetLayout(CreateGPassPipelineLayout())
+    builder.SetLayout(gpass_layout)
         .SetName("Geometry Pipeline")
         .AddBlendAttachment({ .Enabled = false })
         .AddBlendAttachment({ .Enabled = false })
@@ -186,15 +189,15 @@ void RxDeferredRenderer::CreateLightingDSLayout()
     RxDsLayoutBuilder builder {};
 
     // sDepth
-    builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
     // sAlbedo
-    builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
     // sNormal
-    builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
     // sShadowDepth
-    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+    builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
 
-    builder.AddBinding(5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, RxShaderType::eFragment);
+    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, RxShaderType::eFragment);
 
     DsLayoutLightingFrag = builder.Build();
 }
@@ -368,6 +371,7 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 
 void RxDeferredRenderer::CreateCompPipeline()
 {
+    VkPipelineLayout comp_layout = CreateCompPipelineLayout();
     CreateCompPass();
 
     RxAttachmentList attachment_list;
@@ -382,7 +386,7 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     RxPipelineBuilder builder;
 
-    builder.SetLayout(CreateCompPipelineLayout())
+    builder.SetLayout(comp_layout)
         .SetName("Composition Pipeline")
         .AddBlendAttachment({ .Enabled = false })
         .SetAttachments(&attachment_list)
@@ -426,12 +430,14 @@ void RxDeferredRenderer::CreateCompPass()
 
     CompPass.ClearValues.Insert(VkClearValue { .color = { { 0.0f, 0.3f, 0.0f, 1.0f } } });
 
+    CompPass.MarkFinalStage();
     CompPass.BuildRenderStage();
 
     CompPass.AddInputTarget(1, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
     CompPass.AddInputTarget(2, GPass.GetTarget(RxImageFormat::eBGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
     CompPass.AddInputTarget(3, GPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
     CompPass.AddInputTarget(3, LightPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.LightsSampler);
+
 
     CompPass.BuildInputDescriptors(&DsComposition);
 }

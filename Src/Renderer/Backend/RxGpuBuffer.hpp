@@ -46,10 +46,10 @@ public:
 
     RxRawGpuBuffer operator=(RxRawGpuBuffer& other) = delete;
 
-    void Create(uint64 size, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
+    void Create(uint64 size_in_bytes, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
                 RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::eNone)
     {
-        Size = size;
+        Size = size_in_bytes;
         mUsageFlags = buffer_usage;
         mBufferFlags = buffer_flags;
 
@@ -61,7 +61,7 @@ public:
 
         const VkBufferCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                                                  .flags = 0,
-                                                 .size = size,
+                                                 .size = size_in_bytes,
                                                  .usage = mUsageFlags,
                                                  .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
 
@@ -121,6 +121,8 @@ public:
     {
         FxDebugAssert(data.Size > 0);
         FxDebugAssert(data.pData != nullptr);
+
+        FxAssertMsg(this->Size >= data.GetSizeInBytes(), "GPU buffer is smaller than source buffer!");
 
         Map();
 
@@ -214,13 +216,11 @@ public:
     template <typename TElementType>
     void Create(RxBufferUsageType usage, const FxSizedArray<TElementType>& data)
     {
-        this->Size = data.Size;
+        this->Size = data.Size * sizeof(TElementType);
         Usage = usage;
 
-        const uint64_t buffer_size = data.Size * sizeof(TElementType);
-
         RxRawGpuBuffer staging_buffer;
-        staging_buffer.Create(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        staging_buffer.Create(Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         // Upload the data to the staging buffer
         staging_buffer.Upload(data);
@@ -231,7 +231,7 @@ public:
         Fx_Fwd_SubmitUploadCmd(
             [&](RxCommandBuffer& cmd)
             {
-                VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = buffer_size };
+                VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
                 vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
             });
 
