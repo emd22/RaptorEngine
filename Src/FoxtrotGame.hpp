@@ -20,8 +20,6 @@ public:
 
 private:
     void InitEngine();
-
-    void CreateSkybox();
     void CreateLights();
 
     void Tick();

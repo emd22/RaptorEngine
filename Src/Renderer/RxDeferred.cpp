@@ -324,12 +324,6 @@ void RxDeferredRenderer::DestroyLightingPipeline()
         DsLayoutLightingMaterialProperties = nullptr;
     }
 
-    // if (DsLayoutObjectBuffer) {
-    //     vkDestroyDescriptorSetLayout(device, DsLayoutObjectBuffer, nullptr);
-    //     DsLayoutObjectBuffer = nullptr;
-    // }
-
-
     PlLightingOutsideVolume.Destroy();
 
     PlLightingInsideVolume.Layout = nullptr;

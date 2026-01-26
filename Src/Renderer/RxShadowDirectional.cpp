@@ -67,6 +67,10 @@ void RxShadowDirectional::Begin()
 
     RenderStage.Begin(cmd, mPipeline);
 
+    
+    gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                   gShadowRenderer->GetPipeline(), gObjectManager->GetBaseOffset());
+
     //VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
     /*RxDescriptorSet::BindMultiple(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline,
                                   FxSlice(desc_sets, FxSizeofArray(desc_sets)));*/

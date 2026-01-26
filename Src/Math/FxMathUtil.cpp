@@ -33,12 +33,6 @@ static constexpr float32 scCosineCoeff0_3 = -0.5f;
 
 void SinCos(float32 in_angle, float32* out_sine, float32* out_cosine)
 {
-    *out_sine = std::sin(in_angle);
-    *out_cosine = std::cos(in_angle);
-
-    return;
-
-
     static constexpr float32 scPi = FX_PI;
     static constexpr float32 scHalfPi = FX_HALF_PI;
 

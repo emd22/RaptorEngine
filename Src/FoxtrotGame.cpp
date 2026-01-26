@@ -250,7 +250,6 @@ void FoxtrotGame::ProcessControls()
         mouse_delta.X = (DeltaTime * mouse_delta.X * scMouseSensitivity);
         mouse_delta.Y = (DeltaTime * mouse_delta.Y * -scMouseSensitivity);
 
-
         // camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         Player.RotateHead(mouse_delta);
     }
@@ -317,35 +316,15 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-
-    FxVec3f pistol_destination = camera->Position;
+    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
+                                 camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);
 
     pPistolObject->MoveTo(pistol_destination);
-    pPistolObject->Update();
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
-
-    // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
-
-    // pPistolObject->mRotation = PistolRotationGoal;
-
-    /*FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
-                                 camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);*/
-
-    // double cur_time = static_cast<double>(gRenderer->GetElapsedFrameCount()) * 0.1;
-    // FxVec3f pistol_destination = FxVec3f(cos(cur_time) * 0.5, 1.0, 0.0f);
-
-
-    // pPistolObject->MoveBy();
-
-    // FxVec3f shadow_pos = FxVec3f(0, 10, 5);
-    // FxVec3f target = FxVec3f(0.0f, 0.0f, 0.0f);
+    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
-    // gShadowRenderer->ShadowCamera.ResolveViewToTexels(512);
-    // gShadowRenderer->ShadowCamera.Position.Y *= -1.0f;
-
-    // target.Y *= -1.0f;
 
     FxVec3f target = Player.Position;
 
@@ -359,15 +338,14 @@ void FoxtrotGame::Tick()
         return;
     }
 
+    gPhysics->Update();
+
     RxFrameData* frame = gRenderer->GetFrame();
 
     frame->CommandBuffer.Reset();
     frame->CommandBuffer.Record();
 
     gShadowRenderer->Begin();
-
-    gObjectManager->mObjectBufferDS.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                   gShadowRenderer->GetPipeline(), gObjectManager->GetBaseOffset());
 
     RxShadowPushConstants consts;
 
@@ -385,55 +363,19 @@ void FoxtrotGame::Tick()
 
     gRenderer->BeginGeometry();
 
-    // deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *camera);
-
     mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
     gRenderer->DoComposition(*camera);
 
-    gPhysics->Update();
-
     mLastTick = current_tick;
-}
-
-void FoxtrotGame::CreateSkybox()
-{
-    // // Load the cubemap as a 2d image
-    // FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, VK_FORMAT_R8G8B8A8_SRGB,
-    //                                                                "../Textures/TestCubemap.png");
-    // skybox_texture->WaitUntilLoaded();
-
-    // // Create the layers 2d image to use in the renderer
-    // RxImage cubemap_image;
-    // cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
-
-    // auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
-
-    // for (int i = 0; i < RendererFramesInFlight; i++) {
-    //     RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
-    //     gRenderer->pDeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
-    // }
-
-    // gRenderer->pDeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
-
-    // pSkyboxMesh = generated_cube->AsPositionsMesh();
-    // gRenderer->pDeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, pSkyboxMesh);
-
-    // pSkyboxMesh->IsReference = false;
 }
 
 void FoxtrotGame::DestroyGame()
 {
     gRenderer->GetDevice()->WaitForIdle();
 
-    // FxMaterialManager::GetGlobalManager().Destroy();
     FxMaterialManager::GetGlobalManager().Destroy();
     AxManager::GetInstance().Shutdown();
-
-    // pSkyboxMesh->IsReference = false;
-    // pSkyboxMesh->Destroy();
-
-    // gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
 
     gRenderer->pDeferredRenderer->Destroy();
 }
