@@ -315,8 +315,18 @@ void FoxtrotGame::Tick()
         Player.Update(DeltaTime);
     }
 
-
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
+
+
+    FxVec3f pistol_destination = camera->Position;
+
+    pPistolObject->MoveTo(pistol_destination);
+    pPistolObject->Update();
+
+    FxLogInfo("\n\nPISTOL: {}", pPistolObject->mPosition);
+    FxLogInfo("CAMERA: {}", camera->Position);
+
+    camera->ViewMatrix.Print();
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
@@ -327,10 +337,9 @@ void FoxtrotGame::Tick()
     /*FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
                                  camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);*/
 
-    FxVec3f pistol_destination = Player.Position;
+    // double cur_time = static_cast<double>(gRenderer->GetElapsedFrameCount()) * 0.1;
+    // FxVec3f pistol_destination = FxVec3f(cos(cur_time) * 0.5, 1.0, 0.0f);
 
-    pPistolObject->MoveTo(pistol_destination);
-    pPistolObject->Update();
 
     // pPistolObject->MoveBy();
 

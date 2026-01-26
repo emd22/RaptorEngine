@@ -55,8 +55,9 @@ public:
 
         VmaAllocationCreateFlags vma_create_flags = 0;
 
-        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped) != 0) {
-            vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped)) {
+            vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT |
+                                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
         }
 
         const VkBufferCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,

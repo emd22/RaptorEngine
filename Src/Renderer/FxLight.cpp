@@ -129,6 +129,8 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
     gRenderer->Uniforms.SubmitPtr(camera.Position.mData, sizeof(float32) * 3);
     gRenderer->Uniforms.Submit(mRadius);
 
+    gRenderer->Uniforms.FlushToGpu();
+
     pLightVolume->Render(frame->CommandBuffer, *pPipeline);
 }
 
@@ -210,6 +212,8 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
 
     gRenderer->Uniforms.SubmitPtr(mPosition.mData, sizeof(float32) * 3);
     gRenderer->Uniforms.Submit(Color.Value);
+
+    gRenderer->Uniforms.FlushToGpu();
 
     // gRenderer->Uniforms.AssertSize(sizeof(FxLightFragPushConstants));
 

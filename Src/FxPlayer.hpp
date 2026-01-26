@@ -23,7 +23,7 @@ public:
 
     void Jump();
 
-    /** 
+    /**
      * @brief Move the player and its physics by `offset`.
      */
     void TeleportBy(const FxVec3f& offset)
@@ -68,9 +68,9 @@ private:
             MovementDirection.Y = std::sin(pCamera->mAngleY);
         }
 
-         //MovementDirection = FxVec3f(c_angley, s_angley, c_angley) * MovementDirection;
+        // MovementDirection = FxVec3f(c_angley, s_angley, c_angley) * MovementDirection;
         // Clear the movement direction's Y. This is because sin(mAngleY) = 0 when mAngleY is zero.
-        //MovementDirection.Y = 0.0f;
+        // MovementDirection.Y = 0.0f;
 
         // CameraDirection.NormalizeIP();
 

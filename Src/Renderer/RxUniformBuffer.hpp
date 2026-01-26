@@ -23,6 +23,8 @@ public:
 
     RxRawGpuBuffer& GetGpuBuffer() { return mGpuBuffer; }
 
+    void FlushToGpu() { mGpuBuffer.FlushToGpu(GetBaseOffset(), mUniformIndex + 1); }
+
     template <typename TValueType>
     void Submit(const TValueType& value)
     {

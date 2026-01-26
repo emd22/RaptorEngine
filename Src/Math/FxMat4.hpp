@@ -20,6 +20,9 @@ class FxQuat;
 class alignas(16) FxMat4f
 {
 public:
+    static const FxMat4f sIdentity;
+
+public:
     FxMat4f() noexcept
     {
         Columns[0].Load1(0);
@@ -44,8 +47,6 @@ public:
         return FxMat4f(FxVec4f(data[0], data[4], data[8], data[12]), FxVec4f(data[1], data[5], data[9], data[13]),
                        FxVec4f(data[2], data[6], data[10], data[14]), FxVec4f(data[3], data[7], data[11], data[15]));
     }
-
-    static const FxMat4f sIdentity;
 
     static FxMat4f AsTranslation(FxVec3f position)
     {

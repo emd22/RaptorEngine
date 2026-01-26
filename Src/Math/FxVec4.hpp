@@ -39,6 +39,7 @@ public:
     FxVec4f& operator-=(const FxVec4f& other);
     FxVec4f& operator*=(const FxVec4f& other);
 
+
     FX_FORCE_INLINE FxVec4f& operator*=(float32 scalar);
 
     FxVec4f& operator=(const FxVec4f& other);

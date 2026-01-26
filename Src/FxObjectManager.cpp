@@ -19,7 +19,7 @@ void FxObjectManager::Create()
     RxUtil::SetDebugLabel("Object Buffer", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, DsLayoutObjectBuffer);
 
     mObjectGpuBuffer.Create(sizeof(FxObjectGpuEntry) * FX_MAX_GPU_OBJECTS, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                            VMA_MEMORY_USAGE_CPU_TO_GPU, RxGpuBufferFlags::ePersistentMapped);
+                            VMA_MEMORY_USAGE_CPU_ONLY, RxGpuBufferFlags::ePersistentMapped);
     mObjectSlotsInUse.InitZero(FX_MAX_GPU_OBJECTS);
 
     if (!mObjectBufferDS.IsInited()) {
@@ -93,7 +93,7 @@ void FxObjectManager::Submit(FxObjectId object_id, FxObjectGpuEntry& entry)
 
     memcpy(&buffer[object_id], &entry, sizeof(FxObjectGpuEntry));
 
-    // mObjectGpuBuffer.FlushToGpu(object_id * sizeof(FxObjectGpuEntry), sizeof(FxObjectGpuEntry));
+    mObjectGpuBuffer.FlushToGpu(object_id * sizeof(FxObjectGpuEntry), sizeof(FxObjectGpuEntry));
 }
 
 void FxObjectManager::Submit(FxObjectId object_id, FxMat4f& model_matrix)
@@ -106,6 +106,8 @@ void FxObjectManager::Submit(FxObjectId object_id, FxMat4f& model_matrix)
     // FxObjectGpuEntry entry;
 
     memcpy(&buffer[object_id], model_matrix.RawData, sizeof(FxMat4f));
+
+    mObjectGpuBuffer.FlushToGpu(object_id * sizeof(FxObjectGpuEntry), sizeof(FxObjectGpuEntry));
 }
 
 
