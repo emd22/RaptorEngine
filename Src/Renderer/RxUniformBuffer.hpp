@@ -26,15 +26,15 @@ public:
     void FlushToGpu() { mGpuBuffer.FlushToGpu(GetBaseOffset(), mUniformIndex + 1); }
 
     template <typename TValueType>
-    void Submit(const TValueType& value)
+    void Write(const TValueType& value)
     {
         constexpr uint32 type_size = sizeof(TValueType);
 
-        SubmitPtr(&value, type_size);
+        WritePtr(&value, type_size);
     }
 
     template <typename TPtrType>
-    void SubmitPtr(const TPtrType* value, uint32 size)
+    void WritePtr(const TPtrType* value, uint32 size)
     {
         FxAssert(mGpuBuffer.IsMapped());
 

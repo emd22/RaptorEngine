@@ -58,9 +58,8 @@ void FxEntity::SetModelMatrix(const FxMat4f& other)
 
     mModelMatrix = other;
 
-    if (ObjectId != UINT32_MAX) {
-        gObjectManager->Submit(ObjectId, mModelMatrix);
-    }
+    // Trigger an immediate update
+    SubmitMatrixIfNeeded();
 }
 
 // const FxMat4f& FxEntity::GetNormalMatrix()
@@ -81,6 +80,18 @@ FxMat4f& FxEntity::GetModelMatrix()
     return mModelMatrix;
 }
 
+void FxEntity::SubmitMatrixIfNeeded()
+{
+    // There is no object id assigned to the object yet, break
+    if (ObjectId == UINT32_MAX || mMatrixUpdateFramesRemaining == 0) {
+        return;
+    }
+
+    gObjectManager->Submit(ObjectId, mModelMatrix);
+
+    --mMatrixUpdateFramesRemaining;
+}
+
 void FxEntity::RecalculateModelMatrix()
 {
     if (TransformMode == FxTransformMode::eDefault) {
@@ -93,9 +104,7 @@ void FxEntity::RecalculateModelMatrix()
                        FxMat4f::AsTranslation(mPosition);
     }
 
-    if (ObjectId != UINT32_MAX) {
-        gObjectManager->Submit(ObjectId, mModelMatrix);
-    }
+    mMatrixUpdateFramesRemaining = RxFramesInFlight;
 
     // mNormalMatrix = mModelMatrix.Inverse().Transposed();
     mbMatrixOutOfDate = false;

@@ -476,11 +476,6 @@ void RxRenderBackend::BeginGeometry()
 
     pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
 
-    FxDrawPushConstants push_constants {};
-
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pDeferredRenderer->PlGeometry.Layout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                       &push_constants);
 }
 
 void RxRenderBackend::PresentFrame()
@@ -548,14 +543,14 @@ void RxRenderBackend::BeginLighting()
     RxFrameData* frame = GetFrame();
 
     RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
-    FxDebugAssert(depth_target != nullptr);
+    FxAssert(depth_target != nullptr);
 
 
     pDeferredRenderer->GPass.End();
     depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
     pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
-    pDeferredRenderer->DsLighting.BindWithOffset(frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                  pDeferredRenderer->PlLightingDirectional,
                                                  gRenderer->Uniforms.GetBaseOffset());
 }

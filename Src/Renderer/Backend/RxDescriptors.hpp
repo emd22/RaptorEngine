@@ -43,35 +43,35 @@ class RxDescriptorSet
 public:
     void Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, uint32 count = 1);
 
-    static inline void BindMultiple(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+    static inline void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
                                     const RxPipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count)
     {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets_count, sets, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets_count, sets, 0, nullptr);
     }
 
-    static inline void BindMultiple(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+    static inline void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
                                     const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets)
     {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets.Size, sets.pData, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, 0, nullptr);
     }
 
-    static inline void BindMultipleOffset(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+    static inline void BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
                                           const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets,
                                           const FxSlice<uint32>& offsets)
     {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, sets.Size, sets.pData, offsets.Size,
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, offsets.Size,
                                 offsets.pData);
     }
 
-    void BindWithOffset(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline,
+    void BindWithOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline,
                         uint32 offset) const
     {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 1, &offset);
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, 1, &Set, 1, &offset);
     }
 
-    void Bind(const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline) const
+    void Bind(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline) const
     {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, 0, 1, &Set, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, 1, &Set, 0, nullptr);
     }
 
     VkDescriptorSet Get() { return Set; }

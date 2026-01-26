@@ -8,19 +8,22 @@
 void FxObjectManager::Create()
 {
     if (!mDescriptorPool.Pool) {
+        mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1);
         mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
         mDescriptorPool.Create(gRenderer->GetDevice(), 2);
     }
 
     RxDsLayoutBuilder builder {};
-    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RxShaderType::eVertex);
     DsLayoutObjectBuffer = builder.Build();
 
-    RxUtil::SetDebugLabel("Object Buffer", VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, DsLayoutObjectBuffer);
+    //RxUtil::SetDebugLabel("Object Buffer", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, DsLayoutObjectBuffer);
 
-    mObjectGpuBuffer.Create(sizeof(FxObjectGpuEntry) * FX_MAX_GPU_OBJECTS, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+    uint32 buffer_size = (sizeof(FxObjectGpuEntry) * scMaxObjects) * RxFramesInFlight;
+    
+    mObjectGpuBuffer.Create(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                             VMA_MEMORY_USAGE_CPU_ONLY, RxGpuBufferFlags::ePersistentMapped);
-    mObjectSlotsInUse.InitZero(FX_MAX_GPU_OBJECTS);
+    mObjectSlotsInUse.InitZero(scMaxObjects);
 
     if (!mObjectBufferDS.IsInited()) {
         FxAssert(DsLayoutObjectBuffer != nullptr);
@@ -30,7 +33,7 @@ void FxObjectManager::Create()
     VkDescriptorBufferInfo info {
         .buffer = mObjectGpuBuffer.Buffer,
         .offset = 0,
-        .range = VK_WHOLE_SIZE,
+        .range = scMaxObjects * sizeof(FxObjectGpuEntry),
     };
 
     VkWriteDescriptorSet buffer_write {
@@ -39,7 +42,7 @@ void FxObjectManager::Create()
         .dstBinding = 0,
         .dstArrayElement = 0,
         .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
         .pBufferInfo = &info,
     };
 
@@ -74,40 +77,51 @@ void FxObjectManager::Create()
     // RxUtil::SetDebugLabel("Object Buffer DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mObjectBufferDS.Set);
 }
 
+
+
+uint32 FxObjectManager::GetBaseOffset() const 
+{ 
+    return (gRenderer->GetFrameNumber() * scMaxObjects * sizeof(FxObjectGpuEntry)); 
+}
+
+uint32 FxObjectManager::GetOffsetObjectIndex(uint32 object_id) const 
+{ 
+    return GetBaseOffset() + (object_id * sizeof(FxObjectGpuEntry));
+}
+
+FxObjectGpuEntry* FxObjectManager::GetBufferAtFrame(uint32 object_id)
+{ 
+    uint8* entry_buffer = reinterpret_cast<uint8*>(mObjectGpuBuffer.pMappedBuffer);
+    
+    return reinterpret_cast<FxObjectGpuEntry*>(entry_buffer + GetOffsetObjectIndex(object_id));
+}
+
 FxObjectId FxObjectManager::GenerateObjectId()
 {
     FxObjectId free_object_id = mObjectSlotsInUse.FindNextFreeBit();
     mObjectSlotsInUse.Set(free_object_id);
 
     return free_object_id;
-
-    // static uint32 sObjectId = 0;
-    // return (sObjectId++);
 }
 
 void FxObjectManager::Submit(FxObjectId object_id, FxObjectGpuEntry& entry)
 {
-    FxAssert(object_id < FX_MAX_GPU_OBJECTS);
-    FxObjectGpuEntry* buffer = reinterpret_cast<FxObjectGpuEntry*>(mObjectGpuBuffer.pMappedBuffer);
+    FxAssert(object_id < scMaxObjects);
+    
+    memcpy(GetBufferAtFrame(object_id), &entry, sizeof(FxObjectGpuEntry));
 
-
-    memcpy(&buffer[object_id], &entry, sizeof(FxObjectGpuEntry));
-
-    mObjectGpuBuffer.FlushToGpu(object_id * sizeof(FxObjectGpuEntry), sizeof(FxObjectGpuEntry));
+    //mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(FxObjectGpuEntry));
 }
 
 void FxObjectManager::Submit(FxObjectId object_id, FxMat4f& model_matrix)
 {
     static_assert(offsetof(FxObjectGpuEntry, ModelMatrix) == 0);
 
-    FxAssert(object_id < FX_MAX_GPU_OBJECTS);
-    FxObjectGpuEntry* buffer = reinterpret_cast<FxObjectGpuEntry*>(mObjectGpuBuffer.pMappedBuffer);
+    FxAssert(object_id < scMaxObjects);
 
-    // FxObjectGpuEntry entry;
+    memcpy(GetBufferAtFrame(object_id), model_matrix.RawData, sizeof(FxMat4f));
 
-    memcpy(&buffer[object_id], model_matrix.RawData, sizeof(FxMat4f));
-
-    mObjectGpuBuffer.FlushToGpu(object_id * sizeof(FxObjectGpuEntry), sizeof(FxObjectGpuEntry));
+    //mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(FxObjectGpuEntry));
 }
 
 

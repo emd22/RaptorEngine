@@ -323,11 +323,6 @@ void FoxtrotGame::Tick()
     pPistolObject->MoveTo(pistol_destination);
     pPistolObject->Update();
 
-    FxLogInfo("\n\nPISTOL: {}", pPistolObject->mPosition);
-    FxLogInfo("CAMERA: {}", camera->Position);
-
-    camera->ViewMatrix.Print();
-
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
 
     // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
@@ -370,6 +365,9 @@ void FoxtrotGame::Tick()
     frame->CommandBuffer.Record();
 
     gShadowRenderer->Begin();
+
+    gObjectManager->mObjectBufferDS.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                   gShadowRenderer->GetPipeline(), gObjectManager->GetBaseOffset());
 
     RxShadowPushConstants consts;
 

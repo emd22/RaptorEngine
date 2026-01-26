@@ -208,14 +208,14 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
     VkDescriptorSet sets_to_bind[] = {
         mDescriptorSet.Set,                  // Set 0
         manager.mMaterialPropertiesDS.Set,   // Set 1: Material Properties Buffer
-        gObjectManager->mObjectBufferDS.Set, // Set 2: Object Properties Buffer
+        //gObjectManager->mObjectBufferDS.Set, // Set 2: Object Properties Buffer
     };
 
     // const uint32 properties_offset = static_cast<uint32>(mMaterialPropertiesIndex * sizeof(FxMaterialProperties));
 
-    // uint32 dynamic_offsets[] = { properties_offset, 0 };
+    uint32 dynamic_offsets[] = { 0, 0 };
 
-    RxDescriptorSet::BindMultiple(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
+    RxDescriptorSet::BindMultiple(0, *cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
                                   FxMakeSlice(sets_to_bind, FxSizeofArray(sets_to_bind)));
     // mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
 

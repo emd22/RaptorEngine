@@ -30,7 +30,7 @@ class RxSamplerCache
 public:
     RxSamplerCache() = default;
 
-    constexpr RxSampler* Request(const RxSamplerProps& props) 
+    RxSampler* Request(const RxSamplerProps& props) 
     { 
         FxHash64 prop_id = FxHashObj64(props);
 

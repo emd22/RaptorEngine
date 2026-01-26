@@ -118,16 +118,16 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
     }
 
 
-    gRenderer->Uniforms.SubmitPtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
-    gRenderer->Uniforms.SubmitPtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
-    gRenderer->Uniforms.SubmitPtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
     // Note that the light position is packed with the light colour as the fourth component!
-    gRenderer->Uniforms.SubmitPtr(mPosition.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Submit(Color.Value);
+    gRenderer->Uniforms.WritePtr(mPosition.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(Color.Value);
 
-    gRenderer->Uniforms.SubmitPtr(camera.Position.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Submit(mRadius);
+    gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(mRadius);
 
     gRenderer->Uniforms.FlushToGpu();
 
@@ -196,22 +196,22 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
     gRenderer->Uniforms.Rewind();
 
     if (shadow_camera) {
-        gRenderer->Uniforms.SubmitPtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+        gRenderer->Uniforms.WritePtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
                                       sizeof(FxMat4f));
     }
     else {
-        gRenderer->Uniforms.SubmitPtr(camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+        gRenderer->Uniforms.WritePtr(camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
     }
 
-    gRenderer->Uniforms.SubmitPtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
-    gRenderer->Uniforms.SubmitPtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
     // // Note that the light position is packed with the light colour as the fourth component!
-    gRenderer->Uniforms.SubmitPtr(camera.Position.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Submit(mRadius);
+    gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(mRadius);
 
-    gRenderer->Uniforms.SubmitPtr(mPosition.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Submit(Color.Value);
+    gRenderer->Uniforms.WritePtr(mPosition.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(Color.Value);
 
     gRenderer->Uniforms.FlushToGpu();
 

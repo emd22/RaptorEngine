@@ -6,6 +6,7 @@
 #include <Math/FxQuat.hpp>
 #include <Math/Vector.hpp>
 #include <Renderer/FxCamera.hpp>
+#include <Renderer/RxConstants.hpp>
 
 #define FX_VALIDATE_ENTITY_TYPE(TType_) static_assert(C_IsEntity<TType_>);
 
@@ -79,6 +80,8 @@ public:
         if (mbMatrixOutOfDate) {
             RecalculateModelMatrix();
         }
+        
+        SubmitMatrixIfNeeded();
     }
 
     FX_FORCE_INLINE void MarkMatrixOutOfDate() { mbMatrixOutOfDate = true; }
@@ -87,6 +90,11 @@ public:
 
 protected:
     void RecalculateModelMatrix();
+
+    /**
+     * @brief Submit the matrix to the object gpu buffer if there have been changes, or if it has not been synched with the current frame yet.
+     */
+    void SubmitMatrixIfNeeded();
 
 public:
     uint32 ObjectId = UINT32_MAX;
@@ -106,6 +114,8 @@ protected:
     bool mbMatrixOutOfDate : 1 = true;
 
     FxMat4f mModelMatrix = FxMat4f::sIdentity;
+
+    uint32 mMatrixUpdateFramesRemaining = RxFramesInFlight;
     // FxMat4f mNormalMatrix = FxMat4f::Identity;
 };
 

@@ -453,7 +453,7 @@ void RxDeferredRenderer::DoCompPass(FxCamera& camera)
 
     // CompPass.Begin(cmd, PlComposition);
 
-    DsComposition.Bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PlComposition);
+    DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PlComposition);
 
     // Use single triangle instead of two triangles as it removes the overlapping quads the gpu
     // renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html
