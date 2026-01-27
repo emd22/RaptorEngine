@@ -136,7 +136,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
 
         if (!texture_view.texture) {
             // MakeEmptyMaterialTexture(material, material->Diffuse);
-            material->Diffuse.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
+            material->Diffuse.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_UNorm>();
 
             material->Properties.BaseColor = FxColor::FromFloats(
                 gltf_material->pbr_metallic_roughness.base_color_factor);
@@ -169,7 +169,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
     else {
         // material->MetallicRoughness.pImage = nullptr;
 
-        material->MetallicRoughness.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
+        material->MetallicRoughness.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_UNorm>();
     }
 
 

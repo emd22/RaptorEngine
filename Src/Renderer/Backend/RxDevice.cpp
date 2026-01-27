@@ -272,7 +272,7 @@ VkSurfaceFormatKHR RxGpuDevice::GetSurfaceFormat()
             return surface_format;
         }
 
-        if (surface_format.format == VK_FORMAT_R8G8B8A8_SRGB) {
+        if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM) {
             best_format = surface_format;
         }
     }

@@ -134,7 +134,7 @@ private:
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent<RxImageFormat::eRGBA8_SRGB> Diffuse;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> Diffuse;
     FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap;
     FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> MetallicRoughness;
 

@@ -234,7 +234,7 @@ FSOutput FragmentMain(FSInput in)
     float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
     float3 specular_term = Fr;
 
-    out.vColor = float4(attenuation *  (visibility *diffuse_term + visibility *specular_term) * light_color.rgb * NdotL, 1.0);
+    out.vColor = float4(attenuation *  (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL, 1.0);
 
 #ifdef FX_LIGHT_DIRECTIONAL
     // out.vColor = float4(float3(visibility), 1.0f);

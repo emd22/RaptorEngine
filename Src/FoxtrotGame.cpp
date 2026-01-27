@@ -119,7 +119,7 @@ void FoxtrotGame::CreateLights()
 
     pSun = FxMakeRef<FxLightDirectional>();
     pSun->MoveTo(FxVec3f(0, 8, -5));
-    pSun->Color = FxColor(0x9AC8F3, 10);
+    pSun->Color = FxColor(0xFAF8D3, 30);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
     mMainScene.Attach(pSun);
@@ -311,7 +311,7 @@ void FoxtrotGame::Tick()
 
 
     if (!sbShowShadowCam) {
-        Player.Move(DeltaTime, GetMovementVector());
+        Player.Move(DeltaTime, GetMovementVector() * DeltaTime);
         Player.Update(DeltaTime);
     }
 
