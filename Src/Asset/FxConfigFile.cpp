@@ -1,63 +1,31 @@
 #include "FxConfigFile.hpp"
 
-#include <stdio.h>
-
+#include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
 #include <Util/FxTokenizer.hpp>
 #include <string>
 
-static FILE* FileOpen(const char* path, const char* mode)
-{
-#ifdef _WIN32
-    FILE* fp = nullptr;
-    errno_t result = fopen_s(&fp, path, mode);
-
-    if (result != 0) {
-        return nullptr;
-    }
-
-    return fp;
-#else
-    return fopen(path, mode);
-#endif
-}
-
 void FxConfigFile::Load(const std::string& path)
 {
-    FILE* fp = FileOpen(path.c_str(), "rb");
-    if (fp == nullptr) {
-        FxLogError("Could not open config file at '{:s}'", path);
+    FxFile file(path.c_str(), FxFile::eRead, FxFile::eBinary);
+
+    if (!file.IsFileOpen()) {
         return;
     }
 
-    std::fseek(fp, 0, SEEK_END);
-    size_t file_size = std::ftell(fp);
-    std::rewind(fp);
+    FxSlice<char> file_buffer = file.Read<char>();
 
-    char* file_buffer = FxMemPool::Alloc<char>(file_size);
-
-    size_t read_size = std::fread(file_buffer, 1, file_size, fp);
-    if (read_size != file_size) {
-        FxLogWarning("Error reading all data from config file at '{:s}' (BytesRead={:d}, Size={:d})", path, read_size,
-                     file_size);
-    }
-
-    FxTokenizer tokenizer(file_buffer, read_size);
+    FxTokenizer tokenizer(file_buffer.pData, file_buffer.Size);
     tokenizer.Tokenize();
 
     ParseEntries(tokenizer.GetTokens());
-
-    fclose(fp);
 }
 
-static bool TokenIsValue(const FxTokenizer::Token& token, const char* str)
-{
-    return (!strncmp(token.Start, str, token.Length));
-}
+static bool TokenIsValue(const FxToken& token, const char* str) { return (!strncmp(token.Start, str, token.Length)); }
 
 static inline bool IsNumber(char ch) { return (ch >= '0' && ch <= '9'); }
 
-static FxConfigEntry::ValueType GetValueTokenType(const FxTokenizer::Token& token)
+static FxConfigEntry::ValueType GetValueTokenType(const FxToken& token)
 {
     using VType = FxConfigEntry::ValueType;
 
@@ -83,7 +51,7 @@ static FxConfigEntry::ValueType GetValueTokenType(const FxTokenizer::Token& toke
     return current_type;
 }
 
-void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
+void FxConfigFile::ParseEntries(FxPagedArray<FxToken>& tokens)
 {
     mConfigEntries.Create(32);
 
@@ -92,7 +60,7 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
     const uint32 tokens_size = tokens.Size();
 
     for (uint32 i = 0; i < tokens_size; i++) {
-        const FxTokenizer::Token& token = tokens[i];
+        const FxToken& token = tokens[i];
 
         entry.NameHash = FxHashStr32(token.Start, token.Length);
         entry.Name = token.GetStr();
@@ -101,6 +69,7 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
         if ((++i) >= tokens_size) {
             break;
         }
+
         // Token is not equals, print warning and continue
         if (!TokenIsValue(tokens[i], "=")) {
             FxLogWarning("Expected '=' but found '{:.{}}'", tokens[i].Start, tokens[i].Length);
@@ -108,7 +77,7 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
         }
 
         // Get the value token
-        FxTokenizer::Token& value_token = tokens[++i];
+        FxToken& value_token = tokens[++i];
 
         using VType = FxConfigEntry::ValueType;
 
@@ -137,4 +106,15 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens)
 
         mConfigEntries.Insert(entry);
     }
+}
+
+const FxConfigEntry* FxConfigFile::GetEntry(uint32 requested_name_hash) const
+{
+    for (const FxConfigEntry& entry : mConfigEntries) {
+        if (entry.NameHash == requested_name_hash) {
+            return &entry;
+        }
+    }
+
+    return nullptr;
 }

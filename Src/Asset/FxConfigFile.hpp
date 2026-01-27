@@ -97,17 +97,9 @@ public:
     FxConfigFile() = default;
 
     void Load(const std::string& path);
-    FxPagedArray<FxConfigEntry>& GetEntries() { return mConfigEntries; }
 
-    const FxConfigEntry* GetEntry(uint32 requested_name_hash) const
-    {
-        for (const FxConfigEntry& entry : mConfigEntries) {
-            if (entry.NameHash == requested_name_hash) {
-                return &entry;
-            }
-        }
-        return nullptr;
-    }
+    const FxConfigEntry* GetEntry(uint32 requested_name_hash) const;
+    FxPagedArray<FxConfigEntry>& GetEntries() { return mConfigEntries; }
 
     template <typename T>
     T GetValue(uint32 entry_name_hash) const
@@ -126,7 +118,7 @@ public:
     }
 
 private:
-    void ParseEntries(FxPagedArray<FxTokenizer::Token>& tokens);
+    void ParseEntries(FxPagedArray<FxToken>& tokens);
 
 private:
     FxPagedArray<FxConfigEntry> mConfigEntries;
