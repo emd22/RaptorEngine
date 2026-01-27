@@ -19,7 +19,7 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
 
     FxAssert(size.X > 0.0f && size.Y > 0.0f);
 
-    mDevice = gRenderer->GetDevice();
+    mpDevice = gRenderer->GetDevice();
 
     FxSizedArray<VkAttachmentReference> color_refs(attachments.Attachments.Size);
 
@@ -27,9 +27,9 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
     VkAttachmentReference depth_attachment_ref {};
 
     for (int i = 0; i < attachments.Attachments.Size; i++) {
-        const VkAttachmentDescription& attachment = attachments.Attachments[i].Build();
+        const RxAttachment& attachment = attachments.Attachments[i];
 
-        if (RxUtil::IsFormatDepth(attachment.format)) {
+        if (attachment.IsDepth()) {
             has_depth_attachment = true;
 
             depth_attachment_ref.attachment = i;
@@ -91,7 +91,7 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
             .srcSubpass = 0,
             .dstSubpass = VK_SUBPASS_EXTERNAL,
 
-            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
 
             .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 
@@ -120,14 +120,14 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
     VkRenderPassCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .attachmentCount = static_cast<uint32>(attachments.Attachments.Size),
-        .pAttachments = attachments.GetBuiltAttachments(),
+        .pAttachments = attachments.GetAttachmentDescriptions(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
         .dependencyCount = sizeof(subpass_dependencies) / sizeof(subpass_dependencies[0]),
         .pDependencies = subpass_dependencies,
     };
 
-    const VkResult status = vkCreateRenderPass(mDevice->Device, &create_info, nullptr, &RenderPass);
+    const VkResult status = vkCreateRenderPass(mpDevice->Device, &create_info, nullptr, &RenderPass);
 
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Failed to create render pass", status);
@@ -136,7 +136,7 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
 
 void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_values)
 {
-    CommandBuffer = cmd;
+    pCommandBuffer = cmd;
 
     if (RenderPass == nullptr) {
         FxModulePanic("Render pass has not been previously created", 0);
@@ -158,15 +158,15 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
 
 void RxRenderPass::End()
 {
-    FxAssert(CommandBuffer != nullptr);
+    FxAssert(pCommandBuffer != nullptr);
 
-    vkCmdEndRenderPass(CommandBuffer->CommandBuffer);
+    vkCmdEndRenderPass(pCommandBuffer->CommandBuffer);
 }
 
 void RxRenderPass::Destroy()
 {
     if (RenderPass != nullptr) {
-        vkDestroyRenderPass(mDevice->Device, RenderPass, nullptr);
+        vkDestroyRenderPass(mpDevice->Device, RenderPass, nullptr);
     }
     RenderPass = nullptr;
 }

@@ -21,6 +21,9 @@ constexpr uint64 FxUnitKibibyte = 1024;
 constexpr uint64 FxUnitMebibyte = FxUnitKibibyte * 1024;
 constexpr uint64 FxUnitGibibyte = FxUnitMebibyte * 1024;
 
+using FxHandle = uint32;
+
+static constexpr FxHandle FxNullHandle = UINT32_MAX;
 
 #include <cstddef>
 // #include <type_traits>

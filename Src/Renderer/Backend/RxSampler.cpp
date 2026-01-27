@@ -79,40 +79,35 @@ static FX_FORCE_INLINE VkCompareOp GetVkCompareOp(RxSamplerCompareOp op)
 RxSampler::RxSampler(RxSampler&& other)
 {
     Sampler = other.Sampler;
-    mDevice = other.mDevice;
+    CacheId = other.CacheId;
+    CachePropId = other.CachePropId;
 
     other.Sampler = nullptr;
-    other.mDevice = nullptr;
+    other.InvalidateCacheId();
 }
 
-RxSampler::RxSampler(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
-                     RxSamplerAddressMode address_mode, RxSamplerBorderColor border_color,
-                     RxSamplerCompareOp compare_op)
+RxSampler::RxSampler(const RxSamplerProps& props)
 {
-    Create(min_filter, mag_filter, mipmap_filter, address_mode, border_color, compare_op);
+    Create(props);
 }
 
-void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
-                       RxSamplerAddressMode address_mode, RxSamplerBorderColor border_color,
-                       RxSamplerCompareOp compare_op)
+void RxSampler::Create(const RxSamplerProps& props)
 {
     if (Sampler) {
-        OldLog::Warning("Sampler has been previously initialized!", 0);
+        FxLogWarning("Sampler has been previously initialized!");
         return;
     }
 
-    mDevice = gRenderer->GetDevice();
-
-    VkSamplerAddressMode vk_addr_mode = GetVkAddressMode(address_mode);
+    VkSamplerAddressMode vk_addr_mode = GetVkAddressMode(props.AddressMode);
 
 
     VkSamplerCreateInfo sampler_info {
         .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 
-        .magFilter = GetVkFilter(mag_filter),
-        .minFilter = GetVkFilter(min_filter),
+        .magFilter = GetVkFilter(props.MagFilter),
+        .minFilter = GetVkFilter(props.MinFilter),
 
-        .mipmapMode = GetVkMipMode(mipmap_filter),
+        .mipmapMode = GetVkMipMode(props.MipFilter),
 
         .addressModeU = vk_addr_mode,
         .addressModeV = vk_addr_mode,
@@ -123,25 +118,25 @@ void RxSampler::Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, R
         .anisotropyEnable = VK_FALSE,
         // .maxAnisotropy = 0,
 
-        .compareEnable = static_cast<VkBool32>(compare_op != RxSamplerCompareOp::eNone),
-        .compareOp = GetVkCompareOp(compare_op),
+        .compareEnable = static_cast<VkBool32>(props.CompareOp != RxSamplerCompareOp::eNone),
+        .compareOp = GetVkCompareOp(props.CompareOp),
 
         .minLod = 0.0f,
         .maxLod = 0.0f,
 
-        .borderColor = GetVkBorderColor(border_color),
+        .borderColor = GetVkBorderColor(props.BorderColor),
         .unnormalizedCoordinates = VK_FALSE,
     };
 
-    VkResult result = vkCreateSampler(mDevice->Device, &sampler_info, nullptr, &Sampler);
+    VkResult result = vkCreateSampler(gRenderer->GetDevice()->Device, &sampler_info, nullptr, &Sampler);
 
     if (result != VK_SUCCESS) {
-        OldLog::Error("Error creating texture sampler!", 0);
+        FxLogError("Error creating texture sampler!");
         Sampler = nullptr;
     }
 }
 
-void RxSampler::Create() { Create(RxSamplerFilter::eLinear, RxSamplerFilter::eLinear, RxSamplerFilter::eLinear); }
+void RxSampler::Create() { Create({}); }
 
 void RxSampler::Destroy()
 {
@@ -150,6 +145,6 @@ void RxSampler::Destroy()
     }
 
 
-    vkDestroySampler(mDevice->Device, Sampler, nullptr);
+    vkDestroySampler(gRenderer->GetDevice()->Device, Sampler, nullptr);
     Sampler = nullptr;
 }

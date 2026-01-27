@@ -6,11 +6,10 @@
 #include <ThirdParty/Jolt/Math/Quat.h>
 #include <math.h>
 
-#include <immintrin.h>
-
 #include <Math/FxAVXUtil.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
+#include <Math/FxSSE.hpp>
 
 const FxQuat FxQuat::sIdentity = FxQuat(0, 0, 0, 1);
 
@@ -29,7 +28,7 @@ FxQuat FxQuat::FromAxisAngle(FxVec3f axis, float32 angle)
 
     const __m128 vec = _mm_mul_ps(FxSSE::Normalize(axis.mIntrin), _mm_set1_ps(sv));
 
-    //return FxQuat(vsetq_lane_f32(cv, vec, 3));
+    // return FxQuat(vsetq_lane_f32(cv, vec, 3));
     return FxQuat(_mm_insert_ps(vec, _mm_set_ss(cv), 0x30));
 }
 

@@ -73,4 +73,5 @@ FX_FORCE_INLINE FxVec4f& FxVec4f::operator=(const FxVec4f& other)
     return *this;
 }
 
+
 #endif

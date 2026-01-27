@@ -23,7 +23,7 @@ public:
     RxTexture() = default;
 
     void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u& dimensions,
-                VkFormat format, uint32 components, const FxRef<RxSampler>& sampler)
+                RxImageFormat format, uint32 components, const FxRef<RxSampler>& sampler)
     {
         Sampler = sampler;
         Create(image_type, image_data, dimensions, format, components);
@@ -31,15 +31,13 @@ public:
 
     // TODO: update this and remove the format/color restrictions
     void Create(RxImageType image_type, const FxSizedArray<uint8>& image_data, const FxVec2u dimensions,
-                VkFormat format, uint32 components)
+                RxImageFormat format, uint32 components)
     {
-        mDevice = Fx_Fwd_GetGpuDevice();
-
         // TODO: pass in stride for texture size
         const size_t data_size = dimensions.X * dimensions.Y * components;
         //        assert(image_data.Size == data_size);
 
-        RxRawGpuBuffer<uint8> staging_buffer;
+        RxRawGpuBuffer staging_buffer;
         staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                               VMA_MEMORY_USAGE_CPU_TO_GPU);
         staging_buffer.Upload(image_data);
@@ -47,7 +45,7 @@ public:
         const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-        Image.Create(image_type, dimensions, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, VK_IMAGE_ASPECT_COLOR_BIT);
+        Image.Create(image_type, dimensions, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, RxImageAspectFlag::eColor);
 
         // RxImageTypeProperties type_properties = RxImageTypeGetProperties(image_type);
 
@@ -97,7 +95,4 @@ public:
 public:
     RxImage Image;
     FxRef<RxSampler> Sampler { nullptr };
-
-private:
-    RxGpuDevice* mDevice = nullptr;
 };

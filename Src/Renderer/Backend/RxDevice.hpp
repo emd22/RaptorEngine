@@ -11,14 +11,14 @@
 class RxQueueFamilies
 {
 public:
-    static const uint32 QueueNull = UINT32_MAX;
+    static const uint32 scNullQueue = UINT32_MAX;
 
     void FindQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface);
 
     /// Checks if the main graphics and presentation queues have been queried
     bool IsComplete()
     {
-        return (mGraphicsIndex != QueueNull && mPresentIndex != QueueNull && mTransferIndex != QueueNull);
+        return (mGraphicsIndex != scNullQueue && mPresentIndex != scNullQueue && mTransferIndex != scNullQueue);
     }
 
     /// Retrieves the available queue indices
@@ -46,9 +46,9 @@ public:
     FxSizedArray<VkQueueFamilyProperties> RawFamilies;
 
 private:
-    uint32 mGraphicsIndex = QueueNull;
-    uint32 mPresentIndex = QueueNull;
-    uint32 mTransferIndex = QueueNull;
+    uint32 mGraphicsIndex = scNullQueue;
+    uint32 mPresentIndex = scNullQueue;
+    uint32 mTransferIndex = scNullQueue;
 };
 
 class RxGpuDevice
@@ -65,7 +65,7 @@ public:
 
     void WaitForIdle();
 
-    VkSurfaceFormatKHR GetBestSurfaceFormat();
+    VkSurfaceFormatKHR GetSurfaceFormat();
 
     operator VkDevice() const { return Device; }
     operator VkPhysicalDevice() const { return Physical; }

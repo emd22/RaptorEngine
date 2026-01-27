@@ -1,87 +1,77 @@
 #pragma once
 
-#include "RxDevice.hpp"
-
 #include <vulkan/vulkan.h>
 
 #include <Core/FxPanic.hpp>
-#include <cstdint>
+#include <Core/FxTypes.hpp>
 
+#include <Core/FxBitset.hpp>
+
+/**
+ * @brief A CPU-GPU barrier.
+ */
 class RxFence
 {
 public:
-    void Create(RxGpuDevice* device)
-    {
-        const VkFenceCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-                                                .pNext = nullptr,
-                                                .flags = VK_FENCE_CREATE_SIGNALED_BIT };
+    void Create();
 
-        mDevice = device;
+    void WaitFor(uint64 timeout = UINT64_MAX) const;
+    void Reset();
 
-        const VkResult status = vkCreateFence(mDevice->Device, &create_info, nullptr, &Fence);
-        if (status != VK_SUCCESS) {
-            FxPanicVulkan("Fence", "Could not create fence", status);
-        }
-    }
+    FX_FORCE_INLINE VkFence Get() const { return Fence; }
 
-    struct WaitOptions
-    {
-        uint64 Timeout = UINT64_MAX;
-    };
-
-    void WaitFor(WaitOptions wait_options = { .Timeout = UINT64_MAX }) const
-    {
-        const VkResult status = vkWaitForFences(mDevice->Device, 1, &Fence, true, wait_options.Timeout);
-
-        if (status != VK_SUCCESS) {
-            FxPanicVulkan("Fence", "Could not create fence", status);
-        }
-    }
-
-    void Reset()
-    {
-        const VkResult status = vkResetFences(mDevice->Device, 1, &Fence);
-
-        if (status != VK_SUCCESS) {
-            FxPanicVulkan("Fence", "Could not reset fence", status);
-        }
-    }
-
-    void Destroy() { vkDestroyFence(mDevice->Device, Fence, nullptr); }
+    void Destroy();
 
 public:
-    VkFence Fence;
-
-private:
-    RxGpuDevice* mDevice = nullptr;
+    VkFence Fence = nullptr;
 };
 
 
+/**
+ * @brief A GPU-side barrier.
+ */
 class RxSemaphore
 {
 public:
-    void Create(RxGpuDevice* device)
+    RxSemaphore() = default;
+
+    void Create();
+
+    FX_FORCE_INLINE VkSemaphore Get() const { return Semaphore; }
+
+    void SetCacheId(uint32 id)
     {
-        const VkSemaphoreCreateInfo create_info {
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = 0
-        };
-
-        mDevice = device;
-
-        const VkResult status = vkCreateSemaphore(device->Device, &create_info, nullptr, &Semaphore);
-
-        if (status != VK_SUCCESS) {
-            FxPanicVulkan("Semaphore", "Could not create semaphore", status);
-        }
+        FxAssertMsg(mCacheId == UINT32_MAX, "Semaphore is already assigned to a cache slot!");
+        mCacheId = id;
     }
 
-    void Destroy() { vkDestroySemaphore(mDevice->Device, Semaphore, nullptr); }
+    FX_FORCE_INLINE uint32 GetCacheId() const { return mCacheId; }
+    void InvalidateCacheId() { mCacheId = UINT32_MAX; }
+
+    void Destroy();
 
 public:
-    VkSemaphore Semaphore;
+    VkSemaphore Semaphore = nullptr;
 
 private:
-    RxGpuDevice* mDevice = nullptr;
+    uint32 mCacheId = UINT32_MAX;
+};
+
+
+
+class RxSemaphoreCache
+{
+    static constexpr uint32 scNumSemaphores = 24;
+
+public:
+    RxSemaphoreCache();
+
+    RxSemaphore* Request();
+    void Release(RxSemaphore* semaphore);
+
+    ~RxSemaphoreCache();
+
+private:
+    FxSizedArray<RxSemaphore> mSemaphores;
+    FxBitset mInUse;
 };

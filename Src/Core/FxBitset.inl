@@ -49,23 +49,25 @@ FX_FORCE_INLINE void FxBitset::Unset(uint32 index)
     mBits.pData[int_index] &= (~mask);
 }
 
-FX_FORCE_INLINE int FxBitset::FindNextFreeBit() const
+FX_FORCE_INLINE uint32 FxBitset::FindNextFreeBit() const
 {
-    const uint64 c_full_chunk = (~0ULL);
+    constexpr uint64 cFullChunk = (~0ULL);
 
     for (uint32 i = 0; i < mBits.Size; i++) {
         const uint64 chunk = mBits[i];
 
         // Every bit is set, continue to next chunk
-        if (chunk == c_full_chunk) {
+        if (chunk == cFullChunk) {
             continue;
         }
 
         // Find bit in chunk (R to L) and return the index in the bitset.
         // This is returning (current_byte_n * 64) + index_in_byte.
 
-        return (i << 6) + FxBit::FindFirstZero<uint64>(chunk);
-        // return (i << 6) + std::countr_zero(chunk);
+        uint32 bit_index = FxBit::FindFirstZero32(chunk);
+        FxDebugAssert(bit_index != FxBit::scBitNotFound);
+
+        return (i << 6) + bit_index;
     }
 
     return scNoFreeBits;

@@ -19,7 +19,6 @@ public:
     ~RxSwapchain();
 
     void Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device);
-    void CreateSwapchainFramebuffers();
 
     VkSwapchainKHR GetSwapchain() const { return mSwapchain; }
 
@@ -29,18 +28,14 @@ private:
     void CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface);
     void CreateSwapchainImages();
     void CreateImageViews();
+    void CreateFramebuffers();
+    void CreateSamplers();
 
     void DestroyFramebuffersAndImageViews();
     void DestroyInternalSwapchain();
 
 public:
-    // FxSizedArray<VkImageView> ImageViews;
-    // FxSizedArray<VkImage> Images;
     FxSizedArray<RxImage> OutputImages;
-
-    // FxSizedArray<RxImage> ColorImages;
-    // FxSizedArray<RxImage> PositionImages;
-    // FxSizedArray<RxImage> DepthImages;
 
     RxSampler ColorSampler;
     RxSampler DepthSampler;
@@ -48,17 +43,22 @@ public:
     RxSampler NormalsSampler;
     RxSampler LightsSampler;
 
-    // FxSizedArray<RxFramebuffer> GPassFramebuffers;
-    // FxSizedArray<RxFramebuffer> CompFramebuffers;
-
     FxVec2u Extent = FxVec2u::sZero;
 
-    VkSurfaceFormatKHR SurfaceFormat;
+    // VkSurfaceFormatKHR SurfaceFormat;
+    struct
+    {
+        RxImageFormat Format = RxImageFormat::eNone;
+        VkColorSpaceKHR ColorSpace;
+    } Surface;
 
-    bool Initialized = false;
+    bool bInitialized = false;
 
 private:
     RxGpuDevice* mDevice = nullptr;
+
+    FxSizedArray<RxFramebuffer> mFramebuffers;
+
     // RxGraphicsPipeline* mPipeline = nullptr;
     // RxGraphicsPipeline* mCompPipeline = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;

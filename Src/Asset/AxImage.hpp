@@ -33,7 +33,7 @@ public:
 
     static FxPagedArray<FxRef<AxImage>>& GetEmptyImagesArray();
 
-    template <VkFormat TFormat, int32 TNumChannels>
+    template <RxImageFormat TFormat>
     static FxRef<AxImage> GetEmptyImage()
     {
         static FxRef<AxImage> sEmptyImage { nullptr };
@@ -48,23 +48,26 @@ public:
             empty_images.Create(8);
         }
 
-        FxSizedArray<uint8> image_data(TNumChannels);
-        memset(image_data.pData, 1, TNumChannels);
+        constexpr uint32 pixel_size = RxImageFormatUtil::GetSize(TFormat);
+
+        FxSizedArray<uint8> image_data(pixel_size);
+        memset(image_data.pData, 1, pixel_size);
         image_data.MarkFull();
 
         sEmptyImage = FxMakeRef<AxImage>();
 
-        sEmptyImage->Texture.Create(RxImageType::eImage, image_data, FxVec2u(1, 1), TFormat, TNumChannels);
-        sEmptyImage->IsFinishedNotifier.SignalDataWritten();
-        sEmptyImage->bIsUploadedToGpu = true;
-        sEmptyImage->bIsUploadedToGpu.notify_all();
-        sEmptyImage->mIsLoaded.store(true);
+        sEmptyImage->Texture.Create(RxImageType::e2d, image_data, FxVec2u(1, 1), TFormat, pixel_size);
+        sEmptyImage->MarkAndSignalLoaded();
 
         empty_images.Insert(sEmptyImage);
 
         return sEmptyImage;
     }
 
+    /**
+     * Signal to any assets that are waiting that this asset is now loaded and ready to be used.
+     */
+    void MarkAndSignalLoaded();
 
     ~AxImage() override { Destroy(); }
 
@@ -74,9 +77,7 @@ public:
 public:
     RxTexture Texture;
 
-    uint32 NumComponents = 3;
-
-    RxImageType ImageType = RxImageType::eImage;
+    RxImageType ImageType = RxImageType::e2d;
     FxVec2u Size = FxVec2u::sZero;
 
 private:

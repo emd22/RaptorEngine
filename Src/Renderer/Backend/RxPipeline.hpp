@@ -9,7 +9,7 @@
 #include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxSlice.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FxMat4.hpp>
 
 class RxCommandBuffer;
 
@@ -35,18 +35,6 @@ struct alignas(16) FxLightVertPushConstants
     float32 CameraMatrix[16];
 
     uint32 ObjectId = 0;
-};
-
-struct alignas(16) FxLightFragPushConstants
-{
-    float32 LightCameraMatrix[16];
-    float32 InvView[16];
-    float32 InvProj[16];
-
-    float32 EyePosition[3];
-    float32 LightRadius;
-    float32 LightPosition[3];
-    uint32 LightColor;
 };
 
 struct alignas(16) FxCompositionPushConstants

@@ -4,7 +4,7 @@
 #include "RxDescriptors.hpp"
 #include "RxSynchro.hpp"
 
-#include <Math/Mat4.hpp>
+#include <Math/FxMat4.hpp>
 
 
 struct alignas(16) RxUniformBufferObject
@@ -22,10 +22,8 @@ public:
 
 public:
     RxCommandPool CommandPool;
+
     RxCommandBuffer CommandBuffer;
-    RxCommandBuffer ShadowCommandBuffer;
-    RxCommandBuffer LightCommandBuffer;
-    RxCommandBuffer CompCommandBuffer;
 
     // RxDescriptorSet DescriptorSet;
     RxDescriptorSet CompDescriptorSet;

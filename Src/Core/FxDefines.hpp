@@ -28,9 +28,16 @@
 // #define FX_SIZED_ARRAY_DEBUG
 #define FX_SIZED_ARRAY_NO_MEMPOOL
 
-#define FX_DEBUG_IMAGE_VIEWS 1
+
+/// Warn that a paged array has not been called with .Init() before inserting. This can be useful if the default
+/// initalization size is too low (leading to more memory allocation calls), or too high (bad fitment of possibly large
+/// objects.)
+// #define FX_WARN_PAGED_ARRAY_AUTO_INIT 1
+
+// #define FX_DEBUG_IMAGE_VIEWS 1
 
 // #define FX_NO_DEBUG_ASSERTS
+
 
 ////////////////////////////////
 // Platform/Compiler macros
@@ -59,14 +66,13 @@
 
 #ifdef FX_NO_SIMD
 // FX_NO_SIMD defined
-#elif defined(__ARM_NEON__)
+#elif defined __ARM_NEON__ && !defined FX_USE_SIMDE
 #define FX_USE_NEON 1
 #define FX_USE_SIMD 1
 
-#elif defined __AVX2__ || defined FX_PLATFORM_WINDOWS
+#elif defined __AVX2__ || defined FX_PLATFORM_WINDOWS || defined FX_USE_SIMDE
 #define FX_USE_AVX  1
 #define FX_USE_SIMD 1
-
 #else
 #define FX_NO_SIMD 1
 #endif
@@ -89,8 +95,6 @@
 #else
 #define FX_FORCE_INLINE inline __attribute__((always_inline))
 #endif
-
-#include <type_traits>
 
 #define FX_ENUM_AS_BITS(EnumType_, value_) static_cast<std::underlying_type_t<EnumType_>>(value_)
 

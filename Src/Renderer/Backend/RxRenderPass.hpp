@@ -13,14 +13,9 @@ class RxCommandBuffer;
 class RxRenderPass
 {
 public:
-    // void Create(RxGpuDevice &device, RxSwapchain &swapchain);
-    // void CreateComp(RxGpuDevice& device, RxSwapchain& swapchain);
-
     void Create(RxAttachmentList& color_attachments, const FxVec2u& size, const FxVec2u& offset = FxVec2u::sZero);
 
     void Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_colors);
-    // void BeginComp(RxCommandBuffer* cmd);
-
     void End();
 
     void Destroy();
@@ -29,11 +24,11 @@ public:
 
 public:
     VkRenderPass RenderPass = nullptr;
-    RxCommandBuffer* CommandBuffer = nullptr;
+    RxCommandBuffer* pCommandBuffer = nullptr;
 
     FxVec2u Size = FxVec2u::sZero;
     FxVec2u Offset = FxVec2u::sZero;
 
 private:
-    RxGpuDevice* mDevice = nullptr;
+    RxGpuDevice* mpDevice = nullptr;
 };

@@ -191,7 +191,7 @@ void AxManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, 
 }
 
 
-void AxManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const std::string& path)
+void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset, const std::string& path)
 {
     bool is_jpeg = IsFileJpeg(path);
 
@@ -199,7 +199,6 @@ void AxManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, path);
     }
@@ -207,22 +206,20 @@ void AxManager::LoadImage(RxImageType image_type, VkFormat format, FxRef<AxImage
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, path);
     }
 }
 
 
-void AxManager::LoadImageFromMemory(RxImageType image_type, VkFormat format, FxRef<AxImage>& asset, const uint8* data,
-                                    uint32 data_size)
+void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset,
+                                    const uint8* data, uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, "", data, data_size);
     }
@@ -231,7 +228,6 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, VkFormat format, FxR
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        loader->ImageNumComponents = RxUtil::GetFormatPixelSize(format);
 
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, "", data, data_size);
     }
@@ -317,13 +313,23 @@ void AxManager::CheckForItemsToLoad()
 
     AxWorker* worker = FindWorkerThread();
 
+    // Set this to something small, but high enough that it won't cancel loading in a ton of big models at once.
+    int tries_remaining = 5;
+
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
+        if (tries_remaining <= 0) {
+            FxLogError("Could not find worker thread, breaking...");
+            break;
+        }
+
         FxLogDebug("No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up
         worker = FindWorkerThread();
+
+        --tries_remaining;
     }
 
     // Submit the item we want to load

@@ -3,8 +3,8 @@
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
 
+#include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
-#include <Math/Mat4.hpp>
 
 const FxMat4f FxMat4f::sIdentity = FxMat4f((float32[16]) { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 });
 
@@ -314,7 +314,7 @@ FxMat4f FxMat4f::GetWithoutTranslation() const
     return mat;
 }
 
-FxMat4f FxMat4f::Transposed()
+FxMat4f FxMat4f::Transposed() const
 {
     float32x4x2_t tmp1 = vzipq_f32(Columns[0].mIntrin, Columns[2].mIntrin);
     float32x4x2_t tmp2 = vzipq_f32(Columns[1].mIntrin, Columns[3].mIntrin);
@@ -348,17 +348,13 @@ void FxMat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(flo
 
 void FxMat4f::LookAt(FxVec3f eye, FxVec3f target, FxVec3f upvec)
 {
-    const FxVec3f direction = (target - eye);
-
-    FxVec3f forward = direction;
+    FxVec3f forward = (target - eye);
     forward.NormalizeIP();
 
     FxVec3f right = upvec.Cross(forward);
     right.NormalizeIP();
 
     const FxVec3f up = forward.Cross(right);
-
-    FxVec3f neg_eye = -eye;
 
     Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
     Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
@@ -388,7 +384,7 @@ void FxMat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 
     Columns[1].Y = (-height);
 
     Columns[2].Z = (-depth_range);
-    Columns[2].W = (1.0);
+    Columns[2].W = (1.0f);
 
     Columns[3].Z = far_plane * depth_range;
     Columns[3].W = (0);

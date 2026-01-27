@@ -4,8 +4,7 @@
 
 #ifdef FX_USE_AVX
 
-#include <immintrin.h>
-
+#include <Math/FxSSE.hpp>
 #include <Math/FxVec3.hpp>
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
@@ -25,10 +24,7 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const flo
     return static_cast<bool>(_mm_testz_si128(cmp_v, cmp_v));
 }
 
-FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const
-{
-    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other.mIntrin, 0xFF));
-}
+FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const { return Dot(other.mIntrin); }
 
 FX_FORCE_INLINE bool FxVec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 
@@ -43,7 +39,9 @@ FX_FORCE_INLINE void FxVec3f::Set(float32 x, float32 y, float32 z) { mIntrin = _
 
 FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const
 {
-    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0xFF));
+
+    // Mask S 0111 D 1111 so we do not include the unused component in our dot product
+    return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0x7F));
 }
 
 FX_FORCE_INLINE FxVec3f FxVec3f::Min(const FxVec3f& a, const FxVec3f& b)
@@ -84,6 +82,12 @@ FX_FORCE_INLINE FxVec3f& FxVec3f::LerpIP(const FxVec3f& dest, const float step)
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::NormalizeIP()
 {
+    const float32 length = Length();
+
+    if (length == 0.0f) {
+        return *this;
+    }
+
     // Calculate length and splat to register
     const __m128 len_v = _mm_set1_ps(Length());
 
@@ -95,14 +99,20 @@ FX_FORCE_INLINE FxVec3f& FxVec3f::NormalizeIP()
 
 FX_FORCE_INLINE FxVec3f FxVec3f::Normalize() const
 {
+    const float32 length = Length();
+
+    if (length == 0.0f) {
+        return *this;
+    }
+
     // Calculate length and splat to register
-    const __m128 len_v = _mm_set1_ps(Length());
+    const __m128 len_v = _mm_set1_ps(length);
 
     return FxVec3f(_mm_div_ps(mIntrin, len_v));
 }
 
 FX_FORCE_INLINE float32 FxVec3f::Length() const
-{
+{ 
     __m128 v = mIntrin;
     return sqrtf(Dot(v));
 }
@@ -150,13 +160,13 @@ FX_FORCE_INLINE FxVec3f FxVec3f::operator/(float32 scalar) const
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator+=(const FxVec3f& other)
 {
-    mIntrin = _mm_add_ps(mIntrin, other);
+    mIntrin = _mm_add_ps(mIntrin, other.mIntrin);
     return *this;
 }
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator-=(const FxVec3f& other)
 {
-    mIntrin = _mm_sub_ps(mIntrin, other);
+    mIntrin = _mm_sub_ps(mIntrin, other.mIntrin);
     return *this;
 }
 
@@ -168,7 +178,7 @@ FX_FORCE_INLINE FxVec3f& FxVec3f::operator-=(float32 scalar)
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator*=(const FxVec3f& other)
 {
-    mIntrin = _mm_mul_ps(mIntrin, other);
+    mIntrin = _mm_mul_ps(mIntrin, other.mIntrin);
     return *this;
 }
 

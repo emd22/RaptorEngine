@@ -13,9 +13,8 @@
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
-template <typename ElementType> class RxRawGpuBuffer;
-
-template <typename ElementType> class RxGpuBuffer;
+class RxRawGpuBuffer;
+class RxGpuBuffer;
 
 enum class RxBufferUsageType
 {
@@ -23,44 +22,11 @@ enum class RxBufferUsageType
     Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 };
 
-template <typename ElementType> class RxGpuBufferMapContext
-{
-public:
-    RxGpuBufferMapContext(RxRawGpuBuffer<ElementType>* buffer) : mGpuBuffer(buffer) { mGpuBuffer->Map(); }
-
-    /** Returns the raw pointer representation of the mapped data. */
-    operator void*()
-    {
-        if (!mGpuBuffer->pMappedBuffer) {
-            return nullptr;
-        }
-
-        return mGpuBuffer->pMappedBuffer;
-    }
-
-    /** Returns the pointer representation of the mapped data. */
-    ElementType* GetPtr()
-    {
-        FxDebugAssert(mGpuBuffer->pMappedBuffer != nullptr);
-        return static_cast<ElementType*>(mGpuBuffer->pMappedBuffer);
-    }
-
-    ~RxGpuBufferMapContext() { mGpuBuffer->UnMap(); }
-
-    /**
-     * Manually unmaps the buffer.
-     */
-    void UnMap() const { mGpuBuffer->UnMap(); }
-
-private:
-    RxRawGpuBuffer<ElementType>* mGpuBuffer = nullptr;
-};
-
 enum class RxGpuBufferFlags : uint16
 {
-    None = 0x00,
+    eNone = 0x00,
     /** The buffer is mapped for the lifetime of the buffer. */
-    PersistentMapped = 0x01,
+    ePersistentMapped = 0x01,
 
     FX_DEFINE_AS_FLAG_ENUM,
 };
@@ -71,36 +37,32 @@ enum class RxGpuBufferFlags : uint16
 /**
  * @brief Provides a GPU buffer that can be created with more complex parameters without staging.
  */
-template <typename ElementType> class RxRawGpuBuffer
+class RxRawGpuBuffer
 {
-public:
-    const int32 ElementSize = sizeof(ElementType);
-
 public:
     RxRawGpuBuffer() = default;
 
-    RxRawGpuBuffer(RxRawGpuBuffer<ElementType>& other) = delete;
+    RxRawGpuBuffer(RxRawGpuBuffer& other) = delete;
 
-    RxRawGpuBuffer operator=(RxRawGpuBuffer<ElementType>& other) = delete;
+    RxRawGpuBuffer operator=(RxRawGpuBuffer& other) = delete;
 
-    void Create(uint64 element_count, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
-                RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::None)
+    void Create(uint64 size_in_bytes, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
+                RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::eNone)
     {
-        Size = element_count;
+        Size = size_in_bytes;
         mUsageFlags = buffer_usage;
         mBufferFlags = buffer_flags;
 
-        const uint64 buffer_size = ElementSize * Size;
-
         VmaAllocationCreateFlags vma_create_flags = 0;
 
-        if ((mBufferFlags & RxGpuBufferFlags::PersistentMapped) != 0) {
-            vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped)) {
+            vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT |
+                                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
         }
 
         const VkBufferCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                                                  .flags = 0,
-                                                 .size = buffer_size,
+                                                 .size = size_in_bytes,
                                                  .usage = mUsageFlags,
                                                  .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
 
@@ -115,28 +77,10 @@ public:
         }
 
 
-        if ((mBufferFlags & RxGpuBufferFlags::PersistentMapped) != 0) {
+        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped) != 0) {
             // Get the pointer from VMA for the mapped GPU buffer
             pMappedBuffer = allocation_info.pMappedData;
         }
-
-#ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
-        static uint32 allocation_number = 0;
-
-        allocation_number += 1;
-
-        std::string allocation_name = "";
-        // typeid(ElementType).name();
-
-        char name_buffer[256];
-        char demangled_name_buffer[128];
-
-        FxUtil::DemangleName(typeid(ElementType).name(), demangled_name_buffer, 128);
-
-        snprintf(name_buffer, 128, "%s{%u}", demangled_name_buffer, allocation_number);
-
-        vmaSetAllocationName(Fx_Fwd_GetGpuAllocator(), Allocation, name_buffer);
-#endif
 
         Initialized = true;
     }
@@ -145,15 +89,6 @@ public:
     {
         vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
     }
-
-
-    /**
-     * Creates a new context that automatically maps and unmaps memory at the
-     * end of scope.
-     *
-     * To get the mapped buffer, either use `value.MappedBuffer`, or `value` when using the value as a pointer.
-     */
-    RxGpuBufferMapContext<ElementType> GetMappedContext() { return RxGpuBufferMapContext<ElementType>(this); }
 
     void Map()
     {
@@ -182,14 +117,20 @@ public:
         pMappedBuffer = nullptr;
     }
 
-    void Upload(const FxSizedArray<ElementType>& data)
+    template <typename TElementType>
+    void Upload(const FxSizedArray<TElementType>& data)
     {
         FxDebugAssert(data.Size > 0);
         FxDebugAssert(data.pData != nullptr);
 
-        auto buffer = GetMappedContext();
+        FxAssertMsg(this->Size >= data.GetSizeInBytes(), "GPU buffer is smaller than source buffer!");
+
+        Map();
+
         const size_t size_in_bytes = data.GetSizeInBytes();
-        memcpy(buffer.GetPtr(), data.pData, size_in_bytes);
+        memcpy(pMappedBuffer, data.pData, size_in_bytes);
+
+        UnMap();
     }
 
     void Destroy()
@@ -222,7 +163,42 @@ public:
 
 private:
     VkBufferUsageFlags mUsageFlags = 0;
-    RxGpuBufferFlags mBufferFlags = RxGpuBufferFlags::None;
+    RxGpuBufferFlags mBufferFlags = RxGpuBufferFlags::eNone;
+};
+
+
+class RxGpuBufferMapContext
+{
+public:
+    RxGpuBufferMapContext(RxRawGpuBuffer* buffer) : mpGpuBuffer(buffer) { mpGpuBuffer->Map(); }
+
+    /** Returns the raw pointer representation of the mapped data. */
+    operator void*()
+    {
+        if (!mpGpuBuffer->pMappedBuffer) {
+            return nullptr;
+        }
+
+        return mpGpuBuffer->pMappedBuffer;
+    }
+
+    /** Returns the pointer representation of the mapped data. */
+    template <typename TElementType>
+    TElementType* GetPtr()
+    {
+        FxDebugAssert(mpGpuBuffer->pMappedBuffer != nullptr);
+        return static_cast<TElementType*>(mpGpuBuffer->pMappedBuffer);
+    }
+
+    ~RxGpuBufferMapContext() { mpGpuBuffer->UnMap(); }
+
+    /**
+     * Manually unmaps the buffer.
+     */
+    void UnMap() const { mpGpuBuffer->UnMap(); }
+
+private:
+    RxRawGpuBuffer* mpGpuBuffer = nullptr;
 };
 
 
@@ -230,23 +206,23 @@ private:
  * A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
  * buffer type.
  */
-template <typename ElementType> class RxGpuBuffer : public RxRawGpuBuffer<ElementType>
+class RxGpuBuffer : public RxRawGpuBuffer
 {
 private:
-    using RxRawGpuBuffer<ElementType>::Create;
+    using RxRawGpuBuffer::Create;
 
 public:
     RxGpuBuffer() = default;
 
-    void Create(RxBufferUsageType usage, const FxSizedArray<ElementType>& data)
+    template <typename TElementType>
+    void Create(RxBufferUsageType usage, const FxSizedArray<TElementType>& data)
     {
-        this->Size = data.Size;
+        this->Size = data.Size * sizeof(TElementType);
         Usage = usage;
 
-        const uint64_t buffer_size = data.Size * sizeof(ElementType);
+        RxRawGpuBuffer staging_buffer;
+        staging_buffer.Create(Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-        RxRawGpuBuffer<ElementType> staging_buffer;
-        staging_buffer.Create(this->Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         // Upload the data to the staging buffer
         staging_buffer.Upload(data);
 
@@ -256,7 +232,7 @@ public:
         Fx_Fwd_SubmitUploadCmd(
             [&](RxCommandBuffer& cmd)
             {
-                VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = buffer_size };
+                VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
                 vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
             });
 
@@ -265,7 +241,4 @@ public:
 
 public:
     RxBufferUsageType Usage;
-
-private:
-    size_t ElementSize = sizeof(ElementType);
 };

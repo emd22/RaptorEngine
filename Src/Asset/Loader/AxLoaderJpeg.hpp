@@ -2,7 +2,7 @@
 
 #include "AxLoaderImageBase.hpp"
 
-#include <jpeglib.h>
+#include <TurboJPEG/jpeglib.h>
 
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxTypes.hpp>

@@ -13,6 +13,125 @@
 #include <Math/FxVec2.hpp>
 #include <optional>
 
+enum class RxImageFormat
+{
+    eNone,
+
+    // Color formats
+
+    eBGRA8_UNorm,
+    eRGBA8_SRGB,
+    eRGBA8_UNorm,
+
+    eRG32_Float,
+
+    eRGBA16_Float,
+
+    eRGB32_Float,
+
+    /// DO NOT USE FORMAT: Marker for depth formats
+    _eDepthFormatsBegin,
+
+    eD16_UNorm_S8_UInt,
+    eD32_Float,
+    eD32_Float_S8_UInt,
+
+    /// DO NOT USE FORMAT: Marker for depth formats
+    _eDepthFormatsEnd,
+};
+
+
+struct RxImageFormatUtil
+{
+    static constexpr bool IsDepth(RxImageFormat format)
+    {
+        if (format > RxImageFormat::_eDepthFormatsBegin && format < RxImageFormat::_eDepthFormatsEnd) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @brief Get the size of the format in bytes. For example, RGBA8 would return 4.
+     */
+    static constexpr uint32 GetSize(RxImageFormat format)
+    {
+        switch (format) {
+        case RxImageFormat::eNone:
+        case RxImageFormat::_eDepthFormatsBegin:
+        case RxImageFormat::_eDepthFormatsEnd:
+            break;
+
+            // Color formats
+
+        case RxImageFormat::eBGRA8_UNorm:
+        case RxImageFormat::eRGBA8_SRGB:
+        case RxImageFormat::eRGBA8_UNorm:
+            return 4;
+
+        case RxImageFormat::eRG32_Float:
+        case RxImageFormat::eRGBA16_Float:
+            return 8;
+
+        case RxImageFormat::eRGB32_Float:
+            return 12;
+
+            // Depth formats
+
+        case RxImageFormat::eD16_UNorm_S8_UInt:
+            return 3;
+
+        case RxImageFormat::eD32_Float:
+            return 4;
+
+        case RxImageFormat::eD32_Float_S8_UInt:
+            return 5;
+        }
+
+        return 0;
+    }
+
+
+    static constexpr VkFormat ToUnderlying(RxImageFormat format)
+    {
+        switch (format) {
+        case RxImageFormat::eNone:
+        case RxImageFormat::_eDepthFormatsBegin:
+        case RxImageFormat::_eDepthFormatsEnd:
+            break;
+
+            // Color formats
+
+        case RxImageFormat::eRG32_Float:
+            return VK_FORMAT_R32G32_SFLOAT;
+        case RxImageFormat::eBGRA8_UNorm:
+            return VK_FORMAT_B8G8R8A8_UNORM;
+        case RxImageFormat::eRGBA8_SRGB:
+            return VK_FORMAT_R8G8B8A8_SRGB;
+        case RxImageFormat::eRGBA8_UNorm:
+            return VK_FORMAT_R8G8B8A8_UNORM;
+
+        case RxImageFormat::eRGBA16_Float:
+            return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case RxImageFormat::eRGB32_Float:
+            return VK_FORMAT_R32G32B32_SFLOAT;
+
+            // Depth Formats
+
+        case RxImageFormat::eD16_UNorm_S8_UInt:
+            return VK_FORMAT_D16_UNORM_S8_UINT;
+        case RxImageFormat::eD32_Float:
+            return VK_FORMAT_D32_SFLOAT;
+        case RxImageFormat::eD32_Float_S8_UInt:
+            return VK_FORMAT_D32_SFLOAT_S8_UINT;
+        }
+
+        return VK_FORMAT_UNDEFINED;
+    }
+};
+
+
 struct RxImageTypeProperties
 {
     VkImageViewType ViewType;
@@ -21,16 +140,14 @@ struct RxImageTypeProperties
 
 enum class RxImageType
 {
-    eImage,
+    e2d,
     eCubemap,
 };
 
 enum class RxImageAspectFlag
 {
-    eAuto,
     eColor = VK_IMAGE_ASPECT_COLOR_BIT,
     eDepth = VK_IMAGE_ASPECT_DEPTH_BIT,
-
 };
 
 struct RxTransitionLayoutOverrides
@@ -41,7 +158,7 @@ struct RxTransitionLayoutOverrides
 
 struct RxImageCubemapOptions
 {
-    RxImageAspectFlag AspectFlag = RxImageAspectFlag::eAuto;
+    RxImageAspectFlag AspectFlag = RxImageAspectFlag::eColor;
 };
 
 const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type);
@@ -49,39 +166,41 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type);
 class RxImage
 {
 public:
-    RxGpuDevice* GetDevice();
+    void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
+                VkImageUsageFlags usage, RxImageAspectFlag aspect);
 
-    void Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageTiling tiling,
-                VkImageUsageFlags usage, VkImageAspectFlags aspect_flags);
-
-    void Create(RxImageType image_type, const FxVec2u& size, VkFormat format, VkImageUsageFlags usage,
-                VkImageAspectFlags aspect_flags);
+    void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageUsageFlags usage,
+                RxImageAspectFlag aspect);
 
     void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1,
                           std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
 
-    void CopyFromBuffer(const RxRawGpuBuffer<uint8>& buffer, VkImageLayout final_layout, FxVec2u size,
-                        uint32 base_layer = 0);
+    void TransitionDepthToShaderRO(RxCommandBuffer& cmd);
 
-    void CreateLayeredImageFromCubemap(RxImage& cubemap, VkFormat image_format, RxImageCubemapOptions options);
+
+    void CopyFromBuffer(const RxRawGpuBuffer& buffer, VkImageLayout final_layout, FxVec2u size, uint32 base_layer = 0);
+
+    void CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat image_format, VkImageAspectFlags aspect_flags,
+                                       RxImageCubemapOptions options);
+
+    FX_FORCE_INLINE bool IsInited() const { return (Image != nullptr); }
+
     void Destroy();
 
     ~RxImage() { Destroy(); }
 
+
 public:
     FxVec2u Size = FxVec2u::sZero;
+
+    RxImageAspectFlag Aspect = RxImageAspectFlag::eColor;
 
     VkImage Image = nullptr;
     VkImageView View = nullptr;
 
-    VkFormat Format = VK_FORMAT_UNDEFINED;
+    RxImageType ViewType = RxImageType::e2d;
+    RxImageFormat Format = RxImageFormat::eNone;
     VkImageLayout ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VmaAllocation Allocation = nullptr;
-
-private:
-    RxGpuDevice* mDevice = nullptr;
-
-    RxImageType mViewType = RxImageType::eImage;
-    bool mIsDepthTexture = false;
 };

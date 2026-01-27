@@ -2,8 +2,7 @@
 
 #ifdef FX_USE_AVX
 
-#include <nmmintrin.h>
-
+#include <Math/FxSSE.hpp>
 #include <Math/FxVec4.hpp>
 
 
@@ -41,8 +40,6 @@ void FxVec4f::Load4(float32 x, float32 y, float32 z, float32 w)
     const float32 values[4] = { x, y, z, w };
     mIntrin = _mm_load_ps(values);
 }
-
-
 
 
 #endif // #ifdef FX_USE_AVX

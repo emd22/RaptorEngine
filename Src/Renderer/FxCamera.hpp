@@ -1,12 +1,12 @@
 #pragma once
 
 #include <FxObjectLayer.hpp>
+#include <Math/FxMat4.hpp>
 #include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxVec2.hpp>
 #include <Math/FxVec3.hpp>
-#include <Math/Mat4.hpp>
 
 enum class FxCameraType
 {
@@ -125,8 +125,8 @@ public:
     ~FxOrthoCamera() override {}
 
 private:
-    float32 mWidth = 60.0f;
-    float32 mHeight = 60.0f;
+    float32 mWidth = 10.0f;
+    float32 mHeight = 10.0f;
 };
 
 ///////////////////////////////////////////////
@@ -202,6 +202,8 @@ public:
         case FxObjectLayer::ePlayerLayer:
             return mWeaponCameraMatrix;
         }
+
+        return mCameraMatrix;
     }
 
     ~FxPerspectiveCamera() override {}
@@ -232,5 +234,5 @@ private:
     FxMat4f mWeaponCameraMatrix = FxMat4f::sIdentity;
     FxMat4f mWeaponProjectionMatrix = FxMat4f::sIdentity;
 
-    float32 mWeaponFov = FxDegToRad(70.0f);
+    float32 mWeaponFov = FxDegToRad(60.0f);
 };

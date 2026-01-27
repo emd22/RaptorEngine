@@ -206,6 +206,9 @@ void FxObject::RenderMesh()
 
     pMaterial->Bind(&cmd);
 
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pMaterial->pPipeline,
+                                                   gObjectManager->GetBaseOffset());
+
     if (pMesh) {
         pMesh->Render(cmd, *pMaterial->pPipeline);
     }
@@ -213,16 +216,14 @@ void FxObject::RenderMesh()
 
 void FxObject::Update()
 {
-    if (!mbPhysicsEnabled) {
-        return;
-    }
+    if (mbPhysicsEnabled) {
+        if (mbPhysicsTransformOutOfDate) {
+            Physics.Teleport(mPosition, mRotation);
+            mbPhysicsTransformOutOfDate = false;
+        }
 
-    if (mbPhysicsTransformOutOfDate) {
-        Physics.Teleport(mPosition, mRotation);
-        mbPhysicsTransformOutOfDate = false;
+        SyncObjectWithPhysics();
     }
-
-    SyncObjectWithPhysics();
 }
 
 

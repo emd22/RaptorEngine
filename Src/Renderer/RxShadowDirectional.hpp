@@ -7,6 +7,7 @@
 #include <Renderer/Backend/RxPipeline.hpp>
 #include <Renderer/Backend/RxRenderPass.hpp>
 #include <Renderer/FxCamera.hpp>
+#include <Renderer/RxRenderStage.hpp>
 
 class RxDeferredLightingPass;
 
@@ -26,25 +27,15 @@ public:
     void End();
 
     FX_FORCE_INLINE RxPipeline& GetPipeline() { return mPipeline; }
-    FX_FORCE_INLINE RxCommandBuffer* GetCommandBuffer() { return mCommandBuffer; }
 
 private:
-    void UpdateDescriptorSet(int index, const RxDeferredLightingPass& lighting_pass);
+    void UpdateLightDescriptors();
 
 public:
     FxOrthoCamera ShadowCamera;
-    RxCommandBuffer* mCommandBuffer;
-    FxStackArray<RxImage, RendererFramesInFlight> mAttachments;
+
+    RxRenderStage RenderStage;
 
 private:
-    FxStackArray<RxFramebuffer, RendererFramesInFlight> mFramebuffers;
-
-    RxRenderPass mRenderPass;
     RxPipeline mPipeline;
-
-
-    VkDescriptorSetLayout mDsLayout;
-    RxDescriptorSet mDescriptorSet;
-
-    RxDescriptorPool mDescriptorPool;
 };

@@ -74,6 +74,28 @@ inline constexpr FxHash64 FxHashData64(const FxSlice<TObj>& slice, uint64 thash 
     return thash;
 }
 
+
+template <typename TObj>
+inline FxHash64 FxHashObj64(const TObj& obj, uint64 thash = FX_HASH64_FNV1A_INIT)
+{
+    const uint8* start = reinterpret_cast<const uint8*>(&obj);
+    const uint8* end = start + sizeof(TObj);
+
+    uint32 index = 0;
+
+    while ((start + index) < end) {
+        /* xor the bottom with the current octet */
+        thash ^= static_cast<FxHash64>(*(start + index));
+
+        /* multiply by the 64 bit FNV magic prime mod 2^64 */
+        thash += (thash << 1) + (thash << 4) + (thash << 5) + (thash << 7) + (thash << 8) + (thash << 40);
+
+        ++index;
+    }
+
+    return thash;
+}
+
 inline constexpr FxHash64 FxHashStr64(const char* str, uint64 thash = FX_HASH64_FNV1A_INIT)
 {
     uint8 ch = 0;

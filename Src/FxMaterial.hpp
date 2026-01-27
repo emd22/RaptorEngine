@@ -12,7 +12,7 @@
 #include <Renderer/Backend/RxDescriptors.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
 
-#define FX_MAX_MATERIALS 256
+#define FX_MAX_MATERIALS 128
 
 enum class FxMaterialComponentStatus
 {
@@ -20,7 +20,7 @@ enum class FxMaterialComponentStatus
     eNotReady,
 };
 
-template <VkFormat TFormat>
+template <RxImageFormat TFormat>
 struct FxMaterialComponent
 {
 public:
@@ -35,7 +35,7 @@ public:
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pImage && !pDataToLoad) {
-            pImage = AxImage::GetEmptyImage<TFormat, RxUtil::GetFormatPixelSize(TFormat)>();
+            pImage = AxImage::GetEmptyImage<TFormat>();
         }
 
         if (!CheckIfReady()) {
@@ -47,6 +47,7 @@ public:
 
         return Status::eReady;
     }
+
     ~FxMaterialComponent() = default;
 
 private:
@@ -80,10 +81,11 @@ struct FxMaterialProperties
 class FxMaterial
 {
 public:
-    enum class ResourceType
+    enum ResourceType : uint32
     {
         eDiffuse,
         eNormal,
+        eMetallicRoughness,
 
         eMaxImages,
     };
@@ -99,6 +101,9 @@ public:
             break;
         case ResourceType::eNormal:
             NormalMap.pImage = image;
+            break;
+        case ResourceType::eMetallicRoughness:
+            MetallicRoughness.pImage = image;
             break;
 
         default:
@@ -129,8 +134,9 @@ private:
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent<VK_FORMAT_R8G8B8A8_SRGB> Diffuse;
-    FxMaterialComponent<VK_FORMAT_R8G8B8A8_UNORM> NormalMap;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> Diffuse;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> MetallicRoughness;
 
     FxMaterialProperties Properties {};
 
@@ -161,9 +167,6 @@ private:
 
 class FxMaterialManager
 {
-    // TODO: replace with a calculated material count
-    const uint32 MaxMaterials = 64;
-
 public:
     static FxMaterialManager& GetGlobalManager();
 
@@ -179,12 +182,13 @@ public:
 public:
     FxRef<RxSampler> pAlbedoSampler { nullptr };
     FxRef<RxSampler> pNormalMapSampler { nullptr };
+    FxRef<RxSampler> pMetallicRoughnessSampler { nullptr };
     // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**
      * @brief A large GPU buffer containing all loaded in material properties.
      */
-    RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesBuffer;
+    RxRawGpuBuffer MaterialPropertiesBuffer;
     uint32 NumMaterialsInBuffer = 0;
 
     FxBitset MaterialsInUse;

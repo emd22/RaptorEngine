@@ -3,6 +3,8 @@
 void FxOrthoCamera::UpdateProjectionMatrix()
 {
     ProjectionMatrix.LoadOrthographicMatrix(mWidth, mHeight, mNearPlane, mFarPlane);
+
+    mbRequireMatrixUpdate = false;
 }
 
 void FxOrthoCamera::UpdateCameraMatrix()

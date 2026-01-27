@@ -15,10 +15,12 @@ void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device)
     mDevice = device;
 
     CreateSwapchain(size, surface);
+    CreateSamplers();
     CreateSwapchainImages();
     CreateImageViews();
+    CreateFramebuffers();
 
-    Initialized = true;
+    bInitialized = true;
 }
 
 void RxSwapchain::CreateSwapchainImages()
@@ -40,9 +42,11 @@ void RxSwapchain::CreateSwapchainImages()
         image->View = nullptr;
         image->Allocation = nullptr;
         image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        image->Format = SurfaceFormat.format;
+        image->Format = Surface.Format;
     }
 }
+
+void RxSwapchain::CreateFramebuffers() {}
 
 void RxSwapchain::CreateImageViews()
 {
@@ -51,7 +55,7 @@ void RxSwapchain::CreateImageViews()
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .image = OutputImages[i].Image,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = SurfaceFormat.format,
+            .format = RxImageFormatUtil::ToUnderlying(Surface.Format),
             .components = {
                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
                 .g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -86,8 +90,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     }
 
     const VkExtent2D extent = {
-        .width = (uint32)size.GetX(),
-        .height = (uint32)size.GetY(),
+        .width = size.X,
+        .height = size.Y,
     };
 
     uint32 image_count = capabilities.minImageCount + 1;
@@ -99,7 +103,24 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     FxLogInfo("Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount, capabilities.maxImageCount,
               image_count);
 
-    SurfaceFormat = mDevice->GetBestSurfaceFormat();
+    // Retrieve the image format for the surface (the window's render target)
+    {
+        VkSurfaceFormatKHR surface_format = mDevice->GetSurfaceFormat();
+
+        // For now we will enforce that RGBA16 is supported by the render device. This is the first chosen
+        // if it is supported.
+        FxAssert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
+                 surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
+
+        if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+            Surface.Format = RxImageFormat::eRGBA16_Float;
+        }
+        else if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM) {
+            Surface.Format = RxImageFormat::eRGBA8_UNorm;
+        }
+
+        Surface.ColorSpace = surface_format.colorSpace;
+    }
 
     const VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
@@ -109,8 +130,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
 
         .minImageCount = image_count,
 
-        .imageFormat = SurfaceFormat.format,
-        .imageColorSpace = SurfaceFormat.colorSpace,
+        .imageFormat = RxImageFormatUtil::ToUnderlying(Surface.Format),
+        .imageColorSpace = Surface.ColorSpace,
 
         .imageExtent = extent,
         .imageArrayLayers = 1,
@@ -136,57 +157,51 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     }
 }
 
-void RxSwapchain::CreateSwapchainFramebuffers()
+void RxSwapchain::CreateSamplers()
 {
-    // CompFramebuffers.Free();
-    // CompFramebuffers.InitSize(OutputImages.Size);
-
-    FxSizedArray<VkImageView> temp_views2;
-    temp_views2.InitSize(1);
-
-    for (int i = 0; i < OutputImages.Size; i++) {
-        temp_views2[0] = OutputImages[i].View;
-
-        // CompFramebuffers[i].Create(temp_views2, *comp_pipeline, Extent);
-    }
-
     ColorSampler.Create();
-    DepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest);
-    ShadowDepthSampler.Create(RxSamplerFilter::eNearest, RxSamplerFilter::eNearest, RxSamplerFilter::eNearest,
-                              RxSamplerAddressMode::eClampToBorder, RxSamplerBorderColor::eFloatWhite,
-                              RxSamplerCompareOp::eGreaterOrEqual);
+
+    DepthSampler.Create(RxSamplerProps {
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+    });
+
+    ShadowDepthSampler.Create(RxSamplerProps {
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eNearest,
+        RxSamplerAddressMode::eClampToBorder,
+        RxSamplerBorderColor::eFloatWhite,
+        RxSamplerCompareOp::eGreater,
+    });
+
     NormalsSampler.Create();
     LightsSampler.Create();
-
-    // mCompPipeline = comp_pipeline;
 }
 
 void RxSwapchain::DestroyFramebuffersAndImageViews()
 {
-    for (int i = 0; i < RendererFramesInFlight; i++) {
-        // CompFramebuffers[i].Destroy();
-
-        // Since the RxImage's `VkImage` is from the swapchain, we do not want to destroy it
-        // using VMA. Mark the Image as nullptr incase something happened to the `Allocation` inside.
+    for (int i = 0; i < RxFramesInFlight; i++) {
+        // HACK: Clears the image so that we only destroy the image view. This should be updated!
         OutputImages[i].Image = nullptr;
         OutputImages[i].Destroy();
     }
 
+
+    // TODO: Add sampler cache!
     ColorSampler.Destroy();
     DepthSampler.Destroy();
     ShadowDepthSampler.Destroy();
     NormalsSampler.Destroy();
     LightsSampler.Destroy();
-
-
-    // CompFramebuffers.Free();
 }
 
 void RxSwapchain::DestroyInternalSwapchain() { vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr); }
 
 void RxSwapchain::Destroy()
 {
-    if (!Initialized) {
+    if (!bInitialized) {
         return;
     }
 
@@ -194,7 +209,7 @@ void RxSwapchain::Destroy()
     // Images.Free();
     DestroyInternalSwapchain();
 
-    Initialized = false;
+    bInitialized = false;
 }
 
 RxSwapchain::~RxSwapchain() { Destroy(); }

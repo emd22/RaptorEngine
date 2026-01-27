@@ -101,7 +101,7 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
 //     }
 // }
 
-template <VkFormat TFormat>
+template <RxImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
@@ -120,19 +120,6 @@ static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMater
     component.pDataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 
-// void FxLoaderGltf::MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component)
-// {
-// component.pTexture = FxAssetImage::GetEmptyImage();
-// FxSizedArray<uint8> image_data = { 1, 1, 1, 1 };
-
-// component.Texture = FxMakeRef<FxAssetImage>();
-// component.Texture->Texture.Create(RxImageType::Image, image_data, FxVec2u(1, 1), VK_FORMAT_R8G8B8A8_SRGB, 4);
-// component.Texture->IsFinishedNotifier.SignalDataWritten();
-// component.Texture->bIsUploadedToGpu = true;
-// component.Texture->bIsUploadedToGpu.notify_all();
-// component.Texture->mIsLoaded.store(true);
-// }
-
 void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive)
 {
     cgltf_material* gltf_material = primitive->material;
@@ -149,7 +136,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
 
         if (!texture_view.texture) {
             // MakeEmptyMaterialTexture(material, material->Diffuse);
-            material->Diffuse.pImage = AxImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_SRGB, 4>();
+            material->Diffuse.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_UNorm>();
 
             material->Properties.BaseColor = FxColor::FromFloats(
                 gltf_material->pbr_metallic_roughness.base_color_factor);
@@ -173,6 +160,18 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         // material->NormalMap.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_UNORM, 4>();
         // MakeEmptyMaterialTexture(material, material->Normal);
     }
+
+
+    if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture != nullptr) {
+        MakeMaterialTextureForPrimitive(material, material->MetallicRoughness,
+                                        gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
+    }
+    else {
+        // material->MetallicRoughness.pImage = nullptr;
+
+        material->MetallicRoughness.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_UNorm>();
+    }
+
 
     object->pMaterial = material;
 }

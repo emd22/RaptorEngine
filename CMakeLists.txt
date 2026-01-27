@@ -7,17 +7,20 @@ project(ThirdPartyLib)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
+
 if (WIN32)
 	message("${CMAKE_SOURCE_DIR}")
-	link_directories(${CMAKE_SOURCE_DIR}/Lib/win32)
+	link_directories(${CMAKE_SOURCE_DIR}/Lib/Win32)
 else()
-	link_directories(${CMAKE_SOURCE_DIR}/Lib/macos)
+	link_directories(${CMAKE_SOURCE_DIR}/Lib/macOS)
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/Lib/Include)
 
-find_package(libjpeg-turbo REQUIRED)
-find_package(SDL3 REQUIRED)
+if(MSVC)
+else()
+	# find_package(libjpeg-turbo REQUIRED)
+endif()
 
 if(MSVC)
 	add_compile_options("/MP")
@@ -28,7 +31,8 @@ file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.
 add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
 target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
 
-target_link_libraries(ThirdPartyLib slang SDL3::SDL3 jpeg)
+
+target_link_libraries(ThirdPartyLib slang SDL3 turbojpeg)
 
 target_compile_definitions(
     ThirdPartyLib
@@ -36,8 +40,8 @@ target_compile_definitions(
     -DVMA_RECORDING_ENABLED=1
     -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
 )
-target_compile_options(ThirdPartyLib PRIVATE)
 
+target_compile_options(ThirdPartyLib PRIVATE)
 
 project(cr CXX)
 
@@ -46,6 +50,9 @@ set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
+# For testing SSE/AVX code on non x64 processors
+# set(FX_USE_SIMDE TRUE)
+
 file (GLOB_RECURSE SOURCES "Src/*.cpp" "Src/*.inl")
 list(FILTER SOURCES EXCLUDE REGEX "Src/ThirdParty/.*")
 
@@ -53,7 +60,6 @@ file (GLOB_RECURSE HEADERS "Src/*.hpp" "Src/*.inl")
 list(FILTER HEADERS EXCLUDE REGEX "Src/ThirdParty/.*")
 
 find_package(Vulkan REQUIRED)
-
 
 add_definitions(
     -DVMA_RECORDING_ENABLED=1
@@ -65,6 +71,12 @@ add_definitions(
 	-DFX_BASE_DIR="${CMAKE_SOURCE_DIR}"
     # -DFX_DEBUG_STATIC_ARRAY
 )
+
+
+
+if (FX_USE_SIMDE)
+    add_definitions(-DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES)
+endif()
 
 if (APPLE)
 	add_compile_options(
@@ -94,4 +106,4 @@ include_directories(
 
 add_executable(cr ${SOURCES} ${HEADERS})
 
-target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES} SDL3::SDL3)
+target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES})

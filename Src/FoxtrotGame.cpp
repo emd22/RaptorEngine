@@ -75,7 +75,7 @@ void FoxtrotGame::InitEngine()
     gPhysics->Create();
 
     AxManager& asset_manager = AxManager::GetInstance();
-    asset_manager.Start(2);
+    asset_manager.Start(4);
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
     material_manager.Create();
@@ -119,7 +119,7 @@ void FoxtrotGame::CreateLights()
 
     pSun = FxMakeRef<FxLightDirectional>();
     pSun->MoveTo(FxVec3f(0, 8, -5));
-    pSun->Color = FxColor(0xFAF8E3, 15);
+    pSun->Color = FxColor(0xFAF8D3, 30);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
     mMainScene.Attach(pSun);
@@ -149,10 +149,11 @@ void FoxtrotGame::CreateGame()
     mMainScene.Attach(pLevelObject);
 
     pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DamagedHelmet.glb", { .KeepInMemory = true });
-    // pHelmetObject->RotateX(M_PI_2);
-    // pHelmetObject->Scale(FxVec3f(0.5));
+    pHelmetObject->RotateX(M_PI_2);
+    pHelmetObject->RotateZ(-M_PI_2);
+    pHelmetObject->Scale(0.5);
     pHelmetObject->WaitUntilLoaded();
-    pHelmetObject->MoveBy(FxVec3f(0, 2, 3.5));
+    pHelmetObject->MoveBy(FxVec3f(0, 1.2, 3.5));
 
     // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
 
@@ -172,7 +173,8 @@ void FoxtrotGame::CreateGame()
 
     CreateLights();
 
-    Player.Physics.bDisableGravity = true;
+    // Player.Physics.bDisableGravity = true;
+    Player.SetFlyMode(false);
 
     gShadowRenderer = new RxShadowDirectional(FxVec2u(1024, 1024));
     // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
@@ -199,16 +201,16 @@ static FX_FORCE_INLINE FxVec3f GetMovementVector()
     FxVec3f movement = FxVec3f::sZero;
 
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
-        movement.Z = 1.0f;
+        movement.Z += 1.0f;
     }
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
-        movement.Z = -1.0f;
+        movement.Z += -1.0f;
     }
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
-        movement.X = 1.0f;
+        movement.X += 1.0f;
     }
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
-        movement.X = -1.0f;
+        movement.X += -1.0f;
     }
 
     return movement;
@@ -218,10 +220,6 @@ void FoxtrotGame::ProcessControls()
 {
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Q)) {
         sbRunning = false;
-    }
-
-    if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT)) {
-        printf("MOUSE DOWN\n");
     }
 
     // Click to lock mouse
@@ -253,7 +251,6 @@ void FoxtrotGame::ProcessControls()
         mouse_delta.X = (DeltaTime * mouse_delta.X * scMouseSensitivity);
         mouse_delta.Y = (DeltaTime * mouse_delta.Y * -scMouseSensitivity);
 
-
         // camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         Player.RotateHead(mouse_delta);
     }
@@ -269,15 +266,8 @@ void FoxtrotGame::ProcessControls()
         Player.Jump();
     }
 
-    if (FxControlManager::IsKeyPressed(FX_KEY_EQUALS)) {
-        gRenderer->pDeferredRenderer->ToggleWireframe(true);
-    }
-    if (FxControlManager::IsKeyPressed(FX_KEY_MINUS)) {
-        gRenderer->pDeferredRenderer->ToggleWireframe(false);
-    }
 
-
-    if (FxControlManager::IsKeyPressed(FX_KEY_O)) {
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_O)) {
         // Print out memory pool statistics
         FxLogInfo("=== Memory Pool Stats ====");
 
@@ -305,7 +295,8 @@ void FoxtrotGame::ProcessControls()
 
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_N)) {
-        Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
+        // Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
+        Player.SetFlyMode(!Player.IsFlyMode());
     }
 }
 
@@ -318,32 +309,23 @@ void FoxtrotGame::Tick()
     FxControlManager::Update();
     ProcessControls();
 
+
     if (!sbShowShadowCam) {
-        Player.Move(DeltaTime, GetMovementVector());
+        Player.Move(DeltaTime, GetMovementVector() * DeltaTime);
         Player.Update(DeltaTime);
     }
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
+    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.55)) -
+                                 camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);
+
+    pPistolObject->MoveTo(pistol_destination);
+
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
+    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
 
-    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 50.0, DeltaTime);
-
-    pPistolObject->MoveTo(camera->Position + (camera->Direction * FxVec3f(0.45)) -
-                          camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15));
-    // pPistolObject->MoveBy();
-
-    gPhysics->Update();
-
-
-    // FxVec3f shadow_pos = FxVec3f(0, 10, 5);
-    // FxVec3f target = FxVec3f(0.0f, 0.0f, 0.0f);
-
-    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
-    gShadowRenderer->ShadowCamera.ResolveViewToTexels(1024);
-    // gShadowRenderer->ShadowCamera.Position.Y *= -1.0f;
-
-    // target.Y *= -1.0f;
+    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 10.0f));
 
     FxVec3f target = Player.Position;
 
@@ -352,48 +334,35 @@ void FoxtrotGame::Tick()
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
-
     if (gRenderer->BeginFrame() != RxFrameResult::Success) {
         mLastTick = current_tick;
         return;
     }
 
+    gPhysics->Update();
+
+    RxFrameData* frame = gRenderer->GetFrame();
+
+    frame->CommandBuffer.Reset();
+    frame->CommandBuffer.Record();
+
     gShadowRenderer->Begin();
 
     RxShadowPushConstants consts;
-    // memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-    //        sizeof(float32) * 16);
-    // consts.ObjectId = pLevelObject->ObjectId;
-
-    // vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
-    //                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
-
-    // pLevelObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
 
     memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
            sizeof(float32) * 16);
     consts.ObjectId = pHelmetObject->ObjectId;
 
-    vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
+    vkCmdPushConstants(gRenderer->GetFrame()->CommandBuffer.Get(), gShadowRenderer->GetPipeline().Layout,
                        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
 
-    pHelmetObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
-
-    // memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-    //        sizeof(float32) * 16);
-    // consts.ObjectId = pPistolObject->ObjectId;
-
-    // vkCmdPushConstants(gShadowRenderer->GetCommandBuffer()->CommandBuffer, gShadowRenderer->GetPipeline().Layout,
-    //                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
-
-    // pPistolObject->RenderPrimitive(*gShadowRenderer->GetCommandBuffer(), gShadowRenderer->GetPipeline());
+    pHelmetObject->RenderPrimitive(gRenderer->GetFrame()->CommandBuffer, gShadowRenderer->GetPipeline());
 
     gShadowRenderer->End();
 
 
     gRenderer->BeginGeometry();
-
-    // deferred_renderer->SkyboxRenderer.Render(gRenderer->GetFrame()->CommandBuffer, *camera);
 
     mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
@@ -402,44 +371,12 @@ void FoxtrotGame::Tick()
     mLastTick = current_tick;
 }
 
-void FoxtrotGame::CreateSkybox()
-{
-    // // Load the cubemap as a 2d image
-    // FxRef<FxAssetImage> skybox_texture = FxAssetManager::LoadImage(RxImageType::Image, VK_FORMAT_R8G8B8A8_SRGB,
-    //                                                                "../Textures/TestCubemap.png");
-    // skybox_texture->WaitUntilLoaded();
-
-    // // Create the layers 2d image to use in the renderer
-    // RxImage cubemap_image;
-    // cubemap_image.CreateLayeredImageFromCubemap(skybox_texture->Texture.Image, VK_FORMAT_R8G8B8A8_SRGB);
-
-    // auto generated_cube = FxMeshGen::MakeCube({ .Scale = 5 });
-
-    // for (int i = 0; i < RendererFramesInFlight; i++) {
-    //     RxImage& skybox_output_image = gRenderer->Swapchain.OutputImages[i];
-    //     gRenderer->pDeferredRenderer->SkyboxRenderer.SkyboxAttachments.Insert(&skybox_output_image);
-    // }
-
-    // gRenderer->pDeferredRenderer->SkyboxRenderer.SkyAttachment = &cubemap_image;
-
-    // pSkyboxMesh = generated_cube->AsPositionsMesh();
-    // gRenderer->pDeferredRenderer->SkyboxRenderer.Create(gRenderer->Swapchain.Extent, pSkyboxMesh);
-
-    // pSkyboxMesh->IsReference = false;
-}
-
 void FoxtrotGame::DestroyGame()
 {
     gRenderer->GetDevice()->WaitForIdle();
 
-    // FxMaterialManager::GetGlobalManager().Destroy();
     FxMaterialManager::GetGlobalManager().Destroy();
     AxManager::GetInstance().Shutdown();
-
-    // pSkyboxMesh->IsReference = false;
-    // pSkyboxMesh->Destroy();
-
-    // gRenderer->pDeferredRenderer->SkyboxRenderer.Destroy();
 
     gRenderer->pDeferredRenderer->Destroy();
 }

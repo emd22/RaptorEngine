@@ -3,7 +3,7 @@
 #include <Asset/FxMeshGen.hpp>
 #include <FxColor.hpp>
 #include <FxEntity.hpp>
-#include <Math/Mat4.hpp>
+#include <Math/FxMat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
 class FxCamera;
@@ -43,8 +43,8 @@ public:
     virtual ~FxLightBase() {}
 
 public:
-    FxRef<FxPrimitiveMesh<VertexType>> LightVolume { nullptr };
-    FxRef<FxMeshGen::GeneratedMesh> LightVolumeGen { nullptr };
+    FxRef<FxPrimitiveMesh<VertexType>> pLightVolume { nullptr };
+    FxRef<FxMeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
 
     RxPipeline* pPipelineInside = nullptr;
     RxPipeline* pPipelineOutside = nullptr;
@@ -56,7 +56,7 @@ public:
     bool bEnabled = true;
 
 protected:
-    FxRef<FxPrimitiveMesh<>> mDebugMesh { nullptr };
+    FxRef<FxPrimitiveMesh<>> mpDebugMesh { nullptr };
     RxPipeline* pPipeline = nullptr;
 
     float32 mRadius = 1.0f;

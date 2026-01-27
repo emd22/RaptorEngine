@@ -4,6 +4,6 @@
 
 namespace Fwd::AssetManager {
 
-FxRef<AxImage> LoadImageFromMemory(VkFormat format, const uint8* data, uint32 data_size);
+FxRef<AxImage> LoadImageFromMemory(RxImageFormat format, const uint8* data, uint32 data_size);
 
 }; // namespace Fwd::AssetManager

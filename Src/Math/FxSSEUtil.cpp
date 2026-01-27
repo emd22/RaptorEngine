@@ -3,7 +3,7 @@
 
 #ifdef FX_USE_AVX
 
-#include <immintrin.h>
+#include "FxSSE.hpp"
 
 #include <Math/FxAVXUtil.hpp>
 #include <Math/FxMathConsts.hpp>

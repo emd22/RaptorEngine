@@ -24,16 +24,25 @@ void FxPlayer::MoveBy(const FxVec3f& by)
 void FxPlayer::Jump()
 {
     if (Physics.bIsGrounded) {
-        JumpForce = 350.0f;
+        JumpForce = 2.0f;
     }
+}
+
+void FxPlayer::SetFlyMode(bool value)
+{
+    mbIsFlymode = value;
+    Physics.bDisableGravity = value;
 }
 
 void FxPlayer::Move(float delta_time, const FxVec3f& offset)
 {
-    const FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
+    // FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
+    if (mbIsFlymode) {
+        // new_direction.Y = (pCamera->mAngleY);
+    }
 
-    const FxVec3f forward = new_direction * offset.Z;
-    const FxVec3f right = new_direction.Cross(FxVec3f::sUp) * offset.X;
+    const FxVec3f forward = MovementDirection * offset.Z;
+    const FxVec3f right = MovementDirection.Cross(FxVec3f::sUp) * offset.X;
 
     FxVec3f movement_goal = (forward + right);
 
@@ -41,13 +50,20 @@ void FxPlayer::Move(float delta_time, const FxVec3f& offset)
         movement_goal.NormalizeIP();
     }
 
-    mUserForce = mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed),
-                                              cMovementLerpSpeed, delta_time);
+    // mUserForce = movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed);
 
-    mUserForce.Y = JumpForce;
-    JumpForce = 0;
+    mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed), cMovementLerpSpeed,
+                                 delta_time);
 
-    Physics.ApplyMovement(mUserForce * delta_time);
+    if (mbIsFlymode) {
+        // mUserForce.Y = ;
+    }
+    else {
+        mUserForce.Y = JumpForce;
+        JumpForce = 0;
+    }
+
+    Physics.ApplyMovement(mUserForce);
 
     // mUserForce += offset;
     // const FxVec3f max_speed = FxVec3f(cMaxWalkSpeed);
@@ -61,21 +77,10 @@ void FxPlayer::Update(float32 delta_time)
 {
     UpdateDirection();
 
-    // if (!mbUpdatePhysicsTransform) {
-    //     return;
-    // }
-
     Physics.Update(delta_time);
     SyncPhysicsToPlayer();
 
-    // Physics.ApplyMovement(Direction * FxVec3f(1.0, 0.0, 1.0));
-
-    FxVec3f camera_updated_position = mCameraOffset;
-    camera_updated_position += Position;
-    // camera_updated_position.Y += Physics.HeadRecoveryYOffset;
-
-    pCamera->MoveTo(camera_updated_position);
-
+    pCamera->MoveTo(Position + mCameraOffset);
     pCamera->Update();
 
     mbUpdatePhysicsTransform = false;

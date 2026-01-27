@@ -4,21 +4,22 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/Log.hpp>
+#include <Core/FxHash.hpp>
 
-enum class RxSamplerFilter
+
+enum class RxSamplerFilter : uint8
 {
     eNearest,
     eLinear,
 };
 
-enum class RxSamplerAddressMode
+enum class RxSamplerAddressMode : uint8
 {
     eRepeat,
     eClampToBorder,
 };
 
-enum class RxSamplerBorderColor
+enum class RxSamplerBorderColor : uint8
 {
     eIntBlack,
     eFloatBlack,
@@ -28,7 +29,7 @@ enum class RxSamplerBorderColor
     eFloatTransparent,
 };
 
-enum class RxSamplerCompareOp
+enum class RxSamplerCompareOp : uint8
 {
     eNone,
     eEqual,
@@ -38,24 +39,42 @@ enum class RxSamplerCompareOp
     eGreaterOrEqual,
 };
 
+struct RxSamplerProps
+{
+    RxSamplerFilter MinFilter = RxSamplerFilter::eLinear;
+    RxSamplerFilter MagFilter = RxSamplerFilter::eLinear;
+    RxSamplerFilter MipFilter = RxSamplerFilter::eLinear;
+
+    RxSamplerAddressMode AddressMode = RxSamplerAddressMode::eRepeat;
+    RxSamplerBorderColor BorderColor = RxSamplerBorderColor::eIntBlack;
+    RxSamplerCompareOp CompareOp = RxSamplerCompareOp::eNone;
+};
+
 
 class RxSampler
 {
 public:
     RxSampler() = default;
-    RxSampler(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
-              RxSamplerAddressMode address_mode = RxSamplerAddressMode::eRepeat,
-              RxSamplerBorderColor border_color = RxSamplerBorderColor::eIntBlack,
-              RxSamplerCompareOp = RxSamplerCompareOp::eNone);
+    RxSampler(const RxSamplerProps& props);
 
     RxSampler(RxSampler&& other);
 
-    void Create(RxSamplerFilter min_filter, RxSamplerFilter mag_filter, RxSamplerFilter mipmap_filter,
-                RxSamplerAddressMode address_mode = RxSamplerAddressMode::eRepeat,
-                RxSamplerBorderColor border_color = RxSamplerBorderColor::eIntBlack,
-                RxSamplerCompareOp compare_op = RxSamplerCompareOp::eNone);
+    void Create(const RxSamplerProps& props);
 
     void Create();
+
+
+    void SetCacheId(uint64 prop_id, uint32 cache_id)
+    { 
+        CachePropId = prop_id;
+        CacheId = cache_id;
+    }
+
+    void InvalidateCacheId()
+    { 
+        CachePropId = 0;
+        CacheId = UINT32_MAX;
+    }
 
     void Destroy();
 
@@ -64,9 +83,17 @@ public:
 public:
     VkSampler Sampler = nullptr;
 
+    /**
+     * @brief The index for the sampler in the cache.
+     */
+    uint32 CacheId = UINT32_MAX;
+
+    /**
+     * @brief An identifier for the properties that the sampler was created with. Used by RxSamplerCache.
+     */
+    FxHash64 CachePropId = 0;
+
 private:
     friend class RxSamplerCache;
     friend struct RxSamplerHandle;
-
-    RxGpuDevice* mDevice = nullptr;
 };

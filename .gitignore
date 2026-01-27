@@ -4,6 +4,9 @@ xcbuild/*
 xcbuild/**/*
 Src/out/**/*
 
+Shaders/Spirv/**/*
+Shaders/ShaderCompileDb.fxdb
+
 .*
 
 # Exclusions for .*

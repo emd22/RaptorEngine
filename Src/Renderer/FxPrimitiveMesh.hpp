@@ -28,23 +28,6 @@ public:
         IsReady = other.IsReady;
     }
 
-    // void CreateFromData(const FxSizedArray<FxVec3f>& vertices, FxSizedArray<uint32>& indices)
-    //     requires std::same_as<TVertexType, RxVertex<FxVertexPosition>>
-    // {
-    //     UploadVertices(static_cast<FxSizedArray<TVertexType>>(vertices));
-    //     UploadIndices(indices);
-    // }
-
-    /**
-     * @brief Uploads the vertices and indices to the primitive mesh. Copies the vertices and indices into
-     * a cpu-side buffer if the property `KeepInMemory` is true.
-     */
-    // void CreateFromData(const FxSizedArray<TVertexType>& vertices, const FxSizedArray<uint32>& indices)
-    // {
-    //     UploadVertices(vertices);
-    //     UploadIndices(indices);
-    // }
-
     /**
      * @brief Calls `.UploadToGpu()` on the vertex list. Assumes that the vertex list has been modified with vertices.
      *
@@ -105,10 +88,7 @@ public:
     void UploadIndices(FxSizedArray<uint32>&& indices)
     {
         GpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
-
-        // if (KeepInMemory) {
         LocalIndexBuffer = std::move(indices);
-        // }
     }
 
     FxSizedArray<TVertexType>& GetVertices()
@@ -133,8 +113,8 @@ public:
 
     bool IsWritable() { return (VertexList.GpuBuffer.Initialized && GpuIndexBuffer.Initialized); }
 
-    RxGpuBuffer<TVertexType>& GetVertexBuffer() { return VertexList.GpuBuffer; }
-    RxGpuBuffer<uint32>& GetIndexBuffer() { return GpuIndexBuffer; }
+    RxGpuBuffer& GetVertexBuffer() { return VertexList.GpuBuffer; }
+    RxGpuBuffer& GetIndexBuffer() { return GpuIndexBuffer; }
 
     void Render(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
     {
@@ -144,7 +124,7 @@ public:
         vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(cmd.CommandBuffer, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(GpuIndexBuffer.Size), 1, 0, 0, 0);
+        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), 1, 0, 0, 0);
     }
 
     void RecalculateNormals()
@@ -260,6 +240,6 @@ public:
     bool IsReference = false;
     bool KeepInMemory = false;
 
-    RxGpuBuffer<uint32> GpuIndexBuffer;
+    RxGpuBuffer GpuIndexBuffer;
     FxSizedArray<uint32> LocalIndexBuffer;
 };

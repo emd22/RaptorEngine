@@ -16,7 +16,7 @@ void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const R
     const VkFramebufferCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
         .renderPass = render_pass.RenderPass,
-        .attachmentCount = (uint32)image_views.Size,
+        .attachmentCount = static_cast<uint32>(image_views.Size),
         .pAttachments = image_views.pData,
         .width = size.X,
         .height = size.Y,

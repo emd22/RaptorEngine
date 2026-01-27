@@ -1,4 +1,73 @@
-// #include "RxSamplerCache.hpp"
+#include "RxSamplerCache.hpp"
+
+///////////////////////////////
+// Cache section functions
+///////////////////////////////
+
+RxSamplerCacheSection::RxSamplerCacheSection()
+{ 
+
+}
+
+
+RxSampler* RxSamplerCacheSection::Request(const RxSamplerProps& props)
+{
+    if (!mSamplers.IsInited()) {
+        mInUse.InitZero(scMaxSamplersForType);
+        mSamplers.InitCapacity(scMaxSamplersForType);
+    }
+
+    FxAssertMsg(PropId != 0, "Prop ID was not set for RxSamplerCacheSection!");
+
+    uint32 next_free = mInUse.FindNextFreeBit();
+    
+    // No available samplers, return null
+    if (next_free == FxBitset::scNoFreeBits) {
+        return nullptr;
+    }
+    
+    RxSampler* sampler = nullptr;
+
+    // If there are samplers available but they have not been created yet, create one
+    if (next_free > mSamplers.Size) {
+        sampler = mSamplers.Insert();
+        sampler->Create(props);
+        sampler->SetCacheId(PropId, next_free);
+    }
+    else {
+        sampler = &mSamplers[next_free];
+        sampler->SetCacheId(PropId, next_free);
+    }
+
+    mInUse.Set(next_free);
+
+    return sampler;
+}
+
+void RxSamplerCacheSection::Release(RxSampler* sampler)
+{
+    if (!sampler) {
+        return;
+    }
+
+    FxAssertMsg(sampler->CacheId == UINT32_MAX, "Sampler has already been released!");
+
+    mInUse.Unset(sampler->CacheId);
+    sampler->InvalidateCacheId();
+}
+
+
+
+///////////////////////////////
+// Cache functions
+///////////////////////////////
+
+
+
+
+
+
+
 
 // #include "FxEngine.hpp"
 

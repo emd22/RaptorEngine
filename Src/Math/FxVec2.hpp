@@ -6,11 +6,11 @@ template <typename Type>
 class FxVec2Base
 {
 public:
-    FxVec2Base() = default;
+    constexpr FxVec2Base() = default;
 
-    FxVec2Base(Type x, Type y) : X(x), Y(y) {}
+    constexpr FxVec2Base(Type x, Type y) : X(x), Y(y) {}
 
-    explicit FxVec2Base(Type scalar) : X(scalar), Y(scalar) {}
+    constexpr explicit FxVec2Base(Type scalar) : X(scalar), Y(scalar) {}
 
     FxVec2Base operator+(const FxVec2Base& other) const
     {
@@ -63,6 +63,14 @@ public:
         result.X *= scalar;
         result.Y *= scalar;
         return result;
+    }
+
+    /**
+     * @brief Checks if a vector is **exactly** equal to another vector. This does not account for floating point error.
+     */
+    bool operator==(const FxVec2Base<Type>& other) const
+    { 
+        return (X == other.X && Y == other.Y);
     }
 
     FxVec2Base<Type>& operator=(const FxVec2Base<Type>& other)

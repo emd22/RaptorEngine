@@ -16,16 +16,16 @@ FxLightBase::FxLightBase(FxLightFlags flags) : Flags(flags)
     FxLogDebug("Creating light (id={})", ObjectId);
 }
 
-void FxLightBase::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { LightVolume = volume; }
+void FxLightBase::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { pLightVolume = volume; }
 
 void FxLightBase::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh)
 {
-    LightVolumeGen = volume_gen;
-    LightVolume = volume_gen->AsPositionsMesh();
+    pLightVolumeGen = volume_gen;
+    pLightVolume = volume_gen->AsPositionsMesh();
     // Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
 
     if (create_debug_mesh) {
-        mDebugMesh = volume_gen->AsMesh();
+        mpDebugMesh = volume_gen->AsMesh();
     }
 }
 
@@ -101,8 +101,9 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
     RxFrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
-    pPipeline->Bind(frame->LightCommandBuffer);
+    gRenderer->Uniforms.Rewind();
 
+    pPipeline->Bind(frame->CommandBuffer);
 
     {
         FxLightVertPushConstants push_constants {};
@@ -112,39 +113,31 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
 
         push_constants.ObjectId = ObjectId;
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+        vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                            sizeof(push_constants), &push_constants);
     }
-    {
-        FxLightFragPushConstants push_constants {};
-
-        memcpy(push_constants.LightCameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-               sizeof(FxMat4f));
-
-        memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
-        memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
 
-        // Copy the light positions to the push constants
-        memcpy(push_constants.LightPosition, mPosition.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.WritePtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
 
+    // Note that the light position is packed with the light colour as the fourth component!
+    gRenderer->Uniforms.WritePtr(mPosition.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(Color.Value);
 
-        push_constants.LightColor = Color.Value;
+    gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(mRadius);
 
-        memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
-        push_constants.LightRadius = mRadius;
+    gRenderer->Uniforms.FlushToGpu();
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                           sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
-    }
-
-    LightVolume->Render(frame->LightCommandBuffer, *pPipeline);
+    pLightVolume->Render(frame->CommandBuffer, *pPipeline);
 }
 
 
 void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
 {
-    if (!mDebugMesh) {
+    if (!mpDebugMesh) {
         return;
     }
 
@@ -159,7 +152,7 @@ void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                        &push_constants);
 
-    mDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
+    mpDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
 }
 
 
@@ -187,7 +180,7 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
     RxFrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
-    pPipeline->Bind(frame->LightCommandBuffer);
+    pPipeline->Bind(frame->CommandBuffer);
 
     {
         FxLightVertPushConstants push_constants {};
@@ -196,31 +189,33 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
 
         push_constants.ObjectId = ObjectId;
 
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+        vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                            sizeof(push_constants), &push_constants);
     }
-    {
-        FxLightFragPushConstants push_constants {};
 
-        if (shadow_camera) {
-            // FxMat4f new_camera_matrix = mModelMatrix * shadow_camera->ProjectionMatrix;
-            memcpy(push_constants.LightCameraMatrix, shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-                   sizeof(FxMat4f));
-        }
-        memcpy(push_constants.InvView, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
-        memcpy(push_constants.InvProj, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.Rewind();
 
-        // Copy the light positions to the push constants
-        memcpy(push_constants.LightPosition, mPosition.mData, sizeof(float32) * 3);
-
-        push_constants.LightColor = Color.Value;
-
-        memcpy(push_constants.EyePosition, camera.Position.mData, sizeof(float32) * 3);
-        push_constants.LightRadius = mRadius;
-
-        vkCmdPushConstants(frame->LightCommandBuffer.CommandBuffer, pPipeline->Layout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                           sizeof(FxLightVertPushConstants), sizeof(FxLightFragPushConstants), &push_constants);
+    if (shadow_camera) {
+        gRenderer->Uniforms.WritePtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+                                      sizeof(FxMat4f));
+    }
+    else {
+        gRenderer->Uniforms.WritePtr(camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
     }
 
-    vkCmdDraw(frame->LightCommandBuffer.CommandBuffer, 3, 1, 0, 0);
+    gRenderer->Uniforms.WritePtr(camera.InvViewMatrix.RawData, sizeof(FxMat4f));
+    gRenderer->Uniforms.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+
+    // // Note that the light position is packed with the light colour as the fourth component!
+    gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(mRadius);
+
+    gRenderer->Uniforms.WritePtr(mPosition.mData, sizeof(float32) * 3);
+    gRenderer->Uniforms.Write(Color.Value);
+
+    gRenderer->Uniforms.FlushToGpu();
+
+    // gRenderer->Uniforms.AssertSize(sizeof(FxLightFragPushConstants));
+
+    vkCmdDraw(frame->CommandBuffer.Get(), 3, 1, 0, 0);
 }

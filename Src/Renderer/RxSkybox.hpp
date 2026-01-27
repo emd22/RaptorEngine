@@ -33,18 +33,18 @@ public:
 
 private:
     void CreateSkyboxPipeline();
-    //VkPipelineLayout CreateSkyboxPipelineLayout();
+    // VkPipelineLayout CreateSkyboxPipelineLayout();
     void BuildDescriptorSets(uint32 frame_index);
 
 public:
     // VkDescriptorSetLayout DsLayoutSkyboxVertex = nullptr;
     VkDescriptorSetLayout DsLayoutSkyboxFragment = nullptr;
 
-    FxStackArray<RxDescriptorSet, RendererFramesInFlight> DsSkyboxFragments {};
+    FxStackArray<RxDescriptorSet, RxFramesInFlight> DsSkyboxFragments {};
 
     RxPipeline SkyboxPipeline;
 
-    FxStackArray<RxImage*, RendererFramesInFlight> SkyboxAttachments;
+    FxStackArray<RxImage*, RxFramesInFlight> SkyboxAttachments;
 
     RxImage* SkyAttachment = nullptr;
 
@@ -54,6 +54,4 @@ private:
     RxDescriptorPool mDescriptorPool {};
 
     FxRef<FxPrimitiveMesh<VertexType>> mSkyboxMesh { nullptr };
-
-    RxDeferredRenderer* mDeferredRenderer = nullptr;
 };

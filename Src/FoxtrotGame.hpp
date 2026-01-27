@@ -20,8 +20,6 @@ public:
 
 private:
     void InitEngine();
-
-    void CreateSkybox();
     void CreateLights();
 
     void Tick();
@@ -44,7 +42,7 @@ public:
     FxQuat PistolRotationGoal = FxQuat::sIdentity;
 
     FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> pSkyboxMesh { nullptr };
-    double DeltaTime = 1.0f;
+    double DeltaTime = 1.0f / 60.0f;
 
     FxObjectManager ObjectManager;
 

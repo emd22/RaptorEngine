@@ -1,19 +1,14 @@
 #pragma once
 
-#include <Math/FxVec4.hpp>
-
 #include <Core/FxDefines.hpp>
+#include <Math/FxVec4.hpp>
 
 #ifdef FX_USE_AVX
 
-#include <immintrin.h>
-
 #include <Math/FxAVXUtil.hpp>
+#include <Math/FxSSE.hpp>
 
-FX_FORCE_INLINE float32 FxVec4f::LengthSquared() const
-{
-    return FxSSE::LengthSquared(mIntrin);
-}
+FX_FORCE_INLINE float32 FxVec4f::LengthSquared() const { return FxSSE::LengthSquared(mIntrin); }
 
 
 ///////////////////////////////

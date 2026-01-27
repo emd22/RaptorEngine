@@ -4,7 +4,7 @@
 
 #ifdef FX_USE_AVX
 
-#include <immintrin.h>
+#include "FxSSE.hpp"
 
 #include <Core/FxTypes.hpp>
 
@@ -29,18 +29,34 @@ constexpr uint32 scSignMask32 = 0x80000000;
 
 FX_FORCE_INLINE __m128 RemoveSign(__m128 vec)
 {
-    // Based off of https://fastcpp.blogspot.com/2011/03/changing-sign-of-float-values-using-sse.html
+    const __m128 sign_mask = _mm_castsi128_ps(_mm_set1_epi32(scSignMask32));
+    // Return the value with the sign bit removed
+    return _mm_andnot_ps(sign_mask, vec);
+}
 
-    const __m128 sign_mask = _mm_set1_ps(-0.0);
-    return _mm_andnot_ps(vec, sign_mask);
+FX_FORCE_INLINE float32 Dot(__m128 a, __m128 b) { return _mm_cvtss_f32(_mm_dp_ps(a, b, 0xFF)); }
+
+/**
+ * @brief Sets the signs of all components of `v` to the sign of `TSign`
+ * @tparam TSign A value (e.g. 1.0 or -1.0) to specify the sign.
+ */
+template <int TSign>
+FX_FORCE_INLINE __m128 SetSigns(__m128 v)
+{
+    const __m128 sign_v = _mm_castsi128_ps(_mm_set1_epi32(scSignMask32));
+
+    if constexpr (TSign > 0.0) {
+        // Return the value without the sign bit (always positive)
+        return _mm_andnot_ps(sign_v, v);
+    }
+
+    // Return the value with the sign bit (always negative)
+    return _mm_or_ps(v, sign_v);
 }
 
 template <int TX, int TY, int TZ, int TW>
-FX_FORCE_INLINE __m128 SetSign(__m128 v)
+FX_FORCE_INLINE __m128 FlipSigns(__m128 v)
 {
-    // [sign][exponent][  mantissa    ]
-    //
-    // We can represent just the sign bit using -0.0f
     constexpr float32 signs[4] = {
         TX > 0 ? 0.0f : -0.0f,
         TY > 0 ? 0.0f : -0.0f,
@@ -49,7 +65,6 @@ FX_FORCE_INLINE __m128 SetSign(__m128 v)
     };
 
     const __m128 sign_v = _mm_load_ps(signs);
-
     return _mm_xor_ps(v, sign_v);
 }
 

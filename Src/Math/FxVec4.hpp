@@ -5,7 +5,7 @@
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
 #elif defined(FX_USE_AVX)
-#include <immintrin.h>
+#include "FxSSE.hpp"
 #endif
 
 class alignas(16) FxVec4f
@@ -38,6 +38,7 @@ public:
     FxVec4f& operator+=(const FxVec4f& other);
     FxVec4f& operator-=(const FxVec4f& other);
     FxVec4f& operator*=(const FxVec4f& other);
+
 
     FX_FORCE_INLINE FxVec4f& operator*=(float32 scalar);
 
@@ -137,5 +138,5 @@ struct std::formatter<FxVec4f>
 
 /* Definitions for inline functions */
 #include "Vector/FxVec4_None.inl"
-#include "Vector/Simd/FxVec4_Neon.inl"
 #include "Vector/Simd/FxVec4_AVX.inl"
+#include "Vector/Simd/FxVec4_Neon.inl"

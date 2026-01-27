@@ -8,10 +8,10 @@
 
 class FxPlayer
 {
-    const FxVec3f cMaxWalkSpeed = FxVec3f(500.0f);
-    const FxVec3f cMaxSprintSpeed = FxVec3f(1000.0f);
+    const FxVec3f cMaxWalkSpeed = FxVec3f(3.0f);
+    const FxVec3f cMaxSprintSpeed = FxVec3f(5.5f);
 
-    const float32 cMovementLerpSpeed = 35.0f;
+    const float32 cMovementLerpSpeed = 10.0f;
 
 public:
     FxPlayer() = default;
@@ -23,13 +23,19 @@ public:
 
     void Jump();
 
-    void TeleportBy(const FxVec3f& by)
+    /**
+     * @brief Move the player and its physics by `offset`.
+     */
+    void TeleportBy(const FxVec3f& offset)
     {
         SyncPhysicsToPlayer();
 
-        Position += by;
+        Position += offset;
         Physics.Teleport(Position);
     }
+
+    void SetFlyMode(bool value);
+    bool IsFlyMode() const { return mbIsFlymode; };
 
     void Move(float delta_time, const FxVec3f& offset);
 
@@ -54,13 +60,17 @@ private:
             return;
         }
 
-        const float32 c_anglex = std::cos(pCamera->mAngleX);
-        const float32 s_anglex = std::sin(pCamera->mAngleX);
+        float32 s_anglex, c_anglex;
+        FxMath::SinCos(pCamera->mAngleX, &s_anglex, &c_anglex);
 
-        MovementDirection.Set(s_anglex, 1.0f, c_anglex);
-        // CameraDirection = FxVec3f(c_angley, s_angley, c_angley) * MovementDirection;
+        MovementDirection.Set(s_anglex, 0.0f, c_anglex);
+        if (mbIsFlymode) {
+            MovementDirection.Y = std::sin(pCamera->mAngleY);
+        }
+
+        // MovementDirection = FxVec3f(c_angley, s_angley, c_angley) * MovementDirection;
         // Clear the movement direction's Y. This is because sin(mAngleY) = 0 when mAngleY is zero.
-        MovementDirection.Y = 0.0f;
+        // MovementDirection.Y = 0.0f;
 
         // CameraDirection.NormalizeIP();
 
@@ -82,6 +92,7 @@ public:
     FxVec3f Position = FxVec3f::sZero;
 
     bool bIsSprinting = false;
+
     float JumpForce = 0.0f;
 
 private:
@@ -92,4 +103,6 @@ private:
     bool mbIsApplyingUserForce : 1 = false;
     bool mbUpdateDirection : 1 = true;
     bool mbUpdatePhysicsTransform : 1 = true;
+
+    bool mbIsFlymode : 1 = false;
 };

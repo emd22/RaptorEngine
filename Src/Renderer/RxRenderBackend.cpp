@@ -4,9 +4,9 @@
 #include "Backend/RxPipeline.hpp"
 #include "Backend/RxSynchro.hpp"
 #include "Backend/RxUtil.hpp"
-#include "Constants.hpp"
 #include "FxEngine.hpp"
 #include "FxObjectManager.hpp"
+#include "RxConstants.hpp"
 #include "RxDeferred.hpp"
 
 #include <SDL3/SDL.h>
@@ -88,17 +88,12 @@ void RxRenderBackend::Init(FxVec2u window_size)
     // per Swapchain image, not frame in flight.
     mSubmitSemaphores.InitSize(Swapchain.OutputImages.Size);
     for (RxSemaphore& sem : mSubmitSemaphores) {
-        sem.Create(&mDevice);
+        sem.Create();
     }
 
-
-    // PipelineCache.Create(RendererFramesInFlight);
-
-    // SamplerCache.Create();
-
-    Swapchain.CreateSwapchainFramebuffers();
-
     gObjectManager->Create();
+
+    Uniforms.Create();
 
     pDeferredRenderer = FxMakeRef<RxDeferredRenderer>();
     pDeferredRenderer->Create(Swapchain.Extent);
@@ -111,7 +106,7 @@ void RxRenderBackend::InitUploadContext()
     UploadContext.CommandPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
     UploadContext.CommandBuffer.Create(&UploadContext.CommandPool);
 
-    UploadContext.UploadFence.Create(GetDevice());
+    UploadContext.UploadFence.Create();
     UploadContext.UploadFence.Reset();
 }
 
@@ -124,7 +119,7 @@ void RxRenderBackend::DestroyUploadContext()
 
 void RxRenderBackend::InitFrames()
 {
-    Frames.InitSize(RendererFramesInFlight);
+    Frames.InitSize(RxFramesInFlight);
 
     const uint32 graphics_family = GetDevice()->mQueueFamilies.GetGraphicsFamily();
 
@@ -134,9 +129,9 @@ void RxRenderBackend::InitFrames()
         RxFrameData& frame = Frames.pData[i];
         frame.CommandPool.Create(device, graphics_family);
         frame.CommandBuffer.Create(&frame.CommandPool);
-        frame.ShadowCommandBuffer.Create(&frame.CommandPool);
+        /*frame.ShadowCommandBuffer.Create(&frame.CommandPool);
         frame.CompCommandBuffer.Create(&frame.CommandPool);
-        frame.LightCommandBuffer.Create(&frame.CommandPool);
+        frame.LightCommandBuffer.Create(&frame.CommandPool);*/
 
         frame.Create(device);
 
@@ -160,10 +155,6 @@ void RxRenderBackend::DestroyFrames()
         frame.CompDescriptorSet.Destroy();
 
         frame.CommandBuffer.Destroy();
-        frame.ShadowCommandBuffer.Destroy();
-        frame.CompCommandBuffer.Destroy();
-        frame.LightCommandBuffer.Destroy();
-        frame.CommandPool.Destroy();
 
         frame.Destroy();
     }
@@ -462,9 +453,7 @@ RxFrameResult RxRenderBackend::BeginFrame()
 {
     RxFrameData* frame = GetFrame();
 
-    pCurrentGPass = pDeferredRenderer->GetCurrentGPass();
-    pCurrentCompPass = pDeferredRenderer->GetCurrentCompPass();
-    pCurrentLightingPass = pDeferredRenderer->GetCurrentLightingPass();
+    Uniforms.Rewind();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -484,38 +473,9 @@ void RxRenderBackend::BeginGeometry()
 {
     RxFrameData* frame = GetFrame();
 
-    frame->CommandBuffer.Reset();
-    frame->CommandBuffer.Record();
 
-    // pipeline.RenderPass.Begin();
-    // pipeline.Bind(frame->CommandBuffer);
+    pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
 
-    pCurrentGPass->Begin();
-
-    // const int32 width = Swapchain.Extent.Width();
-    // const int32 height = Swapchain.Extent.Height();
-
-    // const VkViewport viewport = {
-    //     .x = 0,
-    //     .y = 0,
-    //     .width = (float32)width,
-    //     .height = (float32)height,
-    //     .minDepth = 1.0,
-    //     .maxDepth = 0.0,
-    // };
-
-    // vkCmdSetViewport(frame->CommandBuffer.CommandBuffer, 0, 1, &viewport);
-
-    // const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
-    //                            .extent = { .width = (uint32)width, .height = (uint32)height } };
-
-    // vkCmdSetScissor(frame->CommandBuffer.CommandBuffer, 0, 1, &scissor);
-
-    FxDrawPushConstants push_constants {};
-    // memcpy(push_constants.MVPMatrix, MVPMatrix.RawData, sizeof(float32) * 16);
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pDeferredRenderer->PlGeometry.Layout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                       &push_constants);
 }
 
 void RxRenderBackend::PresentFrame()
@@ -523,7 +483,7 @@ void RxRenderBackend::PresentFrame()
     RxFrameData* frame = GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
     };
 
     VkSemaphore* submit_semaphore = &mSubmitSemaphores[mImageIndex].Semaphore;
@@ -532,11 +492,11 @@ void RxRenderBackend::PresentFrame()
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->LightingSem.Semaphore,
+        .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
         .pWaitDstStageMask = wait_stages,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CompCommandBuffer.CommandBuffer,
+        .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
 
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = submit_semaphore,
@@ -545,7 +505,7 @@ void RxRenderBackend::PresentFrame()
     VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
           "Error submitting draw buffer");
 
-    if (Swapchain.Initialized != true) {
+    if (Swapchain.bInitialized != true) {
         FxModulePanic("Swapchain not initialized!");
     }
 
@@ -582,82 +542,54 @@ void RxRenderBackend::BeginLighting()
 {
     RxFrameData* frame = GetFrame();
 
-    pCurrentGPass->End();
+    RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
+    FxAssert(depth_target != nullptr);
 
-    pCurrentGPass->DepthAttachment.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, frame->CommandBuffer);
 
-    frame->CommandBuffer.End();
+    pDeferredRenderer->GPass.End();
+    depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
-    frame->LightCommandBuffer.Reset();
-    frame->LightCommandBuffer.Record();
-
-    pCurrentLightingPass->Begin();
-
-    // const int32 width = Swapchain.Extent.Width();
-    // const int32 height = Swapchain.Extent.Height();
-
-    // const VkViewport viewport = {
-    //     .x = 0,
-    //     .y = 0,
-    //     .width = (float32)width,
-    //     .height = (float32)height,
-    //     .minDepth = 1.0,
-    //     .maxDepth = 0.0,
-    // };
-
-    // vkCmdSetViewport(frame->LightCommandBuffer.CommandBuffer, 0, 1, &viewport);
-
-    // const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
-    //                            .extent = { .width = (uint32)width, .height = (uint32)height } };
-
-    // vkCmdSetScissor(frame->LightCommandBuffer.CommandBuffer, 0, 1, &scissor);
+    pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
+    pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                 pDeferredRenderer->PlLightingDirectional,
+                                                 gRenderer->Uniforms.GetBaseOffset());
 }
 
 #include <Renderer/FxCamera.hpp>
 
-static_assert(RendererFramesInFlight == 3);
+static_assert(RxFramesInFlight == 3);
 
 void RxRenderBackend::DoComposition(FxCamera& render_cam)
 {
     RxFrameData* frame = GetFrame();
 
-    pCurrentLightingPass->End();
-    frame->LightCommandBuffer.End();
+    pDeferredRenderer->LightPass.End();
 
-    pCurrentCompPass->Begin();
+    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlComposition);
+    pDeferredRenderer->DoCompPass(render_cam);
 
-    // const int32 width = Swapchain.Extent.Width();
-    // const int32 height = Swapchain.Extent.Height();
+    {
+        /*FxStackArray<RxCommandBuffer, 1> commands;
+        commands.Insert(frame->CommandBuffer);
 
-    // const VkViewport viewport = {
-    //     .x = 0,
-    //     .y = 0,
-    //     .width = (float32)width,
-    //     .height = (float32)height,
-    //     .minDepth = 1.0,
-    //     .maxDepth = 0.0,
-    // };
+        FxStackArray<RxSemaphore, 1> wait_semaphores;
+        wait_semaphores.Insert(frame->ShadowsSem);
 
-    // vkCmdSetViewport(frame->CompCommandBuffer.CommandBuffer, 0, 1, &viewport);
-
-    // const VkRect2D scissor = { .offset = { .x = 0, .y = 0 },
-    //                            .extent = { .width = (uint32)width, .height = (uint32)height } };
-
-    // vkCmdSetScissor(frame->CompCommandBuffer.CommandBuffer, 0, 1, &scissor);
+        FxStackArray<RxSemaphore, 1> signal_semaphores;
+        signal_semaphores.Insert(frame->OffscreenSem);*/
 
 
-    pCurrentCompPass->DoCompPass(render_cam);
+        // pDeferredRenderer->GPass.Submit(FxSlice(commands), FxSlice(wait_semaphores), FxSlice(signal_semaphores));
+    }
 
-    pCurrentGPass->Submit();
 
-    pCurrentLightingPass->Submit();
     PresentFrame();
 
     ProcessDeletionQueue();
 
     mInternalFrameCounter++;
 
-    mFrameNumber = (mInternalFrameCounter % RendererFramesInFlight);
+    mFrameNumber = (mInternalFrameCounter % RxFramesInFlight);
 }
 
 RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
@@ -682,12 +614,6 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
     }
 
     return RxFrameResult::RenderError;
-}
-
-inline RxUniformBufferObject& RxRenderBackend::GetUbo()
-{
-    static RxUniformBufferObject ubo;
-    return ubo;
 }
 
 void RxRenderBackend::CreateSurfaceFromWindow()
