@@ -34,7 +34,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     RxDescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
@@ -46,6 +46,9 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     pNormalMapSampler = FxMakeRef<RxSampler>();
     pNormalMapSampler->Create();
+
+    pMetallicRoughnessSampler = FxMakeRef<RxSampler>();
+    pMetallicRoughnessSampler->Create();
 
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
@@ -63,8 +66,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 
     {
-        FxStackArray<VkWriteDescriptorSet, 2> write_descriptor_sets;
-        FxStackArray<VkDescriptorBufferInfo, 2> write_buffer_infos;
+        FxStackArray<VkWriteDescriptorSet, FxMaterial::ResourceType::eMaxImages> write_descriptor_sets;
+        FxStackArray<VkDescriptorBufferInfo, FxMaterial::ResourceType::eMaxImages> write_buffer_infos;
 
         {
             VkDescriptorBufferInfo info {
@@ -127,6 +130,7 @@ void FxMaterialManager::Destroy()
     pAlbedoSampler->Destroy();
 
     pNormalMapSampler->Destroy();
+    pMetallicRoughnessSampler->Destroy();
 
     MaterialPropertiesBuffer.Destroy();
 
@@ -138,35 +142,6 @@ void FxMaterialManager::Destroy()
 
     mbInitialized = false;
 }
-
-
-// VkDescriptorSetLayout FxMaterial::BuildLayout()
-// {
-//     VkDescriptorSetLayoutBinding image_layout_binding {
-//         .binding = 1,
-//         .descriptorCount = 1,
-//         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-//         .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-//         .pImmutableSamplers = nullptr,
-//     };
-
-//     VkDescriptorSetLayoutBinding bindings[] = {
-//         image_layout_binding,
-//     };
-
-//     VkDescriptorSetLayoutCreateInfo ds_info {
-//         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-//         .bindingCount = sizeof(bindings) / sizeof(bindings[0]),
-//         .pBindings = bindings,
-//     };
-
-//     VkResult status = vkCreateDescriptorSetLayout(RendererVulkan->GetDevice()->Device, &ds_info, nullptr,
-//     &mSetLayout); if (status != VK_SUCCESS) {
-//         FxModulePanic("Failed to create material descriptor set layout", status);
-//     }
-
-//     return mSetLayout;
-// }
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
     if (!component_.pImage || !component_.pImage->IsLoaded()) {                                                        \
@@ -181,6 +156,7 @@ bool FxMaterial::IsReady()
 
     CHECK_COMPONENT_READY(Diffuse);
     CHECK_COMPONENT_READY(NormalMap);
+    CHECK_COMPONENT_READY(MetallicRoughness);
 
     return (mbIsReady = true);
 }
@@ -206,20 +182,13 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     VkDescriptorSet sets_to_bind[] = {
-        mDescriptorSet.Set,                  // Set 0
-        manager.mMaterialPropertiesDS.Set,   // Set 1: Material Properties Buffer
-        //gObjectManager->mObjectBufferDS.Set, // Set 2: Object Properties Buffer
+        mDescriptorSet.Set,                // Set 0
+        manager.mMaterialPropertiesDS.Set, // Set 1: Material Properties Buffer
     };
 
-    // const uint32 properties_offset = static_cast<uint32>(mMaterialPropertiesIndex * sizeof(FxMaterialProperties));
-
-    uint32 dynamic_offsets[] = { 0, 0 };
 
     RxDescriptorSet::BindMultiple(0, *cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
                                   FxMakeSlice(sets_to_bind, FxSizeofArray(sets_to_bind)));
-    // mDescriptorSet.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *Pipeline);
-
-    // mMaterialPropertiesDS.Bind(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, gRenderer->DeferredgRenderer->GPassPipeline);
 
     return true;
 }
@@ -313,6 +282,9 @@ void FxMaterial::Build()
 
     BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
 
+    FxMaterialComponentStatus metallic_roughness_status = MetallicRoughness.Build(manager.pMetallicRoughnessSampler);
+    BUILD_MATERIAL_COMPONENT(MetallicRoughness, manager.pMetallicRoughnessSampler);
+
     // Update the material descriptor
     {
         constexpr int max_images = static_cast<int>(FxMaterial::ResourceType::eMaxImages);
@@ -327,6 +299,10 @@ void FxMaterial::Build()
         // Push material textures
         PUSH_IMAGE_IF_SET(Diffuse.pImage, 0);
         PUSH_IMAGE_IF_SET(NormalMap.pImage, 1);
+
+        // if (metallic_roughness_status == FxMaterialComponentStatus::eReady) {
+        PUSH_IMAGE_IF_SET(MetallicRoughness.pImage, 2);
+        // }
 
         {
             // VkDescriptorBufferInfo info {

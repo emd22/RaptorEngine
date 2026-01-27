@@ -163,16 +163,16 @@ FSOutput FragmentMain(FSInput in)
     float2 screen_uv = in.vPosition.xy / float2(1024, 720);
 
     float depth = 1.0 - sDepth.Sample(screen_uv).r;
-    float3 albedo = sAlbedo.Sample(screen_uv).rgb;
+    float4 albedo_rgba = sAlbedo.Sample(screen_uv);
+    float3 albedo = albedo_rgba.rgb;
     float4 normal_rgba = sNormal.Sample(screen_uv);
 
     float3 world_position = WorldPosFromDepth(screen_uv, depth);
 
     float4 light_color = unpackUnorm4x8ToFloat(uiLightColor);
-    // float4 light_color = float4(1, 0, 0, 1);
 
-    let roughness : float = 0.1;
-    let metallic : float = 0.9;
+    float roughness = normal_rgba.w;
+    float metallic = albedo_rgba.w;
 
     float light_intensity = 15;
 
@@ -193,7 +193,8 @@ FSOutput FragmentMain(FSInput in)
 
     // Check that the UV values are greater than 0.0 and less than 1.0
     if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
-        visibility = sShadowDepth.SampleCmpLevelZero(shadow_uv, shadow_z + 0.001);
+        visibility = sShadowDepth.SampleCmpLevelZero(shadow_uv, shadow_z + 0.001f) + 0.2f;
+        visibility = min(visibility, 1.0f);
     }
 
     float3 L = normalize(vLightPosition);

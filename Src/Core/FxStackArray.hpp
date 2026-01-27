@@ -26,7 +26,7 @@ public:
 
     T* Insert(const T& value)
     {
-        if (Size + 1 > Capacity) {
+        if (Size >= Capacity) {
             throw std::out_of_range("FxStackArray insert out of range");
         }
         pData[Size++] = value;
@@ -41,7 +41,7 @@ public:
 
     const T& operator[](size_t index) const
     {
-        if (index > Capacity) {
+        if (index >= Capacity) {
             throw std::out_of_range("FxStackArray access out of range");
         }
         return pData[index];
@@ -49,7 +49,7 @@ public:
 
     T& operator[](size_t index)
     {
-        if (index > Capacity) {
+        if (index >= Capacity) {
             throw std::out_of_range("FxStackArray access out of range");
         }
         return pData[index];

@@ -46,14 +46,14 @@ void FxPlayer::Move(float delta_time, const FxVec3f& offset)
 
     FxVec3f movement_goal = (forward + right);
 
-    /*if (movement_goal.Length() > 1e-3) {
+    if (movement_goal.Length() > 1e-3) {
         movement_goal.NormalizeIP();
-    }*/
+    }
 
-    mUserForce = movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed);
+    // mUserForce = movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed);
 
-    /*mUserForce = mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed),
-                                              cMovementLerpSpeed, delta_time);*/
+    mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed), cMovementLerpSpeed,
+                                 delta_time);
 
     if (mbIsFlymode) {
         // mUserForce.Y = ;

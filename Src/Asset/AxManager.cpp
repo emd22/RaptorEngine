@@ -199,14 +199,14 @@ void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxRef<Ax
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        
+
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, path);
     }
     else {
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        
+
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, path);
     }
 }
@@ -220,7 +220,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format
         FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        
+
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, "", data, data_size);
     }
     else {
@@ -228,7 +228,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
-        
+
         SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, "", data, data_size);
     }
 }
@@ -313,13 +313,23 @@ void AxManager::CheckForItemsToLoad()
 
     AxWorker* worker = FindWorkerThread();
 
+    // Set this to something small, but high enough that it won't cancel loading in a ton of big models at once.
+    int tries_remaining = 5;
+
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
+        if (tries_remaining <= 0) {
+            FxLogError("Could not find worker thread, breaking...");
+            break;
+        }
+
         FxLogDebug("No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up
         worker = FindWorkerThread();
+
+        --tries_remaining;
     }
 
     // Submit the item we want to load

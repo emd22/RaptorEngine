@@ -81,10 +81,11 @@ struct FxMaterialProperties
 class FxMaterial
 {
 public:
-    enum class ResourceType
+    enum ResourceType : uint32
     {
         eDiffuse,
         eNormal,
+        eMetallicRoughness,
 
         eMaxImages,
     };
@@ -100,6 +101,9 @@ public:
             break;
         case ResourceType::eNormal:
             NormalMap.pImage = image;
+            break;
+        case ResourceType::eMetallicRoughness:
+            MetallicRoughness.pImage = image;
             break;
 
         default:
@@ -132,6 +136,7 @@ public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
     FxMaterialComponent<RxImageFormat::eRGBA8_SRGB> Diffuse;
     FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> MetallicRoughness;
 
     FxMaterialProperties Properties {};
 
@@ -177,6 +182,7 @@ public:
 public:
     FxRef<RxSampler> pAlbedoSampler { nullptr };
     FxRef<RxSampler> pNormalMapSampler { nullptr };
+    FxRef<RxSampler> pMetallicRoughnessSampler { nullptr };
     // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**

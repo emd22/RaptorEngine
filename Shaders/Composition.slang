@@ -91,6 +91,7 @@ FSOut FragmentMain(FSIn in)
 
     out.vColor = float4(lerp(lit_color, albedo.rgb, 0.25), 1.0);
 #endif
+    // out.vColor = float4(float3(sNormal.Sample(in.vUV).w), 1.0);
 
     return out;
 

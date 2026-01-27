@@ -75,7 +75,7 @@ void FoxtrotGame::InitEngine()
     gPhysics->Create();
 
     AxManager& asset_manager = AxManager::GetInstance();
-    asset_manager.Start(2);
+    asset_manager.Start(4);
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
     material_manager.Create();
@@ -119,7 +119,7 @@ void FoxtrotGame::CreateLights()
 
     pSun = FxMakeRef<FxLightDirectional>();
     pSun->MoveTo(FxVec3f(0, 8, -5));
-    pSun->Color = FxColor(0xFAF8E3, 15);
+    pSun->Color = FxColor(0x9AC8F3, 10);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
     mMainScene.Attach(pSun);
@@ -149,10 +149,11 @@ void FoxtrotGame::CreateGame()
     mMainScene.Attach(pLevelObject);
 
     pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DamagedHelmet.glb", { .KeepInMemory = true });
-    // pHelmetObject->RotateX(M_PI_2);
-    // pHelmetObject->Scale(FxVec3f(0.5));
+    pHelmetObject->RotateX(M_PI_2);
+    pHelmetObject->RotateZ(-M_PI_2);
+    pHelmetObject->Scale(0.5);
     pHelmetObject->WaitUntilLoaded();
-    pHelmetObject->MoveBy(FxVec3f(0, 2, 3.5));
+    pHelmetObject->MoveBy(FxVec3f(0, 1.2, 3.5));
 
     // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
 
@@ -316,7 +317,7 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
+    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.55)) -
                                  camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);
 
     pPistolObject->MoveTo(pistol_destination);
@@ -324,7 +325,7 @@ void FoxtrotGame::Tick()
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
     pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
 
-    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
+    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 10.0f));
 
     FxVec3f target = Player.Position;
 

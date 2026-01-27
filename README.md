@@ -19,6 +19,8 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 
 ## Screenshots
 **PBR Lighting**
+![Updated lighting](Screenshots/04_LightingUpdate.png)
+
 ![Normalmapped cube](Screenshots/01_NormalMappedCube.png)
 <!--<img src="Screenshots/00_PbrLitHelmet.png" width="300">-->
 ![Damaged helmet model with red and white lights lighting it](Screenshots/00_PbrLitHelmet.png)
