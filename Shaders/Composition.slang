@@ -76,18 +76,18 @@ FSOut FragmentMain(FSIn in)
 
 #else
 
-    let exposure: float = 1.1;
+    let exposure: float = 0.9;
 
     float4 lighting = sLighting.Sample(in.vUV);
 
-    float3 final_color = lerp(albedo.rgb, lighting.rgb, 0.75) ;
+    float3 final_color = lerp(albedo.rgb, lighting.rgb, 0.75) * exposure;
 
     // float3 hdr_recip =  1.0 / (final_color + float3(1.0));
 
     // let cfGamma : float = 1.0 / 2.2;
     // final_color = pow(final_color, float3(cfGamma));
 
-    out.vColor = float4((final_color), 1.0);
+    out.vColor = float4(ACESFilm(final_color), 1.0);
 
 #endif
     // out.vColor = float4(float3(sNormal.Sample(in.vUV).w), 1.0);

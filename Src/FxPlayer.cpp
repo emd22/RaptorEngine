@@ -24,7 +24,7 @@ void FxPlayer::MoveBy(const FxVec3f& by)
 void FxPlayer::Jump()
 {
     if (Physics.bIsGrounded) {
-        JumpForce = 4.0f;
+        JumpForce = 2.0f;
     }
 }
 

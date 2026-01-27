@@ -8,10 +8,10 @@
 
 class FxPlayer
 {
-    const FxVec3f cMaxWalkSpeed = FxVec3f(8.0f);
-    const FxVec3f cMaxSprintSpeed = FxVec3f(15.0f);
+    const FxVec3f cMaxWalkSpeed = FxVec3f(3.0f);
+    const FxVec3f cMaxSprintSpeed = FxVec3f(5.5f);
 
-    const float32 cMovementLerpSpeed = 20.0f;
+    const float32 cMovementLerpSpeed = 10.0f;
 
 public:
     FxPlayer() = default;
