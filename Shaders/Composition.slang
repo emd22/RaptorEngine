@@ -76,7 +76,7 @@ FSOut FragmentMain(FSIn in)
 
 #else
 
-    let exposure: float = 0.9;
+    let exposure: float = 1.0;
 
     float4 lighting = sLighting.Sample(in.vUV);
 

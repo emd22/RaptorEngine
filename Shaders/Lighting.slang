@@ -174,7 +174,7 @@ FSOutput FragmentMain(FSInput in)
     float roughness = normal_rgba.w;
     float metallic = albedo_rgba.w;
 
-    float light_intensity = 15;
+    float light_intensity = light_color.w * 255.0;
 
     float3 F0 = float3(0.04);
     F0 = lerp(F0, albedo, metallic);

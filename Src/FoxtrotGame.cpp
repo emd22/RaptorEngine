@@ -119,7 +119,7 @@ void FoxtrotGame::CreateLights()
 
     pSun = FxMakeRef<FxLightDirectional>();
     pSun->MoveTo(FxVec3f(0, 8, -5));
-    pSun->Color = FxColor(0xFAF8D3, 30);
+    pSun->Color = FxColor(0xCADFE3, 7);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);
     mMainScene.Attach(pSun);
@@ -317,7 +317,7 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.55)) -
+    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
                                  camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);
 
     pPistolObject->MoveTo(pistol_destination);
