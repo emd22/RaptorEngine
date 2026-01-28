@@ -79,7 +79,7 @@ void PhPlayer::Update(float32 delta_time)
     else {
         velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
         if (!bDisableGravity) {
-            velocity += phys.GetGravity() * gPhysics->cDeltaTime;
+            velocity += phys.GetGravity() * 0.8 * gPhysics->cDeltaTime;
         }
 
         bIsGrounded = false;

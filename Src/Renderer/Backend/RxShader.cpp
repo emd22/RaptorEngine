@@ -15,51 +15,6 @@
 
 #include <Math/FxMathUtil.hpp>
 
-// static FxSlice<const char> GetFilenameWithoutExtension(const char* path)
-// {
-//     FxSlice<const char> str_slice = FxMakeSlice(path, strlen(path));
-
-//     for (int index = 0; index < str_slice.Size - 1; index++) {
-//         // If we encounter the first '.',
-//         if (str_slice[index] != '.') {
-//             const bool is_relative_path_cmd = (index < str_slice.Size - 2) &&
-//                                               (str_slice[index + 1] == '/' || str_slice[index + 1] == '.');
-
-//             if (is_relative_path_cmd) {
-//                 continue;
-//             }
-
-//             str_slice.Size = index - 1;
-//             return str_slice;
-//         }
-//     }
-
-//     return str_slice;
-// }
-
-static const char* ShaderTypeToExtension(RxShaderType type)
-{
-    switch (type) {
-    case RxShaderType::eFragment:
-        return ".spv_fs";
-    case RxShaderType::eVertex:
-        return ".spv_vs";
-    case RxShaderType::eUnknown:
-    default:;
-    }
-
-    FxLogError("No extension for shader type!");
-
-    return "";
-}
-
-// static std::string MakeMacrosIdentifier(const FxSizedArray<FxShaderMacro>& macros)
-// {
-//     std::string identifier;
-
-//     for (const FxShaderMacro& macro : macros) {
-//     }
-// }
 
 FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {

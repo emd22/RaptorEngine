@@ -9,9 +9,8 @@
 static const uint16 scBinHeaderStart = 0xA1B2;
 static const uint16 scBinHeaderEnd = 0x2B1A;
 
-
-static constexpr uint16 scByteAlignment = 16;
-static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
+// static constexpr uint16 scByteAlignment = 16;
+// static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
 
 // void FxDataPack::AddEntry(const FxSlice<uint8>& identifier, const FxSlice<uint8>& data)
 // {
