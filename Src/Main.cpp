@@ -3,6 +3,7 @@
 
 #include "FoxtrotGame.hpp"
 
+#include <Asset/FxConfigFile.hpp>
 #include <Asset/FxDataPack.hpp>
 #include <FxEngine.hpp>
 #include <Math/FxMathConsts.hpp>
@@ -12,28 +13,25 @@ FX_SET_MODULE_NAME("Main")
 
 int main()
 {
-    FxMemPool::GetGlobalPool().Create(200, FxUnitMebibyte);
-
-    // float32 angle = FX_PI_2;
+    FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
     // {
-    //     float32 sine_sanity = std::sin(angle);
-    //     float32 cosine_sanity = std::cos(angle);
+    //     FxConfigFile cf;
+    //     cf.AddEntry<uint32>("IntTest", 20);
+    //     cf.AddEntry<float32>("FloatTest", 10.5f);
 
-    //     FxLogInfo("Sanity:");
-    //     FxLogInfo("Sine: {}, Cosine:{}", sine_sanity, cosine_sanity);
-    //     FxLogInfo("");
+    //     cf.Write("Test.conf");
     // }
 
     // {
-    //     float32 sine = 0.0f, cosine = 0.0f;
-
-    //     FxMath::SinCos(angle, &sine, &cosine);
-
-    //     FxLogInfo("Results:");
-    //     FxLogInfo("Sine: {}, Cosine:{}", sine, cosine);
-    //     FxLogInfo("");
+    //     FxConfigFile cf;
+    //     cf.Load("Test.conf");
+    //     FxPagedArray<FxConfigEntry>& entries = cf.GetEntries();
+    //     for (const FxConfigEntry& entry : entries) {
+    //         FxLogInfo("ENTRY: {}", entry.AsString());
+    //     }
     // }
+
 
     {
         FoxtrotGame game {};

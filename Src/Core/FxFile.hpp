@@ -68,6 +68,7 @@ public:
     void WriteRaw(const void* data, uint64 size);
 
     void Write(const char* str);
+    void Write(const std::string& str) { Write(str.c_str()); }
 
     template <typename... TTypes>
     void WriteMulti(TTypes... values)

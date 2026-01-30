@@ -33,6 +33,8 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
 void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, RxImageAspectFlag aspect)
 {
+    FxAssert(size.X > 0 && size.Y > 0);
+
     Aspect = aspect;
     Size = size;
     Format = format;

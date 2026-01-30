@@ -23,28 +23,27 @@ void FxConfigFile::Load(const std::string& path)
 
 static bool TokenIsValue(const FxToken& token, const char* str) { return (!strncmp(token.Start, str, token.Length)); }
 
-static inline bool IsNumber(char ch) { return (ch >= '0' && ch <= '9'); }
-
 static FxConfigEntry::ValueType GetValueTokenType(const FxToken& token)
 {
     using VType = FxConfigEntry::ValueType;
 
-    VType current_type = VType::None;
+    VType current_type = VType::eNone;
+
+    FxToken::IsNumericResult numeric_result = token.IsNumeric();
+    if (numeric_result != FxToken::IsNumericResult::NaN) {
+        if (numeric_result == FxToken::IsNumericResult::Integer) {
+            return VType::eInt;
+        }
+        else {
+            return VType::eFloat;
+        }
+    }
 
     for (uint32 i = 0; i < token.Length; i++) {
         char ch = token.Start[i];
 
-        if (IsNumber(ch) && (current_type == VType::None || current_type == VType::Int)) {
-            current_type = VType::Int;
-            continue;
-        }
-
         if (ch == '"') {
-            current_type = VType::Str;
-        }
-
-        if (current_type == VType::None) {
-            current_type = VType::Identifier;
+            current_type = VType::eString;
         }
     }
 
@@ -62,8 +61,9 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxToken>& tokens)
     for (uint32 i = 0; i < tokens_size; i++) {
         const FxToken& token = tokens[i];
 
-        entry.NameHash = FxHashStr32(token.Start, token.Length);
-        entry.Name = token.GetStr();
+        entry.Name = (token.GetStr());
+        entry.NameHash = FxHashStr64(token.GetStr().c_str());
+
 
         // Eat the equals token
         if ((++i) >= tokens_size) {
@@ -84,37 +84,55 @@ void FxConfigFile::ParseEntries(FxPagedArray<FxToken>& tokens)
         entry.Type = GetValueTokenType(value_token);
 
         switch (entry.Type) {
-        case VType::None:
+        case VType::eNone:
             break;
-        case VType::Str:
+        case VType::eString:
             // Remove the first quote
             value_token.Start++;
             value_token.Length--;
 
             // Remove the ending quote
             value_token.Length--;
-            [[fallthrough]];
-        case VType::Identifier:
-            entry.ValueStr = value_token.GetHeapStr();
+            entry.Set(value_token.GetStr());
             break;
-        case VType::Int:
-            entry.ValueInt = value_token.ToInt();
+        case VType::eInt:
+            entry.Set<int64>(value_token.ToInt());
+            break;
+        case VType::eFloat:
+            entry.Set<float32>(value_token.ToFloat());
             break;
         default:
             break;
         }
 
-        mConfigEntries.Insert(entry);
+        mConfigEntries.Insert(std::move(entry));
     }
 }
 
-const FxConfigEntry* FxConfigFile::GetEntry(uint32 requested_name_hash) const
+const FxConfigEntry* FxConfigFile::GetEntry(FxHash64 requested_name_hash) const
 {
     for (const FxConfigEntry& entry : mConfigEntries) {
+        FxLogWarning("Checking: {} :: {}", entry.NameHash, requested_name_hash);
         if (entry.NameHash == requested_name_hash) {
             return &entry;
         }
     }
 
     return nullptr;
+}
+
+
+void FxConfigFile::Write(const std::string& path)
+{
+    FxFile file(path.c_str(), FxFile::eWrite, FxFile::eText);
+
+    if (!file.IsFileOpen()) {
+        return;
+    }
+
+    for (const FxConfigEntry& entry : mConfigEntries) {
+        file.WriteMulti(entry.Name.c_str(), " = ", entry.AsString(), '\n');
+    }
+
+    file.Close();
 }
