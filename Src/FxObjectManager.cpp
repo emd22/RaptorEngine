@@ -17,12 +17,12 @@ void FxObjectManager::Create()
     builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RxShaderType::eVertex);
     DsLayoutObjectBuffer = builder.Build();
 
-    //RxUtil::SetDebugLabel("Object Buffer", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, DsLayoutObjectBuffer);
+    // RxUtil::SetDebugLabel("Object Buffer", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, DsLayoutObjectBuffer);
 
     uint32 buffer_size = (sizeof(FxObjectGpuEntry) * scMaxObjects) * RxFramesInFlight;
-    
-    mObjectGpuBuffer.Create(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                            VMA_MEMORY_USAGE_CPU_ONLY, RxGpuBufferFlags::ePersistentMapped);
+
+    mObjectGpuBuffer.Create(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_ONLY,
+                            RxGpuBufferFlags::ePersistentMapped);
     mObjectSlotsInUse.InitZero(scMaxObjects);
 
     if (!mObjectBufferDS.IsInited()) {
@@ -78,21 +78,20 @@ void FxObjectManager::Create()
 }
 
 
-
-uint32 FxObjectManager::GetBaseOffset() const 
-{ 
-    return (gRenderer->GetFrameNumber() * scMaxObjects * sizeof(FxObjectGpuEntry)); 
+uint32 FxObjectManager::GetBaseOffset() const
+{
+    return (gRenderer->GetFrameNumber() * scMaxObjects * sizeof(FxObjectGpuEntry));
 }
 
-uint32 FxObjectManager::GetOffsetObjectIndex(uint32 object_id) const 
-{ 
+uint32 FxObjectManager::GetOffsetObjectIndex(uint32 object_id) const
+{
     return GetBaseOffset() + (object_id * sizeof(FxObjectGpuEntry));
 }
 
 FxObjectGpuEntry* FxObjectManager::GetBufferAtFrame(uint32 object_id)
-{ 
+{
     uint8* entry_buffer = reinterpret_cast<uint8*>(mObjectGpuBuffer.pMappedBuffer);
-    
+
     return reinterpret_cast<FxObjectGpuEntry*>(entry_buffer + GetOffsetObjectIndex(object_id));
 }
 
@@ -107,10 +106,10 @@ FxObjectId FxObjectManager::GenerateObjectId()
 void FxObjectManager::Submit(FxObjectId object_id, FxObjectGpuEntry& entry)
 {
     FxAssert(object_id < scMaxObjects);
-    
+
     memcpy(GetBufferAtFrame(object_id), &entry, sizeof(FxObjectGpuEntry));
 
-    //mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(FxObjectGpuEntry));
+    // mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(FxObjectGpuEntry));
 }
 
 void FxObjectManager::Submit(FxObjectId object_id, FxMat4f& model_matrix)
@@ -121,7 +120,7 @@ void FxObjectManager::Submit(FxObjectId object_id, FxMat4f& model_matrix)
 
     memcpy(GetBufferAtFrame(object_id), model_matrix.RawData, sizeof(FxMat4f));
 
-    //mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(FxObjectGpuEntry));
+    // mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(FxObjectGpuEntry));
 }
 
 
@@ -149,6 +148,31 @@ void FxObjectManager::PrintActive(int limit)
             }
         }
     }
+}
+
+FxObjectId FxObjectManager::ReserveInstances(FxObjectId object_id, uint32 num_instances)
+{
+    // Unset the current object to determine if the current span of slots can contain the instances
+    mObjectSlotsInUse.Unset(object_id);
+
+    // Find the new bit group (+1 for the current object)
+    uint32 start_index = mObjectSlotsInUse.FindNextFreeBitGroup(num_instances + 1);
+    FxAssert(start_index != FxBit::scBitNotFound);
+
+    // There is not enough room after our current object, move it
+    if (start_index != object_id) {
+        Submit(start_index, *GetBufferAtFrame(object_id));
+
+        // The object id is already 'freed', so we do not need to call FreeObjectId.
+    }
+
+    // Mark the following bits as 'in use' to prevent other future objects from snatching them.
+    for (uint32 i = start_index; i < start_index + num_instances; i++) {
+        mObjectSlotsInUse.Set(i);
+    }
+
+    // Return the new slot block
+    return start_index;
 }
 
 

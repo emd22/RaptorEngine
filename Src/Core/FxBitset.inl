@@ -13,13 +13,13 @@ FX_FORCE_INLINE void FxBitset::Set(uint32 index)
     const uint16 int_index = (index >> 6);
 
     // The mask for the bit that we are querying
-    const uint64 mask = (1ULL << (index & 0x3F));
+    const uint64 mask = (1ULL << (index & scBitIndexMask));
 
     mBits.pData[int_index] |= mask;
 }
 
 
-FX_FORCE_INLINE bool FxBitset::Get(uint32 index)
+FX_FORCE_INLINE bool FxBitset::Get(uint32 index) const
 {
     if (mBits.IsEmpty()) {
         return false;
@@ -29,7 +29,7 @@ FX_FORCE_INLINE bool FxBitset::Get(uint32 index)
     const uint16 int_index = (index >> 6);
 
     // The mask for the bit that we are querying
-    const uint64 mask = (1ULL << (index & 0x3F));
+    const uint64 mask = (1ULL << (index & scBitIndexMask));
 
     return (mBits.pData[int_index] & mask);
 }
@@ -44,17 +44,28 @@ FX_FORCE_INLINE void FxBitset::Unset(uint32 index)
     const uint16 int_index = (index >> 6);
 
     // The mask for the bit that we are querying
-    const uint64 mask = (1ULL << (index & 0x3F));
+    const uint64 mask = (1ULL << (index & scBitIndexMask));
 
     mBits.pData[int_index] &= (~mask);
 }
 
-FX_FORCE_INLINE uint32 FxBitset::FindNextFreeBit() const
+FX_FORCE_INLINE uint32 FxBitset::FindNextFreeBit(uint32 start_index) const
 {
+    const uint32 start_byte = (start_index / 64);
+
+    uint64 byte_mask = 0;
+
+    uint64 bit_index = (start_index & scBitIndexMask);
+
+    // if the start index is not at a byte boundary, we need to mask off the start of the byte.
+    if (bit_index != 0) {
+        byte_mask = (1 << bit_index) - 1;
+    }
+
     constexpr uint64 cFullChunk = (~0ULL);
 
-    for (uint32 i = 0; i < mBits.Size; i++) {
-        const uint64 chunk = mBits[i];
+    for (uint32 i = start_byte; i < mBits.Size; i++) {
+        const uint64 chunk = (mBits[i] | byte_mask);
 
         // Every bit is set, continue to next chunk
         if (chunk == cFullChunk) {
@@ -71,4 +82,32 @@ FX_FORCE_INLINE uint32 FxBitset::FindNextFreeBit() const
     }
 
     return scNoFreeBits;
+}
+
+FX_FORCE_INLINE uint32 FxBitset::FindNextFreeBitGroup(uint32 group_size) const
+{
+    const uint32 max_size = mBits.Size * 64;
+
+    uint32 start_index = FindNextFreeBit();
+
+    while (start_index < max_size) {
+        if (!Get(start_index + group_size)) {
+            bool is_free = true;
+            for (uint32 i = start_index + 1; i < start_index + group_size - 1; i++) {
+                if (Get(i)) {
+                    is_free = false;
+                    break;
+                }
+            }
+
+            // Full group is free, break out
+            if (is_free) {
+                return start_index;
+            }
+        }
+
+        start_index = FindNextFreeBit(start_index);
+    }
+
+    return FxBit::scBitNotFound;
 }

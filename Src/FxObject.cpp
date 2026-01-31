@@ -116,10 +116,32 @@ void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
     }
 }
 
+void FxObject::MakeInstanceOf(const FxRef<FxObject>& source)
+{
+    FxAssertMsg((source->mInstanceSlots - source->mInstanceSlotsInUse) > 0,
+                "Object has no instance slots remaining! Did you reserve any instances on the source object?");
+
+    gObjectManager->FreeObjectId(ObjectId);
+
+    mpInstanceSource = source;
+    mbIsInstance = true;
+
+    ++source->mInstanceSlotsInUse;
+
+    ObjectId = source->ObjectId + source->mInstanceSlotsInUse;
+}
+
+void FxObject::ReserveInstances(uint32 num)
+{
+    ObjectId = gObjectManager->ReserveInstances(ObjectId, num);
+    mInstanceSlots = num;
+    mInstanceSlotsInUse = 0;
+}
+
 void FxObject::RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
 {
     if (pMesh) {
-        pMesh->Render(cmd, pipeline);
+        pMesh->Render(cmd, pipeline, 1);
     }
 
     if (AttachedNodes.IsEmpty()) {
@@ -128,7 +150,7 @@ void FxObject::RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pip
 
     for (const FxRef<FxObject>& node : AttachedNodes) {
         if (node->pMesh) {
-            node->pMesh->Render(cmd, pipeline);
+            node->pMesh->Render(cmd, pipeline, (mInstanceSlotsInUse + 1)); // + 1 for source object!
         }
     }
 }
@@ -210,7 +232,7 @@ void FxObject::RenderMesh()
                                                    gObjectManager->GetBaseOffset());
 
     if (pMesh) {
-        pMesh->Render(cmd, *pMaterial->pPipeline);
+        pMesh->Render(cmd, *pMaterial->pPipeline, (mInstanceSlotsInUse + 1)); // + 1 for source object
     }
 }
 

@@ -39,6 +39,9 @@ public:
     FxRef<FxObject> pHelmetObject { nullptr };
     FxRef<FxObject> pLevelObject { nullptr };
 
+    FxRef<FxObject> pHelmetInstance { nullptr };
+
+
     FxQuat PistolRotationGoal = FxQuat::sIdentity;
 
     FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> pSkyboxMesh { nullptr };

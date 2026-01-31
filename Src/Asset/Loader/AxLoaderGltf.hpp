@@ -43,6 +43,8 @@ private:
     void UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh<>>& mesh,
                               cgltf_primitive* primitive);
 
+    void LoadAnimations();
+    void LoadAnimationSkins();
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;

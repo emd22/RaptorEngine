@@ -116,7 +116,7 @@ public:
     RxGpuBuffer& GetVertexBuffer() { return VertexList.GpuBuffer; }
     RxGpuBuffer& GetIndexBuffer() { return GpuIndexBuffer; }
 
-    void Render(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
+    void Render(const RxCommandBuffer& cmd, const RxPipeline& pipeline, uint32 num_instances)
     {
         const VkDeviceSize offset = 0;
         //        RxFrameData* frame = Rx_Fwd_GetFrame();
@@ -124,7 +124,8 @@ public:
         vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(cmd.CommandBuffer, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), 1, 0, 0, 0);
+        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0,
+                         0, 0);
     }
 
     void RecalculateNormals()

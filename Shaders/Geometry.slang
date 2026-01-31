@@ -23,6 +23,7 @@ struct VSIn
     float3 vNormal : NORMAL;
     float2 vUV : TEXCOORD0;
     float3 vTangent : TANGENT;
+    uint uiInstanceId : SV_InstanceID;
 };
 
 struct VSPushConsts
@@ -42,7 +43,7 @@ VSOut VertexMain(VSIn in)
 {
     VSOut out;
 
-    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex].mModel;
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + in.uiInstanceId].mModel;
 
     float4x4 MVP = mul(VSConst.mViewProjection, model_matrix);
 

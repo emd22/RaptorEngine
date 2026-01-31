@@ -131,7 +131,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
 
     gRenderer->Uniforms.FlushToGpu();
 
-    pLightVolume->Render(frame->CommandBuffer, *pPipeline);
+    pLightVolume->Render(frame->CommandBuffer, *pPipeline, 1);
 }
 
 
@@ -152,7 +152,7 @@ void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                        &push_constants);
 
-    mpDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry);
+    mpDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry, 1);
 }
 
 
@@ -197,7 +197,7 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
 
     if (shadow_camera) {
         gRenderer->Uniforms.WritePtr(shadow_camera->GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-                                      sizeof(FxMat4f));
+                                     sizeof(FxMat4f));
     }
     else {
         gRenderer->Uniforms.WritePtr(camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));

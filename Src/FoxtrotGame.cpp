@@ -155,12 +155,21 @@ void FoxtrotGame::CreateGame()
     pHelmetObject->WaitUntilLoaded();
     pHelmetObject->MoveBy(FxVec3f(0, 1.2, 3.5));
 
+    pHelmetObject->ReserveInstances(2);
+
+    pHelmetInstance = FxMakeRef<FxObject>();
+    pHelmetInstance->MakeInstanceOf(pHelmetObject);
+
+    pHelmetInstance->MoveTo(FxVec3f(10, 2, 10));
+
     // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
 
     gPhysics->OptimizeBroadPhase();
 
 
     mMainScene.Attach(pHelmetObject);
+
+    mMainScene.Attach(pHelmetInstance);
 
     pPistolObject = AxManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();

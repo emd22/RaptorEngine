@@ -337,7 +337,6 @@ void FxMaterial::Build()
 
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
-    printf("Base colour: %u\n", Properties.BaseColor.Value);
 
     if (has_normal_map) {
         pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;

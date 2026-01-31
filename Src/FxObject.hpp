@@ -27,6 +27,8 @@ public:
 public:
     FxObject();
 
+    void MakeInstanceOf(const FxRef<FxObject>& source);
+
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
     /**
@@ -49,6 +51,12 @@ public:
 
     void PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotionType motion_type,
                            const PhProperties& physics_properties);
+
+    /**
+     * @brief Reserve `num_instances` amount of future instances in the object manager.
+     * @note This may update the object id if there are not enough free slots following this object.
+     */
+    void ReserveInstances(uint32 num_instances);
 
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
@@ -75,10 +83,15 @@ public:
     PhObject Physics;
 
 private:
-    RxUniformBufferObject mUbo;
+    /// Object slots allocated following this object. Used by other instances of this object.
+    uint16 mInstanceSlots = 0;
+    uint16 mInstanceSlotsInUse = 0;
+
+    FxRef<FxObject> mpInstanceSource { nullptr };
 
     bool mbReadyToRender : 1 = false;
     bool mbPhysicsEnabled : 1 = false;
+    bool mbIsInstance : 1 = false;
 
     FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };

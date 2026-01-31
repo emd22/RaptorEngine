@@ -251,36 +251,17 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
     FxLogInfo("Add primitive:");
 }
 
+void AxLoaderGltf::LoadAnimations() { FxLogInfo("Gltf model has {} animations", mGltfData->animations_count); }
 
-// FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view)
-//{
-//     if (!texture_view.texture) {
-//         return FxRef<FxAssetImage>(nullptr);
-//     }
-//
-//     if (texture_view.texture->image->uri != nullptr) {
-//         std::cout << "Texture URI: " << texture_view.texture->image->uri << '\n';
-//         return FxRef<FxAssetImage>(nullptr);
-//     }
-//
-//     if (texture_view.texture->image != nullptr) {
-//         const uint8* data = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
-//
-//         uint32 size = texture_view.texture->image->buffer_view->size;
-//
-//         FxRef<FxAssetImage> texture = FxAssetManager::LoadFromMemory<FxAssetImage>(data, size);
-//
-//         // Since this is being loaded on another thread anyway, this shouldn't cause too much of an issue.
-////        texture->WaitUntilLoaded();
-//
-//        return texture;
-//    }
-//    else {
-//        std::cout << "no image added\n";
-//    }
-//
-//    return FxRef<FxAssetImage>(nullptr);
-//}
+void AxLoaderGltf::LoadAnimationSkins()
+{
+    FxLogInfo("Gltf model has {} animation skins", mGltfData->skins_count);
+
+    for (uint32 i = 0; i < mGltfData->skins_count; i++) {
+        cgltf_skin& skin = mGltfData->skins[i];
+        FxLogInfo("Joints: {}", skin.joints_count);
+    }
+}
 
 AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
 {
@@ -301,27 +282,7 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxRef<AxBase> asset, const std::
         return AxLoaderGltf::Status::eError;
     }
 
-
-    std::cout << "cgltf textures; " << mGltfData->textures_count << '\n';
-
-
-    // if (mGltfData->materials_count) {
-    //     for (int i = 0; i < mGltfData->materials_count; i++) {
-    //         cgltf_material& gltf_material = mGltfData->materials[i];
-
-    //         FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
-
-
-    //         if (gltf_material.has_pbr_metallic_roughness) {
-    //             material->DiffuseTexture = LoadTexture(material,
-    //             gltf_material.pbr_metallic_roughness.base_color_texture);
-
-    //         }
-
-
-    //         model->Materials.push_back(material);
-    //     }
-    // }
+    LoadAnimationSkins();
 
     return AxLoaderGltf::Status::eSuccess;
 }
@@ -339,23 +300,7 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(FxRef<AxBase> asset, const uin
         return AxLoaderGltf::Status::eError;
     }
 
-    std::cout << "cgltf textures; " << mGltfData->textures_count << '\n';
-
-    // if (mGltfData->materials_count) {
-    //     for (int i = 0; i < mGltfData->materials_count; i++) {
-    //         cgltf_material& gltf_material = mGltfData->materials[i];
-
-    //         FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
-
-
-    //         if (gltf_material.has_pbr_metallic_roughness) {
-    //             material->DiffuseTexture = LoadTexture(material,
-    //             gltf_material.pbr_metallic_roughness.base_color_texture);
-    //         }
-
-    //         model->Materials.push_back(material);
-    //     }
-    // }
+    LoadAnimationSkins();
 
     return AxLoaderGltf::Status::eSuccess;
 }
