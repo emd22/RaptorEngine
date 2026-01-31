@@ -45,8 +45,6 @@ public:
      */
     FxRef(T* ptr, FxRefCount* cnt)
     {
-        FxSpinThreadGuard guard(&IsBusy);
-
         mRefCnt = cnt;
 
         mPtr = ptr;
@@ -66,9 +64,6 @@ public:
         requires std::is_base_of_v<T, DerivedType>
     FxRef(const FxRef<DerivedType>& other)
     {
-        FxSpinThreadGuard other_guard(&other.IsBusy);
-        FxSpinThreadGuard guard(&IsBusy);
-
         mRefCnt = other.mRefCnt;
         mPtr = other.mPtr;
 
@@ -84,9 +79,6 @@ public:
         requires std::is_base_of_v<BaseType, T>
     FxRef(const FxRef<BaseType>& other)
     {
-        FxSpinThreadGuard other_guard(&other.IsBusy);
-        FxSpinThreadGuard guard(&IsBusy);
-
         mRefCnt = other.mRefCnt;
         mPtr = static_cast<T*>(other.mPtr);
 
@@ -101,9 +93,6 @@ public:
      */
     FxRef(const FxRef& other)
     {
-        FxSpinThreadGuard other_guard(&other.IsBusy);
-        FxSpinThreadGuard guard(&IsBusy);
-
         mRefCnt = other.mRefCnt;
         mPtr = other.mPtr;
 
@@ -115,9 +104,6 @@ public:
 
     FxRef(FxRef&& other)
     {
-        FxSpinThreadGuard other_guard(&other.IsBusy);
-        FxSpinThreadGuard guard(&IsBusy);
-
         // No need to Inc or Dec the ref count here as we are moving the value.
         mRefCnt = std::move(other.mRefCnt);
         mPtr = std::move(other.mPtr);
@@ -127,12 +113,7 @@ public:
     }
 
 
-    ~FxRef()
-    {
-        FxSpinThreadGuard guard(&IsBusy);
-
-        DecRef();
-    }
+    ~FxRef() { DecRef(); }
 
     /**
      * Constructs a new FxRef for the given type using the provided arguments.
@@ -160,8 +141,6 @@ public:
     /** Retrieves the internal usage count for the reference. */
     uint32 GetRefCount()
     {
-        FxSpinThreadGuard guard(&IsBusy);
-
         if (mRefCnt) {
             return mRefCnt->Count;
         }
@@ -175,9 +154,6 @@ public:
 
     FxRef& operator=(const FxRef& other)
     {
-        FxSpinThreadGuard guard(&IsBusy);
-        FxSpinThreadGuard other_guard(&other.IsBusy);
-
         // If there is already a pointer in this reference, decrement or destroy it
         // This will be an infinite memory printing machine if this is not here
         if (mPtr && mRefCnt) {
@@ -196,8 +172,6 @@ public:
 
     T* operator->() const noexcept
     {
-        FxSpinThreadGuard guard(&IsBusy);
-
         FxAssert(mRefCnt != nullptr && mPtr != nullptr);
 
         return mPtr;
@@ -205,26 +179,14 @@ public:
 
     T& operator*() const noexcept
     {
-        FxSpinThreadGuard guard(&IsBusy);
-
         FxAssert((mRefCnt != nullptr && mPtr != nullptr));
 
         return *mPtr;
     }
 
-    bool operator==(nullptr_t np) const noexcept
-    {
-        FxSpinThreadGuard guard(&IsBusy);
+    bool operator==(nullptr_t np) const noexcept { return mPtr == nullptr; }
 
-        return mPtr == nullptr;
-    }
-
-    operator bool() const noexcept
-    {
-        FxSpinThreadGuard guard(&IsBusy);
-
-        return mPtr != nullptr;
-    }
+    operator bool() const noexcept { return mPtr != nullptr; }
 
     void SetNull()
     {
@@ -333,3 +295,22 @@ FxRef<T> FxMakeRef(Types... args)
 {
     return FxRef<T>::New(std::forward<Types>(args)...);
 }
+
+
+template <typename TUnderlyingType>
+struct FxRefContext
+{
+public:
+    FxRefContext(const FxRef<TUnderlyingType>& ref) : mRef(ref)
+    {
+        FxAssert(mRef.mRefCnt != nullptr);
+        mRef.mRefCnt->Inc();
+    }
+
+    TUnderlyingType* Get() { return mRef.mPtr; }
+
+    ~FxRefContext() { mRef.mRefCnt->Dec(); }
+
+private:
+    const FxRef<TUnderlyingType>& mRef;
+};

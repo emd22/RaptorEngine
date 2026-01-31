@@ -116,19 +116,23 @@ void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
     }
 }
 
-void FxObject::MakeInstanceOf(const FxRef<FxObject>& source)
+void FxObject::MakeInstanceOf(const FxRef<FxObject>& source_ref)
 {
-    FxAssertMsg((source->mInstanceSlots - source->mInstanceSlotsInUse) > 0,
+    FxObject& source = *source_ref;
+
+    FxAssertMsg((source.mInstanceSlots - source.mInstanceSlotsInUse) > 0,
                 "Object has no instance slots remaining! Did you reserve any instances on the source object?");
 
     gObjectManager->FreeObjectId(ObjectId);
 
-    mpInstanceSource = source;
+    mpInstanceSource = source_ref;
     mbIsInstance = true;
 
-    ++source->mInstanceSlotsInUse;
+    ++source.mInstanceSlotsInUse;
 
-    ObjectId = source->ObjectId + source->mInstanceSlotsInUse;
+    ObjectId = source.ObjectId + source.mInstanceSlotsInUse;
+
+    // Acquire the transformations from the source object
 }
 
 void FxObject::ReserveInstances(uint32 num)

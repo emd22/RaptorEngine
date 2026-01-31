@@ -27,7 +27,7 @@ public:
 public:
     FxObject();
 
-    void MakeInstanceOf(const FxRef<FxObject>& source);
+    void MakeInstanceOf(const FxRef<FxObject>& source_ref);
 
     void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
 
