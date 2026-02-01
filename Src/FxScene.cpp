@@ -2,6 +2,7 @@
 
 #include <FxEngine.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/RxShadowDirectional.hpp>
 
 void FxScene::Create()
 {
@@ -22,12 +23,9 @@ void FxScene::Attach(const FxRef<FxLightBase>& light)
 
 void FxScene::Render(FxCamera* shadow_camera)
 {
-    const FxPerspectiveCamera& camera = *mpCurrentCamera;
+    FxPerspectiveCamera& camera = *mpCurrentCamera;
 
-    // const FxRef<RxDeferredRenderer>& deferred_renderer = gRenderer->DeferredRenderer;
-
-    // Render Geometry
-    // deferred_renderer->pGeometryPipeline->Bind(gRenderer->GetFrame()->CommandBuffer);
+    gRenderer->BeginGeometry();
 
     for (const FxRef<FxObject>& obj : mObjects) {
         obj->Update();
@@ -40,7 +38,35 @@ void FxScene::Render(FxCamera* shadow_camera)
     for (const FxRef<FxLightBase>& light : mLights) {
         light->Render(camera, shadow_camera);
     }
+
+    gRenderer->DoComposition(camera);
 }
+
+void FxScene::RenderShadows(FxCamera* shadow_camera)
+{
+    gShadowRenderer->Begin();
+
+    RxShadowPushConstants consts;
+
+    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
+           sizeof(float32) * 16);
+
+    for (const FxRef<FxObject>& obj : mObjects) {
+        if (!obj->IsShadowCaster()) {
+            continue;
+        }
+
+        consts.ObjectId = obj->ObjectId;
+
+        vkCmdPushConstants(gRenderer->GetFrame()->CommandBuffer.Get(), gShadowRenderer->GetPipeline().Layout,
+                           VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
+
+        obj->RenderPrimitive(gRenderer->GetFrame()->CommandBuffer, gShadowRenderer->GetPipeline());
+    }
+
+    gShadowRenderer->End();
+}
+
 void FxScene::Destroy()
 {
     mObjects.Destroy();

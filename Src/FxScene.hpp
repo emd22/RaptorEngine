@@ -18,7 +18,9 @@ public:
     void Attach(const FxRef<FxLightBase>& light);
 
     void SelectCamera(const FxRef<FxCamera>& camera) { mpCurrentCamera = camera; }
+
     void Render(FxCamera* shadow_camera);
+    void RenderShadows(FxCamera* shadow_camera);
 
     const FxPagedArray<FxRef<FxLightBase>>& GetAllLights() { return mLights; }
     const FxPagedArray<FxRef<FxObject>>& GetAllObjects() { return mObjects; }
@@ -36,6 +38,7 @@ public:
 
 private:
     FxPagedArray<FxRef<FxObject>> mObjects;
+
     FxPagedArray<FxRef<FxLightBase>> mLights;
 
     FxRef<FxPerspectiveCamera> mpCurrentCamera { nullptr };

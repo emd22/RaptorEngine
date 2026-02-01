@@ -216,7 +216,6 @@ private:
             // NOTE: Unless we want to store the size of the original object, using the casting constructor messes up
             // using mpPtr + sizeof(T) == mpRefCnt to check if the allocation is combined.
 
-
             if (mbIsCombinedAllocation) {
                 // Call the destructor manually (we remove the type info so the MemPool::Free call won't call it)
                 if constexpr (std::is_destructible_v<T>) {

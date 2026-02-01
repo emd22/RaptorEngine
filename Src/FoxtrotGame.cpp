@@ -148,19 +148,14 @@ void FoxtrotGame::CreateGame()
     //                                    PhObject::PhysicsType::eStatic, {});
     mMainScene.Attach(pLevelObject);
 
-    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DamagedHelmet.glb", { .KeepInMemory = true });
-    pHelmetObject->RotateX(M_PI_2);
-    pHelmetObject->RotateZ(-M_PI_2);
+    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/AnimTest.glb", { .KeepInMemory = true });
+    // pHelmetObject->RotateX(M_PI_2);
+    // pHelmetObject->RotateZ(-M_PI_2);
     pHelmetObject->Scale(0.5);
     pHelmetObject->WaitUntilLoaded();
-    pHelmetObject->MoveBy(FxVec3f(0, 1.2, 3.5));
+    pHelmetObject->MoveBy(FxVec3f(0, -0.5, 1.5));
 
-    pHelmetObject->ReserveInstances(2);
-
-    pHelmetInstance = FxMakeRef<FxObject>();
-    pHelmetInstance->MakeInstanceOf(pHelmetObject);
-
-    pHelmetInstance->MoveTo(FxVec3f(10, 2, 10));
+    pHelmetObject->SetShadowCaster(true);
 
     // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
 
@@ -169,7 +164,6 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.Attach(pHelmetObject);
 
-    mMainScene.Attach(pHelmetInstance);
 
     pPistolObject = AxManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
@@ -334,6 +328,8 @@ void FoxtrotGame::Tick()
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
     pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
 
+    pPistolObject->SetShadowCaster(true);
+
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 10.0f));
 
     FxVec3f target = Player.Position;
@@ -355,27 +351,8 @@ void FoxtrotGame::Tick()
     frame->CommandBuffer.Reset();
     frame->CommandBuffer.Record();
 
-    gShadowRenderer->Begin();
-
-    RxShadowPushConstants consts;
-
-    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
-           sizeof(float32) * 16);
-    consts.ObjectId = pHelmetObject->ObjectId;
-
-    vkCmdPushConstants(gRenderer->GetFrame()->CommandBuffer.Get(), gShadowRenderer->GetPipeline().Layout,
-                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
-
-    pHelmetObject->RenderPrimitive(gRenderer->GetFrame()->CommandBuffer, gShadowRenderer->GetPipeline());
-
-    gShadowRenderer->End();
-
-
-    gRenderer->BeginGeometry();
-
+    mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
     mMainScene.Render(&gShadowRenderer->ShadowCamera);
-
-    gRenderer->DoComposition(*camera);
 
     mLastTick = current_tick;
 }

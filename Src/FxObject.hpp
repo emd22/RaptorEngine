@@ -64,6 +64,9 @@ public:
     FX_FORCE_INLINE void SetObjectLayer(FxObjectLayer layer) { mObjectLayer = layer; }
     FX_FORCE_INLINE FxObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
+    FX_FORCE_INLINE void SetShadowCaster(const bool value) { mbIsShadowCaster = value; }
+    FX_FORCE_INLINE bool IsShadowCaster() const { return mbIsShadowCaster; }
+
     void Destroy() override;
     ~FxObject();
 
@@ -82,6 +85,7 @@ public:
 
     PhObject Physics;
 
+
 private:
     /// Object slots allocated following this object. Used by other instances of this object.
     uint16 mInstanceSlots = 0;
@@ -92,6 +96,8 @@ private:
     bool mbReadyToRender : 1 = false;
     bool mbPhysicsEnabled : 1 = false;
     bool mbIsInstance : 1 = false;
+    bool mbIsShadowCaster : 1 = false;
+
 
     FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };
