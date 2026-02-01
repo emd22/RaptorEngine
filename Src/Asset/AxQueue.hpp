@@ -10,11 +10,11 @@ class AxQueue
 public:
     AxQueue() = default;
 
-    void Push(AxQueueItem& value)
+    void Push(AxQueueItem&& value)
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        mQueue.push_back(value);
+        mQueue.push_back(std::move(value));
     }
 
     // void Push(FxAssetQueueItem &&value)

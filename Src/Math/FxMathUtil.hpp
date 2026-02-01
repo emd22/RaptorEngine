@@ -19,7 +19,7 @@ FX_FORCE_INLINE float32 RSqrt(float32 x);
 
 FX_FORCE_INLINE float32 Clamp(float32 value, float32 lower, float32 upper) { return fmin(fmax(value, lower), upper); }
 
-template <uint16 TAlignTo>
+template <uint32 TAlignTo>
 FX_FORCE_INLINE uint64 AlignValue(uint64 value)
 {
     // Generic case
@@ -79,7 +79,7 @@ template <>
 FX_FORCE_INLINE uint64 AlignValue<16>(uint64 value)
 {
     // Get the bottom four bits (value % 16)
-    const uint8 remainder = (value & 0x0F);
+    const uint64 remainder = (value & 0x0F);
 
     if (remainder != 0) {
         value += (16 - remainder);
@@ -99,6 +99,12 @@ FX_FORCE_INLINE uint64 AlignValue<32>(uint64 value)
     }
 
     return value;
+}
+
+template <typename TPtrType, uint32 TAlignTo>
+FX_FORCE_INLINE TPtrType AlignPtr(TPtrType ptr)
+{
+    return reinterpret_cast<TPtrType>(AlignValue<TAlignTo>(reinterpret_cast<uintptr_t>(ptr)));
 }
 
 

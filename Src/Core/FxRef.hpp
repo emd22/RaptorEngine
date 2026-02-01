@@ -9,14 +9,14 @@
 #include <Core/FxLog.hpp>
 #endif
 
-#include <atomic>
+#include <Math/FxMathUtil.hpp>
 #include <cstddef>
 
 /** The internal reference count for `FxRef`. */
 struct FxRefCount
 {
     using IntType = uint32;
-    using RefCountType = std::atomic<IntType>;
+    using RefCountType = IntType;
 
     /** Increments the reference count */
     void Inc() { ++Count; }
@@ -32,8 +32,8 @@ template <typename T>
 class FxRef
 {
 public:
-    FxRef() : mRefCnt(nullptr), mPtr(nullptr) {}
-    FxRef(nullptr_t np) : mRefCnt(nullptr), mPtr(nullptr) {}
+    FxRef() : mpRefCnt(nullptr), mpPtr(nullptr) {}
+    FxRef(nullptr_t np) : mpRefCnt(nullptr), mpPtr(nullptr) {}
 
     /**
      * Constructs a new FxRef from a pointer.
@@ -43,15 +43,12 @@ public:
     /**
      * Constructs a new FxRef from a pointer and a pre-allocated ref count.
      */
-    FxRef(T* ptr, FxRefCount* cnt)
+    FxRef(T* ptr, FxRefCount* cnt, bool is_combined_allocation = false)
+        : mpRefCnt(cnt), mpPtr(ptr), mbIsCombinedAllocation(is_combined_allocation)
     {
-        mRefCnt = cnt;
-
-        mPtr = ptr;
-
 #ifdef FX_DEBUG_REF
-        FxLogDebug("Created FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mPtr),
-                   reinterpret_cast<void*>(mRefCnt));
+        FxLogDebug("Created FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mpPtr),
+                   reinterpret_cast<void*>(mpRefCnt));
 #endif
     }
 
@@ -64,11 +61,12 @@ public:
         requires std::is_base_of_v<T, DerivedType>
     FxRef(const FxRef<DerivedType>& other)
     {
-        mRefCnt = other.mRefCnt;
-        mPtr = other.mPtr;
+        mpRefCnt = other.mpRefCnt;
+        mpPtr = other.mpPtr;
+        mbIsCombinedAllocation = other.mbIsCombinedAllocation;
 
-        if (mRefCnt) {
-            mRefCnt->Inc();
+        if (mpRefCnt) {
+            mpRefCnt->Inc();
         }
     }
 
@@ -79,11 +77,12 @@ public:
         requires std::is_base_of_v<BaseType, T>
     FxRef(const FxRef<BaseType>& other)
     {
-        mRefCnt = other.mRefCnt;
-        mPtr = static_cast<T*>(other.mPtr);
+        mpRefCnt = other.mpRefCnt;
+        mpPtr = static_cast<T*>(other.mpPtr);
+        mbIsCombinedAllocation = other.mbIsCombinedAllocation;
 
-        if (mRefCnt) {
-            mRefCnt->Inc();
+        if (mpRefCnt) {
+            mpRefCnt->Inc();
         }
     }
 
@@ -93,23 +92,24 @@ public:
      */
     FxRef(const FxRef& other)
     {
-        mRefCnt = other.mRefCnt;
-        mPtr = other.mPtr;
+        mpRefCnt = other.mpRefCnt;
+        mpPtr = other.mpPtr;
+        mbIsCombinedAllocation = other.mbIsCombinedAllocation;
 
-        if (mRefCnt) {
-            mRefCnt->Inc();
+        if (mpRefCnt) {
+            mpRefCnt->Inc();
         }
     }
 
 
     FxRef(FxRef&& other)
     {
-        // No need to Inc or Dec the ref count here as we are moving the value.
-        mRefCnt = std::move(other.mRefCnt);
-        mPtr = std::move(other.mPtr);
+        mpRefCnt = (other.mpRefCnt);
+        mpPtr = (other.mpPtr);
+        mbIsCombinedAllocation = other.mbIsCombinedAllocation;
 
-        other.mPtr = nullptr;
-        other.mRefCnt = nullptr;
+        other.mpPtr = nullptr;
+        other.mpRefCnt = nullptr;
     }
 
 
@@ -123,26 +123,36 @@ public:
     template <typename... Args>
     static FxRef<T> New(Args... args)
     {
-        void* raw_ptr = FxMemPool::Alloc<void>(sizeof(FxRefCount) + sizeof(T));
-        T* obj_ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(raw_ptr) + sizeof(FxRefCount));
+        // Since we want to ensure aligned laod/store on the ref count object as well, we should ensure that the T
+        // object is aligned on a 16 byte boundary.
+        uint8* raw_ptr = FxMemPool::Alloc<uint8>(FxMath::AlignValue<16>(sizeof(T)) + sizeof(FxRefCount));
+
+        T* obj_ptr = reinterpret_cast<T*>(raw_ptr);
+        FxRefCount* count_ptr = reinterpret_cast<FxRefCount*>(raw_ptr + sizeof(T));
+
+        FxAssert(reinterpret_cast<uint8*>(count_ptr) - sizeof(T) == raw_ptr);
 
         // Construct the ref count
-        ::new (raw_ptr) FxRefCount();
+        ::new (count_ptr) FxRefCount();
 
         // Construct the Ref object
         if constexpr (std::is_constructible_v<T, Args...>) {
             ::new (obj_ptr) T(std::forward<Args>(args)...);
         }
 
-        // T* ptr = FxMemPool::Alloc<T>(sizeof(T), std::forward<Args>(args)...);
-        return FxRef<T>(obj_ptr, reinterpret_cast<FxRefCount*>(raw_ptr));
+#ifdef FX_DEBUG_REF
+        FxLogDebug("Creating FxRef {:p} (RefCnt: {:p}) as combined allocation", reinterpret_cast<void*>(obj_ptr),
+                   reinterpret_cast<void*>(count_ptr));
+#endif
+
+        return FxRef<T>(obj_ptr, count_ptr, true);
     }
 
     /** Retrieves the internal usage count for the reference. */
     uint32 GetRefCount()
     {
-        if (mRefCnt) {
-            return mRefCnt->Count;
+        if (mpRefCnt) {
+            return mpRefCnt->Count;
         }
 
         return 0;
@@ -156,12 +166,13 @@ public:
     {
         // If there is already a pointer in this reference, decrement or destroy it
         // This will be an infinite memory printing machine if this is not here
-        if (mPtr && mRefCnt) {
+        if (mpPtr && mpRefCnt) {
             DecRef();
         }
 
-        mPtr = other.mPtr;
-        mRefCnt = other.mRefCnt;
+        mpPtr = other.mpPtr;
+        mpRefCnt = other.mpRefCnt;
+        mbIsCombinedAllocation = other.mbIsCombinedAllocation;
 
         // Since `mRefCnt` now points to the old ref's count, Inc'ing this
         // marks that the object is in use.
@@ -172,69 +183,67 @@ public:
 
     T* operator->() const noexcept
     {
-        FxAssert(mRefCnt != nullptr && mPtr != nullptr);
+        FxAssert(mpRefCnt != nullptr && mpPtr != nullptr);
 
-        return mPtr;
+        return mpPtr;
     }
 
     T& operator*() const noexcept
     {
-        FxAssert((mRefCnt != nullptr && mPtr != nullptr));
+        FxAssert((mpRefCnt != nullptr && mpPtr != nullptr));
 
-        return *mPtr;
+        return *mpPtr;
     }
 
-    bool operator==(nullptr_t np) const noexcept { return mPtr == nullptr; }
+    bool operator==(nullptr_t np) const noexcept { return mpPtr == nullptr; }
 
-    operator bool() const noexcept { return mPtr != nullptr; }
+    operator bool() const noexcept { return mpPtr != nullptr; }
 
     void SetNull()
     {
-        mPtr = nullptr;
-        mRefCnt = nullptr;
+        mpPtr = nullptr;
+        mpRefCnt = nullptr;
     }
 
 private:
     FX_FORCE_INLINE void DestroyRef()
     {
-        if (mPtr) {
+        if (mpPtr) {
             // The pointer if the ref count and ptr are allocated together.
-            // +========+==========+======
-            // | RefCnt | Obj Ptr  | . . .
-            // +========+==========+======
+            // +=========+==========+======
+            // | Obj Ptr | RefCnt   | . . .
+            // +=========+==========+======
+            // NOTE: Unless we want to store the size of the original object, using the casting constructor messes up
+            // using mpPtr + sizeof(T) == mpRefCnt to check if the allocation is combined.
 
-            uint8* bundled_ptr = reinterpret_cast<uint8*>(mPtr) - sizeof(FxRefCount);
 
-            // Check if they were allocated together
-            if (reinterpret_cast<uint8*>(mRefCnt) == bundled_ptr) {
+            if (mbIsCombinedAllocation) {
                 // Call the destructor manually (we remove the type info so the MemPool::Free call won't call it)
                 if constexpr (std::is_destructible_v<T>) {
-                    mPtr->~T();
+                    mpPtr->~T();
                 }
                 // Call the destructor on the ref count
-                mRefCnt->~FxRefCount();
+                mpRefCnt->~FxRefCount();
 
                 // Free the bundled memory
-                FxMemPool::Free(bundled_ptr);
+                FxMemPool::Free(reinterpret_cast<uint8*>(mpPtr));
 
-                // Null our stuff out here
-                mRefCnt = nullptr;
-                mPtr = nullptr;
+                mpRefCnt = nullptr;
+                mpPtr = nullptr;
 
                 return;
             }
 
             // The pointer exists but the ref count ptr != the bundled ptr, so we will free the
             // ptr normally.
-            FxMemPool::Free<T>(mPtr);
-            mPtr = nullptr;
+            FxMemPool::Free<T>(mpPtr);
+            mpPtr = nullptr;
         }
 
-
-        if (mRefCnt) {
+        if (mpRefCnt) {
             // Free the ref count
-            FxMemPool::Free<FxRefCount>(mRefCnt);
-            mRefCnt = nullptr;
+            FxMemPool::Free<FxRefCount>(mpRefCnt);
+            mpRefCnt = nullptr;
         }
     }
 
@@ -243,18 +252,16 @@ private:
      */
     void DecRef()
     {
-        // Note that since these are only called by other protected ref functions, these do not need a spinlock guard.
-
         // Reference count does not exist, we can assume that the object is corrupt or no longer exists.
-        if (!mRefCnt) {
+        if (!mpRefCnt) {
             return;
         }
 
         // If the reference count is zero, we can free the ptr as it is not being used by any other objects.
-        if (mRefCnt->Dec() == 0) {
+        if (mpRefCnt->Dec() == 0) {
 #ifdef FX_DEBUG_REF
-            FxLogDebug("Destroying FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mPtr),
-                       reinterpret_cast<void*>(mRefCnt));
+            FxLogDebug("Destroying FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mpPtr),
+                       reinterpret_cast<void*>(mpRefCnt));
 #endif
             // Destroy the reference
             DestroyRef();
@@ -266,23 +273,21 @@ private:
      */
     void IncRef()
     {
-        // Note that since these are only called by other protected ref functions, these do not need a spinlock guard.
-
-        if (!mRefCnt) {
+        if (!mpRefCnt) {
             return;
         }
 
-        mRefCnt->Inc();
+        mpRefCnt->Inc();
     }
 
 
 public:
     /** The usage count for the reference */
-    FxRefCount* mRefCnt = nullptr;
-    T* mPtr = nullptr;
+    FxRefCount* mpRefCnt = nullptr;
+    T* mpPtr = nullptr;
 
-    /** Denotes if the ref is currently in use from some thread */
-    mutable FxAtomicFlag IsBusy {};
+    /// Was the memory allocated as one buffer?
+    bool mbIsCombinedAllocation = false;
 };
 
 /**
@@ -303,13 +308,17 @@ struct FxRefContext
 public:
     FxRefContext(const FxRef<TUnderlyingType>& ref) : mRef(ref)
     {
-        FxAssert(mRef.mRefCnt != nullptr);
-        mRef.mRefCnt->Inc();
+        FxAssert(mRef.mpRefCnt != nullptr);
+        mRef.mpRefCnt->Inc();
     }
 
-    TUnderlyingType* Get() { return mRef.mPtr; }
+    FxRefContext(const FxRefContext<TUnderlyingType>& other) = delete;
+    FxRefContext(FxRefContext<TUnderlyingType>&& other) = delete;
 
-    ~FxRefContext() { mRef.mRefCnt->Dec(); }
+    FX_FORCE_INLINE TUnderlyingType* GetPtr() { return mRef.mpPtr; }
+    FX_FORCE_INLINE TUnderlyingType& Get() { return *mRef.mpPtr; }
+
+    ~FxRefContext() { mRef.mpRefCnt->Dec(); }
 
 private:
     const FxRef<TUnderlyingType>& mRef;

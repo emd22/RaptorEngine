@@ -3,14 +3,14 @@
 #include "AxBase.hpp"
 #include "Loader/AxLoaderBase.hpp"
 
-#include <Core/FxRef.hpp>
+#include <Core/FxTSRef.hpp>
+#include <mutex>
 #include <string>
 
 enum class AxType
 {
     None,
     Binary,
-    // Model,
     Object,
     Image,
 };
@@ -32,7 +32,37 @@ struct AxQueueItem
     {
     }
 
+    AxQueueItem(AxQueueItem&& other)
+    {
+        other.mMutex.lock();
+        Path = other.Path;
+        Loader = std::move(other.Loader);
+        Asset = std::move(other.Asset);
+        RawData = other.RawData;
+        DataSize = other.DataSize;
+        AssetType = other.AssetType;
+        other.mMutex.unlock();
+    }
+
+
+    AxQueueItem& operator=(AxQueueItem&& other)
+    {
+        other.mMutex.lock();
+        Path = other.Path;
+        Loader = std::move(other.Loader);
+        Asset = std::move(other.Asset);
+        RawData = other.RawData;
+        DataSize = other.DataSize;
+        AssetType = other.AssetType;
+        other.mMutex.unlock();
+
+        return *this;
+    }
+
+public:
     std::string Path;
+
+    std::mutex mMutex;
 
     FxRef<AxLoaderBase> Loader { nullptr };
     FxRef<AxBase> Asset { nullptr };

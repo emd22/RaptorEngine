@@ -83,13 +83,13 @@ if (APPLE)
 		-g
 		-Wall
 		# -Wpedantic
-		-fsanitize=address
+		# -fsanitize=address
 		-Wno-nullability-extension
 		# -O2
 	)
 
 	add_link_options(
-		-fsanitize=address
+		# -fsanitize=address
 	)
 endif()
 

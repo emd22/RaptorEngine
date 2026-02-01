@@ -25,16 +25,17 @@ public:
 
     void Create();
 
-    void SubmitItemToLoad(const AxQueueItem& item)
+    void SubmitItemToLoad(AxQueueItem&& item)
     {
         // Wait for item to no longer be busy
         while (IsBusy.test()) {
             IsBusy.wait(true);
         }
+
         // Set busy
         IsBusy.test_and_set();
 
-        Item = (item);
+        Item = std::move(item);
         ItemReady.SignalDataWritten();
     }
 
@@ -205,11 +206,11 @@ private:
 
         if (data != nullptr) {
             AxQueueItem queue_item((loader), asset, TEnumValue, data, data_size);
-            mgr.mLoadQueue.Push(queue_item);
+            mgr.mLoadQueue.Push(std::move(queue_item));
         }
         else {
             AxQueueItem queue_item((loader), asset, TEnumValue, path);
-            mgr.mLoadQueue.Push(queue_item);
+            mgr.mLoadQueue.Push(std::move(queue_item));
         }
 
         mgr.ItemsEnqueued.test_and_set();

@@ -467,7 +467,7 @@ void FxMemPool::FreeRaw(void* ptr, FxMemPool* pool)
     if (pool->mPoolPages.IsEmpty()) {
 #ifdef FX_BUILD_DEBUG
         FxLogWarning("Attempting to free a ptr {:p} after mempool is destroyed", ptr);
-        // FX_BREAKPOINT;
+        FX_BREAKPOINT;
 #endif
         return;
     }

@@ -18,7 +18,11 @@ public:
     FxTSRef() : mRefCnt(nullptr), mPtr(nullptr) {}
     FxTSRef(nullptr_t np) : mRefCnt(nullptr), mPtr(nullptr) {}
 
-    static FxTSRef<T> FromRef(const FxRef<T>& ref) {}
+    static FxTSRef<T> FromRef(const FxRef<T>& ref)
+    {
+        FxTSRef<T> ts_ref(ref.mpPtr, ref.mpRefCnt);
+        return ts_ref;
+    }
 
     /**
      * Constructs a new FxRef from a pointer.
@@ -54,8 +58,8 @@ public:
         FxSpinThreadGuard other_guard(&other.IsBusy);
         FxSpinThreadGuard guard(&IsBusy);
 
-        mRefCnt = other.mRefCnt;
-        mPtr = other.mPtr;
+        mRefCnt = other.mpRefCnt;
+        mPtr = other.mpPtr;
 
         if (mRefCnt) {
             mRefCnt->Inc();
@@ -72,8 +76,8 @@ public:
         FxSpinThreadGuard other_guard(&other.IsBusy);
         FxSpinThreadGuard guard(&IsBusy);
 
-        mRefCnt = other.mRefCnt;
-        mPtr = static_cast<T*>(other.mPtr);
+        mRefCnt = other.mpRefCnt;
+        mPtr = static_cast<T*>(other.mpPtr);
 
         if (mRefCnt) {
             mRefCnt->Inc();

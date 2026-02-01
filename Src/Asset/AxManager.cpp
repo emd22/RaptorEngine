@@ -40,6 +40,8 @@ void AxWorker::Update()
             break;
         }
 
+        Item.mMutex.lock();
+
         // If there is data passed in then we load from memory
         if (Item.RawData != nullptr && Item.DataSize > 0) {
             LoadStatus = Item.Loader->LoadFromMemory(Item.Asset, Item.RawData, Item.DataSize);
@@ -49,6 +51,8 @@ void AxWorker::Update()
             // Call our specialized loader to load the asset file
             LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
         }
+
+        Item.mMutex.unlock();
 
 
         // Mark that we are waiting for the data to be uploaded to the GPU
@@ -242,6 +246,8 @@ void AxManager::CheckForUploadableData()
             continue;
         }
 
+        std::lock_guard<std::mutex> guard(worker.Item.mMutex);
+
         auto& loaded_item = worker.Item;
 
         // The asset was successfully loaded, upload to GPU
@@ -253,20 +259,14 @@ void AxManager::CheckForUploadableData()
                 loaded_item.Asset->bIsUploadedToGpu.wait(true);
             }
 
-
-            // Call the OnLoaded callback if it was registered
             if (!loaded_item.Asset->mOnLoadedCallbacks.empty()) {
                 for (auto& callback : loaded_item.Asset->mOnLoadedCallbacks) {
                     callback(loaded_item.Asset);
                 }
-                // loaded_item.Asset->mOnLoadedCallback(loaded_item.Asset);
             }
 
             loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
             loaded_item.Asset->mIsLoaded.store(true);
-
-            //            FxRef<FxLoaderGltf> gltf_loader(loaded_item.Loader);
-            //            gltf_loader->LoadAttachedMaterials();
 
             // Destroy the loader(clearing the loading buffers)
             loaded_item.Loader->Destroy(loaded_item.Asset);
@@ -333,7 +333,7 @@ void AxManager::CheckForItemsToLoad()
     }
 
     // Submit the item we want to load
-    worker->SubmitItemToLoad(item);
+    worker->SubmitItemToLoad(std::move(item));
 }
 
 void AxManager::AssetManagerUpdate()

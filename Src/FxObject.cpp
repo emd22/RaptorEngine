@@ -118,7 +118,8 @@ void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
 
 void FxObject::MakeInstanceOf(const FxRef<FxObject>& source_ref)
 {
-    FxObject& source = *source_ref;
+    FxRefContext<FxObject> source_ctx(source_ref);
+    FxObject& source = source_ctx.Get();
 
     FxAssertMsg((source.mInstanceSlots - source.mInstanceSlotsInUse) > 0,
                 "Object has no instance slots remaining! Did you reserve any instances on the source object?");
