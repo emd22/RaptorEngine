@@ -96,14 +96,16 @@ void RxRenderStage::AddInputBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, ui
 
     FxAssertMsg(buffer != nullptr, "Input buffer cannot be null!");
 
-    InputTarget input_target { .BindIndex = bind_index,
-                               .pTarget = nullptr,
-                               .pSampler = nullptr,
-                               .pBuffer = buffer,
-                               .BufferOffset = offset,
-                               .BufferRange = range };
+    InputTarget input_buffer {
+        .BindIndex = bind_index,
+        .pTarget = nullptr,
+        .pSampler = nullptr,
+        .pBuffer = buffer,
+        .BufferOffset = offset,
+        .BufferRange = range,
+    };
 
-    mInputTargets.Insert(input_target);
+    mInputTargets.Insert(input_buffer);
 }
 
 void RxRenderStage::BuildRenderStage()

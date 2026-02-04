@@ -140,6 +140,8 @@ void FoxtrotGame::CreateGame()
     pLevelObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
     pLevelObject->WaitUntilLoaded();
 
+    pLevelObject->SetRenderUnlit(true);
+
     pLevelObject->PhysicsCreateMesh(*pLevelObject->pMesh, PhMotionType::eStatic, {});
 
     // ground_object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(20, 1, 20), PhMotionType::eStatic, {});

@@ -91,7 +91,7 @@ FxSizedArray<VkAttachmentDescription>& RxAttachmentList::GetAttachmentDescriptio
 }
 
 
-RxAttachmentList& RxAttachmentList::Add(RxAttachment&& attachment)
+RxAttachmentList& RxAttachmentList::Add(const RxAttachment& attachment)
 {
     CheckInited();
     Attachments.Insert(attachment);

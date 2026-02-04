@@ -131,7 +131,7 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
 
     gRenderer->Uniforms.FlushToGpu();
 
-    pLightVolume->Render(frame->CommandBuffer, *pPipeline, 1);
+    pLightVolume->Render(frame->CommandBuffer, 1);
 }
 
 
@@ -145,14 +145,14 @@ void FxLightBase::RenderDebugMesh(const FxPerspectiveCamera& camera)
     FxRef<RxDeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
     FxDrawPushConstants push_constants {};
-    memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
+    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData, sizeof(FxMat4f));
     push_constants.ObjectId = ObjectId;
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout,
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
                        &push_constants);
 
-    mpDebugMesh->Render(frame->CommandBuffer, deferred->PlGeometry, 1);
+    mpDebugMesh->Render(frame->CommandBuffer, 1);
 }
 
 

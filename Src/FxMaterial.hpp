@@ -7,7 +7,6 @@
 #include <Core/FxBitset.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
-#include <Core/Log.hpp>
 #include <FxColor.hpp>
 #include <Renderer/Backend/RxDescriptors.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
@@ -121,6 +120,7 @@ public:
      * @returns True if the material was bound succesfully.
      */
     bool Bind(RxCommandBuffer* cmd);
+    bool BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline);
 
     void Build();
     void Destroy();

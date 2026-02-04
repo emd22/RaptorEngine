@@ -17,7 +17,6 @@
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxTypes.hpp>
-#include <Core/Log.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
 #include <chrono>
 #include <iostream>
@@ -475,7 +474,6 @@ void RxRenderBackend::BeginGeometry()
 
 
     pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
-
 }
 
 void RxRenderBackend::PresentFrame()

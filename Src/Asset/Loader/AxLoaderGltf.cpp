@@ -56,50 +56,16 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
         }
     }
 
-    // FxLogInfo("Positions:");
-
-    // auto combined_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBufferAndCalcDimensions(positions, normals, uvs,
-    // &object->Dimensions);
-    // for (const auto& vertex : combined_vertices) {
-    //     printf("FxVec3f(%f, %f, %f), ", vertex.Position[0], vertex.Position[1], vertex.Position[2]);
-    // }
-
-    // printf("\n");
-
-
-    // Upload the vertices to the primtive mesh
-    // mesh->UploadVertices(std::move(combined_vertices));
-
     mesh->VertexList.CreateFrom(positions, normals, uvs, tangents);
     mesh->UploadVertices();
 
     mesh->IsReady = true;
 }
 
-// void CreateMaterialFromGltfMesh(FxRef<FxObject>& object, cgltf_material* gltf_material)
-//{
-////    cgltf_material* gltf_material = primitive->material;
-//    if (!gltf_material) {
-//        return;
-//    }
-//
-//    FxRef<FxMaterial> material = FxRef<FxMaterial>::New();
-//
-//    if (gltf_material->has_pbr_metallic_roughness) {
-//        material->DiffuseTexture.Texture = LoadTexture(material,
-//        gltf_material->pbr_metallic_roughness.base_color_texture);
-//    }
-//
-//    object->Material = material;
-//}
-
-// void FxLoaderGltf::LoadAttachedMaterials()
-//{
-//     for (FxGltfMaterialToLoad& to_load : MaterialsToLoad) {
-//         CreateMaterialFromGltfMesh(to_load.Object,
-//         mGltfData->meshes[to_load.MeshIndex].primitives[to_load.PrimitiveIndex].material);
-//     }
-// }
+void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_skin* skin)
+{
+    FxLogInfo("Joints: {}", skin->joints_count);
+}
 
 template <RxImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
@@ -146,6 +112,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
             material->Properties.BaseColor = FxColor::FromRGBA(1, 1, 1, 255);
         }
     }
+
     // There is no albedo texture on the model, use the base colour.
     else {
         material->Properties.BaseColor = FxColor::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
@@ -156,9 +123,6 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
     }
     else {
         material->NormalMap.pImage = nullptr;
-
-        // material->NormalMap.pImage = FxAssetImage::GetEmptyImage<VK_FORMAT_R8G8B8A8_UNORM, 4>();
-        // MakeEmptyMaterialTexture(material, material->Normal);
     }
 
 
@@ -197,21 +161,13 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
         FxRef<FxPrimitiveMesh<>> primitive_mesh = FxMakeRef<FxPrimitiveMesh<>>();
 
         // Keep the primitive mesh's vertices and indices in memory if `KeepInMemory` is set
-        primitive_mesh->KeepInMemory = KeepInMemory;
+        primitive_mesh->KeepInMemory = bKeepInMemory;
 
         // if there are indices in the mesh, add them to the FxPrimitiveMesh
         if (primitive->indices != nullptr) {
             indices.InitSize(primitive->indices->count);
 
             cgltf_accessor_unpack_indices(primitive->indices, indices.pData, sizeof(uint32), primitive->indices->count);
-
-            // FxLogDebug("Indices:");
-
-            // for (const auto& index : indices) {
-            //     printf("%d, ", index);
-            // }
-
-            // printf("\n");
 
             // Set the mesh indices
             primitive_mesh->UploadIndices(std::move(indices));
@@ -220,18 +176,6 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
         UnpackMeshAttributes(current_object, primitive_mesh, primitive);
 
         MakeMaterialForPrimitive(current_object, primitive);
-
-
-        //        CreateMaterialFromPrimitive(current_object, primitive);
-        //        FxGltfMaterialToLoad material{
-        //            .PrimitiveIndex = i,
-        ////            .GltfMaterial = gltf_mesh->primitives[i].material,
-        //            .Object = current_object,
-        //            .MeshIndex = mesh_index
-        //        };
-
-
-        //        MaterialsToLoad.push_back(material);
 
         current_object->pMesh = primitive_mesh;
 
@@ -242,47 +186,31 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
             // Create a new object to load into next
             current_object = FxMakeRef<FxObject>();
         }
-
-        // model->Meshes.Data[i] = primtive_mesh;
     }
 
     //    object = current_object;
-
-    FxLogInfo("Add primitive:");
 }
 
-void AxLoaderGltf::LoadAnimations() { FxLogInfo("Gltf model has {} animations", mGltfData->animations_count); }
+void AxLoaderGltf::LoadAnimations() { FxLogInfo("Gltf model has {} animations", mpGltfData->animations_count); }
 
-void AxLoaderGltf::LoadAnimationSkins()
-{
-    FxLogInfo("Gltf model has {} animation skins", mGltfData->skins_count);
-
-    for (uint32 i = 0; i < mGltfData->skins_count; i++) {
-        cgltf_skin& skin = mGltfData->skins[i];
-        FxLogInfo("Joints: {}", skin.joints_count);
-    }
-}
 
 AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
 {
-    //    FxRef<FxAssetModel> model(asset);
-
     cgltf_options options {};
 
-    cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mGltfData);
+    cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mpGltfData);
     if (status != cgltf_result_success) {
         FxLogError("Error parsing GLTF file! (path: {:s})", path);
         return AxLoaderGltf::Status::eError;
     }
 
-    status = cgltf_load_buffers(&options, mGltfData, path.c_str());
+    status = cgltf_load_buffers(&options, mpGltfData, path.c_str());
     if (status != cgltf_result_success) {
         FxLogError("Error loading buffers from GLTF file! (path: {:s})", path);
 
         return AxLoaderGltf::Status::eError;
     }
 
-    LoadAnimationSkins();
 
     return AxLoaderGltf::Status::eSuccess;
 }
@@ -294,13 +222,11 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(FxRef<AxBase> asset, const uin
 
     cgltf_options options {};
 
-    cgltf_result status = cgltf_parse(&options, data, size, &mGltfData);
+    cgltf_result status = cgltf_parse(&options, data, size, &mpGltfData);
     if (status != cgltf_result_success) {
         FxLogError("Error parsing GLTF file from data");
         return AxLoaderGltf::Status::eError;
     }
-
-    LoadAnimationSkins();
 
     return AxLoaderGltf::Status::eSuccess;
 }
@@ -315,21 +241,26 @@ void AxLoaderGltf::CreateGpuResource(FxRef<AxBase>& asset)
 
     // If there are multiple gltf meshes, we will need to use the output object as a
     // container for multiple other meshes
-    const bool has_multiple_meshes = mGltfData->meshes_count > 1;
+    const bool has_multiple_meshes = mpGltfData->meshes_count > 1;
     if (has_multiple_meshes) {
         current_object = FxMakeRef<FxObject>();
     }
 
-    FxLogInfo("Unpacking GLTF object with {} meshes", mGltfData->meshes_count);
+    FxLogInfo("Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
 
-    for (int mesh_index = 0; mesh_index < mGltfData->meshes_count; mesh_index++) {
-        cgltf_mesh* mesh = &mGltfData->meshes[mesh_index];
+    for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
+        cgltf_node* node = &mpGltfData->nodes[node_index];
 
-        printf("Primitives Count: %zu\n", mesh->primitives_count);
+        // Might be good to not ignore the other GLTF things in the future, but thats not a priority for now
+        if (!node->mesh) {
+            continue;
+        }
 
-        // object->Meshes.InitSize(mesh->primitives_count);
+        UploadMeshToGpu(current_object, node->mesh, node_index);
 
-        UploadMeshToGpu(current_object, mesh, mesh_index);
+        if (node->skin) {
+            LoadAnimationSkin(current_object->pMesh, node->skin);
+        }
 
         if (has_multiple_meshes) {
             // Attach the current object to the object container (our output)
@@ -340,14 +271,7 @@ void AxLoaderGltf::CreateGpuResource(FxRef<AxBase>& asset)
         }
     }
 
-    //    cgltf_free(mGltfData);
-    //    mGltfData = nullptr;
-
-
     asset = output_object;
-    //    current_object.mPtr = nullptr;
-    //    current_object.mRefCnt = nullptr;
-
 
     asset->bIsUploadedToGpu = true;
     asset->bIsUploadedToGpu.notify_all();
@@ -355,13 +279,9 @@ void AxLoaderGltf::CreateGpuResource(FxRef<AxBase>& asset)
 
 void AxLoaderGltf::Destroy(FxRef<AxBase>& asset)
 {
-    //    while (!asset->bIsUploadedToGpu) {
-    //        asset->bIsUploadedToGpu.wait(true);
-    //    }
-
-    if (mGltfData) {
+    if (mpGltfData) {
         printf("Destroyed mesh\n");
-        cgltf_free(mGltfData);
-        mGltfData = nullptr;
+        cgltf_free(mpGltfData);
+        mpGltfData = nullptr;
     }
 }

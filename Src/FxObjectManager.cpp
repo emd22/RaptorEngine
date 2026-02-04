@@ -38,7 +38,7 @@ void FxObjectManager::Create()
 
     VkWriteDescriptorSet buffer_write {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = mObjectBufferDS.Set,
+        .dstSet = mObjectBufferDS.Get(),
         .dstBinding = 0,
         .dstArrayElement = 0,
         .descriptorCount = 1,
@@ -94,6 +94,7 @@ FxObjectGpuEntry* FxObjectManager::GetBufferAtFrame(uint32 object_id)
 
     return reinterpret_cast<FxObjectGpuEntry*>(entry_buffer + GetOffsetObjectIndex(object_id));
 }
+
 
 FxObjectId FxObjectManager::GenerateObjectId()
 {

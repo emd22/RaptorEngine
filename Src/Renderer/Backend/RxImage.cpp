@@ -24,7 +24,7 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
         props.LayerCount = 6;
     }
     else {
-        OldLog::Error("Unknown image type!", 0);
+        FxLogError("Unknown image type!");
     }
 
     return props;

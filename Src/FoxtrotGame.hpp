@@ -38,6 +38,7 @@ public:
     FxRef<FxObject> pPistolObject { nullptr };
     FxRef<FxObject> pHelmetObject { nullptr };
     FxRef<FxObject> pLevelObject { nullptr };
+    FxRef<FxObject> pSkyboxObject { nullptr };
 
     FxRef<FxObject> pHelmetInstance { nullptr };
 

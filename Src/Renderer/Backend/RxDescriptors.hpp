@@ -3,6 +3,7 @@
 #include "RxDevice.hpp"
 #include "RxGpuBuffer.hpp"
 #include "RxPipeline.hpp"
+#include "RxSampler.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -40,48 +41,65 @@ private:
 
 class RxDescriptorSet
 {
+    struct DescriptorEntry
+    {
+        uint32 BindIndex = 0;
+        RxImage* pImage = nullptr;
+        RxSampler* pSampler = nullptr;
+        RxRawGpuBuffer* pBuffer = nullptr;
+
+        uint32 BufferOffset = 0;
+        uint32 BufferRange = 0;
+    };
+
+
+    static constexpr uint32 scMaxBuffers = 2;
+    static constexpr uint32 scMaxImages = 6;
+
+    static constexpr uint32 scMaxDescriptorEntries = scMaxBuffers + scMaxImages;
+
 public:
     void Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, uint32 count = 1);
+    bool IsInited() const { return Set != nullptr; }
 
-    static inline void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
-                                    const RxPipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count)
+    static void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                             const RxPipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count);
+
+    static void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                             const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets);
+
+    static void BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                                   const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets,
+                                   const FxSlice<uint32>& offsets);
+
+    void BindWithOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                        const RxPipeline& pipeline, uint32 offset) const;
+
+    void Bind(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+              const RxPipeline& pipeline) const;
+
+    void AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint32 offset, uint32 range);
+    void AddImage(uint32 bind_index, RxImage* image, RxSampler* sampler);
+
+    void Build();
+
+    VkDescriptorSet Get()
     {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets_count, sets, 0, nullptr);
+        if (!mbIsBuilt) {
+            Build();
+        }
+
+        return Set;
     }
 
-    static inline void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
-                                    const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets)
-    {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, 0, nullptr);
-    }
-
-    static inline void BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
-                                          const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets,
-                                          const FxSlice<uint32>& offsets)
-    {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, offsets.Size,
-                                offsets.pData);
-    }
-
-    void BindWithOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline,
-                        uint32 offset) const
-    {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, 1, &Set, 1, &offset);
-    }
-
-    void Bind(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point, const RxPipeline& pipeline) const
-    {
-        vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, 1, &Set, 0, nullptr);
-    }
-
-    VkDescriptorSet Get() { return Set; }
-
-    operator VkDescriptorSet() { return Set; }
+    bool operator!() const { return Set == nullptr; }
 
     void Destroy() {}
 
-    bool IsInited() const { return Set != nullptr; }
-
-public:
+private:
     VkDescriptorSet Set = nullptr;
+
+    bool mbIsBuilt : 1 = false;
+
+    FxSizedArray<DescriptorEntry> mDescriptorEntries;
 };

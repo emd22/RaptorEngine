@@ -181,7 +181,7 @@ inline bool IsFileJpeg(const std::string& path)
 void AxManager::LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options)
 {
     FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
-    loader->KeepInMemory = options.KeepInMemory;
+    loader->bKeepInMemory = options.KeepInMemory;
 
     SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::Object>(asset, loader, path);
 }

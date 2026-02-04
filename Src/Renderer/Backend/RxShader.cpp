@@ -6,7 +6,6 @@
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxFile.hpp>
 #include <Core/FxTypes.hpp>
-#include <Core/Log.hpp>
 #include <Core/MemPool/FxMemPool.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 // #include <fstream>
@@ -162,7 +161,7 @@ void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data, VkShade
     const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &shader_module);
 
     if (status != VK_SUCCESS) {
-        OldLog::Error("Could not create vulkan shader module...");
+        FxLogError("Could not create Vulkan shader module: {}", RxUtil::ResultToStr(status));
         return;
     }
 }

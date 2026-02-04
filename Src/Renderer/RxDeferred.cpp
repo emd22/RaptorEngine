@@ -23,6 +23,8 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     CreateGPassPipeline();
     CreateLightingPipeline();
     CreateCompPipeline();
+
+    CreateUnlitPipeline();
 }
 
 void RxDeferredRenderer::Destroy()
@@ -80,7 +82,7 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         DsLayoutGPassMaterial = builder.Build();
     }
 
-    FxStackArray<VkDescriptorSetLayout, 3> layouts = {
+    FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
         DsLayoutGPassMaterial,
         DsLayoutLightingMaterialProperties,
         gObjectManager->DsLayoutObjectBuffer,
@@ -93,14 +95,88 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         },
     };
 
-    FxSlice<VkDescriptorSetLayout> layouts2 = FxSlice<VkDescriptorSetLayout>(layouts);
-    FxLogWarning("Layouts: {}", layouts2.Size);
-
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(layouts));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(ds_layouts));
 
     RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
     return layout;
+}
+
+VkPipelineLayout RxDeferredRenderer::CreateUnlitPipelineLayout()
+{
+    {
+        RxDsLayoutBuilder builder {};
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+        DsLayoutUnlit = builder.Build();
+    }
+
+    FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+        DsLayoutUnlit,
+        DsLayoutLightingMaterialProperties,
+        gObjectManager->DsLayoutObjectBuffer,
+    };
+
+    FxStackArray<RxPushConstants, 1> push_consts = {
+        RxPushConstants {
+            .Size = sizeof(FxDrawPushConstants),
+            .StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        },
+    };
+
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(ds_layouts));
+
+    RxUtil::SetDebugLabel("Unlit Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+
+    return layout;
+}
+
+void RxDeferredRenderer::CreateUnlitPipeline()
+{
+    VkPipelineLayout layout = CreateUnlitPipelineLayout();
+
+    RxShader shader_unlit("Unlit");
+    FxRef<RxShaderProgram> vertex_shader = shader_unlit.GetProgram(RxShaderType::eVertex, {});
+    FxRef<RxShaderProgram> fragment_shader = shader_unlit.GetProgram(RxShaderType::eFragment, {});
+
+    RxAttachment* target = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
+    FxAssert(target != nullptr);
+
+    FxVertexInfo vertex_info = FxMakeVertexInfo();
+
+    // DsUnlit.Create(DescriptorPool, DsLayoutUnlit);
+    // VkDescriptorImageInfo image_info {
+    //     .sampler = gRenderer->Swapchain.LightsSampler.Sampler,
+    //     .imageView = target->GetImageView(),
+    //     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    // };
+
+    // const VkWriteDescriptorSet image_write {
+    //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+    //     .dstSet = DsUnlit.Get(),
+    //     .dstBinding = 0,
+    //     .dstArrayElement = 0,
+    //     .descriptorCount = 1,
+    //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    //     .pImageInfo = &image_info,
+    // };
+
+    // vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &image_write, 0, nullptr);
+
+    RxPipelineBuilder builder {};
+
+    RxAttachmentList attachment_list {};
+    // attachment_list.Add(*LightPass.GetTarget(RxImageFormat::eRGBA16_Float));
+
+    builder.SetLayout(layout)
+        .SetName("Unlit Pipeline")
+        .AddBlendAttachment({ .Enabled = false })
+        .SetAttachments(&attachment_list)
+        .SetShaders(vertex_shader, fragment_shader)
+        .SetRenderPass(&LightPass.GetRenderPass())
+        .SetVertexInfo(&vertex_info)
+        .SetCullMode(VK_CULL_MODE_BACK_BIT)
+        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+    builder.Build(PlUnlit);
 }
 
 
@@ -252,7 +328,6 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     LightPass.BuildInputDescriptors(&DsLighting);
 
-
     RxShader lighting_shader("Lighting");
 
     {
@@ -348,6 +423,7 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
         DsLayoutCompFrag = builder.Build();
     }
 
+
     VkDescriptorSetLayout layouts[] = {
         DsLayoutCompFrag,
     };
@@ -360,6 +436,7 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
 
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
     PlComposition.SetLayout(layout);
+
 
     return layout;
 }

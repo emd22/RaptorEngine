@@ -7,7 +7,6 @@
 #include <Asset/AxImage.hpp>
 #include <Core/FxMemory.hpp>
 #include <Core/FxRef.hpp>
-#include <Core/Log.hpp>
 
 static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(RxImageFormat format)
 {
@@ -121,7 +120,8 @@ void AxLoaderJpeg::CreateGpuResource(FxRef<AxBase>& asset)
 {
     FxRef<AxImage> image(asset);
 
-    image->Texture.Create(image->ImageType, mImageData, image->Size, ImageFormat, RxImageFormatUtil::GetSize(ImageFormat));
+    image->Texture.Create(image->ImageType, mImageData, image->Size, ImageFormat,
+                          RxImageFormatUtil::GetSize(ImageFormat));
 
     asset->bIsUploadedToGpu = true;
     asset->bIsUploadedToGpu.notify_all();

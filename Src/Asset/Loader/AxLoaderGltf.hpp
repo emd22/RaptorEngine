@@ -11,11 +11,11 @@ struct cgltf_material;
 struct cgltf_mesh;
 struct cgltf_texture_view;
 struct cgltf_primitive;
+struct cgltf_skin;
 
 struct AxGltfMaterialToLoad
 {
-    //    cgltf_material* GltfMaterial = nullptr;
-    FxRef<FxObject> Object { nullptr };
+    FxRef<FxObject> pObject { nullptr };
     int PrimitiveIndex = 0;
     int MeshIndex = 0;
 };
@@ -44,12 +44,12 @@ private:
                               cgltf_primitive* primitive);
 
     void LoadAnimations();
-    void LoadAnimationSkins();
+    void LoadAnimationSkin(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_skin* skin);
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;
 
-    bool KeepInMemory = false;
+    bool bKeepInMemory = false;
 
     FxSizedArray<RxVertexDefault> VertexBuffer;
     FxSizedArray<uint32> IndexBuffer;
@@ -63,5 +63,7 @@ protected:
     // texture_view);
 
 private:
-    cgltf_data* mGltfData = nullptr;
+    cgltf_data* mpGltfData = nullptr;
+
+    FxSizedArray<FxMat4f> mBones;
 };

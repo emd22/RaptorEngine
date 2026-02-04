@@ -1,9 +1,7 @@
 #pragma once
 
-#include <mutex>
 #include <condition_variable>
-
-#include <Core/Log.hpp>
+#include <mutex>
 
 class FxDataNotifier
 {
@@ -24,7 +22,7 @@ public:
         mCV.notify_one();
     }
 
-    void WaitForData(bool pass_if_already_done=false)
+    void WaitForData(bool pass_if_already_done = false)
     {
         std::unique_lock<std::mutex> lock(mMutex);
 
@@ -58,7 +56,6 @@ public:
 
     void Kill()
     {
-
         std::unique_lock<std::mutex> lock(mMutex);
 
         mKilled = true;
@@ -66,7 +63,6 @@ public:
 
         mCV.notify_one();
     }
-
 
 
 private:

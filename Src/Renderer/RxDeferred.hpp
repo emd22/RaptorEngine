@@ -38,6 +38,7 @@ private:
     void CreateGPass();
 
     VkPipelineLayout CreateGPassPipelineLayout();
+    VkPipelineLayout CreateUnlitPipelineLayout();
 
     // Lighting
     // void CreateLightVolumePipeline();
@@ -53,6 +54,8 @@ private:
     // Composition
     void CreateCompPipeline();
     void DestroyCompPipeline();
+
+    void CreateUnlitPipeline();
 
     VkPipelineLayout CreateCompPipelineLayout();
 
@@ -94,6 +97,12 @@ public:
     RxPipeline PlLightingInsideVolume;
     RxPipeline PlLightingDirectional;
 
+    /////////////////////////////////////////////////
+    // Unlit (After light pass, acts as GPass)
+    /////////////////////////////////////////////////
+    VkDescriptorSetLayout DsLayoutUnlit = nullptr;
+    RxPipeline PlUnlit;
+    RxDescriptorSet DsUnlit;
 
     //////////////////////
     // Composition Pass

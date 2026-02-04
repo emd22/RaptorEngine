@@ -143,10 +143,10 @@ void FxObject::ReserveInstances(uint32 num)
     mInstanceSlotsInUse = 0;
 }
 
-void FxObject::RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pipeline)
+void FxObject::RenderPrimitive(const RxCommandBuffer& cmd)
 {
     if (pMesh) {
-        pMesh->Render(cmd, pipeline, 1);
+        pMesh->Render(cmd, 1);
     }
 
     if (AttachedNodes.IsEmpty()) {
@@ -155,7 +155,7 @@ void FxObject::RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pip
 
     for (const FxRef<FxObject>& node : AttachedNodes) {
         if (node->pMesh) {
-            node->pMesh->Render(cmd, pipeline, (mInstanceSlotsInUse + 1)); // + 1 for source object!
+            node->pMesh->Render(cmd, (mInstanceSlotsInUse + 1)); // + 1 for source object!
         }
     }
 }
@@ -176,7 +176,7 @@ void FxObject::Render(const FxCamera& camera)
 
     push_constants.ObjectId = ObjectId;
 
-    memcpy(push_constants.VPMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(FxMat4f));
+    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(FxMat4f));
 
     if (pMaterial) {
         push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
@@ -237,7 +237,7 @@ void FxObject::RenderMesh()
                                                    gObjectManager->GetBaseOffset());
 
     if (pMesh) {
-        pMesh->Render(cmd, *pMaterial->pPipeline, (mInstanceSlotsInUse + 1)); // + 1 for source object
+        pMesh->Render(cmd, (mInstanceSlotsInUse + 1)); // + 1 for source object
     }
 }
 

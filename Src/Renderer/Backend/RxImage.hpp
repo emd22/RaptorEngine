@@ -185,6 +185,8 @@ public:
 
     FX_FORCE_INLINE bool IsInited() const { return (Image != nullptr); }
 
+    void TransferToGpuOnly();
+
     void Destroy();
 
     ~RxImage() { Destroy(); }

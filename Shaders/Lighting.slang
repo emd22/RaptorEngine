@@ -165,6 +165,7 @@ FSOutput FragmentMain(FSInput in)
     float depth = 1.0 - sDepth.Sample(screen_uv).r;
     float4 albedo_rgba = sAlbedo.Sample(screen_uv);
     float3 albedo = albedo_rgba.rgb;
+
     float4 normal_rgba = sNormal.Sample(screen_uv);
 
     float3 world_position = WorldPosFromDepth(screen_uv, depth);

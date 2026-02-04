@@ -1,17 +1,6 @@
 #include "RxExtensionHandles.hpp"
 
-RxVoidFunction RxGetExtensionFunc_(VkInstance instance, const char* name)
-{
-    RxVoidFunction raw_ptr = vkGetInstanceProcAddr(instance, name);
-
-    if (raw_ptr != nullptr) {
-        return raw_ptr;
-    }
-
-    OldLog::Error("Could not load extension function '%s'", name);
-    return nullptr;
-}
-
+#include <Core/FxLog.hpp>
 
 VkResult Rx_EXT_SetDebugUtilsObjectName(VkInstance instance, VkDevice device,
                                         const VkDebugUtilsObjectNameInfoEXT* pNameInfo)

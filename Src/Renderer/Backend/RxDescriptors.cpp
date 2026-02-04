@@ -40,6 +40,9 @@ void RxDescriptorPool::Destroy()
     Pool = nullptr;
 }
 
+/////////////////////////////////////
+// Descriptor Sets
+/////////////////////////////////////
 
 void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, uint32 count)
 {
@@ -56,4 +59,136 @@ void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout
     if (status != VK_SUCCESS) {
         FxPanicVulkan("DescriptorSet", "Failed to allocate descriptor set!", status);
     }
+}
+
+void RxDescriptorSet::BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                                   const RxPipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count)
+{
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets_count, sets, 0, nullptr);
+}
+
+void RxDescriptorSet::BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                                   const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets)
+{
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, 0, nullptr);
+}
+
+void BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                        const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets,
+                        const FxSlice<uint32>& offsets)
+{
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, offsets.Size,
+                            offsets.pData);
+}
+
+void RxDescriptorSet::BindWithOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                                     const RxPipeline& pipeline, uint32 offset) const
+{
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, 1, &Set, 1, &offset);
+}
+
+void RxDescriptorSet::Bind(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
+                           const RxPipeline& pipeline) const
+{
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, 1, &Set, 0, nullptr);
+}
+
+
+void RxDescriptorSet::AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint32 offset, uint32 range)
+{
+    if (!mDescriptorEntries.IsInited()) {
+        mDescriptorEntries.InitCapacity(scMaxDescriptorEntries);
+    }
+
+    FxAssertMsg(buffer != nullptr, "Input buffer cannot be null!");
+
+    DescriptorEntry input_buffer {
+        .BindIndex = bind_index,
+        .pImage = nullptr,
+        .pSampler = nullptr,
+        .pBuffer = buffer,
+        .BufferOffset = offset,
+        .BufferRange = range,
+    };
+
+    mDescriptorEntries.Insert(input_buffer);
+
+    mbIsBuilt = false;
+}
+
+void RxDescriptorSet::AddImage(uint32 bind_index, RxImage* image, RxSampler* sampler)
+{
+    if (!mDescriptorEntries.IsInited()) {
+        mDescriptorEntries.InitCapacity(scMaxDescriptorEntries);
+    }
+
+    FxAssertMsg(image != nullptr, "Input image cannot be null!");
+
+    DescriptorEntry input_target {
+        .BindIndex = bind_index,
+        .pImage = image,
+        .pSampler = sampler,
+        .pBuffer = nullptr,
+    };
+
+    mDescriptorEntries.Insert(input_target);
+
+    mbIsBuilt = false;
+}
+
+void RxDescriptorSet::Build()
+{
+    FxAssert(mbIsBuilt == false);
+
+    FxStackArray<VkDescriptorImageInfo, scMaxImages> image_infos;
+    FxStackArray<VkDescriptorBufferInfo, scMaxBuffers> buffer_infos;
+    FxStackArray<VkWriteDescriptorSet, scMaxDescriptorEntries> write_infos;
+
+    for (const DescriptorEntry& entry : mDescriptorEntries) {
+        if (entry.pImage) {
+            VkDescriptorImageInfo image_info {
+                .sampler = entry.pSampler->Sampler,
+                .imageView = entry.pImage->View,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            };
+
+            const VkWriteDescriptorSet image_write {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = Set,
+                .dstBinding = entry.BindIndex,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .pImageInfo = image_infos.Insert(image_info),
+            };
+
+            write_infos.Insert(image_write);
+        }
+        else if (entry.pBuffer) {
+            const VkDescriptorBufferInfo buffer_info {
+                .buffer = gRenderer->Uniforms.GetGpuBuffer().Buffer,
+                .offset = entry.BufferOffset,
+                .range = entry.BufferRange,
+            };
+
+            const VkWriteDescriptorSet buffer_write {
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = Set,
+                .dstBinding = entry.BindIndex,
+                .dstArrayElement = 0,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .pImageInfo = nullptr,
+                .pBufferInfo = buffer_infos.Insert(buffer_info),
+            };
+
+            write_infos.Insert(buffer_write);
+        }
+    }
+
+    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
+
+    mbIsBuilt = true;
+
+    mDescriptorEntries.Free();
 }

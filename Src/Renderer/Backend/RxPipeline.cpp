@@ -293,23 +293,6 @@ VkPipelineLayout RxPipeline::CreateLayout(const FxSlice<const RxPushConstants>& 
         current_pc_offset += pc_def.Size;
     }
 
-
-    // if (vert_push_consts_size) {
-    //     VkPushConstantRange& range = pc_ranges[0];
-    //     range.size = vert_push_consts_size;
-    //     range.offset = 0;
-    //     range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    //     ++pc_ranges_count;
-    // }
-
-    // if (frag_push_consts_size) {
-    //     VkPushConstantRange& range = pc_ranges[pc_ranges_count];
-    //     range.size = frag_push_consts_size;
-    //     range.offset = vert_push_consts_size ? vert_push_consts_size : 0;
-    //     range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    //     ++pc_ranges_count;
-    // }
-
     VkPipelineLayoutCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = descriptor_set_layouts.Size,

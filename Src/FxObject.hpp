@@ -34,7 +34,7 @@ public:
     /**
      * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
      */
-    void RenderPrimitive(const RxCommandBuffer& cmd, const RxPipeline& pipeline);
+    void RenderPrimitive(const RxCommandBuffer& cmd);
     void Render(const FxCamera& camera);
 
     bool CheckIfReady();
@@ -67,6 +67,9 @@ public:
     FX_FORCE_INLINE void SetShadowCaster(const bool value) { mbIsShadowCaster = value; }
     FX_FORCE_INLINE bool IsShadowCaster() const { return mbIsShadowCaster; }
 
+    FX_FORCE_INLINE void SetRenderUnlit(const bool value) { mbRenderUnlit = value; }
+    FX_FORCE_INLINE bool GetRenderUnlit() const { return mbRenderUnlit; }
+
     void Destroy() override;
     ~FxObject();
 
@@ -97,7 +100,7 @@ private:
     bool mbPhysicsEnabled : 1 = false;
     bool mbIsInstance : 1 = false;
     bool mbIsShadowCaster : 1 = false;
-
+    bool mbRenderUnlit : 1 = false;
 
     FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };

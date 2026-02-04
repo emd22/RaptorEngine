@@ -4,7 +4,13 @@
 #include "Backend/RxFrameData.hpp"
 #include "Backend/RxGpuBuffer.hpp"
 
-#include <atomic>
+#include <Math/FxQuat.hpp>
+
+struct FxMeshBone
+{
+    FxVec3f Position;
+    FxQuat Rotation;
+};
 
 template <typename TVertexType = RxVertexDefault>
 class FxPrimitiveMesh
@@ -116,7 +122,7 @@ public:
     RxGpuBuffer& GetVertexBuffer() { return VertexList.GpuBuffer; }
     RxGpuBuffer& GetIndexBuffer() { return GpuIndexBuffer; }
 
-    void Render(const RxCommandBuffer& cmd, const RxPipeline& pipeline, uint32 num_instances)
+    void Render(const RxCommandBuffer& cmd, uint32 num_instances)
     {
         const VkDeviceSize offset = 0;
         //        RxFrameData* frame = Rx_Fwd_GetFrame();
@@ -235,6 +241,8 @@ public:
 
 public:
     RxVertexList<TVertexType> VertexList;
+
+    FxSizedArray<FxMeshBone> Bones;
 
     std::atomic_bool IsReady = std::atomic_bool(false);
 

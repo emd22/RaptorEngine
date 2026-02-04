@@ -75,7 +75,7 @@ public:
 
     static RxAttachmentList New() { return {}; }
 
-    RxAttachmentList& Add(RxAttachment&& attachment);
+    RxAttachmentList& Add(const RxAttachment& attachment);
 
     void CreateImages();
     FxSizedArray<VkAttachmentDescription>& GetAttachmentDescriptions();
