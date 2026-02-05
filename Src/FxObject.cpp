@@ -47,10 +47,12 @@ bool FxObject::CheckIfReady()
         return (mbReadyToRender = true);
     }
 
+
     if (!pMesh) {
         FX_BREAKPOINT;
     }
 
+    // Not a container, ensure there is a material
     if (!pMaterial || !pMaterial->IsReady()) {
         return (mbReadyToRender = false);
     }
@@ -143,23 +145,6 @@ void FxObject::ReserveInstances(uint32 num)
     mInstanceSlotsInUse = 0;
 }
 
-void FxObject::RenderPrimitive(const RxCommandBuffer& cmd)
-{
-    if (pMesh) {
-        pMesh->Render(cmd, 1);
-    }
-
-    if (AttachedNodes.IsEmpty()) {
-        return;
-    }
-
-    for (const FxRef<FxObject>& node : AttachedNodes) {
-        if (node->pMesh) {
-            node->pMesh->Render(cmd, (mInstanceSlotsInUse + 1)); // + 1 for source object!
-        }
-    }
-}
-
 
 void FxObject::Render(const FxCamera& camera)
 {
@@ -206,7 +191,10 @@ void FxObject::Render(const FxCamera& camera)
             obj->pMaterial->Build();
         }
 
+        obj->UpdateIfOutOfDate();
+
         push_constants.ObjectId = ObjectId;
+        push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
 
         vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->pMaterial->pPipeline->Layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
@@ -216,6 +204,110 @@ void FxObject::Render(const FxCamera& camera)
     }
 }
 
+void FxObject::RenderUnlit(const FxCamera& camera)
+{
+    if (!GetRenderUnlit()) {
+        return;
+    }
+
+    UpdateIfOutOfDate();
+
+    if (pMaterial && !pMaterial->bIsBuilt) {
+        pMaterial->Build();
+        return;
+    }
+
+    if (pMaterial && !CheckIfReady()) {
+        return;
+    }
+
+
+    FxDrawPushConstants push_constants {};
+    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(GetObjectLayer()).RawData, sizeof(FxMat4f));
+
+    RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    RxPipeline& pipeline = gRenderer->pDeferredRenderer->PlUnlit;
+
+    pipeline.Bind(cmd);
+
+
+    if (pMaterial) {
+        push_constants.ObjectId = ObjectId;
+        push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
+
+        vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                           sizeof(push_constants), &push_constants);
+
+
+        bool material_bound = pMaterial->BindWithPipeline(cmd, pipeline, false);
+        if (!material_bound) {
+            FxLogWarning("Material not bound!");
+            return;
+        }
+
+        gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+                                                       gObjectManager->GetBaseOffset());
+
+        RenderPrimitive(cmd);
+    }
+
+
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+                                                   gObjectManager->GetBaseOffset());
+
+
+    for (FxRef<FxObject>& obj : AttachedNodes) {
+        if (!obj->pMaterial) {
+            continue;
+        }
+
+        obj->Update();
+
+        obj->UpdateIfOutOfDate();
+
+        if (obj->pMaterial && !obj->pMaterial->bIsBuilt) {
+            obj->pMaterial->Build();
+            return;
+        }
+
+        if (!obj->CheckIfReady()) {
+            return;
+        }
+
+        push_constants.ObjectId = ObjectId;
+        push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
+
+        vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                           sizeof(push_constants), &push_constants);
+
+
+        bool material_bound = obj->pMaterial->BindWithPipeline(cmd, pipeline, false);
+        if (!material_bound) {
+            FxLogWarning("Material not bound!");
+            return;
+        }
+
+        obj->RenderPrimitive(cmd);
+    }
+}
+
+
+void FxObject::RenderPrimitive(const RxCommandBuffer& cmd)
+{
+    if (pMesh) {
+        pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
+    }
+
+    if (AttachedNodes.IsEmpty()) {
+        return;
+    }
+
+    for (const FxRef<FxObject>& node : AttachedNodes) {
+        if (node->pMesh) {
+            node->pMesh->Render(cmd, (node->mInstanceSlotsInUse + 1)); // + 1 for source object!
+        }
+    }
+}
 
 void FxObject::RenderMesh()
 {

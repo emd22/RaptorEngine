@@ -36,6 +36,7 @@ public:
      */
     void RenderPrimitive(const RxCommandBuffer& cmd);
     void Render(const FxCamera& camera);
+    void RenderUnlit(const FxCamera& camera);
 
     bool CheckIfReady();
 

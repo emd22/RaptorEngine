@@ -195,6 +195,8 @@ bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bo
         return false;
     }
 
+    pipeline.Bind(cmd);
+
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     RxDescriptorSet* descriptor_set = &mDsDefault;

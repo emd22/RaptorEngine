@@ -29,21 +29,13 @@ enum class FxTransformMode
 class FxEntity
 {
 public:
-    FxEntity() { Children.reserve(4); }
-
-    void AddChild(FxRef<FxEntity>& entity) { Children.push_back(entity); }
-
     virtual void MoveTo(const FxVec3f& position)
     {
         mPosition = position;
         MarkTransformOutOfDate();
     }
 
-    virtual void MoveBy(const FxVec3f& offset)
-    {
-        mPosition += offset;
-        MarkTransformOutOfDate();
-    }
+    virtual void MoveBy(const FxVec3f& offset) { MoveTo(mPosition + offset); }
 
     virtual void Scale(const float scale);
     virtual void SetScale(const float scale);
@@ -80,7 +72,7 @@ public:
         if (mbMatrixOutOfDate) {
             RecalculateModelMatrix();
         }
-        
+
         SubmitMatrixIfNeeded();
     }
 
@@ -92,7 +84,8 @@ protected:
     void RecalculateModelMatrix();
 
     /**
-     * @brief Submit the matrix to the object gpu buffer if there have been changes, or if it has not been synched with the current frame yet.
+     * @brief Submit the matrix to the object gpu buffer if there have been changes, or if it has not been synched with
+     * the current frame yet.
      */
     void SubmitMatrixIfNeeded();
 
@@ -106,8 +99,6 @@ public:
     FxVec3f RotationOrigin = FxVec3f::sZero;
 
     FxTransformMode TransformMode = FxTransformMode::eDefault;
-
-    std::vector<FxRef<FxEntity>> Children;
 
 protected:
     bool mbPhysicsTransformOutOfDate : 1 = true;

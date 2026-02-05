@@ -64,6 +64,8 @@ struct FSOutput {
 };
 
 layout(set = 0, binding = 0) Sampler2D sAlbedo;
+layout(set = 0, binding = 1) Sampler2D sNormalMap;
+layout(set = 0, binding = 2) Sampler2D sMetallicRoughness;
 
 layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
 

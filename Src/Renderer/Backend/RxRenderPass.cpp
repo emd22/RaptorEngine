@@ -91,7 +91,7 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
             .srcSubpass = 0,
             .dstSubpass = VK_SUBPASS_EXTERNAL,
 
-            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 
             .dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 
@@ -107,7 +107,7 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
 
             .srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 
-            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 
             .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
 

@@ -69,9 +69,9 @@ FSOut FragmentMain(FSIn in)
 {
     FSOut out;
 
-    float4 albedo = sAlbedo.Sample(in.vUV);
 
 #ifdef RENDER_UNLIT
+    float4 albedo = sAlbedo.Sample(in.vUV);
     out.vColor = float4(albedo.rgb, 1.0);
 
 #else
@@ -80,14 +80,12 @@ FSOut FragmentMain(FSIn in)
 
     float4 lighting = sLighting.Sample(in.vUV);
 
-    float3 final_color = lerp(albedo.rgb, lighting.rgb, 0.75) * exposure;
-
     // float3 hdr_recip =  1.0 / (final_color + float3(1.0));
 
     // let cfGamma : float = 1.0 / 2.2;
     // final_color = pow(final_color, float3(cfGamma));
 
-    out.vColor = float4(ACESFilm(final_color), 1.0);
+    out.vColor = float4(ACESFilm(lighting.rgb * exposure), 1.0);
 
 #endif
     // out.vColor = float4(float3(sNormal.Sample(in.vUV).w), 1.0);

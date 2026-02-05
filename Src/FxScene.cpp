@@ -30,6 +30,7 @@ void FxScene::Render(FxCamera* shadow_camera)
     for (const FxRef<FxObject>& obj : mObjects) {
         obj->Update();
 
+
         if (obj->GetRenderUnlit()) {
             continue;
         }
@@ -44,47 +45,18 @@ void FxScene::Render(FxCamera* shadow_camera)
         light->Render(camera, shadow_camera);
     }
 
-    // RenderUnlitObjects(camera);
+    RenderUnlitObjects(camera);
 
     gRenderer->DoComposition(camera);
 }
 
 void FxScene::RenderUnlitObjects(const FxCamera& camera) const
 {
-    RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-
-    RxPipeline& pipeline = gRenderer->pDeferredRenderer->PlUnlit;
-
-    pipeline.Bind(cmd);
-
-    FxDrawPushConstants push_constants {};
-
     for (const FxRef<FxObject>& obj : mObjects) {
         if (!obj->GetRenderUnlit()) {
             continue;
         }
-
-        pipeline.Bind(cmd);
-
-
-        push_constants.ObjectId = obj->ObjectId;
-
-        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(obj->GetObjectLayer()).RawData, sizeof(FxMat4f));
-
-        if (obj->pMaterial) {
-            push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
-            obj->pMaterial->BindWithPipeline(cmd, pipeline, true);
-        }
-
-
-        gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-                                                       gObjectManager->GetBaseOffset());
-
-        vkCmdPushConstants(cmd.Get(), obj->pMaterial->pPipeline->Layout,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                           &push_constants);
-
-        obj->RenderPrimitive(cmd);
+        obj->RenderUnlit(camera);
     }
 }
 
@@ -101,6 +73,8 @@ void FxScene::RenderShadows(FxCamera* shadow_camera)
         if (!obj->IsShadowCaster()) {
             continue;
         }
+
+        obj->Update();
 
         consts.ObjectId = obj->ObjectId;
 

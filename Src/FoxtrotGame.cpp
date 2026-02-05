@@ -171,6 +171,7 @@ void FoxtrotGame::CreateGame()
     pPistolObject->WaitUntilLoaded();
 
     pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);
+    pPistolObject->SetRenderUnlit(true);
 
     PistolRotationGoal = pPistolObject->mRotation;
 

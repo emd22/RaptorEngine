@@ -129,6 +129,8 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
     gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
     gRenderer->Uniforms.Write(mRadius);
 
+    gRenderer->Uniforms.Write(AmbientColor.Value);
+
     gRenderer->Uniforms.FlushToGpu();
 
     pLightVolume->Render(frame->CommandBuffer, 1);

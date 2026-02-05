@@ -24,7 +24,7 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     CreateLightingPipeline();
     CreateCompPipeline();
 
-    // CreateUnlitPipeline();
+    CreateUnlitPipeline();
 }
 
 void RxDeferredRenderer::Destroy()
@@ -109,14 +109,8 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 
 VkPipelineLayout RxDeferredRenderer::CreateUnlitPipelineLayout()
 {
-    {
-        RxDsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
-        DsLayoutUnlit = builder.Build();
-    }
-
     FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
-        DsLayoutUnlit,
+        DsLayoutGPassMaterial,
         DsLayoutLightingMaterialProperties,
         gObjectManager->DsLayoutObjectBuffer,
     };
@@ -150,17 +144,14 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 
     RxPipelineBuilder builder {};
 
-    RxAttachmentList attachment_list {};
-    // attachment_list.Add(*target);
-
     builder.SetLayout(layout)
         .SetName("Unlit Pipeline")
         .AddBlendAttachment({ .Enabled = false })
-        .SetAttachments(&attachment_list)
+        .SetAttachments(&LightPass.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&LightPass.GetRenderPass())
         .SetVertexInfo(&vertex_info)
-        .SetCullMode(VK_CULL_MODE_BACK_BIT)
+        .SetCullMode(VK_CULL_MODE_NONE)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
     builder.Build(PlUnlit);
 }

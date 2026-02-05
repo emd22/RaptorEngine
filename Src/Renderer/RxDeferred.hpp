@@ -101,7 +101,7 @@ public:
     /////////////////////////////////////////////////
     // Unlit (After light pass, acts as GPass)
     /////////////////////////////////////////////////
-    VkDescriptorSetLayout DsLayoutUnlit = nullptr;
+    // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
     RxPipeline PlUnlit;
     RxDescriptorSet DsUnlit;
 
