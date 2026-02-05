@@ -83,8 +83,11 @@ struct FSIn
 };
 
 layout(set = 0, binding = 0) Sampler2D sAlbedo;
+
+#ifdef USE_NORMAL_MAPS
 layout(set = 0, binding = 1) Sampler2D sNormalMap;
 layout(set = 0, binding = 2) Sampler2D sMetallicRoughness;
+#endif
 
 layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
 
@@ -96,7 +99,6 @@ FSOut FragmentMain(FSIn in)
 
     float4 material_color = unpackUnorm4x8ToFloat(bMaterialBuffer[VSConst.uiMaterialIndex].uiBaseColor);
     out.vAlbedo = float4(sAlbedo.Sample(in.vUV).rgb, 1.0) + material_color;
-
 
 #ifdef USE_NORMAL_MAPS
     float2 roughness_metallic = sMetallicRoughness.Sample(in.vUV).gb;
@@ -113,7 +115,6 @@ FSOut FragmentMain(FSIn in)
 
     // Metalness
     out.vAlbedo.w = roughness_metallic.y;
-
 #else
     out.vNormal = float4(in.vNormalWS, 0.5);
 #endif

@@ -10,7 +10,7 @@ void RxUniforms::Create()
     static_assert((scUniformBufferSize % 2 == 0));
     constexpr uint32 size_in_ints = (scUniformBufferSize)*RxFramesInFlight;
 
-    mGpuBuffer.Create(size_in_ints, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+    mGpuBuffer.Create(RxGpuBufferType::eUniformWithOffset, size_in_ints, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
                       RxGpuBufferFlags::ePersistentMapped);
 }
 

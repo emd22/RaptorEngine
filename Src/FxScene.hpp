@@ -27,11 +27,10 @@ public:
 
     void Destroy();
 
-    ~FxScene()
-    {
-        FxLogInfo("DESTROY SCENE");
-        Destroy();
-    }
+    ~FxScene() { Destroy(); }
+
+private:
+    void RenderUnlitObjects(const FxCamera& camera) const;
 
 public:
     FxObjectManager ObjectManager;

@@ -17,12 +17,12 @@ void FxObjectManager::Create()
     builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, RxShaderType::eVertex);
     DsLayoutObjectBuffer = builder.Build();
 
-    // RxUtil::SetDebugLabel("Object Buffer", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, DsLayoutObjectBuffer);
-
     uint32 buffer_size = (sizeof(FxObjectGpuEntry) * scMaxObjects) * RxFramesInFlight;
 
-    mObjectGpuBuffer.Create(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_ONLY,
+    mObjectGpuBuffer.Create(RxGpuBufferType::eStorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
                             RxGpuBufferFlags::ePersistentMapped);
+
+
     mObjectSlotsInUse.InitZero(scMaxObjects);
 
     if (!mObjectBufferDS.IsInited()) {
@@ -30,51 +30,9 @@ void FxObjectManager::Create()
         mObjectBufferDS.Create(mDescriptorPool, DsLayoutObjectBuffer);
     }
 
-    VkDescriptorBufferInfo info {
-        .buffer = mObjectGpuBuffer.Buffer,
-        .offset = 0,
-        .range = scMaxObjects * sizeof(FxObjectGpuEntry),
-    };
-
-    VkWriteDescriptorSet buffer_write {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .dstSet = mObjectBufferDS.Get(),
-        .dstBinding = 0,
-        .dstArrayElement = 0,
-        .descriptorCount = 1,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-        .pBufferInfo = &info,
-    };
-
-
-    vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &buffer_write, 0, nullptr);
-
-    // FxStackArray<VkWriteDescriptorSet, 2> write_descriptor_sets;
-    // FxStackArray<VkDescriptorBufferInfo, 2> write_buffer_infos;
-
-    // VkDescriptorBufferInfo info {
-    //     .buffer = gObjectManager->mObjectGpuBuffer.Buffer,
-    //     .offset = 0,
-    //     .range = VK_WHOLE_SIZE,
-    // };
-
-    // VkWriteDescriptorSet buffer_write {
-    //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //     .dstSet = mObjectBufferDS.Set,
-    //     .dstBinding = 1,
-    //     .dstArrayElement = 0,
-    //     .descriptorCount = 1,
-    //     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-    //     .pBufferInfo = write_buffer_infos.Insert(info),
-    // };
-
-    // write_descriptor_sets.Insert(buffer_write);
-
-    // vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
-    // 0,
-    //                        nullptr);
-
-    // RxUtil::SetDebugLabel("Object Buffer DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mObjectBufferDS.Set);
+    static constexpr uint32 bound_size = scMaxObjects * sizeof(FxObjectGpuEntry);
+    mObjectBufferDS.AddBuffer(0, &mObjectGpuBuffer, 0, bound_size);
+    mObjectBufferDS.Build();
 }
 
 

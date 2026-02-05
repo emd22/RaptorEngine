@@ -17,6 +17,8 @@ class RxTexture;
 
 #include <Renderer/RxConstants.hpp>
 
+struct RxAttachment;
+
 class RxDescriptorPool
 {
 public:
@@ -38,6 +40,12 @@ private:
     friend class RxDescriptorSet;
 };
 
+enum class RxDescriptorBufferType
+{
+    eStorage,
+    eUniform,
+};
+
 
 class RxDescriptorSet
 {
@@ -48,8 +56,8 @@ class RxDescriptorSet
         RxSampler* pSampler = nullptr;
         RxRawGpuBuffer* pBuffer = nullptr;
 
-        uint32 BufferOffset = 0;
-        uint32 BufferRange = 0;
+        uint64 BufferOffset = 0;
+        uint64 BufferRange = 0;
     };
 
 
@@ -78,8 +86,9 @@ public:
     void Bind(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
               const RxPipeline& pipeline) const;
 
-    void AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint32 offset, uint32 range);
+    void AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint64 offset, uint64 range);
     void AddImage(uint32 bind_index, RxImage* image, RxSampler* sampler);
+    void AddImageFromTarget(uint32 bind_index, RxAttachment* target, RxSampler* sampler);
 
     void Build();
 

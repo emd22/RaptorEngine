@@ -57,11 +57,6 @@ public:
 protected:
     void CreateGpuResource(FxRef<AxBase>& asset) override;
 
-    // void UnpackMeshAttributes(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_primitive* primitive);
-
-    // static FxRef<FxAssetImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view&
-    // texture_view);
-
 private:
     cgltf_data* mpGltfData = nullptr;
 

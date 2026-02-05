@@ -217,7 +217,7 @@ public:
     void UploadToGpu()
     {
         FxLogInfo("Uploading vertex list to GPU buffer");
-        GpuBuffer.Create(RxBufferUsageType::Vertices, LocalBuffer);
+        GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, LocalBuffer);
     }
 
     FxVec3f CalculateDimensionsFromPositions()

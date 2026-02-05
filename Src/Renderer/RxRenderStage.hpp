@@ -39,11 +39,6 @@ public:
     RxAttachmentList& GetTargets() { return mOutputTargets; }
     RxAttachment* GetTarget(RxImageFormat format, int sub_index = 0);
 
-    void AddInputBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint32 offset, uint32 range);
-    void AddInputTarget(uint32 bind_index, RxAttachment* target, RxSampler* sampler);
-
-    void BuildInputDescriptors(RxDescriptorSet* out);
-
     void MarkFinalStage();
 
     RxRenderPass& GetRenderPass() { return mRenderPass; }

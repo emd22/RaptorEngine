@@ -84,7 +84,7 @@ public:
         LocalIndexBuffer.InitAsCopyOf(indices);
         // }
 
-        GpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
+        GpuIndexBuffer.Create(RxGpuBufferType::eIndexBuffer, indices);
     }
 
     /**
@@ -93,7 +93,7 @@ public:
      */
     void UploadIndices(FxSizedArray<uint32>&& indices)
     {
-        GpuIndexBuffer.Create(RxBufferUsageType::Indices, indices);
+        GpuIndexBuffer.Create(RxGpuBufferType::eIndexBuffer, indices);
         LocalIndexBuffer = std::move(indices);
     }
 

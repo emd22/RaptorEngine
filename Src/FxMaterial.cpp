@@ -54,9 +54,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     FxLogInfo("Creating material buffer of size {:d}", material_buffer_size);
 
-    MaterialPropertiesBuffer.Create(sizeof(FxMaterialProperties) * material_buffer_size,
-                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                    RxGpuBufferFlags::ePersistentMapped);
+    MaterialPropertiesBuffer.Create(RxGpuBufferType::eStorage, sizeof(FxMaterialProperties) * material_buffer_size,
+                                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, RxGpuBufferFlags::ePersistentMapped);
 
 
     if (!mMaterialPropertiesDS.IsInited()) {
@@ -64,36 +63,12 @@ void FxMaterialManager::Create(uint32 entities_per_page)
         mMaterialPropertiesDS.Create(dp, gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties);
     }
 
-
-    {
-        FxStackArray<VkWriteDescriptorSet, FxMaterial::ResourceType::eMaxImages> write_descriptor_sets;
-        FxStackArray<VkDescriptorBufferInfo, FxMaterial::ResourceType::eMaxImages> write_buffer_infos;
-
-        {
-            VkDescriptorBufferInfo info {
-                .buffer = MaterialPropertiesBuffer.Buffer,
-                .offset = 0,
-                .range = VK_WHOLE_SIZE,
-            };
-
-            VkWriteDescriptorSet buffer_write {
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = mMaterialPropertiesDS.Get(),
-                .dstBinding = 0,
-                .dstArrayElement = 0,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                .pBufferInfo = write_buffer_infos.Insert(info),
-            };
-
-            write_descriptor_sets.Insert(buffer_write);
-        }
-
-        vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size, write_descriptor_sets.pData,
-                               0, nullptr);
-    }
+    mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);
+    mMaterialPropertiesDS.Build();
 
     RxUtil::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Get());
+
+    FxLogInfo("Done!");
 
     mbInitialized = true;
 }
@@ -134,17 +109,13 @@ void FxMaterialManager::Destroy()
 
     MaterialPropertiesBuffer.Destroy();
 
-    // if (mDescriptorPool) {
-    // vkDestroyDescriptorPool(gRenderer->GetDevice()->Device, mDescriptorPool.Pool, nullptr);
-    // }
-    //
     mDescriptorPool.Destroy();
 
     mbInitialized = false;
 }
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
-    if (!component_.pImage || !component_.pImage->IsLoaded()) {                                                        \
+    if (component_.Exists() && !component_.pImage->IsLoaded()) {                                                       \
         return false;                                                                                                  \
     }
 
@@ -154,6 +125,10 @@ bool FxMaterial::IsReady()
         return true;
     }
 
+    if (!Diffuse.Exists()) {
+        return false;
+    }
+
     CHECK_COMPONENT_READY(Diffuse);
     CHECK_COMPONENT_READY(NormalMap);
     CHECK_COMPONENT_READY(MetallicRoughness);
@@ -161,13 +136,30 @@ bool FxMaterial::IsReady()
     return (mbIsReady = true);
 }
 
+RxDescriptorSet& FxMaterial::GetDescriptorSetAlbedoOnly()
+{
+    if (mDsAlbedoOnly.IsInited()) {
+        return mDsAlbedoOnly;
+    }
+
+    mDsAlbedoOnly.Create(FxMaterialManager::GetDescriptorPool(),
+                         gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, 1);
+
+
+    mDsAlbedoOnly.AddImage(0, &Diffuse.pImage->Texture.Image, Diffuse.pImage->Texture.Sampler.mpPtr);
+    mDsAlbedoOnly.Build();
+
+    return mDsAlbedoOnly;
+}
+
+
 bool FxMaterial::Bind(RxCommandBuffer* cmd)
 {
     if (!bIsBuilt.load()) {
         Build();
     }
 
-    if (!IsReady() || !mDescriptorSet) {
+    if (!IsReady() || !mDsDefault) {
         return false;
     }
 
@@ -182,7 +174,7 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     VkDescriptorSet sets_to_bind[] = {
-        mDescriptorSet.Get(),                // Set 0
+        mDsDefault.Get(),                    // Set 0
         manager.mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
     };
 
@@ -193,20 +185,25 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
     return true;
 }
 
-bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline)
+bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bool albedo_only)
 {
     if (!bIsBuilt.load()) {
         Build();
     }
 
-    if (!IsReady() || !mDescriptorSet) {
+    if (!IsReady() || !mDsDefault) {
         return false;
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
+    RxDescriptorSet* descriptor_set = &mDsDefault;
+    if (albedo_only) {
+        descriptor_set = &GetDescriptorSetAlbedoOnly();
+    }
+
     VkDescriptorSet sets_to_bind[] = {
-        mDescriptorSet.Get(),                // Set 0
+        descriptor_set->Get(),               // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
         manager.mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
     };
 
@@ -219,21 +216,12 @@ bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline)
 void FxMaterial::Destroy()
 {
     if (bIsBuilt) {
-        // if (mSetLayout) {
-        //     vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, mSetLayout, nullptr);
-        // }
-
         bIsBuilt.store(false);
     }
 
     if (mMaterialPropertiesIndex != UINT32_MAX) {
         FxMaterialManager::GetGlobalManager().MaterialsInUse.Unset(mMaterialPropertiesIndex);
     }
-
-    // TODO: figure out why the FxRef isn't destroying the object...
-    // if (Diffuse.pImage) {
-    //     Diffuse.pImage->Destroy();
-    // }
 }
 
 
@@ -255,25 +243,6 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 }
 
 
-#define PUSH_IMAGE_IF_SET(img, binding)                                                                                \
-    if (img != nullptr) {                                                                                              \
-        const VkDescriptorImageInfo image_info {                                                                       \
-            .sampler = img->Texture.Sampler->Sampler,                                                                  \
-            .imageView = img->Texture.Image.View,                                                                      \
-            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                                                   \
-        };                                                                                                             \
-        const VkWriteDescriptorSet image_write {                                                                       \
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,                                                           \
-            .dstSet = descriptor_set.Set,                                                                              \
-            .dstBinding = binding,                                                                                     \
-            .dstArrayElement = 0,                                                                                      \
-            .descriptorCount = 1,                                                                                      \
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,                                               \
-            .pImageInfo = write_image_infos.Insert(image_info),                                                        \
-        };                                                                                                             \
-        write_descriptor_sets.Insert(image_write);                                                                     \
-    }
-
 #define BUILD_MATERIAL_COMPONENT(component_, sampler_)                                                                 \
     {                                                                                                                  \
         if (component_.Build(sampler_) == FxMaterialComponentStatus::eNotReady) {                                      \
@@ -283,56 +252,43 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 
 void FxMaterial::Build()
 {
-    if (!mDescriptorSet.IsInited()) {
-        mDescriptorSet.Create(FxMaterialManager::GetDescriptorPool(),
-                              gRenderer->pDeferredRenderer->DsLayoutGPassMaterial, 2);
+    if (!mDsDefault.IsInited()) {
+        mDsDefault.Create(FxMaterialManager::GetDescriptorPool(), gRenderer->pDeferredRenderer->DsLayoutGPassMaterial,
+                          2);
     }
-
-    bool has_normal_map = false;
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     // Build components
     BUILD_MATERIAL_COMPONENT(Diffuse, manager.pAlbedoSampler);
 
-    if (NormalMap.pImage) {
-        has_normal_map = true;
-    }
-
     BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
 
     MetallicRoughness.Build(manager.pMetallicRoughnessSampler);
     BUILD_MATERIAL_COMPONENT(MetallicRoughness, manager.pMetallicRoughnessSampler);
 
-    // Update the material descriptor
-    {
-        // constexpr int max_images = static_cast<int>(FxMaterial::ResourceType::eMaxImages);
-        // constexpr int max_buffers = 1;
+    // Fill material descriptor
 
-        // FxStackArray<VkDescriptorImageInfo, max_images> write_image_infos;
-        // FxStackArray<VkDescriptorBufferInfo, max_buffers> write_buffer_infos;
-        // FxStackArray<VkWriteDescriptorSet, (max_images + max_buffers)> write_descriptor_sets;
+    mDsDefault.AddImage(0, &Diffuse.pImage->Texture.Image, Diffuse.pImage->Texture.Sampler.mpPtr);
 
-        // RxDescriptorSet& descriptor_set = mDescriptorSet;
+    // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
+    // not need to.
 
-        mDescriptorSet.AddImage(0, &Diffuse.pImage->Texture.Image, Diffuse.pImage->Texture.Sampler.mpPtr);
-        mDescriptorSet.AddImage(1, &NormalMap.pImage->Texture.Image, NormalMap.pImage->Texture.Sampler.mpPtr);
-        mDescriptorSet.AddImage(2, &MetallicRoughness.pImage->Texture.Image,
-                                MetallicRoughness.pImage->Texture.Sampler.mpPtr);
+    if (NormalMap.Exists()) {
+        mDsDefault.AddImage(1, &NormalMap.pImage->Texture.Image, NormalMap.pImage->Texture.Sampler.mpPtr);
 
-        mDescriptorSet.Build();
+        // To reduce permutations -- the metallic roughness map should only be
+        // enabled if there is also a normal map.
+        if (!MetallicRoughness.Exists()) {
+            MetallicRoughness.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
+        }
 
-        // Push material textures
-        // PUSH_IMAGE_IF_SET(Diffuse.pImage, 0);
-        // PUSH_IMAGE_IF_SET(NormalMap.pImage, 1);
-        // PUSH_IMAGE_IF_SET(MetallicRoughness.pImage, 2);
-
-        // vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_descriptor_sets.Size,
-        // write_descriptor_sets.pData,
-        //                        0, nullptr);
+        mDsDefault.AddImage(2, &MetallicRoughness.pImage->Texture.Image,
+                            MetallicRoughness.pImage->Texture.Sampler.mpPtr);
     }
 
-    // mMaterialPropertiesIndex = (manager.NumMaterialsInBuffer++);
+    mDsDefault.Build();
+
 
     FxAssert(mMaterialPropertiesIndex != UINT32_MAX);
 
@@ -342,16 +298,12 @@ void FxMaterial::Build()
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
 
-    if (has_normal_map) {
+    if (NormalMap.Exists()) {
         pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
     }
     else {
         pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
     }
 
-
-    // material->BaseColor = ;
-
-    // Mark material as built
     bIsBuilt.store(true);
 }

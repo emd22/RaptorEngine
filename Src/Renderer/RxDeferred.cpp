@@ -24,7 +24,7 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     CreateLightingPipeline();
     CreateCompPipeline();
 
-    CreateUnlitPipeline();
+    // CreateUnlitPipeline();
 }
 
 void RxDeferredRenderer::Destroy()
@@ -72,7 +72,6 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         // Create object buffer DS layout
     }
 
-    // Fragment descriptor set
     {
         RxDsLayoutBuilder builder {};
         builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
@@ -80,6 +79,12 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
         // builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RxShaderType::eVertex);
         DsLayoutGPassMaterial = builder.Build();
+    }
+
+    {
+        RxDsLayoutBuilder builder {};
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+        DsLayoutGPassMaterialAlbedoOnly = builder.Build();
     }
 
     FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
@@ -138,34 +143,15 @@ void RxDeferredRenderer::CreateUnlitPipeline()
     FxRef<RxShaderProgram> vertex_shader = shader_unlit.GetProgram(RxShaderType::eVertex, {});
     FxRef<RxShaderProgram> fragment_shader = shader_unlit.GetProgram(RxShaderType::eFragment, {});
 
-    RxAttachment* target = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
-    FxAssert(target != nullptr);
+    // RxAttachment* target = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
+    // FxAssert(target != nullptr);
 
     FxVertexInfo vertex_info = FxMakeVertexInfo();
-
-    // DsUnlit.Create(DescriptorPool, DsLayoutUnlit);
-    // VkDescriptorImageInfo image_info {
-    //     .sampler = gRenderer->Swapchain.LightsSampler.Sampler,
-    //     .imageView = target->GetImageView(),
-    //     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    // };
-
-    // const VkWriteDescriptorSet image_write {
-    //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //     .dstSet = DsUnlit.Get(),
-    //     .dstBinding = 0,
-    //     .dstArrayElement = 0,
-    //     .descriptorCount = 1,
-    //     .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-    //     .pImageInfo = &image_info,
-    // };
-
-    // vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, 1, &image_write, 0, nullptr);
 
     RxPipelineBuilder builder {};
 
     RxAttachmentList attachment_list {};
-    // attachment_list.Add(*LightPass.GetTarget(RxImageFormat::eRGBA16_Float));
+    // attachment_list.Add(*target);
 
     builder.SetLayout(layout)
         .SetName("Unlit Pipeline")
@@ -248,6 +234,10 @@ void RxDeferredRenderer::DestroyGPassPipeline()
         vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterial, nullptr);
         DsLayoutGPassMaterial = nullptr;
     }
+    if (DsLayoutGPassMaterialAlbedoOnly) {
+        vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterialAlbedoOnly, nullptr);
+        DsLayoutGPassMaterialAlbedoOnly = nullptr;
+    }
 
     PlGeometry.Destroy();
 
@@ -315,18 +305,18 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     DsLighting.Create(DescriptorPool, DsLayoutLightingFrag);
 
-    // Depth
-    LightPass.AddInputTarget(0, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-    // Albedo
-    LightPass.AddInputTarget(1, GPass.GetTarget(RxImageFormat::eBGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
-    // Normals
-    LightPass.AddInputTarget(2, GPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
-
+    // sDepth
+    DsLighting.AddImageFromTarget(0, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+    // sAlbedo
+    DsLighting.AddImageFromTarget(1, GPass.GetTarget(RxImageFormat::eBGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+    // sNormals
+    DsLighting.AddImageFromTarget(2, GPass.GetTarget(RxImageFormat::eRGBA16_Float),
+                                  &gRenderer->Swapchain.NormalsSampler);
     // Skip 3 for the shadow target, added by RxDirectionalShadows
+    // Uniform buffer
+    DsLighting.AddBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.scUniformBufferSize);
 
-    LightPass.AddInputBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.scUniformBufferSize);
-
-    LightPass.BuildInputDescriptors(&DsLighting);
+    DsLighting.Build();
 
     RxShader lighting_shader("Lighting");
 
@@ -502,13 +492,19 @@ void RxDeferredRenderer::CreateCompPass()
     CompPass.MarkFinalStage();
     CompPass.BuildRenderStage();
 
-    CompPass.AddInputTarget(1, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-    CompPass.AddInputTarget(2, GPass.GetTarget(RxImageFormat::eBGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
-    CompPass.AddInputTarget(3, GPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
-    CompPass.AddInputTarget(4, LightPass.GetTarget(RxImageFormat::eRGBA16_Float), &gRenderer->Swapchain.LightsSampler);
+    DsComposition.AddImageFromTarget(1, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+
+    DsComposition.AddImageFromTarget(2, GPass.GetTarget(RxImageFormat::eBGRA8_UNorm),
+                                     &gRenderer->Swapchain.ColorSampler);
+
+    DsComposition.AddImageFromTarget(3, GPass.GetTarget(RxImageFormat::eRGBA16_Float),
+                                     &gRenderer->Swapchain.NormalsSampler);
+
+    DsComposition.AddImageFromTarget(4, LightPass.GetTarget(RxImageFormat::eRGBA16_Float),
+                                     &gRenderer->Swapchain.LightsSampler);
 
 
-    CompPass.BuildInputDescriptors(&DsComposition);
+    DsComposition.Build();
 }
 
 void RxDeferredRenderer::DoCompPass(FxCamera& camera)

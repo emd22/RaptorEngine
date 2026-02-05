@@ -1,6 +1,7 @@
 #include "RxDescriptors.hpp"
 
 #include <FxEngine.hpp>
+#include <Renderer/RxAttachment.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 /////////////////////////////////////
@@ -94,7 +95,7 @@ void RxDescriptorSet::Bind(uint32 first_set_index, const RxCommandBuffer& cmd, V
 }
 
 
-void RxDescriptorSet::AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint32 offset, uint32 range)
+void RxDescriptorSet::AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint64 offset, uint64 range)
 {
     if (!mDescriptorEntries.IsInited()) {
         mDescriptorEntries.InitCapacity(scMaxDescriptorEntries);
@@ -114,6 +115,12 @@ void RxDescriptorSet::AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint3
     mDescriptorEntries.Insert(input_buffer);
 
     mbIsBuilt = false;
+}
+
+void RxDescriptorSet::AddImageFromTarget(uint32 bind_index, RxAttachment* target, RxSampler* sampler)
+{
+    FxAssertMsg(target != nullptr, "Input target cannot be null!");
+    AddImage(bind_index, &target->Image, sampler);
 }
 
 void RxDescriptorSet::AddImage(uint32 bind_index, RxImage* image, RxSampler* sampler)
@@ -139,6 +146,7 @@ void RxDescriptorSet::AddImage(uint32 bind_index, RxImage* image, RxSampler* sam
 void RxDescriptorSet::Build()
 {
     FxAssert(mbIsBuilt == false);
+    FxAssertMsg(mDescriptorEntries.IsNotEmpty(), "Descriptor set is missing entries!");
 
     FxStackArray<VkDescriptorImageInfo, scMaxImages> image_infos;
     FxStackArray<VkDescriptorBufferInfo, scMaxBuffers> buffer_infos;
@@ -166,7 +174,7 @@ void RxDescriptorSet::Build()
         }
         else if (entry.pBuffer) {
             const VkDescriptorBufferInfo buffer_info {
-                .buffer = gRenderer->Uniforms.GetGpuBuffer().Buffer,
+                .buffer = entry.pBuffer->Buffer,
                 .offset = entry.BufferOffset,
                 .range = entry.BufferRange,
             };
@@ -177,7 +185,7 @@ void RxDescriptorSet::Build()
                 .dstBinding = entry.BindIndex,
                 .dstArrayElement = 0,
                 .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                .descriptorType = RxGpuBufferUtil::BufferTypeToDescriptorType(entry.pBuffer->Type),
                 .pImageInfo = nullptr,
                 .pBufferInfo = buffer_infos.Insert(buffer_info),
             };

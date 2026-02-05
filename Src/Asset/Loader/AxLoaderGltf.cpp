@@ -71,9 +71,7 @@ template <RxImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
-    if (!texture_view.texture) {
-        return;
-    }
+    FxAssert(texture_view.texture != nullptr);
 
     const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
@@ -112,28 +110,20 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
             material->Properties.BaseColor = FxColor::FromRGBA(1, 1, 1, 255);
         }
     }
-
-    // There is no albedo texture on the model, use the base colour.
     else {
+        // There is no albedo texture on the model, use the base colour.
         material->Properties.BaseColor = FxColor::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
     }
 
+    // Load the normalmap
     if (gltf_material->normal_texture.texture != nullptr) {
         MakeMaterialTextureForPrimitive(material, material->NormalMap, gltf_material->normal_texture);
     }
-    else {
-        material->NormalMap.pImage = nullptr;
-    }
 
-
+    // Load the metallic/roughness texture
     if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture != nullptr) {
         MakeMaterialTextureForPrimitive(material, material->MetallicRoughness,
                                         gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
-    }
-    else {
-        // material->MetallicRoughness.pImage = nullptr;
-
-        material->MetallicRoughness.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_UNorm>();
     }
 
 

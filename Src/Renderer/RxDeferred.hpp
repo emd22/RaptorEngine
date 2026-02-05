@@ -72,6 +72,7 @@ public:
 
     VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
+    VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
 
     RxRenderStage GPass;
 

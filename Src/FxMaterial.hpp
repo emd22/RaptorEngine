@@ -19,6 +19,10 @@ enum class FxMaterialComponentStatus
     eNotReady,
 };
 
+/////////////////////////////////////
+// Material Component
+/////////////////////////////////////
+
 template <RxImageFormat TFormat>
 struct FxMaterialComponent
 {
@@ -47,6 +51,8 @@ public:
         return Status::eReady;
     }
 
+    bool Exists() const { return (pImage != nullptr); }
+
     ~FxMaterialComponent() = default;
 
 private:
@@ -71,6 +77,10 @@ private:
         return true;
     }
 };
+
+/////////////////////////////////////
+// Material
+/////////////////////////////////////
 
 struct FxMaterialProperties
 {
@@ -120,17 +130,15 @@ public:
      * @returns True if the material was bound succesfully.
      */
     bool Bind(RxCommandBuffer* cmd);
-    bool BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline);
+    bool BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bool albedo_only = false);
 
     void Build();
+
+    RxDescriptorSet& GetDescriptorSet() { return mDsDefault; }
+    RxDescriptorSet& GetDescriptorSetAlbedoOnly();
+
     void Destroy();
-
     ~FxMaterial() { Destroy(); }
-
-private:
-    VkDescriptorSetLayout BuildLayout();
-
-    // bool CheckComponentTextureLoaded(FxMaterialComponent& component);
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
@@ -143,8 +151,6 @@ public:
     FxHash32 NameHash { 0 };
     std::string Name = "";
 
-    RxDescriptorSet mDescriptorSet {};
-
     RxPipeline* pPipeline = nullptr;
 
     std::atomic_bool bIsBuilt { false };
@@ -155,15 +161,16 @@ public:
     uint32 mMaterialPropertiesIndex = UINT32_MAX;
 
 private:
-    // VkDescriptorSetLayout mSetLayout = nullptr;
+    RxDescriptorSet mDsDefault;
+    RxDescriptorSet mDsAlbedoOnly;
 
-    /**
-     * @brief Descriptor set layout for material properties, used in the light pass fragment shader.
-     */
-    // VkDescriptorSetLayout mMaterialPropertiesLayoutDS = nullptr;
 
     bool mbIsReady : 1 = false;
 };
+
+/////////////////////////////////////
+// Material Manager
+/////////////////////////////////////
 
 class FxMaterialManager
 {

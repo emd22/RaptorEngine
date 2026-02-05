@@ -67,11 +67,11 @@ void RxShadowDirectional::Begin()
 
     RenderStage.Begin(cmd, mPipeline);
 
-    
+
     gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                    gShadowRenderer->GetPipeline(), gObjectManager->GetBaseOffset());
 
-    //VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
+    // VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
     /*RxDescriptorSet::BindMultiple(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline,
                                   FxSlice(desc_sets, FxSizeofArray(desc_sets)));*/
 }
@@ -80,8 +80,8 @@ void RxShadowDirectional::End() { RenderStage.End(); }
 
 void RxShadowDirectional::UpdateLightDescriptors()
 {
-    gRenderer->pDeferredRenderer->LightPass.AddInputTarget(3, RenderStage.GetTarget(RxImageFormat::eD32_Float, 0),
-                                                           &gRenderer->Swapchain.ShadowDepthSampler);
-
-    gRenderer->pDeferredRenderer->LightPass.BuildInputDescriptors(&gRenderer->pDeferredRenderer->DsLighting);
+    RxDescriptorSet& ds = gRenderer->pDeferredRenderer->DsLighting;
+    ds.AddImageFromTarget(3, RenderStage.GetTarget(RxImageFormat::eD32_Float),
+                          &gRenderer->Swapchain.ShadowDepthSampler);
+    ds.Build();
 }

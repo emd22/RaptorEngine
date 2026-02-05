@@ -44,6 +44,13 @@ void FxScene::Render(FxCamera* shadow_camera)
         light->Render(camera, shadow_camera);
     }
 
+    // RenderUnlitObjects(camera);
+
+    gRenderer->DoComposition(camera);
+}
+
+void FxScene::RenderUnlitObjects(const FxCamera& camera) const
+{
     RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
 
     RxPipeline& pipeline = gRenderer->pDeferredRenderer->PlUnlit;
@@ -57,6 +64,8 @@ void FxScene::Render(FxCamera* shadow_camera)
             continue;
         }
 
+        pipeline.Bind(cmd);
+
 
         push_constants.ObjectId = obj->ObjectId;
 
@@ -64,7 +73,7 @@ void FxScene::Render(FxCamera* shadow_camera)
 
         if (obj->pMaterial) {
             push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
-            obj->pMaterial->BindWithPipeline(cmd, pipeline);
+            obj->pMaterial->BindWithPipeline(cmd, pipeline, true);
         }
 
 
@@ -77,9 +86,6 @@ void FxScene::Render(FxCamera* shadow_camera)
 
         obj->RenderPrimitive(cmd);
     }
-
-
-    gRenderer->DoComposition(camera);
 }
 
 void FxScene::RenderShadows(FxCamera* shadow_camera)

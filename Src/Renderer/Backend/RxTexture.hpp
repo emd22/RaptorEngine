@@ -38,8 +38,8 @@ public:
         //        assert(image_data.Size == data_size);
 
         RxRawGpuBuffer staging_buffer;
-        staging_buffer.Create(data_size, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                              VMA_MEMORY_USAGE_CPU_TO_GPU);
+        staging_buffer.Create(RxGpuBufferType::eTransfer, data_size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+                              RxGpuBufferFlags::eTransferReceiver);
         staging_buffer.Upload(image_data);
 
         const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |

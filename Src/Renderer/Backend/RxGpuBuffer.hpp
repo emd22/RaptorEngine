@@ -4,12 +4,8 @@
 #include "Fwd/Rx_Fwd_GetGpuAllocator.hpp"
 #include "Fwd/Rx_Fwd_SubmitUploadGpuCmd.hpp"
 
-#include <memory.h>
-
-#include <Core/FxPanic.hpp>
 #include <Core/FxTypes.hpp>
 #include <Core/FxUtil.hpp>
-#include <cstring>
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
@@ -27,11 +23,68 @@ enum class RxGpuBufferFlags : uint16
     eNone = 0x00,
     /** The buffer is mapped for the lifetime of the buffer. */
     ePersistentMapped = 0x01,
+    eTransferReceiver = 0x02,
 
     FX_DEFINE_AS_FLAG_ENUM,
 };
 
 // FX_DEFINE_ENUM_AS_FLAGS(RxGpuBufferFlags);
+
+enum class RxGpuBufferType
+{
+    eStorage,
+    eStorageWithOffset,
+    eUniform,
+    eUniformWithOffset,
+    eTransfer,
+    eVertexBuffer,
+    eIndexBuffer,
+};
+
+class RxGpuBufferUtil
+{
+public:
+    static constexpr VkBufferUsageFlags BufferTypeToUnderlying(RxGpuBufferType type)
+    {
+        switch (type) {
+        case RxGpuBufferType::eStorage:
+        case RxGpuBufferType::eStorageWithOffset:
+            return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+        case RxGpuBufferType::eUniform:
+        case RxGpuBufferType::eUniformWithOffset:
+            return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+        case RxGpuBufferType::eTransfer:
+            return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        case RxGpuBufferType::eVertexBuffer:
+            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        case RxGpuBufferType::eIndexBuffer:
+            return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        }
+
+        return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    }
+
+    static constexpr VkDescriptorType BufferTypeToDescriptorType(RxGpuBufferType type)
+    {
+        switch (type) {
+        case RxGpuBufferType::eStorage:
+            return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        case RxGpuBufferType::eStorageWithOffset:
+            return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+
+        case RxGpuBufferType::eUniform:
+            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        case RxGpuBufferType::eUniformWithOffset:
+            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+
+        default:;
+        }
+
+        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    }
+};
 
 
 /**
@@ -46,76 +99,19 @@ public:
 
     RxRawGpuBuffer operator=(RxRawGpuBuffer& other) = delete;
 
-    void Create(uint64 size_in_bytes, VkBufferUsageFlags buffer_usage, VmaMemoryUsage memory_usage,
-                RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::eNone)
-    {
-        Size = size_in_bytes;
-        mUsageFlags = buffer_usage;
-        mBufferFlags = buffer_flags;
-
-        VmaAllocationCreateFlags vma_create_flags = 0;
-
-        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped)) {
-            vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT |
-                                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-        }
-
-        const VkBufferCreateInfo create_info = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                                                 .flags = 0,
-                                                 .size = size_in_bytes,
-                                                 .usage = mUsageFlags,
-                                                 .sharingMode = VK_SHARING_MODE_EXCLUSIVE };
-
-        const VmaAllocationCreateInfo alloc_create_info = { .flags = vma_create_flags, .usage = memory_usage };
-
-        VmaAllocationInfo allocation_info;
-        const VkResult status = vmaCreateBuffer(Fx_Fwd_GetGpuAllocator(), &create_info, &alloc_create_info, &Buffer,
-                                                &Allocation, &allocation_info);
-
-        if (status != VK_SUCCESS) {
-            FxPanicVulkan("GPUBuffer", "Error allocating staging buffer!", status);
-        }
-
-
-        if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped) != 0) {
-            // Get the pointer from VMA for the mapped GPU buffer
-            pMappedBuffer = allocation_info.pMappedData;
-        }
-
-        Initialized = true;
-    }
+    void Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
+                RxGpuBufferFlags buffer_flags = RxGpuBufferFlags::eNone);
 
     void FlushToGpu(uint32 offset, uint32 size)
     {
         vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
     }
 
-    void Map()
-    {
-        if (IsMapped()) {
-            FxLogWarning("Buffer {:p} is already mapped!", reinterpret_cast<void*>(Buffer));
-            return;
-        }
-
-        const VkResult status = vmaMapMemory(Fx_Fwd_GetGpuAllocator(), Allocation, &pMappedBuffer);
-
-        if (status != VK_SUCCESS) {
-            FxLogError("Could not map GPU memory to main memory! (Usage: 0x{:x})", mUsageFlags);
-            return;
-        }
-    }
+    void Map();
 
     bool IsMapped() const { return pMappedBuffer != nullptr; }
 
-    void UnMap()
-    {
-        if (!IsMapped()) {
-            return;
-        }
-
-        vmaUnmapMemory(Fx_Fwd_GetGpuAllocator(), Allocation);
-        pMappedBuffer = nullptr;
-    }
+    void UnMap();
 
     template <typename TElementType>
     void Upload(const FxSizedArray<TElementType>& data)
@@ -133,26 +129,13 @@ public:
         UnMap();
     }
 
-    void Destroy()
-    {
-        // FxLogInfo("Destroying GPU buffer of size {}", Size);
-        if (!(Initialized.load()) || Allocation == nullptr || Buffer == nullptr) {
-            return;
-        }
-
-        // if (IsMapped()) {
-        //     UnMap();
-        // }
-
-        Fx_Fwd_AddGpuBufferToDeletionQueue(this->Buffer, this->Allocation);
-
-        Initialized.store(false);
-        Size = 0;
-    }
+    void Destroy();
 
     ~RxRawGpuBuffer() { Destroy(); }
 
 public:
+    RxGpuBufferType Type = RxGpuBufferType::eStorage;
+
     VkBuffer Buffer = nullptr;
     VmaAllocation Allocation = nullptr;
 
@@ -162,7 +145,6 @@ public:
     uint64 Size = 0;
 
 private:
-    VkBufferUsageFlags mUsageFlags = 0;
     RxGpuBufferFlags mBufferFlags = RxGpuBufferFlags::eNone;
 };
 
@@ -215,20 +197,19 @@ public:
     RxGpuBuffer() = default;
 
     template <typename TElementType>
-    void Create(RxBufferUsageType usage, const FxSizedArray<TElementType>& data)
+    void Create(RxGpuBufferType buffer_type, const FxSizedArray<TElementType>& data)
     {
         this->Size = data.Size * sizeof(TElementType);
-        Usage = usage;
+        this->Type = buffer_type;
 
         RxRawGpuBuffer staging_buffer;
-        staging_buffer.Create(Size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        // Upload the data to the staging buffer
+        staging_buffer.Create(RxGpuBufferType::eTransfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
         staging_buffer.Upload(data);
 
-        this->Create(this->Size, FxUtil::EnumToInt(Usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                     VMA_MEMORY_USAGE_GPU_ONLY);
+        // Create the GPU-only buffer as a transfer destination
+        this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, RxGpuBufferFlags::eTransferReceiver);
 
+        // Transfer
         Fx_Fwd_SubmitUploadCmd(
             [&](RxCommandBuffer& cmd)
             {
@@ -238,7 +219,4 @@ public:
 
         staging_buffer.Destroy();
     }
-
-public:
-    RxBufferUsageType Usage;
 };
