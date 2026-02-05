@@ -140,7 +140,7 @@ void FoxtrotGame::CreateGame()
     pLevelObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
     pLevelObject->WaitUntilLoaded();
 
-    pLevelObject->SetRenderUnlit(true);
+    // pLevelObject->SetRenderUnlit(true);
 
     pLevelObject->PhysicsCreateMesh(*pLevelObject->pMesh, PhMotionType::eStatic, {});
 
