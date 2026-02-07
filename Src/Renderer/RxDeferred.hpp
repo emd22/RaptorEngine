@@ -8,7 +8,8 @@
 #include "RxPipelineList.hpp"
 #include "RxRenderPassCache.hpp"
 #include "RxRenderStage.hpp"
-#include "RxSkybox.hpp"
+
+class FxCamera;
 
 struct RxFrameData;
 
