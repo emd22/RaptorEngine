@@ -30,8 +30,8 @@ static FxConfigEntry::ValueType GetValueTokenType(const FxToken& token)
     VType current_type = VType::eNone;
 
     FxToken::IsNumericResult numeric_result = token.IsNumeric();
-    if (numeric_result != FxToken::IsNumericResult::NaN) {
-        if (numeric_result == FxToken::IsNumericResult::Integer) {
+    if (numeric_result != FxToken::IsNumericResult::eNaN) {
+        if (numeric_result == FxToken::IsNumericResult::eInteger) {
             return VType::eInt;
         }
         else {

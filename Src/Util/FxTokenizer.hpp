@@ -10,44 +10,44 @@
 
 enum class FxTokenType
 {
-    Unknown,
-    Identifier,
+    eUnknown,
+    eIdentifier,
 
-    String,
-    Integer,
-    Float,
+    eString,
+    eInteger,
+    eFloat,
 
-    Equals,
+    eEquals,
 
-    LParen,
-    RParen,
+    eLParen,
+    eRParen,
 
-    LBracket,
-    RBracket,
+    eLBracket,
+    eRBracket,
 
-    LBrace,
-    RBrace,
+    eLBrace,
+    eRBrace,
 
-    Plus,
-    Dollar,
-    Minus,
+    ePlus,
+    eDollar,
+    eMinus,
 
-    Question,
+    eQuestion,
 
-    Dot,
-    Comma,
-    Semicolon,
+    eDot,
+    eComma,
+    eSemicolon,
 
-    DocComment,
+    eDocComment,
 };
 
 struct FxToken
 {
     enum class IsNumericResult
     {
-        NaN,
-        Integer,
-        Frfunctional
+        eNaN,
+        eInteger,
+        eFractional
     };
 
 public:
@@ -83,63 +83,8 @@ public:
         return (Hash = FxHashStr64(Start, Length));
     }
 
-    IsNumericResult IsNumeric() const
-    {
-        char ch;
-
-        IsNumericResult result = IsNumericResult::NaN;
-
-        for (int i = 0; i < Length; i++) {
-            ch = Start[i];
-
-            // If there is a number preceding the dot then we are a frfunctional
-            if (ch == '.' && result != IsNumericResult::NaN) {
-                result = IsNumericResult::Frfunctional;
-                continue;
-            }
-
-            if ((ch >= '0' && ch <= '9')) {
-                // If no numbers have been found yet then set to integer
-                if (result == IsNumericResult::NaN) {
-                    result = IsNumericResult::Integer;
-                }
-                continue;
-            }
-
-            // Not a number
-            return IsNumericResult::NaN;
-        }
-
-        // Is numeric
-        return result;
-    }
-
-    static const char* GetTypeName(FxTokenType type)
-    {
-        const char* type_names[] = {
-            "Unknown",    "Identifier",
-
-            "String",     "Integer",    "Float",
-
-            "Equals",
-
-            "LParen",     "RParen",
-
-            "LBracket",   "RBracket",
-
-            "LBrace",     "RBrace",
-
-            "Plus",       "Dollar",     "Minus",
-
-            "Question",
-
-            "Dot",        "Comma",      "Semicolon",
-
-            "DocComment",
-        };
-
-        return type_names[static_cast<uint32>(type)];
-    }
+    IsNumericResult IsNumeric() const;
+    static const char* GetTypeName(FxTokenType type);
 
     int64 ToInt() const
     {
@@ -179,7 +124,7 @@ public:
     char* End = nullptr;
 
     FxHash64 Hash = 0;
-    FxTokenType Type = FxTokenType::Unknown;
+    FxTokenType Type = FxTokenType::eUnknown;
     uint32 Length = 0;
 
     uint16 FileColumn = 0;
@@ -194,98 +139,97 @@ public:
 
     struct State
     {
-        char* Data = nullptr;
-        char* DataEnd = nullptr;
-        bool InString = false;
+        char* pDataStart = nullptr;
+        char* pData = nullptr;
+        char* pDataEnd = nullptr;
+        bool bInString = false;
 
         uint32 FileLine = 0;
-        char* StartOfLine = nullptr;
+        char* pStartOfLine = nullptr;
     };
 
 
     FxTokenizer() = delete;
 
-    FxTokenizer(char* data, uint32 buffer_size) : mData(data), mDataEnd(data + buffer_size), mStartOfLine(data) {}
-
-    FxTokenType GetTokenType(FxToken& token);
+    FxTokenizer(char* data, uint32 buffer_size)
+        : mpDataStart(data), mpData(data), mpDataEnd(data + buffer_size), mpLinePtr(data)
+    {
+    }
 
     void SubmitTokenIfData(FxToken& token, char* end_ptr = nullptr, char* start_ptr = nullptr);
 
+    FxTokenType GetTokenType(FxToken& token);
     bool CheckOperators(FxToken& current_token, char ch);
-
     uint32 ReadQuotedString(char* buffer, uint32 max_size, bool skip_on_success = true);
-
     bool ExpectString(const char* expected_value, bool skip_on_success = true);
 
-    void IncludeFile(char* path);
-
-    void TryReadInternalCall()
-    {
-        if (ExpectString("include")) {
-            char include_path[512];
-
-            if (!ReadQuotedString(include_path, 512)) {
-                puts("Error reading include path!");
-                return;
-            }
-
-            IncludeFile(include_path);
-        }
-    }
-
-    bool IsNewline(char ch)
-    {
-        const bool is_newline = (ch == '\n');
-        if (is_newline) {
-            ++mFileLine;
-            mStartOfLine = mData;
-        }
-        return is_newline;
-    }
+    void TryReadInternalCall();
+    void IncludeFile(const char* path);
 
     void Tokenize();
 
+    void SetDataPtr(char* ptr)
+    {
+        mpDataStart = ptr;
+        mpData = ptr;
+    }
+
     size_t GetTokenIndexInFile(FxToken& token) const
     {
-        assert(token.Start > mData);
-        return (token.Start - mData);
+        assert(token.Start > mpData);
+        return (token.Start - mpData);
     }
 
     FxPagedArray<FxToken>& GetTokens() { return mTokens; }
 
     void SaveState()
     {
-        mSavedState.Data = mData;
-        mSavedState.DataEnd = mDataEnd;
-        mSavedState.InString = mInString;
+        mSavedState.pDataStart = mpData;
+        mSavedState.pData = mpData;
+        mSavedState.pDataEnd = mpDataEnd;
+        mSavedState.bInString = mbInString;
 
-        mSavedState.FileLine = mFileLine;
-        mSavedState.StartOfLine = mStartOfLine;
+        mSavedState.FileLine = mLineNumber;
+        mSavedState.pStartOfLine = mpLinePtr;
     }
 
     void RestoreState()
     {
-        mData = mSavedState.Data;
-        mDataEnd = mSavedState.DataEnd;
-        mInString = mSavedState.InString;
+        mpDataStart = mSavedState.pDataStart;
+        mpData = mSavedState.pData;
+        mpDataEnd = mSavedState.pDataEnd;
+        mbInString = mSavedState.bInString;
 
-        mFileLine = mSavedState.FileLine;
-        mStartOfLine = mSavedState.StartOfLine;
+        mLineNumber = mSavedState.FileLine;
+        mpLinePtr = mSavedState.pStartOfLine;
     }
+
+    ~FxTokenizer();
 
 private:
     bool IsWhitespace(char ch) { return (ch == ' ' || ch == '\t' || IsNewline(ch) || ch == '\r'); }
 
+    bool IsNewline(char ch)
+    {
+        const bool is_newline = (ch == '\n');
+        if (is_newline) {
+            ++mLineNumber;
+            mpLinePtr = mpData;
+        }
+        return is_newline;
+    }
+
 private:
     State mSavedState;
 
-    char* mData = nullptr;
-    char* mDataEnd = nullptr;
+    char* mpDataStart = nullptr;
+    char* mpData = nullptr;
+    char* mpDataEnd = nullptr;
 
-    bool mInString = false;
+    bool mbInString = false;
 
-    uint32 mFileLine = 0;
-    char* mStartOfLine = nullptr;
+    uint32 mLineNumber = 0;
+    char* mpLinePtr = nullptr;
 
     FxPagedArray<FxToken> mTokens;
 };

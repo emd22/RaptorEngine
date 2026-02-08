@@ -1,62 +1,127 @@
 #include "FxTokenizer.hpp"
 
+
+const char* FxToken::GetTypeName(FxTokenType type)
+{
+    const char* type_names[] = {
+        "Unknown",    "Identifier",
+
+        "String",     "Integer",    "Float",
+
+        "Equals",
+
+        "LParen",     "RParen",
+
+        "LBracket",   "RBracket",
+
+        "LBrace",     "RBrace",
+
+        "Plus",       "Dollar",     "Minus",
+
+        "Question",
+
+        "Dot",        "Comma",      "Semicolon",
+
+        "DocComment",
+    };
+
+    return type_names[static_cast<uint32>(type)];
+}
+
+
+FxToken::IsNumericResult FxToken::IsNumeric() const
+{
+    char ch;
+
+    FxToken::IsNumericResult result = FxToken::IsNumericResult::eNaN;
+
+    for (int i = 0; i < Length; i++) {
+        ch = Start[i];
+
+        // If there is a number preceding the dot then we are a frfunctional
+        if (ch == '.' && result != FxToken::IsNumericResult::eNaN) {
+            result = FxToken::IsNumericResult::eFractional;
+            continue;
+        }
+
+        if ((ch >= '0' && ch <= '9')) {
+            // If no numbers have been found yet then set to integer
+            if (result == FxToken::IsNumericResult::eNaN) {
+                result = FxToken::IsNumericResult::eInteger;
+            }
+            continue;
+        }
+
+        // Not a number
+        return FxToken::IsNumericResult::eNaN;
+    }
+
+    // Is numeric
+    return result;
+}
+
+
+/////////////////////////////////////
+// Tokenizer
+/////////////////////////////////////
+
 FxTokenType FxTokenizer::GetTokenType(FxToken& token)
 {
-    if (token.Type == FxTokenType::DocComment) {
-        return FxTokenType::DocComment;
+    if (token.Type == FxTokenType::eDocComment) {
+        return FxTokenType::eDocComment;
     }
 
     // Check if the token is a number
     FxToken::IsNumericResult is_numeric = token.IsNumeric();
 
     switch (is_numeric) {
-    case FxToken::IsNumericResult::Integer:
-        return FxTokenType::Integer;
-    case FxToken::IsNumericResult::Frfunctional:
-        return FxTokenType::Float;
-    case FxToken::IsNumericResult::NaN:
+    case FxToken::IsNumericResult::eInteger:
+        return FxTokenType::eInteger;
+    case FxToken::IsNumericResult::eFractional:
+        return FxTokenType::eFloat;
+    case FxToken::IsNumericResult::eNaN:
         break;
     }
 
     if (token.Length > 2) {
         // Checks if the token is a string
         if (token.Start[0] == '"' && token.Start[token.Length - 1] == '"') {
-            return FxTokenType::String;
+            return FxTokenType::eString;
         }
     }
 
     if (token.Length == 1) {
         switch (token.Start[0]) {
         case '=':
-            return FxTokenType::Equals;
+            return FxTokenType::eEquals;
         case '(':
-            return FxTokenType::LParen;
+            return FxTokenType::eLParen;
         case ')':
-            return FxTokenType::RParen;
+            return FxTokenType::eRParen;
         case '[':
-            return FxTokenType::LBracket;
+            return FxTokenType::eLBracket;
         case ']':
-            return FxTokenType::RBracket;
+            return FxTokenType::eRBracket;
         case '{':
-            return FxTokenType::LBrace;
+            return FxTokenType::eLBrace;
         case '}':
-            return FxTokenType::RBrace;
+            return FxTokenType::eRBrace;
         case '+':
-            return FxTokenType::Plus;
+            return FxTokenType::ePlus;
         case '-':
-            return FxTokenType::Minus;
+            return FxTokenType::eMinus;
         case '$':
-            return FxTokenType::Dollar;
+            return FxTokenType::eDollar;
         case '.':
-            return FxTokenType::Dot;
+            return FxTokenType::eDot;
         case ',':
-            return FxTokenType::Comma;
+            return FxTokenType::eComma;
         case ';':
-            return FxTokenType::Semicolon;
+            return FxTokenType::eSemicolon;
         }
     }
 
-    return FxTokenType::Identifier;
+    return FxTokenType::eIdentifier;
 }
 
 
@@ -67,33 +132,34 @@ void FxTokenizer::SubmitTokenIfData(FxToken& token, char* end_ptr, char* start_p
     }
 
     if (end_ptr == nullptr) {
-        end_ptr = mData;
+        end_ptr = mpData;
     }
 
     if (start_ptr == nullptr) {
-        start_ptr = mData;
+        start_ptr = mpData;
     }
 
-    token.End = mData;
+    token.End = mpData;
     token.Type = GetTokenType(token);
 
     mTokens.Insert(token);
     token.Clear();
 
-    token.Start = mData;
+    token.Start = mpData;
 
     uint16 column = 1;
-    if (mStartOfLine) {
-        column = static_cast<uint16>((mData - mStartOfLine));
+    if (mpLinePtr) {
+        column = static_cast<uint16>((mpData - mpLinePtr));
     }
+
     token.FileColumn = column;
-    token.FileLine = mFileLine + 1;
+    token.FileLine = mLineNumber + 1;
 }
 
 
 bool FxTokenizer::CheckOperators(FxToken& current_token, char ch)
 {
-    if (ch == '.' && current_token.IsNumeric() != FxToken::IsNumericResult::NaN) {
+    if (ch == '.' && current_token.IsNumeric() != FxToken::IsNumericResult::eNaN) {
         return false;
     }
 
@@ -101,15 +167,15 @@ bool FxTokenizer::CheckOperators(FxToken& current_token, char ch)
 
     if (is_operator) {
         // If there is data waiting, submit to the token list
-        SubmitTokenIfData(current_token, mData);
+        SubmitTokenIfData(current_token, mpData);
 
         // Submit the operator as its own token
         current_token.Increment();
 
-        char* end_of_operator = mData;
-        ++mData;
+        char* end_of_operator = mpData;
+        ++mpData;
 
-        SubmitTokenIfData(current_token, end_of_operator, mData);
+        SubmitTokenIfData(current_token, end_of_operator, mpData);
 
         return true;
     }
@@ -121,11 +187,11 @@ bool FxTokenizer::CheckOperators(FxToken& current_token, char ch)
 uint32 FxTokenizer::ReadQuotedString(char* buffer, uint32 max_size, bool skip_on_success)
 {
     char ch;
-    char* data = mData;
+    char* data = mpData;
 
     uint32 buf_size = 0;
 
-    if (data >= mDataEnd) {
+    if (data >= mpDataEnd) {
         return 0;
     }
 
@@ -157,7 +223,7 @@ uint32 FxTokenizer::ReadQuotedString(char* buffer, uint32 max_size, bool skip_on
     }
 
     if (skip_on_success) {
-        mData = data;
+        mpData = data;
     }
 
     buffer[buf_size] = 0;
@@ -171,9 +237,9 @@ bool FxTokenizer::ExpectString(const char* expected_value, bool skip_on_success)
     char ch;
     int expected_index = 0;
 
-    char* data = mData;
+    char* data = mpData;
 
-    while (data < mDataEnd && ((ch = *(data)))) {
+    while (data < mpDataEnd && ((ch = *(data)))) {
         if (!expected_value[expected_index]) {
             break;
         }
@@ -187,14 +253,14 @@ bool FxTokenizer::ExpectString(const char* expected_value, bool skip_on_success)
     }
 
     if (skip_on_success) {
-        mData = data;
+        mpData = data;
     }
 
     return true;
 }
 
 
-void FxTokenizer::IncludeFile(char* path)
+void FxTokenizer::IncludeFile(const char* path)
 {
     FxFile file(path, FxFile::ModType::eRead, FxFile::DataType::eBinary);
 
@@ -204,23 +270,23 @@ void FxTokenizer::IncludeFile(char* path)
         return;
     }
 
-    uint32 include_size = 0;
-    FxSlice<char> include_data = file.Read<char>();
 
     // Save the current state of the tokenizer
     SaveState();
 
-    mData = include_data;
-    mDataEnd = include_data + include_size;
-    mInString = false;
+    FxSlice<char> include_data = file.Read<char>();
+
+    SetDataPtr(include_data.pData);
+    mpDataEnd = include_data.pData + include_data.Size;
+    mbInString = false;
 
     // Tokenize all of the included file
     Tokenize();
 
+    FxMemPool::Free<char>(mpData);
+
     // Restore back to previous state
     RestoreState();
-
-    // FoxMemPool::Free(include_data);
 }
 
 
@@ -231,23 +297,23 @@ void FxTokenizer::Tokenize()
     }
 
     FxToken current_token;
-    current_token.Start = mData;
+    current_token.Start = mpData;
 
     bool in_comment = false;
     bool is_doccomment = false;
 
     char ch;
 
-    while (mData < mDataEnd && ((ch = *(mData)))) {
-        if (ch == '/' && ((mData + 1) < mDataEnd) && ((*(mData + 1)) == '/')) {
+    while (mpData < mpDataEnd && ((ch = *(mpData)))) {
+        if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '/')) {
             SubmitTokenIfData(current_token);
             in_comment = true;
 
-            ++mData;
-            if (*(++mData) == '?') {
-                while ((ch = *(++mData))) {
+            ++mpData;
+            if (*(++mpData) == '?') {
+                while ((ch = *(++mpData))) {
                     if (isalnum(ch) || ch == '\n') {
-                        current_token.Start = mData;
+                        current_token.Start = mpData;
                         break;
                     }
                 }
@@ -255,15 +321,15 @@ void FxTokenizer::Tokenize()
             }
         }
 
-        if (ch == '/' && ((mData + 1) < mDataEnd) && ((*(mData + 1)) == '*')) {
+        if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '*')) {
             SubmitTokenIfData(current_token);
             in_comment = true;
 
-            ++mData;
+            ++mpData;
 
-            while ((mData + 1 < mDataEnd) && (ch = *(++mData))) {
-                if (ch == '*' && ((mData + 1) < mDataEnd) && (*(mData + 1) == '/')) {
-                    current_token.Start = mData;
+            while ((mpData + 1 < mpDataEnd) && (ch = *(++mpData))) {
+                if (ch == '*' && ((mpData + 1) < mpDataEnd) && (*(mpData + 1) == '/')) {
+                    current_token.Start = mpData;
                     break;
                 }
             }
@@ -273,7 +339,7 @@ void FxTokenizer::Tokenize()
         // below by the IsWhitespace check.
         if (in_comment) {
             if (!IsNewline(ch)) {
-                ++mData;
+                ++mpData;
                 if (is_doccomment) {
                     current_token.Increment();
                 }
@@ -281,10 +347,10 @@ void FxTokenizer::Tokenize()
             }
 
             if (is_doccomment) {
-                current_token.Type = FxTokenType::DocComment;
+                current_token.Type = FxTokenType::eDocComment;
                 SubmitTokenIfData(current_token);
 
-                current_token.Type = FxTokenType::Unknown;
+                current_token.Type = FxTokenType::eUnknown;
 
                 is_doccomment = false;
             }
@@ -295,26 +361,26 @@ void FxTokenizer::Tokenize()
 
         if (ch == '"') {
             // If we are not currently in a string, submit the token if there is data waiting
-            if (!mInString) {
+            if (!mbInString) {
                 SubmitTokenIfData(current_token);
             }
 
-            mInString = !mInString;
+            mbInString = !mbInString;
         }
 
-        if (mInString) {
-            ++mData;
+        if (mbInString) {
+            ++mpData;
             current_token.Increment();
             continue;
         }
 
         // Internal call
         if (ch == '@') {
-            ++mData;
+            ++mpData;
             TryReadInternalCall();
 
             current_token.Length = 0;
-            current_token.Start = mData;
+            current_token.Start = mpData;
 
             continue;
         }
@@ -322,8 +388,8 @@ void FxTokenizer::Tokenize()
         if (IsWhitespace(ch)) {
             SubmitTokenIfData(current_token);
 
-            mData++;
-            current_token.Start = mData;
+            mpData++;
+            current_token.Start = mpData;
             continue;
         }
 
@@ -331,8 +397,29 @@ void FxTokenizer::Tokenize()
             continue;
         }
 
-        mData++;
+        mpData++;
         current_token.Increment();
     }
     SubmitTokenIfData(current_token);
+}
+
+
+void FxTokenizer::TryReadInternalCall()
+{
+    if (ExpectString("include")) {
+        char include_path[512];
+
+        if (!ReadQuotedString(include_path, 512)) {
+            puts("Error reading include path!");
+            return;
+        }
+
+        IncludeFile(include_path);
+    }
+}
+
+FxTokenizer::~FxTokenizer()
+{
+    FxMemPool::Free(mpDataStart);
+    mTokens.Destroy();
 }
