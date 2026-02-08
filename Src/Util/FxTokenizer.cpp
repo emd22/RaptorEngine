@@ -1,154 +1,64 @@
 #include "FxTokenizer.hpp"
 
-using IsNumericResult = FxToken::IsNumericResult;
-
-//////////////////////////////////////
-// Token functions
-//////////////////////////////////////
-
-char* FxToken::GetHeapStr() const
+FxTokenType FxTokenizer::GetTokenType(FxToken& token)
 {
-    char* str = static_cast<char*>(std::malloc(Length + 1));
-
-    if (str == nullptr) {
-        FxPanic("FxTokenizer", "Error allocating heap string!");
-        return nullptr;
-    }
-
-    strncpy(str, Start, Length);
-    str[Length] = 0;
-
-    return str;
-}
-
-FxHash32 FxToken::GetHash()
-{
-    if (Hash != 0) {
-        return Hash;
-    }
-    return (Hash = FxHashStr32(Start, Length));
-}
-
-IsNumericResult FxToken::IsNumeric() const
-{
-    char ch;
-
-    IsNumericResult result = IsNumericResult::NaN;
-
-    for (int i = 0; i < Length; i++) {
-        ch = Start[i];
-
-        // If there is a number preceding the dot then we are a fractional
-        if (ch == '.' && result != IsNumericResult::NaN) {
-            result = IsNumericResult::Fractional;
-            continue;
-        }
-
-        if ((ch >= '0' && ch <= '9')) {
-            // If no numbers have been found yet then set to integer
-            if (result == IsNumericResult::NaN) {
-                result = IsNumericResult::Integer;
-            }
-            continue;
-        }
-
-        // Not a number
-        return IsNumericResult::NaN;
-    }
-
-    // Is numeric
-    return result;
-}
-
-
-int64 FxToken::ToInt() const
-{
-    char buffer[32];
-    strncpy(buffer, Start, Length);
-    buffer[Length] = 0;
-
-    char* end = nullptr;
-    return strtoll(buffer, &end, 10);
-}
-
-float32 FxToken::ToFloat() const
-{
-    char buffer[32];
-    strncpy(buffer, Start, Length);
-    buffer[Length] = 0;
-
-    char* end = nullptr;
-    return strtof(buffer, &end);
-}
-
-void FxToken::Clear()
-{
-    Start = nullptr;
-    End = nullptr;
-    Length = 0;
-}
-
-/////////////////////////////////////
-// Tokenizer Functions
-/////////////////////////////////////
-
-FxTokenType FxTokenizer::GetTokenType(const FxToken& token) const
-{
-    if (token.Type == FxTokenType::eDocComment) {
-        return FxTokenType::eDocComment;
+    if (token.Type == FxTokenType::DocComment) {
+        return FxTokenType::DocComment;
     }
 
     // Check if the token is a number
-    IsNumericResult is_numeric = token.IsNumeric();
+    FxToken::IsNumericResult is_numeric = token.IsNumeric();
+
     switch (is_numeric) {
-    case IsNumericResult::Integer:
-        return FxTokenType::eInteger;
-    case IsNumericResult::Fractional:
-        return FxTokenType::eFloat;
-    case IsNumericResult::NaN:
+    case FxToken::IsNumericResult::Integer:
+        return FxTokenType::Integer;
+    case FxToken::IsNumericResult::Frfunctional:
+        return FxTokenType::Float;
+    case FxToken::IsNumericResult::NaN:
         break;
     }
 
     if (token.Length > 2) {
         // Checks if the token is a string
         if (token.Start[0] == '"' && token.Start[token.Length - 1] == '"') {
-            return FxTokenType::eString;
+            return FxTokenType::String;
         }
     }
 
     if (token.Length == 1) {
         switch (token.Start[0]) {
         case '=':
-            return FxTokenType::eEquals;
+            return FxTokenType::Equals;
         case '(':
-            return FxTokenType::eLParen;
+            return FxTokenType::LParen;
         case ')':
-            return FxTokenType::eRParen;
+            return FxTokenType::RParen;
         case '[':
-            return FxTokenType::eLBracket;
+            return FxTokenType::LBracket;
         case ']':
-            return FxTokenType::eRBracket;
+            return FxTokenType::RBracket;
         case '{':
-            return FxTokenType::eLBrace;
+            return FxTokenType::LBrace;
         case '}':
-            return FxTokenType::eRBrace;
+            return FxTokenType::RBrace;
         case '+':
-            return FxTokenType::ePlus;
+            return FxTokenType::Plus;
         case '-':
-            return FxTokenType::eMinus;
+            return FxTokenType::Minus;
         case '$':
-            return FxTokenType::eDollar;
+            return FxTokenType::Dollar;
         case '.':
-            return FxTokenType::eDot;
+            return FxTokenType::Dot;
         case ',':
-            return FxTokenType::eComma;
+            return FxTokenType::Comma;
         case ';':
-            return FxTokenType::eSemicolon;
+            return FxTokenType::Semicolon;
         }
     }
 
-    return FxTokenType::eIdentifier;
+    return FxTokenType::Identifier;
 }
+
 
 void FxTokenizer::SubmitTokenIfData(FxToken& token, char* end_ptr, char* start_ptr)
 {
@@ -196,14 +106,17 @@ bool FxTokenizer::CheckOperators(FxToken& current_token, char ch)
         // Submit the operator as its own token
         current_token.Increment();
 
-        SubmitTokenIfData(current_token, mData, (mData + 1));
+        char* end_of_operator = mData;
         ++mData;
+
+        SubmitTokenIfData(current_token, end_of_operator, mData);
 
         return true;
     }
 
     return false;
 }
+
 
 uint32 FxTokenizer::ReadQuotedString(char* buffer, uint32 max_size, bool skip_on_success)
 {
@@ -252,6 +165,7 @@ uint32 FxTokenizer::ReadQuotedString(char* buffer, uint32 max_size, bool skip_on
     return buf_size;
 }
 
+
 bool FxTokenizer::ExpectString(const char* expected_value, bool skip_on_success)
 {
     char ch;
@@ -280,26 +194,18 @@ bool FxTokenizer::ExpectString(const char* expected_value, bool skip_on_success)
 }
 
 
-bool FxTokenizer::IsNewline(char ch)
-{
-    const bool is_newline = (ch == '\n');
-    if (is_newline) {
-        ++mFileLine;
-        mStartOfLine = mData;
-    }
-    return is_newline;
-}
-
 void FxTokenizer::IncludeFile(char* path)
 {
-    FILE* fp = FxUtil::FileOpen(path, "rb");
-    if (!fp) {
-        printf("Could not open include file '%s'\n", path);
+    FxFile file(path, FxFile::ModType::eRead, FxFile::DataType::eBinary);
+
+
+    if (!file.IsFileOpen()) {
+        FxLogError("Could not open include file '{}'", path);
         return;
     }
 
     uint32 include_size = 0;
-    char* include_data = ReadFileData(fp, &include_size);
+    FxSlice<char> include_data = file.Read<char>();
 
     // Save the current state of the tokenizer
     SaveState();
@@ -314,45 +220,9 @@ void FxTokenizer::IncludeFile(char* path)
     // Restore back to previous state
     RestoreState();
 
-    // FxMemPool::Free(include_data);
+    // FoxMemPool::Free(include_data);
 }
 
-void FxTokenizer::TryReadInternalCall()
-{
-    if (ExpectString("include")) {
-        char include_path[512];
-
-        if (!ReadQuotedString(include_path, 512)) {
-            puts("Error reading include path!");
-            return;
-        }
-
-        IncludeFile(include_path);
-    }
-}
-
-
-char* FxTokenizer::ReadFileData(FILE* fp, uint32* file_size_out)
-{
-    if (!fp || !file_size_out) {
-        return nullptr;
-    }
-
-    std::fseek(fp, 0, SEEK_END);
-    size_t file_size = std::ftell(fp);
-    (*file_size_out) = file_size;
-
-    std::rewind(fp);
-
-    char* data = FxMemPool::Alloc<char>(file_size);
-
-    size_t read_size = std::fread(data, 1, file_size, fp);
-    if (read_size != file_size) {
-        FxLogWarning("Error tokenizing buffer (BytesRead={}, Size={})", read_size, file_size);
-    }
-
-    return data;
-}
 
 void FxTokenizer::Tokenize()
 {
@@ -369,11 +239,11 @@ void FxTokenizer::Tokenize()
     char ch;
 
     while (mData < mDataEnd && ((ch = *(mData)))) {
-        if (ch == '#') {
+        if (ch == '/' && ((mData + 1) < mDataEnd) && ((*(mData + 1)) == '/')) {
             SubmitTokenIfData(current_token);
             in_comment = true;
 
-            //++mData;
+            ++mData;
             if (*(++mData) == '?') {
                 while ((ch = *(++mData))) {
                     if (isalnum(ch) || ch == '\n') {
@@ -384,6 +254,21 @@ void FxTokenizer::Tokenize()
                 is_doccomment = true;
             }
         }
+
+        if (ch == '/' && ((mData + 1) < mDataEnd) && ((*(mData + 1)) == '*')) {
+            SubmitTokenIfData(current_token);
+            in_comment = true;
+
+            ++mData;
+
+            while ((mData + 1 < mDataEnd) && (ch = *(++mData))) {
+                if (ch == '*' && ((mData + 1) < mDataEnd) && (*(mData + 1) == '/')) {
+                    current_token.Start = mData;
+                    break;
+                }
+            }
+        }
+
         // If we are in a comment, skip until we hit a newline. Carriage return is eaten by our
         // below by the IsWhitespace check.
         if (in_comment) {
@@ -396,10 +281,10 @@ void FxTokenizer::Tokenize()
             }
 
             if (is_doccomment) {
-                current_token.Type = FxTokenType::eDocComment;
+                current_token.Type = FxTokenType::DocComment;
                 SubmitTokenIfData(current_token);
 
-                current_token.Type = FxTokenType::eUnknown;
+                current_token.Type = FxTokenType::Unknown;
 
                 is_doccomment = false;
             }
