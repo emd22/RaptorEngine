@@ -1,13 +1,13 @@
 #include "FxPlayer.hpp"
 
+#include <FxEngine.hpp>
+#include <Renderer/RxRenderBackend.hpp>
+
 void FxPlayer::Create()
 {
     pCamera = FxMakeRef<FxPerspectiveCamera>();
 
-    const float32 window_width = 1024;
-    const float32 window_height = 720;
-
-    pCamera->SetAspectRatio(window_width / window_height);
+    pCamera->SetAspectRatio(gRenderer->Swapchain.GetAspectRatio());
 
     Physics.Create();
 

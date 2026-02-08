@@ -129,6 +129,9 @@ void FxLightBase::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_cam
     gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
     gRenderer->Uniforms.Write(mRadius);
 
+    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
+    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
+
     gRenderer->Uniforms.Write(AmbientColor.Value);
 
     gRenderer->Uniforms.FlushToGpu();
@@ -214,6 +217,11 @@ void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* sha
 
     gRenderer->Uniforms.WritePtr(mPosition.mData, sizeof(float32) * 3);
     gRenderer->Uniforms.Write(Color.Value);
+
+    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
+    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
+
+    gRenderer->Uniforms.Write(AmbientColor.Value);
 
     gRenderer->Uniforms.FlushToGpu();
 

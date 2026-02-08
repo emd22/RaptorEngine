@@ -74,13 +74,20 @@ layout(binding = 3) Sampler2DShadow sShadowDepth;
 
 layout(binding = 4) cbuffer FSUniforms
 {
+    // 64
     float4x4 LightCameraMatrix;
+    // 128
     float4x4 mInvView;
+    // 192
     float4x4 mInvProjection;
+    // 196
     float3 vEyePosition;
     float1 fLightRadius;
+    // 200
     float3 vLightPosition;
     uint1 uiLightColor;
+
+    float2 vCameraSize;
     uint1 uiAmbient;
 };
 
@@ -158,7 +165,7 @@ FSOutput FragmentMain(FSInput in)
 {
     FSOutput out;
 
-    float2 screen_uv = in.vPosition.xy / float2(1024, 720);
+    float2 screen_uv = in.vPosition.xy / vCameraSize;
 
     float depth = 1.0 - sDepth.Sample(screen_uv).r;
     float4 albedo_rgba = sAlbedo.Sample(screen_uv);

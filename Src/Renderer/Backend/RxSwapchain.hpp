@@ -22,6 +22,12 @@ public:
 
     VkSwapchainKHR GetSwapchain() const { return mSwapchain; }
 
+    float GetAspectRatio() const
+    {
+        FxAssert(Extent.X > 0 && Extent.Y > 0);
+        return static_cast<float>(Extent.X) / Extent.Y;
+    }
+
     void Destroy();
 
 private:
