@@ -9,13 +9,9 @@
 
 #include <Core/FxPanic.hpp>
 #include <Core/FxSizedArray.hpp>
+#include <Renderer/RxConstants.hpp>
 
 #include "vulkan/vulkan_core.h"
-// #include "RxTexture.hpp"
-//
-class RxTexture;
-
-#include <Renderer/RxConstants.hpp>
 
 struct RxAttachment;
 

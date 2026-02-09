@@ -255,6 +255,10 @@ void FxObject::RenderUnlit(const FxCamera& camera)
     gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
                                                    gObjectManager->GetBaseOffset());
 
+    if (AttachedNodes.IsEmpty()) {
+        return;
+    }
+
 
     for (FxRef<FxObject>& obj : AttachedNodes) {
         if (!obj->pMaterial) {

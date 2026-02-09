@@ -172,6 +172,9 @@ public:
     void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageUsageFlags usage,
                 RxImageAspectFlag aspect);
 
+    void CreateGpuOnly(RxImageType image_type, const FxVec2u& size, RxImageFormat format,
+                       const FxSizedArray<uint8>& image_data);
+
     void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1,
                           std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
 
@@ -185,7 +188,6 @@ public:
 
     FX_FORCE_INLINE bool IsInited() const { return (Image != nullptr); }
 
-    void TransferToGpuOnly();
 
     void Destroy();
 

@@ -34,7 +34,7 @@ public:
     using Status = FxMaterialComponentStatus;
 
 public:
-    FxMaterialComponent::Status Build(const FxRef<RxSampler>& sampler)
+    FxMaterialComponent::Status Build()
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pImage && !pDataToLoad) {
@@ -45,8 +45,6 @@ public:
             // The texture is not ready, return the status to the material build function
             return Status::eNotReady;
         }
-
-        pImage->Texture.SetSampler(sampler);
 
         return Status::eReady;
     }

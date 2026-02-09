@@ -120,8 +120,7 @@ void AxLoaderJpeg::CreateGpuResource(FxRef<AxBase>& asset)
 {
     FxRef<AxImage> image(asset);
 
-    image->Texture.Create(image->ImageType, mImageData, image->Size, ImageFormat,
-                          RxImageFormatUtil::GetSize(ImageFormat));
+    image->Image.CreateGpuOnly(image->ImageType, image->Size, ImageFormat, mImageData);
 
     asset->bIsUploadedToGpu = true;
     asset->bIsUploadedToGpu.notify_all();

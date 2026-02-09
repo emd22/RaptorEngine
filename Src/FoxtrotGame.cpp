@@ -137,6 +137,13 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
+    pSkyboxObject = AxManager::LoadObject(FX_BASE_DIR "/Models/Skybox.glb");
+    pSkyboxObject->WaitUntilLoaded();
+
+    // pSkyboxObject->SetRenderUnlit(true);
+
+    mMainScene.Attach(pSkyboxObject);
+
     pLevelObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
     pLevelObject->WaitUntilLoaded();
 

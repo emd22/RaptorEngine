@@ -151,6 +151,22 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
 }
 
 
+void RxImage::CreateGpuOnly(RxImageType image_type, const FxVec2u& size, RxImageFormat format,
+                            const FxSizedArray<uint8>& image_data)
+{
+    RxRawGpuBuffer staging_buffer;
+    staging_buffer.Create(RxGpuBufferType::eTransfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+                          RxGpuBufferFlags::eTransferReceiver);
+    staging_buffer.Upload(image_data);
+
+    const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, RxImageAspectFlag::eColor);
+
+    CopyFromBuffer(staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size);
+}
+
 void RxImage::TransitionDepthToShaderRO(RxCommandBuffer& cmd)
 {
     VkImageMemoryBarrier barrier {

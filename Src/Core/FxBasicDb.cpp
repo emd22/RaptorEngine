@@ -56,7 +56,7 @@ void FxBasicDb::SaveToFile()
     for (const FxBasicDbEntry& entry : mEntryMarkers) {
         std::string key_str = std::to_string(entry.KeyHash);
         mOutFile.Write(key_str.c_str(), key_str.length());
-        mOutFile.Write('\t');
+        mOutFile.Write(',');
         mOutFile.Write(entry.Value.c_str(), entry.Value.length());
         mOutFile.Write('\n');
     }
@@ -89,7 +89,7 @@ void FxBasicDb::Parse()
     while (start < end) {
         char ch = (*start);
 
-        if (ch == '\t') {
+        if (ch == ',') {
             if (token_index <= 0) {
                 ++start;
                 continue;

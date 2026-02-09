@@ -3,21 +3,7 @@
 #include "AxBase.hpp"
 
 #include <Core/FxRef.hpp>
-#include <Renderer/Backend/RxTexture.hpp>
-
-// struct FxAssetImageTransform
-// {
-//     enum class Type
-//     {
-//         eNone,
-//         eTruncatePixels,
-//     };
-
-// public:
-
-//     Type TransformType = Type::eNone;
-// };
-
+#include <Renderer/Backend/RxImage.hpp>
 
 class AxImage : public AxBase
 {
@@ -56,7 +42,7 @@ public:
 
         sEmptyImage = FxMakeRef<AxImage>();
 
-        sEmptyImage->Texture.Create(RxImageType::e2d, image_data, FxVec2u(1, 1), TFormat, pixel_size);
+        sEmptyImage->Image.CreateGpuOnly(RxImageType::e2d, FxVec2u(1, 1), TFormat, image_data);
         sEmptyImage->MarkAndSignalLoaded();
 
         empty_images.Insert(sEmptyImage);
@@ -75,11 +61,8 @@ public:
     void Destroy() override;
 
 public:
-    RxTexture Texture;
+    RxImage Image;
 
     RxImageType ImageType = RxImageType::e2d;
     FxVec2u Size = FxVec2u::sZero;
-
-private:
-    // bool mImageReady = false;
 };

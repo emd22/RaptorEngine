@@ -11,10 +11,10 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxRef<AxBase> asset, const std::st
 
     const int pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
     FxAssert(pixel_size > 0);
-   
+
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
-    //image->NumComponents = mChannels;
+    // image->NumComponents = mChannels;
     image->Size = { uint32(mWidth), uint32(mHeight) };
 
     uint32 data_size = mWidth * mHeight * pixel_size;
@@ -72,9 +72,7 @@ void AxLoaderStb::CreateGpuResource(FxRef<AxBase>& asset)
     data_arr.Size = mDataSize;
     data_arr.Capacity = mDataSize;
 
-    const uint32 pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
-
-    image->Texture.Create(image->ImageType, data_arr, image->Size, ImageFormat, pixel_size);
+    image->Image.CreateGpuOnly(image->ImageType, image->Size, ImageFormat, data_arr);
 
     asset = image;
 

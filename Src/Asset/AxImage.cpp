@@ -14,7 +14,7 @@ void AxImage::Destroy()
         return;
     }
 
-    Texture.Destroy();
+    Image.Destroy();
 
     // mImageReady = false;
     bIsUploadedToGpu = false;

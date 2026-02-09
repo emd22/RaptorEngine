@@ -40,16 +40,6 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     }
 
     // Material properties buffer descriptors
-
-    pAlbedoSampler = FxMakeRef<RxSampler>();
-    pAlbedoSampler->Create();
-
-    pNormalMapSampler = FxMakeRef<RxSampler>();
-    pNormalMapSampler->Create();
-
-    pMetallicRoughnessSampler = FxMakeRef<RxSampler>();
-    pMetallicRoughnessSampler->Create();
-
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
     FxLogInfo("Creating material buffer of size {:d}", material_buffer_size);
@@ -102,11 +92,6 @@ void FxMaterialManager::Destroy()
         return;
     }
 
-    pAlbedoSampler->Destroy();
-
-    pNormalMapSampler->Destroy();
-    pMetallicRoughnessSampler->Destroy();
-
     MaterialPropertiesBuffer.Destroy();
 
     mDescriptorPool.Destroy();
@@ -146,7 +131,7 @@ RxDescriptorSet& FxMaterial::GetDescriptorSetAlbedoOnly()
                          gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, 1);
 
 
-    mDsAlbedoOnly.AddImage(0, &Diffuse.pImage->Texture.Image, Diffuse.pImage->Texture.Sampler.mpPtr);
+    mDsAlbedoOnly.AddImage(0, &Diffuse.pImage->Image, &gRenderer->Swapchain.ColorSampler);
     mDsAlbedoOnly.Build();
 
     return mDsAlbedoOnly;
@@ -245,9 +230,9 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 }
 
 
-#define BUILD_MATERIAL_COMPONENT(component_, sampler_)                                                                 \
+#define BUILD_MATERIAL_COMPONENT(component_)                                                                           \
     {                                                                                                                  \
-        if (component_.Build(sampler_) == FxMaterialComponentStatus::eNotReady) {                                      \
+        if (component_.Build() == FxMaterialComponentStatus::eNotReady) {                                              \
             return;                                                                                                    \
         }                                                                                                              \
     }
@@ -262,22 +247,22 @@ void FxMaterial::Build()
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     // Build components
-    BUILD_MATERIAL_COMPONENT(Diffuse, manager.pAlbedoSampler);
+    BUILD_MATERIAL_COMPONENT(Diffuse);
 
-    BUILD_MATERIAL_COMPONENT(NormalMap, manager.pNormalMapSampler);
+    BUILD_MATERIAL_COMPONENT(NormalMap);
 
-    MetallicRoughness.Build(manager.pMetallicRoughnessSampler);
-    BUILD_MATERIAL_COMPONENT(MetallicRoughness, manager.pMetallicRoughnessSampler);
+    MetallicRoughness.Build();
+    BUILD_MATERIAL_COMPONENT(MetallicRoughness);
 
     // Fill material descriptor
 
-    mDsDefault.AddImage(0, &Diffuse.pImage->Texture.Image, Diffuse.pImage->Texture.Sampler.mpPtr);
+    mDsDefault.AddImage(0, &Diffuse.pImage->Image, &gRenderer->Swapchain.ColorSampler);
 
     // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
     // not need to.
 
     if (NormalMap.Exists()) {
-        mDsDefault.AddImage(1, &NormalMap.pImage->Texture.Image, NormalMap.pImage->Texture.Sampler.mpPtr);
+        mDsDefault.AddImage(1, &NormalMap.pImage->Image, &gRenderer->Swapchain.NormalsSampler);
 
         // To reduce permutations -- the metallic roughness map should only be
         // enabled if there is also a normal map.
@@ -285,8 +270,7 @@ void FxMaterial::Build()
             MetallicRoughness.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
         }
 
-        mDsDefault.AddImage(2, &MetallicRoughness.pImage->Texture.Image,
-                            MetallicRoughness.pImage->Texture.Sampler.mpPtr);
+        mDsDefault.AddImage(2, &MetallicRoughness.pImage->Image, &gRenderer->Swapchain.ColorSampler);
     }
 
     mDsDefault.Build();
