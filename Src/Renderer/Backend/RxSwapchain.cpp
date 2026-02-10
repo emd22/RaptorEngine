@@ -168,9 +168,9 @@ void RxSwapchain::CreateSamplers()
     });
 
     ShadowDepthSampler.Create(RxSamplerProps {
-        RxSamplerFilter::eNearest,
-        RxSamplerFilter::eNearest,
-        RxSamplerFilter::eNearest,
+        RxSamplerFilter::eLinear,
+        RxSamplerFilter::eLinear,
+        RxSamplerFilter::eLinear,
         RxSamplerAddressMode::eClampToBorder,
         RxSamplerBorderColor::eFloatWhite,
         RxSamplerCompareOp::eGreater,
@@ -185,7 +185,7 @@ void RxSwapchain::DestroyFramebuffersAndImageViews()
     for (int i = 0; i < RxFramesInFlight; i++) {
         // HACK: Clears the image so that we only destroy the image view. This should be updated!
         OutputImages[i].Image = nullptr;
-        OutputImages[i].Destroy();
+        OutputImages[i].DecRef();
     }
 
 

@@ -199,7 +199,7 @@ FSOutput FragmentMain(FSInput in)
 
     // Check that the UV values are greater than 0.0 and less than 1.0
     if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
-        visibility = sShadowDepth.SampleCmpLevelZero(shadow_uv, shadow_z + 0.001f) + 0.2f;
+        visibility = sShadowDepth.SampleCmpLevelZero(shadow_uv, shadow_z + 0.001f) + 0.4f;
         visibility = min(visibility, 1.0f);
     }
 

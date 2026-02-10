@@ -30,6 +30,51 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
     return props;
 }
 
+RxImage::RxImage() { mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount)); }
+
+RxImage::RxImage(const RxImage& other) { (*this) = other; }
+
+RxImage::RxImage(FxRef<RxImage>&& ref) { (*this) = std::move(ref); }
+
+RxImage& RxImage::operator=(FxRef<RxImage>&& ref)
+{
+    // Set the image properties, move the ref count over.
+    (*this) = *ref;
+
+    mpRefCnt = ref.mpRefCnt;
+    ref.mpRefCnt = nullptr;
+
+    ref.DestroyRef();
+
+    return *this;
+}
+
+
+RxImage& RxImage::operator=(const RxImage& other)
+{
+    Size = other.Size;
+    Aspect = other.Aspect;
+
+    Image = other.Image;
+    View = other.View;
+
+    ViewType = other.ViewType;
+    Format = other.Format;
+    ImageLayout = other.ImageLayout;
+    Allocation = other.Allocation;
+
+    mpRefCnt = other.mpRefCnt;
+
+    // if (!mpRefCnt) {
+    //     mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
+    // }
+    if (mpRefCnt) {
+        mpRefCnt->Inc();
+    }
+
+    return *this;
+}
+
 void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, RxImageAspectFlag aspect)
 {
@@ -39,6 +84,10 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
     Size = size;
     Format = format;
     ViewType = image_type;
+
+    if (!mpRefCnt) {
+        mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
+    }
 
     // Get the vulkan values for the image type
     RxImageTypeProperties image_type_props = RxImageTypeGetProperties(image_type);
@@ -443,8 +492,20 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat imag
         });
 }
 
-void RxImage::Destroy()
+void RxImage::DecRef()
 {
+    if (!mpRefCnt) {
+        return;
+    }
+
+
+    if (mpRefCnt->Dec() > 0) {
+        return;
+    }
+
+    FxMemPool::Free(mpRefCnt);
+    mpRefCnt = nullptr;
+
     if (View != nullptr) {
         vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
     }
@@ -453,9 +514,9 @@ void RxImage::Destroy()
         vmaDestroyImage(gRenderer->GpuAllocator, this->Image, this->Allocation);
     }
 
-    this->Image = nullptr;
-    this->Allocation = nullptr;
-    this->View = nullptr;
+    Image = nullptr;
+    Allocation = nullptr;
+    View = nullptr;
 
     // Fx_Fwd_AddToDeletionQueue([this](FxDeletionObject* obj) {
     //     if (this->Image == nullptr || this->Allocation == nullptr) {
@@ -472,3 +533,6 @@ void RxImage::Destroy()
     //     this->Allocation = nullptr;
     // });
 }
+
+
+RxImage::~RxImage() { DecRef(); }

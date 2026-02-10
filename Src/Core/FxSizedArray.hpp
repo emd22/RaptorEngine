@@ -250,7 +250,15 @@ public:
         memcpy(pData, ptr, GetSizeInBytes());
     }
 
-    void Clear() { Size = 0; }
+    void Clear()
+    {
+        for (size_t i = 0; i < Size; i++) {
+            TElementType& element = pData[i];
+            element.~TElementType();
+        }
+
+        Size = 0;
+    }
 
     inline bool IsEmpty() const { return Size == 0; }
     inline bool IsNotEmpty() const { return !IsEmpty(); }

@@ -164,7 +164,7 @@ static FxSlice<uint8> CreateAlignedBufferForSpirv(const Slang::ComPtr<slang::IBl
 bool FxShaderCompiler::IsOutOfDate(const char* path)
 {
     if (!sShaderCompileDb.IsOpen()) {
-        sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/ShaderCompileDb.fxdb");
+        sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
     }
 
     FxHash64 compile_entry_id = FxHashStr64(path);
@@ -186,7 +186,7 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
                                bool do_db_flush)
 {
     if (!sShaderCompileDb.IsOpen()) {
-        sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/ShaderCompileDb.fxdb");
+        sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
     }
 
     FxLogInfo("Compiling shader {} with {} macros", path, macros.Size);

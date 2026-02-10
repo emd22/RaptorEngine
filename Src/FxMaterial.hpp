@@ -28,7 +28,7 @@ struct FxMaterialComponent
 {
 public:
 public:
-    FxRef<AxImage> pImage { nullptr };
+    FxRef<AxImage> pAssetImage;
     FxSlice<const uint8> pDataToLoad { nullptr };
 
     using Status = FxMaterialComponentStatus;
@@ -37,8 +37,8 @@ public:
     FxMaterialComponent::Status Build()
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
-        if (!pImage && !pDataToLoad) {
-            pImage = AxImage::GetEmptyImage<TFormat>();
+        if (!pAssetImage && !pDataToLoad) {
+            pAssetImage = AxImage::GetEmptyImage<TFormat>();
         }
 
         if (!CheckIfReady()) {
@@ -49,7 +49,7 @@ public:
         return Status::eReady;
     }
 
-    bool Exists() const { return (pImage != nullptr); }
+    bool Exists() const { return (pAssetImage != nullptr); }
 
     ~FxMaterialComponent() = default;
 
@@ -59,16 +59,15 @@ private:
         // If there is data passed in and the image has not been loaded yet, load it using the
         // asset manager. This will be validated on the next call of this function. (when attempting to build the
         // material)
-        if (!pImage && pDataToLoad) {
+        if (!pAssetImage && pDataToLoad) {
             FxSlice<const uint8>& image_data = pDataToLoad;
+            pAssetImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, image_data.pData, image_data.Size);
 
-            pImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, image_data.pData, image_data.Size);
-            // pImage = FxAssetManager::LoadImageFromMemory(Format, image_data.pData, image_data.Size);
             return false;
         }
 
         // If there is no texture and we are not loaded, return not loaded.
-        if (!pImage || !pImage->IsLoaded()) {
+        if (!pAssetImage || !pAssetImage->IsLoaded()) {
             return false;
         }
 
@@ -104,13 +103,13 @@ public:
     {
         switch (type) {
         case ResourceType::eDiffuse:
-            Diffuse.pImage = image;
+            Diffuse.pAssetImage = image;
             break;
         case ResourceType::eNormal:
-            NormalMap.pImage = image;
+            NormalMap.pAssetImage = image;
             break;
         case ResourceType::eMetallicRoughness:
-            MetallicRoughness.pImage = image;
+            MetallicRoughness.pAssetImage = image;
             break;
 
         default:
@@ -184,10 +183,6 @@ public:
 
     ~FxMaterialManager() { Destroy(); }
 
-public:
-    FxRef<RxSampler> pAlbedoSampler { nullptr };
-    FxRef<RxSampler> pNormalMapSampler { nullptr };
-    FxRef<RxSampler> pMetallicRoughnessSampler { nullptr };
     // RxRawGpuBuffer<FxMaterialProperties> MaterialPropertiesUbo;
 
     /**

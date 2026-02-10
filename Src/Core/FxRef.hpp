@@ -44,7 +44,7 @@ public:
      * Constructs a new FxRef from a pointer and a pre-allocated ref count.
      */
     FxRef(T* ptr, FxRefCount* cnt, bool is_combined_allocation = false)
-        : mpRefCnt(cnt), mpPtr(ptr), mbIsCombinedAllocation(is_combined_allocation)
+        : mpRefCnt(cnt), mpPtr(ptr), mbIsCombinedAllocation(is_combined_allocation), mbIsExternalPtr(true)
     {
 #ifdef FX_DEBUG_REF
         FxLogDebug("Created FxRef {:p} (RefCnt: {:p})", reinterpret_cast<void*>(mpPtr),
@@ -205,8 +205,7 @@ public:
         mpRefCnt = nullptr;
     }
 
-private:
-    FX_FORCE_INLINE void DestroyRef()
+    void DestroyRef()
     {
         if (mpPtr) {
             // The pointer if the ref count and ptr are allocated together.
@@ -233,9 +232,13 @@ private:
                 return;
             }
 
-            // The pointer exists but the ref count ptr != the bundled ptr, so we will free the
-            // ptr normally.
-            FxMemPool::Free<T>(mpPtr);
+            // If the ptr is external, we can assume that it will be freed by the owner.
+            if (!mbIsExternalPtr) {
+                // The pointer exists but the ref count ptr != the bundled ptr, so we will free the
+                // ptr normally.
+                FxMemPool::Free<T>(mpPtr);
+            }
+
             mpPtr = nullptr;
         }
 
@@ -246,6 +249,7 @@ private:
         }
     }
 
+private:
     /**
      * Decrements the reference count and destroys the object if there are no other references to it.
      */
@@ -286,7 +290,8 @@ public:
     T* mpPtr = nullptr;
 
     /// Was the memory allocated as one buffer?
-    bool mbIsCombinedAllocation = false;
+    bool mbIsCombinedAllocation : 1 = false;
+    bool mbIsExternalPtr : 1 = false;
 };
 
 /**

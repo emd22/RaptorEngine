@@ -100,7 +100,7 @@ void FxMaterialManager::Destroy()
 }
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
-    if (component_.Exists() && !component_.pImage->IsLoaded()) {                                                       \
+    if (component_.Exists() && !component_.pAssetImage->IsLoaded()) {                                                  \
         return false;                                                                                                  \
     }
 
@@ -131,7 +131,7 @@ RxDescriptorSet& FxMaterial::GetDescriptorSetAlbedoOnly()
                          gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, 1);
 
 
-    mDsAlbedoOnly.AddImage(0, &Diffuse.pImage->Image, &gRenderer->Swapchain.ColorSampler);
+    mDsAlbedoOnly.AddImage(0, &Diffuse.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
     mDsAlbedoOnly.Build();
 
     return mDsAlbedoOnly;
@@ -165,7 +165,7 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
 
 
     RxDescriptorSet::BindMultiple(0, *cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
-                                  FxMakeSlice(sets_to_bind, FxSizeofArray(sets_to_bind)));
+                                  FxMakeSlice(sets_to_bind, std::size(sets_to_bind)));
 
     return true;
 }
@@ -195,7 +195,7 @@ bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bo
     };
 
     RxDescriptorSet::BindMultiple(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-                                  FxMakeSlice(sets_to_bind, FxSizeofArray(sets_to_bind)));
+                                  FxMakeSlice(sets_to_bind, std::size(sets_to_bind)));
 
     return true;
 }
@@ -215,14 +215,14 @@ void FxMaterial::Destroy()
 template <RxImageFormat TFormat>
 static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 {
-    if (!component.pImage && component.pDataToLoad) {
+    if (!component.pAssetImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pImage = AxManager::LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
+        component.pAssetImage = AxManager::LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
         return false;
     }
 
-    if (!component.pImage || !component.pImage->IsLoaded()) {
+    if (!component.pAssetImage || !component.pAssetImage.IsLoaded()) {
         return false;
     }
 
@@ -256,21 +256,21 @@ void FxMaterial::Build()
 
     // Fill material descriptor
 
-    mDsDefault.AddImage(0, &Diffuse.pImage->Image, &gRenderer->Swapchain.ColorSampler);
+    mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
 
     // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
     // not need to.
 
     if (NormalMap.Exists()) {
-        mDsDefault.AddImage(1, &NormalMap.pImage->Image, &gRenderer->Swapchain.NormalsSampler);
+        mDsDefault.AddImage(1, &NormalMap.pAssetImage->Image, &gRenderer->Swapchain.NormalsSampler);
 
         // To reduce permutations -- the metallic roughness map should only be
         // enabled if there is also a normal map.
         if (!MetallicRoughness.Exists()) {
-            MetallicRoughness.pImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
+            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
         }
 
-        mDsDefault.AddImage(2, &MetallicRoughness.pImage->Image, &gRenderer->Swapchain.ColorSampler);
+        mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
     }
 
     mDsDefault.Build();

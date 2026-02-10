@@ -123,7 +123,7 @@ void RxRenderPass::Create(RxAttachmentList& attachments, const FxVec2u& size, co
         .pAttachments = attachments.GetAttachmentDescriptions(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
-        .dependencyCount = sizeof(subpass_dependencies) / sizeof(subpass_dependencies[0]),
+        .dependencyCount = std::size(subpass_dependencies),
         .pDependencies = subpass_dependencies,
     };
 

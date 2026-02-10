@@ -35,7 +35,6 @@ public:
     RxAttachment(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
                  VkImageLayout initial_layout, VkImageLayout final_layout);
 
-
     VkAttachmentDescription BuildDescription() const;
     void CreateImage();
 
@@ -75,12 +74,12 @@ public:
 
     static RxAttachmentList New() { return {}; }
 
+    RxAttachmentList& Add(const RxAttachment* attachment);
     RxAttachmentList& Add(const RxAttachment& attachment);
 
     void CreateImages();
     FxSizedArray<VkAttachmentDescription>& GetAttachmentDescriptions();
     FxSizedArray<VkImageView>& GetImageViews();
-
 
 private:
     FX_FORCE_INLINE void CheckInited()

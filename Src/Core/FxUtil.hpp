@@ -5,7 +5,7 @@
 #include <Core/FxTypes.hpp>
 #include <type_traits>
 
-#define FxSizeofArray(arr_) (sizeof((arr_)) / sizeof((arr_)[0]))
+#define FxSizeofArray(arr_) std::size(arr)
 
 class FxUtil
 {

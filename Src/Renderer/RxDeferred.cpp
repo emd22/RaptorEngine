@@ -144,6 +144,14 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 
     RxPipelineBuilder builder {};
 
+    // FxStackArray<VkClearValue, 1> clear_values;
+
+    RxAttachmentList att {};
+    att.Add(LightPass.GetTarget(RxImageFormat::eRGBA16_Float));
+    // attachments.Add(GPass.GetTarget(RxImageFormat::eD32_Float));
+
+    // RpUnlit.Create(attachments, gRenderer->Swapchain.Extent);
+
     builder.SetLayout(layout)
         .SetName("Unlit Pipeline")
         .AddBlendAttachment({ .Enabled = false })
@@ -273,8 +281,7 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
         // RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
-                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxMakeSlice(layouts, std::size(layouts)));
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
     PlLightingOutsideVolume.SetLayout(layout);
@@ -412,8 +419,7 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
     FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxCompositionPushConstants),
                                                                        .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
 
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts),
-                                                       FxMakeSlice(layouts, FxSizeofArray(layouts)));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxMakeSlice(layouts, std::size(layouts)));
 
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
     PlComposition.SetLayout(layout);

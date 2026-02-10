@@ -42,6 +42,7 @@ public:
     void MarkFinalStage();
 
     RxRenderPass& GetRenderPass() { return mRenderPass; }
+    RxFramebuffer& GetFramebuffer() { return mFramebuffer; }
 
     /**
      * @brief Builds the Vulkan objects for the render stage. This is deferred until the user requests a renderpass or

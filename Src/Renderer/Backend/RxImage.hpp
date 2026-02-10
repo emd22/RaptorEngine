@@ -10,8 +10,8 @@
 
 #include <ThirdParty/vk_mem_alloc.h>
 
+#include <Core/FxRef.hpp>
 #include <Math/FxVec2.hpp>
-#include <optional>
 
 enum class RxImageFormat
 {
@@ -166,6 +166,17 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type);
 class RxImage
 {
 public:
+    RxImage();
+    RxImage(const RxImage& other);
+
+    /**
+     * @brief Transfers an `FxRef` to the normal ref counted image.
+     */
+    RxImage(FxRef<RxImage>&& ref);
+
+    RxImage& operator=(const RxImage& other);
+    RxImage& operator=(FxRef<RxImage>&& ref);
+
     void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
                 VkImageUsageFlags usage, RxImageAspectFlag aspect);
 
@@ -188,11 +199,9 @@ public:
 
     FX_FORCE_INLINE bool IsInited() const { return (Image != nullptr); }
 
+    void DecRef();
 
-    void Destroy();
-
-    ~RxImage() { Destroy(); }
-
+    ~RxImage();
 
 public:
     FxVec2u Size = FxVec2u::sZero;
@@ -207,4 +216,6 @@ public:
     VkImageLayout ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VmaAllocation Allocation = nullptr;
+
+    FxRefCount* mpRefCnt = nullptr;
 };

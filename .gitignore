@@ -5,7 +5,7 @@ xcbuild/**/*
 Src/out/**/*
 
 Shaders/Spirv/**/*
-Shaders/ShaderCompileDb.fxdb
+Shaders/LastUpdated.fxd
 
 .*
 

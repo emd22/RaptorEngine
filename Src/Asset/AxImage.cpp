@@ -8,17 +8,7 @@ static FxPagedArray<FxRef<AxImage>> mEmptyImagesPerFormat;
 
 FxPagedArray<FxRef<AxImage>>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
 
-void AxImage::Destroy()
-{
-    if (!bIsUploadedToGpu.load()) {
-        return;
-    }
-
-    Image.Destroy();
-
-    // mImageReady = false;
-    bIsUploadedToGpu = false;
-}
+AxImage::AxImage(const AxImage& other) { (*this) = other; }
 
 void AxImage::MarkAndSignalLoaded()
 {
@@ -28,4 +18,25 @@ void AxImage::MarkAndSignalLoaded()
     bIsUploadedToGpu.notify_all();
 
     mIsLoaded.store(true);
+}
+
+AxImage& AxImage::operator=(const AxImage& other)
+{
+    Image = other.Image;
+    ImageType = other.ImageType;
+    Size = other.Size;
+
+    return *this;
+}
+
+
+void AxImage::Destroy()
+{
+    if (!bIsUploadedToGpu.load()) {
+        return;
+    }
+
+    Image.DecRef();
+
+    bIsUploadedToGpu = false;
 }

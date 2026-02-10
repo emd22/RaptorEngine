@@ -106,6 +106,8 @@ public:
     RxPipeline PlUnlit;
     RxDescriptorSet DsUnlit;
 
+    RxRenderPass RpUnlit;
+
     //////////////////////
     // Composition Pass
     //////////////////////

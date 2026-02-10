@@ -8,6 +8,8 @@ void RxGpuBufferSubmitUploadCmd(std::function<void(RxCommandBuffer&)> func) { gR
 void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
                             RxGpuBufferFlags buffer_flags)
 {
+    FxAssert(size_in_bytes > 0);
+
     Size = size_in_bytes;
     Type = buffer_type;
     mBufferFlags = buffer_flags;

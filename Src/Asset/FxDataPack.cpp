@@ -38,6 +38,8 @@ void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
         if (found_entry) {
             found_entry->Data.Free();
             found_entry->Data.InitAsCopyOf(data.pData, data.Size);
+            found_entry->DataSize = data.Size;
+
             FxLogInfo("Updating data pack entry {}", id);
             return;
         }
@@ -186,17 +188,15 @@ void FxDataPack::WriteToFile(const char* name)
         File.Flush();
         File.Close();
     }
+
     File.Open(name, FxFile::eWrite, FxFile::eBinary);
 
     if (!File.IsFileOpen()) {
         return;
     }
 
-
     BinaryWriteHeader();
     BinaryWriteData();
-
-    // File.Close();
 }
 
 

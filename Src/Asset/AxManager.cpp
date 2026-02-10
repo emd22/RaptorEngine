@@ -117,14 +117,11 @@ void AxManager::Shutdown()
     // which frees the `FxRef`'s to the data
     mWorkerThreads.Free();
 
-
-    // Cleanup all permutations of "empty images" that were created. Because there is one
-    // image created for each format that requires one.
+    // Cleanup all permutations of "empty images" that were created.
     FxPagedArray<FxRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
     if (empty_images_list.IsInited()) {
         for (FxRef<AxImage>& image_ref : empty_images_list) {
-            image_ref->Destroy();
-            image_ref.SetNull();
+            image_ref.DestroyRef();
         }
     }
 

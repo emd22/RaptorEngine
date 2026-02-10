@@ -101,6 +101,12 @@ RxAttachmentList& RxAttachmentList::Add(const RxAttachment& attachment)
     return *this;
 }
 
+RxAttachmentList& RxAttachmentList::Add(const RxAttachment* attachment)
+{
+    FxAssertMsg(attachment != nullptr, "Attachment cannot be null!");
+    return Add(*attachment);
+}
+
 void RxAttachmentList::CreateImages()
 {
     for (RxAttachment& attachment : Attachments) {
@@ -116,7 +122,6 @@ FxSizedArray<VkImageView>& RxAttachmentList::GetImageViews()
     if (mbImageViewsBuilt) {
         return mBuiltImageViews;
     }
-
 
     if (!mBuiltImageViews.IsInited()) {
         mBuiltImageViews.InitCapacity(Attachments.Size);
