@@ -50,7 +50,7 @@ public:
     RxDescriptorPool mDescriptorPool {};
 
 public:
-    RxRawGpuBuffer mObjectGpuBuffer;
+    RxRawGpuBuffer mObjectGpuBuffer {};
     FxBitset mObjectSlotsInUse;
 
     RxDescriptorSet mObjectBufferDS {};

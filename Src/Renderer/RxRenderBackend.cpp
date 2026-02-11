@@ -639,12 +639,20 @@ void RxRenderBackend::Destroy()
         sem.Destroy();
     }
 
+    uint32 num_deletes = 0;
+
+
     while (!mDeletionQueue.empty()) {
-        ProcessDeletionQueue(true);
+        if (ProcessDeletionQueue(true)) {
+            ++num_deletes;
+        }
+
         // insert a small delay to avoid the processor spinning out while
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
+
+    FxLogInfo("Total number of deletes: {}", num_deletes);
 
     gObjectManager->Destroy();
 

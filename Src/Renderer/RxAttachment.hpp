@@ -60,7 +60,7 @@ public:
     VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    RxImage Image;
+    RxImage Image {};
 };
 
 class RxAttachmentList

@@ -60,7 +60,7 @@ public:
     void Destroy() override;
 
 public:
-    RxImage Image;
+    RxImage Image {};
 
     RxImageType ImageType = RxImageType::e2d;
     FxVec2u Size = FxVec2u::sZero;

@@ -106,7 +106,6 @@ public:
     static constexpr FxCameraType scType = FxCameraType::eOrthographic;
 
 public:
-    FxOrthoCamera(float32 left, float32 right, float32 bottom, float32 top) {}
     FxOrthoCamera() { Update(); }
 
     void UpdateProjectionMatrix() override;

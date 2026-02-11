@@ -3,8 +3,6 @@
 #include <FxEngine.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-void RxGpuBufferSubmitUploadCmd(std::function<void(RxCommandBuffer&)> func) { gRenderer->SubmitUploadCmd(func); }
-
 void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
                             RxGpuBufferFlags buffer_flags)
 {
@@ -37,12 +35,16 @@ void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, V
     const VmaAllocationCreateInfo alloc_create_info = { .flags = vma_create_flags, .usage = memory_usage };
 
     VmaAllocationInfo allocation_info;
-    const VkResult status = vmaCreateBuffer(Fx_Fwd_GetGpuAllocator(), &create_info, &alloc_create_info, &Buffer,
+    const VkResult status = vmaCreateBuffer(gRenderer->GpuAllocator, &create_info, &alloc_create_info, &Buffer,
                                             &Allocation, &allocation_info);
 
     if (status != VK_SUCCESS) {
-        FxPanicVulkan("GPUBuffer", "Error allocating staging buffer!", status);
+        FxPanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
     }
+
+
+    FxLogInfo("Create Buffer  (Buffer={:p}, Allocation={:p})", reinterpret_cast<void*>(Buffer),
+              reinterpret_cast<void*>(Allocation));
 
 
     if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped) != 0) {
@@ -60,7 +62,7 @@ void RxRawGpuBuffer::Map()
         return;
     }
 
-    const VkResult status = vmaMapMemory(Fx_Fwd_GetGpuAllocator(), Allocation, &pMappedBuffer);
+    const VkResult status = vmaMapMemory(gRenderer->GpuAllocator, Allocation, &pMappedBuffer);
 
     if (status != VK_SUCCESS) {
         FxLogError("Could not map GPU memory! (BufferType=0x{:x}, Error={})", static_cast<uint32>(Type),
@@ -76,7 +78,7 @@ void RxRawGpuBuffer::UnMap()
         return;
     }
 
-    vmaUnmapMemory(Fx_Fwd_GetGpuAllocator(), Allocation);
+    vmaUnmapMemory(gRenderer->GpuAllocator, Allocation);
     pMappedBuffer = nullptr;
 }
 
@@ -86,8 +88,11 @@ void RxRawGpuBuffer::Destroy()
         return;
     }
 
-    Fx_Fwd_AddGpuBufferToDeletionQueue(this->Buffer, this->Allocation);
+    gRenderer->AddGpuBufferToDeletionQueue(Buffer, Allocation);
 
     Initialized.store(false);
     Size = 0;
+
+    Allocation = nullptr;
+    Buffer = nullptr;
 }

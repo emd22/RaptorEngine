@@ -19,6 +19,7 @@ include_directories(${CMAKE_SOURCE_DIR}/Lib/Include)
 
 if(MSVC)
 else()
+    add_compile_options(-Wno-nullability-completeness)
 	# find_package(libjpeg-turbo REQUIRED)
 endif()
 
@@ -84,7 +85,7 @@ if (APPLE)
 		-Wall
 		# -Wpedantic
 		# -fsanitize=address
-		-Wno-nullability-extension
+
 		# -O2
 	)
 

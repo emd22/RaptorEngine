@@ -188,7 +188,7 @@ public:
     /**
      * @brief A large GPU buffer containing all loaded in material properties.
      */
-    RxRawGpuBuffer MaterialPropertiesBuffer;
+    RxRawGpuBuffer MaterialPropertiesBuffer {};
     uint32 NumMaterialsInBuffer = 0;
 
     FxBitset MaterialsInUse;

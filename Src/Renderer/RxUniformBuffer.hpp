@@ -66,7 +66,7 @@ public:
 private:
     /// Gpu buffer that stores current uniform buffer data. Note that this is a continguous buffer that stores
     /// `RxFramesInFlight` number of uniform structures that are of size `scUniformBufferSize`.
-    RxRawGpuBuffer mGpuBuffer;
+    RxRawGpuBuffer mGpuBuffer {};
 
     uint32 mUniformIndex = 0;
 };

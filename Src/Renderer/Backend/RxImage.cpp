@@ -65,10 +65,10 @@ RxImage& RxImage::operator=(const RxImage& other)
 
     mpRefCnt = other.mpRefCnt;
 
-    // if (!mpRefCnt) {
-    //     mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
-    // }
-    if (mpRefCnt) {
+    if (!mpRefCnt) {
+        mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
+    }
+    else {
         mpRefCnt->Inc();
     }
 
@@ -79,6 +79,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
                      VkImageUsageFlags usage, RxImageAspectFlag aspect)
 {
     FxAssert(size.X > 0 && size.Y > 0);
+    FxAssert(Image == nullptr && Allocation == nullptr);
 
     Aspect = aspect;
     Size = size;
@@ -133,6 +134,9 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
     }
 
 
+    FxLogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
+              reinterpret_cast<void*>(Allocation));
+
 #ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
     {
         static uint32 allocation_number = 0;
@@ -174,6 +178,10 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
     status = vkCreateImageView(gRenderer->GetDevice()->Device, &view_create_info, nullptr, &View);
     if (status != VK_SUCCESS) {
         FxModulePanicVulkan("Could not create swapchain image view", status);
+    }
+
+    if (reinterpret_cast<uintptr_t>(Image) == 0x2b000000002b) {
+        FX_BREAKPOINT;
     }
 
     std::string image_view_name = "";
@@ -465,29 +473,6 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat imag
             vkCmdCopyImage(cmd.CommandBuffer, cubemap.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.pData);
 
-            // VkBufferImageCopy copy {
-            //     .bufferOffset = 0,
-            //     .bufferRowLength = 0,
-            //     .bufferImageHeight = 0,
-            //     .imageSubresource {
-            //         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            //         .mipLevel = 0,
-            //         .baseArrayLayer = base_layer,
-            //         .layerCount = 1,
-            //     },
-            //     .imageExtent =
-            //         VkExtent3D {
-            //             .width = size.X,
-            //             .height = size.Y,
-            //             .depth = 1,
-            //         },
-            // };
-
-            // vkCmdCopyImage(cmd.CommandBuffer, cubemap.Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, Image,
-            //                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-            // TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd);
-            //
             TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 6);
         });
 }
@@ -498,13 +483,16 @@ void RxImage::DecRef()
         return;
     }
 
-
     if (mpRefCnt->Dec() > 0) {
         return;
     }
 
     FxMemPool::Free(mpRefCnt);
     mpRefCnt = nullptr;
+
+
+    FxLogInfo("Destroy Image  (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
+              reinterpret_cast<void*>(Allocation));
 
     if (View != nullptr) {
         vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
@@ -517,21 +505,6 @@ void RxImage::DecRef()
     Image = nullptr;
     Allocation = nullptr;
     View = nullptr;
-
-    // Fx_Fwd_AddToDeletionQueue([this](FxDeletionObject* obj) {
-    //     if (this->Image == nullptr || this->Allocation == nullptr) {
-    //         return;
-    //     }
-
-    //     printf("Destroy image!!\n");
-
-    //     vkDestroyImageView(this->mDevice->Device, this->View, nullptr);
-    //     vmaDestroyImage(RendererVulkan->GpuAllocator, this->Image,
-    //     this->Allocation);
-
-    //     this->Image = nullptr;
-    //     this->Allocation = nullptr;
-    // });
 }
 
 

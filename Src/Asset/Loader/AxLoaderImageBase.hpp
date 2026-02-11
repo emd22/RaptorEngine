@@ -10,7 +10,7 @@ public:
     using Status = AxLoaderBase::Status;
 
 public:
-    RxImageType ImageType;
+    RxImageType ImageType = RxImageType::e2d;
     RxImageFormat ImageFormat = RxImageFormat::eNone;
-    //int16 ImageNumComponents = 0;
+    // int16 ImageNumComponents = 0;
 };

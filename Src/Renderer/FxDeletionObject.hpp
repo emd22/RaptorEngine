@@ -17,5 +17,5 @@ struct FxDeletionObject
     uint32 DeletionFrameNumber = 0;
     FuncType Func = [](FxDeletionObject* object) {};
 
-    bool IsGpuBuffer : 1 = false;
+    bool bIsGpuBuffer : 1 = false;
 };

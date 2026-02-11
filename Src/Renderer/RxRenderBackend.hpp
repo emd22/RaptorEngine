@@ -14,10 +14,9 @@
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
+#include <Core/FxDefer.hpp>
 #include <Core/FxRef.hpp>
 #include <deque>
-
-struct SDL_Window;
 
 enum class RxFrameResult
 {
@@ -42,7 +41,7 @@ class FxCamera;
 
 class RxRenderBackend
 {
-    const uint32 DeletionFrameSpacing = 3;
+    const uint32 scDeletionFrameSpacing = 3;
 
 public:
     using SubmitFunc = std::function<void(RxCommandBuffer& cmd)>;
@@ -71,21 +70,14 @@ public:
 
     void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
-        // Log::Info("Adding GPUBuffer to deletion queue at frame %d", mInternalFrameCounter);
-        if (mInDeletionQueue) {
-            mInDeletionQueue.wait(false);
-        }
-
-        mInDeletionQueue.store(true);
+        std::lock_guard<std::mutex> guard(mInDeletionQueue);
 
         mDeletionQueue.push_back(FxDeletionObject {
             .Buffer = buffer,
             .Allocation = allocation,
-            .DeletionFrameNumber = mInternalFrameCounter + DeletionFrameSpacing,
-            .IsGpuBuffer = true,
+            .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
+            .bIsGpuBuffer = true,
         });
-
-        mInDeletionQueue.store(false);
     }
 
     VkInstance GetVulkanInstance() { return mInstance; }
@@ -100,47 +92,56 @@ public:
 
     ~RxRenderBackend() { Destroy(); }
 
-    void ProcessDeletionQueue(bool immediate = false)
+    bool ProcessDeletionQueue(bool immediate = false)
     {
         if (mDeletionQueue.empty()) {
-            return;
+            return false;
         }
 
-        if (immediate && mInDeletionQueue) {
-            mInDeletionQueue.wait(false);
-        }
-        if (mInDeletionQueue) {
-            return;
-        }
+        if (immediate) {
+            FxLogInfo("PROCESS QUEUE");
 
-        mInDeletionQueue.store(true);
+            mInDeletionQueue.lock();
+        }
+        else if (!mInDeletionQueue.try_lock()) {
+            return false;
+        }
 
         FxDeletionObject& object = mDeletionQueue.front();
 
-        // Log::Debug("Deleting object from deletion queue from frame %d", object.DeletionFrameNumber);
+        FxLogDebug("Processing object ({}) from deletion queue", object.DeletionFrameNumber);
 
         const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
 
+        bool did_delete = false;
+
         if (immediate || is_frame_spaced) {
-            if (object.IsGpuBuffer) {
+            if (object.bIsGpuBuffer) {
+                FxLogWarning("DESTROYING BUFFER!");
                 vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
+                did_delete = true;
             }
             else {
                 object.Func(&object);
+                did_delete = true;
             }
 
             mDeletionQueue.pop_front();
         }
 
-        mInDeletionQueue.store(false);
+        mInDeletionQueue.unlock();
+
+        return did_delete;
     }
 
     void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
         FxLogInfo("Adding object to deletion queue at frame {}", mInternalFrameCounter);
 
+        std::lock_guard<std::mutex> guard(mInDeletionQueue);
+
         mDeletionQueue.push_back(FxDeletionObject {
-            .DeletionFrameNumber = mInternalFrameCounter,
+            .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
             .Func = func,
         });
     }
@@ -217,6 +218,6 @@ protected:
     uint32 mFrameNumber = 0;
     uint32 mInternalFrameCounter = 0;
 
-    std::atomic_bool mInDeletionQueue = false;
+    std::mutex mInDeletionQueue;
     std::deque<FxDeletionObject> mDeletionQueue;
 };
