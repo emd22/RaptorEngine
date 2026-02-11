@@ -3,6 +3,7 @@
 #include "AxBase.hpp"
 #include "Loader/AxLoaderBase.hpp"
 
+#include <Core/FxLockContext.hpp>
 #include <Core/FxTSRef.hpp>
 #include <mutex>
 #include <string>
@@ -15,61 +16,76 @@ enum class AxType
     Image,
 };
 
+struct AxItemData
+{
+    AxItemData() = default;
+
+    template <typename TLoaderType, typename TAssetType>
+    AxItemData(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset) : pLoader(loader), pAsset(asset)
+    {
+    }
+
+    AxItemData(AxItemData&& other) { (*this) = std::move(other); }
+
+    AxItemData& operator=(AxItemData&& other)
+    {
+        pLoader = std::move(other.pLoader);
+        pAsset = std::move(other.pAsset);
+        return *this;
+    }
+
+    FxRef<AxLoaderBase> pLoader { nullptr };
+    FxRef<AxBase> pAsset { nullptr };
+};
+
 struct AxQueueItem
 {
     AxQueueItem() = default;
 
     template <typename TLoaderType, typename TAssetType>
     AxQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, AxType type, const std::string& path)
-        : Path(path), Loader(loader), Asset(asset), RawData(nullptr), DataSize(0), AssetType(type)
+        : Path(path), RawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
     {
     }
 
     template <typename TLoaderType, typename TAssetType>
     AxQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, AxType type, const uint8* data,
                 uint32 data_size)
-        : Path(""), Loader(loader), Asset(asset), RawData(data), DataSize(data_size), AssetType(type)
+        : Path(""), RawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
     {
     }
 
-    AxQueueItem(AxQueueItem&& other)
-    {
-        other.mMutex.lock();
-        Path = other.Path;
-        Loader = std::move(other.Loader);
-        Asset = std::move(other.Asset);
-        RawData = other.RawData;
-        DataSize = other.DataSize;
-        AssetType = other.AssetType;
-        other.mMutex.unlock();
-    }
-
+    AxQueueItem(AxQueueItem&& other) { (*this) = std::move(other); }
 
     AxQueueItem& operator=(AxQueueItem&& other)
     {
         other.mMutex.lock();
+
         Path = other.Path;
-        Loader = std::move(other.Loader);
-        Asset = std::move(other.Asset);
+        Data = std::move(other.Data);
         RawData = other.RawData;
         DataSize = other.DataSize;
         AssetType = other.AssetType;
+
         other.mMutex.unlock();
 
         return *this;
     }
+
+    FxLockContext<AxItemData> GetDataContext() { return FxLockContext<AxItemData>(mMutex, Data); }
 
 public:
     std::string Path;
 
     std::mutex mMutex;
 
-    FxRef<AxLoaderBase> Loader { nullptr };
-    FxRef<AxBase> Asset { nullptr };
 
     // Data for loading from memory
     const uint8* RawData = nullptr;
     uint32 DataSize = 0;
 
     AxType AssetType;
+
+private:
+    AxItemData Data;
 };

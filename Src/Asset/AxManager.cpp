@@ -40,26 +40,26 @@ void AxWorker::Update()
             break;
         }
 
-        Item.mMutex.lock();
+        // Retrieve the loader and asset from the item
+        FxLockContext<AxItemData> asset_data = Item.GetDataContext();
 
         // If there is data passed in then we load from memory
         if (Item.RawData != nullptr && Item.DataSize > 0) {
-            LoadStatus = Item.Loader->LoadFromMemory(Item.Asset, Item.RawData, Item.DataSize);
+            LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.RawData, Item.DataSize);
+
+            // LoadStatus = Item.pLoader->LoadFromMemory(Item.pAsset, Item.RawData, Item.DataSize);
         }
         // There is no data passed in, load from file
         else {
-            // Call our specialized loader to load the asset file
-            LoadStatus = Item.Loader->LoadFromFile(Item.Asset, Item.Path);
-        }
+            LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
 
-        Item.mMutex.unlock();
+            // Call our specialized loader to load the asset file
+            // LoadStatus = Item.pLoader->LoadFromFile(Item.pAsset, Item.Path);
+        }
 
 
         // Mark that we are waiting for the data to be uploaded to the GPU
         DataPendingUpload.test_and_set();
-
-        // Signal the main asset thread that we are done
-        //        manager.DataLoaded.SignalDataWritten();
     }
 }
 
@@ -246,41 +246,44 @@ void AxManager::CheckForUploadableData()
             continue;
         }
 
-        std::lock_guard<std::mutex> guard(worker.Item.mMutex);
+        // std::lock_guard<std::mutex> guard(worker.Item.mMutex);
 
-        auto& loaded_item = worker.Item;
+        // AxQueueItem& loaded_item = worker.Item;
+
+        FxLockContext<AxItemData> asset_data = worker.Item.GetDataContext();
+
 
         // The asset was successfully loaded, upload to GPU
         if (worker.LoadStatus == AxLoaderBase::Status::eSuccess) {
             // Load the resouce into GPU memory
-            loaded_item.Loader->CreateGpuResource(loaded_item.Asset);
+            asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
 
-            while (!loaded_item.Asset->bIsUploadedToGpu) {
-                loaded_item.Asset->bIsUploadedToGpu.wait(true);
+            while (!asset_data->pAsset->bIsUploadedToGpu) {
+                asset_data->pAsset->bIsUploadedToGpu.wait(true);
             }
 
-            if (!loaded_item.Asset->mOnLoadedCallbacks.empty()) {
-                for (auto& callback : loaded_item.Asset->mOnLoadedCallbacks) {
-                    callback(loaded_item.Asset);
+            if (!asset_data->pAsset->mOnLoadedCallbacks.empty()) {
+                for (auto& callback : asset_data->pAsset->mOnLoadedCallbacks) {
+                    callback(asset_data->pAsset);
                 }
             }
 
-            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
-            loaded_item.Asset->mIsLoaded.store(true);
+            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->mIsLoaded.store(true);
 
             // Destroy the loader(clearing the loading buffers)
-            loaded_item.Loader->Destroy(loaded_item.Asset);
+            asset_data->pLoader->Destroy(asset_data->pAsset);
         }
         else if (worker.LoadStatus == AxLoaderBase::Status::eError) {
-            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
 
             // There was an error, call the OnError callback if it was registered
-            if (loaded_item.Asset->mOnErrorCallback) {
-                loaded_item.Asset->mOnErrorCallback(loaded_item.Asset);
+            if (asset_data->pAsset->mOnErrorCallback) {
+                asset_data->pAsset->mOnErrorCallback(asset_data->pAsset);
             }
         }
         else if (worker.LoadStatus == AxLoaderBase::Status::eNone) {
-            loaded_item.Asset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
 
             FxPanic("FxAssetManager", "Worker status is none!");
         }

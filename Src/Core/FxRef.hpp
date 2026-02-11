@@ -220,8 +220,11 @@ public:
                 if constexpr (std::is_destructible_v<T>) {
                     mpPtr->~T();
                 }
-                // Call the destructor on the ref count
-                mpRefCnt->~FxRefCount();
+                
+                if (mpRefCnt) {
+                    // Call the destructor on the ref count
+                    mpRefCnt->~FxRefCount();
+                }
 
                 // Free the bundled memory
                 FxMemPool::Free(reinterpret_cast<uint8*>(mpPtr));

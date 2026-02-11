@@ -59,7 +59,7 @@ FX_FORCE_INLINE uint32 FxBitset::FindNextFreeBit(uint32 start_index) const
 
     // if the start index is not at a byte boundary, we need to mask off the start of the byte.
     if (bit_index != 0) {
-        byte_mask = (1 << bit_index) - 1;
+        byte_mask = (1ULL << bit_index) - 1;
     }
 
     constexpr uint64 cFullChunk = (~0ULL);

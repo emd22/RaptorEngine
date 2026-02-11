@@ -145,15 +145,20 @@ public:
     // Methods to load into existing containers
     ////////////////////////////////////////////////
 
-    /**
-     * @brief Loads an object into the provided asset from a path.
-     */
-    static void LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options = {});
+    static void LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset,
+                                    const uint8* data, uint32 data_size);
 
     /**
      * @brief Loads an asset into the provided asset from the provided data.
      */
     static void LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size);
+
+
+    /**
+     * @brief Loads an object into the provided asset from a path.
+     */
+    static void LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options = {});
+
 
     static void LoadImage(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset, const std::string& path);
 
@@ -164,17 +169,12 @@ public:
     {
         return LoadImage(RxImageType::e2d, format, asset, path);
     }
-
-
-    static void LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset,
-                                    const uint8* data, uint32 data_size);
-
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
     static void LoadImageFromMemory(FxRef<AxImage>& asset, RxImageFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::e2d, format, asset, data, data_size);
+        LoadImageFromMemory(RxImageType::e2d, format, asset, data, data_size);
     }
 
     ~AxManager() { Shutdown(); }
@@ -195,10 +195,7 @@ private:
     static void SubmitAssetToLoad(const FxRef<TAssetType>& asset, FxRef<TLoaderType>& loader, const std::string& path,
                                   const uint8* data = nullptr, uint32 data_size = 0)
     {
-        if (asset->bIsUploadedToGpu) {
-            printf("*** DELETING ***\n");
-            asset->Destroy();
-        }
+        FxAssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
 
         // FxRef<LoaderType> loader = FxRef<LoaderType>::New();
 

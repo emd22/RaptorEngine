@@ -94,16 +94,15 @@ public:
 
     bool ProcessDeletionQueue(bool immediate = false)
     {
-        if (mDeletionQueue.empty()) {
-            return false;
-        }
-
         if (immediate) {
-            FxLogInfo("PROCESS QUEUE");
-
             mInDeletionQueue.lock();
         }
         else if (!mInDeletionQueue.try_lock()) {
+            return false;
+        }
+
+        if (mDeletionQueue.empty()) {
+            mInDeletionQueue.unlock();
             return false;
         }
 
@@ -117,7 +116,6 @@ public:
 
         if (immediate || is_frame_spaced) {
             if (object.bIsGpuBuffer) {
-                FxLogWarning("DESTROYING BUFFER!");
                 vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
                 did_delete = true;
             }
@@ -136,7 +134,7 @@ public:
 
     void AddToDeletionQueue(FxDeletionObject::FuncType func)
     {
-        FxLogInfo("Adding object to deletion queue at frame {}", mInternalFrameCounter);
+        // FxLogInfo("Adding object to deletion queue at frame {}", mInternalFrameCounter);
 
         std::lock_guard<std::mutex> guard(mInDeletionQueue);
 
@@ -146,7 +144,7 @@ public:
         });
     }
 
-    uint32 GetElapsedFrameCount() const { return mInternalFrameCounter; }
+    uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
     uint32 GetFrameNumber() const { return mFrameNumber; }
 
 private:
@@ -216,7 +214,7 @@ private:
 
 protected:
     uint32 mFrameNumber = 0;
-    uint32 mInternalFrameCounter = 0;
+    std::atomic_uint32_t mInternalFrameCounter = 0;
 
     std::mutex mInDeletionQueue;
     std::deque<FxDeletionObject> mDeletionQueue;

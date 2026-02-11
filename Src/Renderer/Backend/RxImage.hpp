@@ -5,7 +5,6 @@
 // #define VMA_DEBUG_LOG(...) OldLog::Warning(__VA_ARGS__)
 
 #include "RxCommands.hpp"
-#include "RxDevice.hpp"
 #include "RxGpuBuffer.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>

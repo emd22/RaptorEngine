@@ -175,17 +175,13 @@ public:
 
     const TElementType& operator[](size_t index) const
     {
-        if (index >= Size) {
-            throw std::out_of_range("FxSizedArray access out of range");
-        }
+        FxAssertMsg(index < Capacity, "Access out of range");
         return pData[index];
     }
 
     TElementType& operator[](size_t index)
     {
-        if (index >= Size) {
-            throw std::out_of_range("FxSizedArray access out of range");
-        }
+        FxAssertMsg(index < Capacity, "Access out of range");
         return pData[index];
     }
 
@@ -265,10 +261,7 @@ public:
 
     TElementType& Insert(const TElementType& object)
     {
-        if (Size > Capacity) {
-            printf("New Size(%zu) > Capacity(%zu)!\n", Size, Capacity);
-            throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
-        }
+        FxAssertMsg(Size < Capacity, "Insert will exceed capacity!");
 
         TElementType* element = &pData[Size++];
 
@@ -279,10 +272,7 @@ public:
 
     void Insert(TElementType&& object)
     {
-        if (Size > Capacity) {
-            printf("New Size(%zu) > Capacity(%zu)!\n", Size, Capacity);
-            throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
-        }
+        FxAssertMsg(Size < Capacity, "Insert will exceed capacity!");
 
         TElementType* element = &pData[Size++];
 
@@ -292,10 +282,7 @@ public:
     /** Inserts a new empty element into the array and returns a pointer to the element */
     TElementType* Insert()
     {
-        if (Size > Capacity) {
-            printf("New Size(%zu) > Capacity(%zu)!\n", Size, Capacity);
-            throw std::out_of_range("FxSizedArray insert is larger than the capacity!");
-        }
+        FxAssertMsg(Size < Capacity, "Insert will exceed capacity!");
 
         TElementType* element = &pData[Size++];
 
@@ -306,9 +293,7 @@ public:
 
     void InitCapacity(size_t element_count)
     {
-        if (pData != nullptr) {
-            throw std::runtime_error("FxSizedArray has already been previously initialized, cannot InitCapacity!");
-        }
+        FxAssertMsg(pData == nullptr, "SizedArray has already been initialized!");
 
         InternalAllocateArray(element_count);
 
@@ -367,15 +352,6 @@ public:
         }
 #endif
     }
-
-    // void InitSize()
-    // {
-    //     if (Capacity == 0) {
-    //         throw std::runtime_error("Static array capacity has not been set!");
-    //     }
-
-    //     Size = Capacity;
-    // }
 
     size_t GetSizeInBytes() const { return Size * sizeof(TElementType); }
 
