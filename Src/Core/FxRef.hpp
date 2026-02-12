@@ -64,6 +64,7 @@ public:
         mpRefCnt = other.mpRefCnt;
         mpPtr = other.mpPtr;
         mbIsCombinedAllocation = other.mbIsCombinedAllocation;
+        mbIsExternalPtr = other.mbIsExternalPtr;
 
         if (mpRefCnt) {
             mpRefCnt->Inc();
@@ -80,6 +81,7 @@ public:
         mpRefCnt = other.mpRefCnt;
         mpPtr = static_cast<T*>(other.mpPtr);
         mbIsCombinedAllocation = other.mbIsCombinedAllocation;
+        mbIsExternalPtr = other.mbIsExternalPtr;
 
         if (mpRefCnt) {
             mpRefCnt->Inc();
@@ -95,6 +97,7 @@ public:
         mpRefCnt = other.mpRefCnt;
         mpPtr = other.mpPtr;
         mbIsCombinedAllocation = other.mbIsCombinedAllocation;
+        mbIsExternalPtr = other.mbIsExternalPtr;
 
         if (mpRefCnt) {
             mpRefCnt->Inc();
@@ -107,6 +110,7 @@ public:
         mpRefCnt = (other.mpRefCnt);
         mpPtr = (other.mpPtr);
         mbIsCombinedAllocation = other.mbIsCombinedAllocation;
+        mbIsExternalPtr = other.mbIsExternalPtr;
 
         other.mpPtr = nullptr;
         other.mpRefCnt = nullptr;
@@ -173,6 +177,7 @@ public:
         mpPtr = other.mpPtr;
         mpRefCnt = other.mpRefCnt;
         mbIsCombinedAllocation = other.mbIsCombinedAllocation;
+        mbIsExternalPtr = other.mbIsExternalPtr;
 
         // Since `mRefCnt` now points to the old ref's count, Inc'ing this
         // marks that the object is in use.
@@ -220,7 +225,7 @@ public:
                 if constexpr (std::is_destructible_v<T>) {
                     mpPtr->~T();
                 }
-                
+
                 if (mpRefCnt) {
                     // Call the destructor on the ref count
                     mpRefCnt->~FxRefCount();

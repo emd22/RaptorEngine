@@ -654,6 +654,7 @@ void RxRenderBackend::Destroy()
 
     FxLogInfo("Total number of deletes: {}", num_deletes);
 
+
     gObjectManager->Destroy();
 
     // SamplerCache.Destroy();
@@ -664,6 +665,10 @@ void RxRenderBackend::Destroy()
     GetDevice()->WaitForIdle();
 
     Swapchain.Destroy();
+
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
 
     DestroyGPUAllocator();
 

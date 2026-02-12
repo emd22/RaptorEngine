@@ -490,9 +490,7 @@ void RxImage::DecRef()
     FxMemPool::Free(mpRefCnt);
     mpRefCnt = nullptr;
 
-
-    FxLogInfo("Destroy Image  (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
-              reinterpret_cast<void*>(Allocation));
+    static uint32 num_destroyed = 0;
 
     if (View != nullptr) {
         vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
@@ -500,7 +498,10 @@ void RxImage::DecRef()
 
     if (Image != nullptr && Allocation != nullptr) {
         vmaDestroyImage(gRenderer->GpuAllocator, this->Image, this->Allocation);
+        ++num_destroyed;
     }
+
+    FxLogWarning("Num Destroyed: {}", num_destroyed);
 
     Image = nullptr;
     Allocation = nullptr;

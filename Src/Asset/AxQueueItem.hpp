@@ -10,10 +10,10 @@
 
 enum class AxType
 {
-    None,
-    Binary,
-    Object,
-    Image,
+    eNone,
+    eBinary,
+    eObject,
+    eImage,
 };
 
 struct AxItemData
@@ -59,7 +59,7 @@ struct AxQueueItem
 
     AxQueueItem& operator=(AxQueueItem&& other)
     {
-        other.mMutex.lock();
+        mMutex.lock();
 
         Path = other.Path;
         Data = std::move(other.Data);
@@ -67,7 +67,7 @@ struct AxQueueItem
         DataSize = other.DataSize;
         AssetType = other.AssetType;
 
-        other.mMutex.unlock();
+        mMutex.unlock();
 
         return *this;
     }

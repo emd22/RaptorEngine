@@ -183,7 +183,7 @@ void AxManager::LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLo
     FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.KeepInMemory;
 
-    SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::Object>(asset, loader, path);
+    SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::eObject>(asset, loader, path);
 }
 
 
@@ -191,7 +191,7 @@ void AxManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, 
 {
     FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
 
-    SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::Object>(asset, loader, "", data, data_size);
+    SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::eObject>(asset, loader, "", data, data_size);
 }
 
 
@@ -204,14 +204,14 @@ void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxRef<Ax
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::eImage>(asset, loader, path);
     }
     else {
         FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::eImage>(asset, loader, path);
     }
 }
 
@@ -225,7 +225,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::eImage>(asset, loader, "", data, data_size);
     }
     else {
         // Load the image using stb_image
@@ -233,7 +233,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::eImage>(asset, loader, "", data, data_size);
     }
 }
 

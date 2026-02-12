@@ -63,7 +63,6 @@ public:
     void SelectWindow(const FxRef<FxWindow>& window) { mpWindow = window; }
 
     FX_FORCE_INLINE FxRef<FxWindow> GetWindow() { return mpWindow; }
-
     FX_FORCE_INLINE RxGpuDevice* GetDevice() { return &mDevice; }
 
     RxUniformBufferObject& GetUbo();
@@ -108,13 +107,13 @@ public:
 
         FxDeletionObject& object = mDeletionQueue.front();
 
-        FxLogDebug("Processing object ({}) from deletion queue", object.DeletionFrameNumber);
-
         const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
 
         bool did_delete = false;
 
         if (immediate || is_frame_spaced) {
+            FxLogDebug("Processing object ({}) from deletion queue", object.DeletionFrameNumber);
+
             if (object.bIsGpuBuffer) {
                 vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
                 did_delete = true;
