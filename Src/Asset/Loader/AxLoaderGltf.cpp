@@ -270,7 +270,6 @@ void AxLoaderGltf::CreateGpuResource(FxRef<AxBase>& asset)
 void AxLoaderGltf::Destroy(FxRef<AxBase>& asset)
 {
     if (mpGltfData) {
-        printf("Destroyed mesh\n");
         cgltf_free(mpGltfData);
         mpGltfData = nullptr;
     }

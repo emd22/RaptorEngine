@@ -137,7 +137,9 @@ FxObjectId FxObjectManager::ReserveInstances(FxObjectId object_id, uint32 num_in
 
 void FxObjectManager::Destroy()
 {
-    // mObjectBufferDS.Destroy();
+    mObjectBufferDS.Destroy();
     mDescriptorPool.Destroy();
     mObjectGpuBuffer.Destroy();
+
+    vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, DsLayoutObjectBuffer, nullptr);
 }

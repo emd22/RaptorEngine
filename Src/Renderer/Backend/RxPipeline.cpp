@@ -85,7 +85,7 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
         const VkPipelineShaderStageCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = RxShaderUtil::ToUnderlyingType(shader_program->ShaderType),
-            .module = shader_program->pShader,
+            .module = shader_program->Get(),
             .pName = "main",
             .pSpecializationInfo = &specialization_info,
         };
@@ -229,6 +229,9 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     }
 
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
+
+    FxLogInfo("Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
+              reinterpret_cast<void*>(Layout));
 }
 
 void RxPipeline::Bind(const RxCommandBuffer& command_buffer)
@@ -254,14 +257,9 @@ void RxPipeline::Destroy()
         vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);
         Pipeline = nullptr;
     }
-    if (Layout || mbDoNotDestroyLayout) {
+    if (Layout && !mbDoNotDestroyLayout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
         Layout = nullptr;
-    }
-
-    if (CompDescriptorSetLayout) {
-        vkDestroyDescriptorSetLayout(mDevice->Device, CompDescriptorSetLayout, nullptr);
-        CompDescriptorSetLayout = nullptr;
     }
 
     // RenderPass.Destroy();

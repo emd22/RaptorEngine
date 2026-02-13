@@ -87,6 +87,7 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
     FxDataPackEntry* program_entry = mDataPack.QuerySection(program_id);
 
     FxRef<RxShaderProgram> program = FxMakeRef<RxShaderProgram>();
+    program->pShader = this;
 
     // The program is not compiled currently, compile it!
     if (!program_entry) {
@@ -109,7 +110,7 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
 
         FxDebugAssert(program_data.Size == FxMath::AlignValue<4>(program_data.Size));
 
-        CreateShaderModule(program_data.Size, reinterpret_cast<uint32*>(program_data.pData), program->pShader);
+        CreateShaderModule(program_data.Size, reinterpret_cast<uint32*>(program_data.pData), program->InternalShader);
     }
     // The program has not been loaded from the datapack yet, load only that section
     else {
@@ -119,7 +120,7 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
 
         mDataPack.ReadSection(program_entry, buffer_slice);
 
-        CreateShaderModule(buffer_size, buffer, program->pShader);
+        CreateShaderModule(buffer_size, buffer, program->InternalShader);
     }
 
     return program;
@@ -140,12 +141,12 @@ void RxShader::RecompileShader(const std::string& source_path, const std::string
 
 void RxShaderProgram::Destroy()
 {
-    if (pShader == nullptr) {
+    if (InternalShader == nullptr) {
         return;
     }
 
     RxGpuDevice* device = gRenderer->GetDevice();
-    vkDestroyShaderModule(device->Device, pShader, nullptr);
+    vkDestroyShaderModule(device->Device, InternalShader, nullptr);
 }
 
 void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module)

@@ -214,11 +214,7 @@ public:
     void CreateFrom(const FxSizedArray<float32>& positions) { CreateFrom(positions, {}, {}, {}); }
     void CreateFrom(const FxSizedArray<FxVec3f>& positions) { CreateFrom(positions, {}, {}, {}); }
 
-    void UploadToGpu()
-    {
-        FxLogInfo("Uploading vertex list to GPU buffer");
-        GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, LocalBuffer);
-    }
+    void UploadToGpu() { GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, LocalBuffer); }
 
     FxVec3f CalculateDimensionsFromPositions()
     {

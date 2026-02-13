@@ -52,6 +52,11 @@ RxImage& RxImage::operator=(FxRef<RxImage>&& ref)
 
 RxImage& RxImage::operator=(const RxImage& other)
 {
+    // If this image is already established, then we should decrement the ref here.
+    if (mpRefCnt) {
+        DecRef();
+    }
+
     Size = other.Size;
     Aspect = other.Aspect;
 
@@ -63,6 +68,7 @@ RxImage& RxImage::operator=(const RxImage& other)
     ImageLayout = other.ImageLayout;
     Allocation = other.Allocation;
 
+    // Set the new ref count
     mpRefCnt = other.mpRefCnt;
 
     if (!mpRefCnt) {
@@ -500,8 +506,6 @@ void RxImage::DecRef()
         vmaDestroyImage(gRenderer->GpuAllocator, this->Image, this->Allocation);
         ++num_destroyed;
     }
-
-    FxLogWarning("Num Destroyed: {}", num_destroyed);
 
     Image = nullptr;
     Allocation = nullptr;

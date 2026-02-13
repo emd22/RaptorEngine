@@ -28,6 +28,8 @@ public:
 
     FX_FORCE_INLINE RxPipeline& GetPipeline() { return mPipeline; }
 
+    ~RxShadowDirectional() = default;
+
 private:
     void UpdateLightDescriptors();
 

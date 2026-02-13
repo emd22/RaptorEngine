@@ -318,6 +318,8 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     RxShader lighting_shader("Lighting");
 
+    VkPipelineLayout layout = CreateLightingPipelineLayout();
+
     {
         FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
         FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
@@ -325,7 +327,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
         FxVertexInfo vertex_info = FxMakeLightVertexInfo();
 
         RxPipelineBuilder builder {};
-        builder.SetLayout(CreateLightingPipelineLayout())
+        builder.SetLayout(layout)
             .SetName("Lighting(Point)")
             .AddBlendAttachment({
                 .Enabled = true,
@@ -353,7 +355,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
         RxPipelineBuilder builder {};
 
-        builder.SetLayout(CreateLightingPipelineLayout())
+        builder.SetLayout(layout)
             .SetName("Lighting(Directional)")
             .AddBlendAttachment({
                 .Enabled = true,
@@ -392,6 +394,9 @@ void RxDeferredRenderer::DestroyLightingPipeline()
 
     PlLightingInsideVolume.Layout = nullptr;
     PlLightingInsideVolume.Destroy();
+
+    PlLightingDirectional.Layout = nullptr;
+    PlLightingDirectional.Destroy();
 }
 
 //////////////////////////////////////////

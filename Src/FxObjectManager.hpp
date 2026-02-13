@@ -27,8 +27,6 @@ public:
 
     void PrintActive(int limit = 20);
 
-    void Destroy();
-
     uint32 GetOffsetObjectIndex(uint32 object_id) const;
     uint32 GetBaseOffset() const;
 
@@ -42,6 +40,10 @@ public:
      * @returns The object id for the first slot of the block.
      */
     FxObjectId ReserveInstances(FxObjectId object_id, uint32 num_instances);
+
+    void Destroy();
+
+    ~FxObjectManager() { Destroy(); }
 
 private:
     FxObjectGpuEntry* GetBufferAtFrame(uint32 object_id);

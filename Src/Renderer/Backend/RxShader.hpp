@@ -12,6 +12,8 @@ enum class RxShaderType
     eFragment,
 };
 
+class RxShader;
+
 class RxShaderUtil
 {
 public:
@@ -40,25 +42,32 @@ class RxShaderProgram
 {
 public:
     RxShaderProgram() = default;
-    RxShaderProgram(nullptr_t np) : pShader(nullptr), ShaderType(RxShaderType::eUnknown) {}
+    RxShaderProgram(nullptr_t np) : InternalShader(nullptr), ShaderType(RxShaderType::eUnknown) {}
 
     RxShaderProgram(RxShaderProgram&& other)
     {
-        pShader = other.pShader;
+        InternalShader = other.InternalShader;
         ShaderType = other.ShaderType;
 
-        other.pShader = nullptr;
+        other.InternalShader = nullptr;
         other.ShaderType = RxShaderType::eUnknown;
     }
 
     void Destroy();
     ~RxShaderProgram() { Destroy(); }
 
-    FX_FORCE_INLINE bool operator==(nullptr_t np) const { return pShader == nullptr; }
+    FX_FORCE_INLINE bool operator==(nullptr_t np) const { return InternalShader == nullptr; }
 
-private:
+    FX_FORCE_INLINE VkShaderModule& Get()
+    {
+        FxAssert(InternalShader != nullptr);
+        return InternalShader;
+    }
+
 public:
-    VkShaderModule pShader = nullptr;
+    VkShaderModule InternalShader = nullptr;
+    RxShader* pShader = nullptr;
+
     RxShaderType ShaderType = RxShaderType::eUnknown;
 };
 
@@ -73,6 +82,8 @@ public:
     FxRef<RxShaderProgram> GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros);
 
     void Load(const char* path);
+
+    const std::string& GetName() const { return Name; }
 
 private:
     void CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module);

@@ -31,7 +31,19 @@ public:
 
     void Reset() { vkResetCommandPool(mpDevice->Device, CommandPool, 0); }
 
-    void Destroy() { vkDestroyCommandPool(mpDevice->Device, CommandPool, nullptr); }
+    FX_FORCE_INLINE VkCommandPool Get() { return CommandPool; };
+
+    void Destroy()
+    {
+        if (!CommandPool) {
+            return;
+        }
+
+        vkDestroyCommandPool(mpDevice->Device, CommandPool, nullptr);
+        CommandPool = nullptr;
+    }
+
+    ~RxCommandPool() { Destroy(); }
 
 public:
     VkCommandPool CommandPool = nullptr;
@@ -53,8 +65,7 @@ public:
     void Reset();
     void End();
 
-    FX_FORCE_INLINE VkCommandBuffer Get() const
-    { return CommandBuffer; }
+    FX_FORCE_INLINE VkCommandBuffer Get() const { return CommandBuffer; }
 
 
     operator VkCommandBuffer() const { return CommandBuffer; }

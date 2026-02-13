@@ -80,8 +80,8 @@ if (FX_USE_SIMDE)
 endif()
 
 if (APPLE)
-    set(SANITIZE -fsanitize=thread)
-    # set(SANITIZE )
+    # set(SANITIZE -fsanitize=thread)
+    set(SANITIZE )
 
 
 	add_compile_options(

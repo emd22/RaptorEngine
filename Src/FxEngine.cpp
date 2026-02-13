@@ -8,8 +8,8 @@
 #include <Renderer/RxPipelineList.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/RxRenderPassCache.hpp>
-#include <Renderer/RxShadowDirectional.hpp>
 #include <Renderer/RxSamplerCache.hpp>
+#include <Renderer/RxShadowDirectional.hpp>
 
 RxRenderBackend* gRenderer = nullptr;
 PhJolt* gPhysics = nullptr;
@@ -34,11 +34,21 @@ void FxEngineGlobalsInit()
 
 void FxEngineGlobalsDestroy()
 {
-    delete gRenderer;
     delete gPhysics;
+    gPhysics = nullptr;
+
     delete gShaderCompiler;
+    gShaderCompiler = nullptr;
+
     delete gPipelines;
+    gPipelines = nullptr;
+
     delete gObjectManager;
+    gObjectManager = nullptr;
+
+    delete gRenderer;
+    gRenderer = nullptr;
+
 
     // delete gRenderPassCache;
 }

@@ -63,7 +63,6 @@ private:
     void CreateCompPass();
     void BuildLightDescriptors();
 
-
 public:
     RxDescriptorPool DescriptorPool;
 
@@ -104,9 +103,9 @@ public:
     /////////////////////////////////////////////////
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
     RxPipeline PlUnlit;
-    RxDescriptorSet DsUnlit;
+    // RxDescriptorSet DsUnlit;
 
-    RxRenderPass RpUnlit;
+    // RxRenderPass RpUnlit;
 
     //////////////////////
     // Composition Pass

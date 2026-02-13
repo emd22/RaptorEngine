@@ -62,6 +62,8 @@ public:
      */
     void Rewind();
 
+    void Destroy() { mGpuBuffer.Destroy(); }
+
 
 private:
     /// Gpu buffer that stores current uniform buffer data. Note that this is a continguous buffer that stores

@@ -373,7 +373,10 @@ void FoxtrotGame::DestroyGame()
     FxMaterialManager::GetGlobalManager().Destroy();
     AxManager::GetInstance().Shutdown();
 
-    gRenderer->pDeferredRenderer->Destroy();
+    delete gShadowRenderer;
+    gShadowRenderer = nullptr;
+
+    gRenderer->pDeferredRenderer.DestroyRef();
 }
 
 

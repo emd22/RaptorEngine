@@ -639,36 +639,23 @@ void RxRenderBackend::Destroy()
         sem.Destroy();
     }
 
-    uint32 num_deletes = 0;
+    Uniforms.Destroy();
 
 
     while (!mDeletionQueue.empty()) {
-        if (ProcessDeletionQueue(true)) {
-            ++num_deletes;
-        }
+        ProcessDeletionQueue(true);
 
         // insert a small delay to avoid the processor spinning out while
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
-    FxLogInfo("Total number of deletes: {}", num_deletes);
 
-
-    gObjectManager->Destroy();
-
-    // SamplerCache.Destroy();
-
-    // GPassDescriptorPool.Destroy();
     CompDescriptorPool.Destroy();
 
     GetDevice()->WaitForIdle();
 
     Swapchain.Destroy();
-
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-
 
     DestroyGPUAllocator();
 

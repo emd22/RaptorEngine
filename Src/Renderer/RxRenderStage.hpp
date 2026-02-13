@@ -54,6 +54,8 @@ public:
 
     void End() { mRenderPass.End(); }
 
+    ~RxRenderStage() = default;
+
 private:
     void MakeClearValues();
     void CreateFinalStageFramebuffers();
