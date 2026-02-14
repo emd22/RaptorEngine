@@ -2,6 +2,7 @@
 
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <Util/FxTokenizer.hpp>
 #include <string>
 
@@ -62,7 +63,7 @@ std::string FxConfigValue::AsString() const
     case ValueType::eFloat:
         return std::to_string(mFloatValue);
     case ValueType::eString:
-        return std::string(mStringValue);
+        return std::format("\"{}\"", mStringValue);
     case ValueType::eStruct:
         break;
     }
@@ -70,24 +71,32 @@ std::string FxConfigValue::AsString() const
     return "";
 }
 
-std::string FxConfigEntry::AsString() const
+std::string FxConfigEntry::AsString(uint32 indent) const
 {
     std::string member_list = "";
 
+    std::string indent_str = "";
+
+    for (uint32 i = 0; i < indent; i++) {
+        indent_str += '\t';
+    }
+
+
     if (Type == ValueType::eStruct) {
         for (const FxConfigEntry& entry : Members) {
-            member_list += std::format("{} = {},\n", entry.Name, entry.AsString());
+            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name, entry.AsString(indent + 1));
         }
 
-        return std::format("{{\n{}}} ({} members)", member_list, Members.Size());
+        return std::format("{{\n{}{}}}", member_list, indent_str);
     }
-    if (bIsArray) {
+    else if (bIsArray) {
         for (const FxConfigValue& value : ArrayData) {
             member_list += std::format("{}, ", value.AsString());
         }
 
-        return std::format("[ {}] ({} values)", member_list, ArrayData.Size());
+        return std::format("[ {} ]", member_list);
     }
+
 
     return this->FxConfigValue::AsString();
 }
@@ -102,7 +111,9 @@ FxConfigEntry::~FxConfigEntry()
     Type = ValueType::eNone;
 
     mStringValue = nullptr;
-    Members.Destroy();
+    if (Members.IsInited()) {
+        Members.Destroy();
+    }
 }
 
 

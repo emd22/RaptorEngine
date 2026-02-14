@@ -1,8 +1,9 @@
 #pragma once
 
+#include <Core/FxPagedArray.hpp>
+//
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
-#include <Core/FxPagedArray.hpp>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>

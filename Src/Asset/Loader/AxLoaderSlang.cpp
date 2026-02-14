@@ -2,7 +2,6 @@
 
 #include <ThirdParty/Slang/slang.h>
 
-#include <Asset/AxShader.hpp>
 #include <Core/FxFile.hpp>
 
 using Status = AxLoaderSlang::Status;

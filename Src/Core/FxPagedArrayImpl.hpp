@@ -409,6 +409,9 @@ public:
 
     void Destroy()
     {
+        TrackedSize = 0;
+        pCurrentPage = nullptr;
+
         if (pFirstPage == nullptr || bDoNotDestroy) {
             return;
         }
@@ -427,10 +430,8 @@ public:
             current_page = next_page;
         }
 
-        TrackedSize = 0;
 
         pFirstPage = nullptr;
-        pCurrentPage = nullptr;
     }
 
     ~FxPagedArray()

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "FxPagedArray.hpp"
+#include <Core/FxPagedArray.hpp>
+//
 #include "FxTypes.hpp"
 
 namespace FxFilesystemIO {

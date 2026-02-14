@@ -1,5 +1,6 @@
 #pragma once
 
+//
 #include <Core/FxHash.hpp>
 #include <Core/FxMemory.hpp>
 #include <Core/FxPagedArray.hpp>
@@ -15,6 +16,14 @@ concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_poi
 struct FxConfigValue
 {
 public:
+    FxConfigValue() = default;
+
+    template <typename T>
+    FxConfigValue(T value)
+    {
+        Set(value);
+    }
+
     template <typename T>
     T Get() const;
 
@@ -93,12 +102,29 @@ public:
 class FxConfigEntry : public FxConfigValue
 {
 public:
+    static FxConfigEntry Array(const std::string& name, FxConfigValue::ValueType type)
+    {
+        FxConfigEntry entry(name);
+        entry.Type = type;
+        entry.bIsArray = true;
+        return entry;
+    }
+
+    static FxConfigEntry Struct(const std::string& name)
+    {
+        FxConfigEntry entry(name);
+        entry.Type = FxConfigValue::ValueType::eStruct;
+        return entry;
+    }
+
+public:
     FxConfigEntry() = default;
 
+    FxConfigEntry(const std::string& name) : Name(name) { NameHash = FxHashStr64(name.c_str()); }
+
     template <typename TType>
-    FxConfigEntry(const std::string& name, TType value) : Name(name)
+    FxConfigEntry(const std::string& name, TType value) : FxConfigEntry(name)
     {
-        NameHash = FxHashStr64(name.c_str());
         Set(value);
     }
 
@@ -121,7 +147,7 @@ public:
     FxConfigEntry& operator=(const FxConfigEntry& other) = delete;
 
 
-    std::string AsString() const;
+    std::string AsString(uint32 indent = 0) const;
 
     ~FxConfigEntry();
 
@@ -158,7 +184,6 @@ public:
         return entry->Get<T>();
     }
 
-    void ParseValue(FxConfigValue& value);
 
     template <typename T>
     constexpr T GetValue(const char* entry_name) const
@@ -178,6 +203,20 @@ public:
         mConfigEntries.Insert(std::move(entry));
     }
 
+    FxConfigEntry& AddEntry(FxConfigEntry&& entry)
+    {
+        if (!mConfigEntries.IsInited()) {
+            mConfigEntries.Create();
+        }
+        return mConfigEntries.Insert(std::move(entry));
+    }
+
+private:
+    void Parse(FxPagedArray<FxToken>& tokens);
+    bool EatToken(FxTokenType type);
+    FxConfigEntry ParseEntry();
+    void ParseValue(FxConfigValue& value);
+
     FX_FORCE_INLINE FxToken* GetToken() const
     {
         FxAssert(mTokenIndex <= mpTokens->Size());
@@ -186,12 +225,6 @@ public:
 
     FX_FORCE_INLINE void NextToken() { ++mTokenIndex; }
 
-
-    FxConfigEntry ParseEntry();
-
-private:
-    void Parse(FxPagedArray<FxToken>& tokens);
-    bool EatToken(FxTokenType type);
 
 private:
     FxPagedArray<FxConfigEntry> mConfigEntries;
