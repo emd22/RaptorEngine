@@ -32,8 +32,6 @@ public:
             }
         }
 
-        FxLogInfo("Max Positions: {}, Min Positions: {}", max_vertex, min_vertex);
-
         // Return the difference between the min and max positions
         max_vertex -= min_vertex;
 

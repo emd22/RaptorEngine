@@ -89,7 +89,6 @@ public:
 
     PhObject Physics;
 
-
 private:
     /// Object slots allocated following this object. Used by other instances of this object.
     uint16 mInstanceSlots = 0;

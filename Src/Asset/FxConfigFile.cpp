@@ -5,6 +5,90 @@
 #include <Util/FxTokenizer.hpp>
 #include <string>
 
+/////////////////////////////////////
+// Config entry functions
+/////////////////////////////////////
+
+
+FxConfigEntry::FxConfigEntry(FxConfigEntry&& other)
+{
+    Type = other.Type;
+    other.Type = ValueType::eNone;
+
+    if (Type == ValueType::eString) {
+        mStringValue = other.mStringValue;
+        other.mStringValue = nullptr;
+    }
+    else if (Type == ValueType::eInt) {
+        mIntValue = other.mIntValue;
+    }
+    else if (Type == ValueType::eFloat) {
+        mFloatValue = other.mFloatValue;
+    }
+
+    Name = other.Name;
+    NameHash = other.NameHash;
+    Members = std::move(other.Members);
+
+    other.NameHash = 0;
+    other.Name.clear();
+}
+
+void FxConfigEntry::AddMember(FxConfigEntry&& entry)
+{
+    if (!Members.IsInited()) {
+        Members.Create();
+    }
+
+    Members.Insert(std::move(entry));
+}
+
+std::string FxConfigEntry::AsString() const
+{
+    std::string member_list = "";
+
+    if (Type == ValueType::eStruct) {
+        for (const FxConfigEntry& entry : Members) {
+            member_list += std::format("{} = {},\n", entry.Name, entry.AsString());
+        }
+
+        return std::format("{{\n{}}} ({} members)", member_list, Members.Size());
+    }
+
+    switch (Type) {
+    case ValueType::eNone:
+        return "";
+    case ValueType::eInt:
+        return std::to_string(mIntValue);
+    case ValueType::eFloat:
+        return std::to_string(mFloatValue);
+    case ValueType::eString:
+        return std::string(mStringValue);
+    case ValueType::eStruct:
+        break;
+    }
+
+    return "";
+}
+
+
+FxConfigEntry::~FxConfigEntry()
+{
+    if (Type == ValueType::eString && mStringValue != nullptr) {
+        free(mStringValue);
+    }
+
+    Type = ValueType::eNone;
+
+    mStringValue = nullptr;
+    Members.Destroy();
+}
+
+
+/////////////////////////////////////
+// Config file functions
+/////////////////////////////////////
+
 void FxConfigFile::Load(const std::string& path)
 {
     FxFile file(path.c_str(), FxFile::eRead, FxFile::eBinary);
@@ -18,7 +102,7 @@ void FxConfigFile::Load(const std::string& path)
     FxTokenizer tokenizer(file_buffer.pData, file_buffer.Size);
     tokenizer.Tokenize();
 
-    ParseEntries(tokenizer.GetTokens());
+    Parse(tokenizer.GetTokens());
 }
 
 static bool TokenIsValue(const FxToken& token, const char* str) { return (!strncmp(token.Start, str, token.Length)); }
@@ -50,63 +134,104 @@ static FxConfigEntry::ValueType GetValueTokenType(const FxToken& token)
     return current_type;
 }
 
-void FxConfigFile::ParseEntries(FxPagedArray<FxToken>& tokens)
+bool FxConfigFile::EatToken(FxTokenType type)
 {
-    mConfigEntries.Create(32);
+    const bool correct_token = (GetToken()->Type == type);
+
+    if (!correct_token) {
+        FxLogError("Config: Expected '{}' but found '{}'", FxToken::GetTypeName(type),
+                   FxToken::GetTypeName(GetToken()->Type));
+        return false;
+    }
+
+    NextToken();
+
+    return true;
+}
+
+FxConfigEntry FxConfigFile::ParseEntry()
+{
+    // [IDENTIFIER] = [INT | FLOAT | STRING | STRUCT]
 
     FxConfigEntry entry;
 
+    FxToken* token = GetToken();
+
+    entry.Name = (token->GetStr());
+    entry.NameHash = FxHashStr64(token->GetStr().c_str());
+
+    EatToken(FxTokenType::eIdentifier);
+    EatToken(FxTokenType::eEquals);
+
+    // Parse struct
+    // [IDENTIFIER] = { [ENTRY]... }
+    if (GetToken()->Type == FxTokenType::eLBrace) {
+        EatToken(FxTokenType::eLBrace);
+
+        entry.Type = FxConfigEntry::ValueType::eStruct;
+
+        // Add each entry as a member of the current entry
+        while (GetToken()->Type != FxTokenType::eRBrace) {
+            FxConfigEntry member = ParseEntry();
+            FxLogInfo("Adding entry {} -> {}", member.Name, member.AsString());
+            entry.AddMember(std::move(member));
+        }
+
+        EatToken(FxTokenType::eRBrace);
+
+        return entry;
+    }
+
+    // Parse single value entry
+    // [IDENTIFIER] = [INT | FLOAT | STRING]
+
+    FxToken* value_token = GetToken();
+
+    using VType = FxConfigEntry::ValueType;
+
+    entry.Type = GetValueTokenType(*value_token);
+
+    switch (entry.Type) {
+    case VType::eNone:
+        break;
+    case VType::eString:
+        // Remove the first quote
+        value_token->Start++;
+        value_token->Length--;
+
+        // Remove the ending quote
+        value_token->Length--;
+        entry.Set(value_token->GetStr());
+
+        break;
+    case VType::eInt:
+        entry.Set<int64>(value_token->ToInt());
+        break;
+    case VType::eFloat:
+        entry.Set<float32>(value_token->ToFloat());
+        break;
+    default:
+        break;
+    }
+
+    NextToken();
+
+    return entry;
+}
+
+void FxConfigFile::Parse(FxPagedArray<FxToken>& tokens)
+{
+    mConfigEntries.Create(32);
+
+    mpTokens = &tokens;
+
     const uint32 tokens_size = tokens.Size();
 
-    for (uint32 i = 0; i < tokens_size; i++) {
-        const FxToken& token = tokens[i];
-
-        entry.Name = (token.GetStr());
-        entry.NameHash = FxHashStr64(token.GetStr().c_str());
-
-
-        // Eat the equals token
-        if ((++i) >= tokens_size) {
-            break;
-        }
-
-        // Token is not equals, print warning and continue
-        if (!TokenIsValue(tokens[i], "=")) {
-            FxLogWarning("Expected '=' but found '{:.{}}'", tokens[i].Start, tokens[i].Length);
-            continue;
-        }
-
-        // Get the value token
-        FxToken& value_token = tokens[++i];
-
-        using VType = FxConfigEntry::ValueType;
-
-        entry.Type = GetValueTokenType(value_token);
-
-        switch (entry.Type) {
-        case VType::eNone:
-            break;
-        case VType::eString:
-            // Remove the first quote
-            value_token.Start++;
-            value_token.Length--;
-
-            // Remove the ending quote
-            value_token.Length--;
-            entry.Set(value_token.GetStr());
-            break;
-        case VType::eInt:
-            entry.Set<int64>(value_token.ToInt());
-            break;
-        case VType::eFloat:
-            entry.Set<float32>(value_token.ToFloat());
-            break;
-        default:
-            break;
-        }
-
-        mConfigEntries.Insert(std::move(entry));
+    while (mTokenIndex < tokens_size) {
+        mConfigEntries.Insert(ParseEntry());
     }
+
+    mpTokens = nullptr;
 }
 
 const FxConfigEntry* FxConfigFile::GetEntry(FxHash64 requested_name_hash) const

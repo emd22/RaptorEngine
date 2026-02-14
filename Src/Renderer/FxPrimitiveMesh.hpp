@@ -97,6 +97,16 @@ public:
         LocalIndexBuffer = std::move(indices);
     }
 
+    FxVec3f GetDimensions()
+    {
+        if (VertexList.LocalBuffer.IsEmpty()) {
+            FxLogError("Cannot get dimensions of object that does not have local vertices!");
+            return FxVec3f::sZero;
+        }
+
+        return FxMeshUtil::CalculateDimensions(VertexList.LocalBuffer);
+    }
+
     FxSizedArray<TVertexType>& GetVertices()
     {
         if (!KeepInMemory) {
@@ -211,16 +221,6 @@ public:
 
         VertexList.bContainsNormals = true;
     }
-
-
-    //    void Render(RxCommandBuffer& cmd, RxGraphicsPipeline& pipeline)
-    //    {
-    //        const VkDeviceSize offset = 0;
-    //        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &mVertexBuffer.Buffer, &offset);
-    //        vkCmdBindIndexBuffer(cmd.CommandBuffer, mIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
-    //
-    //        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(mIndexBuffer.Size), 1, 0, 0, 0);
-    //    }
 
     void Destroy()
     {

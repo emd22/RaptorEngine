@@ -110,14 +110,29 @@ public:
 
     FxPagedArray() = default;
 
-    FxPagedArray(const FxPagedArray& other) = delete;
+    FxPagedArray(const FxPagedArray& other) { (*this) = other; }
 
     /**
      * @brief Creates a new paged array with a page capacity of `page_node_capacity`.
      */
     FxPagedArray(uint32 page_node_capacity) { Create(page_node_capacity); }
 
-    FxPagedArray(FxPagedArray&& other)
+    FxPagedArray(FxPagedArray&& other) { (*this) = std::move(other); }
+
+    FxPagedArray& operator=(const FxPagedArray& other)
+    {
+        pFirstPage = other.pFirstPage;
+        pCurrentPage = other.pCurrentPage;
+
+        PageNodeCapacity = other.PageNodeCapacity;
+        CurrentPageIndex = other.CurrentPageIndex;
+
+        TrackedSize = other.TrackedSize;
+
+        return *this;
+    }
+
+    FxPagedArray& operator=(FxPagedArray&& other)
     {
         pFirstPage = other.pFirstPage;
         pCurrentPage = other.pCurrentPage;
@@ -135,46 +150,12 @@ public:
 
         other.TrackedSize = 0;
 
-        // return *this;
-    }
-
-    FxPagedArray& operator=(const FxPagedArray& other)
-    {
-        pFirstPage = other.pFirstPage;
-        pCurrentPage = other.pCurrentPage;
-
-        PageNodeCapacity = other.PageNodeCapacity;
-        CurrentPageIndex = other.CurrentPageIndex;
-
-        TrackedSize = other.TrackedSize;
-
         return *this;
     }
 
-    // FxPagedArray& operator=(FxPagedArray&& other)
-    // {
-    //     FirstPage = other.FirstPage;
-    //     CurrentPage = other.CurrentPage;
-
-    //     PageNodeCapacity = other.PageNodeCapacity;
-    //     CurrentPageIndex = other.CurrentPageIndex;
-
-    //     TrackedSize = other.TrackedSize;
-
-    //     other.FirstPage = nullptr;
-    //     other.CurrentPage = nullptr;
-
-    //     other.PageNodeCapacity = 0;
-    //     other.CurrentPageIndex = 0;
-
-    //     other.TrackedSize = 0;
-
-    //     return *this;
-    // }
-
     Iterator begin() const { return Iterator(pFirstPage, 0); }
 
-    Iterator end() const { return Iterator(pCurrentPage, pCurrentPage->Size); }
+    Iterator end() const { return Iterator(pCurrentPage, pCurrentPage ? pCurrentPage->Size : 0); }
 
     size_t GetCalculatedSize() const
     {

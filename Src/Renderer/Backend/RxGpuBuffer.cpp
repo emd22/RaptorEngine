@@ -43,8 +43,8 @@ void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, V
     }
 
 
-    FxLogInfo("Create Buffer  (Buffer={:p}, Allocation={:p}, Size={})", reinterpret_cast<void*>(Buffer),
-              reinterpret_cast<void*>(Allocation), Size);
+    // FxLogInfo("Create Buffer  (Buffer={:p}, Allocation={:p}, Size={})", reinterpret_cast<void*>(Buffer),
+    //           reinterpret_cast<void*>(Allocation), Size);
 
 
     if ((mBufferFlags & RxGpuBufferFlags::ePersistentMapped) != 0) {

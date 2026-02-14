@@ -20,6 +20,7 @@ public:
         eInt,
         eFloat,
         eString,
+        eStruct,
     };
 
 public:
@@ -51,31 +52,11 @@ public:
     }
 
     FxConfigEntry(const FxConfigEntry& other) = delete;
-    FxConfigEntry(FxConfigEntry&& other)
-    {
-        Type = other.Type;
-        other.Type = ValueType::eNone;
+    FxConfigEntry(FxConfigEntry&& other);
 
-        if (Type == ValueType::eString) {
-            mStringValue = other.mStringValue;
-            other.mStringValue = nullptr;
-        }
-        else if (Type == ValueType::eInt) {
-            mIntValue = other.mIntValue;
-        }
-        else if (Type == ValueType::eFloat) {
-            mFloatValue = other.mFloatValue;
-        }
-
-        Name = other.Name;
-        NameHash = other.NameHash;
-
-        other.NameHash = 0;
-        other.Name.clear();
-    }
+    void AddMember(FxConfigEntry&& entry);
 
     FxConfigEntry& operator=(const FxConfigEntry& other) = delete;
-
 
     void Set(const std::string& str)
     {
@@ -83,41 +64,7 @@ public:
         mStringValue = strdup(str.c_str());
     }
 
-    void Print()
-    {
-        printf("Entry [Name=%s, Type=", Name.c_str());
-        switch (Type) {
-        case ValueType::eNone:
-            printf("None]\n");
-            break;
-        case ValueType::eString:
-            printf("Str, Value=\"%s\"]\n", mStringValue);
-            break;
-        case ValueType::eInt:
-            printf("Int, Value=%lld]\n", mIntValue);
-            break;
-        case ValueType::eFloat:
-            printf("Float, Value=%f\n", mFloatValue);
-        default:
-            break;
-        }
-    }
-
-    std::string AsString() const
-    {
-        switch (Type) {
-        case ValueType::eNone:
-            return "";
-        case ValueType::eInt:
-            return std::to_string(mIntValue);
-        case ValueType::eFloat:
-            return std::to_string(mFloatValue);
-        case ValueType::eString:
-            return std::string(mStringValue);
-        }
-
-        return "";
-    }
+    std::string AsString() const;
 
     template <typename T>
     T Get() const;
@@ -148,21 +95,15 @@ public:
         return mStringValue;
     }
 
-    ~FxConfigEntry()
-    {
-        if (Type == ValueType::eString && mStringValue != nullptr) {
-            free(mStringValue);
-        }
+    ~FxConfigEntry();
 
-        Type = ValueType::eNone;
-
-        mStringValue = nullptr;
-    }
-
+public:
     FxHash64 NameHash = 0;
     std::string Name = "";
 
     ValueType Type = ValueType::eNone;
+
+    FxPagedArray<FxConfigEntry> Members;
 
 private:
     union
@@ -213,9 +154,24 @@ public:
         mConfigEntries.Insert(std::move(entry));
     }
 
+    FX_FORCE_INLINE FxToken* GetToken() const
+    {
+        FxAssert(mTokenIndex <= mpTokens->Size());
+        return &mpTokens->Get(mTokenIndex);
+    }
+
+    FX_FORCE_INLINE void NextToken() { ++mTokenIndex; }
+
+
+    FxConfigEntry ParseEntry();
+
 private:
-    void ParseEntries(FxPagedArray<FxToken>& tokens);
+    void Parse(FxPagedArray<FxToken>& tokens);
+    bool EatToken(FxTokenType type);
 
 private:
     FxPagedArray<FxConfigEntry> mConfigEntries;
+
+    FxPagedArray<FxToken>* mpTokens = nullptr;
+    uint32 mTokenIndex = 0;
 };

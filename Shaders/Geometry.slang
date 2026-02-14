@@ -6,7 +6,20 @@ module Geometry;
 // Vertex shader
 //////////////////////////////////
 
-struct VSOut
+struct VSInput
+{
+    float3 vPosition : POSITION;
+    float3 vNormal : NORMAL;
+    float2 vUV : TEXCOORD0;
+    float3 vTangent : TANGENT;
+    uint uiInstanceId : SV_InstanceID;
+#ifdef USE_SKINNING
+    float4 vJointIndices : ATTR0;
+    float4 vJointWeights : ATTR1;
+#endif
+};
+
+struct VSOutput
 {
     float4 vPosition : SV_POSITION;
     float3 vNormalWS   : NORMAL;
@@ -15,15 +28,6 @@ struct VSOut
     float3 vTangentWS : TANGENT;
     float3 vBitangentWS : BITANGENT;
 #endif
-};
-
-struct VSIn
-{
-    float3 vPosition : POSITION;
-    float3 vNormal : NORMAL;
-    float2 vUV : TEXCOORD0;
-    float3 vTangent : TANGENT;
-    uint uiInstanceId : SV_InstanceID;
 };
 
 struct VSPushConsts
@@ -39,9 +43,9 @@ layout(set = 2, binding = 0) StructuredBuffer<Object> bObjectBuffer;
 
 [shader("vertex")]
 
-VSOut VertexMain(VSIn in)
+VSOutput VertexMain(VSInput in)
 {
-    VSOut out;
+    VSOutput out;
 
     float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + in.uiInstanceId].mModel;
 
@@ -66,12 +70,12 @@ VSOut VertexMain(VSIn in)
 
 #include "./MaterialProperties.slang.inc"
 
-struct FSOut {
+struct FSOutput {
     float4 vAlbedo : SV_TARGET0;
     float4 vNormal : SV_TARGET1;
 };
 
-struct FSIn
+struct FSInput
 {
     float3 vNormalWS : NORMAL;
     float2 vUV : TEXCOORD0;
@@ -93,9 +97,9 @@ layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
 
 [shader("fragment")]
 
-FSOut FragmentMain(FSIn in)
+FSOutput FragmentMain(FSInput in)
 {
-    FSOut out;
+    FSOutput out;
 
     float4 material_color = unpackUnorm4x8ToFloat(bMaterialBuffer[VSConst.uiMaterialIndex].uiBaseColor);
     out.vAlbedo = float4(sAlbedo.Sample(in.vUV).rgb, 1.0) + material_color;

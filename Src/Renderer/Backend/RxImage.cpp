@@ -140,8 +140,8 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
     }
 
 
-    FxLogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
-              reinterpret_cast<void*>(Allocation));
+    // FxLogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
+    //           reinterpret_cast<void*>(Allocation));
 
 #ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
     {

@@ -30,8 +30,12 @@ bool FxObject::CheckIfReady()
     // If this is a container object, check that the attached nodes are ready
     if (!AttachedNodes.IsEmpty()) {
         // If there is a mesh attached to the container as well, check it
-        if (pMesh && !pMesh->IsReady) {
-            return (mbReadyToRender = false);
+        if (pMesh) {
+            if (!pMesh->IsReady) {
+                return (mbReadyToRender = false);
+            }
+
+            Dimensions = pMesh->GetDimensions();
         }
 
         if (pMaterial && !pMaterial->IsReady()) {
@@ -61,6 +65,8 @@ bool FxObject::CheckIfReady()
     if (!pMesh || !pMesh->IsReady.load()) {
         return (mbReadyToRender = false);
     }
+
+    Dimensions = pMesh->GetDimensions();
 
     return (mbReadyToRender = true);
 }

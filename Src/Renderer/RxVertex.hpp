@@ -216,33 +216,6 @@ public:
 
     void UploadToGpu() { GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, LocalBuffer); }
 
-    FxVec3f CalculateDimensionsFromPositions()
-    {
-        return FxMeshUtil::CalculateDimensions(LocalBuffer);
-        // if (LocalBuffer.IsEmpty()) {
-        //     FxLogWarning("Cannot calculate dimensions as the local vertex buffer has been cleared!");
-
-        //     return FxVec3f::sZero;
-        // }
-
-        // FxVec3f min_positions = FxVec3f(10000);
-        // FxVec3f max_positions = FxVec3f(-10000);
-
-        // for (int i = 0; i < LocalBuffer.Size; i++) {
-        //     const FxVec3f& position = LocalBuffer[i].Position;
-
-        //     min_positions = FxVec3f::Min(min_positions, position);
-        //     max_positions = FxVec3f::Max(max_positions, position);
-        // }
-
-        // FxLogInfo("Max Positions: {}, Min Positions: {}", max_positions, min_positions);
-
-        // // Return the difference between the min and max positions
-        // max_positions -= min_positions;
-
-        // return max_positions;
-    }
-
     void DestroyLocalBuffer() { LocalBuffer.Free(); }
     void Destroy()
     {
@@ -255,8 +228,6 @@ public:
     ~RxVertexList() { Destroy(); }
 
 public:
-    FxVec3f Dimensions = FxVec3f::sZero;
-
     RxGpuBuffer GpuBuffer {};
     FxSizedArray<TVertexType> LocalBuffer {};
 

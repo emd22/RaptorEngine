@@ -15,27 +15,19 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    // {
-    //     FxConfigFile cf;
-    //     cf.AddEntry<uint32>("IntTest", 20);
-    //     cf.AddEntry<float32>("FloatTest", 10.5f);
+    FxConfigFile config;
+    config.Load(FX_BASE_DIR "/Config/ObjTest.conf");
 
-    //     cf.Write("Test.conf");
-    // }
+    FxPagedArray<FxConfigEntry>& entries = config.GetEntries();
 
-    // {
-    //     FxConfigFile cf;
-    //     cf.Load("Test.conf");
-    //     FxPagedArray<FxConfigEntry>& entries = cf.GetEntries();
-    //     for (const FxConfigEntry& entry : entries) {
-    //         FxLogInfo("ENTRY: {}", entry.AsString());
-    //     }
-    // }
-
-
-    {
-        FoxtrotGame game {};
+    for (const FxConfigEntry& entry : entries) {
+        FxLogInfo("Entry ({}) = {}", entry.Name, entry.AsString());
     }
+
+
+    // {
+    //     FoxtrotGame game {};
+    // }
 
     FxEngineGlobalsDestroy();
 }
