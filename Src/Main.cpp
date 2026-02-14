@@ -16,7 +16,7 @@ int main()
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
     FxConfigFile config;
-    config.Load(FX_BASE_DIR "/Config/ObjTest.conf");
+    config.Load(FX_BASE_DIR "/Config/Test.prx");
 
     FxPagedArray<FxConfigEntry>& entries = config.GetEntries();
 

@@ -1,0 +1,10 @@
+Meta = {
+Name = "Test Project"
+}
+Objects = {
+    Arms = {
+        Position = [0, 0.5, 1.5]
+        Rotation = [0, 0, 0, 1]
+        bShadowCaster = 0
+    }
+}

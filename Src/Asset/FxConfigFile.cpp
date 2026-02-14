@@ -10,7 +10,7 @@
 /////////////////////////////////////
 
 
-FxConfigEntry::FxConfigEntry(FxConfigEntry&& other)
+FxConfigEntry& FxConfigEntry::operator=(FxConfigEntry&& other)
 {
     Type = other.Type;
     other.Type = ValueType::eNone;
@@ -28,14 +28,20 @@ FxConfigEntry::FxConfigEntry(FxConfigEntry&& other)
 
     Name = other.Name;
     NameHash = other.NameHash;
+
     Members = std::move(other.Members);
     ArrayData = std::move(other.ArrayData);
+
     bIsArray = other.bIsArray;
     other.bIsArray = false;
 
     other.NameHash = 0;
     other.Name.clear();
+
+    return *this;
 }
+
+FxConfigEntry::FxConfigEntry(FxConfigEntry&& other) { (*this) = std::move(other); }
 
 void FxConfigEntry::AddMember(FxConfigEntry&& entry)
 {
@@ -164,11 +170,33 @@ bool FxConfigFile::EatToken(FxTokenType type)
 
 void FxConfigFile::ParseValue(FxConfigValue& value)
 {
-    FxToken* value_token = GetToken();
-
     using VType = FxConfigEntry::ValueType;
 
+    FxToken* value_token = GetToken();
+
+    // Handle unary minus (in a simple way, but still handles recursive negatives)
+    if (value_token->Type == FxTokenType::eMinus) {
+        EatToken(FxTokenType::eMinus);
+
+        FxConfigValue temp;
+        ParseValue(temp);
+
+        switch (temp.Type) {
+        case VType::eInt:
+            value.Set<int64>(-temp.Get<int64>());
+            break;
+        case VType::eFloat:
+            value.Set<float32>(-temp.Get<float32>());
+            break;
+        default:
+            break;
+        }
+
+        return;
+    }
+
     value.Type = GetValueTokenType(*value_token);
+
 
     switch (value.Type) {
     case VType::eNone:
@@ -228,6 +256,7 @@ FxConfigEntry FxConfigFile::ParseEntry()
         return entry;
     }
 
+    // Parse array
     else if (GetToken()->Type == FxTokenType::eLBracket) {
         EatToken(FxTokenType::eLBracket);
 
@@ -236,7 +265,7 @@ FxConfigEntry FxConfigFile::ParseEntry()
         FxToken* value_token = GetToken();
         entry.Type = GetValueTokenType(*value_token);
 
-        while (GetToken()->Type != FxTokenType::eRBrace) {
+        while (GetToken()->Type != FxTokenType::eRBracket) {
             FxConfigValue value;
             value.Type = entry.Type;
             ParseValue(value);
@@ -250,6 +279,8 @@ FxConfigEntry FxConfigFile::ParseEntry()
         }
 
         EatToken(FxTokenType::eRBracket);
+
+        return entry;
     }
 
     // Parse single value entry

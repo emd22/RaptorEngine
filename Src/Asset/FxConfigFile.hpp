@@ -102,9 +102,10 @@ public:
         Set(value);
     }
 
-
     FxConfigEntry(const FxConfigEntry& other) = delete;
     FxConfigEntry(FxConfigEntry&& other);
+
+    FxConfigEntry& operator=(FxConfigEntry&& entry);
 
     void AddMember(FxConfigEntry&& entry);
 
