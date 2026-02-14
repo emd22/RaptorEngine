@@ -11,61 +11,10 @@ template <typename TType>
 concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_point_v<TType> ||
                                std::is_same_v<TType, char*>;
 
-class FxConfigEntry
+
+struct FxConfigValue
 {
 public:
-    enum class ValueType
-    {
-        eNone,
-        eInt,
-        eFloat,
-        eString,
-        eStruct,
-    };
-
-public:
-    FxConfigEntry() = default;
-
-    template <typename TType>
-    FxConfigEntry(const std::string& name, TType value) : Name(name)
-    {
-        NameHash = FxHashStr64(name.c_str());
-        Set(value);
-    }
-
-    template <typename TType>
-        requires C_ConfigSupportsType<TType> && (!std::is_same_v<std::string, TType>)
-    void Set(TType value)
-    {
-        if constexpr (std::is_integral_v<TType>) {
-            Type = ValueType::eInt;
-            mIntValue = value;
-        }
-        else if constexpr (std::is_floating_point_v<TType>) {
-            Type = ValueType::eFloat;
-            mFloatValue = value;
-        }
-        else if constexpr (std::is_same_v<char*, std::remove_const_t<TType>>) {
-            Type = ValueType::eString;
-            mStringValue = strdup(value);
-        }
-    }
-
-    FxConfigEntry(const FxConfigEntry& other) = delete;
-    FxConfigEntry(FxConfigEntry&& other);
-
-    void AddMember(FxConfigEntry&& entry);
-
-    FxConfigEntry& operator=(const FxConfigEntry& other) = delete;
-
-    void Set(const std::string& str)
-    {
-        Type = ValueType::eString;
-        mStringValue = strdup(str.c_str());
-    }
-
-    std::string AsString() const;
-
     template <typename T>
     T Get() const;
 
@@ -95,17 +44,44 @@ public:
         return mStringValue;
     }
 
-    ~FxConfigEntry();
+    template <typename TType>
+        requires C_ConfigSupportsType<TType> && (!std::is_same_v<std::string, TType>)
+    void Set(TType value)
+    {
+        if constexpr (std::is_integral_v<TType>) {
+            Type = ValueType::eInt;
+            mIntValue = value;
+        }
+        else if constexpr (std::is_floating_point_v<TType>) {
+            Type = ValueType::eFloat;
+            mFloatValue = value;
+        }
+        else if constexpr (std::is_same_v<char*, std::remove_const_t<TType>>) {
+            Type = ValueType::eString;
+            mStringValue = strdup(value);
+        }
+    }
+
+    void Set(const std::string& str)
+    {
+        Type = ValueType::eString;
+        mStringValue = strdup(str.c_str());
+    }
+
+    std::string AsString() const;
 
 public:
-    FxHash64 NameHash = 0;
-    std::string Name = "";
+    enum class ValueType
+    {
+        eNone,
+        eInt,
+        eFloat,
+        eString,
+        eStruct,
+    };
 
     ValueType Type = ValueType::eNone;
 
-    FxPagedArray<FxConfigEntry> Members;
-
-private:
     union
     {
         int64 mIntValue;
@@ -113,6 +89,51 @@ private:
         char* mStringValue;
     };
 };
+
+class FxConfigEntry : public FxConfigValue
+{
+public:
+    FxConfigEntry() = default;
+
+    template <typename TType>
+    FxConfigEntry(const std::string& name, TType value) : Name(name)
+    {
+        NameHash = FxHashStr64(name.c_str());
+        Set(value);
+    }
+
+
+    FxConfigEntry(const FxConfigEntry& other) = delete;
+    FxConfigEntry(FxConfigEntry&& other);
+
+    void AddMember(FxConfigEntry&& entry);
+
+    void AppendValue(FxConfigValue&& value)
+    {
+        if (!ArrayData.IsInited()) {
+            ArrayData.Create();
+        }
+
+        ArrayData.Insert(std::move(value));
+    }
+
+    FxConfigEntry& operator=(const FxConfigEntry& other) = delete;
+
+
+    std::string AsString() const;
+
+    ~FxConfigEntry();
+
+public:
+    FxHash64 NameHash = 0;
+    std::string Name = "";
+
+    bool bIsArray = false;
+
+    FxPagedArray<FxConfigEntry> Members;
+    FxPagedArray<FxConfigValue> ArrayData;
+};
+
 
 class FxConfigFile
 {
@@ -135,6 +156,8 @@ public:
         }
         return entry->Get<T>();
     }
+
+    void ParseValue(FxConfigValue& value);
 
     template <typename T>
     constexpr T GetValue(const char* entry_name) const

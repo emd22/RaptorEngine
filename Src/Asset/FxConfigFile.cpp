@@ -29,6 +29,9 @@ FxConfigEntry::FxConfigEntry(FxConfigEntry&& other)
     Name = other.Name;
     NameHash = other.NameHash;
     Members = std::move(other.Members);
+    ArrayData = std::move(other.ArrayData);
+    bIsArray = other.bIsArray;
+    other.bIsArray = false;
 
     other.NameHash = 0;
     other.Name.clear();
@@ -43,18 +46,8 @@ void FxConfigEntry::AddMember(FxConfigEntry&& entry)
     Members.Insert(std::move(entry));
 }
 
-std::string FxConfigEntry::AsString() const
+std::string FxConfigValue::AsString() const
 {
-    std::string member_list = "";
-
-    if (Type == ValueType::eStruct) {
-        for (const FxConfigEntry& entry : Members) {
-            member_list += std::format("{} = {},\n", entry.Name, entry.AsString());
-        }
-
-        return std::format("{{\n{}}} ({} members)", member_list, Members.Size());
-    }
-
     switch (Type) {
     case ValueType::eNone:
         return "";
@@ -69,6 +62,28 @@ std::string FxConfigEntry::AsString() const
     }
 
     return "";
+}
+
+std::string FxConfigEntry::AsString() const
+{
+    std::string member_list = "";
+
+    if (Type == ValueType::eStruct) {
+        for (const FxConfigEntry& entry : Members) {
+            member_list += std::format("{} = {},\n", entry.Name, entry.AsString());
+        }
+
+        return std::format("{{\n{}}} ({} members)", member_list, Members.Size());
+    }
+    if (bIsArray) {
+        for (const FxConfigValue& value : ArrayData) {
+            member_list += std::format("{}, ", value.AsString());
+        }
+
+        return std::format("[ {}] ({} values)", member_list, ArrayData.Size());
+    }
+
+    return this->FxConfigValue::AsString();
 }
 
 
@@ -104,8 +119,6 @@ void FxConfigFile::Load(const std::string& path)
 
     Parse(tokenizer.GetTokens());
 }
-
-static bool TokenIsValue(const FxToken& token, const char* str) { return (!strncmp(token.Start, str, token.Length)); }
 
 static FxConfigEntry::ValueType GetValueTokenType(const FxToken& token)
 {
@@ -149,6 +162,39 @@ bool FxConfigFile::EatToken(FxTokenType type)
     return true;
 }
 
+void FxConfigFile::ParseValue(FxConfigValue& value)
+{
+    FxToken* value_token = GetToken();
+
+    using VType = FxConfigEntry::ValueType;
+
+    value.Type = GetValueTokenType(*value_token);
+
+    switch (value.Type) {
+    case VType::eNone:
+        break;
+    case VType::eString:
+        // Remove the first quote
+        value_token->Start++;
+        value_token->Length--;
+
+        // Remove the ending quote
+        value_token->Length--;
+        value.Set(value_token->GetStr());
+        break;
+    case VType::eInt:
+        value.Set<int64>(value_token->ToInt());
+        break;
+    case VType::eFloat:
+        value.Set<float32>(value_token->ToFloat());
+        break;
+    default:
+        break;
+    }
+
+    NextToken();
+}
+
 FxConfigEntry FxConfigFile::ParseEntry()
 {
     // [IDENTIFIER] = [INT | FLOAT | STRING | STRUCT]
@@ -182,39 +228,36 @@ FxConfigEntry FxConfigFile::ParseEntry()
         return entry;
     }
 
+    else if (GetToken()->Type == FxTokenType::eLBracket) {
+        EatToken(FxTokenType::eLBracket);
+
+        entry.bIsArray = true;
+
+        FxToken* value_token = GetToken();
+        entry.Type = GetValueTokenType(*value_token);
+
+        while (GetToken()->Type != FxTokenType::eRBrace) {
+            FxConfigValue value;
+            value.Type = entry.Type;
+            ParseValue(value);
+            entry.AppendValue(std::move(value));
+
+            if (GetToken()->Type == FxTokenType::eRBracket) {
+                break;
+            }
+
+            EatToken(FxTokenType::eComma);
+        }
+
+        EatToken(FxTokenType::eRBracket);
+    }
+
     // Parse single value entry
     // [IDENTIFIER] = [INT | FLOAT | STRING]
 
     FxToken* value_token = GetToken();
-
-    using VType = FxConfigEntry::ValueType;
-
     entry.Type = GetValueTokenType(*value_token);
-
-    switch (entry.Type) {
-    case VType::eNone:
-        break;
-    case VType::eString:
-        // Remove the first quote
-        value_token->Start++;
-        value_token->Length--;
-
-        // Remove the ending quote
-        value_token->Length--;
-        entry.Set(value_token->GetStr());
-
-        break;
-    case VType::eInt:
-        entry.Set<int64>(value_token->ToInt());
-        break;
-    case VType::eFloat:
-        entry.Set<float32>(value_token->ToFloat());
-        break;
-    default:
-        break;
-    }
-
-    NextToken();
+    ParseValue(entry);
 
     return entry;
 }
