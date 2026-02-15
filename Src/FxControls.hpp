@@ -130,7 +130,6 @@ private:
     friend class FxControlManager;
 
 public:
-
 public:
     inline bool IsKeyDown() const { return mbKeyDown; }
     inline bool IsKeyUp() const { return !mbKeyDown; }

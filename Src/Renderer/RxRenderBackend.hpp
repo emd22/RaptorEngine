@@ -36,7 +36,7 @@ struct RxGpuUploadContext
 
     RxFence UploadFence;
 
-    ~RxGpuUploadContext() { FxLogInfo("DESTROYING UPLOAD CONTEXT"); }
+    ~RxGpuUploadContext() = default;
 };
 
 class FxCamera;

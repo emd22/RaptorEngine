@@ -17,19 +17,16 @@
 
 FxConfigEntry& FxConfigEntry::operator=(FxConfigEntry&& other)
 {
-    Type = other.Type;
-    other.Type = ValueType::eNone;
-
-    if (Type == ValueType::eString) {
+    if (other.Type == FxConfigEntry::ValueType::eString) {
         mStringValue = other.mStringValue;
         other.mStringValue = nullptr;
     }
-    else if (Type == ValueType::eInt) {
-        mIntValue = other.mIntValue;
+    else {
+        Set(other);
     }
-    else if (Type == ValueType::eFloat) {
-        mFloatValue = other.mFloatValue;
-    }
+
+    Type = other.Type;
+    other.Type = FxConfigEntry::ValueType::eNone;
 
     Members = std::move(other.Members);
     ArrayData = std::move(other.ArrayData);
@@ -195,12 +192,16 @@ void FxConfigFile::Load(const std::string& path)
         return;
     }
 
+    InitConstants();
+
     FxSlice<char> file_buffer = file.Read<char>();
 
     FxTokenizer tokenizer(file_buffer.pData, file_buffer.Size);
     tokenizer.Tokenize();
 
     Parse(tokenizer.GetTokens());
+
+    PrintEntries();
 }
 
 static FxConfigEntry::ValueType GetValueTokenType(const FxToken& token)
@@ -245,11 +246,33 @@ bool FxConfigFile::EatToken(FxTokenType type)
     return true;
 }
 
+void FxConfigFile::PrintEntries()
+{
+    FxPagedArray<FxConfigEntry>& entries = GetEntries();
+
+    for (const FxConfigEntry& entry : entries) {
+        FxLogInfo("Entry: {} -> {}", entry.Name.Get(), entry.AsString());
+    }
+}
+
 void FxConfigFile::ParseValue(FxConfigValue& value)
 {
     using VType = FxConfigEntry::ValueType;
 
     FxToken* value_token = GetToken();
+
+    // Check for constants
+    if (value_token->Type == FxTokenType::eIdentifier) {
+        for (const FxConfigEntry& entry : mConstants) {
+            if (entry.Name == value_token->GetHash()) {
+                value.Set(entry);
+                NextToken();
+                return;
+            }
+        }
+
+        FxLogError("Could not find reference to constant {}!", value_token->GetStr());
+    }
 
     // Handle unary minus (in a simple way, but still handles recursive negatives)
     if (value_token->Type == FxTokenType::eMinus) {
@@ -395,7 +418,6 @@ void FxConfigFile::Parse(FxPagedArray<FxToken>& tokens)
 FxConfigEntry* FxConfigFile::GetEntry(FxHash64 requested_name_hash) const
 {
     for (FxConfigEntry& entry : mConfigEntries) {
-        FxLogWarning("Checking: {} :: {}", entry.Name.GetHash(), requested_name_hash);
         if (entry.Name == requested_name_hash) {
             return &entry;
         }
@@ -418,4 +440,17 @@ void FxConfigFile::Write(const std::string& path)
     }
 
     file.Close();
+}
+
+void FxConfigFile::InitConstants()
+{
+    constexpr uint32 cMaxConstants = 16;
+
+    mConstants.InitCapacity(cMaxConstants);
+
+    mConstants.Insert(FxConfigEntry("TRUE", 1));
+    mConstants.Insert(FxConfigEntry("FALSE", 0));
+
+    mConstants.Insert(FxConfigEntry("OBJLAYER_WORLD", 0));
+    mConstants.Insert(FxConfigEntry("OBJLAYER_PLAYER", 1));
 }

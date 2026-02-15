@@ -81,7 +81,7 @@ public:
         if (Hash != 0) {
             return Hash;
         }
-        return (Hash = FxHashStr64(Start, Length));
+        return (Hash = FxHashData64(FxSlice<char>(Start, Length)));
     }
 
     IsNumericResult IsNumeric() const;

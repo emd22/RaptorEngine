@@ -16,6 +16,8 @@ public:
 private:
     void AddObjectFromEntry(const std::string& path, const FxConfigEntry& object, FxScene& scene);
 
+    void ApplyPropertiesToObject(const FxRef<FxObject>& object, const FxConfigEntry& object_entry);
+
 public:
     // FxConfigFile InfoFile;
 };

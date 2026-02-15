@@ -42,8 +42,7 @@ void FoxtrotGame::InitEngine()
     FxLogCreateFile("FoxtrotLog.log");
 #endif
 
-    FxConfigFile config;
-    config.Load(FX_BASE_DIR "/Config/Main.conf");
+    Config.Load(FX_BASE_DIR "/Config/Main.conf");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
@@ -64,10 +63,12 @@ void FoxtrotGame::InitEngine()
                exit(1);
            });
 
-    const uint32 window_width = config.GetValue<uint32>("Width");
-    const uint32 window_height = config.GetValue<uint32>("Height");
+    FxConfigEntry* window_entry = Config.GetEntry(FxHashStr64("Window"));
 
-    FxRef<FxWindow> window = FxWindow::New(config.GetValue<const char*>("WindowTitle"),
+    const uint32 window_width = window_entry->GetMember(FxHashStr64("Width"))->Get<uint32>();
+    const uint32 window_height = window_entry->GetMember(FxHashStr64("Height"))->Get<uint32>();
+
+    FxRef<FxWindow> window = FxWindow::New(window_entry->GetMember(FxHashStr64("Title"))->Get<const char*>(),
                                            FxVec2i(window_width, window_height));
 
     gRenderer->SelectWindow(window);
@@ -139,7 +140,10 @@ void FoxtrotGame::CreateGame()
     mMainScene.SelectCamera(Player.pCamera);
 
     FxSceneFile scene_file;
-    scene_file.Load(FX_BASE_DIR "/Data/Demo", mMainScene);
+
+    const char* scene_to_load = Config.GetEntry(FxHashStr64("Scene"))->Get<const char*>();
+
+    scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
 
 
     pSkyboxObject = AxManager::LoadObject("skybox", FX_BASE_DIR "/Models/Skybox.glb");
@@ -162,33 +166,9 @@ void FoxtrotGame::CreateGame()
     //                                    PhObject::PhysicsType::eStatic, {});
     mMainScene.Attach(pLevelObject);
 
-    // pHelmetObject = AxManager::LoadObject("animtest", FX_BASE_DIR "/Models/AnimTest.glb", { .KeepInMemory = true });
-    // // pHelmetObject->RotateX(M_PI_2);
-    // // pHelmetObject->RotateZ(-M_PI_2);
-    // pHelmetObject->Scale(0.5);
-    // pHelmetObject->WaitUntilLoaded();
-    // pHelmetObject->MoveBy(FxVec3f(0, -0.5, 1.5));
-
-    // pHelmetObject->SetShadowCaster(true);
-
-    // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
-
     gPhysics->OptimizeBroadPhase();
 
-
-    // mMainScene.Attach(pHelmetObject);
-
-    pPistolObject = mMainScene.FindObject(FxHashStr64("pistol"));
-
-
-    // pPistolObject = AxManager::LoadObject("pistol", FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true
-    // }); pPistolObject->WaitUntilLoaded();
-
-    // pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);
-
-    // PistolRotationGoal = pPistolObject->mRotation;
-
-    // mMainScene.Attach(pPistolObject);
+    pPistolObject = mMainScene.FindObject(FxHashStr64("Pistol"));
 
     CreateLights();
 
@@ -306,6 +286,14 @@ void FoxtrotGame::ProcessControls()
         FxLogInfo("Total Frees:  {}", stats.TotalFrees);
 
         FxLogInfo("");
+    }
+
+    if (FxControlManager::IsComboDown(FxKey::FX_KEY_LSHIFT, FxKey::FX_KEY_R)) {
+        // Reload the object properties from the scene
+        FxSceneFile scene_file;
+        scene_file.Load(
+            std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(FxHashStr64("Scene"))->Get<const char*>()),
+            mMainScene);
     }
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {

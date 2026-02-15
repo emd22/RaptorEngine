@@ -120,8 +120,6 @@ void AxManager::Shutdown()
     // Cleanup all permutations of "empty images" that were created.
     FxPagedArray<FxRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
 
-    FxLogInfo("Number of empty images created: {}", empty_images_list.Size());
-
     if (empty_images_list.IsInited()) {
         for (FxRef<AxImage>& image_ref : empty_images_list) {
             image_ref.DestroyRef();

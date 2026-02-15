@@ -49,7 +49,6 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
         else if (attribute->type == cgltf_attribute_type_tangent) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
 
-            FxLogInfo("Model contains tangents!");
             // Create our vertex normal buffer
             tangents.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, tangents.pData, data_size);

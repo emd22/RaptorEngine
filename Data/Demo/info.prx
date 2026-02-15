@@ -1,19 +1,18 @@
-meta = {
-    name = "demo0"
-}
-objects = {
-
-animtest = {
-    mesh = "/model.glb"
-    shadows = 1
-    scale = 0.5
-    pos = [0.0, -0.5, 1.5]
-    rot = [0.0, 0.0, 0.0, 1.0]
-}
-pistol = {
-    mesh = "/pistol.glb"
-    shadows = 1
-    layer = 1
+Meta = {
+    Name = "demo0"
 }
 
+Objects = {
+    AnimTest = {
+        Mesh = "/model.glb"
+        Shadows = TRUE
+        Scale = 0.5
+        Pos = [0.0, -0.5, 1.5]
+        Rot = [0.0, 0.0, 0.0, 1.0]
+    }
+    Pistol = {
+        Mesh = "/pistol.glb"
+        Shadows = TRUE
+        Layer = OBJLAYER_PLAYER
+    }
 }

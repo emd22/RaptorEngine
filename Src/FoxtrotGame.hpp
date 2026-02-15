@@ -2,6 +2,7 @@
 
 #include "FxObjectManager.hpp"
 
+#include <Asset/FxConfigFile.hpp>
 #include <FxObject.hpp>
 #include <FxPlayer.hpp>
 #include <FxScene.hpp>
@@ -53,4 +54,6 @@ public:
 private:
     uint64 mLastTick = 0;
     FxScene mMainScene {};
+
+    FxConfigFile Config;
 };

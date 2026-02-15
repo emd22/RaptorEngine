@@ -18,6 +18,10 @@ concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_poi
                                std::is_same_v<TType, char*>;
 
 
+/////////////////////////////////////
+// Config Value
+/////////////////////////////////////
+
 struct FxConfigValue
 {
 public:
@@ -28,6 +32,27 @@ public:
     {
         Set(value);
     }
+
+    FxConfigValue(const FxConfigValue& other) { (*this) = other; }
+
+    FxConfigValue& operator=(const FxConfigValue& other)
+    {
+        Type = other.Type;
+
+        if (Type == ValueType::eString) {
+            mStringValue = strdup(other.mStringValue);
+        }
+        else if (Type == ValueType::eInt) {
+            mIntValue = other.mIntValue;
+        }
+        else if (Type == ValueType::eFloat) {
+            mFloatValue = other.mFloatValue;
+        }
+
+        return *this;
+    }
+
+    void Set(const FxConfigValue& other) { (*this) = other; }
 
     template <typename T>
     T Get() const;
@@ -104,6 +129,12 @@ public:
     };
 };
 
+
+/////////////////////////////////////
+// Config Entry
+/////////////////////////////////////
+
+
 class FxConfigEntry : public FxConfigValue
 {
 public:
@@ -115,10 +146,29 @@ public:
         return entry;
     }
 
+    template <typename TType>
+    static FxConfigEntry Array(const std::string& name, FxConfigValue::ValueType type, const FxSlice<TType>& data)
+    {
+        FxConfigEntry entry = FxConfigEntry::Array(name, type);
+
+        for (const TType& value : data) {
+            entry.AppendValue(value);
+        }
+
+        return entry;
+    }
+
     static FxConfigEntry Struct(const std::string& name)
     {
         FxConfigEntry entry(name);
         entry.Type = FxConfigValue::ValueType::eStruct;
+        return entry;
+    }
+
+    template <typename TType>
+    static FxConfigEntry Literal(const std::string& name, const TType& literal)
+    {
+        FxConfigEntry entry(name, literal);
         return entry;
     }
 
@@ -167,6 +217,9 @@ public:
     FxPagedArray<FxConfigValue> ArrayData;
 };
 
+/////////////////////////////////////
+// Config File
+/////////////////////////////////////
 
 class FxConfigFile
 {
@@ -178,6 +231,8 @@ public:
 
     FxConfigEntry* GetEntry(FxHash64 requested_name_hash) const;
     FxPagedArray<FxConfigEntry>& GetEntries() { return mConfigEntries; }
+
+    void PrintEntries();
 
     template <typename T>
     T GetValue(FxHash64 entry_name_hash) const
@@ -230,9 +285,12 @@ private:
 
     FX_FORCE_INLINE void NextToken() { ++mTokenIndex; }
 
+    void InitConstants();
+
 
 private:
     FxPagedArray<FxConfigEntry> mConfigEntries;
+    FxSizedArray<FxConfigEntry> mConstants;
 
     FxPagedArray<FxToken>* mpTokens = nullptr;
     uint32 mTokenIndex = 0;
