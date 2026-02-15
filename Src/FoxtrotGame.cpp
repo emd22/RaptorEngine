@@ -7,6 +7,7 @@
 
 #include <Asset/AxManager.hpp>
 #include <Asset/FxConfigFile.hpp>
+#include <Asset/FxSceneFile.hpp>
 #include <Core/FxDefer.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxRef.hpp>
@@ -137,14 +138,18 @@ void FoxtrotGame::CreateGame()
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    pSkyboxObject = AxManager::LoadObject(FX_BASE_DIR "/Models/Skybox.glb");
+    FxSceneFile scene_file;
+    scene_file.Load(FX_BASE_DIR "/Data/Demo", mMainScene);
+
+
+    pSkyboxObject = AxManager::LoadObject("skybox", FX_BASE_DIR "/Models/Skybox.glb");
     pSkyboxObject->WaitUntilLoaded();
 
     // pSkyboxObject->SetRenderUnlit(true);
 
     mMainScene.Attach(pSkyboxObject);
 
-    pLevelObject = AxManager::LoadObject(FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
+    pLevelObject = AxManager::LoadObject("level", FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
     pLevelObject->WaitUntilLoaded();
 
     // pLevelObject->SetRenderUnlit(true);
@@ -157,24 +162,24 @@ void FoxtrotGame::CreateGame()
     //                                    PhObject::PhysicsType::eStatic, {});
     mMainScene.Attach(pLevelObject);
 
-    pHelmetObject = AxManager::LoadObject(FX_BASE_DIR "/Models/AnimTest.glb", { .KeepInMemory = true });
-    // pHelmetObject->RotateX(M_PI_2);
-    // pHelmetObject->RotateZ(-M_PI_2);
-    pHelmetObject->Scale(0.5);
-    pHelmetObject->WaitUntilLoaded();
-    pHelmetObject->MoveBy(FxVec3f(0, -0.5, 1.5));
+    // pHelmetObject = AxManager::LoadObject("animtest", FX_BASE_DIR "/Models/AnimTest.glb", { .KeepInMemory = true });
+    // // pHelmetObject->RotateX(M_PI_2);
+    // // pHelmetObject->RotateZ(-M_PI_2);
+    // pHelmetObject->Scale(0.5);
+    // pHelmetObject->WaitUntilLoaded();
+    // pHelmetObject->MoveBy(FxVec3f(0, -0.5, 1.5));
 
-    pHelmetObject->SetShadowCaster(true);
+    // pHelmetObject->SetShadowCaster(true);
 
     // pHelmetObject->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(5, 20, 0.5), PhMotionType::eStatic, {});
 
     gPhysics->OptimizeBroadPhase();
 
 
-    mMainScene.Attach(pHelmetObject);
+    // mMainScene.Attach(pHelmetObject);
 
 
-    pPistolObject = AxManager::LoadObject(FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
+    pPistolObject = AxManager::LoadObject("pistol", FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
     pPistolObject->WaitUntilLoaded();
 
     pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);

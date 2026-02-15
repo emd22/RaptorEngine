@@ -6,6 +6,7 @@
 // #include <ThirdParty/Jolt/Physics/Body/Body.h>
 // #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
+#include <Core/FxName.hpp>
 #include <Core/MemPool/FxMPPagedArray.hpp>
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
@@ -88,6 +89,8 @@ public:
     FxVec3f Dimensions = FxVec3f::sZero;
 
     PhObject Physics;
+
+    FxName Name;
 
 private:
     /// Object slots allocated following this object. Used by other instances of this object.

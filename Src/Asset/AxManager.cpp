@@ -178,20 +178,24 @@ inline bool IsFileJpeg(const std::string& path)
     return false;
 }
 
-void AxManager::LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options)
+void AxManager::LoadObject(const std::string& name, FxRef<FxObject>& asset, const std::string& path,
+                           FxLoadObjectOptions options)
 {
     FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.KeepInMemory;
 
     SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::eObject>(asset, loader, path);
+    asset->Name = name;
 }
 
 
-void AxManager::LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size)
+void AxManager::LoadObjectFromMemory(const std::string& name, FxRef<FxObject>& asset, const uint8* data,
+                                     uint32 data_size)
 {
     FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
 
     SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::eObject>(asset, loader, "", data, data_size);
+    asset->Name = name;
 }
 
 

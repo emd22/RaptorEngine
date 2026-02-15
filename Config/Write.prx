@@ -1,8 +1,0 @@
-Meta = {
-	Text = "Test Project 1"
-}
-Objects = {
-	Entry1 = {
-		Pos = [ 10, 20, 30,  ]
-	}
-}

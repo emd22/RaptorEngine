@@ -3,8 +3,12 @@
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
+#include <Math/FxQuat.hpp>
+#include <Math/FxVec3.hpp>
+#include <Math/FxVec4.hpp>
 #include <Util/FxTokenizer.hpp>
 #include <string>
+
 
 /////////////////////////////////////
 // Config entry functions
@@ -27,17 +31,14 @@ FxConfigEntry& FxConfigEntry::operator=(FxConfigEntry&& other)
         mFloatValue = other.mFloatValue;
     }
 
-    Name = other.Name;
-    NameHash = other.NameHash;
-
     Members = std::move(other.Members);
     ArrayData = std::move(other.ArrayData);
 
     bIsArray = other.bIsArray;
     other.bIsArray = false;
 
-    other.NameHash = 0;
-    other.Name.clear();
+    Name = other.Name;
+    other.Name.Clear();
 
     return *this;
 }
@@ -84,7 +85,7 @@ std::string FxConfigEntry::AsString(uint32 indent) const
 
     if (Type == ValueType::eStruct) {
         for (const FxConfigEntry& entry : Members) {
-            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name, entry.AsString(indent + 1));
+            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
         }
 
         return std::format("{{\n{}{}}}", member_list, indent_str);
@@ -99,6 +100,73 @@ std::string FxConfigEntry::AsString(uint32 indent) const
 
 
     return this->FxConfigValue::AsString();
+}
+
+FxConfigEntry* FxConfigEntry::GetMember(const FxHash64 name_hash) const
+{
+    for (FxConfigEntry& entry : Members) {
+        if (entry.Name == name_hash) {
+            return &entry;
+        }
+    }
+
+    FxLogError("Cannot find member in config entry!");
+
+    return nullptr;
+}
+
+
+void FxConfigEntry::AppendValue(const FxVec3f& vec)
+{
+    if (!Members.IsInited()) {
+        Members.Create(4);
+    }
+
+    AppendValue(vec.X);
+    AppendValue(vec.Y);
+    AppendValue(vec.Z);
+}
+
+void FxConfigEntry::AppendValue(const FxVec4f& vec)
+{
+    if (!Members.IsInited()) {
+        Members.Create(5);
+    }
+
+    AppendValue(vec.X);
+    AppendValue(vec.Y);
+    AppendValue(vec.Z);
+    AppendValue(vec.W);
+}
+
+
+void FxConfigEntry::AppendValue(const FxQuat& quat)
+{
+    if (!Members.IsInited()) {
+        Members.Create(5);
+    }
+
+    AppendValue(quat.X);
+    AppendValue(quat.Y);
+    AppendValue(quat.Z);
+    AppendValue(quat.W);
+}
+
+
+FxVec3f FxConfigEntry::GetVec3f() const
+{
+    FxAssert(bIsArray == true && ArrayData.Size() >= 3);
+
+    return FxVec3f(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>());
+}
+
+
+FxQuat FxConfigEntry::GetQuat() const
+{
+    FxAssert(bIsArray == true && ArrayData.Size() >= 4);
+
+    return FxQuat(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>(),
+                  ArrayData[3].Get<float32>());
 }
 
 
@@ -234,6 +302,15 @@ void FxConfigFile::ParseValue(FxConfigValue& value)
     NextToken();
 }
 
+void FxConfigEntry::AppendValue(FxConfigValue&& value)
+{
+    if (!ArrayData.IsInited()) {
+        ArrayData.Create(8);
+    }
+
+    ArrayData.Insert(std::move(value));
+}
+
 FxConfigEntry FxConfigFile::ParseEntry()
 {
     // [IDENTIFIER] = [INT | FLOAT | STRING | STRUCT]
@@ -242,8 +319,7 @@ FxConfigEntry FxConfigFile::ParseEntry()
 
     FxToken* token = GetToken();
 
-    entry.Name = (token->GetStr());
-    entry.NameHash = FxHashStr64(token->GetStr().c_str());
+    entry.Name = token->GetStr();
 
     EatToken(FxTokenType::eIdentifier);
     EatToken(FxTokenType::eEquals);
@@ -258,7 +334,7 @@ FxConfigEntry FxConfigFile::ParseEntry()
         // Add each entry as a member of the current entry
         while (GetToken()->Type != FxTokenType::eRBrace) {
             FxConfigEntry member = ParseEntry();
-            FxLogInfo("Adding entry {} -> {}", member.Name, member.AsString());
+            FxLogInfo("Adding entry {} -> {}", member.Name.Get(), member.AsString());
             entry.AddMember(std::move(member));
         }
 
@@ -319,11 +395,11 @@ void FxConfigFile::Parse(FxPagedArray<FxToken>& tokens)
     mpTokens = nullptr;
 }
 
-const FxConfigEntry* FxConfigFile::GetEntry(FxHash64 requested_name_hash) const
+FxConfigEntry* FxConfigFile::GetEntry(FxHash64 requested_name_hash) const
 {
-    for (const FxConfigEntry& entry : mConfigEntries) {
-        FxLogWarning("Checking: {} :: {}", entry.NameHash, requested_name_hash);
-        if (entry.NameHash == requested_name_hash) {
+    for (FxConfigEntry& entry : mConfigEntries) {
+        FxLogWarning("Checking: {} :: {}", entry.Name.GetHash(), requested_name_hash);
+        if (entry.Name == requested_name_hash) {
             return &entry;
         }
     }
@@ -341,7 +417,7 @@ void FxConfigFile::Write(const std::string& path)
     }
 
     for (const FxConfigEntry& entry : mConfigEntries) {
-        file.WriteMulti(entry.Name.c_str(), " = ", entry.AsString(), '\n');
+        file.WriteMulti(entry.Name.Get(), " = ", entry.AsString(), '\n');
     }
 
     file.Close();

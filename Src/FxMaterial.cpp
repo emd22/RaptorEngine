@@ -76,7 +76,6 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pi
 
     FxRef<FxMaterial> ref = FxMakeRef<FxMaterial>();
 
-    ref->NameHash = FxHashStr32(name.c_str());
     ref->Name = name;
     ref->pPipeline = pipeline;
     ref->mMaterialPropertiesIndex = free_material_index;

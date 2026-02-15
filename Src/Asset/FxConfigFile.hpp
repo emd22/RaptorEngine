@@ -3,10 +3,15 @@
 //
 #include <Core/FxHash.hpp>
 #include <Core/FxMemory.hpp>
+#include <Core/FxName.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Core/FxTypes.hpp>
 #include <Util/FxTokenizer.hpp>
 #include <string>
+
+class FxVec3f;
+class FxVec4f;
+class FxQuat;
 
 template <typename TType>
 concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_point_v<TType> ||
@@ -120,7 +125,7 @@ public:
 public:
     FxConfigEntry() = default;
 
-    FxConfigEntry(const std::string& name) : Name(name) { NameHash = FxHashStr64(name.c_str()); }
+    FxConfigEntry(const std::string& name) : Name(name) {}
 
     template <typename TType>
     FxConfigEntry(const std::string& name, TType value) : FxConfigEntry(name)
@@ -135,14 +140,16 @@ public:
 
     void AddMember(FxConfigEntry&& entry);
 
-    void AppendValue(FxConfigValue&& value)
-    {
-        if (!ArrayData.IsInited()) {
-            ArrayData.Create();
-        }
+    void AppendValue(FxConfigValue&& value);
 
-        ArrayData.Insert(std::move(value));
-    }
+    void AppendValue(const FxVec3f& vec);
+    void AppendValue(const FxVec4f& vec);
+    void AppendValue(const FxQuat& quat);
+
+    FxConfigEntry* GetMember(const FxHash64 name) const;
+
+    FxVec3f GetVec3f() const;
+    FxQuat GetQuat() const;
 
     FxConfigEntry& operator=(const FxConfigEntry& other) = delete;
 
@@ -152,8 +159,7 @@ public:
     ~FxConfigEntry();
 
 public:
-    FxHash64 NameHash = 0;
-    std::string Name = "";
+    FxName Name;
 
     bool bIsArray = false;
 
@@ -170,7 +176,7 @@ public:
     void Load(const std::string& path);
     void Write(const std::string& path);
 
-    const FxConfigEntry* GetEntry(FxHash64 requested_name_hash) const;
+    FxConfigEntry* GetEntry(FxHash64 requested_name_hash) const;
     FxPagedArray<FxConfigEntry>& GetEntries() { return mConfigEntries; }
 
     template <typename T>
@@ -196,7 +202,6 @@ public:
     {
         FxConfigEntry entry;
         entry.Name = name;
-        entry.NameHash = FxHashStr64(name.c_str());
 
         entry.Set<TValue>(value);
 

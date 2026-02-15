@@ -25,6 +25,8 @@ public:
     const FxPagedArray<FxRef<FxLightBase>>& GetAllLights() { return mLights; }
     const FxPagedArray<FxRef<FxObject>>& GetAllObjects() { return mObjects; }
 
+    FxRef<FxObject> FindObject();
+
     void Destroy();
 
     ~FxScene() { Destroy(); }
@@ -35,9 +37,10 @@ private:
 public:
     FxObjectManager ObjectManager;
 
+    FxName Name = "(unnamed)";
+
 private:
     FxPagedArray<FxRef<FxObject>> mObjects;
-
     FxPagedArray<FxRef<FxLightBase>> mLights;
 
     FxRef<FxPerspectiveCamera> mpCurrentCamera { nullptr };

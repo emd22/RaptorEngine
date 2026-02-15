@@ -5,7 +5,7 @@
 #include <Asset/AxImage.hpp>
 #include <Asset/Fwd/Ax_Fwd_Manager.hpp>
 #include <Core/FxBitset.hpp>
-#include <Core/FxHash.hpp>
+#include <Core/FxName.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <FxColor.hpp>
 #include <Renderer/Backend/RxDescriptors.hpp>
@@ -145,8 +145,7 @@ public:
 
     FxMaterialProperties Properties {};
 
-    FxHash32 NameHash { 0 };
-    std::string Name = "";
+    FxName Name;
 
     RxPipeline* pPipeline = nullptr;
 

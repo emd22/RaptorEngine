@@ -89,10 +89,11 @@ public:
      * @brief Creates a new `FxObject` and loads the provided asset into it from
      * the path provided.
      */
-    static FxRef<FxObject> LoadObject(const std::string& path, FxLoadObjectOptions options = {})
+    static FxRef<FxObject> LoadObject(const std::string& name, const std::string& path,
+                                      FxLoadObjectOptions options = {})
     {
         FxRef<FxObject> asset = FxRef<FxObject>::New();
-        LoadObject(asset, path, options);
+        LoadObject(name, asset, path, options);
 
         return asset;
     }
@@ -101,10 +102,10 @@ public:
      * @brief Creates a new `FxObject` and loads the asset into it from
      * the data provided.
      */
-    static FxRef<FxObject> LoadObjectFromMemory(const uint8* data, uint32 data_size)
+    static FxRef<FxObject> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
     {
         FxRef<FxObject> asset = FxRef<FxObject>::New();
-        LoadObjectFromMemory(asset, data, data_size);
+        LoadObjectFromMemory(name, asset, data, data_size);
 
         return asset;
     }
@@ -151,13 +152,15 @@ public:
     /**
      * @brief Loads an asset into the provided asset from the provided data.
      */
-    static void LoadObjectFromMemory(FxRef<FxObject>& asset, const uint8* data, uint32 data_size);
+    static void LoadObjectFromMemory(const std::string& name, FxRef<FxObject>& asset, const uint8* data,
+                                     uint32 data_size);
 
 
     /**
      * @brief Loads an object into the provided asset from a path.
      */
-    static void LoadObject(FxRef<FxObject>& asset, const std::string& path, FxLoadObjectOptions options = {});
+    static void LoadObject(const std::string& name, FxRef<FxObject>& asset, const std::string& path,
+                           FxLoadObjectOptions options = {});
 
 
     static void LoadImage(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset, const std::string& path);

@@ -373,9 +373,9 @@ public:
     }
 
 
-    TElementType& operator[](size_t index) { return Get(index); }
+    TElementType& operator[](size_t index) const { return Get(index); }
 
-    TElementType& Get(size_t index)
+    TElementType& Get(size_t index) const
     {
         Page* page = nullptr;
         const uint32 dest_page_index = (index / PageNodeCapacity);
