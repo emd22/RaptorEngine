@@ -178,15 +178,17 @@ void FoxtrotGame::CreateGame()
 
     // mMainScene.Attach(pHelmetObject);
 
+    pPistolObject = mMainScene.FindObject(FxHashStr64("pistol"));
 
-    pPistolObject = AxManager::LoadObject("pistol", FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true });
-    pPistolObject->WaitUntilLoaded();
 
-    pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);
+    // pPistolObject = AxManager::LoadObject("pistol", FX_BASE_DIR "/Models/PistolTextured.glb", { .KeepInMemory = true
+    // }); pPistolObject->WaitUntilLoaded();
 
-    PistolRotationGoal = pPistolObject->mRotation;
+    // pPistolObject->SetObjectLayer(FxObjectLayer::ePlayerLayer);
 
-    mMainScene.Attach(pPistolObject);
+    // PistolRotationGoal = pPistolObject->mRotation;
+
+    // mMainScene.Attach(pPistolObject);
 
     CreateLights();
 

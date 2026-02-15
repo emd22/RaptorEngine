@@ -10,5 +10,10 @@ animtest = {
     pos = [0.0, -0.5, 1.5]
     rot = [0.0, 0.0, 0.0, 1.0]
 }
+pistol = {
+    mesh = "/pistol.glb"
+    shadows = 1
+    layer = 1
+}
 
 }

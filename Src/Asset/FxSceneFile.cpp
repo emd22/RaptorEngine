@@ -72,5 +72,14 @@ void FxSceneFile::AddObjectFromEntry(const std::string& scene_path, const FxConf
         object->MarkTransformOutOfDate();
     }
 
+    FxConfigEntry* layer = object_entry.GetMember(FxHashStr64("layer"));
+    if (layer != nullptr) {
+        int64 layer_value = layer->Get<int64>();
+
+        if (layer_value == static_cast<int64>(FxObjectLayer::ePlayerLayer)) {
+            object->SetObjectLayer(FxObjectLayer::ePlayerLayer);
+        }
+    }
+
     scene.Attach(object);
 }

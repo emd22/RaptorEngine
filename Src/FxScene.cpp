@@ -21,6 +21,18 @@ void FxScene::Attach(const FxRef<FxLightBase>& light)
     light->OnAttached(this);
 }
 
+FxRef<FxObject> FxScene::FindObject(FxHash64 name_hash)
+{
+    for (FxRef<FxObject>& obj : mObjects) {
+        if (obj->Name == name_hash) {
+            return obj;
+        }
+    }
+
+    return FxRef<FxObject>(nullptr);
+}
+
+
 void FxScene::Render(FxCamera* shadow_camera)
 {
     FxPerspectiveCamera& camera = *mpCurrentCamera;

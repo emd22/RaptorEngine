@@ -110,8 +110,6 @@ FxConfigEntry* FxConfigEntry::GetMember(const FxHash64 name_hash) const
         }
     }
 
-    FxLogError("Cannot find member in config entry!");
-
     return nullptr;
 }
 
@@ -334,7 +332,6 @@ FxConfigEntry FxConfigFile::ParseEntry()
         // Add each entry as a member of the current entry
         while (GetToken()->Type != FxTokenType::eRBrace) {
             FxConfigEntry member = ParseEntry();
-            FxLogInfo("Adding entry {} -> {}", member.Name.Get(), member.AsString());
             entry.AddMember(std::move(member));
         }
 

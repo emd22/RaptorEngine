@@ -25,7 +25,7 @@ public:
     const FxPagedArray<FxRef<FxLightBase>>& GetAllLights() { return mLights; }
     const FxPagedArray<FxRef<FxObject>>& GetAllObjects() { return mObjects; }
 
-    FxRef<FxObject> FindObject();
+    FxRef<FxObject> FindObject(FxHash64 name_hash);
 
     void Destroy();
 
