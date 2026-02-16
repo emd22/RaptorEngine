@@ -43,7 +43,7 @@ FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> FxMeshGen::GeneratedMesh::AsPo
     FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> mesh = FxMakeRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>>();
     // mesh->IsReference = true;
 
-    FxSizedArray<RxVertex<FxVertexPosition>> points(Positions.Size);
+    FxSizedArray<RxVertexBase> points(Positions.Size);
 
     for (uint32 i = 0; i < Positions.Size; i++) {
         auto* vertex = points.Insert();

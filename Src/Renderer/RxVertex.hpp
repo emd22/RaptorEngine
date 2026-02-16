@@ -8,55 +8,19 @@
 #include <Math/FxVec3.hpp>
 #include <Renderer/FxMeshUtil.hpp>
 
-enum FxVertexFlags : int8
-{
-    FxVertexPosition = 0x01,
-    FxVertexNormal = 0x02,
-    FxVertexUV = 0x04,
-    FxVertexTangent = 0x08,
-};
-
-FX_DEFINE_ENUM_AS_FLAGS(FxVertexFlags);
-
+// Suppress clangd and its hate for #pragma pack
+static_assert(true);
 
 // Pack all of the structs below
 #pragma pack(push, 1)
 
-template <FxVertexFlags TComponents>
-struct RxVertex;
-
-template <>
-struct RxVertex<FxVertexPosition>
+struct RxVertexBase
 {
-    static constexpr FxVertexFlags Components = FxVertexPosition;
-
     float32 Position[3];
 };
 
-template <>
-struct RxVertex<FxVertexPosition | FxVertexNormal>
+struct RxVertexDefault
 {
-    static constexpr FxVertexFlags Components = (FxVertexPosition | FxVertexNormal);
-
-    float32 Position[3];
-    float32 Normal[3];
-};
-
-template <>
-struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV>
-{
-    static constexpr FxVertexFlags Components = (FxVertexPosition | FxVertexNormal | FxVertexUV);
-
-    float32 Position[3];
-    float32 Normal[3];
-    float32 UV[2];
-};
-
-template <>
-struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent>
-{
-    static constexpr FxVertexFlags Components = (FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent);
-
     float32 Position[3];
     float32 Normal[3];
     float32 UV[2];
@@ -65,8 +29,6 @@ struct RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent
 
 // End packing structs
 #pragma pack(pop)
-
-using RxVertexDefault = RxVertex<FxVertexPosition | FxVertexNormal | FxVertexUV | FxVertexTangent>;
 
 template <>
 struct std::formatter<RxVertexDefault>
@@ -87,7 +49,7 @@ struct std::formatter<RxVertexDefault>
  * true, this macro zeros the member.
  */
 #define RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(component_, member_name_, component_n_)                                \
-    if constexpr (can_output_##member_name_) {                                                                         \
+    if constexpr (is_default_vertex) {                                                                                 \
         if (has_##member_name_) {                                                                                      \
             memcpy(&component_, &member_name_.pData[i * component_n_], sizeof(float32) * component_n_);                \
         }                                                                                                              \
@@ -97,7 +59,7 @@ struct std::formatter<RxVertexDefault>
     }
 
 #define RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(component_, member_name_, component_n_)                           \
-    if constexpr (can_output_##member_name_) {                                                                         \
+    if constexpr (is_default_vertex) {                                                                                 \
         if (has_##member_name_) {                                                                                      \
             memcpy(&component_, member_name_.pData[i].mData, sizeof(float32) * component_n_);                          \
         }                                                                                                              \
@@ -126,9 +88,7 @@ public:
         const bool has_uvs = (uvs.IsNotEmpty());
         const bool has_tangents = (tangents.IsNotEmpty());
 
-        constexpr bool can_output_normals = (TVertexType::Components & FxVertexNormal);
-        constexpr bool can_output_uvs = (TVertexType::Components & FxVertexUV);
-        constexpr bool can_output_tangents = (TVertexType::Components & FxVertexTangent);
+        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertexDefault>;
 
         // Create the local (cpu-side) buffer to store our vertices
         LocalBuffer.InitCapacity(positions.Size / 3);
@@ -185,9 +145,7 @@ public:
         const bool has_uvs = (uvs.IsNotEmpty());
         const bool has_tangents = (tangents.IsNotEmpty());
 
-        constexpr bool can_output_normals = (TVertexType::Components & FxVertexNormal);
-        constexpr bool can_output_uvs = (TVertexType::Components & FxVertexUV);
-        constexpr bool can_output_tangents = (TVertexType::Components & FxVertexTangent);
+        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertexDefault>;
 
         // Create the local (cpu-side) buffer to store our vertices
         LocalBuffer.InitCapacity(positions.Size);

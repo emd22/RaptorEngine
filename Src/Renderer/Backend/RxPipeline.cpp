@@ -39,7 +39,7 @@ FxVertexInfo FxMakeVertexInfo()
 
 FxVertexInfo FxMakeLightVertexInfo()
 {
-    using VertexType = RxVertex<FxVertexPosition>;
+    using VertexType = RxVertexBase;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,

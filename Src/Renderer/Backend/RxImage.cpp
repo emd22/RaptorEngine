@@ -496,8 +496,6 @@ void RxImage::DecRef()
     FxMemPool::Free(mpRefCnt);
     mpRefCnt = nullptr;
 
-    static uint32 num_destroyed = 0;
-
     if (View != nullptr) {
         vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
     }

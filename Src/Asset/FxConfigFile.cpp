@@ -200,8 +200,6 @@ void FxConfigFile::Load(const std::string& path)
     tokenizer.Tokenize();
 
     Parse(tokenizer.GetTokens());
-
-    PrintEntries();
 }
 
 static FxConfigEntry::ValueType GetValueTokenType(const FxToken& token)

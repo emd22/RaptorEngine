@@ -25,7 +25,7 @@ FX_DEFINE_ENUM_AS_FLAGS(FxLightFlags);
 class FxLightBase : public FxEntity
 {
 public:
-    using VertexType = RxVertex<FxVertexPosition>;
+    using VertexType = RxVertexBase;
 
     static constexpr FxEntityType scEntityType = FxEntityType::eLight;
 
