@@ -178,6 +178,7 @@ void RxGpuDevice::CreateLogicalDevice()
         .pQueuePriorities = transfer_priorities,
     });
 
+
     const VkPhysicalDeviceFeatures device_features {
         .fillModeNonSolid = true,
     };
@@ -196,15 +197,25 @@ void RxGpuDevice::CreateLogicalDevice()
     VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PORTABILITY_SUBSET_FEATURES_KHR,
         .mutableComparisonSamplers = VK_TRUE, // For samplers that use compareOp's / SampleCmp in shaders
+        .pNext = nullptr,
     };
-
 #endif
+
+    VkPhysicalDeviceVulkan11Features vk11_features {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .shaderDrawParameters = VK_TRUE,
+#ifdef FX_PLATFORM_MACOS
+        .pNext = &portability_features,
+#else
+        .pNext = nullptr,
+#endif
+    };
 
 
     const VkDeviceCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 
-        .queueCreateInfoCount = (uint32)queue_create_infos.size(),
+        .queueCreateInfoCount = static_cast<uint32>(queue_create_infos.size()),
         .pQueueCreateInfos = queue_create_infos.data(),
 
         // device specific layers (not used in modern vulkan)
@@ -217,9 +228,7 @@ void RxGpuDevice::CreateLogicalDevice()
         .ppEnabledExtensionNames = device_extensions,
         .pEnabledFeatures = &device_features,
 
-#ifdef FX_PLATFORM_MACOS
-        .pNext = &portability_features,
-#endif
+        .pNext = &vk11_features,
     };
 
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);

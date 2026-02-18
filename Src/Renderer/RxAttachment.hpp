@@ -41,6 +41,8 @@ public:
     RxImage& GetImage() { return Image; }
     VkImageView& GetImageView() { return Image.View; }
 
+    void SetImage(const RxImage& image) { Image = image; }
+
     bool IsDepth() const { return Aspect == RxImageAspectFlag::eDepth; }
 
 public:

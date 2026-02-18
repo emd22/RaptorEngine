@@ -98,4 +98,9 @@ void FxSceneFile::ApplyPropertiesToObject(const FxRef<FxObject>& object, const F
             object->SetObjectLayer(FxObjectLayer::ePlayerLayer);
         }
     }
+
+    FxConfigEntry* unlit = object_entry.GetMember(FxHashStr64("Unlit"));
+    if (unlit != nullptr) {
+        object->SetRenderUnlit(static_cast<bool>(unlit->Get<int64>()));
+    }
 }

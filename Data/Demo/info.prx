@@ -15,4 +15,8 @@ Objects = {
         Shadows = TRUE
         Layer = OBJLAYER_PLAYER
     }
+    Skybox = {
+        Mesh = "/Skybox.glb"
+        Unlit = TRUE
+    }
 }

@@ -53,6 +53,7 @@ void FxScene::Render(FxCamera* shadow_camera)
     // Render lights
     gRenderer->BeginLighting();
 
+
     for (const FxRef<FxLightBase>& light : mLights) {
         light->Render(camera, shadow_camera);
     }
@@ -64,6 +65,10 @@ void FxScene::Render(FxCamera* shadow_camera)
 
 void FxScene::RenderUnlitObjects(const FxCamera& camera) const
 {
+    // RxAttachment* depth_target = gRenderer->pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
+    // FxAssert(depth_target != nullptr);
+    // depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
+
     for (const FxRef<FxObject>& obj : mObjects) {
         if (!obj->GetRenderUnlit()) {
             continue;

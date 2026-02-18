@@ -377,6 +377,23 @@ void FxObject::SyncObjectWithPhysics()
     }
 }
 
+void FxObject::SetRenderUnlit(const bool value)
+{
+    OnLoaded(
+        [](FxRef<AxBase> base_asset)
+        {
+            FxRef<FxObject> asset = base_asset;
+            if (asset->pMaterial) {
+                asset->pMaterial->pPipeline = &gRenderer->pDeferredRenderer->PlUnlit;
+            }
+            else {
+                FxLogError("No material bound!");
+            }
+        });
+
+    mbRenderUnlit = value;
+}
+
 
 void FxObject::SetPhysicsEnabled(bool enabled)
 {

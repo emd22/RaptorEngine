@@ -71,6 +71,10 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
         }
     }
 
+    if (!has_depth_attachment) {
+        FxLogInfo("Pipeline '{}' does not have a depth attachment", name);
+    }
+
     VkSpecializationInfo specialization_info = {
         .mapEntryCount = 0,
         .pMapEntries = nullptr,
@@ -177,8 +181,6 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
         .attachmentCount = color_blend_attachments.Size,
         .pAttachments = color_blend_attachments,
     };
-
-    // RenderPass->Create2(attachments);
 
     VkBool32 depth_test_enabled = VK_TRUE;
     VkBool32 depth_write_enabled = VK_TRUE;

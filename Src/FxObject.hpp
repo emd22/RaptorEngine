@@ -69,7 +69,7 @@ public:
     FX_FORCE_INLINE void SetShadowCaster(const bool value) { mbIsShadowCaster = value; }
     FX_FORCE_INLINE bool IsShadowCaster() const { return mbIsShadowCaster; }
 
-    FX_FORCE_INLINE void SetRenderUnlit(const bool value) { mbRenderUnlit = value; }
+    void SetRenderUnlit(const bool value);
     FX_FORCE_INLINE bool GetRenderUnlit() const { return mbRenderUnlit; }
 
     void Destroy() override;

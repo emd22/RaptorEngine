@@ -11,15 +11,12 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
-#include <ThirdParty/vk_mem_alloc.h>
-#include <vulkan/vulkan.h>
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxTypes.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
-#include <chrono>
-#include <iostream>
+#include <Renderer/FxCamera.hpp>
 #include <thread>
 #include <vector>
 
@@ -540,12 +537,11 @@ void RxRenderBackend::BeginLighting()
 {
     RxFrameData* frame = GetFrame();
 
+    pDeferredRenderer->GPass.End();
+
     RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
     FxAssert(depth_target != nullptr);
-
-
-    pDeferredRenderer->GPass.End();
-    depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
+    // depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
     pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
     pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -553,7 +549,6 @@ void RxRenderBackend::BeginLighting()
                                                  gRenderer->Uniforms.GetBaseOffset());
 }
 
-#include <Renderer/FxCamera.hpp>
 
 static_assert(RxFramesInFlight == 3);
 
@@ -596,9 +591,6 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
 
     const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
                                                   frame->ImageAvailable.Semaphore, nullptr, &mImageIndex);
-
-
-    // FxLogInfo("Retrieve {}", mImageIndex);
 
     if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
         return RxFrameResult::Success;

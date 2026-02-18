@@ -146,20 +146,33 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 
     // FxStackArray<VkClearValue, 1> clear_values;
 
-    RxAttachmentList att {};
-    att.Add(LightPass.GetTarget(RxImageFormat::eRGBA16_Float));
-    // attachments.Add(GPass.GetTarget(RxImageFormat::eD32_Float));
+    RxAttachmentList attachments {};
+
+    RxAttachment* lp_light_attachment = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
+
+    RxAttachment light_attachment(RxImageFormat::eRGBA16_Float, gRenderer->Swapchain.Extent);
+    light_attachment.LoadOp = RxLoadOp::eLoad;
+    light_attachment.StoreOp = RxStoreOp::eStore;
+    light_attachment.SetImage(lp_light_attachment->GetImage());
+    attachments.Add(light_attachment);
+
+    RxAttachment depth_attachment(RxImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
+    depth_attachment.LoadOp = RxLoadOp::eLoad;
+    depth_attachment.StoreOp = RxStoreOp::eStore;
+    depth_attachment.SetImage(GPass.GetTarget(RxImageFormat::eD32_Float)->GetImage());
+    attachments.Add(depth_attachment);
 
     // RpUnlit.Create(attachments, gRenderer->Swapchain.Extent);
 
     builder.SetLayout(layout)
         .SetName("Unlit Pipeline")
         .AddBlendAttachment({ .Enabled = false })
-        .SetAttachments(&LightPass.GetTargets())
+        .SetAttachments(&attachments)
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&LightPass.GetRenderPass())
         .SetVertexInfo(&vertex_info)
         .SetCullMode(VK_CULL_MODE_NONE)
+        .SetPolygonMode(VK_POLYGON_MODE_LINE)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
     builder.Build(PlUnlit);
 }
@@ -455,7 +468,9 @@ void RxDeferredRenderer::CreateCompPipeline()
         .SetRenderPass(&CompPass.GetRenderPass())
         .SetVertexInfo(nullptr)
         .SetCullMode(VK_CULL_MODE_NONE)
-        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE)
+        .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true });
+
 
     builder.Build(PlComposition);
 

@@ -189,6 +189,7 @@ public:
                           std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
 
     void TransitionDepthToShaderRO(RxCommandBuffer& cmd);
+    void TransitionDepthToAttachment(RxCommandBuffer& cmd);
 
 
     void CopyFromBuffer(const RxRawGpuBuffer& buffer, VkImageLayout final_layout, FxVec2u size, uint32 base_layer = 0);

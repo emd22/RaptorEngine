@@ -146,12 +146,12 @@ void FoxtrotGame::CreateGame()
     scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
 
 
-    pSkyboxObject = AxManager::LoadObject("skybox", FX_BASE_DIR "/Models/Skybox.glb");
-    pSkyboxObject->WaitUntilLoaded();
+    // pSkyboxObject = AxManager::LoadObject("skybox", FX_BASE_DIR "/Models/Skybox.glb");
+    // pSkyboxObject->WaitUntilLoaded();
 
     // pSkyboxObject->SetRenderUnlit(true);
 
-    mMainScene.Attach(pSkyboxObject);
+    // mMainScene.Attach(pSkyboxObject);
 
     pLevelObject = AxManager::LoadObject("level", FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
     pLevelObject->WaitUntilLoaded();
