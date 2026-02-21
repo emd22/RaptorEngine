@@ -151,20 +151,21 @@ void RxDeferredRenderer::CreateUnlitPipeline()
     RxTarget* lp_light_attachment = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
     RxTarget* lp_depth_attachment = GPass.GetTarget(RxImageFormat::eD32_Float);
 
+    FxAssert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
 
     RxTarget depth_attachment(RxImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
     depth_attachment.LoadOp = RxLoadOp::eLoad;
     depth_attachment.StoreOp = RxStoreOp::eDontCare;
     depth_attachment.Aspect = RxImageAspectFlag::eDepth;
     depth_attachment.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    depth_attachment.InitialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     depth_attachment.SetImage(lp_depth_attachment->GetImage());
     attachments.Add(depth_attachment);
 
     RxTarget light_attachment(RxImageFormat::eRGBA16_Float, gRenderer->Swapchain.Extent);
     light_attachment.LoadOp = RxLoadOp::eLoad;
     light_attachment.StoreOp = RxStoreOp::eStore;
-    light_attachment.InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    light_attachment.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     light_attachment.SetImage(lp_light_attachment->GetImage());
     attachments.Add(light_attachment);
