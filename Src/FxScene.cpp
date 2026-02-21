@@ -65,9 +65,9 @@ void FxScene::Render(FxCamera* shadow_camera)
 
 void FxScene::RenderUnlitObjects(const FxCamera& camera) const
 {
-    // RxAttachment* depth_target = gRenderer->pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
-    // FxAssert(depth_target != nullptr);
-    // depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
+    // gRenderer->pDeferredRenderer->PlUnlit.Bind(gRenderer->GetFrame()->CommandBuffer);
+    gRenderer->BeginUnlit();
+
 
     for (const FxRef<FxObject>& obj : mObjects) {
         if (!obj->GetRenderUnlit()) {

@@ -1,6 +1,6 @@
 #include "RxRenderPassCache.hpp"
 
-RxRenderPassId RxRenderPassCache::CreateRenderPass(RxAttachmentList& attachment_list)
+RxRenderPassId RxRenderPassCache::CreateRenderPass(RxTargetList& attachment_list)
 {
     RxRenderPassId id = GetRenderPassId(attachment_list);
 

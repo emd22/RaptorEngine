@@ -15,6 +15,11 @@ Objects = {
         Shadows = TRUE
         Layer = OBJLAYER_PLAYER
     }
+    BrickTest = {
+        Mesh = "/BrickTest.glb"
+        Shadows = TRUE
+        Pos = [0.0, 0.5, 3.0]
+    }
     Skybox = {
         Mesh = "/Skybox.glb"
         Unlit = TRUE

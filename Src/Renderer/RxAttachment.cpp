@@ -3,47 +3,51 @@
 #include <FxEngine.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size)
+RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size)
 {
     Image.Format = format;
     Image.Size = size;
 
-    if (size == RxAttachment::scFullScreen) {
+    if (size == RxTarget::scFullScreen) {
         Image.Size = gRenderer->Swapchain.Extent;
     }
 }
 
-RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
-                           VkImageLayout initial_layout, VkImageLayout final_layout)
+RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
+                   VkImageLayout initial_layout, VkImageLayout final_layout)
     : LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
     Image.Format = format;
     Image.Size = size;
 
-    if (size == RxAttachment::scFullScreen) {
+    if (size == RxTarget::scFullScreen) {
         Image.Size = gRenderer->Swapchain.Extent;
     }
 }
 
-RxAttachment::RxAttachment(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect)
+RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect)
     : Usage(usage), Aspect(aspect)
 {
     Image.Format = format;
     Image.Size = size;
 
-    if (size == RxAttachment::scFullScreen) {
+    if (size == RxTarget::scFullScreen) {
         Image.Size = gRenderer->Swapchain.Extent;
     }
 }
 
 
-void RxAttachment::CreateImage()
+void RxTarget::CreateImage()
 {
+    if (bReuseImage) {
+        return;
+    }
+
     Image.Create(ImageType, Image.Size, Image.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect);
 }
 
 
-VkAttachmentDescription RxAttachment::BuildDescription() const
+VkAttachmentDescription RxTarget::BuildDescription() const
 {
     FxAssert(Image.Format != RxImageFormat::eNone);
 
@@ -68,7 +72,7 @@ VkAttachmentDescription RxAttachment::BuildDescription() const
 ///////////////////////////////////
 
 
-FxSizedArray<VkAttachmentDescription>& RxAttachmentList::GetAttachmentDescriptions()
+FxSizedArray<VkAttachmentDescription>& RxTargetList::GetDescriptions()
 {
     // Return the descriptions if they are already built
     if (mbDescriptionsBuilt) {
@@ -76,12 +80,12 @@ FxSizedArray<VkAttachmentDescription>& RxAttachmentList::GetAttachmentDescriptio
     }
 
     if (!mBuiltAttachmentDescriptions) {
-        mBuiltAttachmentDescriptions.InitCapacity(mMaxAttachments);
+        mBuiltAttachmentDescriptions.InitCapacity(mMaxTargets);
     }
 
     mBuiltAttachmentDescriptions.Clear();
 
-    for (const RxAttachment& at : Attachments) {
+    for (const RxTarget& at : Targets) {
         mBuiltAttachmentDescriptions.Insert(at.BuildDescription());
     }
 
@@ -91,32 +95,32 @@ FxSizedArray<VkAttachmentDescription>& RxAttachmentList::GetAttachmentDescriptio
 }
 
 
-RxAttachmentList& RxAttachmentList::Add(const RxAttachment& attachment)
+RxTargetList& RxTargetList::Add(const RxTarget& attachment)
 {
     CheckInited();
-    Attachments.Insert(attachment);
+    Targets.Insert(attachment);
 
     mbImageViewsBuilt = false;
 
     return *this;
 }
 
-RxAttachmentList& RxAttachmentList::Add(const RxAttachment* attachment)
+RxTargetList& RxTargetList::Add(const RxTarget* attachment)
 {
     FxAssertMsg(attachment != nullptr, "Attachment cannot be null!");
     return Add(*attachment);
 }
 
-void RxAttachmentList::CreateImages()
+void RxTargetList::CreateImages()
 {
-    for (RxAttachment& attachment : Attachments) {
+    for (RxTarget& attachment : Targets) {
         attachment.CreateImage();
     }
 
     mbImagesCreated = true;
 }
 
-FxSizedArray<VkImageView>& RxAttachmentList::GetImageViews()
+FxSizedArray<VkImageView>& RxTargetList::GetImageViews()
 {
     // Return the list of views if it is already populated
     if (mbImageViewsBuilt) {
@@ -124,12 +128,12 @@ FxSizedArray<VkImageView>& RxAttachmentList::GetImageViews()
     }
 
     if (!mBuiltImageViews.IsInited()) {
-        mBuiltImageViews.InitCapacity(Attachments.Size);
+        mBuiltImageViews.InitCapacity(Targets.Size);
     }
 
     mBuiltImageViews.Clear();
 
-    for (RxAttachment& attachment : Attachments) {
+    for (RxTarget& attachment : Targets) {
         // Check to ensure that the image (and therefore the view) is created.
         if (!attachment.Image.IsInited()) {
             continue;

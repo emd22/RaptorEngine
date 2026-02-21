@@ -60,6 +60,7 @@ public:
     RxFrameResult BeginFrame();
     void BeginGeometry();
     void BeginLighting();
+    void BeginUnlit();
     void DoComposition(FxCamera& render_cam);
 
     void SelectWindow(const FxRef<FxWindow>& window) { mpWindow = window; }

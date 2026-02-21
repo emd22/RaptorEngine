@@ -106,22 +106,25 @@ void FxObject::OnAttached(FxScene* scene)
 
 void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
 {
-    // TODO: replace this with a callback system
-    WaitUntilLoaded();
+    OnLoaded(
+        [&pipeline, update_children](FxRef<AxBase> base_asset)
+        {
+            FxRef<FxObject> asset = base_asset;
 
-    if (pMaterial) {
-        pMaterial->pPipeline = pipeline;
-    }
-
-    if (update_children) {
-        for (FxRef<FxObject>& node : AttachedNodes) {
-            if (!node->pMaterial) {
-                continue;
+            if (asset->pMaterial) {
+                asset->pMaterial->pPipeline = pipeline;
             }
 
-            node->pMaterial->pPipeline = pipeline;
-        }
-    }
+            if (update_children) {
+                for (FxRef<FxObject>& node : asset->AttachedNodes) {
+                    if (!node->pMaterial) {
+                        continue;
+                    }
+
+                    node->pMaterial->pPipeline = pipeline;
+                }
+            }
+        });
 }
 
 void FxObject::MakeInstanceOf(const FxRef<FxObject>& source_ref)
@@ -379,17 +382,7 @@ void FxObject::SyncObjectWithPhysics()
 
 void FxObject::SetRenderUnlit(const bool value)
 {
-    OnLoaded(
-        [](FxRef<AxBase> base_asset)
-        {
-            FxRef<FxObject> asset = base_asset;
-            if (asset->pMaterial) {
-                asset->pMaterial->pPipeline = &gRenderer->pDeferredRenderer->PlUnlit;
-            }
-            else {
-                FxLogError("No material bound!");
-            }
-        });
+    SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
 
     mbRenderUnlit = value;
 }

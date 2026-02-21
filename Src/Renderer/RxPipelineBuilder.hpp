@@ -101,7 +101,7 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& SetAttachments(RxAttachmentList* attachment_list)
+    FX_FORCE_INLINE RxPipelineBuilder& SetAttachments(RxTargetList* attachment_list)
     {
         mpAttachmentList = attachment_list;
 
@@ -200,7 +200,7 @@ public:
         pipeline.Layout = mLayout;
 
         FxLogInfo("Creating pipeline '{}'", mPipelineName);
-        pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetAttachmentDescriptions(), vk_blend_attachments,
+        pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetDescriptions(), vk_blend_attachments,
                         mVertexInfo, *mRenderPass, mProperties);
 
         if (mbDidFirstBuild) {
@@ -212,7 +212,7 @@ public:
 
 private:
     FxSizedArray<RxPipelineBlendAttachment> mBlendAttachments;
-    RxAttachmentList* mpAttachmentList = nullptr;
+    RxTargetList* mpAttachmentList = nullptr;
 
     VkPipelineLayout mLayout = nullptr;
 

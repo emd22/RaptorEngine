@@ -13,12 +13,14 @@ class RxCommandBuffer;
 class RxRenderPass
 {
 public:
-    void Create(RxAttachmentList& color_attachments, const FxVec2u& size, const FxVec2u& offset = FxVec2u::sZero);
+    void Create(RxTargetList& color_attachments, FxVec2u size, const FxVec2u& offset = FxVec2u::sZero);
 
     void Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_colors);
     void End();
 
     void Destroy();
+
+    FX_FORCE_INLINE VkRenderPass Get() const { return RenderPass; }
 
     ~RxRenderPass() { Destroy(); }
 

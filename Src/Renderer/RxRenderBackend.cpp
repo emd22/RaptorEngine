@@ -539,9 +539,9 @@ void RxRenderBackend::BeginLighting()
 
     pDeferredRenderer->GPass.End();
 
-    RxAttachment* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
+    RxTarget* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
     FxAssert(depth_target != nullptr);
-    // depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
+    depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
     pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
     pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -552,11 +552,29 @@ void RxRenderBackend::BeginLighting()
 
 static_assert(RxFramesInFlight == 3);
 
-void RxRenderBackend::DoComposition(FxCamera& render_cam)
+void RxRenderBackend::BeginUnlit()
 {
     RxFrameData* frame = GetFrame();
 
     pDeferredRenderer->LightPass.End();
+
+
+    // RxTarget* depth_target = gRenderer->pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
+    // FxAssert(depth_target != nullptr);
+    // depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
+
+    pDeferredRenderer->RpForward.Begin(&frame->CommandBuffer, pDeferredRenderer->FbForward.Get(),
+                                       FxSlice<VkClearValue>({}, 0));
+
+    pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
+}
+
+void RxRenderBackend::DoComposition(FxCamera& render_cam)
+{
+    RxFrameData* frame = GetFrame();
+
+    pDeferredRenderer->RpForward.End();
+    // pDeferredRenderer->LightPass.End();
 
     pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlComposition);
     pDeferredRenderer->DoCompPass(render_cam);

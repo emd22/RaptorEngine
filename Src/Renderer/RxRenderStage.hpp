@@ -17,7 +17,7 @@ class RxRenderStage
     struct InputTarget
     {
         uint32 BindIndex = 0;
-        RxAttachment* pTarget = nullptr;
+        RxTarget* pTarget = nullptr;
         RxSampler* pSampler = nullptr;
         RxRawGpuBuffer* pBuffer = nullptr;
 
@@ -35,9 +35,10 @@ public:
     }
 
     void AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
+    void AddTarget(const RxTarget& attachment);
 
-    RxAttachmentList& GetTargets() { return mOutputTargets; }
-    RxAttachment* GetTarget(RxImageFormat format, int sub_index = 0);
+    RxTargetList& GetTargets() { return mOutputTargets; }
+    RxTarget* GetTarget(RxImageFormat format, int sub_index = 0);
 
     void MarkFinalStage();
 
@@ -66,7 +67,7 @@ public:
     FxSizedArray<VkClearValue> ClearValues;
 
 private:
-    RxAttachmentList mOutputTargets;
+    RxTargetList mOutputTargets;
     FxSizedArray<InputTarget> mInputTargets;
 
     RxFramebuffer mFramebuffer;

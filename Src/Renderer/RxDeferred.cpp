@@ -39,15 +39,15 @@ void RxDeferredRenderer::CreateGPass()
     GPass.Create(gRenderer->Swapchain.Extent);
 
     // Albedo target
-    GPass.AddTarget(RxImageFormat::eBGRA8_UNorm, RxAttachment::scFullScreen,
+    GPass.AddTarget(RxImageFormat::eBGRA8_UNorm, RxTarget::scFullScreen,
                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
 
     // Normals target
-    GPass.AddTarget(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen,
+    GPass.AddTarget(RxImageFormat::eRGBA16_Float, RxTarget::scFullScreen,
                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
 
     // Depth target
-    GPass.AddTarget(RxImageFormat::eD32_Float, RxAttachment::scFullScreen,
+    GPass.AddTarget(RxImageFormat::eD32_Float, RxTarget::scFullScreen,
                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     RxImageAspectFlag::eDepth);
 
@@ -146,33 +146,41 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 
     // FxStackArray<VkClearValue, 1> clear_values;
 
-    RxAttachmentList attachments {};
+    RxTargetList attachments {};
 
-    RxAttachment* lp_light_attachment = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
+    RxTarget* lp_light_attachment = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
+    RxTarget* lp_depth_attachment = GPass.GetTarget(RxImageFormat::eD32_Float);
 
-    RxAttachment light_attachment(RxImageFormat::eRGBA16_Float, gRenderer->Swapchain.Extent);
+
+    RxTarget depth_attachment(RxImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
+    depth_attachment.LoadOp = RxLoadOp::eLoad;
+    depth_attachment.StoreOp = RxStoreOp::eDontCare;
+    depth_attachment.Aspect = RxImageAspectFlag::eDepth;
+    depth_attachment.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    depth_attachment.InitialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment.SetImage(lp_depth_attachment->GetImage());
+    attachments.Add(depth_attachment);
+
+    RxTarget light_attachment(RxImageFormat::eRGBA16_Float, gRenderer->Swapchain.Extent);
     light_attachment.LoadOp = RxLoadOp::eLoad;
     light_attachment.StoreOp = RxStoreOp::eStore;
+    light_attachment.InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     light_attachment.SetImage(lp_light_attachment->GetImage());
     attachments.Add(light_attachment);
 
-    RxAttachment depth_attachment(RxImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
-    depth_attachment.LoadOp = RxLoadOp::eLoad;
-    depth_attachment.StoreOp = RxStoreOp::eStore;
-    depth_attachment.SetImage(GPass.GetTarget(RxImageFormat::eD32_Float)->GetImage());
-    attachments.Add(depth_attachment);
 
-    // RpUnlit.Create(attachments, gRenderer->Swapchain.Extent);
+    RpForward.Create(attachments, RxTarget::scFullScreen);
+    FbForward.Create(attachments.GetImageViews(), RpForward, RxTarget::scFullScreen);
 
     builder.SetLayout(layout)
         .SetName("Unlit Pipeline")
         .AddBlendAttachment({ .Enabled = false })
         .SetAttachments(&attachments)
         .SetShaders(vertex_shader, fragment_shader)
-        .SetRenderPass(&LightPass.GetRenderPass())
+        .SetRenderPass(&RpForward)
         .SetVertexInfo(&vertex_info)
         .SetCullMode(VK_CULL_MODE_NONE)
-        .SetPolygonMode(VK_POLYGON_MODE_LINE)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
     builder.Build(PlUnlit);
 }
@@ -291,7 +299,6 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
 
     FxStackArray<RxPushConstants, 2> push_consts = {
         RxPushConstants { .Size = sizeof(FxLightVertPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
-        // RxPushConstants { .Size = sizeof(FxLightFragPushConstants), .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
     };
 
     VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxMakeSlice(layouts, std::size(layouts)));
@@ -310,8 +317,22 @@ void RxDeferredRenderer::CreateLightingPipeline()
     }
 
     LightPass.Create(gRenderer->Swapchain.Extent);
-    LightPass.AddTarget(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen,
+
+
+    LightPass.AddTarget(RxImageFormat::eRGBA16_Float, RxTarget::scFullScreen,
                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
+
+    // LightPass.AddTarget(RxImageFormat::eD32_Float, RxTarget::scFullScreen,
+    //                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    //                     RxImageAspectFlag::eDepth);
+
+    // RxTarget* depth_attachment = LightPass.GetTarget(RxImageFormat::eD32_Float);
+    // depth_attachment->LoadOp = RxLoadOp::eLoad;
+    // depth_attachment->StoreOp = RxStoreOp::eDontCare;
+    // depth_attachment->bRenderPassOnly = true;
+    // depth_attachment->SetImage(GPass.GetTarget(RxImageFormat::eD32_Float)->GetImage());
+
+
     LightPass.BuildRenderStage();
 
     DsLighting.Create(DescriptorPool, DsLayoutLightingFrag);
@@ -354,6 +375,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
             .SetShaders(vertex_shader, fragment_shader)
             .SetRenderPass(&LightPass.GetRenderPass())
             .SetVertexInfo(&vertex_info)
+            .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true })
             .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
         builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingOutsideVolume);

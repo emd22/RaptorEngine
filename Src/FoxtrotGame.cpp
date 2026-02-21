@@ -120,7 +120,7 @@ void FoxtrotGame::CreateLights()
 
 
     pSun = FxMakeRef<FxLightDirectional>();
-    pSun->MoveTo(FxVec3f(0, 8, -5));
+    pSun->MoveTo(FxVec3f(0, 4, -5));
     pSun->Color = FxColor(0xCADFE3, 7);
     // sun->SetLightVolume(light_volume);
     // sun->SetRadius(20);

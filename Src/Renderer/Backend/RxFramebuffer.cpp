@@ -13,6 +13,10 @@ FX_SET_MODULE_NAME("Framebuffer")
 
 void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const RxRenderPass& render_pass, FxVec2u size)
 {
+    if (size == RxTarget::scFullScreen) {
+        size = gRenderer->Swapchain.Extent;
+    }
+
     const VkFramebufferCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
         .renderPass = render_pass.RenderPass,

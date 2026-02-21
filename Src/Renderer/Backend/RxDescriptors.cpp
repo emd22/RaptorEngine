@@ -117,7 +117,7 @@ void RxDescriptorSet::AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint6
     mbIsBuilt = false;
 }
 
-void RxDescriptorSet::AddImageFromTarget(uint32 bind_index, RxAttachment* target, RxSampler* sampler)
+void RxDescriptorSet::AddImageFromTarget(uint32 bind_index, RxTarget* target, RxSampler* sampler)
 {
     FxAssertMsg(target != nullptr, "Input target cannot be null!");
     AddImage(bind_index, &target->Image, sampler);

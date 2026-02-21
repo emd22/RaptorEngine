@@ -13,7 +13,7 @@
 
 #include "vulkan/vulkan_core.h"
 
-struct RxAttachment;
+struct RxTarget;
 
 class RxDescriptorPool
 {
@@ -84,7 +84,7 @@ public:
 
     void AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint64 offset, uint64 range);
     void AddImage(uint32 bind_index, RxImage* image, RxSampler* sampler);
-    void AddImageFromTarget(uint32 bind_index, RxAttachment* target, RxSampler* sampler);
+    void AddImageFromTarget(uint32 bind_index, RxTarget* target, RxSampler* sampler);
 
     void Build();
 

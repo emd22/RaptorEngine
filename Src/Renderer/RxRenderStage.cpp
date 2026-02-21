@@ -4,9 +4,9 @@
 #include <Renderer/RxRenderBackend.hpp>
 
 
-RxAttachment* RxRenderStage::GetTarget(RxImageFormat format, int sub_index)
+RxTarget* RxRenderStage::GetTarget(RxImageFormat format, int sub_index)
 {
-    for (RxAttachment& attachment : mOutputTargets.Attachments) {
+    for (RxTarget& attachment : mOutputTargets.Targets) {
         if (attachment.Image.Format == format) {
             if ((sub_index--) > 0) {
                 continue;
@@ -69,13 +69,19 @@ void RxRenderStage::Begin(RxCommandBuffer& cmd, RxPipeline& pipeline)
 void RxRenderStage::AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage,
                               RxImageAspectFlag aspect)
 {
-    mOutputTargets.Add(RxAttachment(format, size, usage, aspect));
+    mOutputTargets.Add(RxTarget(format, size, usage, aspect));
 }
+
+void RxRenderStage::AddTarget(const RxTarget& attachment) { mOutputTargets.Add(attachment); }
 
 
 void RxRenderStage::MakeClearValues()
 {
-    for (const RxAttachment& attachment : mOutputTargets.Attachments) {
+    for (const RxTarget& attachment : mOutputTargets.Targets) {
+        if (attachment.bRenderPassOnly) {
+            continue;
+        }
+
         if (attachment.Aspect == RxImageAspectFlag::eDepth) {
             ClearValues.Insert(VkClearValue { .depthStencil = { 0.0f, 0U } });
         }
@@ -112,7 +118,6 @@ void RxRenderStage::MarkFinalStage()
 
 void RxRenderStage::AddPresentTarget()
 {
-    mOutputTargets.Add(RxAttachment(gRenderer->Swapchain.Surface.Format, RxAttachment::scFullScreen,
-                                    RxLoadOp::eDontCare, RxStoreOp::eStore, VK_IMAGE_LAYOUT_UNDEFINED,
-                                    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
+    mOutputTargets.Add(RxTarget(gRenderer->Swapchain.Surface.Format, RxTarget::scFullScreen, RxLoadOp::eDontCare,
+                                RxStoreOp::eStore, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 }

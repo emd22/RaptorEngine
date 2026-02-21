@@ -24,9 +24,9 @@ public:
 public:
     RxRenderPassCache() { Create(scMaxRenderPassesPerId); };
 
-    static inline RxRenderPassId GetRenderPassId(const RxAttachmentList& attachments)
+    static inline RxRenderPassId GetRenderPassId(const RxTargetList& targets)
     {
-        auto& ab = attachments.Attachments;
+        auto& ab = targets.Targets;
 
         union
         {
@@ -37,16 +37,14 @@ public:
             };
 
             uint64 Value;
-        } id = {
-            .Hash = FxHashStr32(reinterpret_cast<char*>(ab.pData), ab.GetSizeInBytes()),
-            .Count = static_cast<uint8>(ab.Size)
-        };
+        } id = { .Hash = FxHashStr32(reinterpret_cast<char*>(ab.pData), ab.GetSizeInBytes()),
+                 .Count = static_cast<uint8>(ab.Size) };
 
         return id.Value;
     }
 
 
-    RxRenderPassId CreateRenderPass(RxAttachmentList& attachment_list);
+    RxRenderPassId CreateRenderPass(RxTargetList& attachment_list);
     Handle Request(RxRenderPassId id);
     void Release(RxRenderPassId id, RxRenderPass* render_pass);
 

@@ -22,18 +22,18 @@ enum class RxStoreOp
 };
 
 
-struct RxAttachment
+struct RxTarget
 {
 public:
     static constexpr FxVec2u scFullScreen = FxVec2u(0U);
 
 public:
-    RxAttachment() = default;
+    RxTarget() = default;
 
-    RxAttachment(RxImageFormat format, const FxVec2u& size);
-    RxAttachment(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
-    RxAttachment(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
-                 VkImageLayout initial_layout, VkImageLayout final_layout);
+    RxTarget(RxImageFormat format, const FxVec2u& size);
+    RxTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
+    RxTarget(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
+             VkImageLayout initial_layout, VkImageLayout final_layout);
 
     VkAttachmentDescription BuildDescription() const;
     void CreateImage();
@@ -41,7 +41,11 @@ public:
     RxImage& GetImage() { return Image; }
     VkImageView& GetImageView() { return Image.View; }
 
-    void SetImage(const RxImage& image) { Image = image; }
+    void SetImage(const RxImage& image)
+    {
+        Image = image;
+        bReuseImage = true;
+    }
 
     bool IsDepth() const { return Aspect == RxImageAspectFlag::eDepth; }
 
@@ -63,37 +67,39 @@ public:
     VkImageLayout FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     RxImage Image {};
+
+    bool bReuseImage : 1 = false;
+    bool bRenderPassOnly : 1 = false;
 };
 
-class RxAttachmentList
+class RxTargetList
 {
 public:
-    RxAttachmentList() = default;
-    RxAttachmentList(uint32 max_attachments) : mMaxAttachments(max_attachments) {}
-    RxAttachmentList(const RxAttachmentList& other) { Attachments.InitAsCopyOf(other.Attachments); }
-    RxAttachmentList(RxAttachmentList&& other) noexcept { Attachments = std::move(other.Attachments); }
+    RxTargetList() = default;
+    RxTargetList(uint32 max_targets) : mMaxTargets(max_targets) {}
+    RxTargetList(const RxTargetList& other) { Targets.InitAsCopyOf(other.Targets); }
+    RxTargetList(RxTargetList&& other) noexcept { Targets = std::move(other.Targets); }
 
+    static RxTargetList New() { return {}; }
 
-    static RxAttachmentList New() { return {}; }
-
-    RxAttachmentList& Add(const RxAttachment* attachment);
-    RxAttachmentList& Add(const RxAttachment& attachment);
+    RxTargetList& Add(const RxTarget* attachment);
+    RxTargetList& Add(const RxTarget& attachment);
 
     void CreateImages();
-    FxSizedArray<VkAttachmentDescription>& GetAttachmentDescriptions();
+    FxSizedArray<VkAttachmentDescription>& GetDescriptions();
     FxSizedArray<VkImageView>& GetImageViews();
 
 private:
     FX_FORCE_INLINE void CheckInited()
     {
-        if (!Attachments) {
-            Attachments.InitCapacity(mMaxAttachments);
+        if (!Targets) {
+            Targets.InitCapacity(mMaxTargets);
         }
     }
 
 
 public:
-    FxSizedArray<RxAttachment> Attachments;
+    FxSizedArray<RxTarget> Targets;
 
 
 private:
@@ -104,5 +110,5 @@ private:
     FxSizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
     FxSizedArray<VkImageView> mBuiltImageViews;
 
-    uint32 mMaxAttachments = 10;
+    uint32 mMaxTargets = 10;
 };

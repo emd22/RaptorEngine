@@ -99,13 +99,14 @@ public:
     RxPipeline PlLightingDirectional;
 
     /////////////////////////////////////////////////
-    // Unlit (After light pass, acts as GPass)
+    // Forward pass / Unlit
     /////////////////////////////////////////////////
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
     RxPipeline PlUnlit;
     // RxDescriptorSet DsUnlit;
 
-    // RxRenderPass RpUnlit;
+    RxRenderPass RpForward;
+    RxFramebuffer FbForward;
 
     //////////////////////
     // Composition Pass
