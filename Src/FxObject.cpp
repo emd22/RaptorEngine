@@ -31,7 +31,7 @@ bool FxObject::CheckIfReady()
     if (!AttachedNodes.IsEmpty()) {
         // If there is a mesh attached to the container as well, check it
         if (pMesh) {
-            if (!pMesh->IsReady) {
+            if (!pMesh->bIsReady) {
                 return (mbReadyToRender = false);
             }
 
@@ -62,7 +62,7 @@ bool FxObject::CheckIfReady()
     }
 
     // This is not a container object, just check that the mesh is loaded
-    if (!pMesh || !pMesh->IsReady.load()) {
+    if (!pMesh || !pMesh->bIsReady.load()) {
         return (mbReadyToRender = false);
     }
 
@@ -382,7 +382,12 @@ void FxObject::SyncObjectWithPhysics()
 
 void FxObject::SetRenderUnlit(const bool value)
 {
-    SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
+    if (value) {
+        SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
+    }
+    else {
+        SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps);
+    }
 
     mbRenderUnlit = value;
 }

@@ -19,7 +19,7 @@ public:
     void Teleport(const FxVec3f& position);
     void ApplyMovement(const FxVec3f& direction);
 
-    void Update(float32 delta_time);
+    void Update(float64 delta_time);
 
 public:
     JPH::Ref<JPH::CharacterVirtual> pPlayerVirt;
@@ -27,10 +27,10 @@ public:
 
     JPH::Vec3 mMovementVector = JPH::Vec3::sZero();
 
-    float32 HeadRecoveryYOffset = 0.0f;
+    // float32 HeadRecoveryYOffset = 0.0f;
     float mTime = 0.01f;
 
     bool bIsGrounded : 1 = false;
 
-    bool bDisableGravity = false;
+    bool bDisableGravity : 1 = false;
 };

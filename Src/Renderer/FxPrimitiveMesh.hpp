@@ -31,7 +31,7 @@ public:
         VertexList = other.VertexList;
         GpuIndexBuffer = other.GpuIndexBuffer;
 
-        IsReady = other.IsReady;
+        bIsReady = other.bIsReady;
     }
 
     /**
@@ -57,7 +57,7 @@ public:
      */
     void UploadVertices(const FxSizedArray<TVertexType>& vertices)
     {
-        if (KeepInMemory) {
+        if (bKeepInMemory) {
             VertexList.LocalBuffer.InitAsCopyOf(vertices);
         }
 
@@ -70,7 +70,7 @@ public:
      */
     void UploadVertices(FxSizedArray<TVertexType>&& vertices)
     {
-        if (KeepInMemory) {
+        if (bKeepInMemory) {
             VertexList.LocalBuffer = std::move(vertices);
         }
 
@@ -80,9 +80,9 @@ public:
     /** @brief Uploads mesh indices to a primitive mesh. */
     void UploadIndices(const FxSizedArray<uint32>& indices)
     {
-        // if (KeepInMemory) {
-        LocalIndexBuffer.InitAsCopyOf(indices);
-        // }
+        if (bKeepInMemory) {
+            LocalIndexBuffer.InitAsCopyOf(indices);
+        }
 
         GpuIndexBuffer.Create(RxGpuBufferType::eIndexBuffer, indices);
     }
@@ -109,7 +109,7 @@ public:
 
     FxSizedArray<TVertexType>& GetVertices()
     {
-        if (!KeepInMemory) {
+        if (!bKeepInMemory) {
             FxLogWarning("Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
         }
 
@@ -119,7 +119,7 @@ public:
 
     FxSizedArray<uint32>& GetIndices()
     {
-        if (!KeepInMemory) {
+        if (!bKeepInMemory) {
             FxLogWarning("Requesting indices from a primitive mesh while `KeepInMemory` != true!");
         }
 
@@ -224,11 +224,11 @@ public:
 
     void Destroy()
     {
-        if (IsReference || !IsReady.load()) {
+        if (bIsReference || !bIsReady.load()) {
             return;
         }
 
-        IsReady.store(false);
+        bIsReady.store(false);
 
         VertexList.Destroy();
 
@@ -244,10 +244,10 @@ public:
 
     FxSizedArray<FxMeshBone> Bones;
 
-    std::atomic_bool IsReady = std::atomic_bool(false);
+    std::atomic_bool bIsReady = std::atomic_bool(false);
 
-    bool IsReference = false;
-    bool KeepInMemory = false;
+    bool bIsReference = false;
+    bool bKeepInMemory = false;
 
     RxGpuBuffer GpuIndexBuffer;
     FxSizedArray<uint32> LocalIndexBuffer;

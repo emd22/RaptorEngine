@@ -61,7 +61,10 @@ public:
         requires std::is_integral_v<TIntType>
     TIntType Get() const
     {
-        FxAssert(Type == ValueType::eInt);
+        if (Type != ValueType::eInt) {
+            FxLogWarning("Attempting to retrieve int type from non-int!");
+            return 0.0f;
+        }
 
         return static_cast<TIntType>(mIntValue);
     }
@@ -70,7 +73,10 @@ public:
         requires std::is_floating_point_v<TFloatType>
     TFloatType Get() const
     {
-        FxAssert(Type == ValueType::eFloat);
+        if (Type != ValueType::eFloat) {
+            FxLogWarning("Attempting to retrieve float type from non-float!");
+            return 0.0f;
+        }
 
         return static_cast<TFloatType>(mFloatValue);
     }

@@ -58,7 +58,7 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
     mesh->VertexList.CreateFrom(positions, normals, uvs, tangents);
     mesh->UploadVertices();
 
-    mesh->IsReady = true;
+    mesh->bIsReady = true;
 }
 
 void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_skin* skin)
@@ -143,14 +143,14 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
     }
 
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
-        auto* primitive = &gltf_mesh->primitives[i];
+        cgltf_primitive* primitive = &gltf_mesh->primitives[i];
 
         FxSizedArray<uint32> indices;
 
         FxRef<FxPrimitiveMesh<>> primitive_mesh = FxMakeRef<FxPrimitiveMesh<>>();
 
         // Keep the primitive mesh's vertices and indices in memory if `KeepInMemory` is set
-        primitive_mesh->KeepInMemory = bKeepInMemory;
+        primitive_mesh->bKeepInMemory = bKeepInMemory;
 
         // if there are indices in the mesh, add them to the FxPrimitiveMesh
         if (primitive->indices != nullptr) {

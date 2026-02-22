@@ -59,7 +59,7 @@ FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> FxMeshGen::GeneratedMesh::AsPo
     mesh->VertexList.LocalBuffer = std::move(points);
     mesh->UploadVertices();
 
-    mesh->IsReady.store(true);
+    mesh->bIsReady.store(true);
 
     // Create the mesh using our bodged point array
     // mesh->CreateFromData(points, Indices);
@@ -82,7 +82,7 @@ FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
     // auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
     // mesh->CreateFromData(fat_vertices, Indices);
 
-    mesh->IsReady.store(true);
+    mesh->bIsReady.store(true);
 
     return mesh;
 }

@@ -137,15 +137,9 @@ void RxDeferredRenderer::CreateUnlitPipeline()
     FxRef<RxShaderProgram> vertex_shader = shader_unlit.GetProgram(RxShaderType::eVertex, {});
     FxRef<RxShaderProgram> fragment_shader = shader_unlit.GetProgram(RxShaderType::eFragment, {});
 
-    // RxAttachment* target = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
-    // FxAssert(target != nullptr);
-
     FxVertexInfo vertex_info = FxMakeVertexInfo();
 
     RxPipelineBuilder builder {};
-
-    // FxStackArray<VkClearValue, 1> clear_values;
-
     RxTargetList attachments {};
 
     RxTarget* lp_light_attachment = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
@@ -165,9 +159,10 @@ void RxDeferredRenderer::CreateUnlitPipeline()
     RxTarget light_attachment(RxImageFormat::eRGBA16_Float, gRenderer->Swapchain.Extent);
     light_attachment.LoadOp = RxLoadOp::eLoad;
     light_attachment.StoreOp = RxStoreOp::eStore;
-    light_attachment.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
+    light_attachment.InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    light_attachment.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     light_attachment.SetImage(lp_light_attachment->GetImage());
+
     attachments.Add(light_attachment);
 
 
@@ -181,7 +176,7 @@ void RxDeferredRenderer::CreateUnlitPipeline()
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&RpForward)
         .SetVertexInfo(&vertex_info)
-        .SetCullMode(VK_CULL_MODE_NONE)
+        .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
     builder.Build(PlUnlit);
 }
@@ -322,6 +317,10 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     LightPass.AddTarget(RxImageFormat::eRGBA16_Float, RxTarget::scFullScreen,
                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
+
+    RxTarget* light_target = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
+    FxAssert(light_target != nullptr);
+    light_target->FinalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     // LightPass.AddTarget(RxImageFormat::eD32_Float, RxTarget::scFullScreen,
     //                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,

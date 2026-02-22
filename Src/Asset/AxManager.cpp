@@ -180,7 +180,7 @@ void AxManager::LoadObject(const std::string& name, FxRef<FxObject>& asset, cons
                            FxLoadObjectOptions options)
 {
     FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
-    loader->bKeepInMemory = options.KeepInMemory;
+    loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
     SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::eObject>(asset, loader, path);
     asset->Name = name;

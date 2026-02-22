@@ -49,7 +49,7 @@ private:
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;
 
-    bool bKeepInMemory = false;
+    bool bKeepInMemory : 1 = false;
 
     FxSizedArray<RxVertexDefault> VertexBuffer;
     FxSizedArray<uint32> IndexBuffer;

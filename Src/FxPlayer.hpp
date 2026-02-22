@@ -8,8 +8,8 @@
 
 class FxPlayer
 {
-    const FxVec3f cMaxWalkSpeed = FxVec3f(3.0f);
-    const FxVec3f cMaxSprintSpeed = FxVec3f(5.5f);
+    const FxVec3f cMaxWalkSpeed = FxVec3f(5.0f);
+    const FxVec3f cMaxSprintSpeed = FxVec3f(12.0f);
 
     const float32 cMovementLerpSpeed = 10.0f;
 
@@ -18,7 +18,7 @@ public:
 
     void Create();
 
-    void Update(float32 delta_time);
+    void Update(float64 delta_time);
     void MoveBy(const FxVec3f& by);
 
     void Jump();
@@ -34,10 +34,19 @@ public:
         Physics.Teleport(Position);
     }
 
-    void SetFlyMode(bool value);
-    bool IsFlyMode() const { return mbIsFlymode; };
+    /**
+     * @brief Move the player and its physics by `offset`.
+     */
+    void TeleportTo(const FxVec3f& position)
+    {
+        Position = position;
+        Physics.Teleport(Position);
+    }
 
-    void Move(float delta_time, const FxVec3f& offset);
+    void SetFlyMode(bool value);
+    bool IsFlyMode() const { return Physics.bDisableGravity; };
+
+    void Move(float64 delta_time, const FxVec3f& offset);
 
     void RotateHead(const FxVec2f& xy)
     {

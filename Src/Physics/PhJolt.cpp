@@ -47,7 +47,7 @@ void PhJolt::Update()
     // simulation stable. Do 1 collision step per 1 / 60th of a second (round up).
     const int collision_steps = 1;
 
-    PhysicsSystem.Update(cDeltaTime, collision_steps, pTempAllocator.pPtr, pJobSystem.pPtr);
+    PhysicsSystem.Update(cTimeStep, collision_steps, pTempAllocator.pPtr, pJobSystem.pPtr);
 }
 
 void PhJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }

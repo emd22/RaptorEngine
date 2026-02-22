@@ -176,7 +176,7 @@ public:
     JPH::PhysicsSystem PhysicsSystem;
 
     bool bPhysicsPaused = false;
-    const float cDeltaTime = 1.0f / 60.0f;
+    const float cTimeStep = 1.0f / 60.0f;
 
     FxMemberRef<JPH::TempAllocatorImpl> pTempAllocator;
     FxMemberRef<JPH::JobSystemThreadPool> pJobSystem;

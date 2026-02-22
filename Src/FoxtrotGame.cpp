@@ -101,8 +101,7 @@ void FoxtrotGame::CreateLights()
 
     // constexpr float32 scHeight = 5.0f;
 
-    FxRef<FxMeshGen::GeneratedMesh> light_volume = FxMeshGen::MakeIcoSphere(2);
-
+    // FxRef<FxMeshGen::GeneratedMesh> light_volume = FxMeshGen::MakeIcoSphere(2);
 
     // for (int y = 0; y < scNumLightsY; y++) {
     //     for (int x = 0; x < scNumLightsX; x++) {
@@ -120,10 +119,8 @@ void FoxtrotGame::CreateLights()
 
 
     pSun = FxMakeRef<FxLightDirectional>();
-    pSun->MoveTo(FxVec3f(0, 4, -5));
-    pSun->Color = FxColor(0xCADFE3, 7);
-    // sun->SetLightVolume(light_volume);
-    // sun->SetRadius(20);
+    pSun->MoveTo(FxVec3f(0, 4, -5).Normalize());
+    pSun->Color = FxColor(0xCADFE3, 5);
     mMainScene.Attach(pSun);
 }
 
@@ -135,7 +132,8 @@ void FoxtrotGame::CreateGame()
 
     Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     // Move the player up and behind the other objects
-    Player.TeleportBy(FxVec3f(0.0f, 4.0f, -4.0f));
+    Player.TeleportTo(FxVec3f(0.0f, 4.0f, -4.0f));
+    Player.SetFlyMode(true);
 
     mMainScene.SelectCamera(Player.pCamera);
 
@@ -153,7 +151,7 @@ void FoxtrotGame::CreateGame()
 
     // mMainScene.Attach(pSkyboxObject);
 
-    pLevelObject = AxManager::LoadObject("level", FX_BASE_DIR "/Models/DemoRoom2.glb", { .KeepInMemory = true });
+    pLevelObject = AxManager::LoadObject("level", FX_BASE_DIR "/Models/DemoRoom2.glb", { .bKeepInMemory = true });
     pLevelObject->WaitUntilLoaded();
 
     // pLevelObject->SetRenderUnlit(true);
@@ -173,7 +171,7 @@ void FoxtrotGame::CreateGame()
     CreateLights();
 
     // Player.Physics.bDisableGravity = true;
-    Player.SetFlyMode(false);
+    // Player.SetFlyMode(false);
 
     gShadowRenderer = new RxShadowDirectional(FxVec2u(1024, 1024));
     // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
@@ -265,29 +263,6 @@ void FoxtrotGame::ProcessControls()
         Player.Jump();
     }
 
-
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_O)) {
-        // Print out memory pool statistics
-        FxLogInfo("=== Memory Pool Stats ====");
-
-        FxMemPool& global_pool = FxMemPool::GetGlobalPool();
-
-        const double total_used = static_cast<double>(global_pool.GetTotalUsed()) / FxUnitMebibyte;
-        const double total_capacity = static_cast<double>(global_pool.GetTotalCapacity()) / FxUnitMebibyte;
-
-        float usage_percent = (total_used / total_capacity) * 100.0f;
-        FxLogInfo("Usage: {:.02f} MiB / {:.02f} MiB ({:.02f}% In Use)", total_used, total_capacity, usage_percent);
-
-        const FxMemPoolStatistics& stats = global_pool.GetStatistics();
-
-        FxLogInfo("Peak Used: {:.02f} MiB", (static_cast<double>(stats.BytesAllocatedPeak) / FxUnitMebibyte));
-        FxLogInfo("");
-        FxLogInfo("Total Allocs: {}", stats.TotalAllocs);
-        FxLogInfo("Total Frees:  {}", stats.TotalFrees);
-
-        FxLogInfo("");
-    }
-
     if (FxControlManager::IsComboDown(FxKey::FX_KEY_LSHIFT, FxKey::FX_KEY_R)) {
         // Reload the object properties from the scene
         FxSceneFile scene_file;
@@ -298,6 +273,11 @@ void FoxtrotGame::ProcessControls()
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
         pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
+    }
+
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_0)) {
+        Player.SetFlyMode(true);
+        Player.TeleportTo(FxVec3f(0.0f, 4.0f, -4.0f));
     }
 
 
@@ -313,12 +293,13 @@ void FoxtrotGame::Tick()
 
     DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
 
+
     FxControlManager::Update();
     ProcessControls();
 
 
     if (!sbShowShadowCam) {
-        Player.Move(DeltaTime, GetMovementVector() * DeltaTime);
+        Player.Move(DeltaTime, GetMovementVector());
         Player.Update(DeltaTime);
     }
 

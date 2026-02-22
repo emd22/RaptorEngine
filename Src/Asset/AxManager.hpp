@@ -57,7 +57,8 @@ public:
 
 struct FxLoadObjectOptions
 {
-    bool KeepInMemory = false;
+    bool bKeepInMemory : 1 = false;
+    bool bGeneratePhysicsMesh : 1 = false;
 };
 
 class AxManager

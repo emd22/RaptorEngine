@@ -30,11 +30,11 @@ void FxPlayer::Jump()
 
 void FxPlayer::SetFlyMode(bool value)
 {
-    mbIsFlymode = value;
+    // mbIsFlymode = value;
     Physics.bDisableGravity = value;
 }
 
-void FxPlayer::Move(float delta_time, const FxVec3f& offset)
+void FxPlayer::Move(float64 delta_time, const FxVec3f& offset)
 {
     // FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
     if (mbIsFlymode) {
@@ -55,15 +55,17 @@ void FxPlayer::Move(float delta_time, const FxVec3f& offset)
     mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed), cMovementLerpSpeed,
                                  delta_time);
 
+    FxVec3f force = mUserForce;
+
     if (mbIsFlymode) {
         // mUserForce.Y = ;
     }
     else {
-        mUserForce.Y = JumpForce;
+        force.Y = JumpForce;
         JumpForce = 0;
     }
 
-    Physics.ApplyMovement(mUserForce);
+    Physics.ApplyMovement(force);
 
     // mUserForce += offset;
     // const FxVec3f max_speed = FxVec3f(cMaxWalkSpeed);
@@ -73,7 +75,7 @@ void FxPlayer::Move(float delta_time, const FxVec3f& offset)
     // MoveBy();
 }
 
-void FxPlayer::Update(float32 delta_time)
+void FxPlayer::Update(float64 delta_time)
 {
     UpdateDirection();
 
