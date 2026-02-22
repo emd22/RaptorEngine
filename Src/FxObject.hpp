@@ -51,7 +51,7 @@ public:
     void PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
                                 const PhProperties& physics_properties);
 
-    void PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotionType motion_type,
+    void PhysicsCreateMesh(const FxRef<FxPrimitiveMesh<>>& physics_mesh, PhMotionType motion_type,
                            const PhProperties& physics_properties);
 
     /**

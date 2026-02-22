@@ -59,7 +59,13 @@ void FxSceneFile::AddObjectFromEntry(const std::string& scene_path, const FxConf
 {
     const char* mesh_path = object_entry.GetMember(FxHashStr64("Mesh"))->Get<const char*>();
 
-    FxRef<FxObject> object = AxManager::LoadObject(object_entry.Name.Get(), scene_path + mesh_path);
+
+    FxLoadObjectOptions load_options {};
+    if (object_entry.GetMember(FxHashStr64("Physics")) != nullptr) {
+        load_options.bGeneratePhysicsMesh = true;
+    }
+
+    FxRef<FxObject> object = AxManager::LoadObject(object_entry.Name.Get(), scene_path + mesh_path, load_options);
 
     ApplyPropertiesToObject(object, object_entry);
 
@@ -67,7 +73,7 @@ void FxSceneFile::AddObjectFromEntry(const std::string& scene_path, const FxConf
 }
 
 
-void FxSceneFile::ApplyPropertiesToObject(const FxRef<FxObject>& object, const FxConfigEntry& object_entry)
+void FxSceneFile::ApplyPropertiesToObject(FxRef<FxObject>& object, const FxConfigEntry& object_entry)
 {
     FxConfigEntry* shadow_caster = object_entry.GetMember(FxHashStr64("Shadows"));
     if (shadow_caster != nullptr) {
@@ -82,6 +88,7 @@ void FxSceneFile::ApplyPropertiesToObject(const FxRef<FxObject>& object, const F
     FxConfigEntry* position = object_entry.GetMember(FxHashStr64("Pos"));
     if (position != nullptr) {
         object->MoveTo(position->GetVec3f());
+        object->Update();
     }
 
     FxConfigEntry* rotation = object_entry.GetMember(FxHashStr64("Rot"));
@@ -102,5 +109,20 @@ void FxSceneFile::ApplyPropertiesToObject(const FxRef<FxObject>& object, const F
     FxConfigEntry* unlit = object_entry.GetMember(FxHashStr64("Unlit"));
     if (unlit != nullptr) {
         object->SetRenderUnlit(static_cast<bool>(unlit->Get<int64>()));
+    }
+
+    FxConfigEntry* physics = object_entry.GetMember(FxHashStr64("Physics"));
+    if (physics != nullptr && !object->Physics.mbHasPhysicsBody) {
+        PhMotionType motion_type = PhMotionType::eStatic;
+
+        FxConfigEntry* type = physics->GetMember(FxHashStr64("Type"));
+        if (type && type->Get<uint32>() == static_cast<uint32>(PhMotionType::eDynamic)) {
+            motion_type = PhMotionType::eDynamic;
+        }
+
+        FxConfigEntry* from_mesh = physics->GetMember(FxHashStr64("FromMesh"));
+        if (from_mesh != nullptr && from_mesh->Get<bool>() == true) {
+            object->PhysicsCreateMesh(object->pMesh, motion_type, {});
+        }
     }
 }

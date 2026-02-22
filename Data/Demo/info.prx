@@ -19,6 +19,7 @@ Objects = {
         Mesh = "/BrickTest.glb"
         Shadows = TRUE
         Physics = {
+            Type = PHYS_STATIC
             FromMesh = TRUE
         }
         Pos = [0.0, 0.5, 3.0]

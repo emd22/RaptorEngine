@@ -451,4 +451,7 @@ void FxConfigFile::InitConstants()
 
     mConstants.Insert(FxConfigEntry("OBJLAYER_WORLD", 0));
     mConstants.Insert(FxConfigEntry("OBJLAYER_PLAYER", 1));
+
+    mConstants.Insert(FxConfigEntry("PHYS_STATIC", 0));
+    mConstants.Insert(FxConfigEntry("PHYS_DYNAMIC", 1));
 }

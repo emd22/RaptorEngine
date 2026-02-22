@@ -75,14 +75,30 @@ bool FxObject::CheckIfReady()
 void FxObject::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions,
                                       PhMotionType motion_type, const PhProperties& physics_properties)
 {
-    Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
+    OnLoaded(
+        [&](FxRef<AxBase> base_asset)
+        {
+            FxRef<FxObject> asset = base_asset;
+            Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
+            mbPhysicsTransformOutOfDate = true;
+            mbPhysicsEnabled = true;
+        });
 }
 
 
-void FxObject::PhysicsCreateMesh(const FxPrimitiveMesh<>& physics_mesh, PhMotionType motion_type,
+void FxObject::PhysicsCreateMesh(const FxRef<FxPrimitiveMesh<>>& physics_mesh, PhMotionType motion_type,
                                  const PhProperties& physics_properties)
 {
-    Physics.CreateMeshBody(physics_mesh, motion_type, physics_properties);
+    OnLoaded(
+        [&](FxRef<AxBase> base_asset)
+        {
+            FxLogInfo("Creating mesh collider for '{}'", Name.Get());
+
+            FxRef<FxObject> asset = base_asset;
+            Physics.CreateMeshBody(*physics_mesh, motion_type, physics_properties);
+            mbPhysicsTransformOutOfDate = true;
+            mbPhysicsEnabled = true;
+        });
 }
 
 void FxObject::OnAttached(FxScene* scene)
