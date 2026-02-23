@@ -111,6 +111,8 @@ void FxSceneFile::ApplyPropertiesToObject(FxRef<FxObject>& object, const FxConfi
         object->SetRenderUnlit(static_cast<bool>(unlit->Get<int64>()));
     }
 
+    PhProperties physics_properties {};
+
     FxConfigEntry* physics = object_entry.GetMember(FxHashStr64("Physics"));
     if (physics != nullptr && !object->Physics.mbHasPhysicsBody) {
         PhMotionType motion_type = PhMotionType::eStatic;
@@ -122,7 +124,25 @@ void FxSceneFile::ApplyPropertiesToObject(FxRef<FxObject>& object, const FxConfi
 
         FxConfigEntry* from_mesh = physics->GetMember(FxHashStr64("FromMesh"));
         if (from_mesh != nullptr && from_mesh->Get<bool>() == true) {
-            object->PhysicsCreateMesh(object->pMesh, motion_type, {});
+            object->PhysicsCreateMesh(nullptr, motion_type, physics_properties);
+        }
+
+        FxConfigEntry* box_collider = physics->GetMember(FxHashStr64("BoxCollider"));
+        if (box_collider != nullptr) {
+            FxConfigEntry* size_entry = box_collider->GetMember(FxHashStr64("Size"));
+
+            FxVec3f size;
+
+            if (!size_entry) {
+                FxLogError("Size not defined for object box collider!");
+                size = FxVec3f::sOne;
+            }
+            else {
+                size = size_entry->GetVec3f();
+                FxLogInfo("USING SIZE {}", size);
+            }
+
+            object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, size, motion_type, physics_properties);
         }
     }
 }

@@ -51,8 +51,10 @@ public:
     void PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
                                 const PhProperties& physics_properties);
 
-    void PhysicsCreateMesh(const FxRef<FxPrimitiveMesh<>>& physics_mesh, PhMotionType motion_type,
+    void PhysicsCreateMesh(FxRef<FxPrimitiveMesh<>> physics_mesh, PhMotionType motion_type,
                            const PhProperties& physics_properties);
+
+    void PrintDebug() const;
 
     /**
      * @brief Reserve `num_instances` amount of future instances in the object manager.

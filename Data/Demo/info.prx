@@ -3,29 +3,42 @@ Meta = {
 }
 
 Objects = {
+    Skybox = {
+        Mesh = "/Skybox.glb"
+        Unlit = TRUE
+    }
+
+    Level = {
+        Mesh = "/DemoRoom2.glb"
+        Physics = {
+            Type = PHYS_STATIC
+            FromMesh = TRUE
+        }
+        Pos=[0.0, -2.0, 0.0]
+    }
+
     AnimTest = {
-        Mesh = "/model.glb"
+        Mesh = "/Model.glb"
         Shadows = TRUE
         Scale = 0.5
         Pos = [0.0, -0.5, 1.5]
         Rot = [0.0, 0.0, 0.0, 1.0]
     }
+
     Pistol = {
-        Mesh = "/pistol.glb"
+        Mesh = "/Pistol.glb"
         Shadows = TRUE
         Layer = OBJLAYER_PLAYER
     }
+
     BrickTest = {
         Mesh = "/BrickTest.glb"
         Shadows = TRUE
-        Physics = {
+        Physics={
             Type = PHYS_STATIC
-            FromMesh = TRUE
+            BoxCollider = { Size = [4.0, 4.0, 0.5] }
         }
         Pos = [0.0, 0.5, 3.0]
-    }
-    Skybox = {
-        Mesh = "/Skybox.glb"
-        Unlit = TRUE
+        Rot = [0.0, 0.0, 0.0, 1.0]
     }
 }

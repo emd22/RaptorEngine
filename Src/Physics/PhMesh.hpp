@@ -4,6 +4,7 @@
 // Jolt headers
 #include <ThirdParty/Jolt/Geometry/IndexedTriangle.h>
 #include <ThirdParty/Jolt/Math/Float3.h>
+#include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/Shape.h>
 
 #include <Core/FxMemberRef.hpp>
@@ -15,7 +16,7 @@ class PhMesh
 public:
     PhMesh(const FxPrimitiveMesh<>& mesh);
 
-    JPH::ShapeSettings::ShapeResult GetShapeResult();
+    JPH::MeshShapeSettings GetShapeSettings() const;
 
 public:
     JPH::VertexList VertexList;

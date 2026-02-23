@@ -77,7 +77,7 @@ void FoxtrotGame::InitEngine()
     gPhysics->Create();
 
     AxManager& asset_manager = AxManager::GetInstance();
-    asset_manager.Start(4);
+    asset_manager.Start(2);
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
     material_manager.Create();
@@ -151,17 +151,17 @@ void FoxtrotGame::CreateGame()
 
     // mMainScene.Attach(pSkyboxObject);
 
-    pLevelObject = AxManager::LoadObject("level", FX_BASE_DIR "/Models/DemoRoom2.glb", { .bKeepInMemory = true });
+    // pLevelObject = AxManager::LoadObject("level", FX_BASE_DIR "/Models/DemoRoom2.glb", { .bKeepInMemory = true });
 
     // pLevelObject->SetRenderUnlit(true);
 
-    pLevelObject->PhysicsCreateMesh(pLevelObject->pMesh, PhMotionType::eStatic, {});
+    // pLevelObject->PhysicsCreateMesh(pLevelObject->pMesh, PhMotionType::eStatic, {});
 
     // ground_object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(20, 1, 20), PhMotionType::eStatic, {});
 
     // ground_object->PhysicsObjectCreate(static_cast<PhObject::Flags>(PhObject::eCreateInactive),
     //                                    PhObject::PhysicsType::eStatic, {});
-    mMainScene.Attach(pLevelObject);
+    // mMainScene.Attach(pLevelObject);
 
     gPhysics->OptimizeBroadPhase();
 

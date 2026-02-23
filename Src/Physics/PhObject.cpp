@@ -13,18 +13,19 @@
 #include <FxEngine.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
-/*
- Object->CreateBody(PhBodyType::eBox, FxVec3f(1, 2, 3), PhObject::PhysicsType::eStatic);
- */
 
 void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
                                    const PhProperties& object_properties)
 {
+    mMotionType = motion_type;
+
+    JPH::RVec3 jolt_dimensions;
+    (dimensions * 0.5).ToJoltVec3(jolt_dimensions);
+
+    FxLogInfo("Creating primitive collider with dimensions {}", dimensions);
+
     switch (primitive_type) {
     case PhPrimitiveType::eBox: {
-        JPH::RVec3 jolt_dimensions;
-        dimensions.ToJoltVec3(jolt_dimensions);
-
         JPH::BoxShapeSettings box_shape_settings(jolt_dimensions);
         box_shape_settings.SetDensity(object_properties.Density);
         box_shape_settings.mConvexRadius = object_properties.ConvexRadius;
@@ -32,20 +33,26 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f
         JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
         JPH::ShapeRefC box_shape = box_shape_result.Get();
 
-        CreateJoltBody(box_shape, {}, motion_type, object_properties);
-    }
+        CreateJoltBody(box_shape, PhObject::Flags::eNone, motion_type, object_properties);
+    } break;
     }
 }
 
 void PhObject::CreateMeshBody(const FxPrimitiveMesh<>& mesh, PhMotionType motion_type,
                               const PhProperties& object_properties)
 {
+    mMotionType = motion_type;
+
     PhMesh physics_mesh(mesh);
 
-    JPH::ShapeSettings::ShapeResult mesh_shape_result = physics_mesh.GetShapeResult();
+    JPH::MeshShapeSettings mesh_settings = physics_mesh.GetShapeSettings();
+
+
+    JPH::ShapeSettings::ShapeResult mesh_shape_result = mesh_settings.Create();
     JPH::ShapeRefC box_shape = mesh_shape_result.Get();
 
-    CreateJoltBody(box_shape, {}, motion_type, object_properties);
+
+    CreateJoltBody(box_shape, PhObject::Flags::eNone, motion_type, object_properties);
 }
 
 
@@ -65,7 +72,6 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMot
     }
 
     JPH::EMotionType jolt_motion_type = JPH::EMotionType::Static;
-
     PhLayer::Type object_layer = PhLayer::Static;
 
     switch (motion_type) {
@@ -105,7 +111,7 @@ void PhObject::DestroyPhysicsBody()
     JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
 
     body_interface.RemoveBody(GetBodyId());
-    // body_interface.DestroyBody(GetBodyId());
+    body_interface.DestroyBody(GetBodyId());
 
     mpPhysicsBody = nullptr;
     mbHasPhysicsBody = false;
@@ -126,4 +132,6 @@ void PhObject::Teleport(FxVec3f position, FxQuat rotation)
 
     gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetBodyId(), jolt_position, jolt_rotation,
                                                                       JPH::EActivation::Activate);
+
+    FxLogInfo("Teleporting to sync physics object");
 }

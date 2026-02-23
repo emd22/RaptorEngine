@@ -204,6 +204,8 @@ public:
 
     operator bool() const noexcept { return mpPtr != nullptr; }
 
+    bool IsValid() const noexcept { return mpPtr != nullptr && mpRefCnt != nullptr; }
+
     void SetNull()
     {
         mpPtr = nullptr;

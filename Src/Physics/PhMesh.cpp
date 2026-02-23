@@ -37,8 +37,5 @@ PhMesh::PhMesh(const FxPrimitiveMesh<>& mesh)
     }
 }
 
-JPH::ShapeSettings::ShapeResult PhMesh::GetShapeResult()
-{
-    JPH::MeshShapeSettings mesh_shape_settings(VertexList, TriangleList);
-    return mesh_shape_settings.Create();
-}
+
+JPH::MeshShapeSettings PhMesh::GetShapeSettings() const { return JPH::MeshShapeSettings(VertexList, TriangleList); }

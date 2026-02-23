@@ -115,8 +115,6 @@ public:
                                                   JPH::RVec3Arg inBaseOffset,
                                                   const JPH::CollideShapeResult& inCollisionResult) override
     {
-        FxLogInfo("Contact validate callback");
-
         const JPH::ValidateResult result = ContactListener::OnContactValidate(inBody1, inBody2, inBaseOffset,
                                                                               inCollisionResult);
 

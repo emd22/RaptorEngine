@@ -17,7 +17,7 @@ struct PhProperties
 public:
     PhProperties() = default;
 
-    float32 ConvexRadius = 0.005f;
+    float32 ConvexRadius = 0.001f;
     float32 Friction = 0.2f;
     float32 Restitution = 0.1f;
 
@@ -46,6 +46,7 @@ class PhObject
 public:
     enum Flags
     {
+        eNone = 0x00,
         eCreateInactive = 0x01,
     };
 
@@ -66,11 +67,14 @@ public:
     FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
     FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
 
+    FX_FORCE_INLINE PhMotionType GetMotionType() const { return mMotionType; }
+
 private:
     void CreateJoltBody(JPH::ShapeRefC shape, Flags flags, PhMotionType type, const PhProperties& properties);
 
 public:
     JPH::Body* mpPhysicsBody = nullptr;
+    PhMotionType mMotionType = PhMotionType::eStatic;
 
     bool mbHasPhysicsBody : 1 = false;
 };

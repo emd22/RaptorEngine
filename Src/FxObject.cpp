@@ -76,28 +76,36 @@ void FxObject::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVe
                                       PhMotionType motion_type, const PhProperties& physics_properties)
 {
     OnLoaded(
-        [&](FxRef<AxBase> base_asset)
+        [primitive_type, dimensions, motion_type, physics_properties](FxRef<AxBase> base_asset)
         {
             FxRef<FxObject> asset = base_asset;
-            Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
-            mbPhysicsTransformOutOfDate = true;
-            mbPhysicsEnabled = true;
+            asset->Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
+            asset->mbPhysicsTransformOutOfDate = true;
+            asset->SetPhysicsEnabled(true);
+
+            asset->PrintDebug();
         });
 }
 
 
-void FxObject::PhysicsCreateMesh(const FxRef<FxPrimitiveMesh<>>& physics_mesh, PhMotionType motion_type,
+void FxObject::PhysicsCreateMesh(FxRef<FxPrimitiveMesh<>> custom_physics_mesh, PhMotionType motion_type,
                                  const PhProperties& physics_properties)
 {
     OnLoaded(
-        [&](FxRef<AxBase> base_asset)
+        [custom_physics_mesh, motion_type, physics_properties](FxRef<AxBase> base_asset)
         {
-            FxLogInfo("Creating mesh collider for '{}'", Name.Get());
-
             FxRef<FxObject> asset = base_asset;
-            Physics.CreateMeshBody(*physics_mesh, motion_type, physics_properties);
-            mbPhysicsTransformOutOfDate = true;
-            mbPhysicsEnabled = true;
+
+            FxRef<FxPrimitiveMesh<>> physics_mesh { nullptr };
+            physics_mesh = custom_physics_mesh ? custom_physics_mesh : asset->pMesh;
+
+            FxAssert(physics_mesh.IsValid());
+
+            asset->Physics.CreateMeshBody(*physics_mesh, motion_type, physics_properties);
+            asset->mbPhysicsTransformOutOfDate = true;
+            asset->SetPhysicsEnabled(true);
+
+            asset->PrintDebug();
         });
 }
 
@@ -378,7 +386,7 @@ void FxObject::Update()
 void FxObject::AttachObject(const FxRef<FxObject>& object)
 {
     if (AttachedNodes.IsEmpty()) {
-        AttachedNodes.Create(32);
+        AttachedNodes.Create(8);
     }
 
     Dimensions += object->Dimensions;
@@ -412,19 +420,31 @@ void FxObject::SetRenderUnlit(const bool value)
 void FxObject::SetPhysicsEnabled(bool enabled)
 {
     if (!Physics.mbHasPhysicsBody) {
+        FxLogWarning("Object does not have physics body!");
         return;
     }
 
     if (enabled) {
-        FxLogDebug("Activate body");
+        FxLogInfo("Activate physics body");
         gPhysics->GetBodyInterface().ActivateBody(Physics.GetBodyId());
     }
     else {
-        FxLogDebug("Deactivate body");
+        FxLogInfo("Deactivate physics body");
         gPhysics->GetBodyInterface().DeactivateBody(Physics.GetBodyId());
     }
 
     mbPhysicsEnabled = enabled;
+}
+
+void FxObject::PrintDebug() const
+{
+    FxLogInfo("FxObject '{}' (Id={}) {{", Name.Get(), ObjectId);
+    FxLogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale,
+              pMesh ? pMesh->GetDimensions() : FxVec3f::sZero);
+    FxLogInfo("\tHasPhys?={}, Enabled?={}, Type={}", Physics.mbHasPhysicsBody, mbPhysicsEnabled,
+              Physics.GetMotionType() == PhMotionType::eStatic ? "Static" : "Dynamic");
+    FxLogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}", mbIsInstance, mbReadyToRender, mbIsShadowCaster);
+    FxLogInfo("}}");
 }
 
 
