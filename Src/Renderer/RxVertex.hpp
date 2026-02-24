@@ -8,35 +8,70 @@
 #include <Math/FxVec3.hpp>
 #include <Renderer/FxMeshUtil.hpp>
 
+enum class RxVertexType
+{
+    eSlim,
+    eDefault,
+    eSkinned
+};
+
 // Suppress clangd and its hate for #pragma pack
 static_assert(true);
 
 // Pack all of the structs below
 #pragma pack(push, 1)
 
-struct RxVertexBase
+template <RxVertexType TType>
+struct RxVertex
 {
-    float32 Position[3];
 };
 
-struct RxVertexDefault
+template <>
+struct RxVertex<RxVertexType::eSlim>
+{
+    float32 Position[3];
+
+public:
+    float32* GetPosition() { return Position; }
+};
+
+template <>
+struct RxVertex<RxVertexType::eDefault>
 {
     float32 Position[3];
     float32 Normal[3];
     float32 UV[2];
     float32 Tangent[3];
+
+public:
+    float32* GetPosition() { return Position; }
 };
+
+template <>
+struct RxVertex<RxVertexType::eSkinned>
+{
+    float32 Position[3];
+    float32 Normal[3];
+    float32 UV[2];
+    float32 Tangent[3];
+    uint32 BoneIds[4];      /// Skinning bone ids
+    float32 BoneWeights[4]; /// Skinning bone weights
+
+public:
+    float32* GetPosition() { return Position; }
+};
+
 
 // End packing structs
 #pragma pack(pop)
 
 template <>
-struct std::formatter<RxVertexDefault>
+struct std::formatter<RxVertex<RxVertexType::eDefault>>
 {
     auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
     template <typename FmtContext>
-    auto format(const RxVertexDefault& obj, FmtContext& ctx) const
+    auto format(const RxVertex<RxVertexType::eDefault>& obj, FmtContext& ctx) const
     {
         return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
                               static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));
@@ -88,7 +123,7 @@ public:
         const bool has_uvs = (uvs.IsNotEmpty());
         const bool has_tangents = (tangents.IsNotEmpty());
 
-        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertexDefault>;
+        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertex<RxVertexType::eDefault>>;
 
         // Create the local (cpu-side) buffer to store our vertices
         LocalBuffer.InitCapacity(positions.Size / 3);
@@ -145,7 +180,7 @@ public:
         const bool has_uvs = (uvs.IsNotEmpty());
         const bool has_tangents = (tangents.IsNotEmpty());
 
-        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertexDefault>;
+        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertex<RxVertexType::eDefault>>;
 
         // Create the local (cpu-side) buffer to store our vertices
         LocalBuffer.InitCapacity(positions.Size);

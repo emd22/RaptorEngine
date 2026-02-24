@@ -3,6 +3,7 @@
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
 
+#include <Core/FxPanic.hpp>
 #include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
 

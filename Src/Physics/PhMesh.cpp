@@ -8,13 +8,13 @@ PhMesh::PhMesh(const FxPrimitiveMesh<>& mesh)
 {
     FxAssert(mesh.VertexList.LocalBuffer.IsNotEmpty());
 
-    const FxSizedArray<RxVertexDefault>& vertex_buffer = mesh.VertexList.LocalBuffer;
+    const FxSizedArray<RxVertex<RxVertexType::eDefault>>& vertex_buffer = mesh.VertexList.LocalBuffer;
     const FxSizedArray<uint32>& index_buffer = mesh.LocalIndexBuffer;
 
     VertexList.reserve(vertex_buffer.Size);
 
     for (uint64 index = 0; index < vertex_buffer.Size; index++) {
-        const RxVertexDefault& vertex = vertex_buffer.pData[index];
+        const RxVertex<RxVertexType::eDefault>& vertex = vertex_buffer.pData[index];
 
         VertexList.emplace_back(JPH::Float3 {
             vertex.Position[0],

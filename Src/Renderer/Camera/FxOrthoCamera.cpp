@@ -1,3 +1,4 @@
+#include <Core/FxPanic.hpp>
 #include <Renderer/FxCamera.hpp>
 
 void FxOrthoCamera::UpdateProjectionMatrix()

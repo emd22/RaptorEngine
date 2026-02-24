@@ -12,7 +12,7 @@ struct FxMeshBone
     FxQuat Rotation;
 };
 
-template <typename TVertexType = RxVertexDefault>
+template <typename TVertexType = RxVertex<RxVertexType::eDefault>>
 class FxPrimitiveMesh
 {
 public:
@@ -40,7 +40,7 @@ public:
      */
     inline void UploadVertices()
     {
-        if constexpr (std::is_same_v<TVertexType, RxVertexDefault>) {
+        if constexpr (std::is_same_v<TVertexType, RxVertex<RxVertexType::eDefault>>) {
             if (!VertexList.bContainsNormals) {
                 FxLogDebug("Recalculating normals for mesh");
                 RecalculateNormals();
@@ -146,6 +146,8 @@ public:
 
     void RecalculateNormals()
     {
+        using VertexType = RxVertex<RxVertexType::eDefault>;
+
         if (LocalIndexBuffer.IsEmpty()) {
             FxLogWarning("Cannot recalculate normals as a local indices are missing!");
             return;
@@ -156,7 +158,7 @@ public:
             return;
         }
 
-        FxSizedArray<RxVertexDefault>& vertices = VertexList.LocalBuffer;
+        FxSizedArray<VertexType>& vertices = VertexList.LocalBuffer;
 
         const uint32 num_vertices = vertices.Size;
         const uint32 num_faces = num_vertices / 3;
@@ -188,9 +190,9 @@ public:
              */
 
 
-            RxVertexDefault& vertex_a = vertices.pData[index_a];
-            RxVertexDefault& vertex_b = vertices.pData[index_b];
-            RxVertexDefault& vertex_c = vertices.pData[index_c];
+            VertexType& vertex_a = vertices.pData[index_a];
+            VertexType& vertex_b = vertices.pData[index_b];
+            VertexType& vertex_c = vertices.pData[index_c];
 
             const FxVec3f edge_a = FxVec3f::FromDifference(vertex_a.Position, vertex_b.Position);
             const FxVec3f edge_b = FxVec3f::FromDifference(vertex_c.Position, vertex_b.Position);
@@ -212,7 +214,7 @@ public:
 
 
         for (uint32 index = 0; index < VertexList.LocalBuffer.Size; index++) {
-            RxVertexDefault& vertex = VertexList.LocalBuffer[index];
+            VertexType& vertex = VertexList.LocalBuffer[index];
 
             FxVec3f vec(vertex.Position);
             vec.NormalizeIP();

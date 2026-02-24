@@ -6,6 +6,7 @@
 #include <ThirdParty/Jolt/Math/Real.h>
 #include <arm_neon.h>
 
+#include <Core/FxLog.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxNeonUtil.hpp>
 #include <Math/FxVec3.hpp>

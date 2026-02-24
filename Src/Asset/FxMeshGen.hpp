@@ -11,7 +11,7 @@ struct FxMeshGenOptions
 class FxMeshGen
 {
 public:
-    using PositionVertex = RxVertexBase;
+    using PositionVertex = RxVertex<RxVertexType::eSlim>;
 
     struct GeneratedMesh
     {
