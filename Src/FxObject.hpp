@@ -84,6 +84,8 @@ private:
 
 public:
     FxRef<FxPrimitiveMesh<>> pMesh { nullptr };
+    FxRef<FxPrimitiveMesh<RxVertexType::eSkinned>> pSkinnedMesh { nullptr };
+
     FxRef<FxMaterial> pMaterial { nullptr };
 
     FxPagedArray<FxRef<FxObject>> AttachedNodes;

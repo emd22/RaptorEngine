@@ -242,7 +242,7 @@ public:
 
 
 public:
-    RxVertexList<TVertexType> VertexList;
+    RxVertexList VertexList;
 
     FxSizedArray<FxMeshBone> Bones;
 

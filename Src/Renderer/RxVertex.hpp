@@ -2,6 +2,7 @@
 
 #include "Backend/RxGpuBuffer.hpp"
 
+#include <Core/FxAnonArray.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxTypes.hpp>
 #include <Math/FxVec2.hpp>
@@ -14,6 +15,7 @@ enum class RxVertexType
     eDefault,
     eSkinned
 };
+
 
 // Suppress clangd and its hate for #pragma pack
 static_assert(true);
@@ -29,6 +31,7 @@ struct RxVertex
 template <>
 struct RxVertex<RxVertexType::eSlim>
 {
+public:
     float32 Position[3];
 
 public:
@@ -38,6 +41,7 @@ public:
 template <>
 struct RxVertex<RxVertexType::eDefault>
 {
+public:
     float32 Position[3];
     float32 Normal[3];
     float32 UV[2];
@@ -103,15 +107,17 @@ struct std::formatter<RxVertex<RxVertexType::eDefault>>
         }                                                                                                              \
     }
 
-template <typename TVertexType>
+constexpr bool FxIsComplexVertex(RxVertexType vertex_type)
+{
+    return (vertex_type == RxVertexType::eDefault || vertex_type == RxVertexType::eSkinned);
+}
+
 class RxVertexList
 {
 public:
-    using VertexType = TVertexType;
-
-public:
     RxVertexList() = default;
 
+    template <RxVertexType TVertexType>
     void CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
                     const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents)
     {
@@ -123,10 +129,12 @@ public:
         const bool has_uvs = (uvs.IsNotEmpty());
         const bool has_tangents = (tangents.IsNotEmpty());
 
-        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertex<RxVertexType::eDefault>>;
+        RxVertex<TVertexType> vertex;
+
+        constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
 
         // Create the local (cpu-side) buffer to store our vertices
-        LocalBuffer.InitCapacity(positions.Size / 3);
+        LocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size / 3);
 
         if (!has_uvs) {
             FxLogWarning("Vertex list does not contain UV coordinates", 0);
@@ -145,7 +153,7 @@ public:
         }
 
         for (int i = 0; i < LocalBuffer.Capacity; i++) {
-            TVertexType vertex;
+            RxVertex<TVertexType> vertex;
 
             memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
 
@@ -169,6 +177,7 @@ public:
         }
     }
 
+    template <RxVertexType TVertexType>
     void CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
                     const FxSizedArray<FxVec2f>& uvs, const FxSizedArray<FxVec3f>& tangents)
     {
@@ -180,17 +189,17 @@ public:
         const bool has_uvs = (uvs.IsNotEmpty());
         const bool has_tangents = (tangents.IsNotEmpty());
 
-        constexpr bool is_default_vertex = std::is_same_v<TVertexType, RxVertex<RxVertexType::eDefault>>;
+        constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
 
         // Create the local (cpu-side) buffer to store our vertices
-        LocalBuffer.InitCapacity(positions.Size);
+        LocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size);
 
         if (!has_uvs) {
-            FxLogWarning("Vertex list does not contain UV coordinates", 0);
+            FxLogWarning("Vertex list does not contain UV coordinates");
         }
 
         for (int i = 0; i < LocalBuffer.Capacity; i++) {
-            TVertexType vertex;
+            RxVertex<TVertexType> vertex;
 
             memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
 
@@ -204,8 +213,8 @@ public:
         }
     }
 
-    void CreateFrom(const FxSizedArray<float32>& positions) { CreateFrom(positions, {}, {}, {}); }
-    void CreateFrom(const FxSizedArray<FxVec3f>& positions) { CreateFrom(positions, {}, {}, {}); }
+    // void CreateFrom(const FxSizedArray<float32>& positions) { CreateFrom(positions, {}, {}, {}); }
+    // void CreateFrom(const FxSizedArray<FxVec3f>& positions) { CreateFrom(positions, {}, {}, {}); }
 
     void UploadToGpu() { GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, LocalBuffer); }
 
@@ -222,7 +231,8 @@ public:
 
 public:
     RxGpuBuffer GpuBuffer {};
-    FxSizedArray<TVertexType> LocalBuffer {};
+    // FxSizedArray<TVertexType> LocalBuffer {};
+    FxAnonArray LocalBuffer;
 
     bool bContainsNormals : 1 = false;
     bool bContainsUVs : 1 = false;
