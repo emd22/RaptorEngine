@@ -40,11 +40,10 @@ private:
     // void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
     void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive);
 
-    void UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh<>>& mesh,
-                              cgltf_primitive* primitive);
+    void UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh, cgltf_primitive* primitive);
 
     void LoadAnimations();
-    void LoadAnimationSkin(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_skin* skin);
+    void LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin);
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;

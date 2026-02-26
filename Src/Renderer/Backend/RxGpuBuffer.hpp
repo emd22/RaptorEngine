@@ -206,7 +206,7 @@ public:
 
         RxRawGpuBuffer staging_buffer;
         staging_buffer.Create(RxGpuBufferType::eTransfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        staging_buffer.Upload(data);
+        staging_buffer.Upload(data, Size);
 
         // Create the GPU-only buffer as a transfer destination
         this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, RxGpuBufferFlags::eTransferReceiver);

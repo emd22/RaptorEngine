@@ -1,14 +1,17 @@
 #pragma once
 
-#include <Core/FxSizedArray.hpp>
+#include <Core/FxAnonArray.hpp>
 #include <Math/FxVec3.hpp>
+#include <Renderer/RxVertex.hpp>
+#include <cfloat>
 
 class FxMeshUtil
 {
 public:
-    template <typename TVertexType>
-    static FxVec3f CalculateDimensions(const FxSizedArray<TVertexType>& vertices)
+    static FxVec3f CalculateDimensions(const RxVertexList& vertex_list)
     {
+        const FxAnonArray& vertices = vertex_list.GetLocalBuffer();
+
         if (vertices.IsEmpty()) {
             FxLogWarning("Cannot calculate dimensions as there are no vertices!");
             return FxVec3f::sZero;
@@ -17,19 +20,15 @@ public:
         FxVec3f min_vertex = FxVec3f(10000);
         FxVec3f max_vertex = FxVec3f(-10000);
 
-        for (int i = 0; i < vertices.Size; i++) {
-            if constexpr (std::is_same_v<TVertexType, float32>) {
-                const FxVec3f position = FxVec3f(&vertices[i * 3]);
+        for (uint32 i = 0; i < vertices.Size; i++) {
+            // Since the position resides at the same location for each vertex type (see static_assert in
+            // RxVertexUtil::GetPosition), the vertex type used here can be anything, and offsets are preserved as the
+            // size of the object is stored in the anonymous buffer.
+            FxVec3f position = RxVertexUtil::GetPosition(
+                *reinterpret_cast<const RxVertex<RxVertexType::eSlim>*>(vertices.GetRaw(i)));
 
-                min_vertex = FxVec3f::Min(min_vertex, position);
-                max_vertex = FxVec3f::Max(max_vertex, position);
-            }
-            else {
-                const FxVec3f& position = vertices[i].Position;
-
-                min_vertex = FxVec3f::Min(min_vertex, position);
-                max_vertex = FxVec3f::Max(max_vertex, position);
-            }
+            min_vertex = FxVec3f::Min(min_vertex, position);
+            max_vertex = FxVec3f::Max(max_vertex, position);
         }
 
         // Return the difference between the min and max positions

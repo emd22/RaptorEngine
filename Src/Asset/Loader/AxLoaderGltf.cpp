@@ -14,7 +14,7 @@
 
 FxRef<AxImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
 
-void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh<>>& mesh,
+void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh,
                                         cgltf_primitive* primitive)
 {
     FxSizedArray<float32> positions;
@@ -55,13 +55,13 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
         }
     }
 
-    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents);
+    mesh->VertexList.CreateFrom<RxVertexType::eDefault>(positions, normals, uvs, tangents);
     mesh->UploadVertices();
 
     mesh->bIsReady = true;
 }
 
-void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh<>>& mesh, cgltf_skin* skin)
+void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
 {
     FxLogInfo("Joints: {}", skin->joints_count);
 }
@@ -147,7 +147,7 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
         FxSizedArray<uint32> indices;
 
-        FxRef<FxPrimitiveMesh<>> primitive_mesh = FxMakeRef<FxPrimitiveMesh<>>();
+        FxRef<FxPrimitiveMesh> primitive_mesh = FxMakeRef<FxPrimitiveMesh>();
 
         // Keep the primitive mesh's vertices and indices in memory if `KeepInMemory` is set
         primitive_mesh->bKeepInMemory = bKeepInMemory;

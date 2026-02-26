@@ -32,7 +32,7 @@ public:
 public:
     FxLightBase(FxLightFlags flags = FxLF_None);
 
-    void SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume);
+    void SetLightVolume(const FxRef<FxPrimitiveMesh>& volume);
     void SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
 
     void SetRadius(const float radius);
@@ -43,7 +43,7 @@ public:
     virtual ~FxLightBase() {}
 
 public:
-    FxRef<FxPrimitiveMesh<VertexType>> pLightVolume { nullptr };
+    FxRef<FxPrimitiveMesh> pLightVolume { nullptr };
     FxRef<FxMeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
 
     RxPipeline* pPipelineInside = nullptr;
@@ -57,7 +57,7 @@ public:
     bool bEnabled = true;
 
 protected:
-    FxRef<FxPrimitiveMesh<>> mpDebugMesh { nullptr };
+    FxRef<FxPrimitiveMesh> mpDebugMesh { nullptr };
     RxPipeline* pPipeline = nullptr;
 
     float32 mRadius = 1.0f;

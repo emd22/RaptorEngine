@@ -38,10 +38,9 @@ static const int32 IcoIndex[] = {
 };
 
 
-FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> FxMeshGen::GeneratedMesh::AsPositionsMesh()
+FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsSlimMesh()
 {
-    FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> mesh = FxMakeRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>>();
-    // mesh->IsReference = true;
+    FxRef<FxPrimitiveMesh> mesh = FxMakeRef<FxPrimitiveMesh>();
 
     FxSizedArray<RxVertex<RxVertexType::eSlim>> points(Positions.Size);
 
@@ -56,35 +55,46 @@ FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> FxMeshGen::GeneratedMesh::AsPo
 
     mesh->UploadIndices(Indices);
 
-    mesh->VertexList.LocalBuffer = std::move(points);
+    mesh->VertexList.CreateFrom<RxVertexType::eSlim>(std::move(points));
     mesh->UploadVertices();
 
     mesh->bIsReady.store(true);
 
-    // Create the mesh using our bodged point array
-    // mesh->CreateFromData(points, Indices);
-
     return mesh;
 }
 
-FxRef<FxPrimitiveMesh<>> FxMeshGen::GeneratedMesh::AsMesh()
+FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsDefaultMesh()
 {
     // Create a mesh using the default vertex format (positions, normals, uvs)
-    FxRef<FxPrimitiveMesh<>> mesh = FxMakeRef<FxPrimitiveMesh<>>();
+    FxRef<FxPrimitiveMesh> mesh = FxMakeRef<FxPrimitiveMesh>();
     // mesh->IsReference = true;
 
     mesh->UploadIndices(Indices);
 
     // Create the vertex list from our list of positions
-    mesh->VertexList.CreateFrom(Positions);
+    mesh->VertexList.CreateFrom<RxVertexType::eDefault>(Positions, {}, {}, {});
     mesh->UploadVertices();
-
-    // auto fat_vertices = FxPrimitiveMesh<>::MakeCombinedVertexBuffer(Positions);
-    // mesh->CreateFromData(fat_vertices, Indices);
 
     mesh->bIsReady.store(true);
 
     return mesh;
+}
+
+FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsMesh(RxVertexType vertex_type)
+{
+    if (vertex_type == RxVertexType::eSlim) {
+        return AsSlimMesh();
+    }
+    switch (vertex_type) {
+    case RxVertexType::eDefault:
+        return AsDefaultMesh();
+    case RxVertexType::eSlim:
+        return AsSlimMesh();
+    default:
+        FxLogError("Mesh type not supported!");
+    }
+
+    return nullptr;
 }
 
 // Implementation is based on code from https://winter.dev/projects/mesh/icosphere

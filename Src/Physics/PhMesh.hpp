@@ -14,7 +14,7 @@
 class PhMesh
 {
 public:
-    PhMesh(const FxPrimitiveMesh<>& mesh);
+    PhMesh(const FxPrimitiveMesh& mesh);
 
     JPH::MeshShapeSettings GetShapeSettings() const;
 

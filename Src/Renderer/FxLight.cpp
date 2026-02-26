@@ -16,16 +16,16 @@ FxLightBase::FxLightBase(FxLightFlags flags) : Flags(flags)
     FxLogDebug("Creating light (id={})", ObjectId);
 }
 
-void FxLightBase::SetLightVolume(const FxRef<FxPrimitiveMesh<VertexType>>& volume) { pLightVolume = volume; }
+void FxLightBase::SetLightVolume(const FxRef<FxPrimitiveMesh>& volume) { pLightVolume = volume; }
 
 void FxLightBase::SetLightVolume(const FxRef<FxMeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh)
 {
     pLightVolumeGen = volume_gen;
-    pLightVolume = volume_gen->AsPositionsMesh();
+    pLightVolume = volume_gen->AsSlimMesh();
     // Radius = LightVolume->VertexList.CalculateDimensionsFromPositions().X;
 
     if (create_debug_mesh) {
-        mpDebugMesh = volume_gen->AsMesh();
+        mpDebugMesh = volume_gen->AsDefaultMesh();
     }
 }
 

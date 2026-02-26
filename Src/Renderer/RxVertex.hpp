@@ -7,7 +7,6 @@
 #include <Core/FxTypes.hpp>
 #include <Math/FxVec2.hpp>
 #include <Math/FxVec3.hpp>
-#include <Renderer/FxMeshUtil.hpp>
 
 enum class RxVertexType
 {
@@ -31,24 +30,16 @@ struct RxVertex
 template <>
 struct RxVertex<RxVertexType::eSlim>
 {
-public:
     float32 Position[3];
-
-public:
-    float32* GetPosition() { return Position; }
 };
 
 template <>
 struct RxVertex<RxVertexType::eDefault>
 {
-public:
     float32 Position[3];
     float32 Normal[3];
     float32 UV[2];
     float32 Tangent[3];
-
-public:
-    float32* GetPosition() { return Position; }
 };
 
 template <>
@@ -60,14 +51,28 @@ struct RxVertex<RxVertexType::eSkinned>
     float32 Tangent[3];
     uint32 BoneIds[4];      /// Skinning bone ids
     float32 BoneWeights[4]; /// Skinning bone weights
-
-public:
-    float32* GetPosition() { return Position; }
 };
 
 
 // End packing structs
 #pragma pack(pop)
+
+
+class RxVertexUtil
+{
+public:
+    template <RxVertexType TVertexType>
+    static FxVec3f GetPosition(const RxVertex<TVertexType>& vertex)
+    {
+        static_assert(offsetof(RxVertex<RxVertexType::eSlim>, Position) ==
+                          offsetof(RxVertex<RxVertexType::eDefault>, Position) &&
+                      offsetof(RxVertex<RxVertexType::eDefault>, Position) ==
+                          offsetof(RxVertex<RxVertexType::eSkinned>, Position));
+
+        return FxVec3f(vertex.Position);
+    }
+};
+
 
 template <>
 struct std::formatter<RxVertex<RxVertexType::eDefault>>
@@ -117,6 +122,7 @@ class RxVertexList
 public:
     RxVertexList() = default;
 
+
     template <RxVertexType TVertexType>
     void CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
                     const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents)
@@ -129,12 +135,10 @@ public:
         const bool has_uvs = (uvs.IsNotEmpty());
         const bool has_tangents = (tangents.IsNotEmpty());
 
-        RxVertex<TVertexType> vertex;
-
         constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
 
         // Create the local (cpu-side) buffer to store our vertices
-        LocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size / 3);
+        mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size / 3);
 
         if (!has_uvs) {
             FxLogWarning("Vertex list does not contain UV coordinates", 0);
@@ -152,7 +156,7 @@ public:
             bContainsTangents = true;
         }
 
-        for (int i = 0; i < LocalBuffer.Capacity; i++) {
+        for (int i = 0; i < mLocalBuffer.Capacity; i++) {
             RxVertex<TVertexType> vertex;
 
             memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
@@ -173,7 +177,7 @@ public:
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.UV, uvs, 2);
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Tangent, tangents, 3);
 
-            LocalBuffer.Insert(vertex);
+            mLocalBuffer.Insert(vertex);
         }
     }
 
@@ -192,13 +196,13 @@ public:
         constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
 
         // Create the local (cpu-side) buffer to store our vertices
-        LocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size);
+        mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size);
 
         if (!has_uvs) {
-            FxLogWarning("Vertex list does not contain UV coordinates");
+            FxLogWarning("Vertex list does not contain UV coordinates", 0);
         }
 
-        for (int i = 0; i < LocalBuffer.Capacity; i++) {
+        for (int i = 0; i < mLocalBuffer.Capacity; i++) {
             RxVertex<TVertexType> vertex;
 
             memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
@@ -209,16 +213,34 @@ public:
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.UV, uvs, 2);
             RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Tangent, tangents, 3);
 
-            LocalBuffer.Insert(vertex);
+            mLocalBuffer.Insert(vertex);
         }
     }
 
-    // void CreateFrom(const FxSizedArray<float32>& positions) { CreateFrom(positions, {}, {}, {}); }
-    // void CreateFrom(const FxSizedArray<FxVec3f>& positions) { CreateFrom(positions, {}, {}, {}); }
 
-    void UploadToGpu() { GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, LocalBuffer); }
+    template <RxVertexType TVertexType>
+    void CreateFrom(FxSizedArray<RxVertex<TVertexType>>&& vertices)
+    {
+        VertexType = TVertexType;
+        mLocalBuffer = std::move(vertices);
+    }
 
-    void DestroyLocalBuffer() { LocalBuffer.Free(); }
+    template <RxVertexType TVertexType>
+    void CreateAsCopyOf(const FxSizedArray<RxVertex<TVertexType>>& vertices)
+    {
+        VertexType = TVertexType;
+        mLocalBuffer.InitAsCopyOf(FxSlice(vertices));
+    }
+
+    void UploadToGpu() { GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, mLocalBuffer); }
+
+    /** @brief Returns true if the vertex type supports storing normals */
+    FX_FORCE_INLINE bool SupportsNormals() const { return (VertexType != RxVertexType::eSlim); }
+
+    /** @brief Returns true if the vertex buffer has been supplied values for normals. */
+    FX_FORCE_INLINE bool HasNormals() const { return bContainsNormals; }
+
+    void DestroyLocalBuffer() { mLocalBuffer.Free(); }
     void Destroy()
     {
         GpuBuffer.Destroy();
@@ -226,17 +248,22 @@ public:
         DestroyLocalBuffer();
     }
 
+    FxAnonArray& GetLocalBuffer() { return mLocalBuffer; }
+    const FxAnonArray& GetLocalBuffer() const { return mLocalBuffer; }
+
 
     ~RxVertexList() { Destroy(); }
 
 public:
+    RxVertexType VertexType = RxVertexType::eDefault;
     RxGpuBuffer GpuBuffer {};
-    // FxSizedArray<TVertexType> LocalBuffer {};
-    FxAnonArray LocalBuffer;
 
     bool bContainsNormals : 1 = false;
     bool bContainsUVs : 1 = false;
     bool bContainsTangents : 1 = false;
+
+private:
+    FxAnonArray mLocalBuffer;
 };
 
 #undef RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE

@@ -135,3 +135,8 @@ void RxGpuBuffer::Create(RxGpuBufferType buffer_type, void* data, uint64 size)
 
     staging_buffer.Destroy();
 }
+
+void RxGpuBuffer::Create(RxGpuBufferType buffer_type, const FxAnonArray& data)
+{
+    Create(buffer_type, data.pData, data.Size);
+}

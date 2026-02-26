@@ -12,79 +12,67 @@ struct FxMeshBone
     FxQuat Rotation;
 };
 
-template <typename TVertexType = RxVertex<RxVertexType::eDefault>>
 class FxPrimitiveMesh
 {
 public:
     FxPrimitiveMesh() = default;
 
-    FxPrimitiveMesh(FxSizedArray<TVertexType>& vertices) { UploadVertices(vertices); }
+    template <RxVertexType TVertexType>
+    FxPrimitiveMesh(FxSizedArray<RxVertex<TVertexType>>& vertices)
+    {
+        UploadVertices(vertices);
+    }
 
-    FxPrimitiveMesh(FxSizedArray<TVertexType>& vertices, FxSizedArray<uint32>& indices)
+    template <RxVertexType TVertexType>
+    FxPrimitiveMesh(FxSizedArray<RxVertex<TVertexType>>& vertices, FxSizedArray<uint32>& indices)
     {
         CreateFromData(vertices, indices);
     }
 
-    template <typename T>
-    FxPrimitiveMesh(FxPrimitiveMesh<T>& other)
-    {
-        VertexList = other.VertexList;
-        GpuIndexBuffer = other.GpuIndexBuffer;
+    // FxPrimitiveMesh(FxPrimitiveMesh&& other)
+    // {
+    //     VertexList = std::move(other.VertexList);
+    //     GpuIndexBuffer = other.GpuIndexBuffer;
 
-        bIsReady = other.bIsReady;
-    }
+    //     bIsReady = other.bIsReady;
+    // }
 
     /**
-     * @brief Calls `.UploadToGpu()` on the vertex list. Assumes that the vertex list has been modified with vertices.
-     *
+     * @brief Recalculates normals if needed and uploads the vertex list to the GPU.
      */
     inline void UploadVertices()
     {
-        if constexpr (std::is_same_v<TVertexType, RxVertex<RxVertexType::eDefault>>) {
-            if (!VertexList.bContainsNormals) {
-                FxLogDebug("Recalculating normals for mesh");
-                RecalculateNormals();
-            }
+        if (VertexList.SupportsNormals() && !VertexList.HasNormals()) {
+            FxLogDebug("Calculating normals for mesh");
+            RecalculateNormals();
         }
-
 
         VertexList.UploadToGpu();
     }
 
     /**
-     * @brief Uploads the vertices and indices to the primitive mesh. Moves the vertices (no copy)
-     * into a cpu-side buffer if the property `KeepInMemory` is true.
+     * @brief Uploads the vertices to the mesh's GPU buffers and copies the data into a cpu-side buffer if the property
+     * `KeepInMemory` is true.
      */
-    void UploadVertices(const FxSizedArray<TVertexType>& vertices)
+    template <RxVertexType TVertexType>
+    void UploadVertices(const FxSizedArray<RxVertex<TVertexType>>& vertices)
     {
-        if (bKeepInMemory) {
-            VertexList.LocalBuffer.InitAsCopyOf(vertices);
-        }
-
+        VertexList.CreateAsCopyOf<TVertexType>(vertices);
         UploadVertices();
     }
 
-    /**
-     * @brief Uploads mesh vertices to a primtive mesh, and stores the vertices without copy if the property
-     * `KeepInMemory` is true.
-     */
-    void UploadVertices(FxSizedArray<TVertexType>&& vertices)
+    template <RxVertexType TVertexType>
+    void UploadVertices(FxSizedArray<RxVertex<TVertexType>>&& vertices)
     {
-        if (bKeepInMemory) {
-            VertexList.LocalBuffer = std::move(vertices);
-        }
-
+        VertexList.CreateFrom(vertices);
         UploadVertices();
     }
 
     /** @brief Uploads mesh indices to a primitive mesh. */
     void UploadIndices(const FxSizedArray<uint32>& indices)
     {
-        if (bKeepInMemory) {
-            LocalIndexBuffer.InitAsCopyOf(indices);
-        }
-
-        GpuIndexBuffer.Create(RxGpuBufferType::eIndexBuffer, indices);
+        LocalIndexBuffer.InitAsCopyOf(indices);
+        GpuIndexBuffer.Create(RxGpuBufferType::eIndexBuffer, FxSlice(indices));
     }
 
     /**
@@ -93,28 +81,18 @@ public:
      */
     void UploadIndices(FxSizedArray<uint32>&& indices)
     {
-        GpuIndexBuffer.Create(RxGpuBufferType::eIndexBuffer, indices);
+        GpuIndexBuffer.Create<uint32>(RxGpuBufferType::eIndexBuffer, indices);
         LocalIndexBuffer = std::move(indices);
     }
 
-    FxVec3f GetDimensions()
-    {
-        if (VertexList.LocalBuffer.IsEmpty()) {
-            FxLogError("Cannot get dimensions of object that does not have local vertices!");
-            return FxVec3f::sZero;
-        }
-
-        return FxMeshUtil::CalculateDimensions(VertexList.LocalBuffer);
-    }
-
-    FxSizedArray<TVertexType>& GetVertices()
+    RxVertexList& GetVertices()
     {
         if (!bKeepInMemory) {
             FxLogWarning("Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
         }
 
-        // This will return an empty FxSizedArray if `KeepInMemory` is false!
-        return VertexList.LocalBuffer;
+        // Note that VertexList.LocalBuffer will be empty given bKeepInMemory is false.
+        return VertexList;
     }
 
     FxSizedArray<uint32>& GetIndices()
@@ -123,7 +101,7 @@ public:
             FxLogWarning("Requesting indices from a primitive mesh while `KeepInMemory` != true!");
         }
 
-        // This will return an empty FxSizedArray if `KeepInMemory` is false!
+        // This will return an empty array if `KeepInMemory` is false!
         return LocalIndexBuffer;
     }
 
@@ -149,23 +127,23 @@ public:
         using VertexType = RxVertex<RxVertexType::eDefault>;
 
         if (LocalIndexBuffer.IsEmpty()) {
-            FxLogWarning("Cannot recalculate normals as a local indices are missing!");
+            FxLogWarning("Cannot recalculate normals as local indices are missing!");
             return;
         }
 
-        if (VertexList.LocalBuffer.IsEmpty()) {
-            FxLogWarning("Cannot recalculate normals as a local vertices are missing!");
+        FxAnonArray& vertices = VertexList.GetLocalBuffer();
+
+        if (vertices.IsEmpty()) {
+            FxLogWarning("Cannot recalculate normals as local vertices are missing!");
             return;
         }
-
-        FxSizedArray<VertexType>& vertices = VertexList.LocalBuffer;
 
         const uint32 num_vertices = vertices.Size;
         const uint32 num_faces = num_vertices / 3;
 
         // Zero the mesh normals
         for (uint32 index = 0; index < num_vertices; index++) {
-            memset(vertices[index].Normal, 0, sizeof(float32) * 3);
+            memset(vertices.Get<VertexType>(index).Normal, 0, sizeof(VertexType::Normal));
         }
 
         for (uint32 index = 0; index < num_faces; index++) {
@@ -190,9 +168,9 @@ public:
              */
 
 
-            VertexType& vertex_a = vertices.pData[index_a];
-            VertexType& vertex_b = vertices.pData[index_b];
-            VertexType& vertex_c = vertices.pData[index_c];
+            VertexType& vertex_a = vertices.Get<VertexType>(index_a);
+            VertexType& vertex_b = vertices.Get<VertexType>(index_b);
+            VertexType& vertex_c = vertices.Get<VertexType>(index_c);
 
             const FxVec3f edge_a = FxVec3f::FromDifference(vertex_a.Position, vertex_b.Position);
             const FxVec3f edge_b = FxVec3f::FromDifference(vertex_c.Position, vertex_b.Position);
@@ -213,8 +191,8 @@ public:
         }
 
 
-        for (uint32 index = 0; index < VertexList.LocalBuffer.Size; index++) {
-            VertexType& vertex = VertexList.LocalBuffer[index];
+        for (uint32 index = 0; index < vertices.Size; index++) {
+            VertexType& vertex = vertices.Get<VertexType>(index);
 
             FxVec3f vec(vertex.Position);
             vec.NormalizeIP();
@@ -249,7 +227,7 @@ public:
     std::atomic_bool bIsReady = std::atomic_bool(false);
 
     bool bIsReference = false;
-    bool bKeepInMemory = false;
+    bool bKeepInMemory = true;
 
     RxGpuBuffer GpuIndexBuffer;
     FxSizedArray<uint32> LocalIndexBuffer;

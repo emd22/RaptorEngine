@@ -38,7 +38,7 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f
     }
 }
 
-void PhObject::CreateMeshBody(const FxPrimitiveMesh<>& mesh, PhMotionType motion_type,
+void PhObject::CreateMeshBody(const FxPrimitiveMesh& mesh, PhMotionType motion_type,
                               const PhProperties& object_properties)
 {
     mMotionType = motion_type;

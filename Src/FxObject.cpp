@@ -10,12 +10,13 @@
 #include <FxObjectManager.hpp>
 #include <FxScene.hpp>
 #include <Physics/PhJolt.hpp>
+#include <Renderer/FxMeshUtil.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 FxObject::FxObject() { ObjectId = gObjectManager->GenerateObjectId(); }
 
-void FxObject::Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material)
+void FxObject::Create(const FxRef<FxPrimitiveMesh>& mesh, const FxRef<FxMaterial>& material)
 {
     pMesh = mesh;
     pMaterial = material;
@@ -35,7 +36,9 @@ bool FxObject::CheckIfReady()
                 return (mbReadyToRender = false);
             }
 
-            Dimensions = pMesh->GetDimensions();
+
+            Dimensions = FxMeshUtil::CalculateDimensions(pMesh->GetVertices());
+            // Dimensions = pMesh->GetDimensions();
         }
 
         if (pMaterial && !pMaterial->IsReady()) {
@@ -66,7 +69,8 @@ bool FxObject::CheckIfReady()
         return (mbReadyToRender = false);
     }
 
-    Dimensions = pMesh->GetDimensions();
+    // Dimensions = pMesh->GetDimensions();
+    Dimensions = FxMeshUtil::CalculateDimensions(pMesh->GetVertices());
 
     return (mbReadyToRender = true);
 }
@@ -88,7 +92,7 @@ void FxObject::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVe
 }
 
 
-void FxObject::PhysicsCreateMesh(FxRef<FxPrimitiveMesh<>> custom_physics_mesh, PhMotionType motion_type,
+void FxObject::PhysicsCreateMesh(FxRef<FxPrimitiveMesh> custom_physics_mesh, PhMotionType motion_type,
                                  const PhProperties& physics_properties)
 {
     OnLoaded(
@@ -96,7 +100,7 @@ void FxObject::PhysicsCreateMesh(FxRef<FxPrimitiveMesh<>> custom_physics_mesh, P
         {
             FxRef<FxObject> asset = base_asset;
 
-            FxRef<FxPrimitiveMesh<>> physics_mesh { nullptr };
+            FxRef<FxPrimitiveMesh> physics_mesh { nullptr };
             physics_mesh = custom_physics_mesh ? custom_physics_mesh : asset->pMesh;
 
             FxAssert(physics_mesh.IsValid());
@@ -439,8 +443,7 @@ void FxObject::SetPhysicsEnabled(bool enabled)
 void FxObject::PrintDebug() const
 {
     FxLogInfo("FxObject '{}' (Id={}) {{", Name.Get(), ObjectId);
-    FxLogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale,
-              pMesh ? pMesh->GetDimensions() : FxVec3f::sZero);
+    FxLogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
     FxLogInfo("\tHasPhys?={}, Enabled?={}, Type={}", Physics.mbHasPhysicsBody, mbPhysicsEnabled,
               Physics.GetMotionType() == PhMotionType::eStatic ? "Static" : "Dynamic");
     FxLogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}", mbIsInstance, mbReadyToRender, mbIsShadowCaster);
