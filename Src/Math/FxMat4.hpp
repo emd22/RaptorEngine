@@ -3,6 +3,7 @@
 #include "FxVec3.hpp"
 #include "FxVec4.hpp"
 
+
 #if FX_USE_NEON
 #include <arm_neon.h>
 #elif FX_USE_AVX

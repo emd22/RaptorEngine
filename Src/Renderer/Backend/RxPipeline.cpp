@@ -17,7 +17,7 @@ static RxPipeline* spBoundPipeline = nullptr;
 
 FxVertexInfo FxMakeVertexInfo()
 {
-    using VertexType = RxVertexDefault;
+    using VertexType = RxVertex<RxVertexType::eDefault>;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,
@@ -39,7 +39,7 @@ FxVertexInfo FxMakeVertexInfo()
 
 FxVertexInfo FxMakeLightVertexInfo()
 {
-    using VertexType = RxVertexBase;
+    using VertexType = RxVertex<RxVertexType::eSlim>;
 
     VkVertexInputBindingDescription binding_desc = {
         .binding = 0,

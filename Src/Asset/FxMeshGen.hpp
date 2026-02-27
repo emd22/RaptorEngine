@@ -11,15 +11,17 @@ struct FxMeshGenOptions
 class FxMeshGen
 {
 public:
-    using PositionVertex = RxVertexBase;
+    using PositionVertex = RxVertex<RxVertexType::eSlim>;
 
     struct GeneratedMesh
     {
         FxSizedArray<FxVec3f> Positions;
         FxSizedArray<uint32> Indices;
 
-        FxRef<FxPrimitiveMesh<PositionVertex>> AsPositionsMesh();
-        FxRef<FxPrimitiveMesh<>> AsMesh();
+        FxRef<FxPrimitiveMesh> AsMesh(RxVertexType vertex_type);
+
+        FxRef<FxPrimitiveMesh> AsSlimMesh();
+        FxRef<FxPrimitiveMesh> AsDefaultMesh();
 
         void Destroy()
         {
@@ -28,6 +30,8 @@ public:
         }
 
         ~GeneratedMesh() { Destroy(); }
+
+    private:
     };
 
 public:

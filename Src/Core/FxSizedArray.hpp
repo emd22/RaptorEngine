@@ -256,8 +256,8 @@ public:
         Size = 0;
     }
 
-    inline bool IsEmpty() const { return Size == 0; }
-    inline bool IsNotEmpty() const { return !IsEmpty(); }
+    FX_FORCE_INLINE bool IsEmpty() const { return Size == 0; }
+    FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
 
     TElementType& Insert(const TElementType& object)
     {

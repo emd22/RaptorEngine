@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/FxTypes.hpp>
+#include <format>
 
 template <typename Type>
 class FxVec2Base
@@ -68,10 +69,7 @@ public:
     /**
      * @brief Checks if a vector is **exactly** equal to another vector. This does not account for floating point error.
      */
-    bool operator==(const FxVec2Base<Type>& other) const
-    { 
-        return (X == other.X && Y == other.Y);
-    }
+    bool operator==(const FxVec2Base<Type>& other) const { return (X == other.X && Y == other.Y); }
 
     FxVec2Base<Type>& operator=(const FxVec2Base<Type>& other)
     {

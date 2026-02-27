@@ -12,7 +12,6 @@
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
 
-template <typename T>
 class FxPrimitiveMesh;
 
 class FxObject : public AxBase, public FxEntity
@@ -30,7 +29,7 @@ public:
 
     void MakeInstanceOf(const FxRef<FxObject>& source_ref);
 
-    void Create(const FxRef<FxPrimitiveMesh<>>& mesh, const FxRef<FxMaterial>& material);
+    void Create(const FxRef<FxPrimitiveMesh>& mesh, const FxRef<FxMaterial>& material);
 
     /**
      * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
@@ -51,7 +50,7 @@ public:
     void PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
                                 const PhProperties& physics_properties);
 
-    void PhysicsCreateMesh(FxRef<FxPrimitiveMesh<>> physics_mesh, PhMotionType motion_type,
+    void PhysicsCreateMesh(FxRef<FxPrimitiveMesh> physics_mesh, PhMotionType motion_type,
                            const PhProperties& physics_properties);
 
     void PrintDebug() const;
@@ -83,7 +82,8 @@ private:
     void SyncObjectWithPhysics();
 
 public:
-    FxRef<FxPrimitiveMesh<>> pMesh { nullptr };
+    FxRef<FxPrimitiveMesh> pMesh { nullptr };
+
     FxRef<FxMaterial> pMaterial { nullptr };
 
     FxPagedArray<FxRef<FxObject>> AttachedNodes;

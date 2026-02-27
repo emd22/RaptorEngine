@@ -38,15 +38,10 @@ public:
     // TODO: Player attachment system
     FxRef<FxObject> pPistolObject { nullptr };
     FxRef<FxObject> pHelmetObject { nullptr };
-    // FxRef<FxObject> pLevelObject { nullptr };
-    FxRef<FxObject> pSkyboxObject { nullptr };
-
-    FxRef<FxObject> pHelmetInstance { nullptr };
 
 
     FxQuat PistolRotationGoal = FxQuat::sIdentity;
 
-    FxRef<FxPrimitiveMesh<FxMeshGen::PositionVertex>> pSkyboxMesh { nullptr };
     double DeltaTime = 1.0f / 60.0f;
 
     FxObjectManager ObjectManager;

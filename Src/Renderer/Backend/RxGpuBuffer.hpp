@@ -4,6 +4,8 @@
 #include "Fwd/Rx_Fwd_GetGpuAllocator.hpp"
 #include "Fwd/Rx_Fwd_SubmitUploadGpuCmd.hpp"
 
+#include <Core/FxAnonArray.hpp>
+#include <Core/FxSlice.hpp>
 #include <Core/FxTypes.hpp>
 #include <Core/FxUtil.hpp>
 
@@ -108,25 +110,21 @@ public:
     }
 
     void Map();
+    void UnMap();
 
     bool IsMapped() const { return pMappedBuffer != nullptr; }
 
-    void UnMap();
+    /**
+     * @brief Uploads raw data buffer to the GPU buffer.
+     * @param data The data to upload
+     * @param size The size of the buffer in bytes
+     */
+    void Upload(void* data, uint64 size);
 
     template <typename TElementType>
     void Upload(const FxSizedArray<TElementType>& data)
     {
-        FxDebugAssert(data.Size > 0);
-        FxDebugAssert(data.pData != nullptr);
-
-        FxAssertMsg(this->Size >= data.GetSizeInBytes(), "GPU buffer is smaller than source buffer!");
-
-        Map();
-
-        const size_t size_in_bytes = data.GetSizeInBytes();
-        memcpy(pMappedBuffer, data.pData, size_in_bytes);
-
-        UnMap();
+        Upload(reinterpret_cast<void*>(data.pData), data.GetSizeInBytes());
     }
 
     void Destroy();
@@ -185,7 +183,7 @@ private:
 
 
 /**
- * A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
+ * @brief A GPU buffer that is created CPU side, and copied over to a GPU-only buffer. This is the default
  * buffer type.
  */
 class RxGpuBuffer : public RxRawGpuBuffer
@@ -196,15 +194,19 @@ private:
 public:
     RxGpuBuffer() = default;
 
+
+    void Create(RxGpuBufferType buffer_type, void* data, uint64 size);
+    void Create(RxGpuBufferType buffer_type, const FxAnonArray& data);
+
     template <typename TElementType>
-    void Create(RxGpuBufferType buffer_type, const FxSizedArray<TElementType>& data)
+    void Create(RxGpuBufferType buffer_type, const FxSlice<TElementType>& data)
     {
-        this->Size = data.Size * sizeof(TElementType);
-        this->Type = buffer_type;
+        Size = data.Size * sizeof(TElementType);
+        Type = buffer_type;
 
         RxRawGpuBuffer staging_buffer;
         staging_buffer.Create(RxGpuBufferType::eTransfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        staging_buffer.Upload(data);
+        staging_buffer.Upload(data, Size);
 
         // Create the GPU-only buffer as a transfer destination
         this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, RxGpuBufferFlags::eTransferReceiver);

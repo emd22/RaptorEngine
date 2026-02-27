@@ -9,7 +9,6 @@
 #include <FxMaterial.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
-template <typename T>
 class FxPrimitiveMesh;
 
 struct PhProperties
@@ -55,7 +54,7 @@ public:
     void CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
                              const PhProperties& object_properties);
 
-    void CreateMeshBody(const FxPrimitiveMesh<>& mesh, PhMotionType motion_type, const PhProperties& object_properties);
+    void CreateMeshBody(const FxPrimitiveMesh& mesh, PhMotionType motion_type, const PhProperties& object_properties);
 
     void DestroyPhysicsBody();
 

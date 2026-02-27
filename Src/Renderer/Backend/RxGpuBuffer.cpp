@@ -96,3 +96,47 @@ void RxRawGpuBuffer::Destroy()
     Allocation = nullptr;
     Buffer = nullptr;
 }
+
+void RxRawGpuBuffer::Upload(void* data, uint64 size)
+{
+    FxDebugAssert(size > 0);
+    FxDebugAssert(data != nullptr);
+
+    FxAssertMsg(this->Size >= size, "GPU buffer is smaller than source buffer!");
+
+    Map();
+    memcpy(pMappedBuffer, data, size);
+    UnMap();
+}
+
+/////////////////////////////////////
+// Staged Gpu Buffer Functions
+/////////////////////////////////////
+
+void RxGpuBuffer::Create(RxGpuBufferType buffer_type, void* data, uint64 size)
+{
+    Size = size;
+    Type = buffer_type;
+
+    RxRawGpuBuffer staging_buffer;
+    staging_buffer.Create(RxGpuBufferType::eTransfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    staging_buffer.Upload(data, size);
+
+    // Create the GPU-only buffer as a transfer destination
+    this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, RxGpuBufferFlags::eTransferReceiver);
+
+    // Transfer
+    Fx_Fwd_SubmitUploadCmd(
+        [&](RxCommandBuffer& cmd)
+        {
+            VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
+            vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
+        });
+
+    staging_buffer.Destroy();
+}
+
+void RxGpuBuffer::Create(RxGpuBufferType buffer_type, const FxAnonArray& data)
+{
+    Create(buffer_type, data.pData, data.Size * data.ObjectSize);
+}

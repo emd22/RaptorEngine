@@ -97,16 +97,14 @@ public:
      * pitch of the camera.
      */
     FxVec3f MovementDirection = FxVec3f::sForward;
-
     FxVec3f Position = FxVec3f::sZero;
-
-    bool bIsSprinting = false;
 
     float JumpForce = 0.0f;
 
+    bool bIsSprinting : 1 = false;
+
 private:
     FxVec3f mCameraOffset = FxVec3f::sZero;
-
     FxVec3f mUserForce = FxVec3f::sZero;
 
     bool mbIsApplyingUserForce : 1 = false;

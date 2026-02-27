@@ -4,17 +4,17 @@
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 
 
-PhMesh::PhMesh(const FxPrimitiveMesh<>& mesh)
+PhMesh::PhMesh(const FxPrimitiveMesh& mesh)
 {
-    FxAssert(mesh.VertexList.LocalBuffer.IsNotEmpty());
+    const FxAnonArray& positions = mesh.VertexList.GetLocalBuffer();
+    FxAssert(positions.IsNotEmpty());
 
-    const FxSizedArray<RxVertexDefault>& vertex_buffer = mesh.VertexList.LocalBuffer;
     const FxSizedArray<uint32>& index_buffer = mesh.LocalIndexBuffer;
 
-    VertexList.reserve(vertex_buffer.Size);
+    VertexList.reserve(positions.Size);
 
-    for (uint64 index = 0; index < vertex_buffer.Size; index++) {
-        const RxVertexDefault& vertex = vertex_buffer.pData[index];
+    for (uint64 index = 0; index < positions.Size; index++) {
+        const RxVertex<RxVertexType::eDefault>& vertex = positions.Get<RxVertex<RxVertexType::eDefault>>(index);
 
         VertexList.emplace_back(JPH::Float3 {
             vertex.Position[0],
