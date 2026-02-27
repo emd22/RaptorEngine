@@ -138,5 +138,5 @@ void RxGpuBuffer::Create(RxGpuBufferType buffer_type, void* data, uint64 size)
 
 void RxGpuBuffer::Create(RxGpuBufferType buffer_type, const FxAnonArray& data)
 {
-    Create(buffer_type, data.pData, data.Size);
+    Create(buffer_type, data.pData, data.Size * data.ObjectSize);
 }

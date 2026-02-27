@@ -57,7 +57,7 @@ public:
 
 struct FxLoadObjectOptions
 {
-    bool bKeepInMemory : 1 = false;
+    bool bKeepInMemory : 1 = true;
     bool bGeneratePhysicsMesh : 1 = false;
 };
 

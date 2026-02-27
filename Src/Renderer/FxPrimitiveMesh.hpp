@@ -29,14 +29,6 @@ public:
         CreateFromData(vertices, indices);
     }
 
-    // FxPrimitiveMesh(FxPrimitiveMesh&& other)
-    // {
-    //     VertexList = std::move(other.VertexList);
-    //     GpuIndexBuffer = other.GpuIndexBuffer;
-
-    //     bIsReady = other.bIsReady;
-    // }
-
     /**
      * @brief Recalculates normals if needed and uploads the vertex list to the GPU.
      */
@@ -64,7 +56,7 @@ public:
     template <RxVertexType TVertexType>
     void UploadVertices(FxSizedArray<RxVertex<TVertexType>>&& vertices)
     {
-        VertexList.CreateFrom(vertices);
+        VertexList.CreateFrom<TVertexType>(std::move(vertices));
         UploadVertices();
     }
 
@@ -227,7 +219,7 @@ public:
     std::atomic_bool bIsReady = std::atomic_bool(false);
 
     bool bIsReference = false;
-    bool bKeepInMemory = true;
+    bool bKeepInMemory = false;
 
     RxGpuBuffer GpuIndexBuffer;
     FxSizedArray<uint32> LocalIndexBuffer;

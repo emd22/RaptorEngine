@@ -17,15 +17,15 @@ public:
             return FxVec3f::sZero;
         }
 
-        FxVec3f min_vertex = FxVec3f(10000);
-        FxVec3f max_vertex = FxVec3f(-10000);
+        FxVec3f min_vertex = FxVec3f(FLT_MAX);
+        FxVec3f max_vertex = FxVec3f(-FLT_MAX);
 
         for (uint32 i = 0; i < vertices.Size; i++) {
             // Since the position resides at the same location for each vertex type (see static_assert in
             // RxVertexUtil::GetPosition), the vertex type used here can be anything, and offsets are preserved as the
             // size of the object is stored in the anonymous buffer.
             FxVec3f position = RxVertexUtil::GetPosition(
-                *reinterpret_cast<const RxVertex<RxVertexType::eSlim>*>(vertices.GetRaw(i)));
+                *reinterpret_cast<const RxVertex<RxVertexType::eDefault>*>(vertices.GetRaw(i)));
 
             min_vertex = FxVec3f::Min(min_vertex, position);
             max_vertex = FxVec3f::Max(max_vertex, position);

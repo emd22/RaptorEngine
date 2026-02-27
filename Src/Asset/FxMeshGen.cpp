@@ -82,16 +82,13 @@ FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsDefaultMesh()
 
 FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsMesh(RxVertexType vertex_type)
 {
-    if (vertex_type == RxVertexType::eSlim) {
-        return AsSlimMesh();
-    }
     switch (vertex_type) {
     case RxVertexType::eDefault:
         return AsDefaultMesh();
     case RxVertexType::eSlim:
         return AsSlimMesh();
     default:
-        FxLogError("Mesh type not supported!");
+        FxLogError("Mesh type is not supported!");
     }
 
     return nullptr;

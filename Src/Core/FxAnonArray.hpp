@@ -22,6 +22,8 @@ public:
         (*this) = std::move(other);
     }
 
+    FxAnonArray(const FxAnonArray& other) = delete;
+
     template <typename T>
     FxAnonArray& operator=(FxSizedArray<T>&& other) noexcept
     {
@@ -37,22 +39,26 @@ public:
         return *this;
     }
 
+    FxAnonArray& operator=(const FxAnonArray& other) = delete;
+
     void Create(uint32 object_size, uint32 size);
 
     template <typename T>
-    void InitAsCopyOf(const FxSlice<T>& data)
+    void InitAsCopyOf(const FxSizedArray<T>& data)
     {
         FxAssert(pData == nullptr);
 
-        Create(sizeof(T), data.Size);
-        memcpy(pData, data.pData);
+        Create(sizeof(T), data.Capacity);
+        memcpy(pData, data.pData, data.GetSizeInBytes());
+        Size = data.Size;
     }
 
     template <typename T>
     void Insert(const T& object)
     {
         FxAssert(sizeof(T) == ObjectSize);
-        memcpy(&reinterpret_cast<T*>(pData)[Size++], &object, sizeof(T));
+        memcpy(&reinterpret_cast<T*>(pData)[Size], &object, sizeof(T));
+        ++Size;
     }
 
     FX_FORCE_INLINE bool IsEmpty() const { return pData == nullptr || Size == 0; }
@@ -77,12 +83,16 @@ public:
     void* GetRaw(uint32 index)
     {
         FxAssert(index < Size);
+        FxAssert(ObjectSize > 0);
+
         return reinterpret_cast<void*>(reinterpret_cast<uint8*>(pData) + (index * ObjectSize));
     }
 
     const void* GetRaw(uint32 index) const
     {
         FxAssert(index < Size);
+        FxAssert(ObjectSize > 0);
+
         return reinterpret_cast<void*>(reinterpret_cast<uint8*>(pData) + (index * ObjectSize));
     }
 
@@ -92,6 +102,7 @@ public:
     {
         FxAssert(sizeof(T) == ObjectSize);
         FxAssert(index < Size);
+
         return reinterpret_cast<T*>(pData) + index;
     }
 
