@@ -22,7 +22,7 @@ public:
     void CreatePipeline(const char* name, const FxSlice<RxShaderProgram>& shader_list,
                         const FxSlice<VkAttachmentDescription>& attachments,
                         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-                        FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
+                        RxVertexDescription* vertex_info, const RxRenderPass& render_pass,
                         const RxPipelineProperties& properties);
 
     Handle RequestPipeline(const FxHash32 name_hash);

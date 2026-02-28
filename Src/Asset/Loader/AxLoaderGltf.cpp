@@ -57,8 +57,6 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
 
     mesh->VertexList.CreateFrom<RxVertexType::eDefault>(positions, normals, uvs, tangents);
     mesh->UploadVertices();
-
-    mesh->bIsReady = true;
 }
 
 void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
@@ -165,6 +163,8 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
         UnpackMeshAttributes(current_object, primitive_mesh, primitive);
 
         MakeMaterialForPrimitive(current_object, primitive);
+
+        primitive_mesh->bIsReady = true;
 
         current_object->pMesh = primitive_mesh;
 

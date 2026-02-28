@@ -15,49 +15,10 @@ FX_SET_MODULE_NAME("Pipeline")
 
 static RxPipeline* spBoundPipeline = nullptr;
 
-FxVertexInfo FxMakeVertexInfo()
-{
-    using VertexType = RxVertex<RxVertexType::eDefault>;
-
-    VkVertexInputBindingDescription binding_desc = {
-        .binding = 0,
-        .stride = sizeof(VertexType),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-
-    FxSizedArray<VkVertexInputAttributeDescription> attribs = {
-        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
-        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
-        { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
-        { .location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Tangent) },
-    };
-
-    FxLogDebug("Amount of attributes: {:d}", attribs.Size);
-
-    return { binding_desc, std::move(attribs), true };
-}
-
-FxVertexInfo FxMakeLightVertexInfo()
-{
-    using VertexType = RxVertex<RxVertexType::eSlim>;
-
-    VkVertexInputBindingDescription binding_desc = {
-        .binding = 0,
-        .stride = sizeof(VertexType),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-
-    FxSizedArray<VkVertexInputAttributeDescription> attribs = {
-        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
-    };
-
-    return { binding_desc, std::move(attribs), true };
-}
-
 void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                         const FxSlice<VkAttachmentDescription>& attachments,
                         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-                        FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
+                        RxVertexDescription* vertex_info, const RxRenderPass& render_pass,
                         const RxPipelineProperties& properties)
 {
     mDevice = gRenderer->GetDevice();
@@ -145,9 +106,9 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
 
     if (vertex_info != nullptr) {
         vertex_input_info.vertexBindingDescriptionCount = 1;
-        vertex_input_info.pVertexBindingDescriptions = &vertex_info->binding;
-        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->attributes.Size);
-        vertex_input_info.pVertexAttributeDescriptions = vertex_info->attributes.pData;
+        vertex_input_info.pVertexBindingDescriptions = &vertex_info->Binding;
+        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->Attributes.Size);
+        vertex_input_info.pVertexAttributeDescriptions = vertex_info->Attributes.pData;
     }
 
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {

@@ -117,7 +117,7 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& SetVertexInfo(FxVertexInfo* vertex_info)
+    FX_FORCE_INLINE RxPipelineBuilder& SetVertexDescription(RxVertexDescription* vertex_info)
     {
         mVertexInfo = vertex_info;
         return *this;
@@ -223,7 +223,7 @@ private:
 
     RxRenderPass* mRenderPass { nullptr };
 
-    FxVertexInfo* mVertexInfo { nullptr };
+    RxVertexDescription* mVertexInfo { nullptr };
     RxPipelineProperties mProperties;
 
     bool mbDidFirstBuild = false;

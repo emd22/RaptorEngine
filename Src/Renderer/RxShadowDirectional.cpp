@@ -37,7 +37,7 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
     FxRef<RxShaderProgram> vertex_shader = shader_shadow.GetProgram(RxShaderType::eVertex, {});
     FxRef<RxShaderProgram> fragment_shader = shader_shadow.GetProgram(RxShaderType::eFragment, {});
 
-    FxVertexInfo vertex_info = FxMakeVertexInfo();
+    RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
     RxPipelineProperties pipeline_properties {
         .ViewportSize = size,
@@ -52,7 +52,7 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
         .SetAttachments(&RenderStage.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&RenderStage.GetRenderPass())
-        .SetVertexInfo(&vertex_info)
+        .SetVertexDescription(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 

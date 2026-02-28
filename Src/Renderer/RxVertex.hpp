@@ -58,20 +58,17 @@ struct RxVertex<RxVertexType::eSkinned>
 #pragma pack(pop)
 
 
-class RxVertexUtil
+namespace RxVertexUtil {
+template <RxVertexType TVertexType>
+FxVec3f GetPosition(const RxVertex<TVertexType>& vertex)
 {
-public:
-    template <RxVertexType TVertexType>
-    static FxVec3f GetPosition(const RxVertex<TVertexType>& vertex)
-    {
-        static_assert(offsetof(RxVertex<RxVertexType::eSlim>, Position) ==
-                          offsetof(RxVertex<RxVertexType::eDefault>, Position) &&
-                      offsetof(RxVertex<RxVertexType::eDefault>, Position) ==
-                          offsetof(RxVertex<RxVertexType::eSkinned>, Position));
+    static_assert(
+        offsetof(RxVertex<RxVertexType::eSlim>, Position) == offsetof(RxVertex<RxVertexType::eDefault>, Position) &&
+        offsetof(RxVertex<RxVertexType::eDefault>, Position) == offsetof(RxVertex<RxVertexType::eSkinned>, Position));
 
-        return FxVec3f(vertex.Position);
-    }
-};
+    return FxVec3f(vertex.Position);
+}
+}; // namespace RxVertexUtil
 
 
 template <>
