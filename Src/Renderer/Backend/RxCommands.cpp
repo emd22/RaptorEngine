@@ -3,7 +3,7 @@
 #include "RxDevice.hpp"
 
 #include <Core/FxPanic.hpp>
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 

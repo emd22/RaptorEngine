@@ -16,6 +16,7 @@
 #include <FxMaterial.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/RxShadowDirectional.hpp>
 #include <csignal>
@@ -50,6 +51,7 @@ void FoxtrotGame::InitEngine()
 
     // Create the global engine variables
     FxEngineGlobalsInit();
+    RxGlobals::Init();
 
 
     FxControlManager::Init();

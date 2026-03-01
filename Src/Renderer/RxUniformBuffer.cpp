@@ -3,7 +3,7 @@
 #include "RxConstants.hpp"
 #include "RxRenderBackend.hpp"
 
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 
 void RxUniforms::Create()
 {

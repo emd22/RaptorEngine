@@ -1,6 +1,6 @@
 #include "RxAttachment.hpp"
 
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size)

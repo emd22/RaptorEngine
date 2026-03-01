@@ -17,8 +17,10 @@
 #include <Core/FxTypes.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
 #include <Renderer/FxCamera.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <thread>
 #include <vector>
+
 
 #define FX_VULKAN_DEBUG 1
 

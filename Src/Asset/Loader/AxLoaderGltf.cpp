@@ -5,12 +5,13 @@
 #include <Asset/AxBase.hpp>
 #include <Asset/AxManager.hpp>
 #include <Core/FxRef.hpp>
-#include <FxEngine.hpp>
 #include <FxMaterial.hpp>
 #include <FxObject.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
+
+// Renderer includes
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
-#include <iostream>
 
 FxRef<AxImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
 

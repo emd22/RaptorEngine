@@ -12,6 +12,7 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/FxMeshUtil.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 FxObject::FxObject() { ObjectId = gObjectManager->GenerateObjectId(); }

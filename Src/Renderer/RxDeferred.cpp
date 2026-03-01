@@ -7,6 +7,7 @@
 #include <FxObjectManager.hpp>
 #include <Renderer/FxCamera.hpp>
 #include <Renderer/RxDeferred.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 

@@ -3,6 +3,7 @@
 #include <FxEngine.hpp>
 #include <FxObject.hpp>
 #include <Renderer/Backend/RxDsLayoutBuilder.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 void FxObjectManager::Create()

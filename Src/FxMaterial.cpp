@@ -5,12 +5,12 @@
 #include <Asset/AxManager.hpp>
 #include <Core/FxDefines.hpp>
 #include <Core/FxStackArray.hpp>
-#include <FxEngine.hpp>
 #include <FxObjectManager.hpp>
 #include <Renderer/Backend/RxCommands.hpp>
 #include <Renderer/Backend/RxDevice.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
 #include <Renderer/RxDeferred.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 FX_SET_MODULE_NAME("FxMaterial")

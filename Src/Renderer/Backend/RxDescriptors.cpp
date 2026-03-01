@@ -1,7 +1,7 @@
 #include "RxDescriptors.hpp"
 
-#include <FxEngine.hpp>
 #include <Renderer/RxAttachment.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 /////////////////////////////////////

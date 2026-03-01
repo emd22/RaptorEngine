@@ -6,8 +6,8 @@
 
 #include <Core/FxPanic.hpp>
 #include <Core/FxStackArray.hpp>
-#include <FxEngine.hpp>
 #include <Renderer/RxDeferred.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 

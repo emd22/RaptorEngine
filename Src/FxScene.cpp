@@ -1,6 +1,6 @@
 #include "FxScene.hpp"
 
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/RxShadowDirectional.hpp>
 

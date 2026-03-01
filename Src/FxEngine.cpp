@@ -1,35 +1,19 @@
 #include "FxEngine.hpp"
 
 #include <Asset/FxShaderCompiler.hpp>
-#include <Core/FxRef.hpp>
-#include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
-#include <Renderer/RxPipelineList.hpp>
-#include <Renderer/RxRenderBackend.hpp>
-#include <Renderer/RxRenderPassCache.hpp>
-#include <Renderer/RxSamplerCache.hpp>
-#include <Renderer/RxShadowDirectional.hpp>
 
-RxRenderBackend* gRenderer = nullptr;
 PhJolt* gPhysics = nullptr;
 FxShaderCompiler* gShaderCompiler = nullptr;
-RxPipelineList* gPipelines = nullptr;
-RxRenderPassCache* gRenderPassCache = nullptr;
 FxObjectManager* gObjectManager = nullptr;
-RxShadowDirectional* gShadowRenderer = nullptr;
-RxSamplerCache* gSamplerCache = nullptr;
 
 
 void FxEngineGlobalsInit()
 {
-    gRenderer = new RxRenderBackend;
     gPhysics = new PhJolt;
     gShaderCompiler = new FxShaderCompiler;
-    // gRenderPassCache = new RxRenderPassCache;
-    gPipelines = new RxPipelineList;
     gObjectManager = new FxObjectManager;
-    gSamplerCache = new RxSamplerCache;
 }
 
 void FxEngineGlobalsDestroy()
@@ -40,15 +24,6 @@ void FxEngineGlobalsDestroy()
     delete gShaderCompiler;
     gShaderCompiler = nullptr;
 
-    delete gPipelines;
-    gPipelines = nullptr;
-
     delete gObjectManager;
     gObjectManager = nullptr;
-
-    delete gRenderer;
-    gRenderer = nullptr;
-
-
-    // delete gRenderPassCache;
 }

@@ -6,8 +6,8 @@
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxStackArray.hpp>
-#include <FxEngine.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
+#include <Renderer/RxGlobals.hpp>
 
 FX_SET_MODULE_NAME("RxImage")
 

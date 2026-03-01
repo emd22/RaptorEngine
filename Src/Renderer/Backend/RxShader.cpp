@@ -7,12 +7,9 @@
 #include <Core/FxFile.hpp>
 #include <Core/FxTypes.hpp>
 #include <Core/MemPool/FxMemPool.hpp>
-#include <Renderer/RxRenderBackend.hpp>
-// #include <fstream>
-// #include <ios>
-// #include <iostream>
-
 #include <Math/FxMathUtil.hpp>
+#include <Renderer/RxGlobals.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 
 FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
