@@ -15,6 +15,37 @@ FX_FORCE_INLINE float32 FxVec4f::LengthSquared() const
     return vaddvq_f32(vec);
 }
 
+FX_FORCE_INLINE bool FxVec4f::IsCloseTo(const FxVec4f& other, const float32 tolerance) const
+{
+    return IsCloseTo(other.mIntrin);
+}
+
+FX_FORCE_INLINE bool FxVec4f::IsCloseTo(const FxVec4f::SimdType other, const float32 tolerance) const
+{
+    // Get the absolute difference between the vectors
+    const float32x4_t diff = vabdq_f32(mIntrin, other);
+
+    // Is the difference greater than our threshold?
+    const uint32x4_t lt = vcgtq_f32(diff, vdupq_n_f32(tolerance));
+
+    // If any components are true, return false.
+    return vmaxvq_u32(lt) == 0;
+}
+
+FX_FORCE_INLINE bool FxVec4f::IsZero() const
+{
+    const uint32x4_t is_zero_v = vceqzq_f32(mIntrin);
+    return vmaxvq_u32(is_zero_v) == 0;
+}
+
+FX_FORCE_INLINE bool FxVec4f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
+
+FX_FORCE_INLINE void FxVec4f::Set(float32 x, float32 y, float32 z, float32 w)
+{
+    const float32 v[4] = { x, y, z, w };
+    this->mIntrin = vld1q_f32(v);
+}
+
 
 ///////////////////////////////
 // Vec + Vec Operators

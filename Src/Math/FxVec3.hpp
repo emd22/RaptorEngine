@@ -9,12 +9,10 @@
 
 #include <arm_neon.h>
 #elif defined(FX_USE_AVX)
-#include "FxAVXUtil.hpp"
 #include "FxSSE.hpp"
+#include "FxSSEUtil.hpp"
 
 #endif
-
-#include <cmath>
 
 class FxVec4f;
 
@@ -46,13 +44,15 @@ public:
     FxVec3f(const float32* values);
     FxVec3f(const JPH::Vec3& other);
 
+    explicit FxVec3f(float32 scalar);
+
 #ifdef FX_USE_SIMD
+    explicit FxVec3f(SimdType intrin) : mIntrin(intrin) {}
     FxVec3f(const FxVec4f& other);
 #else
     FxVec3f(const FxVec4f& other) : X(other.X), Y(other.Y), Z(other.Z) {}
 #endif
 
-    explicit FxVec3f(float32 scalar);
 
     FX_FORCE_INLINE void Set(float32 x, float32 y, float32 z);
 
@@ -75,20 +75,6 @@ public:
         output[2] = Z;
     }
 
-    FX_FORCE_INLINE FxVec3f operator+(const FxVec3f& other) const;
-    FX_FORCE_INLINE FxVec3f operator-(const FxVec3f& other) const;
-    FX_FORCE_INLINE FxVec3f operator*(const FxVec3f& other) const;
-
-    FX_FORCE_INLINE FxVec3f operator*(float32 scalar) const;
-    FX_FORCE_INLINE FxVec3f operator/(float32 scalar) const;
-
-    FX_FORCE_INLINE FxVec3f operator-() const;
-
-    FX_FORCE_INLINE FxVec3f& operator+=(const FxVec3f& other);
-    FX_FORCE_INLINE FxVec3f& operator-=(float32 scalar);
-    FX_FORCE_INLINE FxVec3f& operator-=(const FxVec3f& other);
-    FX_FORCE_INLINE FxVec3f& operator*=(const FxVec3f& other);
-
     FX_FORCE_INLINE float32 DistanceTo(const FxVec3f& other) const { return (other - *this).Length(); }
 
     FX_FORCE_INLINE bool IntersectsSphere(const FxVec3f& sphere_center, float32 sphere_radius) const
@@ -105,6 +91,9 @@ public:
     FX_FORCE_INLINE bool IsZero() const;
     FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
     FX_FORCE_INLINE bool IsCloseTo(const FxVec3f& other, const float32 tolerance = 0.00001) const;
+#ifdef FX_USE_SIMD
+    FX_FORCE_INLINE bool IsCloseTo(const SimdType other, const float32 tolerance = 0.00001) const;
+#endif
     bool IsCloseTo(const JPH::Vec3& other, const float32 threshold = 0.001) const;
 
     FX_FORCE_INLINE FxVec3f Normalize() const;
@@ -127,7 +116,6 @@ public:
     FX_FORCE_INLINE static FxVec3f Min(const FxVec3f& a, const FxVec3f& b);
     FX_FORCE_INLINE static FxVec3f Max(const FxVec3f& a, const FxVec3f& b);
     FX_FORCE_INLINE static FxVec3f Clamp(const FxVec3f& v, const FxVec3f& min, const FxVec3f& max);
-
     FX_FORCE_INLINE static FxVec3f Lerp(const FxVec3f& a, const FxVec3f& b, const float f);
     FX_FORCE_INLINE FxVec3f& LerpIP(const FxVec3f& dest, const float step);
 
@@ -139,35 +127,31 @@ public:
 
     void Print() const;
 
-#ifdef FX_USE_SIMD
-    FX_FORCE_INLINE bool IsCloseTo(const SimdType other, const float32 tolerance = 0.00001) const;
-#endif
-
 #ifdef FX_USE_NEON
+    // Neon has optimized fetch's when using the intrinsic
     FX_FORCE_INLINE float32 GetX() const { return vgetq_lane_f32(mIntrin, 0); }
     FX_FORCE_INLINE float32 GetY() const { return vgetq_lane_f32(mIntrin, 1); }
     FX_FORCE_INLINE float32 GetZ() const { return vgetq_lane_f32(mIntrin, 2); }
+#else
+    FX_FORCE_INLINE float32 GetX() const { return X; }
+    FX_FORCE_INLINE float32 GetY() const { return Y; }
+    FX_FORCE_INLINE float32 GetZ() const { return Z; }
+#endif
 
+#ifdef FX_USE_NEON
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         return FxVec3f(FxNeon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
-#elif FX_USE_AVX
-    FX_FORCE_INLINE float32 GetX() const { return X; }
-    FX_FORCE_INLINE float32 GetY() const { return Y; }
-    FX_FORCE_INLINE float32 GetZ() const { return Z; }
 
+#elif FX_USE_AVX
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
         return FxVec3f(FxSSE::SetSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
 #else
-    FX_FORCE_INLINE float32 GetX() const { return X; }
-    FX_FORCE_INLINE float32 GetY() const { return Y; }
-    FX_FORCE_INLINE float32 GetZ() const { return Z; }
-
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
@@ -178,12 +162,28 @@ public:
 
         return FxVec3f(rx, ry, rz, rw);
     }
-
 #endif
 
-#ifdef FX_USE_SIMD
-    explicit FxVec3f(SimdType intrin) : mIntrin(intrin) {}
+    /////////////////////////////////////
+    // Operator overloads
+    /////////////////////////////////////
 
+    FX_FORCE_INLINE FxVec3f operator+(const FxVec3f& other) const;
+    FX_FORCE_INLINE FxVec3f operator-(const FxVec3f& other) const;
+    FX_FORCE_INLINE FxVec3f operator*(const FxVec3f& other) const;
+    FX_FORCE_INLINE FxVec3f operator/(const FxVec3f& other) const;
+
+    FX_FORCE_INLINE FxVec3f operator*(float32 scalar) const;
+    FX_FORCE_INLINE FxVec3f operator/(float32 scalar) const;
+
+    FX_FORCE_INLINE FxVec3f operator-() const;
+
+    FX_FORCE_INLINE FxVec3f& operator+=(const FxVec3f& other);
+    FX_FORCE_INLINE FxVec3f& operator-=(float32 scalar);
+    FX_FORCE_INLINE FxVec3f& operator-=(const FxVec3f& other);
+    FX_FORCE_INLINE FxVec3f& operator*=(const FxVec3f& other);
+
+#ifdef FX_USE_SIMD
     FxVec3f& operator=(const SimdType& other)
     {
         mIntrin = other;

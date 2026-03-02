@@ -4,9 +4,9 @@
 
 #ifdef FX_USE_AVX
 
-#include <Math/FxAVXUtil.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxSSE.hpp>
+#include <Math/FxSSEUtil.hpp>
 
 FX_FORCE_INLINE FxQuat& FxQuat::operator=(const __m128 other)
 {

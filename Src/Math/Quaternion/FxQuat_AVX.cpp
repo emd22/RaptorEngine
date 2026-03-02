@@ -6,10 +6,10 @@
 #include <ThirdParty/Jolt/Math/Quat.h>
 #include <math.h>
 
-#include <Math/FxAVXUtil.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxSSE.hpp>
+#include <Math/FxSSEUtil.hpp>
 
 const FxQuat FxQuat::sIdentity = FxQuat(0, 0, 0, 1);
 

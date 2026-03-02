@@ -3,10 +3,10 @@
 #ifdef FX_USE_AVX
 
 #include <Core/FxTypes.hpp>
-#include <Math/FxAVXUtil.hpp>
 #include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxSSE.hpp>
+#include <Math/FxSSEUtil.hpp>
 
 static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                             0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };

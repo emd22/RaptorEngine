@@ -5,13 +5,23 @@
 
 
 #ifdef FX_USE_NEON
+#include "FxNeonUtil.hpp"
+
 #include <arm_neon.h>
 #elif defined(FX_USE_AVX)
 #include "FxSSE.hpp"
+#include "FxSSEUtil.hpp"
 #endif
 
 class alignas(16) FxVec4f
 {
+private:
+#if defined(FX_USE_NEON)
+    using SimdType = float32x4_t;
+#elif defined(FX_USE_AVX)
+    using SimdType = __m128;
+#endif
+
 public:
     static const FxVec4f sZero;
     static const FxVec4f sOne;
@@ -21,45 +31,24 @@ public:
 
     FxVec4f() = default;
     FxVec4f(float32 x, float32 y, float32 z, float32 w);
-    FxVec4f(float32 values[4]);
-
+    FxVec4f(const float32* values);
     explicit FxVec4f(float32 scalar);
 
-    void Set(float32 x, float32 y, float32 z, float32 w);
-
-    FX_FORCE_INLINE FxVec4f operator+(const FxVec4f& other) const;
-    FX_FORCE_INLINE FxVec4f operator-(const FxVec4f& other) const;
-    FX_FORCE_INLINE FxVec4f operator*(const FxVec4f& other) const;
-    FX_FORCE_INLINE FxVec4f operator/(const FxVec4f& other) const;
-
-    FX_FORCE_INLINE FxVec4f operator*(float32 scalar) const;
-    FX_FORCE_INLINE FxVec4f operator/(float32 scalar) const;
-
-    FxVec4f operator-() const;
-
-    FxVec4f& operator+=(const FxVec4f& other);
-    FxVec4f& operator-=(const FxVec4f& other);
-    FxVec4f& operator*=(const FxVec4f& other);
+    FX_FORCE_INLINE void Set(float32 x, float32 y, float32 z, float32 w);
 
 
-    FX_FORCE_INLINE FxVec4f& operator*=(float32 scalar);
+    FX_FORCE_INLINE bool IsZero() const;
+    FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
+    FX_FORCE_INLINE bool IsCloseTo(const FxVec4f& other, const float32 tolerance = 0.00001) const;
+#ifdef FX_USE_SIMD
+    FX_FORCE_INLINE bool IsCloseTo(const SimdType other, const float32 tolerance = 0.00001) const;
+#endif
+
 
     FxVec4f& operator=(const FxVec4f& other);
 
-    /**
-     * Loads 4 values into the vector.
-     */
-    void Load4(float32 x, float32 y, float32 z, float32 w);
-
-    /**
-     * Loads 4 values into the vector from a pointer.
-     */
-    void Load4Ptr(const float32* values);
-
-    /**
-     * Loads a single value into the vector to all components.
-     */
-    void Load1(float32 scalar);
+    FX_FORCE_INLINE FxVec4f Normalize() const;
+    FX_FORCE_INLINE FxVec4f& NormalizeIP();
 
     FX_FORCE_INLINE float32 LengthSquared() const;
     FX_FORCE_INLINE bool IsNormalized(float32 tolerance) const { return abs(LengthSquared() - 1.0f) <= tolerance; }
@@ -77,6 +66,50 @@ public:
     FX_FORCE_INLINE float32 GetW() const { return W; }
 #endif
 
+#ifdef FX_USE_NEON
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec4f FlipSigns(const FxVec4f& vec)
+    {
+        return FxVec4f(FxNeon::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
+    }
+
+#elif FX_USE_AVX
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static FxVec4f FlipSigns(const FxVec4f& vec)
+    {
+        return FxVec4f(FxSSE::SetSigns<TX, TY, TZ, TW>(vec.mIntrin));
+    }
+#else
+    template <int TX, int TY, int TZ, int TW>
+    FX_FORCE_INLINE static Fxvec4f FlipSigns(const FxVec4f& vec)
+    {
+        constexpr float rx = TX > 0.0 ? vec.X : -vec.X;
+        constexpr float ry = TY > 0.0 ? vec.Y : -vec.Y;
+        constexpr float rz = TZ > 0.0 ? vec.Z : -vec.Z;
+        constexpr float rw = TW > 0.0 ? vec.W : -vec.W;
+
+        return FxVec4f(rx, ry, rz, rw);
+    }
+#endif
+
+    /////////////////////////////////////
+    // Operator overloads
+    /////////////////////////////////////
+
+    FX_FORCE_INLINE FxVec4f operator+(const FxVec4f& other) const;
+    FX_FORCE_INLINE FxVec4f operator-(const FxVec4f& other) const;
+    FX_FORCE_INLINE FxVec4f operator*(const FxVec4f& other) const;
+    FX_FORCE_INLINE FxVec4f operator/(const FxVec4f& other) const;
+
+    FX_FORCE_INLINE FxVec4f operator*(float32 scalar) const;
+    FX_FORCE_INLINE FxVec4f operator/(float32 scalar) const;
+
+    FxVec4f operator-() const;
+
+    FxVec4f& operator+=(const FxVec4f& other);
+    FxVec4f& operator-=(const FxVec4f& other);
+    FxVec4f& operator*=(const FxVec4f& other);
+    FX_FORCE_INLINE FxVec4f& operator*=(float32 scalar);
 
 #ifdef FX_USE_NEON
     explicit FxVec4f(float32x4_t intrin) : mIntrin(intrin) {}

@@ -5,8 +5,8 @@
 
 #ifdef FX_USE_AVX
 
-#include <Math/FxAVXUtil.hpp>
 #include <Math/FxSSE.hpp>
+#include <Math/FxSSEUtil.hpp>
 
 FX_FORCE_INLINE float32 FxVec4f::LengthSquared() const { return FxSSE::LengthSquared(mIntrin); }
 

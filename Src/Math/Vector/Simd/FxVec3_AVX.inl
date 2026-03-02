@@ -7,6 +7,23 @@
 #include <Math/FxSSE.hpp>
 #include <Math/FxVec3.hpp>
 
+
+FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
+{
+    const float32 values[4] = { x, y, z, 0 };
+    mIntrin = _mm_load_ps(values);
+}
+
+FxVec3f::FxVec3f(const float32* values)
+{
+    // Allocate here to avoid unordered loads into our SSE register and avoid overstepping
+    // the buffer in `values`
+    const float32 values4[4] = { values[0], values[1], values[2], 0 };
+    mIntrin = _mm_load_ps(values4);
+}
+
+FxVec3f::FxVec3f(float32 scalar) { mIntrin = _mm_set1_ps(scalar); }
+
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {
     return IsCloseTo(other.mIntrin);
@@ -28,19 +45,11 @@ FX_FORCE_INLINE float32 FxVec3f::Dot(const FxVec3f& other) const { return Dot(ot
 
 FX_FORCE_INLINE bool FxVec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 
-FX_FORCE_INLINE bool FxVec3f::operator==(const FxVec3f& other) const
-{
-    __m128i cmp_v = _mm_castps_si128(_mm_cmpeq_ps(mIntrin, other.mIntrin));
-    return static_cast<bool>(_mm_test_all_ones(cmp_v));
-}
-
 FX_FORCE_INLINE void FxVec3f::Set(float32 x, float32 y, float32 z) { mIntrin = _mm_setr_ps(x, y, z, 0.0f); }
-
 
 FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const
 {
-
-    // Mask S 0111 D 1111 so we do not include the unused component in our dot product
+    // Mask is Src->0111 Dest->1111 so we do not include the unused component in our result
     return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0x7F));
 }
 
@@ -112,7 +121,7 @@ FX_FORCE_INLINE FxVec3f FxVec3f::Normalize() const
 }
 
 FX_FORCE_INLINE float32 FxVec3f::Length() const
-{ 
+{
     __m128 v = mIntrin;
     return sqrtf(Dot(v));
 }
@@ -121,6 +130,14 @@ FX_FORCE_INLINE float32 FxVec3f::Length() const
 //////////////////////////////
 // Operator Overloads
 //////////////////////////////
+
+FX_FORCE_INLINE bool FxVec3f::operator==(const FxVec3f& other) const
+{
+    __m128i cmp_v = _mm_castps_si128(_mm_cmpeq_ps(mIntrin, other.mIntrin));
+    // This is frequently done as a comparision against _mm_movemask, but _mm_test_all_ones potentially saves one extra
+    // instruction.
+    return static_cast<bool>(_mm_test_all_ones(cmp_v));
+}
 
 FX_FORCE_INLINE FxVec3f FxVec3f::operator+(const FxVec3f& other) const
 {
@@ -140,11 +157,25 @@ FX_FORCE_INLINE FxVec3f FxVec3f::operator*(const FxVec3f& other) const
     return FxVec3f(result);
 }
 
+FX_FORCE_INLINE FxVec3f FxVec3f::operator/(const FxVec3f& other) const
+{
+    __m128 result = _mm_div_ps(mIntrin, other.mIntrin);
+    return FxVec3f(result);
+}
+
 FX_FORCE_INLINE FxVec3f FxVec3f::operator*(float32 scalar) const
 {
     __m128 result = _mm_mul_ps(mIntrin, _mm_set1_ps(scalar));
     return FxVec3f(result);
 }
+
+
+FX_FORCE_INLINE FxVec3f FxVec3f::operator/(float32 scalar) const
+{
+    __m128 result = _mm_div_ps(mIntrin, _mm_set1_ps(scalar));
+    return FxVec3f(result);
+}
+
 
 FX_FORCE_INLINE FxVec3f FxVec3f::operator-() const
 {
@@ -152,11 +183,6 @@ FX_FORCE_INLINE FxVec3f FxVec3f::operator-() const
     return FxVec3f(result);
 }
 
-FX_FORCE_INLINE FxVec3f FxVec3f::operator/(float32 scalar) const
-{
-    __m128 result = _mm_div_ps(mIntrin, _mm_set1_ps(scalar));
-    return FxVec3f(result);
-}
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator+=(const FxVec3f& other)
 {

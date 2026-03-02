@@ -110,6 +110,10 @@ public:
 
     FxSizedArray(std::initializer_list<TElementType> list)
     {
+        if (list.size() == 0) {
+            return;
+        }
+
         InitCapacity(list.size());
 
         for (const TElementType& obj : list) {

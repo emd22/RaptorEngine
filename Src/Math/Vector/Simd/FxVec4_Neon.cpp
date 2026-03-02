@@ -17,32 +17,14 @@ const FxVec4f FxVec4f::sOne = FxVec4f(1.0f, 1.0f, 1.0f, 1.0f);
 FxVec4f::FxVec4f(float32 x, float32 y, float32 z, float32 w)
 {
     const float32 values[4] = { x, y, z, w };
-    this->mIntrin = vld1q_f32(values);
+    mIntrin = vld1q_f32(values);
 }
 
 
-FxVec4f::FxVec4f(float32 values[4]) { this->mIntrin = vld1q_f32(values); }
+FxVec4f::FxVec4f(const float32* values) { mIntrin = vld1q_f32(values); }
 
 
 FxVec4f::FxVec4f(float32 scalar) { mIntrin = vdupq_n_f32(scalar); }
-
-
-void FxVec4f::Set(float32 x, float32 y, float32 z, float32 w)
-{
-    const float32 values[4] = { x, y, z, w };
-    this->mIntrin = vld1q_f32(values);
-}
-
-
-void FxVec4f::Load4Ptr(const float32* values) { this->mIntrin = vld1q_f32(values); }
-
-void FxVec4f::Load1(float32 value) { this->mIntrin = vdupq_n_f32(value); }
-
-void FxVec4f::Load4(float32 x, float32 y, float32 z, float32 w)
-{
-    const float32 values[4] = { x, y, z, w };
-    this->mIntrin = vld1q_f32(values);
-}
 
 
 #endif // #ifdef FX_USE_NEON

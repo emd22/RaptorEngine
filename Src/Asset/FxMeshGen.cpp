@@ -67,12 +67,11 @@ FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsDefaultMesh()
 {
     // Create a mesh using the default vertex format (positions, normals, uvs)
     FxRef<FxPrimitiveMesh> mesh = FxMakeRef<FxPrimitiveMesh>();
-    // mesh->IsReference = true;
 
     mesh->UploadIndices(Indices);
 
-    // Create the vertex list from our list of positions
-    mesh->VertexList.CreateFrom<RxVertexType::eDefault>(Positions, {}, {}, {});
+    // mesh->VertexList.CreateFrom<RxVertexType::eDefault>(Positions, {}, {}, {});
+    mesh->VertexList.CreateFrom(Positions, {}, {}, {});
     mesh->UploadVertices();
 
     mesh->bIsReady.store(true);

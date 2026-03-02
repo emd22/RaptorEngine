@@ -5,6 +5,21 @@
 #ifdef FX_USE_NEON
 #include <Math/FxVec3.hpp>
 
+
+FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
+{
+    const float32 values[4] = { x, y, z, 0 };
+    mIntrin = vld1q_f32(values);
+}
+
+FxVec3f::FxVec3f(const float32* values)
+{
+    const float32 values4[4] = { values[0], values[1], values[2], 0 };
+    mIntrin = vld1q_f32(values4);
+}
+
+FX_FORCE_INLINE FxVec3f::FxVec3f(float32 scalar) { mIntrin = vdupq_n_f32(scalar); }
+
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {
     return IsCloseTo(other.mIntrin);
@@ -30,10 +45,6 @@ FX_FORCE_INLINE bool FxVec3f::IsZero() const
 
 FX_FORCE_INLINE bool FxVec3f::IsNearZero(const float32 tolerance) const { return IsCloseTo(sZero, tolerance); }
 
-FX_FORCE_INLINE bool FxVec3f::operator==(const FxVec3f& other) const
-{
-    return (vaddvq_u32(vceqq_f32(mIntrin, other.mIntrin))) != 0;
-}
 
 FX_FORCE_INLINE void FxVec3f::Set(float32 x, float32 y, float32 z)
 {
@@ -109,27 +120,40 @@ FX_FORCE_INLINE float32 FxVec3f::Dot(FxVec3f::SimdType other) const { return FxN
 // Operator Overloads
 //////////////////////////////
 
+FX_FORCE_INLINE bool FxVec3f::operator==(const FxVec3f& other) const
+{
+    return (vaddvq_u32(vceqq_f32(mIntrin, other.mIntrin))) != 0;
+}
+
 FX_FORCE_INLINE FxVec3f FxVec3f::operator+(const FxVec3f& other) const
 {
-    float32x4_t result = vaddq_f32(mIntrin, other.mIntrin);
-    return FxVec3f(result);
+    return FxVec3f(vaddq_f32(mIntrin, other.mIntrin));
 }
 
 FX_FORCE_INLINE FxVec3f FxVec3f::operator-(const FxVec3f& other) const
 {
-    float32x4_t result = vsubq_f32(mIntrin, other.mIntrin);
-    return FxVec3f(result);
+    return FxVec3f(vsubq_f32(mIntrin, other.mIntrin));
 }
 
 FX_FORCE_INLINE FxVec3f FxVec3f::operator*(const FxVec3f& other) const
 {
-    float32x4_t result = vmulq_f32(mIntrin, other.mIntrin);
-    return FxVec3f(result);
+    return FxVec3f(vmulq_f32(mIntrin, other.mIntrin));
 }
 
 FX_FORCE_INLINE FxVec3f FxVec3f::operator*(float32 scalar) const
 {
     float32x4_t result = vmulq_n_f32(mIntrin, scalar);
+    return FxVec3f(result);
+}
+
+FX_FORCE_INLINE FxVec3f FxVec3f::operator/(const FxVec3f& other) const
+{
+    return FxVec3f(vdivq_f32(mIntrin, other.mIntrin));
+}
+
+FX_FORCE_INLINE FxVec3f FxVec3f::operator/(float32 scalar) const
+{
+    float32x4_t result = vdivq_f32(mIntrin, vdupq_n_f32(scalar));
     return FxVec3f(result);
 }
 
@@ -139,11 +163,6 @@ FX_FORCE_INLINE FxVec3f FxVec3f::operator-() const
     return FxVec3f(result);
 }
 
-FX_FORCE_INLINE FxVec3f FxVec3f::operator/(float32 scalar) const
-{
-    float32x4_t result = vdivq_f32(mIntrin, vdupq_n_f32(scalar));
-    return FxVec3f(result);
-}
 
 FX_FORCE_INLINE FxVec3f& FxVec3f::operator+=(const FxVec3f& other)
 {

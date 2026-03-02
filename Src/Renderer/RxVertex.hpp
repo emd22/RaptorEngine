@@ -119,107 +119,113 @@ class RxVertexList
 public:
     RxVertexList() = default;
 
+    void CreateSlimFrom(const FxSizedArray<float32>& positions);
+    void CreateSlimFrom(const FxSizedArray<FxVec3f>& positions);
 
-    template <RxVertexType TVertexType>
-    void CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
-                    const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents)
-    {
-        if (normals.IsNotEmpty()) {
-            FxAssert((normals.Size == positions.Size));
-        }
-
-        VertexType = TVertexType;
-
-        const bool has_normals = (normals.IsNotEmpty());
-        const bool has_uvs = (uvs.IsNotEmpty());
-        const bool has_tangents = (tangents.IsNotEmpty());
-
-        constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
-
-        // Create the local (cpu-side) buffer to store our vertices
-        mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size / 3);
-
-        if (!has_uvs) {
-            FxLogWarning("Vertex list does not contain UV coordinates", 0);
-        }
-
-        // Note that if can_output_* is true but has_* is false, that field will be zeroed out.
-
-        if (has_normals) {
-            bContainsNormals = true;
-        }
-        if (has_uvs) {
-            bContainsUVs = true;
-        }
-        if (has_tangents) {
-            bContainsTangents = true;
-        }
-
-        for (int i = 0; i < mLocalBuffer.Capacity; i++) {
-            RxVertex<TVertexType> vertex;
-
-            memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
-
-            // If the normals are available (passed in and not null), then output them to the vertex object. If not,
-            // zero them.
-            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Normal, normals, 3);
-            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.UV, uvs, 2);
-            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Tangent, tangents, 3);
-
-            mLocalBuffer.Insert(vertex);
-        }
-    }
-
-    template <RxVertexType TVertexType>
     void CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
-                    const FxSizedArray<FxVec2f>& uvs, const FxSizedArray<FxVec3f>& tangents)
-    {
-        if (normals.IsNotEmpty()) {
-            FxAssert((normals.Size == positions.Size));
-        }
-
-        VertexType = TVertexType;
-
-        const bool has_normals = (normals.IsNotEmpty());
-        const bool has_uvs = (uvs.IsNotEmpty());
-        const bool has_tangents = (tangents.IsNotEmpty());
-
-        constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
-
-        // Create the local (cpu-side) buffer to store our vertices
-        mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size);
-
-        if (!has_uvs) {
-            FxLogWarning("Vertex list does not contain UV coordinates");
-        }
-
-        // Note that if can_output_* is true but has_* is false, that field will be zeroed out.
-
-        if (has_normals) {
-            bContainsNormals = true;
-        }
-        if (has_uvs) {
-            bContainsUVs = true;
-        }
-        if (has_tangents) {
-            bContainsTangents = true;
-        }
+                    const FxSizedArray<FxVec2u>& uvs, const FxSizedArray<FxVec3f>& tangents, FxVec4f);
 
 
-        for (uint32 i = 0; i < mLocalBuffer.Capacity; i++) {
-            RxVertex<TVertexType> vertex;
+    // template <RxVertexType TVertexType>
+    // void CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
+    //                 const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents)
+    // {
+    //     if (normals.IsNotEmpty()) {
+    //         FxAssert((normals.Size == positions.Size));
+    //     }
 
-            memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
+    //     VertexType = TVertexType;
 
-            // If the normals are available (passed in and not null), then output them to the vertex object. If not,
-            // zero them.
-            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Normal, normals, 3);
-            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.UV, uvs, 2);
-            RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Tangent, tangents, 3);
+    //     const bool has_normals = (normals.IsNotEmpty());
+    //     const bool has_uvs = (uvs.IsNotEmpty());
+    //     const bool has_tangents = (tangents.IsNotEmpty());
 
-            mLocalBuffer.Insert(vertex);
-        }
-    }
+    //     constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
+
+    //     // Create the local (cpu-side) buffer to store our vertices
+    //     mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size / 3);
+
+    //     if (!has_uvs) {
+    //         FxLogWarning("Vertex list does not contain UV coordinates", 0);
+    //     }
+
+    //     // Note that if can_output_* is true but has_* is false, that field will be zeroed out.
+
+    //     if (has_normals) {
+    //         bContainsNormals = true;
+    //     }
+    //     if (has_uvs) {
+    //         bContainsUVs = true;
+    //     }
+    //     if (has_tangents) {
+    //         bContainsTangents = true;
+    //     }
+
+    //     for (int i = 0; i < mLocalBuffer.Capacity; i++) {
+    //         RxVertex<TVertexType> vertex;
+
+    //         memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
+
+    //         // If the normals are available (passed in and not null), then output them to the vertex object. If not,
+    //         // zero them.
+    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Normal, normals, 3);
+    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.UV, uvs, 2);
+    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Tangent, tangents, 3);
+
+    //         mLocalBuffer.Insert(vertex);
+    //     }
+    // }
+
+    // template <RxVertexType TVertexType>
+    // void CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
+    //                 const FxSizedArray<FxVec2f>& uvs, const FxSizedArray<FxVec3f>& tangents)
+    // {
+    //     if (normals.IsNotEmpty()) {
+    //         FxAssert((normals.Size == positions.Size));
+    //     }
+
+    //     VertexType = TVertexType;
+
+    //     const bool has_normals = (normals.IsNotEmpty());
+    //     const bool has_uvs = (uvs.IsNotEmpty());
+    //     const bool has_tangents = (tangents.IsNotEmpty());
+
+    //     constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
+
+    //     // Create the local (cpu-side) buffer to store our vertices
+    //     mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size);
+
+    //     if (!has_uvs) {
+    //         FxLogWarning("Vertex list does not contain UV coordinates");
+    //     }
+
+    //     // Note that if can_output_* is true but has_* is false, that field will be zeroed out.
+
+    //     if (has_normals) {
+    //         bContainsNormals = true;
+    //     }
+    //     if (has_uvs) {
+    //         bContainsUVs = true;
+    //     }
+    //     if (has_tangents) {
+    //         bContainsTangents = true;
+    //     }
+
+
+    //     for (uint32 i = 0; i < mLocalBuffer.Capacity; i++) {
+    //         RxVertex<TVertexType> vertex;
+
+    //         memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
+
+    //         // If the normals are available (passed in and not null), then output them to the vertex object. If not,
+    //         // zero them.
+    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Normal, normals, 3);
+    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.UV, uvs, 2);
+    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Tangent, tangents, 3);
+
+    //         mLocalBuffer.Insert(vertex);
+    //     }
+    // }
 
 
     template <RxVertexType TVertexType>

@@ -22,7 +22,7 @@ FxVec4f::FxVec4f(float32 x, float32 y, float32 z, float32 w)
 }
 
 
-FxVec4f::FxVec4f(float32 values[4]) { mIntrin = _mm_load_ps(values); }
+FxVec4f::FxVec4f(const float32* values) { mIntrin = _mm_load_ps(values); }
 FxVec4f::FxVec4f(float32 scalar) { mIntrin = _mm_set1_ps(scalar); }
 
 void FxVec4f::Set(float32 x, float32 y, float32 z, float32 w)

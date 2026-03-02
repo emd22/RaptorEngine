@@ -19,19 +19,6 @@ const FxVec3f FxVec3f::sUp = FxVec3f(0.0f, 1.0f, 0.0f);
 const FxVec3f FxVec3f::sRight = FxVec3f(1.0f, 0.0f, 0.0f);
 const FxVec3f FxVec3f::sForward = FxVec3f(0.0f, 0.0f, 1.0f);
 
-FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
-{
-    const float32 values[4] = { x, y, z, 0 };
-    mIntrin = vld1q_f32(values);
-}
-
-FxVec3f::FxVec3f(const float32* values)
-{
-    const float32 values4[4] = { values[0], values[1], values[2], 0 };
-    mIntrin = vld1q_f32(values4);
-}
-
-FxVec3f::FxVec3f(float32 scalar) { mIntrin = vdupq_n_f32(scalar); }
 
 FxVec3f::FxVec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
 
