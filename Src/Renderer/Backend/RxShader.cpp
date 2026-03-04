@@ -40,7 +40,6 @@ bool RxShader::PreloadCompiledPrograms(const std::string& pack_path)
         return false;
     }
 
-
     mDataPack.ReadAllEntries();
 
     return true;
@@ -65,11 +64,14 @@ const std::string RxShader::GetProgramPath() const
     return compiled_path;
 }
 
-FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros)
+
+FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
+                                                     const FxSizedArray<FxShaderMacro>& macros)
 {
     std::string source_path = GetSourcePath();
     const char* c_source_path = source_path.c_str();
 
+    // Check if the shader is out of date
     if (FxShaderCompiler::IsOutOfDate(c_source_path)) {
         FxLogWarning("Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
         // Shader is out of date, compile it
@@ -78,47 +80,73 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
         mDataPack.WriteToFile(GetProgramPath().c_str());
     }
 
+    // Generate an ID based on the shader type and macros. This is used for querying for the program in the DataPack.
     FxHash64 program_id = RxShader::GenerateShaderId(shader_type, macros);
     FxLogDebug("Getting program from {} (Id={})", Name, program_id);
 
-    FxDataPackEntry* program_entry = mDataPack.QuerySection(program_id);
-
+    // Create the program
     FxRef<RxShaderProgram> program = FxMakeRef<RxShaderProgram>();
+    program->ShaderType = shader_type;
     program->pShader = this;
 
-    // The program is not compiled currently, compile it!
-    if (!program_entry) {
+
+    // Check for the program in the DataPack
+    FxDataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
+
+    // If there is no compiled version of the program in the DataPack, compile it and save it to disk.
+    if (!dp_entry) {
         std::string program_path = GetProgramPath();
         RecompileShader(GetSourcePath(), program_path, macros);
 
-        program_entry = mDataPack.QuerySection(program_id);
-
-        // There must be an issue during compilation or a bug in the shader compiler, return the empty program
-        if (program_entry == nullptr) {
+        dp_entry = mDataPack.QuerySection(program_id);
+        if (dp_entry == nullptr) {
             FxLogError("Pack entry does not exist after compilation! (Id={})", program_id);
             return program;
         }
     }
 
-    program->ShaderType = shader_type;
 
-    if (program_entry && program_entry->Data.IsNotEmpty()) {
-        const FxSizedArray<uint8>& program_data = program_entry->Data;
-
-        FxDebugAssert(program_data.Size == FxMath::AlignValue<4>(program_data.Size));
+    // If there is data available, create the program.
+    if (dp_entry->Data.IsNotEmpty()) {
+        FxLogInfo("Data is available, creating shader...");
+        const FxSizedArray<uint8>& program_data = dp_entry->Data;
+        FxAssert(program_data.Size == FxMath::AlignValue<4>(program_data.Size));
 
         CreateShaderModule(program_data.Size, reinterpret_cast<uint32*>(program_data.pData), program->InternalShader);
-    }
-    // The program has not been loaded from the datapack yet, load only that section
-    else {
-        uint32 buffer_size = FxMath::AlignValue<4>(program_entry->DataSize);
-        uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
-        FxSlice<uint8> buffer_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
 
-        mDataPack.ReadSection(program_entry, buffer_slice);
-
-        CreateShaderModule(buffer_size, buffer, program->InternalShader);
+        return program;
     }
+
+    // The entry exists in the DataPack but the data has not been loaded yet. Load only that section of the DataPack and
+    // create the program.
+    FxLogInfo("Loading data pack section for shader...");
+
+    uint32 buffer_size = FxMath::AlignValue<4>(dp_entry->DataSize);
+    uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
+    FxSlice<uint8> buffer_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
+
+    mDataPack.ReadSection(dp_entry, buffer_slice);
+
+    CreateShaderModule(buffer_size, buffer, program->InternalShader);
+
+    return program;
+}
+
+
+FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros)
+{
+    ProgramCache& cached_type = mCachedTypes[static_cast<uint32>(shader_type)];
+
+    const FxHash64 macro_hash = FxHashData64(FxMakeSlice(macros.pData, macros.GetSizeInBytes()));
+    auto program_it = cached_type.Programs.find(macro_hash);
+
+    if (program_it != cached_type.Programs.end()) {
+        return program_it->second;
+    }
+
+    // Program has not been cached, load it from the data pack or compile it, and save it back to the cache.
+    FxRef<RxShaderProgram> program = LoadUncachedProgram(shader_type, macros);
+    cached_type.Programs[macro_hash] = program;
 
     return program;
 }
@@ -145,6 +173,7 @@ void RxShaderProgram::Destroy()
     RxGpuDevice* device = gRenderer->GetDevice();
     vkDestroyShaderModule(device->Device, InternalShader, nullptr);
 }
+
 
 void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module)
 {

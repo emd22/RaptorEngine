@@ -14,28 +14,28 @@ enum class RxShaderType
 
 class RxShader;
 
-class RxShaderUtil
+namespace RxShaderUtil {
+static constexpr uint32 scNumShaderTypes = static_cast<uint32>(RxShaderType::eFragment);
+
+/**
+ * @brief Get the underlying Vulkan shader stage bit for an RxShaderType.
+ */
+static constexpr VkShaderStageFlagBits ToUnderlyingType(RxShaderType type)
 {
-public:
-    /**
-     * @brief Get the underlying Vulkan shader stage bit for an RxShaderType.
-     */
-    static constexpr VkShaderStageFlagBits ToUnderlyingType(RxShaderType type)
-    {
-        switch (type) {
-        case RxShaderType::eUnknown:
-            FxLogError("Shader stage is RxShaderType::eUnknown!");
-            break;
+    switch (type) {
+    case RxShaderType::eUnknown:
+        FxLogError("Shader stage is RxShaderType::eUnknown!");
+        break;
 
-        case RxShaderType::eVertex:
-            return VK_SHADER_STAGE_VERTEX_BIT;
-        case RxShaderType::eFragment:
-            return VK_SHADER_STAGE_FRAGMENT_BIT;
-        }
-
+    case RxShaderType::eVertex:
         return VK_SHADER_STAGE_VERTEX_BIT;
+    case RxShaderType::eFragment:
+        return VK_SHADER_STAGE_FRAGMENT_BIT;
     }
-};
+
+    return VK_SHADER_STAGE_VERTEX_BIT;
+}
+}; // namespace RxShaderUtil
 
 
 class RxShaderProgram
@@ -48,12 +48,15 @@ public:
     {
         InternalShader = other.InternalShader;
         ShaderType = other.ShaderType;
+        pShader = other.pShader;
 
         other.InternalShader = nullptr;
         other.ShaderType = RxShaderType::eUnknown;
+        other.pShader = nullptr;
     }
 
     void Destroy();
+
     ~RxShaderProgram() { Destroy(); }
 
     FX_FORCE_INLINE bool operator==(nullptr_t np) const { return InternalShader == nullptr; }
@@ -73,13 +76,35 @@ public:
 
 class RxShader
 {
+    /**
+     * @brief Holds a collection of shader programs that have already been loaded from the DataPack or created with the
+     * ShaderCompiler.
+     *
+     * A cached shader can be retrieved from mCachedTypes using the shader type as a key, using the helper function
+     * `RetrieveCachedShaderProgram`.
+     *
+     * Each of these programs should be
+     */
+    struct ProgramCache
+    {
+        std::unordered_map<FxHash64, FxRef<RxShaderProgram>> Programs;
+    };
+
 public:
     static FxHash64 GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
 
     RxShader() = delete;
     RxShader(const char* path) { Load(path); }
 
+    /**
+     * @brief Returns a cached program if it has previously been queried or loads the uncached version from disk.
+     */
     FxRef<RxShaderProgram> GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros);
+
+    /**
+     * @brief Loads a shader program from the DataPack or compiles it if it does not exist.
+     */
+    FxRef<RxShaderProgram> LoadUncachedProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros);
 
     void Load(const char* path);
 
@@ -101,6 +126,10 @@ private:
 
 private:
     std::string Name = "Unknown";
+
+    /// A list of shader types (that hold shader programs) that have already been retreived from the datapack or
+    /// created.
+    FxStackArray<ProgramCache, RxShaderUtil::scNumShaderTypes + 1> mCachedTypes;
 
     FxDataPack mDataPack;
 };

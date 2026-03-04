@@ -61,11 +61,7 @@ public:
         ++Size;
     }
 
-    void InsertRaw(const void* value)
-    {
-        memcpy(reinterpret_cast<uint8*>(pData) + (ObjectSize * Size), value, ObjectSize);
-        ++Size;
-    }
+    void InsertRaw(const void* value);
 
     FX_FORCE_INLINE bool IsEmpty() const { return pData == nullptr || Size == 0; }
     FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
@@ -86,22 +82,8 @@ public:
         return reinterpret_cast<T*>(pData)[index];
     }
 
-    void* GetRaw(uint32 index)
-    {
-        FxAssert(index < Size);
-        FxAssert(ObjectSize > 0);
-
-        return reinterpret_cast<void*>(reinterpret_cast<uint8*>(pData) + (index * ObjectSize));
-    }
-
-    const void* GetRaw(uint32 index) const
-    {
-        FxAssert(index < Size);
-        FxAssert(ObjectSize > 0);
-
-        return reinterpret_cast<void*>(reinterpret_cast<uint8*>(pData) + (index * ObjectSize));
-    }
-
+    void* GetRaw(uint32 index);
+    const void* GetRaw(uint32 index) const;
 
     template <typename T>
     T* GetPtr(uint32 index)

@@ -8,7 +8,6 @@
 #include "FxDeletionObject.hpp"
 #include "FxWindow.hpp"
 #include "RxDeferred.hpp"
-#include "RxSamplerCache.hpp"
 #include "RxUniformBuffer.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>

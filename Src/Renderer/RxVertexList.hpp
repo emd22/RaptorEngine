@@ -70,6 +70,3 @@ public:
 private:
     FxAnonArray mLocalBuffer;
 };
-
-// #undef RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE
-// #undef RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3

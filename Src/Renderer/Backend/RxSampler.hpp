@@ -65,13 +65,13 @@ public:
 
 
     void SetCacheId(uint64 prop_id, uint32 cache_id)
-    { 
+    {
         CachePropId = prop_id;
         CacheId = cache_id;
     }
 
     void InvalidateCacheId()
-    { 
+    {
         CachePropId = 0;
         CacheId = UINT32_MAX;
     }
@@ -94,6 +94,5 @@ public:
     FxHash64 CachePropId = 0;
 
 private:
-    friend class RxSamplerCache;
     friend struct RxSamplerHandle;
 };

@@ -98,6 +98,9 @@ public:
 
     void ReadAllEntries() { BinaryReadAllData(); }
 
+    void Close();
+    bool IsOpen() const { return File.IsFileOpen(); };
+
     ~FxDataPack();
 
 private:

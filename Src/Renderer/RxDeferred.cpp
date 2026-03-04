@@ -202,6 +202,10 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
+    // RxShader& shader = gShaderCache->Request(RxShaderId::eGeometry);
+    // shader.GetProgram(RxShaderType::eVertex, {});
+    // shader.GetProgram(RxShaderType::eVertex, {FxShaderMacro{"FX_USE_NORMALS", "1"}});
+
     // RpGeometry.Create(attachments, gRenderer->Swapchain.Extent);
 
     RxPipelineBuilder builder;

@@ -1,10 +1,12 @@
 #include "RxGlobals.hpp"
 
 #include "RxRenderBackend.hpp"
+#include "RxShaderCache.hpp"
 #include "RxShadowDirectional.hpp"
 
 RxRenderBackend* gRenderer = nullptr;
 RxShadowDirectional* gShadowRenderer = nullptr;
+RxShaderCache* gShaderCache = nullptr;
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
     delete name_;                                                                                                      \
@@ -15,8 +17,7 @@ namespace RxGlobals {
 void Init()
 {
     gRenderer = new RxRenderBackend;
-
-    // Add other init functions here
+    gShaderCache = new RxShaderCache;
 }
 
 void Destroy()
@@ -25,10 +26,8 @@ void Destroy()
         DESTROY_GLOBAL(gShadowRenderer);
     }
 
-    FxLogInfo("Destroying renderer globals");
+    DESTROY_GLOBAL(gShaderCache);
     DESTROY_GLOBAL(gRenderer);
-
-    // Add other destroys here
 }
 
 }; // namespace RxGlobals

@@ -224,10 +224,12 @@ bool FxDataPack::ReadFromFile(const char* name)
     return true;
 }
 
-
-FxDataPack::~FxDataPack()
+void FxDataPack::Close()
 {
     if (File.IsFileOpen()) {
         File.Close();
     }
 }
+
+
+FxDataPack::~FxDataPack() { Close(); }
