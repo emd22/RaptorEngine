@@ -10,6 +10,7 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>
 #include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/RxShaderCache.hpp>
 
 
 FX_SET_MODULE_NAME("DeferredRenderer")
@@ -195,10 +196,10 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     CreateGPass();
 
-
-    RxShader shader_geometry("Geometry");
-    FxRef<RxShaderProgram> vertex_shader = shader_geometry.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_geometry.GetProgram(RxShaderType::eFragment, {});
+    FxRef<RxShader> shader_geometry = gShaderCache->Request(RxShaderId::eGeometry);
+    // RxShader shader_geometry("Geometry");
+    FxRef<RxShaderProgram> vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, {});
+    FxRef<RxShaderProgram> fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, {});
 
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
@@ -228,11 +229,11 @@ void RxDeferredRenderer::CreateGPassPipeline()
     {
         FxSizedArray<FxShaderMacro> normal_mapped_macros { FxShaderMacro { "USE_NORMAL_MAPS", "1" } };
 
-        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry.GetProgram(RxShaderType::eVertex,
-                                                                             normal_mapped_macros);
+        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex,
+                                                                              normal_mapped_macros);
 
-        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry.GetProgram(RxShaderType::eFragment,
-                                                                               normal_mapped_macros);
+        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment,
+                                                                                normal_mapped_macros);
 
         builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
             .SetShaders(nm_vertex_shader, nm_fragment_shader)

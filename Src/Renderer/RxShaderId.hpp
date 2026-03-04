@@ -2,8 +2,7 @@
 
 #include <Core/FxTypes.hpp>
 
-namespace RxShaderId {
-enum Id : uint32
+enum RxShaderId : uint32
 {
     eGeometry,    // 0
     eLighting,    // 1
@@ -11,14 +10,15 @@ enum Id : uint32
     eShadows,     // 3
     eUnlit,       // 4
 
-    // Add other shaders here.
-
     eNumShaders,
 };
 
+namespace RxShaderIdUtil {
+
+
 constexpr uint32 scNumShaders = static_cast<uint32>(eNumShaders);
 
-constexpr const char* GetName(const Id id)
+constexpr const char* GetName(const RxShaderId id)
 {
     switch (id) {
     case eGeometry:
@@ -37,4 +37,4 @@ constexpr const char* GetName(const Id id)
     return nullptr;
 }
 
-} // namespace RxShaderId
+} // namespace RxShaderIdUtil

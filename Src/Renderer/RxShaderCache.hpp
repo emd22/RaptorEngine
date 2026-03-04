@@ -1,30 +1,20 @@
 #pragma once
 
+#include "Backend/RxShader.hpp"
+#include "RxShaderId.hpp"
+
 #include <Core/FxHash.hpp>
 #include <Core/FxRef.hpp>
-#include <Renderer/Backend/RxShader.hpp>
-#include <unordered_map>
+#include <Core/FxSizedArray.hpp>
 
 class RxShaderCache
 {
 public:
-    RxShaderCache() = default;
+    RxShaderCache();
 
-    template <const char* TName>
-    RxShader* Request()
-    {
-        constexpr FxHash64 name_hash = FxHashStr64(TName);
-        FxRef<RxShader>& shader = mCache[name_hash];
-
-        // If the shader does not exist in the cache, create a new one
-        if (!shader.IsValid()) {
-            shader = FxMakeRef<RxShader>(TName);
-        }
-
-        return shader.mpPtr;
-    }
+    FxRef<RxShader> Request(const RxShaderId id);
 
 
 private:
-    std::unordered_map<FxHash64, FxRef<RxShader>> mCache;
+    FxSizedArray<FxRef<RxShader>> mCache;
 };
