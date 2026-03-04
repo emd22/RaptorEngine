@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Core/FxDefines.hpp>
 #include <Core/FxTypes.hpp>
 #include <format>
-
 
 #ifdef FX_USE_NEON
 #include "FxNeonUtil.hpp"
@@ -40,11 +40,11 @@ public:
 
 public:
     FxVec3f() = default;
-    FxVec3f(float32 x, float32 y, float32 z);
-    FxVec3f(const float32* values);
+    FX_FORCE_INLINE FxVec3f(float32 x, float32 y, float32 z);
+    FX_FORCE_INLINE FxVec3f(const float32* values);
     FxVec3f(const JPH::Vec3& other);
 
-    explicit FxVec3f(float32 scalar);
+    FX_FORCE_INLINE explicit FxVec3f(float32 scalar);
 
 #ifdef FX_USE_SIMD
     explicit FxVec3f(SimdType intrin) : mIntrin(intrin) {}
@@ -231,6 +231,6 @@ struct std::formatter<FxVec3f>
 };
 
 
-#include "Vector/FxVec3_None.inl"
-#include "Vector/Simd/FxVec3_AVX.inl"
-#include "Vector/Simd/FxVec3_Neon.inl"
+#include "Impl/Vector/FxVec3_AVX.inl"
+#include "Impl/Vector/FxVec3_Fallback.inl"
+#include "Impl/Vector/FxVec3_Neon.inl"

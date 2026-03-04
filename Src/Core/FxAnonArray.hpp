@@ -61,6 +61,12 @@ public:
         ++Size;
     }
 
+    void InsertRaw(const void* value)
+    {
+        memcpy(reinterpret_cast<uint8*>(pData) + (ObjectSize * Size), value, ObjectSize);
+        ++Size;
+    }
+
     FX_FORCE_INLINE bool IsEmpty() const { return pData == nullptr || Size == 0; }
     FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
 

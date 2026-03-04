@@ -1,8 +1,9 @@
 #pragma once
 
-#include <Math/FxVec3.hpp>
+#include <Core/FxDefines.hpp>
 
 #ifdef FX_NO_SIMD
+#include <Math/FxVec3.hpp>
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 threshold)
 {

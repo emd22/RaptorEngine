@@ -1,15 +1,26 @@
 #pragma once
 
 #include <Core/FxDefines.hpp>
-#include <Math/FxVec4.hpp>
 
 #ifdef FX_USE_AVX
-
 #include <Math/FxSSE.hpp>
 #include <Math/FxSSEUtil.hpp>
+#include <Math/FxVec4.hpp>
+
+FX_FORCE_INLINE FxVec4f::FxVec4f(float32 x, float32 y, float32 z, float32 w)
+{
+    const float32 values[4] = { x, y, z, w };
+    mIntrin = _mm_loadu_ps(values);
+}
+
+FX_FORCE_INLINE FxVec4f::FxVec4f(const float32* values) { mIntrin = _mm_loadu_ps(values); }
+FX_FORCE_INLINE FxVec4f::FxVec4f(float32 scalar) { mIntrin = _mm_set1_ps(scalar); }
+
 
 FX_FORCE_INLINE float32 FxVec4f::LengthSquared() const { return FxSSE::LengthSquared(mIntrin); }
 
+FX_FORCE_INLINE void FxVec4f::Set(float32 x, float32 y, float32 z, float32 w) { mIntrin = _mm_setr_ps(x, y, z, w); }
+FX_FORCE_INLINE void FxVec4f::Set(float32 scalar) { mIntrin = _mm_set1_ps(scalar); }
 
 ///////////////////////////////
 // Vec + Vec Operators

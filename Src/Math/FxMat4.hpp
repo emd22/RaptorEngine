@@ -26,18 +26,18 @@ public:
 public:
     FxMat4f() noexcept
     {
-        Columns[0].Load1(0);
-        Columns[1].Load1(0);
-        Columns[2].Load1(0);
-        Columns[3].Load1(0);
+        Columns[0].Set(0);
+        Columns[1].Set(0);
+        Columns[2].Set(0);
+        Columns[3].Set(0);
     }
 
     FxMat4f(const float data[16]) noexcept
     {
-        Columns[0].Load4Ptr(data);
-        Columns[1].Load4Ptr(data + 4);
-        Columns[2].Load4Ptr(data + 8);
-        Columns[3].Load4Ptr(data + 12);
+        Columns[0] = FxVec4f(data);
+        Columns[1] = FxVec4f(data + 4);
+        Columns[2] = FxVec4f(data + 8);
+        Columns[3] = FxVec4f(data + 12);
     }
 
     FxMat4f(float data[4][4]) noexcept;
@@ -52,7 +52,7 @@ public:
     static FxMat4f AsTranslation(FxVec3f position)
     {
         FxMat4f result = FxMat4f::sIdentity;
-        result.Columns[3].Load4(position.X, position.Y, position.Z, 1.0f);
+        result.Columns[3].Set(position.X, position.Y, position.Z, 1.0f);
         return result;
 
         /*return FxMat4f((float32[16]) {
@@ -87,10 +87,10 @@ public:
 
     FxMat4f(float scalar) noexcept
     {
-        Columns[0].Load1(scalar);
-        Columns[1].Load1(scalar);
-        Columns[2].Load1(scalar);
-        Columns[3].Load1(scalar);
+        Columns[0].Set(scalar);
+        Columns[1].Set(scalar);
+        Columns[2].Set(scalar);
+        Columns[3].Set(scalar);
     }
 
     FxMat4f(FxVec4f c0, FxVec4f c1, FxVec4f c2, FxVec4f c3) noexcept
@@ -111,18 +111,18 @@ public:
 
     inline void LoadIdentity()
     {
-        Columns[0].Load4(1.0f, 0.0f, 0.0f, 0.0f);
-        Columns[1].Load4(0.0f, 1.0f, 0.0f, 0.0f);
-        Columns[2].Load4(0.0f, 0.0f, 1.0f, 0.0f);
-        Columns[3].Load4(0.0f, 0.0f, 0.0f, 1.0f);
+        Columns[0].Set(1.0f, 0.0f, 0.0f, 0.0f);
+        Columns[1].Set(0.0f, 1.0f, 0.0f, 0.0f);
+        Columns[2].Set(0.0f, 0.0f, 1.0f, 0.0f);
+        Columns[3].Set(0.0f, 0.0f, 0.0f, 1.0f);
     }
 
     void Set(float data[16])
     {
-        Columns[0].Load4Ptr(data);
-        Columns[1].Load4Ptr(data + 4);
-        Columns[2].Load4Ptr(data + 8);
-        Columns[3].Load4Ptr(data + 12);
+        Columns[0] = FxVec4f(data);
+        Columns[1] = FxVec4f(data + 4);
+        Columns[2] = FxVec4f(data + 8);
+        Columns[3] = FxVec4f(data + 12);
     }
 
     FxMat4f& operator=(const FxMat4f& other)

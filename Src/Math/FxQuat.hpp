@@ -119,5 +119,5 @@ struct std::formatter<FxQuat>
     }
 };
 
-#include "Quaternion/FxQuat_AVX.inl"
-#include "Quaternion/FxQuat_Neon.inl"
+#include "Impl/Quaternion/FxQuat_AVX.inl"
+#include "Impl/Quaternion/FxQuat_Neon.inl"

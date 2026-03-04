@@ -56,7 +56,7 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
         }
     }
 
-    mesh->VertexList.CreateFrom<RxVertexType::eDefault>(positions, normals, uvs, tangents);
+    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, {}, {});
     mesh->UploadVertices();
 }
 

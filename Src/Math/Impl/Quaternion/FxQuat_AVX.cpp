@@ -15,7 +15,7 @@ const FxQuat FxQuat::sIdentity = FxQuat(0, 0, 0, 1);
 
 FxQuat::FxQuat(float32 x, float32 y, float32 z, float32 w)
 {
-    float32 values[] = { x, y, z, w };
+    float32 values alignas(16)[4] = { x, y, z, w };
     mIntrin = _mm_load_ps(values);
 }
 

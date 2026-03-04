@@ -1,11 +1,14 @@
 #include <Core/FxDefines.hpp>
 
-#ifdef FX_USE_AVX
+#ifdef FX_USE_NEON
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Math/Real.h>
+#include <arm_neon.h>
 
-#include <Math/FxSSE.hpp>
+#include <Core/FxLog.hpp>
+#include <Math/FxMathUtil.hpp>
+#include <Math/FxNeonUtil.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
 
@@ -18,23 +21,11 @@ const FxVec3f FxVec3f::sForward = FxVec3f(0.0f, 0.0f, 1.0f);
 
 
 FxVec3f::FxVec3f(const JPH::Vec3& other) { FromJoltVec3(other); }
-
 FxVec3f::FxVec3f(const FxVec4f& other) { mIntrin = other.mIntrin; }
 
 
 void FxVec3f::Print() const { FxLogInfo("Vec3f {{ X={:.6f}, Y={:.6f}, Z={:.6f} }}", X, Y, Z); }
 
-// float32 FxVec3f::Length() const
-// {
-//     // float32x4_t vec = mIntrin;
-
-//     // Square the vector
-//     // vec = vmulq_f32(vec, vec);
-//     // Add all components (horizontal add)
-//     // float32 len2 = vaddvq_f32(vec);
-
-//     return sqrtf(Dot(mIntrin));
-// }
 
 FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const
 {
@@ -52,15 +43,15 @@ FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const
 
 FxVec3f FxVec3f::Cross(const FxVec3f& other) const
 {
-    const __m128 a = mIntrin;
-    const __m128 b = other.mIntrin;
+    const float32x4_t a = mIntrin;
+    const float32x4_t b = other.mIntrin;
 
-    const __m128 a_yzxw = FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
-    const __m128 b_yzxw = FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
+    float32x4_t a_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
+    float32x4_t b_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
 
-    const __m128 result_yzxw = _mm_sub_ps(_mm_mul_ps(a, b_yzxw), _mm_mul_ps(a_yzxw, b));
+    const float32x4_t result_yzxw = vsubq_f32(vmulq_f32(a, b_yzxw), vmulq_f32(a_yzxw, b));
 
-    return FxVec3f(FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));
+    return FxVec3f(FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));
 }
 
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
@@ -70,6 +61,7 @@ bool FxVec3f::IsCloseTo(const JPH::Vec3& other, const float32 tolerance) const
 {
     return IsCloseTo(other.mValue, tolerance);
 }
+
 
 bool FxVec3f::operator==(const JPH::Vec3& other) const { return (*this) == FxVec3f(other.mValue); }
 

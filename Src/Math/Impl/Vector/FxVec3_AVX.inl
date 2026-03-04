@@ -8,21 +8,20 @@
 #include <Math/FxVec3.hpp>
 
 
-FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
+FX_FORCE_INLINE FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
 {
-    const float32 values[4] = { x, y, z, 0 };
+    const float32 values alignas(16)[4] = { x, y, z, 0 };
     mIntrin = _mm_load_ps(values);
 }
 
-FxVec3f::FxVec3f(const float32* values)
+FX_FORCE_INLINE FxVec3f::FxVec3f(const float32* values)
 {
-    // Allocate here to avoid unordered loads into our SSE register and avoid overstepping
-    // the buffer in `values`
-    const float32 values4[4] = { values[0], values[1], values[2], 0 };
-    mIntrin = _mm_load_ps(values4);
+    // Allocate here to avoid unordered loads into our SSE register and avoid overstepping the buffer
+    const float32 values alignas(16)[4] = { values[0], values[1], values[2], 0 };
+    mIntrin = _mm_load_ps(values);
 }
 
-FxVec3f::FxVec3f(float32 scalar) { mIntrin = _mm_set1_ps(scalar); }
+FX_FORCE_INLINE FxVec3f::FxVec3f(float32 scalar) { mIntrin = _mm_set1_ps(scalar); }
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {

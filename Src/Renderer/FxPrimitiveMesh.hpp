@@ -1,8 +1,7 @@
 #pragma once
 
-#include "Backend/Fwd/Rx_Fwd_GetFrame.hpp"
-#include "Backend/RxFrameData.hpp"
 #include "Backend/RxGpuBuffer.hpp"
+#include "RxVertexList.hpp"
 
 #include <Math/FxQuat.hpp>
 

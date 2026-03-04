@@ -4,7 +4,7 @@
 #include <Core/FxPagedArray.hpp>
 #include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
-#include <Math/Vector.hpp>
+#include <Math/FxVec3.hpp>
 #include <Renderer/FxCamera.hpp>
 #include <Renderer/RxConstants.hpp>
 

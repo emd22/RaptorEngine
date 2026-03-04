@@ -57,7 +57,7 @@ FX_FORCE_INLINE __m128 SetSigns(__m128 v)
 template <int TX, int TY, int TZ, int TW>
 FX_FORCE_INLINE __m128 FlipSigns(__m128 v)
 {
-    constexpr float32 signs[4] = {
+    constexpr float32 signs alignas(16)[4] = {
         TX > 0 ? 0.0f : -0.0f,
         TY > 0 ? 0.0f : -0.0f,
         TZ > 0 ? 0.0f : -0.0f,

@@ -71,7 +71,7 @@ FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsDefaultMesh()
     mesh->UploadIndices(Indices);
 
     // mesh->VertexList.CreateFrom<RxVertexType::eDefault>(Positions, {}, {}, {});
-    mesh->VertexList.CreateFrom(Positions, {}, {}, {});
+    mesh->VertexList.CreateFrom(Positions, {}, {}, {}, {}, {});
     mesh->UploadVertices();
 
     mesh->bIsReady.store(true);

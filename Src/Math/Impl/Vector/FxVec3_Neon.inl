@@ -3,16 +3,17 @@
 #include <Core/FxDefines.hpp>
 
 #ifdef FX_USE_NEON
+
 #include <Math/FxVec3.hpp>
 
 
-FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
+FX_FORCE_INLINE FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
 {
     const float32 values[4] = { x, y, z, 0 };
     mIntrin = vld1q_f32(values);
 }
 
-FxVec3f::FxVec3f(const float32* values)
+FX_FORCE_INLINE FxVec3f::FxVec3f(const float32* values)
 {
     const float32 values4[4] = { values[0], values[1], values[2], 0 };
     mIntrin = vld1q_f32(values4);

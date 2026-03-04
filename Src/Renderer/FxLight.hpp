@@ -6,6 +6,7 @@
 #include <Math/FxMat4.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
 
+class RxPipeline;
 class FxCamera;
 
 enum FxLightFlags : uint16

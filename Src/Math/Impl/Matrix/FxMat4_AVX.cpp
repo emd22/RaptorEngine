@@ -121,10 +121,10 @@ void FxMat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near
 
     const float32 depth_range = 1.0f / (far_plane - near_plane);
 
-    Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
-    Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
-    Columns[2].Load4(0.0f, 0.0f, depth_range, 0.0f);
-    Columns[3].Load4(0.0f, 0.0f, -depth_range * near_plane, 1.0f);
+    Columns[0].Set(2.0f / width, 0.0f, 0.0f, 0.0f);
+    Columns[1].Set(0.0f, -2.0f / height, 0.0f, 0.0f);
+    Columns[2].Set(0.0f, 0.0f, depth_range, 0.0f);
+    Columns[3].Set(0.0f, 0.0f, -depth_range * near_plane, 1.0f);
 }
 
 
@@ -143,7 +143,7 @@ FxMat4f FxMat4f::AsRotationX(float rad)
     result.Columns[0].mIntrin = c0;
 
     // {0, cos(x), sin(x), 0}
-    const float32 c1_v[4] = { 0, cr, sr, 0 };
+    const float32 c1_v alignas(16)[4] = { 0, cr, sr, 0 };
 
     const __m128 c1 = _mm_load_ps(c1_v);
     result.Columns[1].mIntrin = c1;
@@ -191,7 +191,7 @@ FxMat4f FxMat4f::AsRotationY(float rad)
     const __m128 one_zzz = _mm_set_ss(1.0f);
 
     // {sin(x), 0, cos(x), 0}
-    float c2_v[4] = { sr, 0, cr, 0 };
+    float c2_v alignas(16)[4] = { sr, 0, cr, 0 };
     const __m128 c2 = _mm_load_ps(c2_v);
     result.Columns[2].mIntrin = c2;
 
@@ -364,10 +364,12 @@ void FxMat4f::Rotate(FxVec3f rotation)
 
 FxMat4f::FxMat4f(float data[4][4]) noexcept
 {
-    Columns[0].mIntrin = _mm_load_ps(data[0]);
-    Columns[1].mIntrin = _mm_load_ps(data[1]);
-    Columns[2].mIntrin = _mm_load_ps(data[2]);
-    Columns[3].mIntrin = _mm_load_ps(data[3]);
+    // Its likely that this 64 byte buffer is aligned on a 32 byte boundary, but it cannot be assumed
+    // given aligned laods can throw a GP exception.
+    Columns[0].mIntrin = _mm_loadu_ps(data[0]);
+    Columns[1].mIntrin = _mm_loadu_ps(data[1]);
+    Columns[2].mIntrin = _mm_loadu_ps(data[2]);
+    Columns[3].mIntrin = _mm_loadu_ps(data[3]);
 }
 
 // Implementation taken from linmath, https://github.com/datenwolf/linmath.h/blob/master/linmath.h
@@ -498,10 +500,10 @@ void FxMat4f::LookAt(FxVec3f eye, FxVec3f target, FxVec3f upvec)
 
     const FxVec3f up = forward.Cross(right);
 
-    Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
-    Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
-    Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
-    Columns[3].Load4(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
+    Columns[0].Set(right.X, up.X, forward.X, 0.0f);
+    Columns[1].Set(right.Y, up.Y, forward.Y, 0.0f);
+    Columns[2].Set(right.Z, up.Z, forward.Z, 0.0f);
+    Columns[3].Set(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
 }
 
 // Mat4f Mat4f::Multiply(Mat4f &other)

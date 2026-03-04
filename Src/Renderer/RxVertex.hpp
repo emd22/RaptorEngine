@@ -1,19 +1,19 @@
 #pragma once
 
-#include "Backend/RxGpuBuffer.hpp"
-
-#include <Core/FxAnonArray.hpp>
-#include <Core/FxSizedArray.hpp>
 #include <Core/FxTypes.hpp>
 #include <Math/FxVec2.hpp>
 #include <Math/FxVec3.hpp>
+#include <Math/FxVec4.hpp>
+
 
 enum class RxVertexType
 {
     eSlim,
     eDefault,
-    eSkinned
+    eSkinned,
 };
+
+constexpr RxVertexType RxVertexLargestType = RxVertexType::eSkinned;
 
 
 // Suppress clangd and its hate for #pragma pack
@@ -57,20 +57,6 @@ struct RxVertex<RxVertexType::eSkinned>
 // End packing structs
 #pragma pack(pop)
 
-
-namespace RxVertexUtil {
-template <RxVertexType TVertexType>
-FxVec3f GetPosition(const RxVertex<TVertexType>& vertex)
-{
-    static_assert(
-        offsetof(RxVertex<RxVertexType::eSlim>, Position) == offsetof(RxVertex<RxVertexType::eDefault>, Position) &&
-        offsetof(RxVertex<RxVertexType::eDefault>, Position) == offsetof(RxVertex<RxVertexType::eSkinned>, Position));
-
-    return FxVec3f(vertex.Position);
-}
-}; // namespace RxVertexUtil
-
-
 template <>
 struct std::formatter<RxVertex<RxVertexType::eDefault>>
 {
@@ -84,197 +70,37 @@ struct std::formatter<RxVertex<RxVertexType::eDefault>>
     }
 };
 
+
+namespace RxVertexUtil {
+
 /**
- * @brief Output the component to the a local RxVertex object if a local variable `can_output_{member_name_}` is true.
- * If `has_{member_name_}` is true, then this macro copies the data into the proper member of the object. If it is not
- * true, this macro zeros the member.
+ * @brief Returns the size of a vertex given a vertex type.
  */
-#define RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(component_, member_name_, component_n_)                                \
-    if constexpr (is_default_vertex) {                                                                                 \
-        if (has_##member_name_) {                                                                                      \
-            memcpy(&component_, &member_name_.pData[i * component_n_], sizeof(float32) * component_n_);                \
-        }                                                                                                              \
-        else {                                                                                                         \
-            memset(&component_, 0, sizeof(float32) * component_n_);                                                    \
-        }                                                                                                              \
-    }
-
-#define RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(component_, member_name_, component_n_)                           \
-    if constexpr (is_default_vertex) {                                                                                 \
-        if (has_##member_name_) {                                                                                      \
-            memcpy(&component_, member_name_.pData[i].mData, sizeof(float32) * component_n_);                          \
-        }                                                                                                              \
-        else {                                                                                                         \
-            memset(&component_, 0, sizeof(float32) * component_n_);                                                    \
-        }                                                                                                              \
-    }
-
-constexpr bool FxIsComplexVertex(RxVertexType vertex_type)
+FX_FORCE_INLINE uint32 GetSize(RxVertexType type)
 {
-    return (vertex_type == RxVertexType::eDefault || vertex_type == RxVertexType::eSkinned);
+    if (type == RxVertexType::eSlim) {
+        return sizeof(RxVertex<RxVertexType::eSlim>);
+    }
+    else if (type == RxVertexType::eDefault) {
+        return sizeof(RxVertex<RxVertexType::eDefault>);
+    }
+    else if (type == RxVertexType::eSkinned) {
+        return sizeof(RxVertex<RxVertexType::eSkinned>);
+    }
+
+    return 0;
 }
 
-class RxVertexList
+/**
+ * @brief Returns the position values given a vertex struct.
+ */
+template <RxVertexType TVertexType>
+FxVec3f GetPosition(const RxVertex<TVertexType>& vertex)
 {
-public:
-    RxVertexList() = default;
+    static_assert(
+        offsetof(RxVertex<RxVertexType::eSlim>, Position) == offsetof(RxVertex<RxVertexType::eDefault>, Position) &&
+        offsetof(RxVertex<RxVertexType::eDefault>, Position) == offsetof(RxVertex<RxVertexType::eSkinned>, Position));
 
-    void CreateSlimFrom(const FxSizedArray<float32>& positions);
-    void CreateSlimFrom(const FxSizedArray<FxVec3f>& positions);
-
-    void CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
-                    const FxSizedArray<FxVec2u>& uvs, const FxSizedArray<FxVec3f>& tangents, FxVec4f);
-
-
-    // template <RxVertexType TVertexType>
-    // void CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
-    //                 const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents)
-    // {
-    //     if (normals.IsNotEmpty()) {
-    //         FxAssert((normals.Size == positions.Size));
-    //     }
-
-    //     VertexType = TVertexType;
-
-    //     const bool has_normals = (normals.IsNotEmpty());
-    //     const bool has_uvs = (uvs.IsNotEmpty());
-    //     const bool has_tangents = (tangents.IsNotEmpty());
-
-    //     constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
-
-    //     // Create the local (cpu-side) buffer to store our vertices
-    //     mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size / 3);
-
-    //     if (!has_uvs) {
-    //         FxLogWarning("Vertex list does not contain UV coordinates", 0);
-    //     }
-
-    //     // Note that if can_output_* is true but has_* is false, that field will be zeroed out.
-
-    //     if (has_normals) {
-    //         bContainsNormals = true;
-    //     }
-    //     if (has_uvs) {
-    //         bContainsUVs = true;
-    //     }
-    //     if (has_tangents) {
-    //         bContainsTangents = true;
-    //     }
-
-    //     for (int i = 0; i < mLocalBuffer.Capacity; i++) {
-    //         RxVertex<TVertexType> vertex;
-
-    //         memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
-
-    //         // If the normals are available (passed in and not null), then output them to the vertex object. If not,
-    //         // zero them.
-    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Normal, normals, 3);
-    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.UV, uvs, 2);
-    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE(vertex.Tangent, tangents, 3);
-
-    //         mLocalBuffer.Insert(vertex);
-    //     }
-    // }
-
-    // template <RxVertexType TVertexType>
-    // void CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
-    //                 const FxSizedArray<FxVec2f>& uvs, const FxSizedArray<FxVec3f>& tangents)
-    // {
-    //     if (normals.IsNotEmpty()) {
-    //         FxAssert((normals.Size == positions.Size));
-    //     }
-
-    //     VertexType = TVertexType;
-
-    //     const bool has_normals = (normals.IsNotEmpty());
-    //     const bool has_uvs = (uvs.IsNotEmpty());
-    //     const bool has_tangents = (tangents.IsNotEmpty());
-
-    //     constexpr bool is_default_vertex = FxIsComplexVertex(TVertexType);
-
-    //     // Create the local (cpu-side) buffer to store our vertices
-    //     mLocalBuffer.Create(sizeof(RxVertex<TVertexType>), positions.Size);
-
-    //     if (!has_uvs) {
-    //         FxLogWarning("Vertex list does not contain UV coordinates");
-    //     }
-
-    //     // Note that if can_output_* is true but has_* is false, that field will be zeroed out.
-
-    //     if (has_normals) {
-    //         bContainsNormals = true;
-    //     }
-    //     if (has_uvs) {
-    //         bContainsUVs = true;
-    //     }
-    //     if (has_tangents) {
-    //         bContainsTangents = true;
-    //     }
-
-
-    //     for (uint32 i = 0; i < mLocalBuffer.Capacity; i++) {
-    //         RxVertex<TVertexType> vertex;
-
-    //         memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
-
-    //         // If the normals are available (passed in and not null), then output them to the vertex object. If not,
-    //         // zero them.
-    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Normal, normals, 3);
-    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.UV, uvs, 2);
-    //         RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3(vertex.Tangent, tangents, 3);
-
-    //         mLocalBuffer.Insert(vertex);
-    //     }
-    // }
-
-
-    template <RxVertexType TVertexType>
-    void CreateFrom(FxSizedArray<RxVertex<TVertexType>>&& vertices)
-    {
-        VertexType = TVertexType;
-        mLocalBuffer = std::move(vertices);
-    }
-
-    template <RxVertexType TVertexType>
-    void CreateAsCopyOf(const FxSizedArray<RxVertex<TVertexType>>& vertices)
-    {
-        VertexType = TVertexType;
-        mLocalBuffer.InitAsCopyOf(vertices);
-    }
-
-    void UploadToGpu() { GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, mLocalBuffer); }
-
-    /** @brief Returns true if the vertex type supports storing normals */
-    FX_FORCE_INLINE bool SupportsNormals() const { return (VertexType != RxVertexType::eSlim); }
-
-    /** @brief Returns true if the vertex buffer has been supplied values for normals. */
-    FX_FORCE_INLINE bool HasNormals() const { return bContainsNormals; }
-
-    void DestroyLocalBuffer() { mLocalBuffer.Free(); }
-    void Destroy()
-    {
-        GpuBuffer.Destroy();
-
-        DestroyLocalBuffer();
-    }
-
-    FxAnonArray& GetLocalBuffer() { return mLocalBuffer; }
-    const FxAnonArray& GetLocalBuffer() const { return mLocalBuffer; }
-
-
-    ~RxVertexList() { Destroy(); }
-
-public:
-    RxVertexType VertexType = RxVertexType::eDefault;
-    RxGpuBuffer GpuBuffer {};
-
-    bool bContainsNormals : 1 = false;
-    bool bContainsUVs : 1 = false;
-    bool bContainsTangents : 1 = false;
-
-private:
-    FxAnonArray mLocalBuffer;
-};
-
-#undef RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE
-#undef RX_VERTEX_OUTPUT_COMPONENT_IF_AVAILABLE_VEC3
+    return FxVec3f(vertex.Position);
+}
+}; // namespace RxVertexUtil

@@ -357,10 +357,10 @@ void FxMat4f::LookAt(FxVec3f eye, FxVec3f target, FxVec3f upvec)
 
     const FxVec3f up = forward.Cross(right);
 
-    Columns[0].Load4(right.X, up.X, forward.X, 0.0f);
-    Columns[1].Load4(right.Y, up.Y, forward.Y, 0.0f);
-    Columns[2].Load4(right.Z, up.Z, forward.Z, 0.0f);
-    Columns[3].Load4(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
+    Columns[0].Set(right.X, up.X, forward.X, 0.0f);
+    Columns[1].Set(right.Y, up.Y, forward.Y, 0.0f);
+    Columns[2].Set(right.Z, up.Z, forward.Z, 0.0f);
+    Columns[3].Set(-eye.Dot(right), -eye.Dot(up), -eye.Dot(forward), 1.0f);
 }
 
 void FxMat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 near_plane, float32 far_plane)
@@ -413,10 +413,10 @@ void FxMat4f::LoadOrthographicMatrix(float32 width, float32 height, float32 near
     const float32 depth_range = 1.0f / (far_plane - near_plane);
 
 
-    Columns[0].Load4(2.0f / width, 0.0f, 0.0f, 0.0f);
-    Columns[1].Load4(0.0f, -2.0f / height, 0.0f, 0.0f);
-    Columns[2].Load4(0.0f, 0.0f, depth_range, 0.0f);
-    Columns[3].Load4(0.0f, 0.0f, -depth_range * near_plane, 1.0f);
+    Columns[0].Set(2.0f / width, 0.0f, 0.0f, 0.0f);
+    Columns[1].Set(0.0f, -2.0f / height, 0.0f, 0.0f);
+    Columns[2].Set(0.0f, 0.0f, depth_range, 0.0f);
+    Columns[3].Set(0.0f, 0.0f, -depth_range * near_plane, 1.0f);
 
 
     // Print();
