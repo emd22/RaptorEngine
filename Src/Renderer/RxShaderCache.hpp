@@ -14,7 +14,6 @@ public:
 
     FxRef<RxShader> Request(const RxShaderId id);
 
-
 private:
     FxSizedArray<FxRef<RxShader>> mCache;
 };

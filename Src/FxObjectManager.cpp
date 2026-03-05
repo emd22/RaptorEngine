@@ -2,6 +2,7 @@
 
 #include <FxEngine.hpp>
 #include <FxObject.hpp>
+#include <Math/FxMat4.hpp>
 #include <Renderer/Backend/RxDsLayoutBuilder.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
@@ -72,7 +73,7 @@ void FxObjectManager::Submit(FxObjectId object_id, FxObjectGpuEntry& entry)
     // mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(FxObjectGpuEntry));
 }
 
-void FxObjectManager::Submit(FxObjectId object_id, FxMat4f& model_matrix)
+void FxObjectManager::Submit(FxObjectId object_id, const FxMat4f& model_matrix)
 {
     static_assert(offsetof(FxObjectGpuEntry, ModelMatrix) == 0);
 

@@ -4,6 +4,7 @@
 #include <FxObjectManager.hpp>
 #include <Renderer/Backend/RxDsLayoutBuilder.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
+#include <Renderer/Backend/RxVertexDescription.hpp>
 #include <Renderer/RxDeferred.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>

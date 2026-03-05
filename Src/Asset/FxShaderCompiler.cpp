@@ -182,8 +182,14 @@ bool FxShaderCompiler::CompileIfOutOfDate(const char* path, FxDataPack& pack, co
 
     return out_of_date;
 }
-void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSizedArray<FxShaderMacro>& macros,
-                               bool do_db_flush)
+
+#define WRITE_COMPILED_PROGRAM(index_, shader_type_)                                                                   \
+    if (WriteCompiledProgram(index_, shader_type_) == Result::eFailed) {                                               \
+        return Result::eFailed;                                                                                        \
+    }
+
+FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack& pack,
+                                                   const FxSizedArray<FxShaderMacro>& macros, bool do_db_flush)
 {
     if (!sShaderCompileDb.IsOpen()) {
         sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
@@ -209,7 +215,7 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
     if (diagnostic_blob != nullptr) {
         FxLogError("Error loading Slang module for {}", path);
         PrintSlangDiagnostics(diagnostic_blob);
-        return;
+        return Result::eFailed;
     }
 
     Slang::ComPtr<slang::IEntryPoint> vertex_entry_point;
@@ -243,46 +249,39 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
 
     Slang::ComPtr<slang::IBlob> spirv_code;
 
-    // Write the vertex shader code
-    if (has_vertex_shader) {
-        result = composed_program->getEntryPointCode(0, 0, spirv_code.writeRef(), diagnostic_blob.writeRef());
+    auto WriteCompiledProgram = [&](uint32 entry_index, RxShaderType shader_type) -> Result
+    {
+        result = composed_program->getEntryPointCode(entry_index, 0, spirv_code.writeRef(), diagnostic_blob.writeRef());
 
         if (SLANG_FAILED(result)) {
-            FxLogError("Could not get vertex shader SPIRV (Path={})", path);
+            FxLogError("Could not get {} shader SPIRV (Path={})", RxShaderUtil::TypeToName(shader_type), path);
             PrintSlangDiagnostics(diagnostic_blob);
-            return;
+            return Result::eFailed;
         }
 
         {
             FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
-            pack.AddEntry(RxShader::GenerateShaderId(RxShaderType::eVertex, macros), aligned_buffer);
+            pack.AddEntry(RxShader::GenerateShaderId(shader_type, macros), aligned_buffer);
             FxMemPool::Free(aligned_buffer.pData);
         }
 
-        FxLogInfo("Compiled vertex shader {} (Size={})", path, spirv_code->getBufferSize());
-    }
+        FxLogInfo("Compiled {} shader {} (Size={})", RxShaderUtil::TypeToName(shader_type), path,
+                  spirv_code->getBufferSize());
 
-    // Clear the spirv_code
-    spirv_code.setNull();
+        spirv_code.setNull();
 
-    // Write the fragment shader code
-    if (has_fragment_shader) {
-        result = composed_program->getEntryPointCode(1, 0, spirv_code.writeRef(), diagnostic_blob.writeRef());
+        return Result::eSuccess;
+    };
 
-        if (SLANG_FAILED(result)) {
-            FxLogError("Could not get fragment shader SPIRV (Path={})", path);
-            PrintSlangDiagnostics(diagnostic_blob);
-            return;
-        }
+    // Write the compiled programs to the DataPack
 
-        {
-            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
-            pack.AddEntry(RxShader::GenerateShaderId(RxShaderType::eFragment, macros), aligned_buffer);
-            FxMemPool::Free(aligned_buffer.pData);
-        }
+    WRITE_COMPILED_PROGRAM(0, RxShaderType::eVertex);
+    WRITE_COMPILED_PROGRAM(1, RxShaderType::eFragment);
 
-        FxLogInfo("Compiled fragment shader {} (Size={})", path, spirv_code->getBufferSize());
-    }
+
+    // slang::ProgramLayout* layout = composed_program->getLayout(0);
+
+    // layout->get
 
     FxLogDebug("Compiled shader pack (HasVertex={}, HasFragment={})", has_vertex_shader, has_fragment_shader);
 
@@ -291,6 +290,8 @@ void FxShaderCompiler::Compile(const char* path, FxDataPack& pack, const FxSized
     if (do_db_flush) {
         sShaderCompileDb.SaveToFile();
     }
+
+    return Result::eSuccess;
 }
 
 void FxShaderCompiler::Destroy()

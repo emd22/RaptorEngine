@@ -7,7 +7,6 @@
 
 enum class RxShaderType
 {
-    eUnknown,
     eVertex,
     eFragment,
 };
@@ -15,7 +14,7 @@ enum class RxShaderType
 class RxShader;
 
 namespace RxShaderUtil {
-static constexpr uint32 scNumShaderTypes = static_cast<uint32>(RxShaderType::eFragment);
+static constexpr uint32 scNumShaderTypes = static_cast<uint32>(RxShaderType::eFragment) + 1;
 
 /**
  * @brief Get the underlying Vulkan shader stage bit for an RxShaderType.
@@ -23,10 +22,6 @@ static constexpr uint32 scNumShaderTypes = static_cast<uint32>(RxShaderType::eFr
 static constexpr VkShaderStageFlagBits ToUnderlyingType(RxShaderType type)
 {
     switch (type) {
-    case RxShaderType::eUnknown:
-        FxLogError("Shader stage is RxShaderType::eUnknown!");
-        break;
-
     case RxShaderType::eVertex:
         return VK_SHADER_STAGE_VERTEX_BIT;
     case RxShaderType::eFragment:
@@ -35,6 +30,17 @@ static constexpr VkShaderStageFlagBits ToUnderlyingType(RxShaderType type)
 
     return VK_SHADER_STAGE_VERTEX_BIT;
 }
+
+static FX_FORCE_INLINE const char* TypeToName(RxShaderType type)
+{
+    switch (type) {
+    case RxShaderType::eVertex:
+        return "Vertex";
+    case RxShaderType::eFragment:
+        return "Fragment";
+    }
+    return "Unknown";
+}
 }; // namespace RxShaderUtil
 
 
@@ -42,7 +48,7 @@ class RxShaderProgram
 {
 public:
     RxShaderProgram() = default;
-    RxShaderProgram(nullptr_t np) : InternalShader(nullptr), ShaderType(RxShaderType::eUnknown) {}
+    RxShaderProgram(nullptr_t np) : InternalShader(nullptr), ShaderType(RxShaderType::eVertex) {}
 
     RxShaderProgram(RxShaderProgram&& other)
     {
@@ -51,7 +57,7 @@ public:
         pShader = other.pShader;
 
         other.InternalShader = nullptr;
-        other.ShaderType = RxShaderType::eUnknown;
+        other.ShaderType = RxShaderType::eVertex;
         other.pShader = nullptr;
     }
 
@@ -71,7 +77,7 @@ public:
     VkShaderModule InternalShader = nullptr;
     RxShader* pShader = nullptr;
 
-    RxShaderType ShaderType = RxShaderType::eUnknown;
+    RxShaderType ShaderType = RxShaderType::eVertex;
 };
 
 class RxShader
@@ -94,7 +100,11 @@ public:
     static FxHash64 GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
 
     RxShader() = delete;
-    RxShader(const char* path) { Load(path); }
+    RxShader(const char* path)
+    {
+        mCachedTypes.Size = mCachedTypes.Capacity;
+        Load(path);
+    }
 
     /**
      * @brief Returns a cached program if it has previously been queried or loads the uncached version from disk.
@@ -129,7 +139,7 @@ private:
 
     /// A list of shader types (that hold shader programs) that have already been retreived from the datapack or
     /// created.
-    FxStackArray<ProgramCache, RxShaderUtil::scNumShaderTypes + 1> mCachedTypes;
+    FxStackArray<ProgramCache, RxShaderUtil::scNumShaderTypes> mCachedTypes;
 
     FxDataPack mDataPack;
 };

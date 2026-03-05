@@ -1,9 +1,11 @@
 
 #include "RxPipeline.hpp"
 
-#include "Core/FxDefines.hpp"
 #include "RxCommands.hpp"
+#include "RxShader.hpp"
+#include "RxVertexDescription.hpp"
 
+#include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxStackArray.hpp>
 #include <Renderer/RxDeferred.hpp>

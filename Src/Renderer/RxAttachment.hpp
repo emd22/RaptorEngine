@@ -85,6 +85,8 @@ public:
     RxTargetList& Add(const RxTarget* attachment);
     RxTargetList& Add(const RxTarget& attachment);
 
+    bool IsCompatible(const RxTargetList& other) const;
+
     void CreateImages();
     FxSizedArray<VkAttachmentDescription>& GetDescriptions();
     FxSizedArray<VkImageView>& GetImageViews();

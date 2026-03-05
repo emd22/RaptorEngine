@@ -2,15 +2,15 @@
 
 #include "Backend/RxDsLayoutBuilder.hpp"
 #include "Backend/RxShader.hpp"
+#include "Backend/RxVertexDescription.hpp"
+#include "FxCamera.hpp"
 #include "FxEngine.hpp"
+#include "RxGlobals.hpp"
+#include "RxPipelineBuilder.hpp"
+#include "RxRenderBackend.hpp"
+#include "RxShaderCache.hpp"
 
 #include <FxObjectManager.hpp>
-#include <Renderer/FxCamera.hpp>
-#include <Renderer/RxDeferred.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxPipelineBuilder.hpp>
-#include <Renderer/RxRenderBackend.hpp>
-#include <Renderer/RxShaderCache.hpp>
 
 
 FX_SET_MODULE_NAME("DeferredRenderer")
@@ -135,9 +135,9 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 {
     VkPipelineLayout layout = CreateUnlitPipelineLayout();
 
-    RxShader shader_unlit("Unlit");
-    FxRef<RxShaderProgram> vertex_shader = shader_unlit.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_unlit.GetProgram(RxShaderType::eFragment, {});
+    FxRef<RxShader> shader_unlit = gShaderCache->Request(RxShaderId::eUnlit);
+    FxRef<RxShaderProgram> vertex_shader = shader_unlit->GetProgram(RxShaderType::eVertex, {});
+    FxRef<RxShaderProgram> fragment_shader = shader_unlit->GetProgram(RxShaderType::eFragment, {});
 
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
@@ -197,17 +197,10 @@ void RxDeferredRenderer::CreateGPassPipeline()
     CreateGPass();
 
     FxRef<RxShader> shader_geometry = gShaderCache->Request(RxShaderId::eGeometry);
-    // RxShader shader_geometry("Geometry");
     FxRef<RxShaderProgram> vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, {});
     FxRef<RxShaderProgram> fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, {});
 
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
-
-    // RxShader& shader = gShaderCache->Request(RxShaderId::eGeometry);
-    // shader.GetProgram(RxShaderType::eVertex, {});
-    // shader.GetProgram(RxShaderType::eVertex, {FxShaderMacro{"FX_USE_NORMALS", "1"}});
-
-    // RpGeometry.Create(attachments, gRenderer->Swapchain.Extent);
 
     RxPipelineBuilder builder;
 

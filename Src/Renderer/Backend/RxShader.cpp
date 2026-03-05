@@ -11,6 +11,8 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+#define DEBUG_FORCE_OUT_OF_DATE 1
+
 
 FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {
@@ -71,13 +73,26 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
     std::string source_path = GetSourcePath();
     const char* c_source_path = source_path.c_str();
 
+
     // Check if the shader is out of date
-    if (FxShaderCompiler::IsOutOfDate(c_source_path)) {
+    bool is_out_of_date = FxShaderCompiler::IsOutOfDate(c_source_path);
+#ifdef DEBUG_FORCE_OUT_OF_DATE
+    is_out_of_date = true;
+#endif
+
+    if (is_out_of_date) {
         FxLogWarning("Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
         // Shader is out of date, compile it
-        FxShaderCompiler::Compile(c_source_path, mDataPack, macros);
-        // Save the program back to the datapack
-        mDataPack.WriteToFile(GetProgramPath().c_str());
+
+        FxShaderCompiler::Result compile_result = FxShaderCompiler::Compile(c_source_path, mDataPack, macros);
+
+        if (compile_result != FxShaderCompiler::Result::eFailed) {
+            // Save the program back to the datapack
+            mDataPack.WriteToFile(GetProgramPath().c_str());
+        }
+
+        // If the shader failed to compile, it will not be written back to the datapack. We can continue using the out
+        // of date shader.
     }
 
     // Generate an ID based on the shader type and macros. This is used for querying for the program in the DataPack.
@@ -104,7 +119,6 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
             return program;
         }
     }
-
 
     // If there is data available, create the program.
     if (dp_entry->Data.IsNotEmpty()) {

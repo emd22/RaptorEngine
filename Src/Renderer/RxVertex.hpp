@@ -5,7 +5,6 @@
 #include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
 
-
 enum class RxVertexType
 {
     eSlim,
