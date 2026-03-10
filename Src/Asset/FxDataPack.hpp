@@ -37,7 +37,7 @@ struct FxDataPackEntry
     FxDataPackEntry& operator=(const FxDataPackEntry& other) = delete;
 
 public:
-    FxHash64 Id = 0;
+    FxHash64 Id = FxHashNull64;
     uint32 DataOffset = 0;
     uint32 DataSize = 0;
 

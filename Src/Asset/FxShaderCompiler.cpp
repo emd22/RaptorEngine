@@ -144,20 +144,23 @@ void FxShaderCompiler::CompileAllShaders(const char* folder_path)
     // sShaderCompileDb.SaveToFile();
 }
 
-static FxSlice<uint8> CreateAlignedBufferForSpirv(const Slang::ComPtr<slang::IBlob>& spirv_code)
+
+static FxSlice<uint8> CreateAlignedBufferForSpirv(const RxShaderOutline& outline,
+                                                  Slang::ComPtr<slang::IBlob> spirv_code)
 {
-    uint32 unaligned_size = spirv_code->getBufferSize();
-    uint32 buffer_size = FxMath::AlignValue<4>(unaligned_size);
+    const uint32 reflection_size = FxMath::AlignValue<4>(outline.GetReflectionSize());
+    const uint32 total_buffer_size = reflection_size + FxMath::AlignValue<4>(spirv_code->getBufferSize());
 
-    uint8* buffer = FxMemPool::Alloc<uint8>(buffer_size);
+    uint8* big_buffer = FxMemPool::Alloc<uint8>(total_buffer_size);
 
-    memcpy(buffer, spirv_code->getBufferPointer(), unaligned_size);
+    // Write the reflection data (shader outline) out to the buffer
+    outline.WriteToBuffer(reinterpret_cast<uint32*>(big_buffer));
 
-    if (unaligned_size < buffer_size) {
-        memset(buffer + unaligned_size, 0, buffer_size - unaligned_size);
-    }
+    // Write compiled SPIRV data after the reflection data
+    uint8* compiled_data = big_buffer + reflection_size;
+    memcpy(compiled_data, spirv_code->getBufferPointer(), spirv_code->getBufferSize());
 
-    return FxMakeSlice(buffer, buffer_size);
+    return FxMakeSlice(big_buffer, total_buffer_size);
 }
 
 
@@ -187,6 +190,108 @@ bool FxShaderCompiler::CompileIfOutOfDate(const char* path, FxDataPack& pack, co
     if (WriteCompiledProgram(index_, shader_type_) == Result::eFailed) {                                               \
         return Result::eFailed;                                                                                        \
     }
+
+static bool UpdateFromUserAttributes(slang::TypeReflection* type)
+{
+    uint32 num_attrs = type->getUserAttributeCount();
+
+    // constexpr FxHash32 cDynamic = FxHashStr32("FxDynamic");
+
+    for (uint32 i = 0; i < num_attrs; i++) {
+        slang::Attribute* attr = type->getUserAttributeByIndex(i);
+
+        // Not enough attributes yet to justify the hash and iteration cost
+        if (!strcmp(attr->getName(), "FxDynamic")) {
+            // desc_entry.bUseDynamicType = true;
+            return true;
+        }
+
+
+        return false;
+        // const FxHash32 name_hash = FxHashStr32(attr->getName());
+
+        // switch (name_hash) {
+        // case cDynamic:
+        //     desc_entry.bUseDynamicType = true;
+        //     break;
+        // default:;
+        // }
+    }
+}
+
+static RxShaderDescriptorType UpdateFromUserType(slang::TypeReflection* type)
+{
+    SlangResourceShape shape = type->getResourceShape();
+
+    switch ((shape & SLANG_RESOURCE_BASE_SHAPE_MASK)) {
+    case SLANG_STRUCTURED_BUFFER:
+        return RxShaderDescriptorType::eStructuredBuffer;
+        break;
+    case SLANG_TEXTURE_2D: // Same as SLANG_SAMPLER
+        return RxShaderDescriptorType::eSampler2D;
+        break;
+    default:
+        FxLogError("Cannot find type for descriptor table slot in shader!");
+        break;
+    }
+
+    return RxShaderDescriptorType::eStructuredBuffer;
+}
+
+
+static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>& composed_program,
+                                            RxShaderType shader_type)
+{
+    RxShaderOutline outline;
+
+    slang::ProgramLayout* program_layout = composed_program->getLayout(static_cast<uint32>(shader_type));
+    const uint32 num_uniforms = program_layout->getParameterCount();
+
+    FxLogInfo("Number of Uniforms: {}", num_uniforms);
+
+    for (uint32 i = 0; i < num_uniforms; i++) {
+        slang::VariableLayoutReflection* var_layout = program_layout->getParameterByIndex(i);
+
+        const char* name = var_layout->getName();
+        slang::ParameterCategory category = var_layout->getCategory();
+
+        slang::TypeLayoutReflection* type_layout = var_layout->getTypeLayout();
+
+        uint32 binding = var_layout->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+        uint32 set = var_layout->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
+
+        switch (category) {
+        // Constant buffers
+        case slang::ParameterCategory::PushConstantBuffer: {
+            uint32 pc_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER);
+            FxLogInfo("PC size: {}", pc_size);
+            outline.PushConstantSizes[static_cast<uint32>(shader_type)] = pc_size;
+        } break;
+
+        // Uniform buffers
+        case slang::ParameterCategory::Uniform:
+            outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer, false, set, binding);
+            break;
+
+        // Samplers, SSBOs
+        case slang::ParameterCategory::DescriptorTableSlot: {
+            slang::TypeReflection* type = var_layout->getType();
+            outline.AddDescriptor(UpdateFromUserType(type), UpdateFromUserAttributes(type), set, binding);
+        } break;
+
+        // Vertex attributes
+        case slang::ParameterCategory::VaryingInput:
+            break;
+
+        default:;
+        }
+
+
+        FxLogInfo("Found uniform '{}' at (set={}, binding={})", name, set, binding);
+    }
+
+    return outline;
+}
 
 FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack& pack,
                                                    const FxSizedArray<FxShaderMacro>& macros, bool do_db_flush)
@@ -260,7 +365,8 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
         }
 
         {
-            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(spirv_code);
+            RxShaderOutline refl = GetProgramReflection(composed_program, shader_type);
+            FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(refl, spirv_code);
             pack.AddEntry(RxShader::GenerateShaderId(shader_type, macros), aligned_buffer);
             FxMemPool::Free(aligned_buffer.pData);
         }
@@ -277,11 +383,6 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
 
     WRITE_COMPILED_PROGRAM(0, RxShaderType::eVertex);
     WRITE_COMPILED_PROGRAM(1, RxShaderType::eFragment);
-
-
-    // slang::ProgramLayout* layout = composed_program->getLayout(0);
-
-    // layout->get
 
     FxLogDebug("Compiled shader pack (HasVertex={}, HasFragment={})", has_vertex_shader, has_fragment_shader);
 

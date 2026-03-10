@@ -72,7 +72,7 @@ public:
 
     void InvalidateCacheId()
     {
-        CachePropId = 0;
+        CachePropId = FxHashNull64;
         CacheId = UINT32_MAX;
     }
 
@@ -91,7 +91,7 @@ public:
     /**
      * @brief An identifier for the properties that the sampler was created with. Used by RxSamplerCache.
      */
-    FxHash64 CachePropId = 0;
+    FxHash64 CachePropId = FxHashNull64;
 
 private:
     friend struct RxSamplerHandle;

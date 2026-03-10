@@ -1,6 +1,7 @@
 module Geometry;
 
 #include "./Object.slang.inc"
+#include "./Util.slang"
 
 //////////////////////////////////
 // Vertex shader
@@ -37,6 +38,7 @@ struct VSPushConsts
     uint uiMaterialIndex;
 };
 
+[FxDynamic]
 layout(set = 2, binding = 0) StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;

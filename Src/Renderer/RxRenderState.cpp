@@ -5,7 +5,7 @@
 #include <Renderer/Backend/RxShader.hpp>
 #include <Renderer/RxPipelineBuilder.hpp>
 
-RxRenderState::RxRenderState() { mState.Shaders.Size = mState.Shaders.Capacity; }
+RxRenderState::RxRenderState() { mState.Shaders.MarkFull(); }
 
 
 void RxRenderState::SetRenderPass(const RxRenderPass& render_pass) {}

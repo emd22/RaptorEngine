@@ -78,7 +78,7 @@ public:
 
     FxHash64 GetHash()
     {
-        if (Hash != 0) {
+        if (Hash != FxHashNull64) {
             return Hash;
         }
         return (Hash = FxHashData64(FxSlice<char>(Start, Length)));
@@ -124,7 +124,7 @@ public:
     char* Start = nullptr;
     char* End = nullptr;
 
-    FxHash64 Hash = 0;
+    FxHash64 Hash = FxHashNull64;
     FxTokenType Type = FxTokenType::eUnknown;
     uint32 Length = 0;
 

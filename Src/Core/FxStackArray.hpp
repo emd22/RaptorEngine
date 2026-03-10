@@ -55,6 +55,10 @@ public:
         return pData[index];
     }
 
+    void MarkFull() { Size = Capacity; };
+
+    uint32 GetSizeInBytes() const { return Size * sizeof(T); }
+
     T& Last() { return pData[Size]; }
 
     operator T*() noexcept { return pData; }

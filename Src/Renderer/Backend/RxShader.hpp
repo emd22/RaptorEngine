@@ -13,6 +13,7 @@ enum class RxShaderType
 
 class RxShader;
 
+
 namespace RxShaderUtil {
 static constexpr uint32 scNumShaderTypes = static_cast<uint32>(RxShaderType::eFragment) + 1;
 
@@ -42,6 +43,77 @@ static FX_FORCE_INLINE const char* TypeToName(RxShaderType type)
     return "Unknown";
 }
 }; // namespace RxShaderUtil
+
+
+enum class RxShaderDescriptorType : uint16
+{
+    eStructuredBuffer,
+    eUniformBuffer,
+    eSampler2D,
+};
+
+struct RxShaderDescriptorEntry
+{
+    RxShaderDescriptorEntry() = default;
+    RxShaderDescriptorEntry(RxShaderDescriptorType type, bool use_dynamic_type, uint32 set, uint32 binding)
+        : Type(type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)), Set(set), Binding(binding)
+    {
+    }
+
+    RxShaderDescriptorType Type;
+    uint16 bUseDynamicType = 0;
+    uint32 Set = 0;
+    uint32 Binding = 0;
+};
+
+
+struct RxShaderOutline
+{
+public:
+    RxShaderOutline() { PushConstantSizes.MarkFull(); }
+
+    FxHash64 GetHash()
+    {
+        if (mHash == FxHashNull64 || mbOutOfDate) {
+            mHash = FxHashData64(FxSlice(DescriptorEntries));
+            mbOutOfDate = false;
+        }
+
+        return mHash;
+    }
+
+    uint32 GetReflectionSize() const;
+
+    void WriteToBuffer(uint32* raw_buffer) const;
+    void ReadFromBuffer(const FxSlice<uint32>& data);
+
+    void AddDescriptor(RxShaderDescriptorType type, bool use_dynamic_type, uint32 set, uint32 binding)
+    {
+        if (!DescriptorEntries.IsInited()) {
+            DescriptorEntries.InitCapacity(16);
+        }
+
+        mbOutOfDate = true;
+        DescriptorEntries.Insert(RxShaderDescriptorEntry(type, use_dynamic_type, set, binding));
+    }
+
+    bool operator==(RxShaderOutline& other)
+    {
+        const bool pcs_match = memcmp(PushConstantSizes.pData, other.PushConstantSizes.pData,
+                                      other.PushConstantSizes.GetSizeInBytes());
+
+        return pcs_match && (GetHash() == other.GetHash());
+    }
+
+public:
+    FxSizedArray<RxShaderDescriptorEntry> DescriptorEntries;
+    FxStackArray<uint32, RxShaderUtil::scNumShaderTypes> PushConstantSizes = { 0, 0 };
+
+private:
+    FxHash64 mHash = FxHashNull64;
+
+    bool mbOutOfDate : 1 = false;
+};
 
 
 class RxShaderProgram
@@ -77,6 +149,8 @@ public:
     VkShaderModule InternalShader = nullptr;
     RxShader* pShader = nullptr;
 
+    RxShaderOutline Outline;
+
     RxShaderType ShaderType = RxShaderType::eVertex;
 };
 
@@ -102,7 +176,7 @@ public:
     RxShader() = delete;
     RxShader(const char* path)
     {
-        mCachedTypes.Size = mCachedTypes.Capacity;
+        mCachedTypes.MarkFull();
         Load(path);
     }
 
@@ -133,6 +207,9 @@ private:
 
     const std::string GetSourcePath() const;
     const std::string GetProgramPath() const;
+
+public:
+    RxShaderOutline Outline;
 
 private:
     std::string Name = "Unknown";

@@ -12,6 +12,9 @@
 using FxHash32 = uint32;
 using FxHash64 = uint64;
 
+static constexpr FxHash64 FxHashNull64 = UINT64_MAX;
+static constexpr FxHash32 FxHashNull32 = UINT32_MAX;
+
 /**
  * Hashes a string at compile time using FNV-1a.
  *

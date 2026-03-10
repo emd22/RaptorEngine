@@ -1,6 +1,7 @@
 module Lighting;
 
 #include "./Object.slang.inc"
+#include "./Util.slang"
 
 //////////////////////////////////
 // Vertex shader
@@ -72,6 +73,7 @@ layout(binding = 1) Sampler2D sAlbedo;
 layout(binding = 2) Sampler2D sNormal;
 layout(binding = 3) Sampler2DShadow sShadowDepth;
 
+[FxDynamic]
 layout(binding = 4) cbuffer FSUniforms
 {
     // 64

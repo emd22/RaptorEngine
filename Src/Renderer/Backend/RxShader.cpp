@@ -13,6 +13,45 @@
 
 #define DEBUG_FORCE_OUT_OF_DATE 1
 
+/////////////////////////////////////
+// Shader Outline Functions
+/////////////////////////////////////
+
+
+uint32 RxShaderOutline::GetReflectionSize() const
+{
+    uint32 reflection_header_size = sizeof(uint32);                            // Size of reflection header
+    reflection_header_size += sizeof(uint32) * RxShaderUtil::scNumShaderTypes; // Push constant buffer sizes
+    reflection_header_size += sizeof(uint32);                                  // Number of descriptor entries
+    reflection_header_size += DescriptorEntries.GetSizeInBytes();              // The descriptor entries
+
+    return reflection_header_size;
+}
+
+void RxShaderOutline::WriteToBuffer(uint32* buffer) const
+{
+    uint32 pc_index = 0;
+    for (; pc_index < RxShaderUtil::scNumShaderTypes; pc_index++) {
+        *(buffer++) = PushConstantSizes[pc_index];
+    }
+
+    // Amount of descriptor entries
+    *(++buffer) = DescriptorEntries.Size;
+
+    uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
+
+    for (const RxShaderDescriptorEntry& entry : DescriptorEntries) {
+        memcpy(sd_buffer, &entry, sizeof(RxShaderDescriptorEntry));
+        sd_buffer += sizeof(RxShaderDescriptorEntry);
+    }
+}
+
+
+void RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data) {}
+
+/////////////////////////////////////
+// Shader Functions
+/////////////////////////////////////
 
 FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {
@@ -191,6 +230,9 @@ void RxShaderProgram::Destroy()
 
 void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module)
 {
+    // Load reflected data
+    Outline.ReadFromBuffer(FxSlice<uint32>(shader_data, file_size));
+
     const VkShaderModuleCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = file_size,

@@ -42,10 +42,10 @@ public:
     void Clear()
     {
         mName.clear();
-        mHash = 0;
+        mHash = FxHashNull64;
     }
 
 private:
     std::string mName = "";
-    FxHash64 mHash = 0;
+    FxHash64 mHash = FxHashNull64;
 };
