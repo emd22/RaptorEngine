@@ -85,7 +85,12 @@ public:
     uint32 GetReflectionSize() const;
 
     void WriteToBuffer(uint32* raw_buffer) const;
-    void ReadFromBuffer(const FxSlice<uint32>& data);
+
+    /**
+     * @brief Reads the outline from a data buffer
+     * @returns The size of the outline
+     */
+    uint32 ReadFromBuffer(const FxSlice<uint32>& data);
 
     void AddDescriptor(RxShaderDescriptorType type, bool use_dynamic_type, uint32 set, uint32 binding)
     {

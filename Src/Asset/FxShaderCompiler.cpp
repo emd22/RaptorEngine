@@ -148,7 +148,7 @@ void FxShaderCompiler::CompileAllShaders(const char* folder_path)
 static FxSlice<uint8> CreateAlignedBufferForSpirv(const RxShaderOutline& outline,
                                                   Slang::ComPtr<slang::IBlob> spirv_code)
 {
-    const uint32 reflection_size = FxMath::AlignValue<4>(outline.GetReflectionSize());
+    const uint32 reflection_size = outline.GetReflectionSize();
     const uint32 total_buffer_size = reflection_size + FxMath::AlignValue<4>(spirv_code->getBufferSize());
 
     uint8* big_buffer = FxMemPool::Alloc<uint8>(total_buffer_size);
@@ -207,7 +207,6 @@ static bool UpdateFromUserAttributes(slang::TypeReflection* type)
         }
 
 
-        return false;
         // const FxHash32 name_hash = FxHashStr32(attr->getName());
 
         // switch (name_hash) {
@@ -217,6 +216,7 @@ static bool UpdateFromUserAttributes(slang::TypeReflection* type)
         // default:;
         // }
     }
+    return false;
 }
 
 static RxShaderDescriptorType UpdateFromUserType(slang::TypeReflection* type)
@@ -263,7 +263,7 @@ static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>
         switch (category) {
         // Constant buffers
         case slang::ParameterCategory::PushConstantBuffer: {
-            uint32 pc_size = type_layout->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER);
+            uint32 pc_size = static_cast<uint32>(type_layout->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER));
             FxLogInfo("PC size: {}", pc_size);
             outline.PushConstantSizes[static_cast<uint32>(shader_type)] = pc_size;
         } break;

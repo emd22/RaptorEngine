@@ -9,6 +9,21 @@
 static const uint16 scBinHeaderStart = 0xA1B2;
 static const uint16 scBinHeaderEnd = 0x2B1A;
 
+/*
+ * HEADER BEGIN - A1B2
+ *      ENTRY 1    (16 bytes)
+ *      - ENTRY ID (8 bytes)
+ *      - OFFSET   (4 bytes)
+ *      - SIZE     (4 bytes)
+ *      ENTRY 2    (16 bytes)
+ *      ENTRY N
+ * HEADER END   - 2B1A
+ * ENTRY 1 DATA
+ * ENTRY 2 DATA
+ * ENTRY N DATA
+ */
+
+
 // static constexpr uint16 scByteAlignment = 16;
 // static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
 

@@ -11,7 +11,7 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-#define DEBUG_FORCE_OUT_OF_DATE 1
+// #define DEBUG_FORCE_OUT_OF_DATE 1
 
 /////////////////////////////////////
 // Shader Outline Functions
@@ -25,18 +25,21 @@ uint32 RxShaderOutline::GetReflectionSize() const
     reflection_header_size += sizeof(uint32);                                  // Number of descriptor entries
     reflection_header_size += DescriptorEntries.GetSizeInBytes();              // The descriptor entries
 
-    return reflection_header_size;
+    return FxMath::AlignValue<4>(reflection_header_size);
 }
 
 void RxShaderOutline::WriteToBuffer(uint32* buffer) const
 {
+    *(buffer++) = GetReflectionSize();
+
     uint32 pc_index = 0;
+    // Write the push constant sizes for each shader type
     for (; pc_index < RxShaderUtil::scNumShaderTypes; pc_index++) {
         *(buffer++) = PushConstantSizes[pc_index];
     }
 
     // Amount of descriptor entries
-    *(++buffer) = DescriptorEntries.Size;
+    *(buffer++) = static_cast<uint32>(DescriptorEntries.Size);
 
     uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
 
@@ -47,7 +50,29 @@ void RxShaderOutline::WriteToBuffer(uint32* buffer) const
 }
 
 
-void RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data) {}
+uint32 RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data)
+{
+    uint32* buffer = data.pData;
+
+    uint32 size_of_outline = *(buffer++);
+
+    // Read the push constant sizes for each shader type
+    for (uint32 pc_index = 0; pc_index < RxShaderUtil::scNumShaderTypes; pc_index++) {
+        PushConstantSizes[pc_index] = *(buffer++);
+    }
+
+    const uint32 num_ds_entries = *(buffer++);
+    DescriptorEntries.InitSize(num_ds_entries);
+
+    uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
+
+    for (RxShaderDescriptorEntry& entry : DescriptorEntries) {
+        memcpy(&entry, sd_buffer, sizeof(RxShaderDescriptorEntry));
+        sd_buffer += sizeof(RxShaderDescriptorEntry);
+    }
+
+    return size_of_outline;
+}
 
 /////////////////////////////////////
 // Shader Functions
@@ -228,14 +253,16 @@ void RxShaderProgram::Destroy()
 }
 
 
-void RxShader::CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module)
+void RxShader::CreateShaderModule(uint32 file_size, uint32* raw_data, VkShaderModule& shader_module)
 {
     // Load reflected data
-    Outline.ReadFromBuffer(FxSlice<uint32>(shader_data, file_size));
+    uint32 reflected_size = Outline.ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
+
+    uint32* shader_data = reinterpret_cast<uint32*>(reinterpret_cast<uint8*>(raw_data) + reflected_size);
 
     const VkShaderModuleCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = file_size,
+        .codeSize = file_size - reflected_size,
         .pCode = shader_data,
     };
 
