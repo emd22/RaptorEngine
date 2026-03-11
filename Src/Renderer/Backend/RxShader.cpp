@@ -54,7 +54,7 @@ uint32 RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data)
 {
     uint32* buffer = data.pData;
 
-    uint32 size_of_outline = *(buffer++);
+    const uint32 size_of_outline = *(buffer++);
 
     // Read the push constant sizes for each shader type
     for (uint32 pc_index = 0; pc_index < RxShaderUtil::scNumShaderTypes; pc_index++) {
@@ -138,6 +138,11 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
     const char* c_source_path = source_path.c_str();
 
 
+    if (!mDataPack.IsOpen() || mDataPack.Entries.IsEmpty()) {
+        std::string program_path = GetProgramPath();
+        mDataPack.ReadFromFile(program_path.c_str());
+    }
+
     // Check if the shader is out of date
     bool is_out_of_date = FxShaderCompiler::IsOutOfDate(c_source_path);
 #ifdef DEBUG_FORCE_OUT_OF_DATE
@@ -172,8 +177,11 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
     // Check for the program in the DataPack
     FxDataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
 
+    // mDataPack.PrintInfo();
+
     // If there is no compiled version of the program in the DataPack, compile it and save it to disk.
     if (!dp_entry) {
+        FxLogWarning("Shader was not found in datapack, recompiling...");
         std::string program_path = GetProgramPath();
         RecompileShader(GetSourcePath(), program_path, macros);
 
@@ -190,7 +198,8 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
         const FxSizedArray<uint8>& program_data = dp_entry->Data;
         FxAssert(program_data.Size == FxMath::AlignValue<4>(program_data.Size));
 
-        CreateShaderModule(program_data.Size, reinterpret_cast<uint32*>(program_data.pData), program->InternalShader);
+        CreateShaderModule(*program, program_data.Size, reinterpret_cast<uint32*>(program_data.pData),
+                           program->InternalShader);
 
         return program;
     }
@@ -205,7 +214,7 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
 
     mDataPack.ReadSection(dp_entry, buffer_slice);
 
-    CreateShaderModule(buffer_size, buffer, program->InternalShader);
+    CreateShaderModule(*program, buffer_size, buffer, program->InternalShader);
 
     return program;
 }
@@ -235,10 +244,11 @@ void RxShader::RecompileShader(const std::string& source_path, const std::string
     // The previous programs are loaded in already from `PreloadCompiledPrograms()`
 
     // Compile to the shader pack
-    FxShaderCompiler::Compile(source_path.c_str(), mDataPack, macros);
+    FxShaderCompiler::Result compile_result = FxShaderCompiler::Compile(source_path.c_str(), mDataPack, macros);
 
-    // Write the programs back to disk
-    mDataPack.WriteToFile(compiled_path.c_str());
+    if (compile_result != FxShaderCompiler::Result::eFailed) {
+        mDataPack.WriteToFile(compiled_path.c_str());
+    }
 }
 
 
@@ -253,10 +263,11 @@ void RxShaderProgram::Destroy()
 }
 
 
-void RxShader::CreateShaderModule(uint32 file_size, uint32* raw_data, VkShaderModule& shader_module)
+void RxShader::CreateShaderModule(RxShaderProgram& program, uint32 file_size, uint32* raw_data,
+                                  VkShaderModule& shader_module)
 {
     // Load reflected data
-    uint32 reflected_size = Outline.ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
+    uint32 reflected_size = program.Outline.ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
 
     uint32* shader_data = reinterpret_cast<uint32*>(reinterpret_cast<uint8*>(raw_data) + reflected_size);
 

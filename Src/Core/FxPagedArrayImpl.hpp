@@ -98,6 +98,7 @@ public:
         }
 
         TElementType& operator*() { return mCurrentPage->Data[mCurrentIndex]; }
+        const TElementType& operator*() const { return mCurrentPage->Data[mCurrentIndex]; }
 
         bool operator!=(const Iterator& other)
         {

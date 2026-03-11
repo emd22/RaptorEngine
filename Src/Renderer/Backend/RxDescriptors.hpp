@@ -97,12 +97,15 @@ public:
         return Set;
     }
 
+    VkDescriptorSetLayout GetLayout() { return Layout; }
+
     bool operator!() const { return Set == nullptr; }
 
     void Destroy() {}
 
 private:
     VkDescriptorSet Set = nullptr;
+    VkDescriptorSetLayout Layout = nullptr;
 
     bool mbIsBuilt : 1 = false;
 

@@ -14,13 +14,7 @@ struct FxDataPackEntry
     FxDataPackEntry(FxHash64 id, FxSizedArray<uint8>&& data, uint32 data_offset, uint32 data_size)
         : Id(id), DataOffset(data_offset), DataSize(data_size), Data(std::move(data)) {};
 
-    FxDataPackEntry(FxDataPackEntry&& other)
-    {
-        Data = std::move(other.Data);
-        Id = other.Id;
-        DataOffset = other.DataOffset;
-        DataSize = other.DataSize;
-    }
+    FxDataPackEntry(FxDataPackEntry&& other) { (*this) = std::move(other); }
 
     FxDataPackEntry& operator=(FxDataPackEntry&& other)
     {
@@ -28,6 +22,10 @@ struct FxDataPackEntry
         Id = other.Id;
         DataOffset = other.DataOffset;
         DataSize = other.DataSize;
+
+        other.Id = FxHashNull64;
+        other.DataSize = 0;
+        other.DataOffset = 0;
 
         return *this;
     }

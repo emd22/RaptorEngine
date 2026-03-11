@@ -223,15 +223,16 @@ static RxShaderDescriptorType UpdateFromUserType(slang::TypeReflection* type)
 {
     SlangResourceShape shape = type->getResourceShape();
 
-    switch ((shape & SLANG_RESOURCE_BASE_SHAPE_MASK)) {
-    case SLANG_STRUCTURED_BUFFER:
+    switch ((shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK)) {
+    case SlangResourceShape::SLANG_STRUCTURED_BUFFER:
         return RxShaderDescriptorType::eStructuredBuffer;
         break;
-    case SLANG_TEXTURE_2D: // Same as SLANG_SAMPLER
+    case SlangResourceShape::SLANG_TEXTURE_2D: // Same as SLANG_SAMPLER
         return RxShaderDescriptorType::eSampler2D;
         break;
     default:
-        FxLogError("Cannot find type for descriptor table slot in shader!");
+        FxLogError("Cannot find type for descriptor table slot in shader! (Type=0x{:x}, Name={})",
+                   static_cast<uint16>(shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK), type->getName());
         break;
     }
 
@@ -269,14 +270,31 @@ static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>
         } break;
 
         // Uniform buffers
-        case slang::ParameterCategory::Uniform:
-            outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer, false, set, binding);
-            break;
+        case slang::ParameterCategory::ConstantBuffer: {
+            FxHash32 name_hash = FxHashStr32(var_layout->getTypeLayout()->getName());
+            outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer, false, name_hash, set, binding);
+        } break;
 
         // Samplers, SSBOs
         case slang::ParameterCategory::DescriptorTableSlot: {
             slang::TypeReflection* type = var_layout->getType();
-            outline.AddDescriptor(UpdateFromUserType(type), UpdateFromUserAttributes(type), set, binding);
+
+            if (type->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
+                FxHash32 name_hash = FxHashStr32(var_layout->getTypeLayout()->getName());
+                outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer, false, name_hash, set, binding);
+                break;
+            }
+
+            RxShaderDescriptorType desc_type = UpdateFromUserType(type);
+            FxHash32 name_hash = 0;
+            if (desc_type == RxShaderDescriptorType::eStructuredBuffer) {
+                name_hash = FxHashStr32(var_layout->getTypeLayout()->getElementTypeLayout()->getName());
+            }
+            else {
+                name_hash = FxHashStr32(var_layout->getTypeLayout()->getName());
+            }
+
+            outline.AddDescriptor(desc_type, UpdateFromUserAttributes(type), name_hash, set, binding);
         } break;
 
         // Vertex attributes

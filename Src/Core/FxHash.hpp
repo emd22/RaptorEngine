@@ -114,3 +114,15 @@ inline constexpr FxHash64 FxHashStr64(const char* str, uint64 thash = FX_HASH64_
 
     return thash;
 }
+
+
+struct FxHash64Stl
+{
+    std::size_t operator()(FxHash64 key) const { return key; }
+};
+
+
+struct FxHash32Stl
+{
+    std::size_t operator()(FxHash32 key) const { return key; }
+};

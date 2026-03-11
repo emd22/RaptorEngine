@@ -160,7 +160,7 @@ void FxDataPack::PrintInfo() const
 
 
     for (const FxDataPackEntry& entry : Entries) {
-        FxLogInfo("Entry {:20} => Offset={}, Size={}", entry.Id, entry.DataOffset, entry.DataSize);
+        FxLogInfo("Entry 0x{:x} => Offset={}, Size={}", entry.Id, entry.DataOffset, entry.DataSize);
     }
 
     FxLogInfo("================");
@@ -207,6 +207,7 @@ void FxDataPack::WriteToFile(const char* name)
     File.Open(name, FxFile::eWrite, FxFile::eBinary);
 
     if (!File.IsFileOpen()) {
+        FxLogError("Data pack '{}' could not be written to", name);
         return;
     }
 
@@ -231,6 +232,7 @@ bool FxDataPack::ReadFromFile(const char* name)
     File.Open(name, FxFile::eRead, FxFile::eBinary);
 
     if (!File.IsFileOpen()) {
+        FxLogError("Error opening data pack '{}'", name);
         return false;
     }
 

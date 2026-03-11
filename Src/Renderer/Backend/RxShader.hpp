@@ -55,13 +55,16 @@ enum class RxShaderDescriptorType : uint16
 struct RxShaderDescriptorEntry
 {
     RxShaderDescriptorEntry() = default;
-    RxShaderDescriptorEntry(RxShaderDescriptorType type, bool use_dynamic_type, uint32 set, uint32 binding)
-        : Type(type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)), Set(set), Binding(binding)
+    RxShaderDescriptorEntry(RxShaderDescriptorType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set,
+                            uint32 binding)
+        : Type(type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)), NameHash(name_hash), Set(set),
+          Binding(binding)
     {
     }
 
-    RxShaderDescriptorType Type;
+    RxShaderDescriptorType Type; // uint16
     uint16 bUseDynamicType = 0;
+    FxHash32 NameHash = 0;
     uint32 Set = 0;
     uint32 Binding = 0;
 };
@@ -92,14 +95,15 @@ public:
      */
     uint32 ReadFromBuffer(const FxSlice<uint32>& data);
 
-    void AddDescriptor(RxShaderDescriptorType type, bool use_dynamic_type, uint32 set, uint32 binding)
+    void AddDescriptor(RxShaderDescriptorType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set,
+                       uint32 binding)
     {
         if (!DescriptorEntries.IsInited()) {
             DescriptorEntries.InitCapacity(16);
         }
 
         mbOutOfDate = true;
-        DescriptorEntries.Insert(RxShaderDescriptorEntry(type, use_dynamic_type, set, binding));
+        DescriptorEntries.Insert(RxShaderDescriptorEntry(type, use_dynamic_type, name_hash, set, binding));
     }
 
     bool operator==(RxShaderOutline& other)
@@ -200,7 +204,8 @@ public:
     const std::string& GetName() const { return Name; }
 
 private:
-    void CreateShaderModule(uint32 file_size, uint32* shader_data, VkShaderModule& shader_module);
+    void CreateShaderModule(RxShaderProgram& program, uint32 file_size, uint32* shader_data,
+                            VkShaderModule& shader_module);
 
     /**
      * @brief Fetches all compiled shader permutations from the datapack if the pack exists.
@@ -212,9 +217,6 @@ private:
 
     const std::string GetSourcePath() const;
     const std::string GetProgramPath() const;
-
-public:
-    RxShaderOutline Outline;
 
 private:
     std::string Name = "Unknown";
