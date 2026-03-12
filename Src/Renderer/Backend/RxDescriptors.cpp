@@ -49,6 +49,8 @@ void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout
 {
     FxAssertMsg(pool.IsInited(), "Descriptor pool is not initialized!");
 
+    Layout = layout;
+
     VkDescriptorSetAllocateInfo alloc_info {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool = pool.Get();
@@ -199,4 +201,13 @@ void RxDescriptorSet::Build()
     mbIsBuilt = true;
 
     mDescriptorEntries.Free();
+}
+
+
+void RxDescriptorSet::Destroy()
+{
+    // if (Layout != nullptr) {
+    //     vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, Layout, nullptr);
+    //     Layout = nullptr;
+    // }
 }

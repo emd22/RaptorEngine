@@ -191,46 +191,31 @@ bool FxShaderCompiler::CompileIfOutOfDate(const char* path, FxDataPack& pack, co
         return Result::eFailed;                                                                                        \
     }
 
-static bool UpdateFromUserAttributes(slang::VariableReflection* type)
+static bool IsBufferTypeDynamic(slang::VariableReflection* type)
 {
     uint32 num_attrs = type->getUserAttributeCount();
 
-    // constexpr FxHash32 cDynamic = FxHashStr32("FxDynamic");
-
-    FxLogInfo("NUM ATTRS {}", num_attrs);
     for (uint32 i = 0; i < num_attrs; i++) {
         slang::Attribute* attr = type->getUserAttributeByIndex(i);
 
-        FxLogInfo("ATTR NAME {}", attr->getName());
-        // Not enough attributes yet to justify the hash and iteration cost
         if (!strcmp(attr->getName(), "FxDynamic")) {
-            // desc_entry.bUseDynamicType = true;
             return true;
         }
-
-
-        // const FxHash32 name_hash = FxHashStr32(attr->getName());
-
-        // switch (name_hash) {
-        // case cDynamic:
-        //     desc_entry.bUseDynamicType = true;
-        //     break;
-        // default:;
-        // }
     }
+
     return false;
 }
 
-static RxShaderDescriptorType UpdateFromUserType(slang::TypeReflection* type)
+static RxShaderOutlineEntryType UpdateFromUserType(slang::TypeReflection* type)
 {
     SlangResourceShape shape = type->getResourceShape();
 
     switch ((shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK)) {
     case SlangResourceShape::SLANG_STRUCTURED_BUFFER:
-        return RxShaderDescriptorType::eStructuredBuffer;
+        return RxShaderOutlineEntryType::eStructuredBuffer;
         break;
     case SlangResourceShape::SLANG_TEXTURE_2D: // Same as SLANG_SAMPLER
-        return RxShaderDescriptorType::eSampler2D;
+        return RxShaderOutlineEntryType::eSampler2D;
         break;
     default:
         FxLogError("Cannot find type for descriptor table slot in shader! (Type=0x{:x}, Name={})",
@@ -238,7 +223,7 @@ static RxShaderDescriptorType UpdateFromUserType(slang::TypeReflection* type)
         break;
     }
 
-    return RxShaderDescriptorType::eStructuredBuffer;
+    return RxShaderOutlineEntryType::eStructuredBuffer;
 }
 
 
@@ -278,22 +263,21 @@ static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>
             // Constant buffers are stored in the DescriptorTableSlot
             if (type->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
                 FxHash32 name_hash = FxHashStr32(var_layout->getName());
-                outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer,
-                                      UpdateFromUserAttributes(var_layout->getVariable()), name_hash, set, binding);
+                outline.AddEntry(RxShaderOutlineEntryType::eUniformBuffer,
+                                 IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set, binding);
                 break;
             }
 
-            RxShaderDescriptorType desc_type = UpdateFromUserType(type);
+            RxShaderOutlineEntryType desc_type = UpdateFromUserType(type);
             FxHash32 name_hash = 0;
-            if (desc_type == RxShaderDescriptorType::eStructuredBuffer) {
+            if (desc_type == RxShaderOutlineEntryType::eStructuredBuffer) {
                 name_hash = FxHashStr32(var_layout->getName());
             }
             else {
                 name_hash = FxHashStr32(var_layout->getName());
             }
 
-            outline.AddDescriptor(desc_type, UpdateFromUserAttributes(var_layout->getVariable()), name_hash, set,
-                                  binding);
+            outline.AddEntry(desc_type, IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set, binding);
         } break;
 
         // Vertex attributes

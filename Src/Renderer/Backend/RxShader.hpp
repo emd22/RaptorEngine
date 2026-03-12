@@ -5,7 +5,7 @@
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxTypes.hpp>
 
-enum class RxShaderType
+enum class RxShaderType : uint16
 {
     eVertex,
     eFragment,
@@ -45,41 +45,41 @@ static FX_FORCE_INLINE const char* TypeToName(RxShaderType type)
 }; // namespace RxShaderUtil
 
 
-enum class RxShaderDescriptorType : uint16
+enum class RxShaderOutlineEntryType : uint16
 {
     eStructuredBuffer,
     eUniformBuffer,
     eSampler2D,
 };
 
-class RxShaderDescriptorUtil
+class RxShaderOutlineUtil
 {
 public:
-    static const char* GetTypeName(RxShaderDescriptorType type)
+    static const char* GetTypeName(RxShaderOutlineEntryType type)
     {
         switch (type) {
-        case RxShaderDescriptorType::eStructuredBuffer:
+        case RxShaderOutlineEntryType::eStructuredBuffer:
             return "Structured Buffer";
-        case RxShaderDescriptorType::eUniformBuffer:
+        case RxShaderOutlineEntryType::eUniformBuffer:
             return "Uniform Buffer";
-        case RxShaderDescriptorType::eSampler2D:
+        case RxShaderOutlineEntryType::eSampler2D:
             return "Sampler 2D";
         }
         return "Unknown";
     }
 };
 
-struct RxShaderDescriptorEntry
+struct RxShaderOutlineEntry
 {
-    RxShaderDescriptorEntry() = default;
-    RxShaderDescriptorEntry(RxShaderDescriptorType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set,
-                            uint32 binding)
+    RxShaderOutlineEntry() = default;
+    RxShaderOutlineEntry(RxShaderOutlineEntryType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set,
+                         uint32 binding)
         : Type(type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)), NameHash(name_hash), Set(set),
           Binding(binding)
     {
     }
 
-    RxShaderDescriptorType Type; // uint16
+    RxShaderOutlineEntryType Type; // uint16
     uint16 bUseDynamicType = 0;
     FxHash32 NameHash = 0;
     uint32 Set = 0;
@@ -87,14 +87,23 @@ struct RxShaderDescriptorEntry
 };
 
 
+struct RxShaderDescriptorId
+{
+    uint32 Set = 0;
+    /// Hash of the outline entries and the shader type
+    FxHash32 Hash = FxHashNull32;
+};
+
+
 struct RxShaderOutline
 {
+public:
     /// The maximum number of sets that can be bound in shader
     static constexpr uint32 scNumSets = 6;
     static constexpr uint32 scMaxEntriesPerBucket = 10;
 
-    using DescEntry = RxShaderDescriptorEntry;
-    using DescType = RxShaderDescriptorType;
+    using DescEntry = RxShaderOutlineEntry;
+    using DescType = RxShaderOutlineEntryType;
 
     using EntryList = FxSizedArray<DescEntry>;
 
@@ -116,22 +125,14 @@ public:
      */
     uint32 ReadFromBuffer(const FxSlice<uint32>& data);
 
-    void AddDescriptor(RxShaderDescriptorType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set,
-                       uint32 binding)
+    void AddEntry(RxShaderOutlineEntryType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set, uint32 binding)
     {
-        // if (!DescriptorEntries.IsInited()) {
-        //     DescriptorEntries.InitCapacity(16);
-        // }
-
-        mbOutOfDate = true;
-
-
         FxSizedArray<DescEntry>& bucket = SetBuckets[set];
         if (!bucket.IsInited()) {
             bucket.InitCapacity(scMaxEntriesPerBucket);
         }
 
-        bucket.Insert(RxShaderDescriptorEntry(type, use_dynamic_type, name_hash, set, binding));
+        bucket.Insert(RxShaderOutlineEntry(type, use_dynamic_type, name_hash, set, binding));
 
         ++DescriptorEntryCount;
     }
@@ -146,7 +147,6 @@ public:
     uint32 DescriptorEntryCount = 0;
 
 private:
-    bool mbOutOfDate : 1 = false;
 };
 
 
@@ -167,6 +167,8 @@ public:
         other.pShader = nullptr;
     }
 
+    void BuildDescriptors();
+
     void Destroy();
 
     ~RxShaderProgram() { Destroy(); }
@@ -183,7 +185,9 @@ public:
     VkShaderModule InternalShader = nullptr;
     RxShader* pShader = nullptr;
 
-    RxShaderOutline Outline;
+    FxRef<RxShaderOutline> ShaderOutline { nullptr };
+
+    FxSizedArray<RxShaderDescriptorId> Descriptors;
 
     RxShaderType ShaderType = RxShaderType::eVertex;
 };

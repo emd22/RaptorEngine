@@ -7,36 +7,35 @@
 #include <Core/FxTypes.hpp>
 #include <unordered_map>
 
-struct RxShaderDescriptorEntry;
+
+struct RxShaderDescriptorId;
+struct RxShaderOutlineEntry;
+
+enum class RxShaderType : uint16;
 
 class RxDescriptorCache
 {
-    static constexpr uint32 scMaxSets = 6;
-    static constexpr uint32 scMaxBindings = 6;
-    static constexpr uint32 scMaxEntries = 4;
+    static constexpr uint32 scMaxSections = 6;
+    static constexpr uint32 scMaxSetsPerSection = 4;
+
 
 public:
-    struct Entry
-    {
-        RxDescriptorSet Set;
-        FxHash32 Hash = FxHashNull32;
-    };
-
-    struct Binding
-    {
-        FxSizedArray<Entry> Entries;
-
-        void AddEntry(const RxShaderDescriptorEntry& entry);
-    };
+    using Section = std::unordered_map<FxHash32, FxRef<RxDescriptorSet>, FxHash32Stl>;
 
 public:
     RxDescriptorCache() { mSections.MarkFull(); };
 
-    FxRef<RxDescriptorSet> Request(const RxShaderDescriptorEntry& entry);
+    /**
+     * @brief Registers a new descriptor set in the cache.
+     * @returns The identifier to access it by
+     */
+    RxShaderDescriptorId Register(uint32 set, RxShaderType shader_type,
+                                  const FxSizedArray<RxShaderOutlineEntry>& entry_list);
 
-    ~RxDescriptorCache() = default;
+    FxRef<RxDescriptorSet> Request(const RxShaderDescriptorId& id);
+
+    ~RxDescriptorCache();
 
 public:
-    //
-    FxStackArray<FxSizedArray<Binding>, scMaxSets> mSections;
+    FxStackArray<Section, scMaxSections> mSections;
 };

@@ -101,7 +101,9 @@ public:
 
     bool operator!() const { return Set == nullptr; }
 
-    void Destroy() {}
+    void Destroy();
+
+    ~RxDescriptorSet() { Destroy(); }
 
 private:
     VkDescriptorSet Set = nullptr;

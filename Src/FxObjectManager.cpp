@@ -143,5 +143,8 @@ void FxObjectManager::Destroy()
     mDescriptorPool.Destroy();
     mObjectGpuBuffer.Destroy();
 
-    vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, DsLayoutObjectBuffer, nullptr);
+    // if (DsLayoutObjectBuffer) {
+    // vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, DsLayoutObjectBuffer, nullptr);
+    // DsLayoutObjectBuffer = nullptr;
+    // }
 }
