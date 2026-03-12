@@ -23,10 +23,28 @@ uint32 RxShaderOutline::GetReflectionSize() const
     uint32 reflection_header_size = sizeof(uint32);                            // Size of reflection header
     reflection_header_size += sizeof(uint32) * RxShaderUtil::scNumShaderTypes; // Push constant buffer sizes
     reflection_header_size += sizeof(uint32);                                  // Number of descriptor entries
-    reflection_header_size += DescriptorEntries.GetSizeInBytes();              // The descriptor entries
+    reflection_header_size += DescriptorEntryCount * sizeof(RxShaderDescriptorEntry);
 
     return FxMath::AlignValue<4>(reflection_header_size);
 }
+
+void RxShaderOutline::Print() const
+{
+    FxLogInfo("=== Outline Debug ===");
+    FxLogInfo("Maximum Sets: {}", scNumSets);
+    for (uint32 bucket_index = 0; bucket_index < scNumSets; bucket_index++) {
+        const EntryList& list = SetBuckets[bucket_index];
+        FxLogInfo("Set {} -> {} entries", bucket_index, list.Size);
+
+        for (uint32 i = 0; i < list.Size; i++) {
+            const DescEntry& entry = list[i];
+            FxLogInfo("\tType={}, IsDynamic?={}, NameHash={}, Set={}, Binding={}",
+                      RxShaderDescriptorUtil::GetTypeName(entry.Type), entry.bUseDynamicType, entry.NameHash, entry.Set,
+                      entry.Binding);
+        }
+    }
+}
+
 
 void RxShaderOutline::WriteToBuffer(uint32* buffer) const
 {
@@ -38,14 +56,24 @@ void RxShaderOutline::WriteToBuffer(uint32* buffer) const
         *(buffer++) = PushConstantSizes[pc_index];
     }
 
-    // Amount of descriptor entries
-    *(buffer++) = static_cast<uint32>(DescriptorEntries.Size);
+    // Number of descriptor entries across buckets
+    *(buffer++) = static_cast<uint32>(DescriptorEntryCount);
 
     uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
 
-    for (const RxShaderDescriptorEntry& entry : DescriptorEntries) {
-        memcpy(sd_buffer, &entry, sizeof(RxShaderDescriptorEntry));
-        sd_buffer += sizeof(RxShaderDescriptorEntry);
+
+    for (uint32 bucket_index = 0; bucket_index < SetBuckets.Size; bucket_index++) {
+        const EntryList& bucket = SetBuckets[bucket_index];
+
+        if (bucket.IsEmpty()) {
+            continue;
+        }
+
+        // Write each entry in the bucket
+        for (DescEntry& entry : bucket) {
+            memcpy(sd_buffer, &entry, sizeof(RxShaderDescriptorEntry));
+            sd_buffer += sizeof(RxShaderDescriptorEntry);
+        }
     }
 }
 
@@ -62,13 +90,20 @@ uint32 RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data)
     }
 
     const uint32 num_ds_entries = *(buffer++);
-    DescriptorEntries.InitSize(num_ds_entries);
 
     uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
 
-    for (RxShaderDescriptorEntry& entry : DescriptorEntries) {
-        memcpy(&entry, sd_buffer, sizeof(RxShaderDescriptorEntry));
+    for (uint32 entry_index = 0; entry_index < num_ds_entries; entry_index++) {
+        RxShaderDescriptorEntry desc_entry;
+        memcpy(&desc_entry, sd_buffer, sizeof(RxShaderDescriptorEntry));
         sd_buffer += sizeof(RxShaderDescriptorEntry);
+
+        EntryList& entry_list = SetBuckets[desc_entry.Set];
+        if (!entry_list.IsInited()) {
+            entry_list.InitCapacity(scMaxEntriesPerBucket);
+        }
+
+        entry_list.Insert(desc_entry);
     }
 
     return size_of_outline;
@@ -268,6 +303,8 @@ void RxShader::CreateShaderModule(RxShaderProgram& program, uint32 file_size, ui
 {
     // Load reflected data
     uint32 reflected_size = program.Outline.ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
+
+    program.Outline.Print();
 
     uint32* shader_data = reinterpret_cast<uint32*>(reinterpret_cast<uint8*>(raw_data) + reflected_size);
 

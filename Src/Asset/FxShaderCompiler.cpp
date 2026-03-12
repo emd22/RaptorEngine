@@ -191,15 +191,17 @@ bool FxShaderCompiler::CompileIfOutOfDate(const char* path, FxDataPack& pack, co
         return Result::eFailed;                                                                                        \
     }
 
-static bool UpdateFromUserAttributes(slang::TypeReflection* type)
+static bool UpdateFromUserAttributes(slang::VariableReflection* type)
 {
     uint32 num_attrs = type->getUserAttributeCount();
 
     // constexpr FxHash32 cDynamic = FxHashStr32("FxDynamic");
 
+    FxLogInfo("NUM ATTRS {}", num_attrs);
     for (uint32 i = 0; i < num_attrs; i++) {
         slang::Attribute* attr = type->getUserAttributeByIndex(i);
 
+        FxLogInfo("ATTR NAME {}", attr->getName());
         // Not enough attributes yet to justify the hash and iteration cost
         if (!strcmp(attr->getName(), "FxDynamic")) {
             // desc_entry.bUseDynamicType = true;
@@ -269,32 +271,29 @@ static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>
             outline.PushConstantSizes[static_cast<uint32>(shader_type)] = pc_size;
         } break;
 
-        // Uniform buffers
-        case slang::ParameterCategory::ConstantBuffer: {
-            FxHash32 name_hash = FxHashStr32(var_layout->getTypeLayout()->getName());
-            outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer, false, name_hash, set, binding);
-        } break;
-
-        // Samplers, SSBOs
+        // Samplers, SSBOs, Constant Buffers
         case slang::ParameterCategory::DescriptorTableSlot: {
             slang::TypeReflection* type = var_layout->getType();
 
+            // Constant buffers are stored in the DescriptorTableSlot
             if (type->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
-                FxHash32 name_hash = FxHashStr32(var_layout->getTypeLayout()->getName());
-                outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer, false, name_hash, set, binding);
+                FxHash32 name_hash = FxHashStr32(var_layout->getName());
+                outline.AddDescriptor(RxShaderDescriptorType::eUniformBuffer,
+                                      UpdateFromUserAttributes(var_layout->getVariable()), name_hash, set, binding);
                 break;
             }
 
             RxShaderDescriptorType desc_type = UpdateFromUserType(type);
             FxHash32 name_hash = 0;
             if (desc_type == RxShaderDescriptorType::eStructuredBuffer) {
-                name_hash = FxHashStr32(var_layout->getTypeLayout()->getElementTypeLayout()->getName());
+                name_hash = FxHashStr32(var_layout->getName());
             }
             else {
-                name_hash = FxHashStr32(var_layout->getTypeLayout()->getName());
+                name_hash = FxHashStr32(var_layout->getName());
             }
 
-            outline.AddDescriptor(desc_type, UpdateFromUserAttributes(type), name_hash, set, binding);
+            outline.AddDescriptor(desc_type, UpdateFromUserAttributes(var_layout->getVariable()), name_hash, set,
+                                  binding);
         } break;
 
         // Vertex attributes

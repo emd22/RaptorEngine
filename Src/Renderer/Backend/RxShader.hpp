@@ -52,6 +52,23 @@ enum class RxShaderDescriptorType : uint16
     eSampler2D,
 };
 
+class RxShaderDescriptorUtil
+{
+public:
+    static const char* GetTypeName(RxShaderDescriptorType type)
+    {
+        switch (type) {
+        case RxShaderDescriptorType::eStructuredBuffer:
+            return "Structured Buffer";
+        case RxShaderDescriptorType::eUniformBuffer:
+            return "Uniform Buffer";
+        case RxShaderDescriptorType::eSampler2D:
+            return "Sampler 2D";
+        }
+        return "Unknown";
+    }
+};
+
 struct RxShaderDescriptorEntry
 {
     RxShaderDescriptorEntry() = default;
@@ -72,19 +89,23 @@ struct RxShaderDescriptorEntry
 
 struct RxShaderOutline
 {
+    /// The maximum number of sets that can be bound in shader
+    static constexpr uint32 scNumSets = 6;
+    static constexpr uint32 scMaxEntriesPerBucket = 10;
+
+    using DescEntry = RxShaderDescriptorEntry;
+    using DescType = RxShaderDescriptorType;
+
+    using EntryList = FxSizedArray<DescEntry>;
+
 public:
-    RxShaderOutline() { PushConstantSizes.MarkFull(); }
-
-    FxHash64 GetHash()
+    RxShaderOutline()
     {
-        if (mHash == FxHashNull64 || mbOutOfDate) {
-            mHash = FxHashData64(FxSlice(DescriptorEntries));
-            mbOutOfDate = false;
-        }
-
-        return mHash;
+        PushConstantSizes.MarkFull();
+        SetBuckets.MarkFull();
     }
 
+    void Print() const;
     uint32 GetReflectionSize() const;
 
     void WriteToBuffer(uint32* raw_buffer) const;
@@ -98,29 +119,33 @@ public:
     void AddDescriptor(RxShaderDescriptorType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set,
                        uint32 binding)
     {
-        if (!DescriptorEntries.IsInited()) {
-            DescriptorEntries.InitCapacity(16);
-        }
+        // if (!DescriptorEntries.IsInited()) {
+        //     DescriptorEntries.InitCapacity(16);
+        // }
 
         mbOutOfDate = true;
-        DescriptorEntries.Insert(RxShaderDescriptorEntry(type, use_dynamic_type, name_hash, set, binding));
-    }
 
-    bool operator==(RxShaderOutline& other)
-    {
-        const bool pcs_match = memcmp(PushConstantSizes.pData, other.PushConstantSizes.pData,
-                                      other.PushConstantSizes.GetSizeInBytes());
 
-        return pcs_match && (GetHash() == other.GetHash());
+        FxSizedArray<DescEntry>& bucket = SetBuckets[set];
+        if (!bucket.IsInited()) {
+            bucket.InitCapacity(scMaxEntriesPerBucket);
+        }
+
+        bucket.Insert(RxShaderDescriptorEntry(type, use_dynamic_type, name_hash, set, binding));
+
+        ++DescriptorEntryCount;
     }
 
 public:
-    FxSizedArray<RxShaderDescriptorEntry> DescriptorEntries;
+    FxStackArray<EntryList, scNumSets> SetBuckets;
+
+    // FxSizedArray<RxShaderDescriptorEntry> DescriptorEntries;
     FxStackArray<uint32, RxShaderUtil::scNumShaderTypes> PushConstantSizes = { 0, 0 };
 
-private:
-    FxHash64 mHash = FxHashNull64;
+    /// The number of descriptor entries stored.
+    uint32 DescriptorEntryCount = 0;
 
+private:
     bool mbOutOfDate : 1 = false;
 };
 
@@ -176,7 +201,7 @@ class RxShader
      */
     struct ProgramCache
     {
-        std::unordered_map<FxHash64, FxRef<RxShaderProgram>> Programs;
+        std::unordered_map<FxHash64, FxRef<RxShaderProgram>, FxHash64Stl> Programs;
     };
 
 public:
