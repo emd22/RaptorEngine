@@ -36,7 +36,7 @@ Objects = {
         Shadows = TRUE
         Physics={
             Type = PHYS_STATIC
-            BoxCollider = { Size = [4.0, 4.0, 0.5] }
+            BoxCollider = { Size = [4.0, 12.0, 0.5] }
         }
         Pos = [0.0, 0.5, 0.0]
     }

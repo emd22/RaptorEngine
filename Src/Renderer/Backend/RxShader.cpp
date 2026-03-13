@@ -12,6 +12,7 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+
 // #define DEBUG_FORCE_OUT_OF_DATE 1
 
 /////////////////////////////////////
@@ -118,14 +119,14 @@ FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShad
 {
     FxHash64 hash = FX_HASH64_FNV1A_INIT;
 
-    constexpr FxHash64 cPrefixHashFS = FxHashStr64("FRAGSHADER");
     constexpr FxHash64 cPrefixHashVS = FxHashStr64("VERTSHADER");
+    constexpr FxHash64 cPrefixHashFS = FxHashStr64("FRAGSHADER");
 
-    if (type == RxShaderType::eFragment) {
-        hash = cPrefixHashFS;
-    }
-    else if (type == RxShaderType::eVertex) {
+    if (type == RxShaderType::eVertex) {
         hash = cPrefixHashVS;
+    }
+    else if (type == RxShaderType::eFragment) {
+        hash = cPrefixHashFS;
     }
 
     FxLogInfo("Building entry ID with {} macros", macros.Size);
@@ -297,6 +298,20 @@ void RxShaderProgram::BuildDescriptors()
     FxLogInfo("Added {} descriptors to shader program", Descriptors.Size);
 }
 
+
+void RxShaderProgram::Bind(const RxCommandBuffer& cmd, const RxPipeline& pipeline,
+                           const RxShaderBindOptions& bind_options)
+{
+    for (const RxShaderDescriptorId& ds_id : Descriptors) {
+        FxRef<RxDescriptorSet> ds = gDescriptorCache->Request(ds_id);
+        if (bind_options.bUseOffset && ds->HasDynamicOffsets()) {
+            ds->BindWithOffset(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, bind_options.BufferOffset);
+            continue;
+        }
+
+        ds->Bind(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    }
+}
 
 void RxShaderProgram::Destroy()
 {

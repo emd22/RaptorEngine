@@ -29,7 +29,7 @@ void FxObjectManager::Create()
 
     if (!mObjectBufferDS.IsInited()) {
         FxAssert(DsLayoutObjectBuffer != nullptr);
-        mObjectBufferDS.Create(mDescriptorPool, DsLayoutObjectBuffer);
+        mObjectBufferDS.Create(mDescriptorPool, DsLayoutObjectBuffer, true);
     }
 
     static constexpr uint32 bound_size = scMaxObjects * sizeof(FxObjectGpuEntry);
@@ -143,8 +143,8 @@ void FxObjectManager::Destroy()
     mDescriptorPool.Destroy();
     mObjectGpuBuffer.Destroy();
 
-    // if (DsLayoutObjectBuffer) {
-    // vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, DsLayoutObjectBuffer, nullptr);
-    // DsLayoutObjectBuffer = nullptr;
-    // }
+    if (DsLayoutObjectBuffer) {
+        vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, DsLayoutObjectBuffer, nullptr);
+        DsLayoutObjectBuffer = nullptr;
+    }
 }

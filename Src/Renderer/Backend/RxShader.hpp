@@ -12,6 +12,8 @@ enum class RxShaderType : uint16
 };
 
 class RxShader;
+class RxCommandBuffer;
+class RxPipeline;
 
 
 namespace RxShaderUtil {
@@ -92,6 +94,8 @@ struct RxShaderDescriptorId
     uint32 Set = 0;
     /// Hash of the outline entries and the shader type
     FxHash32 Hash = FxHashNull32;
+
+    bool bContainsDynamicEntry = false;
 };
 
 
@@ -149,6 +153,11 @@ public:
 private:
 };
 
+struct RxShaderBindOptions
+{
+    bool bUseOffset = false;
+    uint32 BufferOffset = 0;
+};
 
 class RxShaderProgram
 {
@@ -168,6 +177,8 @@ public:
     }
 
     void BuildDescriptors();
+
+    void Bind(const RxCommandBuffer& cmd, const RxPipeline& pipeline, const RxShaderBindOptions& bind_options);
 
     void Destroy();
 

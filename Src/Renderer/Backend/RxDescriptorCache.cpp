@@ -29,31 +29,47 @@ RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader
     RxDescriptorPool& dp = gRenderer->pDeferredRenderer->DescriptorPool;
     RxDsLayoutBuilder layout_builder {};
 
+    FxLogInfo("");
+    FxLogInfo("=== Registering Set {} for {} ===", set, RxShaderUtil::TypeToName(shader_type));
+
+    bool has_dynamic_offsets = false;
+
     for (const RxShaderOutlineEntry& entry : entries) {
         using SOType = RxShaderOutlineEntryType;
 
         VkDescriptorType ds_type;
 
+        if (entry.bUseDynamicType) {
+            has_dynamic_offsets = true;
+        }
+
         switch (entry.Type) {
         case SOType::eSampler2D:
             ds_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            FxLogInfo("\tBinding {} => sampler2d", entry.Binding);
             break;
         case SOType::eStructuredBuffer:
             ds_type = entry.bUseDynamicType ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
                                             : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            FxLogInfo("\tBinding {} => structured buffer ({})", entry.Binding,
+                      entry.bUseDynamicType ? "dynamic" : "normal");
             break;
         case SOType::eUniformBuffer:
             ds_type = entry.bUseDynamicType ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
                                             : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            FxLogInfo("\tBinding {} => uniform buffer ({})", entry.Binding,
+                      entry.bUseDynamicType ? "dynamic" : "normal");
             break;
         }
 
         layout_builder.AddBinding(entry.Binding, ds_type, shader_type);
     }
 
-    entry->Create(dp, layout_builder.Build());
+    FxLogInfo("");
 
-    return RxShaderDescriptorId { .Hash = hash, .Set = set };
+    entry->Create(dp, layout_builder.Build(), has_dynamic_offsets);
+
+    return RxShaderDescriptorId { .Hash = hash, .Set = set, .bContainsDynamicEntry = has_dynamic_offsets };
 }
 
 FxRef<RxDescriptorSet> RxDescriptorCache::Request(const RxShaderDescriptorId& id)
@@ -69,6 +85,7 @@ RxDescriptorCache::~RxDescriptorCache()
         Section& section = mSections[section_index];
 
         for (auto& [key, ref] : section) {
+            ref->DestroyLayout();
             ref.DestroyRef();
         }
     }

@@ -9,6 +9,7 @@
 #include "RxPipelineBuilder.hpp"
 #include "RxRenderBackend.hpp"
 #include "RxShaderCache.hpp"
+#include "RxState.hpp"
 
 #include <FxObjectManager.hpp>
 
@@ -20,6 +21,7 @@ void RxDeferredRenderer::Create(const FxVec2u& extent)
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 5);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
     DescriptorPool.Create(gRenderer->GetDevice(), 16);
 
@@ -335,7 +337,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     LightPass.BuildRenderStage();
 
-    DsLighting.Create(DescriptorPool, DsLayoutLightingFrag);
+    DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
 
     // sDepth
     DsLighting.AddImageFromTarget(0, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
@@ -345,7 +347,6 @@ void RxDeferredRenderer::CreateLightingPipeline()
     DsLighting.AddImageFromTarget(2, GPass.GetTarget(RxImageFormat::eRGBA16_Float),
                                   &gRenderer->Swapchain.NormalsSampler);
     // Skip 3 for the shadow target, added by RxDirectionalShadows
-    // Uniform buffer
     DsLighting.AddBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.scUniformBufferSize);
 
     DsLighting.Build();
@@ -522,7 +523,7 @@ void RxDeferredRenderer::DestroyCompPipeline()
 
 void RxDeferredRenderer::CreateCompPass()
 {
-    DsComposition.Create(DescriptorPool, DsLayoutCompFrag);
+    DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
 
     CompPass.Create(gRenderer->Swapchain.Extent);
 

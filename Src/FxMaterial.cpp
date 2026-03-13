@@ -50,7 +50,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     if (!mMaterialPropertiesDS.IsInited()) {
         FxAssert(gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
-        mMaterialPropertiesDS.Create(dp, gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties);
+        mMaterialPropertiesDS.Create(dp, gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties, false);
     }
 
     mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);

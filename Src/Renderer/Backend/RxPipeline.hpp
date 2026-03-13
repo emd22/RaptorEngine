@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RxRenderPass.hpp"
+#include "RxShader.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -12,7 +13,6 @@
 struct RxVertexDescription;
 class RxCommandBuffer;
 class RxGpuDevice;
-class RxShaderProgram;
 
 struct alignas(16) FxDrawPushConstants
 {
@@ -77,6 +77,11 @@ private:
 public:
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;
+
+    // XXX: TEMP
+    FxRef<RxShaderProgram> VertexShader { nullptr };
+    FxRef<RxShaderProgram> FragmentShader { nullptr };
+
 
 private:
     RxGpuDevice* mDevice = nullptr;

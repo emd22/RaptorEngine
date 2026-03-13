@@ -12,7 +12,6 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-
 FX_SET_MODULE_NAME("Pipeline")
 
 static RxPipeline* spBoundPipeline = nullptr;
@@ -26,6 +25,10 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     mDevice = gRenderer->GetDevice();
 
     bool has_depth_attachment = false;
+
+    // XXX: TEMP
+    VertexShader = shaders[0];
+    FragmentShader = shaders[1];
 
     // Depth attachment is usually the last attachment, check last first
     for (int32 i = attachments.Size - 1; i >= 0; i--) {
@@ -199,13 +202,13 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
               reinterpret_cast<void*>(Layout));
 }
 
-void RxPipeline::Bind(const RxCommandBuffer& command_buffer)
+void RxPipeline::Bind(const RxCommandBuffer& cmd)
 {
     if (this == spBoundPipeline) {
         return;
     }
 
-    vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+    vkCmdBindPipeline(cmd.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
     spBoundPipeline = this;
 }

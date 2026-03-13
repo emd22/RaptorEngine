@@ -63,7 +63,7 @@ class RxDescriptorSet
     static constexpr uint32 scMaxDescriptorEntries = scMaxBuffers + scMaxImages;
 
 public:
-    void Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, uint32 count = 1);
+    void Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets, uint32 count = 1);
     bool IsInited() const { return Set != nullptr; }
 
     static void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
@@ -97,7 +97,10 @@ public:
         return Set;
     }
 
+    bool HasDynamicOffsets() const { return mbHasDynamicOffsets; }
+
     VkDescriptorSetLayout GetLayout() { return Layout; }
+    void DestroyLayout();
 
     bool operator!() const { return Set == nullptr; }
 
@@ -109,6 +112,7 @@ private:
     VkDescriptorSet Set = nullptr;
     VkDescriptorSetLayout Layout = nullptr;
 
+    bool mbHasDynamicOffsets : 1 = false;
     bool mbIsBuilt : 1 = false;
 
     FxSizedArray<DescriptorEntry> mDescriptorEntries;
