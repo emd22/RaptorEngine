@@ -1,12 +1,13 @@
-build/*
-build/**/*
-xcbuild/*
+build
+xcbuild
 xcbuild/**/*
 Src/out/**/*
 
 Shaders/Spirv/**/*
 Shaders/LastUpdated.fxd
 
+obj
+*.ninja
 .*
 
 # Exclusions for .*
