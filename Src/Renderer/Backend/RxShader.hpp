@@ -74,14 +74,15 @@ public:
 struct RxShaderOutlineEntry
 {
     RxShaderOutlineEntry() = default;
-    RxShaderOutlineEntry(RxShaderOutlineEntryType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set,
-                         uint32 binding)
-        : Type(type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)), NameHash(name_hash), Set(set),
-          Binding(binding)
+    RxShaderOutlineEntry(RxShaderOutlineEntryType type, RxShaderType shader_type, bool use_dynamic_type,
+                         FxHash32 name_hash, uint32 set, uint32 binding)
+        : Type(type), ShaderType(shader_type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)),
+          NameHash(name_hash), Set(set), Binding(binding)
     {
     }
 
     RxShaderOutlineEntryType Type; // uint16
+    RxShaderType ShaderType;
     uint16 bUseDynamicType = 0;
     FxHash32 NameHash = 0;
     uint32 Set = 0;
@@ -129,14 +130,16 @@ public:
      */
     uint32 ReadFromBuffer(const FxSlice<uint32>& data);
 
-    void AddEntry(RxShaderOutlineEntryType type, bool use_dynamic_type, FxHash32 name_hash, uint32 set, uint32 binding)
+    void AddEntry(RxShaderOutlineEntryType type, RxShaderType shader_type, bool use_dynamic_type, FxHash32 name_hash,
+                  uint32 set, uint32 binding)
     {
         FxSizedArray<DescEntry>& bucket = SetBuckets[set];
+
         if (!bucket.IsInited()) {
             bucket.InitCapacity(scMaxEntriesPerBucket);
         }
 
-        bucket.Insert(RxShaderOutlineEntry(type, use_dynamic_type, name_hash, set, binding));
+        bucket.Insert(RxShaderOutlineEntry(type, shader_type, use_dynamic_type, name_hash, set, binding));
 
         ++DescriptorEntryCount;
     }
@@ -172,7 +175,6 @@ public:
         pShader = other.pShader;
 
         other.InternalShader = nullptr;
-        other.ShaderType = RxShaderType::eVertex;
         other.pShader = nullptr;
     }
 

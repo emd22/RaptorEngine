@@ -254,7 +254,8 @@ static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>
             uint32 pc_size = static_cast<uint32>(type_layout->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER));
             FxLogInfo("PC size: {}", pc_size);
             outline.PushConstantSizes[static_cast<uint32>(shader_type)] = pc_size;
-        } break;
+            break;
+        }
 
         // Samplers, SSBOs, Constant Buffers
         case slang::ParameterCategory::DescriptorTableSlot: {
@@ -263,22 +264,19 @@ static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>
             // Constant buffers are stored in the DescriptorTableSlot
             if (type->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
                 FxHash32 name_hash = FxHashStr32(var_layout->getName());
-                outline.AddEntry(RxShaderOutlineEntryType::eUniformBuffer,
+                outline.AddEntry(RxShaderOutlineEntryType::eUniformBuffer, shader_type,
                                  IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set, binding);
                 break;
             }
 
             RxShaderOutlineEntryType desc_type = UpdateFromUserType(type);
-            FxHash32 name_hash = 0;
-            if (desc_type == RxShaderOutlineEntryType::eStructuredBuffer) {
-                name_hash = FxHashStr32(var_layout->getName());
-            }
-            else {
-                name_hash = FxHashStr32(var_layout->getName());
-            }
+            FxHash32 name_hash = FxHashStr32(var_layout->getName());
 
-            outline.AddEntry(desc_type, IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set, binding);
-        } break;
+            outline.AddEntry(desc_type, shader_type, IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set,
+                             binding);
+
+            break;
+        }
 
         // Vertex attributes
         case slang::ParameterCategory::VaryingInput:

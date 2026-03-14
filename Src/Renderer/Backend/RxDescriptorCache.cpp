@@ -12,13 +12,15 @@ RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader
 {
     Section& section = mSections[set];
 
-
     // Hash -> shader type and outline entries
-    FxHash32 hash = FxHashData32(FxSlice(entries), FxHashObj32<RxShaderType>(shader_type));
+    FxHash32 hash = FxHashData32(FxSlice(entries), FxHashStr32(RxShaderUtil::TypeToName(shader_type)));
 
+    FxLogInfo("");
+    FxLogInfo("=== Registering Set {} for {} ===", set, RxShaderUtil::TypeToName(shader_type));
 
     // Check if the DS already exists
     if (section.find(hash) != section.end()) {
+        FxLogInfo("");
         return RxShaderDescriptorId { .Hash = hash, .Set = set };
     }
 
@@ -29,13 +31,14 @@ RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader
     RxDescriptorPool& dp = gRenderer->pDeferredRenderer->DescriptorPool;
     RxDsLayoutBuilder layout_builder {};
 
-    FxLogInfo("");
-    FxLogInfo("=== Registering Set {} for {} ===", set, RxShaderUtil::TypeToName(shader_type));
-
     bool has_dynamic_offsets = false;
 
     for (const RxShaderOutlineEntry& entry : entries) {
         using SOType = RxShaderOutlineEntryType;
+
+        if (entry.ShaderType != shader_type) {
+            continue;
+        }
 
         VkDescriptorType ds_type;
 
@@ -43,24 +46,28 @@ RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader
             has_dynamic_offsets = true;
         }
 
+        const char* binding_name = "None";
+
         switch (entry.Type) {
         case SOType::eSampler2D:
             ds_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            FxLogInfo("\tBinding {} => sampler2d", entry.Binding);
+            binding_name = "Sampler2D";
             break;
         case SOType::eStructuredBuffer:
             ds_type = entry.bUseDynamicType ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
                                             : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            FxLogInfo("\tBinding {} => structured buffer ({})", entry.Binding,
-                      entry.bUseDynamicType ? "dynamic" : "normal");
+            binding_name = "Structured Buffer";
             break;
         case SOType::eUniformBuffer:
             ds_type = entry.bUseDynamicType ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
                                             : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            FxLogInfo("\tBinding {} => uniform buffer ({})", entry.Binding,
-                      entry.bUseDynamicType ? "dynamic" : "normal");
+            binding_name = "Uniform Buffer";
+
             break;
         }
+
+        FxLogInfo("\tBinding {} => {} ({}) -> ST: {}", entry.Binding, binding_name,
+                  entry.bUseDynamicType ? "Dynamic" : "Normal", RxShaderUtil::TypeToName(shader_type));
 
         layout_builder.AddBinding(entry.Binding, ds_type, shader_type);
     }

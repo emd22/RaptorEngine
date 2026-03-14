@@ -285,6 +285,8 @@ void RxShaderProgram::BuildDescriptors()
 
     Descriptors.InitCapacity(RxShaderOutline::scNumSets);
 
+    FxLogWarning("Build Descriptors for shader {}", RxShaderUtil::TypeToName(ShaderType));
+
     for (uint32 set_index = 0; set_index < RxShaderOutline::scNumSets; set_index++) {
         RxShaderOutline::EntryList& entry_list = ShaderOutline->SetBuckets[set_index];
 
@@ -332,7 +334,6 @@ void RxShader::CreateShaderModule(RxShaderProgram& program, uint32 file_size, ui
     uint32 reflected_size = program.ShaderOutline->ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
 
     program.BuildDescriptors();
-
     program.ShaderOutline.DestroyRef();
 
     uint32* shader_data = reinterpret_cast<uint32*>(reinterpret_cast<uint8*>(raw_data) + reflected_size);

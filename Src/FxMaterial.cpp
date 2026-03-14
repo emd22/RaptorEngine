@@ -127,7 +127,7 @@ RxDescriptorSet& FxMaterial::GetDescriptorSetAlbedoOnly()
     }
 
     mDsAlbedoOnly.Create(FxMaterialManager::GetDescriptorPool(),
-                         gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, 1);
+                         gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, false, 1);
 
 
     mDsAlbedoOnly.AddImage(0, &Diffuse.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
@@ -240,7 +240,7 @@ void FxMaterial::Build()
 {
     if (!mDsDefault.IsInited()) {
         mDsDefault.Create(FxMaterialManager::GetDescriptorPool(), gRenderer->pDeferredRenderer->DsLayoutGPassMaterial,
-                          2);
+                          false, 2);
     }
 
     FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();

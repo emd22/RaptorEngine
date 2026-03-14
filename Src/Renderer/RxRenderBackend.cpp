@@ -549,15 +549,15 @@ void RxRenderBackend::BeginLighting()
 
     pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
 
-    // gState->BufferOffset(RxShaderType::eVertex, gRenderer->Uniforms.GetBaseOffset());
-    // gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
-    // gState->Apply(frame->CommandBuffer);
-    // gState->Reset();
+    gState->BufferOffset(RxShaderType::eVertex, gRenderer->Uniforms.GetBaseOffset());
+    gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
+    gState->Apply(frame->CommandBuffer);
+    gState->Reset();
 
 
-    pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                 pDeferredRenderer->PlLightingDirectional,
-                                                 gRenderer->Uniforms.GetBaseOffset());
+    // pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    //                                              pDeferredRenderer->PlLightingDirectional,
+    //                                              gRenderer->Uniforms.GetBaseOffset());
 }
 
 
