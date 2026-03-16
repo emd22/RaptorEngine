@@ -21,7 +21,7 @@ RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader
     // Check if the DS already exists
     if (section.find(hash) != section.end()) {
         FxLogInfo("");
-        return RxShaderDescriptorId { .Hash = hash, .Set = set };
+        return RxShaderDescriptorId { .Set = set, .Hash = hash};
     }
 
     // Insert the entry into the hashmap
@@ -76,7 +76,7 @@ RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader
 
     entry->Create(dp, layout_builder.Build(), has_dynamic_offsets);
 
-    return RxShaderDescriptorId { .Hash = hash, .Set = set, .bContainsDynamicEntry = has_dynamic_offsets };
+    return RxShaderDescriptorId { .Set = set, .Hash = hash, .bContainsDynamicEntry = has_dynamic_offsets };
 }
 
 FxRef<RxDescriptorSet> RxDescriptorCache::Request(const RxShaderDescriptorId& id)

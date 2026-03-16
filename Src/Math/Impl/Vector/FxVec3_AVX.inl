@@ -14,10 +14,10 @@ FX_FORCE_INLINE FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
     mIntrin = _mm_load_ps(values);
 }
 
-FX_FORCE_INLINE FxVec3f::FxVec3f(const float32* values)
+FX_FORCE_INLINE FxVec3f::FxVec3f(const float32* unaligned)
 {
     // Allocate here to avoid unordered loads into our SSE register and avoid overstepping the buffer
-    const float32 values alignas(16)[4] = { values[0], values[1], values[2], 0 };
+    const float32 values alignas(16)[4] = { unaligned[0], unaligned[1], unaligned[2], 0 };
     mIntrin = _mm_load_ps(values);
 }
 

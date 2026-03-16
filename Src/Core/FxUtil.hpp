@@ -4,6 +4,7 @@
 
 #include <Core/FxTypes.hpp>
 #include <type_traits>
+#include <cstdio>
 
 #define FxSizeofArray(arr_) std::size(arr)
 

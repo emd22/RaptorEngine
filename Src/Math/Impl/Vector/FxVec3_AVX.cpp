@@ -8,6 +8,7 @@
 #include <Math/FxSSE.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
+#include <Core/FxLog.hpp>
 
 const FxVec3f FxVec3f::sZero = FxVec3f(0.0f, 0.0f, 0.0f);
 const FxVec3f FxVec3f::sOne = FxVec3f(1.0f, 1.0f, 1.0f);

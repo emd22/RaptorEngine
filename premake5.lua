@@ -1,60 +1,54 @@
 workspace "foxtrot"
-    configurations { "Debug", "RelWithDebInfo", "Release" }
+    configurations { "Debug", "Release" }
     targetdir "build/%{cfg.buildcfg}"
-    platforms {"Win64", "macOS"}
-    cppdialect ("C++20")
+    cppdialect "C++20"
+	
+	if _ACTION and _ACTION:startswith("vs") then 
+		platforms {"x64"}
+	else
+		platforms {"x64", "macOS"}
+	end
 
-
-    filter {"platforms:Win64"}
+    filter {"platforms:x64"}
         system "windows"
         architecture "x86_64"
         buildoptions { "/MP", "/arch:AVX2", "/Oi" }
         libdirs { "./Lib/Win32" }
 
-
     filter {"platforms:macOS"}
         system "macosx"
-        architecture "arm64"
+        architecture "aarch64"
         buildoptions {"-Wno-nullability-completeness"}
         libdirs { "./Lib/macOS" }
-
-    newoption {
-        trigger = "simde",
-        description = "Use SIMDe to use AVX on a non-AVX platform"
-    }
-
--- Third party files, compiled into static library
-project "tplib"
-    kind "StaticLib"
-    language "C++"
-
-    files {"Src/ThirdParty/**.cpp", "Src/ThirdParty/**.h", "Src/ThirdParty/**.hpp", "Src/ThirdParty/**.inl"}
-    includedirs {"Lib/Include", "Src/ThirdParty"}
-
+	
+	
     filter "configurations:Debug"
         defines { "DEBUG" }
         symbols "On"
 
-    filter "configurations:RelWithDebInfo"
-        defines { "NDEBUG" }
-        symbols "On"
-        optimize "On"
-
     filter "configurations:Release"
         defines { "NDEBUG" }
         optimize "On"
-
-
+	
+	filter {}
+	
+    newoption {
+        trigger = "simde",
+        description = "Use SIMDe to use AVX on a non-AVX platform"
+    }
+	
+	
 project "foxtrot"
     kind "ConsoleApp"
     language "C++"
     targetdir "build/%{cfg.buildcfg}"
+	objdir "buildobj/%{cfg.buildcfg}"
+	libdirs {"$(VULKAN_SDK)/Lib"}
+  
+    files {"Src/**.cpp", "Src/**.inl", "Src/**.hpp", "Src/ThirdParty/**.cpp", "Src/ThirdParty/**.h", "Src/ThirdParty/**.hpp", "Src/ThirdParty/**.inl"}
 
-    files {"Src/**.cpp", "Src/**.inl", "Src/**.hpp"}
-
-    includedirs { "Src", "Src/ThirdParty", "Lib/Include" }
-    libdirs { "build/%{cfg.buildcfg}" }
-    links {"tplib", "Vulkan", "slang", "turbojpeg", "SDL3"}
+    includedirs { "Src", "Src/ThirdParty", "Lib/Include", "Lib/Include", "$(VULKAN_SDK)/include" }
+    links {"vulkan-1", "slang", "turbojpeg", "SDL3"}
 
     defines { "FX_BASE_DIR=\"" .. _MAIN_SCRIPT_DIR .. "\"", "_USE_MATH_DEFINES" }
 
@@ -65,15 +59,4 @@ project "foxtrot"
     filter "platforms:macOS"
         defines { "VK_ENABLE_BETA_EXTENSIONS=1" }
 
-    filter "configurations:Debug"
-        defines { "DEBUG" }
-        symbols "On"
-
-    filter "configurations:RelWithDebInfo"
-        defines { "NDEBUG" }
-        symbols "On"
-        optimize "On"
-
-    filter "configurations:Release"
-        defines { "NDEBUG" }
-        optimize "On"
+	filter {}

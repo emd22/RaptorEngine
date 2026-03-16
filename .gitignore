@@ -1,4 +1,5 @@
 build
+buildobj
 xcbuild
 xcbuild/**/*
 Src/out/**/*
@@ -9,6 +10,9 @@ Shaders/LastUpdated.fxd
 obj
 *.ninja
 .*
+*.vcxproj*
+foxtrot.slnx
+foxtrot.sln
 
 # Exclusions for .*
 !.gitignore

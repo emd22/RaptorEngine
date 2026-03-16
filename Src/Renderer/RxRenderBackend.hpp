@@ -16,6 +16,7 @@
 #include <Core/FxDefer.hpp>
 #include <Core/FxRef.hpp>
 #include <deque>
+#include <mutex>
 
 enum class RxFrameResult
 {

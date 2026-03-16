@@ -8,6 +8,8 @@
 #include <Math/FxSSE.hpp>
 #include <Math/FxSSEUtil.hpp>
 
+#include <Core/FxPanic.hpp>
+
 static const float32 scIdentityData[16] = { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                             0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 
@@ -15,42 +17,16 @@ const FxMat4f FxMat4f::sIdentity = FxMat4f(scIdentityData);
 
 __m128 FxMat4f::MultiplyVec4f_SSE(const FxVec4f& vec)
 {
-    __m128 result = _mm_setzero_ps();
+    __m128 v = vec.mIntrin;
+    __m128 v0 = FxSSE::Permute4<FxShuffle_AX>(v);
+    __m128 v1 = FxSSE::Permute4<FxShuffle_AY>(v);
+    __m128 v2 = FxSSE::Permute4<FxShuffle_AZ>(v);
+    __m128 v3 = FxSSE::Permute4<FxShuffle_AW>(v);
 
-    __m128 a0 = Columns[0].mIntrin;
-    __m128 a1 = Columns[1].mIntrin;
-    __m128 a2 = Columns[2].mIntrin;
-    __m128 a3 = Columns[3].mIntrin;
-
-    FxAssert(false);
-
-    // {X, Y, Z, W}
-    /*
-     1*X,  2*Y,  3*Z,  4*W,
-     5*X,  6*Y,  7*Z,  8*W,
-     9*X, 10*Y, 11*Z, 12*W,
-    13*X, 14*Y, 15*Z, 16*W,
-
-    */
-
-    // Multiply each lane (component) from the vector to each column in the matrix.
-
-    /*result = _mm_mul_ps(result, a0);
-    result = _mm_add_ps(result, FxSSE::Permute4<FxShuffle_AX, FxShuffle_AX, FxShuffle_AX, FxShuffle_AX>(vec.mIntrin));
-
-    result = _mm_mul_ps(result, a1);
-    result = _mm_add_ps(result, FxSSE::Permute4<FxShuffle_AY, FxShuffle_AY, FxShuffle_AY, FxShuffle_AY>(vec.mIntrin));
-
-    result = _mm_mul_ps(result, a2);
-    result = _mm_add_ps(result, FxSSE::Permute4<FxShuffle_AZ, FxShuffle_AZ, FxShuffle_AZ, FxShuffle_AZ>(vec.mIntrin));
-
-    result = _mm_mul_ps(result, a3);
-    result = _mm_add_ps(result, FxSSE::Permute4<FxShuffle_AW, FxShuffle_AW, FxShuffle_AW, FxShuffle_AW>(vec.mIntrin));*/
-
-    // result = vfmaq_laneq_f32(result, a0, vec.mIntrin, 0);
-    // result = vfmaq_laneq_f32(result, a1, vec.mIntrin, 1);
-    // result = vfmaq_laneq_f32(result, a2, vec.mIntrin, 2);
-    // result = vfmaq_laneq_f32(result, a3, vec.mIntrin, 3);
+    __m128 result = _mm_mul_ps(Columns[0].mIntrin, v0);
+    result = _mm_fmadd_ps(Columns[1].mIntrin, v1, result);
+    result = _mm_fmadd_ps(Columns[2].mIntrin, v2, result);
+    result = _mm_fmadd_ps(Columns[3].mIntrin, v3, result);
 
     return result;
 }

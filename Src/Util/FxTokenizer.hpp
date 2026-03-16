@@ -239,9 +239,9 @@ private:
 template <>
 struct std::formatter<FxToken>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxToken& obj, std::format_context& ctx) const
+    auto format(const FxToken& obj, std::format_context& ctx) const
     {
         const std::string str(obj.Start, obj.Length);
         return std::format_to(ctx.out(), "(Type={}, {})", FxToken::GetTypeName(obj.Type), str);

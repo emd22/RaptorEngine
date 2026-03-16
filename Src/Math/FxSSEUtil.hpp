@@ -78,7 +78,16 @@ FX_FORCE_INLINE __m128 Permute4(__m128 a)
     static_assert(TComp4 < FxShuffle_BX);
 
     constexpr uint8 permute = _MM_SHUFFLE(TComp4, TComp3, TComp2, TComp1);
-    return _mm_shuffle_ps(a, a, permute);
+    return _mm_permute_ps(a, permute);
+}
+
+template <FxShuffleComponent TComp>
+FX_FORCE_INLINE __m128 Permute4(__m128 a)
+{
+    static_assert(TComp < FxShuffle_BX);
+
+    constexpr uint8 permute = _MM_SHUFFLE(TComp, TComp, TComp, TComp);
+    return _mm_permute_ps(a, permute);
 }
 
 FX_FORCE_INLINE float32 LengthSquared(__m128 vec) { return _mm_cvtss_f32(_mm_dp_ps(vec, vec, 0xF1)); }

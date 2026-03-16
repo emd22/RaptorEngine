@@ -12,6 +12,8 @@
 #include <Core/FxRef.hpp>
 #include <Math/FxVec2.hpp>
 
+#include <optional>
+
 enum class RxImageFormat
 {
     eNone,

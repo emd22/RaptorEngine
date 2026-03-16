@@ -5,6 +5,8 @@
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxTypes.hpp>
 
+#include <unordered_map>
+
 enum class RxShaderType : uint16
 {
     eVertex,
