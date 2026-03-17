@@ -189,6 +189,7 @@ public:
         return pData[index];
     }
 
+
     FxSizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
     {
         const size_t list_size = list.size();
@@ -248,6 +249,13 @@ public:
     {
         InitSize(size);
         memcpy(pData, ptr, GetSizeInBytes());
+    }
+
+    void CloneFrom(const FxSizedArray<TElementType>& other)
+    {
+        InitCapacity(other.Capacity);
+        Size = other.Size;
+        memcpy(pData, other.pData, other.GetSizeInBytes());
     }
 
     void Clear()

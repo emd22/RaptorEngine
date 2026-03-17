@@ -4,7 +4,6 @@
 #include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxTypes.hpp>
-
 #include <unordered_map>
 
 enum class RxShaderType : uint16
@@ -175,6 +174,8 @@ public:
         InternalShader = other.InternalShader;
         ShaderType = other.ShaderType;
         pShader = other.pShader;
+        ShaderOutline = other.ShaderOutline;
+        Descriptors.CloneFrom(other.Descriptors);
 
         other.InternalShader = nullptr;
         other.pShader = nullptr;

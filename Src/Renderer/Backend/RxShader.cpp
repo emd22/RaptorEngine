@@ -13,7 +13,7 @@
 #include <Renderer/RxRenderBackend.hpp>
 
 
-// #define DEBUG_FORCE_OUT_OF_DATE 1
+#define DEBUG_FORCE_OUT_OF_DATE 1
 
 /////////////////////////////////////
 // Shader Outline Functions
@@ -73,6 +73,8 @@ void RxShaderOutline::WriteToBuffer(uint32* buffer) const
 
         // Write each entry in the bucket
         for (DescEntry& entry : bucket) {
+            FxLogInfo("ENTRY HAS SHADER TYPE {}", RxShaderUtil::TypeToName(entry.ShaderType));
+
             memcpy(sd_buffer, &entry, sizeof(RxShaderOutlineEntry));
             sd_buffer += sizeof(RxShaderOutlineEntry);
         }
@@ -202,9 +204,9 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
 
     // Create the program
     FxRef<RxShaderProgram> program = FxMakeRef<RxShaderProgram>();
+    FxLogInfo("** SETTING program type to {}", RxShaderUtil::TypeToName(shader_type));
     program->ShaderType = shader_type;
     program->pShader = this;
-
 
     // Check for the program in the DataPack
     FxDataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
@@ -291,6 +293,7 @@ void RxShaderProgram::BuildDescriptors()
         RxShaderOutline::EntryList& entry_list = ShaderOutline->SetBuckets[set_index];
 
         if (entry_list.IsEmpty()) {
+            FxLogWarning("Skipping descriptors for {} (no entries found)", RxShaderUtil::TypeToName(ShaderType));
             continue;
         }
 

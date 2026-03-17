@@ -227,18 +227,15 @@ static RxShaderOutlineEntryType UpdateFromUserType(slang::TypeReflection* type)
 }
 
 
-static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>& composed_program,
-                                            RxShaderType shader_type)
+static RxShaderOutline GetProgramReflection(slang::EntryPointReflection* entry_refl, RxShaderType shader_type)
 {
     RxShaderOutline outline;
 
-    slang::ProgramLayout* program_layout = composed_program->getLayout(static_cast<uint32>(shader_type));
-    const uint32 num_uniforms = program_layout->getParameterCount();
-
-    FxLogInfo("Number of Uniforms: {}", num_uniforms);
+    // slang::ProgramLayout* program_layout = composed_program->getLayout(SLANG_SPIRV);
+    const uint32 num_uniforms = entry_refl->getParameterCount();
 
     for (uint32 i = 0; i < num_uniforms; i++) {
-        slang::VariableLayoutReflection* var_layout = program_layout->getParameterByIndex(i);
+        slang::VariableLayoutReflection* var_layout = entry_refl->getParameterByIndex(i);
 
         const char* name = var_layout->getName();
         slang::ParameterCategory category = var_layout->getCategory();
@@ -264,6 +261,7 @@ static RxShaderOutline GetProgramReflection(Slang::ComPtr<slang::IComponentType>
             // Constant buffers are stored in the DescriptorTableSlot
             if (type->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
                 FxHash32 name_hash = FxHashStr32(var_layout->getName());
+
                 outline.AddEntry(RxShaderOutlineEntryType::eUniformBuffer, shader_type,
                                  IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set, binding);
                 break;
@@ -364,7 +362,9 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
         }
 
         {
-            RxShaderOutline refl = GetProgramReflection(composed_program, shader_type);
+            slang::EntryPointReflection* entry_refl = composed_program->getLayout()->getEntryPointByIndex(entry_index);
+
+            RxShaderOutline refl = GetProgramReflection(entry_refl, shader_type);
             FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(refl, spirv_code);
             pack.AddEntry(RxShader::GenerateShaderId(shader_type, macros), aligned_buffer);
             FxMemPool::Free(aligned_buffer.pData);

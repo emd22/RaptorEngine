@@ -6,7 +6,7 @@ workspace "foxtrot"
 	if _ACTION and _ACTION:startswith("vs") then
 		platforms {"x64"}
 	else
-		platforms {"x64", "macOS"}
+		platforms {"macOS", "x64"}
 	end
 
     filter {"platforms:x64"}
@@ -54,9 +54,10 @@ project "foxtrot"
         links {"vulkan-1"}
 		includedirs {"$(VULKAN_SDK)/include"}
 	else
-	    libdirs {"$VULKAN_SDK/lib"}
+	    local vk_env = os.getenv("VULKAN_SDK");
+	    libdirs {vk_env .. "/lib"}
 		links {"vulkan.1"}
-		includedirs {"$VULKAN_SDK/include"}
+		includedirs {vk_env .. "/include"}
 	end
 
     files {"Src/**.cpp", "Src/**.inl", "Src/**.hpp", "Src/ThirdParty/**.cpp", "Src/ThirdParty/**.h", "Src/ThirdParty/**.hpp", "Src/ThirdParty/**.inl"}
