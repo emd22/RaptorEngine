@@ -51,12 +51,12 @@ project "foxtrot"
 
 	if os.host() == "windows" then
 	    libdirs {"$(VULKAN_SDK)/Lib"}
-        links {"vulkan-1"}
+        links {"vulkan-1", "dxcompiler"}
 		includedirs {"$(VULKAN_SDK)/include"}
 	else
 	    local vk_env = os.getenv("VULKAN_SDK");
 	    libdirs {vk_env .. "/lib"}
-		links {"vulkan.1"}
+		links {"vulkan.1", "dxcompiler"}
 		includedirs {vk_env .. "/include"}
 	end
 

@@ -5,6 +5,7 @@
 
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxDataPack.hpp>
+#include <Asset/FxShaderCompiler.hpp>
 #include <FxEngine.hpp>
 #include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
@@ -15,11 +16,16 @@ FX_SET_MODULE_NAME("Main")
 int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
-    {
-        FoxtrotGame game {};
-    }
+
+    FxDataPack dp;
+
+    FxShaderCompiler::Compile(FX_BASE_DIR "/Shaders/HLSL/GPass.hlsl", dp, {});
+
+    // {
+    //     FoxtrotGame game {};
+    // }
 
 
-    FxEngineGlobalsDestroy();
-    RxGlobals::Destroy();
+    // FxEngineGlobalsDestroy();
+    // RxGlobals::Destroy();
 }
