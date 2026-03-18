@@ -1,14 +1,12 @@
 
-#include "Util.hlsl"
 
 ///////////////////////////////////
 // Vertex Shader
 ///////////////////////////////////
 
-F_PARAMTEST(FPT_VERTEX, 10, FR_STRUCTBUFFER)
+F_PROGRAM(FPT_VERTEX);
 
-
-F_PROGRAM(FPT_VERTEX)
+#include "./Util.hlsl"
 
 struct VSInput
 {
@@ -41,7 +39,7 @@ struct VSPushConsts
     uint uiMaterialIndex;
 };
 
-F_REFLECT(FR_STRUCTBUFFER, 2, 0)
+//F_REFLECT(FR_STRUCTBUFFER, 2, 0)
 [[vk::binding(2, 0)]] StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
@@ -71,7 +69,7 @@ VSOutput main(VSInput in)
 // Pixel Shader
 ///////////////////////////////////
 
-F_PROGRAM(FPT_PIXEL)
+F_PROGRAM(FPT_PIXEL);
 
 struct FSOutput {
     float4 vAlbedo : SV_TARGET0;
@@ -89,14 +87,17 @@ struct FSInput
 #endif
 };
 
+//F_REFLECT(FR_SAMPLER2D, 0, 0)
 [[vk::binding(0, 0)]] sampler2D sAlbedo;
 
 #ifdef USE_NORMAL_MAPS
+//F_REFLECT(FR_SAMPLER2D, 0, 1)
 [[vk::binding(0, 1)]] sampler2D sNormalMap;
+//F_REFLECT(FR_SAMPLER2D, 0, 2)
 [[vk::binding(0, 2)]] sampler2D sMetallicRoughness;
 #endif
 
-
+//F_REFLECT(FR_STRUCTBUFFER, 1, 0)
 layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
 
 FSOutput main(FSInput in)
@@ -124,7 +125,6 @@ FSOutput main(FSInput in)
 #else
     out.vNormal = float4(in.vNormalWS, 0.5);
 #endif
-
 
     return out;
 }

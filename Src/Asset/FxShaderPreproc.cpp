@@ -15,6 +15,8 @@ enum StringId
     // Reflection definitions
     F_REFLECT,
     FR_STRUCTBUFFER,
+    FR_UNIFORMBUFFER,
+    FR_SAMPLER2D,
 
     // Test definitions
     F_PARAMTEST,
@@ -29,6 +31,8 @@ static constexpr const char* scStrings[] = {
     // Reflection definitions
     "F_REFLECT",
     "FR_STRUCTBUFFER",
+    "FR_UNIFORMBUFFER",
+    "FR_SAMPLER2D",
 
     // Test definitions
     "F_PARAMTEST",
@@ -116,6 +120,23 @@ struct PPFuncEntry
         return;                                                                                                        \
     }
 
+static int32 ParamGetInt(const FxSlice<char>& param)
+{
+    char* endptr;
+
+    // hacky...
+    char restore = 0;
+    std::swap(restore, *(param.pData + param.Size));
+    const int32 value = std::strtol(param.pData, &endptr, 10);
+    std::swap(restore, *(param.pData + param.Size));
+
+    return value;
+}
+
+/////////////////////////////////////
+// Preprocessor Definitions
+/////////////////////////////////////
+
 static void ParseProgramDefinition(const std::vector<FxSlice<char>>& params, State& state, Result& result)
 {
     REQUIRE_PARAMS(params, 1);
@@ -134,24 +155,6 @@ static void ParseProgramDefinition(const std::vector<FxSlice<char>>& params, Sta
     result.SetShaderBounds(FxSlice<char>(state.GetCurrentPtr(), 0));
 }
 
-static int32 ParamGetInt(const FxSlice<char>& param)
-{
-    char* endptr;
-
-    printf("* GET INT FOR %.*s\n", param.Size, param.pData);
-
-    // hacky...
-    char restore = 0;
-    // Save the end character, set to null terminator
-    std::swap(restore, *(param.pData + param.Size));
-
-    const int32 value = std::strtol(param.pData, &endptr, 10);
-
-    // Restore end character
-    std::swap(restore, *(param.pData + param.Size));
-
-    return value;
-}
 
 static void ParseReflectionDefinition(const std::vector<FxSlice<char>>& params, State& state, Result& result)
 {
@@ -162,7 +165,28 @@ static void ParseReflectionDefinition(const std::vector<FxSlice<char>>& params, 
     const int32 set = ParamGetInt(params[1]);
     const int32 binding = ParamGetInt(params[2]);
 
-    FxLogInfo("SET: {}, BINDING: {}", set, binding);
+    FxHash32 refl_hash = FxHashData32(refl_type);
+
+    constexpr FxHash32 scStructBuffer = FxHashStr32(FSTR(FR_STRUCTBUFFER));
+    constexpr FxHash32 scUniformBuffer = FxHashStr32(FSTR(FR_UNIFORMBUFFER));
+    constexpr FxHash32 scSampler2D = FxHashStr32(FSTR(FR_SAMPLER2D));
+
+    EntryType type = EntryType::eStructuredBuffer;
+
+    switch (refl_hash) {
+    case scStructBuffer:
+        type = EntryType::eStructuredBuffer;
+        break;
+    case scUniformBuffer:
+        type = EntryType::eUniformBuffer;
+        break;
+    case scSampler2D:
+        type = EntryType::eSampler2D;
+        break;
+    default:;
+    }
+
+    result.Reflection.emplace_back(type, set, binding);
 }
 
 
@@ -200,7 +224,7 @@ static void ParsePPFuncCall(State& state, Result& result)
     }
 
     if (func && func->bHasParameters) {
-        state.Next(); // LParen
+        state.Next(); // Skip LParen
 
         FxSlice<char> param(state.GetCurrentPtr(), 0);
 
@@ -210,7 +234,7 @@ static void ParsePPFuncCall(State& state, Result& result)
             if (state.Get() == ',') {
                 param_list.push_back(param);
 
-                state.Next(); // Eat comma
+                state.Next(); // Skip comma
                 while (std::isspace(state.Get())) {
                     state.Next();
                 }
@@ -225,10 +249,13 @@ static void ParsePPFuncCall(State& state, Result& result)
             state.Next();
         }
 
+
         // Push the final parameter
         param_list.push_back(param);
+        state.Next(); // Skip RParen
 
-        state.Next(); // RParen
+        // Sync the size of the program to the current position in state
+        result.GetShaderBounds().Size = state.GetCurrentPtr() - result.GetShaderBounds().pData;
 
         func->Func(param_list, state, result);
     }
@@ -250,11 +277,6 @@ Result Process(const FxSlice<char>& data)
 
         ++result.GetShaderBounds().Size;
     }
-
-    printf("= VERTEX PROGRAM =:\n%.*s\n\n", result.GetShaderBounds(RxShaderType::eVertex).Size,
-           result.GetShaderBounds(RxShaderType::eVertex).pData);
-    printf("= PIXEL  PROGRAM =:\n%.*s\n\n", result.GetShaderBounds(RxShaderType::eFragment).Size,
-           result.GetShaderBounds(RxShaderType::eFragment).pData);
 
     return result;
 }

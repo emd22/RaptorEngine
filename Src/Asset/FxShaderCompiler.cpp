@@ -300,6 +300,11 @@ bool FxShaderCompiler::CompileIfOutOfDate(const char* path, FxDataPack& pack, co
 //     return outline;
 // }
 
+// static void BuildProgram(FxShaderPreproc::Result& preproc)
+// {
+
+// }
+
 
 FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack& pack,
                                                    const FxSizedArray<FxShaderMacro>& macros, bool do_db_flush)
@@ -308,29 +313,79 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
     //     sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
     // }
 
+    constexpr uint32 cCodePage = DXC_CP_UTF8;
+
+
     FxLogInfo("Compiling shader {} with {} macros", path, macros.Size);
 
     FxFile file(path, FxFile::ModType::eRead, FxFile::DataType::eBinary);
     FxSlice<char> file_data = file.Read<char>();
 
-    FxShaderPreproc::Process(file_data);
+    FxShaderPreproc::Result preproc = FxShaderPreproc::Process(file_data);
 
-    // CComPtr<IDxcUtils> utils;
-    // CComPtr<IDxcCompiler3> compiler;
+    CComPtr<IDxcUtils> utils;
+    CComPtr<IDxcCompiler3> compiler;
 
-    // DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
-    // DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
+    DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
+    DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
 
 
-    // CComPtr<IDxcIncludeHandler> include_handler;
-    // utils->CreateDefaultIncludeHandler(&include_handler);
+    CComPtr<IDxcIncludeHandler> include_handler;
+    utils->CreateDefaultIncludeHandler(&include_handler);
 
-    // // Convert path to a wide char string
-    // wchar_t wpath[128];
-    // mbstowcs(wpath, path, 128);
+    // Convert path to a wide char string
+    wchar_t wpath[128];
+    mbstowcs(wpath, path, 128);
 
-    // FxSizedArray<LPCWSTR> compile_args = { wpath, L"-E", L"main", L"-spirv" };
 
+    const FxSizedArray<LPCWSTR> compile_args = {
+        wpath,
+        // Entrypoint
+        L"-E",
+        L"main",
+
+        // Target profile
+        L"-T",
+        L"vs_6_0",
+
+        // Output format
+        L"-spirv",
+    };
+
+    CComPtr<IDxcBlobEncoding> source_blob;
+    auto& shader_raw_data = preproc.GetShaderBounds(RxShaderType::eVertex);
+    utils->CreateBlob(shader_raw_data.pData, shader_raw_data.Size, cCodePage, &source_blob);
+
+    DxcBuffer buffer {};
+    buffer.Encoding = cCodePage;
+    buffer.Ptr = source_blob->GetBufferPointer();
+    buffer.Size = source_blob->GetBufferSize();
+
+    HRESULT hresult;
+
+    printf("CODE: ((%.*s))\n", shader_raw_data.Size, shader_raw_data.pData);
+
+    CComPtr<IDxcResult> result { nullptr };
+    hresult = compiler->Compile(&buffer, compile_args.pData, static_cast<uint32>(compile_args.Size), include_handler,
+                                IID_PPV_ARGS(&result));
+
+    if (SUCCEEDED(hresult)) {
+        result->GetStatus(&hresult);
+    }
+
+    if (FAILED(hresult) && result) {
+        CComPtr<IDxcBlobEncoding> error_blob;
+        hresult = result->GetErrorBuffer(&error_blob);
+
+        if (SUCCEEDED(hresult) && error_blob) {
+            FxLogError("Failed to compile shader '{}'!", path);
+            FxLogError("Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+            return FxShaderCompiler::Result::eFailed;
+        }
+    }
+
+    CComPtr<IDxcBlob> spirv_bin;
+    result->GetResult(&spirv_bin);
 
     return FxShaderCompiler::Result::eSuccess;
 
