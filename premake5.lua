@@ -1,5 +1,5 @@
 workspace "foxtrot"
-    configurations { "Debug", "DebugRelease", "Release" }
+    configurations { "DebugRelease", "Debug", "Release" }
     targetdir "build/%{cfg.buildcfg}"
     cppdialect "C++20"
 

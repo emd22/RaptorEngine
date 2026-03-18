@@ -1,20 +1,40 @@
 #include "FxShaderPreproc.hpp"
 
+#include <cctype>
+#include <cstdlib>
+
 namespace FxShaderPreproc {
 
 enum StringId
 {
+    // Program type definitions
+    F_PROGRAM,
     FPT_VERTEX,
     FPT_PIXEL,
+
+    // Reflection definitions
+    F_REFLECT,
+    FR_STRUCTBUFFER,
+
+    // Test definitions
+    F_PARAMTEST,
 };
 
 static constexpr const char* scStrings[] = {
+    // Program type definitions
+    "F_PROGRAM",
     "FPT_VERTEX",
     "FPT_PIXEL",
+
+    // Reflection definitions
+    "F_REFLECT",
+    "FR_STRUCTBUFFER",
+
+    // Test definitions
+    "F_PARAMTEST",
 };
 
-#define FSTR(_id) scStrings[_id]
-
+constexpr const char* FSTR(StringId id) { return scStrings[static_cast<uint32>(id)]; }
 
 struct State
 {
@@ -74,39 +94,94 @@ enum class ParseResult
     eSuccess,
 };
 
-
 struct PPFuncEntry
 {
-    using FuncType = void(const FxSlice<char>& param, State& state, Result& result);
+    using FuncType = void(const std::vector<FxSlice<char>>& param, State& state, Result& result);
 
     PPFuncEntry() = delete;
 
     PPFuncEntry(const char* name, bool has_parameters, const std::function<FuncType> func)
-        : pName(name), bParameters(has_parameters), Func(func)
+        : pName(name), bHasParameters(has_parameters), Func(func)
     {
     }
 
     const char* pName;
-    bool bParameters;
+    bool bHasParameters;
     const std::function<FuncType> Func;
 };
 
-static void ParseProgramDefinition(const FxSlice<char>& program_type, State& state, Result& result)
+#define REQUIRE_PARAMS(_params, _amt_req)                                                                              \
+    if (_params.size() < _amt_req) {                                                                                   \
+        FxLogError("SHADER: Not enough parameters found in preprocessor function!");                                   \
+        return;                                                                                                        \
+    }
+
+static void ParseProgramDefinition(const std::vector<FxSlice<char>>& params, State& state, Result& result)
 {
-    printf("Name: %.*s\n", program_type.Size, program_type.pData);
+    REQUIRE_PARAMS(params, 1);
+
+    const FxSlice<char>& program_type = params[0];
+
+    // Set the new shader type
     if (!strncmp(program_type.pData, FSTR(FPT_VERTEX), program_type.Size)) {
         result.SetCurrentShader(RxShaderType::eVertex);
-        FxLogInfo("New shader: Vertex");
     }
     else if (!strncmp(program_type.pData, FSTR(FPT_PIXEL), program_type.Size)) {
         result.SetCurrentShader(RxShaderType::eFragment);
-        FxLogInfo("New shader: Pixel");
     }
+
+    // Skip the ptr to be at our current position
+    result.SetShaderBounds(FxSlice<char>(state.GetCurrentPtr(), 0));
+}
+
+static int32 ParamGetInt(const FxSlice<char>& param)
+{
+    char* endptr;
+
+    printf("* GET INT FOR %.*s\n", param.Size, param.pData);
+
+    // hacky...
+    char restore = 0;
+    // Save the end character, set to null terminator
+    std::swap(restore, *(param.pData + param.Size));
+
+    const int32 value = std::strtol(param.pData, &endptr, 10);
+
+    // Restore end character
+    std::swap(restore, *(param.pData + param.Size));
+
+    return value;
+}
+
+static void ParseReflectionDefinition(const std::vector<FxSlice<char>>& params, State& state, Result& result)
+{
+    REQUIRE_PARAMS(params, 3);
+
+    const FxSlice<char>& refl_type = params[0];
+
+    const int32 set = ParamGetInt(params[1]);
+    const int32 binding = ParamGetInt(params[2]);
+
+    FxLogInfo("SET: {}, BINDING: {}", set, binding);
+}
+
+
+static void ParseParamTestDefinition(const std::vector<FxSlice<char>>& params, State& state, Result& result)
+{
+    printf("== PARAMTEST ==\n");
+
+    for (const FxSlice<char>& param : params) {
+        printf("PARAMETER: '%.*s'\n", param.Size, param.pData);
+    }
+
+    printf("=====\n");
 }
 
 
 static const PPFuncEntry PPFunctions[] = {
-    PPFuncEntry("F_PROGRAM", true, ParseProgramDefinition),
+    PPFuncEntry(FSTR(F_PROGRAM), true, ParseProgramDefinition),
+    PPFuncEntry(FSTR(F_REFLECT), true, ParseReflectionDefinition),
+    PPFuncEntry(FSTR(F_PARAMTEST), true, ParseParamTestDefinition),
 };
 
 
@@ -124,78 +199,40 @@ static void ParsePPFuncCall(State& state, Result& result)
         func = nullptr;
     }
 
-    if (func && func->bParameters) {
+    if (func && func->bHasParameters) {
         state.Next(); // LParen
 
         FxSlice<char> param(state.GetCurrentPtr(), 0);
 
+        std::vector<FxSlice<char>> param_list;
+
         while (state.Get() != ')') {
+            if (state.Get() == ',') {
+                param_list.push_back(param);
+
+                state.Next(); // Eat comma
+                while (std::isspace(state.Get())) {
+                    state.Next();
+                }
+
+                param.pData = state.GetCurrentPtr();
+                param.Size = 0;
+
+                continue;
+            }
+
             ++param.Size;
             state.Next();
         }
+
+        // Push the final parameter
+        param_list.push_back(param);
+
         state.Next(); // RParen
 
-        func->Func(param, state, result);
+        func->Func(param_list, state, result);
     }
 }
-
-
-// static void ParseProgramType(State& state, Result& result)
-// {
-//     state.NextIfEqual(' ');
-
-//     constexpr uint32 cOpBufferSize = 80;
-
-//     char op[cOpBufferSize];
-//     uint32 op_index = 0;
-
-//     while (state.Get() != '(') {
-//         op[op_index++] = state.Get();
-//         state.Next();
-//     }
-
-//     op[op_index] = 0;
-
-//     if (strncmp(op, "PROGRAM", cOpBufferSize)) {
-//         FxLogError("Unknown preproc keyword '{}' in shader", op);
-
-//         return;
-//     }
-
-//     // Skip LParen
-//     state.Next();
-
-//     op_index = 0;
-
-//     while (state.Get() != ')') {
-//         op[op_index++] = state.Get();
-//         state.Next();
-//     }
-
-//     op[op_index] = 0;
-
-
-//     FxHash32 st_hash = FxHashStr32(op);
-
-//     static constexpr FxHash32 scVertex = FxHashStr32("VERTEX");
-//     static constexpr FxHash32 scPixel = FxHashStr32("PIXEL");
-
-//     switch (st_hash) {
-//     case scVertex:
-//         result.SetCurrentShader(RxShaderType::eVertex);
-//         break;
-//     case scPixel:
-//         result.SetCurrentShader(RxShaderType::eVertex);
-//         break;
-//     }
-
-//     result.SetShaderBounds(FxSlice<char>(state.FileData.pData + state.Index, 0));
-
-//     FxLogInfo("New shader type: {}", RxShaderUtil::TypeToName(result.CurrentType));
-
-//     // Skip RParen
-//     state.Next();
-// }
 
 
 Result Process(const FxSlice<char>& data)
@@ -209,10 +246,15 @@ Result Process(const FxSlice<char>& data)
     result.SetShaderBounds(FxSlice<char>(data.pData, 0));
 
     for (; state.Index < data.Size; state.Next()) {
-        const uint32 chars_remaining = data.Size - state.Index;
-
         ParsePPFuncCall(state, result);
+
+        ++result.GetShaderBounds().Size;
     }
+
+    printf("= VERTEX PROGRAM =:\n%.*s\n\n", result.GetShaderBounds(RxShaderType::eVertex).Size,
+           result.GetShaderBounds(RxShaderType::eVertex).pData);
+    printf("= PIXEL  PROGRAM =:\n%.*s\n\n", result.GetShaderBounds(RxShaderType::eFragment).Size,
+           result.GetShaderBounds(RxShaderType::eFragment).pData);
 
     return result;
 }

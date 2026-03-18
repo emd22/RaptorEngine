@@ -5,6 +5,9 @@
 // Vertex Shader
 ///////////////////////////////////
 
+F_PARAMTEST(FPT_VERTEX, 10, FR_STRUCTBUFFER)
+
+
 F_PROGRAM(FPT_VERTEX)
 
 struct VSInput
@@ -38,7 +41,8 @@ struct VSPushConsts
     uint uiMaterialIndex;
 };
 
-layout(set = 2, binding = 0) StructuredBuffer<Object> bObjectBuffer;
+F_REFLECT(FR_STRUCTBUFFER, 2, 0)
+[[vk::binding(2, 0)]] StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
@@ -91,6 +95,7 @@ struct FSInput
 [[vk::binding(0, 1)]] sampler2D sNormalMap;
 [[vk::binding(0, 2)]] sampler2D sMetallicRoughness;
 #endif
+
 
 layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
 

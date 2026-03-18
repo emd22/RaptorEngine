@@ -10,6 +10,7 @@ struct Result
 public:
     Result() = default;
     FxSlice<char>& GetShaderBounds() { return ProgramData[static_cast<uint32>(CurrentType)]; }
+    FxSlice<char>& GetShaderBounds(RxShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
     void SetShaderBounds(const FxSlice<char>& bounds) { GetShaderBounds() = bounds; }
     void SetCurrentShader(RxShaderType type) { CurrentType = type; }
 
