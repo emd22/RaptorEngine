@@ -1,12 +1,12 @@
 
+#include "./Util.hlsl"
+
 
 ///////////////////////////////////
 // Vertex Shader
 ///////////////////////////////////
 
-F_PROGRAM(FPT_VERTEX);
-
-#include "./Util.hlsl"
+F_PROGRAM(FPT_VERTEX)
 
 struct VSInput
 {
@@ -44,32 +44,32 @@ struct VSPushConsts
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
-VSOutput main(VSInput in)
+VSOutput main(VSInput input)
 {
-    VSOutput out;
+    VSOutput output;
 
-    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + in.uiInstanceId].mModel;
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
 
     float4x4 MVP = mul(VSConst.mViewProjection, model_matrix);
 
-    out.vPosition = mul(MVP, float4(in.vPosition, 1.0));
-    out.vNormalWS = normalize(mul(float3x3(model_matrix), in.vNormal));
+    output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
+    output.vNormalWS = normalize(mul((float4x3)model_matrix, input.vNormal));
 
 #ifdef USE_NORMAL_MAPS
-    out.vTangentWS = normalize(mul(float3x3(model_matrix), in.vTangent));
-    out.vBitangentWS = cross(out.vNormalWS, out.vTangentWS);
+    output.vTangentWS = normalize(mul((float3x3)model_matrix, input.vTangent));
+    output.vBitangentWS = cross(output.vNormalWS, output.vTangentWS);
 #endif
 
-    out.vUV = in.vUV;
+    output.vUV = input.vUV;
 
-    return out;
+    return output;
 }
 
 ///////////////////////////////////
 // Pixel Shader
 ///////////////////////////////////
 
-F_PROGRAM(FPT_PIXEL);
+F_PROGRAM(FPT_PIXEL)
 
 struct FSOutput {
     float4 vAlbedo : SV_TARGET0;
@@ -88,43 +88,39 @@ struct FSInput
 };
 
 //F_REFLECT(FR_SAMPLER2D, 0, 0)
-[[vk::binding(0, 0)]] sampler2D sAlbedo;
+
+F_TEXTURE2D(tAlbedo, 0)
 
 #ifdef USE_NORMAL_MAPS
-//F_REFLECT(FR_SAMPLER2D, 0, 1)
-[[vk::binding(0, 1)]] sampler2D sNormalMap;
-//F_REFLECT(FR_SAMPLER2D, 0, 2)
-[[vk::binding(0, 2)]] sampler2D sMetallicRoughness;
+F_TEXTURE2D(tNormalMap, 1)
+F_TEXTURE2D(tMetallicRoughness, 2)
 #endif
 
+
 //F_REFLECT(FR_STRUCTBUFFER, 1, 0)
-layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
+[[vk::binding(1, 0)]] StructuredBuffer<Material> bMaterialBuffer;
 
-FSOutput main(FSInput in)
+FSOutput main(FSInput input)
 {
-    FSOutput out;
+    FSOutput output;
 
-    float4 material_color = unpackUnorm4x8ToFloat(bMaterialBuffer[VSConst.uiMaterialIndex].uiBaseColor);
-    out.vAlbedo = float4(sAlbedo.Sample(in.vUV).rgb, 1.0) + material_color;
+    output.vAlbedo = float4(F_SAMPLE(tAlbedo, input.vUV).rgb, 1.0);
 
 #ifdef USE_NORMAL_MAPS
-    float2 roughness_metallic = sMetallicRoughness.Sample(in.vUV).gb;
+    float2 roughness_metallic = F_SAMPLE(tMetallicRoughness, input.vUV).gb;
+    float3 normal_ts = F_SAMPLE(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
-    float3 normal_ts = sNormalMap.Sample(in.vUV).rgb;
-    normal_ts = normal_ts * 2.0 - 1.0;
-
-    float3x3 TBN = float3x3(in.vTangentWS, in.vBitangentWS, in.vNormalWS);
+    float3x3 TBN = float3x3(input.vTangentWS, input.vBitangentWS, input.vNormalWS);
 
     float3 normal_ws = mul(normal_ts, TBN);
 
-    // Roughness
-    out.vNormal = float4(normalize(normal_ws), roughness_metallic.x);
-
+    // XYZ=Normal, W=Roughness
+    output.vNormal = float4(normalize(normal_ws), roughness_metallic.x);
     // Metalness
-    out.vAlbedo.w = roughness_metallic.y;
+    output.vAlbedo.w = roughness_metallic.y;
 #else
-    out.vNormal = float4(in.vNormalWS, 0.5);
+    output.vNormal = float4(input.vNormalWS, 0.5);
 #endif
 
-    return out;
+    return output;
 }

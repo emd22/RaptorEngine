@@ -48,13 +48,23 @@ public:
         pData = other.pData;
 
         other.pData = nullptr;
-    }
 
+        return *this;
+    }
 
     ~FxDynArray()
     {
+        // Destroy all objects
+
+        if constexpr (std::is_destructible_v<TElementType>) {
+            for (uint32 i = 0; i < Size; i++) {
+                pData[i].~TElementType();
+            }
+        }
+
+
         if (pData) {
-            std::free(pData);
+            std::free(reinterpret_cast<void*>(pData));
         }
     }
 
@@ -63,14 +73,14 @@ private:
     {
         // If the data has not been allocated yet, allocate it with a minimum size.
         if (pData == nullptr) {
-            Capacity = scInitialSize;
-            pData = std::malloc(sizeof(TElementType) * Capacity);
+            Capacity = PageSize;
+            pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * Capacity));
         }
 
         // If there is no remaining space, use the growth function and resize our buffer.
         if (pData && Size + 1 >= Capacity) {
             Capacity = TGrow(Capacity, PageSize);
-            pData = std::realloc(pData, sizeof(TElementType) * Capacity);
+            pData = reinterpret_cast<TElementType*>(std::realloc(pData, sizeof(TElementType) * Capacity));
         }
     }
 
@@ -78,7 +88,7 @@ public:
     uint32 Size = 0;
     uint32 Capacity = 0;
 
-    uint32 PageSize = 16;
+    uint32 PageSize = scInitialSize;
 
     TElementType* pData = nullptr;
 };

@@ -5,12 +5,15 @@
 
 namespace FxShaderPreproc {
 
+static constexpr uint32 scDataPageSize = 512;
+
 enum StringId
 {
     // Program type definitions
     F_PROGRAM,
     FPT_VERTEX,
     FPT_PIXEL,
+    FPT_ALL,
 
     // Reflection definitions
     F_REFLECT,
@@ -27,6 +30,7 @@ static constexpr const char* scStrings[] = {
     "F_PROGRAM",
     "FPT_VERTEX",
     "FPT_PIXEL",
+    "FPT_ALL",
 
     // Reflection definitions
     "F_REFLECT",
@@ -38,7 +42,8 @@ static constexpr const char* scStrings[] = {
     "F_PARAMTEST",
 };
 
-constexpr const char* FSTR(StringId id) { return scStrings[static_cast<uint32>(id)]; }
+constexpr const char* FStr(StringId id) { return scStrings[static_cast<uint32>(id)]; }
+constexpr FxHash32 FHash(StringId id) { return FxHashStr32(FStr(id)); }
 
 struct State
 {
@@ -90,6 +95,8 @@ public:
 public:
     FxSlice<char> FileData;
     uint32 Index = 0;
+
+    uint32 CurrentLine = 0;
 };
 
 enum class ParseResult
@@ -141,18 +148,23 @@ static void ParseProgramDefinition(const std::vector<FxSlice<char>>& params, Sta
 {
     REQUIRE_PARAMS(params, 1);
 
-    const FxSlice<char>& program_type = params[0];
+    FxHash32 type_hash = FxHashData32(params[0]);
 
-    // Set the new shader type
-    if (!strncmp(program_type.pData, FSTR(FPT_VERTEX), program_type.Size)) {
+    switch (type_hash) {
+    case FHash(FPT_VERTEX):
         result.SetCurrentShader(RxShaderType::eVertex);
-    }
-    else if (!strncmp(program_type.pData, FSTR(FPT_PIXEL), program_type.Size)) {
+        break;
+    case FHash(FPT_PIXEL):
         result.SetCurrentShader(RxShaderType::eFragment);
+        break;
+    case FHash(FPT_ALL):
+        result.bBroadcastToAllPrograms = true;
+        return;
+    default:;
     }
 
-    // Skip the ptr to be at our current position
-    result.SetShaderBounds(FxSlice<char>(state.GetCurrentPtr(), 0));
+    // Notify DXC about the actual line number to make the HLSL error messages less ass
+    result.InsertString(std::format("#line {}\n", state.CurrentLine + 1));
 }
 
 
@@ -166,21 +178,16 @@ static void ParseReflectionDefinition(const std::vector<FxSlice<char>>& params, 
     const int32 binding = ParamGetInt(params[2]);
 
     FxHash32 refl_hash = FxHashData32(refl_type);
-
-    constexpr FxHash32 scStructBuffer = FxHashStr32(FSTR(FR_STRUCTBUFFER));
-    constexpr FxHash32 scUniformBuffer = FxHashStr32(FSTR(FR_UNIFORMBUFFER));
-    constexpr FxHash32 scSampler2D = FxHashStr32(FSTR(FR_SAMPLER2D));
-
     EntryType type = EntryType::eStructuredBuffer;
 
     switch (refl_hash) {
-    case scStructBuffer:
+    case FHash(FR_STRUCTBUFFER):
         type = EntryType::eStructuredBuffer;
         break;
-    case scUniformBuffer:
+    case FHash(FR_UNIFORMBUFFER):
         type = EntryType::eUniformBuffer;
         break;
-    case scSampler2D:
+    case FHash(FR_SAMPLER2D):
         type = EntryType::eSampler2D;
         break;
     default:;
@@ -203,9 +210,9 @@ static void ParseParamTestDefinition(const std::vector<FxSlice<char>>& params, S
 
 
 static const PPFuncEntry PPFunctions[] = {
-    PPFuncEntry(FSTR(F_PROGRAM), true, ParseProgramDefinition),
-    PPFuncEntry(FSTR(F_REFLECT), true, ParseReflectionDefinition),
-    PPFuncEntry(FSTR(F_PARAMTEST), true, ParseParamTestDefinition),
+    PPFuncEntry(FStr(F_PROGRAM), true, ParseProgramDefinition),
+    PPFuncEntry(FStr(F_REFLECT), true, ParseReflectionDefinition),
+    PPFuncEntry(FStr(F_PARAMTEST), true, ParseParamTestDefinition),
 };
 
 
@@ -230,6 +237,7 @@ static void ParsePPFuncCall(State& state, Result& result)
 
         std::vector<FxSlice<char>> param_list;
 
+        // Parse arguments
         while (state.Get() != ')') {
             if (state.Get() == ',') {
                 param_list.push_back(param);
@@ -254,9 +262,6 @@ static void ParsePPFuncCall(State& state, Result& result)
         param_list.push_back(param);
         state.Next(); // Skip RParen
 
-        // Sync the size of the program to the current position in state
-        result.GetShaderBounds().Size = state.GetCurrentPtr() - result.GetShaderBounds().pData;
-
         func->Func(param_list, state, result);
     }
 }
@@ -268,17 +273,51 @@ Result Process(const FxSlice<char>& data)
 
     State state(data);
 
+    result.GetBuffer().SetPageSize(scDataPageSize);
+
     // Set the default(vertex) shader to be the size of the shader file. This is a fallback if there is no preprocessor
     // statements found.
-    result.SetShaderBounds(FxSlice<char>(data.pData, 0));
+    // result.SetShaderBounds(FxSlice<char>(data.pData, 0));
 
     for (; state.Index < data.Size; state.Next()) {
         ParsePPFuncCall(state, result);
 
-        ++result.GetShaderBounds().Size;
+        char ch = state.Get();
+
+        if (result.bBroadcastToAllPrograms) {
+            result.GetBuffer(RxShaderType::eVertex).Insert(ch);
+            result.GetBuffer(RxShaderType::eFragment).Insert(ch);
+
+            continue;
+        }
+
+        if (ch == '\n') {
+            ++state.CurrentLine;
+        }
+
+        result.GetBuffer().Insert(ch);
     }
 
     return result;
+}
+
+
+static void SaveProgramToDisk(const char* name, RxShaderType shader_type, const Result& result)
+{
+    const DataBuffer& buffer = result.ProgramData[static_cast<uint32>(shader_type)];
+
+    if (buffer.Size > 0) {
+        std::string sname = std::string(name) + "_" + RxShaderUtil::TypeToName(shader_type) + ".hlsl";
+        FxFile file(sname.c_str(), FxFile::ModType::eWrite, FxFile::DataType::eBinary);
+        file.Write(FxSlice<char>(buffer.pData, buffer.Size));
+        file.Close();
+    }
+}
+
+void DebugSaveToDisk(const char* name, const Result& result)
+{
+    SaveProgramToDisk(name, RxShaderType::eVertex, result);
+    SaveProgramToDisk(name, RxShaderType::eFragment, result);
 }
 
 }; // namespace FxShaderPreproc

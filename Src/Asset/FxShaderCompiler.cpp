@@ -25,98 +25,7 @@ static FxBasicDb sShaderCompileDb;
 static const char* scVertexEntrypoint = "VertexMain";
 static const char* scFragmentEntrypoint = "FragmentMain";
 
-// static Slang::ComPtr<slang::IGlobalSession>& GetSlangGlobalSession()
-// {
-//     thread_local Slang::ComPtr<slang::IGlobalSession> global_session;
-
-//     // If the session has not been created, create it
-//     if (!global_session.get()) {
-//         slang::createGlobalSession(global_session.writeRef());
-//     }
-
-//     return global_session;
-// }
-
-// static void CreateSlangSession(Slang::ComPtr<slang::ISession>& local_session, const FxSizedArray<FxShaderMacro>&
-// macros)
-// {
-//     Slang::ComPtr<slang::IGlobalSession>& global_session = GetSlangGlobalSession();
-
-//     slang::TargetDesc target_desc {
-//         .format = SLANG_SPIRV,
-//         .profile = global_session->findProfile("spirv_1_4"),
-//     };
-
-//     FxSizedArray<slang::PreprocessorMacroDesc> preprocessor_macros;
-
-//     if (macros.IsNotEmpty()) {
-//         FxLogDebug("Creating preprocessor list of {} macros", macros.Size);
-//         preprocessor_macros.InitCapacity(macros.Size);
-//         for (const FxShaderMacro& macro : macros) {
-//             slang::PreprocessorMacroDesc* ppmacro = preprocessor_macros.Insert();
-//             ppmacro->name = macro.pcName;
-//             ppmacro->value = macro.pcValue;
-//         }
-//     }
-
-//     FxStackArray<slang::CompilerOptionEntry, 3> compiler_options = {
-//         {
-//             slang::CompilerOptionName::EmitSpirvDirectly,
-//             { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr },
-//         },
-//         {
-//             // Use "slang 2026" profile to warn for legacy code
-//             slang::CompilerOptionName::LanguageVersion,
-//             { slang::CompilerOptionValueKind::Int, 2026, 0, nullptr, nullptr },
-//         },
-//         {
-//             // Column-major matrices
-//             slang::CompilerOptionName::MatrixLayoutColumn,
-//             { slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr },
-//         }
-//     };
-
-//     slang::SessionDesc session_desc {
-//         .targets = &target_desc,
-//         .targetCount = 1,
-
-//         .preprocessorMacros = preprocessor_macros.pData,
-//         .preprocessorMacroCount = static_cast<SlangInt>(preprocessor_macros.Size),
-
-//         .compilerOptionEntries = compiler_options.pData,
-//         .compilerOptionEntryCount = compiler_options.Size,
-//     };
-
-//     global_session->createSession(session_desc, local_session.writeRef());
-// }
-
-// static Slang::ComPtr<slang::ISession>& GetDefaultSlangSession()
-// {
-//     thread_local Slang::ComPtr<slang::ISession> local_session;
-
-//     if (!local_session.get()) {
-//         CreateSlangSession(local_session, {});
-//     }
-
-//     return local_session;
-// }
-
-// static void PrintSlangDiagnostics(Slang::ComPtr<slang::IBlob>& diagnostic_blob)
-// {
-//     if (diagnostic_blob != nullptr) {
-//         FxLogError("Diagnostic Info:\n {}", reinterpret_cast<const char*>(diagnostic_blob->getBufferPointer()));
-//     }
-// }
-
-// static void RecordShaderCompileTime(const char* path)
-// {
-//     FxHash64 compile_id = FxHashStr64(path);
-//     FxLogInfo("Logging compile time for {} ({})", path, compile_id);
-
-//     uint64 modification_time = FxFilesystemIO::FileGetLastModified(path);
-//     sShaderCompileDb.WriteEntry(FxBasicDbEntry { .KeyHash = compile_id, .Value = std::to_string(modification_time)
-//     });
-// }
+using CompileResult = FxShaderCompiler::Result;
 
 static bool IsShaderUpToDate(FxHash64 entry_id, const char* path)
 {
@@ -134,45 +43,6 @@ static bool IsShaderUpToDate(FxHash64 entry_id, const char* path)
 
     return true;
 }
-
-// void FxShaderCompiler::CompileAllShaders(const char* folder_path)
-// {
-//     // FxPagedArray<std::string> shader_paths = FxFilesystemIO::DirListIfHasExtension(folder_path, ".slang", true);
-
-//     // if (shader_paths.IsEmpty()) {
-//     //     return;
-//     // }
-
-
-//     // for (const std::string& shader_path : shader_paths) {
-//     //     const std::string path_to_compile = std::format("{}{}.slang", folder_path, shader_path);
-//     //     const std::string output_path = std::format("{}Spirv/{}.spv", folder_path, shader_path);
-
-//     //     FxDataPack shader_pack;
-//     //     FxShaderCompiler::Compile(path_to_compile.c_str(), shader_pack, false);
-//     // }
-
-//     // sShaderCompileDb.SaveToFile();
-// }
-
-
-// static FxSlice<uint8> CreateAlignedBufferForSpirv(const RxShaderOutline& outline,
-//                                                   Slang::ComPtr<slang::IBlob> spirv_code)
-// {
-//     const uint32 reflection_size = outline.GetReflectionSize();
-//     const uint32 total_buffer_size = reflection_size + FxMath::AlignValue<4>(spirv_code->getBufferSize());
-
-//     uint8* big_buffer = FxMemPool::Alloc<uint8>(total_buffer_size);
-
-//     // Write the reflection data (shader outline) out to the buffer
-//     outline.WriteToBuffer(reinterpret_cast<uint32*>(big_buffer));
-
-//     // Write compiled SPIRV data after the reflection data
-//     uint8* compiled_data = big_buffer + reflection_size;
-//     memcpy(compiled_data, spirv_code->getBufferPointer(), spirv_code->getBufferSize());
-
-//     return FxMakeSlice(big_buffer, total_buffer_size);
-// }
 
 
 bool FxShaderCompiler::IsOutOfDate(const char* path)
@@ -197,146 +67,39 @@ bool FxShaderCompiler::CompileIfOutOfDate(const char* path, FxDataPack& pack, co
     return out_of_date;
 }
 
-#define WRITE_COMPILED_PROGRAM(index_, shader_type_)                                                                   \
-    if (WriteCompiledProgram(index_, shader_type_) == Result::eFailed) {                                               \
-        return Result::eFailed;                                                                                        \
-    }
+#define SHADER_VERSION L"6_7"
 
-// static bool IsBufferTypeDynamic(slang::VariableReflection* type)
-// {
-//     uint32 num_attrs = type->getUserAttributeCount();
-
-//     for (uint32 i = 0; i < num_attrs; i++) {
-//         slang::Attribute* attr = type->getUserAttributeByIndex(i);
-
-//         if (!strcmp(attr->getName(), "FxDynamic")) {
-//             return true;
-//         }
-//     }
-
-//     return false;
-// }
-
-// static RxShaderOutlineEntryType UpdateFromUserType(slang::TypeReflection* type)
-// {
-//     SlangResourceShape shape = type->getResourceShape();
-
-//     switch ((shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK)) {
-//     case SlangResourceShape::SLANG_STRUCTURED_BUFFER:
-//         return RxShaderOutlineEntryType::eStructuredBuffer;
-//         break;
-//     case SlangResourceShape::SLANG_TEXTURE_2D: // Same as SLANG_SAMPLER
-//         return RxShaderOutlineEntryType::eSampler2D;
-//         break;
-//     default:
-//         FxLogError("Cannot find type for descriptor table slot in shader! (Type=0x{:x}, Name={})",
-//                    static_cast<uint16>(shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK), type->getName());
-//         break;
-//     }
-
-//     return RxShaderOutlineEntryType::eStructuredBuffer;
-// }
-
-
-// static RxShaderOutline GetProgramReflection(slang::EntryPointReflection* entry_refl, RxShaderType shader_type)
-// {
-//     RxShaderOutline outline;
-
-//     // slang::ProgramLayout* program_layout = composed_program->getLayout(SLANG_SPIRV);
-//     const uint32 num_uniforms = entry_refl->getParameterCount();
-
-//     for (uint32 i = 0; i < num_uniforms; i++) {
-//         slang::VariableLayoutReflection* var_layout = entry_refl->getParameterByIndex(i);
-
-//         const char* name = var_layout->getName();
-//         slang::ParameterCategory category = var_layout->getCategory();
-
-//         slang::TypeLayoutReflection* type_layout = var_layout->getTypeLayout();
-
-//         uint32 binding = var_layout->getOffset(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
-//         uint32 set = var_layout->getBindingSpace(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT);
-
-//         switch (category) {
-//         // Constant buffers
-//         case slang::ParameterCategory::PushConstantBuffer: {
-//             uint32 pc_size =
-//             static_cast<uint32>(type_layout->getSize(SLANG_PARAMETER_CATEGORY_PUSH_CONSTANT_BUFFER)); FxLogInfo("PC
-//             size: {}", pc_size); outline.PushConstantSizes[static_cast<uint32>(shader_type)] = pc_size; break;
-//         }
-
-//         // Samplers, SSBOs, Constant Buffers
-//         case slang::ParameterCategory::DescriptorTableSlot: {
-//             slang::TypeReflection* type = var_layout->getType();
-
-//             // Constant buffers are stored in the DescriptorTableSlot
-//             if (type->getKind() == slang::TypeReflection::Kind::ConstantBuffer) {
-//                 FxHash32 name_hash = FxHashStr32(var_layout->getName());
-
-//                 outline.AddEntry(RxShaderOutlineEntryType::eUniformBuffer, shader_type,
-//                                  IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set, binding);
-//                 break;
-//             }
-
-//             RxShaderOutlineEntryType desc_type = UpdateFromUserType(type);
-//             FxHash32 name_hash = FxHashStr32(var_layout->getName());
-
-//             outline.AddEntry(desc_type, shader_type, IsBufferTypeDynamic(var_layout->getVariable()), name_hash, set,
-//                              binding);
-
-//             break;
-//         }
-
-//         // Vertex attributes
-//         case slang::ParameterCategory::VaryingInput:
-//             break;
-
-//         default:;
-//         }
-
-
-//         FxLogInfo("Found uniform '{}' at (set={}, binding={})", name, set, binding);
-//     }
-
-//     return outline;
-// }
-
-// static void BuildProgram(FxShaderPreproc::Result& preproc)
-// {
-
-// }
-
-
-FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack& pack,
-                                                   const FxSizedArray<FxShaderMacro>& macros, bool do_db_flush)
+static const wchar_t* ShaderTypeToDxName(RxShaderType type)
 {
-    // if (!sShaderCompileDb.IsOpen()) {
-    //     sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
-    // }
+    switch (type) {
+    case RxShaderType::eVertex:
+        return L"vs_" SHADER_VERSION;
+    case RxShaderType::eFragment:
+        return L"ps_" SHADER_VERSION;
+    }
+    return L"";
+}
 
+struct CompileState
+{
+    const char* pPath;
+    FxDataPack& Pack;
+    const FxSizedArray<FxShaderMacro>& pMacros;
+    FxShaderPreproc::Result& Preproc;
+    CComPtr<IDxcUtils> pUtils;
+    CComPtr<IDxcCompiler3> pCompiler;
+    CComPtr<IDxcIncludeHandler> pIncludeHandler;
+};
+
+
+static CompileResult CompileProgram(const CompileState& state, RxShaderType shader_type)
+{
     constexpr uint32 cCodePage = DXC_CP_UTF8;
 
 
-    FxLogInfo("Compiling shader {} with {} macros", path, macros.Size);
-
-    FxFile file(path, FxFile::ModType::eRead, FxFile::DataType::eBinary);
-    FxSlice<char> file_data = file.Read<char>();
-
-    FxShaderPreproc::Result preproc = FxShaderPreproc::Process(file_data);
-
-    CComPtr<IDxcUtils> utils;
-    CComPtr<IDxcCompiler3> compiler;
-
-    DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
-    DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
-
-
-    CComPtr<IDxcIncludeHandler> include_handler;
-    utils->CreateDefaultIncludeHandler(&include_handler);
-
     // Convert path to a wide char string
     wchar_t wpath[128];
-    mbstowcs(wpath, path, 128);
-
+    mbstowcs(wpath, state.pPath, 128);
 
     const FxSizedArray<LPCWSTR> compile_args = {
         wpath,
@@ -346,15 +109,15 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
 
         // Target profile
         L"-T",
-        L"vs_6_0",
+        ShaderTypeToDxName(shader_type),
 
         // Output format
         L"-spirv",
     };
 
     CComPtr<IDxcBlobEncoding> source_blob;
-    auto& shader_raw_data = preproc.GetShaderBounds(RxShaderType::eVertex);
-    utils->CreateBlob(shader_raw_data.pData, shader_raw_data.Size, cCodePage, &source_blob);
+    auto& shader_raw_data = state.Preproc.GetBuffer(shader_type);
+    state.pUtils->CreateBlob(shader_raw_data.pData, shader_raw_data.Size, cCodePage, &source_blob);
 
     DxcBuffer buffer {};
     buffer.Encoding = cCodePage;
@@ -363,11 +126,11 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
 
     HRESULT hresult;
 
-    printf("CODE: ((%.*s))\n", shader_raw_data.Size, shader_raw_data.pData);
+    // printf("CODE:\n%.*s\n", shader_raw_data.Size, shader_raw_data.pData);
 
     CComPtr<IDxcResult> result { nullptr };
-    hresult = compiler->Compile(&buffer, compile_args.pData, static_cast<uint32>(compile_args.Size), include_handler,
-                                IID_PPV_ARGS(&result));
+    hresult = state.pCompiler->Compile(&buffer, compile_args.pData, static_cast<uint32>(compile_args.Size),
+                                       state.pIncludeHandler, IID_PPV_ARGS(&result));
 
     if (SUCCEEDED(hresult)) {
         result->GetStatus(&hresult);
@@ -378,120 +141,61 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
         hresult = result->GetErrorBuffer(&error_blob);
 
         if (SUCCEEDED(hresult) && error_blob) {
-            FxLogError("Failed to compile shader '{}'!", path);
+            FxLogError("Failed to compile shader '{}'!", state.pPath);
             FxLogError("Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
-            return FxShaderCompiler::Result::eFailed;
+            return CompileResult::eFailed;
         }
     }
 
     CComPtr<IDxcBlob> spirv_bin;
     result->GetResult(&spirv_bin);
 
-    return FxShaderCompiler::Result::eSuccess;
+    FxHash64 shader_id = RxShader::GenerateShaderId(shader_type, state.pMacros);
 
+    FxLogInfo("IS 4 byte aligned? {:s}", !(spirv_bin->GetBufferSize() % 4));
 
-    // bool has_vertex_shader = false;
-    // bool has_fragment_shader = false;
+    state.Pack.AddEntry(shader_id, FxMakeSlice<uint8>(reinterpret_cast<uint8*>(spirv_bin->GetBufferPointer()),
+                                                      spirv_bin->GetBufferSize()));
 
-    // slang::IModule* module = nullptr;
-    // Slang::ComPtr<slang::ISession>& session = GetDefaultSlangSession();
-
-    // // Create a new slang session with those macros defined
-    // if (macros.IsNotEmpty()) {
-    //     CreateSlangSession(session, macros);
-    // }
-
-    // Slang::ComPtr<slang::IBlob> diagnostic_blob;
-
-    // module = session->loadModule(path, diagnostic_blob.writeRef());
-
-    // if (diagnostic_blob != nullptr) {
-    //     FxLogError("Error loading Slang module for {}", path);
-    //     PrintSlangDiagnostics(diagnostic_blob);
-    //     return Result::eFailed;
-    // }
-
-    // Slang::ComPtr<slang::IEntryPoint> vertex_entry_point;
-    // Slang::ComPtr<slang::IEntryPoint> fragment_entry_point;
-
-    // module->findEntryPointByName(scVertexEntrypoint, vertex_entry_point.writeRef());
-    // module->findEntryPointByName(scFragmentEntrypoint, fragment_entry_point.writeRef());
-
-    // FxStackArray<slang::IComponentType*, 3> component_types;
-    // component_types.Insert(module);
-
-    // // Add each entry point if they are defined
-    // if (vertex_entry_point.get()) {
-    //     component_types.Insert(vertex_entry_point);
-    //     has_vertex_shader = true;
-    // }
-
-    // if (fragment_entry_point.get()) {
-    //     component_types.Insert(fragment_entry_point);
-    //     has_fragment_shader = true;
-    // }
-
-    // Slang::ComPtr<slang::IComponentType> composed_program;
-
-    // SlangResult result = session->createCompositeComponentType(component_types.pData, component_types.Size,
-    //                                                            composed_program.writeRef(),
-    //                                                            diagnostic_blob.writeRef());
-
-    // if (SLANG_FAILED(result) || diagnostic_blob != nullptr) {
-    //     PrintSlangDiagnostics(diagnostic_blob);
-    // }
-
-    // Slang::ComPtr<slang::IBlob> spirv_code;
-
-    // auto WriteCompiledProgram = [&](uint32 entry_index, RxShaderType shader_type) -> Result
-    // {
-    //     result = composed_program->getEntryPointCode(entry_index, 0, spirv_code.writeRef(),
-    //     diagnostic_blob.writeRef());
-
-    //     if (SLANG_FAILED(result)) {
-    //         FxLogError("Could not get {} shader SPIRV (Path={})", RxShaderUtil::TypeToName(shader_type), path);
-    //         PrintSlangDiagnostics(diagnostic_blob);
-    //         return Result::eFailed;
-    //     }
-
-    //     {
-    //         slang::EntryPointReflection* entry_refl =
-    //         composed_program->getLayout()->getEntryPointByIndex(entry_index);
-
-    //         RxShaderOutline refl = GetProgramReflection(entry_refl, shader_type);
-    //         FxSlice<uint8> aligned_buffer = CreateAlignedBufferForSpirv(refl, spirv_code);
-    //         pack.AddEntry(RxShader::GenerateShaderId(shader_type, macros), aligned_buffer);
-    //         FxMemPool::Free(aligned_buffer.pData);
-    //     }
-
-    //     FxLogInfo("Compiled {} shader {} (Size={})", RxShaderUtil::TypeToName(shader_type), path,
-    //               spirv_code->getBufferSize());
-
-    //     spirv_code.setNull();
-
-    //     return Result::eSuccess;
-    // };
-
-    // // Write the compiled programs to the DataPack
-
-    // WRITE_COMPILED_PROGRAM(0, RxShaderType::eVertex);
-    // WRITE_COMPILED_PROGRAM(1, RxShaderType::eFragment);
-
-    // FxLogDebug("Compiled shader pack (HasVertex={}, HasFragment={})", has_vertex_shader, has_fragment_shader);
-
-    // RecordShaderCompileTime(path);
-
-    // if (do_db_flush) {
-    //     sShaderCompileDb.SaveToFile();
-    // }
-
-    // return Result::eSuccess;
+    return CompileResult::eSuccess;
 }
 
-void FxShaderCompiler::Destroy()
+#define SOURCE_EXISTS(_shader_type) (preproc.GetBuffer(_shader_type).Size > 0)
+#define COMPILE_DEFAULT(_shader_type)                                                                                  \
+    CompileProgram(CompileState(path, pack, macros, preproc, utils, compiler, include_handler), _shader_type)
+
+#define TRY_COMPILE_PROGRAM(_shader_type)                                                                              \
+    if (SOURCE_EXISTS(_shader_type) && COMPILE_DEFAULT(_shader_type) != CompileResult::eSuccess) {                     \
+        return CompileResult::eFailed;                                                                                 \
+    }
+
+
+FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack& pack,
+                                                   const FxSizedArray<FxShaderMacro>& macros, bool do_db_flush)
 {
-    sShaderCompileDb.Close();
+    FxLogInfo("Compiling shader {} with {} macros", path, macros.Size);
 
-    // GetSlangSession().setNull();
-    // GetSlangGlobalSession().setNull();
+    FxFile file(path, FxFile::ModType::eRead, FxFile::DataType::eBinary);
+    FxSlice<char> file_data = file.Read<char>();
+
+    FxShaderPreproc::Result preproc = FxShaderPreproc::Process(file_data);
+
+    FxShaderPreproc::DebugSaveToDisk("./gpass", preproc);
+
+    CComPtr<IDxcUtils> utils;
+    CComPtr<IDxcCompiler3> compiler;
+
+    DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
+    DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
+
+    CComPtr<IDxcIncludeHandler> include_handler;
+    utils->CreateDefaultIncludeHandler(&include_handler);
+
+
+    TRY_COMPILE_PROGRAM(RxShaderType::eVertex);
+    TRY_COMPILE_PROGRAM(RxShaderType::eFragment);
+
+    return CompileResult::eSuccess;
 }
+
+void FxShaderCompiler::Destroy() { sShaderCompileDb.Close(); }

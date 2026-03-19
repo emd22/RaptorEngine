@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/FxDynArray.hpp>
 #include <Core/FxSlice.hpp>
 #include <Core/FxTypes.hpp>
 #include <Renderer/Backend/RxShader.hpp>
@@ -7,6 +8,9 @@
 
 
 namespace FxShaderPreproc {
+
+
+using DataBuffer = FxDynArray<char, FxGrowthFunctions::InPages>;
 
 enum EntryType : uint16
 {
@@ -30,18 +34,31 @@ struct Result
 {
 public:
     Result() = default;
-    FxSlice<char>& GetShaderBounds() { return ProgramData[static_cast<uint32>(CurrentType)]; }
-    FxSlice<char>& GetShaderBounds(RxShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
-    void SetShaderBounds(const FxSlice<char>& bounds) { GetShaderBounds() = bounds; }
-    void SetCurrentShader(RxShaderType type) { CurrentType = type; }
+
+    DataBuffer& GetBuffer() { return ProgramData[static_cast<uint32>(CurrentType)]; }
+    DataBuffer& GetBuffer(RxShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
+
+    void InsertString(const std::string& str)
+    {
+        DataBuffer& buffer = GetBuffer();
+        for (const char ch : str) {
+            buffer.Insert(ch);
+        }
+    }
+
+    void SetCurrentShader(RxShaderType type)
+    {
+        bBroadcastToAllPrograms = false;
+        CurrentType = type;
+    }
 
 public:
-    std::array<FxSlice<char>, RxShaderUtil::scNumShaderTypes> ProgramData = { {
-        FxSlice<char>(nullptr),
-        FxSlice<char>(nullptr),
-    } };
+    std::array<DataBuffer, RxShaderUtil::scNumShaderTypes> ProgramData;
 
     RxShaderType CurrentType = RxShaderType::eVertex;
+
+    // Before a program definition, broadcast to all
+    bool bBroadcastToAllPrograms = true;
 
     std::vector<Entry> Reflection;
 };
@@ -52,5 +69,6 @@ public:
  */
 Result Process(const FxSlice<char>& data);
 
+void DebugSaveToDisk(const char* name, const Result& result);
 
 }; // namespace FxShaderPreproc
