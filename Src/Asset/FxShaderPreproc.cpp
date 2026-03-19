@@ -64,17 +64,17 @@ public:
 
     char Get() const { return Get(0); }
 
-    void Next() { Index++; };
+    void NextChar() { Index++; };
     void Skip(uint32 skip) { Index += skip; };
 
     void NextIfEqual(char p)
     {
         if (Get() == p) {
-            Next();
+            NextChar();
         }
     }
 
-    bool EatStringIfExists(const char* s)
+    bool TryReadString(const char* s)
     {
         uint32 offset = 0;
         char ch;
@@ -215,6 +215,96 @@ static const PPFuncEntry PPFunctions[] = {
     PPFuncEntry(FStr(F_PARAMTEST), true, ParseParamTestDefinition),
 };
 
+static void WriteCurrentCharToProgram(State& state, Result& result)
+{
+    char ch = state.Get();
+
+    if (ch == '\n') {
+        ++state.CurrentLine;
+    }
+
+    if (result.bBroadcastToAllPrograms) {
+        result.GetBuffer(RxShaderType::eVertex).Insert(ch);
+        result.GetBuffer(RxShaderType::eFragment).Insert(ch);
+
+        return;
+    }
+
+    result.GetBuffer().Insert(ch);
+}
+
+static bool ParseIfdef(State& state, Result& result, const FxSizedArray<FxShaderMacro>& macros)
+{
+    char read_macro[256];
+    uint32 read_index = 0;
+
+
+    auto WriteUntilHash = [&]()
+    {
+        while (state.Get() != '#') {
+            // Continue saving each character until the condition is closed
+            WriteCurrentCharToProgram(state, result);
+            state.NextChar();
+        }
+    };
+
+    auto SkipUntilHash = [&]()
+    {
+        while (state.Get() != '#') {
+            // Continue saving each character until the condition is closed
+            state.NextChar();
+        }
+    };
+
+    if (state.TryReadString("#ifdef ")) {
+        read_index = 0;
+
+        while (state.Get() != '\n') {
+            read_macro[read_index++] = state.Get();
+            state.NextChar();
+        }
+
+        state.NextIfEqual('\n');
+
+        read_macro[read_index] = 0;
+
+        bool macro_found = false;
+
+        printf("MACRO: '%.*s'\n", read_index, read_macro);
+
+        for (const FxShaderMacro& macro : macros) {
+            if (!std::strncmp(macro.pcName, read_macro, read_index)) {
+                macro_found = true;
+                break;
+            }
+        }
+
+        if (macro_found) {
+            WriteUntilHash();
+
+            if (state.TryReadString("#else")) {
+                SkipUntilHash();
+            }
+        }
+        else {
+            // Skip the body of the ifdef
+            SkipUntilHash();
+
+            // Write the else condition
+            if (state.TryReadString("#else")) {
+                WriteUntilHash();
+            }
+        }
+
+        // Eat the final endif
+        state.TryReadString("#endif");
+        state.NextIfEqual('\n');
+
+        return true;
+    }
+
+    return false;
+}
 
 static void ParsePPFuncCall(State& state, Result& result)
 {
@@ -223,7 +313,7 @@ static void ParsePPFuncCall(State& state, Result& result)
     for (uint32 index = 0; index < std::size(PPFunctions); index++) {
         func = &PPFunctions[index];
 
-        if (state.EatStringIfExists(func->pName)) {
+        if (state.TryReadString(func->pName)) {
             break;
         }
 
@@ -231,7 +321,7 @@ static void ParsePPFuncCall(State& state, Result& result)
     }
 
     if (func && func->bHasParameters) {
-        state.Next(); // Skip LParen
+        state.NextChar(); // Skip LParen
 
         FxSlice<char> param(state.GetCurrentPtr(), 0);
 
@@ -242,9 +332,9 @@ static void ParsePPFuncCall(State& state, Result& result)
             if (state.Get() == ',') {
                 param_list.push_back(param);
 
-                state.Next(); // Skip comma
+                state.NextChar(); // Skip comma
                 while (std::isspace(state.Get())) {
-                    state.Next();
+                    state.NextChar();
                 }
 
                 param.pData = state.GetCurrentPtr();
@@ -254,48 +344,35 @@ static void ParsePPFuncCall(State& state, Result& result)
             }
 
             ++param.Size;
-            state.Next();
+            state.NextChar();
         }
 
 
         // Push the final parameter
         param_list.push_back(param);
-        state.Next(); // Skip RParen
+        state.NextChar(); // Skip RParen
 
         func->Func(param_list, state, result);
     }
 }
 
 
-Result Process(const FxSlice<char>& data)
+Result Process(const FxSlice<char>& data, const FxSizedArray<FxShaderMacro>& macros)
 {
     Result result {};
+    result.GetBuffer().SetPageSize(scDataPageSize);
 
     State state(data);
 
-    result.GetBuffer().SetPageSize(scDataPageSize);
-
-    // Set the default(vertex) shader to be the size of the shader file. This is a fallback if there is no preprocessor
-    // statements found.
-    // result.SetShaderBounds(FxSlice<char>(data.pData, 0));
-
-    for (; state.Index < data.Size; state.Next()) {
+    while (state.Index < data.Size) {
         ParsePPFuncCall(state, result);
 
-        char ch = state.Get();
-
-        if (result.bBroadcastToAllPrograms) {
-            result.GetBuffer(RxShaderType::eVertex).Insert(ch);
-            result.GetBuffer(RxShaderType::eFragment).Insert(ch);
-
+        if (state.Get() == '#' && ParseIfdef(state, result, macros)) {
             continue;
         }
 
-        if (ch == '\n') {
-            ++state.CurrentLine;
-        }
-
-        result.GetBuffer().Insert(ch);
+        WriteCurrentCharToProgram(state, result);
+        state.NextChar();
     }
 
     return result;

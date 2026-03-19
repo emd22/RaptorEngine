@@ -67,8 +67,7 @@ public:
 /**
  * @brief Processes a shader file and retrieves each program and associated reflection data.
  */
-Result Process(const FxSlice<char>& data);
-
+Result Process(const FxSlice<char>& data, const FxSizedArray<FxShaderMacro>& macros);
 void DebugSaveToDisk(const char* name, const Result& result);
 
 }; // namespace FxShaderPreproc

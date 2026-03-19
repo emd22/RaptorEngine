@@ -82,9 +82,9 @@ static const wchar_t* ShaderTypeToDxName(RxShaderType type)
 
 struct CompileState
 {
-    const char* pPath;
+    const char* pcPath;
     FxDataPack& Pack;
-    const FxSizedArray<FxShaderMacro>& pMacros;
+    const FxSizedArray<FxShaderMacro>& pcMacros;
     FxShaderPreproc::Result& Preproc;
     CComPtr<IDxcUtils> pUtils;
     CComPtr<IDxcCompiler3> pCompiler;
@@ -99,7 +99,7 @@ static CompileResult CompileProgram(const CompileState& state, RxShaderType shad
 
     // Convert path to a wide char string
     wchar_t wpath[128];
-    mbstowcs(wpath, state.pPath, 128);
+    mbstowcs(wpath, state.pcPath, 128);
 
     const FxSizedArray<LPCWSTR> compile_args = {
         wpath,
@@ -141,7 +141,7 @@ static CompileResult CompileProgram(const CompileState& state, RxShaderType shad
         hresult = result->GetErrorBuffer(&error_blob);
 
         if (SUCCEEDED(hresult) && error_blob) {
-            FxLogError("Failed to compile shader '{}'!", state.pPath);
+            FxLogError("Failed to compile shader '{}'!", state.pcPath);
             FxLogError("Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
             return CompileResult::eFailed;
         }
@@ -150,12 +150,13 @@ static CompileResult CompileProgram(const CompileState& state, RxShaderType shad
     CComPtr<IDxcBlob> spirv_bin;
     result->GetResult(&spirv_bin);
 
-    FxHash64 shader_id = RxShader::GenerateShaderId(shader_type, state.pMacros);
+    FxHash64 shader_id = RxShader::GenerateShaderId(shader_type, state.pcMacros);
 
     FxLogInfo("IS 4 byte aligned? {:s}", !(spirv_bin->GetBufferSize() % 4));
 
     state.Pack.AddEntry(shader_id, FxMakeSlice<uint8>(reinterpret_cast<uint8*>(spirv_bin->GetBufferPointer()),
                                                       spirv_bin->GetBufferSize()));
+
 
     return CompileResult::eSuccess;
 }
@@ -178,9 +179,7 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
     FxFile file(path, FxFile::ModType::eRead, FxFile::DataType::eBinary);
     FxSlice<char> file_data = file.Read<char>();
 
-    FxShaderPreproc::Result preproc = FxShaderPreproc::Process(file_data);
-
-    FxShaderPreproc::DebugSaveToDisk("./gpass", preproc);
+    FxShaderPreproc::Result preproc = FxShaderPreproc::Process(file_data, macros);
 
     CComPtr<IDxcUtils> utils;
     CComPtr<IDxcCompiler3> compiler;
@@ -190,7 +189,6 @@ FxShaderCompiler::Result FxShaderCompiler::Compile(const char* path, FxDataPack&
 
     CComPtr<IDxcIncludeHandler> include_handler;
     utils->CreateDefaultIncludeHandler(&include_handler);
-
 
     TRY_COMPILE_PROGRAM(RxShaderType::eVertex);
     TRY_COMPILE_PROGRAM(RxShaderType::eFragment);
