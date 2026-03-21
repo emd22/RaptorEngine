@@ -16,6 +16,7 @@ class RxShader;
 class RxCommandBuffer;
 class RxPipeline;
 
+using RxShaderId = FxHash64;
 
 namespace RxShaderUtil {
 static constexpr uint32 scNumShaderTypes = static_cast<uint32>(RxShaderType::eFragment) + 1;
@@ -221,11 +222,11 @@ class RxShader
      */
     struct ProgramCache
     {
-        std::unordered_map<FxHash64, FxRef<RxShaderProgram>, FxHash64Stl> Programs;
+        std::unordered_map<RxShaderId, FxRef<RxShaderProgram>, FxHash64Stl> Programs;
     };
 
 public:
-    static FxHash64 GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
+    static RxShaderId GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
 
     RxShader() = delete;
     RxShader(const char* path)

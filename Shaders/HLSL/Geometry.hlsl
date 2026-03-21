@@ -1,5 +1,5 @@
 
-#include "./Helper.hlsli"
+#include "./Helper.hlsl"
 
 
 ///////////////////////////////////
@@ -40,7 +40,7 @@ struct VSPushConsts
 };
 
 //F_REFLECT(FR_STRUCTBUFFER, 2, 0)
-[[vk::binding(2, 0)]] StructuredBuffer<Object> bObjectBuffer;
+[[vk::binding(0, 2)]] StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
@@ -89,26 +89,26 @@ struct FSInput
 
 //F_REFLECT(FR_SAMPLER2D, 0, 0)
 
-F_TEXTURE2D(tAlbedo, 0)
+F_Texture2D(tAlbedo, 0)
 
 #ifdef USE_NORMAL_MAPS
-F_TEXTURE2D(tNormalMap, 1)
-F_TEXTURE2D(tMetallicRoughness, 2)
+F_Texture2D(tNormalMap, 1)
+F_Texture2D(tMetallicRoughness, 2)
 #endif
 
 
 //F_REFLECT(FR_STRUCTBUFFER, 1, 0)
-[[vk::binding(1, 0)]] StructuredBuffer<Material> bMaterialBuffer;
+[[vk::binding(0, 1)]] StructuredBuffer<Material> bMaterialBuffer;
 
 FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    output.vAlbedo = float4(F_SAMPLE(tAlbedo, input.vUV).rgb, 1.0);
+    output.vAlbedo = float4(F_Sample(tAlbedo, input.vUV).rgb, 1.0);
 
 #ifdef USE_NORMAL_MAPS
-    float2 roughness_metallic = F_SAMPLE(tMetallicRoughness, input.vUV).gb;
-    float3 normal_ts = F_SAMPLE(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
+    float2 roughness_metallic = F_Sample(tMetallicRoughness, input.vUV).gb;
+    float3 normal_ts = F_Sample(tNormalMap, input.vUV).rgb * 2.0 - 1.0;
 
     float3x3 TBN = float3x3(input.vTangentWS, input.vBitangentWS, input.vNormalWS);
 

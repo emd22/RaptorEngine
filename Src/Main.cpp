@@ -17,15 +17,15 @@ int main()
 {
     FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    FxDataPack dp;
+    // FxDataPack dp;
 
-    FxShaderCompiler::Compile(FX_BASE_DIR "/Shaders/HLSL/GPass.hlsl", dp, {});
+    // FxShaderCompiler::Compile(FX_BASE_DIR "/Shaders/HLSL/GPass.hlsl", dp, {});
 
-    // {
-    //     FoxtrotGame game {};
-    // }
+    {
+        FoxtrotGame game {};
+    }
 
 
-    // FxEngineGlobalsDestroy();
-    // RxGlobals::Destroy();
+    FxEngineGlobalsDestroy();
+    RxGlobals::Destroy();
 }

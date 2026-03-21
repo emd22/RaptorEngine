@@ -117,7 +117,7 @@ uint32 RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data)
 // Shader Functions
 /////////////////////////////////////
 
-FxHash64 RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
+RxShaderId RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
 {
     FxHash64 hash = FX_HASH64_FNV1A_INIT;
 
@@ -160,7 +160,7 @@ void RxShader::Load(const char* shader_name)
 }
 
 
-const std::string RxShader::GetSourcePath() const { return FxAssetPath(AxPathQuery::eShaders) + Name + ".slang"; }
+const std::string RxShader::GetSourcePath() const { return FxAssetPath(AxPathQuery::eShaders) + Name + ".hlsl"; }
 const std::string RxShader::GetProgramPath() const
 {
     std::string compiled_folder = std::string(FxAssetPath(AxPathQuery::eShaders)) + "Spirv/";
@@ -283,39 +283,39 @@ void RxShader::RecompileShader(const std::string& source_path, const std::string
 
 void RxShaderProgram::BuildDescriptors()
 {
-    FxAssert(ShaderOutline.IsValid());
+    // FxAssert(ShaderOutline.IsValid());
 
-    Descriptors.InitCapacity(RxShaderOutline::scNumSets);
+    // Descriptors.InitCapacity(RxShaderOutline::scNumSets);
 
-    FxLogWarning("Build Descriptors for shader {}", RxShaderUtil::TypeToName(ShaderType));
+    // FxLogWarning("Build Descriptors for shader {}", RxShaderUtil::TypeToName(ShaderType));
 
-    for (uint32 set_index = 0; set_index < RxShaderOutline::scNumSets; set_index++) {
-        RxShaderOutline::EntryList& entry_list = ShaderOutline->SetBuckets[set_index];
+    // for (uint32 set_index = 0; set_index < RxShaderOutline::scNumSets; set_index++) {
+    //     RxShaderOutline::EntryList& entry_list = ShaderOutline->SetBuckets[set_index];
 
-        if (entry_list.IsEmpty()) {
-            FxLogWarning("Skipping descriptors for {} (no entries found)", RxShaderUtil::TypeToName(ShaderType));
-            continue;
-        }
+    //     if (entry_list.IsEmpty()) {
+    //         FxLogWarning("Skipping descriptors for {} (no entries found)", RxShaderUtil::TypeToName(ShaderType));
+    //         continue;
+    //     }
 
-        Descriptors.Insert(gDescriptorCache->Register(set_index, ShaderType, entry_list));
-    }
+    //     Descriptors.Insert(gDescriptorCache->Register(set_index, ShaderType, entry_list));
+    // }
 
-    FxLogInfo("Added {} descriptors to shader program", Descriptors.Size);
+    // FxLogInfo("Added {} descriptors to shader program", Descriptors.Size);
 }
 
 
 void RxShaderProgram::Bind(const RxCommandBuffer& cmd, const RxPipeline& pipeline,
                            const RxShaderBindOptions& bind_options)
 {
-    for (const RxShaderDescriptorId& ds_id : Descriptors) {
-        FxRef<RxDescriptorSet> ds = gDescriptorCache->Request(ds_id);
-        if (bind_options.bUseOffset && ds->HasDynamicOffsets()) {
-            ds->BindWithOffset(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, bind_options.BufferOffset);
-            continue;
-        }
+    // for (const RxShaderDescriptorId& ds_id : Descriptors) {
+    //     FxRef<RxDescriptorSet> ds = gDescriptorCache->Request(ds_id);
+    //     if (bind_options.bUseOffset && ds->HasDynamicOffsets()) {
+    //         ds->BindWithOffset(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, bind_options.BufferOffset);
+    //         continue;
+    //     }
 
-        ds->Bind(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    }
+    //     ds->Bind(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    // }
 }
 
 void RxShaderProgram::Destroy()
@@ -334,9 +334,10 @@ void RxShader::CreateShaderModule(RxShaderProgram& program, uint32 file_size, ui
 {
     // Load the reflected data into the shader outline
     program.ShaderOutline = FxRef<RxShaderOutline>::New();
-    uint32 reflected_size = program.ShaderOutline->ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
+    uint32 reflected_size = 0;
+    // uint32 reflected_size = program.ShaderOutline->ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
 
-    program.BuildDescriptors();
+    // program.BuildDescriptors();
     program.ShaderOutline.DestroyRef();
 
     uint32* shader_data = reinterpret_cast<uint32*>(reinterpret_cast<uint8*>(raw_data) + reflected_size);

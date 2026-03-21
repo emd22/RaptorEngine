@@ -22,12 +22,9 @@
 
 static FxBasicDb sShaderCompileDb;
 
-static const char* scVertexEntrypoint = "VertexMain";
-static const char* scFragmentEntrypoint = "FragmentMain";
-
 using CompileResult = FxShaderCompiler::Result;
 
-static bool IsShaderUpToDate(FxHash64 entry_id, const char* path)
+static bool IsShaderUpToDate(RxShaderId entry_id, const char* path)
 {
     FxBasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
     if (!entry) {
@@ -51,7 +48,7 @@ bool FxShaderCompiler::IsOutOfDate(const char* path)
         sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
     }
 
-    FxHash64 compile_entry_id = FxHashStr64(path);
+    RxShaderId compile_entry_id = FxHashStr64(path);
 
     return !IsShaderUpToDate(compile_entry_id, path);
 }
@@ -150,9 +147,11 @@ static CompileResult CompileProgram(const CompileState& state, RxShaderType shad
     CComPtr<IDxcBlob> spirv_bin;
     result->GetResult(&spirv_bin);
 
-    FxHash64 shader_id = RxShader::GenerateShaderId(shader_type, state.pcMacros);
+    const RxShaderId shader_id = RxShader::GenerateShaderId(shader_type, state.pcMacros);
 
     FxLogInfo("IS 4 byte aligned? {:s}", !(spirv_bin->GetBufferSize() % 4));
+
+    FxLogInfo("Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
 
     state.Pack.AddEntry(shader_id, FxMakeSlice<uint8>(reinterpret_cast<uint8*>(spirv_bin->GetBufferPointer()),
                                                       spirv_bin->GetBufferSize()));

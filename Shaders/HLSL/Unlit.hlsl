@@ -29,7 +29,7 @@ struct VSPushConsts
     uint uiMaterialIndex;
 };
 
-layout(set = 2, binding = 0) StructuredBuffer<Object> bObjectBuffer;
+[[vk::binding(0, 2)]] StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
@@ -62,18 +62,17 @@ struct FSOutput {
     float4 vAlbedo : SV_TARGET0;
 };
 
-F_TEXTURE2D(tAlbedo, 0)
-F_TEXTURE2D(tNormalMap, 1)
-F_TEXTURE2D(tMetallicRoughness, 2)
+F_Texture2D(tAlbedo, 0)
+F_Texture2D(tNormalMap, 1)
+F_Texture2D(tMetallicRoughness, 2)
 
-layout(set = 1, binding = 0) StructuredBuffer<Material> bMaterialBuffer;
+[[vk::binding(0, 1)]] StructuredBuffer<Material> bMaterialBuffer;
 
 FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    float4 material_color = F_UnpackUintToFloat4(bMaterialBuffer[VSConst.uiMaterialIndex].uiBaseColor);
-    output.vAlbedo = float4(sAlbedo.Sample(input.vUV).rgb, 1.0) + material_color;
+    output.vAlbedo = float4(F_Sample(tAlbedo, input.vUV).rgb, 1.0);
 
     return output;
 }
