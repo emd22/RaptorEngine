@@ -6,6 +6,7 @@
 #include <ThirdParty/Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
+#include <Core/FxRefUtil.hpp>
 #include <FxEngine.hpp>
 #include <FxObjectManager.hpp>
 #include <FxScene.hpp>
@@ -17,7 +18,7 @@
 
 FxObject::FxObject() { ObjectId = gObjectManager->GenerateObjectId(); }
 
-void FxObject::Create(const FxRef<FxPrimitiveMesh>& mesh, const FxRef<FxMaterial>& material)
+void FxObject::Create(const FxRef<FxPrimitiveMesh>& mesh, const FxTSRef<FxMaterial>& material)
 {
     pMesh = mesh;
     pMaterial = material;
@@ -46,7 +47,7 @@ bool FxObject::CheckIfReady()
             return (mbReadyToRender = false);
         }
 
-        for (FxRef<FxObject>& object : AttachedNodes) {
+        for (FxTSRef<FxObject>& object : AttachedNodes) {
             if (!object->CheckIfReady()) {
                 return (mbReadyToRender = false);
             }
@@ -85,9 +86,9 @@ void FxObject::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const FxVe
                                       PhMotionType motion_type, const PhProperties& physics_properties)
 {
     OnLoaded(
-        [primitive_type, dimensions, motion_type, physics_properties](FxRef<AxBase> base_asset)
+        [primitive_type, dimensions, motion_type, physics_properties](FxTSRef<AxBase> base_asset)
         {
-            FxRef<FxObject> asset = base_asset;
+            FxTSRef<FxObject> asset = base_asset;
             asset->Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
             asset->mbPhysicsTransformOutOfDate = true;
             asset->SetPhysicsEnabled(true);
@@ -101,9 +102,9 @@ void FxObject::PhysicsCreateMesh(FxRef<FxPrimitiveMesh> custom_physics_mesh, PhM
                                  const PhProperties& physics_properties)
 {
     OnLoaded(
-        [custom_physics_mesh, motion_type, physics_properties](FxRef<AxBase> base_asset)
+        [custom_physics_mesh, motion_type, physics_properties](FxTSRef<AxBase> base_asset)
         {
-            FxRef<FxObject> asset = base_asset;
+            FxTSRef<FxObject> asset = base_asset;
 
             FxRef<FxPrimitiveMesh> physics_mesh { nullptr };
             physics_mesh = custom_physics_mesh ? custom_physics_mesh : asset->pMesh;
@@ -140,16 +141,16 @@ void FxObject::OnAttached(FxScene* scene)
 void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
 {
     OnLoaded(
-        [&pipeline, update_children](FxRef<AxBase> base_asset)
+        [&pipeline, update_children](FxTSRef<AxBase> base_asset)
         {
-            FxRef<FxObject> asset = base_asset;
+            FxTSRef<FxObject> asset = base_asset;
 
             if (asset->pMaterial) {
                 asset->pMaterial->pPipeline = pipeline;
             }
 
             if (update_children) {
-                for (FxRef<FxObject>& node : asset->AttachedNodes) {
+                for (FxTSRef<FxObject>& node : asset->AttachedNodes) {
                     if (!node->pMaterial) {
                         continue;
                     }
@@ -160,9 +161,9 @@ void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
         });
 }
 
-void FxObject::MakeInstanceOf(const FxRef<FxObject>& source_ref)
+void FxObject::MakeInstanceOf(const FxTSRef<FxObject>& source_ref)
 {
-    FxRefContext<FxObject> source_ctx(source_ref);
+    FxRefContext<FxTSRef<FxObject>> source_ctx(source_ref);
     FxObject& source = source_ctx.Get();
 
     FxAssertMsg((source.mInstanceSlots - source.mInstanceSlotsInUse) > 0,
@@ -224,7 +225,7 @@ void FxObject::Render(const FxCamera& camera)
 
     // If there are attached objects, then iterate through each and render each
     // This will use the MVP and uniforms from above
-    for (FxRef<FxObject>& obj : AttachedNodes) {
+    for (FxTSRef<FxObject>& obj : AttachedNodes) {
         if (!obj->pMaterial) {
             continue;
         }
@@ -302,7 +303,7 @@ void FxObject::RenderUnlit(const FxCamera& camera)
     }
 
 
-    for (FxRef<FxObject>& obj : AttachedNodes) {
+    for (FxTSRef<FxObject>& obj : AttachedNodes) {
         if (!obj->pMaterial) {
             continue;
         }
@@ -348,7 +349,7 @@ void FxObject::RenderPrimitive(const RxCommandBuffer& cmd)
         return;
     }
 
-    for (const FxRef<FxObject>& node : AttachedNodes) {
+    for (const FxTSRef<FxObject>& node : AttachedNodes) {
         if (node->pMesh) {
             node->pMesh->Render(cmd, (node->mInstanceSlotsInUse + 1)); // + 1 for source object!
         }
@@ -392,7 +393,7 @@ void FxObject::Update()
 }
 
 
-void FxObject::AttachObject(const FxRef<FxObject>& object)
+void FxObject::AttachObject(const FxTSRef<FxObject>& object)
 {
     if (AttachedNodes.IsEmpty()) {
         AttachedNodes.Create(8);
@@ -469,7 +470,7 @@ void FxObject::Destroy()
     Physics.DestroyPhysicsBody();
 
     if (!AttachedNodes.IsEmpty()) {
-        for (FxRef<FxObject>& obj : AttachedNodes) {
+        for (FxTSRef<FxObject>& obj : AttachedNodes) {
             obj->Destroy();
         }
     }

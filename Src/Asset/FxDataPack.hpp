@@ -104,7 +104,7 @@ public:
 private:
     void BinaryWriteHeader();
     void BinaryWriteData();
-    void BinaryReadHeader();
+    bool BinaryReadHeader();
     void BinaryReadAllData();
 
     void JumpToEntry(FxHash64 id);

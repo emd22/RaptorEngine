@@ -68,7 +68,7 @@ void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
 }
 
 
-void FxDataPack::BinaryReadHeader()
+bool FxDataPack::BinaryReadHeader()
 {
     uint16 header_start = 0;
     File.Read<uint16>(FxMakeSlice(&header_start, 1));
@@ -80,7 +80,9 @@ void FxDataPack::BinaryReadHeader()
         Entries.Create(number_of_entries);
     }
 
-    FxAssert(header_start == scBinHeaderStart);
+    if (header_start != scBinHeaderStart) {
+        return false;
+    }
 
     for (int index = 0; index < number_of_entries; index++) {
         FxHash64 id;
@@ -102,7 +104,12 @@ void FxDataPack::BinaryReadHeader()
 
     uint16 header_end;
     File.Read<uint16>(FxMakeSlice(&header_end, 1));
-    FxAssert(header_end == scBinHeaderEnd);
+
+    if (header_end != scBinHeaderEnd) {
+        return false;
+    }
+
+    return true;
 }
 
 void FxDataPack::BinaryWriteHeader()
@@ -236,7 +243,16 @@ bool FxDataPack::ReadFromFile(const char* name)
         return false;
     }
 
-    BinaryReadHeader();
+    bool successful = BinaryReadHeader();
+    if (!successful) {
+        File.Close();
+        // Open the file in write mode to clear it
+        File.Open(name, FxFile::eWrite, FxFile::eBinary);
+        File.Close();
+
+        // Return unsuccessful
+        return false;
+    }
 
     return true;
 }

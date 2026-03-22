@@ -6,7 +6,7 @@ workspace "foxtrot"
 	if _ACTION and _ACTION:startswith("vs") then
 		platforms {"x64"}
 	else
-		platforms {"macOS", "x64"}
+		platforms {"macOS"}
 	end
 
     filter {"platforms:x64"}
@@ -59,11 +59,13 @@ project "foxtrot"
 		runpathdirs {vk_env .. "/lib"}
 		links {"vulkan.1", "dxcompiler"}
 		includedirs {vk_env .. "/include"}
+		externalincludedirs {vk_env .. "/include"}
 	end
 
     files {"Src/**.cpp", "Src/**.inl", "Src/**.hpp", "Src/ThirdParty/**.cpp", "Src/ThirdParty/**.h", "Src/ThirdParty/**.hpp", "Src/ThirdParty/**.inl"}
 
     includedirs { "Src", "Src/ThirdParty", "Lib/Include", "Lib/Include" }
+    externalincludedirs { "Src", "Src/ThirdParty", "Lib/Include", "Lib/Include" }
     links {"slang", "turbojpeg", "SDL3"}
 
     defines { "FX_BASE_DIR=\"" .. _MAIN_SCRIPT_DIR .. "\"", "_USE_MATH_DEFINES" }

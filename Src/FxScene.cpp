@@ -12,7 +12,7 @@ void FxScene::Create()
     mLights.Create(32);
 }
 
-void FxScene::Attach(const FxRef<FxObject>& object)
+void FxScene::Attach(const FxTSRef<FxObject>& object)
 {
     mObjects.Insert(object);
     object->OnAttached(this);
@@ -23,15 +23,15 @@ void FxScene::Attach(const FxRef<FxLightBase>& light)
     light->OnAttached(this);
 }
 
-FxRef<FxObject> FxScene::FindObject(FxHash64 name_hash)
+FxTSRef<FxObject> FxScene::FindObject(FxHash64 name_hash)
 {
-    for (FxRef<FxObject>& obj : mObjects) {
+    for (FxTSRef<FxObject>& obj : mObjects) {
         if (obj->Name == name_hash) {
             return obj;
         }
     }
 
-    return FxRef<FxObject>(nullptr);
+    return FxTSRef<FxObject>(nullptr);
 }
 
 
@@ -41,7 +41,7 @@ void FxScene::Render(FxCamera* shadow_camera)
 
     gRenderer->BeginGeometry();
 
-    for (const FxRef<FxObject>& obj : mObjects) {
+    for (const FxTSRef<FxObject>& obj : mObjects) {
         obj->Update();
 
 
@@ -71,7 +71,7 @@ void FxScene::RenderUnlitObjects(const FxCamera& camera) const
     gRenderer->BeginUnlit();
 
 
-    for (const FxRef<FxObject>& obj : mObjects) {
+    for (const FxTSRef<FxObject>& obj : mObjects) {
         if (!obj->GetRenderUnlit()) {
             continue;
         }
@@ -94,7 +94,7 @@ void FxScene::RenderShadows(FxCamera* shadow_camera)
 
     RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
 
-    for (const FxRef<FxObject>& obj : mObjects) {
+    for (const FxTSRef<FxObject>& obj : mObjects) {
         if (!obj->IsShadowCaster()) {
             continue;
         }

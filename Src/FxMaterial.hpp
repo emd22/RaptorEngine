@@ -28,7 +28,7 @@ struct FxMaterialComponent
 {
 public:
 public:
-    FxRef<AxImage> pAssetImage;
+    FxTSRef<AxImage> pAssetImage;
     FxSlice<const uint8> pDataToLoad { nullptr };
 
     using Status = FxMaterialComponentStatus;
@@ -99,7 +99,7 @@ public:
 public:
     FxMaterial() = default;
 
-    void Attach(ResourceType type, const FxRef<AxImage>& image)
+    void Attach(ResourceType type, const FxTSRef<AxImage>& image)
     {
         switch (type) {
         case ResourceType::eDiffuse:
@@ -174,7 +174,7 @@ public:
     static FxMaterialManager& GetGlobalManager();
 
     void Create(uint32 materials_per_page = 64);
-    static FxRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
+    static FxTSRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
 
     static RxDescriptorPool& GetDescriptorPool() { return GetGlobalManager().mDescriptorPool; }
 

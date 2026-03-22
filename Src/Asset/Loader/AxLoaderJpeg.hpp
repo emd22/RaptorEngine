@@ -15,15 +15,15 @@ public:
 
     AxLoaderJpeg() = default;
 
-    Status LoadFromFile(FxRef<AxBase> asset, const std::string& path) override;
-    Status LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(FxTSRef<AxBase> asset, const std::string& path) override;
+    Status LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
-    void Destroy(FxRef<AxBase>& asset) override;
+    void Destroy(FxTSRef<AxBase>& asset) override;
 
     ~AxLoaderJpeg() override = default;
 
 protected:
-    void CreateGpuResource(FxRef<AxBase>& asset) override;
+    void CreateGpuResource(FxTSRef<AxBase>& asset) override;
 
 private:
     struct jpeg_decompress_struct mJpegInfo;

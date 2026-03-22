@@ -63,7 +63,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     mbInitialized = true;
 }
 
-FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline)
+FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline)
 {
     FxMaterialManager& gm = GetGlobalManager();
 
@@ -74,7 +74,7 @@ FxRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pi
     int free_material_index = gm.MaterialsInUse.FindNextFreeBit();
     FxAssert(free_material_index != FxBitset::scNoFreeBits);
 
-    FxRef<FxMaterial> ref = FxMakeRef<FxMaterial>();
+    FxTSRef<FxMaterial> ref = FxTSRef<FxMaterial>::New();
 
     ref->Name = name;
     ref->pPipeline = pipeline;

@@ -19,14 +19,14 @@ public:
 
     AxLoaderBase() {}
 
-    virtual Status LoadFromFile(FxRef<AxBase> asset, const std::string& path) = 0;
-    virtual Status LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size) = 0;
+    virtual Status LoadFromFile(FxTSRef<AxBase> asset, const std::string& path) = 0;
+    virtual Status LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size) = 0;
 
-    virtual void Destroy(FxRef<AxBase>& asset) = 0;
+    virtual void Destroy(FxTSRef<AxBase>& asset) = 0;
 
     virtual ~AxLoaderBase() {}
 
-    virtual void CreateGpuResource(FxRef<AxBase>& asset) = 0;
+    virtual void CreateGpuResource(FxTSRef<AxBase>& asset) = 0;
 
 protected:
     friend class AxManager;

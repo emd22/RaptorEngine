@@ -118,10 +118,10 @@ void AxManager::Shutdown()
     mWorkerThreads.Free();
 
     // Cleanup all permutations of "empty images" that were created.
-    FxPagedArray<FxRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
+    FxPagedArray<FxTSRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
 
     if (empty_images_list.IsInited()) {
-        for (FxRef<AxImage>& image_ref : empty_images_list) {
+        for (FxTSRef<AxImage>& image_ref : empty_images_list) {
             image_ref.DestroyRef();
         }
     }
@@ -176,10 +176,10 @@ inline bool IsFileJpeg(const std::string& path)
     return false;
 }
 
-void AxManager::LoadObject(const std::string& name, FxRef<FxObject>& asset, const std::string& path,
+void AxManager::LoadObject(const std::string& name, FxTSRef<FxObject>& asset, const std::string& path,
                            FxLoadObjectOptions options)
 {
-    FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
+    FxTSRef<AxLoaderGltf> loader = FxTSRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
     SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::eObject>(asset, loader, path);
@@ -187,29 +187,30 @@ void AxManager::LoadObject(const std::string& name, FxRef<FxObject>& asset, cons
 }
 
 
-void AxManager::LoadObjectFromMemory(const std::string& name, FxRef<FxObject>& asset, const uint8* data,
+void AxManager::LoadObjectFromMemory(const std::string& name, FxTSRef<FxObject>& asset, const uint8* data,
                                      uint32 data_size)
 {
-    FxRef<AxLoaderGltf> loader = FxRef<AxLoaderGltf>::New();
+    FxTSRef<AxLoaderGltf> loader = FxTSRef<AxLoaderGltf>::New();
 
     SubmitAssetToLoad<FxObject, AxLoaderGltf, AxType::eObject>(asset, loader, "", data, data_size);
     asset->Name = name;
 }
 
 
-void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset, const std::string& path)
+void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxTSRef<AxImage>& asset,
+                          const std::string& path)
 {
     bool is_jpeg = IsFileJpeg(path);
 
     if (is_jpeg) {
-        FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
+        FxTSRef<AxLoaderJpeg> loader = FxTSRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::eImage>(asset, loader, path);
     }
     else {
-        FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
+        FxTSRef<AxLoaderStb> loader = FxTSRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
@@ -218,12 +219,12 @@ void AxManager::LoadImage(RxImageType image_type, RxImageFormat format, FxRef<Ax
 }
 
 
-void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset,
+void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxTSRef<AxImage>& asset,
                                     const uint8* data, uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
-        FxRef<AxLoaderJpeg> loader = FxRef<AxLoaderJpeg>::New();
+        FxTSRef<AxLoaderJpeg> loader = FxTSRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
@@ -231,7 +232,7 @@ void AxManager::LoadImageFromMemory(RxImageType image_type, RxImageFormat format
     }
     else {
         // Load the image using stb_image
-        FxRef<AxLoaderStb> loader = FxRef<AxLoaderStb>::New();
+        FxTSRef<AxLoaderStb> loader = FxTSRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
@@ -337,8 +338,10 @@ void AxManager::CheckForItemsToLoad()
         --tries_remaining;
     }
 
-    // Submit the item we want to load
-    worker->SubmitItemToLoad(std::move(item));
+    if (worker) {
+        // Submit the item we want to load
+        worker->SubmitItemToLoad(std::move(item));
+    }
 }
 
 void AxManager::AssetManagerUpdate()

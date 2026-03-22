@@ -15,7 +15,7 @@ struct cgltf_skin;
 
 struct AxGltfMaterialToLoad
 {
-    FxRef<FxObject> pObject { nullptr };
+    FxTSRef<FxObject> pObject { nullptr };
     int PrimitiveIndex = 0;
     int MeshIndex = 0;
 };
@@ -27,20 +27,21 @@ public:
 
     AxLoaderGltf() = default;
 
-    Status LoadFromFile(FxRef<AxBase> asset, const std::string& path) override;
-    Status LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(FxTSRef<AxBase> asset, const std::string& path) override;
+    Status LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
-    void UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index);
+    void UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index);
 
-    void Destroy(FxRef<AxBase>& asset) override;
+    void Destroy(FxTSRef<AxBase>& asset) override;
 
     ~AxLoaderGltf() override = default;
 
 private:
     // void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
-    void MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive);
+    void MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_primitive* primitive);
 
-    void UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh, cgltf_primitive* primitive);
+    void UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh,
+                              cgltf_primitive* primitive);
 
     void LoadAnimations();
     void LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin);
@@ -53,7 +54,7 @@ public:
     FxSizedArray<uint32> IndexBuffer;
 
 protected:
-    void CreateGpuResource(FxRef<AxBase>& asset) override;
+    void CreateGpuResource(FxTSRef<AxBase>& asset) override;
 
 private:
     cgltf_data* mpGltfData = nullptr;

@@ -11,6 +11,7 @@
 #include <Core/FxDefer.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxRef.hpp>
+#include <Core/FxRefUtil.hpp>
 #include <FxControls.hpp>
 #include <FxEngine.hpp>
 #include <FxMaterial.hpp>

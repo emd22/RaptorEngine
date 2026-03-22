@@ -90,10 +90,10 @@ public:
      * @brief Creates a new `FxObject` and loads the provided asset into it from
      * the path provided.
      */
-    static FxRef<FxObject> LoadObject(const std::string& name, const std::string& path,
-                                      FxLoadObjectOptions options = {})
+    static FxTSRef<FxObject> LoadObject(const std::string& name, const std::string& path,
+                                        FxLoadObjectOptions options = {})
     {
-        FxRef<FxObject> asset = FxRef<FxObject>::New();
+        FxTSRef<FxObject> asset = FxTSRef<FxObject>::New();
         LoadObject(name, asset, path, options);
 
         return asset;
@@ -103,23 +103,23 @@ public:
      * @brief Creates a new `FxObject` and loads the asset into it from
      * the data provided.
      */
-    static FxRef<FxObject> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
+    static FxTSRef<FxObject> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
     {
-        FxRef<FxObject> asset = FxRef<FxObject>::New();
+        FxTSRef<FxObject> asset = FxTSRef<FxObject>::New();
         LoadObjectFromMemory(name, asset, data, data_size);
 
         return asset;
     }
 
-    static FxRef<AxImage> LoadImage(RxImageType image_type, RxImageFormat format, const std::string& path)
+    static FxTSRef<AxImage> LoadImage(RxImageType image_type, RxImageFormat format, const std::string& path)
     {
-        FxRef<AxImage> asset = FxRef<AxImage>::New();
+        FxTSRef<AxImage> asset = FxTSRef<AxImage>::New();
         LoadImage(image_type, format, asset, path);
 
         return asset;
     }
 
-    static inline FxRef<AxImage> LoadImage(const std::string& path, RxImageFormat format)
+    static inline FxTSRef<AxImage> LoadImage(const std::string& path, RxImageFormat format)
     {
         return LoadImage(RxImageType::e2d, format, path);
     }
@@ -128,16 +128,16 @@ public:
      * @brief Creates a new `FxObject` and loads the asset into it from
      * the data provided.
      */
-    static FxRef<AxImage> LoadImageFromMemory(RxImageType image_type, RxImageFormat format, const uint8* data,
-                                              uint32 data_size)
+    static FxTSRef<AxImage> LoadImageFromMemory(RxImageType image_type, RxImageFormat format, const uint8* data,
+                                                uint32 data_size)
     {
-        FxRef<AxImage> asset = FxRef<AxImage>::New();
+        FxTSRef<AxImage> asset = FxTSRef<AxImage>::New();
         LoadImageFromMemory(image_type, format, asset, data, data_size);
 
         return asset;
     }
 
-    static inline FxRef<AxImage> LoadImageFromMemory(RxImageFormat format, const uint8* data, uint32 data_size)
+    static inline FxTSRef<AxImage> LoadImageFromMemory(RxImageFormat format, const uint8* data, uint32 data_size)
     {
         return LoadImageFromMemory(RxImageType::e2d, format, data, data_size);
     }
@@ -147,36 +147,37 @@ public:
     // Methods to load into existing containers
     ////////////////////////////////////////////////
 
-    static void LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset,
+    static void LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxTSRef<AxImage>& asset,
                                     const uint8* data, uint32 data_size);
 
     /**
      * @brief Loads an asset into the provided asset from the provided data.
      */
-    static void LoadObjectFromMemory(const std::string& name, FxRef<FxObject>& asset, const uint8* data,
+    static void LoadObjectFromMemory(const std::string& name, FxTSRef<FxObject>& asset, const uint8* data,
                                      uint32 data_size);
 
 
     /**
      * @brief Loads an object into the provided asset from a path.
      */
-    static void LoadObject(const std::string& name, FxRef<FxObject>& asset, const std::string& path,
+    static void LoadObject(const std::string& name, FxTSRef<FxObject>& asset, const std::string& path,
                            FxLoadObjectOptions options = {});
 
 
-    static void LoadImage(RxImageType image_type, RxImageFormat format, FxRef<AxImage>& asset, const std::string& path);
+    static void LoadImage(RxImageType image_type, RxImageFormat format, FxTSRef<AxImage>& asset,
+                          const std::string& path);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    static inline void LoadImage(FxRef<AxImage>& asset, RxImageFormat format, const std::string& path)
+    static inline void LoadImage(FxTSRef<AxImage>& asset, RxImageFormat format, const std::string& path)
     {
         return LoadImage(RxImageType::e2d, format, asset, path);
     }
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
-    static void LoadImageFromMemory(FxRef<AxImage>& asset, RxImageFormat format, const uint8* data, uint32 data_size)
+    static void LoadImageFromMemory(FxTSRef<AxImage>& asset, RxImageFormat format, const uint8* data, uint32 data_size)
     {
         LoadImageFromMemory(RxImageType::e2d, format, asset, data, data_size);
     }
@@ -196,8 +197,8 @@ private:
 
     template <typename TAssetType, typename TLoaderType, AxType TEnumValue>
         requires C_IsAsset<TAssetType>
-    static void SubmitAssetToLoad(const FxRef<TAssetType>& asset, FxRef<TLoaderType>& loader, const std::string& path,
-                                  const uint8* data = nullptr, uint32 data_size = 0)
+    static void SubmitAssetToLoad(const FxTSRef<TAssetType>& asset, FxTSRef<TLoaderType>& loader,
+                                  const std::string& path, const uint8* data = nullptr, uint32 data_size = 0)
     {
         FxAssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
 

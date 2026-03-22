@@ -32,6 +32,8 @@ template <typename T>
 class FxRef
 {
 public:
+    using UserType = T;
+
     FxRef() : mpRefCnt(nullptr), mpPtr(nullptr) {}
     FxRef(nullptr_t np) : mpRefCnt(nullptr), mpPtr(nullptr) {}
 
@@ -302,38 +304,4 @@ public:
     /// Was the memory allocated as one buffer?
     bool mbIsCombinedAllocation : 1 = false;
     bool mbIsExternalPtr : 1 = false;
-};
-
-/**
- * Constructs a new `FxRef` for the type `T` using the arguments `args`.
- * @tparam T the undelying type of the reference.
- * @tparam Types the types of the arguments passed in.
- */
-template <typename T, typename... Types>
-FxRef<T> FxMakeRef(Types... args)
-{
-    return FxRef<T>::New(std::forward<Types>(args)...);
-}
-
-
-template <typename TUnderlyingType>
-struct FxRefContext
-{
-public:
-    FxRefContext(const FxRef<TUnderlyingType>& ref) : mRef(ref)
-    {
-        FxAssert(mRef.mpRefCnt != nullptr);
-        mRef.mpRefCnt->Inc();
-    }
-
-    FxRefContext(const FxRefContext<TUnderlyingType>& other) = delete;
-    FxRefContext(FxRefContext<TUnderlyingType>&& other) = delete;
-
-    FX_FORCE_INLINE TUnderlyingType* GetPtr() { return mRef.mpPtr; }
-    FX_FORCE_INLINE TUnderlyingType& Get() { return *mRef.mpPtr; }
-
-    ~FxRefContext() { mRef.mpRefCnt->Dec(); }
-
-private:
-    const FxRef<TUnderlyingType>& mRef;
 };

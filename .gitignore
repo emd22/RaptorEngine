@@ -21,3 +21,7 @@ foxtrot.sln
 !.clangd
 !.clang-format
 !.clang-tidy
+
+compile_commands.json
+foxtrot.xcodeproj
+foxtrot.xcworkspace
