@@ -72,8 +72,8 @@ void RxVertexList::CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSi
                 // To support skinned vertices, we enforce that there is data available above; this means we dont need
                 // to check in WriteOrZero.
 
-                WriteOrZeroVec<float32, FxVec4f, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
                 WriteOrZeroVec<uint32, FxVec4u, 4>(vertex.BoneIds, bone_ids, vertex_index, true);
+                WriteOrZeroVec<float32, FxVec4f, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
             }
         }
 
@@ -129,8 +129,8 @@ void RxVertexList::CreateFrom(const FxSizedArray<float32>& positions, const FxSi
             if (supports_skinning) {
                 // To support skinned vertices, we enforce that there is data available above; this means we dont need
                 // to check in WriteOrZero.
-                WriteOrZero<float32, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
                 WriteOrZero<uint32, 4>(vertex.BoneIds, bone_ids, vertex_index, true);
+                WriteOrZero<float32, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
             }
         }
 

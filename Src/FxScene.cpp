@@ -1,5 +1,7 @@
 #include "FxScene.hpp"
 
+#include <FxEngine.hpp>
+#include <FxObjectManager.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/RxShadowDirectional.hpp>
@@ -86,19 +88,43 @@ void FxScene::RenderShadows(FxCamera* shadow_camera)
     memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(FxObjectLayer::eWorldLayer).RawData,
            sizeof(float32) * 16);
 
+    bool in_skinned_shader = false;
+
+    RxPipeline* pipeline = &gShadowRenderer->GetPipeline();
+
+    RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+
     for (const FxRef<FxObject>& obj : mObjects) {
         if (!obj->IsShadowCaster()) {
             continue;
+        }
+
+
+        if (in_skinned_shader && !obj->IsSkinned()) {
+            pipeline = &gShadowRenderer->GetPipeline();
+            in_skinned_shader = false;
+            pipeline->Bind(cmd);
+
+            gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                                                           gObjectManager->GetBaseOffset());
+        }
+        if (obj->IsSkinned()) {
+            pipeline = &gShadowRenderer->GetSkinnedPipeline();
+            in_skinned_shader = true;
+            pipeline->Bind(cmd);
+
+            gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                                                           gObjectManager->GetBaseOffset());
         }
 
         obj->Update();
 
         consts.ObjectId = obj->ObjectId;
 
-        vkCmdPushConstants(gRenderer->GetFrame()->CommandBuffer.Get(), gShadowRenderer->GetPipeline().Layout,
-                           VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants), &consts);
+        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants),
+                           &consts);
 
-        obj->RenderPrimitive(gRenderer->GetFrame()->CommandBuffer);
+        obj->RenderPrimitive(cmd);
     }
 
     gShadowRenderer->End();

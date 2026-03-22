@@ -22,6 +22,8 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
     FxSizedArray<float32> normals;
     FxSizedArray<float32> uvs;
     FxSizedArray<float32> tangents;
+    FxSizedArray<float32> weights;
+    FxSizedArray<uint32> boneids;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto* attribute = &primitive->attributes[i];
@@ -42,21 +44,29 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
         }
         else if (attribute->type == cgltf_attribute_type_texcoord) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
-
-            // Create our vertex normal buffer
             uvs.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, uvs.pData, data_size);
         }
         else if (attribute->type == cgltf_attribute_type_tangent) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
-
-            // Create our vertex normal buffer
             tangents.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, tangents.pData, data_size);
         }
+        else if (attribute->type == cgltf_attribute_type_weights) {
+            cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
+            weights.InitSize(data_size);
+            cgltf_accessor_unpack_floats(attribute->data, weights.pData, data_size);
+        }
+        else if (attribute->type == cgltf_attribute_type_joints) {
+            boneids.InitSize(attribute->data->count * 4);
+
+            for (cgltf_size j = 0; j < attribute->data->count; j++) {
+                cgltf_accessor_read_uint(attribute->data, j, reinterpret_cast<cgltf_uint*>(&boneids.pData[j * 4]), 4);
+            }
+        }
     }
 
-    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, {}, {});
+    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids);
     mesh->UploadVertices();
 }
 

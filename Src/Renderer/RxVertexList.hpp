@@ -45,6 +45,8 @@ public:
     /** @brief Returns true if the vertex buffer has been supplied values for normals. */
     FX_FORCE_INLINE bool HasNormals() const { return bContainsNormals; }
 
+    FX_FORCE_INLINE bool IsSkinned() const { return VertexType == RxVertexType::eSkinned; }
+
     void DestroyLocalBuffer() { mLocalBuffer.Free(); }
     void Destroy()
     {

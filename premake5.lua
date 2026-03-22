@@ -56,6 +56,7 @@ project "foxtrot"
 	else
 	    local vk_env = os.getenv("VULKAN_SDK");
 	    libdirs {vk_env .. "/lib"}
+		runpathdirs {vk_env .. "/lib"}
 		links {"vulkan.1", "dxcompiler"}
 		includedirs {vk_env .. "/include"}
 	end
@@ -73,5 +74,7 @@ project "foxtrot"
 
     filter "platforms:macOS"
         defines { "VK_ENABLE_BETA_EXTENSIONS=1" }
+
+    cleancommands {"ninja -t clean"}
 
 	filter {}

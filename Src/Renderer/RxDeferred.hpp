@@ -80,6 +80,8 @@ public:
     RxPipeline PlGeometryWireframe;
     RxPipeline PlGeometryWithNormalMaps;
 
+    RxPipeline PlGeometrySkinned;
+
     RxPipeline* pGeometryPipeline = nullptr;
 
     //////////////////////

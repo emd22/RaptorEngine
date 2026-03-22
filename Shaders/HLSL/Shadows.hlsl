@@ -15,6 +15,11 @@ struct VSInput
     float3 vNormal : NORMAL;
     float2 vUV : TEXCOORD0;
     float3 vTangent : TANGENT;
+    uint uiInstanceId : SV_InstanceID;
+#ifdef USE_SKINNING
+    uint4 vJointIndices : ATTR0;
+    float4 vJointWeights : ATTR1;
+#endif
 };
 
 struct VSOutput
@@ -38,7 +43,7 @@ struct VSPushConsts
 VSOutput main(VSInput input) : SV_POSITION
 {
     VSOutput output;
-    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex].mModel;
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
     float4x4 MVP = mul(VSConst.mCameraMatrix, model_matrix);
     output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
     return output;

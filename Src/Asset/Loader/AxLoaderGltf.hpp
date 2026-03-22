@@ -50,7 +50,6 @@ public:
 
     bool bKeepInMemory : 1 = false;
 
-    FxSizedArray<RxVertex<RxVertexType::eDefault>> VertexBuffer;
     FxSizedArray<uint32> IndexBuffer;
 
 protected:

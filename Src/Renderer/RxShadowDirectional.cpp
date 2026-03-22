@@ -36,15 +36,16 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
     VkPipelineLayout pipeline_layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(desc_sets));
 
     RxShader shader_shadow("Shadows");
-    FxRef<RxShaderProgram> vertex_shader = shader_shadow.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_shadow.GetProgram(RxShaderType::eFragment, {});
-
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
     RxPipelineProperties pipeline_properties {
         .ViewportSize = size,
         .DepthCompareOp = VK_COMPARE_OP_GREATER,
     };
+
+
+    FxRef<RxShaderProgram> vertex_shader = shader_shadow.GetProgram(RxShaderType::eVertex, {});
+    FxRef<RxShaderProgram> fragment_shader = shader_shadow.GetProgram(RxShaderType::eFragment, {});
 
     RxPipelineBuilder builder {};
     builder.SetLayout(pipeline_layout)
@@ -60,6 +61,16 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
     builder.Build(mPipeline);
 
+    {
+        FxSizedArray<FxShaderMacro> macros = { FxShaderMacro { "USE_SKINNING", "1" } };
+
+        vertex_shader = shader_shadow.GetProgram(RxShaderType::eVertex, macros);
+        fragment_shader = shader_shadow.GetProgram(RxShaderType::eFragment, macros);
+
+        vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eSkinned>();
+        builder.SetVertexDescription(&vertex_info).SetShaders(vertex_shader, fragment_shader).Build(mPipelineSkinned);
+    }
+
     UpdateLightDescriptors();
 }
 
@@ -68,7 +79,6 @@ void RxShadowDirectional::Begin()
     RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
 
     RenderStage.Begin(cmd, mPipeline);
-
 
     gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                    gShadowRenderer->GetPipeline(), gObjectManager->GetBaseOffset());

@@ -27,6 +27,7 @@ public:
     void End();
 
     FX_FORCE_INLINE RxPipeline& GetPipeline() { return mPipeline; }
+    FX_FORCE_INLINE RxPipeline& GetSkinnedPipeline() { return mPipelineSkinned; }
 
     ~RxShadowDirectional() = default;
 
@@ -40,4 +41,5 @@ public:
 
 private:
     RxPipeline mPipeline;
+    RxPipeline mPipelineSkinned;
 };

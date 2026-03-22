@@ -73,6 +73,10 @@ bool FxObject::CheckIfReady()
     // Dimensions = pMesh->GetDimensions();
     Dimensions = FxMeshUtil::CalculateDimensions(pMesh->GetVertices());
 
+    if (pMesh->VertexList.IsSkinned()) {
+        pMaterial->pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
+    }
+
     return (mbReadyToRender = true);
 }
 
@@ -447,7 +451,8 @@ void FxObject::PrintDebug() const
     FxLogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
     FxLogInfo("\tHasPhys?={}, Enabled?={}, Type={}", Physics.mbHasPhysicsBody, mbPhysicsEnabled,
               Physics.GetMotionType() == PhMotionType::eStatic ? "Static" : "Dynamic");
-    FxLogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}", mbIsInstance, mbReadyToRender, mbIsShadowCaster);
+    FxLogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}", mbIsInstance, mbReadyToRender,
+              mbIsShadowCaster, pMesh && pMesh->VertexList.IsSkinned());
     FxLogInfo("}}");
 }
 

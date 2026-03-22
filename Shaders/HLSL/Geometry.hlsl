@@ -16,7 +16,7 @@ struct VSInput
     float3 vTangent : TANGENT;
     uint uiInstanceId : SV_InstanceID;
 #ifdef USE_SKINNING
-    float4 vJointIndices : ATTR0;
+    uint4 vJointIndices : ATTR0;
     float4 vJointWeights : ATTR1;
 #endif
 };

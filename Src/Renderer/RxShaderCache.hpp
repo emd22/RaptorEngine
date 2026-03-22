@@ -12,7 +12,7 @@ class RxShaderCache
 public:
     RxShaderCache();
 
-    FxRef<RxShader> Request(const RxShaderId id);
+    FxRef<RxShader> Request(const RxShaderName name);
 
 private:
     FxSizedArray<FxRef<RxShader>> mCache;

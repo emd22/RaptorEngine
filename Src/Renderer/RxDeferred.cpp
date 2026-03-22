@@ -138,7 +138,7 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 {
     VkPipelineLayout layout = CreateUnlitPipelineLayout();
 
-    FxRef<RxShader> shader_unlit = gShaderCache->Request(RxShaderId::eUnlit);
+    FxRef<RxShader> shader_unlit = gShaderCache->Request(RxShaderName::eUnlit);
     FxRef<RxShaderProgram> vertex_shader = shader_unlit->GetProgram(RxShaderType::eVertex, {});
     FxRef<RxShaderProgram> fragment_shader = shader_unlit->GetProgram(RxShaderType::eFragment, {});
 
@@ -199,7 +199,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     CreateGPass();
 
-    FxRef<RxShader> shader_geometry = gShaderCache->Request(RxShaderId::eGeometry);
+    FxRef<RxShader> shader_geometry = gShaderCache->Request(RxShaderName::eGeometry);
     FxRef<RxShaderProgram> vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, {});
     FxRef<RxShaderProgram> fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, {});
 
@@ -236,6 +236,21 @@ void RxDeferredRenderer::CreateGPassPipeline()
             .Build(PlGeometryWithNormalMaps);
     }
 
+    {
+        vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eSkinned>();
+
+        FxSizedArray<FxShaderMacro> macros = { FxShaderMacro { "USE_NORMAL_MAPS", "1" },
+                                               FxShaderMacro { "USE_SKINNING", "1" } };
+
+        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, macros);
+        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, macros);
+
+        builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
+            .SetVertexDescription(&vertex_info)
+            .SetShaders(nm_vertex_shader, nm_fragment_shader)
+            .Build(PlGeometrySkinned);
+    }
+
     pGeometryPipeline = &PlGeometry;
 }
 
@@ -264,6 +279,9 @@ void RxDeferredRenderer::DestroyGPassPipeline()
 
     PlGeometryWireframe.Layout = nullptr;
     PlGeometryWireframe.Destroy();
+
+    PlGeometrySkinned.Layout = nullptr;
+    PlGeometrySkinned.Destroy();
 }
 
 

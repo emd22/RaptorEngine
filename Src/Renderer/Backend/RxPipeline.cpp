@@ -14,7 +14,7 @@
 
 FX_SET_MODULE_NAME("Pipeline")
 
-static RxPipeline* spBoundPipeline = nullptr;
+static VkPipeline spBoundPipeline = nullptr;
 
 void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                         const FxSlice<VkAttachmentDescription>& attachments,
@@ -204,13 +204,13 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
 
 void RxPipeline::Bind(const RxCommandBuffer& cmd)
 {
-    if (this == spBoundPipeline) {
+    if (this->Pipeline == spBoundPipeline) {
         return;
     }
 
     vkCmdBindPipeline(cmd.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-    spBoundPipeline = this;
+    spBoundPipeline = this->Pipeline;
 }
 
 void RxPipeline::Destroy()
@@ -227,9 +227,9 @@ void RxPipeline::Destroy()
     }
     if (Layout && !mbDoNotDestroyLayout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
-        Layout = nullptr;
     }
 
+    Layout = nullptr;
     // RenderPass.Destroy();
 }
 

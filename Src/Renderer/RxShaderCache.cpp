@@ -1,13 +1,13 @@
 #include "RxShaderCache.hpp"
 
-RxShaderCache::RxShaderCache() { mCache.InitSize(RxShaderIdUtil::scNumShaders); }
+RxShaderCache::RxShaderCache() { mCache.InitSize(RxShaderNameUtil::scNumShaders); }
 
-FxRef<RxShader> RxShaderCache::Request(const RxShaderId id)
+FxRef<RxShader> RxShaderCache::Request(const RxShaderName id)
 {
     FxRef<RxShader>& shader = mCache[id];
     if (!shader.IsValid()) {
         // Shader is not in cache, create a new one
-        shader = FxMakeRef<RxShader>(RxShaderIdUtil::GetName(id));
+        shader = FxMakeRef<RxShader>(RxShaderNameUtil::GetName(id));
     }
 
     return shader;

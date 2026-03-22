@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FxAllocator.hpp"
+// #include "FxAllocator.hpp"
 #include "FxDefines.hpp"
 #include "FxLog.hpp"
 #include "FxMemory.hpp"
@@ -47,6 +47,7 @@ public:
         TElementType& operator*() const { return mPtr[mIndex]; }
 
         bool operator==(const Iterator& b) const { return mPtr == b.mPtr && mIndex == b.mIndex; }
+
 
     private:
         TElementType* mPtr;
@@ -188,7 +189,6 @@ public:
         FxAssertMsg(index < Capacity, "Access out of range");
         return pData[index];
     }
-
 
     FxSizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
     {

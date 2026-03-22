@@ -73,6 +73,8 @@ public:
     void SetRenderUnlit(const bool value);
     FX_FORCE_INLINE bool GetRenderUnlit() const { return mbRenderUnlit; }
 
+    FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
+
     void Destroy() override;
     ~FxObject();
 
