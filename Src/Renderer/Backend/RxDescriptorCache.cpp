@@ -2,6 +2,7 @@
 
 #include "RxShader.hpp"
 
+#include <Core/FxRefUtil.hpp>
 #include <Renderer/Backend/RxDsLayoutBuilder.hpp>
 #include <Renderer/RxDeferred.hpp>
 #include <Renderer/RxGlobals.hpp>

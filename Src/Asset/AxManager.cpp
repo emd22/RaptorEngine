@@ -21,8 +21,8 @@
 
 void AxWorker::Create()
 {
-    while (Running.test_and_set(std::memory_order_acquire)) {
-        Running.wait(true, std::memory_order_relaxed);
+    while (bRunning.test_and_set(std::memory_order_acquire)) {
+        bRunning.wait(true, std::memory_order_relaxed);
     }
 
     Thread = std::thread([this]() { this->Update(); });
@@ -32,11 +32,11 @@ void AxWorker::Update()
 {
     // FxAssetManager& manager = FxAssetManager::GetInstance();
 
-    while (Running.test()) {
+    while (bRunning.test()) {
         ItemReady.WaitForData();
         ItemReady.Reset();
 
-        if (!Running.test()) {
+        if (!bRunning.test()) {
             break;
         }
 
@@ -59,7 +59,7 @@ void AxWorker::Update()
 
 
         // Mark that we are waiting for the data to be uploaded to the GPU
-        DataPendingUpload.test_and_set();
+        bDataPendingUpload.test_and_set();
     }
 }
 
@@ -99,8 +99,8 @@ void AxManager::Shutdown()
     ItemsEnqueuedNotifier.Kill();
 
     for (auto& worker : mWorkerThreads) {
-        worker.Running.clear();
-        worker.Running.notify_one();
+        worker.bRunning.clear();
+        worker.bRunning.notify_one();
 
         // The worker waits on the ItemReady notifier, so we kill the notifier
         worker.ItemReady.Kill();
@@ -245,7 +245,7 @@ void AxManager::CheckForUploadableData()
 {
     for (auto& worker : mWorkerThreads) {
         // If there are no uploads pending, skip the worker
-        if (!worker.DataPendingUpload.test()) {
+        if (!worker.bDataPendingUpload.test()) {
             continue;
         }
 
@@ -292,17 +292,17 @@ void AxManager::CheckForUploadableData()
         }
 
         ItemsEnqueued.clear();
-        worker.IsBusy.clear();
+        worker.bIsBusy.clear();
         worker.LoadStatus = AxLoaderBase::Status::eNone;
 
-        worker.DataPendingUpload.clear();
+        worker.bDataPendingUpload.clear();
     }
 }
 
 bool AxManager::CheckWorkersBusy()
 {
     for (auto& worker : mWorkerThreads) {
-        if (worker.IsBusy.test()) {
+        if (worker.bIsBusy.test()) {
             return true;
         }
     }
@@ -325,7 +325,7 @@ void AxManager::CheckForItemsToLoad()
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
         if (tries_remaining <= 0) {
-            FxLogError("Could not find worker thread, breaking...");
+            FxLogError("Could not find worker thread, skipping load of object...");
             break;
         }
 
@@ -378,11 +378,16 @@ void AxManager::AssetManagerUpdate()
 
 AxWorker* AxManager::FindWorkerThread()
 {
+    uint32 worker_id = 0;
     for (AxWorker& worker : mWorkerThreads) {
-        if (!worker.IsBusy.test()) {
+        ++worker_id;
+        if (!worker.bIsBusy.test()) {
+            FxLogInfo("Found worker (id={})", worker_id);
             return &worker;
         }
     }
+    FxLogInfo("Did not find any open worker!");
+
     return nullptr;
 }
 

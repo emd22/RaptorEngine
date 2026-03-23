@@ -115,8 +115,6 @@ public:
         bool did_delete = false;
 
         if (immediate || is_frame_spaced) {
-            FxLogDebug("Processing object ({}) from deletion queue", object.DeletionFrameNumber);
-
             if (object.bIsGpuBuffer) {
                 vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
                 did_delete = true;

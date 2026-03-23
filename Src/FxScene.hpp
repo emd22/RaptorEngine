@@ -10,7 +10,7 @@
 class FxScene
 {
 public:
-    FxScene() { Create(); }
+    FxScene() = default;
 
     void Create();
 
@@ -35,8 +35,6 @@ private:
     void RenderUnlitObjects(const FxCamera& camera) const;
 
 public:
-    FxObjectManager ObjectManager;
-
     FxName Name = "(unnamed)";
 
 private:

@@ -80,7 +80,7 @@ void FoxtrotGame::InitEngine()
     gPhysics->Create();
 
     AxManager& asset_manager = AxManager::GetInstance();
-    asset_manager.Start(2);
+    asset_manager.Start(3);
 
     FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
     material_manager.Create();
@@ -90,37 +90,6 @@ void FoxtrotGame::InitEngine()
 
 void FoxtrotGame::CreateLights()
 {
-    // constexpr float32 scNumLightsX = 4;
-    // constexpr float32 scNumLightsY = 4;
-
-    // constexpr float32 scAreaX = 20.0f;
-    // constexpr float32 scAreaY = 20.0f;
-
-    // constexpr float32 scDistanceX = scAreaX / scNumLightsX;
-    // constexpr float32 scDistanceY = scAreaY / scNumLightsY;
-
-    // constexpr float32 scOffsetX = scAreaX / 2.0f;
-    // constexpr float32 scOffsetY = scAreaY / 2.0f;
-
-    // constexpr float32 scHeight = 5.0f;
-
-    // FxRef<FxMeshGen::GeneratedMesh> light_volume = FxMeshGen::MakeIcoSphere(2);
-
-    // for (int y = 0; y < scNumLightsY; y++) {
-    //     for (int x = 0; x < scNumLightsX; x++) {
-    //         FxRef<FxLight> light = FxMakeRef<FxLight>();
-    //         FxVec3f position = FxVec3f((scDistanceX * x) - scOffsetX, scHeight, (scDistanceY * y) - scOffsetY);
-    //         light->MoveTo(position);
-    //         light->SetLightVolume(light_volume, false);
-    //         light->Color = FxColor(0x76a6a6FF);
-
-    //         light->Scale(FxVec3f(25));
-
-    //         mMainScene.Attach(light);
-    //     }
-    // }
-
-
     pSun = FxMakeRef<FxLightDirectional>();
     pSun->MoveTo(FxVec3f(0, 4, -5).Normalize());
     pSun->Color = FxColor(0xCADFE3, 5);
@@ -129,10 +98,9 @@ void FoxtrotGame::CreateLights()
 
 void FoxtrotGame::CreateGame()
 {
+    mMainScene.Create();
+
     Player.Create();
-
-    // CreateSkybox();
-
     Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     // Move the player up and behind the other objects
     Player.TeleportTo(FxVec3f(0.0f, 4.0f, -4.0f));
@@ -145,49 +113,19 @@ void FoxtrotGame::CreateGame()
     const char* scene_to_load = Config.GetEntry(FxHashStr64("Scene"))->Get<const char*>();
 
     scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
-
-
-    // pSkyboxObject = AxManager::LoadObject("skybox", FX_BASE_DIR "/Models/Skybox.glb");
-    // pSkyboxObject->WaitUntilLoaded();
-
-    // pSkyboxObject->SetRenderUnlit(true);
-
-    // mMainScene.Attach(pSkyboxObject);
-
-    // pLevelObject = AxManager::LoadObject("level", FX_BASE_DIR "/Models/DemoRoom2.glb", { .bKeepInMemory = true });
-
-    // pLevelObject->SetRenderUnlit(true);
-
-    // pLevelObject->PhysicsCreateMesh(pLevelObject->pMesh, PhMotionType::eStatic, {});
-
-    // ground_object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, FxVec3f(20, 1, 20), PhMotionType::eStatic, {});
-
-    // ground_object->PhysicsObjectCreate(static_cast<PhObject::Flags>(PhObject::eCreateInactive),
-    //                                    PhObject::PhysicsType::eStatic, {});
-    // mMainScene.Attach(pLevelObject);
-
     gPhysics->OptimizeBroadPhase();
 
     pPistolObject = mMainScene.FindObject(FxHashStr64("Pistol"));
 
     CreateLights();
 
-    // Player.Physics.bDisableGravity = true;
-    // Player.SetFlyMode(false);
-
     gShadowRenderer = new RxShadowDirectional(FxVec2u(1024, 1024));
-    // ShadowRenderer->ShadowCamera.MoveTo(pSun->mPosition);
     gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 3.0f, -4.0f), FxVec3f(0, 1, 0));
     gShadowRenderer->ShadowCamera.SetFarPlane(100.0f);
     gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
     gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
-
-    // Player.pCamera->ViewMatrix = ShadowRenderer->ShadowCamera.ViewMatrix;
-    // Player.pCamera->UpdateProjectionMatrix();
-    // Player.pCamera->UpdateCameraMatrix();
-
 
     while (sbRunning) {
         Tick();

@@ -90,6 +90,9 @@ void FxObjectManager::FreeObjectId(FxObjectId id)
     if (id == UINT32_MAX) {
         return;
     }
+
+    FxLogInfo("Freeing object {} from object manager", id);
+
     mObjectSlotsInUse.Unset(id);
 }
 

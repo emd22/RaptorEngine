@@ -1,5 +1,6 @@
 #include "FxMeshGen.hpp"
 
+#include <Core/FxRefUtil.hpp>
 #include <Math/FxVec2.hpp>
 #include <Math/FxVec3.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>

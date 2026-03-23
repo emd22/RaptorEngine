@@ -14,6 +14,7 @@
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
+#include <Core/FxRefUtil.hpp>
 #include <Core/FxTypes.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
 #include <Renderer/FxCamera.hpp>

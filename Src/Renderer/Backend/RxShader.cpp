@@ -6,6 +6,7 @@
 #include <Asset/AxPaths.hpp>
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxFile.hpp>
+#include <Core/FxRefUtil.hpp>
 #include <Core/FxTypes.hpp>
 #include <Core/MemPool/FxMemPool.hpp>
 #include <Math/FxMathUtil.hpp>

@@ -28,12 +28,12 @@ public:
     void SubmitItemToLoad(AxQueueItem&& item)
     {
         // Wait for item to no longer be busy
-        while (IsBusy.test()) {
-            IsBusy.wait(true);
+        while (bIsBusy.test()) {
+            bIsBusy.wait(true);
         }
 
         // Set busy
-        IsBusy.test_and_set();
+        bIsBusy.test_and_set();
 
         Item = std::move(item);
         ItemReady.SignalDataWritten();
@@ -47,10 +47,10 @@ public:
 
     FxDataNotifier ItemReady;
 
-    std::atomic_flag Running = ATOMIC_FLAG_INIT;
-    std::atomic_flag IsBusy = ATOMIC_FLAG_INIT;
+    std::atomic_flag bRunning = ATOMIC_FLAG_INIT;
+    std::atomic_flag bIsBusy = ATOMIC_FLAG_INIT;
 
-    std::atomic_flag DataPendingUpload = ATOMIC_FLAG_INIT;
+    std::atomic_flag bDataPendingUpload = ATOMIC_FLAG_INIT;
 
     std::thread Thread;
 };

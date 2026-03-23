@@ -1,5 +1,6 @@
 #include "FxPlayer.hpp"
 
+#include <Core/FxRefUtil.hpp>
 #include <FxEngine.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>

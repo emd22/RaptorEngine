@@ -94,7 +94,7 @@ public:
 
     FxVec3f mPosition = FxVec3f::sZero;
     FxQuat mRotation = FxQuat::sIdentity;
-    float mScale = 1.0f;
+    float32 mScale = 1.0f;
 
     FxVec3f RotationOrigin = FxVec3f::sZero;
 

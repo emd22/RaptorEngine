@@ -1,5 +1,8 @@
 #include "RxShaderCache.hpp"
 
+#include <Core/FxRefUtil.hpp>
+
+
 RxShaderCache::RxShaderCache() { mCache.InitSize(RxShaderNameUtil::scNumShaders); }
 
 FxRef<RxShader> RxShaderCache::Request(const RxShaderName id)
