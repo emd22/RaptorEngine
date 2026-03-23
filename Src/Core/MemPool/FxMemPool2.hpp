@@ -52,6 +52,8 @@ typedef void* pool_t;
 
 typedef void (*tlsf_walker)(void* ptr, size_t size, int used, void* user);
 
+class ControlBlock;
+
 class FxMemPool2
 {
 public:
@@ -64,11 +66,11 @@ public:
 
     /* Add/remove memory pools. */
     pool_t AddPool(void* mem, size_t bytes);
-    void tlsf_remove_pool(tlsf_t tlsf, pool_t pool);
+    void RemovePool(pool_t pool);
 
     /* malloc/memalign/realloc/free replacements. */
     void* Alloc(size_t bytes);
-    void* AlignedAlloc(tlsf_t tlsf, size_t align, size_t bytes);
+    void* AlignedAlloc(size_t align, size_t bytes);
     void* Realloc(void* ptr, size_t size);
     void Free(void* ptr);
 
@@ -78,9 +80,9 @@ public:
     int tlsf_check(tlsf_t tlsf);
     int tlsf_check_pool(pool_t pool);
 
-public:
-    tlsf_t pTlsf;
-
 private:
-    void* mpUnalignedMemory = nullptr;
+    ControlBlock* GetControlBlock();
+
+public:
+    void* pMemory;
 };

@@ -17,7 +17,7 @@ FX_SET_MODULE_NAME("Main")
 int main()
 {
     FxMemPool2 pool;
-    pool.Create(FxUnitKibibyte * 10);
+    pool.Create(FxUnitKibibyte * 50);
 
     void* a = pool.Alloc(1024);
     FxLogInfo("ptr A: {:p}", a);
