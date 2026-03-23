@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- * Heavily modified version of the TLSF memory allocator v3.1, written by Matthew Conte.
+ * Heavily modified version of the TLSF memory allocator v3.1 written by Matthew Conte.
  */
 
 /*
@@ -50,23 +50,25 @@
 typedef void* tlsf_t;
 typedef void* pool_t;
 
-typedef void (*tlsf_walker)(void* ptr, size_t size, int used, void* user);
-
 class ControlBlock;
 
 class FxMemPool2
 {
 public:
+    using WalkerFunc = void (*)(void* ptr, size_t size, int32 used, void* user);
+
+public:
+    using Status = int32;
+    static constexpr Status scPoolOk = 0;
+
     void Create(uint64 size);
 
     tlsf_t CreateFromPtr(void* allocated_buffer);
     tlsf_t CreateWithPool(void* mem, size_t bytes);
 
-    pool_t tlsf_get_pool(tlsf_t tlsf);
-
-    /* Add/remove memory pools. */
     pool_t AddPool(void* mem, size_t bytes);
     void RemovePool(pool_t pool);
+    pool_t GetPool();
 
     /* malloc/memalign/realloc/free replacements. */
     void* Alloc(size_t bytes);
@@ -75,10 +77,9 @@ public:
     void Free(void* ptr);
 
     /* Debugging. */
-    void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user);
-    /* Returns nonzero if any internal consistency check fails. */
-    int tlsf_check(tlsf_t tlsf);
-    int tlsf_check_pool(pool_t pool);
+    void WalkPool(pool_t pool, WalkerFunc walker, void* user);
+    Status CheckIntegrity();
+    Status CheckPool(pool_t pool);
 
 private:
     ControlBlock* GetControlBlock();

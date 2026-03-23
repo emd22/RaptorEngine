@@ -17,19 +17,16 @@
 #define tlsf_decl static
 #endif
 
-static constexpr uint32 scAlignment = 8;
+static constexpr uint32 scAlignmentSize = 16;
 
-struct BlockHeader;
+using Status = FxMemPool2::Status;
 
-FX_FORCE_INLINE static void* BlockToPtr(BlockHeader* block);
-FX_FORCE_INLINE static const void* BlockToPtr(const BlockHeader* block);
+struct MemBlock;
+
+FX_FORCE_INLINE static void* BlockToPtr(MemBlock* block);
+FX_FORCE_INLINE static const void* BlockToPtr(const MemBlock* block);
 
 static void* align_ptr(const void* ptr, size_t align);
-
-
-/*
-** Constants.
-*/
 
 /* Public constants: may be modified. */
 enum tlsf_public
@@ -51,18 +48,12 @@ enum tlsf_private
     FL_INDEX_MAX = 32,
 
     SL_INDEX_COUNT = (1 << SL_INDEX_COUNT_LOG2),
-    FL_INDEX_SHIFT = (SL_INDEX_COUNT_LOG2 + 3),
+    FL_INDEX_SHIFT = (SL_INDEX_COUNT_LOG2 + 4),
     FL_INDEX_COUNT = (FL_INDEX_MAX - FL_INDEX_SHIFT + 1),
 
     SMALL_BLOCK_SIZE = (1 << FL_INDEX_SHIFT),
 };
 
-/*
-** Cast and min/max macros.
-*/
-
-#define tlsf_min(a, b) ((a) < (b) ? (a) : (b))
-#define tlsf_max(a, b) ((a) > (b) ? (a) : (b))
 
 /*
 ** Set assert macro, if it has not been provided by the user.
@@ -71,24 +62,16 @@ enum tlsf_private
 #define tlsf_assert assert
 #endif
 
-/*
-** Static assertion mechanism.
-*/
 
-#define _tlsf_glue2(x, y)       x##y
-#define _tlsf_glue(x, y)        _tlsf_glue2(x, y)
-#define tlsf_static_assert(exp) typedef char _tlsf_glue(static_assert, __LINE__)[(exp) ? 1 : -1]
-
-/* This code has been tested on 32- and 64-bit (LP/LLP) architectures. */
-tlsf_static_assert(sizeof(int) * CHAR_BIT == 32);
-tlsf_static_assert(sizeof(size_t) * CHAR_BIT >= 32);
-tlsf_static_assert(sizeof(size_t) * CHAR_BIT <= 64);
+static_assert(sizeof(int) * CHAR_BIT == 32);
+static_assert(sizeof(size_t) * CHAR_BIT >= 32);
+static_assert(sizeof(size_t) * CHAR_BIT <= 64);
 
 /* SL_INDEX_COUNT must be <= number of bits in sl_bitmap's storage type. */
-tlsf_static_assert(sizeof(unsigned int) * CHAR_BIT >= SL_INDEX_COUNT);
+static_assert(sizeof(unsigned int) * CHAR_BIT >= SL_INDEX_COUNT);
 
 /* Ensure we've properly tuned our sizes. */
-tlsf_static_assert(scAlignment == SMALL_BLOCK_SIZE / SL_INDEX_COUNT);
+static_assert(scAlignmentSize == SMALL_BLOCK_SIZE / SL_INDEX_COUNT);
 
 /*
 ** Data structures and associated constants.
@@ -115,7 +98,7 @@ static constexpr size_t scBlockPrevFreeBit = 1 << 1;
 **   simplify the implementation.
 ** - The next_free / prev_free fields are only valid if the block is free.
 */
-struct alignas(16) BlockHeader
+struct alignas(16) MemBlock
 {
 public:
     size_t GetSize() const { return Size & ~(scBlockFreeBit | scBlockPrevFreeBit); }
@@ -133,19 +116,19 @@ public:
     void SetPrevFree() { Size |= scBlockPrevFreeBit; }
     void SetPrevUsed() { Size &= ~scBlockPrevFreeBit; }
 
-    BlockHeader* GetPrev()
+    MemBlock* GetPrev()
     {
         tlsf_assert(IsPrevFree() && "previous block must be free");
         return pPrevPhysBlock;
     }
 
     /* Return location of next existing block. */
-    BlockHeader* GetNext() const;
+    MemBlock* GetNext() const;
 
     /* Link a new block with its physical neighbor, return the neighbor. */
-    BlockHeader* LinkToNextBlock()
+    MemBlock* LinkToNextBlock()
     {
-        BlockHeader* next = GetNext();
+        MemBlock* next = GetNext();
         next->pPrevPhysBlock = this;
         return next;
     }
@@ -153,7 +136,7 @@ public:
     void MarkFree()
     {
         /* Link the block to the next block, first. */
-        BlockHeader* next = LinkToNextBlock();
+        MemBlock* next = LinkToNextBlock();
 
         next->SetPrevFree();
         SetFree();
@@ -161,26 +144,26 @@ public:
 
     void MarkUsed()
     {
-        BlockHeader* next = GetNext();
+        MemBlock* next = GetNext();
         next->SetPrevUsed();
         SetUsed();
     }
 
-    bool CanSplit(uint64 size) const { return GetSize() >= sizeof(BlockHeader) + size; }
+    bool CanSplit(uint64 size) const { return GetSize() >= sizeof(MemBlock) + size; }
 
     /* Split a block into two, the second of which is free. */
-    BlockHeader* Split(uint64 size);
+    MemBlock* Split(uint64 size);
 
 public:
     /* Points to the previous physical block. */
-    BlockHeader* pPrevPhysBlock;
+    MemBlock* pPrevPhysBlock;
 
     /* The size of this block, excluding the block header. */
     size_t Size;
 
     /* Next and previous free blocks. */
-    BlockHeader* pNextFree;
-    BlockHeader* pPrevFree;
+    MemBlock* pNextFree;
+    MemBlock* pPrevFree;
 };
 
 
@@ -220,7 +203,7 @@ struct alignas(16) ControlBlock
 {
 public:
     /* Remove a given block from the free list. */
-    void RemoveBlockFromFreeList(BlockHeader* block)
+    void RemoveBlockFromFreeList(MemBlock* block)
     {
         int fl, sl;
         mapping_insert(block->GetSize(), &fl, &sl);
@@ -228,7 +211,7 @@ public:
     }
 
     /* Insert a given block into the free list. */
-    void AddBlockToFreeList(BlockHeader* block)
+    void AddBlockToFreeList(MemBlock* block)
     {
         int fl, sl;
         mapping_insert(block->GetSize(), &fl, &sl);
@@ -236,10 +219,10 @@ public:
     }
 
     /* Remove a free block from the free list.*/
-    void RemoveFreeBlock(BlockHeader* block, int fl, int sl)
+    void RemoveFreeBlock(MemBlock* block, int fl, int sl)
     {
-        BlockHeader* prev = block->pPrevFree;
-        BlockHeader* next = block->pNextFree;
+        MemBlock* prev = block->pPrevFree;
+        MemBlock* next = block->pNextFree;
         tlsf_assert(prev && "prev_free field can not be null");
         tlsf_assert(next && "next_free field can not be null");
         next->pPrevFree = prev;
@@ -262,17 +245,17 @@ public:
     }
 
     /* Insert a free block into the free block list. */
-    void InsertFreeBlock(BlockHeader* block, int fl, int sl)
+    void InsertFreeBlock(MemBlock* block, int fl, int sl)
     {
-        BlockHeader* current = ppBlocks[fl][sl];
-        tlsf_assert(current && "free list cannot have a null entry");
-        tlsf_assert(block && "cannot insert a null entry into the free list");
+        MemBlock* current = ppBlocks[fl][sl];
+        FxAssertMsg(current != nullptr, "Free list cannot have a null entry");
+        FxAssertMsg(block != nullptr, "Cannot insert a null entry into the free list");
         block->pNextFree = current;
         block->pPrevFree = &NullBlock;
         current->pPrevFree = block;
 
         void* btp = BlockToPtr(block);
-        void* align_btp = FxMath::AlignPtr<void*, scAlignment>(BlockToPtr(block));
+        void* align_btp = FxMath::AlignPtr<void*, scAlignmentSize>(BlockToPtr(block));
 
         tlsf_assert(btp == align_btp && "block not aligned properly");
         /*
@@ -286,30 +269,30 @@ public:
 
 public:
     /* Empty lists point at this block to indicate they are free. */
-    BlockHeader NullBlock;
+    MemBlock NullBlock;
 
     /* Bitmaps for free lists. */
     unsigned int FlBitmap;
     unsigned int SlBitmap[FL_INDEX_COUNT];
 
     /* Head of free lists. */
-    BlockHeader* ppBlocks[FL_INDEX_COUNT][SL_INDEX_COUNT];
+    MemBlock* ppBlocks[FL_INDEX_COUNT][SL_INDEX_COUNT];
 };
 /*
 ** The size of the block header exposed to used blocks is the size field.
 ** The prev_phys_block field is stored *inside* the previous free block.
 */
-static const size_t block_header_overhead = sizeof(size_t);
+static constexpr size_t scBlockHeaderSize = 16;
 
 /* User data starts directly after the size field in a used block. */
-static constexpr size_t scBlockStartOffset = offsetof(BlockHeader, Size) + sizeof(size_t);
+static constexpr size_t scBlockStartOffset = offsetof(MemBlock, Size) + sizeof(size_t);
 
 /*
 ** A free block must be large enough to store its header minus the size of
 ** the prev_phys_block field, and no larger than the number of addressable
 ** bits for FL_INDEX.
 */
-static const size_t block_size_min = sizeof(BlockHeader) - sizeof(BlockHeader*);
+static const size_t block_size_min = sizeof(MemBlock) - sizeof(MemBlock*);
 static const size_t block_size_max = 1llu << FL_INDEX_MAX;
 
 
@@ -320,30 +303,30 @@ typedef ptrdiff_t tlsfptr_t;
 ** block_header_t member functions.
 */
 
-FX_FORCE_INLINE static BlockHeader* BlockFromPtr(void* ptr)
+FX_FORCE_INLINE static MemBlock* BlockFromPtr(void* ptr)
 {
-    return reinterpret_cast<BlockHeader*>(reinterpret_cast<uint8*>(ptr) - scBlockStartOffset);
+    return reinterpret_cast<MemBlock*>(reinterpret_cast<uint8*>(ptr) - scBlockStartOffset);
 }
 
-FX_FORCE_INLINE static const BlockHeader* BlockFromPtr(const void* ptr)
+FX_FORCE_INLINE static const MemBlock* BlockFromPtr(const void* ptr)
 {
-    return reinterpret_cast<const BlockHeader*>(reinterpret_cast<const uint8*>(ptr) - scBlockStartOffset);
+    return reinterpret_cast<const MemBlock*>(reinterpret_cast<const uint8*>(ptr) - scBlockStartOffset);
 }
 
-FX_FORCE_INLINE static void* BlockToPtr(BlockHeader* block)
+FX_FORCE_INLINE static void* BlockToPtr(MemBlock* block)
 {
     return reinterpret_cast<void*>(reinterpret_cast<uint8*>(block) + scBlockStartOffset);
 }
 
-FX_FORCE_INLINE static const void* BlockToPtr(const BlockHeader* block)
+FX_FORCE_INLINE static const void* BlockToPtr(const MemBlock* block)
 {
     return reinterpret_cast<const void*>(reinterpret_cast<const uint8*>(block) + scBlockStartOffset);
 }
 
 /* Return location of next block after block of given size. */
-static BlockHeader* GetBlock(const void* ptr, size_t size)
+static MemBlock* GetBlock(const void* ptr, size_t size)
 {
-    return reinterpret_cast<BlockHeader*>(reinterpret_cast<uintptr_t>(ptr) + size);
+    return reinterpret_cast<MemBlock*>(reinterpret_cast<uintptr_t>(ptr) + size);
 }
 
 
@@ -366,9 +349,9 @@ static void* align_ptr(const void* ptr, size_t align)
     return reinterpret_cast<void*>(aligned);
 }
 
-BlockHeader* BlockHeader::GetNext() const
+MemBlock* MemBlock::GetNext() const
 {
-    BlockHeader* next = GetBlock(BlockToPtr(this), GetSize() - block_header_overhead);
+    MemBlock* next = GetBlock(BlockToPtr(this), GetSize() - scBlockHeaderSize);
     tlsf_assert(!IsLast());
     return next;
 }
@@ -385,14 +368,14 @@ static size_t adjust_request_size(size_t size, size_t align)
 
         /* aligned sized must not exceed block_size_max or we'll go out of bounds on sl_bitmap */
         if (aligned < block_size_max) {
-            adjust = tlsf_max(aligned, block_size_min);
+            adjust = std::max(aligned, block_size_min);
         }
     }
     return adjust;
 }
 
 
-static BlockHeader* search_suitable_block(ControlBlock* control, int* fli, int* sli)
+static MemBlock* search_suitable_block(ControlBlock* control, int* fli, int* sli)
 {
     int fl = *fli;
     int sl = *sli;
@@ -426,17 +409,17 @@ static BlockHeader* search_suitable_block(ControlBlock* control, int* fli, int* 
 }
 
 
-BlockHeader* BlockHeader::Split(uint64 size)
+MemBlock* MemBlock::Split(uint64 size)
 {
     /* Calculate the amount of space left in the remaining block. */
-    BlockHeader* remaining = GetBlock(BlockToPtr(this), size - block_header_overhead);
+    MemBlock* remaining = GetBlock(BlockToPtr(this), size - scBlockHeaderSize);
 
-    const size_t remain_size = GetSize() - (size + block_header_overhead);
+    const size_t remain_size = GetSize() - (size + scBlockHeaderSize);
 
     tlsf_assert(BlockToPtr(remaining) == align_ptr(BlockToPtr(remaining), scAlignment) &&
                 "remaining block not aligned properly");
 
-    tlsf_assert(GetSize() == remain_size + size + block_header_overhead);
+    tlsf_assert(GetSize() == remain_size + size + scBlockHeaderSize);
     remaining->SetSize(remain_size);
     tlsf_assert(remaining->GetSize() >= block_size_min && "block split with invalid size");
 
@@ -448,20 +431,20 @@ BlockHeader* BlockHeader::Split(uint64 size)
 
 
 /* Absorb a free block's storage into an adjacent previous free block. */
-static BlockHeader* block_absorb(BlockHeader* prev, BlockHeader* block)
+static MemBlock* block_absorb(MemBlock* prev, MemBlock* block)
 {
     tlsf_assert(!prev->IsLast() && "previous block can't be last");
     /* Note: Leaves flags untouched. */
-    prev->Size += block->GetSize() + block_header_overhead;
+    prev->Size += block->GetSize() + scBlockHeaderSize;
     prev->LinkToNextBlock();
     return prev;
 }
 
 /* Merge a just-freed block with an adjacent previous free block. */
-static BlockHeader* block_merge_prev(ControlBlock* control, BlockHeader* block)
+static MemBlock* block_merge_prev(ControlBlock* control, MemBlock* block)
 {
     if (block->IsPrevFree()) {
-        BlockHeader* prev = block->GetPrev();
+        MemBlock* prev = block->GetPrev();
         tlsf_assert(prev && "prev physical block can't be null");
         tlsf_assert(prev->IsFree() && "prev block is not free though marked as such");
         control->RemoveBlockFromFreeList(prev);
@@ -472,9 +455,9 @@ static BlockHeader* block_merge_prev(ControlBlock* control, BlockHeader* block)
 }
 
 /* Merge a just-freed block with an adjacent free block. */
-static BlockHeader* block_merge_next(ControlBlock* control, BlockHeader* block)
+static MemBlock* block_merge_next(ControlBlock* control, MemBlock* block)
 {
-    BlockHeader* next = block->GetNext();
+    MemBlock* next = block->GetNext();
     tlsf_assert(next && "next physical block can't be null");
 
     if (next->IsFree()) {
@@ -488,11 +471,11 @@ static BlockHeader* block_merge_next(ControlBlock* control, BlockHeader* block)
 }
 
 /* Trim any trailing block space off the end of a block, return to pool. */
-static void block_trim_free(ControlBlock* control, BlockHeader* block, size_t size)
+static void block_trim_free(ControlBlock* control, MemBlock* block, size_t size)
 {
     tlsf_assert((block->IsFree()) && "block must be free");
     if (block->CanSplit(size)) {
-        BlockHeader* remaining_block = block->Split(size);
+        MemBlock* remaining_block = block->Split(size);
         block->LinkToNextBlock();
 
         remaining_block->SetPrevFree();
@@ -501,12 +484,12 @@ static void block_trim_free(ControlBlock* control, BlockHeader* block, size_t si
 }
 
 /* Trim any trailing block space off the end of a used block, return to pool. */
-static void block_trim_used(ControlBlock* control, BlockHeader* block, size_t size)
+static void block_trim_used(ControlBlock* control, MemBlock* block, size_t size)
 {
     tlsf_assert(!(block->IsFree()) && "block must be used");
     if (block->CanSplit(size)) {
         /* If the next block is free, we must coalesce. */
-        BlockHeader* remaining_block = block->Split(size);
+        MemBlock* remaining_block = block->Split(size);
         remaining_block->SetPrevUsed();
 
         remaining_block = block_merge_next(control, remaining_block);
@@ -514,12 +497,12 @@ static void block_trim_used(ControlBlock* control, BlockHeader* block, size_t si
     }
 }
 
-static BlockHeader* block_trim_free_leading(ControlBlock* control, BlockHeader* block, size_t size)
+static MemBlock* block_trim_free_leading(ControlBlock* control, MemBlock* block, size_t size)
 {
-    BlockHeader* remaining_block = block;
+    MemBlock* remaining_block = block;
     if (block->CanSplit(size)) {
         /* We want the 2nd block. */
-        remaining_block = block->Split(size - block_header_overhead);
+        remaining_block = block->Split(size - scBlockHeaderSize);
         remaining_block->SetPrevFree();
 
         block->LinkToNextBlock();
@@ -529,10 +512,10 @@ static BlockHeader* block_trim_free_leading(ControlBlock* control, BlockHeader* 
     return remaining_block;
 }
 
-static BlockHeader* block_locate_free(ControlBlock* control, size_t size)
+static MemBlock* block_locate_free(ControlBlock* control, size_t size)
 {
     int fl = 0, sl = 0;
-    BlockHeader* block = 0;
+    MemBlock* block = 0;
 
     if (size) {
         mapping_search(size, &fl, &sl);
@@ -557,7 +540,7 @@ static BlockHeader* block_locate_free(ControlBlock* control, size_t size)
     return block;
 }
 
-static void* block_prepare_used(ControlBlock* control, BlockHeader* block, size_t size)
+static void* block_prepare_used(ControlBlock* control, MemBlock* block, size_t size)
 {
     void* p = 0;
     if (block) {
@@ -604,7 +587,7 @@ typedef struct integrity_t
 
 static void integrity_walker(void* ptr, size_t size, int used, void* user)
 {
-    BlockHeader* block = BlockFromPtr(ptr);
+    MemBlock* block = BlockFromPtr(ptr);
     integrity_t* integ = reinterpret_cast<integrity_t*>(user);
     const bool this_prev_status = block->IsPrevFree();
     const bool this_status = block->IsFree();
@@ -620,12 +603,12 @@ static void integrity_walker(void* ptr, size_t size, int used, void* user)
     integ->status += status;
 }
 
-int tlsf_check(tlsf_t tlsf)
+Status FxMemPool2::CheckIntegrity()
 {
     int i, j;
 
-    ControlBlock* control = reinterpret_cast<ControlBlock*>(tlsf);
-    int status = 0;
+    ControlBlock* control = GetControlBlock();
+    Status status = scPoolOk;
 
     /* Check that the free lists and bitmaps are accurate. */
     for (i = 0; i < FL_INDEX_COUNT; ++i) {
@@ -633,7 +616,7 @@ int tlsf_check(tlsf_t tlsf)
             const int fl_map = control->FlBitmap & (1U << i);
             const int sl_list = control->SlBitmap[i];
             const int sl_map = sl_list & (1U << j);
-            const BlockHeader* block = control->ppBlocks[i][j];
+            const MemBlock* block = control->ppBlocks[i][j];
 
             /* Check that first- and second-level lists agree. */
             if (!fl_map) {
@@ -675,10 +658,10 @@ static void default_walker(void* ptr, size_t size, int used, void* user)
     printf("\t%p %s size: %x (%p)\n", ptr, used ? "used" : "free", (unsigned int)size, BlockFromPtr(ptr));
 }
 
-void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user)
+void FxMemPool2::WalkPool(pool_t pool, WalkerFunc walker, void* user)
 {
-    tlsf_walker pool_walker = walker ? walker : default_walker;
-    BlockHeader* block = GetBlock(pool, -(int)block_header_overhead);
+    WalkerFunc pool_walker = walker ? walker : default_walker;
+    MemBlock* block = GetBlock(pool, -(int)scBlockHeaderSize);
 
     while (block && !block->IsLast()) {
         pool_walker(BlockToPtr(block), block->GetSize(), !block->IsFree(), user);
@@ -686,27 +669,17 @@ void tlsf_walk_pool(pool_t pool, tlsf_walker walker, void* user)
     }
 }
 
-size_t tlsf_block_size(void* ptr)
-{
-    size_t size = 0;
-    if (ptr) {
-        const BlockHeader* block = BlockFromPtr(ptr);
-        size = block->GetSize();
-    }
-    return size;
-}
-
-int tlsf_check_pool(pool_t pool)
+int FxMemPool2::CheckPool(pool_t pool)
 {
     /* Check that the blocks are physically correct. */
     integrity_t integ = { 0, 0 };
-    tlsf_walk_pool(pool, integrity_walker, &integ);
+    WalkPool(pool, integrity_walker, &integ);
 
     return integ.status;
 }
 
 
-size_t tlsf_scAlignment(void) { return scAlignment; }
+size_t tlsf_scAlignment(void) { return scAlignmentSize; }
 
 size_t tlsf_block_size_min(void) { return block_size_min; }
 
@@ -717,21 +690,21 @@ size_t tlsf_block_size_max(void) { return block_size_max; }
 ** tlsf_add_pool, equal to the overhead of a free block and the
 ** sentinel block.
 */
-static constexpr size_t tlsf_pool_overhead(void) { return 4 * block_header_overhead; }
+static constexpr size_t tlsf_pool_overhead(void) { return 4 * scBlockHeaderSize; }
 
-static constexpr size_t tlsf_alloc_overhead(void) { return block_header_overhead; }
+static constexpr size_t tlsf_alloc_overhead(void) { return scBlockHeaderSize; }
 
 pool_t FxMemPool2::AddPool(void* mem, size_t bytes)
 {
-    BlockHeader* block;
-    BlockHeader* next;
+    MemBlock* block;
+    MemBlock* next;
 
 
     const size_t pool_overhead = tlsf_pool_overhead();
-    const size_t pool_bytes = align_down(bytes - pool_overhead, scAlignment);
+    const size_t pool_bytes = align_down(bytes - pool_overhead, scAlignmentSize);
 
-    if (((ptrdiff_t)mem % scAlignment) != 0) {
-        printf("tlsf_add_pool: Memory must be aligned by %u bytes.\n", (unsigned int)scAlignment);
+    if (((ptrdiff_t)mem % scAlignmentSize) != 0) {
+        printf("tlsf_add_pool: Memory must be aligned by %u bytes.\n", (unsigned int)scAlignmentSize);
         return 0;
     }
 
@@ -749,7 +722,7 @@ pool_t FxMemPool2::AddPool(void* mem, size_t bytes)
     ** so that the prev_phys_block field falls outside of the pool -
     ** it will never be used.
     */
-    block = GetBlock(mem, -block_header_overhead);
+    block = GetBlock(mem, -scBlockHeaderSize);
 
     block->SetSize(pool_bytes);
     block->SetFree();
@@ -770,13 +743,13 @@ pool_t FxMemPool2::AddPool(void* mem, size_t bytes)
 void FxMemPool2::RemovePool(pool_t pool)
 {
     ControlBlock* control = GetControlBlock();
-    BlockHeader* block = GetBlock(pool, -(int)block_header_overhead);
+    MemBlock* block = GetBlock(pool, -(int)scBlockHeaderSize);
 
     int fl = 0, sl = 0;
 
-    tlsf_assert((block->IsFree()) && "block should be free");
-    tlsf_assert(!block->GetNext()->IsFree() && "next block should not be free");
-    tlsf_assert(block->GetNext()->GetSize() == 0 && "next block size should be zero");
+    FxAssert((block->IsFree()));
+    FxAssert(!block->GetNext()->IsFree());
+    FxAssert(block->GetNext()->GetSize() == 0);
 
     mapping_insert((block->GetSize()), &fl, &sl);
     control->RemoveFreeBlock(block, fl, sl);
@@ -831,8 +804,8 @@ tlsf_t FxMemPool2::CreateFromPtr(void* allocated_buffer)
     }
 #endif
 
-    if ((reinterpret_cast<ptrdiff_t>(allocated_buffer) % scAlignment) != 0) {
-        printf("tlsf_create: Memory must be aligned to %u bytes.\n", (unsigned int)scAlignment);
+    if ((reinterpret_cast<ptrdiff_t>(allocated_buffer) % scAlignmentSize) != 0) {
+        printf("tlsf_create: Memory must be aligned to %u bytes.\n", (unsigned int)scAlignmentSize);
         return 0;
     }
 
@@ -852,18 +825,18 @@ tlsf_t FxMemPool2::CreateWithPool(void* mem, size_t bytes)
 ControlBlock* FxMemPool2::GetControlBlock() { return reinterpret_cast<ControlBlock*>(pMemory); }
 
 
-pool_t tlsf_get_pool(tlsf_t tlsf)
+pool_t FxMemPool2::GetPool()
 {
-    return reinterpret_cast<pool_t>(reinterpret_cast<uint8*>(tlsf) + sizeof(ControlBlock));
+    return reinterpret_cast<pool_t>(reinterpret_cast<uint8*>(pMemory) + sizeof(ControlBlock));
 }
 
 void* FxMemPool2::Alloc(size_t size)
 {
     ControlBlock* control = GetControlBlock();
 
-    const size_t adjust = adjust_request_size(size, scAlignment);
+    const size_t adjust = adjust_request_size(size, scAlignmentSize);
 
-    BlockHeader* block = block_locate_free(control, adjust);
+    MemBlock* block = block_locate_free(control, adjust);
     return block_prepare_used(control, block, adjust);
 }
 
@@ -871,7 +844,7 @@ void* FxMemPool2::AlignedAlloc(size_t align, size_t size)
 {
     ControlBlock* control = GetControlBlock();
 
-    const size_t adjust = adjust_request_size(size, scAlignment);
+    const size_t adjust = adjust_request_size(size, scAlignmentSize);
 
     /*
     ** We must allocate an additional minimum block size bytes so that if
@@ -881,19 +854,19 @@ void* FxMemPool2::AlignedAlloc(size_t align, size_t size)
     ** the prev_phys_block field is not valid, and we can't simply adjust
     ** the size of that block.
     */
-    const size_t gap_minimum = sizeof(BlockHeader);
+    const size_t gap_minimum = sizeof(MemBlock);
     const size_t size_with_gap = adjust_request_size(adjust + align + gap_minimum, align);
 
     /*
     ** If alignment is less than or equals base alignment, we're done.
     ** If we requested 0 bytes, return null, as tlsf_malloc(0) does.
     */
-    const size_t aligned_size = (adjust && align > scAlignment) ? size_with_gap : adjust;
+    const size_t aligned_size = (adjust && align > scAlignmentSize) ? size_with_gap : adjust;
 
-    BlockHeader* block = block_locate_free(control, aligned_size);
+    MemBlock* block = block_locate_free(control, aligned_size);
 
     /* This can't be a static assert. */
-    tlsf_assert(sizeof(BlockHeader) == block_size_min + block_header_overhead);
+    tlsf_assert(sizeof(BlockHeader) == block_size_min + scBlockHeaderSize);
 
     if (block) {
         void* ptr = BlockToPtr(block);
@@ -903,7 +876,7 @@ void* FxMemPool2::AlignedAlloc(size_t align, size_t size)
         /* If gap size is too small, offset to next aligned boundary. */
         if (gap && gap < gap_minimum) {
             const size_t gap_remain = gap_minimum - gap;
-            const size_t offset = tlsf_max(gap_remain, align);
+            const size_t offset = std::max(gap_remain, align);
             const void* next_aligned = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(aligned) + offset);
 
             aligned = align_ptr(next_aligned, align);
@@ -927,7 +900,7 @@ void FxMemPool2::Free(void* ptr)
 
     ControlBlock* control = GetControlBlock();
 
-    BlockHeader* block = BlockFromPtr(ptr);
+    MemBlock* block = BlockFromPtr(ptr);
     tlsf_assert(!(block->IsFree()) && "block already marked as free");
     block->MarkFree();
     block = block_merge_prev(control, block);
@@ -962,12 +935,12 @@ void* FxMemPool2::Realloc(void* ptr, size_t size)
         p = Alloc(size);
     }
     else {
-        BlockHeader* block = BlockFromPtr(ptr);
-        BlockHeader* next = block->GetNext();
+        MemBlock* block = BlockFromPtr(ptr);
+        MemBlock* next = block->GetNext();
 
         const size_t cursize = block->GetSize();
-        const size_t combined = cursize + next->GetSize() + block_header_overhead;
-        const size_t adjust = adjust_request_size(size, scAlignment);
+        const size_t combined = cursize + next->GetSize() + scBlockHeaderSize;
+        const size_t adjust = adjust_request_size(size, scAlignmentSize);
 
         tlsf_assert(!(block->IsFree()) && "block already marked as free");
 
@@ -978,7 +951,7 @@ void* FxMemPool2::Realloc(void* ptr, size_t size)
         if (adjust > cursize && (!next->IsFree() || adjust > combined)) {
             p = Alloc(size);
             if (p) {
-                const size_t minsize = tlsf_min(cursize, size);
+                const size_t minsize = std::min(cursize, size);
                 memcpy(p, ptr, minsize);
                 Free(ptr);
             }
