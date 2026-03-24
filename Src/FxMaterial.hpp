@@ -171,12 +171,10 @@ private:
 class FxMaterialManager
 {
 public:
-    static FxMaterialManager& GetGlobalManager();
-
     void Create(uint32 materials_per_page = 64);
-    static FxTSRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
+    FxTSRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
 
-    static RxDescriptorPool& GetDescriptorPool() { return GetGlobalManager().mDescriptorPool; }
+    RxDescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 
     void Destroy();
 

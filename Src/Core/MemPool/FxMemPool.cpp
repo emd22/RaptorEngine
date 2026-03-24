@@ -50,8 +50,14 @@
 
 #define tlsf_decl inline
 
+/// The total alignment and alignment of each allocation from the memory pool.
+/// Default is 16 to allow for aligned loads and stores on ARM and modern x64.
 static constexpr uint32 scAlignmentSize = 16;
+
+/// The amount of bits to shift to get `scAlignmentSize`. Used in TLSF to get block sizes and index counts
 static constexpr uint32 scAlignmentShift = 4;
+static_assert((1 << scAlignmentShift) == scAlignmentSize);
+
 
 using Status = FxMemPool::Status;
 

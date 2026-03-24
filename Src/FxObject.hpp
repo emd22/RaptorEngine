@@ -7,9 +7,9 @@
 // #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Core/FxName.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <Core/FxRef.hpp>
 #include <Core/FxTSRef.hpp>
-#include <Core/MemPool/FxMPPagedArray.hpp>
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>

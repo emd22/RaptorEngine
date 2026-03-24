@@ -48,7 +48,7 @@ void AxWorker::Update()
             LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
 
             // Data is loaded, free it
-            gEnginePool->FreeRaw(reinterpret_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
+            gEnginePool->FreeRaw(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
         }
         // There is no data passed in, load from file
         else {

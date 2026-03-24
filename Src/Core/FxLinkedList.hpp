@@ -5,6 +5,8 @@
 
 #include <cstdlib>
 
+// #define FX_LINKED_LIST_NO_REUSE_NODES 1
+
 template <typename ElementType>
 class FxLinkedList
 {
@@ -18,7 +20,7 @@ public:
 
     private:
         friend class FxLinkedList;
-        ElementType& InsertAfterNode(Node* other)
+        inline ElementType& InsertAfterNode(Node* other)
         {
             Prev = other;
             Next = other->Next;
@@ -31,7 +33,7 @@ public:
             return Data;
         }
 
-        ElementType& InsertBeforeNode(Node* other)
+        inline ElementType& InsertBeforeNode(Node* other)
         {
             Prev = other->Prev;
             Next = other;
@@ -60,6 +62,7 @@ public:
     {
         Node* node = nullptr;
 
+#ifdef FX_LINKED_LIST_NO_REUSE_NODES
         // Check if there are available spaces that have been freed recently
         if (!mFreedNodes.IsEmpty()) {
             // Set the node to use as the last node that was freed
@@ -68,11 +71,15 @@ public:
             // Remove the node from the freed list
             mFreedNodes.RemoveLast();
         }
-
         // No nodes can be recycled, insert a new one
         if (node == nullptr) {
             node = mNodePool.Insert();
         }
+
+#else
+        node = mNodePool.Insert();
+#endif
+
 
         node->Data = data;
         node->Prev = nullptr;
@@ -88,17 +95,21 @@ public:
             return;
         }
 
+#ifdef FX_LINKED_LIST_NO_REUSE_NODES
         // Insert the node into the freed list. This allocated node will be reused when needed.
         {
             auto* element = mFreedNodes.Insert();
+
             (*element) = node;
         }
+#endif
 
         // If the current node is the head of the list, set the head to be the next node.
         // This means that if there is no node next, the head will be set to null.
         if (node == Head) {
             Head = node->Next;
         }
+
         // If the current node is the tail, set the tail to be the node behind the current one.
         if (node == Tail) {
             Tail = node->Prev;
@@ -117,7 +128,7 @@ public:
     }
 
     /**
-     * Inserts a value at the end of a list.
+     * @brief Inserts a value at the end of a list.
      */
     Node* InsertLast(const ElementType& element)
     {

@@ -27,7 +27,7 @@
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
 
 // #define FX_SIZED_ARRAY_DEBUG
-#define FX_SIZED_ARRAY_NO_MEMPOOL
+// #define FX_SIZED_ARRAY_NO_MEMPOOL
 
 
 /// Warn that a paged array has not been called with .Init() before inserting. This can be useful if the default

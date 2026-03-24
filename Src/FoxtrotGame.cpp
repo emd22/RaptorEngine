@@ -81,8 +81,7 @@ void FoxtrotGame::InitEngine()
     AxManager& asset_manager = AxManager::GetInstance();
     asset_manager.Start(3);
 
-    FxMaterialManager& material_manager = FxMaterialManager::GetGlobalManager();
-    material_manager.Create();
+    gMaterialManager->Create();
 
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 }
@@ -285,7 +284,7 @@ void FoxtrotGame::DestroyGame()
 {
     gRenderer->GetDevice()->WaitForIdle();
 
-    FxMaterialManager::GetGlobalManager().Destroy();
+    gMaterialManager->Destroy();
     AxManager::GetInstance().Shutdown();
 
     delete gShadowRenderer;

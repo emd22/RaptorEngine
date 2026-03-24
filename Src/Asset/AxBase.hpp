@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Core/FxDataNotifier.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <Core/FxTSRef.hpp>
-#include <Core/MemPool/FxMPPagedArray.hpp>
 #include <atomic>
 #include <functional>
 

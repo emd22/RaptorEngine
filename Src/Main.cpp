@@ -17,34 +17,16 @@ FX_SET_MODULE_NAME("Main")
 
 int main()
 {
-    // FxMemPool pool;
-    // pool.Create(FxUnitKibibyte * 50);
+    gEnginePool = new FxMemPool;
+    gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
-    // void* a = pool.AllocRaw(1024);
-    // FxLogInfo("ptr A: {:p}", a);
+    FxGlobals::Init();
 
-    // pool.FreeRaw(a);
-
-    // void* b = pool.AllocRaw(512);
-    // FxLogInfo("ptr B: {:p}", b);
-    // void* c = pool.AllocRaw(512);
-    // FxLogInfo("ptr C: {:p}", c);
-
-
-    // FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
-
-    FxEngineGlobalsInit();
-
-    uint32* x = gEnginePool->Alloc<uint32>(2000);
-    FxLogInfo("{:p}", reinterpret_cast<void*>(x));
-    x = gEnginePool->Alloc<uint32>(23000);
-    FxLogInfo("{:p}", reinterpret_cast<void*>(x));
     {
         FoxtrotGame game {};
     }
 
-
-    FxEngineGlobalsDestroy();
+    FxGlobals::Destroy();
     RxGlobals::Destroy();
 
     FxDefer(

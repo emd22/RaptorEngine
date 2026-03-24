@@ -15,19 +15,13 @@
 
 FX_SET_MODULE_NAME("FxMaterial")
 
-FxMaterialManager& FxMaterialManager::GetGlobalManager()
-{
-    static FxMaterialManager global_manager;
-    return global_manager;
-}
-
 void FxMaterialManager::Create(uint32 entities_per_page)
 {
     if (mbInitialized) {
         return;
     }
 
-    GetGlobalManager().mMaterials.Create(entities_per_page);
+    mMaterials.Create(entities_per_page);
 
     MaterialsInUse.InitZero(FX_MAX_MATERIALS);
 
@@ -65,13 +59,11 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline)
 {
-    FxMaterialManager& gm = GetGlobalManager();
-
-    if (!gm.mMaterials.IsInited()) {
-        gm.Create();
+    if (!mMaterials.IsInited()) {
+        Create();
     }
 
-    int free_material_index = gm.MaterialsInUse.FindNextFreeBit();
+    int free_material_index = MaterialsInUse.FindNextFreeBit();
     FxAssert(free_material_index != FxBitset::scNoFreeBits);
 
     FxTSRef<FxMaterial> ref = FxTSRef<FxMaterial>::New();
@@ -80,7 +72,7 @@ FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* 
     ref->pPipeline = pipeline;
     ref->mMaterialPropertiesIndex = free_material_index;
 
-    gm.MaterialsInUse.Set(free_material_index);
+    MaterialsInUse.Set(free_material_index);
 
     return ref;
 }
@@ -126,7 +118,7 @@ RxDescriptorSet& FxMaterial::GetDescriptorSetAlbedoOnly()
         return mDsAlbedoOnly;
     }
 
-    mDsAlbedoOnly.Create(FxMaterialManager::GetDescriptorPool(),
+    mDsAlbedoOnly.Create(gMaterialManager->GetDescriptorPool(),
                          gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, false, 1);
 
 
@@ -155,11 +147,10 @@ bool FxMaterial::Bind(RxCommandBuffer* cmd)
         pPipeline->Bind(*cmd);
     }
 
-    FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     VkDescriptorSet sets_to_bind[] = {
-        mDsDefault.Get(),                    // Set 0
-        manager.mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
+        mDsDefault.Get(),                              // Set 0
+        gMaterialManager->mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
     };
 
 
@@ -181,16 +172,14 @@ bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bo
 
     pipeline.Bind(cmd);
 
-    FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
-
     RxDescriptorSet* descriptor_set = &mDsDefault;
     if (albedo_only) {
         descriptor_set = &GetDescriptorSetAlbedoOnly();
     }
 
     VkDescriptorSet sets_to_bind[] = {
-        descriptor_set->Get(),               // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
-        manager.mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
+        descriptor_set->Get(),                         // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
+        gMaterialManager->mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
     };
 
     RxDescriptorSet::BindMultiple(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
@@ -206,7 +195,7 @@ void FxMaterial::Destroy()
     }
 
     if (mMaterialPropertiesIndex != UINT32_MAX) {
-        FxMaterialManager::GetGlobalManager().MaterialsInUse.Unset(mMaterialPropertiesIndex);
+        gMaterialManager->MaterialsInUse.Unset(mMaterialPropertiesIndex);
     }
 }
 
@@ -239,11 +228,9 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 void FxMaterial::Build()
 {
     if (!mDsDefault.IsInited()) {
-        mDsDefault.Create(FxMaterialManager::GetDescriptorPool(), gRenderer->pDeferredRenderer->DsLayoutGPassMaterial,
+        mDsDefault.Create(gMaterialManager->GetDescriptorPool(), gRenderer->pDeferredRenderer->DsLayoutGPassMaterial,
                           false, 2);
     }
-
-    FxMaterialManager& manager = FxMaterialManager::GetGlobalManager();
 
     // Build components
     BUILD_MATERIAL_COMPONENT(Diffuse);
@@ -278,7 +265,7 @@ void FxMaterial::Build()
     FxAssert(mMaterialPropertiesIndex != UINT32_MAX);
 
     FxMaterialProperties* materials_buffer = static_cast<FxMaterialProperties*>(
-        manager.MaterialPropertiesBuffer.pMappedBuffer);
+        gMaterialManager->MaterialPropertiesBuffer.pMappedBuffer);
 
     FxMaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
