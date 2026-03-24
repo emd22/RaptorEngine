@@ -25,3 +25,11 @@ foxtrot.sln
 compile_commands.json
 foxtrot.xcodeproj
 foxtrot.xcworkspace
+
+Makefile
+*.make
+
+CMakeCache.txt
+*.cmake
+
+CMakeFiles

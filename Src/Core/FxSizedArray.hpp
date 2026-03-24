@@ -103,7 +103,7 @@ public:
         for (const TElementType& obj : list) {
             Insert(obj);
         }
-    }
+    };
 
     FxSizedArray(FxSizedArray<TElementType>&& other)
     {

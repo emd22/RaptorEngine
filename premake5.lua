@@ -3,16 +3,21 @@ workspace "foxtrot"
     targetdir "build/%{cfg.buildcfg}"
     cppdialect "C++20"
 
+
+
 	if _ACTION and _ACTION:startswith("vs") then
 		platforms {"x64"}
 	else
 		platforms {"macOS"}
 	end
 
+	multiprocessorcompile "On"
+
     filter {"platforms:x64"}
         system "windows"
         architecture "x86_64"
-        buildoptions { "/MP", "/arch:AVX2", "/Oi" }
+        buildoptions {  "/Oi" }
+    	vectorextensions "AVX2"
         libdirs { "./Lib/Win32" }
 
     filter {"platforms:macOS"}
@@ -29,11 +34,15 @@ workspace "foxtrot"
     filter "configurations:DebugRelease"
         defines { "NDEBUG" }
         symbols "On"
+        -- linktimeoptimization "On"
         optimize "On"
 
     filter "configurations:Release"
         defines { "NDEBUG" }
-        optimize "On"
+        linktimeoptimization "On"
+        optimize "Speed"
+        runtimechecks       "Off"
+		buffersecuritycheck "Off"
 
 	filter {}
 
@@ -49,6 +58,14 @@ project "foxtrot"
     targetdir "build/%{cfg.buildcfg}"
 	objdir "buildobj/%{cfg.buildcfg}"
 
+
+    files {
+        "Src/**.hpp", "Src/**.inl", "Src/**.cpp",
+
+        "Src/ThirdParty/**.cpp", "Src/ThirdParty/**.h",
+        "Src/ThirdParty/**.hpp", "Src/ThirdParty/**.inl"
+    }
+
 	if os.host() == "windows" then
 	    libdirs {"$(VULKAN_SDK)/Lib"}
         links {"vulkan-1", "dxcompiler"}
@@ -62,11 +79,10 @@ project "foxtrot"
 		externalincludedirs {vk_env .. "/include"}
 	end
 
-    files {"Src/**.cpp", "Src/**.inl", "Src/**.hpp", "Src/ThirdParty/**.cpp", "Src/ThirdParty/**.h", "Src/ThirdParty/**.hpp", "Src/ThirdParty/**.inl"}
 
     includedirs { "Src", "Src/ThirdParty", "Lib/Include", "Lib/Include" }
     externalincludedirs { "Src", "Src/ThirdParty", "Lib/Include", "Lib/Include" }
-    links {"slang", "turbojpeg", "SDL3"}
+    links {"turbojpeg", "SDL3"}
 
     defines { "FX_BASE_DIR=\"" .. _MAIN_SCRIPT_DIR .. "\"", "_USE_MATH_DEFINES" }
 
@@ -76,7 +92,6 @@ project "foxtrot"
 
     filter "platforms:macOS"
         defines { "VK_ENABLE_BETA_EXTENSIONS=1" }
+	filter {}
 
     cleancommands {"ninja -t clean"}
-
-	filter {}
