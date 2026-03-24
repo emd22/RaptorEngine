@@ -9,25 +9,7 @@
 class RxCommandPool
 {
 public:
-    void Create(RxGpuDevice* device, uint32 queue_family)
-    {
-        QueueFamilyIndex = queue_family;
-
-        const VkCommandPoolCreateInfo create_info = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .pNext = nullptr,
-            .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            .queueFamilyIndex = queue_family,
-        };
-
-        mpDevice = device;
-
-        const VkResult status = vkCreateCommandPool(mpDevice->Device, &create_info, nullptr, &CommandPool);
-
-        if (status != VK_SUCCESS) {
-            FxPanicVulkan("FxCommandPool", "Error creating command pool", status);
-        }
-    }
+    void Create(RxGpuDevice* device, uint32 queue_family);
 
     void Reset() { vkResetCommandPool(mpDevice->Device, CommandPool, 0); }
 

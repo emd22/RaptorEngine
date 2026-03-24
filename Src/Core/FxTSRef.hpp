@@ -6,6 +6,7 @@
 #include "FxTypes.hpp"
 
 #include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 
 #ifdef FX_DEBUG_REF
 #include <Core/FxLog.hpp>
@@ -43,7 +44,7 @@ public:
     /**
      * Constructs a new FxTSRef from a pointer.
      */
-    FxTSRef(T* ptr) : FxTSRef(ptr, FxMemPool::Alloc<FxTSRefCount>(sizeof(FxTSRefCount))) {}
+    FxTSRef(T* ptr) : FxTSRef(ptr, gEnginePool->Alloc<FxTSRefCount>(sizeof(FxTSRefCount))) {}
 
     /**
      * Constructs a new FxTSRef from a pointer and a pre-allocated ref count.
@@ -134,7 +135,7 @@ public:
     {
         // Since we want to ensure aligned laod/store on the ref count object as well, we should ensure that the T
         // object is aligned on a 16 byte boundary.
-        uint8* raw_ptr = FxMemPool::Alloc<uint8>(FxMath::AlignValue<16>(sizeof(T)) + sizeof(FxTSRefCount));
+        uint8* raw_ptr = gEnginePool->Alloc<uint8>(FxMath::AlignValue<16>(sizeof(T)) + sizeof(FxTSRefCount));
 
         T* obj_ptr = reinterpret_cast<T*>(raw_ptr);
         FxTSRefCount* count_ptr = reinterpret_cast<FxTSRefCount*>(raw_ptr + sizeof(T));
@@ -239,7 +240,7 @@ public:
                 }
 
                 // Free the bundled memory
-                FxMemPool::Free(reinterpret_cast<uint8*>(mpPtr));
+                gEnginePool->Free(reinterpret_cast<uint8*>(mpPtr));
 
                 mpRefCnt = nullptr;
                 mpPtr = nullptr;
@@ -251,7 +252,7 @@ public:
             if (!mbIsExternalPtr) {
                 // The pointer exists but the ref count ptr != the bundled ptr, so we will free the
                 // ptr normally.
-                FxMemPool::Free<T>(mpPtr);
+                gEnginePool->Free<T>(mpPtr);
             }
 
             mpPtr = nullptr;
@@ -259,7 +260,7 @@ public:
 
         if (mpRefCnt) {
             // Free the ref count
-            FxMemPool::Free<FxTSRefCount>(mpRefCnt);
+            gEnginePool->Free<FxTSRefCount>(mpRefCnt);
             mpRefCnt = nullptr;
         }
     }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "FxDefines.hpp"
-#include "FxMemory.hpp"
 #include "FxPanic.hpp"
 #include "FxTypes.hpp"
 
@@ -9,6 +8,8 @@
 #include <Core/FxLog.hpp>
 #endif
 
+#include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <cstddef>
 
@@ -40,7 +41,7 @@ public:
     /**
      * Constructs a new FxRef from a pointer.
      */
-    FxRef(T* ptr) : FxRef(ptr, FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount))) {}
+    FxRef(T* ptr) : FxRef(ptr, gEnginePool->Alloc<FxRefCount>(sizeof(FxRefCount))) {}
 
     /**
      * Constructs a new FxRef from a pointer and a pre-allocated ref count.
@@ -131,7 +132,7 @@ public:
     {
         // Since we want to ensure aligned laod/store on the ref count object as well, we should ensure that the T
         // object is aligned on a 16 byte boundary.
-        uint8* raw_ptr = FxMemPool::Alloc<uint8>(FxMath::AlignValue<16>(sizeof(T)) + sizeof(FxRefCount));
+        uint8* raw_ptr = gEnginePool->Alloc<uint8>(FxMath::AlignValue<16>(sizeof(T)) + sizeof(FxRefCount));
 
         T* obj_ptr = reinterpret_cast<T*>(raw_ptr);
         FxRefCount* count_ptr = reinterpret_cast<FxRefCount*>(raw_ptr + sizeof(T));
@@ -236,7 +237,7 @@ public:
                 }
 
                 // Free the bundled memory
-                FxMemPool::Free(reinterpret_cast<uint8*>(mpPtr));
+                gEnginePool->Free(reinterpret_cast<uint8*>(mpPtr));
 
                 mpRefCnt = nullptr;
                 mpPtr = nullptr;
@@ -248,7 +249,7 @@ public:
             if (!mbIsExternalPtr) {
                 // The pointer exists but the ref count ptr != the bundled ptr, so we will free the
                 // ptr normally.
-                FxMemPool::Free<T>(mpPtr);
+                gEnginePool->Free<T>(mpPtr);
             }
 
             mpPtr = nullptr;
@@ -256,7 +257,7 @@ public:
 
         if (mpRefCnt) {
             // Free the ref count
-            FxMemPool::Free<FxRefCount>(mpRefCnt);
+            gEnginePool->Free<FxRefCount>(mpRefCnt);
             mpRefCnt = nullptr;
         }
     }

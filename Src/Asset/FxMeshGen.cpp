@@ -97,7 +97,7 @@ FxRef<FxPrimitiveMesh> FxMeshGen::GeneratedMesh::AsMesh(RxVertexType vertex_type
 // Implementation is based on code from https://winter.dev/projects/mesh/icosphere
 FxRef<FxMeshGen::GeneratedMesh> FxMeshGen::MakeIcoSphere(int resolution)
 {
-    const int rn = (int)pow(4, resolution);
+    const int rn = static_cast<int>(pow(4, resolution));
 
     const int total_index_count = IcoIndexCount * rn;
     const int total_vertex_count = IcoVertexCount + IcoIndexCount * (1 - rn) / (1 - 4);

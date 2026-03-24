@@ -1,5 +1,8 @@
 #include "FxTokenizer.hpp"
 
+#include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
+
 
 const char* FxToken::GetTypeName(FxTokenType type)
 {
@@ -283,7 +286,7 @@ void FxTokenizer::IncludeFile(const char* path)
     // Tokenize all of the included file
     Tokenize();
 
-    FxMemPool::Free<char>(mpData);
+    gEnginePool->Free<char>(mpData);
 
     // Restore back to previous state
     RestoreState();
@@ -420,6 +423,6 @@ void FxTokenizer::TryReadInternalCall()
 
 FxTokenizer::~FxTokenizer()
 {
-    FxMemPool::Free(mpDataStart);
+    gEnginePool->Free(mpDataStart);
     mTokens.Destroy();
 }

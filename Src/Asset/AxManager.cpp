@@ -44,10 +44,11 @@ void AxWorker::Update()
         FxLockContext<AxItemData> asset_data = Item.GetDataContext();
 
         // If there is data passed in then we load from memory
-        if (Item.RawData != nullptr && Item.DataSize > 0) {
-            LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.RawData, Item.DataSize);
+        if (Item.pcRawData != nullptr && Item.DataSize > 0) {
+            LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
 
-            // LoadStatus = Item.pLoader->LoadFromMemory(Item.pAsset, Item.RawData, Item.DataSize);
+            // Data is loaded, free it
+            gEnginePool->FreeRaw(reinterpret_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
         }
         // There is no data passed in, load from file
         else {

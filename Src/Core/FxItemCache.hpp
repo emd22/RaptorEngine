@@ -3,8 +3,9 @@
 #include <Core/FxBitset.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxSizedArray.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 #include <map>
-
 #include <unordered_map>
 
 /**
@@ -72,7 +73,7 @@ struct FxItemCacheSection_SingleItem
     bool bInUse : 1 = false;
 
 public:
-    void Create(uint32 max_items) { pItem = FxMemPool::Alloc<TItemType>(sizeof(TItemType)); }
+    void Create(uint32 max_items) { pItem = gEnginePool->Alloc<TItemType>(sizeof(TItemType)); }
 
     TItemType* Request()
     {

@@ -85,7 +85,7 @@ static void MakeMaterialTextureForPrimitive(FxTSRef<FxMaterial>& material, FxMat
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
 
     // Stage that shit so we can nuke mGltfData as soon as we can
-    uint8* goober_buffer = FxMemPool::Alloc<uint8>(image_buffer_size);
+    uint8* goober_buffer = gEnginePool->Alloc<uint8>(image_buffer_size);
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
     // Submit as data to be loaded later by the asset manager

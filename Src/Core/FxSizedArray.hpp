@@ -2,8 +2,8 @@
 
 // #include "FxAllocator.hpp"
 #include "FxDefines.hpp"
-#include "FxLog.hpp"
 #include "FxMemory.hpp"
+#include "FxPanic.hpp"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -11,6 +11,10 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <stdexcept>
+
+#ifdef FX_SIZED_ARRAY_DEBUG
+#include "FxLog.hpp"
+#endif
 
 static inline void NoMemError()
 {

@@ -51,7 +51,6 @@ void FoxtrotGame::InitEngine()
     }
 
     // Create the global engine variables
-    FxEngineGlobalsInit();
     RxGlobals::Init();
 
 

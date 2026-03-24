@@ -95,6 +95,10 @@ FX_FORCE_INLINE uint32 FindLastOne32(uint32 value)
 FX_FORCE_INLINE uint32 FindLastOne64(uint64 value)
 {
 #if defined(FX_COMPILER_CLANG) || defined(FX_COMPILER_GCC)
+    if (value == 0) {
+        return scBitNotFound;
+    }
+
     uint32 index = 64 - static_cast<uint32>(__builtin_clzll(value));
     if (!index) {
         return scBitNotFound;

@@ -1,6 +1,7 @@
 #include "FxAnonArray.hpp"
 
 #include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 
 void FxAnonArray::Create(uint32 object_size, uint32 size)
 {
@@ -9,7 +10,7 @@ void FxAnonArray::Create(uint32 object_size, uint32 size)
     Size = 0;
 
     // pData = FxMemPool::AllocRaw(object_size * size);
-    pData = malloc(object_size * size);
+    pData = gEnginePool->AllocRaw(object_size * size);
 }
 
 FxAnonArray::FxAnonArray(FxAnonArray&& other) { (*this) = std::move(other); }
@@ -36,7 +37,7 @@ void FxAnonArray::Free()
     }
 
     // FxMemPool::Free(pData);
-    free(pData);
+    gEnginePool->FreeRaw(pData);
 
     Capacity = 0;
     Size = 0;

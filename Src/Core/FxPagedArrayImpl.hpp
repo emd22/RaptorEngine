@@ -31,7 +31,7 @@ class FxPagedArray
 public:
     struct Page
     {
-        TElementType* Data = nullptr;
+        TElementType* pData = nullptr;
 
         /** The number of elements in use in `Data` */
         uint32 Size;
@@ -42,21 +42,21 @@ public:
     public:
         void Destroy()
         {
-            if (!Data) {
+            if (!pData) {
                 return;
             }
 
             // Call the destructor for each item in the page
             if constexpr (std::is_destructible_v<TElementType>) {
                 for (uint32 i = 0; i < Size; i++) {
-                    Data[i].~TElementType();
+                    pData[i].~TElementType();
                 }
             }
 
             // Since we have already called the destructors on each object, we don't want to call the
             // destructor on the ptr of the object. Free the page without calling the destructor
-            FX_PAGED_ARRAY_FREE(void, (reinterpret_cast<void*>(Data)));
-            Data = nullptr;
+            FX_PAGED_ARRAY_FREE(void, (reinterpret_cast<void*>(pData)));
+            pData = nullptr;
         }
     };
 
@@ -97,8 +97,8 @@ public:
             return *this;
         }
 
-        TElementType& operator*() { return mCurrentPage->Data[mCurrentIndex]; }
-        const TElementType& operator*() const { return mCurrentPage->Data[mCurrentIndex]; }
+        TElementType& operator*() { return mCurrentPage->pData[mCurrentIndex]; }
+        const TElementType& operator*() const { return mCurrentPage->pData[mCurrentIndex]; }
 
         bool operator!=(const Iterator& other)
         {
@@ -200,7 +200,7 @@ public:
         InitializedIfNeeded();
 
         // Create a new item and initialize it
-        TElementType* element = &pCurrentPage->Data[pCurrentPage->Size];
+        TElementType* element = &pCurrentPage->pData[pCurrentPage->Size];
 
         if constexpr (std::is_constructible_v<TElementType>) {
             ::new (element) TElementType;
@@ -231,7 +231,7 @@ public:
     {
         InitializedIfNeeded();
 
-        TElementType* new_element = &pCurrentPage->Data[pCurrentPage->Size];
+        TElementType* new_element = &pCurrentPage->pData[pCurrentPage->Size];
 
         if constexpr (std::is_copy_constructible_v<TElementType>) {
             ::new (new_element) TElementType(element);
@@ -264,7 +264,7 @@ public:
     {
         InitializedIfNeeded();
 
-        TElementType* new_element = &pCurrentPage->Data[pCurrentPage->Size];
+        TElementType* new_element = &pCurrentPage->pData[pCurrentPage->Size];
 
         if constexpr (std::is_move_constructible_v<TElementType>) {
             ::new (new_element) TElementType(std::move(element));
@@ -298,7 +298,7 @@ public:
         Page* current_page = pCurrentPage;
 
         while (current_page != nullptr) {
-            const void* data_start_ptr = reinterpret_cast<char*>(current_page->Data);
+            const void* data_start_ptr = reinterpret_cast<char*>(current_page->pData);
             const void* data_end_ptr = data_start_ptr + (sizeof(TElementType) * PageNodeCapacity);
 
             const char* value_u8 = reinterpret_cast<char*>(value);
@@ -311,7 +311,7 @@ public:
         return nullptr;
     }
 
-    TElementType& GetLast() { return pCurrentPage->Data[pCurrentPage->Size - 1]; }
+    TElementType& GetLast() { return pCurrentPage->pData[pCurrentPage->Size - 1]; }
 
     TElementType* RemoveLast()
     {
@@ -404,7 +404,7 @@ public:
 
         const uint32 item_index = index - (dest_page_index * PageNodeCapacity);
 
-        return page->Data[item_index];
+        return page->pData[item_index];
     }
 
 
@@ -448,13 +448,11 @@ private:
     Page* AllocateNewPage(Page* prev, Page* next)
     {
         // Allocate and initialize the page object
-        void* allocated_page = FX_PAGED_ARRAY_ALLOC(Page, sizeof(Page));
-        if (allocated_page == nullptr) {
+        Page* page = FX_PAGED_ARRAY_ALLOC(Page, sizeof(Page));
+        if (page == nullptr) {
             FxPanic("FxPagedArray", "Memory error allocating page");
             return nullptr;
         }
-
-        Page* page = static_cast<Page*>(allocated_page);
 
         page->Size = 0;
         page->pNext = next;
@@ -468,7 +466,7 @@ private:
             return nullptr;
         }
 
-        page->Data = static_cast<TElementType*>(allocated_nodes);
+        page->pData = static_cast<TElementType*>(allocated_nodes);
 
         ++CurrentPageIndex;
 

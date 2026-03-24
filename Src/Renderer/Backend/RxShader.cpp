@@ -241,12 +241,14 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
     FxLogInfo("Loading data pack section for shader...");
 
     uint32 buffer_size = FxMath::AlignValue<4>(dp_entry->DataSize);
-    uint32* buffer = FxMemPool::Alloc<uint32>(buffer_size);
+    uint32* buffer = gEnginePool->Alloc<uint32>(buffer_size);
     FxSlice<uint8> buffer_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
 
     mDataPack.ReadSection(dp_entry, buffer_slice);
 
     CreateShaderModule(*program, buffer_size, buffer, program->InternalShader);
+
+    gEnginePool->Free(buffer);
 
     return program;
 }

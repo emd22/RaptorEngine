@@ -2,7 +2,7 @@
 
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
-#include <Core/FxSizedArray.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <Core/FxSlice.hpp>
 
 class FxFile;

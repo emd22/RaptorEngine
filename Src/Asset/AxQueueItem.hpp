@@ -45,14 +45,14 @@ struct AxQueueItem
     template <typename TLoaderType, typename TAssetType>
     AxQueueItem(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset, AxType type,
                 const std::string& path)
-        : Path(path), RawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
+        : Path(path), pcRawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
     {
     }
 
     template <typename TLoaderType, typename TAssetType>
     AxQueueItem(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset, AxType type, const uint8* data,
                 uint32 data_size)
-        : Path(""), RawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
+        : Path(""), pcRawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
     {
     }
 
@@ -64,7 +64,7 @@ struct AxQueueItem
 
         Path = other.Path;
         Data = std::move(other.Data);
-        RawData = other.RawData;
+        pcRawData = other.pcRawData;
         DataSize = other.DataSize;
         AssetType = other.AssetType;
 
@@ -82,7 +82,7 @@ public:
 
 
     // Data for loading from memory
-    const uint8* RawData = nullptr;
+    const uint8* pcRawData = nullptr;
     uint32 DataSize = 0;
 
     AxType AssetType;

@@ -4,6 +4,8 @@
 //
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -63,7 +65,7 @@ public:
 
     inline char* GetHeapStr() const
     {
-        char* str = FxMemPool::Alloc<char>(Length + 1);
+        char* str = gEnginePool->Alloc<char>(Length + 1);
 
         if (str == nullptr) {
             FxPanic("FoxTokenizer", "Error allocating heap string!", 0);

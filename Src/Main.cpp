@@ -6,7 +6,8 @@
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxDataPack.hpp>
 #include <Asset/FxShaderCompiler.hpp>
-#include <Core/MemPool/FxMemPool2.hpp>
+#include <Core/FxDefer.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
 #include <FxEngine.hpp>
 #include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
@@ -16,31 +17,40 @@ FX_SET_MODULE_NAME("Main")
 
 int main()
 {
-    FxMemPool2 pool;
-    pool.Create(FxUnitKibibyte * 50);
+    // FxMemPool pool;
+    // pool.Create(FxUnitKibibyte * 50);
 
-    void* a = pool.Alloc(1024);
-    FxLogInfo("ptr A: {:p}", a);
+    // void* a = pool.AllocRaw(1024);
+    // FxLogInfo("ptr A: {:p}", a);
 
-    pool.Free(a);
+    // pool.FreeRaw(a);
 
-    void* b = pool.Alloc(512);
-    FxLogInfo("ptr B: {:p}", b);
-    void* c = pool.Alloc(512);
-    FxLogInfo("ptr C: {:p}", c);
+    // void* b = pool.AllocRaw(512);
+    // FxLogInfo("ptr B: {:p}", b);
+    // void* c = pool.AllocRaw(512);
+    // FxLogInfo("ptr C: {:p}", c);
 
 
     // FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
 
-    // FxDataPack dp;
+    FxEngineGlobalsInit();
 
-    // FxShaderCompiler::Compile(FX_BASE_DIR "/Shaders/HLSL/GPass.hlsl", dp, {});
+    uint32* x = gEnginePool->Alloc<uint32>(2000);
+    FxLogInfo("{:p}", reinterpret_cast<void*>(x));
+    x = gEnginePool->Alloc<uint32>(23000);
+    FxLogInfo("{:p}", reinterpret_cast<void*>(x));
+    {
+        FoxtrotGame game {};
+    }
 
-    // {
-    //     FoxtrotGame game {};
-    // }
 
+    FxEngineGlobalsDestroy();
+    RxGlobals::Destroy();
 
-    // FxEngineGlobalsDestroy();
-    // RxGlobals::Destroy();
+    FxDefer(
+        []()
+        {
+            delete gEnginePool;
+            gEnginePool = nullptr;
+        });
 }
