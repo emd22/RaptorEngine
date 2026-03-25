@@ -73,7 +73,7 @@ void AxWorker::Update()
 void AxManager::Start(int32 thread_count)
 {
     mThreadCount = thread_count;
-    mActive.test_and_set();
+    mbActive.test_and_set();
 
     // Allocate the workers
     mWorkerThreads.InitCapacity(thread_count);
@@ -92,11 +92,13 @@ void AxManager::Start(int32 thread_count)
 
 void AxManager::Shutdown()
 {
-    if (!mActive.test()) {
+    FxLogInfo("Shutting down asset manager...");
+
+    if (!mbActive.test()) {
         return;
     }
 
-    mActive.clear();
+    mbActive.clear();
     ItemsEnqueuedNotifier.Kill();
 
     for (auto& worker : mWorkerThreads) {
@@ -109,16 +111,12 @@ void AxManager::Shutdown()
         worker.Thread.join();
     }
 
-
     mAssetManagerThread->join();
     delete mAssetManagerThread;
 
-    // Free the workers thread array here---
-    // this calls the destructors for each worker thread,
-    // which frees the `FxRef`'s to the data
     mWorkerThreads.Free();
 
-    // Cleanup all permutations of "empty images" that were created.
+    // Cleanup all permutations of empty images that were created.
     FxPagedArray<FxTSRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
 
     if (empty_images_list.IsInited()) {
@@ -126,8 +124,6 @@ void AxManager::Shutdown()
             image_ref.DestroyRef();
         }
     }
-
-    // mLoadQueue.Destroy();
 }
 
 // template<>
@@ -347,7 +343,7 @@ void AxManager::CheckForItemsToLoad()
 
 void AxManager::AssetManagerUpdate()
 {
-    while (mActive.test()) {
+    while (mbActive.test()) {
         bool is_busy = CheckWorkersBusy();
 
         // If any of the workers are still marked as busy, there is data
@@ -355,7 +351,7 @@ void AxManager::AssetManagerUpdate()
         if (is_busy) {
             // Loop while we are busy to check for when we are pending upload, as well
             // as check for new arrivals.
-            while (CheckWorkersBusy()) {
+            while (CheckWorkersBusy() && mbActive.test()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
 
                 // Check if there is data to be uploaded to the GPU
@@ -369,7 +365,7 @@ void AxManager::AssetManagerUpdate()
         // There are no busy workers remaining, wait for the next item to be enqueued.
         ItemsEnqueuedNotifier.WaitForData();
         ItemsEnqueuedNotifier.Reset();
-        if (!mActive.test()) {
+        if (!mbActive.test()) {
             break;
         }
 

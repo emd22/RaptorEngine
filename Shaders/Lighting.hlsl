@@ -194,8 +194,8 @@ FSOutput main(FSInput input)
 
     // Check that the UV values are greater than 0.0 and less than 1.0
     if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
-        visibility = F_SampleCmpLevelZero(tShadow, shadow_uv, shadow_z + 0.001f) + 0.4f;
-        visibility = min(visibility, 1.0f);
+        visibility = F_SampleCmpLevelZero(tShadow, shadow_uv, shadow_z + 0.001f);
+        visibility = clamp(visibility, 0.05f, 1.0f);
     }
 
     float3 L = normalize(vLightPosition);
@@ -235,7 +235,7 @@ FSOutput main(FSInput input)
     float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
     float3 specular_term = Fr;
 
-    float4 ambient = F_UnpackUIntToFloat4(uiAmbient);
+    float4 ambient = F_UnpackUIntToFloat4(uiAmbient) * float4(albedo, 1.0f);
 
     output.vColor = float4(attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL + ambient.rgb, 1.0);
 

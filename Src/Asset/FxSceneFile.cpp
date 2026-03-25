@@ -145,4 +145,11 @@ void FxSceneFile::ApplyPropertiesToObject(FxTSRef<FxObject>& object, const FxCon
             object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, size, motion_type, physics_properties);
         }
     }
+
+    object->OnLoaded(
+        [](FxTSRef<AxBase> base_asset)
+        {
+            FxTSRef<FxObject> obj = base_asset;
+            obj->PrintDebug();
+        });
 }

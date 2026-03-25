@@ -4,6 +4,8 @@
 #include <Core/FxLog.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
 
+void FxTerminate();
+
 #ifdef FX_PLATFORM_WINDOWS
 #define FX_BREAKPOINT __debugbreak()
 #elif FX_PLATFORM_MACOS
@@ -21,7 +23,7 @@ void FxPanic(const char* module, const char* fmt, TTypes&&... items)
 
     FxLogFatal(fmt, std::forward<TTypes>(items)...);
 
-    std::terminate();
+    FxTerminate();
 }
 
 template <typename... TTypes>
@@ -36,9 +38,8 @@ void FxPanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&
     FxLogFatal(fmt, std::forward<TTypes>(items)...);
     FxLogFatal("=> Vulkan Err: {:s}", RxUtil::ResultToStr(result));
 
-    std::terminate();
+    FxTerminate();
 }
-
 
 #define FxModulePanic(...)       FxPanic(FxModuleName__, __VA_ARGS__)
 #define FxModulePanicVulkan(...) FxPanicVulkan(FxModuleName__, __VA_ARGS__)

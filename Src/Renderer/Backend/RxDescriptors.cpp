@@ -24,6 +24,8 @@ void RxDescriptorPool::Create(RxGpuDevice* device, uint32 max_sets)
     pool_info.poolSizeCount = pool_sizes.Size;
     pool_info.pPoolSizes = pool_sizes.pData;
 
+    SetCapacity = max_sets;
+
     VkResult status = vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool);
 
     if (status != VK_SUCCESS) {
@@ -45,7 +47,7 @@ void RxDescriptorPool::Destroy()
 // Descriptor Sets
 /////////////////////////////////////
 
-void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
+void RxDescriptorSet::Create(RxDescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
                              uint32 count)
 {
     FxAssertMsg(pool.IsInited(), "Descriptor pool is not initialized!");
@@ -59,9 +61,12 @@ void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout
     alloc_info.descriptorSetCount = 1;
     alloc_info.pSetLayouts = &layout;
 
+    pool.SetsUsed++;
+
     VkResult status = vkAllocateDescriptorSets(gRenderer->GetDevice()->Device, &alloc_info, &Set);
 
     if (status != VK_SUCCESS) {
+        FxLogError("Pool has {} allocated sets, with {} currently in use.", pool.SetCapacity, pool.SetsUsed);
         FxPanicVulkan("DescriptorSet", "Failed to allocate descriptor set!", status);
     }
 }

@@ -59,4 +59,6 @@ public:
 
     RxDescriptorSet mObjectBufferDS {};
     VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
+
+    std::mutex mInUse;
 };

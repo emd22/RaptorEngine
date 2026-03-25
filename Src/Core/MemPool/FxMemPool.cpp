@@ -595,7 +595,6 @@ static MemBlock* block_locate_free(ControlBlock* control, size_t size)
     }
 
     if (block) {
-        FxLogInfo("Block size = {}, size = {}", block->GetSize(), size);
         tlsf_assert((block->GetSize()) >= size);
         control->RemoveFreeBlock(block, fl, sl);
     }

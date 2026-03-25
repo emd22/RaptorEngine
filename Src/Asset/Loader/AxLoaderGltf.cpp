@@ -30,15 +30,11 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<F
 
         if (attribute->type == cgltf_attribute_type_position) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
-
-            // Create our vertex position buffer
             positions.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, positions.pData, data_size);
         }
         else if (attribute->type == cgltf_attribute_type_normal) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
-
-            // Create our vertex normal buffer
             normals.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, normals.pData, data_size);
         }
@@ -100,7 +96,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_pri
         return;
     }
 
-    FxTSRef<FxMaterial> material = gMaterialManager->New("Fireplace", &gRenderer->pDeferredRenderer->PlGeometry);
+    FxTSRef<FxMaterial> material = gMaterialManager->New(object->Name.Get(), &gRenderer->pDeferredRenderer->PlGeometry);
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
@@ -125,6 +121,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_pri
 
     // Load the normalmap
     if (gltf_material->normal_texture.texture != nullptr) {
+        FxLogInfo("OBJECT has normal maps : {}", object->Name.Get());
         MakeMaterialTextureForPrimitive(material, material->NormalMap, gltf_material->normal_texture);
     }
 

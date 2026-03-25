@@ -53,7 +53,7 @@ VSOutput main(VSInput input)
     float4x4 MVP = mul(VSConst.mViewProjection, model_matrix);
 
     output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
-    output.vNormalWS = normalize(mul((float4x3)model_matrix, input.vNormal));
+    output.vNormalWS = normalize(mul((float3x3)model_matrix, input.vNormal));
 
 #ifdef USE_NORMAL_MAPS
     output.vTangentWS = normalize(mul((float3x3)model_matrix, input.vTangent));
@@ -119,7 +119,8 @@ FSOutput main(FSInput input)
     // Metalness
     output.vAlbedo.w = roughness_metallic.y;
 #else
-    output.vNormal = float4(input.vNormalWS, 0.5);
+    output.vNormal = float4(input.vNormalWS, 0.0);
+    output.vAlbedo.w = 0.0;
 #endif
 
     return output;

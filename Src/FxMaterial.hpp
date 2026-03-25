@@ -16,6 +16,7 @@
 enum class FxMaterialComponentStatus
 {
     eReady,
+    eMissingComponent,
     eNotReady,
 };
 
@@ -28,7 +29,7 @@ struct FxMaterialComponent
 {
 public:
 public:
-    FxTSRef<AxImage> pAssetImage;
+    FxTSRef<AxImage> pAssetImage { nullptr };
     FxSlice<const uint8> pDataToLoad { nullptr };
 
     using Status = FxMaterialComponentStatus;
@@ -38,7 +39,8 @@ public:
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pAssetImage && !pDataToLoad) {
-            pAssetImage = AxImage::GetEmptyImage<TFormat>();
+            // pAssetImage = AxImage::GetEmptyImage<TFormat>();
+            return Status::eMissingComponent;
         }
 
         if (!CheckIfReady()) {
@@ -139,9 +141,9 @@ public:
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> Diffuse;
-    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap;
-    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> MetallicRoughness;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> Diffuse {};
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap {};
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> MetallicRoughness {};
 
     FxMaterialProperties Properties {};
 
@@ -200,4 +202,6 @@ private:
     RxDescriptorPool mDescriptorPool;
 
     bool mbInitialized : 1 = false;
+
+    std::mutex mInUse;
 };

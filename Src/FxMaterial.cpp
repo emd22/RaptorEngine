@@ -28,8 +28,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     RxDescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 15);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
 
@@ -59,6 +59,8 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
 FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline)
 {
+    std::lock_guard guard(mInUse);
+
     if (!mMaterials.IsInited()) {
         Create();
     }
@@ -229,7 +231,7 @@ void FxMaterial::Build()
 {
     if (!mDsDefault.IsInited()) {
         mDsDefault.Create(gMaterialManager->GetDescriptorPool(), gRenderer->pDeferredRenderer->DsLayoutGPassMaterial,
-                          false, 2);
+                          false, 1);
     }
 
     // Build components
@@ -237,7 +239,7 @@ void FxMaterial::Build()
 
     BUILD_MATERIAL_COMPONENT(NormalMap);
 
-    MetallicRoughness.Build();
+    // MetallicRoughness.Build();
     BUILD_MATERIAL_COMPONENT(MetallicRoughness);
 
     // Fill material descriptor

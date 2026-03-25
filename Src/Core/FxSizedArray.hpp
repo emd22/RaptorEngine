@@ -19,7 +19,7 @@
 static inline void NoMemError()
 {
     puts("FxSizedArray: out of memory");
-    std::terminate();
+    FxTerminate();
 }
 
 template <typename TElementType>

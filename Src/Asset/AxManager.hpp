@@ -225,7 +225,7 @@ public:
 private:
     AxQueue mLoadQueue;
 
-    std::atomic_flag mActive;
+    std::atomic_flag mbActive;
 
     FxDataNotifier ItemsEnqueuedNotifier;
     std::atomic_flag ItemsEnqueued;

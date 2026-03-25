@@ -9,7 +9,7 @@ Objects = {
     }
 
     Level = {
-        Mesh = "/DemoRoom2.glb"
+        Mesh = "/TestFloor.glb"
         Physics = {
             Type = PHYS_STATIC
             FromMesh = TRUE
@@ -17,13 +17,14 @@ Objects = {
         Pos=[0.0, -2.0, 0.0]
     }
 
+/*
     AnimTest = {
-        Mesh = "/Model.glb"
-        Shadows = TRUE
-        Scale = 0.5
-        Pos = [0.0, -0.5, 1.5]
-        Rot = [0.0, 0.0, 0.0, 1.0]
+        Mesh = "/AnimatedChick.glb"
+        Shadows = FALSE
+        Pos = [0.0, -1.0, 1.5]
+        Rot = [0.0, 0.2, 0.0, 1.0]
     }
+    */
 
     Pistol = {
         Mesh = "/Pistol.glb"
@@ -39,7 +40,7 @@ Objects = {
             Type = PHYS_STATIC
             BoxCollider = { Size = [4.0, 4.0, 0.5] }
         }
-        Pos = [0.0, 0.5, 5.0]
+        Pos = [0.0, 0.5, 1.0]
     }
 
 }
