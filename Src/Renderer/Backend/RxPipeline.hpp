@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../RxVertex.hpp"
 #include "RxRenderPass.hpp"
 #include "RxShader.hpp"
 
@@ -9,18 +8,11 @@
 #include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
 #include <Core/FxSlice.hpp>
-#include <Math/FxMat4.hpp>
+#include <Renderer/RxVertex.hpp>
 
+struct RxVertexDescription;
 class RxCommandBuffer;
-
-struct FxVertexInfo
-{
-    VkVertexInputBindingDescription binding;
-    FxSizedArray<VkVertexInputAttributeDescription> attributes;
-
-    bool bIsInited : 1 = false;
-};
-
+class RxGpuDevice;
 
 struct alignas(16) FxDrawPushConstants
 {
@@ -40,9 +32,6 @@ struct alignas(16) FxCompositionPushConstants
     float32 ViewInverse[16];
     float32 ProjInverse[16];
 };
-
-FxVertexInfo FxMakeVertexInfo();
-FxVertexInfo FxMakeLightVertexInfo();
 
 struct RxPipelineProperties
 {
@@ -69,8 +58,9 @@ class RxPipeline
 public:
     void Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                 const FxSlice<VkAttachmentDescription>& attachments,
-                const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments, FxVertexInfo* vertex_info,
-                const RxRenderPass& render_pass, const RxPipelineProperties& properties);
+                const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
+                RxVertexDescription* vertex_info, const RxRenderPass& render_pass,
+                const RxPipelineProperties& properties);
 
     FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout) { Layout = layout; }
 
@@ -88,6 +78,11 @@ public:
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;
 
+    // XXX: TEMP
+    FxRef<RxShaderProgram> VertexShader { nullptr };
+    FxRef<RxShaderProgram> FragmentShader { nullptr };
+
+
 private:
     RxGpuDevice* mDevice = nullptr;
 
@@ -95,5 +90,4 @@ protected:
     friend class RxPipelineBuilder;
 
     bool mbDoNotDestroyLayout = false;
-    // ShaderList mShaders;
 };

@@ -1,8 +1,8 @@
 #include "RxSynchro.hpp"
 
-#include <FxEngine.hpp>
-#include <Renderer/RxRenderBackend.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
+#include <Renderer/RxGlobals.hpp>
+#include <Renderer/RxRenderBackend.hpp>
 
 /////////////////////////////////////
 // RxFence functions
@@ -49,18 +49,15 @@ void RxFence::Destroy()
 }
 
 
-
 /////////////////////////////////////
 // RxSemaphore functions
 /////////////////////////////////////
 
 void RxSemaphore::Create()
 {
-    const VkSemaphoreCreateInfo create_info {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0
-    };
+    const VkSemaphoreCreateInfo create_info { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                                              .pNext = nullptr,
+                                              .flags = 0 };
 
     const VkResult status = vkCreateSemaphore(gRenderer->GetDevice()->Device, &create_info, nullptr, &Semaphore);
 
@@ -70,12 +67,10 @@ void RxSemaphore::Create()
 }
 
 void RxSemaphore::Destroy()
-{ 
+{
     vkDestroySemaphore(gRenderer->GetDevice()->Device, Semaphore, nullptr);
     Semaphore = nullptr;
 }
-
-
 
 
 /////////////////////////////////////
@@ -84,7 +79,7 @@ void RxSemaphore::Destroy()
 
 
 RxSemaphoreCache::RxSemaphoreCache()
-{ 
+{
     mSemaphores.InitCapacity(scNumSemaphores);
     mInUse.InitZero(scNumSemaphores);
 }
@@ -92,7 +87,7 @@ RxSemaphoreCache::RxSemaphoreCache()
 RxSemaphore* RxSemaphoreCache::Request()
 {
     uint32 next_free = mInUse.FindNextFreeBit();
-    
+
     // No available semaphores, return null
     if (next_free == FxBitset::scNoFreeBits) {
         return nullptr;
@@ -113,10 +108,7 @@ RxSemaphore* RxSemaphoreCache::Request()
     return semaphore;
 }
 
-void RxSemaphoreCache::Release(RxSemaphore* semaphore) 
-{
-    mInUse.Unset(semaphore->GetCacheId());
-}
+void RxSemaphoreCache::Release(RxSemaphore* semaphore) { mInUse.Unset(semaphore->GetCacheId()); }
 
 RxSemaphoreCache::~RxSemaphoreCache()
 {

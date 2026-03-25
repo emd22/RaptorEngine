@@ -7,7 +7,9 @@
 // #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Core/FxName.hpp>
-#include <Core/MemPool/FxMPPagedArray.hpp>
+#include <Core/FxPagedArray.hpp>
+#include <Core/FxRef.hpp>
+#include <Core/FxTSRef.hpp>
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
@@ -27,9 +29,9 @@ public:
 public:
     FxObject();
 
-    void MakeInstanceOf(const FxRef<FxObject>& source_ref);
+    void MakeInstanceOf(const FxTSRef<FxObject>& source_ref);
 
-    void Create(const FxRef<FxPrimitiveMesh>& mesh, const FxRef<FxMaterial>& material);
+    void Create(const FxRef<FxPrimitiveMesh>& mesh, const FxTSRef<FxMaterial>& material);
 
     /**
      * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
@@ -40,7 +42,7 @@ public:
 
     bool CheckIfReady();
 
-    void AttachObject(const FxRef<FxObject>& object);
+    void AttachObject(const FxTSRef<FxObject>& object);
     void Update();
 
     void OnAttached(FxScene* scene) override;
@@ -73,6 +75,8 @@ public:
     void SetRenderUnlit(const bool value);
     FX_FORCE_INLINE bool GetRenderUnlit() const { return mbRenderUnlit; }
 
+    FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
+
     void Destroy() override;
     ~FxObject();
 
@@ -84,9 +88,9 @@ private:
 public:
     FxRef<FxPrimitiveMesh> pMesh { nullptr };
 
-    FxRef<FxMaterial> pMaterial { nullptr };
+    FxTSRef<FxMaterial> pMaterial { nullptr };
 
-    FxPagedArray<FxRef<FxObject>> AttachedNodes;
+    FxPagedArray<FxTSRef<FxObject>> AttachedNodes;
 
     FxVec3f Dimensions = FxVec3f::sZero;
 
@@ -99,7 +103,7 @@ private:
     uint16 mInstanceSlots = 0;
     uint16 mInstanceSlotsInUse = 0;
 
-    FxRef<FxObject> mpInstanceSource { nullptr };
+    FxTSRef<FxObject> mpInstanceSource { nullptr };
 
     bool mbReadyToRender : 1 = false;
     bool mbPhysicsEnabled : 1 = false;

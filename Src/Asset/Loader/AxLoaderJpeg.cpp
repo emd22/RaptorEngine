@@ -23,9 +23,9 @@ static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(RxImageFormat format)
 }
 
 
-AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
+AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
 {
-    FxRef<AxImage> image(asset);
+    FxTSRef<AxImage> image(asset);
 
     const char* c_path = path.c_str();
 
@@ -72,9 +72,9 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxRef<AxBase> asset, const std::
     return Status::eSuccess;
 }
 
-AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size)
+AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size)
 {
-    FxRef<AxImage> image(asset);
+    FxTSRef<AxImage> image(asset);
 
     struct jpeg_error_mgr error_mgr;
 
@@ -116,9 +116,9 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(FxRef<AxBase> asset, const uin
     return Status::eSuccess;
 }
 
-void AxLoaderJpeg::CreateGpuResource(FxRef<AxBase>& asset)
+void AxLoaderJpeg::CreateGpuResource(FxTSRef<AxBase>& asset)
 {
-    FxRef<AxImage> image(asset);
+    FxTSRef<AxImage> image(asset);
 
     image->Image.CreateGpuOnly(image->ImageType, image->Size, ImageFormat, mImageData);
 
@@ -126,7 +126,7 @@ void AxLoaderJpeg::CreateGpuResource(FxRef<AxBase>& asset)
     asset->bIsUploadedToGpu.notify_all();
 }
 
-void AxLoaderJpeg::Destroy(FxRef<AxBase>& asset)
+void AxLoaderJpeg::Destroy(FxTSRef<AxBase>& asset)
 {
     //    while (!asset->bIsUploadedToGpu) {
     //        asset->bIsUploadedToGpu.wait(true);

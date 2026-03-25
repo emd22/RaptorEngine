@@ -4,6 +4,7 @@
 #include "FxEngine.hpp"
 
 #include <FxObjectManager.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 

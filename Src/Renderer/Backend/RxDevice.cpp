@@ -203,17 +203,19 @@ void RxGpuDevice::CreateLogicalDevice()
 
     VkPhysicalDeviceVulkan11Features vk11_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-        .shaderDrawParameters = VK_TRUE,
 #ifdef FX_PLATFORM_MACOS
         .pNext = &portability_features,
 #else
         .pNext = nullptr,
 #endif
+        .shaderDrawParameters = VK_TRUE,
+
     };
 
 
     const VkDeviceCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &vk11_features,
 
         .queueCreateInfoCount = static_cast<uint32>(queue_create_infos.size()),
         .pQueueCreateInfos = queue_create_infos.data(),
@@ -228,7 +230,6 @@ void RxGpuDevice::CreateLogicalDevice()
         .ppEnabledExtensionNames = device_extensions,
         .pEnabledFeatures = &device_features,
 
-        .pNext = &vk11_features,
     };
 
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);

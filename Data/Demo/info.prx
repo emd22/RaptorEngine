@@ -31,6 +31,7 @@ Objects = {
         Layer = OBJLAYER_PLAYER
     }
 
+
     BrickTest = {
         Mesh = "/BrickTest.glb"
         Shadows = TRUE
@@ -38,6 +39,7 @@ Objects = {
             Type = PHYS_STATIC
             BoxCollider = { Size = [4.0, 4.0, 0.5] }
         }
-        Pos = [0.0, 0.5, 0.0]
+        Pos = [0.0, 0.5, 5.0]
     }
+
 }

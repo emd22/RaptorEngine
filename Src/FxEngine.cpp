@@ -1,54 +1,39 @@
 #include "FxEngine.hpp"
 
 #include <Asset/FxShaderCompiler.hpp>
-#include <Core/FxRef.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
-#include <Renderer/RxPipelineList.hpp>
-#include <Renderer/RxRenderBackend.hpp>
-#include <Renderer/RxRenderPassCache.hpp>
-#include <Renderer/RxSamplerCache.hpp>
-#include <Renderer/RxShadowDirectional.hpp>
 
-RxRenderBackend* gRenderer = nullptr;
 PhJolt* gPhysics = nullptr;
 FxShaderCompiler* gShaderCompiler = nullptr;
-RxPipelineList* gPipelines = nullptr;
-RxRenderPassCache* gRenderPassCache = nullptr;
 FxObjectManager* gObjectManager = nullptr;
-RxShadowDirectional* gShadowRenderer = nullptr;
-RxSamplerCache* gSamplerCache = nullptr;
+FxMaterialManager* gMaterialManager = nullptr;
+FxMemPool* gEnginePool = nullptr;
+
+#define DESTROY_GLOBAL(name_)                                                                                          \
+    delete name_;                                                                                                      \
+    name_ = nullptr
 
 
-void FxEngineGlobalsInit()
+namespace FxGlobals {
+
+void Init()
 {
-    gRenderer = new RxRenderBackend;
     gPhysics = new PhJolt;
     gShaderCompiler = new FxShaderCompiler;
-    // gRenderPassCache = new RxRenderPassCache;
-    gPipelines = new RxPipelineList;
     gObjectManager = new FxObjectManager;
-    gSamplerCache = new RxSamplerCache;
+    gMaterialManager = new FxMaterialManager;
 }
 
-void FxEngineGlobalsDestroy()
+
+void Destroy()
 {
-    delete gPhysics;
-    gPhysics = nullptr;
-
-    delete gShaderCompiler;
-    gShaderCompiler = nullptr;
-
-    delete gPipelines;
-    gPipelines = nullptr;
-
-    delete gObjectManager;
-    gObjectManager = nullptr;
-
-    delete gRenderer;
-    gRenderer = nullptr;
-
-
-    // delete gRenderPassCache;
+    DESTROY_GLOBAL(gPhysics);
+    DESTROY_GLOBAL(gShaderCompiler);
+    DESTROY_GLOBAL(gObjectManager);
+    DESTROY_GLOBAL(gMaterialManager);
 }
+
+} // namespace FxGlobals

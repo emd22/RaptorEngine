@@ -10,14 +10,27 @@
 
 namespace FxMath {
 
-constexpr float32 DegreesToRadians(float32 degrees) { return ((degrees) * (M_PI / 180.0f)); }
-constexpr float32 RadiansToDegrees(float32 radians) { return ((radians) * (180.0f / M_PI)); }
+constexpr float32 DegreesToRadians(float32 degrees) { return ((degrees) * static_cast<float32>(M_PI / 180.0)); }
+constexpr float32 RadiansToDegrees(float32 radians) { return ((radians) * static_cast<float32>(180.0 / M_PI)); }
 
 void SinCos(float32 rad, float32* out_sine, float32* out_cosine);
 
 FX_FORCE_INLINE float32 RSqrt(float32 x);
 
 FX_FORCE_INLINE float32 Clamp(float32 value, float32 lower, float32 upper) { return fmin(fmax(value, lower), upper); }
+
+FX_FORCE_INLINE uint64 AlignValue(uint64 value, const uint16 alignto)
+{
+    // Generic case
+    const uint16 remainder = (value % alignto);
+
+    // If the value is not aligned(there is a remainder in the division), offset our value by the missing bytes
+    if (remainder != 0) {
+        value += (alignto - remainder);
+    }
+
+    return value;
+}
 
 template <uint32 TAlignTo>
 FX_FORCE_INLINE uint64 AlignValue(uint64 value)
@@ -105,6 +118,12 @@ template <typename TPtrType, uint32 TAlignTo>
 FX_FORCE_INLINE TPtrType AlignPtr(TPtrType ptr)
 {
     return reinterpret_cast<TPtrType>(AlignValue<TAlignTo>(reinterpret_cast<uintptr_t>(ptr)));
+}
+
+template <typename TPtrType>
+FX_FORCE_INLINE TPtrType AlignPtr(TPtrType ptr, uint32 alignto)
+{
+    return reinterpret_cast<TPtrType>(AlignValue(reinterpret_cast<uintptr_t>(ptr), alignto));
 }
 
 

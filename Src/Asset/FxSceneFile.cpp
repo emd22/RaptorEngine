@@ -48,7 +48,7 @@ void FxSceneFile::Load(const std::string& path, FxScene& scene)
             AddObjectFromEntry(path, object_entry, scene);
         }
         else {
-            FxRef<FxObject> object = scene.FindObject(object_entry.Name.GetHash());
+            FxTSRef<FxObject> object = scene.FindObject(object_entry.Name.GetHash());
             ApplyPropertiesToObject(object, object_entry);
         }
     }
@@ -65,7 +65,7 @@ void FxSceneFile::AddObjectFromEntry(const std::string& scene_path, const FxConf
         load_options.bGeneratePhysicsMesh = true;
     }
 
-    FxRef<FxObject> object = AxManager::LoadObject(object_entry.Name.Get(), scene_path + mesh_path, load_options);
+    FxTSRef<FxObject> object = AxManager::LoadObject(object_entry.Name.Get(), scene_path + mesh_path, load_options);
 
     ApplyPropertiesToObject(object, object_entry);
 
@@ -73,7 +73,7 @@ void FxSceneFile::AddObjectFromEntry(const std::string& scene_path, const FxConf
 }
 
 
-void FxSceneFile::ApplyPropertiesToObject(FxRef<FxObject>& object, const FxConfigEntry& object_entry)
+void FxSceneFile::ApplyPropertiesToObject(FxTSRef<FxObject>& object, const FxConfigEntry& object_entry)
 {
     FxConfigEntry* shadow_caster = object_entry.GetMember(FxHashStr64("Shadows"));
     if (shadow_caster != nullptr) {

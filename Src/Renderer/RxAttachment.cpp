@@ -1,6 +1,6 @@
 #include "RxAttachment.hpp"
 
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size)
@@ -145,4 +145,24 @@ FxSizedArray<VkImageView>& RxTargetList::GetImageViews()
     mbImageViewsBuilt = true;
 
     return mBuiltImageViews;
+}
+
+bool RxTargetList::IsCompatible(const RxTargetList& other) const
+{
+    if (Targets.Size != other.Targets.Size) {
+        return false;
+    }
+
+    for (uint32 index = 0; index < Targets.Size; index++) {
+        const RxTarget& t = Targets[index];
+        const RxTarget& other_t = other.Targets[index];
+
+        const bool format_matches = t.Image.Format == other_t.Image.Format;
+
+        if (!format_matches) {
+            return false;
+        }
+    }
+
+    return true;
 }

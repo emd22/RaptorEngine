@@ -2,7 +2,7 @@
 
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
-#include <Core/FxSizedArray.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <Core/FxSlice.hpp>
 
 class FxFile;
@@ -14,13 +14,7 @@ struct FxDataPackEntry
     FxDataPackEntry(FxHash64 id, FxSizedArray<uint8>&& data, uint32 data_offset, uint32 data_size)
         : Id(id), DataOffset(data_offset), DataSize(data_size), Data(std::move(data)) {};
 
-    FxDataPackEntry(FxDataPackEntry&& other)
-    {
-        Data = std::move(other.Data);
-        Id = other.Id;
-        DataOffset = other.DataOffset;
-        DataSize = other.DataSize;
-    }
+    FxDataPackEntry(FxDataPackEntry&& other) { (*this) = std::move(other); }
 
     FxDataPackEntry& operator=(FxDataPackEntry&& other)
     {
@@ -28,6 +22,10 @@ struct FxDataPackEntry
         Id = other.Id;
         DataOffset = other.DataOffset;
         DataSize = other.DataSize;
+
+        other.Id = FxHashNull64;
+        other.DataSize = 0;
+        other.DataOffset = 0;
 
         return *this;
     }
@@ -37,7 +35,7 @@ struct FxDataPackEntry
     FxDataPackEntry& operator=(const FxDataPackEntry& other) = delete;
 
 public:
-    FxHash64 Id = 0;
+    FxHash64 Id = FxHashNull64;
     uint32 DataOffset = 0;
     uint32 DataSize = 0;
 
@@ -98,12 +96,15 @@ public:
 
     void ReadAllEntries() { BinaryReadAllData(); }
 
+    void Close();
+    bool IsOpen() const { return File.IsFileOpen(); };
+
     ~FxDataPack();
 
 private:
     void BinaryWriteHeader();
     void BinaryWriteData();
-    void BinaryReadHeader();
+    bool BinaryReadHeader();
     void BinaryReadAllData();
 
     void JumpToEntry(FxHash64 id);

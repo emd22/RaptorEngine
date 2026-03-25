@@ -14,11 +14,15 @@
 
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
+#include <Core/FxRefUtil.hpp>
 #include <Core/FxTypes.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
 #include <Renderer/FxCamera.hpp>
+#include <Renderer/RxGlobals.hpp>
+#include <Renderer/RxState.hpp>
 #include <thread>
 #include <vector>
+
 
 #define FX_VULKAN_DEBUG 1
 
@@ -543,7 +547,15 @@ void RxRenderBackend::BeginLighting()
     FxAssert(depth_target != nullptr);
     depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
+
     pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
+
+    // gState->BufferOffset(RxShaderType::eVertex, gRenderer->Uniforms.GetBaseOffset());
+    // gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
+    // gState->Apply(frame->CommandBuffer);
+    // gState->Reset();
+
+
     pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                  pDeferredRenderer->PlLightingDirectional,
                                                  gRenderer->Uniforms.GetBaseOffset());

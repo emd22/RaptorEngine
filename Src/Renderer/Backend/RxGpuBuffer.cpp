@@ -1,6 +1,6 @@
 #include "RxGpuBuffer.hpp"
 
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,

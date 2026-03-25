@@ -1,7 +1,7 @@
 #include "RxDescriptors.hpp"
 
-#include <FxEngine.hpp>
 #include <Renderer/RxAttachment.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 /////////////////////////////////////
@@ -45,9 +45,13 @@ void RxDescriptorPool::Destroy()
 // Descriptor Sets
 /////////////////////////////////////
 
-void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, uint32 count)
+void RxDescriptorSet::Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
+                             uint32 count)
 {
     FxAssertMsg(pool.IsInited(), "Descriptor pool is not initialized!");
+
+    Layout = layout;
+    mbHasDynamicOffsets = has_dynamic_offsets;
 
     VkDescriptorSetAllocateInfo alloc_info {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -199,4 +203,21 @@ void RxDescriptorSet::Build()
     mbIsBuilt = true;
 
     mDescriptorEntries.Free();
+}
+
+void RxDescriptorSet::DestroyLayout()
+{
+    if (Layout == nullptr) {
+        return;
+    }
+    vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, Layout, nullptr);
+    Layout = nullptr;
+}
+
+void RxDescriptorSet::Destroy()
+{
+    // if (Layout != nullptr) {
+    //     vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, Layout, nullptr);
+    //     Layout = nullptr;
+    // }
 }

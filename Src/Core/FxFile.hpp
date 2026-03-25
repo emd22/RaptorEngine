@@ -5,6 +5,8 @@
 
 #include <Core/FxSlice.hpp>
 #include <Core/FxTypes.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <filesystem>
 
@@ -60,7 +62,7 @@ public:
         }
 
         const uint64 buffer_size = FxMath::AlignValue<sizeof(TDataType)>(GetFileSize());
-        TDataType* buffer = FxMemPool::Alloc<TDataType>(buffer_size);
+        TDataType* buffer = gEnginePool->Alloc<TDataType>(buffer_size);
 
         return Read(FxMakeSlice(buffer, buffer_size));
     }

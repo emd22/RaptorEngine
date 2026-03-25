@@ -1,6 +1,6 @@
 #include "RxSampler.hpp"
 
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 
@@ -86,10 +86,7 @@ RxSampler::RxSampler(RxSampler&& other)
     other.InvalidateCacheId();
 }
 
-RxSampler::RxSampler(const RxSamplerProps& props)
-{
-    Create(props);
-}
+RxSampler::RxSampler(const RxSamplerProps& props) { Create(props); }
 
 void RxSampler::Create(const RxSamplerProps& props)
 {

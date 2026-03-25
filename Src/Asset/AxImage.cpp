@@ -4,9 +4,9 @@
 #include <Core/FxRef.hpp>
 
 
-static FxPagedArray<FxRef<AxImage>> mEmptyImagesPerFormat;
+static FxPagedArray<FxTSRef<AxImage>> mEmptyImagesPerFormat;
 
-FxPagedArray<FxRef<AxImage>>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
+FxPagedArray<FxTSRef<AxImage>>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
 
 AxImage::AxImage(const AxImage& other) { (*this) = other; }
 

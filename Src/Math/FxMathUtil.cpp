@@ -3,6 +3,7 @@
 #include "FxMathConsts.hpp"
 
 #include <cmath>
+#include <bit>
 
 // Should we warn if FP_FAST_FMAF is not defined?
 //

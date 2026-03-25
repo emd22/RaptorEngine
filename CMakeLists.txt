@@ -1,114 +1,81 @@
-cmake_minimum_required(VERSION 3.23)
-
-project(ThirdPartyLib)
-
-# set(CMAKE_TOOLCHAIN_FILE, "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+cmake_minimum_required(VERSION 3.16)
+project(foxtrot LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo" CACHE STRING "" FORCE)
 
-if (WIN32)
-	message("${CMAKE_SOURCE_DIR}")
-	link_directories(${CMAKE_SOURCE_DIR}/Lib/Win32)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/${CMAKE_BUILD_TYPE}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/${CMAKE_BUILD_TYPE}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/${CMAKE_BUILD_TYPE}")
+
+option(USE_SIMDE "Use SIMDe to use AVX on a non-AVX platform" OFF)
+
+file(GLOB_RECURSE SOURCES
+    "Src/*.hpp" "Src/*.inl" "Src/*.cpp"
+    "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.h"
+    "Src/ThirdParty/*.hpp" "Src/ThirdParty/*.inl"
+)
+
+add_executable(foxtrot ${SOURCES})
+
+if(WIN32)
+    target_compile_options(foxtrot PRIVATE /Oi /MP /arch:AVX2)
+    target_link_directories(foxtrot PRIVATE "./Lib/Win32")
+
+    if(DEFINED ENV{VULKAN_SDK})
+        target_include_directories(foxtrot SYSTEM PRIVATE "$ENV{VULKAN_SDK}/include")
+        target_link_directories(foxtrot PRIVATE "$ENV{VULKAN_SDK}/Lib")
+    endif()
+
+    target_link_libraries(foxtrot PRIVATE vulkan-1 dxcompiler)
+    target_compile_definitions(foxtrot PRIVATE _USE_MATH_DEFINES)
+
+elseif(APPLE)
+    set_target_properties(foxtrot PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "aarch64")
+    target_compile_options(foxtrot PRIVATE -Wno-nullability-completeness)
+    target_link_directories(foxtrot PRIVATE "./Lib/macOS")
+
+    set(VK_SDK $ENV{VULKAN_SDK})
+    target_include_directories(foxtrot SYSTEM BEFORE PRIVATE "${VK_SDK}/include")
+    target_link_directories(foxtrot PRIVATE "${VK_SDK}/lib")
+    set_target_properties(foxtrot PROPERTIES BUILD_RPATH "${VK_SDK}/lib")
+
+    target_link_libraries(foxtrot PRIVATE vulkan.1 dxcompiler)
+    target_compile_definitions(foxtrot PRIVATE VK_ENABLE_BETA_EXTENSIONS=1)
+endif()
+
+target_include_directories(foxtrot PRIVATE
+    "Src"
+    "Src/ThirdParty"
+    "Lib/Include"
+)
+
+target_compile_definitions(foxtrot PRIVATE
+    FX_BASE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+target_compile_definitions(foxtrot PRIVATE
+    $<$<CONFIG:Debug>:DEBUG>
+    $<$<CONFIG:Release>:NDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:NDEBUG>
+)
+
+if(USE_SIMDE)
+    target_compile_definitions(foxtrot PRIVATE FX_USE_SIMDE SIMDE_ENABLE_NATIVE_ALIASES)
+endif()
+
+if(MSVC)
+    target_compile_options(foxtrot PRIVATE
+        $<$<CONFIG:Release>:/Ot /GS
+        $<$<CONFIG:RelWithDebInfo>:/O2>
+    )
 else()
-	link_directories(${CMAKE_SOURCE_DIR}/Lib/macOS)
+    target_compile_options(foxtrot PRIVATE
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+    )
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR}/Lib/Include)
-
-if(MSVC)
-else()
-    add_compile_options(-Wno-nullability-completeness)
-	# find_package(libjpeg-turbo REQUIRED)
-endif()
-
-if(MSVC)
-	add_compile_options("/MP")
-endif()
-
-# add third party sources to static library
-file (GLOB_RECURSE THIRD_PARTY_SOURCES "Src/ThirdParty/*.cpp" "Src/ThirdParty/*.h" "Src/ThirdParty/*.hpp" "Src/ThirdParty/*.inl")
-add_library(ThirdPartyLib STATIC ${THIRD_PARTY_SOURCES})
-target_include_directories(ThirdPartyLib PRIVATE ${CMAKE_SOURCE_DIR}/Src/ThirdParty)
-
-
-target_link_libraries(ThirdPartyLib slang SDL3 turbojpeg)
-
-target_compile_definitions(
-    ThirdPartyLib
-    PRIVATE
-    -DVMA_RECORDING_ENABLED=1
-    -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
-)
-
-target_compile_options(ThirdPartyLib PRIVATE)
-
-project(cr CXX)
-
-set(CMAKE_BUILD_TYPE RelWithDebInfo)
-
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-
-# For testing SSE/AVX code on non x64 processors
-# set(FX_USE_SIMDE TRUE)
-
-file (GLOB_RECURSE SOURCES "Src/*.cpp" "Src/*.inl")
-list(FILTER SOURCES EXCLUDE REGEX "Src/ThirdParty/.*")
-
-file (GLOB_RECURSE HEADERS "Src/*.hpp" "Src/*.inl")
-list(FILTER HEADERS EXCLUDE REGEX "Src/ThirdParty/.*")
-
-find_package(Vulkan REQUIRED)
-
-add_definitions(
-    -DVMA_RECORDING_ENABLED=1
-    -DVMA_DEBUG_ALWAYS_DETECT_LEAKS=1
-
-    -DVK_ENABLE_BETA_EXTENSIONS=1   # Used by PortabilitySubsetFeaturesKHR for macOS; From around 2020, but still under BETA_EXTENSIONS per vulkan.h.
-
-	-D_USE_MATH_DEFINES
-	-DFX_BASE_DIR="${CMAKE_SOURCE_DIR}"
-    # -DFX_DEBUG_STATIC_ARRAY
-)
-
-
-
-if (FX_USE_SIMDE)
-    add_definitions(-DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES)
-endif()
-
-if (APPLE)
-    # set(SANITIZE -fsanitize=thread)
-    set(SANITIZE )
-
-
-	add_compile_options(
-		-g
-		-Wall
-		# -Wpedantic
-		${SANITIZE}
-		# -O2
-	)
-
-	add_link_options(
-	    ${SANITIZE}
-
-	)
-endif()
-
-if(MSVC)
-	add_compile_options("/MP" "/Oi" "/arch:AVX2")
-endif()
-
-include_directories(
-    ${CMAKE_SOURCE_DIR}/Src
-	${CMAKE_SOURCE_DIR}/Src/ThirdParty
-    ${Vulkan_INCLUDE_DIRS}
-    # ${SDL3_INCLUDE_DIRS}
-)
-
-add_executable(cr ${SOURCES} ${HEADERS})
-
-target_link_libraries(cr ThirdPartyLib ${Vulkan_LIBRARIES})
+target_link_libraries(foxtrot PRIVATE turbojpeg SDL3)

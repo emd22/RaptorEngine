@@ -10,11 +10,11 @@
 class FxScene
 {
 public:
-    FxScene() { Create(); }
+    FxScene() = default;
 
     void Create();
 
-    void Attach(const FxRef<FxObject>& object);
+    void Attach(const FxTSRef<FxObject>& object);
     void Attach(const FxRef<FxLightBase>& light);
 
     void SelectCamera(const FxRef<FxCamera>& camera) { mpCurrentCamera = camera; }
@@ -22,10 +22,10 @@ public:
     void Render(FxCamera* shadow_camera);
     void RenderShadows(FxCamera* shadow_camera);
 
+    const FxPagedArray<FxTSRef<FxObject>>& GetAllObjects() { return mObjects; }
     const FxPagedArray<FxRef<FxLightBase>>& GetAllLights() { return mLights; }
-    const FxPagedArray<FxRef<FxObject>>& GetAllObjects() { return mObjects; }
 
-    FxRef<FxObject> FindObject(FxHash64 name_hash);
+    FxTSRef<FxObject> FindObject(FxHash64 name_hash);
 
     void Destroy();
 
@@ -35,12 +35,10 @@ private:
     void RenderUnlitObjects(const FxCamera& camera) const;
 
 public:
-    FxObjectManager ObjectManager;
-
     FxName Name = "(unnamed)";
 
 private:
-    FxPagedArray<FxRef<FxObject>> mObjects;
+    FxPagedArray<FxTSRef<FxObject>> mObjects;
     FxPagedArray<FxRef<FxLightBase>> mLights;
 
     FxRef<FxPerspectiveCamera> mpCurrentCamera { nullptr };

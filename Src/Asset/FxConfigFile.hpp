@@ -1,6 +1,5 @@
 #pragma once
 
-//
 #include <Core/FxHash.hpp>
 #include <Core/FxMemory.hpp>
 #include <Core/FxName.hpp>
@@ -9,9 +8,9 @@
 #include <Util/FxTokenizer.hpp>
 #include <string>
 
-class FxVec3f;
 class FxVec4f;
 class FxQuat;
+class FxVec3f;
 
 template <typename TType>
 concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_point_v<TType> ||

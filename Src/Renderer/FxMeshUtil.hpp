@@ -2,7 +2,7 @@
 
 #include <Core/FxAnonArray.hpp>
 #include <Math/FxVec3.hpp>
-#include <Renderer/RxVertex.hpp>
+#include <Renderer/RxVertexList.hpp>
 #include <cfloat>
 
 class FxMeshUtil

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Core/FxDataNotifier.hpp>
-#include <Core/FxRef.hpp>
-#include <Core/MemPool/FxMPPagedArray.hpp>
+#include <Core/FxPagedArray.hpp>
+#include <Core/FxTSRef.hpp>
 #include <atomic>
 #include <functional>
 
@@ -22,8 +22,8 @@ protected:
 
 public:
     // using OnLoadFunc = void (*)(FxRef<FxBaseAsset> asset);
-    using OnLoadFunc = std::function<void(FxRef<AxBase>)>;
-    using OnErrorFunc = void (*)(FxRef<AxBase> asset);
+    using OnLoadFunc = std::function<void(FxTSRef<AxBase>)>;
+    using OnErrorFunc = void (*)(FxTSRef<AxBase> asset);
 
     virtual void WaitUntilLoaded()
     {

@@ -2,13 +2,12 @@
 
 #include "RxFramebuffer.hpp"
 #include "RxImage.hpp"
-#include "RxPipeline.hpp"
 #include "RxSampler.hpp"
 
 #include <vulkan/vulkan.h>
 
 #include <Core/FxSizedArray.hpp>
-#include <Math/Vector.hpp>
+#include <Math/FxVec2.hpp>
 
 class RxGpuDevice;
 

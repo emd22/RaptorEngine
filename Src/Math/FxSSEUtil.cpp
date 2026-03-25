@@ -5,8 +5,8 @@
 
 #include "FxSSE.hpp"
 
-#include <Math/FxAVXUtil.hpp>
 #include <Math/FxMathConsts.hpp>
+#include <Math/FxSSEUtil.hpp>
 
 static constexpr uint32 sConstSignMask = 0x80000000;
 

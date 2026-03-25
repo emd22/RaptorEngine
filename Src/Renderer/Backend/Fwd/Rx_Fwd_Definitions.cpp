@@ -4,7 +4,7 @@
 #include "Rx_Fwd_GetGpuAllocator.hpp"
 #include "Rx_Fwd_SubmitUploadGpuCmd.hpp"
 
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 /* Rx_Fwd_GetFrame.hpp */

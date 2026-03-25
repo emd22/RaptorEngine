@@ -1,13 +1,18 @@
-build/*
-build/**/*
-xcbuild/*
+build
+buildobj
+xcbuild
 xcbuild/**/*
 Src/out/**/*
 
 Shaders/Spirv/**/*
 Shaders/LastUpdated.fxd
 
+obj
+*.ninja
 .*
+*.vcxproj*
+foxtrot.slnx
+foxtrot.sln
 
 # Exclusions for .*
 !.gitignore
@@ -16,3 +21,15 @@ Shaders/LastUpdated.fxd
 !.clangd
 !.clang-format
 !.clang-tidy
+
+compile_commands.json
+foxtrot.xcodeproj
+foxtrot.xcworkspace
+
+Makefile
+*.make
+
+CMakeCache.txt
+*.cmake
+
+CMakeFiles

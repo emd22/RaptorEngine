@@ -6,8 +6,10 @@
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxStackArray.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
 #include <FxEngine.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
+#include <Renderer/RxGlobals.hpp>
 
 FX_SET_MODULE_NAME("RxImage")
 
@@ -30,7 +32,7 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
     return props;
 }
 
-RxImage::RxImage() { mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount)); }
+RxImage::RxImage() { mpRefCnt = gEnginePool->Alloc<FxRefCount>(sizeof(FxRefCount)); }
 
 RxImage::RxImage(const RxImage& other) { (*this) = other; }
 
@@ -72,7 +74,7 @@ RxImage& RxImage::operator=(const RxImage& other)
     mpRefCnt = other.mpRefCnt;
 
     if (!mpRefCnt) {
-        mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
+        mpRefCnt = gEnginePool->Alloc<FxRefCount>(sizeof(FxRefCount));
     }
     else {
         mpRefCnt->Inc();
@@ -93,7 +95,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
     ViewType = image_type;
 
     if (!mpRefCnt) {
-        mpRefCnt = FxMemPool::Alloc<FxRefCount>(sizeof(FxRefCount));
+        mpRefCnt = gEnginePool->Alloc<FxRefCount>(sizeof(FxRefCount));
     }
 
     // Get the vulkan values for the image type
@@ -525,7 +527,7 @@ void RxImage::DecRef()
         return;
     }
 
-    FxMemPool::Free(mpRefCnt);
+    gEnginePool->Free(mpRefCnt);
     mpRefCnt = nullptr;
 
     if (View != nullptr) {

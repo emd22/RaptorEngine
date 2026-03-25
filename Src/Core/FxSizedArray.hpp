@@ -1,16 +1,20 @@
 #pragma once
 
-#include "FxAllocator.hpp"
+// #include "FxAllocator.hpp"
 #include "FxDefines.hpp"
-#include "FxLog.hpp"
-#include "FxMemory.hpp"
+#include "FxPanic.hpp"
 
 #include <stddef.h>
 #include <stdio.h>
 
+#include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 #include <cstdlib>
 #include <initializer_list>
-#include <stdexcept>
+
+#ifdef FX_SIZED_ARRAY_DEBUG
+#include "FxLog.hpp"
+#endif
 
 static inline void NoMemError()
 {
@@ -48,6 +52,7 @@ public:
 
         bool operator==(const Iterator& b) const { return mPtr == b.mPtr && mIndex == b.mIndex; }
 
+
     private:
         TElementType* mPtr;
         size_t mIndex;
@@ -83,39 +88,22 @@ public:
 #ifdef FX_SIZED_ARRAY_DEBUG
         FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", Capacity, typeid(TElementType).name());
 #endif
-
-#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
-        pData = FxMemPool::Alloc<TElementType>(static_cast<uint32>(sizeof(TElementType)) * element_count);
-        if (pData == nullptr) {
-            NoMemError();
-        }
-#else
-        TElementType* allocated_ptr;
-        try {
-            allocated_ptr = new TElementType[element_count];
-        }
-        catch (const std::bad_alloc& e) {
-            NoMemError();
-        }
-
-        pData = static_cast<TElementType*>(allocated_ptr);
-#endif
-
+        InternalAllocateArray(element_count);
         Size = 0;
-
-        // for (size_t i = 0; i < element_count; i++) {
-        //     new(Data + i) ElementType;
-        // }
     }
 
     FxSizedArray(std::initializer_list<TElementType> list)
     {
+        if (list.size() == 0) {
+            return;
+        }
+
         InitCapacity(list.size());
 
         for (const TElementType& obj : list) {
             Insert(obj);
         }
-    }
+    };
 
     FxSizedArray(FxSizedArray<TElementType>&& other)
     {
@@ -146,15 +134,12 @@ public:
             element.~TElementType();
         }
 
-        FxMemPool::Free(static_cast<void*>(pData));
+        if (gEnginePool) {
+            gEnginePool->FreeRaw(static_cast<void*>(pData));
+        }
 #else
-        delete[] pData;
+        std::free(pData);
 #endif
-
-
-        // if (Size == 2012) {
-        //     FX_BREAKPOINT;
-        // }
 
 #ifdef FX_SIZED_ARRAY_DEBUG
         FxLogDebug("Freeing FxSizedArray of size {:d} (type: {:s})", Size, typeid(TElementType).name());
@@ -246,6 +231,13 @@ public:
         memcpy(pData, ptr, GetSizeInBytes());
     }
 
+    void CloneFrom(const FxSizedArray<TElementType>& other)
+    {
+        InitCapacity(other.Capacity);
+        Size = other.Size;
+        memcpy(pData, other.pData, other.GetSizeInBytes());
+    }
+
     void Clear()
     {
         for (size_t i = 0; i < Size; i++) {
@@ -264,7 +256,6 @@ public:
         FxAssertMsg(Size < Capacity, "Insert will exceed capacity!");
 
         TElementType* element = &pData[Size++];
-
         new (element) TElementType(object);
 
         return *element;
@@ -384,20 +375,23 @@ protected:
         FxLogDebug("Allocating FxSizedArray of capacity {:d} (type: {:s})", element_count, typeid(TElementType).name());
 #endif
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
-        pData = FxMemPool::Alloc<TElementType>(sizeof(TElementType) * element_count);
+        pData = static_cast<TElementType*>(gEnginePool->AllocRaw(sizeof(TElementType) * element_count));
+        // for (uint32 i = 0; i < Capacity; i++) {
+        //     ::new (pData[i]) TElementType();
+        // }
+
         if (pData == nullptr) {
             NoMemError();
         }
 #else
-        pData = new TElementType[element_count];
+        // pData = new TElementType[element_count];
+        pData = std::malloc(sizeof(TElementType) * element_count);
 
         if (pData == nullptr) {
             NoMemError();
         }
 
 #endif
-
-        // Data = new ElementType[element_count];
 
         Capacity = element_count;
     }

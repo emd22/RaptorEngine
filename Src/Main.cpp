@@ -5,19 +5,34 @@
 
 #include <Asset/FxConfigFile.hpp>
 #include <Asset/FxDataPack.hpp>
+#include <Asset/FxShaderCompiler.hpp>
+#include <Core/FxDefer.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
 #include <FxEngine.hpp>
 #include <Math/FxMathConsts.hpp>
 #include <Math/FxMathUtil.hpp>
+#include <Renderer/RxGlobals.hpp>
 
 FX_SET_MODULE_NAME("Main")
 
 int main()
 {
-    FxMemPool::GetGlobalPool().Create(100, FxUnitMebibyte);
+    gEnginePool = new FxMemPool;
+    gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
+
+    FxGlobals::Init();
 
     {
         FoxtrotGame game {};
     }
 
-    FxEngineGlobalsDestroy();
+    FxGlobals::Destroy();
+    RxGlobals::Destroy();
+
+    FxDefer(
+        []()
+        {
+            delete gEnginePool;
+            gEnginePool = nullptr;
+        });
 }

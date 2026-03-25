@@ -5,7 +5,7 @@
 #include <SDL3/SDL.h>
 
 #include <Core/FxLog.hpp>
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 /** Converts an SDL scancode to its corresponding FxKey ID. */

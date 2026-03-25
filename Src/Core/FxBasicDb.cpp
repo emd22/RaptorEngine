@@ -125,7 +125,7 @@ void FxBasicDb::Parse()
         ++start;
     }
 
-    FxMemPool::Free(mpData);
+    gEnginePool->Free(mpData);
 }
 
 FxBasicDbEntry* FxBasicDb::FindEntry(FxHash64 key)

@@ -9,6 +9,8 @@ struct alignas(16) FxObjectGpuEntry
     float ModelMatrix[16];
 };
 
+class FxMat4f;
+
 using FxObjectId = uint32;
 
 class FxObjectManager
@@ -22,7 +24,7 @@ public:
 
     FxObjectId GenerateObjectId();
     void Submit(FxObjectId id, FxObjectGpuEntry& entry);
-    void Submit(FxObjectId id, FxMat4f& model_matrix);
+    void Submit(FxObjectId id, const FxMat4f& model_matrix);
     void FreeObjectId(FxObjectId id);
 
     void PrintActive(int limit = 20);

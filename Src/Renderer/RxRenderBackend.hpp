@@ -8,7 +8,6 @@
 #include "FxDeletionObject.hpp"
 #include "FxWindow.hpp"
 #include "RxDeferred.hpp"
-#include "RxSamplerCache.hpp"
 #include "RxUniformBuffer.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>
@@ -17,6 +16,7 @@
 #include <Core/FxDefer.hpp>
 #include <Core/FxRef.hpp>
 #include <deque>
+#include <mutex>
 
 enum class RxFrameResult
 {
@@ -115,8 +115,6 @@ public:
         bool did_delete = false;
 
         if (immediate || is_frame_spaced) {
-            FxLogDebug("Processing object ({}) from deletion queue", object.DeletionFrameNumber);
-
             if (object.bIsGpuBuffer) {
                 vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
                 did_delete = true;

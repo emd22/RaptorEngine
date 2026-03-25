@@ -2,23 +2,28 @@
 
 #include "Backend/RxDsLayoutBuilder.hpp"
 #include "Backend/RxShader.hpp"
+#include "Backend/RxVertexDescription.hpp"
+#include "FxCamera.hpp"
 #include "FxEngine.hpp"
+#include "RxGlobals.hpp"
+#include "RxPipelineBuilder.hpp"
+#include "RxRenderBackend.hpp"
+#include "RxShaderCache.hpp"
+#include "RxState.hpp"
 
 #include <FxObjectManager.hpp>
-#include <Renderer/FxCamera.hpp>
-#include <Renderer/RxDeferred.hpp>
-#include <Renderer/RxPipelineBuilder.hpp>
-#include <Renderer/RxRenderBackend.hpp>
 
 
 FX_SET_MODULE_NAME("DeferredRenderer")
 
 void RxDeferredRenderer::Create(const FxVec2u& extent)
 {
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8);
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
-    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2);
-    DescriptorPool.Create(gRenderer->GetDevice(), 10);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 5);
+    DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
+    DescriptorPool.Create(gRenderer->GetDevice(), 16);
 
     CreateGPassPipeline();
     CreateLightingPipeline();
@@ -133,11 +138,11 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 {
     VkPipelineLayout layout = CreateUnlitPipelineLayout();
 
-    RxShader shader_unlit("Unlit");
-    FxRef<RxShaderProgram> vertex_shader = shader_unlit.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_unlit.GetProgram(RxShaderType::eFragment, {});
+    FxRef<RxShader> shader_unlit = gShaderCache->Request(RxShaderName::eUnlit);
+    FxRef<RxShaderProgram> vertex_shader = shader_unlit->GetProgram(RxShaderType::eVertex, {});
+    FxRef<RxShaderProgram> fragment_shader = shader_unlit->GetProgram(RxShaderType::eFragment, {});
 
-    FxVertexInfo vertex_info = FxMakeVertexInfo();
+    RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
     RxPipelineBuilder builder {};
     RxTargetList attachments {};
@@ -175,7 +180,7 @@ void RxDeferredRenderer::CreateUnlitPipeline()
         .SetAttachments(&attachments)
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&RpForward)
-        .SetVertexInfo(&vertex_info)
+        .SetVertexDescription(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
     builder.Build(PlUnlit);
@@ -194,14 +199,11 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     CreateGPass();
 
+    FxRef<RxShader> shader_geometry = gShaderCache->Request(RxShaderName::eGeometry);
+    FxRef<RxShaderProgram> vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, {});
+    FxRef<RxShaderProgram> fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, {});
 
-    RxShader shader_geometry("Geometry");
-    FxRef<RxShaderProgram> vertex_shader = shader_geometry.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_geometry.GetProgram(RxShaderType::eFragment, {});
-
-    FxVertexInfo vertex_info = FxMakeVertexInfo();
-
-    // RpGeometry.Create(attachments, gRenderer->Swapchain.Extent);
+    RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
     RxPipelineBuilder builder;
 
@@ -212,7 +214,7 @@ void RxDeferredRenderer::CreateGPassPipeline()
         .SetAttachments(&GPass.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&GPass.GetRenderPass())
-        .SetVertexInfo(&vertex_info)
+        .SetVertexDescription(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
@@ -223,15 +225,30 @@ void RxDeferredRenderer::CreateGPassPipeline()
     {
         FxSizedArray<FxShaderMacro> normal_mapped_macros { FxShaderMacro { "USE_NORMAL_MAPS", "1" } };
 
-        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry.GetProgram(RxShaderType::eVertex,
-                                                                             normal_mapped_macros);
+        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex,
+                                                                              normal_mapped_macros);
 
-        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry.GetProgram(RxShaderType::eFragment,
-                                                                               normal_mapped_macros);
+        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment,
+                                                                                normal_mapped_macros);
 
         builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
             .SetShaders(nm_vertex_shader, nm_fragment_shader)
             .Build(PlGeometryWithNormalMaps);
+    }
+
+    {
+        vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eSkinned>();
+
+        FxSizedArray<FxShaderMacro> macros = { FxShaderMacro { "USE_NORMAL_MAPS", "1" },
+                                               FxShaderMacro { "USE_SKINNING", "1" } };
+
+        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, macros);
+        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, macros);
+
+        builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
+            .SetVertexDescription(&vertex_info)
+            .SetShaders(nm_vertex_shader, nm_fragment_shader)
+            .Build(PlGeometrySkinned);
     }
 
     pGeometryPipeline = &PlGeometry;
@@ -262,6 +279,9 @@ void RxDeferredRenderer::DestroyGPassPipeline()
 
     PlGeometryWireframe.Layout = nullptr;
     PlGeometryWireframe.Destroy();
+
+    PlGeometrySkinned.Layout = nullptr;
+    PlGeometrySkinned.Destroy();
 }
 
 
@@ -335,7 +355,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
 
     LightPass.BuildRenderStage();
 
-    DsLighting.Create(DescriptorPool, DsLayoutLightingFrag);
+    DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
 
     // sDepth
     DsLighting.AddImageFromTarget(0, GPass.GetTarget(RxImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
@@ -345,7 +365,6 @@ void RxDeferredRenderer::CreateLightingPipeline()
     DsLighting.AddImageFromTarget(2, GPass.GetTarget(RxImageFormat::eRGBA16_Float),
                                   &gRenderer->Swapchain.NormalsSampler);
     // Skip 3 for the shadow target, added by RxDirectionalShadows
-    // Uniform buffer
     DsLighting.AddBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.scUniformBufferSize);
 
     DsLighting.Build();
@@ -358,7 +377,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
         FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
         FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
 
-        FxVertexInfo vertex_info = FxMakeLightVertexInfo();
+        RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eSlim>();
 
         RxPipelineBuilder builder {};
         builder.SetLayout(layout)
@@ -374,7 +393,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
             .SetAttachments(&LightPass.GetTargets())
             .SetShaders(vertex_shader, fragment_shader)
             .SetRenderPass(&LightPass.GetRenderPass())
-            .SetVertexInfo(&vertex_info)
+            .SetVertexDescription(&vertex_info)
             .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true })
             .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
@@ -403,7 +422,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
             .SetAttachments(&LightPass.GetTargets())
             .SetShaders(vertex_shader, fragment_shader)
             .SetRenderPass(&LightPass.GetRenderPass())
-            .SetVertexInfo(nullptr)
+            .SetVertexDescription(nullptr)
             .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
         builder.Build(PlLightingDirectional);
@@ -488,7 +507,7 @@ void RxDeferredRenderer::CreateCompPipeline()
         .SetAttachments(&CompPass.GetTargets())
         .SetShaders(lit_vertex_shader, lit_fragment_shader)
         .SetRenderPass(&CompPass.GetRenderPass())
-        .SetVertexInfo(nullptr)
+        .SetVertexDescription(nullptr)
         .SetCullMode(VK_CULL_MODE_NONE)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE)
         .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true });
@@ -522,7 +541,7 @@ void RxDeferredRenderer::DestroyCompPipeline()
 
 void RxDeferredRenderer::CreateCompPass()
 {
-    DsComposition.Create(DescriptorPool, DsLayoutCompFrag);
+    DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
 
     CompPass.Create(gRenderer->Swapchain.Extent);
 

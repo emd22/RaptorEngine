@@ -5,22 +5,25 @@
 #include <Asset/AxBase.hpp>
 #include <Asset/AxManager.hpp>
 #include <Core/FxRef.hpp>
-#include <FxEngine.hpp>
 #include <FxMaterial.hpp>
 #include <FxObject.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>
+
+// Renderer includes
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
-#include <iostream>
 
-FxRef<AxImage> LoadTexture(const FxRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
+FxTSRef<AxImage> LoadTexture(const FxTSRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
 
-void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh,
+void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh,
                                         cgltf_primitive* primitive)
 {
     FxSizedArray<float32> positions;
     FxSizedArray<float32> normals;
     FxSizedArray<float32> uvs;
     FxSizedArray<float32> tangents;
+    FxSizedArray<float32> weights;
+    FxSizedArray<uint32> boneids;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto* attribute = &primitive->attributes[i];
@@ -41,24 +44,30 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxRef<FxObject>& object, FxRef<FxP
         }
         else if (attribute->type == cgltf_attribute_type_texcoord) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
-
-            // Create our vertex normal buffer
             uvs.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, uvs.pData, data_size);
         }
         else if (attribute->type == cgltf_attribute_type_tangent) {
             cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
-
-            // Create our vertex normal buffer
             tangents.InitSize(data_size);
             cgltf_accessor_unpack_floats(attribute->data, tangents.pData, data_size);
         }
+        else if (attribute->type == cgltf_attribute_type_weights) {
+            cgltf_size data_size = cgltf_accessor_unpack_floats(attribute->data, nullptr, 0);
+            weights.InitSize(data_size);
+            cgltf_accessor_unpack_floats(attribute->data, weights.pData, data_size);
+        }
+        else if (attribute->type == cgltf_attribute_type_joints) {
+            boneids.InitSize(attribute->data->count * 4);
+
+            for (cgltf_size j = 0; j < attribute->data->count; j++) {
+                cgltf_accessor_read_uint(attribute->data, j, reinterpret_cast<cgltf_uint*>(&boneids.pData[j * 4]), 4);
+            }
+        }
     }
 
-    mesh->VertexList.CreateFrom<RxVertexType::eDefault>(positions, normals, uvs, tangents);
+    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids);
     mesh->UploadVertices();
-
-    mesh->bIsReady = true;
 }
 
 void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
@@ -67,7 +76,7 @@ void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* s
 }
 
 template <RxImageFormat TFormat>
-static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
+static void MakeMaterialTextureForPrimitive(FxTSRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
     FxAssert(texture_view.texture != nullptr);
@@ -76,14 +85,14 @@ static void MakeMaterialTextureForPrimitive(FxRef<FxMaterial>& material, FxMater
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
 
     // Stage that shit so we can nuke mGltfData as soon as we can
-    uint8* goober_buffer = FxMemPool::Alloc<uint8>(image_buffer_size);
+    uint8* goober_buffer = gEnginePool->Alloc<uint8>(image_buffer_size);
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
     // Submit as data to be loaded later by the asset manager
     component.pDataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 
-void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primitive* primitive)
+void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_primitive* primitive)
 {
     cgltf_material* gltf_material = primitive->material;
 
@@ -91,7 +100,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
         return;
     }
 
-    FxRef<FxMaterial> material = FxMaterialManager::New("Fireplace", &gRenderer->pDeferredRenderer->PlGeometry);
+    FxTSRef<FxMaterial> material = gMaterialManager->New("Fireplace", &gRenderer->pDeferredRenderer->PlGeometry);
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
@@ -129,17 +138,17 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxRef<FxObject>& object, cgltf_primi
     object->pMaterial = material;
 }
 
-void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index)
+void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index)
 {
     const bool has_multiple_primitives = gltf_mesh->primitives_count > 1;
 
     // Assume at first that there is only one primitive;
-    FxRef<FxObject> current_object = object;
+    FxTSRef<FxObject> current_object = object;
 
     // Similarly to `CreateGpuResource`, we are going to make the `object` into a container
     // if there are multiple primitives.
     if (has_multiple_primitives) {
-        current_object = FxMakeRef<FxObject>();
+        current_object = FxTSRef<FxObject>::New();
     }
 
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
@@ -147,7 +156,7 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
         FxSizedArray<uint32> indices;
 
-        FxRef<FxPrimitiveMesh> primitive_mesh = FxMakeRef<FxPrimitiveMesh>();
+        FxRef<FxPrimitiveMesh> primitive_mesh = FxRef<FxPrimitiveMesh>::New();
 
         // Keep the primitive mesh's vertices and indices in memory if `KeepInMemory` is set
         primitive_mesh->bKeepInMemory = bKeepInMemory;
@@ -166,6 +175,8 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 
         MakeMaterialForPrimitive(current_object, primitive);
 
+        primitive_mesh->bIsReady = true;
+
         current_object->pMesh = primitive_mesh;
 
         if (has_multiple_primitives) {
@@ -173,7 +184,7 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
             object->AttachObject(current_object);
 
             // Create a new object to load into next
-            current_object = FxMakeRef<FxObject>();
+            current_object = FxTSRef<FxObject>::New();
         }
     }
 
@@ -183,7 +194,7 @@ void AxLoaderGltf::UploadMeshToGpu(FxRef<FxObject>& object, cgltf_mesh* gltf_mes
 void AxLoaderGltf::LoadAnimations() { FxLogInfo("Gltf model has {} animations", mpGltfData->animations_count); }
 
 
-AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
+AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
 {
     cgltf_options options {};
 
@@ -204,7 +215,7 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxRef<AxBase> asset, const std::
     return AxLoaderGltf::Status::eSuccess;
 }
 
-AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size)
+AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size)
 {
     // (void)asset;
     //    FxRef<FxAssetModel> model(asset);
@@ -220,19 +231,19 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(FxRef<AxBase> asset, const uin
     return AxLoaderGltf::Status::eSuccess;
 }
 
-void AxLoaderGltf::CreateGpuResource(FxRef<AxBase>& asset)
+void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
 {
-    FxRef<FxObject> output_object(asset);
+    FxTSRef<FxObject> output_object(asset);
 
 
     // If there is only one mesh to load, store the mesh directly in the output object
-    FxRef<FxObject> current_object = output_object;
+    FxTSRef<FxObject> current_object = output_object;
 
     // If there are multiple gltf meshes, we will need to use the output object as a
     // container for multiple other meshes
     const bool has_multiple_meshes = mpGltfData->meshes_count > 1;
     if (has_multiple_meshes) {
-        current_object = FxMakeRef<FxObject>();
+        current_object = FxTSRef<FxObject>::New();
     }
 
     FxLogInfo("Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
@@ -256,7 +267,7 @@ void AxLoaderGltf::CreateGpuResource(FxRef<AxBase>& asset)
             output_object->AttachObject(current_object);
 
             // Create a new object to load into next
-            current_object = FxMakeRef<FxObject>();
+            current_object = FxTSRef<FxObject>::New();
         }
     }
 
@@ -266,7 +277,7 @@ void AxLoaderGltf::CreateGpuResource(FxRef<AxBase>& asset)
     asset->bIsUploadedToGpu.notify_all();
 }
 
-void AxLoaderGltf::Destroy(FxRef<AxBase>& asset)
+void AxLoaderGltf::Destroy(FxTSRef<AxBase>& asset)
 {
     if (mpGltfData) {
         cgltf_free(mpGltfData);

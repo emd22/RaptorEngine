@@ -3,9 +3,9 @@
 #include <Asset/AxBase.hpp>
 #include <Asset/AxImage.hpp>
 
-AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
+AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
 {
-    FxRef<AxImage> image(asset);
+    FxTSRef<AxImage> image(asset);
 
     const char* c_path = path.c_str();
 
@@ -29,9 +29,9 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxRef<AxBase> asset, const std::st
     return AxLoaderStb::Status::eSuccess;
 }
 
-AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size)
+AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size)
 {
-    FxRef<AxImage> image(asset);
+    FxTSRef<AxImage> image(asset);
 
     const int pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
     FxAssert(pixel_size > 0);
@@ -58,9 +58,9 @@ AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxRef<AxBase> asset, const uint8
     return AxLoaderStb::Status::eSuccess;
 }
 
-void AxLoaderStb::CreateGpuResource(FxRef<AxBase>& asset)
+void AxLoaderStb::CreateGpuResource(FxTSRef<AxBase>& asset)
 {
-    FxRef<AxImage> image(asset);
+    FxTSRef<AxImage> image(asset);
 
     FxSizedArray<uint8> data_arr;
 
@@ -109,7 +109,7 @@ void AxLoaderStb::CreateGpuResource(FxRef<AxBase>& asset)
 //     FxStackArray<VkImageCopy, 6> image_copy_infos;
 // }
 
-void AxLoaderStb::Destroy(FxRef<AxBase>& asset)
+void AxLoaderStb::Destroy(FxTSRef<AxBase>& asset)
 {
     // while (!asset->bIsUploadedToGpu) {
     //     asset->bIsUploadedToGpu.wait(true);

@@ -21,7 +21,7 @@ struct AxItemData
     AxItemData() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxItemData(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset) : pLoader(loader), pAsset(asset)
+    AxItemData(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset) : pLoader(loader), pAsset(asset)
     {
     }
 
@@ -34,8 +34,8 @@ struct AxItemData
         return *this;
     }
 
-    FxRef<AxLoaderBase> pLoader { nullptr };
-    FxRef<AxBase> pAsset { nullptr };
+    FxTSRef<AxLoaderBase> pLoader { nullptr };
+    FxTSRef<AxBase> pAsset { nullptr };
 };
 
 struct AxQueueItem
@@ -43,15 +43,16 @@ struct AxQueueItem
     AxQueueItem() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, AxType type, const std::string& path)
-        : Path(path), RawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
+    AxQueueItem(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset, AxType type,
+                const std::string& path)
+        : Path(path), pcRawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
     {
     }
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const FxRef<TLoaderType>& loader, const FxRef<TAssetType>& asset, AxType type, const uint8* data,
+    AxQueueItem(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset, AxType type, const uint8* data,
                 uint32 data_size)
-        : Path(""), RawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
+        : Path(""), pcRawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
     {
     }
 
@@ -63,7 +64,7 @@ struct AxQueueItem
 
         Path = other.Path;
         Data = std::move(other.Data);
-        RawData = other.RawData;
+        pcRawData = other.pcRawData;
         DataSize = other.DataSize;
         AssetType = other.AssetType;
 
@@ -81,7 +82,7 @@ public:
 
 
     // Data for loading from memory
-    const uint8* RawData = nullptr;
+    const uint8* pcRawData = nullptr;
     uint32 DataSize = 0;
 
     AxType AssetType;

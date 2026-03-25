@@ -5,7 +5,7 @@
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxTypes.hpp>
-#include <FxEngine.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 

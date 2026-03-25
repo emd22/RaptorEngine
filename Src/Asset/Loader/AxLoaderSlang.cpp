@@ -19,7 +19,7 @@ using Status = AxLoaderSlang::Status;
 //     }
 // }
 
-Status AxLoaderSlang::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
+Status AxLoaderSlang::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
 {
     // FxRef<FxAssetShader> shader(asset);
 
@@ -41,8 +41,8 @@ Status AxLoaderSlang::LoadFromFile(FxRef<AxBase> asset, const std::string& path)
     return Status::eSuccess;
 }
 
-Status AxLoaderSlang::LoadFromMemory(FxRef<AxBase> asset, const uint8* data, uint32 size) { return Status::eSuccess; }
+Status AxLoaderSlang::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size) { return Status::eSuccess; }
 
-void AxLoaderSlang::CreateGpuResource(FxRef<AxBase>& asset) {}
+void AxLoaderSlang::CreateGpuResource(FxTSRef<AxBase>& asset) {}
 
-void AxLoaderSlang::Destroy(FxRef<AxBase>& asset) {}
+void AxLoaderSlang::Destroy(FxTSRef<AxBase>& asset) {}

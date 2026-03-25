@@ -4,7 +4,7 @@
 #include <ThirdParty/Jolt/Physics/Body/Body.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
-#include <Core/MemPool/FxMPPagedArray.hpp>
+#include <Core/FxPagedArray.hpp>
 #include <FxEntity.hpp>
 #include <FxMaterial.hpp>
 #include <Renderer/FxPrimitiveMesh.hpp>

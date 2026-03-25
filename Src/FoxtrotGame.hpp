@@ -36,8 +36,8 @@ public:
     FxRef<FxLightDirectional> pSun { nullptr };
 
     // TODO: Player attachment system
-    FxRef<FxObject> pPistolObject { nullptr };
-    FxRef<FxObject> pHelmetObject { nullptr };
+    FxTSRef<FxObject> pPistolObject { nullptr };
+    FxTSRef<FxObject> pHelmetObject { nullptr };
 
 
     FxQuat PistolRotationGoal = FxQuat::sIdentity;

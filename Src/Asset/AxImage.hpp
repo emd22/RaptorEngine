@@ -14,19 +14,19 @@ public:
     AxImage() = default;
     AxImage(const AxImage& other);
 
-    static FxPagedArray<FxRef<AxImage>>& GetEmptyImagesArray();
+    static FxPagedArray<FxTSRef<AxImage>>& GetEmptyImagesArray();
 
     template <RxImageFormat TFormat>
-    static FxRef<AxImage> GetEmptyImage()
+    static FxTSRef<AxImage> GetEmptyImage()
     {
         // Stashed ptr for the image
-        static FxRef<AxImage> spEmptyImage { nullptr };
+        static FxTSRef<AxImage> spEmptyImage { nullptr };
 
         if (spEmptyImage) {
             return spEmptyImage;
         }
 
-        FxPagedArray<FxRef<AxImage>>& empty_images = GetEmptyImagesArray();
+        FxPagedArray<FxTSRef<AxImage>>& empty_images = GetEmptyImagesArray();
 
         if (!empty_images.IsInited()) {
             empty_images.Create(10);
@@ -38,7 +38,7 @@ public:
         memset(image_data.pData, 1, pixel_size);
         image_data.MarkFull();
 
-        spEmptyImage = FxMakeRef<AxImage>();
+        spEmptyImage = FxTSRef<AxImage>::New();
         spEmptyImage->Image.CreateGpuOnly(RxImageType::e2d, FxVec2u(1, 1), TFormat, image_data);
         spEmptyImage->MarkAndSignalLoaded();
 

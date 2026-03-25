@@ -6,7 +6,6 @@
 #include "Backend/RxImage.hpp"
 #include "Backend/RxSampler.hpp"
 #include "RxPipelineList.hpp"
-#include "RxRenderPassCache.hpp"
 #include "RxRenderStage.hpp"
 
 class FxCamera;
@@ -80,6 +79,8 @@ public:
     RxPipeline PlGeometryNoDepthTest;
     RxPipeline PlGeometryWireframe;
     RxPipeline PlGeometryWithNormalMaps;
+
+    RxPipeline PlGeometrySkinned;
 
     RxPipeline* pGeometryPipeline = nullptr;
 

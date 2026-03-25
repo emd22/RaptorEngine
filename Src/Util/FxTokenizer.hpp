@@ -4,6 +4,8 @@
 //
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
+#include <Core/MemPool/FxMemPool.hpp>
+#include <FxEngine.hpp>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -63,7 +65,7 @@ public:
 
     inline char* GetHeapStr() const
     {
-        char* str = FxMemPool::Alloc<char>(Length + 1);
+        char* str = gEnginePool->Alloc<char>(Length + 1);
 
         if (str == nullptr) {
             FxPanic("FoxTokenizer", "Error allocating heap string!", 0);
@@ -78,7 +80,7 @@ public:
 
     FxHash64 GetHash()
     {
-        if (Hash != 0) {
+        if (Hash != FxHashNull64) {
             return Hash;
         }
         return (Hash = FxHashData64(FxSlice<char>(Start, Length)));
@@ -124,7 +126,7 @@ public:
     char* Start = nullptr;
     char* End = nullptr;
 
-    FxHash64 Hash = 0;
+    FxHash64 Hash = FxHashNull64;
     FxTokenType Type = FxTokenType::eUnknown;
     uint32 Length = 0;
 
@@ -239,9 +241,9 @@ private:
 template <>
 struct std::formatter<FxToken>
 {
-    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    constexpr auto format(const FxToken& obj, std::format_context& ctx) const
+    auto format(const FxToken& obj, std::format_context& ctx) const
     {
         const std::string str(obj.Start, obj.Length);
         return std::format_to(ctx.out(), "(Type={}, {})", FxToken::GetTypeName(obj.Type), str);

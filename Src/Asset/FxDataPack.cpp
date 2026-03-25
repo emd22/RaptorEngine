@@ -9,6 +9,21 @@
 static const uint16 scBinHeaderStart = 0xA1B2;
 static const uint16 scBinHeaderEnd = 0x2B1A;
 
+/*
+ * HEADER BEGIN - A1B2
+ *      ENTRY 1    (16 bytes)
+ *      - ENTRY ID (8 bytes)
+ *      - OFFSET   (4 bytes)
+ *      - SIZE     (4 bytes)
+ *      ENTRY 2    (16 bytes)
+ *      ENTRY N
+ * HEADER END   - 2B1A
+ * ENTRY 1 DATA
+ * ENTRY 2 DATA
+ * ENTRY N DATA
+ */
+
+
 // static constexpr uint16 scByteAlignment = 16;
 // static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
 
@@ -53,7 +68,7 @@ void FxDataPack::AddEntry(FxHash64 id, const FxSlice<uint8>& data)
 }
 
 
-void FxDataPack::BinaryReadHeader()
+bool FxDataPack::BinaryReadHeader()
 {
     uint16 header_start = 0;
     File.Read<uint16>(FxMakeSlice(&header_start, 1));
@@ -65,7 +80,9 @@ void FxDataPack::BinaryReadHeader()
         Entries.Create(number_of_entries);
     }
 
-    FxAssert(header_start == scBinHeaderStart);
+    if (header_start != scBinHeaderStart) {
+        return false;
+    }
 
     for (int index = 0; index < number_of_entries; index++) {
         FxHash64 id;
@@ -87,7 +104,12 @@ void FxDataPack::BinaryReadHeader()
 
     uint16 header_end;
     File.Read<uint16>(FxMakeSlice(&header_end, 1));
-    FxAssert(header_end == scBinHeaderEnd);
+
+    if (header_end != scBinHeaderEnd) {
+        return false;
+    }
+
+    return true;
 }
 
 void FxDataPack::BinaryWriteHeader()
@@ -145,7 +167,7 @@ void FxDataPack::PrintInfo() const
 
 
     for (const FxDataPackEntry& entry : Entries) {
-        FxLogInfo("Entry {:20} => Offset={}, Size={}", entry.Id, entry.DataOffset, entry.DataSize);
+        FxLogInfo("Entry 0x{:x} => Offset={}, Size={}", entry.Id, entry.DataOffset, entry.DataSize);
     }
 
     FxLogInfo("================");
@@ -192,6 +214,7 @@ void FxDataPack::WriteToFile(const char* name)
     File.Open(name, FxFile::eWrite, FxFile::eBinary);
 
     if (!File.IsFileOpen()) {
+        FxLogError("Data pack '{}' could not be written to", name);
         return;
     }
 
@@ -216,18 +239,30 @@ bool FxDataPack::ReadFromFile(const char* name)
     File.Open(name, FxFile::eRead, FxFile::eBinary);
 
     if (!File.IsFileOpen()) {
+        FxLogError("Error opening data pack '{}'", name);
         return false;
     }
 
-    BinaryReadHeader();
+    bool successful = BinaryReadHeader();
+    if (!successful) {
+        File.Close();
+        // Open the file in write mode to clear it
+        File.Open(name, FxFile::eWrite, FxFile::eBinary);
+        File.Close();
+
+        // Return unsuccessful
+        return false;
+    }
 
     return true;
 }
 
-
-FxDataPack::~FxDataPack()
+void FxDataPack::Close()
 {
     if (File.IsFileOpen()) {
         File.Close();
     }
 }
+
+
+FxDataPack::~FxDataPack() { Close(); }

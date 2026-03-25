@@ -1,68 +1,34 @@
 
 #include "RxPipeline.hpp"
 
-#include "Core/FxDefines.hpp"
 #include "RxCommands.hpp"
+#include "RxShader.hpp"
+#include "RxVertexDescription.hpp"
 
+#include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxStackArray.hpp>
-#include <FxEngine.hpp>
 #include <Renderer/RxDeferred.hpp>
+#include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
-
 
 FX_SET_MODULE_NAME("Pipeline")
 
-static RxPipeline* spBoundPipeline = nullptr;
-
-FxVertexInfo FxMakeVertexInfo()
-{
-    using VertexType = RxVertex<RxVertexType::eDefault>;
-
-    VkVertexInputBindingDescription binding_desc = {
-        .binding = 0,
-        .stride = sizeof(VertexType),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-
-    FxSizedArray<VkVertexInputAttributeDescription> attribs = {
-        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
-        { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Normal) },
-        { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(VertexType, UV) },
-        { .location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(VertexType, Tangent) },
-    };
-
-    FxLogDebug("Amount of attributes: {:d}", attribs.Size);
-
-    return { binding_desc, std::move(attribs), true };
-}
-
-FxVertexInfo FxMakeLightVertexInfo()
-{
-    using VertexType = RxVertex<RxVertexType::eSlim>;
-
-    VkVertexInputBindingDescription binding_desc = {
-        .binding = 0,
-        .stride = sizeof(VertexType),
-        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-    };
-
-    FxSizedArray<VkVertexInputAttributeDescription> attribs = {
-        { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0 },
-    };
-
-    return { binding_desc, std::move(attribs), true };
-}
+static VkPipeline spBoundPipeline = nullptr;
 
 void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
                         const FxSlice<VkAttachmentDescription>& attachments,
                         const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
-                        FxVertexInfo* vertex_info, const RxRenderPass& render_pass,
+                        RxVertexDescription* vertex_info, const RxRenderPass& render_pass,
                         const RxPipelineProperties& properties)
 {
     mDevice = gRenderer->GetDevice();
 
     bool has_depth_attachment = false;
+
+    // XXX: TEMP
+    VertexShader = shaders[0];
+    FragmentShader = shaders[1];
 
     // Depth attachment is usually the last attachment, check last first
     for (int32 i = attachments.Size - 1; i >= 0; i--) {
@@ -145,9 +111,9 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
 
     if (vertex_info != nullptr) {
         vertex_input_info.vertexBindingDescriptionCount = 1;
-        vertex_input_info.pVertexBindingDescriptions = &vertex_info->binding;
-        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->attributes.Size);
-        vertex_input_info.pVertexAttributeDescriptions = vertex_info->attributes.pData;
+        vertex_input_info.pVertexBindingDescriptions = &vertex_info->Binding;
+        vertex_input_info.vertexAttributeDescriptionCount = static_cast<uint32>(vertex_info->Attributes.Size);
+        vertex_input_info.pVertexAttributeDescriptions = vertex_info->Attributes.pData;
     }
 
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_info = {
@@ -236,15 +202,15 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
               reinterpret_cast<void*>(Layout));
 }
 
-void RxPipeline::Bind(const RxCommandBuffer& command_buffer)
+void RxPipeline::Bind(const RxCommandBuffer& cmd)
 {
-    if (this == spBoundPipeline) {
+    if (this->Pipeline == spBoundPipeline) {
         return;
     }
 
-    vkCmdBindPipeline(command_buffer.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+    vkCmdBindPipeline(cmd.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
 
-    spBoundPipeline = this;
+    spBoundPipeline = this->Pipeline;
 }
 
 void RxPipeline::Destroy()
@@ -261,9 +227,9 @@ void RxPipeline::Destroy()
     }
     if (Layout && !mbDoNotDestroyLayout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
-        Layout = nullptr;
     }
 
+    Layout = nullptr;
     // RenderPass.Destroy();
 }
 

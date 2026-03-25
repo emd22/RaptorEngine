@@ -13,7 +13,25 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 - Integration with Jolt Physics
 - Deferred rendering with light volumes
 
-## Platforms
+## Building
+To build the engine, make sure you have Premake5 installed.
+
+### Building for MacOS
+You can use `premake5 [build system]` to generate the project files. To build with Ninja, you use one of the generated build targets.
+For example,
+```
+# Generate the project or build files
+premake5 ninja
+
+# Build the engine and third party libraries
+ninja RelWithDebInfo_macOS
+
+# Run the engine
+./build/RelWithDebInfo/foxtrot
+```
+
+
+## Platforms Supported
 - Windows (x86_64)
 - macOS (aarch64)
 
