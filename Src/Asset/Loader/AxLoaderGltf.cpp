@@ -63,6 +63,8 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<F
     }
 
     mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids);
+
+    FxLogInfo("Weights size: {}, ids size: {}", weights.Size, boneids.Size);
     mesh->UploadVertices();
 }
 
@@ -96,7 +98,8 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_pri
         return;
     }
 
-    FxTSRef<FxMaterial> material = gMaterialManager->New(object->Name.Get(), &gRenderer->pDeferredRenderer->PlGeometry);
+    FxTSRef<FxMaterial> material = gMaterialManager->New(object->Name.Get(), &gRenderer->pDeferredRenderer->PlGeometry,
+                                                         object->IsSkinned());
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
@@ -121,7 +124,6 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_pri
 
     // Load the normalmap
     if (gltf_material->normal_texture.texture != nullptr) {
-        FxLogInfo("OBJECT has normal maps : {}", object->Name.Get());
         MakeMaterialTextureForPrimitive(material, material->NormalMap, gltf_material->normal_texture);
     }
 
@@ -169,12 +171,12 @@ void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_m
         }
 
         UnpackMeshAttributes(current_object, primitive_mesh, primitive);
+        current_object->pMesh = primitive_mesh;
 
         MakeMaterialForPrimitive(current_object, primitive);
 
         primitive_mesh->bIsReady = true;
 
-        current_object->pMesh = primitive_mesh;
 
         if (has_multiple_primitives) {
             // Attach the current object to the object container (our output)

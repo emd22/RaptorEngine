@@ -38,3 +38,9 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define F_ShadowTexture2D(_name, _reg_n) \
     Texture2D F_TextureName(_name) : register(t##_reg_n, space0); \
     SamplerComparisonState _name : register(s##_reg_n, space0);
+
+
+
+#define BoneMtx float4x4
+
+#define BONE_COUNT 50

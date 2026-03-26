@@ -23,7 +23,6 @@
 #include <thread>
 #include <vector>
 
-
 #define FX_VULKAN_DEBUG 1
 
 using ExtensionNames = RxRenderBackend::ExtensionNames;
@@ -93,7 +92,8 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     gObjectManager->Create();
 
-    Uniforms.Create();
+    Uniforms.Create(scDefaultUniformSize);
+    BoneBuffer.Create(scNumBones * sizeof(FxMat4f));
 
     pDeferredRenderer = FxMakeRef<RxDeferredRenderer>();
     pDeferredRenderer->Create(Swapchain.Extent);
@@ -662,6 +662,7 @@ void RxRenderBackend::Destroy()
     }
 
     Uniforms.Destroy();
+    BoneBuffer.Destroy();
 
 
     while (!mDeletionQueue.empty()) {

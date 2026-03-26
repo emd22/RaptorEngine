@@ -30,13 +30,12 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 15);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 3);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
 
     // Material properties buffer descriptors
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
-
-    FxLogInfo("Creating material buffer of size {:d}", material_buffer_size);
 
     MaterialPropertiesBuffer.Create(RxGpuBufferType::eStorage, sizeof(FxMaterialProperties) * material_buffer_size,
                                     VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, RxGpuBufferFlags::ePersistentMapped);
@@ -52,12 +51,10 @@ void FxMaterialManager::Create(uint32 entities_per_page)
 
     RxUtil::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Get());
 
-    FxLogInfo("Done!");
-
     mbInitialized = true;
 }
 
-FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline)
+FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* pipeline, bool supports_skinning)
 {
     std::lock_guard guard(mInUse);
 
@@ -73,6 +70,7 @@ FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* 
     ref->Name = name;
     ref->pPipeline = pipeline;
     ref->mMaterialPropertiesIndex = free_material_index;
+    ref->SetSupportsSkinning(supports_skinning);
 
     MaterialsInUse.Set(free_material_index);
 
@@ -131,36 +129,7 @@ RxDescriptorSet& FxMaterial::GetDescriptorSetAlbedoOnly()
 }
 
 
-bool FxMaterial::Bind(RxCommandBuffer* cmd)
-{
-    if (!bIsBuilt.load()) {
-        Build();
-    }
-
-    if (!IsReady() || !mDsDefault) {
-        return false;
-    }
-
-    if (!cmd) {
-        cmd = &gRenderer->GetFrame()->CommandBuffer;
-    }
-
-    if (pPipeline) {
-        pPipeline->Bind(*cmd);
-    }
-
-
-    VkDescriptorSet sets_to_bind[] = {
-        mDsDefault.Get(),                              // Set 0
-        gMaterialManager->mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
-    };
-
-
-    RxDescriptorSet::BindMultiple(0, *cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
-                                  FxMakeSlice(sets_to_bind, std::size(sets_to_bind)));
-
-    return true;
-}
+bool FxMaterial::Bind(RxCommandBuffer* cmd) { return BindWithPipeline(*cmd, *pPipeline, false); }
 
 bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bool albedo_only)
 {
@@ -174,18 +143,19 @@ bool FxMaterial::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bo
 
     pipeline.Bind(cmd);
 
-    RxDescriptorSet* descriptor_set = &mDsDefault;
-    if (albedo_only) {
-        descriptor_set = &GetDescriptorSetAlbedoOnly();
-    }
-
     VkDescriptorSet sets_to_bind[] = {
-        descriptor_set->Get(),                         // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
+        mDsDefault.Get(),                              // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
         gMaterialManager->mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
     };
 
-    RxDescriptorSet::BindMultiple(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-                                  FxMakeSlice(sets_to_bind, std::size(sets_to_bind)));
+    FxStackArray<uint32, 1> offsets;
+    if (bSupportsSkinning) {
+        offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
+    }
+
+
+    RxDescriptorSet::BindMultipleOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+                                        FxMakeSlice(sets_to_bind, std::size(sets_to_bind)), FxSlice<uint32>(offsets));
 
     return true;
 }
@@ -208,7 +178,7 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
     if (!component.pAssetImage && component.pDataToLoad) {
         FxSlice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pAssetImage = AxManager::LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
+        component.pAssetImage = gAssetManager->LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
         return false;
     }
 
@@ -230,8 +200,13 @@ static bool CheckComponentTextureLoaded(FxMaterialComponent<TFormat>& component)
 void FxMaterial::Build()
 {
     if (!mDsDefault.IsInited()) {
-        mDsDefault.Create(gMaterialManager->GetDescriptorPool(), gRenderer->pDeferredRenderer->DsLayoutGPassMaterial,
-                          false, 1);
+        VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
+
+        if (bSupportsSkinning) {
+            layout = gRenderer->pDeferredRenderer->DsLayoutGPassSkinned;
+        }
+
+        mDsDefault.Create(gMaterialManager->GetDescriptorPool(), layout, false, 1);
     }
 
     // Build components
@@ -261,8 +236,11 @@ void FxMaterial::Build()
         mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
     }
 
-    mDsDefault.Build();
+    if (bSupportsSkinning) {
+        mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.Size);
+    }
 
+    mDsDefault.Build();
 
     FxAssert(mMaterialPropertiesIndex != UINT32_MAX);
 
@@ -277,6 +255,10 @@ void FxMaterial::Build()
     }
     else {
         pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
+    }
+
+    if (bSupportsSkinning) {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
     }
 
     bIsBuilt.store(true);

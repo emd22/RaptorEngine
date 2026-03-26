@@ -83,9 +83,9 @@ void RxDescriptorSet::BindMultiple(uint32 first_set_index, const RxCommandBuffer
     vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, 0, nullptr);
 }
 
-void BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
-                        const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets,
-                        const FxSlice<uint32>& offsets)
+void RxDescriptorSet::BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd,
+                                         VkPipelineBindPoint bind_point, const RxPipeline& pipeline,
+                                         const FxSlice<VkDescriptorSet>& sets, const FxSlice<uint32>& offsets)
 {
     vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, offsets.Size,
                             offsets.pData);

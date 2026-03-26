@@ -9,12 +9,10 @@
 class RxUniforms
 {
 public:
-    static constexpr uint32 scUniformBufferSize = 512;
-
 public:
     RxUniforms() = default;
 
-    void Create();
+    void Create(uint32 size);
 
     /**
      * @brief Retrieve the pointer that the buffer starts at relative to the current frame.
@@ -38,7 +36,7 @@ public:
     {
         FxAssert(mGpuBuffer.IsMapped());
 
-        if (mUniformIndex + size >= scUniformBufferSize) {
+        if (mUniformIndex + size >= Size) {
             FxLogError("Could not submit uniform as uniform buffer is full!");
             return;
         }
@@ -64,11 +62,14 @@ public:
 
     void Destroy() { mGpuBuffer.Destroy(); }
 
+public:
+    uint32 Size = 0;
 
 private:
     /// Gpu buffer that stores current uniform buffer data. Note that this is a continguous buffer that stores
     /// `RxFramesInFlight` number of uniform structures that are of size `scUniformBufferSize`.
     RxRawGpuBuffer mGpuBuffer {};
+
 
     uint32 mUniformIndex = 0;
 };

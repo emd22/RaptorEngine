@@ -282,6 +282,16 @@ public:
         return element;
     }
 
+    void RemoveLast()
+    {
+        FxAssertMsg(Size > 0, "No elements remaining!");
+        TElementType* element = &pData[Size--];
+
+        if (std::is_destructible_v<TElementType>) {
+            element->~TElementType();
+        }
+    }
+
     void InitCapacity(size_t element_count)
     {
         FxAssertMsg(pData == nullptr, "SizedArray has already been initialized!");

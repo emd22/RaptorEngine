@@ -6,7 +6,7 @@
 
 void FxTerminate()
 {
-    AxManager::GetInstance().Shutdown();
+    gAssetManager->GetInstance()->Shutdown();
 
     FX_BREAKPOINT;
 

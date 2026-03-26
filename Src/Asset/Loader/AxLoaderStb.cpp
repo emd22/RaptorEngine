@@ -22,7 +22,7 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxTSRef<AxBase> asset, const std::
 
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
     if (mImageData == nullptr) {
-        FxLogError("Could not load image file at '{:d}'", c_path);
+        FxLogError("Could not load image file at '{}'", c_path);
         return AxLoaderStb::Status::eError;
     }
 
@@ -37,7 +37,7 @@ AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxTSRef<AxBase> asset, const uin
     FxAssert(pixel_size > 0);
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
-        FxLogError("Could not retrieve info from image in memory! (Size:{u})", size);
+        FxLogError("Could not retrieve info from image in memory! (Size={})", size);
         return AxLoaderStb::Status::eError;
     }
 

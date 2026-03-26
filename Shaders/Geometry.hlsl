@@ -2,6 +2,7 @@
 #include "./Helper.hlsl"
 
 
+
 ///////////////////////////////////
 // Vertex Shader
 ///////////////////////////////////
@@ -38,6 +39,13 @@ struct VSPushConsts
 	uint uiObjectIndex;
     uint uiMaterialIndex;
 };
+
+#ifdef USE_SKINNING
+[[vk::binding(3, 0)]] cbuffer VSUniforms
+{
+    BoneMtx bBones[BONE_COUNT];
+};
+#endif
 
 //F_REFLECT(FR_STRUCTBUFFER, 2, 0)
 [[vk::binding(0, 2)]] StructuredBuffer<Object> bObjectBuffer;

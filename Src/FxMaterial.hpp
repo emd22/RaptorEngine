@@ -122,6 +122,7 @@ public:
 
     bool IsReady();
 
+    void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
     inline uint32 GetMaterialIndex() { return mMaterialPropertiesIndex; }
 
     /**
@@ -153,6 +154,8 @@ public:
 
     std::atomic_bool bIsBuilt { false };
 
+    bool bSupportsSkinning = false;
+
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
      */
@@ -174,7 +177,7 @@ class FxMaterialManager
 {
 public:
     void Create(uint32 materials_per_page = 64);
-    FxTSRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
+    FxTSRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline, bool supports_skinning);
 
     RxDescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 

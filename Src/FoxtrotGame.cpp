@@ -78,8 +78,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    AxManager& asset_manager = AxManager::GetInstance();
-    asset_manager.Start(3);
+    gAssetManager->Start(3);
 
     gMaterialManager->Create();
 
@@ -155,6 +154,8 @@ static FX_FORCE_INLINE FxVec3f GetMovementVector()
 void FoxtrotGame::ProcessControls()
 {
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Q)) {
+        // Release the mouse before quitting the game incase there is a crash.
+        FxControlManager::ReleaseMouse();
         sbRunning = false;
     }
 
@@ -286,10 +287,11 @@ void FoxtrotGame::DestroyGame()
     gRenderer->GetDevice()->WaitForIdle();
 
     gMaterialManager->Destroy();
-    AxManager::GetInstance().Shutdown();
 
     delete gShadowRenderer;
     gShadowRenderer = nullptr;
+
+    gAssetManager->Shutdown();
 
     gRenderer->pDeferredRenderer.DestroyRef();
 }

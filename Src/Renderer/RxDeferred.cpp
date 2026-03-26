@@ -73,9 +73,6 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         DsLayoutLightingMaterialProperties = builder.Build();
     }
 
-    {
-        // Create object buffer DS layout
-    }
 
     {
         RxDsLayoutBuilder builder {};
@@ -107,7 +104,40 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
 
     VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(ds_layouts));
 
-    RxUtil::SetDebugLabel("Geometry Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+    RxUtil::SetDebugLabel("Geometry", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+
+    return layout;
+}
+
+
+VkPipelineLayout RxDeferredRenderer::CreateGPassSkinnedPipelineLayout()
+{
+    {
+        RxDsLayoutBuilder builder {};
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+        builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, RxShaderType::eFragment);
+        builder.AddBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, RxShaderType::eVertex);
+        DsLayoutGPassSkinned = builder.Build();
+    }
+
+
+    FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+        DsLayoutGPassSkinned,
+        DsLayoutLightingMaterialProperties,
+        gObjectManager->DsLayoutObjectBuffer,
+    };
+
+    FxStackArray<RxPushConstants, 1> push_consts = {
+        RxPushConstants {
+            .Size = sizeof(FxDrawPushConstants),
+            .StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        },
+    };
+
+    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(ds_layouts));
+
+    RxUtil::SetDebugLabel("GeometrySkinned", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
     return layout;
 }
@@ -190,12 +220,6 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 void RxDeferredRenderer::CreateGPassPipeline()
 {
     VkPipelineLayout gpass_layout = CreateGPassPipelineLayout();
-    // RxAttachmentList attachments;
-
-    // attachments
-    //     .Add(RxAttachment(RxImageFormat::eBGRA8_UNorm, RxAttachment::scFullScreen))  // Albedo
-    //     .Add(RxAttachment(RxImageFormat::eRGBA16_Float, RxAttachment::scFullScreen)) // Normals
-    //     .Add(RxAttachment(RxImageFormat::eD32_Float, RxAttachment::scFullScreen));   // Depth
 
     CreateGPass();
 
@@ -245,7 +269,10 @@ void RxDeferredRenderer::CreateGPassPipeline()
         FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, macros);
         FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, macros);
 
-        builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
+        VkPipelineLayout skinned_layout = CreateGPassSkinnedPipelineLayout();
+
+        builder.SetLayout(skinned_layout)
+            .SetPolygonMode(VK_POLYGON_MODE_FILL)
             .SetVertexDescription(&vertex_info)
             .SetShaders(nm_vertex_shader, nm_fragment_shader)
             .Build(PlGeometrySkinned);
@@ -259,13 +286,14 @@ void RxDeferredRenderer::DestroyGPassPipeline()
     VkDevice device = gRenderer->GetDevice()->Device;
 
     // Destroy descriptor set layouts
-    if (DsLayoutGPassVertex) {
-        vkDestroyDescriptorSetLayout(device, DsLayoutGPassVertex, nullptr);
-        DsLayoutGPassVertex = nullptr;
-    }
+
     if (DsLayoutGPassMaterial) {
         vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterial, nullptr);
         DsLayoutGPassMaterial = nullptr;
+    }
+    if (DsLayoutGPassSkinned) {
+        vkDestroyDescriptorSetLayout(device, DsLayoutGPassSkinned, nullptr);
+        DsLayoutGPassSkinned = nullptr;
     }
     if (DsLayoutGPassMaterialAlbedoOnly) {
         vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterialAlbedoOnly, nullptr);
@@ -280,7 +308,6 @@ void RxDeferredRenderer::DestroyGPassPipeline()
     PlGeometryWireframe.Layout = nullptr;
     PlGeometryWireframe.Destroy();
 
-    PlGeometrySkinned.Layout = nullptr;
     PlGeometrySkinned.Destroy();
 }
 
@@ -365,7 +392,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
     DsLighting.AddImageFromTarget(2, GPass.GetTarget(RxImageFormat::eRGBA16_Float),
                                   &gRenderer->Swapchain.NormalsSampler);
     // Skip 3 for the shadow target, added by RxDirectionalShadows
-    DsLighting.AddBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.scUniformBufferSize);
+    DsLighting.AddBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.Size);
 
     DsLighting.Build();
 
