@@ -18,6 +18,13 @@ FX_SET_MODULE_NAME("Main")
 
 int main()
 {
+    //     FxQuat a(0.6, 0.8, 0.0, 0.0);
+    //     FxQuat b(-0.8, 0.0, -0.6, 0.0);
+
+    //     FxQuat res = a.SLerp(b, 0.1);
+
+    //     FxLogInfo("SLERP: {}", res);
+
     gEnginePool = new FxMemPool;
     gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 

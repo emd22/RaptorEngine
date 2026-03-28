@@ -27,6 +27,7 @@ enum FxShuffleComponent
 namespace FxNeon {
 
 constexpr uint32 scSignMask32 = 0x80000000;
+static_assert(scSignMask32 == std::bit_cast<uint32>(-0.0f));
 
 template <FxShuffleComponent TA, FxShuffleComponent TB, FxShuffleComponent TC, FxShuffleComponent TD>
 concept C_SinglePermute = (TA <= FxShuffle_AW) && (TB <= FxShuffle_AW) && (TC <= FxShuffle_AW) && (TD <= FxShuffle_AW);
@@ -78,6 +79,11 @@ FX_FORCE_INLINE float32x4_t ReinterpretAsFloat(int32x4_t vec) { return vreinterp
 FX_FORCE_INLINE float32x4_t AndNot(float32x4_t a, float32x4_t b)
 {
     return ReinterpretAsFloat(vbicq_u32(ReinterpretAsUInt(b), ReinterpretAsUInt(a)));
+}
+
+FX_FORCE_INLINE float32x4_t Negate(float32x4_t a)
+{
+    return ReinterpretAsFloat(veorq_u32(ReinterpretAsUInt(a), vdupq_n_u32(scSignMask32)));
 }
 
 FX_FORCE_INLINE float32x4_t Floor(float32x4_t vec) { return vrndmq_f32(vec); }

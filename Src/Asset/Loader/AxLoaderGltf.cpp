@@ -190,10 +190,12 @@ void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_m
     //    object = current_object;
 }
 
+
 void AxLoaderGltf::LoadAnimations()
 {
     for (uint32 index = 0; index < mpGltfData->animations_count; index++) {
         cgltf_animation& anim = mpGltfData->animations[index];
+
 
         FxLogInfo("\tAnimation {} has {} samplers and {} channels", index, anim.samplers_count, anim.channels_count);
     }
