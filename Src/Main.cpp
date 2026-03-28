@@ -7,6 +7,7 @@
 #include <Asset/FxDataPack.hpp>
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxDefer.hpp>
+#include <Core/FxString.hpp>
 #include <Core/MemPool/FxMemPool.hpp>
 #include <FxEngine.hpp>
 #include <Math/FxMathConsts.hpp>

@@ -14,6 +14,12 @@
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
 
+struct FxAnimation
+{
+    std::string Name;
+    FxSizedArray<FxMat4f> Data;
+};
+
 class FxPrimitiveMesh;
 
 class FxObject : public AxBase, public FxEntity
@@ -57,6 +63,9 @@ public:
 
     void PrintDebug() const;
 
+    // XXX: TEMP
+    void UpdateAnimation();
+
     /**
      * @brief Reserve `num_instances` amount of future instances in the object manager.
      * @note This may update the object id if there are not enough free slots following this object.
@@ -87,10 +96,11 @@ private:
 
 public:
     FxRef<FxPrimitiveMesh> pMesh { nullptr };
-
     FxTSRef<FxMaterial> pMaterial { nullptr };
 
     FxPagedArray<FxTSRef<FxObject>> AttachedNodes;
+
+    FxSizedArray<FxAnimation> Animations;
 
     FxVec3f Dimensions = FxVec3f::sZero;
 
@@ -110,6 +120,7 @@ private:
     bool mbIsInstance : 1 = false;
     bool mbIsShadowCaster : 1 = false;
     bool mbRenderUnlit : 1 = false;
+
 
     FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };

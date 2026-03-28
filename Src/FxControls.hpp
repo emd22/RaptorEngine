@@ -94,6 +94,8 @@ public:
      */
     static FxControl* GetKey(FxKey scancode);
 
+    static void ResetKey(FxKey scancode);
+
     ////////////////////////////////
     // Update functions
     ////////////////////////////////
@@ -135,6 +137,12 @@ public:
     inline bool IsKeyUp() const { return !mbKeyDown; }
 
     inline bool IsContinuedPress() const { return mbContinuedPress; }
+
+    inline void Reset()
+    {
+        mbContinuedPress = false;
+        mbKeyDown = false;
+    }
 
     bool IsKeyPressed() const { return (IsKeyDown() && !IsContinuedPress()); }
 

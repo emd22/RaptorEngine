@@ -68,6 +68,7 @@ enum class FxKey
     FX_KEY_SEMICOLON = 51,
     FX_KEY_APOSTROPHE = 52,
     FX_KEY_GRAVE = 53,
+    FX_KEY_TILDE = FX_KEY_GRAVE,
     FX_KEY_COMMA = 54,
     FX_KEY_PERIOD = 55,
     FX_KEY_SLASH = 56,
@@ -91,7 +92,7 @@ enum class FxKey
     FX_KEY_SCROLLLOCK = 71,
     FX_KEY_PAUSE = 72,
 
-    FX_KEY_INSERT = 73, /** Insert on PC's, Help on macOS. Equivalent to FX_KEY_MAC_HELP */
+    FX_KEY_INSERT = 73,   /** Insert on PC's, Help on macOS. Equivalent to FX_KEY_MAC_HELP */
     FX_KEY_MAC_HELP = 73, /** Help on macOS, Insert on PC's. Equivalent to FX_KEY_INSERT. */
 
     FX_KEY_HOME = 74,
@@ -104,7 +105,7 @@ enum class FxKey
     FX_KEY_DOWN = 81,
     FX_KEY_UP = 82,
 
-    FX_KEY_NUMLOCK = 83, /** Numlock on PC's, Clear on macOS. Equivalent to FX_KEY_MAC_CLEAR */
+    FX_KEY_NUMLOCK = 83,   /** Numlock on PC's, Clear on macOS. Equivalent to FX_KEY_MAC_CLEAR */
     FX_KEY_MAC_CLEAR = 83, /** Clear on macOS, Numlock on PC's. Equivalent to FX_KEY_NUMLOCK */
 
     FX_KEY_NUMPAD_DIVIDE = 84,

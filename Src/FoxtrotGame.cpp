@@ -153,7 +153,7 @@ static FX_FORCE_INLINE FxVec3f GetMovementVector()
 
 void FoxtrotGame::ProcessControls()
 {
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Q)) {
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_GRAVE)) {
         // Release the mouse before quitting the game incase there is a crash.
         FxControlManager::ReleaseMouse();
         sbRunning = false;
@@ -192,15 +192,28 @@ void FoxtrotGame::ProcessControls()
         Player.RotateHead(mouse_delta);
     }
 
+
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_SPACE)) {
+        if (!Player.IsFlyMode()) {
+            Player.Jump();
+        }
+    }
+
+    // Elevate up
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_E)) {
+        Player.Move(DeltaTime, FxVec3f::sUp);
+    }
+    // Elevate down
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Q)) {
+        Player.Move(DeltaTime, -FxVec3f::sUp);
+    }
+
+
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_LSHIFT)) {
         Player.bIsSprinting = true;
     }
     else {
         Player.bIsSprinting = false;
-    }
-
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_SPACE)) {
-        Player.Jump();
     }
 
     if (FxControlManager::IsComboDown(FxKey::FX_KEY_LSHIFT, FxKey::FX_KEY_R)) {

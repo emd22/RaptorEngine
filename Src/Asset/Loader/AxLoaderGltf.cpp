@@ -190,7 +190,17 @@ void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_m
     //    object = current_object;
 }
 
-void AxLoaderGltf::LoadAnimations() { FxLogInfo("Gltf model has {} animations", mpGltfData->animations_count); }
+void AxLoaderGltf::LoadAnimations()
+{
+    for (uint32 index = 0; index < mpGltfData->animations_count; index++) {
+        cgltf_animation& anim = mpGltfData->animations[index];
+
+        FxLogInfo("\tAnimation {} has {} samplers and {} channels", index, anim.samplers_count, anim.channels_count);
+    }
+
+
+    FxLogInfo("Gltf model has {} animations", mpGltfData->animations_count);
+}
 
 
 AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
@@ -244,6 +254,10 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
     if (has_multiple_meshes) {
         current_object = FxTSRef<FxObject>::New();
     }
+
+
+    LoadAnimations();
+
 
     FxLogInfo("Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
 

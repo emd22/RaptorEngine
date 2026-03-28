@@ -169,6 +169,8 @@ bool FxControlManager::IsKeyUp(FxKey scancode)
     return key->IsKeyUp();
 }
 
+void FxControlManager::ResetKey(FxKey scancode) { GetInstance().GetKey(scancode)->Reset(); }
+
 ////////////////////////////////
 // Update functions
 ////////////////////////////////

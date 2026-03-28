@@ -240,7 +240,7 @@ FSOutput main(FSInput input)
     output.vColor = float4(attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL + ambient.rgb, 1.0);
 
 #ifdef FX_LIGHT_DIRECTIONAL
-    // out.vColor = float4(float3(visibility), 1.0f);
+    // output.vColor = float4(world_position, 1.0f);
 #endif
 
     return output;

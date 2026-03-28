@@ -1,41 +1,71 @@
 #pragma once
 
 #include <Core/FxTypes.hpp>
-#include <cstring>
+#include <format>
 #include <string>
-
-// TODO: support wide characters
 
 class FxString
 {
+    static constexpr uint32 scStackAllocSize = 32;
+
 public:
-    FxString(char* ptr, uint64 length) : Data(ptr), Length(length) {}
+    static FxString NoCopy(char* ptr, uint32 length);
 
-    FxString(const std::string& other) { *this = other; }
+    FxString() = default;
+    FxString(uint32 allocation_size);
+    FxString(const char* str, uint32 length);
+    FxString(const std::string& str);
+    FxString(const char* str);
 
-    ~FxString()
+    FX_FORCE_INLINE bool IsHeapAllocated() const { return (mpHeapStr != nullptr); }
+
+    FX_FORCE_INLINE uint32 GetLength() const { return Length; }
+
+    const char* CStr() const
     {
-        if (mAllocated) {
-            free(Data);
+        if (IsHeapAllocated()) {
+            return mpHeapStr;
         }
+
+        return mpStackStr;
     }
 
-    FxString(char* ptr) : Data(ptr) { std::strlen(ptr); }
+    FxString& operator=(const char* str);
 
-    bool Empty() const { return (Data == nullptr || Length == 0); }
+    FxString operator+(const FxString& other) const;
+    FxString operator+(const char* other) const;
 
+    const char operator[](size_t index) const;
+    char& operator[](size_t index);
 
-    FxString& operator=(const std::string& other)
-    {
-        Data = (char*)malloc(other.size());
-        memcpy(Data, other.data(), other.size());
-        mAllocated = true;
-    }
-
-public:
-    char* Data = nullptr;
-    uint64 Length = 0;
+    ~FxString();
 
 private:
-    bool mAllocated = false;
+    FX_FORCE_INLINE char* GetInternalPtr()
+    {
+        if (IsHeapAllocated()) {
+            return mpHeapStr;
+        }
+
+        return mpStackStr;
+    }
+
+public:
+    uint32 Length = 0;
+
+private:
+    char mpStackStr[scStackAllocSize];
+    char* mpHeapStr = nullptr;
+};
+
+
+template <>
+struct std::formatter<FxString>
+{
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    auto format(const FxString& str, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "{}", str.CStr());
+    }
 };

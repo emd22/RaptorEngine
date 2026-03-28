@@ -161,6 +161,8 @@ void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
         });
 }
 
+void FxObject::UpdateAnimation() {}
+
 void FxObject::MakeInstanceOf(const FxTSRef<FxObject>& source_ref)
 {
     FxRefContext<FxTSRef<FxObject>> source_ctx(source_ref);

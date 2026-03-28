@@ -361,14 +361,14 @@ void AxManager::AssetManagerUpdate()
         }
         // There is no data being loaded or uploaded, we can unload the extra worker threads.
         else {
-            uint32 amount_threads = mWorkerThreads.Size;
-            // for (uint32 index = amount_threads; index > mMinThreads; index--) {
-            //     FxLogInfo("Killing asset manager worker thread...");
+            const uint32 amount_threads = mWorkerThreads.Size;
+            for (uint32 index = amount_threads; index > mMinThreads; index--) {
+                FxLogInfo("Killing asset manager worker thread...");
 
-            //     mWorkerThreads[index].Kill();
-            //     mWorkerThreads[index].Thread.join();
-            //     mWorkerThreads.RemoveLast();
-            // }
+                mWorkerThreads[index].Kill();
+                mWorkerThreads[index].Thread.join();
+                mWorkerThreads.RemoveLast();
+            }
         }
 
         // There are no busy workers remaining, wait for the next item to be enqueued.

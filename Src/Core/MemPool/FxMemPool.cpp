@@ -52,10 +52,10 @@
 
 /// The total alignment and alignment of each allocation from the memory pool.
 /// Default is 16 to allow for aligned loads and stores on ARM and modern x64.
-static constexpr uint32 scAlignmentSize = 16;
+static constexpr uint32 scAlignmentSize = 8;
 
 /// The amount of bits to shift to get `scAlignmentSize`. Used in TLSF to get block sizes and index counts
-static constexpr uint32 scAlignmentShift = 4;
+static constexpr uint32 scAlignmentShift = (scAlignmentSize == 16 ? 4 : (scAlignmentSize == 8 ? 3 : 2));
 static_assert((1 << scAlignmentShift) == scAlignmentSize);
 
 
@@ -137,7 +137,7 @@ static constexpr size_t scBlockPrevFreeBit = 1 << 1;
 **   simplify the implementation.
 ** - The next_free / prev_free fields are only valid if the block is free.
 */
-struct alignas(scAlignmentSize) MemBlock
+struct alignas(8) MemBlock
 {
 public:
     size_t GetSize() const { return Size & ~(scBlockFreeBit | scBlockPrevFreeBit); }
@@ -198,7 +198,7 @@ public:
     MemBlock* pPrevPhysBlock;
 
     /* The size of this block, excluding the block header. */
-    size_t Size;
+    uint64 Size;
 
     /* Next and previous free blocks. */
     MemBlock* pNextFree;
@@ -249,7 +249,7 @@ static void mapping_search(size_t size, int* fli, int* sli)
     mapping_insert(size, fli, sli);
 }
 
-struct alignas(scAlignmentSize) ControlBlock
+struct alignas(16) ControlBlock
 {
 public:
     /* Remove a given block from the free list. */
@@ -305,7 +305,7 @@ public:
         current->pPrevFree = block;
 
         void* btp = BlockToPtr(block);
-        void* align_btp = FxMath::AlignPtr<void*, scAlignmentSize>(BlockToPtr(block));
+        void* align_btp = FxMath::AlignPtr<void*, scAlignmentSize>(btp);
 
         tlsf_assert(btp == align_btp && "block not aligned properly");
         /*
@@ -342,7 +342,7 @@ static constexpr size_t scBlockStartOffset = offsetof(MemBlock, Size) + sizeof(s
 ** the prev_phys_block field, and no larger than the number of addressable
 ** bits for FL_INDEX.
 */
-static const size_t block_size_min = sizeof(MemBlock);
+static const size_t block_size_min = sizeof(MemBlock) - sizeof(MemBlock*);
 static const size_t block_size_max = 1llu << FL_INDEX_MAX;
 
 
@@ -414,7 +414,7 @@ static size_t adjust_request_size(size_t size, size_t align)
 {
     size_t adjust = 0;
     if (size) {
-        const size_t aligned = align_up(size, align);
+        const size_t aligned = FxMath::AlignValue(size, align);
 
         /* aligned sized must not exceed block_size_max or we'll go out of bounds on sl_bitmap */
         if (aligned < block_size_max) {
@@ -877,12 +877,11 @@ int test_ffs_fls()
 
 void FxMemPool::Create(uint64 size)
 {
-    void* ptr = std::malloc(size);
+    void* ptr = std::aligned_alloc(scAlignmentSize, size);
     FxAssertMsg(ptr != nullptr, "Could not allocate memory pool!");
 
     CreateFromPtr(ptr);
-    AddPool(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(ptr) + sizeof(ControlBlock)),
-            size - sizeof(ControlBlock));
+    AddPool(reinterpret_cast<void*>(reinterpret_cast<uint8*>(ptr) + sizeof(ControlBlock)), size - sizeof(ControlBlock));
 
     pMemory = ptr;
 }

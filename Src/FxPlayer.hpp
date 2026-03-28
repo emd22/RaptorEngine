@@ -74,7 +74,7 @@ private:
 
         MovementDirection.Set(s_anglex, 0.0f, c_anglex);
         if (mbIsFlymode) {
-            MovementDirection.Y = std::sin(pCamera->mAngleY);
+            MovementDirection.Y = sin(pCamera->mAngleY);
         }
 
         // MovementDirection = FxVec3f(c_angley, s_angley, c_angley) * MovementDirection;
