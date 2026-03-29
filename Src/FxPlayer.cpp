@@ -10,6 +10,7 @@ void FxPlayer::Create()
     pCamera = FxMakeRef<FxPerspectiveCamera>();
 
     pCamera->SetAspectRatio(gRenderer->Swapchain.GetAspectRatio());
+    pCamera->SetFov(scWalkingFov);
 
     Physics.Create();
 
@@ -49,8 +50,8 @@ void FxPlayer::Move(float64 delta_time, const FxVec3f& offset)
         movement_goal.NormalizeIP();
     }
 
-    mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed), cMovementLerpSpeed,
-                                 delta_time);
+    mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? scMaxSprintSpeed : scMaxWalkSpeed),
+                                 scMovementLerpSpeed, delta_time);
 
     FxVec3f force = mUserForce;
 
@@ -70,6 +71,15 @@ void FxPlayer::Update(float64 delta_time)
     SyncPhysicsToPlayer();
 
     pCamera->MoveTo(Position + mCameraOffset);
+
+    if (!mUserForce.IsNearZero(0.1)) {
+        if (bIsSprinting && pCamera->GetFov() < scSprintFov) {
+            pCamera->SetFov(FxMath::SmoothInterpolate(pCamera->GetFov(), scSprintFov, 8.0f, delta_time));
+        }
+        else if (!bIsSprinting && pCamera->GetFov() > scWalkingFov) {
+            pCamera->SetFov(FxMath::SmoothInterpolate(pCamera->GetFov(), scWalkingFov, 13.0f, delta_time));
+        }
+    }
     pCamera->Update();
 
     mbUpdatePhysicsTransform = false;

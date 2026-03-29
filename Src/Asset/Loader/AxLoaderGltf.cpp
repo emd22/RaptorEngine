@@ -191,14 +191,69 @@ void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_m
 }
 
 
+int find_keyframe_index(cgltf_accessor* input, float t)
+{
+    for (size_t i = 0; i < input->count - 1; ++i) {
+        float t0, t1;
+        cgltf_accessor_read_float(input, i, &t0, 1);
+        cgltf_accessor_read_float(input, i + 1, &t1, 1);
+        if (t >= t0 && t < t1)
+            return i;
+    }
+    return 0;
+}
+
 void AxLoaderGltf::LoadAnimations()
 {
-    for (uint32 index = 0; index < mpGltfData->animations_count; index++) {
-        cgltf_animation& anim = mpGltfData->animations[index];
+    float t = 1.0;
 
 
-        FxLogInfo("\tAnimation {} has {} samplers and {} channels", index, anim.samplers_count, anim.channels_count);
+    if (!mpGltfData->animations_count) {
+        return;
     }
+
+    FxQuat rotation = FxQuat::sIdentity;
+    FxVec3f translation = FxVec3f::sZero;
+
+    cgltf_animation& anim = mpGltfData->animations[0];
+
+    for (size_t i = 0; i < anim.channels_count; ++i) {
+        cgltf_animation_channel* channel = &anim.channels[i];
+        cgltf_animation_sampler* sampler = channel->sampler;
+
+        // Find keyframe interval
+        int idx = find_keyframe_index(sampler->input, t);
+        float t0, t1;
+        cgltf_accessor_read_float(sampler->input, idx, &t0, 1);
+        cgltf_accessor_read_float(sampler->input, idx + 1, &t1, 1);
+        float alpha = (t - t0) / (t1 - t0);
+
+        // Interpolate based on property type
+        if (channel->target_path == cgltf_animation_path_type_translation) {
+            FxVec3f v0, v1, result;
+            cgltf_accessor_read_float(sampler->output, idx, v0.mData, 3);
+            cgltf_accessor_read_float(sampler->output, idx + 1, v1.mData, 3);
+
+            translation = v0.LerpIP(v1, alpha);
+        }
+        else if (channel->target_path == cgltf_animation_path_type_rotation) {
+            float buffer[4];
+
+            cgltf_accessor_read_float(sampler->output, idx, buffer, 4);
+            FxQuat q0(buffer);
+
+            cgltf_accessor_read_float(sampler->output, idx + 1, buffer, 4);
+            FxQuat q1(buffer);
+
+            rotation = q0.SLerp(q1, alpha);
+        }
+    }
+
+    FxMat4f xform_matrix = FxMat4f::AsRotation(rotation) * FxMat4f::AsTranslation(translation);
+
+    // for (uint32 index = 0; index < mpGltfData->animations_count; index++) {
+    //     FxLogInfo("\tAnimation {} has {} samplers and {} channels", index, anim.samplers_count, anim.channels_count);
+    // }
 
 
     FxLogInfo("Gltf model has {} animations", mpGltfData->animations_count);

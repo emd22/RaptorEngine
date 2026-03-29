@@ -23,7 +23,7 @@ FX_FORCE_INLINE FxVec3f::FxVec3f(float32 scalar) { mIntrin = vdupq_n_f32(scalar)
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {
-    return IsCloseTo(other.mIntrin);
+    return IsCloseTo(other.mIntrin, tolerance);
 }
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const float32 tolerance) const

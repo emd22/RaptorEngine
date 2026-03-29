@@ -19,6 +19,11 @@ FX_FORCE_INLINE float32 RSqrt(float32 x);
 
 FX_FORCE_INLINE float32 Clamp(float32 value, float32 lower, float32 upper) { return fmin(fmax(value, lower), upper); }
 
+FX_FORCE_INLINE float32 SmoothInterpolate(float32 a, float32 b, float32 speed, float32 delta_time)
+{
+    return std::lerp(a, b, 1.0f - expf(-speed * delta_time));
+}
+
 FX_FORCE_INLINE uint64 AlignValue(uint64 value, const uint16 alignto)
 {
     // Generic case

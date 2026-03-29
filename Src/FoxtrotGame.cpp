@@ -26,6 +26,9 @@ FX_SET_MODULE_NAME("FoxtrotGame");
 
 static constexpr float scMouseSensitivity = 0.25;
 
+static constexpr uint32 scFramesForAvg = 10;
+
+
 static double sClockFreq = 1.0f;
 
 static bool sbRunning = true;
@@ -240,11 +243,23 @@ void FoxtrotGame::ProcessControls()
     }
 }
 
+
 void FoxtrotGame::Tick()
 {
     const uint64 current_tick = SDL_GetPerformanceCounter();
 
     DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
+
+    FrameTimeAvg += DeltaTime;
+
+    if (!(gRenderer->GetFrameNumber() % scFramesForAvg)) {
+        double frametime = FrameTimeAvg / scFramesForAvg;
+        double fps = 1.0 / frametime;
+
+        FxLogInfo("FrameTime={}, FPS={}", frametime, fps);
+
+        FrameTimeAvg = 0;
+    }
 
 
     FxControlManager::Update();

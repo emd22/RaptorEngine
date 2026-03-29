@@ -14,6 +14,12 @@ FX_FORCE_INLINE FxQuat& FxQuat::operator=(const __m128 other)
     return *this;
 }
 
+FX_FORCE_INLINE FxQuat::FxQuat(const float32* buffer)
+{
+    const float32 aligned_buffer[] = { buffer[0], buffer[1], buffer[2], buffer[2] };
+    mIntrin = _mm_load_ps(aligned_buffer);
+}
+
 FX_FORCE_INLINE bool FxQuat::IsCloseTo(const FxQuat& other, const float32 tolerance) const
 {
     return IsCloseTo(other.mIntrin, tolerance);

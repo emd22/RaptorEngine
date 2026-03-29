@@ -4,6 +4,12 @@
 
 #ifdef FX_USE_NEON
 
+FX_FORCE_INLINE FxQuat::FxQuat(const float32* buffer)
+{
+    const float aligned_buffer[] = { buffer[0], buffer[1], buffer[2], buffer[2] };
+    mIntrin = vld1q_f32(aligned_buffer);
+}
+
 FX_FORCE_INLINE FxQuat& FxQuat::operator=(const float32x4_t& other)
 {
     mIntrin = other;

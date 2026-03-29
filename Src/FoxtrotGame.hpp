@@ -39,6 +39,8 @@ public:
     FxTSRef<FxObject> pPistolObject { nullptr };
     FxTSRef<FxObject> pHelmetObject { nullptr };
 
+    double FrameTimeAvg = 0.0f;
+
 
     FxQuat PistolRotationGoal = FxQuat::sIdentity;
 
