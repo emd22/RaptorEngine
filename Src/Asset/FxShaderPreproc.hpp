@@ -5,6 +5,7 @@
 #include <Core/FxTypes.hpp>
 #include <Renderer/Backend/RxShader.hpp>
 #include <vector>
+#include <array>
 
 
 namespace FxShaderPreproc {

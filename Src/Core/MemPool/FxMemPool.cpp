@@ -658,8 +658,8 @@ static void integrity_walker(void* ptr, size_t size, int used, void* user)
 
     int status = 0;
     (void)used;
-    tlsf_insist(integ->prev_status == this_prev_status && "prev status incorrect");
-    tlsf_insist(size == this_block_size && "block size incorrect");
+    tlsf_insist((integ->prev_status == this_prev_status) && "prev status incorrect");
+    tlsf_insist((size == this_block_size) && "block size incorrect");
 
     integ->prev_status = this_status;
     integ->status += status;
@@ -877,7 +877,7 @@ int test_ffs_fls()
 
 void FxMemPool::Create(uint64 size)
 {
-    void* ptr = std::aligned_alloc(scAlignmentSize, size);
+    void* ptr = std::malloc(size);
     FxAssertMsg(ptr != nullptr, "Could not allocate memory pool!");
 
     CreateFromPtr(ptr);
@@ -965,7 +965,7 @@ void* FxMemPool::AlignedAllocRaw(uint32 alignment, size_t size)
     if (block) {
         void* ptr = BlockToPtr(block);
         const void* aligned = FxMath::AlignPtr(ptr, alignment);
-        size_t gap = reinterpret_cast<size_t>(reinterpret_cast<uintptr_t>(aligned) - reinterpret_cast<uintptr_t>(ptr));
+        size_t gap = static_cast<size_t>(reinterpret_cast<uintptr_t>(aligned) - reinterpret_cast<uintptr_t>(ptr));
 
         /* If gap size is too small, offset to next aligned boundary. */
         if (gap && gap < gap_minimum) {
@@ -974,7 +974,7 @@ void* FxMemPool::AlignedAllocRaw(uint32 alignment, size_t size)
             const void* next_aligned = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(aligned) + offset);
 
             aligned = FxMath::AlignPtr(next_aligned, alignment);
-            gap = reinterpret_cast<size_t>(reinterpret_cast<uintptr_t>(aligned) - reinterpret_cast<uintptr_t>(ptr));
+            gap = static_cast<size_t>(reinterpret_cast<uintptr_t>(aligned) - reinterpret_cast<uintptr_t>(ptr));
         }
 
         if (gap) {

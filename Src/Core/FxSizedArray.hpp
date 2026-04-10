@@ -16,7 +16,7 @@
 #include "FxLog.hpp"
 #endif
 
-#define FX_SIZED_ARRAY_NO_MEMPOOL 1
+//#define FX_SIZED_ARRAY_NO_MEMPOOL 1
 
 static inline void NoMemError()
 {

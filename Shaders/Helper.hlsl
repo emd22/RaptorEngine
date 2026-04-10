@@ -1,11 +1,11 @@
 // Dummy macros for the shader preprocessor
-#define F_PROGRAM(_type) _type
+#define F_PROGRAM(_type) ;
 #define FPT_VERTEX 0
 #define FPT_PIXEL 1
 /// Global, copy to all shader types
 #define FPT_ALL 2
 
-#define F_REFLECT(_type, _set, _binding) _type
+#define F_REFLECT(_type, _set, _binding) ;
 #define FR_STRUCTBUFFER 0
 #define FR_UNIFORMBUFFER 1
 #define FR_SAMPLER2D 2

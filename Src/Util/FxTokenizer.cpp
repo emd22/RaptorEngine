@@ -308,6 +308,11 @@ void FxTokenizer::Tokenize()
     char ch;
 
     while (mpData < mpDataEnd && ((ch = *(mpData)))) {
+        if (ch == '\r') {
+            ++mpData;
+            continue;
+        }
+
         if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '/')) {
             SubmitTokenIfData(current_token);
             in_comment = true;

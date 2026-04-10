@@ -60,7 +60,11 @@ VSOutput main(VSInput input)
 
     float4x4 MVP = mul(VSConst.mViewProjection, model_matrix);
 
+#ifdef USE_SKINNING
     output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
+#else
+    output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
+#endif
     output.vNormalWS = normalize(mul((float3x3)model_matrix, input.vNormal));
 
 #ifdef USE_NORMAL_MAPS

@@ -3,6 +3,9 @@
 #include <cctype>
 #include <cstdlib>
 
+#include <array>
+#include <functional>
+
 namespace FxShaderPreproc {
 
 static constexpr uint32 scDataPageSize = 512;
@@ -260,16 +263,25 @@ static bool ParseIfdef(State& state, Result& result, const FxSizedArray<FxShader
         read_index = 0;
 
         while (state.Get() != '\n') {
-            read_macro[read_index++] = state.Get();
+            char ch = state.Get();
+
+            if (ch == '\r') {
+                state.NextChar();
+                continue;
+            }
+
+            read_macro[read_index++] = ch;
             state.NextChar();
         }
 
+        state.NextIfEqual('\r');
         state.NextIfEqual('\n');
 
         read_macro[read_index] = 0;
 
         bool macro_found = false;
 
+        printf("MACRO SIZE: %d\n", read_index);
         printf("MACRO: '%.*s'\n", read_index, read_macro);
 
         for (const FxShaderMacro& macro : macros) {
@@ -298,6 +310,7 @@ static bool ParseIfdef(State& state, Result& result, const FxSizedArray<FxShader
 
         // Eat the final endif
         state.TryReadString("#endif");
+        state.NextIfEqual('\r');
         state.NextIfEqual('\n');
 
         return true;

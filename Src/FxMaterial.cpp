@@ -28,7 +28,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     RxDescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 180);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 3);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);

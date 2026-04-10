@@ -7,6 +7,7 @@
 #include "FxSSE.hpp"
 
 #include <Core/FxTypes.hpp>
+#include <bit>
 
 enum FxShuffleComponent
 {
