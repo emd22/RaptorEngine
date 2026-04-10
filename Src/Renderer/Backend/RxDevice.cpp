@@ -196,8 +196,8 @@ void RxGpuDevice::CreateLogicalDevice()
     // List of features that may not be available on all devices
     VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PORTABILITY_SUBSET_FEATURES_KHR,
-        .mutableComparisonSamplers = VK_TRUE, // For samplers that use compareOp's / SampleCmp in shaders
         .pNext = nullptr,
+        .mutableComparisonSamplers = VK_TRUE, // For samplers that use compareOp's / SampleCmp in shaders
     };
 #endif
 

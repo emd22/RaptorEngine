@@ -91,7 +91,7 @@ void FoxtrotGame::InitEngine()
 void FoxtrotGame::CreateLights()
 {
     pSun = FxMakeRef<FxLightDirectional>();
-    pSun->MoveTo(FxVec3f(0.5, 2, -2).Normalize());
+    pSun->MoveTo(FxVec3f(0.5, 5, -1.0).Normalize());
     pSun->Color = FxColor::FromRGBA(0xFA, 0xD2, 0xC0, 6);
     pSun->AmbientColor = FxColor::FromRGBA(0x4A, 0x3A, 0x2A, 1);
     mMainScene.Attach(pSun);
@@ -120,8 +120,8 @@ void FoxtrotGame::CreateGame()
 
     CreateLights();
 
-    gShadowRenderer = new RxShadowDirectional(FxVec2u(1024, 1024));
-    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 4.0f, -4.0f), FxVec3f(0, 1, 0));
+    gShadowRenderer = new RxShadowDirectional(FxVec2u(2048, 2048));
+    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 8.0f, -2.0f), FxVec3f(0, 1, 0));
     gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);
     gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
     gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
@@ -256,7 +256,7 @@ void FoxtrotGame::Tick()
         double frametime = FrameTimeAvg / scFramesForAvg;
         double fps = 1.0 / frametime;
 
-        FxLogInfo("FrameTime={}, FPS={}", frametime, fps);
+        // FxLogInfo("FrameTime={}, FPS={}", frametime, fps);
 
         FrameTimeAvg = 0;
     }

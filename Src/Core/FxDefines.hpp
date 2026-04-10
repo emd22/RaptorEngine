@@ -1,6 +1,6 @@
 #pragma once
 
-#define FX_MEMORY_ENGINE_POOL_SIZE (1024 * 1024 * 80)
+#define FX_MEMORY_ENGINE_POOL_SIZE (1024ULL * 1024ULL * 80ULL)
 
 ////////////////////////////
 // Settings

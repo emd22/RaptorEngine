@@ -28,7 +28,7 @@ void FxMaterialManager::Create(uint32 entities_per_page)
     RxDescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 15);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 180);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 3);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
@@ -62,7 +62,8 @@ FxTSRef<FxMaterial> FxMaterialManager::New(const std::string& name, RxPipeline* 
         Create();
     }
 
-    int free_material_index = MaterialsInUse.FindNextFreeBit();
+    uint32 free_material_index = MaterialsInUse.FindNextFreeBit();
+    FxLogInfo("Free mat index: {}", free_material_index);
     FxAssert(free_material_index != FxBitset::scNoFreeBits);
 
     FxTSRef<FxMaterial> ref = FxTSRef<FxMaterial>::New();

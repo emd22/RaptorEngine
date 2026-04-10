@@ -8,6 +8,7 @@ Objects = {
         Unlit = TRUE
     }
 
+
     Level = {
         Mesh = "/TestFloor.glb"
         Physics = {
@@ -16,7 +17,6 @@ Objects = {
         }
         Pos=[0.0, -2.0, 0.0]
     }
-
 
     AnimTest = {
         Mesh = "/Model.glb"

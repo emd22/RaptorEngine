@@ -83,6 +83,7 @@ FxString& FxString::operator=(const char* str)
 
     if (new_len >= scStackAllocSize && new_len > Length) {
         if (mpHeapStr == nullptr) {
+            mpHeapStr = gEnginePool->Alloc<char>(new_len);
         }
         else {
             mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_len);
