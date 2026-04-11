@@ -1,9 +1,8 @@
 #include "FxShaderPreproc.hpp"
 
+#include <array>
 #include <cctype>
 #include <cstdlib>
-
-#include <array>
 #include <functional>
 
 namespace FxShaderPreproc {
@@ -378,6 +377,14 @@ Result Process(const FxSlice<char>& data, const FxSizedArray<FxShaderMacro>& mac
     State state(data);
 
     while (state.Index < data.Size) {
+        // If there is a comment, skip until the end
+        if (state.Get() == '/' && state.Get(1) == '/') {
+            char ch;
+            while ((ch = state.Get()) && ch != '\n') {
+                state.NextChar();
+            }
+        }
+
         ParsePPFuncCall(state, result);
 
         if (state.Get() == '#' && ParseIfdef(state, result, macros)) {

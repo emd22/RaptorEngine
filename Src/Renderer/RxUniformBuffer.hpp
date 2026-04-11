@@ -14,10 +14,16 @@ public:
 
     void Create(uint32 size);
 
+    uint8* GetBasePtr();
+
     /**
      * @brief Retrieve the pointer that the buffer starts at relative to the current frame.
      */
-    uint8* GetCurrentBuffer();
+    uint8* GetCurrentBuffer()
+    {
+        // Offset by the frame currently in flight
+        return GetBasePtr() + GetBaseOffset();
+    }
 
     RxRawGpuBuffer& GetGpuBuffer() { return mGpuBuffer; }
 
@@ -50,10 +56,17 @@ public:
 
     void AssertSize(uint32 expected_size) { FxAssert(mUniformIndex == expected_size); }
 
+    template <typename TValueType>
+    void SetAllValues(const TValueType& value, bool all_frames)
+    {
+        SetAllValuesRaw(reinterpret_cast<const void*>(&value), sizeof(TValueType), all_frames);
+    }
+
     /**
      * @brief Get the index for start of the buffer at the current frame.
      */
     uint32 GetBaseOffset() const;
+    uint32 GetBaseOffset(uint32 frame_index) const;
 
     /**
      * @brief Resets the uniform buffer back to the start.
@@ -61,6 +74,9 @@ public:
     void Rewind();
 
     void Destroy() { mGpuBuffer.Destroy(); }
+
+private:
+    void SetAllValuesRaw(const void* data, uint32 value_size, bool all_frames);
 
 public:
     uint32 Size = 0;

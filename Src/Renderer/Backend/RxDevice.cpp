@@ -9,6 +9,9 @@
 
 FX_SET_MODULE_NAME("Device")
 
+// Removed for Kosmic Krisp
+
+
 ///////////////////////////////
 // Queue Families
 ///////////////////////////////
@@ -37,6 +40,16 @@ void RxQueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR s
             mTransferIndex = index;
         }
     }
+
+    FxAssert(mGraphicsIndex != scNullQueue);
+
+    // There is no independent transfer queue available, use the graphics queue.
+    //
+    VkQueueFamilyProperties& graphics_props = RawFamilies[mGraphicsIndex];
+    if (!(graphics_props.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+        FxPanic("RxDevice", "Could not find a queue that supports transfer!");
+    }
+    mTransferIndex = mGraphicsIndex;
 }
 
 bool RxQueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index)
@@ -140,10 +153,9 @@ bool RxGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice& physical)
 
 void RxGpuDevice::QueryQueues()
 {
-    vkGetDeviceQueue(Device, mQueueFamilies.GetGraphicsFamily(), 0, &GraphicsQueue);
-    vkGetDeviceQueue(Device, mQueueFamilies.GetPresentFamily(), 0, &PresentQueue);
-
-    vkGetDeviceQueue(Device, mQueueFamilies.GetTransferFamily(), 0, &TransferQueue);
+    vkGetDeviceQueue(Device, mQueueFamilies.GetGraphicsFamily(), 0, &mGraphicsQueue);
+    vkGetDeviceQueue(Device, mQueueFamilies.GetPresentFamily(), 0, &mPresentQueue);
+    vkGetDeviceQueue(Device, mQueueFamilies.GetTransferFamily(), 0, &mTransferQueue);
 }
 
 void RxGpuDevice::CreateLogicalDevice()
@@ -171,27 +183,28 @@ void RxGpuDevice::CreateLogicalDevice()
         .pQueuePriorities = graphics_priorities,
     });
 
-    queue_create_infos.push_back(VkDeviceQueueCreateInfo {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .queueFamilyIndex = mQueueFamilies.GetTransferFamily(),
-        .queueCount = 1,
-        .pQueuePriorities = transfer_priorities,
-    });
-
+    if (mQueueFamilies.HasIndependentTransfer()) {
+        queue_create_infos.push_back(VkDeviceQueueCreateInfo {
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = mQueueFamilies.GetTransferFamily(),
+            .queueCount = 1,
+            .pQueuePriorities = transfer_priorities,
+        });
+    }
 
     const VkPhysicalDeviceFeatures device_features {
-        .fillModeNonSolid = true,
+        // .fillModeNonSolid = true,
     };
 
     const char* device_extensions[] = {
-#ifdef FX_PLATFORM_MACOS
+#ifdef FX_USE_PORTABILITY_EXTENSION
         VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
 #endif
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
     };
 
-#ifdef FX_PLATFORM_MACOS
+#ifdef FX_USE_PORTABILITY_EXTENSION
 
     // List of features that may not be available on all devices
     VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features {
@@ -203,7 +216,7 @@ void RxGpuDevice::CreateLogicalDevice()
 
     VkPhysicalDeviceVulkan11Features vk11_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-#ifdef FX_PLATFORM_MACOS
+#ifdef FX_USE_PORTABILITY_EXTENSION
         .pNext = &portability_features,
 #else
         .pNext = nullptr,

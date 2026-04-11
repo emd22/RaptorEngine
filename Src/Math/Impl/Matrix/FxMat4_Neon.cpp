@@ -377,8 +377,8 @@ void FxMat4f::LoadPerspectiveMatrix(float32 yfov, float32 aspect_ratio, float32 
     ------------------------
            Sa,   0,   0,   0,
            0,  -Sv,   0,   0,
-           0,    0,   a,   b,
-           0,    0,  -1,   0
+           0,    0,  -a,   b,
+           0,    0,   1,   0
     */
 
     Columns[0].X = (width);

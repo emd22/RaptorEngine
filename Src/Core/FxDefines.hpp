@@ -1,6 +1,6 @@
 #pragma once
 
-#define FX_MEMORY_ENGINE_POOL_SIZE (1024ULL * 1024ULL * 300ULL)
+#define FX_MEMORY_ENGINE_POOL_SIZE (1024ULL * 1024ULL * 350ULL)
 
 ////////////////////////////
 // Settings
@@ -53,6 +53,10 @@
 #define FX_PLATFORM_WINDOWS 1
 #else
 #error "Unsupported platform"
+#endif
+
+#ifdef FX_PLATFORM_MACOS
+// #define FX_USE_PORTABILITY_EXTENSION 1
 #endif
 
 #ifdef __clang__

@@ -4,6 +4,7 @@
 
 #include <Asset/AxBase.hpp>
 #include <Asset/AxManager.hpp>
+#include <Asset/FxAnimation.hpp>
 #include <Core/FxRef.hpp>
 #include <FxMaterial.hpp>
 #include <FxObject.hpp>
@@ -55,7 +56,6 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<F
         }
         else if (attribute->type == cgltf_attribute_type_joints) {
             boneids.InitSize(attribute->data->count * 4);
-
             for (cgltf_size j = 0; j < attribute->data->count; j++) {
                 cgltf_accessor_read_uint(attribute->data, j, reinterpret_cast<cgltf_uint*>(&boneids.pData[j * 4]), 4);
             }
@@ -68,9 +68,24 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<F
     mesh->UploadVertices();
 }
 
-void AxLoaderGltf::LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
+void AxLoaderGltf::LoadSkeleton(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
 {
-    FxLogInfo("Joints: {}", skin->joints_count);
+    if (!skin) {
+        return;
+    }
+
+    FxSkeleton skel;
+
+    // Load the bind pose
+    if (skin->inverse_bind_matrices) {
+        cgltf_accessor* accessor = skin->inverse_bind_matrices;
+        skel.InvBindTransforms.InitSize(accessor->count);
+
+        cgltf_accessor_unpack_floats(accessor, reinterpret_cast<float*>(skel.InvBindTransforms.pData),
+                                     accessor->count * 16);
+    }
+
+    FxLogInfo("Loaded skin '{}' with {} joints", skin->name ? skin->name : "Unnamed", skin->joints_count);
 }
 
 template <RxImageFormat TFormat>
@@ -203,57 +218,63 @@ int find_keyframe_index(cgltf_accessor* input, float t)
     return 0;
 }
 
-void AxLoaderGltf::LoadAnimations()
+
+void AxLoaderGltf::LoadAnimation(const cgltf_animation& anim)
 {
-    float t = 1.0;
-
-
-    if (!mpGltfData->animations_count) {
-        return;
-    }
-
     FxQuat rotation = FxQuat::sIdentity;
     FxVec3f translation = FxVec3f::sZero;
-
-    cgltf_animation& anim = mpGltfData->animations[0];
 
     for (size_t i = 0; i < anim.channels_count; ++i) {
         cgltf_animation_channel* channel = &anim.channels[i];
         cgltf_animation_sampler* sampler = channel->sampler;
 
-        // Find keyframe interval
-        int idx = find_keyframe_index(sampler->input, t);
-        float t0, t1;
-        cgltf_accessor_read_float(sampler->input, idx, &t0, 1);
-        cgltf_accessor_read_float(sampler->input, idx + 1, &t1, 1);
-        float alpha = (t - t0) / (t1 - t0);
+        FxSizedArray<float32> timelines;
+        timelines.InitSize(sampler->input->count);
+        cgltf_accessor_unpack_floats(sampler->input, timelines.pData, timelines.Size);
 
-        // Interpolate based on property type
-        if (channel->target_path == cgltf_animation_path_type_translation) {
-            FxVec3f v0, v1, result;
-            cgltf_accessor_read_float(sampler->output, idx, v0.mData, 3);
-            cgltf_accessor_read_float(sampler->output, idx + 1, v1.mData, 3);
+        cgltf_size num_components = cgltf_num_components(sampler->output->type);
+        FxSizedArray<float> keyframe_data;
+        keyframe_data.InitSize(sampler->output->count * num_components);
+        cgltf_accessor_unpack_floats(sampler->output, keyframe_data.pData, keyframe_data.Size);
 
-            translation = v0.LerpIP(v1, alpha);
-        }
-        else if (channel->target_path == cgltf_animation_path_type_rotation) {
-            float buffer[4];
+        // // Interpolate based on property type
+        // if (channel->target_path == cgltf_animation_path_type_translation) {
+        //     FxVec3f v0, v1, result;
+        //     cgltf_accessor_read_float(sampler->output, idx, v0.mData, 3);
+        //     cgltf_accessor_read_float(sampler->output, idx + 1, v1.mData, 3);
 
-            cgltf_accessor_read_float(sampler->output, idx, buffer, 4);
-            FxQuat q0(buffer);
+        //     translation = v0.LerpIP(v1, alpha);
+        // }
+        // else if (channel->target_path == cgltf_animation_path_type_rotation) {
+        //     float buffer[4];
 
-            cgltf_accessor_read_float(sampler->output, idx + 1, buffer, 4);
-            FxQuat q1(buffer);
+        //     cgltf_accessor_read_float(sampler->output, idx, buffer, 4);
+        //     FxQuat q0(buffer);
 
-            rotation = q0.SLerp(q1, alpha);
-        }
+        //     cgltf_accessor_read_float(sampler->output, idx + 1, buffer, 4);
+        //     FxQuat q1(buffer);
+
+        //     rotation = q0.SLerp(q1, alpha);
+        // }
     }
 
     FxMat4f xform_matrix = FxMat4f::AsRotation(rotation) * FxMat4f::AsTranslation(translation);
+}
 
-    // for (uint32 index = 0; index < mpGltfData->animations_count; index++) {
-    //     FxLogInfo("\tAnimation {} has {} samplers and {} channels", index, anim.samplers_count, anim.channels_count);
-    // }
+void AxLoaderGltf::LoadAnimations()
+{
+    if (!mpGltfData->animations_count) {
+        return;
+    }
+
+
+    cgltf_animation& anim = mpGltfData->animations[0];
+
+
+    for (uint32 index = 0; index < mpGltfData->animations_count; index++) {
+        LoadAnimation(mpGltfData->animations[index]);
+        FxLogInfo("\tAnimation {} has {} samplers and {} channels", index, anim.samplers_count, anim.channels_count);
+    }
 
 
     FxLogInfo("Gltf model has {} animations", mpGltfData->animations_count);
@@ -313,9 +334,6 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
     }
 
 
-    LoadAnimations();
-
-
     FxLogInfo("Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
 
     for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
@@ -329,7 +347,7 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
         UploadMeshToGpu(current_object, node->mesh, node_index);
 
         if (node->skin) {
-            LoadAnimationSkin(current_object->pMesh, node->skin);
+            LoadSkeleton(current_object->pMesh, node->skin);
         }
 
         if (has_multiple_meshes) {
@@ -340,6 +358,8 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
             current_object = FxTSRef<FxObject>::New();
         }
     }
+
+    LoadAnimations();
 
     asset = output_object;
 

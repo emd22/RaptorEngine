@@ -11,6 +11,7 @@ struct cgltf_material;
 struct cgltf_mesh;
 struct cgltf_texture_view;
 struct cgltf_primitive;
+struct cgltf_animation;
 struct cgltf_skin;
 
 struct AxGltfMaterialToLoad
@@ -44,7 +45,8 @@ private:
                               cgltf_primitive* primitive);
 
     void LoadAnimations();
-    void LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin);
+    void LoadAnimation(const cgltf_animation& anim);
+    void LoadSkeleton(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin);
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;
