@@ -43,7 +43,7 @@ public:
         FxAssert(mGpuBuffer.IsMapped());
 
         if (mUniformIndex + size >= Size) {
-            FxLogError("Could not submit uniform as uniform buffer is full!");
+            FxLogError("Could not submit uniform as buffer is full!");
             return;
         }
 
@@ -52,6 +52,19 @@ public:
 
         // Offset for the next value
         mUniformIndex += size;
+    }
+
+    template <typename TPtrType>
+    void CopyFrom(const TPtrType* buffer, uint32 size)
+    {
+        FxAssert(mGpuBuffer.IsMapped());
+
+        if (size >= Size) {
+            FxLogError("Could not write buffer that is larger than uniform!");
+            return;
+        }
+
+        std::memcpy(GetCurrentBuffer(), buffer, size);
     }
 
     void AssertSize(uint32 expected_size) { FxAssert(mUniformIndex == expected_size); }

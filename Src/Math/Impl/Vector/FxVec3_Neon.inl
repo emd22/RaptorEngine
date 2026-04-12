@@ -7,9 +7,9 @@
 #include <Math/FxVec3.hpp>
 
 
-FX_FORCE_INLINE FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
+FX_FORCE_INLINE FxVec3f::FxVec3f(float32 x, float32 y, float32 z, float32 w)
 {
-    const float32 values[4] = { x, y, z, 0 };
+    const float32 values[4] = { x, y, z, w };
     mIntrin = vld1q_f32(values);
 }
 

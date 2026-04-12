@@ -47,7 +47,6 @@ class RxRenderBackend
     const uint32 scDeletionFrameSpacing = 3;
 
     static constexpr uint32 scDefaultUniformSize = 512;
-    static constexpr uint32 scNumBones = 50;
 
 public:
     using SubmitFunc = std::function<void(RxCommandBuffer& cmd)>;

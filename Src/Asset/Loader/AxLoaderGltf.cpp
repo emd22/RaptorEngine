@@ -62,31 +62,42 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<F
         }
     }
 
+    uint32 max_bone_id = 0;
+    uint32 min_bone_id = 0;
+    for (uint32 bone_id : boneids) {
+        max_bone_id = std::max(max_bone_id, bone_id);
+        min_bone_id = std::min(min_bone_id, bone_id);
+    }
+
+    if (max_bone_id > FxLimits::MaxBones) {
+        FxLogError("Bone ID ({}) is larger than max number of bones!", max_bone_id);
+    }
+
     mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids);
 
     FxLogInfo("Weights size: {}, ids size: {}", weights.Size, boneids.Size);
     mesh->UploadVertices();
 }
 
-void AxLoaderGltf::LoadSkeleton(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
-{
-    if (!skin) {
-        return;
-    }
+// void AxLoaderGltf::LoadSkeleton(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
+// {
+//     if (!skin) {
+//         return;
+//     }
 
-    FxSkeleton skel;
+//     FxSkeleton skel;
 
-    // Load the bind pose
-    if (skin->inverse_bind_matrices) {
-        cgltf_accessor* accessor = skin->inverse_bind_matrices;
-        skel.InvBindTransforms.InitSize(accessor->count);
+//     // Load the bind pose
+//     if (skin->inverse_bind_matrices) {
+//         cgltf_accessor* accessor = skin->inverse_bind_matrices;
+//         skel.InvBindTransforms.InitSize(accessor->count);
 
-        cgltf_accessor_unpack_floats(accessor, reinterpret_cast<float*>(skel.InvBindTransforms.pData),
-                                     accessor->count * 16);
-    }
+//         cgltf_accessor_unpack_floats(accessor, reinterpret_cast<float*>(skel.InvBindTransforms.pData),
+//                                      accessor->count * 16);
+//     }
 
-    FxLogInfo("Loaded skin '{}' with {} joints", skin->name ? skin->name : "Unnamed", skin->joints_count);
-}
+//     FxLogInfo("Loaded skin '{}' with {} joints", skin->name ? skin->name : "Unnamed", skin->joints_count);
+// }
 
 template <RxImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(FxTSRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
@@ -202,84 +213,151 @@ void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_m
         }
     }
 
+
     //    object = current_object;
 }
 
 
-int find_keyframe_index(cgltf_accessor* input, float t)
+int32 AxLoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const
 {
-    for (size_t i = 0; i < input->count - 1; ++i) {
-        float t0, t1;
-        cgltf_accessor_read_float(input, i, &t0, 1);
-        cgltf_accessor_read_float(input, i + 1, &t1, 1);
-        if (t >= t0 && t < t1)
-            return i;
+    for (cgltf_size i = 0; i < skin->joints_count; i++) {
+        if (skin->joints[i] == node) {
+            return static_cast<int32>(i);
+        }
     }
-    return 0;
+    return -1;
 }
 
-
-void AxLoaderGltf::LoadAnimation(const cgltf_animation& anim)
+void AxLoaderGltf::LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin)
 {
-    FxQuat rotation = FxQuat::sIdentity;
-    FxVec3f translation = FxVec3f::sZero;
-
-    for (size_t i = 0; i < anim.channels_count; ++i) {
-        cgltf_animation_channel* channel = &anim.channels[i];
-        cgltf_animation_sampler* sampler = channel->sampler;
-
-        FxSizedArray<float32> timelines;
-        timelines.InitSize(sampler->input->count);
-        cgltf_accessor_unpack_floats(sampler->input, timelines.pData, timelines.Size);
-
-        cgltf_size num_components = cgltf_num_components(sampler->output->type);
-        FxSizedArray<float> keyframe_data;
-        keyframe_data.InitSize(sampler->output->count * num_components);
-        cgltf_accessor_unpack_floats(sampler->output, keyframe_data.pData, keyframe_data.Size);
-
-        // // Interpolate based on property type
-        // if (channel->target_path == cgltf_animation_path_type_translation) {
-        //     FxVec3f v0, v1, result;
-        //     cgltf_accessor_read_float(sampler->output, idx, v0.mData, 3);
-        //     cgltf_accessor_read_float(sampler->output, idx + 1, v1.mData, 3);
-
-        //     translation = v0.LerpIP(v1, alpha);
-        // }
-        // else if (channel->target_path == cgltf_animation_path_type_rotation) {
-        //     float buffer[4];
-
-        //     cgltf_accessor_read_float(sampler->output, idx, buffer, 4);
-        //     FxQuat q0(buffer);
-
-        //     cgltf_accessor_read_float(sampler->output, idx + 1, buffer, 4);
-        //     FxQuat q1(buffer);
-
-        //     rotation = q0.SLerp(q1, alpha);
-        // }
-    }
-
-    FxMat4f xform_matrix = FxMat4f::AsRotation(rotation) * FxMat4f::AsTranslation(translation);
-}
-
-void AxLoaderGltf::LoadAnimations()
-{
-    if (!mpGltfData->animations_count) {
+    if (!skin) {
         return;
     }
 
+    const uint32 joint_count = static_cast<uint32>(skin->joints_count);
+    skel.JointCount = joint_count;
 
-    cgltf_animation& anim = mpGltfData->animations[0];
+    // Inverse bind matrices
+    if (skin->inverse_bind_matrices) {
+        cgltf_accessor* accessor = skin->inverse_bind_matrices;
+        FxAssert(accessor->count == joint_count);
 
-
-    for (uint32 index = 0; index < mpGltfData->animations_count; index++) {
-        LoadAnimation(mpGltfData->animations[index]);
-        FxLogInfo("\tAnimation {} has {} samplers and {} channels", index, anim.samplers_count, anim.channels_count);
+        skel.InvBindTransforms.InitSize(joint_count);
+        cgltf_accessor_unpack_floats(accessor, reinterpret_cast<float32*>(skel.InvBindTransforms.pData),
+                                     joint_count * 16);
     }
 
+    // Parent indices and names
+    skel.ParentIndices.InitSize(joint_count);
+    skel.JointNames.InitSize(joint_count);
+    skel.LocalTransforms.InitSize(joint_count);
+    skel.WorldTransforms.InitSize(joint_count);
+    skel.SkinningMatrices.InitSize(joint_count);
 
-    FxLogInfo("Gltf model has {} animations", mpGltfData->animations_count);
+    for (uint32 i = 0; i < joint_count; i++) {
+        const cgltf_node* joint = skin->joints[i];
+
+        skel.JointNames[i] = joint->name ? FxString(joint->name) : FxString("joint_" + std::to_string(i));
+        skel.ParentIndices.pData[i] = joint->parent ? FindJointIndex(skin, joint->parent) : -1;
+    }
+
+    FxLogInfo("Loaded skin '{}': {} joints", skin->name ? skin->name : "Unnamed", joint_count);
 }
 
+void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& anim, cgltf_skin* skin)
+{
+    const uint32 joint_count = skin ? static_cast<uint32>(skin->joints_count) : 0;
+
+    out_anim.Name = anim.name ? anim.name : "Unnamed";
+    out_anim.Duration = 0.0f;
+    out_anim.JointTracks.InitSize(joint_count);
+
+    for (uint32 i = 0; i < joint_count; i++) {
+        out_anim.JointTracks.pData[i] = FxBoneTrack {};
+    }
+
+    for (cgltf_size ch = 0; ch < anim.channels_count; ch++) {
+        const cgltf_animation_channel* channel = &anim.channels[ch];
+        const cgltf_animation_sampler* sampler = channel->sampler;
+
+        if (!skin || !channel->target_node) {
+            continue;
+        }
+
+        const int32 joint_idx = FindJointIndex(skin, channel->target_node);
+
+        if (joint_idx < 0) {
+            continue;
+        }
+
+        FxBoneTrack& joint_track = out_anim.JointTracks.pData[joint_idx];
+
+        const cgltf_size key_count = sampler->input->count;
+        const cgltf_size num_components = cgltf_num_components(sampler->output->type);
+
+        FxSizedArray<float32> times;
+        times.InitSize(key_count);
+        cgltf_accessor_unpack_floats(sampler->input, times.pData, key_count);
+
+        if (key_count > 0) {
+            out_anim.Duration = std::max(out_anim.Duration, times.pData[key_count - 1]);
+        }
+
+        // Get translations
+        if (channel->target_path == cgltf_animation_path_type_translation) {
+            FxAssert(sampler->output->type == cgltf_type_vec3);
+            joint_track.Translation.Times = std::move(times);
+            joint_track.Translation.Values.InitSize(key_count);
+
+            for (uint32 key_index = 0; key_index < key_count; key_index++) {
+                float32 buffer[4];
+
+                cgltf_accessor_read_float(sampler->output, key_index, buffer, 3);
+
+                buffer[3] = 0.0f;
+                joint_track.Translation.Values[key_index] = (FxVec3f(buffer));
+            }
+        }
+
+        // Get rotations
+        else if (channel->target_path == cgltf_animation_path_type_rotation) {
+            FxAssert(sampler->output->type == cgltf_type_vec4);
+            joint_track.Rotation.Times = std::move(times);
+            joint_track.Rotation.Values.InitSize(key_count);
+
+            for (uint32 key_index = 0; key_index < key_count; key_index++) {
+                float32 buffer[4];
+
+                cgltf_accessor_read_float(sampler->output, key_index, buffer, 4);
+
+                joint_track.Rotation.Values[key_index] = FxQuat(buffer);
+            }
+        }
+    }
+
+    FxLogInfo("Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
+}
+
+void AxLoaderGltf::LoadAnimations(FxTSRef<FxObject>& output_object, FxSkeleton& skel)
+{
+    if (!mpGltfData->animations_count || mpGltfData->skins_count == 0) {
+        return;
+    }
+
+    // Most models only have one skin/skeleton, so we just assume one for now.
+    cgltf_skin* skin = &mpGltfData->skins[0];
+
+    output_object->Animations.InitCapacity(8);
+
+
+    for (uint32 i = 0; i < mpGltfData->animations_count; i++) {
+        FxAnimation anim;
+        LoadAnimation(anim, mpGltfData->animations[i], skin);
+        output_object->Animations.Insert(std::move(anim));
+    }
+
+    FxLogInfo("Loaded {} animations", mpGltfData->animations_count);
+}
 
 AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
 {
@@ -304,9 +382,6 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxTSRef<AxBase> asset, const std
 
 AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size)
 {
-    // (void)asset;
-    //    FxRef<FxAssetModel> model(asset);
-
     cgltf_options options {};
 
     cgltf_result status = cgltf_parse(&options, data, size, &mpGltfData);
@@ -339,7 +414,7 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
     for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
         cgltf_node* node = &mpGltfData->nodes[node_index];
 
-        // Might be good to not ignore the other GLTF things in the future, but thats not a priority for now
+        // Ignore the other GLTF objects. We have alternative internal systems
         if (!node->mesh) {
             continue;
         }
@@ -347,7 +422,11 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
         UploadMeshToGpu(current_object, node->mesh, node_index);
 
         if (node->skin) {
-            LoadSkeleton(current_object->pMesh, node->skin);
+            // Load a new skeleton
+            current_object->pSkeleton = FxRef<FxSkeleton>::New();
+            LoadSkeleton(*current_object->pSkeleton, node->skin);
+
+            LoadAnimations(current_object, *current_object->pSkeleton);
         }
 
         if (has_multiple_meshes) {
@@ -359,7 +438,6 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
         }
     }
 
-    LoadAnimations();
 
     asset = output_object;
 

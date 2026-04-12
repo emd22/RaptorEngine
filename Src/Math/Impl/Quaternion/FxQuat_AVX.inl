@@ -16,7 +16,7 @@ FX_FORCE_INLINE FxQuat& FxQuat::operator=(const __m128 other)
 
 FX_FORCE_INLINE FxQuat::FxQuat(const float32* buffer)
 {
-    const float32 aligned_buffer[] = { buffer[0], buffer[1], buffer[2], buffer[2] };
+    const float32 aligned_buffer[] = { buffer[0], buffer[1], buffer[2], buffer[3] };
     mIntrin = _mm_load_ps(aligned_buffer);
 }
 
@@ -68,7 +68,7 @@ FX_FORCE_INLINE void FxQuat::NLerpIP(const FxQuat& dest, float32 time)
 
 // Based off of https://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/index.htm and optimized
 // for Neon.
-FX_FORCE_INLINE FxQuat FxQuat::SLerp(const FxQuat& dest, const float32 step)
+FxQuat FxQuat::SLerp(const FxQuat& dest, const float32 step) const
 {
     // Note: there are so many different ways to implement this and a lot of them online just straight up pro
     __m128 a_v = mIntrin;

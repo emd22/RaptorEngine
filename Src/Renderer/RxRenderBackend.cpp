@@ -12,6 +12,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
+#include <Asset/FxAnimation.hpp>
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxRefUtil.hpp>
@@ -94,7 +95,8 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     Uniforms.Create(scDefaultUniformSize);
 
-    BoneBuffer.Create(scNumBones * sizeof(FxMat4f));
+    BoneBuffer.Create(FxLimits::MaxBones * sizeof(FxMat4f));
+
     FxMat4f initial_matrix = FxMat4f::sIdentity;
     BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 

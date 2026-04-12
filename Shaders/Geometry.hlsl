@@ -32,7 +32,7 @@ struct VSOutput
     float3 vTangentWS : TANGENT;
     float3 vBitangentWS : BITANGENT;
 #endif
-    float4 vDebugColor : ATTR0;
+    // float4 vDebugColor : ATTR0;
 };
 
 struct VSPushConsts
@@ -67,11 +67,11 @@ VSOutput main(VSInput input)
 
     output.vPosition = mul(MVP, mul(skin_xform, float4(input.vPosition, 1.0)));
     output.vNormalWS = normalize(mul((float3x3)model_matrix, mul((float3x3)skin_xform, input.vNormal)));
-    output.vDebugColor = input.vJointWeights;
+    // output.vDebugColor = input.vJointWeights;
 #else
     output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
     output.vNormalWS = normalize(mul((float3x3)model_matrix, input.vNormal));
-    output.vDebugColor = float4(1.0, 1.0, 1.0, 1.0);
+    // output.vDebugColor = float4(1.0, 1.0, 1.0, 1.0);
 #endif
 
 #ifdef USE_NORMAL_MAPS
@@ -104,7 +104,7 @@ struct FSInput
     float3 vTangentWS : TANGENT;
     float3 vBitangentWS : BITANGENT;
 #endif
-    float4 vDebugColor : ATTR0;
+    // float4 vDebugColor : ATTR0;
 };
 
 //F_REFLECT(FR_SAMPLER2D, 0, 0)
@@ -143,7 +143,7 @@ FSOutput main(FSInput input)
     output.vAlbedo.w = 0.0;
 #endif
 
-    output.vAlbedo = float4(input.vDebugColor.rgb, 1.0);
+    // output.vAlbedo = float4(input.vDebugColor.rgb, 1.0);
 
     return output;
 }

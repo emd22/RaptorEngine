@@ -6,6 +6,7 @@
 // #include <ThirdParty/Jolt/Physics/Body/Body.h>
 // #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
+#include <Asset/FxAnimation.hpp>
 #include <Core/FxName.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Core/FxRef.hpp>
@@ -14,11 +15,6 @@
 #include <FxMaterial.hpp>
 #include <FxObjectManager.hpp>
 
-struct FxAnimation
-{
-    std::string Name;
-    FxSizedArray<FxMat4f> Data;
-};
 
 class FxPrimitiveMesh;
 
@@ -95,18 +91,20 @@ private:
     void SyncObjectWithPhysics();
 
 public:
+    FxName Name;
+
     FxRef<FxPrimitiveMesh> pMesh { nullptr };
     FxTSRef<FxMaterial> pMaterial { nullptr };
 
+    FxRef<FxSkeleton> pSkeleton { nullptr };
+    FxSizedArray<FxAnimation> Animations;
+    FxAnimation* pCurrentAnimation = nullptr;
+    float32 AnimationTime = 0.0f;
+
     FxPagedArray<FxTSRef<FxObject>> AttachedNodes;
 
-    FxSizedArray<FxAnimation> Animations;
-
     FxVec3f Dimensions = FxVec3f::sZero;
-
     PhObject Physics;
-
-    FxName Name;
 
 private:
     /// Object slots allocated following this object. Used by other instances of this object.
@@ -120,7 +118,6 @@ private:
     bool mbIsInstance : 1 = false;
     bool mbIsShadowCaster : 1 = false;
     bool mbRenderUnlit : 1 = false;
-
 
     FxObjectLayer mObjectLayer = FxObjectLayer::eWorldLayer;
 };
