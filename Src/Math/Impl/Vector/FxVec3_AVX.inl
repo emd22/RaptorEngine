@@ -8,9 +8,9 @@
 #include <Math/FxVec3.hpp>
 
 
-FX_FORCE_INLINE FxVec3f::FxVec3f(float32 x, float32 y, float32 z)
+FX_FORCE_INLINE FxVec3f::FxVec3f(float32 x, float32 y, float32 z, float32 w)
 {
-    const float32 values alignas(16)[4] = { x, y, z, 0 };
+    const float32 values alignas(16)[4] = { x, y, z, w };
     mIntrin = _mm_load_ps(values);
 }
 
@@ -25,7 +25,7 @@ FX_FORCE_INLINE FxVec3f::FxVec3f(float32 scalar) { mIntrin = _mm_set1_ps(scalar)
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tolerance) const
 {
-    return IsCloseTo(other.mIntrin);
+    return IsCloseTo(other.mIntrin, tolerance);
 }
 
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const float32 tolerance) const

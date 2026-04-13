@@ -38,6 +38,7 @@ private:
     void CreateGPass();
 
     VkPipelineLayout CreateGPassPipelineLayout();
+    VkPipelineLayout CreateGPassSkinnedPipelineLayout();
     VkPipelineLayout CreateUnlitPipelineLayout();
 
     // Lighting
@@ -69,8 +70,9 @@ public:
     // Geometry Pass
     /////////////////////
 
-    VkDescriptorSetLayout DsLayoutGPassVertex = nullptr;
     VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
+    VkDescriptorSetLayout DsLayoutGPassSkinned = nullptr;
+
     VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
 
     RxRenderStage GPass;

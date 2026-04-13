@@ -125,6 +125,8 @@ public:
 
     FX_FORCE_INLINE RxPipelineBuilder& SetLayout(VkPipelineLayout layout)
     {
+        // This is a new pipeline
+        mbDidFirstBuild = false;
         mLayout = layout;
         return *this;
     }

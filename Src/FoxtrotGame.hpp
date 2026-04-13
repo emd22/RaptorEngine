@@ -37,7 +37,10 @@ public:
 
     // TODO: Player attachment system
     FxTSRef<FxObject> pPistolObject { nullptr };
+    FxTSRef<FxObject> pArmsObject { nullptr };
     FxTSRef<FxObject> pHelmetObject { nullptr };
+
+    double FrameTimeAvg = 0.0f;
 
 
     FxQuat PistolRotationGoal = FxQuat::sIdentity;

@@ -14,6 +14,8 @@
 #include <chrono>
 #include <thread>
 
+static constexpr uint32 scMaxWorkerThreads = 10;
+
 
 ////////////////////////////////////
 // Asset Worker
@@ -21,22 +23,19 @@
 
 void AxWorker::Create()
 {
-    while (bRunning.test_and_set(std::memory_order_acquire)) {
-        bRunning.wait(true, std::memory_order_relaxed);
-    }
-
     Thread = std::thread([this]() { this->Update(); });
 }
 
 void AxWorker::Update()
 {
-    // FxAssetManager& manager = FxAssetManager::GetInstance();
-
-    while (bRunning.test()) {
+    while (bRunning.load()) {
         ItemReady.WaitForData();
         ItemReady.Reset();
 
-        if (!bRunning.test()) {
+        // In order to stop the worker, we need to kill the ItemReady notifier. Here we need to check if the worker
+        // actually recieved data. This is also cheaper than calling ItemReady.IsKilled, but that shouldn't be a
+        // bottleneck anyway.
+        if (!bRunning.load()) {
             break;
         }
 
@@ -70,15 +69,15 @@ void AxWorker::Update()
 ////////////////////////////////////
 
 
-void AxManager::Start(int32 thread_count)
+void AxManager::Start(int32 min_threads)
 {
-    mThreadCount = thread_count;
-    mActive.test_and_set();
+    mMinThreads = min_threads;
+    mbActive.test_and_set();
 
     // Allocate the workers
-    mWorkerThreads.InitCapacity(thread_count);
+    mWorkerThreads.InitCapacity(scMaxWorkerThreads);
 
-    for (int32 i = 0; i < thread_count; i++) {
+    for (int32 i = 0; i < mMinThreads; i++) {
         // 'Insert' a new worker and get its pointer
         AxWorker* worker = mWorkerThreads.Insert();
 
@@ -86,39 +85,31 @@ void AxManager::Start(int32 thread_count)
         worker->Create();
     }
 
-    std::thread* thread = new std::thread([this]() { AxManager::AssetManagerUpdate(); });
-    mAssetManagerThread = thread;
+    mpAssetManagerThread = new std::thread([this]() { AxManager::AssetManagerUpdate(); });
 }
 
 void AxManager::Shutdown()
 {
-    if (!mActive.test()) {
+    FxLogInfo("Shutting down asset manager...");
+
+    if (!mbActive.test()) {
         return;
     }
 
-    mActive.clear();
+    mbActive.clear();
     ItemsEnqueuedNotifier.Kill();
 
     for (auto& worker : mWorkerThreads) {
-        worker.bRunning.clear();
-        worker.bRunning.notify_one();
-
-        // The worker waits on the ItemReady notifier, so we kill the notifier
-        worker.ItemReady.Kill();
-
+        worker.Kill();
         worker.Thread.join();
     }
 
+    mpAssetManagerThread->join();
+    delete mpAssetManagerThread;
 
-    mAssetManagerThread->join();
-    delete mAssetManagerThread;
-
-    // Free the workers thread array here---
-    // this calls the destructors for each worker thread,
-    // which frees the `FxRef`'s to the data
     mWorkerThreads.Free();
 
-    // Cleanup all permutations of "empty images" that were created.
+    // Cleanup all permutations of empty images that were created.
     FxPagedArray<FxTSRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
 
     if (empty_images_list.IsInited()) {
@@ -126,15 +117,7 @@ void AxManager::Shutdown()
             image_ref.DestroyRef();
         }
     }
-
-    // mLoadQueue.Destroy();
 }
-
-// template<>
-// void FxAssetManager::LoadAsset<FxAssetModel>(FxRef<FxAssetModel> asset, const std::string& path)
-// {
-//     DoLoadAsset<FxAssetModel, FxLoaderGltf, FxAssetType::Model>(asset, path);
-// }
 
 
 inline bool IsMemoryJpeg(const uint8* data, uint32 data_size)
@@ -250,12 +233,7 @@ void AxManager::CheckForUploadableData()
             continue;
         }
 
-        // std::lock_guard<std::mutex> guard(worker.Item.mMutex);
-
-        // AxQueueItem& loaded_item = worker.Item;
-
         FxLockContext<AxItemData> asset_data = worker.Item.GetDataContext();
-
 
         // The asset was successfully loaded, upload to GPU
         if (worker.LoadStatus == AxLoaderBase::Status::eSuccess) {
@@ -310,6 +288,20 @@ bool AxManager::CheckWorkersBusy()
     return false;
 }
 
+void AxManager::AddWorkerThread()
+{
+    // At the maximum number of workers, break
+    if (mWorkerThreads.Size >= mWorkerThreads.Capacity) {
+        FxLogError("Reached maximum number of worker threads");
+        return;
+    }
+
+    FxLogInfo("Creating asset manager worker thread");
+
+    AxWorker* worker = mWorkerThreads.Insert();
+    worker->Create();
+}
+
 void AxManager::CheckForItemsToLoad()
 {
     AxQueueItem item;
@@ -330,6 +322,8 @@ void AxManager::CheckForItemsToLoad()
             break;
         }
 
+        // AddWorkerThread();
+
         FxLogError("No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -347,7 +341,7 @@ void AxManager::CheckForItemsToLoad()
 
 void AxManager::AssetManagerUpdate()
 {
-    while (mActive.test()) {
+    while (mbActive.test()) {
         bool is_busy = CheckWorkersBusy();
 
         // If any of the workers are still marked as busy, there is data
@@ -355,7 +349,7 @@ void AxManager::AssetManagerUpdate()
         if (is_busy) {
             // Loop while we are busy to check for when we are pending upload, as well
             // as check for new arrivals.
-            while (CheckWorkersBusy()) {
+            while (CheckWorkersBusy() && mbActive.test()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
 
                 // Check if there is data to be uploaded to the GPU
@@ -365,11 +359,22 @@ void AxManager::AssetManagerUpdate()
                 CheckForItemsToLoad();
             }
         }
+        // There is no data being loaded or uploaded, we can unload the extra worker threads.
+        else {
+            const uint32 amount_threads = mWorkerThreads.Size;
+            for (uint32 index = amount_threads; index > mMinThreads; index--) {
+                FxLogInfo("Killing asset manager worker thread...");
+
+                mWorkerThreads[index].Kill();
+                mWorkerThreads[index].Thread.join();
+                mWorkerThreads.RemoveLast();
+            }
+        }
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
         ItemsEnqueuedNotifier.WaitForData();
         ItemsEnqueuedNotifier.Reset();
-        if (!mActive.test()) {
+        if (!mbActive.test()) {
             break;
         }
 
@@ -392,9 +397,4 @@ AxWorker* AxManager::FindWorkerThread()
     return nullptr;
 }
 
-AxManager& AxManager::GetInstance()
-{
-    static AxManager AssetManager;
-
-    return AssetManager;
-}
+AxManager* AxManager::GetInstance() { return gAssetManager; }

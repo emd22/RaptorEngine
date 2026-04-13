@@ -10,7 +10,7 @@ FX_FORCE_INLINE void FxBitset::Set(uint32 index)
     }
 
     // The index into the int array (index / 64)
-    const uint16 int_index = (index >> 6);
+    const uint32 int_index = (index >> 6);
 
     // The mask for the bit that we are querying
     const uint64 mask = (1ULL << (index & scBitIndexMask));
@@ -26,7 +26,7 @@ FX_FORCE_INLINE bool FxBitset::Get(uint32 index) const
     }
 
     // The index into the int array (index / 64)
-    const uint16 int_index = (index >> 6);
+    const uint32 int_index = (index >> 6);
 
     // The mask for the bit that we are querying
     const uint64 mask = (1ULL << (index & scBitIndexMask));
@@ -41,7 +41,7 @@ FX_FORCE_INLINE void FxBitset::Unset(uint32 index)
     }
 
     // The index into the int array (index / 64)
-    const uint16 int_index = (index >> 6);
+    const uint32 int_index = (index >> 6);
 
     // The mask for the bit that we are querying
     const uint64 mask = (1ULL << (index & scBitIndexMask));
@@ -75,7 +75,7 @@ FX_FORCE_INLINE uint32 FxBitset::FindNextFreeBit(uint32 start_index) const
         // Find bit in chunk (R to L) and return the index in the bitset.
         // This is returning (current_byte_n * 64) + index_in_byte.
 
-        uint32 bit_index = FxBit::FindFirstZero32(chunk);
+        uint32 bit_index = FxBit::FindFirstZero64(chunk);
         FxDebugAssert(bit_index != FxBit::scBitNotFound);
 
         return (i << 6) + bit_index;

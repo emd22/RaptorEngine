@@ -137,9 +137,9 @@ RxShaderId RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxSh
     return FxHashData64(FxSlice<FxShaderMacro>(macros), hash);
 }
 
-bool RxShader::PreloadCompiledPrograms(const std::string& pack_path)
+bool RxShader::PreloadCompiledPrograms(const char* pack_path)
 {
-    bool did_read = mDataPack.ReadFromFile(pack_path.c_str());
+    bool did_read = mDataPack.ReadFromFile(pack_path);
 
     if (!did_read) {
         FxLogInfo("Could not read compiled shader from {}. Recompiling...", pack_path);
@@ -155,33 +155,30 @@ void RxShader::Load(const char* shader_name)
 {
     Name = shader_name;
 
-    std::string program_path = GetProgramPath();
-
-    PreloadCompiledPrograms(program_path.c_str());
+    FxString program_path = GetProgramPath();
+    PreloadCompiledPrograms(program_path.CStr());
 }
 
 
-const std::string RxShader::GetSourcePath() const { return FxAssetPath(AxPathQuery::eShaders) + Name + ".hlsl"; }
-const std::string RxShader::GetProgramPath() const
+const FxString RxShader::GetSourcePath() const { return FxString(FxAssetPath(AxPathQuery::eShaders)) + Name + ".hlsl"; }
+const FxString RxShader::GetProgramPath() const
 {
-    std::string compiled_folder = std::string(FxAssetPath(AxPathQuery::eShaders)) + "Spirv/";
-    std::string compiled_path = (compiled_folder + Name + ".spack");
-
-    return compiled_path;
+    FxString compiled_folder = FxString(FxAssetPath(AxPathQuery::eShaders)) + "Spirv/";
+    return (compiled_folder + Name + ".spack");
 }
 
 
 FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
                                                      const FxSizedArray<FxShaderMacro>& macros)
 {
-    std::string source_path = GetSourcePath();
-    const char* c_source_path = source_path.c_str();
+    FxString source_path = GetSourcePath();
+    const char* c_source_path = source_path.CStr();
 
-    std::string program_path = GetProgramPath();
+    FxString program_path = GetProgramPath();
 
 
     if (!mDataPack.IsOpen() || mDataPack.Entries.IsEmpty()) {
-        mDataPack.ReadFromFile(program_path.c_str());
+        mDataPack.ReadFromFile(program_path.CStr());
     }
 
     // Check if the shader is out of date
@@ -272,14 +269,14 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
     return program;
 }
 
-void RxShader::RecompileShader(const std::string& source_path, const std::string& compiled_path,
+void RxShader::RecompileShader(const FxString& source_path, const FxString& compiled_path,
                                const FxSizedArray<FxShaderMacro>& macros)
 {
     // Compile to the shader pack
-    FxShaderCompiler::Result compile_result = FxShaderCompiler::Compile(source_path.c_str(), mDataPack, macros);
+    FxShaderCompiler::Result compile_result = FxShaderCompiler::Compile(source_path.CStr(), mDataPack, macros);
 
     if (compile_result != FxShaderCompiler::Result::eFailed) {
-        mDataPack.WriteToFile(compiled_path.c_str());
+        mDataPack.WriteToFile(compiled_path.CStr());
     }
 }
 

@@ -7,6 +7,7 @@
 #include "FxSSE.hpp"
 
 #include <Core/FxTypes.hpp>
+#include <bit>
 
 enum FxShuffleComponent
 {
@@ -26,6 +27,7 @@ enum FxShuffleComponent
 namespace FxSSE {
 
 constexpr uint32 scSignMask32 = 0x80000000;
+static_assert(scSignMask32 == std::bit_cast<uint32>(-0.0f));
 
 FX_FORCE_INLINE __m128 RemoveSign(__m128 vec)
 {
@@ -35,6 +37,8 @@ FX_FORCE_INLINE __m128 RemoveSign(__m128 vec)
 }
 
 FX_FORCE_INLINE float32 Dot(__m128 a, __m128 b) { return _mm_cvtss_f32(_mm_dp_ps(a, b, 0xFF)); }
+
+FX_FORCE_INLINE __m128 Negate(__m128 a) { return _mm_xor_ps(a, _mm_set1_ps(scSignMask32)); }
 
 /**
  * @brief Sets the signs of all components of `v` to the sign of `TSign`

@@ -12,6 +12,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
+#include <Asset/FxAnimation.hpp>
 #include <Core/FxDefines.hpp>
 #include <Core/FxPanic.hpp>
 #include <Core/FxRefUtil.hpp>
@@ -22,7 +23,6 @@
 #include <Renderer/RxState.hpp>
 #include <thread>
 #include <vector>
-
 
 #define FX_VULKAN_DEBUG 1
 
@@ -93,7 +93,12 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     gObjectManager->Create();
 
-    Uniforms.Create();
+    Uniforms.Create(scDefaultUniformSize);
+
+    BoneBuffer.Create(FxLimits::MaxBones * sizeof(FxMat4f));
+
+    FxMat4f initial_matrix = FxMat4f::sIdentity;
+    BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
     pDeferredRenderer = FxMakeRef<RxDeferredRenderer>();
     pDeferredRenderer->Create(Swapchain.Extent);
@@ -148,7 +153,11 @@ void RxRenderBackend::InitFrames()
 
 void RxRenderBackend::DestroyFrames()
 {
-    vkQueueWaitIdle(GetDevice()->GraphicsQueue);
+    {
+        FxSpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
+
+        vkQueueWaitIdle(graphics_queue.Get());
+    }
 
     for (auto& frame : Frames) {
         // frame.DescriptorSet.Destroy();
@@ -219,7 +228,7 @@ void RxRenderBackend::InitVulkan()
     instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
     instance_info.ppEnabledLayerNames = requested_validation_layers.data();
     instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.size());
-#ifdef FX_PLATFORM_MACOS
+#ifdef FX_USE_PORTABILITY_EXTENSION
     instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
 
@@ -414,7 +423,9 @@ void RxRenderBackend::SubmitUploadCmd(RxRenderBackend::SubmitFunc upload_func)
     //     std::this_thread::get_id()
     // );
 
-    VkTry(vkQueueSubmit(GetDevice()->TransferQueue, 1, &submit_info, UploadContext.UploadFence.Fence),
+    FxSpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
+
+    VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Fence),
           "Error submitting upload buffer");
 
     UploadContext.UploadFence.WaitFor();
@@ -440,9 +451,12 @@ void RxRenderBackend::SubmitOneTimeCmd(RxRenderBackend::SubmitFunc submit_func)
         .pCommandBuffers = &cmd.CommandBuffer,
     };
 
-    VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, nullptr), "Error submitting upload buffer");
+    FxSpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 
-    vkQueueWaitIdle(GetDevice()->GraphicsQueue);
+    VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, nullptr), "Error submitting upload buffer");
+    vkQueueWaitIdle(graphics_queue.Get());
+
+    graphics_queue.Unlock();
 
     cmd.Reset();
     cmd.Destroy();
@@ -501,8 +515,15 @@ void RxRenderBackend::PresentFrame()
         .pSignalSemaphores = submit_semaphore,
     };
 
-    VkTry(vkQueueSubmit(GetDevice()->GraphicsQueue, 1, &submit_info, frame->InFlight.Fence),
-          "Error submitting draw buffer");
+    {
+        FxSpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
+
+        VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, frame->InFlight.Fence),
+              "Error submitting draw buffer");
+    }
+
+
+    FxSpinLockContext<VkQueue> present_queue = GetDevice()->GetPresentQueue();
 
     if (Swapchain.bInitialized != true) {
         FxModulePanic("Swapchain not initialized!");
@@ -525,7 +546,7 @@ void RxRenderBackend::PresentFrame()
         .pResults = nullptr,
     };
 
-    const VkResult status = vkQueuePresentKHR(GetDevice()->PresentQueue, &present_info);
+    const VkResult status = vkQueuePresentKHR(present_queue.Get(), &present_info);
 
     if (status == VK_SUCCESS) {
     }
@@ -662,6 +683,7 @@ void RxRenderBackend::Destroy()
     }
 
     Uniforms.Destroy();
+    BoneBuffer.Destroy();
 
 
     while (!mDeletionQueue.empty()) {

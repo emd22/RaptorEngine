@@ -3,6 +3,7 @@
 #include <Asset/FxShaderCompiler.hpp>
 #include <Core/FxRef.hpp>
 #include <Core/FxSizedArray.hpp>
+#include <Core/FxString.hpp>
 #include <Core/FxTypes.hpp>
 #include <unordered_map>
 
@@ -247,7 +248,7 @@ public:
 
     void Load(const char* path);
 
-    const std::string& GetName() const { return Name; }
+    const FxString& GetName() const { return Name; }
 
 private:
     void CreateShaderModule(RxShaderProgram& program, uint32 file_size, uint32* shader_data,
@@ -256,16 +257,16 @@ private:
     /**
      * @brief Fetches all compiled shader permutations from the datapack if the pack exists.
      */
-    bool PreloadCompiledPrograms(const std::string& pack_path);
+    bool PreloadCompiledPrograms(const char* pack_path);
 
-    void RecompileShader(const std::string& source_path, const std::string& output_path,
+    void RecompileShader(const FxString& source_path, const FxString& output_path,
                          const FxSizedArray<FxShaderMacro>& macros);
 
-    const std::string GetSourcePath() const;
-    const std::string GetProgramPath() const;
+    const FxString GetSourcePath() const;
+    const FxString GetProgramPath() const;
 
 private:
-    std::string Name = "Unknown";
+    FxString Name = "Unknown";
 
     /// A list of shader types (that hold shader programs) that have already been retreived from the datapack or
     /// created.

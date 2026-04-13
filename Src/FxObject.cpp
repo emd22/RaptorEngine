@@ -161,6 +161,34 @@ void FxObject::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
         });
 }
 
+void FxObject::UpdateAnimation()
+{
+    if (!pCurrentAnimation && Animations.Size > 0) {
+        pCurrentAnimation = &Animations[0];
+    }
+
+    if (!pCurrentAnimation || !pSkeleton) {
+        return;
+    }
+
+
+    if (AnimationTime >= pCurrentAnimation->Duration) {
+        AnimationTime = 0.0f;
+    }
+    else if (AnimationTime < 0.0001) {
+        AnimationTime = pCurrentAnimation->Duration;
+    }
+
+    FxLogInfo("Animation step {:.02f}", AnimationTime);
+    pSkeleton->EvaluatePose(*pCurrentAnimation, AnimationTime);
+
+    AnimationTime += 0.01f;
+
+    gRenderer->BoneBuffer.Rewind();
+    gRenderer->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData,
+                                   pSkeleton->SkinningMatrices.Size * sizeof(FxMat4f));
+}
+
 void FxObject::MakeInstanceOf(const FxTSRef<FxObject>& source_ref)
 {
     FxRefContext<FxTSRef<FxObject>> source_ctx(source_ref);
@@ -390,6 +418,8 @@ void FxObject::Update()
 
         SyncObjectWithPhysics();
     }
+
+    UpdateAnimation();
 }
 
 

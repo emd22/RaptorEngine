@@ -4,6 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Core/FxLockContext.hpp>
 #include <Core/FxTypes.hpp>
 #include <cstdint>
 #include <vector>
@@ -31,6 +32,8 @@ public:
             mTransferIndex,
         });
     }
+
+    FX_FORCE_INLINE bool HasIndependentTransfer() const { return mTransferIndex != mGraphicsIndex; }
 
     uint32 GetGraphicsFamily() const { return mGraphicsIndex; }
     uint32 GetPresentFamily() const { return mPresentIndex; }
@@ -67,6 +70,19 @@ public:
 
     VkSurfaceFormatKHR GetSurfaceFormat();
 
+    FxSpinLockContext<VkQueue> GetLockableQueue(VkQueue queue)
+    {
+        if (mQueueFamilies.HasIndependentTransfer()) {
+            return FxSpinLockContext<VkQueue>(mTransferMutex, queue, true);
+        }
+
+        return FxSpinLockContext<VkQueue>(mTransferMutex, queue);
+    }
+
+    FX_FORCE_INLINE FxSpinLockContext<VkQueue> GetGraphicsQueue() { return GetLockableQueue(mGraphicsQueue); }
+    FX_FORCE_INLINE FxSpinLockContext<VkQueue> GetTransferQueue() { return GetLockableQueue(mTransferQueue); }
+    FX_FORCE_INLINE FxSpinLockContext<VkQueue> GetPresentQueue() { return GetLockableQueue(mPresentQueue); }
+
     operator VkDevice() const { return Device; }
     operator VkPhysicalDevice() const { return Physical; }
 
@@ -80,11 +96,14 @@ public:
 
     RxQueueFamilies mQueueFamilies;
 
-    VkQueue GraphicsQueue = nullptr;
-    VkQueue TransferQueue = nullptr;
-    VkQueue PresentQueue = nullptr;
 
 private:
     VkInstance mInstance;
     VkSurfaceKHR mSurface;
+
+    VkQueue mGraphicsQueue = nullptr;
+    VkQueue mTransferQueue = nullptr;
+    VkQueue mPresentQueue = nullptr;
+
+    std::atomic_flag mTransferMutex;
 };

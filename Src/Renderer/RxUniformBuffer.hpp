@@ -9,17 +9,21 @@
 class RxUniforms
 {
 public:
-    static constexpr uint32 scUniformBufferSize = 512;
-
 public:
     RxUniforms() = default;
 
-    void Create();
+    void Create(uint32 size);
+
+    uint8* GetBasePtr();
 
     /**
      * @brief Retrieve the pointer that the buffer starts at relative to the current frame.
      */
-    uint8* GetCurrentBuffer();
+    uint8* GetCurrentBuffer()
+    {
+        // Offset by the frame currently in flight
+        return GetBasePtr() + GetBaseOffset();
+    }
 
     RxRawGpuBuffer& GetGpuBuffer() { return mGpuBuffer; }
 
@@ -38,8 +42,8 @@ public:
     {
         FxAssert(mGpuBuffer.IsMapped());
 
-        if (mUniformIndex + size >= scUniformBufferSize) {
-            FxLogError("Could not submit uniform as uniform buffer is full!");
+        if (mUniformIndex + size >= Size) {
+            FxLogError("Could not submit uniform as buffer is full!");
             return;
         }
 
@@ -50,12 +54,32 @@ public:
         mUniformIndex += size;
     }
 
+    template <typename TPtrType>
+    void CopyFrom(const TPtrType* buffer, uint32 size)
+    {
+        FxAssert(mGpuBuffer.IsMapped());
+
+        if (size >= Size) {
+            FxLogError("Could not write buffer that is larger than uniform!");
+            return;
+        }
+
+        std::memcpy(GetCurrentBuffer(), buffer, size);
+    }
+
     void AssertSize(uint32 expected_size) { FxAssert(mUniformIndex == expected_size); }
+
+    template <typename TValueType>
+    void SetAllValues(const TValueType& value, bool all_frames)
+    {
+        SetAllValuesRaw(reinterpret_cast<const void*>(&value), sizeof(TValueType), all_frames);
+    }
 
     /**
      * @brief Get the index for start of the buffer at the current frame.
      */
     uint32 GetBaseOffset() const;
+    uint32 GetBaseOffset(uint32 frame_index) const;
 
     /**
      * @brief Resets the uniform buffer back to the start.
@@ -64,11 +88,17 @@ public:
 
     void Destroy() { mGpuBuffer.Destroy(); }
 
+private:
+    void SetAllValuesRaw(const void* data, uint32 value_size, bool all_frames);
+
+public:
+    uint32 Size = 0;
 
 private:
     /// Gpu buffer that stores current uniform buffer data. Note that this is a continguous buffer that stores
     /// `RxFramesInFlight` number of uniform structures that are of size `scUniformBufferSize`.
     RxRawGpuBuffer mGpuBuffer {};
+
 
     uint32 mUniformIndex = 0;
 };

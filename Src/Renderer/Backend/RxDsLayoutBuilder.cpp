@@ -16,8 +16,6 @@ RxDsLayoutBuilder& RxDsLayoutBuilder::AddBinding(int binding, VkDescriptorType t
 
 VkDescriptorSetLayout RxDsLayoutBuilder::Build()
 {
-    FxAssert(mpDsLayout == nullptr);
-
     VkDescriptorSetLayoutCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .bindingCount = static_cast<uint32>(mLayoutBindings.size()),

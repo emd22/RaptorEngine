@@ -1,6 +1,7 @@
 #include "FxSceneFile.hpp"
 
 #include <Asset/AxManager.hpp>
+#include <FxEngine.hpp>
 
 // void FxSceneFile::Save(const FxScene& scene) {}
 
@@ -65,7 +66,7 @@ void FxSceneFile::AddObjectFromEntry(const std::string& scene_path, const FxConf
         load_options.bGeneratePhysicsMesh = true;
     }
 
-    FxTSRef<FxObject> object = AxManager::LoadObject(object_entry.Name.Get(), scene_path + mesh_path, load_options);
+    FxTSRef<FxObject> object = gAssetManager->LoadObject(object_entry.Name.Get(), scene_path + mesh_path, load_options);
 
     ApplyPropertiesToObject(object, object_entry);
 
@@ -145,4 +146,11 @@ void FxSceneFile::ApplyPropertiesToObject(FxTSRef<FxObject>& object, const FxCon
             object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, size, motion_type, physics_properties);
         }
     }
+
+    object->OnLoaded(
+        [](FxTSRef<AxBase> base_asset)
+        {
+            FxTSRef<FxObject> obj = base_asset;
+            obj->PrintDebug();
+        });
 }

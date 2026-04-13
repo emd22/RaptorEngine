@@ -72,17 +72,16 @@ void PhPlayer::Update(float64 delta_time)
     Vec3 velocity = Vec3::sZero();
 
     if (pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround) {
-        // if (!bIsGrounded) {
-        // HeadRecoveryYOffset = min(-velocity.GetY() * 10.0f, scMaxHeadRecovery);
-        // }
-
         velocity = Vec3::sZero();
 
         bIsGrounded = true;
     }
     else {
         velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
-        if (!bDisableGravity) {
+        if (bDisableGravity) {
+            velocity.SetY(0);
+        }
+        else {
             velocity += gravity;
         }
 
@@ -95,11 +94,6 @@ void PhPlayer::Update(float64 delta_time)
 
     // Move character
     CharacterVirtual::ExtendedUpdateSettings update_settings {};
-
-    // character->ExtendedUpdate(inParams.mDeltaTime, mPhysicsSystem->GetGravity(), update_settings,
-    //                           mPhysicsSystem->GetDefaultBroadPhaseLayerFilter(Layers::MOVING),
-    //                           mPhysicsSystem->GetDefaultLayerFilter(Layers::MOVING), {}, {}, *mTempAllocator);
-
     pPlayerVirt->ExtendedUpdate(delta_time, gravity, update_settings,
                                 phys.GetDefaultBroadPhaseLayerFilter(PhLayer::Dynamic),
                                 phys.GetDefaultLayerFilter(PhLayer::Dynamic), {}, {}, *gPhysics->pTempAllocator);

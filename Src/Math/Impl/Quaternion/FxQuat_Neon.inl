@@ -4,6 +4,12 @@
 
 #ifdef FX_USE_NEON
 
+FX_FORCE_INLINE FxQuat::FxQuat(const float32* buffer)
+{
+    const float aligned_buffer[] = { buffer[0], buffer[1], buffer[2], buffer[3] };
+    mIntrin = vld1q_f32(aligned_buffer);
+}
+
 FX_FORCE_INLINE FxQuat& FxQuat::operator=(const float32x4_t& other)
 {
     mIntrin = other;
@@ -49,9 +55,46 @@ FX_FORCE_INLINE void FxQuat::NLerpIP(const FxQuat& dest, float32 time)
     mIntrin = FxNeon::Normalize(mIntrin);
 }
 
-FX_FORCE_INLINE void FxQuat::SLerpIP(const FxQuat& dest, float32 step)
+// Based off of https://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/index.htm and optimized
+// for Neon.
+FX_FORCE_INLINE FxQuat FxQuat::SLerp(const FxQuat& dest, const float32 step) const
 {
-    // Dot product
+    // Note: there are so many different ways to implement this and a lot of them online just straight up pro
+    float32x4_t a_v = mIntrin;
+    float32x4_t b_v = dest.mIntrin;
+
+    float32x4_t result;
+
+    // Calculate angle between them.
+    float32 cos_half_theta = FxNeon::Dot(a_v, b_v);
+    // if qa=qb or qa=-qb then theta = 0 and we can return qa
+    if (abs(cos_half_theta) >= 1.0) {
+        return FxQuat(mIntrin);
+    }
+
+    // Calculate temporary values.
+    float32 half_theta = acosf(cos_half_theta);
+    float32 sin_half_theta = sqrtf(1.0f - cos_half_theta * cos_half_theta);
+
+    // if theta = 180 degrees then result is not fully defined
+    // we could rotate around any axis normal to qa or qb
+    if (sin_half_theta < 0.001) {
+        float32x4_t half = vdupq_n_f32(0.5f);
+
+        result = vmulq_f32(a_v, half);
+        result = vfmaq_f32(result, b_v, half);
+
+        return FxQuat(result);
+    }
+
+    const float32 sht_recip = 1.0f / sin_half_theta;
+    float32 ratioA = sinf((1.0f - step) * half_theta) * sht_recip;
+    float32 ratioB = sinf(step * half_theta) * sht_recip;
+
+    result = vmulq_f32(a_v, vdupq_n_f32(ratioA));
+    result = vfmaq_f32(result, b_v, vdupq_n_f32(ratioB));
+
+    return FxQuat(result);
 }
 
 #endif

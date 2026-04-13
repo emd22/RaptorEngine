@@ -16,10 +16,12 @@
 #include "FxLog.hpp"
 #endif
 
+//#define FX_SIZED_ARRAY_NO_MEMPOOL 1
+
 static inline void NoMemError()
 {
     puts("FxSizedArray: out of memory");
-    std::terminate();
+    FxTerminate();
 }
 
 template <typename TElementType>
@@ -138,7 +140,7 @@ public:
             gEnginePool->FreeRaw(static_cast<void*>(pData));
         }
 #else
-        std::free(pData);
+        std::free(reinterpret_cast<void*>(pData));
 #endif
 
 #ifdef FX_SIZED_ARRAY_DEBUG
@@ -212,7 +214,15 @@ public:
         InitCapacity(other.Capacity);
         Size = other.Size;
 
-        memcpy(pData, other.pData, other.GetSizeInBytes());
+        if (std::is_copy_constructible_v<TElementType>) {
+            for (SizeType i = 0; i < Size; i++) {
+                new (other.pData + i) TElementType(other.pData[i]);
+            }
+        }
+        else {
+            std::memcpy(reinterpret_cast<void*>(pData), reinterpret_cast<const void*>(other.pData),
+                        other.GetSizeInBytes());
+        }
     }
 
     template <typename T>
@@ -280,6 +290,16 @@ public:
         new (element) TElementType;
 
         return element;
+    }
+
+    void RemoveLast()
+    {
+        FxAssertMsg(Size > 0, "No elements remaining!");
+        TElementType* element = &pData[Size--];
+
+        if (std::is_destructible_v<TElementType>) {
+            element->~TElementType();
+        }
     }
 
     void InitCapacity(size_t element_count)
@@ -385,7 +405,7 @@ protected:
         }
 #else
         // pData = new TElementType[element_count];
-        pData = std::malloc(sizeof(TElementType) * element_count);
+        pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * element_count));
 
         if (pData == nullptr) {
             NoMemError();

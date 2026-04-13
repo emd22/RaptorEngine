@@ -10,6 +10,10 @@
 // DXC
 #ifndef FX_PLATFORM_WINDOWS
 #include <dxc/WinAdapter.h>
+#else
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <atlbase.h>
 #endif
 #include <dxc/dxcapi.h>
 

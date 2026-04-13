@@ -2,6 +2,7 @@
 
 #include "AxLoaderBase.hpp"
 
+#include <Asset/FxAnimation.hpp>
 #include <FxMaterial.hpp>
 #include <FxObject.hpp>
 #include <string>
@@ -11,7 +12,9 @@ struct cgltf_material;
 struct cgltf_mesh;
 struct cgltf_texture_view;
 struct cgltf_primitive;
+struct cgltf_animation;
 struct cgltf_skin;
+struct cgltf_node;
 
 struct AxGltfMaterialToLoad
 {
@@ -43,8 +46,11 @@ private:
     void UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh,
                               cgltf_primitive* primitive);
 
-    void LoadAnimations();
-    void LoadAnimationSkin(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin);
+    int32 FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const;
+
+    void LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin); // now takes skel by ref
+    void LoadAnimation(FxAnimation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
+    void LoadAnimations(FxTSRef<FxObject>& output_object, FxSkeleton& skel);
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;

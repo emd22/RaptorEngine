@@ -59,7 +59,7 @@ public:
     }
 
     /**
-     * Inherits from another FxTSRef that has a type that is convertible to T.
+     * @brief Inherits from another thread safe pointer that has a type that is convertible to T.
      *
      * @tparam U The type of the other FxTSRef
      */

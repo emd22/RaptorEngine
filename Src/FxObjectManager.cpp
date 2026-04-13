@@ -58,6 +58,8 @@ FxObjectGpuEntry* FxObjectManager::GetBufferAtFrame(uint32 object_id)
 
 FxObjectId FxObjectManager::GenerateObjectId()
 {
+    std::lock_guard<std::mutex> guard(mInUse);
+
     FxObjectId free_object_id = mObjectSlotsInUse.FindNextFreeBit();
     mObjectSlotsInUse.Set(free_object_id);
 
@@ -90,6 +92,8 @@ void FxObjectManager::FreeObjectId(FxObjectId id)
     if (id == UINT32_MAX) {
         return;
     }
+
+    std::lock_guard<std::mutex> guard(mInUse);
 
     FxLogInfo("Freeing object {} from object manager", id);
 

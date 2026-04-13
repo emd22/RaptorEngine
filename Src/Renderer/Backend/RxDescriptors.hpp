@@ -30,6 +30,9 @@ public:
 public:
     VkDescriptorPool Pool = nullptr;
 
+    uint16 SetCapacity = 0;
+    uint16 SetsUsed = 0;
+
     std::unordered_map<VkDescriptorType, uint32> RemainingDescriptorCounts;
 
 private:
@@ -63,7 +66,7 @@ class RxDescriptorSet
     static constexpr uint32 scMaxDescriptorEntries = scMaxBuffers + scMaxImages;
 
 public:
-    void Create(const RxDescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets, uint32 count = 1);
+    void Create(RxDescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets, uint32 count = 1);
     bool IsInited() const { return Set != nullptr; }
 
     static void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,

@@ -26,6 +26,9 @@ FX_SET_MODULE_NAME("FoxtrotGame");
 
 static constexpr float scMouseSensitivity = 0.25;
 
+static constexpr uint32 scFramesForAvg = 10;
+
+
 static double sClockFreq = 1.0f;
 
 static bool sbRunning = true;
@@ -78,8 +81,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    AxManager& asset_manager = AxManager::GetInstance();
-    asset_manager.Start(3);
+    gAssetManager->Start(3);
 
     gMaterialManager->Create();
 
@@ -89,8 +91,9 @@ void FoxtrotGame::InitEngine()
 void FoxtrotGame::CreateLights()
 {
     pSun = FxMakeRef<FxLightDirectional>();
-    pSun->MoveTo(FxVec3f(0, 4, -5).Normalize());
-    pSun->Color = FxColor(0xCADFE3, 5);
+    pSun->MoveTo(FxVec3f(0.5, 5, -1.0).Normalize());
+    pSun->Color = FxColor::FromRGBA(0xFA, 0xD2, 0xC0, 6);
+    pSun->AmbientColor = FxColor::FromRGBA(0x4A, 0x3A, 0x2A, 1);
     mMainScene.Attach(pSun);
 }
 
@@ -114,12 +117,13 @@ void FoxtrotGame::CreateGame()
     gPhysics->OptimizeBroadPhase();
 
     pPistolObject = mMainScene.FindObject(FxHashStr64("Pistol"));
+    pArmsObject = mMainScene.FindObject(FxHashStr64("AnimTest"));
 
     CreateLights();
 
-    gShadowRenderer = new RxShadowDirectional(FxVec2u(1024, 1024));
-    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 3.0f, -4.0f), FxVec3f(0, 1, 0));
-    gShadowRenderer->ShadowCamera.SetFarPlane(100.0f);
+    gShadowRenderer = new RxShadowDirectional(FxVec2u(2048, 2048));
+    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 8.0f, -2.0f), FxVec3f(0, 1, 0));
+    gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);
     gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
     gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
@@ -153,7 +157,9 @@ static FX_FORCE_INLINE FxVec3f GetMovementVector()
 
 void FoxtrotGame::ProcessControls()
 {
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_Q)) {
+    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_GRAVE)) {
+        // Release the mouse before quitting the game incase there is a crash.
+        FxControlManager::ReleaseMouse();
         sbRunning = false;
     }
 
@@ -190,15 +196,28 @@ void FoxtrotGame::ProcessControls()
         Player.RotateHead(mouse_delta);
     }
 
+
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_SPACE)) {
+        if (!Player.IsFlyMode()) {
+            Player.Jump();
+        }
+    }
+
+    // Elevate up
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_E)) {
+        Player.Move(DeltaTime, FxVec3f::sUp);
+    }
+    // Elevate down
+    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Q)) {
+        Player.Move(DeltaTime, -FxVec3f::sUp);
+    }
+
+
     if (FxControlManager::IsKeyDown(FxKey::FX_KEY_LSHIFT)) {
         Player.bIsSprinting = true;
     }
     else {
         Player.bIsSprinting = false;
-    }
-
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_SPACE)) {
-        Player.Jump();
     }
 
     if (FxControlManager::IsComboDown(FxKey::FX_KEY_LSHIFT, FxKey::FX_KEY_R)) {
@@ -225,11 +244,23 @@ void FoxtrotGame::ProcessControls()
     }
 }
 
+
 void FoxtrotGame::Tick()
 {
     const uint64 current_tick = SDL_GetPerformanceCounter();
 
     DeltaTime = static_cast<double>(current_tick - mLastTick) / sClockFreq;
+
+    FrameTimeAvg += DeltaTime;
+
+    if (!(gRenderer->GetFrameNumber() % scFramesForAvg)) {
+        double frametime = FrameTimeAvg / scFramesForAvg;
+        double fps = 1.0 / frametime;
+
+        // FxLogInfo("FrameTime={}, FPS={}", frametime, fps);
+
+        FrameTimeAvg = 0;
+    }
 
 
     FxControlManager::Update();
@@ -243,17 +274,20 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
-                                 camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);
+    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.48)) -
+                                 camera->GetRightVector() * FxVec3f(0.165) - camera->GetUpVector() * FxVec3f(0.15);
 
     pPistolObject->MoveTo(pistol_destination);
+    pArmsObject->SetRotationOrigin(FxVec3f(0.2, -0.41, 0.075));
+    pArmsObject->MoveTo(camera->Position + FxVec3f(0.2, -0.41, 0.075));
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
-    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
+    pArmsObject->mRotation = PistolRotationGoal;
+    pPistolObject->mRotation = PistolRotationGoal;
+    // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
 
-    pPistolObject->SetShadowCaster(true);
 
-    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 10.0f));
+    gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 
     FxVec3f target = Player.Position;
 
@@ -285,10 +319,11 @@ void FoxtrotGame::DestroyGame()
     gRenderer->GetDevice()->WaitForIdle();
 
     gMaterialManager->Destroy();
-    AxManager::GetInstance().Shutdown();
 
     delete gShadowRenderer;
     gShadowRenderer = nullptr;
+
+    gAssetManager->Shutdown();
 
     gRenderer->pDeferredRenderer.DestroyRef();
 }

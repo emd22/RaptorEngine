@@ -51,7 +51,7 @@ public:
     RxPipeline* pPipelineOutside = nullptr;
 
     FxColor Color = FxColor::sWhite;
-    FxColor AmbientColor { 0x11111100 };
+    FxColor AmbientColor { 0x101f1f1f };
 
     FxLightFlags Flags = FxLF_None;
 

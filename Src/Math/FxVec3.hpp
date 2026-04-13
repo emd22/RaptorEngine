@@ -40,7 +40,8 @@ public:
 
 public:
     FxVec3f() = default;
-    FX_FORCE_INLINE FxVec3f(float32 x, float32 y, float32 z);
+    FX_FORCE_INLINE FxVec3f(float32 x, float32 y, float32 z) : FxVec3f(x, y, z, 0.0f) {}
+    FX_FORCE_INLINE FxVec3f(float32 x, float32 y, float32 z, float32 w);
     FX_FORCE_INLINE FxVec3f(const float32* values);
     FxVec3f(const JPH::Vec3& other);
 

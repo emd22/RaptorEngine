@@ -1,7 +1,9 @@
 #include "FxShaderPreproc.hpp"
 
+#include <array>
 #include <cctype>
 #include <cstdlib>
+#include <functional>
 
 namespace FxShaderPreproc {
 
@@ -260,16 +262,25 @@ static bool ParseIfdef(State& state, Result& result, const FxSizedArray<FxShader
         read_index = 0;
 
         while (state.Get() != '\n') {
-            read_macro[read_index++] = state.Get();
+            char ch = state.Get();
+
+            if (ch == '\r') {
+                state.NextChar();
+                continue;
+            }
+
+            read_macro[read_index++] = ch;
             state.NextChar();
         }
 
+        state.NextIfEqual('\r');
         state.NextIfEqual('\n');
 
         read_macro[read_index] = 0;
 
         bool macro_found = false;
 
+        printf("MACRO SIZE: %d\n", read_index);
         printf("MACRO: '%.*s'\n", read_index, read_macro);
 
         for (const FxShaderMacro& macro : macros) {
@@ -298,6 +309,7 @@ static bool ParseIfdef(State& state, Result& result, const FxSizedArray<FxShader
 
         // Eat the final endif
         state.TryReadString("#endif");
+        state.NextIfEqual('\r');
         state.NextIfEqual('\n');
 
         return true;
@@ -365,6 +377,14 @@ Result Process(const FxSlice<char>& data, const FxSizedArray<FxShaderMacro>& mac
     State state(data);
 
     while (state.Index < data.Size) {
+        // If there is a comment, skip until the end
+        if (state.Get() == '/' && state.Get(1) == '/') {
+            char ch;
+            while ((ch = state.Get()) && ch != '\n') {
+                state.NextChar();
+            }
+        }
+
         ParsePPFuncCall(state, result);
 
         if (state.Get() == '#' && ParseIfdef(state, result, macros)) {

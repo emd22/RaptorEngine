@@ -16,6 +16,7 @@
 enum class FxMaterialComponentStatus
 {
     eReady,
+    eMissingComponent,
     eNotReady,
 };
 
@@ -28,7 +29,7 @@ struct FxMaterialComponent
 {
 public:
 public:
-    FxTSRef<AxImage> pAssetImage;
+    FxTSRef<AxImage> pAssetImage { nullptr };
     FxSlice<const uint8> pDataToLoad { nullptr };
 
     using Status = FxMaterialComponentStatus;
@@ -38,7 +39,8 @@ public:
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pAssetImage && !pDataToLoad) {
-            pAssetImage = AxImage::GetEmptyImage<TFormat>();
+            // pAssetImage = AxImage::GetEmptyImage<TFormat>();
+            return Status::eMissingComponent;
         }
 
         if (!CheckIfReady()) {
@@ -120,6 +122,7 @@ public:
 
     bool IsReady();
 
+    void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
     inline uint32 GetMaterialIndex() { return mMaterialPropertiesIndex; }
 
     /**
@@ -139,9 +142,9 @@ public:
 
 public:
     //    FxRef<FxAssetImage> DiffuseTexture{nullptr};
-    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> Diffuse;
-    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap;
-    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> MetallicRoughness;
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> Diffuse {};
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> NormalMap {};
+    FxMaterialComponent<RxImageFormat::eRGBA8_UNorm> MetallicRoughness {};
 
     FxMaterialProperties Properties {};
 
@@ -150,6 +153,8 @@ public:
     RxPipeline* pPipeline = nullptr;
 
     std::atomic_bool bIsBuilt { false };
+
+    bool bSupportsSkinning = false;
 
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
@@ -172,7 +177,7 @@ class FxMaterialManager
 {
 public:
     void Create(uint32 materials_per_page = 64);
-    FxTSRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline);
+    FxTSRef<FxMaterial> New(const std::string& name, RxPipeline* pipeline, bool supports_skinning);
 
     RxDescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 
@@ -200,4 +205,6 @@ private:
     RxDescriptorPool mDescriptorPool;
 
     bool mbInitialized : 1 = false;
+
+    std::mutex mInUse;
 };

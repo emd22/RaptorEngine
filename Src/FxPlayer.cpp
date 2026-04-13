@@ -10,6 +10,7 @@ void FxPlayer::Create()
     pCamera = FxMakeRef<FxPerspectiveCamera>();
 
     pCamera->SetAspectRatio(gRenderer->Swapchain.GetAspectRatio());
+    pCamera->SetFov(scWalkingFov);
 
     Physics.Create();
 
@@ -25,56 +26,41 @@ void FxPlayer::MoveBy(const FxVec3f& by)
 
 void FxPlayer::Jump()
 {
-    if (Physics.bIsGrounded) {
+    if (Physics.bIsGrounded && !mbIsFlymode) {
         JumpForce = 2.0f;
     }
 }
 
 void FxPlayer::SetFlyMode(bool value)
 {
-    // mbIsFlymode = value;
+    mbIsFlymode = value;
     Physics.bDisableGravity = value;
 }
 
 void FxPlayer::Move(float64 delta_time, const FxVec3f& offset)
 {
-    // FxVec3f new_direction = FxVec3f(sin(pCamera->mAngleX), 0, cos(pCamera->mAngleX));
-    if (mbIsFlymode) {
-        // new_direction.Y = (pCamera->mAngleY);
-    }
-
     const FxVec3f forward = MovementDirection * offset.Z;
     const FxVec3f right = MovementDirection.Cross(FxVec3f::sUp) * offset.X;
+    const FxVec3f up = FxVec3f::sUp * offset.Y;
 
-    FxVec3f movement_goal = (forward + right);
+
+    FxVec3f movement_goal = (forward + right + up);
 
     if (movement_goal.Length() > 1e-3) {
         movement_goal.NormalizeIP();
     }
 
-    // mUserForce = movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed);
-
-    mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? cMaxSprintSpeed : cMaxWalkSpeed), cMovementLerpSpeed,
-                                 delta_time);
+    mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? scMaxSprintSpeed : scMaxWalkSpeed),
+                                 scMovementLerpSpeed, delta_time);
 
     FxVec3f force = mUserForce;
 
-    if (mbIsFlymode) {
-        // mUserForce.Y = ;
-    }
-    else {
+    if (!mbIsFlymode) {
         force.Y = JumpForce;
         JumpForce = 0;
     }
 
     Physics.ApplyMovement(force);
-
-    // mUserForce += offset;
-    // const FxVec3f max_speed = FxVec3f(cMaxWalkSpeed);
-    // mUserForce = FxVec3f::Min(FxVec3f::Max(mUserForce, -max_speed), max_speed);
-
-    // MarkApplyingUserForce();
-    // MoveBy();
 }
 
 void FxPlayer::Update(float64 delta_time)
@@ -85,6 +71,15 @@ void FxPlayer::Update(float64 delta_time)
     SyncPhysicsToPlayer();
 
     pCamera->MoveTo(Position + mCameraOffset);
+
+    if (!mUserForce.IsNearZero(0.1)) {
+        if (bIsSprinting && pCamera->GetFov() < scSprintFov) {
+            pCamera->SetFov(FxMath::SmoothInterpolate(pCamera->GetFov(), scSprintFov, 8.0f, delta_time));
+        }
+        else if (!bIsSprinting && pCamera->GetFov() > scWalkingFov) {
+            pCamera->SetFov(FxMath::SmoothInterpolate(pCamera->GetFov(), scWalkingFov, 13.0f, delta_time));
+        }
+    }
     pCamera->Update();
 
     mbUpdatePhysicsTransform = false;

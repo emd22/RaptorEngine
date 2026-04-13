@@ -22,6 +22,7 @@ public:
 public:
     FxQuat() = default;
     FxQuat(float32 x, float32 y, float32 z, float32 w);
+    FxQuat(const float32* buffer);
     FxQuat(const JPH::Quat& other);
 
     static FxQuat FromAxisAngle(FxVec3f axis, float32 angle);
@@ -39,8 +40,8 @@ public:
     FX_FORCE_INLINE bool IsCloseTo(const FxQuat& other, const float32 tolerance = 0.0001) const;
     bool IsCloseTo(const JPH::Quat& other, const float32 tolerance = 0.0001) const;
 
-    FX_FORCE_INLINE void SLerpIP(const FxQuat& dest, const float speed);
-    FX_FORCE_INLINE void NLerpIP(const FxQuat& dest, float step);
+    FX_FORCE_INLINE FxQuat SLerp(const FxQuat& dest, const float32 step) const;
+    FX_FORCE_INLINE void NLerpIP(const FxQuat& dest, float32 step);
 
     FX_FORCE_INLINE FxQuat& SmoothInterpolate(const FxQuat& dest, const float speed, const float delta_time)
     {
