@@ -20,8 +20,9 @@ Objects = {
 
     AnimTest = {
         Mesh = "/Model.glb"
-        Shadows = FALSE
-        Pos = [0.0, -1.5, -2.0]
+        Shadows = TRUE
+        Scale = 1.15
+        Layer = OBJLAYER_PLAYER
     }
 
 

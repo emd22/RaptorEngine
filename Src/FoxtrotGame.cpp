@@ -117,6 +117,7 @@ void FoxtrotGame::CreateGame()
     gPhysics->OptimizeBroadPhase();
 
     pPistolObject = mMainScene.FindObject(FxHashStr64("Pistol"));
+    pArmsObject = mMainScene.FindObject(FxHashStr64("AnimTest"));
 
     CreateLights();
 
@@ -273,15 +274,18 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.45)) -
-                                 camera->GetRightVector() * FxVec3f(0.18) - camera->GetUpVector() * FxVec3f(0.15);
+    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.48)) -
+                                 camera->GetRightVector() * FxVec3f(0.165) - camera->GetUpVector() * FxVec3f(0.15);
 
     pPistolObject->MoveTo(pistol_destination);
+    pArmsObject->SetRotationOrigin(FxVec3f(0.2, -0.41, 0.075));
+    pArmsObject->MoveTo(camera->Position + FxVec3f(0.2, -0.41, 0.075));
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
-    pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
+    pArmsObject->mRotation = PistolRotationGoal;
+    pPistolObject->mRotation = PistolRotationGoal;
+    // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
 
-    pPistolObject->SetShadowCaster(true);
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 
