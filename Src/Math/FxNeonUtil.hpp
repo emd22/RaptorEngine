@@ -190,8 +190,6 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
     return vdupq_laneq_f32(a, TComp1);
 }
 
-FX_FORCE_INLINE float32 Dot(float32x4_t a, float32x4_t b) { return vaddvq_f32(vmulq_f32(a, b)); }
-
 /**
  * @brief Returns a vector containing elements across both vectors A and B, in the order of the template parameters.
  *
@@ -237,6 +235,19 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
     // Adjust indices for single permutations
     return Permute4<TComp1 - FxShuffle_BX, TComp2 - FxShuffle_BX, TComp3 - FxShuffle_BX, TComp4 - FxShuffle_BX>(b);
 }
+
+FX_FORCE_INLINE float32 Dot(float32x4_t a, float32x4_t b) { return vaddvq_f32(vmulq_f32(a, b)); }
+
+FX_FORCE_INLINE float32x4_t Cross(float32x4_t a, float32x4_t b)
+{
+    float32x4_t a_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
+    float32x4_t b_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
+
+    const float32x4_t result_yzxw = vsubq_f32(vmulq_f32(a, b_yzxw), vmulq_f32(a_yzxw, b));
+
+    return FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw);
+}
+
 
 FX_FORCE_INLINE float32x4_t Xor(float32x4_t a, float32x4_t b)
 {

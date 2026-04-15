@@ -212,9 +212,6 @@ void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_m
             current_object = FxTSRef<FxObject>::New();
         }
     }
-
-
-    //    object = current_object;
 }
 
 
@@ -225,7 +222,7 @@ int32 AxLoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) con
             return static_cast<int32>(i);
         }
     }
-    return -1;
+    return FxBoneNull;
 }
 
 void AxLoaderGltf::LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin)
@@ -249,7 +246,7 @@ void AxLoaderGltf::LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin)
 
     // Parent indices and names
     skel.ParentIndices.InitSize(joint_count);
-    skel.JointNames.InitSize(joint_count);
+    skel.BoneNames.InitSize(joint_count);
     skel.LocalTransforms.InitSize(joint_count);
     skel.WorldTransforms.InitSize(joint_count);
     skel.SkinningMatrices.InitSize(joint_count);
@@ -257,11 +254,9 @@ void AxLoaderGltf::LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin)
     for (uint32 i = 0; i < joint_count; i++) {
         const cgltf_node* joint = skin->joints[i];
 
-        skel.JointNames[i] = joint->name ? FxString(joint->name) : FxString("joint_" + std::to_string(i));
-        skel.ParentIndices.pData[i] = joint->parent ? FindJointIndex(skin, joint->parent) : -1;
+        skel.BoneNames[i] = joint->name ? FxString(joint->name) : FxString::Fmt("joint_{}", i);
+        skel.ParentIndices[i] = joint->parent ? FindJointIndex(skin, joint->parent) : FxBoneNull;
     }
-
-    FxLogInfo("Loaded skin '{}': {} joints", skin->name ? skin->name : "Unnamed", joint_count);
 }
 
 void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& anim, cgltf_skin* skin)
@@ -270,10 +265,10 @@ void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& a
 
     out_anim.Name = anim.name ? anim.name : "Unnamed";
     out_anim.Duration = 0.0f;
-    out_anim.JointTracks.InitSize(joint_count);
+    out_anim.BoneTracks.InitSize(joint_count);
 
     for (uint32 i = 0; i < joint_count; i++) {
-        out_anim.JointTracks.pData[i] = FxBoneTrack {};
+        out_anim.BoneTracks.pData[i] = FxBoneTrack {};
     }
 
     for (cgltf_size ch = 0; ch < anim.channels_count; ch++) {
@@ -290,7 +285,7 @@ void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& a
             continue;
         }
 
-        FxBoneTrack& joint_track = out_anim.JointTracks.pData[joint_idx];
+        FxBoneTrack& joint_track = out_anim.BoneTracks.pData[joint_idx];
 
         const cgltf_size key_count = sampler->input->count;
         const cgltf_size num_components = cgltf_num_components(sampler->output->type);

@@ -26,6 +26,12 @@ FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f& other, const float32 tole
     return IsCloseTo(other.mIntrin, tolerance);
 }
 
+FX_FORCE_INLINE FxVec3f FxVec3f::MulAdd(const FxVec3f& a, const FxVec3f& b, const FxVec3f& accum)
+{
+    return FxVec3f(vfmaq_f32(accum.mIntrin, a.mIntrin, b.mIntrin));
+}
+
+
 FX_FORCE_INLINE bool FxVec3f::IsCloseTo(const FxVec3f::SimdType other, const float32 tolerance) const
 {
     // Get the absolute difference between the vectors

@@ -5,10 +5,11 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Math/Real.h>
 
+#include <Core/FxLog.hpp>
+#include <Math/FxQuat.hpp>
 #include <Math/FxSSE.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
-#include <Core/FxLog.hpp>
 
 const FxVec3f FxVec3f::sZero = FxVec3f(0.0f, 0.0f, 0.0f);
 const FxVec3f FxVec3f::sOne = FxVec3f(1.0f, 1.0f, 1.0f);
@@ -38,18 +39,22 @@ FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const
     return FxVec3f(ay * bz - by * az, az * bx - bz * ax, ax * by - bx * ay);
 }
 
-FxVec3f FxVec3f::Cross(const FxVec3f& other) const
+FxVec3f FxVec3f::Rotate(const FxQuat& rotation) const
 {
-    const __m128 a = mIntrin;
-    const __m128 b = other.mIntrin;
+    const __m128 zero_v = _mm_setzero_ps();
 
-    const __m128 a_yzxw = FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
-    const __m128 b_yzxw = FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
+    FxQuat vec = FxQuat(_mm_shuffle_ps(mIntrin, zero_v, _MM_SHUFFLE(0, 1, 2, 4)));
+    FxLogInfo("Vec: {}", vec);
+    FxQuat conj_v = rotation.Conjugate();
 
-    const __m128 result_yzxw = _mm_sub_ps(_mm_mul_ps(a, b_yzxw), _mm_mul_ps(a_yzxw, b));
+    FxQuat result = conj_v * vec;
+    result = result * rotation;
 
-    return FxVec3f(FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));
+    return FxVec3f(result.mIntrin);
 }
+
+
+FxVec3f FxVec3f::Cross(const FxVec3f& other) const { return FxVec3f(FxSSE::Cross(mIntrin, other.mIntrin)); }
 
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
 void FxVec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }

@@ -5,12 +5,11 @@
 #include <Core/FxName.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Core/FxTypes.hpp>
+#include <FxColor.hpp>
+#include <Math/FxQuat.hpp>
+#include <Math/FxVec3.hpp>
 #include <Util/FxTokenizer.hpp>
 #include <string>
-
-class FxVec4f;
-class FxQuat;
-class FxVec3f;
 
 template <typename TType>
 concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_point_v<TType> ||
@@ -62,7 +61,7 @@ public:
     {
         if (Type != ValueType::eInt) {
             FxLogWarning("Attempting to retrieve int type from non-int!");
-            return 0.0f;
+            return 0;
         }
 
         return static_cast<TIntType>(mIntValue);
@@ -87,6 +86,7 @@ public:
 
         return mStringValue;
     }
+
 
     template <typename TType>
         requires C_ConfigSupportsType<TType> && (!std::is_same_v<std::string, TType>)
@@ -201,10 +201,84 @@ public:
     void AppendValue(const FxVec4f& vec);
     void AppendValue(const FxQuat& quat);
 
+    /////////////////////////////////////
+    // Value get functions
+    /////////////////////////////////////
+
+
+    template <typename T>
+    T GetValue() const;
+
+    template <>
+    FxVec3f GetValue<FxVec3f>() const
+    {
+        FxAssert(bIsArray == true && ArrayData.Size() >= 3);
+        return FxVec3f(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>());
+    }
+
+    template <>
+    FxQuat GetValue<FxQuat>() const
+    {
+        FxAssert(bIsArray == true && ArrayData.Size() >= 4);
+        return FxQuat(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>(),
+                      ArrayData[3].Get<float32>());
+    }
+
+    template <>
+    FxColor GetValue<FxColor>() const
+    {
+        FxAssert(bIsArray == true && ArrayData.Size() >= 4);
+        return FxColor::FromRGBA(ArrayData[0].Get<int32>(), ArrayData[1].Get<int32>(), ArrayData[2].Get<int32>(),
+                                 ArrayData[3].Get<int32>());
+    }
+
+
+    template <typename TIntType>
+        requires std::is_integral_v<TIntType>
+    TIntType GetValue() const
+    {
+        if (Type != ValueType::eInt) {
+            FxLogWarning("Attempting to retrieve int type from non-int!");
+            return 0;
+        }
+
+        return static_cast<TIntType>(mIntValue);
+    }
+
+    template <typename TFloatType>
+        requires std::is_floating_point_v<TFloatType>
+    TFloatType GetValue() const
+    {
+        if (Type != ValueType::eFloat) {
+            FxLogWarning("Attempting to retrieve float type from non-float!");
+            return 0.0f;
+        }
+
+        return static_cast<TFloatType>(mFloatValue);
+    }
+
+    template <>
+    const char* GetValue() const
+    {
+        FxAssert(Type == ValueType::eString);
+
+        return mStringValue;
+    }
+
+
     FxConfigEntry* GetMember(const FxHash64 name) const;
 
-    FxVec3f GetVec3f() const;
-    FxQuat GetQuat() const;
+    template <typename T>
+    T GetMemberValue(const FxHash64 name, const T& fallback) const
+    {
+        FxConfigEntry* entry = GetMember(name);
+        if (!entry) {
+            return fallback;
+        }
+
+        return entry->GetValue<T>();
+    }
+
 
     FxConfigEntry& operator=(const FxConfigEntry& other) = delete;
 
@@ -240,21 +314,15 @@ public:
     void PrintEntries();
 
     template <typename T>
-    T GetValue(FxHash64 entry_name_hash) const
+    T GetEntryValue(const FxHash64 entry_name_hash, const T& fallback) const
     {
         const FxConfigEntry* entry = GetEntry(entry_name_hash);
         if (!entry) {
             FxLogError("Cannot find config entry {}!", entry_name_hash);
-            return 0;
+            return fallback;
         }
-        return entry->Get<T>();
-    }
 
-
-    template <typename T>
-    constexpr T GetValue(const char* entry_name) const
-    {
-        return GetValue<T>(FxHashStr64(entry_name));
+        return entry->GetValue<T>();
     }
 
     template <typename TValue>

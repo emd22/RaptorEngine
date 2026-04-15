@@ -36,7 +36,40 @@ FX_FORCE_INLINE __m128 RemoveSign(__m128 vec)
     return _mm_andnot_ps(sign_mask, vec);
 }
 
+template <FxShuffleComponent TComp1, FxShuffleComponent TComp2, FxShuffleComponent TComp3, FxShuffleComponent TComp4>
+FX_FORCE_INLINE __m128 Permute4(__m128 a)
+{
+    // Assert that all components are for A
+    static_assert(TComp1 < FxShuffle_BX);
+    static_assert(TComp2 < FxShuffle_BX);
+    static_assert(TComp3 < FxShuffle_BX);
+    static_assert(TComp4 < FxShuffle_BX);
+
+    constexpr uint8 permute = _MM_SHUFFLE(TComp4, TComp3, TComp2, TComp1);
+    return _mm_permute_ps(a, permute);
+}
+
+template <FxShuffleComponent TComp>
+FX_FORCE_INLINE __m128 Permute4(__m128 a)
+{
+    static_assert(TComp < FxShuffle_BX);
+
+    constexpr uint8 permute = _MM_SHUFFLE(TComp, TComp, TComp, TComp);
+    return _mm_permute_ps(a, permute);
+}
+
+
 FX_FORCE_INLINE float32 Dot(__m128 a, __m128 b) { return _mm_cvtss_f32(_mm_dp_ps(a, b, 0xFF)); }
+
+FX_FORCE_INLINE __m128 Cross(__m128 a, __m128 b)
+{
+    const __m128 a_yzxw = FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
+    const __m128 b_yzxw = FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
+
+    const __m128 result_yzxw = _mm_sub_ps(_mm_mul_ps(a, b_yzxw), _mm_mul_ps(a_yzxw, b));
+
+    return FxSSE::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw);
+}
 
 FX_FORCE_INLINE __m128 Negate(__m128 a) { return _mm_xor_ps(a, _mm_set1_ps(scSignMask32)); }
 
@@ -72,27 +105,6 @@ FX_FORCE_INLINE __m128 FlipSigns(__m128 v)
     return _mm_xor_ps(v, sign_v);
 }
 
-template <FxShuffleComponent TComp1, FxShuffleComponent TComp2, FxShuffleComponent TComp3, FxShuffleComponent TComp4>
-FX_FORCE_INLINE __m128 Permute4(__m128 a)
-{
-    // Assert that all components are for A
-    static_assert(TComp1 < FxShuffle_BX);
-    static_assert(TComp2 < FxShuffle_BX);
-    static_assert(TComp3 < FxShuffle_BX);
-    static_assert(TComp4 < FxShuffle_BX);
-
-    constexpr uint8 permute = _MM_SHUFFLE(TComp4, TComp3, TComp2, TComp1);
-    return _mm_permute_ps(a, permute);
-}
-
-template <FxShuffleComponent TComp>
-FX_FORCE_INLINE __m128 Permute4(__m128 a)
-{
-    static_assert(TComp < FxShuffle_BX);
-
-    constexpr uint8 permute = _MM_SHUFFLE(TComp, TComp, TComp, TComp);
-    return _mm_permute_ps(a, permute);
-}
 
 FX_FORCE_INLINE float32 LengthSquared(__m128 vec) { return _mm_cvtss_f32(_mm_dp_ps(vec, vec, 0xF1)); }
 

@@ -179,7 +179,6 @@ void FxObject::UpdateAnimation()
         AnimationTime = pCurrentAnimation->Duration;
     }
 
-    FxLogInfo("Animation step {:.02f}", AnimationTime);
     pSkeleton->EvaluatePose(*pCurrentAnimation, AnimationTime);
 
     AnimationTime += 0.01f;

@@ -15,6 +15,7 @@
 #endif
 
 class FxVec4f;
+class FxQuat;
 
 namespace JPH {
 class Vec3;
@@ -46,6 +47,8 @@ public:
     FxVec3f(const JPH::Vec3& other);
 
     FX_FORCE_INLINE explicit FxVec3f(float32 scalar);
+
+    FX_FORCE_INLINE static FxVec3f MulAdd(const FxVec3f& a, const FxVec3f& b, const FxVec3f& accum);
 
 #ifdef FX_USE_SIMD
     explicit FxVec3f(SimdType intrin) : mIntrin(intrin) {}
@@ -109,6 +112,8 @@ public:
     FxVec3f Cross(const FxVec3f& other) const;
     FxVec3f CrossSlow(const FxVec3f& other) const;
 
+    FxVec3f Rotate(const FxQuat& rotation) const;
+
     FX_FORCE_INLINE float32 Dot(const FxVec3f& other) const;
 #ifdef FX_USE_SIMD
     FX_FORCE_INLINE float32 Dot(SimdType other) const;
@@ -150,7 +155,7 @@ public:
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static FxVec3f FlipSigns(const FxVec3f& vec)
     {
-        return FxVec3f(FxSSE::SetSigns<TX, TY, TZ, TW>(vec.mIntrin));
+        return FxVec3f(FxSSE::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
 #else
     template <int TX, int TY, int TZ, int TW>
@@ -227,7 +232,7 @@ struct std::formatter<FxVec3f>
 
     auto format(const FxVec3f& obj, std::format_context& ctx) const
     {
-        return std::format_to(ctx.out(), "({:.04}, {:.04}, {:.04})", obj.X, obj.Y, obj.Z);
+        return std::format_to(ctx.out(), "({:.04f}, {:.04f}, {:.04f}, {:.04f})", obj.X, obj.Y, obj.Z, obj.W);
     }
 };
 

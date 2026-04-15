@@ -55,6 +55,8 @@ public:
 
     FxLightFlags Flags = FxLF_None;
 
+    FxLightType Type = FxLightType::eUnknown;
+
     bool bEnabled = true;
 
 protected:
@@ -71,9 +73,6 @@ protected:
 class FxLightPoint : public FxLightBase
 {
 public:
-    static constexpr FxLightType scLightType = FxLightType::ePoint;
-
-public:
     FxLightPoint();
 };
 
@@ -82,9 +81,6 @@ public:
  */
 class FxLightDirectional : public FxLightBase
 {
-public:
-    static constexpr FxLightType scLightType = FxLightType::eDirectional;
-
 public:
     FxLightDirectional();
 

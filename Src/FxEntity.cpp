@@ -23,7 +23,7 @@ FxRef<FxEntity> FxEntityManager::New()
     return FxRef<FxEntity>::New(global_manager.mEntityPool.Insert());
 }
 
-void FxEntity::Scale(const float scale) { SetScale(mScale * scale); }
+void FxEntity::ScaleBy(const float scale) { SetScale(mScale * scale); }
 
 void FxEntity::SetScale(const float scale)
 {

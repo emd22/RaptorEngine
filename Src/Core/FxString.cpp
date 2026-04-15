@@ -43,6 +43,17 @@ FxString::FxString(uint32 allocation_size)
     }
 }
 
+bool FxString::operator==(const FxString& other) const
+{
+    const char* a = GetInternalPtr();
+    const char* b = other.GetInternalPtr();
+
+    if (a == nullptr || b == nullptr) {
+        return false;
+    }
+
+    return (!std::strcmp(a, b));
+}
 
 FxString FxString::operator+(const FxString& other) const
 {

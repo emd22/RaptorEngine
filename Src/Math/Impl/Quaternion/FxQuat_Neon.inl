@@ -97,4 +97,6 @@ FX_FORCE_INLINE FxQuat FxQuat::SLerp(const FxQuat& dest, const float32 step) con
     return FxQuat(result);
 }
 
+FX_FORCE_INLINE FxQuat FxQuat::Conjugate() const { return FxQuat(FxNeon::FlipSigns<-1, -1, -1, 1>(mIntrin)); }
+
 #endif

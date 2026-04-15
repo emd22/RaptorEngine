@@ -25,6 +25,16 @@ public:
     const FxPagedArray<FxTSRef<FxObject>>& GetAllObjects() { return mObjects; }
     const FxPagedArray<FxRef<FxLightBase>>& GetAllLights() { return mLights; }
 
+    FxRef<FxLightDirectional> GetDirectionalLight()
+    {
+        for (FxRef<FxLightBase>& light : mLights) {
+            if (light->Type == FxLightType::eDirectional) {
+                return FxRef<FxLightDirectional>(light);
+            }
+        }
+        return FxRef<FxLightDirectional>(nullptr);
+    }
+
     FxTSRef<FxObject> FindObject(FxHash64 name_hash);
 
     void Destroy();

@@ -172,10 +172,17 @@ FxLightPoint::FxLightPoint()
 {
     pPipelineInside = &gRenderer->pDeferredRenderer->PlLightingInsideVolume;
     pPipelineOutside = &gRenderer->pDeferredRenderer->PlLightingOutsideVolume;
+
+    Type = FxLightType::ePoint;
 }
 
 
-FxLightDirectional::FxLightDirectional() { pPipeline = &gRenderer->pDeferredRenderer->PlLightingDirectional; }
+FxLightDirectional::FxLightDirectional()
+{
+    pPipeline = &gRenderer->pDeferredRenderer->PlLightingDirectional;
+
+    Type = FxLightType::eDirectional;
+}
 
 void FxLightDirectional::Render(const FxPerspectiveCamera& camera, FxCamera* shadow_camera)
 {

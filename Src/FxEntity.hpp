@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Asset/AxImage.hpp>
+#include <Core/FxName.hpp>
 #include <Core/FxPagedArray.hpp>
 #include <Math/FxMat4.hpp>
 #include <Math/FxQuat.hpp>
@@ -29,16 +30,22 @@ enum class FxTransformMode
 class FxEntity
 {
 public:
-    virtual void MoveTo(const FxVec3f& position)
+    FX_FORCE_INLINE void SetPosition(const FxVec3f& position)
     {
         mPosition = position;
         MarkTransformOutOfDate();
     }
 
-    virtual void MoveBy(const FxVec3f& offset) { MoveTo(mPosition + offset); }
+    FX_FORCE_INLINE void SetRotation(const FxQuat& rotation)
+    {
+        mRotation = rotation;
+        MarkTransformOutOfDate();
+    }
 
-    virtual void Scale(const float scale);
-    virtual void SetScale(const float scale);
+    void SetScale(const float scale);
+
+    void MoveBy(const FxVec3f& offset) { SetPosition(mPosition + offset); }
+    void ScaleBy(const float scale);
 
     virtual void OnAttached(FxScene* scene) {}
 
@@ -91,6 +98,8 @@ protected:
 
 public:
     uint32 ObjectId = UINT32_MAX;
+
+    FxName Name;
 
     FxVec3f mPosition = FxVec3f::sZero;
     FxQuat mRotation = FxQuat::sIdentity;

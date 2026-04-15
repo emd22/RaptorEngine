@@ -6,6 +6,7 @@
 #include <ThirdParty/Jolt/Math/Quat.h>
 #include <math.h>
 
+#include <Core/FxLog.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxSSE.hpp>
@@ -24,7 +25,9 @@ FxQuat::FxQuat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
 FxQuat FxQuat::FromAxisAngle(FxVec3f axis, float32 angle)
 {
     float32 sv, cv;
-    FxMath::SinCos(angle * 0.5f, &sv, &cv);
+    FxMath::SinCos(angle, &sv, &cv);
+
+    FxLogInfo("Sin {} = {}, Cos {} = {}", angle, sv, angle, cv);
 
     const __m128 vec = _mm_mul_ps(FxSSE::Normalize(axis.mIntrin), _mm_set1_ps(sv));
 

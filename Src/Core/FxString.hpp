@@ -11,6 +11,12 @@ class FxString
 public:
     static FxString NoCopy(char* ptr, uint32 length);
 
+    template <typename... TTypes>
+    static FxString Fmt(const char* fmt, TTypes&&... args)
+    {
+        return FxString(std::vformat(fmt, std::make_format_args(args...)));
+    }
+
     FxString() = default;
     FxString(uint32 allocation_size);
     FxString(const char* str, uint32 length);
@@ -31,6 +37,7 @@ public:
     }
 
     FxString& operator=(const char* str);
+    bool operator==(const FxString& other) const;
 
     FxString operator+(const FxString& other) const;
     FxString operator+(const char* other) const;
@@ -42,6 +49,15 @@ public:
 
 private:
     FX_FORCE_INLINE char* GetInternalPtr()
+    {
+        if (IsHeapAllocated()) {
+            return mpHeapStr;
+        }
+
+        return mpStackStr;
+    }
+
+    FX_FORCE_INLINE const char* GetInternalPtr() const
     {
         if (IsHeapAllocated()) {
             return mpHeapStr;

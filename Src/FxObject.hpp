@@ -91,8 +91,6 @@ private:
     void SyncObjectWithPhysics();
 
 public:
-    FxName Name;
-
     FxRef<FxPrimitiveMesh> pMesh { nullptr };
     FxTSRef<FxMaterial> pMaterial { nullptr };
 

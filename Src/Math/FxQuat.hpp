@@ -10,6 +10,8 @@
 #include "FxSSE.hpp"
 #endif
 
+class FxVec3f;
+
 namespace JPH {
 class Quat;
 }
@@ -26,9 +28,7 @@ public:
     FxQuat(const JPH::Quat& other);
 
     static FxQuat FromAxisAngle(FxVec3f axis, float32 angle);
-
     static FxQuat FromEulerAngles(FxVec3f angles);
-    // static FxQuat FromEulerAngles_NeonTest(FxVec3f angles);
 
     FxVec3f GetEulerAngles() const;
 
@@ -42,6 +42,8 @@ public:
 
     FX_FORCE_INLINE FxQuat SLerp(const FxQuat& dest, const float32 step) const;
     FX_FORCE_INLINE void NLerpIP(const FxQuat& dest, float32 step);
+
+    FX_FORCE_INLINE FxQuat Conjugate() const;
 
     FX_FORCE_INLINE FxQuat& SmoothInterpolate(const FxQuat& dest, const float speed, const float delta_time)
     {
@@ -77,7 +79,6 @@ public:
 
     FX_FORCE_INLINE FxQuat& operator=(const float32x4_t& other);
 
-    operator float32x4_t() const { return mIntrin; }
 #elif defined(FX_USE_AVX)
     explicit FxQuat(__m128 intrin) : mIntrin(intrin) {}
 

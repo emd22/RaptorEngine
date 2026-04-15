@@ -3,6 +3,7 @@
 #include <Core/FxFile.hpp>
 #include <Core/FxHash.hpp>
 #include <Core/FxPagedArray.hpp>
+#include <FxColor.hpp>
 #include <Math/FxQuat.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
@@ -145,23 +146,6 @@ void FxConfigEntry::AppendValue(const FxQuat& quat)
     AppendValue(quat.Y);
     AppendValue(quat.Z);
     AppendValue(quat.W);
-}
-
-
-FxVec3f FxConfigEntry::GetVec3f() const
-{
-    FxAssert(bIsArray == true && ArrayData.Size() >= 3);
-
-    return FxVec3f(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>());
-}
-
-
-FxQuat FxConfigEntry::GetQuat() const
-{
-    FxAssert(bIsArray == true && ArrayData.Size() >= 4);
-
-    return FxQuat(ArrayData[0].Get<float32>(), ArrayData[1].Get<float32>(), ArrayData[2].Get<float32>(),
-                  ArrayData[3].Get<float32>());
 }
 
 

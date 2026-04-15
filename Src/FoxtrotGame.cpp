@@ -90,11 +90,21 @@ void FoxtrotGame::InitEngine()
 
 void FoxtrotGame::CreateLights()
 {
-    pSun = FxMakeRef<FxLightDirectional>();
-    pSun->MoveTo(FxVec3f(0.5, 5, -1.0).Normalize());
-    pSun->Color = FxColor::FromRGBA(0xFA, 0xD2, 0xC0, 6);
-    pSun->AmbientColor = FxColor::FromRGBA(0x4A, 0x3A, 0x2A, 1);
-    mMainScene.Attach(pSun);
+    // pSun = FxMakeRef<FxLightDirectional>();
+    // pSun->MoveTo(FxVec3f(0.5, 5, -1.0).Normalize());
+    // pSun->Color = FxColor::FromRGBA(0xFA, 0xD2, 0xC0, 6);
+    // pSun->AmbientColor = FxColor::FromRGBA(0x4A, 0x3A, 0x2A, 1);
+    // mMainScene.Attach(pSun);
+}
+
+void FoxtrotGame::LoadOffsetsFile()
+{
+    FxConfigFile info;
+
+    info.Load(FX_BASE_DIR "/Config/Offsets.conf");
+
+    PistolOffset = info.GetEntryValue(FxHashStr64("PistolOffset"), FxVec3f::sZero);
+    ArmsOffset = info.GetEntryValue(FxHashStr64("ArmsOffset"), FxVec3f::sZero);
 }
 
 void FoxtrotGame::CreateGame()
@@ -116,8 +126,12 @@ void FoxtrotGame::CreateGame()
     scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
     gPhysics->OptimizeBroadPhase();
 
+    pSun = mMainScene.GetDirectionalLight();
+
     pPistolObject = mMainScene.FindObject(FxHashStr64("Pistol"));
     pArmsObject = mMainScene.FindObject(FxHashStr64("AnimTest"));
+
+    LoadOffsetsFile();
 
     CreateLights();
 
@@ -226,6 +240,8 @@ void FoxtrotGame::ProcessControls()
         scene_file.Load(
             std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(FxHashStr64("Scene"))->Get<const char*>()),
             mMainScene);
+
+        LoadOffsetsFile();
     }
 
     if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
@@ -243,7 +259,6 @@ void FoxtrotGame::ProcessControls()
         Player.SetFlyMode(!Player.IsFlyMode());
     }
 }
-
 
 void FoxtrotGame::Tick()
 {
@@ -274,17 +289,45 @@ void FoxtrotGame::Tick()
 
     FxRef<FxPerspectiveCamera> camera = Player.pCamera;
 
-    FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.48)) -
-                                 camera->GetRightVector() * FxVec3f(0.165) - camera->GetUpVector() * FxVec3f(0.15);
+    // FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.48)) -
+    //                              camera->GetRightVector() * FxVec3f(0.165) - camera->GetUpVector() * FxVec3f(0.15);
 
-    pPistolObject->MoveTo(pistol_destination);
-    pArmsObject->SetRotationOrigin(FxVec3f(0.2, -0.41, 0.075));
-    pArmsObject->MoveTo(camera->Position + FxVec3f(0.2, -0.41, 0.075));
+
+    pArmsObject->SetRotationOrigin(ArmsOffset);
+
+    pArmsObject->SetPosition(camera->Position + ArmsOffset);
+
 
     PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
     pArmsObject->mRotation = PistolRotationGoal;
-    pPistolObject->mRotation = PistolRotationGoal;
+
+    if (pArmsObject->pSkeleton) {
+        if (RHandBone == FxBoneNull) {
+            RHandBone = pArmsObject->pSkeleton->FindBone(pArmsObject->pCurrentAnimation, "hand.R");
+        }
+
+        FxBoneTransform hand_transform = pArmsObject->pSkeleton->GetBoneTransform(
+            pArmsObject->pCurrentAnimation, pArmsObject->AnimationTime, RHandBone);
+
+        hand_transform.Position *= FxVec3f(pArmsObject->mScale);
+
+        pArmsObject->UpdateIfOutOfDate();
+
+        pPistolObject->SetRotationOrigin(ArmsOffset + hand_transform.Position + PistolOffset);
+        pPistolObject->SetPosition(pArmsObject->mPosition + hand_transform.Position + PistolOffset);
+
+        FxLogInfo("{}", hand_transform.Position);
+        pPistolObject->mRotation = PistolRotationGoal;
+        pPistolObject->UpdateIfOutOfDate();
+        // pPistolObject->SetRotationOrigin(pistol_destination);
+    }
+
+    // pPistolObject->SetRotationOrigin(ArmsOffset);
+
+
     // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
+    // pArmsObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
+    // pArmsObject->mRotation = PistolRotationGoal;
 
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));

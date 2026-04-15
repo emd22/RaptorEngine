@@ -40,6 +40,25 @@ void FxSceneFile::Load(const std::string& path, FxScene& scene)
         scene.Name = meta->GetMember(FxHashStr64("Name"))->Get<const char*>();
     }
 
+    // Load sun
+
+    FxRef<FxLightDirectional> sun = scene.GetDirectionalLight();
+    if (!sun.IsValid()) {
+        sun = FxRef<FxLightDirectional>::New();
+        scene.Attach(sun);
+    }
+
+    FxConfigEntry* sun_entry = info.GetEntry(FxHashStr64("Sun"));
+
+    if (sun_entry) {
+        sun->SetPosition(sun_entry->GetMemberValue<FxVec3f>(FxHashStr64("Pos"), FxVec3f::sZero));
+
+        sun->Color = sun_entry->GetMemberValue<FxColor>(FxHashStr64("Color"), FxColor::FromRGBA(100, 100, 100, 4));
+        sun->AmbientColor = sun_entry->GetMemberValue<FxColor>(FxHashStr64("Color"),
+                                                               FxColor::FromRGBA(100, 100, 100, 1));
+    }
+
+
     // Load objects
 
     FxConfigEntry* object_list = info.GetEntry(FxHashStr64("Objects"));
@@ -86,17 +105,12 @@ void FxSceneFile::ApplyPropertiesToObject(FxTSRef<FxObject>& object, const FxCon
         object->SetScale(scale->Get<float32>());
     }
 
-    FxConfigEntry* position = object_entry.GetMember(FxHashStr64("Pos"));
-    if (position != nullptr) {
-        object->MoveTo(position->GetVec3f());
-        object->Update();
-    }
+    object->SetPosition(object_entry.GetMemberValue(FxHashStr64("Pos"), object->mPosition));
+    object->SetRotation(object_entry.GetMemberValue(FxHashStr64("Rot"), object->mRotation));
+    object->SetScale(object_entry.GetMemberValue(FxHashStr64("Scale"), object->mScale));
 
-    FxConfigEntry* rotation = object_entry.GetMember(FxHashStr64("Rot"));
-    if (rotation != nullptr) {
-        object->mRotation = rotation->GetQuat();
-        object->MarkTransformOutOfDate();
-    }
+    object->Update();
+    object->MarkTransformOutOfDate();
 
     FxConfigEntry* layer = object_entry.GetMember(FxHashStr64("Layer"));
     if (layer != nullptr) {
@@ -130,20 +144,8 @@ void FxSceneFile::ApplyPropertiesToObject(FxTSRef<FxObject>& object, const FxCon
 
         FxConfigEntry* box_collider = physics->GetMember(FxHashStr64("BoxCollider"));
         if (box_collider != nullptr) {
-            FxConfigEntry* size_entry = box_collider->GetMember(FxHashStr64("Size"));
-
-            FxVec3f size;
-
-            if (!size_entry) {
-                FxLogError("Size not defined for object box collider!");
-                size = FxVec3f::sOne;
-            }
-            else {
-                size = size_entry->GetVec3f();
-                FxLogInfo("USING SIZE {}", size);
-            }
-
-            object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, size, motion_type, physics_properties);
+            FxVec3f box_size = box_collider->GetMemberValue(FxHashStr64("Size"), FxVec3f::sOne);
+            object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, box_size, motion_type, physics_properties);
         }
     }
 

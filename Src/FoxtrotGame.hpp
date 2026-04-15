@@ -26,6 +26,7 @@ private:
     void Tick();
     void ProcessControls();
 
+    void LoadOffsetsFile();
 
     void DestroyGame();
 
@@ -40,14 +41,16 @@ public:
     FxTSRef<FxObject> pArmsObject { nullptr };
     FxTSRef<FxObject> pHelmetObject { nullptr };
 
+    FxBoneId RHandBone = FxBoneNull;
+
     double FrameTimeAvg = 0.0f;
-
-
-    FxQuat PistolRotationGoal = FxQuat::sIdentity;
-
     double DeltaTime = 1.0f / 60.0f;
 
+    FxQuat PistolRotationGoal = FxQuat::sIdentity;
     FxObjectManager ObjectManager;
+
+    FxVec3f PistolOffset = FxVec3f::sZero;
+    FxVec3f ArmsOffset = FxVec3f::sZero;
 
 private:
     uint64 mLastTick = 0;

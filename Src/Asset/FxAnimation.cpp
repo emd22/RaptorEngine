@@ -1,5 +1,6 @@
 #include "FxAnimation.hpp"
 
+#include <Core/FxString.hpp>
 #include <Math/FxQuat.hpp>
 
 template <typename T>
@@ -20,7 +21,7 @@ FxQuat Interpolate(const FxQuat& a, const FxQuat& b, float32 t)
 }
 
 template <typename T>
-static T GetTransformForTime(float32 time, const FxAnimTrack<T>& track)
+static T GetComponentAtTime(float32 time, const FxBoneTransformTrack<T>& track)
 {
     const uint32 count = static_cast<uint32>(track.Times.Size);
 
@@ -46,8 +47,8 @@ static T GetTransformForTime(float32 time, const FxAnimTrack<T>& track)
 
     // Find bracketing keyframes
     for (uint32 i = 0; i < count - 1; i++) {
-        const float32 t0 = track.Times.pData[i];
-        const float32 t1 = track.Times.pData[i + 1];
+        const float32 t0 = track.Times[i];
+        const float32 t1 = track.Times[i + 1];
 
         if (time >= t0 && time < t1) {
             const float32 duration = t1 - t0;
@@ -65,20 +66,10 @@ void FxSkeleton::EvaluatePose(FxAnimation& anim, float32 time)
     const uint32 joint_count = JointCount;
 
     for (uint32 i = 0; i < joint_count; i++) {
-        const FxBoneTrack& track = anim.JointTracks.pData[i];
+        const FxBoneTrack& track = anim.BoneTracks[i];
 
-        FxVec3f translation = FxVec3f::sZero;
-        FxVec3f scale = FxVec3f::sOne;
-        FxQuat rotation = FxQuat::sIdentity;
-
-        if (track.Translation.Times.Size > 0) {
-            translation = GetTransformForTime(time, track.Translation);
-        }
-
-        if (track.Rotation.Times.Size > 0) {
-            rotation = GetTransformForTime(time, track.Rotation);
-        }
-
+        FxVec3f translation = GetComponentAtTime(time, track.Translation);
+        FxQuat rotation = GetComponentAtTime(time, track.Rotation);
 
         LocalTransforms.pData[i] = FxMat4f::AsRotation(rotation) * FxMat4f::AsTranslation(translation);
     }
@@ -87,14 +78,48 @@ void FxSkeleton::EvaluatePose(FxAnimation& anim, float32 time)
         const int32 parent = ParentIndices.pData[i];
 
         if (parent < 0) {
-            WorldTransforms.pData[i] = LocalTransforms.pData[i];
+            WorldTransforms[i] = LocalTransforms[i];
         }
         else {
-            WorldTransforms.pData[i] = LocalTransforms.pData[i] * WorldTransforms.pData[parent];
+            WorldTransforms[i] = LocalTransforms[i] * WorldTransforms[parent];
         }
     }
 
     for (uint32 i = 0; i < joint_count; i++) {
-        SkinningMatrices.pData[i] = InvBindTransforms[i] * WorldTransforms[i];
+        SkinningMatrices[i] = InvBindTransforms[i] * WorldTransforms[i];
     }
+}
+
+FxBoneTransform FxSkeleton::GetBoneTransform(const FxRef<FxAnimation>& anim, float32 time, FxBoneId bone_id) const
+{
+    FxBoneTransform xform {};
+    if (!anim.IsValid() || bone_id == FxBoneNull) {
+        return xform;
+    }
+
+    if (bone_id > anim->BoneTracks.Size) {
+        FxLogError("Bone ID({}) out of range", bone_id);
+        return xform;
+    }
+
+    const FxBoneTrack& track = anim->BoneTracks[bone_id];
+    return FxBoneTransform(SkinningMatrices[bone_id].GetTranslation() * FxVec3f(-1, 1, -1),
+                           GetComponentAtTime(time, track.Rotation));
+}
+
+
+FxBoneId FxSkeleton::FindBone(const FxRef<FxAnimation>& anim, const FxString& name) const
+{
+    if (!anim.IsValid()) {
+        return FxBoneNull;
+    }
+
+    for (int32 index = 0; index < BoneNames.Size; index++) {
+        if (BoneNames[index] == name) {
+            return index;
+            break;
+        }
+    }
+
+    return FxBoneNull;
 }

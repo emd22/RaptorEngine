@@ -9,6 +9,7 @@
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxNeonUtil.hpp>
 #include <Math/FxQuat.hpp>
+#include <Math/FxVec3.hpp>
 
 const FxQuat FxQuat::sIdentity = FxQuat(0, 0, 0, 1);
 
@@ -25,9 +26,12 @@ FxQuat FxQuat::FromAxisAngle(FxVec3f axis, float32 angle)
     float32 sv, cv;
     FxMath::SinCos(angle * 0.5f, &sv, &cv);
 
-    const float32x4_t vec = vmulq_n_f32(FxNeon::Normalize(axis.mIntrin), sv);
+    // Build the multiplier ({ sin A, sin A, sin A, cos A })
+    float32x4_t mp_v = vsetq_lane_f32(cv, vdupq_n_f32(sv), 3);
 
-    return FxQuat(vsetq_lane_f32(cv, vec, 3));
+    // { X, Y, Z, 1.0 }
+    const float32x4_t axis_v = vsetq_lane_f32(1.0, FxNeon::Normalize(axis.mIntrin), 3);
+    return FxQuat(vmulq_f32(axis_v, mp_v));
 }
 
 bool FxQuat::IsCloseTo(const JPH::Quat& other, const float32 tolerance) const { return IsCloseTo(other.mValue.mValue); }
@@ -93,6 +97,17 @@ FxQuat FxQuat::operator*(const FxQuat& other) const
                   lw * ry - lx * rz + ly * rw + lz * rx, /* */
                   lw * rz + lx * ry - ly * rx + lz * rw, /* */
                   lw * rw - lx * rx - ly * ry - lz * rz);
+}
+
+FxVec3f FxQuat::operator*(const FxVec3f& other) const
+{
+    FxQuat offq = FxQuat(vsetq_lane_f32(0.0f, other.mIntrin, 3));
+    FxQuat conj = Conjugate();
+
+    FxQuat result = conj * offq;
+    result = (result * (*this));
+
+    return FxVec3f(result.mIntrin);
 }
 
 // FxQuat FxQuat::FromEulerAngles_NeonTest(FxVec3f angles)

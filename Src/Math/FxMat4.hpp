@@ -134,6 +134,8 @@ public:
         return *this;
     }
 
+    FxVec3f GetTranslation() const { return FxVec3f(Columns[3]); }
+
     FxMat4f Inverse() const;
     FxMat4f Transposed() const;
     FxMat4f TransposeMat3();

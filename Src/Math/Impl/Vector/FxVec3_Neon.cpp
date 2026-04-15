@@ -9,6 +9,7 @@
 #include <Core/FxLog.hpp>
 #include <Math/FxMathUtil.hpp>
 #include <Math/FxNeonUtil.hpp>
+#include <Math/FxQuat.hpp>
 #include <Math/FxVec3.hpp>
 #include <Math/FxVec4.hpp>
 
@@ -41,18 +42,20 @@ FxVec3f FxVec3f::CrossSlow(const FxVec3f& other) const
     return FxVec3f(ay * bz - by * az, az * bx - bz * ax, ax * by - bx * ay);
 }
 
-FxVec3f FxVec3f::Cross(const FxVec3f& other) const
+
+FxVec3f FxVec3f::Rotate(const FxQuat& rotation) const
 {
-    const float32x4_t a = mIntrin;
-    const float32x4_t b = other.mIntrin;
+    FxQuat vec = FxQuat(vsetq_lane_f32(0.0f, mIntrin, 3));
+    FxQuat conj_v = rotation.Conjugate();
 
-    float32x4_t a_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(a);
-    float32x4_t b_yzxw = FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(b);
+    FxQuat result = conj_v * vec;
+    result = result * rotation;
 
-    const float32x4_t result_yzxw = vsubq_f32(vmulq_f32(a, b_yzxw), vmulq_f32(a_yzxw, b));
-
-    return FxVec3f(FxNeon::Permute4<FxShuffle_AY, FxShuffle_AZ, FxShuffle_AX, FxShuffle_AW>(result_yzxw));
+    return FxVec3f(result.mIntrin);
 }
+
+
+FxVec3f FxVec3f::Cross(const FxVec3f& other) const { return FxVec3f(FxNeon::Cross(mIntrin, other.mIntrin)); }
 
 void FxVec3f::ToJoltVec3(JPH::RVec3& jolt_vec) const { jolt_vec.mValue = mIntrin; }
 void FxVec3f::FromJoltVec3(const JPH::RVec3& jolt_vec) { mIntrin = jolt_vec.mValue; }
