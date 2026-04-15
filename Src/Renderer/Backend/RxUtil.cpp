@@ -5,6 +5,8 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
+
 void RxUtil::SetDebugLabel_(const char* name, VkObjectType object_type, unsigned long long obj_handle)
 {
     VkDebugUtilsObjectNameInfoEXT debug_info { .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -17,3 +19,5 @@ void RxUtil::SetDebugLabel_(const char* name, VkObjectType object_type, unsigned
 
     Rx_EXT_SetDebugUtilsObjectName(gRenderer->GetVulkanInstance(), device->Device, &debug_info);
 }
+
+} // namespace fx::renderer

@@ -5,19 +5,24 @@
 #include "Backend/RxPipeline.hpp"
 #include "Backend/RxSwapchain.hpp"
 #include "Backend/RxSynchro.hpp"
-#include "FxDeletionObject.hpp"
-#include "FxWindow.hpp"
+#include "DeletionObject.hpp"
 #include "RxDeferred.hpp"
 #include "RxUniformBuffer.hpp"
+#include "Window.hpp"
 
 #include <ThirdParty/vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
-#include <Core/FxDefer.hpp>
-#include <Core/FxRef.hpp>
+#include <Core/Defer.hpp>
+#include <Core/Ref.hpp>
 #include <deque>
 #include <mutex>
 
+namespace fx {
+class Camera;
+}
+
+namespace fx::renderer {
 
 enum class RxFrameResult
 {
@@ -40,7 +45,6 @@ struct RxGpuUploadContext
     ~RxGpuUploadContext() = default;
 };
 
-class FxCamera;
 
 class RxRenderBackend
 {
@@ -54,21 +58,21 @@ public:
 public:
     RxRenderBackend() = default;
 
-    using ExtensionList = FxSizedArray<VkExtensionProperties>;
+    using ExtensionList = SizedArray<VkExtensionProperties>;
     using ExtensionNames = std::vector<const char*>;
 
-    void Init(FxVec2u window_size);
+    void Init(Vec2u window_size);
     void Destroy();
 
     RxFrameResult BeginFrame();
     void BeginGeometry();
     void BeginLighting();
     void BeginUnlit();
-    void DoComposition(FxCamera& render_cam);
+    void DoComposition(Camera& render_cam);
 
-    void SelectWindow(const FxRef<FxWindow>& window) { mpWindow = window; }
+    void SelectWindow(const Ref<Window>& window) { mpWindow = window; }
 
-    FX_FORCE_INLINE FxRef<FxWindow> GetWindow() { return mpWindow; }
+    FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
     FX_FORCE_INLINE RxGpuDevice* GetDevice() { return &mDevice; }
 
     RxUniformBufferObject& GetUbo();
@@ -77,7 +81,7 @@ public:
     {
         std::lock_guard<std::mutex> guard(mInDeletionQueue);
 
-        mDeletionQueue.push_back(FxDeletionObject {
+        mDeletionQueue.push_back(DeletionObject {
             .Buffer = buffer,
             .Allocation = allocation,
             .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
@@ -111,7 +115,7 @@ public:
             return false;
         }
 
-        FxDeletionObject& object = mDeletionQueue.front();
+        DeletionObject& object = mDeletionQueue.front();
 
         const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
 
@@ -135,13 +139,13 @@ public:
         return did_delete;
     }
 
-    void AddToDeletionQueue(FxDeletionObject::FuncType func)
+    void AddToDeletionQueue(DeletionObject::FuncType func)
     {
-        // FxLogInfo("Adding object to deletion queue at frame {}", mInternalFrameCounter);
+        // LogInfo("Adding object to deletion queue at frame {}", mInternalFrameCounter);
 
         std::lock_guard<std::mutex> guard(mInDeletionQueue);
 
-        mDeletionQueue.push_back(FxDeletionObject {
+        mDeletionQueue.push_back(DeletionObject {
             .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
             .Func = func,
         });
@@ -171,11 +175,11 @@ private:
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
     ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
 
-    FxSizedArray<VkLayerProperties> GetAvailableValidationLayers();
+    SizedArray<VkLayerProperties> GetAvailableValidationLayers();
 
 public:
     RxSwapchain Swapchain;
-    FxSizedArray<RxFrameData> Frames;
+    SizedArray<RxFrameData> Frames;
 
     VmaAllocator GpuAllocator = nullptr;
 
@@ -190,7 +194,7 @@ public:
     RxDeferredCompPass* pCurrentCompPass = nullptr;
     RxDeferredLightingPass* pCurrentLightingPass = nullptr;
 
-    FxRef<RxDeferredRenderer> pDeferredRenderer { nullptr };
+    Ref<RxDeferredRenderer> pDeferredRenderer { nullptr };
 
     RxUniforms Uniforms;
     RxUniforms BoneBuffer;
@@ -205,14 +209,14 @@ private:
     VkInstance mInstance = nullptr;
     VkSurfaceKHR mWindowSurface = nullptr;
 
-    FxRef<FxWindow> mpWindow = nullptr;
+    Ref<Window> mpWindow = nullptr;
     RxGpuDevice mDevice;
 
     VkDebugUtilsMessengerEXT mDebugMessenger;
 
     ExtensionList mAvailableExtensions;
 
-    FxSizedArray<RxSemaphore> mSubmitSemaphores;
+    SizedArray<RxSemaphore> mSubmitSemaphores;
 
     uint32 mImageIndex = 0;
 
@@ -221,5 +225,7 @@ protected:
     std::atomic_uint32_t mInternalFrameCounter = 0;
 
     std::mutex mInDeletionQueue;
-    std::deque<FxDeletionObject> mDeletionQueue;
+    std::deque<DeletionObject> mDeletionQueue;
 };
+
+} // namespace fx::renderer

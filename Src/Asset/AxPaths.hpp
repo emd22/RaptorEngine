@@ -7,4 +7,4 @@ enum class AxPathQuery
 };
 
 
-const char* FxAssetPath(AxPathQuery query);
+const char* AssetPath(AxPathQuery query);

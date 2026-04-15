@@ -4,10 +4,11 @@
 #include "Backend/RxShader.hpp"
 #include "RxAttachment.hpp"
 
-#include <Core/FxRef.hpp>
-#include <Core/FxSizedArray.hpp>
-#include <Core/FxStackArray.hpp>
+#include <Core/Ref.hpp>
+#include <Core/SizedArray.hpp>
+#include <Core/StackArray.hpp>
 
+namespace fx::renderer {
 
 using RxColorComponentFlags = uint32;
 enum RxColorComponent : uint32
@@ -108,8 +109,8 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE RxPipelineBuilder& SetShaders(const FxRef<RxShaderProgram>& vertex,
-                                                  const FxRef<RxShaderProgram>& fragment)
+    FX_FORCE_INLINE RxPipelineBuilder& SetShaders(const Ref<RxShaderProgram>& vertex,
+                                                  const Ref<RxShaderProgram>& fragment)
     {
         mVertexShader = vertex;
         mFragmentShader = fragment;
@@ -175,7 +176,7 @@ public:
 
     void Build(RxPipeline& pipeline)
     {
-        FxSizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments;
+        SizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments;
 
         // Make vulkan blend attachments
         {
@@ -195,13 +196,13 @@ public:
             }
         }
 
-        FxSizedArray<FxRef<RxShaderProgram>> shader_list = { mVertexShader, mFragmentShader };
+        SizedArray<Ref<RxShaderProgram>> shader_list = { mVertexShader, mFragmentShader };
 
         // Make vulkan blend attachments
 
         pipeline.Layout = mLayout;
 
-        FxLogInfo("Creating pipeline '{}'", mPipelineName);
+        LogInfo("Creating pipeline '{}'", mPipelineName);
         pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetDescriptions(), vk_blend_attachments,
                         mVertexInfo, *mRenderPass, mProperties);
 
@@ -213,15 +214,15 @@ public:
     }
 
 private:
-    FxSizedArray<RxPipelineBlendAttachment> mBlendAttachments;
+    SizedArray<RxPipelineBlendAttachment> mBlendAttachments;
     RxTargetList* mpAttachmentList = nullptr;
 
     VkPipelineLayout mLayout = nullptr;
 
     std::string mPipelineName = "Unnamed Pipeline";
 
-    FxRef<RxShaderProgram> mVertexShader { nullptr };
-    FxRef<RxShaderProgram> mFragmentShader { nullptr };
+    Ref<RxShaderProgram> mVertexShader { nullptr };
+    Ref<RxShaderProgram> mFragmentShader { nullptr };
 
     RxRenderPass* mRenderPass { nullptr };
 
@@ -230,3 +231,5 @@ private:
 
     bool mbDidFirstBuild = false;
 };
+
+} // namespace fx::renderer

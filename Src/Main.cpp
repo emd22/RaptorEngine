@@ -1,40 +1,40 @@
 
-#define VMA_DEBUG_LOG(...) FxLogWarning(__VA_ARGS__)
+#define VMA_DEBUG_LOG(...) LogWarning(__VA_ARGS__)
 
 #include "FoxtrotGame.hpp"
 
-#include <Asset/FxConfigFile.hpp>
-#include <Asset/FxDataPack.hpp>
-#include <Asset/FxShaderCompiler.hpp>
-#include <Core/FxDefer.hpp>
-#include <Core/FxString.hpp>
-#include <Core/MemPool/FxMemPool.hpp>
-#include <FxEngine.hpp>
-#include <Math/FxMathConsts.hpp>
-#include <Math/FxMathUtil.hpp>
+#include <Asset/ConfigFile.hpp>
+#include <Asset/DataPack.hpp>
+#include <Asset/ShaderCompiler.hpp>
+#include <Core/Defer.hpp>
+#include <Core/MemPool/MemPool.hpp>
+#include <Core/String.hpp>
+#include <Engine.hpp>
+#include <Math/MathConsts.hpp>
+#include <Math/MathUtil.hpp>
 #include <Renderer/RxGlobals.hpp>
 
 FX_SET_MODULE_NAME("Main")
 
 int main()
 {
-    gEnginePool = new FxMemPool;
-    gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
+    fx::gEnginePool = new fx::MemPool;
+    fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
-    FxGlobals::Init();
+    fx::Globals::Init();
 
     {
-        FoxtrotGame game {};
+        fx::FoxtrotGame game {};
     }
 
-    FxGlobals::Destroy();
-    RxGlobals::Destroy();
+    fx::Globals::Destroy();
+    fx::RxGlobals::Destroy();
 
-    FxDefer(
+    Defer(
         []()
         {
-            delete gEnginePool;
-            gEnginePool = nullptr;
+            delete fx::gEnginePool;
+            fx::gEnginePool = nullptr;
         });
 
     return 0;

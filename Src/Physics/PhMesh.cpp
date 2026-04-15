@@ -3,18 +3,20 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 
+namespace fx {
 
-PhMesh::PhMesh(const FxPrimitiveMesh& mesh)
+PhMesh::PhMesh(const PrimitiveMesh& mesh)
 {
-    const FxAnonArray& positions = mesh.VertexList.GetLocalBuffer();
-    FxAssert(positions.IsNotEmpty());
+    const AnonArray& positions = mesh.VertexList.GetLocalBuffer();
+    Assert(positions.IsNotEmpty());
 
-    const FxSizedArray<uint32>& index_buffer = mesh.LocalIndexBuffer;
+    const SizedArray<uint32>& index_buffer = mesh.LocalIndexBuffer;
 
     VertexList.reserve(positions.Size);
 
     for (uint64 index = 0; index < positions.Size; index++) {
-        const RxVertex<RxVertexType::eDefault>& vertex = positions.Get<RxVertex<RxVertexType::eDefault>>(index);
+        const renderer::RxVertex<renderer::RxVertexType::eDefault>& vertex =
+            positions.Get<renderer::RxVertex<renderer::RxVertexType::eDefault>>(index);
 
         VertexList.emplace_back(JPH::Float3 {
             vertex.Position[0],
@@ -24,7 +26,7 @@ PhMesh::PhMesh(const FxPrimitiveMesh& mesh)
     }
 
     // Ensure that our vertex buffer is triangulated!
-    FxAssert((index_buffer.Size % 3) == 0);
+    Assert((index_buffer.Size % 3) == 0);
 
     TriangleList.reserve(index_buffer.Size / 3);
 
@@ -39,3 +41,5 @@ PhMesh::PhMesh(const FxPrimitiveMesh& mesh)
 
 
 JPH::MeshShapeSettings PhMesh::GetShapeSettings() const { return JPH::MeshShapeSettings(VertexList, TriangleList); }
+
+} // namespace fx

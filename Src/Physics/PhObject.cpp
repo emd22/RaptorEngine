@@ -10,11 +10,13 @@
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
-#include <FxEngine.hpp>
-#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Engine.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
 
 
-void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+namespace fx {
+
+void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const Vec3f& dimensions, PhMotionType motion_type,
                                    const PhProperties& object_properties)
 {
     mMotionType = motion_type;
@@ -22,7 +24,7 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f
     JPH::RVec3 jolt_dimensions;
     (dimensions * 0.5).ToJoltVec3(jolt_dimensions);
 
-    FxLogInfo("Creating primitive collider with dimensions {}", dimensions);
+    LogInfo("Creating primitive collider with dimensions {}", dimensions);
 
     switch (primitive_type) {
     case PhPrimitiveType::eBox: {
@@ -38,7 +40,7 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f
     }
 }
 
-void PhObject::CreateMeshBody(const FxPrimitiveMesh& mesh, PhMotionType motion_type,
+void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, PhMotionType motion_type,
                               const PhProperties& object_properties)
 {
     mMotionType = motion_type;
@@ -60,7 +62,7 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMot
                               const PhProperties& properties)
 {
     if (mbHasPhysicsBody) {
-        FxLogWarning("Attempting to create physics body when one is already created!");
+        LogWarning("Attempting to create physics body when one is already created!");
         return;
     }
 
@@ -118,7 +120,7 @@ void PhObject::DestroyPhysicsBody()
 }
 
 
-void PhObject::Teleport(FxVec3f position, FxQuat rotation)
+void PhObject::Teleport(Vec3f position, Quat rotation)
 {
     if (!mbHasPhysicsBody) {
         return;
@@ -133,5 +135,7 @@ void PhObject::Teleport(FxVec3f position, FxQuat rotation)
     gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetBodyId(), jolt_position, jolt_rotation,
                                                                       JPH::EActivation::Activate);
 
-    FxLogInfo("Teleporting to sync physics object");
+    LogInfo("Teleporting to sync physics object");
 }
+
+} // namespace fx

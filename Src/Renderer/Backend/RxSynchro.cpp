@@ -4,6 +4,8 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
+
 /////////////////////////////////////
 // RxFence functions
 /////////////////////////////////////
@@ -16,29 +18,29 @@ void RxFence::Create()
 
     const VkResult status = vkCreateFence(gRenderer->GetDevice()->Device, &create_info, nullptr, &Fence);
     if (status != VK_SUCCESS) {
-        FxPanicVulkan("Fence", "Could not create fence", status);
+        PanicVulkan("Fence", "Could not create fence", status);
     }
 }
 
 void RxFence::WaitFor(uint64 timeout) const
 {
-    FxAssert(Fence != nullptr);
+    Assert(Fence != nullptr);
 
     const VkResult status = vkWaitForFences(gRenderer->GetDevice()->Device, 1, &Fence, true, timeout);
 
     if (status != VK_SUCCESS) {
-        FxPanicVulkan("Fence", "Could not create fence", status);
+        PanicVulkan("Fence", "Could not create fence", status);
     }
 }
 
 void RxFence::Reset()
 {
-    FxAssert(Fence != nullptr);
+    Assert(Fence != nullptr);
 
     const VkResult status = vkResetFences(gRenderer->GetDevice()->Device, 1, &Fence);
 
     if (status != VK_SUCCESS) {
-        FxPanicVulkan("Fence", "Could not reset fence", status);
+        PanicVulkan("Fence", "Could not reset fence", status);
     }
 }
 
@@ -62,7 +64,7 @@ void RxSemaphore::Create()
     const VkResult status = vkCreateSemaphore(gRenderer->GetDevice()->Device, &create_info, nullptr, &Semaphore);
 
     if (status != VK_SUCCESS) {
-        FxPanicVulkan("Semaphore", "Could not create semaphore", status);
+        PanicVulkan("Semaphore", "Could not create semaphore", status);
     }
 }
 
@@ -89,7 +91,7 @@ RxSemaphore* RxSemaphoreCache::Request()
     uint32 next_free = mInUse.FindNextFreeBit();
 
     // No available semaphores, return null
-    if (next_free == FxBitset::scNoFreeBits) {
+    if (next_free == Bitset::scNoFreeBits) {
         return nullptr;
     }
 
@@ -118,3 +120,5 @@ RxSemaphoreCache::~RxSemaphoreCache()
 
     mSemaphores.Free();
 }
+
+} // namespace fx::renderer

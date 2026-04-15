@@ -1,13 +1,15 @@
 #pragma once
 
-#include "Core/FxSizedArray.hpp"
+#include "Core/SizedArray.hpp"
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxLockContext.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/LockContext.hpp>
+#include <Core/Types.hpp>
 #include <cstdint>
 #include <vector>
+
+namespace fx::renderer {
 
 class RxQueueFamilies
 {
@@ -46,7 +48,7 @@ private:
     bool FamilyHasPresentSupport(VkPhysicalDevice device, VkSurfaceKHR surface, uint32 family_index);
 
 public:
-    FxSizedArray<VkQueueFamilyProperties> RawFamilies;
+    SizedArray<VkQueueFamilyProperties> RawFamilies;
 
 private:
     uint32 mGraphicsIndex = scNullQueue;
@@ -70,18 +72,18 @@ public:
 
     VkSurfaceFormatKHR GetSurfaceFormat();
 
-    FxSpinLockContext<VkQueue> GetLockableQueue(VkQueue queue)
+    SpinLockContext<VkQueue> GetLockableQueue(VkQueue queue)
     {
         if (mQueueFamilies.HasIndependentTransfer()) {
-            return FxSpinLockContext<VkQueue>(mTransferMutex, queue, true);
+            return SpinLockContext<VkQueue>(mTransferMutex, queue, true);
         }
 
-        return FxSpinLockContext<VkQueue>(mTransferMutex, queue);
+        return SpinLockContext<VkQueue>(mTransferMutex, queue);
     }
 
-    FX_FORCE_INLINE FxSpinLockContext<VkQueue> GetGraphicsQueue() { return GetLockableQueue(mGraphicsQueue); }
-    FX_FORCE_INLINE FxSpinLockContext<VkQueue> GetTransferQueue() { return GetLockableQueue(mTransferQueue); }
-    FX_FORCE_INLINE FxSpinLockContext<VkQueue> GetPresentQueue() { return GetLockableQueue(mPresentQueue); }
+    FX_FORCE_INLINE SpinLockContext<VkQueue> GetGraphicsQueue() { return GetLockableQueue(mGraphicsQueue); }
+    FX_FORCE_INLINE SpinLockContext<VkQueue> GetTransferQueue() { return GetLockableQueue(mTransferQueue); }
+    FX_FORCE_INLINE SpinLockContext<VkQueue> GetPresentQueue() { return GetLockableQueue(mPresentQueue); }
 
     operator VkDevice() const { return Device; }
     operator VkPhysicalDevice() const { return Physical; }
@@ -107,3 +109,5 @@ private:
 
     std::atomic_flag mTransferMutex;
 };
+
+} // namespace fx::renderer

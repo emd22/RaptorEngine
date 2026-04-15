@@ -7,14 +7,16 @@
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <ThirdParty/Jolt/Physics/Collision/Shape/Shape.h>
 
-#include <Core/FxMemberRef.hpp>
-#include <Core/FxSizedArray.hpp>
-#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Core/MemberRef.hpp>
+#include <Core/SizedArray.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
+
+namespace fx {
 
 class PhMesh
 {
 public:
-    PhMesh(const FxPrimitiveMesh& mesh);
+    PhMesh(const PrimitiveMesh& mesh);
 
     JPH::MeshShapeSettings GetShapeSettings() const;
 
@@ -22,3 +24,5 @@ public:
     JPH::VertexList VertexList;
     JPH::IndexedTriangleList TriangleList;
 };
+
+} // namespace fx

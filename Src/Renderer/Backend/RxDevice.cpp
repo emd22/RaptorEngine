@@ -1,16 +1,16 @@
 #include "RxDevice.hpp"
 
-#include "Core/FxDefines.hpp"
-#include "Core/FxSizedArray.hpp"
+#include "Core/Defines.hpp"
+#include "Core/SizedArray.hpp"
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxPanic.hpp>
+#include <Core/Panic.hpp>
 
 FX_SET_MODULE_NAME("Device")
 
-// Removed for Kosmic Krisp
 
+namespace fx::renderer {
 
 ///////////////////////////////
 // Queue Families
@@ -41,13 +41,13 @@ void RxQueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR s
         }
     }
 
-    FxAssert(mGraphicsIndex != scNullQueue);
+    Assert(mGraphicsIndex != scNullQueue);
 
     // There is no independent transfer queue available, use the graphics queue.
     //
     VkQueueFamilyProperties& graphics_props = RawFamilies[mGraphicsIndex];
     if (!(graphics_props.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
-        FxPanic("RxDevice", "Could not find a queue that supports transfer!");
+        Panic("RxDevice", "Could not find a queue that supports transfer!");
     }
     mTransferIndex = mGraphicsIndex;
 }
@@ -59,7 +59,7 @@ bool RxQueueFamilies::FamilyHasPresentSupport(VkPhysicalDevice device, VkSurface
     VkResult status = vkGetPhysicalDeviceSurfaceSupportKHR(device, family_index, surface, &support);
 
     if (status != VK_SUCCESS) {
-        FxLogError("Could not query present support for family at index {:d}", family_index);
+        LogError("Could not query present support for family at index {:d}", family_index);
         return false;
     }
 
@@ -74,7 +74,7 @@ void RxQueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurf
     RawFamilies.InitSize(family_count);
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, RawFamilies.pData);
 
-    FxLogInfo("Amount of queue families: {:d}", family_count);
+    LogInfo("Amount of queue families: {:d}", family_count);
 
 
     FindGraphicsFamily(physical_device, surface);
@@ -142,11 +142,11 @@ bool RxGpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice& physical)
         return true;
     }
 
-    FxLogInfo("Device not suitable: (Vk: {}.{}.{}), Graphics?: {}, Present?: {}, Xfer?: {}, IsComplete?: {}",
-              VK_VERSION_MAJOR(version), VK_VERSION_MINOR(version), VK_VERSION_PATCH(version),
-              (new_families.GetGraphicsFamily() != RxQueueFamilies::scNullQueue),
-              (new_families.GetPresentFamily() != RxQueueFamilies::scNullQueue),
-              (new_families.GetTransferFamily() != RxQueueFamilies::scNullQueue), (new_families.IsComplete()));
+    LogInfo("Device not suitable: (Vk: {}.{}.{}), Graphics?: {}, Present?: {}, Xfer?: {}, IsComplete?: {}",
+            VK_VERSION_MAJOR(version), VK_VERSION_MINOR(version), VK_VERSION_PATCH(version),
+            (new_families.GetGraphicsFamily() != RxQueueFamilies::scNullQueue),
+            (new_families.GetPresentFamily() != RxQueueFamilies::scNullQueue),
+            (new_families.GetTransferFamily() != RxQueueFamilies::scNullQueue), (new_families.IsComplete()));
 
     return false;
 }
@@ -248,7 +248,7 @@ void RxGpuDevice::CreateLogicalDevice()
     const VkResult status = vkCreateDevice(Physical, &create_info, nullptr, &Device);
 
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Could not create logical device", status);
+        ModulePanicVulkan("Could not create logical device", status);
     }
 
     QueryQueues();
@@ -265,9 +265,8 @@ void RxGpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 
     CreateLogicalDevice();
 
-    FxLogInfo("Device Queue Families: \n\tPresent: {:d}\n\tGraphics: {:d}\n\tTransfer: {:d}",
-              mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(),
-              mQueueFamilies.GetTransferFamily());
+    LogInfo("Device Queue Families: \n\tPresent: {:d}\n\tGraphics: {:d}\n\tTransfer: {:d}",
+            mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(), mQueueFamilies.GetTransferFamily());
 }
 
 void RxGpuDevice::Destroy()
@@ -282,7 +281,7 @@ VkSurfaceFormatKHR RxGpuDevice::GetSurfaceFormat()
     uint32 format_count;
     vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, nullptr);
 
-    FxSizedArray<VkSurfaceFormatKHR> surface_formats;
+    SizedArray<VkSurfaceFormatKHR> surface_formats;
     surface_formats.InitSize(format_count);
 
     vkGetPhysicalDeviceSurfaceFormatsKHR(Physical, mSurface, &format_count, surface_formats.pData);
@@ -310,10 +309,10 @@ void RxGpuDevice::PickPhysicalDevice()
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, nullptr), "Could not enumerate physical devices");
 
     if (device_count == 0) {
-        FxModulePanic("No usable physical devices found (no vulkan support!)", 0);
+        ModulePanic("No usable physical devices found (no vulkan support!)", 0);
     }
 
-    FxSizedArray<VkPhysicalDevice> physical_devices;
+    SizedArray<VkPhysicalDevice> physical_devices;
     physical_devices.InitSize(device_count);
 
     VkTry(vkEnumeratePhysicalDevices(mInstance, &device_count, physical_devices.pData),
@@ -326,7 +325,7 @@ void RxGpuDevice::PickPhysicalDevice()
         }
     }
     if (Physical == nullptr) {
-        FxModulePanic("Could not find a suitable physical device!", 0);
+        ModulePanic("Could not find a suitable physical device!", 0);
     }
 }
 
@@ -338,3 +337,5 @@ void RxGpuDevice::WaitForIdle()
 
     vkDeviceWaitIdle(Device);
 }
+
+} // namespace fx::renderer

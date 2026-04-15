@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxLog.hpp>
+#include <Core/Log.hpp>
 
 using RxVoidFunction = void (*)(void);
 
@@ -12,7 +12,7 @@ TFunc RxGetExtensionFunc(VkInstance instance, const char* name)
     RxVoidFunction handle = vkGetInstanceProcAddr(instance, name);
 
     if (!handle) {
-        FxLogError("Could not load extension function '{}'", name);
+        LogError("Could not load extension function '{}'", name);
     }
 
     return reinterpret_cast<TFunc>(handle);

@@ -2,10 +2,11 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxPanic.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/Bitset.hpp>
+#include <Core/Panic.hpp>
+#include <Core/Types.hpp>
 
-#include <Core/FxBitset.hpp>
+namespace fx::renderer {
 
 /**
  * @brief A CPU-GPU barrier.
@@ -41,7 +42,7 @@ public:
 
     void SetCacheId(uint32 id)
     {
-        FxAssertMsg(mCacheId == UINT32_MAX, "Semaphore is already assigned to a cache slot!");
+        AssertMsg(mCacheId == UINT32_MAX, "Semaphore is already assigned to a cache slot!");
         mCacheId = id;
     }
 
@@ -58,7 +59,6 @@ private:
 };
 
 
-
 class RxSemaphoreCache
 {
     static constexpr uint32 scNumSemaphores = 24;
@@ -72,6 +72,8 @@ public:
     ~RxSemaphoreCache();
 
 private:
-    FxSizedArray<RxSemaphore> mSemaphores;
-    FxBitset mInUse;
+    SizedArray<RxSemaphore> mSemaphores;
+    Bitset mInUse;
 };
+
+} // namespace fx::renderer

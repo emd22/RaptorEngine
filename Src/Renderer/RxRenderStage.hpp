@@ -6,7 +6,9 @@
 #include "Backend/RxRenderPass.hpp"
 #include "Backend/RxSampler.hpp"
 
-#include <Core/FxSizedArray.hpp>
+#include <Core/SizedArray.hpp>
+
+namespace fx::renderer {
 
 class RxRenderStage
 {
@@ -28,13 +30,13 @@ class RxRenderStage
 public:
     RxRenderStage() = default;
 
-    void Create(const FxVec2u& size)
+    void Create(const Vec2u& size)
     {
         ClearValues.InitCapacity(scMaxOutputTargets);
         mSize = size;
     }
 
-    void AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
+    void AddTarget(RxImageFormat format, const Vec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
     void AddTarget(const RxTarget& attachment);
 
     RxTargetList& GetTargets() { return mOutputTargets; }
@@ -64,19 +66,21 @@ private:
     void AddPresentTarget();
 
 public:
-    FxSizedArray<VkClearValue> ClearValues;
+    SizedArray<VkClearValue> ClearValues;
 
 private:
     RxTargetList mOutputTargets;
-    FxSizedArray<InputTarget> mInputTargets;
+    SizedArray<InputTarget> mInputTargets;
 
     RxFramebuffer mFramebuffer;
     RxRenderPass mRenderPass;
-    FxVec2u mSize = FxVec2u::sZero;
+    Vec2u mSize = Vec2u::sZero;
 
     bool mbIsBuilt : 1 = false;
 
 
     bool mbIsFinalStage = false;
-    FxSizedArray<RxFramebuffer> mFinalStageFramebuffers;
+    SizedArray<RxFramebuffer> mFinalStageFramebuffers;
 };
+
+} // namespace fx::renderer

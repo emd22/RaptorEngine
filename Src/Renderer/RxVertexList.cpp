@@ -1,7 +1,9 @@
 #include "RxVertexList.hpp"
 
+namespace fx::renderer {
+
 template <typename TType, uint32 TNumComponents>
-FX_FORCE_INLINE void WriteOrZero(TType* dst, const FxSizedArray<TType>& src, uint64 index, bool write_or_zero)
+FX_FORCE_INLINE void WriteOrZero(TType* dst, const SizedArray<TType>& src, uint64 index, bool write_or_zero)
 {
     constexpr uint32 size = TNumComponents * sizeof(TType);
 
@@ -14,7 +16,7 @@ FX_FORCE_INLINE void WriteOrZero(TType* dst, const FxSizedArray<TType>& src, uin
 }
 
 template <typename TType, typename TVecType, uint32 TNumComponents>
-FX_FORCE_INLINE void WriteOrZeroVec(TType* dst, const FxSizedArray<TVecType>& src, uint64 index, bool write_or_zero)
+FX_FORCE_INLINE void WriteOrZeroVec(TType* dst, const SizedArray<TVecType>& src, uint64 index, bool write_or_zero)
 {
     constexpr uint32 size = TNumComponents * sizeof(TType);
 
@@ -27,11 +29,11 @@ FX_FORCE_INLINE void WriteOrZeroVec(TType* dst, const FxSizedArray<TVecType>& sr
 }
 
 
-void RxVertexList::CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
-                              const FxSizedArray<FxVec2f>& uvs, const FxSizedArray<FxVec3f>& tangents,
-                              const FxSizedArray<FxVec4f>& bone_weights, const FxSizedArray<FxVec4u>& bone_ids)
+void RxVertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals,
+                              const SizedArray<Vec2f>& uvs, const SizedArray<Vec3f>& tangents,
+                              const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids)
 {
-    FxAssert(mLocalBuffer.IsEmpty());
+    Assert(mLocalBuffer.IsEmpty());
 
     VertexType = RxVertexType::eSlim;
 
@@ -64,16 +66,16 @@ void RxVertexList::CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSi
 
         // Write the components for a default vertex if the type supports it
         if (supports_default) {
-            WriteOrZeroVec<float32, FxVec3f, 3>(vertex.Normal, normals, vertex_index, bContainsNormals);
-            WriteOrZeroVec<float32, FxVec2f, 2>(vertex.UV, uvs, vertex_index, bContainsUVs);
-            WriteOrZeroVec<float32, FxVec3f, 3>(vertex.Tangent, tangents, vertex_index, bContainsTangents);
+            WriteOrZeroVec<float32, Vec3f, 3>(vertex.Normal, normals, vertex_index, bContainsNormals);
+            WriteOrZeroVec<float32, Vec2f, 2>(vertex.UV, uvs, vertex_index, bContainsUVs);
+            WriteOrZeroVec<float32, Vec3f, 3>(vertex.Tangent, tangents, vertex_index, bContainsTangents);
 
             if (supports_skinning) {
                 // To support skinned vertices, we enforce that there is data available above; this means we dont need
                 // to check in WriteOrZero.
 
-                WriteOrZeroVec<uint32, FxVec4u, 4>(vertex.BoneIds, bone_ids, vertex_index, true);
-                WriteOrZeroVec<float32, FxVec4f, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
+                WriteOrZeroVec<uint32, Vec4u, 4>(vertex.BoneIds, bone_ids, vertex_index, true);
+                WriteOrZeroVec<float32, Vec4f, 4>(vertex.BoneWeights, bone_weights, vertex_index, true);
             }
         }
 
@@ -81,13 +83,13 @@ void RxVertexList::CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSi
     }
 }
 
-void RxVertexList::CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
-                              const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents,
-                              const FxSizedArray<float32>& bone_weights, const FxSizedArray<uint32>& bone_ids)
+void RxVertexList::CreateFrom(const SizedArray<float32>& positions, const SizedArray<float32>& normals,
+                              const SizedArray<float32>& uvs, const SizedArray<float32>& tangents,
+                              const SizedArray<float32>& bone_weights, const SizedArray<uint32>& bone_ids)
 {
-    FxAssert(mLocalBuffer.IsEmpty());
-    FxAssert(positions.Size > 0);
-    FxAssert(((positions.Size) % 3) == 0);
+    Assert(mLocalBuffer.IsEmpty());
+    Assert(positions.Size > 0);
+    Assert(((positions.Size) % 3) == 0);
 
     VertexType = RxVertexType::eSlim;
 
@@ -139,10 +141,10 @@ void RxVertexList::CreateFrom(const FxSizedArray<float32>& positions, const FxSi
 }
 
 
-void RxVertexList::CreateSlimFrom(const FxSizedArray<float32>& positions)
+void RxVertexList::CreateSlimFrom(const SizedArray<float32>& positions)
 {
-    FxAssert(positions.Size > 0);
-    FxAssert((positions.Size % 3) == 0);
+    Assert(positions.Size > 0);
+    Assert((positions.Size % 3) == 0);
 
     VertexType = RxVertexType::eSlim;
 
@@ -156,9 +158,9 @@ void RxVertexList::CreateSlimFrom(const FxSizedArray<float32>& positions)
     }
 }
 
-void RxVertexList::CreateSlimFrom(const FxSizedArray<FxVec3f>& positions)
+void RxVertexList::CreateSlimFrom(const SizedArray<Vec3f>& positions)
 {
-    FxAssert(positions.Size > 0);
+    Assert(positions.Size > 0);
 
     VertexType = RxVertexType::eSlim;
 
@@ -171,3 +173,5 @@ void RxVertexList::CreateSlimFrom(const FxSizedArray<FxVec3f>& positions)
         mLocalBuffer.Insert(vertex);
     }
 }
+
+} // namespace fx::renderer

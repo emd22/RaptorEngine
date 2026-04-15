@@ -1,13 +1,15 @@
 #pragma once
 
-#include <Math/FxVec2.hpp>
+#include <Math/Vec2.hpp>
 #include <Renderer/Backend/RxDescriptors.hpp>
 #include <Renderer/Backend/RxFramebuffer.hpp>
 #include <Renderer/Backend/RxImage.hpp>
 #include <Renderer/Backend/RxPipeline.hpp>
 #include <Renderer/Backend/RxRenderPass.hpp>
-#include <Renderer/FxCamera.hpp>
+#include <Renderer/Camera.hpp>
 #include <Renderer/RxRenderStage.hpp>
+
+namespace fx::renderer {
 
 class RxDeferredLightingPass;
 
@@ -20,7 +22,7 @@ class RxShadowDirectional
 {
 public:
     RxShadowDirectional() = delete;
-    RxShadowDirectional(const FxVec2u& size);
+    RxShadowDirectional(const Vec2u& size);
 
     void Begin();
 
@@ -35,7 +37,7 @@ private:
     void UpdateLightDescriptors();
 
 public:
-    FxOrthoCamera ShadowCamera;
+    OrthoCamera ShadowCamera;
 
     RxRenderStage RenderStage;
 
@@ -43,3 +45,5 @@ private:
     RxPipeline mPipeline;
     RxPipeline mPipelineSkinned;
 };
+
+} // namespace fx::renderer

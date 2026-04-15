@@ -1,6 +1,6 @@
 #include "RxExtensionHandles.hpp"
 
-#include <Core/FxLog.hpp>
+#include <Core/Log.hpp>
 
 VkResult Rx_EXT_SetDebugUtilsObjectName(VkInstance instance, VkDevice device,
                                         const VkDebugUtilsObjectNameInfoEXT* pNameInfo)

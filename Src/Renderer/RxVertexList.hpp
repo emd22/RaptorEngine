@@ -3,49 +3,51 @@
 #include "Backend/RxGpuBuffer.hpp"
 #include "RxVertex.hpp"
 
-#include <Core/FxAnonArray.hpp>
-#include <Core/FxSizedArray.hpp>
+#include <Core/AnonArray.hpp>
+#include <Core/SizedArray.hpp>
+
+namespace fx::renderer {
 
 class RxVertexList
 {
 public:
     RxVertexList() = default;
 
-    void CreateSlimFrom(const FxSizedArray<float32>& positions);
-    void CreateSlimFrom(const FxSizedArray<FxVec3f>& positions);
+    void CreateSlimFrom(const SizedArray<float32>& positions);
+    void CreateSlimFrom(const SizedArray<Vec3f>& positions);
 
-    void CreateFrom(const FxSizedArray<FxVec3f>& positions, const FxSizedArray<FxVec3f>& normals,
-                    const FxSizedArray<FxVec2f>& uvs, const FxSizedArray<FxVec3f>& tangents,
-                    const FxSizedArray<FxVec4f>& bone_weights, const FxSizedArray<FxVec4u>& bone_ids);
+    void CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals, const SizedArray<Vec2f>& uvs,
+                    const SizedArray<Vec3f>& tangents, const SizedArray<Vec4f>& bone_weights,
+                    const SizedArray<Vec4u>& bone_ids);
 
 
-    void CreateFrom(const FxSizedArray<float32>& positions, const FxSizedArray<float32>& normals,
-                    const FxSizedArray<float32>& uvs, const FxSizedArray<float32>& tangents,
-                    const FxSizedArray<float32>& bone_weights, const FxSizedArray<uint32>& bone_ids);
+    void CreateFrom(const SizedArray<float32>& positions, const SizedArray<float32>& normals,
+                    const SizedArray<float32>& uvs, const SizedArray<float32>& tangents,
+                    const SizedArray<float32>& bone_weights, const SizedArray<uint32>& bone_ids);
 
-    template <RxVertexType TVertexType>
-    void CreateFrom(FxSizedArray<RxVertex<TVertexType>>&& vertices)
+    template <renderer::RxVertexType TVertexType>
+    void CreateFrom(SizedArray<renderer::RxVertex<TVertexType>>&& vertices)
     {
         VertexType = TVertexType;
         mLocalBuffer = std::move(vertices);
     }
 
-    template <RxVertexType TVertexType>
-    void CreateAsCopyOf(const FxSizedArray<RxVertex<TVertexType>>& vertices)
+    template <renderer::RxVertexType TVertexType>
+    void CreateAsCopyOf(const SizedArray<renderer::RxVertex<TVertexType>>& vertices)
     {
         VertexType = TVertexType;
         mLocalBuffer.InitAsCopyOf(vertices);
     }
 
-    void UploadToGpu() { GpuBuffer.Create(RxGpuBufferType::eVertexBuffer, mLocalBuffer); }
+    void UploadToGpu() { GpuBuffer.Create(renderer::RxGpuBufferType::eVertexBuffer, mLocalBuffer); }
 
     /** @brief Returns true if the vertex type supports storing normals */
-    FX_FORCE_INLINE bool SupportsNormals() const { return (VertexType != RxVertexType::eSlim); }
+    FX_FORCE_INLINE bool SupportsNormals() const { return (VertexType != renderer::RxVertexType::eSlim); }
 
     /** @brief Returns true if the vertex buffer has been supplied values for normals. */
     FX_FORCE_INLINE bool HasNormals() const { return bContainsNormals; }
 
-    FX_FORCE_INLINE bool IsSkinned() const { return VertexType == RxVertexType::eSkinned; }
+    FX_FORCE_INLINE bool IsSkinned() const { return VertexType == renderer::RxVertexType::eSkinned; }
 
     void DestroyLocalBuffer() { mLocalBuffer.Free(); }
     void Destroy()
@@ -55,20 +57,22 @@ public:
         DestroyLocalBuffer();
     }
 
-    FxAnonArray& GetLocalBuffer() { return mLocalBuffer; }
-    const FxAnonArray& GetLocalBuffer() const { return mLocalBuffer; }
+    AnonArray& GetLocalBuffer() { return mLocalBuffer; }
+    const AnonArray& GetLocalBuffer() const { return mLocalBuffer; }
 
 
     ~RxVertexList() { Destroy(); }
 
 public:
-    RxVertexType VertexType = RxVertexType::eDefault;
-    RxGpuBuffer GpuBuffer {};
+    renderer::RxVertexType VertexType = renderer::RxVertexType::eDefault;
+    renderer::RxGpuBuffer GpuBuffer {};
 
     bool bContainsNormals : 1 = false;
     bool bContainsUVs : 1 = false;
     bool bContainsTangents : 1 = false;
 
 private:
-    FxAnonArray mLocalBuffer;
+    AnonArray mLocalBuffer;
 };
+
+} // namespace fx::renderer

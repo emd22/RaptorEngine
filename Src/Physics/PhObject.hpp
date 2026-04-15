@@ -4,12 +4,14 @@
 #include <ThirdParty/Jolt/Physics/Body/Body.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
-#include <Core/FxPagedArray.hpp>
-#include <FxEntity.hpp>
-#include <FxMaterial.hpp>
-#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Core/PagedArray.hpp>
+#include <Entity.hpp>
+#include <Material.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
 
-class FxPrimitiveMesh;
+namespace fx {
+
+class PrimitiveMesh;
 
 struct PhProperties
 {
@@ -51,17 +53,17 @@ public:
 
 
 public:
-    void CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+    void CreatePrimitiveBody(PhPrimitiveType primitive_type, const Vec3f& dimensions, PhMotionType motion_type,
                              const PhProperties& object_properties);
 
-    void CreateMeshBody(const FxPrimitiveMesh& mesh, PhMotionType motion_type, const PhProperties& object_properties);
+    void CreateMeshBody(const PrimitiveMesh& mesh, PhMotionType motion_type, const PhProperties& object_properties);
 
     void DestroyPhysicsBody();
 
-    void Teleport(FxVec3f position, FxQuat rotation);
+    void Teleport(Vec3f position, Quat rotation);
 
-    FX_FORCE_INLINE FxVec3f GetPosition() { return FxVec3f(mpPhysicsBody->GetPosition()); }
-    FX_FORCE_INLINE FxQuat GetRotation() { return FxQuat(mpPhysicsBody->GetRotation()); }
+    FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
+    FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
 
     FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
     FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
@@ -77,3 +79,5 @@ public:
 
     bool mbHasPhysicsBody : 1 = false;
 };
+
+} // namespace fx

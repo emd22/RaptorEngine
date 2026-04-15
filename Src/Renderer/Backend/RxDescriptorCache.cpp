@@ -2,32 +2,34 @@
 
 #include "RxShader.hpp"
 
-#include <Core/FxRefUtil.hpp>
+#include <Core/RefUtil.hpp>
 #include <Renderer/Backend/RxDsLayoutBuilder.hpp>
 #include <Renderer/RxDeferred.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
+
 RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader_type,
-                                                 const FxSizedArray<RxShaderOutlineEntry>& entries)
+                                                 const SizedArray<RxShaderOutlineEntry>& entries)
 {
     Section& section = mSections[set];
 
     // Hash -> shader type and outline entries
-    FxHash32 hash = FxHashData32(FxSlice(entries), FxHashStr32(RxShaderUtil::TypeToName(shader_type)));
+    Hash32 hash = HashData32(Slice(entries), HashStr32(RxShaderUtil::TypeToName(shader_type)));
 
-    FxLogInfo("");
-    FxLogInfo("=== Registering Set {} for {} ===", set, RxShaderUtil::TypeToName(shader_type));
+    LogInfo("");
+    LogInfo("=== Registering Set {} for {} ===", set, RxShaderUtil::TypeToName(shader_type));
 
     // Check if the DS already exists
     if (section.find(hash) != section.end()) {
-        FxLogInfo("");
+        LogInfo("");
         return RxShaderDescriptorId { .Set = set, .Hash = hash };
     }
 
     // Insert the entry into the hashmap
-    FxRef<RxDescriptorSet>& entry = section[hash];
-    entry = FxMakeRef<RxDescriptorSet>();
+    Ref<RxDescriptorSet>& entry = section[hash];
+    entry = MakeRef<RxDescriptorSet>();
 
     RxDescriptorPool& dp = gRenderer->pDeferredRenderer->DescriptorPool;
     RxDsLayoutBuilder layout_builder {};
@@ -67,20 +69,20 @@ RxShaderDescriptorId RxDescriptorCache::Register(uint32 set, RxShaderType shader
             break;
         }
 
-        FxLogInfo("\tBinding {} => {} ({}) -> ST: {}", entry.Binding, binding_name,
-                  entry.bUseDynamicType ? "Dynamic" : "Normal", RxShaderUtil::TypeToName(shader_type));
+        LogInfo("\tBinding {} => {} ({}) -> ST: {}", entry.Binding, binding_name,
+                entry.bUseDynamicType ? "Dynamic" : "Normal", RxShaderUtil::TypeToName(shader_type));
 
         layout_builder.AddBinding(entry.Binding, ds_type, shader_type);
     }
 
-    FxLogInfo("");
+    LogInfo("");
 
     entry->Create(dp, layout_builder.Build(), has_dynamic_offsets);
 
     return RxShaderDescriptorId { .Set = set, .Hash = hash, .bContainsDynamicEntry = has_dynamic_offsets };
 }
 
-FxRef<RxDescriptorSet> RxDescriptorCache::Request(const RxShaderDescriptorId& id)
+Ref<RxDescriptorSet> RxDescriptorCache::Request(const RxShaderDescriptorId& id)
 {
     Section& section = mSections[id.Set];
     return section[id.Hash];
@@ -98,3 +100,5 @@ RxDescriptorCache::~RxDescriptorCache()
         }
     }
 }
+
+} // namespace fx::renderer

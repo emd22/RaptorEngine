@@ -9,10 +9,13 @@
 
 #include <ThirdParty/vk_mem_alloc.h>
 
-#include <Core/FxRef.hpp>
-#include <Math/FxVec2.hpp>
-
+#include <Core/Ref.hpp>
+#include <Math/Vec2.hpp>
 #include <optional>
+
+
+namespace fx::renderer {
+
 
 enum class RxImageFormat
 {
@@ -171,21 +174,21 @@ public:
     RxImage(const RxImage& other);
 
     /**
-     * @brief Transfers an `FxRef` to the normal ref counted image.
+     * @brief Transfers an `Ref` to the normal ref counted image.
      */
-    RxImage(FxRef<RxImage>&& ref);
+    RxImage(Ref<RxImage>&& ref);
 
     RxImage& operator=(const RxImage& other);
-    RxImage& operator=(FxRef<RxImage>&& ref);
+    RxImage& operator=(Ref<RxImage>&& ref);
 
-    void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
+    void Create(RxImageType image_type, const Vec2u& size, RxImageFormat format, VkImageTiling tiling,
                 VkImageUsageFlags usage, RxImageAspectFlag aspect);
 
-    void Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageUsageFlags usage,
+    void Create(RxImageType image_type, const Vec2u& size, RxImageFormat format, VkImageUsageFlags usage,
                 RxImageAspectFlag aspect);
 
-    void CreateGpuOnly(RxImageType image_type, const FxVec2u& size, RxImageFormat format,
-                       const FxSizedArray<uint8>& image_data);
+    void CreateGpuOnly(RxImageType image_type, const Vec2u& size, RxImageFormat format,
+                       const SizedArray<uint8>& image_data);
 
     void TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, uint32 layer_count = 1,
                           std::optional<RxTransitionLayoutOverrides> overrides = std::nullopt);
@@ -194,7 +197,7 @@ public:
     void TransitionDepthToAttachment(RxCommandBuffer& cmd);
 
 
-    void CopyFromBuffer(const RxRawGpuBuffer& buffer, VkImageLayout final_layout, FxVec2u size, uint32 base_layer = 0);
+    void CopyFromBuffer(const RxRawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size, uint32 base_layer = 0);
 
     void CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat image_format, VkImageAspectFlags aspect_flags,
                                        RxImageCubemapOptions options);
@@ -206,7 +209,7 @@ public:
     ~RxImage();
 
 public:
-    FxVec2u Size = FxVec2u::sZero;
+    Vec2u Size = Vec2u::sZero;
 
     RxImageAspectFlag Aspect = RxImageAspectFlag::eColor;
 
@@ -219,5 +222,7 @@ public:
 
     VmaAllocation Allocation = nullptr;
 
-    FxRefCount* mpRefCnt = nullptr;
+    RefCount* mpRefCnt = nullptr;
 };
+
+} // namespace fx::renderer

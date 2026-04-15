@@ -7,11 +7,13 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxPanic.hpp>
-#include <Core/FxSizedArray.hpp>
+#include <Core/Panic.hpp>
+#include <Core/SizedArray.hpp>
 #include <Renderer/RxConstants.hpp>
 
 #include "vulkan/vulkan_core.h"
+
+namespace fx::renderer {
 
 struct RxTarget;
 
@@ -73,11 +75,11 @@ public:
                              const RxPipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count);
 
     static void BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
-                             const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets);
+                             const RxPipeline& pipeline, const Slice<VkDescriptorSet>& sets);
 
     static void BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
-                                   const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets,
-                                   const FxSlice<uint32>& offsets);
+                                   const RxPipeline& pipeline, const Slice<VkDescriptorSet>& sets,
+                                   const Slice<uint32>& offsets);
 
     void BindWithOffset(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
                         const RxPipeline& pipeline, uint32 offset) const;
@@ -118,5 +120,7 @@ private:
     bool mbHasDynamicOffsets : 1 = false;
     bool mbIsBuilt : 1 = false;
 
-    FxSizedArray<DescriptorEntry> mDescriptorEntries;
+    SizedArray<DescriptorEntry> mDescriptorEntries;
 };
+
+} // namespace fx::renderer

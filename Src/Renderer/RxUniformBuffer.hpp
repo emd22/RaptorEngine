@@ -2,9 +2,10 @@
 
 #include "Backend/RxGpuBuffer.hpp"
 
-#include <Core/FxTypes.hpp>
+#include <Core/Types.hpp>
 #include <cstdlib>
 
+namespace fx::renderer {
 
 class RxUniforms
 {
@@ -40,10 +41,10 @@ public:
     template <typename TPtrType>
     void WritePtr(const TPtrType* value, uint32 size)
     {
-        FxAssert(mGpuBuffer.IsMapped());
+        Assert(mGpuBuffer.IsMapped());
 
         if (mUniformIndex + size >= Size) {
-            FxLogError("Could not submit uniform as buffer is full!");
+            LogError("Could not submit uniform as buffer is full!");
             return;
         }
 
@@ -57,17 +58,17 @@ public:
     template <typename TPtrType>
     void CopyFrom(const TPtrType* buffer, uint32 size)
     {
-        FxAssert(mGpuBuffer.IsMapped());
+        Assert(mGpuBuffer.IsMapped());
 
         if (size >= Size) {
-            FxLogError("Could not write buffer that is larger than uniform!");
+            LogError("Could not write buffer that is larger than uniform!");
             return;
         }
 
         std::memcpy(GetCurrentBuffer(), buffer, size);
     }
 
-    void AssertSize(uint32 expected_size) { FxAssert(mUniformIndex == expected_size); }
+    void AssertSize(uint32 expected_size) { Assert(mUniformIndex == expected_size); }
 
     template <typename TValueType>
     void SetAllValues(const TValueType& value, bool all_frames)
@@ -102,3 +103,5 @@ private:
 
     uint32 mUniformIndex = 0;
 };
+
+} // namespace fx::renderer

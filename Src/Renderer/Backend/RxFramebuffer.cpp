@@ -2,16 +2,17 @@
 
 #include "RxDevice.hpp"
 
-#include <Core/FxDefines.hpp>
-#include <Core/FxPanic.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/Defines.hpp>
+#include <Core/Panic.hpp>
+#include <Core/Types.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
 
 FX_SET_MODULE_NAME("Framebuffer")
 
-void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const RxRenderPass& render_pass, FxVec2u size)
+void RxFramebuffer::Create(const SizedArray<VkImageView>& image_views, const RxRenderPass& render_pass, Vec2u size)
 {
     if (size == RxTarget::scFullScreen) {
         size = gRenderer->Swapchain.Extent;
@@ -32,7 +33,7 @@ void RxFramebuffer::Create(const FxSizedArray<VkImageView>& image_views, const R
     const VkResult status = vkCreateFramebuffer(mDevice->Device, &create_info, nullptr, &Framebuffer);
 
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Failed to create framebuffer", status);
+        ModulePanicVulkan("Failed to create framebuffer", status);
     }
 }
 
@@ -44,3 +45,5 @@ void RxFramebuffer::Destroy()
     vkDestroyFramebuffer(mDevice->Device, Framebuffer, nullptr);
     Framebuffer = nullptr;
 }
+
+} // namespace fx::renderer

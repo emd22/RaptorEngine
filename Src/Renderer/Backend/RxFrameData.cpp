@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
+namespace fx::renderer {
 
 void RxFrameData::Create(RxGpuDevice* device)
 {
@@ -35,3 +36,5 @@ void RxFrameData::Destroy()
     // Ubo.UnMap();
     // Ubo.Destroy();
 };
+
+} // namespace fx::renderer

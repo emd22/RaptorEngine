@@ -1,9 +1,9 @@
 #include "AxPaths.hpp"
 
-#include <Core/FxFilesystemIO.hpp>
+#include <Core/FilesystemIO.hpp>
 
 // TODO: Find asset path based on current dir
-const char* FxAssetPath(AxPathQuery query)
+const char* AssetPath(AxPathQuery query)
 {
     switch (query) {
     case AxPathQuery::eShaders:

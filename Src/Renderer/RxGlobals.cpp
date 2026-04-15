@@ -6,17 +6,23 @@
 #include "RxShadowDirectional.hpp"
 #include "RxState.hpp"
 
+namespace fx {
+namespace renderer {
+
 RxRenderBackend* gRenderer = nullptr;
 RxShadowDirectional* gShadowRenderer = nullptr;
 RxShaderCache* gShaderCache = nullptr;
 RxDescriptorCache* gDescriptorCache = nullptr;
 RxState* gState = nullptr;
 
+} // namespace renderer
 #define DESTROY_GLOBAL(name_)                                                                                          \
     delete name_;                                                                                                      \
     name_ = nullptr
 
 namespace RxGlobals {
+
+using namespace renderer;
 
 void Init()
 {
@@ -39,3 +45,5 @@ void Destroy()
 }
 
 }; // namespace RxGlobals
+
+} // namespace fx

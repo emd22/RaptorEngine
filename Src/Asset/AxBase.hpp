@@ -1,15 +1,18 @@
 #pragma once
 
-#include <Core/FxDataNotifier.hpp>
-#include <Core/FxPagedArray.hpp>
-#include <Core/FxTSRef.hpp>
+#include <Core/DataNotifier.hpp>
+#include <Core/PagedArray.hpp>
+#include <Core/TSRef.hpp>
 #include <atomic>
 #include <functional>
+
+namespace fx {
+
 
 /**
  * An asset base class for other assets to be derived from.
  *
- * @see FxModel
+ * @see Model
  */
 class AxBase
 {
@@ -18,12 +21,12 @@ protected:
 
 
     // template <typename T>
-    // friend class FxRef;
+    // friend class Ref;
 
 public:
-    // using OnLoadFunc = void (*)(FxRef<FxBaseAsset> asset);
-    using OnLoadFunc = std::function<void(FxTSRef<AxBase>)>;
-    using OnErrorFunc = void (*)(FxTSRef<AxBase> asset);
+    // using OnLoadFunc = void (*)(Ref<BaseAsset> asset);
+    using OnLoadFunc = std::function<void(TSRef<AxBase>)>;
+    using OnErrorFunc = void (*)(TSRef<AxBase> asset);
 
     virtual void WaitUntilLoaded()
     {
@@ -45,7 +48,8 @@ public:
     /**
      * Attaches a new callback for when the Asset is finished being loaded by the AssetManager.
      */
-    // void OnLoaded(CallbackFunc &&on_loaded) { AttachCallback(FxAssetCallbackType::OnLoaded, std::move(on_loaded)); }
+    // void OnLoaded(CallbackFunc &&on_loaded) { AttachCallback(AssetCallbackType::OnLoaded, std::move(on_loaded));
+    // }
 
 
     void OnLoaded(const OnLoadFunc& on_loaded_callback)
@@ -72,7 +76,7 @@ public:
     }
 
 public:
-    FxDataNotifier IsFinishedNotifier;
+    DataNotifier IsFinishedNotifier;
     std::atomic_bool bIsUploadedToGpu = false;
 
 protected:
@@ -85,3 +89,5 @@ protected:
 
     friend class AxManager;
 };
+
+} // namespace fx

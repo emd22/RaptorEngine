@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Core/FxTypes.hpp>
+#include <Core/Types.hpp>
+
+namespace fx::renderer {
 
 enum RxShaderName : uint32
 {
@@ -38,3 +40,5 @@ constexpr const char* GetName(const RxShaderName id)
 }
 
 } // namespace RxShaderNameUtil
+
+} // namespace fx::renderer

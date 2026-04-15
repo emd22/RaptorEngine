@@ -3,14 +3,17 @@
 #include <Asset/AxBase.hpp>
 #include <Asset/AxImage.hpp>
 
-AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
+namespace fx {
+
+
+AxLoaderStb::Status AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const std::string& path)
 {
-    FxTSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset);
 
     const char* c_path = path.c_str();
 
-    const int pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
-    FxAssert(pixel_size > 0);
+    const int pixel_size = renderer::RxImageFormatUtil::GetSize(ImageFormat);
+    Assert(pixel_size > 0);
 
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
@@ -22,22 +25,22 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(FxTSRef<AxBase> asset, const std::
 
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
     if (mImageData == nullptr) {
-        FxLogError("Could not load image file at '{}'", c_path);
+        LogError("Could not load image file at '{}'", c_path);
         return AxLoaderStb::Status::eError;
     }
 
     return AxLoaderStb::Status::eSuccess;
 }
 
-AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size)
+AxLoaderStb::Status AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
 {
-    FxTSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset);
 
-    const int pixel_size = RxImageFormatUtil::GetSize(ImageFormat);
-    FxAssert(pixel_size > 0);
+    const int pixel_size = renderer::RxImageFormatUtil::GetSize(ImageFormat);
+    Assert(pixel_size > 0);
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
-        FxLogError("Could not retrieve info from image in memory! (Size={})", size);
+        LogError("Could not retrieve info from image in memory! (Size={})", size);
         return AxLoaderStb::Status::eError;
     }
 
@@ -51,18 +54,18 @@ AxLoaderStb::Status AxLoaderStb::LoadFromMemory(FxTSRef<AxBase> asset, const uin
     mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
     if (mImageData == nullptr) {
-        FxLogError("Could not load image file from memory!");
+        LogError("Could not load image file from memory!");
         return AxLoaderStb::Status::eError;
     }
 
     return AxLoaderStb::Status::eSuccess;
 }
 
-void AxLoaderStb::CreateGpuResource(FxTSRef<AxBase>& asset)
+void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 {
-    FxTSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset);
 
-    FxSizedArray<uint8> data_arr;
+    SizedArray<uint8> data_arr;
 
     // Since the image data in mImageData is not ours(it is stb's),
     // we need to set this flag to prevent it from attemping to be freed.
@@ -80,9 +83,9 @@ void AxLoaderStb::CreateGpuResource(FxTSRef<AxBase>& asset)
     asset->bIsUploadedToGpu.notify_all();
 }
 
-// void FxLoaderStb::LoadCubemapToLayeredImage(const RxImage&)
+// void LoaderStb::LoadCubemapToLayeredImage(const RxImage&)
 // {
-//     FxVec2u cubemap_size = cubemap_image.Size;
+//     Vec2u cubemap_size = cubemap_image.Size;
 
 //     // Here is the type of cubemap we will be looking for here:
 //     //
@@ -103,13 +106,13 @@ void AxLoaderStb::CreateGpuResource(FxTSRef<AxBase>& asset)
 //     const uint32 tile_height = cubemap_size.Y / 3;
 
 //     if (tile_width != tile_height) {
-//         FxLogWarning("Cubemap tile width != cubemap tile height!");
+//         LogWarning("Cubemap tile width != cubemap tile height!");
 //     }
 
-//     FxStackArray<VkImageCopy, 6> image_copy_infos;
+//     StackArray<VkImageCopy, 6> image_copy_infos;
 // }
 
-void AxLoaderStb::Destroy(FxTSRef<AxBase>& asset)
+void AxLoaderStb::Destroy(TSRef<AxBase>& asset)
 {
     // while (!asset->bIsUploadedToGpu) {
     //     asset->bIsUploadedToGpu.wait(true);
@@ -117,3 +120,5 @@ void AxLoaderStb::Destroy(FxTSRef<AxBase>& asset)
 
     stbi_image_free(mImageData);
 }
+
+} // namespace fx

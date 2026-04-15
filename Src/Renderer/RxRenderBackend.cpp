@@ -4,27 +4,29 @@
 #include "Backend/RxPipeline.hpp"
 #include "Backend/RxSynchro.hpp"
 #include "Backend/RxUtil.hpp"
-#include "FxEngine.hpp"
-#include "FxObjectManager.hpp"
+#include "Engine.hpp"
+#include "ObjectManager.hpp"
 #include "RxConstants.hpp"
 #include "RxDeferred.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
-#include <Asset/FxAnimation.hpp>
-#include <Core/FxDefines.hpp>
-#include <Core/FxPanic.hpp>
-#include <Core/FxRefUtil.hpp>
-#include <Core/FxTypes.hpp>
+#include <Asset/Animation.hpp>
+#include <Core/Defines.hpp>
+#include <Core/Panic.hpp>
+#include <Core/RefUtil.hpp>
+#include <Core/Types.hpp>
 #include <Renderer/Backend/RxExtensionHandles.hpp>
-#include <Renderer/FxCamera.hpp>
+#include <Renderer/Camera.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxState.hpp>
 #include <thread>
 #include <vector>
 
 #define FX_VULKAN_DEBUG 1
+
+namespace fx::renderer {
 
 using ExtensionNames = RxRenderBackend::ExtensionNames;
 using ExtensionList = RxRenderBackend::ExtensionList;
@@ -56,12 +58,12 @@ ExtensionNames RxRenderBackend::CheckExtensionsAvailable(ExtensionNames& request
     return missing_extensions;
 }
 
-FxSizedArray<VkLayerProperties> RxRenderBackend::GetAvailableValidationLayers()
+SizedArray<VkLayerProperties> RxRenderBackend::GetAvailableValidationLayers()
 {
     uint32 layer_count;
     vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-    FxSizedArray<VkLayerProperties> validation_layers;
+    SizedArray<VkLayerProperties> validation_layers;
     validation_layers.InitSize(layer_count);
 
     vkEnumerateInstanceLayerProperties(&layer_count, validation_layers.pData);
@@ -71,7 +73,7 @@ FxSizedArray<VkLayerProperties> RxRenderBackend::GetAvailableValidationLayers()
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
 
-void RxRenderBackend::Init(FxVec2u window_size)
+void RxRenderBackend::Init(Vec2u window_size)
 {
     InitVulkan();
     CreateSurfaceFromWindow();
@@ -95,12 +97,12 @@ void RxRenderBackend::Init(FxVec2u window_size)
 
     Uniforms.Create(scDefaultUniformSize);
 
-    BoneBuffer.Create(FxLimits::MaxBones * sizeof(FxMat4f));
+    BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f));
 
-    FxMat4f initial_matrix = FxMat4f::sIdentity;
+    Mat4f initial_matrix = Mat4f::sIdentity;
     BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
-    pDeferredRenderer = FxMakeRef<RxDeferredRenderer>();
+    pDeferredRenderer = MakeRef<RxDeferredRenderer>();
     pDeferredRenderer->Create(Swapchain.Extent);
 
     bInitialized = true;
@@ -154,7 +156,7 @@ void RxRenderBackend::InitFrames()
 void RxRenderBackend::DestroyFrames()
 {
     {
-        FxSpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
+        SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 
         vkQueueWaitIdle(graphics_queue.Get());
     }
@@ -194,7 +196,7 @@ void RxRenderBackend::InitVulkan()
     std::cout << "Requested to load " << all_extensions.size() << " extensions...\n";
 
     for (const auto& extension : all_extensions) {
-        FxLogDebug("Ext: {:s}", extension);
+        LogDebug("Ext: {:s}", extension);
     }
 
     ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions);
@@ -208,7 +210,7 @@ void RxRenderBackend::InitVulkan()
             }
         }
 
-        FxModulePanic("Missing required instance extensions");
+        ModulePanic("Missing required instance extensions");
     }
 
     // auto validation_layers = GetAvailableValidationLayers();
@@ -235,13 +237,13 @@ void RxRenderBackend::InitVulkan()
     VkResult result = vkCreateInstance(&instance_info, nullptr, &mInstance);
 
     if (result != VK_SUCCESS) {
-        FxModulePanicVulkan("Could not create vulkan instance!", result);
+        ModulePanicVulkan("Could not create vulkan instance!", result);
     }
 
 #ifdef FX_VULKAN_DEBUG
     mDebugMessenger = CreateDebugMessenger(mInstance);
     if (!mDebugMessenger) {
-        FxModulePanic("Could not create debug messenger");
+        ModulePanic("Could not create debug messenger");
     }
 #endif
 
@@ -256,16 +258,16 @@ uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_sever
 
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
-        FxLogError(fmt, message);
+        LogError(fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
-        FxLogWarning(fmt, message);
+        LogWarning(fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
         // Log::Info(fmt, message);
     }
     else {
-        FxLogDebug(fmt, message);
+        LogDebug(fmt, message);
     }
 
     return 0;
@@ -307,7 +309,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     const auto status = Rx_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        FxLogError("Could not create debug messenger! (err: {:s})", RxUtil::ResultToStr(status));
+        LogError("Could not create debug messenger! (err: {:s})", RxUtil::ResultToStr(status));
         return nullptr;
     }
 
@@ -333,7 +335,7 @@ void RxRenderBackend::InitGPUAllocator()
 
     const VkResult status = vmaCreateAllocator(&create_info, &GpuAllocator);
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Could not create VMA allocator!", status);
+        ModulePanicVulkan("Could not create VMA allocator!", status);
     }
 }
 
@@ -363,7 +365,7 @@ ExtensionNames RxRenderBackend::MakeInstanceExtensionList(ExtensionNames& user_r
 
 ExtensionList& RxRenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 {
-    FxLogDebug("Querying for instance extensions...");
+    LogDebug("Querying for instance extensions...");
 
 
     if (mAvailableExtensions.IsNotEmpty()) {
@@ -423,7 +425,7 @@ void RxRenderBackend::SubmitUploadCmd(RxRenderBackend::SubmitFunc upload_func)
     //     std::this_thread::get_id()
     // );
 
-    FxSpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
+    SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
 
     VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Fence),
           "Error submitting upload buffer");
@@ -451,7 +453,7 @@ void RxRenderBackend::SubmitOneTimeCmd(RxRenderBackend::SubmitFunc submit_func)
         .pCommandBuffers = &cmd.CommandBuffer,
     };
 
-    FxSpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
+    SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 
     VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, nullptr), "Error submitting upload buffer");
     vkQueueWaitIdle(graphics_queue.Get());
@@ -516,17 +518,17 @@ void RxRenderBackend::PresentFrame()
     };
 
     {
-        FxSpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
+        SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 
         VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, frame->InFlight.Fence),
               "Error submitting draw buffer");
     }
 
 
-    FxSpinLockContext<VkQueue> present_queue = GetDevice()->GetPresentQueue();
+    SpinLockContext<VkQueue> present_queue = GetDevice()->GetPresentQueue();
 
     if (Swapchain.bInitialized != true) {
-        FxModulePanic("Swapchain not initialized!");
+        ModulePanic("Swapchain not initialized!");
     }
 
     const VkSwapchainKHR swapchains[] = {
@@ -554,7 +556,7 @@ void RxRenderBackend::PresentFrame()
         // Swapchain.Rebuild()..
     }
     else {
-        FxLogError("Error submitting present queue. Status: {:x}", static_cast<int32>(status));
+        LogError("Error submitting present queue. Status: {:x}", static_cast<int32>(status));
     }
 }
 
@@ -565,7 +567,7 @@ void RxRenderBackend::BeginLighting()
     pDeferredRenderer->GPass.End();
 
     RxTarget* depth_target = pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
-    FxAssert(depth_target != nullptr);
+    Assert(depth_target != nullptr);
     depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
 
@@ -593,16 +595,16 @@ void RxRenderBackend::BeginUnlit()
 
 
     // RxTarget* depth_target = gRenderer->pDeferredRenderer->GPass.GetTarget(RxImageFormat::eD32_Float, 0);
-    // FxAssert(depth_target != nullptr);
+    // Assert(depth_target != nullptr);
     // depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
     pDeferredRenderer->RpForward.Begin(&frame->CommandBuffer, pDeferredRenderer->FbForward.Get(),
-                                       FxSlice<VkClearValue>({}, 0));
+                                       Slice<VkClearValue>({}, 0));
 
     pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
 }
 
-void RxRenderBackend::DoComposition(FxCamera& render_cam)
+void RxRenderBackend::DoComposition(Camera& render_cam)
 {
     RxFrameData* frame = GetFrame();
 
@@ -613,17 +615,17 @@ void RxRenderBackend::DoComposition(FxCamera& render_cam)
     pDeferredRenderer->DoCompPass(render_cam);
 
     {
-        /*FxStackArray<RxCommandBuffer, 1> commands;
+        /*StackArray<RxCommandBuffer, 1> commands;
         commands.Insert(frame->CommandBuffer);
 
-        FxStackArray<RxSemaphore, 1> wait_semaphores;
+        StackArray<RxSemaphore, 1> wait_semaphores;
         wait_semaphores.Insert(frame->ShadowsSem);
 
-        FxStackArray<RxSemaphore, 1> signal_semaphores;
+        StackArray<RxSemaphore, 1> signal_semaphores;
         signal_semaphores.Insert(frame->OffscreenSem);*/
 
 
-        // pDeferredRenderer->GPass.Submit(FxSlice(commands), FxSlice(wait_semaphores), FxSlice(signal_semaphores));
+        // pDeferredRenderer->GPass.Submit(Slice(commands), Slice(wait_semaphores), Slice(signal_semaphores));
     }
 
 
@@ -651,7 +653,7 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
         return RxFrameResult::GraphicsOutOfDate;
     }
     else {
-        FxLogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
+        LogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
     }
 
     return RxFrameResult::RenderError;
@@ -660,13 +662,13 @@ RxFrameResult RxRenderBackend::GetNextSwapchainImage(RxFrameData* frame)
 void RxRenderBackend::CreateSurfaceFromWindow()
 {
     if (mpWindow == nullptr) {
-        FxModulePanic("No window attached! use FxRenderBackend::SelectWindow()");
+        ModulePanic("No window attached! use RenderBackend::SelectWindow()");
     }
 
     bool success = SDL_Vulkan_CreateSurface(mpWindow->GetWindow(), mInstance, nullptr, &mWindowSurface);
 
     if (!success) {
-        FxModulePanic("Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
+        ModulePanic("Could not attach Vulkan instance to window! (SDL err: {})", SDL_GetError());
     }
 }
 
@@ -716,3 +718,5 @@ void RxRenderBackend::Destroy()
 }
 
 RxFrameData* RxRenderBackend::GetFrame() { return &Frames[GetFrameNumber()]; }
+
+} // namespace fx::renderer

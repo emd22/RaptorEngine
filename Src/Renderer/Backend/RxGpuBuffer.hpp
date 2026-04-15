@@ -4,10 +4,12 @@
 #include "Fwd/Rx_Fwd_GetGpuAllocator.hpp"
 #include "Fwd/Rx_Fwd_SubmitUploadGpuCmd.hpp"
 
-#include <Core/FxAnonArray.hpp>
-#include <Core/FxSlice.hpp>
-#include <Core/FxTypes.hpp>
-#include <Core/FxUtil.hpp>
+#include <Core/AnonArray.hpp>
+#include <Core/Slice.hpp>
+#include <Core/Types.hpp>
+#include <Core/Util.hpp>
+
+namespace fx::renderer {
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
@@ -122,7 +124,7 @@ public:
     void Upload(void* data, uint64 size);
 
     template <typename TElementType>
-    void Upload(const FxSizedArray<TElementType>& data)
+    void Upload(const SizedArray<TElementType>& data)
     {
         Upload(reinterpret_cast<void*>(data.pData), data.GetSizeInBytes());
     }
@@ -166,7 +168,7 @@ public:
     template <typename TElementType>
     TElementType* GetPtr()
     {
-        FxDebugAssert(mpGpuBuffer->pMappedBuffer != nullptr);
+        DebugAssert(mpGpuBuffer->pMappedBuffer != nullptr);
         return static_cast<TElementType*>(mpGpuBuffer->pMappedBuffer);
     }
 
@@ -196,10 +198,10 @@ public:
 
 
     void Create(RxGpuBufferType buffer_type, void* data, uint64 size);
-    void Create(RxGpuBufferType buffer_type, const FxAnonArray& data);
+    void Create(RxGpuBufferType buffer_type, const AnonArray& data);
 
     template <typename TElementType>
-    void Create(RxGpuBufferType buffer_type, const FxSlice<TElementType>& data)
+    void Create(RxGpuBufferType buffer_type, const Slice<TElementType>& data)
     {
         Size = data.Size * sizeof(TElementType);
         Type = buffer_type;
@@ -222,3 +224,5 @@ public:
         staging_buffer.Destroy();
     }
 };
+
+} // namespace fx::renderer

@@ -3,7 +3,9 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size)
+namespace fx::renderer {
+
+RxTarget::RxTarget(RxImageFormat format, const Vec2u& size)
 {
     Image.Format = format;
     Image.Size = size;
@@ -13,7 +15,7 @@ RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size)
     }
 }
 
-RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
+RxTarget::RxTarget(RxImageFormat format, const Vec2u& size, RxLoadOp load_op, RxStoreOp store_op,
                    VkImageLayout initial_layout, VkImageLayout final_layout)
     : LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
@@ -25,7 +27,7 @@ RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, 
     }
 }
 
-RxTarget::RxTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect)
+RxTarget::RxTarget(RxImageFormat format, const Vec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect)
     : Usage(usage), Aspect(aspect)
 {
     Image.Format = format;
@@ -49,7 +51,7 @@ void RxTarget::CreateImage()
 
 VkAttachmentDescription RxTarget::BuildDescription() const
 {
-    FxAssert(Image.Format != RxImageFormat::eNone);
+    Assert(Image.Format != RxImageFormat::eNone);
 
     return VkAttachmentDescription {
         .format = RxImageFormatUtil::ToUnderlying(Image.Format),
@@ -72,7 +74,7 @@ VkAttachmentDescription RxTarget::BuildDescription() const
 ///////////////////////////////////
 
 
-FxSizedArray<VkAttachmentDescription>& RxTargetList::GetDescriptions()
+SizedArray<VkAttachmentDescription>& RxTargetList::GetDescriptions()
 {
     // Return the descriptions if they are already built
     if (mbDescriptionsBuilt) {
@@ -107,7 +109,7 @@ RxTargetList& RxTargetList::Add(const RxTarget& attachment)
 
 RxTargetList& RxTargetList::Add(const RxTarget* attachment)
 {
-    FxAssertMsg(attachment != nullptr, "Attachment cannot be null!");
+    AssertMsg(attachment != nullptr, "Attachment cannot be null!");
     return Add(*attachment);
 }
 
@@ -120,7 +122,7 @@ void RxTargetList::CreateImages()
     mbImagesCreated = true;
 }
 
-FxSizedArray<VkImageView>& RxTargetList::GetImageViews()
+SizedArray<VkImageView>& RxTargetList::GetImageViews()
 {
     // Return the list of views if it is already populated
     if (mbImageViewsBuilt) {
@@ -166,3 +168,5 @@ bool RxTargetList::IsCompatible(const RxTargetList& other) const
 
     return true;
 }
+
+} // namespace fx::renderer

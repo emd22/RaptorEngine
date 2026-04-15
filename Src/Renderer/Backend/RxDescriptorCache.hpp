@@ -2,11 +2,13 @@
 
 #include "RxDescriptors.hpp"
 
-#include <Core/FxRef.hpp>
-#include <Core/FxStackArray.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/Ref.hpp>
+#include <Core/StackArray.hpp>
+#include <Core/Types.hpp>
 #include <unordered_map>
 
+
+namespace fx::renderer {
 
 struct RxShaderDescriptorId;
 struct RxShaderOutlineEntry;
@@ -20,7 +22,7 @@ class RxDescriptorCache
 
 
 public:
-    using Section = std::unordered_map<FxHash32, FxRef<RxDescriptorSet>, FxHash32Stl>;
+    using Section = std::unordered_map<Hash32, Ref<RxDescriptorSet>, Hash32Stl>;
 
 public:
     RxDescriptorCache() { mSections.MarkFull(); };
@@ -30,12 +32,14 @@ public:
      * @returns The identifier to access it by
      */
     RxShaderDescriptorId Register(uint32 set, RxShaderType shader_type,
-                                  const FxSizedArray<RxShaderOutlineEntry>& entry_list);
+                                  const SizedArray<RxShaderOutlineEntry>& entry_list);
 
-    FxRef<RxDescriptorSet> Request(const RxShaderDescriptorId& id);
+    Ref<RxDescriptorSet> Request(const RxShaderDescriptorId& id);
 
     ~RxDescriptorCache();
 
 public:
-    FxStackArray<Section, scMaxSections> mSections;
+    StackArray<Section, scMaxSections> mSections;
 };
+
+} // namespace fx::renderer

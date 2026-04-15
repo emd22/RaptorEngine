@@ -2,9 +2,9 @@
 
 #include "AxLoaderBase.hpp"
 
-#include <Asset/FxAnimation.hpp>
-#include <FxMaterial.hpp>
-#include <FxObject.hpp>
+#include <Asset/Animation.hpp>
+#include <Material.hpp>
+#include <Object.hpp>
 #include <string>
 
 struct cgltf_data;
@@ -16,9 +16,11 @@ struct cgltf_animation;
 struct cgltf_skin;
 struct cgltf_node;
 
+namespace fx {
+
 struct AxGltfMaterialToLoad
 {
-    FxTSRef<FxObject> pObject { nullptr };
+    TSRef<Object> pObject { nullptr };
     int PrimitiveIndex = 0;
     int MeshIndex = 0;
 };
@@ -30,40 +32,41 @@ public:
 
     AxLoaderGltf() = default;
 
-    Status LoadFromFile(FxTSRef<AxBase> asset, const std::string& path) override;
-    Status LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(TSRef<AxBase> asset, const std::string& path) override;
+    Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
-    void UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index);
+    void UploadMeshToGpu(TSRef<Object>& object, cgltf_mesh* gltf_mesh, int mesh_index);
 
-    void Destroy(FxTSRef<AxBase>& asset) override;
+    void Destroy(TSRef<AxBase>& asset) override;
 
     ~AxLoaderGltf() override = default;
 
 private:
-    // void MakeEmptyMaterialTexture(FxRef<FxMaterial>& material, FxMaterialComponent& component);
-    void MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_primitive* primitive);
+    // void MakeEmptyMaterialTexture(Ref<Material>& material, MaterialComponent& component);
+    void MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive);
 
-    void UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh,
-                              cgltf_primitive* primitive);
+    void UnpackMeshAttributes(const TSRef<Object>& object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive);
 
     int32 FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const;
 
-    void LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin); // now takes skel by ref
-    void LoadAnimation(FxAnimation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
-    void LoadAnimations(FxTSRef<FxObject>& output_object, FxSkeleton& skel);
+    void LoadSkeleton(Skeleton& skel, cgltf_skin* skin); // now takes skel by ref
+    void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
+    void LoadAnimations(TSRef<Object>& output_object, Skeleton& skel);
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;
 
     bool bKeepInMemory : 1 = false;
 
-    FxSizedArray<uint32> IndexBuffer;
+    SizedArray<uint32> IndexBuffer;
 
 protected:
-    void CreateGpuResource(FxTSRef<AxBase>& asset) override;
+    void CreateGpuResource(TSRef<AxBase>& asset) override;
 
 private:
     cgltf_data* mpGltfData = nullptr;
 
-    FxSizedArray<FxMat4f> mBones;
+    SizedArray<Mat4f> mBones;
 };
+
+} // namespace fx

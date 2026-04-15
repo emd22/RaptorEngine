@@ -1,6 +1,18 @@
 [
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/AnimationManager.cpp.o -c /Users/emd22/Projects/a2/Src/AnimationManager.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/AnimationManager.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/AnimationManager.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/Animation.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Animation.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/Animation.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Animation.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/AxImage.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/AxImage.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Asset/AxImage.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/AxImage.cpp.o"
@@ -19,51 +31,21 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/ConfigFile.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/ConfigFile.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/ConfigFile.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/ConfigFile.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/DataPack.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/DataPack.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/DataPack.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/DataPack.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/FxAnimation.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/FxAnimation.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/FxAnimation.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/FxAnimation.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/FxConfigFile.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/FxConfigFile.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/FxConfigFile.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/FxConfigFile.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/FxDataPack.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/FxDataPack.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/FxDataPack.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/FxDataPack.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/FxMeshGen.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/FxMeshGen.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/FxMeshGen.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/FxMeshGen.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/FxSceneFile.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/FxSceneFile.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/FxSceneFile.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/FxSceneFile.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/FxShaderCompiler.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/FxShaderCompiler.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/FxShaderCompiler.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/FxShaderCompiler.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/FxShaderPreproc.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/FxShaderPreproc.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/FxShaderPreproc.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/FxShaderPreproc.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -85,69 +67,99 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxAnonArray.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxAnonArray.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxAnonArray.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxAnonArray.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/MeshGen.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/MeshGen.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/MeshGen.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/MeshGen.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxBasicDb.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxBasicDb.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxBasicDb.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxBasicDb.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/SceneFile.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/SceneFile.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/SceneFile.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/SceneFile.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxBitset.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxBitset.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxBitset.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxBitset.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/ShaderCompiler.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/ShaderCompiler.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/ShaderCompiler.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/ShaderCompiler.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxFile.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxFile.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxFile.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxFile.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/ShaderPreproc.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/ShaderPreproc.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/ShaderPreproc.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/ShaderPreproc.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxFilesystemIO.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxFilesystemIO.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxFilesystemIO.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxFilesystemIO.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Color.cpp.o -c /Users/emd22/Projects/a2/Src/Color.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Color.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Color.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxLog.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxLog.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxLog.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxLog.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Controls.cpp.o -c /Users/emd22/Projects/a2/Src/Controls.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Controls.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Controls.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxPanic.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxPanic.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxPanic.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxPanic.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/AnonArray.cpp.o -c /Users/emd22/Projects/a2/Src/Core/AnonArray.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/AnonArray.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/AnonArray.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxString.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxString.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxString.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxString.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/BasicDb.cpp.o -c /Users/emd22/Projects/a2/Src/Core/BasicDb.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/BasicDb.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/BasicDb.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FxUtil.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FxUtil.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/FxUtil.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FxUtil.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/Bitset.cpp.o -c /Users/emd22/Projects/a2/Src/Core/Bitset.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/Bitset.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/Bitset.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/MemPool/FxMemPool.cpp.o -c /Users/emd22/Projects/a2/Src/Core/MemPool/FxMemPool.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/MemPool/FxMemPool.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/MemPool/FxMemPool.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/File.cpp.o -c /Users/emd22/Projects/a2/Src/Core/File.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/File.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/File.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/MemPool/FxMemPoolLegacy.cpp.o -c /Users/emd22/Projects/a2/Src/Core/MemPool/FxMemPoolLegacy.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/MemPool/FxMemPoolLegacy.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/MemPool/FxMemPoolLegacy.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/FilesystemIO.cpp.o -c /Users/emd22/Projects/a2/Src/Core/FilesystemIO.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/FilesystemIO.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/FilesystemIO.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/Log.cpp.o -c /Users/emd22/Projects/a2/Src/Core/Log.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/Log.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/Log.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/MemPool/MemPool.cpp.o -c /Users/emd22/Projects/a2/Src/Core/MemPool/MemPool.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/MemPool/MemPool.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/MemPool/MemPool.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/MemPool/MemPoolLegacy.cpp.o -c /Users/emd22/Projects/a2/Src/Core/MemPool/MemPoolLegacy.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/MemPool/MemPoolLegacy.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/MemPool/MemPoolLegacy.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/Panic.cpp.o -c /Users/emd22/Projects/a2/Src/Core/Panic.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/Panic.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/Panic.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/String.cpp.o -c /Users/emd22/Projects/a2/Src/Core/String.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/String.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/String.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -157,69 +169,27 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Core/Util.cpp.o -c /Users/emd22/Projects/a2/Src/Core/Util.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/Util.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/Util.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Engine.cpp.o -c /Users/emd22/Projects/a2/Src/Engine.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Engine.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Engine.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Entity.cpp.o -c /Users/emd22/Projects/a2/Src/Entity.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Entity.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Entity.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FoxtrotGame.cpp.o -c /Users/emd22/Projects/a2/Src/FoxtrotGame.cpp",
   "file": "/Users/emd22/Projects/a2/Src/FoxtrotGame.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FoxtrotGame.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxAnimationManager.cpp.o -c /Users/emd22/Projects/a2/Src/FxAnimationManager.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxAnimationManager.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxAnimationManager.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxColor.cpp.o -c /Users/emd22/Projects/a2/Src/FxColor.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxColor.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxColor.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxControls.cpp.o -c /Users/emd22/Projects/a2/Src/FxControls.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxControls.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxControls.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxEngine.cpp.o -c /Users/emd22/Projects/a2/Src/FxEngine.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxEngine.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxEngine.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxEntity.cpp.o -c /Users/emd22/Projects/a2/Src/FxEntity.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxEntity.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxEntity.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxMaterial.cpp.o -c /Users/emd22/Projects/a2/Src/FxMaterial.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxMaterial.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxMaterial.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxObject.cpp.o -c /Users/emd22/Projects/a2/Src/FxObject.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxObject.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxObject.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxObjectManager.cpp.o -c /Users/emd22/Projects/a2/Src/FxObjectManager.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxObjectManager.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxObjectManager.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxPlayer.cpp.o -c /Users/emd22/Projects/a2/Src/FxPlayer.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxPlayer.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxPlayer.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/FxScene.cpp.o -c /Users/emd22/Projects/a2/Src/FxScene.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/FxScene.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/FxScene.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -229,93 +199,111 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/FxMathUtil.cpp.o -c /Users/emd22/Projects/a2/Src/Math/FxMathUtil.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/FxMathUtil.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/FxMathUtil.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Material.cpp.o -c /Users/emd22/Projects/a2/Src/Material.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Material.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Material.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/FxNeonUtil.cpp.o -c /Users/emd22/Projects/a2/Src/Math/FxNeonUtil.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/FxNeonUtil.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/FxNeonUtil.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/BoundingBox_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/BoundingBox_Neon.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/BoundingBox_Neon.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/BoundingBox_Neon.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/FxSSEUtil.cpp.o -c /Users/emd22/Projects/a2/Src/Math/FxSSEUtil.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/FxSSEUtil.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/FxSSEUtil.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/Mat4_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Matrix/Mat4_AVX.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Matrix/Mat4_AVX.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/Mat4_AVX.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/FxBoundingBox_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/FxBoundingBox_Neon.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/FxBoundingBox_Neon.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/FxBoundingBox_Neon.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/Mat4_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Matrix/Mat4_Neon.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Matrix/Mat4_Neon.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/Mat4_Neon.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/FxMat4_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Matrix/FxMat4_AVX.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Matrix/FxMat4_AVX.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/FxMat4_AVX.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/Quat_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/Quat_AVX.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/Quat_AVX.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/Quat_AVX.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/FxMat4_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Matrix/FxMat4_Neon.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Matrix/FxMat4_Neon.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Matrix/FxMat4_Neon.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/Quat_Fallback.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/Quat_Fallback.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/Quat_Fallback.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/Quat_Fallback.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/FxQuat_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/FxQuat_AVX.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/FxQuat_AVX.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/FxQuat_AVX.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/Quat_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/Quat_Neon.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/Quat_Neon.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/Quat_Neon.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/FxQuat_Fallback.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/FxQuat_Fallback.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/FxQuat_Fallback.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/FxQuat_Fallback.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec3_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec3_AVX.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec3_AVX.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec3_AVX.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/FxQuat_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/FxQuat_Neon.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Quaternion/FxQuat_Neon.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Quaternion/FxQuat_Neon.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec3_Fallback.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec3_Fallback.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec3_Fallback.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec3_Fallback.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec3_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec3_AVX.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec3_AVX.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec3_AVX.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec3_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec3_Neon.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec3_Neon.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec3_Neon.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec3_Fallback.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec3_Fallback.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec3_Fallback.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec3_Fallback.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec4_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec4_AVX.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec4_AVX.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec4_AVX.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec3_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec3_Neon.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec3_Neon.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec3_Neon.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec4_Fallback.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec4_Fallback.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec4_Fallback.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec4_Fallback.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec4_AVX.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec4_AVX.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec4_AVX.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec4_AVX.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec4_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec4_Neon.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/Vec4_Neon.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/Vec4_Neon.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec4_Fallback.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec4_Fallback.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec4_Fallback.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec4_Fallback.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/MathUtil.cpp.o -c /Users/emd22/Projects/a2/Src/Math/MathUtil.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/MathUtil.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/MathUtil.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec4_Neon.cpp.o -c /Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec4_Neon.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Math/Impl/Vector/FxVec4_Neon.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/Impl/Vector/FxVec4_Neon.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/NeonUtil.cpp.o -c /Users/emd22/Projects/a2/Src/Math/NeonUtil.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/NeonUtil.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/NeonUtil.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Math/SSEUtil.cpp.o -c /Users/emd22/Projects/a2/Src/Math/SSEUtil.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Math/SSEUtil.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Math/SSEUtil.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Object.cpp.o -c /Users/emd22/Projects/a2/Src/Object.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Object.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Object.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/ObjectManager.cpp.o -c /Users/emd22/Projects/a2/Src/ObjectManager.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/ObjectManager.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/ObjectManager.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -340,6 +328,12 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Physics/PhPlayer.cpp.o -c /Users/emd22/Projects/a2/Src/Physics/PhPlayer.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Physics/PhPlayer.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Physics/PhPlayer.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Player.cpp.o -c /Users/emd22/Projects/a2/Src/Player.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Player.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Player.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -451,33 +445,27 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Camera/FxOrthoCamera.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Camera/FxOrthoCamera.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/Camera/FxOrthoCamera.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Camera/FxOrthoCamera.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Camera.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Camera.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/Camera.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Camera.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Camera/FxPerspectiveCamera.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Camera/FxPerspectiveCamera.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/Camera/FxPerspectiveCamera.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Camera/FxPerspectiveCamera.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Camera/OrthoCamera.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Camera/OrthoCamera.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/Camera/OrthoCamera.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Camera/OrthoCamera.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/FxCamera.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/FxCamera.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/FxCamera.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/FxCamera.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Camera/PerspectiveCamera.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Camera/PerspectiveCamera.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/Camera/PerspectiveCamera.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Camera/PerspectiveCamera.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/FxLight.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/FxLight.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/FxLight.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/FxLight.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/FxWindow.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/FxWindow.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/FxWindow.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/FxWindow.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Light.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Light.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/Light.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Light.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -553,9 +541,21 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Script/FxScript.cpp.o -c /Users/emd22/Projects/a2/Src/Script/FxScript.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Script/FxScript.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/FxScript.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Window.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Window.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/Window.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Window.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Scene.cpp.o -c /Users/emd22/Projects/a2/Src/Scene.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Scene.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Scene.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Script/Script.cpp.o -c /Users/emd22/Projects/a2/Src/Script/Script.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Script/Script.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/Script.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -1375,8 +1375,8 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Util/FxTokenizer.cpp.o -c /Users/emd22/Projects/a2/Src/Util/FxTokenizer.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Util/FxTokenizer.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Util/FxTokenizer.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DFX_USE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Util/Tokenizer.cpp.o -c /Users/emd22/Projects/a2/Src/Util/Tokenizer.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Util/Tokenizer.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Util/Tokenizer.cpp.o"
 }
 ]

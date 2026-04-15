@@ -6,15 +6,15 @@
 #include <SDL3/SDL_revision.h>
 
 #include <Asset/AxManager.hpp>
-#include <Asset/FxConfigFile.hpp>
-#include <Asset/FxSceneFile.hpp>
-#include <Core/FxDefer.hpp>
-#include <Core/FxPanic.hpp>
-#include <Core/FxRef.hpp>
-#include <Core/FxRefUtil.hpp>
-#include <FxControls.hpp>
-#include <FxEngine.hpp>
-#include <FxMaterial.hpp>
+#include <Asset/ConfigFile.hpp>
+#include <Asset/SceneFile.hpp>
+#include <Controls.hpp>
+#include <Core/Defer.hpp>
+#include <Core/Panic.hpp>
+#include <Core/Ref.hpp>
+#include <Core/RefUtil.hpp>
+#include <Engine.hpp>
+#include <Material.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/RxGpuBuffer.hpp>
 #include <Renderer/RxGlobals.hpp>
@@ -23,6 +23,10 @@
 #include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
+
+namespace fx {
+
+using namespace renderer;
 
 static constexpr float scMouseSensitivity = 0.25;
 
@@ -44,40 +48,40 @@ FoxtrotGame::FoxtrotGame()
 void FoxtrotGame::InitEngine()
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
-    FxLogCreateFile("FoxtrotLog.log");
+    LogCreateFile("FoxtrotLog.log");
 #endif
 
     Config.Load(FX_BASE_DIR "/Config/Main.conf");
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        FxModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
+        ModulePanic("Could not initialize SDL! (SDL err: {})\n", SDL_GetError());
     }
 
     // Create the global engine variables
-    RxGlobals::Init();
+    fx::RxGlobals::Init();
 
 
-    FxControlManager::Init();
-    FxControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
+    ControlManager::Init();
+    ControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
 
     // catch sigabrt to avoid macOS showing "report" popup
     signal(SIGABRT,
            [](int signum)
            {
-               FxLogError("Aborted!");
+               LogError("Aborted!");
                exit(1);
            });
 
-    FxConfigEntry* window_entry = Config.GetEntry(FxHashStr64("Window"));
+    ConfigEntry* window_entry = Config.GetEntry(HashStr64("Window"));
 
-    const uint32 window_width = window_entry->GetMember(FxHashStr64("Width"))->Get<uint32>();
-    const uint32 window_height = window_entry->GetMember(FxHashStr64("Height"))->Get<uint32>();
+    const uint32 window_width = window_entry->GetMember(HashStr64("Width"))->Get<uint32>();
+    const uint32 window_height = window_entry->GetMember(HashStr64("Height"))->Get<uint32>();
 
-    FxRef<FxWindow> window = FxWindow::New(window_entry->GetMember(FxHashStr64("Title"))->Get<const char*>(),
-                                           FxVec2i(window_width, window_height));
+    Ref<Window> window = Window::New(window_entry->GetMember(HashStr64("Title"))->Get<const char*>(),
+                                     Vec2i(window_width, window_height));
 
     gRenderer->SelectWindow(window);
-    gRenderer->Init(FxVec2u(window_width, window_height));
+    gRenderer->Init(Vec2u(window_width, window_height));
 
     gPhysics->Create();
 
@@ -90,21 +94,21 @@ void FoxtrotGame::InitEngine()
 
 void FoxtrotGame::CreateLights()
 {
-    // pSun = FxMakeRef<FxLightDirectional>();
-    // pSun->MoveTo(FxVec3f(0.5, 5, -1.0).Normalize());
-    // pSun->Color = FxColor::FromRGBA(0xFA, 0xD2, 0xC0, 6);
-    // pSun->AmbientColor = FxColor::FromRGBA(0x4A, 0x3A, 0x2A, 1);
+    // pSun = MakeRef<LightDirectional>();
+    // pSun->MoveTo(Vec3f(0.5, 5, -1.0).Normalize());
+    // pSun->Color = Color::FromRGBA(0xFA, 0xD2, 0xC0, 6);
+    // pSun->AmbientColor = Color::FromRGBA(0x4A, 0x3A, 0x2A, 1);
     // mMainScene.Attach(pSun);
 }
 
 void FoxtrotGame::LoadOffsetsFile()
 {
-    FxConfigFile info;
+    ConfigFile info;
 
     info.Load(FX_BASE_DIR "/Config/Offsets.conf");
 
-    PistolOffset = info.GetEntryValue(FxHashStr64("PistolOffset"), FxVec3f::sZero);
-    ArmsOffset = info.GetEntryValue(FxHashStr64("ArmsOffset"), FxVec3f::sZero);
+    PistolOffset = info.GetEntryValue(HashStr64("PistolOffset"), Vec3f::sZero);
+    ArmsOffset = info.GetEntryValue(HashStr64("ArmsOffset"), Vec3f::sZero);
 }
 
 void FoxtrotGame::CreateGame()
@@ -114,29 +118,29 @@ void FoxtrotGame::CreateGame()
     Player.Create();
     Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     // Move the player up and behind the other objects
-    Player.TeleportTo(FxVec3f(0.0f, 4.0f, -4.0f));
+    Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
     Player.SetFlyMode(true);
 
     mMainScene.SelectCamera(Player.pCamera);
 
-    FxSceneFile scene_file;
+    SceneFile scene_file;
 
-    const char* scene_to_load = Config.GetEntry(FxHashStr64("Scene"))->Get<const char*>();
+    const char* scene_to_load = Config.GetEntry(HashStr64("Scene"))->Get<const char*>();
 
     scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
     gPhysics->OptimizeBroadPhase();
 
     pSun = mMainScene.GetDirectionalLight();
 
-    pPistolObject = mMainScene.FindObject(FxHashStr64("Pistol"));
-    pArmsObject = mMainScene.FindObject(FxHashStr64("AnimTest"));
+    pPistolObject = mMainScene.FindObject(HashStr64("Pistol"));
+    pArmsObject = mMainScene.FindObject(HashStr64("AnimTest"));
 
     LoadOffsetsFile();
 
     CreateLights();
 
-    gShadowRenderer = new RxShadowDirectional(FxVec2u(2048, 2048));
-    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(FxVec3f(0, 8, 5), FxVec3f(0.0f, 8.0f, -2.0f), FxVec3f(0, 1, 0));
+    gShadowRenderer = new RxShadowDirectional(Vec2u(2048, 2048));
+    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
     gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);
     gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
     gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
@@ -149,20 +153,20 @@ void FoxtrotGame::CreateGame()
 }
 
 
-static FX_FORCE_INLINE FxVec3f GetMovementVector()
+static FX_FORCE_INLINE Vec3f GetMovementVector()
 {
-    FxVec3f movement = FxVec3f::sZero;
+    Vec3f movement = Vec3f::sZero;
 
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_W)) {
+    if (ControlManager::IsKeyDown(Key::FX_KEY_W)) {
         movement.Z += 1.0f;
     }
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_S)) {
+    if (ControlManager::IsKeyDown(Key::FX_KEY_S)) {
         movement.Z += -1.0f;
     }
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_A)) {
+    if (ControlManager::IsKeyDown(Key::FX_KEY_A)) {
         movement.X += 1.0f;
     }
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_D)) {
+    if (ControlManager::IsKeyDown(Key::FX_KEY_D)) {
         movement.X += -1.0f;
     }
 
@@ -171,22 +175,22 @@ static FX_FORCE_INLINE FxVec3f GetMovementVector()
 
 void FoxtrotGame::ProcessControls()
 {
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_GRAVE)) {
+    if (ControlManager::IsKeyPressed(Key::FX_KEY_GRAVE)) {
         // Release the mouse before quitting the game incase there is a crash.
-        FxControlManager::ReleaseMouse();
+        ControlManager::ReleaseMouse();
         sbRunning = false;
     }
 
     // Click to lock mouse
-    if (FxControlManager::IsKeyPressed(FxKey::FX_MOUSE_LEFT) && !FxControlManager::IsMouseLocked()) {
-        FxControlManager::CaptureMouse();
+    if (ControlManager::IsKeyPressed(Key::FX_MOUSE_LEFT) && !ControlManager::IsMouseLocked()) {
+        ControlManager::CaptureMouse();
     }
     // Escape to unlock mouse
-    else if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_ESCAPE) && FxControlManager::IsMouseLocked()) {
-        FxControlManager::ReleaseMouse();
+    else if (ControlManager::IsKeyPressed(Key::FX_KEY_ESCAPE) && ControlManager::IsMouseLocked()) {
+        ControlManager::ReleaseMouse();
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_8)) {
+    if (ControlManager::IsKeyPressed(Key::FX_KEY_8)) {
         sbShowShadowCam = !sbShowShadowCam;
 
 
@@ -201,8 +205,8 @@ void FoxtrotGame::ProcessControls()
         }
     }
 
-    if (FxControlManager::IsMouseLocked()) {
-        FxVec2f mouse_delta = FxControlManager::GetMouseDelta();
+    if (ControlManager::IsMouseLocked()) {
+        Vec2f mouse_delta = ControlManager::GetMouseDelta();
         mouse_delta.X = (DeltaTime * mouse_delta.X * scMouseSensitivity);
         mouse_delta.Y = (DeltaTime * mouse_delta.Y * -scMouseSensitivity);
 
@@ -211,50 +215,49 @@ void FoxtrotGame::ProcessControls()
     }
 
 
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_SPACE)) {
+    if (ControlManager::IsKeyDown(Key::FX_KEY_SPACE)) {
         if (!Player.IsFlyMode()) {
             Player.Jump();
         }
     }
 
     // Elevate up
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_E)) {
-        Player.Move(DeltaTime, FxVec3f::sUp);
+    if (ControlManager::IsKeyDown(Key::FX_KEY_E)) {
+        Player.Move(DeltaTime, Vec3f::sUp);
     }
     // Elevate down
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_Q)) {
-        Player.Move(DeltaTime, -FxVec3f::sUp);
+    if (ControlManager::IsKeyDown(Key::FX_KEY_Q)) {
+        Player.Move(DeltaTime, -Vec3f::sUp);
     }
 
 
-    if (FxControlManager::IsKeyDown(FxKey::FX_KEY_LSHIFT)) {
+    if (ControlManager::IsKeyDown(Key::FX_KEY_LSHIFT)) {
         Player.bIsSprinting = true;
     }
     else {
         Player.bIsSprinting = false;
     }
 
-    if (FxControlManager::IsComboDown(FxKey::FX_KEY_LSHIFT, FxKey::FX_KEY_R)) {
+    if (ControlManager::IsComboDown(Key::FX_KEY_LSHIFT, Key::FX_KEY_R)) {
         // Reload the object properties from the scene
-        FxSceneFile scene_file;
-        scene_file.Load(
-            std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(FxHashStr64("Scene"))->Get<const char*>()),
-            mMainScene);
+        SceneFile scene_file;
+        scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr64("Scene"))->Get<const char*>()),
+                        mMainScene);
 
         LoadOffsetsFile();
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_P)) {
+    if (ControlManager::IsKeyPressed(Key::FX_KEY_P)) {
         pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
     }
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_0)) {
+    if (ControlManager::IsKeyPressed(Key::FX_KEY_0)) {
         Player.SetFlyMode(true);
-        Player.TeleportTo(FxVec3f(0.0f, 4.0f, -4.0f));
+        Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
     }
 
 
-    if (FxControlManager::IsKeyPressed(FxKey::FX_KEY_N)) {
+    if (ControlManager::IsKeyPressed(Key::FX_KEY_N)) {
         // Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
         Player.SetFlyMode(!Player.IsFlyMode());
     }
@@ -272,13 +275,13 @@ void FoxtrotGame::Tick()
         double frametime = FrameTimeAvg / scFramesForAvg;
         double fps = 1.0 / frametime;
 
-        // FxLogInfo("FrameTime={}, FPS={}", frametime, fps);
+        // LogInfo("FrameTime={}, FPS={}", frametime, fps);
 
         FrameTimeAvg = 0;
     }
 
 
-    FxControlManager::Update();
+    ControlManager::Update();
     ProcessControls();
 
 
@@ -287,10 +290,11 @@ void FoxtrotGame::Tick()
         Player.Update(DeltaTime);
     }
 
-    FxRef<FxPerspectiveCamera> camera = Player.pCamera;
+    Ref<PerspectiveCamera> camera = Player.pCamera;
 
-    // FxVec3f pistol_destination = camera->Position + (camera->Direction * FxVec3f(0.48)) -
-    //                              camera->GetRightVector() * FxVec3f(0.165) - camera->GetUpVector() * FxVec3f(0.15);
+    // Vec3f pistol_destination = camera->Position + (camera->Direction * Vec3f(0.48)) -
+    //                              camera->GetRightVector() * Vec3f(0.165) - camera->GetUpVector() *
+    //                              Vec3f(0.15);
 
 
     pArmsObject->SetRotationOrigin(ArmsOffset);
@@ -298,25 +302,25 @@ void FoxtrotGame::Tick()
     pArmsObject->SetPosition(camera->Position + ArmsOffset);
 
 
-    PistolRotationGoal = FxQuat::FromEulerAngles(FxVec3f(-camera->mAngleY, camera->mAngleX, 0));
+    PistolRotationGoal = Quat::FromEulerAngles(Vec3f(-camera->mAngleY, camera->mAngleX, 0));
     pArmsObject->mRotation = PistolRotationGoal;
 
     if (pArmsObject->pSkeleton) {
-        if (RHandBone == FxBoneNull) {
+        if (RHandBone == BoneNull) {
             RHandBone = pArmsObject->pSkeleton->FindBone(pArmsObject->pCurrentAnimation, "hand.R");
         }
 
-        FxBoneTransform hand_transform = pArmsObject->pSkeleton->GetBoneTransform(
-            pArmsObject->pCurrentAnimation, pArmsObject->AnimationTime, RHandBone);
+        BoneTransform hand_transform = pArmsObject->pSkeleton->GetBoneTransform(pArmsObject->pCurrentAnimation,
+                                                                                pArmsObject->AnimationTime, RHandBone);
 
-        hand_transform.Position *= FxVec3f(pArmsObject->mScale);
+        hand_transform.Position *= Vec3f(pArmsObject->mScale);
 
         pArmsObject->UpdateIfOutOfDate();
 
         pPistolObject->SetRotationOrigin(ArmsOffset + hand_transform.Position + PistolOffset);
         pPistolObject->SetPosition(pArmsObject->mPosition + hand_transform.Position + PistolOffset);
 
-        FxLogInfo("{}", hand_transform.Position);
+        LogInfo("{}", hand_transform.Position);
         pPistolObject->mRotation = PistolRotationGoal;
         pPistolObject->UpdateIfOutOfDate();
         // pPistolObject->SetRotationOrigin(pistol_destination);
@@ -332,10 +336,10 @@ void FoxtrotGame::Tick()
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 
-    FxVec3f target = Player.Position;
+    Vec3f target = Player.Position;
 
-    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, FxVec3f(0, 1, 0));
-    // FxLogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);
+    gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0));
+    // LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
@@ -377,3 +381,5 @@ FoxtrotGame::~FoxtrotGame()
     DestroyGame();
     mMainScene.Destroy();
 }
+
+} // namespace fx

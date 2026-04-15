@@ -4,7 +4,9 @@
 #include "Backend/RxShader.hpp"
 #include "RxPipelineBuilder.hpp"
 
-#include <Core/FxSlice.hpp>
+#include <Core/Slice.hpp>
+
+namespace fx::renderer {
 
 RxState::RxState() {}
 
@@ -36,3 +38,5 @@ void RxState::Reset()
 
 
 RxState::~RxState() {}
+
+} // namespace fx::renderer

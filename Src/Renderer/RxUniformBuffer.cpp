@@ -5,6 +5,8 @@
 
 #include <Renderer/RxGlobals.hpp>
 
+namespace fx::renderer {
+
 void RxUniforms::Create(uint32 size)
 {
     Size = size;
@@ -22,7 +24,7 @@ uint32 RxUniforms::GetBaseOffset(uint32 frame_index) const { return Size * frame
 
 void RxUniforms::SetAllValuesRaw(const void* data, uint32 value_size, bool all_frames)
 {
-    FxAssert((Size % value_size) == 0);
+    Assert((Size % value_size) == 0);
 
     uint32 num_values = Size / value_size;
 
@@ -43,9 +45,11 @@ void RxUniforms::SetAllValuesRaw(const void* data, uint32 value_size, bool all_f
         memcpy(dst, tmp_buffer, Size);
     }
 
-    FxLogInfo("Writing {} values to {} frames for uniform buffer", num_values, frame_count);
+    LogInfo("Writing {} values to {} frames for uniform buffer", num_values, frame_count);
 
     gEnginePool->FreeRaw(tmp_buffer);
 }
 
 uint8* RxUniforms::GetBasePtr() { return reinterpret_cast<uint8*>(mGpuBuffer.pMappedBuffer); }
+
+} // namespace fx::renderer

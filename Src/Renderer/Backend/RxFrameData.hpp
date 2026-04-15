@@ -4,14 +4,14 @@
 #include "RxDescriptors.hpp"
 #include "RxSynchro.hpp"
 
-#include <Math/FxMat4.hpp>
+#include <Math/Mat4.hpp>
 
+namespace fx::renderer {
 
 struct alignas(16) RxUniformBufferObject
 {
-    FxMat4f MvpMatrix;
+    Mat4f MvpMatrix;
 };
-
 
 struct RxFrameData
 {
@@ -38,3 +38,5 @@ public:
     RxSemaphore RenderFinished;
     RxFence InFlight;
 };
+
+} // namespace fx::renderer

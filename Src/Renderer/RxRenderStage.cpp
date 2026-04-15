@@ -3,6 +3,7 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
 
 RxTarget* RxRenderStage::GetTarget(RxImageFormat format, int sub_index)
 {
@@ -51,7 +52,7 @@ void RxRenderStage::BuildRenderStage()
 
 void RxRenderStage::Begin(RxCommandBuffer& cmd, RxPipeline& pipeline)
 {
-    FxAssert(mbIsBuilt);
+    Assert(mbIsBuilt);
 
     VkFramebuffer framebuffer;
 
@@ -66,7 +67,7 @@ void RxRenderStage::Begin(RxCommandBuffer& cmd, RxPipeline& pipeline)
     pipeline.Bind(cmd);
 }
 
-void RxRenderStage::AddTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage,
+void RxRenderStage::AddTarget(RxImageFormat format, const Vec2u& size, VkImageUsageFlags usage,
                               RxImageAspectFlag aspect)
 {
     mOutputTargets.Add(RxTarget(format, size, usage, aspect));
@@ -94,11 +95,11 @@ void RxRenderStage::MakeClearValues()
 
 void RxRenderStage::CreateFinalStageFramebuffers()
 {
-    FxSizedArray<RxImage>& final_images = gRenderer->Swapchain.OutputImages;
+    SizedArray<RxImage>& final_images = gRenderer->Swapchain.OutputImages;
 
     mFinalStageFramebuffers.InitSize(final_images.Size);
 
-    FxSizedArray<VkImageView> image_views;
+    SizedArray<VkImageView> image_views;
     image_views.InitSize(1);
 
     for (uint32 i = 0; i < final_images.Size; i++) {
@@ -110,7 +111,7 @@ void RxRenderStage::CreateFinalStageFramebuffers()
 
 void RxRenderStage::MarkFinalStage()
 {
-    FxAssertMsg(mbIsBuilt == false, "Cannot mark final -- Render stage was already built!");
+    AssertMsg(mbIsBuilt == false, "Cannot mark final -- Render stage was already built!");
 
     mbIsFinalStage = true;
 }
@@ -121,3 +122,5 @@ void RxRenderStage::AddPresentTarget()
     mOutputTargets.Add(RxTarget(gRenderer->Swapchain.Surface.Format, RxTarget::scFullScreen, RxLoadOp::eDontCare,
                                 RxStoreOp::eStore, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 }
+
+} // namespace fx::renderer

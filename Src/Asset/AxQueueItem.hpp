@@ -3,10 +3,12 @@
 #include "AxBase.hpp"
 #include "Loader/AxLoaderBase.hpp"
 
-#include <Core/FxLockContext.hpp>
-#include <Core/FxTSRef.hpp>
+#include <Core/LockContext.hpp>
+#include <Core/TSRef.hpp>
 #include <mutex>
 #include <string>
+
+namespace fx {
 
 enum class AxType
 {
@@ -21,7 +23,7 @@ struct AxItemData
     AxItemData() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxItemData(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset) : pLoader(loader), pAsset(asset)
+    AxItemData(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset) : pLoader(loader), pAsset(asset)
     {
     }
 
@@ -34,8 +36,8 @@ struct AxItemData
         return *this;
     }
 
-    FxTSRef<AxLoaderBase> pLoader { nullptr };
-    FxTSRef<AxBase> pAsset { nullptr };
+    TSRef<AxLoaderBase> pLoader { nullptr };
+    TSRef<AxBase> pAsset { nullptr };
 };
 
 struct AxQueueItem
@@ -43,14 +45,13 @@ struct AxQueueItem
     AxQueueItem() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset, AxType type,
-                const std::string& path)
+    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, AxType type, const std::string& path)
         : Path(path), pcRawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
     {
     }
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const FxTSRef<TLoaderType>& loader, const FxTSRef<TAssetType>& asset, AxType type, const uint8* data,
+    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, AxType type, const uint8* data,
                 uint32 data_size)
         : Path(""), pcRawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
     {
@@ -73,7 +74,7 @@ struct AxQueueItem
         return *this;
     }
 
-    FxLockContext<AxItemData> GetDataContext() { return FxLockContext<AxItemData>(mMutex, Data); }
+    LockContext<AxItemData> GetDataContext() { return LockContext<AxItemData>(mMutex, Data); }
 
 public:
     std::string Path;
@@ -90,3 +91,5 @@ public:
 private:
     AxItemData Data;
 };
+
+} // namespace fx

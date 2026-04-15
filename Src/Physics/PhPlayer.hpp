@@ -3,9 +3,11 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Character/CharacterVirtual.h>
 
-#include <Core/FxTypes.hpp>
-#include <Math/FxQuat.hpp>
-#include <Math/FxVec3.hpp>
+#include <Core/Types.hpp>
+#include <Math/Quat.hpp>
+#include <Math/Vec3.hpp>
+
+namespace fx {
 
 class PhPlayer
 {
@@ -16,8 +18,8 @@ public:
     PhPlayer() {}
 
     void Create();
-    void Teleport(const FxVec3f& position);
-    void ApplyMovement(const FxVec3f& direction);
+    void Teleport(const Vec3f& position);
+    void ApplyMovement(const Vec3f& direction);
 
     void Update(float64 delta_time);
 
@@ -34,3 +36,5 @@ public:
 
     bool bDisableGravity : 1 = false;
 };
+
+} // namespace fx

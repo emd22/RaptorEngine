@@ -2,6 +2,9 @@
 
 #include "Backend/RxPipeline.hpp"
 
+namespace fx::renderer {
+
+
 using RxPipelineId = uint32;
 
 class RxPipelineList
@@ -23,7 +26,7 @@ public:
     FX_FORCE_INLINE RxPipeline* Get(RxPipelineId id)
     {
         if (id > Pipelines.Size) {
-            FxLogError("Pipeline id out of range!");
+            LogError("Pipeline id out of range!");
             return nullptr;
         }
 
@@ -31,5 +34,7 @@ public:
     }
 
 public:
-    FxSizedArray<RxPipeline> Pipelines;
+    SizedArray<RxPipeline> Pipelines;
 };
+
+} // namespace fx::renderer

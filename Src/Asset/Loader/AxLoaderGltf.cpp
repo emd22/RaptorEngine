@@ -2,29 +2,33 @@
 
 #include <ThirdParty/cgltf.h>
 
+#include <Asset/Animation.hpp>
 #include <Asset/AxBase.hpp>
 #include <Asset/AxManager.hpp>
-#include <Asset/FxAnimation.hpp>
-#include <Core/FxRef.hpp>
-#include <FxMaterial.hpp>
-#include <FxObject.hpp>
-#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Core/Ref.hpp>
+#include <Material.hpp>
+#include <Object.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
 
 // Renderer includes
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-FxTSRef<AxImage> LoadTexture(const FxTSRef<FxMaterial>& material, const cgltf_texture_view& texture_view);
+namespace fx {
 
-void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<FxPrimitiveMesh>& mesh,
+using namespace renderer;
+
+TSRef<AxImage> LoadTexture(const TSRef<Material>& material, const cgltf_texture_view& texture_view);
+
+void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<PrimitiveMesh>& mesh,
                                         cgltf_primitive* primitive)
 {
-    FxSizedArray<float32> positions;
-    FxSizedArray<float32> normals;
-    FxSizedArray<float32> uvs;
-    FxSizedArray<float32> tangents;
-    FxSizedArray<float32> weights;
-    FxSizedArray<uint32> boneids;
+    SizedArray<float32> positions;
+    SizedArray<float32> normals;
+    SizedArray<float32> uvs;
+    SizedArray<float32> tangents;
+    SizedArray<float32> weights;
+    SizedArray<uint32> boneids;
 
     for (int i = 0; i < primitive->attributes_count; i++) {
         auto* attribute = &primitive->attributes[i];
@@ -69,23 +73,23 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<F
         min_bone_id = std::min(min_bone_id, bone_id);
     }
 
-    if (max_bone_id > FxLimits::MaxBones) {
-        FxLogError("Bone ID ({}) is larger than max number of bones!", max_bone_id);
+    if (max_bone_id > Limits::MaxBones) {
+        LogError("Bone ID ({}) is larger than max number of bones!", max_bone_id);
     }
 
     mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids);
 
-    FxLogInfo("Weights size: {}, ids size: {}", weights.Size, boneids.Size);
+    LogInfo("Weights size: {}, ids size: {}", weights.Size, boneids.Size);
     mesh->UploadVertices();
 }
 
-// void AxLoaderGltf::LoadSkeleton(FxRef<FxPrimitiveMesh>& mesh, cgltf_skin* skin)
+// void AxLoaderGltf::LoadSkeleton(Ref<PrimitiveMesh>& mesh, cgltf_skin* skin)
 // {
 //     if (!skin) {
 //         return;
 //     }
 
-//     FxSkeleton skel;
+//     Skeleton skel;
 
 //     // Load the bind pose
 //     if (skin->inverse_bind_matrices) {
@@ -96,14 +100,14 @@ void AxLoaderGltf::UnpackMeshAttributes(const FxTSRef<FxObject>& object, FxRef<F
 //                                      accessor->count * 16);
 //     }
 
-//     FxLogInfo("Loaded skin '{}' with {} joints", skin->name ? skin->name : "Unnamed", skin->joints_count);
+//     LogInfo("Loaded skin '{}' with {} joints", skin->name ? skin->name : "Unnamed", skin->joints_count);
 // }
 
 template <RxImageFormat TFormat>
-static void MakeMaterialTextureForPrimitive(FxTSRef<FxMaterial>& material, FxMaterialComponent<TFormat>& component,
+static void MakeMaterialTextureForPrimitive(TSRef<Material>& material, MaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
-    FxAssert(texture_view.texture != nullptr);
+    Assert(texture_view.texture != nullptr);
 
     const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
@@ -113,10 +117,10 @@ static void MakeMaterialTextureForPrimitive(FxTSRef<FxMaterial>& material, FxMat
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
     // Submit as data to be loaded later by the asset manager
-    component.pDataToLoad = FxMakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
+    component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 
-void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_primitive* primitive)
+void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive)
 {
     cgltf_material* gltf_material = primitive->material;
 
@@ -124,8 +128,8 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_pri
         return;
     }
 
-    FxTSRef<FxMaterial> material = gMaterialManager->New(object->Name.Get(), &gRenderer->pDeferredRenderer->PlGeometry,
-                                                         object->IsSkinned());
+    TSRef<Material> material = gMaterialManager->New(object->Name.Get(), &gRenderer->pDeferredRenderer->PlGeometry,
+                                                     object->IsSkinned());
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
@@ -135,17 +139,16 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_pri
             // MakeEmptyMaterialTexture(material, material->Diffuse);
             material->Diffuse.pAssetImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_UNorm>();
 
-            material->Properties.BaseColor = FxColor::FromFloats(
-                gltf_material->pbr_metallic_roughness.base_color_factor);
+            material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
         }
         else {
             MakeMaterialTextureForPrimitive(material, material->Diffuse, texture_view);
-            material->Properties.BaseColor = FxColor::FromRGBA(1, 1, 1, 255);
+            material->Properties.BaseColor = Color::FromRGBA(1, 1, 1, 255);
         }
     }
     else {
         // There is no albedo texture on the model, use the base colour.
-        material->Properties.BaseColor = FxColor::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+        material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
     }
 
     // Load the normalmap
@@ -163,30 +166,30 @@ void AxLoaderGltf::MakeMaterialForPrimitive(FxTSRef<FxObject>& object, cgltf_pri
     object->pMaterial = material;
 }
 
-void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_mesh, int mesh_index)
+void AxLoaderGltf::UploadMeshToGpu(TSRef<Object>& object, cgltf_mesh* gltf_mesh, int mesh_index)
 {
     const bool has_multiple_primitives = gltf_mesh->primitives_count > 1;
 
     // Assume at first that there is only one primitive;
-    FxTSRef<FxObject> current_object = object;
+    TSRef<Object> current_object = object;
 
     // Similarly to `CreateGpuResource`, we are going to make the `object` into a container
     // if there are multiple primitives.
     if (has_multiple_primitives) {
-        current_object = FxTSRef<FxObject>::New();
+        current_object = TSRef<Object>::New();
     }
 
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
         cgltf_primitive* primitive = &gltf_mesh->primitives[i];
 
-        FxSizedArray<uint32> indices;
+        SizedArray<uint32> indices;
 
-        FxRef<FxPrimitiveMesh> primitive_mesh = FxRef<FxPrimitiveMesh>::New();
+        Ref<PrimitiveMesh> primitive_mesh = Ref<PrimitiveMesh>::New();
 
         // Keep the primitive mesh's vertices and indices in memory if `KeepInMemory` is set
         primitive_mesh->bKeepInMemory = bKeepInMemory;
 
-        // if there are indices in the mesh, add them to the FxPrimitiveMesh
+        // if there are indices in the mesh, add them to the PrimitiveMesh
         if (primitive->indices != nullptr) {
             indices.InitSize(primitive->indices->count);
 
@@ -209,7 +212,7 @@ void AxLoaderGltf::UploadMeshToGpu(FxTSRef<FxObject>& object, cgltf_mesh* gltf_m
             object->AttachObject(current_object);
 
             // Create a new object to load into next
-            current_object = FxTSRef<FxObject>::New();
+            current_object = TSRef<Object>::New();
         }
     }
 }
@@ -222,10 +225,10 @@ int32 AxLoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) con
             return static_cast<int32>(i);
         }
     }
-    return FxBoneNull;
+    return BoneNull;
 }
 
-void AxLoaderGltf::LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin)
+void AxLoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 {
     if (!skin) {
         return;
@@ -237,7 +240,7 @@ void AxLoaderGltf::LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin)
     // Inverse bind matrices
     if (skin->inverse_bind_matrices) {
         cgltf_accessor* accessor = skin->inverse_bind_matrices;
-        FxAssert(accessor->count == joint_count);
+        Assert(accessor->count == joint_count);
 
         skel.InvBindTransforms.InitSize(joint_count);
         cgltf_accessor_unpack_floats(accessor, reinterpret_cast<float32*>(skel.InvBindTransforms.pData),
@@ -254,12 +257,12 @@ void AxLoaderGltf::LoadSkeleton(FxSkeleton& skel, cgltf_skin* skin)
     for (uint32 i = 0; i < joint_count; i++) {
         const cgltf_node* joint = skin->joints[i];
 
-        skel.BoneNames[i] = joint->name ? FxString(joint->name) : FxString::Fmt("joint_{}", i);
-        skel.ParentIndices[i] = joint->parent ? FindJointIndex(skin, joint->parent) : FxBoneNull;
+        skel.BoneNames[i] = joint->name ? String(joint->name) : String::Fmt("joint_{}", i);
+        skel.ParentIndices[i] = joint->parent ? FindJointIndex(skin, joint->parent) : BoneNull;
     }
 }
 
-void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& anim, cgltf_skin* skin)
+void AxLoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin)
 {
     const uint32 joint_count = skin ? static_cast<uint32>(skin->joints_count) : 0;
 
@@ -268,7 +271,7 @@ void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& a
     out_anim.BoneTracks.InitSize(joint_count);
 
     for (uint32 i = 0; i < joint_count; i++) {
-        out_anim.BoneTracks.pData[i] = FxBoneTrack {};
+        out_anim.BoneTracks.pData[i] = BoneTrack {};
     }
 
     for (cgltf_size ch = 0; ch < anim.channels_count; ch++) {
@@ -285,12 +288,12 @@ void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& a
             continue;
         }
 
-        FxBoneTrack& joint_track = out_anim.BoneTracks.pData[joint_idx];
+        BoneTrack& joint_track = out_anim.BoneTracks.pData[joint_idx];
 
         const cgltf_size key_count = sampler->input->count;
         const cgltf_size num_components = cgltf_num_components(sampler->output->type);
 
-        FxSizedArray<float32> times;
+        SizedArray<float32> times;
         times.InitSize(key_count);
         cgltf_accessor_unpack_floats(sampler->input, times.pData, key_count);
 
@@ -300,7 +303,7 @@ void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& a
 
         // Get translations
         if (channel->target_path == cgltf_animation_path_type_translation) {
-            FxAssert(sampler->output->type == cgltf_type_vec3);
+            Assert(sampler->output->type == cgltf_type_vec3);
             joint_track.Translation.Times = std::move(times);
             joint_track.Translation.Values.InitSize(key_count);
 
@@ -310,13 +313,13 @@ void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& a
                 cgltf_accessor_read_float(sampler->output, key_index, buffer, 3);
 
                 buffer[3] = 0.0f;
-                joint_track.Translation.Values[key_index] = (FxVec3f(buffer));
+                joint_track.Translation.Values[key_index] = (Vec3f(buffer));
             }
         }
 
         // Get rotations
         else if (channel->target_path == cgltf_animation_path_type_rotation) {
-            FxAssert(sampler->output->type == cgltf_type_vec4);
+            Assert(sampler->output->type == cgltf_type_vec4);
             joint_track.Rotation.Times = std::move(times);
             joint_track.Rotation.Values.InitSize(key_count);
 
@@ -325,15 +328,15 @@ void AxLoaderGltf::LoadAnimation(FxAnimation& out_anim, const cgltf_animation& a
 
                 cgltf_accessor_read_float(sampler->output, key_index, buffer, 4);
 
-                joint_track.Rotation.Values[key_index] = FxQuat(buffer);
+                joint_track.Rotation.Values[key_index] = Quat(buffer);
             }
         }
     }
 
-    FxLogInfo("Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
+    LogInfo("Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
 }
 
-void AxLoaderGltf::LoadAnimations(FxTSRef<FxObject>& output_object, FxSkeleton& skel)
+void AxLoaderGltf::LoadAnimations(TSRef<Object>& output_object, Skeleton& skel)
 {
     if (!mpGltfData->animations_count || mpGltfData->skins_count == 0) {
         return;
@@ -346,27 +349,27 @@ void AxLoaderGltf::LoadAnimations(FxTSRef<FxObject>& output_object, FxSkeleton& 
 
 
     for (uint32 i = 0; i < mpGltfData->animations_count; i++) {
-        FxAnimation anim;
+        Animation anim;
         LoadAnimation(anim, mpGltfData->animations[i], skin);
         output_object->Animations.Insert(std::move(anim));
     }
 
-    FxLogInfo("Loaded {} animations", mpGltfData->animations_count);
+    LogInfo("Loaded {} animations", mpGltfData->animations_count);
 }
 
-AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
+AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const std::string& path)
 {
     cgltf_options options {};
 
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mpGltfData);
     if (status != cgltf_result_success) {
-        FxLogError("Error parsing GLTF file! (path: {:s})", path);
+        LogError("Error parsing GLTF file! (path: {:s})", path);
         return AxLoaderGltf::Status::eError;
     }
 
     status = cgltf_load_buffers(&options, mpGltfData, path.c_str());
     if (status != cgltf_result_success) {
-        FxLogError("Error loading buffers from GLTF file! (path: {:s})", path);
+        LogError("Error loading buffers from GLTF file! (path: {:s})", path);
 
         return AxLoaderGltf::Status::eError;
     }
@@ -375,36 +378,36 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(FxTSRef<AxBase> asset, const std
     return AxLoaderGltf::Status::eSuccess;
 }
 
-AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size)
+AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
 {
     cgltf_options options {};
 
     cgltf_result status = cgltf_parse(&options, data, size, &mpGltfData);
     if (status != cgltf_result_success) {
-        FxLogError("Error parsing GLTF file from data");
+        LogError("Error parsing GLTF file from data");
         return AxLoaderGltf::Status::eError;
     }
 
     return AxLoaderGltf::Status::eSuccess;
 }
 
-void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
+void AxLoaderGltf::CreateGpuResource(TSRef<AxBase>& asset)
 {
-    FxTSRef<FxObject> output_object(asset);
+    TSRef<Object> output_object(asset);
 
 
     // If there is only one mesh to load, store the mesh directly in the output object
-    FxTSRef<FxObject> current_object = output_object;
+    TSRef<Object> current_object = output_object;
 
     // If there are multiple gltf meshes, we will need to use the output object as a
     // container for multiple other meshes
     const bool has_multiple_meshes = mpGltfData->meshes_count > 1;
     if (has_multiple_meshes) {
-        current_object = FxTSRef<FxObject>::New();
+        current_object = TSRef<Object>::New();
     }
 
 
-    FxLogInfo("Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
+    LogInfo("Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
 
     for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
         cgltf_node* node = &mpGltfData->nodes[node_index];
@@ -418,7 +421,7 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
 
         if (node->skin) {
             // Load a new skeleton
-            current_object->pSkeleton = FxRef<FxSkeleton>::New();
+            current_object->pSkeleton = Ref<Skeleton>::New();
             LoadSkeleton(*current_object->pSkeleton, node->skin);
 
             LoadAnimations(current_object, *current_object->pSkeleton);
@@ -429,7 +432,7 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
             output_object->AttachObject(current_object);
 
             // Create a new object to load into next
-            current_object = FxTSRef<FxObject>::New();
+            current_object = TSRef<Object>::New();
         }
     }
 
@@ -440,10 +443,12 @@ void AxLoaderGltf::CreateGpuResource(FxTSRef<AxBase>& asset)
     asset->bIsUploadedToGpu.notify_all();
 }
 
-void AxLoaderGltf::Destroy(FxTSRef<AxBase>& asset)
+void AxLoaderGltf::Destroy(TSRef<AxBase>& asset)
 {
     if (mpGltfData) {
         cgltf_free(mpGltfData);
         mpGltfData = nullptr;
     }
 }
+
+} // namespace fx

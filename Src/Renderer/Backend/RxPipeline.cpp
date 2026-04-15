@@ -5,20 +5,22 @@
 #include "RxShader.hpp"
 #include "RxVertexDescription.hpp"
 
-#include <Core/FxDefines.hpp>
-#include <Core/FxPanic.hpp>
-#include <Core/FxStackArray.hpp>
+#include <Core/Defines.hpp>
+#include <Core/Panic.hpp>
+#include <Core/StackArray.hpp>
 #include <Renderer/RxDeferred.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 FX_SET_MODULE_NAME("Pipeline")
 
+namespace fx::renderer {
+
 static VkPipeline spBoundPipeline = nullptr;
 
-void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
-                        const FxSlice<VkAttachmentDescription>& attachments,
-                        const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
+void RxPipeline::Create(const std::string& name, const Slice<Ref<RxShaderProgram>>& shaders,
+                        const Slice<VkAttachmentDescription>& attachments,
+                        const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                         RxVertexDescription* vertex_info, const RxRenderPass& render_pass,
                         const RxPipelineProperties& properties)
 {
@@ -38,7 +40,7 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     }
 
     if (!has_depth_attachment) {
-        FxLogInfo("Pipeline '{}' does not have a depth attachment", name);
+        LogInfo("Pipeline '{}' does not have a depth attachment", name);
     }
 
     VkSpecializationInfo specialization_info = {
@@ -49,9 +51,9 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     };
 
     // Shaders
-    FxSizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shaders.Size);
+    SizedArray<VkPipelineShaderStageCreateInfo> shader_create_info(shaders.Size);
 
-    for (const FxRef<RxShaderProgram>& shader_program : shaders) {
+    for (const Ref<RxShaderProgram>& shader_program : shaders) {
         const VkPipelineShaderStageCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = RxShaderUtil::ToUnderlyingType(shader_program->ShaderType),
@@ -60,13 +62,13 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
             .pSpecializationInfo = &specialization_info,
         };
 
-        FxLogDebug("Added shader (Vertex?: {})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
+        LogDebug("Added shader (Vertex?: {})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
 
         shader_create_info.Insert(create_info);
     }
 
     // Dynamic states (scissor & viewport updates dynamically)
-    FxSizedArray<VkDynamicState> dynamic_states = {};
+    SizedArray<VkDynamicState> dynamic_states = {};
 
     const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -74,7 +76,7 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
         .pDynamicStates = dynamic_states,
     };
 
-    FxVec2u viewport_size = properties.ViewportSize;
+    Vec2u viewport_size = properties.ViewportSize;
 
     // If there is no viewport size passed in, assume the swapchain size.
     if (properties.ViewportSize.X == 0 || properties.ViewportSize.Y == 0) {
@@ -193,13 +195,13 @@ void RxPipeline::Create(const std::string& name, const FxSlice<FxRef<RxShaderPro
     const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
 
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Could not create graphics pipeline", status);
+        ModulePanicVulkan("Could not create graphics pipeline", status);
     }
 
     RxUtil::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
 
-    FxLogInfo("Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
-              reinterpret_cast<void*>(Layout));
+    LogInfo("Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
+            reinterpret_cast<void*>(Layout));
 }
 
 void RxPipeline::Bind(const RxCommandBuffer& cmd)
@@ -234,10 +236,10 @@ void RxPipeline::Destroy()
 }
 
 
-VkPipelineLayout RxPipeline::CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
-                                          const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts)
+VkPipelineLayout RxPipeline::CreateLayout(const Slice<const RxPushConstants>& push_constant_defs,
+                                          const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
 {
-    FxStackArray<VkPushConstantRange, 3> push_const_ranges;
+    StackArray<VkPushConstantRange, 3> push_const_ranges;
 
     // VkPushConstantRange pc_ranges[3];
     // uint32 pc_ranges_count = 0;
@@ -247,7 +249,7 @@ VkPipelineLayout RxPipeline::CreateLayout(const FxSlice<const RxPushConstants>& 
     for (int i = 0; i < push_constant_defs.Size; i++) {
         const RxPushConstants& pc_def = push_constant_defs[i];
 
-        FxLogDebug("Adding push constant (Off={}, Sz={})", current_pc_offset, pc_def.Size);
+        LogDebug("Adding push constant (Off={}, Sz={})", current_pc_offset, pc_def.Size);
 
         VkPushConstantRange range {
             .stageFlags = pc_def.StageFlags,
@@ -272,10 +274,12 @@ VkPipelineLayout RxPipeline::CreateLayout(const FxSlice<const RxPushConstants>& 
     VkResult status = vkCreatePipelineLayout(gRenderer->GetDevice()->Device, &create_info, nullptr, &layout);
 
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Failed to create pipeline layout", status);
+        ModulePanicVulkan("Failed to create pipeline layout", status);
     }
 
-    FxLogDebug("Creating pipeline layout {:p}", reinterpret_cast<void*>(layout));
+    LogDebug("Creating pipeline layout {:p}", reinterpret_cast<void*>(layout));
 
     return layout;
 }
+
+} // namespace fx::renderer

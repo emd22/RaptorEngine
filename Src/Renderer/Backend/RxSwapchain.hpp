@@ -6,8 +6,10 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxSizedArray.hpp>
-#include <Math/FxVec2.hpp>
+#include <Core/SizedArray.hpp>
+#include <Math/Vec2.hpp>
+
+namespace fx::renderer {
 
 class RxGpuDevice;
 
@@ -17,20 +19,20 @@ public:
     RxSwapchain() = default;
     ~RxSwapchain();
 
-    void Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device);
+    void Init(Vec2u size, VkSurfaceKHR& surface, RxGpuDevice* device);
 
     VkSwapchainKHR GetSwapchain() const { return mSwapchain; }
 
     float GetAspectRatio() const
     {
-        FxAssert(Extent.X > 0 && Extent.Y > 0);
+        Assert(Extent.X > 0 && Extent.Y > 0);
         return static_cast<float>(Extent.X) / Extent.Y;
     }
 
     void Destroy();
 
 private:
-    void CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface);
+    void CreateSwapchain(Vec2u size, VkSurfaceKHR& surface);
     void CreateSwapchainImages();
     void CreateImageViews();
     void CreateFramebuffers();
@@ -40,7 +42,7 @@ private:
     void DestroyInternalSwapchain();
 
 public:
-    FxSizedArray<RxImage> OutputImages;
+    SizedArray<RxImage> OutputImages;
 
     RxSampler ColorSampler;
     RxSampler DepthSampler;
@@ -48,7 +50,7 @@ public:
     RxSampler NormalsSampler;
     RxSampler LightsSampler;
 
-    FxVec2u Extent = FxVec2u::sZero;
+    Vec2u Extent = Vec2u::sZero;
 
     // VkSurfaceFormatKHR SurfaceFormat;
     struct
@@ -62,9 +64,11 @@ public:
 private:
     RxGpuDevice* mDevice = nullptr;
 
-    FxSizedArray<RxFramebuffer> mFramebuffers;
+    SizedArray<RxFramebuffer> mFramebuffers;
 
     // RxGraphicsPipeline* mPipeline = nullptr;
     // RxGraphicsPipeline* mCompPipeline = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;
 };
+
+} // namespace fx::renderer

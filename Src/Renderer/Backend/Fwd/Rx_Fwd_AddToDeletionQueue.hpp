@@ -2,7 +2,11 @@
 
 #include <ThirdParty/vk_mem_alloc.h>
 
-#include <Renderer/FxDeletionObject.hpp>
+#include <Renderer/DeletionObject.hpp>
 
-void Fx_Fwd_AddToDeletionQueue(const FxDeletionObject::FuncType& func);
+namespace fx::renderer {
+
+void Fx_Fwd_AddToDeletionQueue(const DeletionObject::FuncType& func);
 void Fx_Fwd_AddGpuBufferToDeletionQueue(const VkBuffer& buffer, const VmaAllocation& allocation);
+
+} // namespace fx::renderer

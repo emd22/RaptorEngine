@@ -8,7 +8,11 @@
 #include "RxPipelineList.hpp"
 #include "RxRenderStage.hpp"
 
-class FxCamera;
+namespace fx {
+class Camera;
+}
+
+namespace fx::renderer {
 
 struct RxFrameData;
 
@@ -23,9 +27,9 @@ class RxDeferredLightingPass;
 class RxDeferredRenderer
 {
 public:
-    void Create(const FxVec2u& extent);
+    void Create(const Vec2u& extent);
 
-    void DoCompPass(FxCamera& camera);
+    void DoCompPass(Camera& camera);
 
     void Destroy();
     ~RxDeferredRenderer() { Destroy(); }
@@ -124,3 +128,5 @@ public:
     RxPipeline PlComposition;
     RxPipeline PlCompositionUnlit;
 };
+
+} // namespace fx::renderer

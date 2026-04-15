@@ -3,10 +3,12 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
+
 void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
                             RxGpuBufferFlags buffer_flags)
 {
-    FxAssert(size_in_bytes > 0);
+    Assert(size_in_bytes > 0);
 
     Size = size_in_bytes;
     Type = buffer_type;
@@ -39,11 +41,11 @@ void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, V
                                             &Allocation, &allocation_info);
 
     if (status != VK_SUCCESS) {
-        FxPanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
+        PanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
     }
 
 
-    // FxLogInfo("Create Buffer  (Buffer={:p}, Allocation={:p}, Size={})", reinterpret_cast<void*>(Buffer),
+    // LogInfo("Create Buffer  (Buffer={:p}, Allocation={:p}, Size={})", reinterpret_cast<void*>(Buffer),
     //           reinterpret_cast<void*>(Allocation), Size);
 
 
@@ -58,15 +60,15 @@ void RxRawGpuBuffer::Create(RxGpuBufferType buffer_type, uint64 size_in_bytes, V
 void RxRawGpuBuffer::Map()
 {
     if (IsMapped()) {
-        FxLogWarning("Buffer {:p} is already mapped!", reinterpret_cast<void*>(Buffer));
+        LogWarning("Buffer {:p} is already mapped!", reinterpret_cast<void*>(Buffer));
         return;
     }
 
     const VkResult status = vmaMapMemory(gRenderer->GpuAllocator, Allocation, &pMappedBuffer);
 
     if (status != VK_SUCCESS) {
-        FxLogError("Could not map GPU memory! (BufferType=0x{:x}, Error={})", static_cast<uint32>(Type),
-                   RxUtil::ResultToStr(status));
+        LogError("Could not map GPU memory! (BufferType=0x{:x}, Error={})", static_cast<uint32>(Type),
+                 RxUtil::ResultToStr(status));
         return;
     }
 }
@@ -99,10 +101,10 @@ void RxRawGpuBuffer::Destroy()
 
 void RxRawGpuBuffer::Upload(void* data, uint64 size)
 {
-    FxDebugAssert(size > 0);
-    FxDebugAssert(data != nullptr);
+    DebugAssert(size > 0);
+    DebugAssert(data != nullptr);
 
-    FxAssertMsg(this->Size >= size, "GPU buffer is smaller than source buffer!");
+    AssertMsg(this->Size >= size, "GPU buffer is smaller than source buffer!");
 
     Map();
     memcpy(pMappedBuffer, data, size);
@@ -136,7 +138,9 @@ void RxGpuBuffer::Create(RxGpuBufferType buffer_type, void* data, uint64 size)
     staging_buffer.Destroy();
 }
 
-void RxGpuBuffer::Create(RxGpuBufferType buffer_type, const FxAnonArray& data)
+void RxGpuBuffer::Create(RxGpuBufferType buffer_type, const AnonArray& data)
 {
     Create(buffer_type, data.pData, data.Size * data.ObjectSize);
 }
+
+} // namespace fx::renderer

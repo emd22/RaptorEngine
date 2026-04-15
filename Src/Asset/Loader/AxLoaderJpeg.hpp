@@ -4,9 +4,11 @@
 
 #include <TurboJPEG/jpeglib.h>
 
-#include <Core/FxSizedArray.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/SizedArray.hpp>
+#include <Core/Types.hpp>
 #include <string>
+
+namespace fx {
 
 class AxLoaderJpeg : public AxLoaderImageBase
 {
@@ -15,17 +17,19 @@ public:
 
     AxLoaderJpeg() = default;
 
-    Status LoadFromFile(FxTSRef<AxBase> asset, const std::string& path) override;
-    Status LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(TSRef<AxBase> asset, const std::string& path) override;
+    Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
-    void Destroy(FxTSRef<AxBase>& asset) override;
+    void Destroy(TSRef<AxBase>& asset) override;
 
     ~AxLoaderJpeg() override = default;
 
 protected:
-    void CreateGpuResource(FxTSRef<AxBase>& asset) override;
+    void CreateGpuResource(TSRef<AxBase>& asset) override;
 
 private:
     struct jpeg_decompress_struct mJpegInfo;
-    FxSizedArray<uint8> mImageData;
+    SizedArray<uint8> mImageData;
 };
+
+} // namespace fx

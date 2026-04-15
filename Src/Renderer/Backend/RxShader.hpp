@@ -1,11 +1,14 @@
 #pragma once
 
-#include <Asset/FxShaderCompiler.hpp>
-#include <Core/FxRef.hpp>
-#include <Core/FxSizedArray.hpp>
-#include <Core/FxString.hpp>
-#include <Core/FxTypes.hpp>
+#include <Asset/ShaderCompiler.hpp>
+#include <Core/Ref.hpp>
+#include <Core/SizedArray.hpp>
+#include <Core/String.hpp>
+#include <Core/Types.hpp>
 #include <unordered_map>
+
+
+namespace fx::renderer {
 
 enum class RxShaderType : uint16
 {
@@ -17,7 +20,7 @@ class RxShader;
 class RxCommandBuffer;
 class RxPipeline;
 
-using RxShaderId = FxHash64;
+using RxShaderId = Hash64;
 
 namespace RxShaderUtil {
 static constexpr uint32 scNumShaderTypes = static_cast<uint32>(RxShaderType::eFragment) + 1;
@@ -78,7 +81,7 @@ struct RxShaderOutlineEntry
 {
     RxShaderOutlineEntry() = default;
     RxShaderOutlineEntry(RxShaderOutlineEntryType type, RxShaderType shader_type, bool use_dynamic_type,
-                         FxHash32 name_hash, uint32 set, uint32 binding)
+                         Hash32 name_hash, uint32 set, uint32 binding)
         : Type(type), ShaderType(shader_type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)),
           NameHash(name_hash), Set(set), Binding(binding)
     {
@@ -87,7 +90,7 @@ struct RxShaderOutlineEntry
     RxShaderOutlineEntryType Type; // uint16
     RxShaderType ShaderType;
     uint16 bUseDynamicType = 0;
-    FxHash32 NameHash = 0;
+    Hash32 NameHash = 0;
     uint32 Set = 0;
     uint32 Binding = 0;
 };
@@ -97,7 +100,7 @@ struct RxShaderDescriptorId
 {
     uint32 Set = 0;
     /// Hash of the outline entries and the shader type
-    FxHash32 Hash = FxHashNull32;
+    Hash32 Hash = HashNull32;
 
     bool bContainsDynamicEntry = false;
 };
@@ -113,7 +116,7 @@ public:
     using DescEntry = RxShaderOutlineEntry;
     using DescType = RxShaderOutlineEntryType;
 
-    using EntryList = FxSizedArray<DescEntry>;
+    using EntryList = SizedArray<DescEntry>;
 
 public:
     RxShaderOutline()
@@ -131,12 +134,12 @@ public:
      * @brief Reads the outline from a data buffer
      * @returns The size of the outline
      */
-    uint32 ReadFromBuffer(const FxSlice<uint32>& data);
+    uint32 ReadFromBuffer(const Slice<uint32>& data);
 
-    void AddEntry(RxShaderOutlineEntryType type, RxShaderType shader_type, bool use_dynamic_type, FxHash32 name_hash,
+    void AddEntry(RxShaderOutlineEntryType type, RxShaderType shader_type, bool use_dynamic_type, Hash32 name_hash,
                   uint32 set, uint32 binding)
     {
-        FxSizedArray<DescEntry>& bucket = SetBuckets[set];
+        SizedArray<DescEntry>& bucket = SetBuckets[set];
 
         if (!bucket.IsInited()) {
             bucket.InitCapacity(scMaxEntriesPerBucket);
@@ -148,10 +151,10 @@ public:
     }
 
 public:
-    FxStackArray<EntryList, scNumSets> SetBuckets;
+    StackArray<EntryList, scNumSets> SetBuckets;
 
-    // FxSizedArray<RxShaderDescriptorEntry> DescriptorEntries;
-    FxStackArray<uint32, RxShaderUtil::scNumShaderTypes> PushConstantSizes = { 0, 0 };
+    // SizedArray<RxShaderDescriptorEntry> DescriptorEntries;
+    StackArray<uint32, RxShaderUtil::scNumShaderTypes> PushConstantSizes = { 0, 0 };
 
     /// The number of descriptor entries stored.
     uint32 DescriptorEntryCount = 0;
@@ -195,7 +198,7 @@ public:
 
     FX_FORCE_INLINE VkShaderModule& Get()
     {
-        FxAssert(InternalShader != nullptr);
+        Assert(InternalShader != nullptr);
         return InternalShader;
     }
 
@@ -203,9 +206,9 @@ public:
     VkShaderModule InternalShader = nullptr;
     RxShader* pShader = nullptr;
 
-    FxRef<RxShaderOutline> ShaderOutline { nullptr };
+    Ref<RxShaderOutline> ShaderOutline { nullptr };
 
-    FxSizedArray<RxShaderDescriptorId> Descriptors;
+    SizedArray<RxShaderDescriptorId> Descriptors;
 
     RxShaderType ShaderType = RxShaderType::eVertex;
 };
@@ -223,11 +226,11 @@ class RxShader
      */
     struct ProgramCache
     {
-        std::unordered_map<RxShaderId, FxRef<RxShaderProgram>, FxHash64Stl> Programs;
+        std::unordered_map<RxShaderId, Ref<RxShaderProgram>, Hash64Stl> Programs;
     };
 
 public:
-    static RxShaderId GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros);
+    static RxShaderId GenerateShaderId(RxShaderType type, const SizedArray<ShaderMacro>& macros);
 
     RxShader() = delete;
     RxShader(const char* path)
@@ -239,16 +242,16 @@ public:
     /**
      * @brief Returns a cached program if it has previously been queried or loads the uncached version from disk.
      */
-    FxRef<RxShaderProgram> GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros);
+    Ref<RxShaderProgram> GetProgram(RxShaderType shader_type, const SizedArray<ShaderMacro>& macros);
 
     /**
      * @brief Loads a shader program from the DataPack or compiles it if it does not exist.
      */
-    FxRef<RxShaderProgram> LoadUncachedProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros);
+    Ref<RxShaderProgram> LoadUncachedProgram(RxShaderType shader_type, const SizedArray<ShaderMacro>& macros);
 
     void Load(const char* path);
 
-    const FxString& GetName() const { return Name; }
+    const String& GetName() const { return Name; }
 
 private:
     void CreateShaderModule(RxShaderProgram& program, uint32 file_size, uint32* shader_data,
@@ -259,18 +262,19 @@ private:
      */
     bool PreloadCompiledPrograms(const char* pack_path);
 
-    void RecompileShader(const FxString& source_path, const FxString& output_path,
-                         const FxSizedArray<FxShaderMacro>& macros);
+    void RecompileShader(const String& source_path, const String& output_path, const SizedArray<ShaderMacro>& macros);
 
-    const FxString GetSourcePath() const;
-    const FxString GetProgramPath() const;
+    const String GetSourcePath() const;
+    const String GetProgramPath() const;
 
 private:
-    FxString Name = "Unknown";
+    String Name = "Unknown";
 
     /// A list of shader types (that hold shader programs) that have already been retreived from the datapack or
     /// created.
-    FxStackArray<ProgramCache, RxShaderUtil::scNumShaderTypes> mCachedTypes;
+    StackArray<ProgramCache, RxShaderUtil::scNumShaderTypes> mCachedTypes;
 
-    FxDataPack mDataPack;
+    DataPack mDataPack;
 };
+
+} // namespace fx::renderer

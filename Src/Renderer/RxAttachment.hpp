@@ -4,8 +4,11 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxSizedArray.hpp>
-#include <Core/FxSlice.hpp>
+#include <Core/SizedArray.hpp>
+#include <Core/Slice.hpp>
+
+namespace fx::renderer {
+
 
 enum class RxLoadOp
 {
@@ -25,14 +28,14 @@ enum class RxStoreOp
 struct RxTarget
 {
 public:
-    static constexpr FxVec2u scFullScreen = FxVec2u(0U);
+    static constexpr Vec2u scFullScreen = Vec2u(0U);
 
 public:
     RxTarget() = default;
 
-    RxTarget(RxImageFormat format, const FxVec2u& size);
-    RxTarget(RxImageFormat format, const FxVec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
-    RxTarget(RxImageFormat format, const FxVec2u& size, RxLoadOp load_op, RxStoreOp store_op,
+    RxTarget(RxImageFormat format, const Vec2u& size);
+    RxTarget(RxImageFormat format, const Vec2u& size, VkImageUsageFlags usage, RxImageAspectFlag aspect);
+    RxTarget(RxImageFormat format, const Vec2u& size, RxLoadOp load_op, RxStoreOp store_op,
              VkImageLayout initial_layout, VkImageLayout final_layout);
 
     VkAttachmentDescription BuildDescription() const;
@@ -88,8 +91,8 @@ public:
     bool IsCompatible(const RxTargetList& other) const;
 
     void CreateImages();
-    FxSizedArray<VkAttachmentDescription>& GetDescriptions();
-    FxSizedArray<VkImageView>& GetImageViews();
+    SizedArray<VkAttachmentDescription>& GetDescriptions();
+    SizedArray<VkImageView>& GetImageViews();
 
 private:
     FX_FORCE_INLINE void CheckInited()
@@ -101,7 +104,7 @@ private:
 
 
 public:
-    FxSizedArray<RxTarget> Targets;
+    SizedArray<RxTarget> Targets;
 
 
 private:
@@ -109,8 +112,10 @@ private:
     bool mbImageViewsBuilt : 1 = false;
     bool mbImagesCreated : 1 = false;
 
-    FxSizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
-    FxSizedArray<VkImageView> mBuiltImageViews;
+    SizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
+    SizedArray<VkImageView> mBuiltImageViews;
 
     uint32 mMaxTargets = 10;
 };
+
+} // namespace fx::renderer

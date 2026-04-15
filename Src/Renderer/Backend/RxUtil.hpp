@@ -3,15 +3,17 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxDefines.hpp>
+#include <Core/Defines.hpp>
 
-// #include <Core/FxTypes.hpp>
+// #include <Core/Types.hpp>
+
+namespace fx::renderer {
 
 #define VkTry(func_result, message)                                                                                    \
     {                                                                                                                  \
         const VkResult result__ = (func_result);                                                                       \
         if (result__ != VK_SUCCESS) {                                                                                  \
-            FxModulePanicVulkan((message), result__);                                                                  \
+            ModulePanicVulkan((message), result__);                                                                    \
         }                                                                                                              \
     }
 
@@ -174,3 +176,5 @@ public:
 #endif
     }
 };
+
+} // namespace fx::renderer

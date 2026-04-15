@@ -5,29 +5,31 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxRef.hpp>
-#include <Core/FxSizedArray.hpp>
-#include <Core/FxSlice.hpp>
+#include <Core/Ref.hpp>
+#include <Core/SizedArray.hpp>
+#include <Core/Slice.hpp>
 #include <Renderer/RxVertex.hpp>
+
+namespace fx::renderer {
 
 struct RxVertexDescription;
 class RxCommandBuffer;
 class RxGpuDevice;
 
-struct alignas(16) FxDrawPushConstants
+struct alignas(16) DrawPushConstants
 {
     float32 CameraMatrix[16];
     uint32 ObjectId = 0;
     uint32 MaterialIndex = 0;
 };
 
-struct alignas(16) FxLightVertPushConstants
+struct alignas(16) LightVertPushConstants
 {
     float32 CameraMatrix[16];
     uint32 ObjectId = 0;
 };
 
-struct alignas(16) FxCompositionPushConstants
+struct alignas(16) CompositionPushConstants
 {
     float32 ViewInverse[16];
     float32 ProjInverse[16];
@@ -42,7 +44,7 @@ struct RxPipelineProperties
     bool bDisableDepthTest : 1 = false;
     bool bDisableDepthWrite : 1 = false;
 
-    FxVec2u ViewportSize = FxVec2u::sZero;
+    Vec2u ViewportSize = Vec2u::sZero;
     VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 };
 
@@ -56,16 +58,16 @@ struct RxPushConstants
 class RxPipeline
 {
 public:
-    void Create(const std::string& name, const FxSlice<FxRef<RxShaderProgram>>& shaders,
-                const FxSlice<VkAttachmentDescription>& attachments,
-                const FxSlice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
+    void Create(const std::string& name, const Slice<Ref<RxShaderProgram>>& shaders,
+                const Slice<VkAttachmentDescription>& attachments,
+                const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                 RxVertexDescription* vertex_info, const RxRenderPass& render_pass,
                 const RxPipelineProperties& properties);
 
     FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout) { Layout = layout; }
 
-    static VkPipelineLayout CreateLayout(const FxSlice<const RxPushConstants>& push_constant_defs,
-                                         const FxSlice<VkDescriptorSetLayout>& descriptor_set_layouts);
+    static VkPipelineLayout CreateLayout(const Slice<const RxPushConstants>& push_constant_defs,
+                                         const Slice<VkDescriptorSetLayout>& descriptor_set_layouts);
 
     void Destroy();
 
@@ -79,8 +81,8 @@ public:
     VkPipeline Pipeline = nullptr;
 
     // XXX: TEMP
-    FxRef<RxShaderProgram> VertexShader { nullptr };
-    FxRef<RxShaderProgram> FragmentShader { nullptr };
+    Ref<RxShaderProgram> VertexShader { nullptr };
+    Ref<RxShaderProgram> FragmentShader { nullptr };
 
 
 private:
@@ -91,3 +93,5 @@ protected:
 
     bool mbDoNotDestroyLayout = false;
 };
+
+} // namespace fx::renderer

@@ -3,6 +3,7 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
 
 static FX_FORCE_INLINE VkSamplerMipmapMode GetVkMipMode(RxSamplerFilter filter)
 {
@@ -91,7 +92,7 @@ RxSampler::RxSampler(const RxSamplerProps& props) { Create(props); }
 void RxSampler::Create(const RxSamplerProps& props)
 {
     if (Sampler) {
-        FxLogWarning("Sampler has been previously initialized!");
+        LogWarning("Sampler has been previously initialized!");
         return;
     }
 
@@ -128,7 +129,7 @@ void RxSampler::Create(const RxSamplerProps& props)
     VkResult result = vkCreateSampler(gRenderer->GetDevice()->Device, &sampler_info, nullptr, &Sampler);
 
     if (result != VK_SUCCESS) {
-        FxLogError("Error creating texture sampler!");
+        LogError("Error creating texture sampler!");
         Sampler = nullptr;
     }
 }
@@ -145,3 +146,5 @@ void RxSampler::Destroy()
     vkDestroySampler(gRenderer->GetDevice()->Device, Sampler, nullptr);
     Sampler = nullptr;
 }
+
+} // namespace fx::renderer

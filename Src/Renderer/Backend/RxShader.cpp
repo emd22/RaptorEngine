@@ -1,20 +1,22 @@
 #include "RxShader.hpp"
 
-#include "FxEngine.hpp"
+#include "Engine.hpp"
 #include "RxDescriptorCache.hpp"
 
 #include <Asset/AxPaths.hpp>
-#include <Asset/FxShaderCompiler.hpp>
-#include <Core/FxFile.hpp>
-#include <Core/FxRefUtil.hpp>
-#include <Core/FxTypes.hpp>
-#include <Core/MemPool/FxMemPool.hpp>
-#include <Math/FxMathUtil.hpp>
+#include <Asset/ShaderCompiler.hpp>
+#include <Core/File.hpp>
+#include <Core/MemPool/MemPool.hpp>
+#include <Core/RefUtil.hpp>
+#include <Core/Types.hpp>
+#include <Math/MathUtil.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
 
 #define DEBUG_FORCE_OUT_OF_DATE 1
+
+namespace fx::renderer {
 
 /////////////////////////////////////
 // Shader Outline Functions
@@ -28,22 +30,22 @@ uint32 RxShaderOutline::GetReflectionSize() const
     reflection_header_size += sizeof(uint32);                                      // Number of descriptor entries
     reflection_header_size += DescriptorEntryCount * sizeof(RxShaderOutlineEntry); // The descriptor entries data
 
-    return FxMath::AlignValue<4>(reflection_header_size);
+    return MathUtil::AlignValue<4>(reflection_header_size);
 }
 
 void RxShaderOutline::Print() const
 {
-    FxLogInfo("=== Outline Debug ===");
-    FxLogInfo("Maximum Sets: {}", scNumSets);
+    LogInfo("=== Outline Debug ===");
+    LogInfo("Maximum Sets: {}", scNumSets);
     for (uint32 bucket_index = 0; bucket_index < scNumSets; bucket_index++) {
         const EntryList& list = SetBuckets[bucket_index];
-        FxLogInfo("Set {} -> {} entries", bucket_index, list.Size);
+        LogInfo("Set {} -> {} entries", bucket_index, list.Size);
 
         for (uint32 i = 0; i < list.Size; i++) {
             const DescEntry& entry = list[i];
-            FxLogInfo("\tType={}, IsDynamic?={}, NameHash={}, Set={}, Binding={}",
-                      RxShaderOutlineUtil::GetTypeName(entry.Type), entry.bUseDynamicType, entry.NameHash, entry.Set,
-                      entry.Binding);
+            LogInfo("\tType={}, IsDynamic?={}, NameHash={}, Set={}, Binding={}",
+                    RxShaderOutlineUtil::GetTypeName(entry.Type), entry.bUseDynamicType, entry.NameHash, entry.Set,
+                    entry.Binding);
         }
     }
 }
@@ -74,7 +76,7 @@ void RxShaderOutline::WriteToBuffer(uint32* buffer) const
 
         // Write each entry in the bucket
         for (DescEntry& entry : bucket) {
-            FxLogInfo("ENTRY HAS SHADER TYPE {}", RxShaderUtil::TypeToName(entry.ShaderType));
+            LogInfo("ENTRY HAS SHADER TYPE {}", RxShaderUtil::TypeToName(entry.ShaderType));
 
             memcpy(sd_buffer, &entry, sizeof(RxShaderOutlineEntry));
             sd_buffer += sizeof(RxShaderOutlineEntry);
@@ -83,7 +85,7 @@ void RxShaderOutline::WriteToBuffer(uint32* buffer) const
 }
 
 
-uint32 RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data)
+uint32 RxShaderOutline::ReadFromBuffer(const Slice<uint32>& data)
 {
     uint32* buffer = data.pData;
 
@@ -118,12 +120,12 @@ uint32 RxShaderOutline::ReadFromBuffer(const FxSlice<uint32>& data)
 // Shader Functions
 /////////////////////////////////////
 
-RxShaderId RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxShaderMacro>& macros)
+RxShaderId RxShader::GenerateShaderId(RxShaderType type, const SizedArray<ShaderMacro>& macros)
 {
-    FxHash64 hash = FX_HASH64_FNV1A_INIT;
+    Hash64 hash = FX_HASH64_FNV1A_INIT;
 
-    constexpr FxHash64 cPrefixHashVS = FxHashStr64("VERTSHADER");
-    constexpr FxHash64 cPrefixHashFS = FxHashStr64("FRAGSHADER");
+    constexpr Hash64 cPrefixHashVS = HashStr64("VERTSHADER");
+    constexpr Hash64 cPrefixHashFS = HashStr64("FRAGSHADER");
 
     if (type == RxShaderType::eVertex) {
         hash = cPrefixHashVS;
@@ -132,9 +134,9 @@ RxShaderId RxShader::GenerateShaderId(RxShaderType type, const FxSizedArray<FxSh
         hash = cPrefixHashFS;
     }
 
-    FxLogInfo("Building entry ID with {} macros", macros.Size);
+    LogInfo("Building entry ID with {} macros", macros.Size);
 
-    return FxHashData64(FxSlice<FxShaderMacro>(macros), hash);
+    return HashData64(Slice<ShaderMacro>(macros), hash);
 }
 
 bool RxShader::PreloadCompiledPrograms(const char* pack_path)
@@ -142,7 +144,7 @@ bool RxShader::PreloadCompiledPrograms(const char* pack_path)
     bool did_read = mDataPack.ReadFromFile(pack_path);
 
     if (!did_read) {
-        FxLogInfo("Could not read compiled shader from {}. Recompiling...", pack_path);
+        LogInfo("Could not read compiled shader from {}. Recompiling...", pack_path);
         return false;
     }
 
@@ -155,26 +157,25 @@ void RxShader::Load(const char* shader_name)
 {
     Name = shader_name;
 
-    FxString program_path = GetProgramPath();
+    String program_path = GetProgramPath();
     PreloadCompiledPrograms(program_path.CStr());
 }
 
 
-const FxString RxShader::GetSourcePath() const { return FxString(FxAssetPath(AxPathQuery::eShaders)) + Name + ".hlsl"; }
-const FxString RxShader::GetProgramPath() const
+const String RxShader::GetSourcePath() const { return String(AssetPath(AxPathQuery::eShaders)) + Name + ".hlsl"; }
+const String RxShader::GetProgramPath() const
 {
-    FxString compiled_folder = FxString(FxAssetPath(AxPathQuery::eShaders)) + "Spirv/";
+    String compiled_folder = String(AssetPath(AxPathQuery::eShaders)) + "Spirv/";
     return (compiled_folder + Name + ".spack");
 }
 
 
-FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
-                                                     const FxSizedArray<FxShaderMacro>& macros)
+Ref<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type, const SizedArray<ShaderMacro>& macros)
 {
-    FxString source_path = GetSourcePath();
+    String source_path = GetSourcePath();
     const char* c_source_path = source_path.CStr();
 
-    FxString program_path = GetProgramPath();
+    String program_path = GetProgramPath();
 
 
     if (!mDataPack.IsOpen() || mDataPack.Entries.IsEmpty()) {
@@ -182,13 +183,13 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
     }
 
     // Check if the shader is out of date
-    bool is_out_of_date = FxShaderCompiler::IsOutOfDate(c_source_path);
+    bool is_out_of_date = ShaderCompiler::IsOutOfDate(c_source_path);
 #ifdef DEBUG_FORCE_OUT_OF_DATE
     is_out_of_date = true;
 #endif
 
     if (is_out_of_date) {
-        FxLogWarning("Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
+        LogWarning("Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
 
         RecompileShader(source_path, program_path, macros);
 
@@ -197,35 +198,35 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
     }
 
     // Generate an ID based on the shader type and macros. This is used for querying for the program in the DataPack.
-    FxHash64 program_id = RxShader::GenerateShaderId(shader_type, macros);
-    FxLogDebug("Getting program from {} (Id={})", Name, program_id);
+    Hash64 program_id = RxShader::GenerateShaderId(shader_type, macros);
+    LogDebug("Getting program from {} (Id={})", Name, program_id);
 
     // Create the program
-    FxRef<RxShaderProgram> program = FxMakeRef<RxShaderProgram>();
-    FxLogInfo("** SETTING program type to {}", RxShaderUtil::TypeToName(shader_type));
+    Ref<RxShaderProgram> program = MakeRef<RxShaderProgram>();
+    LogInfo("** SETTING program type to {}", RxShaderUtil::TypeToName(shader_type));
     program->ShaderType = shader_type;
     program->pShader = this;
 
     // Check for the program in the DataPack
-    FxDataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
+    DataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
 
     // If there is no compiled version of the program in the DataPack, compile it and save it to disk.
     if (dp_entry == nullptr) {
-        FxLogWarning("Shader was not found in datapack, recompiling...");
+        LogWarning("Shader was not found in datapack, recompiling...");
         RecompileShader(GetSourcePath(), program_path, macros);
 
         dp_entry = mDataPack.QuerySection(program_id);
         if (dp_entry == nullptr) {
-            FxLogError("Pack entry does not exist after compilation! (Id={})", program_id);
+            LogError("Pack entry does not exist after compilation! (Id={})", program_id);
             return program;
         }
     }
 
     // If there is data available, create the program.
     if (dp_entry->Data.IsNotEmpty()) {
-        FxLogInfo("Data is available, creating shader...");
-        const FxSizedArray<uint8>& program_data = dp_entry->Data;
-        FxAssert(program_data.Size == FxMath::AlignValue<4>(program_data.Size));
+        LogInfo("Data is available, creating shader...");
+        const SizedArray<uint8>& program_data = dp_entry->Data;
+        Assert(program_data.Size == MathUtil::AlignValue<4>(program_data.Size));
 
         CreateShaderModule(*program, program_data.Size, reinterpret_cast<uint32*>(program_data.pData),
                            program->InternalShader);
@@ -235,11 +236,11 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
 
     // The entry exists in the DataPack but the data has not been loaded yet. Load only that section of the DataPack and
     // create the program.
-    FxLogInfo("Loading data pack section for shader...");
+    LogInfo("Loading data pack section for shader...");
 
-    uint32 buffer_size = FxMath::AlignValue<4>(dp_entry->DataSize);
+    uint32 buffer_size = MathUtil::AlignValue<4>(dp_entry->DataSize);
     uint32* buffer = gEnginePool->Alloc<uint32>(buffer_size);
-    FxSlice<uint8> buffer_slice = FxMakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
+    Slice<uint8> buffer_slice = MakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
 
     mDataPack.ReadSection(dp_entry, buffer_slice);
 
@@ -251,11 +252,11 @@ FxRef<RxShaderProgram> RxShader::LoadUncachedProgram(RxShaderType shader_type,
 }
 
 
-FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSizedArray<FxShaderMacro>& macros)
+Ref<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const SizedArray<ShaderMacro>& macros)
 {
     ProgramCache& cached_type = mCachedTypes[static_cast<uint32>(shader_type)];
 
-    const FxHash64 macro_hash = FxHashData64(FxMakeSlice(macros.pData, macros.GetSizeInBytes()));
+    const Hash64 macro_hash = HashData64(MakeSlice(macros.pData, macros.GetSizeInBytes()));
     auto program_it = cached_type.Programs.find(macro_hash);
 
     if (program_it != cached_type.Programs.end()) {
@@ -263,19 +264,19 @@ FxRef<RxShaderProgram> RxShader::GetProgram(RxShaderType shader_type, const FxSi
     }
 
     // Program has not been cached, load it from the data pack or compile it, and save it back to the cache.
-    FxRef<RxShaderProgram> program = LoadUncachedProgram(shader_type, macros);
+    Ref<RxShaderProgram> program = LoadUncachedProgram(shader_type, macros);
     cached_type.Programs[macro_hash] = program;
 
     return program;
 }
 
-void RxShader::RecompileShader(const FxString& source_path, const FxString& compiled_path,
-                               const FxSizedArray<FxShaderMacro>& macros)
+void RxShader::RecompileShader(const String& source_path, const String& compiled_path,
+                               const SizedArray<ShaderMacro>& macros)
 {
     // Compile to the shader pack
-    FxShaderCompiler::Result compile_result = FxShaderCompiler::Compile(source_path.CStr(), mDataPack, macros);
+    ShaderCompiler::Result compile_result = ShaderCompiler::Compile(source_path.CStr(), mDataPack, macros);
 
-    if (compile_result != FxShaderCompiler::Result::eFailed) {
+    if (compile_result != ShaderCompiler::Result::eFailed) {
         mDataPack.WriteToFile(compiled_path.CStr());
     }
 }
@@ -283,24 +284,24 @@ void RxShader::RecompileShader(const FxString& source_path, const FxString& comp
 
 void RxShaderProgram::BuildDescriptors()
 {
-    // FxAssert(ShaderOutline.IsValid());
+    // Assert(ShaderOutline.IsValid());
 
     // Descriptors.InitCapacity(RxShaderOutline::scNumSets);
 
-    // FxLogWarning("Build Descriptors for shader {}", RxShaderUtil::TypeToName(ShaderType));
+    // LogWarning("Build Descriptors for shader {}", RxShaderUtil::TypeToName(ShaderType));
 
     // for (uint32 set_index = 0; set_index < RxShaderOutline::scNumSets; set_index++) {
     //     RxShaderOutline::EntryList& entry_list = ShaderOutline->SetBuckets[set_index];
 
     //     if (entry_list.IsEmpty()) {
-    //         FxLogWarning("Skipping descriptors for {} (no entries found)", RxShaderUtil::TypeToName(ShaderType));
+    //         LogWarning("Skipping descriptors for {} (no entries found)", RxShaderUtil::TypeToName(ShaderType));
     //         continue;
     //     }
 
     //     Descriptors.Insert(gDescriptorCache->Register(set_index, ShaderType, entry_list));
     // }
 
-    // FxLogInfo("Added {} descriptors to shader program", Descriptors.Size);
+    // LogInfo("Added {} descriptors to shader program", Descriptors.Size);
 }
 
 
@@ -308,7 +309,7 @@ void RxShaderProgram::Bind(const RxCommandBuffer& cmd, const RxPipeline& pipelin
                            const RxShaderBindOptions& bind_options)
 {
     // for (const RxShaderDescriptorId& ds_id : Descriptors) {
-    //     FxRef<RxDescriptorSet> ds = gDescriptorCache->Request(ds_id);
+    //     Ref<RxDescriptorSet> ds = gDescriptorCache->Request(ds_id);
     //     if (bind_options.bUseOffset && ds->HasDynamicOffsets()) {
     //         ds->BindWithOffset(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline, bind_options.BufferOffset);
     //         continue;
@@ -333,9 +334,9 @@ void RxShader::CreateShaderModule(RxShaderProgram& program, uint32 file_size, ui
                                   VkShaderModule& shader_module)
 {
     // Load the reflected data into the shader outline
-    program.ShaderOutline = FxRef<RxShaderOutline>::New();
+    program.ShaderOutline = Ref<RxShaderOutline>::New();
     uint32 reflected_size = 0;
-    // uint32 reflected_size = program.ShaderOutline->ReadFromBuffer(FxSlice<uint32>(raw_data, file_size));
+    // uint32 reflected_size = program.ShaderOutline->ReadFromBuffer(Slice<uint32>(raw_data, file_size));
 
     // program.BuildDescriptors();
     program.ShaderOutline.DestroyRef();
@@ -353,7 +354,9 @@ void RxShader::CreateShaderModule(RxShaderProgram& program, uint32 file_size, ui
     const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &shader_module);
 
     if (status != VK_SUCCESS) {
-        FxLogError("Could not create Vulkan shader module: {}", RxUtil::ResultToStr(status));
+        LogError("Could not create Vulkan shader module: {}", RxUtil::ResultToStr(status));
         return;
     }
 }
+
+} // namespace fx::renderer

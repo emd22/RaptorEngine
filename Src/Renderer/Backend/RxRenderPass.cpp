@@ -5,14 +5,15 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxPanic.hpp>
+#include <Core/Panic.hpp>
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
-
 FX_SET_MODULE_NAME("RxRenderPass")
 
-void RxRenderPass::Create(RxTargetList& attachments, FxVec2u size, const FxVec2u& offset)
+namespace fx::renderer {
+
+void RxRenderPass::Create(RxTargetList& attachments, Vec2u size, const Vec2u& offset)
 {
     if (size == RxTarget::scFullScreen) {
         size = gRenderer->Swapchain.Extent;
@@ -21,11 +22,11 @@ void RxRenderPass::Create(RxTargetList& attachments, FxVec2u size, const FxVec2u
     Size = size;
     Offset = offset;
 
-    FxAssert(size.X > 0.0f && size.Y > 0.0f);
+    Assert(size.X > 0.0f && size.Y > 0.0f);
 
     mpDevice = gRenderer->GetDevice();
 
-    FxSizedArray<VkAttachmentReference> color_refs(attachments.Targets.Size);
+    SizedArray<VkAttachmentReference> color_refs(attachments.Targets.Size);
 
     bool has_depth_attachment = false;
     VkAttachmentReference depth_attachment_ref {};
@@ -121,7 +122,7 @@ void RxRenderPass::Create(RxTargetList& attachments, FxVec2u size, const FxVec2u
         }
     };
 
-    FxSizedArray<VkAttachmentDescription>& descriptions = attachments.GetDescriptions();
+    SizedArray<VkAttachmentDescription>& descriptions = attachments.GetDescriptions();
 
     VkRenderPassCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -136,16 +137,16 @@ void RxRenderPass::Create(RxTargetList& attachments, FxVec2u size, const FxVec2u
     const VkResult status = vkCreateRenderPass(mpDevice->Device, &create_info, nullptr, &RenderPass);
 
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Failed to create render pass", status);
+        ModulePanicVulkan("Failed to create render pass", status);
     }
 }
 
-void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const FxSlice<VkClearValue>& clear_values)
+void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const Slice<VkClearValue>& clear_values)
 {
     pCommandBuffer = cmd;
 
     if (RenderPass == nullptr) {
-        FxModulePanic("Render pass has not been previously created", 0);
+        ModulePanic("Render pass has not been previously created", 0);
     }
 
     VkRenderPassBeginInfo render_pass_info = {
@@ -164,7 +165,7 @@ void RxRenderPass::Begin(RxCommandBuffer* cmd, VkFramebuffer framebuffer, const 
 
 void RxRenderPass::End()
 {
-    FxAssert(pCommandBuffer != nullptr);
+    Assert(pCommandBuffer != nullptr);
 
     vkCmdEndRenderPass(pCommandBuffer->CommandBuffer);
 }
@@ -176,3 +177,5 @@ void RxRenderPass::Destroy()
     }
     RenderPass = nullptr;
 }
+
+} // namespace fx::renderer

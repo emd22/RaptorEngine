@@ -1,9 +1,11 @@
 #pragma once
 
-#include <Core/FxTypes.hpp>
-#include <Math/FxVec2.hpp>
-#include <Math/FxVec3.hpp>
-#include <Math/FxVec4.hpp>
+#include <Core/Types.hpp>
+#include <Math/Vec2.hpp>
+#include <Math/Vec3.hpp>
+#include <Math/Vec4.hpp>
+
+namespace fx::renderer {
 
 enum class RxVertexType
 {
@@ -56,13 +58,16 @@ struct RxVertex<RxVertexType::eSkinned>
 // End packing structs
 #pragma pack(pop)
 
+} // namespace fx::renderer
+
+
 template <>
-struct std::formatter<RxVertex<RxVertexType::eDefault>>
+struct std::formatter<fx::renderer::RxVertex<fx::renderer::RxVertexType::eDefault>>
 {
     auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
     template <typename FmtContext>
-    auto format(const RxVertex<RxVertexType::eDefault>& obj, FmtContext& ctx) const
+    auto format(const fx::renderer::RxVertex<fx::renderer::RxVertexType::eDefault>& obj, FmtContext& ctx) const
     {
         return std::format_to(ctx.out(), "( {:.04}, {:.04}, {:.04} )", static_cast<float>(obj.Position[0]),
                               static_cast<float>(obj.Position[1]), static_cast<float>(obj.Position[2]));
@@ -70,12 +75,12 @@ struct std::formatter<RxVertex<RxVertexType::eDefault>>
 };
 
 
-namespace RxVertexUtil {
+namespace fx::renderer::RxVertexUtil {
 
 /**
  * @brief Returns the size of a vertex given a vertex type.
  */
-FX_FORCE_INLINE uint32 GetSize(RxVertexType type)
+FX_FORCE_INLINE uint32 GetSize(fx::renderer::RxVertexType type)
 {
     if (type == RxVertexType::eSlim) {
         return sizeof(RxVertex<RxVertexType::eSlim>);
@@ -94,12 +99,12 @@ FX_FORCE_INLINE uint32 GetSize(RxVertexType type)
  * @brief Returns the position values given a vertex struct.
  */
 template <RxVertexType TVertexType>
-FxVec3f GetPosition(const RxVertex<TVertexType>& vertex)
+Vec3f GetPosition(const RxVertex<TVertexType>& vertex)
 {
     static_assert(
         offsetof(RxVertex<RxVertexType::eSlim>, Position) == offsetof(RxVertex<RxVertexType::eDefault>, Position) &&
         offsetof(RxVertex<RxVertexType::eDefault>, Position) == offsetof(RxVertex<RxVertexType::eSkinned>, Position));
 
-    return FxVec3f(vertex.Position);
+    return Vec3f(vertex.Position);
 }
-}; // namespace RxVertexUtil
+}; // namespace fx::renderer::RxVertexUtil

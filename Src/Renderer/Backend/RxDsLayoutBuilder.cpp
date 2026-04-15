@@ -3,6 +3,7 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
 
 RxDsLayoutBuilder& RxDsLayoutBuilder::AddBinding(int binding, VkDescriptorType type, RxShaderType stage, int count)
 {
@@ -25,9 +26,11 @@ VkDescriptorSetLayout RxDsLayoutBuilder::Build()
     VkResult status = vkCreateDescriptorSetLayout(gRenderer->GetDevice()->Device, &create_info, nullptr, &mpDsLayout);
 
     if (status != VK_SUCCESS) {
-        FxLogError("Error building descriptor set layout with builder! (status={})", RxUtil::ResultToStr(status));
+        LogError("Error building descriptor set layout with builder! (status={})", RxUtil::ResultToStr(status));
         return nullptr;
     }
 
     return mpDsLayout;
 }
+
+} // namespace fx::renderer

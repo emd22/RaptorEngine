@@ -2,13 +2,15 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxSizedArray.hpp>
+#include <Core/SizedArray.hpp>
 #include <Renderer/RxVertex.hpp>
+
+namespace fx::renderer {
 
 struct RxVertexDescription
 {
     VkVertexInputBindingDescription Binding;
-    FxSizedArray<VkVertexInputAttributeDescription> Attributes;
+    SizedArray<VkVertexInputAttributeDescription> Attributes;
 
     bool bIsInited : 1 = false;
 };
@@ -25,7 +27,7 @@ RxVertexDescription BuildDescription()
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
 
-    FxSizedArray<VkVertexInputAttributeDescription> attribs;
+    SizedArray<VkVertexInputAttributeDescription> attribs;
 
     if constexpr (TVertexType == RxVertexType::eSlim) {
         attribs = {
@@ -119,7 +121,7 @@ RxVertexDescription BuildDescription()
         };
     }
     else {
-        FxLogError("Unsupported vertex type!");
+        LogError("Unsupported vertex type!");
     }
 
     return { binding_desc, std::move(attribs), true };
@@ -137,8 +139,10 @@ FX_FORCE_INLINE RxVertexDescription BuildDescription(RxVertexType vertex_type)
     default:;
     }
 
-    FxLogError("Unsupported vertex type!");
+    LogError("Unsupported vertex type!");
 
     return RxVertexDescription {};
 }
 }; // namespace RxVertexUtil
+
+} // namespace fx::renderer

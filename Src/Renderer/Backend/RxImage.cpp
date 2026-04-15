@@ -3,13 +3,15 @@
 
 #include "../RxRenderBackend.hpp"
 
-#include <Core/FxDefines.hpp>
-#include <Core/FxPanic.hpp>
-#include <Core/FxStackArray.hpp>
-#include <Core/MemPool/FxMemPool.hpp>
-#include <FxEngine.hpp>
+#include <Core/Defines.hpp>
+#include <Core/MemPool/MemPool.hpp>
+#include <Core/Panic.hpp>
+#include <Core/StackArray.hpp>
+#include <Engine.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
 #include <Renderer/RxGlobals.hpp>
+
+namespace fx::renderer {
 
 FX_SET_MODULE_NAME("RxImage")
 
@@ -26,19 +28,19 @@ const RxImageTypeProperties RxImageTypeGetProperties(RxImageType image_type)
         props.LayerCount = 6;
     }
     else {
-        FxLogError("Unknown image type!");
+        LogError("Unknown image type!");
     }
 
     return props;
 }
 
-RxImage::RxImage() { mpRefCnt = gEnginePool->Alloc<FxRefCount>(sizeof(FxRefCount)); }
+RxImage::RxImage() { mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount)); }
 
 RxImage::RxImage(const RxImage& other) { (*this) = other; }
 
-RxImage::RxImage(FxRef<RxImage>&& ref) { (*this) = std::move(ref); }
+RxImage::RxImage(Ref<RxImage>&& ref) { (*this) = std::move(ref); }
 
-RxImage& RxImage::operator=(FxRef<RxImage>&& ref)
+RxImage& RxImage::operator=(Ref<RxImage>&& ref)
 {
     // Set the image properties, move the ref count over.
     (*this) = *ref;
@@ -74,7 +76,7 @@ RxImage& RxImage::operator=(const RxImage& other)
     mpRefCnt = other.mpRefCnt;
 
     if (!mpRefCnt) {
-        mpRefCnt = gEnginePool->Alloc<FxRefCount>(sizeof(FxRefCount));
+        mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
     }
     else {
         mpRefCnt->Inc();
@@ -83,11 +85,11 @@ RxImage& RxImage::operator=(const RxImage& other)
     return *this;
 }
 
-void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageTiling tiling,
+void RxImage::Create(RxImageType image_type, const Vec2u& size, RxImageFormat format, VkImageTiling tiling,
                      VkImageUsageFlags usage, RxImageAspectFlag aspect)
 {
-    FxAssert(size.X > 0 && size.Y > 0);
-    FxAssert(Image == nullptr && Allocation == nullptr);
+    Assert(size.X > 0 && size.Y > 0);
+    Assert(Image == nullptr && Allocation == nullptr);
 
     Aspect = aspect;
     Size = size;
@@ -95,7 +97,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
     ViewType = image_type;
 
     if (!mpRefCnt) {
-        mpRefCnt = gEnginePool->Alloc<FxRefCount>(sizeof(FxRefCount));
+        mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
     }
 
     // Get the vulkan values for the image type
@@ -138,11 +140,11 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
 
     VkResult status = vmaCreateImage(gRenderer->GpuAllocator, &image_info, &create_info, &Image, &Allocation, nullptr);
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Could not create vulkan image", status);
+        ModulePanicVulkan("Could not create vulkan image", status);
     }
 
 
-    // FxLogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
+    // LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
     //           reinterpret_cast<void*>(Allocation));
 
 #ifdef FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES
@@ -185,7 +187,7 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
 
     status = vkCreateImageView(gRenderer->GetDevice()->Device, &view_create_info, nullptr, &View);
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Could not create swapchain image view", status);
+        ModulePanicVulkan("Could not create swapchain image view", status);
     }
 
     if (reinterpret_cast<uintptr_t>(Image) == 0x2b000000002b) {
@@ -209,15 +211,15 @@ void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat 
 #endif
 }
 
-void RxImage::Create(RxImageType image_type, const FxVec2u& size, RxImageFormat format, VkImageUsageFlags usage,
+void RxImage::Create(RxImageType image_type, const Vec2u& size, RxImageFormat format, VkImageUsageFlags usage,
                      RxImageAspectFlag aspect)
 {
     Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect);
 }
 
 
-void RxImage::CreateGpuOnly(RxImageType image_type, const FxVec2u& size, RxImageFormat format,
-                            const FxSizedArray<uint8>& image_data)
+void RxImage::CreateGpuOnly(RxImageType image_type, const Vec2u& size, RxImageFormat format,
+                            const SizedArray<uint8>& image_data)
 {
     RxRawGpuBuffer staging_buffer;
     staging_buffer.Create(RxGpuBufferType::eTransfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
@@ -367,7 +369,7 @@ void RxImage::TransitionLayout(VkImageLayout new_layout, RxCommandBuffer& cmd, u
 }
 
 
-void RxImage::CopyFromBuffer(const RxRawGpuBuffer& buffer, VkImageLayout final_layout, FxVec2u size, uint32 base_layer)
+void RxImage::CopyFromBuffer(const RxRawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size, uint32 base_layer)
 {
     Fx_Fwd_SubmitUploadCmd(
         [&](RxCommandBuffer& cmd)
@@ -436,13 +438,13 @@ void RxImage::CreateLayeredImageFromCubemap(RxImage& cubemap, RxImageFormat imag
     const uint32 tile_width = cubemap.Size.X / 4;
     const uint32 tile_height = cubemap.Size.Y / 3;
 
-    FxAssert(tile_width == tile_height);
+    Assert(tile_width == tile_height);
 
 
-    Create(RxImageType::eCubemap, FxVec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
+    Create(RxImageType::eCubemap, Vec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, Aspect);
 
-    FxStackArray<VkImageCopy, 6> copy_infos;
+    StackArray<VkImageCopy, 6> copy_infos;
 
     VkImageCopy copy_info {
         .srcSubresource = { .aspectMask = aspect_flags, .baseArrayLayer = 0, .layerCount = 1, },
@@ -545,3 +547,5 @@ void RxImage::DecRef()
 
 
 RxImage::~RxImage() { DecRef(); }
+
+} // namespace fx::renderer

@@ -4,13 +4,15 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxDefines.hpp>
-#include <Core/FxPanic.hpp>
+#include <Core/Defines.hpp>
+#include <Core/Panic.hpp>
 #include <Renderer/RxDeferred.hpp>
+
+namespace fx::renderer {
 
 FX_SET_MODULE_NAME("RxSwapchain")
 
-void RxSwapchain::Init(FxVec2u size, VkSurfaceKHR& surface, RxGpuDevice* device)
+void RxSwapchain::Init(Vec2u size, VkSurfaceKHR& surface, RxGpuDevice* device)
 {
     mDevice = device;
 
@@ -29,7 +31,7 @@ void RxSwapchain::CreateSwapchainImages()
 
     vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
 
-    FxSizedArray<VkImage> raw_images;
+    SizedArray<VkImage> raw_images;
     raw_images.InitSize(image_count);
 
     vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.pData);
@@ -73,12 +75,12 @@ void RxSwapchain::CreateImageViews()
 
         VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &OutputImages[i].View);
         if (status != VK_SUCCESS) {
-            FxModulePanicVulkan("Could not create swapchain image view", status);
+            ModulePanicVulkan("Could not create swapchain image view", status);
         }
     }
 }
 
-void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
+void RxSwapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR& surface)
 {
     Extent = size;
 
@@ -86,7 +88,7 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mDevice->Physical, surface, &capabilities);
 
     if (result != VK_SUCCESS) {
-        FxModulePanicVulkan("Error retrieving surface capabilities", result);
+        ModulePanicVulkan("Error retrieving surface capabilities", result);
     }
 
     const VkExtent2D extent = {
@@ -100,8 +102,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
         image_count = capabilities.maxImageCount;
     }
 
-    FxLogInfo("Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount, capabilities.maxImageCount,
-              image_count);
+    LogInfo("Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount, capabilities.maxImageCount,
+            image_count);
 
     // Retrieve the image format for the surface (the window's render target)
     {
@@ -109,8 +111,8 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
 
         // For now we will enforce that RGBA16 is supported by the render device. This is the first chosen
         // if it is supported.
-        FxAssert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
-                 surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
+        Assert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
+               surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
 
         if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
             Surface.Format = RxImageFormat::eRGBA16_Float;
@@ -153,7 +155,7 @@ void RxSwapchain::CreateSwapchain(FxVec2u size, VkSurfaceKHR& surface)
     const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
 
     if (status != VK_SUCCESS) {
-        FxModulePanicVulkan("Could not create swapchain", status);
+        ModulePanicVulkan("Could not create swapchain", status);
     }
 }
 
@@ -213,3 +215,5 @@ void RxSwapchain::Destroy()
 }
 
 RxSwapchain::~RxSwapchain() { Destroy(); }
+
+} // namespace fx::renderer

@@ -4,6 +4,8 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
+
 /////////////////////////////////////
 // Descriptor Pool Functions
 /////////////////////////////////////
@@ -11,7 +13,7 @@
 void RxDescriptorPool::Create(RxGpuDevice* device, uint32 max_sets)
 {
     const uint32 pool_sizes_count = RemainingDescriptorCounts.size();
-    FxSizedArray<VkDescriptorPoolSize> pool_sizes(pool_sizes_count);
+    SizedArray<VkDescriptorPoolSize> pool_sizes(pool_sizes_count);
 
     for (const auto& desc_count : RemainingDescriptorCounts) {
         pool_sizes.Insert({ .type = desc_count.first, .descriptorCount = desc_count.second });
@@ -29,7 +31,7 @@ void RxDescriptorPool::Create(RxGpuDevice* device, uint32 max_sets)
     VkResult status = vkCreateDescriptorPool(device->Device, &pool_info, nullptr, &Pool);
 
     if (status != VK_SUCCESS) {
-        FxPanicVulkan("DescriptorPool", "Failed to create descriptor pool!", status);
+        PanicVulkan("DescriptorPool", "Failed to create descriptor pool!", status);
     }
 }
 
@@ -50,7 +52,7 @@ void RxDescriptorPool::Destroy()
 void RxDescriptorSet::Create(RxDescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
                              uint32 count)
 {
-    FxAssertMsg(pool.IsInited(), "Descriptor pool is not initialized!");
+    AssertMsg(pool.IsInited(), "Descriptor pool is not initialized!");
 
     Layout = layout;
     mbHasDynamicOffsets = has_dynamic_offsets;
@@ -66,8 +68,8 @@ void RxDescriptorSet::Create(RxDescriptorPool& pool, VkDescriptorSetLayout layou
     VkResult status = vkAllocateDescriptorSets(gRenderer->GetDevice()->Device, &alloc_info, &Set);
 
     if (status != VK_SUCCESS) {
-        FxLogError("Pool has {} allocated sets, with {} currently in use.", pool.SetCapacity, pool.SetsUsed);
-        FxPanicVulkan("DescriptorSet", "Failed to allocate descriptor set!", status);
+        LogError("Pool has {} allocated sets, with {} currently in use.", pool.SetCapacity, pool.SetsUsed);
+        PanicVulkan("DescriptorSet", "Failed to allocate descriptor set!", status);
     }
 }
 
@@ -78,14 +80,14 @@ void RxDescriptorSet::BindMultiple(uint32 first_set_index, const RxCommandBuffer
 }
 
 void RxDescriptorSet::BindMultiple(uint32 first_set_index, const RxCommandBuffer& cmd, VkPipelineBindPoint bind_point,
-                                   const RxPipeline& pipeline, const FxSlice<VkDescriptorSet>& sets)
+                                   const RxPipeline& pipeline, const Slice<VkDescriptorSet>& sets)
 {
     vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, 0, nullptr);
 }
 
 void RxDescriptorSet::BindMultipleOffset(uint32 first_set_index, const RxCommandBuffer& cmd,
                                          VkPipelineBindPoint bind_point, const RxPipeline& pipeline,
-                                         const FxSlice<VkDescriptorSet>& sets, const FxSlice<uint32>& offsets)
+                                         const Slice<VkDescriptorSet>& sets, const Slice<uint32>& offsets)
 {
     vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout, first_set_index, sets.Size, sets.pData, offsets.Size,
                             offsets.pData);
@@ -110,7 +112,7 @@ void RxDescriptorSet::AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint6
         mDescriptorEntries.InitCapacity(scMaxDescriptorEntries);
     }
 
-    FxAssertMsg(buffer != nullptr, "Input buffer cannot be null!");
+    AssertMsg(buffer != nullptr, "Input buffer cannot be null!");
 
     DescriptorEntry input_buffer {
         .BindIndex = bind_index,
@@ -128,7 +130,7 @@ void RxDescriptorSet::AddBuffer(uint32 bind_index, RxRawGpuBuffer* buffer, uint6
 
 void RxDescriptorSet::AddImageFromTarget(uint32 bind_index, RxTarget* target, RxSampler* sampler)
 {
-    FxAssertMsg(target != nullptr, "Input target cannot be null!");
+    AssertMsg(target != nullptr, "Input target cannot be null!");
     AddImage(bind_index, &target->Image, sampler);
 }
 
@@ -138,7 +140,7 @@ void RxDescriptorSet::AddImage(uint32 bind_index, RxImage* image, RxSampler* sam
         mDescriptorEntries.InitCapacity(scMaxDescriptorEntries);
     }
 
-    FxAssertMsg(image != nullptr, "Input image cannot be null!");
+    AssertMsg(image != nullptr, "Input image cannot be null!");
 
     DescriptorEntry input_target {
         .BindIndex = bind_index,
@@ -154,12 +156,12 @@ void RxDescriptorSet::AddImage(uint32 bind_index, RxImage* image, RxSampler* sam
 
 void RxDescriptorSet::Build()
 {
-    FxAssert(mbIsBuilt == false);
-    FxAssertMsg(mDescriptorEntries.IsNotEmpty(), "Descriptor set is missing entries!");
+    Assert(mbIsBuilt == false);
+    AssertMsg(mDescriptorEntries.IsNotEmpty(), "Descriptor set is missing entries!");
 
-    FxStackArray<VkDescriptorImageInfo, scMaxImages> image_infos;
-    FxStackArray<VkDescriptorBufferInfo, scMaxBuffers> buffer_infos;
-    FxStackArray<VkWriteDescriptorSet, scMaxDescriptorEntries> write_infos;
+    StackArray<VkDescriptorImageInfo, scMaxImages> image_infos;
+    StackArray<VkDescriptorBufferInfo, scMaxBuffers> buffer_infos;
+    StackArray<VkWriteDescriptorSet, scMaxDescriptorEntries> write_infos;
 
     for (const DescriptorEntry& entry : mDescriptorEntries) {
         if (entry.pImage) {
@@ -226,3 +228,5 @@ void RxDescriptorSet::Destroy()
     //     Layout = nullptr;
     // }
 }
+
+} // namespace fx::renderer

@@ -7,6 +7,8 @@
 #include <Renderer/RxGlobals.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
+
 /* Rx_Fwd_GetFrame.hpp */
 RxFrameData* Rx_Fwd_GetFrame() { return gRenderer->GetFrame(); }
 
@@ -18,9 +20,11 @@ VmaAllocator Fx_Fwd_GetGpuAllocator() { return gRenderer->GpuAllocator; }
 
 RxGpuDevice* Rx_Fwd_GetDevice() { return gRenderer->GetDevice(); }
 
-void Fx_Fwd_AddToDeletionQueue(const FxDeletionObject::FuncType& func) { gRenderer->AddToDeletionQueue(func); }
+void Fx_Fwd_AddToDeletionQueue(const DeletionObject::FuncType& func) { gRenderer->AddToDeletionQueue(func); }
 
 void Fx_Fwd_AddGpuBufferToDeletionQueue(const VkBuffer& buffer, const VmaAllocation& allocation)
 {
     gRenderer->AddGpuBufferToDeletionQueue(buffer, allocation);
 }
+
+} // namespace fx::renderer

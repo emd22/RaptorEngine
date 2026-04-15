@@ -3,13 +3,13 @@
 #include "Backend/RxPipeline.hpp"
 #include "Backend/RxShader.hpp"
 
-#include <Core/FxHash.hpp>
-#include <Core/FxRef.hpp>
-#include <Core/FxStackArray.hpp>
+#include <Core/Hash.hpp>
+#include <Core/Ref.hpp>
+#include <Core/StackArray.hpp>
 
+namespace fx::renderer {
 
 class RxRenderPass;
-
 
 class RxState
 {
@@ -30,5 +30,7 @@ private:
     RxPipeline* mpPipeline;
     RxRenderPass* mpRenderPass = nullptr;
 
-    FxStackArray<RxShaderBindOptions, RxShaderUtil::scNumShaderTypes> mBindOptions;
+    StackArray<RxShaderBindOptions, RxShaderUtil::scNumShaderTypes> mBindOptions;
 };
+
+} // namespace fx::renderer

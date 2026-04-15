@@ -5,8 +5,12 @@
 #include <TurboJPEG/jpeglib.h>
 
 #include <Asset/AxImage.hpp>
-#include <Core/FxMemory.hpp>
-#include <Core/FxRef.hpp>
+#include <Core/Memory.hpp>
+#include <Core/Ref.hpp>
+
+namespace fx {
+
+using namespace renderer;
 
 static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(RxImageFormat format)
 {
@@ -23,16 +27,16 @@ static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(RxImageFormat format)
 }
 
 
-AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxTSRef<AxBase> asset, const std::string& path)
+AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const std::string& path)
 {
-    FxTSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset);
 
     const char* c_path = path.c_str();
 
     FILE* fp = fopen(c_path, "rb");
 
     if (!fp) {
-        FxLogError("Could not find JPEG file at '{:s}'", c_path);
+        LogError("Could not find JPEG file at '{:s}'", c_path);
         return AxLoaderJpeg::Status::eError;
     }
 
@@ -72,16 +76,16 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(FxTSRef<AxBase> asset, const std
     return Status::eSuccess;
 }
 
-AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size)
+AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
 {
-    FxTSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset);
 
     struct jpeg_error_mgr error_mgr;
 
     mJpegInfo.err = jpeg_std_error(&error_mgr);
     jpeg_create_decompress(&mJpegInfo);
 
-    FxAssert(data != nullptr);
+    Assert(data != nullptr);
 
     jpeg_mem_src(&mJpegInfo, data, size);
 
@@ -116,9 +120,9 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(FxTSRef<AxBase> asset, const u
     return Status::eSuccess;
 }
 
-void AxLoaderJpeg::CreateGpuResource(FxTSRef<AxBase>& asset)
+void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
 {
-    FxTSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset);
 
     image->Image.CreateGpuOnly(image->ImageType, image->Size, ImageFormat, mImageData);
 
@@ -126,7 +130,7 @@ void AxLoaderJpeg::CreateGpuResource(FxTSRef<AxBase>& asset)
     asset->bIsUploadedToGpu.notify_all();
 }
 
-void AxLoaderJpeg::Destroy(FxTSRef<AxBase>& asset)
+void AxLoaderJpeg::Destroy(TSRef<AxBase>& asset)
 {
     //    while (!asset->bIsUploadedToGpu) {
     //        asset->bIsUploadedToGpu.wait(true);
@@ -134,3 +138,5 @@ void AxLoaderJpeg::Destroy(FxTSRef<AxBase>& asset)
 
     jpeg_destroy_decompress(&mJpegInfo);
 }
+
+} // namespace fx

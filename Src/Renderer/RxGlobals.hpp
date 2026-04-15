@@ -1,5 +1,8 @@
 #pragma once
 
+namespace fx {
+namespace renderer {
+
 class RxShadowDirectional;
 class RxRenderBackend;
 class RxShaderCache;
@@ -12,7 +15,13 @@ extern RxShaderCache* gShaderCache;
 extern RxDescriptorCache* gDescriptorCache;
 extern RxState* gState;
 
+} // namespace renderer
+
 namespace RxGlobals {
+
 void Init();
 void Destroy();
+
 }; // namespace RxGlobals
+
+} // namespace fx

@@ -2,8 +2,8 @@
 
 #include <ThirdParty/Jolt/Jolt.h>
 
-#include <Core/FxLog.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/Log.hpp>
+#include <Core/Types.hpp>
 
 /* Additional Jolt includes */
 #include <ThirdParty/Jolt/Core/Factory.h>
@@ -19,6 +19,8 @@
 
 #include <cstdarg>
 
+namespace fx {
+
 // Callback for traces, connect this to your own trace function if you have one
 static void JoltTrace(const char* fmt, ...)
 {
@@ -30,7 +32,7 @@ static void JoltTrace(const char* fmt, ...)
     va_end(list);
 
     // Print to the TTY
-    FxLogInfo("{}", buffer);
+    LogInfo("{}", buffer);
 }
 
 
@@ -55,7 +57,7 @@ void PhJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
 void PhJolt::Create()
 {
     if (mbIsInited) {
-        FxLogWarning("PhJolt is already initialized!");
+        LogWarning("PhJolt is already initialized!");
         return;
     }
 
@@ -66,7 +68,7 @@ void PhJolt::Create()
 
     JPH::RegisterTypes();
 
-    pTempAllocator.InitRef(10 * FxUnitMebibyte);
+    pTempAllocator.InitRef(10 * UnitMebibyte);
 
     pJobSystem.InitRef(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, JPH::thread::hardware_concurrency() - 1);
 
@@ -163,3 +165,5 @@ PhJolt::~PhJolt()
 
     mbIsInited = false;
 }
+
+} // namespace fx

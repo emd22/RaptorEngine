@@ -1,7 +1,7 @@
 #include "RxShadowDirectional.hpp"
 
-#include <FxEngine.hpp>
-#include <FxObjectManager.hpp>
+#include <Engine.hpp>
+#include <ObjectManager.hpp>
 #include <Renderer/Backend/RxDsLayoutBuilder.hpp>
 #include <Renderer/Backend/RxUtil.hpp>
 #include <Renderer/Backend/RxVertexDescription.hpp>
@@ -10,10 +10,11 @@
 #include <Renderer/RxPipelineBuilder.hpp>
 #include <Renderer/RxRenderBackend.hpp>
 
+namespace fx::renderer {
+
 FX_SET_MODULE_NAME("RxShadowDirectional")
 
-
-RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
+RxShadowDirectional::RxShadowDirectional(const Vec2u& size)
 {
     RenderStage.Create(size);
 
@@ -25,15 +26,15 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
 
     ShadowCamera.Update();
 
-    FxStackArray<VkDescriptorSetLayout, 2> desc_sets = {
+    StackArray<VkDescriptorSetLayout, 2> desc_sets = {
         gObjectManager->DsLayoutObjectBuffer,
     };
 
-    FxStackArray<RxPushConstants, 1> push_consts = {
+    StackArray<RxPushConstants, 1> push_consts = {
         RxPushConstants { .Size = sizeof(RxShadowPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
     };
 
-    VkPipelineLayout pipeline_layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(desc_sets));
+    VkPipelineLayout pipeline_layout = RxPipeline::CreateLayout(Slice(push_consts), Slice(desc_sets));
 
     RxShader shader_shadow("Shadows");
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
@@ -44,8 +45,8 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
     };
 
 
-    FxRef<RxShaderProgram> vertex_shader = shader_shadow.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_shadow.GetProgram(RxShaderType::eFragment, {});
+    Ref<RxShaderProgram> vertex_shader = shader_shadow.GetProgram(RxShaderType::eVertex, {});
+    Ref<RxShaderProgram> fragment_shader = shader_shadow.GetProgram(RxShaderType::eFragment, {});
 
     RxPipelineBuilder builder {};
     builder.SetLayout(pipeline_layout)
@@ -62,7 +63,7 @@ RxShadowDirectional::RxShadowDirectional(const FxVec2u& size)
     builder.Build(mPipeline);
 
     {
-        FxSizedArray<FxShaderMacro> macros = { FxShaderMacro { "USE_SKINNING", "1" } };
+        SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_SKINNING", "1" } };
 
         vertex_shader = shader_shadow.GetProgram(RxShaderType::eVertex, macros);
         fragment_shader = shader_shadow.GetProgram(RxShaderType::eFragment, macros);
@@ -85,7 +86,7 @@ void RxShadowDirectional::Begin()
 
     // VkDescriptorSet desc_sets[] = { gObjectManager->mObjectBufferDS.Set };
     /*RxDescriptorSet::BindMultiple(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline,
-                                  FxSlice(desc_sets, FxSizeofArray(desc_sets)));*/
+                                  Slice(desc_sets, SizeofArray(desc_sets)));*/
 }
 
 void RxShadowDirectional::End() { RenderStage.End(); }
@@ -97,3 +98,5 @@ void RxShadowDirectional::UpdateLightDescriptors()
                           &gRenderer->Swapchain.ShadowDepthSampler);
     ds.Build();
 }
+
+} // namespace fx::renderer

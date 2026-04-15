@@ -3,20 +3,21 @@
 #include "Backend/RxDsLayoutBuilder.hpp"
 #include "Backend/RxShader.hpp"
 #include "Backend/RxVertexDescription.hpp"
-#include "FxCamera.hpp"
-#include "FxEngine.hpp"
+#include "Camera.hpp"
+#include "Engine.hpp"
 #include "RxGlobals.hpp"
 #include "RxPipelineBuilder.hpp"
 #include "RxRenderBackend.hpp"
 #include "RxShaderCache.hpp"
 #include "RxState.hpp"
 
-#include <FxObjectManager.hpp>
+#include <ObjectManager.hpp>
 
+namespace fx::renderer {
 
 FX_SET_MODULE_NAME("DeferredRenderer")
 
-void RxDeferredRenderer::Create(const FxVec2u& extent)
+void RxDeferredRenderer::Create(const Vec2u& extent)
 {
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10);
     DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10);
@@ -60,7 +61,7 @@ void RxDeferredRenderer::CreateGPass()
 }
 
 /////////////////////////////////////
-// FxRenderer GPass Functions
+// Renderer GPass Functions
 /////////////////////////////////////
 
 VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
@@ -89,20 +90,20 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassPipelineLayout()
         DsLayoutGPassMaterialAlbedoOnly = builder.Build();
     }
 
-    FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+    StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
         DsLayoutGPassMaterial,
         DsLayoutLightingMaterialProperties,
         gObjectManager->DsLayoutObjectBuffer,
     };
 
-    FxStackArray<RxPushConstants, 1> push_consts = {
+    StackArray<RxPushConstants, 1> push_consts = {
         RxPushConstants {
-            .Size = sizeof(FxDrawPushConstants),
+            .Size = sizeof(DrawPushConstants),
             .StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         },
     };
 
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(ds_layouts));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
 
     RxUtil::SetDebugLabel("Geometry", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -122,20 +123,20 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassSkinnedPipelineLayout()
     }
 
 
-    FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+    StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
         DsLayoutGPassSkinned,
         DsLayoutLightingMaterialProperties,
         gObjectManager->DsLayoutObjectBuffer,
     };
 
-    FxStackArray<RxPushConstants, 1> push_consts = {
+    StackArray<RxPushConstants, 1> push_consts = {
         RxPushConstants {
-            .Size = sizeof(FxDrawPushConstants),
+            .Size = sizeof(DrawPushConstants),
             .StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         },
     };
 
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(ds_layouts));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
 
     RxUtil::SetDebugLabel("GeometrySkinned", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -144,20 +145,20 @@ VkPipelineLayout RxDeferredRenderer::CreateGPassSkinnedPipelineLayout()
 
 VkPipelineLayout RxDeferredRenderer::CreateUnlitPipelineLayout()
 {
-    FxStackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+    StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
         DsLayoutGPassMaterial,
         DsLayoutLightingMaterialProperties,
         gObjectManager->DsLayoutObjectBuffer,
     };
 
-    FxStackArray<RxPushConstants, 1> push_consts = {
+    StackArray<RxPushConstants, 1> push_consts = {
         RxPushConstants {
-            .Size = sizeof(FxDrawPushConstants),
+            .Size = sizeof(DrawPushConstants),
             .StageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         },
     };
 
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxSlice(ds_layouts));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
 
     RxUtil::SetDebugLabel("Unlit Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
@@ -168,9 +169,9 @@ void RxDeferredRenderer::CreateUnlitPipeline()
 {
     VkPipelineLayout layout = CreateUnlitPipelineLayout();
 
-    FxRef<RxShader> shader_unlit = gShaderCache->Request(RxShaderName::eUnlit);
-    FxRef<RxShaderProgram> vertex_shader = shader_unlit->GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_unlit->GetProgram(RxShaderType::eFragment, {});
+    Ref<RxShader> shader_unlit = gShaderCache->Request(RxShaderName::eUnlit);
+    Ref<RxShaderProgram> vertex_shader = shader_unlit->GetProgram(RxShaderType::eVertex, {});
+    Ref<RxShaderProgram> fragment_shader = shader_unlit->GetProgram(RxShaderType::eFragment, {});
 
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
@@ -180,7 +181,7 @@ void RxDeferredRenderer::CreateUnlitPipeline()
     RxTarget* lp_light_attachment = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
     RxTarget* lp_depth_attachment = GPass.GetTarget(RxImageFormat::eD32_Float);
 
-    FxAssert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
+    Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
 
     RxTarget depth_attachment(RxImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
     depth_attachment.LoadOp = RxLoadOp::eLoad;
@@ -223,9 +224,9 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     CreateGPass();
 
-    FxRef<RxShader> shader_geometry = gShaderCache->Request(RxShaderName::eGeometry);
-    FxRef<RxShaderProgram> vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, {});
+    Ref<RxShader> shader_geometry = gShaderCache->Request(RxShaderName::eGeometry);
+    Ref<RxShaderProgram> vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, {});
+    Ref<RxShaderProgram> fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, {});
 
     RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eDefault>();
 
@@ -247,13 +248,13 @@ void RxDeferredRenderer::CreateGPassPipeline()
 
     // Create geometry pipeline with normal maps
     {
-        FxSizedArray<FxShaderMacro> normal_mapped_macros { FxShaderMacro { "USE_NORMAL_MAPS", "1" } };
+        SizedArray<ShaderMacro> normal_mapped_macros { ShaderMacro { "USE_NORMAL_MAPS", "1" } };
 
-        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex,
+        Ref<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex,
+                                                                            normal_mapped_macros);
+
+        Ref<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment,
                                                                               normal_mapped_macros);
-
-        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment,
-                                                                                normal_mapped_macros);
 
         builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
             .SetShaders(nm_vertex_shader, nm_fragment_shader)
@@ -263,11 +264,11 @@ void RxDeferredRenderer::CreateGPassPipeline()
     {
         vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eSkinned>();
 
-        FxSizedArray<FxShaderMacro> macros = { FxShaderMacro { "USE_NORMAL_MAPS", "1" },
-                                               FxShaderMacro { "USE_SKINNING", "1" } };
+        SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_NORMAL_MAPS", "1" },
+                                           ShaderMacro { "USE_SKINNING", "1" } };
 
-        FxRef<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, macros);
-        FxRef<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, macros);
+        Ref<RxShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(RxShaderType::eVertex, macros);
+        Ref<RxShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(RxShaderType::eFragment, macros);
 
         VkPipelineLayout skinned_layout = CreateGPassSkinnedPipelineLayout();
 
@@ -340,11 +341,11 @@ VkPipelineLayout RxDeferredRenderer::CreateLightingPipelineLayout()
         gObjectManager->DsLayoutObjectBuffer,
     };
 
-    FxStackArray<RxPushConstants, 2> push_consts = {
-        RxPushConstants { .Size = sizeof(FxLightVertPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
+    StackArray<RxPushConstants, 2> push_consts = {
+        RxPushConstants { .Size = sizeof(LightVertPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
     };
 
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxMakeSlice(layouts, std::size(layouts)));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
     RxUtil::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
     PlLightingOutsideVolume.SetLayout(layout);
@@ -366,7 +367,7 @@ void RxDeferredRenderer::CreateLightingPipeline()
                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, RxImageAspectFlag::eColor);
 
     RxTarget* light_target = LightPass.GetTarget(RxImageFormat::eRGBA16_Float);
-    FxAssert(light_target != nullptr);
+    Assert(light_target != nullptr);
     light_target->FinalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     // LightPass.AddTarget(RxImageFormat::eD32_Float, RxTarget::scFullScreen,
@@ -401,8 +402,8 @@ void RxDeferredRenderer::CreateLightingPipeline()
     VkPipelineLayout layout = CreateLightingPipelineLayout();
 
     {
-        FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
-        FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
+        Ref<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, {});
+        Ref<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, {});
 
         RxVertexDescription vertex_info = RxVertexUtil::BuildDescription<RxVertexType::eSlim>();
 
@@ -428,11 +429,10 @@ void RxDeferredRenderer::CreateLightingPipeline()
         builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
     }
     {
-        FxSizedArray<FxShaderMacro> directional_macros { FxShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
+        SizedArray<ShaderMacro> directional_macros { ShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
 
-        FxRef<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, directional_macros);
-        FxRef<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment,
-                                                                            directional_macros);
+        Ref<RxShaderProgram> vertex_shader = lighting_shader.GetProgram(RxShaderType::eVertex, directional_macros);
+        Ref<RxShaderProgram> fragment_shader = lighting_shader.GetProgram(RxShaderType::eFragment, directional_macros);
 
         RxPipelineBuilder builder {};
 
@@ -502,10 +502,10 @@ VkPipelineLayout RxDeferredRenderer::CreateCompPipelineLayout()
         DsLayoutCompFrag,
     };
 
-    FxStackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(FxCompositionPushConstants),
-                                                                       .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
+    StackArray<RxPushConstants, 1> push_consts = { RxPushConstants { .Size = sizeof(CompositionPushConstants),
+                                                                     .StageFlags = VK_SHADER_STAGE_FRAGMENT_BIT } };
 
-    VkPipelineLayout layout = RxPipeline::CreateLayout(FxSlice(push_consts), FxMakeSlice(layouts, std::size(layouts)));
+    VkPipelineLayout layout = RxPipeline::CreateLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
 
     RxUtil::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
     PlComposition.SetLayout(layout);
@@ -523,8 +523,8 @@ void RxDeferredRenderer::CreateCompPipeline()
 
     RxShader shader_composition("Composition");
 
-    FxRef<RxShaderProgram> lit_vertex_shader = shader_composition.GetProgram(RxShaderType::eVertex, {});
-    FxRef<RxShaderProgram> lit_fragment_shader = shader_composition.GetProgram(RxShaderType::eFragment, {});
+    Ref<RxShaderProgram> lit_vertex_shader = shader_composition.GetProgram(RxShaderType::eVertex, {});
+    Ref<RxShaderProgram> lit_fragment_shader = shader_composition.GetProgram(RxShaderType::eFragment, {});
 
     RxPipelineBuilder builder;
 
@@ -543,10 +543,10 @@ void RxDeferredRenderer::CreateCompPipeline()
     builder.Build(PlComposition);
 
 
-    FxSizedArray<FxShaderMacro> unlit_macros { FxShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } };
+    SizedArray<ShaderMacro> unlit_macros { ShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } };
 
-    FxRef<RxShaderProgram> unlit_vertex_shader = shader_composition.GetProgram(RxShaderType::eVertex, unlit_macros);
-    FxRef<RxShaderProgram> unlit_fragment_shader = shader_composition.GetProgram(RxShaderType::eFragment, unlit_macros);
+    Ref<RxShaderProgram> unlit_vertex_shader = shader_composition.GetProgram(RxShaderType::eVertex, unlit_macros);
+    Ref<RxShaderProgram> unlit_fragment_shader = shader_composition.GetProgram(RxShaderType::eFragment, unlit_macros);
 
     builder.SetShaders(unlit_vertex_shader, unlit_fragment_shader).Build(PlCompositionUnlit);
 }
@@ -592,13 +592,13 @@ void RxDeferredRenderer::CreateCompPass()
     DsComposition.Build();
 }
 
-void RxDeferredRenderer::DoCompPass(FxCamera& camera)
+void RxDeferredRenderer::DoCompPass(Camera& camera)
 {
     RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
 
-    FxCompositionPushConstants push_constants {};
-    memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(FxMat4f));
-    memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(FxMat4f));
+    CompositionPushConstants push_constants {};
+    memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(Mat4f));
+    memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
 
     vkCmdPushConstants(cmd.Get(), PlComposition.Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
@@ -616,3 +616,5 @@ void RxDeferredRenderer::DoCompPass(FxCamera& camera)
 
     cmd.End();
 }
+
+} // namespace fx::renderer

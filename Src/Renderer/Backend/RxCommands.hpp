@@ -4,7 +4,9 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/FxTypes.hpp>
+#include <Core/Types.hpp>
+
+namespace fx::renderer {
 
 class RxCommandPool
 {
@@ -65,3 +67,5 @@ private:
     RxCommandPool* mpCommandPool = nullptr;
     RxGpuDevice* mpDevice = nullptr;
 };
+
+} // namespace fx::renderer

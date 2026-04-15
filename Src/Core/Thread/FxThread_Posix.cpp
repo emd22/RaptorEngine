@@ -1,11 +1,8 @@
-#include <Core/FxThread.hpp>
-
-#include <Core/FxDefines.hpp>
+#include <Core/Defines.hpp>
+#include <Core/Thread.hpp>
 
 #ifdef FX_PLATFORM_MACOS
 #include <pthread.h>
 #endif
 
-void FxThread::Create()
-{
-}
+void Thread::Create() {}

@@ -2,7 +2,9 @@
 
 #include "Backend/RxCommands.hpp"
 
-#include <Core/FxPagedArray.hpp>
+#include <Core/PagedArray.hpp>
+
+namespace fx::renderer {
 
 enum class RxCommandUsage
 {
@@ -10,7 +12,7 @@ enum class RxCommandUsage
     eTransfer
 };
 
-using RxCommandHandle = FxHandle;
+using RxCommandHandle = Handle;
 
 class RxCommandManager
 {
@@ -23,3 +25,5 @@ public:
 
 private:
 };
+
+} // namespace fx::renderer
