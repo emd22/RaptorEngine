@@ -55,7 +55,7 @@ public:
     // VkSurfaceFormatKHR SurfaceFormat;
     struct
     {
-        ImageFormat Format = ImageFormat::None;
+        eImageFormat Format = eImageFormat::None;
         VkColorSpaceKHR ColorSpace;
     } Surface;
 

@@ -200,7 +200,7 @@ public:
         switch (layer) {
         case eObjectLayer::WorldLayer:
             return mCameraMatrix;
-        case fx::ePhMotionTypeObjectLayer::PlayerLayer:
+        case eObjectLayer::PlayerLayer:
             return mWeaponCameraMatrix;
         }
 

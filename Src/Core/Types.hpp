@@ -51,6 +51,41 @@ concept C_IsAnyBaseOf = (std::is_base_of_v<TTypes, T> || ...);
 template <typename TPossiblyConst, typename TNonConst>
 concept C_IsSameOrConst = std::is_same_v<typename std::remove_const<TPossiblyConst>::type, TNonConst>;
 
+
+/////////////////////////////////////
+// Enum class bit flags
+/////////////////////////////////////
+
+#define FxEnumFlags(type_)                                                                                             \
+    template <>                                                                                                        \
+    struct EnumFlagsOptIn<type_>                                                                                       \
+    {                                                                                                                  \
+        static constexpr bool bValue = true;                                                                           \
+    }
+
+template <typename T>
+struct EnumFlagsOptIn
+{
+    static constexpr bool bValue = false;
+};
+
+template <typename T>
+constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
+operator&(T lhs, T rhs)
+{
+    typedef typename std::underlying_type<T>::type InternalType;
+    return static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
+}
+
+template <typename T>
+constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
+operator|(T lhs, T rhs)
+{
+    typedef typename std::underlying_type<T>::type InternalType;
+    return static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
+}
+
+
 // template <typename ValueType>
 // class Optional {
 // public:

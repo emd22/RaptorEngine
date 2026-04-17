@@ -36,11 +36,11 @@ public:
         mSize = size;
     }
 
-    void AddTarget(ImageFormat format, const Vec2u& size, VkImageUsageFlags usage, ImageAspectFlag aspect);
+    void AddTarget(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect);
     void AddTarget(const Target& attachment);
 
     TargetList& GetTargets() { return mOutputTargets; }
-    Target* GetTarget(ImageFormat format, int sub_index = 0);
+    Target* GetTarget(eImageFormat format, int sub_index = 0);
 
     void MarkFinalStage();
 

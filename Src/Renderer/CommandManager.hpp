@@ -19,7 +19,7 @@ class CommandManager
 public:
     CommandManager() {}
 
-    CommandHandle Request(CommandUsage usage);
+    CommandHandle Request(eCommandUsage usage);
 
     void Release(CommandHandle handle);
 

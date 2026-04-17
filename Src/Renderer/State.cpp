@@ -6,37 +6,37 @@
 
 #include <Core/Slice.hpp>
 
-namespace fx::renderer {
+// namespace fx::renderer {
 
-State::State() {}
+// State::State() {}
 
-void State::Pipeline(Pipeline* pipeline) { mpPipeline = pipeline; }
+// void State::Pipeline(Pipeline* pipeline) { mpPipeline = pipeline; }
 
-void State::BufferOffset(ShaderType shader_type, uint32 buffer_offset)
-{
-    ShaderBindOptions& dyn = mBindOptions[static_cast<uint32>(shader_type)];
-    dyn.bUseOffset = true;
-    dyn.BufferOffset = buffer_offset;
-}
+// void State::BufferOffset(ShaderType shader_type, uint32 buffer_offset)
+// {
+//     ShaderBindOptions& dyn = mBindOptions[static_cast<uint32>(shader_type)];
+//     dyn.bUseOffset = true;
+//     dyn.BufferOffset = buffer_offset;
+// }
 
-void State::RenderPass(RenderPass* rp) { mpRenderPass = rp; }
+// void State::RenderPass(RenderPass* rp) { mpRenderPass = rp; }
 
-void State::Apply(const CommandBuffer& cmd)
-{
-    // mpPipeline->Bind(cmd);
+// void State::Apply(const CommandBuffer& cmd)
+// {
+//     // mpPipeline->Bind(cmd);
 
-    mpPipeline->VertexShader->Bind(cmd, *mpPipeline, mBindOptions[static_cast<uint32>(ShaderType::Vertex)]);
-    mpPipeline->FragmentShader->Bind(cmd, *mpPipeline, mBindOptions[static_cast<uint32>(ShaderType::Fragment)]);
-}
+//     mpPipeline->VertexShader->Bind(cmd, *mpPipeline, mBindOptions[static_cast<uint32>(ShaderType::Vertex)]);
+//     mpPipeline->FragmentShader->Bind(cmd, *mpPipeline, mBindOptions[static_cast<uint32>(ShaderType::Fragment)]);
+// }
 
-void State::Reset()
-{
-    memset(mBindOptions.pData, 0, mBindOptions.GetSizeInBytes());
-    mpPipeline = nullptr;
-    mpRenderPass = nullptr;
-}
+// void State::Reset()
+// {
+//     memset(mBindOptions.pData, 0, mBindOptions.GetSizeInBytes());
+//     mpPipeline = nullptr;
+//     mpRenderPass = nullptr;
+// }
 
 
-State::~State() {}
+// State::~State() {}
 
-} // namespace fx::renderer
+// } // namespace fx::renderer

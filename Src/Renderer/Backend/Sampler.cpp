@@ -5,85 +5,85 @@
 
 namespace fx::renderer {
 
-static FX_FORCE_INLINE VkSamplerMipmapMode GetVkMipMode(SamplerFilter filter)
+static FX_FORCE_INLINE VkSamplerMipmapMode GetVkMipMode(eSamplerFilter filter)
 {
     switch (filter) {
-    case SamplerFilter::Nearest:
+    case eSamplerFilter::Nearest:
         return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    case SamplerFilter::Linear:
+    case eSamplerFilter::Linear:
         return VK_SAMPLER_MIPMAP_MODE_LINEAR;
     }
 
     return VK_SAMPLER_MIPMAP_MODE_LINEAR;
 }
 
-static FX_FORCE_INLINE VkFilter GetVkFilter(SamplerFilter filter)
+static FX_FORCE_INLINE VkFilter GetVkFilter(eSamplerFilter filter)
 {
     switch (filter) {
-    case SamplerFilter::Nearest:
+    case eSamplerFilter::Nearest:
         return VK_FILTER_NEAREST;
-    case SamplerFilter::Linear:
+    case eSamplerFilter::Linear:
         return VK_FILTER_LINEAR;
     }
 
     return VK_FILTER_LINEAR;
 }
 
-static FX_FORCE_INLINE VkBorderColor GetVkBorderColor(SamplerBorderColor color)
+static FX_FORCE_INLINE VkBorderColor GetVkBorderColor(eSamplerBorderColor color)
 {
     switch (color) {
-    case SamplerBorderColor::IntBlack:
+    case eSamplerBorderColor::IntBlack:
         return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    case SamplerBorderColor::FloatBlack:
+    case eSamplerBorderColor::FloatBlack:
         return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
 
-    case SamplerBorderColor::IntWhite:
+    case eSamplerBorderColor::IntWhite:
         return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
-    case SamplerBorderColor::FloatWhite:
+    case eSamplerBorderColor::FloatWhite:
         return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
 
-    case SamplerBorderColor::IntTransparent:
+    case eSamplerBorderColor::IntTransparent:
         return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
-    case SamplerBorderColor::FloatTransparent:
+    case eSamplerBorderColor::FloatTransparent:
         return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
     }
 }
 
-static FX_FORCE_INLINE VkSamplerAddressMode GetVkAddressMode(SamplerAddressMode addr_mode)
+static FX_FORCE_INLINE VkSamplerAddressMode GetVkAddressMode(eSamplerAddressMode addr_mode)
 {
     switch (addr_mode) {
-    case SamplerAddressMode::Repeat:
+    case eSamplerAddressMode::Repeat:
         return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    case SamplerAddressMode::ClampToBorder:
+    case eSamplerAddressMode::ClampToBorder:
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     }
 }
 
-static FX_FORCE_INLINE VkCompareOp GetVkCompareOp(SamplerCompareOp op)
+static FX_FORCE_INLINE VkCompareOp GetVkCompareOp(eSamplerCompareOp op)
 {
     switch (op) {
-    case SamplerCompareOp::None:
+    case eSamplerCompareOp::None:
         return VK_COMPARE_OP_NEVER;
-    case SamplerCompareOp::Equal:
+    case eSamplerCompareOp::Equal:
         return VK_COMPARE_OP_EQUAL;
-    case SamplerCompareOp::Less:
+    case eSamplerCompareOp::Less:
         return VK_COMPARE_OP_LESS;
-    case SamplerCompareOp::Greater:
+    case eSamplerCompareOp::Greater:
         return VK_COMPARE_OP_GREATER;
-    case SamplerCompareOp::LessOrEqual:
+    case eSamplerCompareOp::LessOrEqual:
         return VK_COMPARE_OP_LESS_OR_EQUAL;
-    case SamplerCompareOp::GreaterOrEqual:
+    case eSamplerCompareOp::GreaterOrEqual:
         return VK_COMPARE_OP_GREATER_OR_EQUAL;
     }
 }
 
 Sampler::Sampler(Sampler&& other)
 {
-    Sampler = other.Sampler;
+    InternalSampler = other.InternalSampler;
     CacheId = other.CacheId;
     CachePropId = other.CachePropId;
 
-    other.Sampler = nullptr;
+    other.InternalSampler = nullptr;
     other.InvalidateCacheId();
 }
 
@@ -91,7 +91,7 @@ Sampler::Sampler(const SamplerProps& props) { Create(props); }
 
 void Sampler::Create(const SamplerProps& props)
 {
-    if (Sampler) {
+    if (InternalSampler) {
         LogWarning("Sampler has been previously initialized!");
         return;
     }
@@ -116,7 +116,7 @@ void Sampler::Create(const SamplerProps& props)
         .anisotropyEnable = VK_FALSE,
         // .maxAnisotropy = 0,
 
-        .compareEnable = static_cast<VkBool32>(props.CompareOp != SamplerCompareOp::None),
+        .compareEnable = static_cast<VkBool32>(props.CompareOp != eSamplerCompareOp::None),
         .compareOp = GetVkCompareOp(props.CompareOp),
 
         .minLod = 0.0f,
@@ -126,11 +126,11 @@ void Sampler::Create(const SamplerProps& props)
         .unnormalizedCoordinates = VK_FALSE,
     };
 
-    VkResult result = vkCreateSampler(gRenderer->GetDevice()->Device, &sampler_info, nullptr, &Sampler);
+    VkResult result = vkCreateSampler(gRenderer->GetDevice()->Device, &sampler_info, nullptr, &InternalSampler);
 
     if (result != VK_SUCCESS) {
         LogError("Error creating texture sampler!");
-        Sampler = nullptr;
+        InternalSampler = nullptr;
     }
 }
 
@@ -138,13 +138,13 @@ void Sampler::Create() { Create({}); }
 
 void Sampler::Destroy()
 {
-    if (!Sampler) {
+    if (!InternalSampler) {
         return;
     }
 
 
-    vkDestroySampler(gRenderer->GetDevice()->Device, Sampler, nullptr);
-    Sampler = nullptr;
+    vkDestroySampler(gRenderer->GetDevice()->Device, InternalSampler, nullptr);
+    InternalSampler = nullptr;
 }
 
 } // namespace fx::renderer

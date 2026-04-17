@@ -15,6 +15,7 @@ public:
 
     void Reset() { vkResetCommandPool(mpDevice->Device, CommandPool, 0); }
 
+    FX_FORCE_INLINE const VkCommandPool Get() const { return CommandPool; }
     FX_FORCE_INLINE VkCommandPool Get() { return CommandPool; };
 
     void Destroy()
@@ -49,8 +50,8 @@ public:
     void Reset();
     void End();
 
-    FX_FORCE_INLINE VkCommandBuffer Get() const { return CommandBuffer; }
-
+    FX_FORCE_INLINE const VkCommandBuffer Get() const { return CommandBuffer; }
+    FX_FORCE_INLINE VkCommandBuffer Get() { return CommandBuffer; }
 
     operator VkCommandBuffer() const { return CommandBuffer; }
 

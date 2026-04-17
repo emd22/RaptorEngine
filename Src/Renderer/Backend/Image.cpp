@@ -64,7 +64,7 @@ Image& Image::operator=(const Image& other)
     Size = other.Size;
     Aspect = other.Aspect;
 
-    Image = other.Image;
+    InternalImage = other.InternalImage;
     View = other.View;
 
     ViewType = other.ViewType;
@@ -89,7 +89,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
                    VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
     Assert(size.X > 0 && size.Y > 0);
-    Assert(Image == nullptr && Allocation == nullptr);
+    Assert(InternalImage == nullptr && Allocation == nullptr);
 
     Aspect = aspect;
     Size = size;
@@ -105,7 +105,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
 
     VkImageCreateFlags image_create_flags = 0;
 
-    if (image_type == ImageType::Cubemap) {
+    if (image_type == eImageType::Cubemap) {
         image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     }
 
@@ -138,7 +138,8 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
         .priority = 1.0f,
     };
 
-    VkResult status = vmaCreateImage(gRenderer->GpuAllocator, &image_info, &create_info, &Image, &Allocation, nullptr);
+    VkResult status = vmaCreateImage(gRenderer->GpuAllocator, &image_info, &create_info, &InternalImage, &Allocation,
+                                     nullptr);
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Could not create vulkan image", status);
     }
@@ -165,7 +166,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
 
     const VkImageViewCreateInfo view_create_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = Image,
+        .image = InternalImage,
         .viewType = image_type_props.ViewType,
         .format = ImageFormatUtil::ToUnderlying(format),
         .components =
@@ -190,12 +191,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
         ModulePanicVulkan("Could not create swapchain image view", status);
     }
 
-    if (reinterpret_cast<uintptr_t>(Image) == 0x2b000000002b) {
-        FX_BREAKPOINT;
-    }
-
     std::string image_view_name = "";
-    // typeid(ElementType).name();
 
 #ifdef FX_DEBUG_IMAGE_VIEWS
     {
@@ -222,14 +218,14 @@ void Image::CreateGpuOnly(eImageType image_type, const Vec2u& size, eImageFormat
                           const SizedArray<uint8>& image_data)
 {
     RawGpuBuffer staging_buffer;
-    staging_buffer.Create(GpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
-                          GpuBufferFlags::TransferReceiver);
+    staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+                          eGpuBufferFlags::TransferReceiver);
     staging_buffer.Upload(image_data);
 
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, ImageAspectFlag::Color);
+    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, eImageAspectFlag::Color);
 
     CopyFromBuffer(staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size);
 }
@@ -248,7 +244,7 @@ void Image::TransitionDepthToShaderRO(CommandBuffer& cmd)
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 
-        .image = Image,
+        .image = InternalImage,
 
         .subresourceRange =
             {
@@ -280,7 +276,7 @@ void Image::TransitionDepthToAttachment(CommandBuffer& cmd)
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 
-        .image = Image,
+        .image = InternalImage,
 
         .subresourceRange =
             {
@@ -318,7 +314,7 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 
-        .image = Image,
+        .image = InternalImage,
 
         .subresourceRange =
             {
@@ -396,7 +392,7 @@ void Image::CopyFromBuffer(const RawGpuBuffer& buffer, VkImageLayout final_layou
                     },
             };
 
-            vkCmdCopyBufferToImage(cmd, buffer.Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+            vkCmdCopyBufferToImage(cmd, buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
             TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
                              TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -416,7 +412,7 @@ enum eCubemapLayer
     Back,
 };
 
-void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_format, VkImageAspectFlags aspect_flags,
+void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
                                           ImageCubemapOptions options)
 {
     // Here is the type of cubemap we will be reading here:
@@ -441,7 +437,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
     Assert(tile_width == tile_height);
 
 
-    Create(ImageType::Cubemap, Vec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
+    Create(eImageType::Cubemap, Vec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, Aspect);
 
     StackArray<VkImageCopy, 6> copy_infos;
@@ -456,7 +452,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
     // Top
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = 0 };
-        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Top;
+        copy_info.dstSubresource.baseArrayLayer = eCubemapLayer::Top;
 
         copy_infos.Insert(copy_info);
     }
@@ -465,7 +461,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
     // Left
     {
         copy_info.srcOffset = { .x = 0, .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Left;
+        copy_info.dstSubresource.baseArrayLayer = eCubemapLayer::Left;
 
 
         copy_infos.Insert(copy_info);
@@ -475,7 +471,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
 
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Front;
+        copy_info.dstSubresource.baseArrayLayer = eCubemapLayer::Front;
 
 
         copy_infos.Insert(copy_info);
@@ -484,7 +480,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
     // Forward
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width) * 2, .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Right;
+        copy_info.dstSubresource.baseArrayLayer = eCubemapLayer::Right;
 
         copy_infos.Insert(copy_info);
     }
@@ -492,7 +488,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
     // Back
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width) * 3, .y = static_cast<int32>(tile_height) };
-        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Back;
+        copy_info.dstSubresource.baseArrayLayer = eCubemapLayer::Back;
 
         copy_infos.Insert(copy_info);
     }
@@ -500,7 +496,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
     // Bottom
     {
         copy_info.srcOffset = { .x = static_cast<int32>(tile_width), .y = static_cast<int32>(tile_height) * 2 };
-        copy_info.dstSubresource.baseArrayLayer = CubemapLayer::Bottom;
+        copy_info.dstSubresource.baseArrayLayer = eCubemapLayer::Bottom;
 
         copy_infos.Insert(copy_info);
     }
@@ -512,8 +508,8 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, ImageFormat image_form
             cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd);
             TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 6);
 
-            vkCmdCopyImage(cmd.CommandBuffer, cubemap.Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, Image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.pData);
+            vkCmdCopyImage(cmd.CommandBuffer, cubemap.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.pData);
 
             TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 6);
         });
@@ -536,11 +532,11 @@ void Image::DecRef()
         vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
     }
 
-    if (Image != nullptr && Allocation != nullptr) {
-        vmaDestroyImage(gRenderer->GpuAllocator, this->Image, this->Allocation);
+    if (InternalImage != nullptr && Allocation != nullptr) {
+        vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
     }
 
-    Image = nullptr;
+    InternalImage = nullptr;
     Allocation = nullptr;
     View = nullptr;
 }

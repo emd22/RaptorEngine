@@ -8,7 +8,7 @@ namespace fx {
 
 namespace Fwd::AssetManager {
 
-TSRef<AxImage> LoadImageFromMemory(renderer::ImageFormat format, const uint8* data, uint32 data_size)
+TSRef<AxImage> LoadImageFromMemory(renderer::eImageFormat format, const uint8* data, uint32 data_size)
 {
     return gAssetManager->LoadImageFromMemory(format, data, data_size);
 }

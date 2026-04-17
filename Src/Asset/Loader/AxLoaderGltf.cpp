@@ -103,7 +103,7 @@ void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<Primiti
 //     LogInfo("Loaded skin '{}' with {} joints", skin->name ? skin->name : "Unnamed", skin->joints_count);
 // }
 
-template <ImageFormat TFormat>
+template <eImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(TSRef<Material>& material, MaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
@@ -137,7 +137,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
 
         if (!texture_view.texture) {
             // MakeEmptyMaterialTexture(material, material->Diffuse);
-            material->Diffuse.pAssetImage = AxImage::GetEmptyImage<ImageFormat::RGBA8_UNorm>();
+            material->Diffuse.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
 
             material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
         }

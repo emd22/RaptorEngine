@@ -12,7 +12,7 @@ class DsLayoutBuilder
 public:
     DsLayoutBuilder() = default;
 
-    DsLayoutBuilder& AddBinding(int binding, VkDescriptorType type, ShaderType stage, int count = 1);
+    DsLayoutBuilder& AddBinding(int binding, VkDescriptorType type, eShaderType stage, int count = 1);
 
     VkDescriptorSetLayout Build();
 

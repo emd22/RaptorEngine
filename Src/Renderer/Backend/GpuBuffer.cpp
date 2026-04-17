@@ -5,8 +5,8 @@
 
 namespace fx::renderer {
 
-void RawGpuBuffer::Create(GpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
-                          GpuBufferFlags buffer_flags)
+void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
+                          eGpuBufferFlags buffer_flags)
 {
     Assert(size_in_bytes > 0);
 
@@ -16,13 +16,13 @@ void RawGpuBuffer::Create(GpuBufferType buffer_type, uint64 size_in_bytes, VmaMe
 
     VmaAllocationCreateFlags vma_create_flags = 0;
 
-    if ((mBufferFlags & GpuBufferFlags::PersistentMapped)) {
+    if ((mBufferFlags & eGpuBufferFlags::PersistentMapped)) {
         vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     }
 
     VkBufferUsageFlags usage_flags = GpuBufferUtil::BufferTypeToUnderlying(buffer_type);
 
-    if (buffer_flags & GpuBufferFlags::TransferReceiver) {
+    if (buffer_flags & eGpuBufferFlags::TransferReceiver) {
         usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
@@ -49,7 +49,7 @@ void RawGpuBuffer::Create(GpuBufferType buffer_type, uint64 size_in_bytes, VmaMe
     //           reinterpret_cast<void*>(Allocation), Size);
 
 
-    if ((mBufferFlags & GpuBufferFlags::PersistentMapped) != 0) {
+    if ((mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0) {
         // Get the pointer from VMA for the mapped GPU buffer
         pMappedBuffer = allocation_info.pMappedData;
     }
@@ -115,17 +115,17 @@ void RawGpuBuffer::Upload(void* data, uint64 size)
 // Staged Gpu Buffer Functions
 /////////////////////////////////////
 
-void GpuBuffer::Create(GpuBufferType buffer_type, void* data, uint64 size)
+void GpuBuffer::Create(eGpuBufferType buffer_type, void* data, uint64 size)
 {
     Size = size;
     Type = buffer_type;
 
     RawGpuBuffer staging_buffer;
-    staging_buffer.Create(GpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    staging_buffer.Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
     staging_buffer.Upload(data, size);
 
     // Create the GPU-only buffer as a transfer destination
-    this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, GpuBufferFlags::TransferReceiver);
+    this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
     // Transfer
     Fx_Fwd_SubmitUploadCmd(
@@ -138,7 +138,7 @@ void GpuBuffer::Create(GpuBufferType buffer_type, void* data, uint64 size)
     staging_buffer.Destroy();
 }
 
-void GpuBuffer::Create(GpuBufferType buffer_type, const AnonArray& data)
+void GpuBuffer::Create(eGpuBufferType buffer_type, const AnonArray& data)
 {
     Create(buffer_type, data.pData, data.Size * data.ObjectSize);
 }

@@ -16,18 +16,19 @@
 
 FX_SET_MODULE_NAME("Main")
 
+
 int main()
 {
     fx::gEnginePool = new fx::MemPool;
     fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
-    fx::Globals::Init();
+    fx::renderer::Globals::Init();
 
     {
         fx::FoxtrotGame game {};
     }
 
-    fx::Globals::Destroy();
+    fx::renderer::Globals::Destroy();
     fx::Globals::Destroy();
 
     Defer(

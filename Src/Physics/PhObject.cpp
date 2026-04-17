@@ -16,7 +16,7 @@
 
 namespace fx {
 
-void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const Vec3f& dimensions, PhMotionType motion_type,
+void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                                    const PhProperties& object_properties)
 {
     mMotionType = motion_type;
@@ -27,7 +27,7 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const Vec3f& 
     LogInfo("Creating primitive collider with dimensions {}", dimensions);
 
     switch (primitive_type) {
-    case PhPrimitiveType::Box: {
+    case ePhPrimitiveType::Box: {
         JPH::BoxShapeSettings box_shape_settings(jolt_dimensions);
         box_shape_settings.SetDensity(object_properties.Density);
         box_shape_settings.mConvexRadius = object_properties.ConvexRadius;
@@ -35,12 +35,12 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const Vec3f& 
         JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
         JPH::ShapeRefC box_shape = box_shape_result.Get();
 
-        CreateJoltBody(box_shape, PhObject::Flags::None, motion_type, object_properties);
+        CreateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
     } break;
     }
 }
 
-void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, PhMotionType motion_type,
+void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_type,
                               const PhProperties& object_properties)
 {
     mMotionType = motion_type;
@@ -54,11 +54,11 @@ void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, PhMotionType motion_typ
     JPH::ShapeRefC box_shape = mesh_shape_result.Get();
 
 
-    CreateJoltBody(box_shape, PhObject::Flags::None, motion_type, object_properties);
+    CreateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
 }
 
 
-void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMotionType motion_type,
+void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
                               const PhProperties& properties)
 {
     if (mbHasPhysicsBody) {
@@ -69,7 +69,7 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMot
 
     JPH::EActivation activation_mode = JPH::EActivation::Activate;
 
-    if (flags & PhObject::Flags::CreateInactive) {
+    if (flags & PhObject::eFlags::CreateInactive) {
         activation_mode = JPH::EActivation::DontActivate;
     }
 
@@ -77,11 +77,11 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMot
     PhLayer::Type object_layer = PhLayer::Static;
 
     switch (motion_type) {
-    case PhMotionType::Static:
+    case ePhMotionType::Static:
         jolt_motion_type = JPH::EMotionType::Static;
         object_layer = PhLayer::Static;
         break;
-    case PhMotionType::Dynamic:
+    case ePhMotionType::Dynamic:
         jolt_motion_type = JPH::EMotionType::Dynamic;
         object_layer = PhLayer::Dynamic;
         break;

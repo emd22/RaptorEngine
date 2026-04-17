@@ -28,7 +28,7 @@ struct AxGltfMaterialToLoad
 class AxLoaderGltf : public AxLoaderBase
 {
 public:
-    using Status = AxLoaderBase::Status;
+    using Status = AxLoaderBase::eStatus;
 
     AxLoaderGltf() = default;
 

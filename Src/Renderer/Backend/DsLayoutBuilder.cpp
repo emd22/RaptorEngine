@@ -5,7 +5,7 @@
 
 namespace fx::renderer {
 
-DsLayoutBuilder& DsLayoutBuilder::AddBinding(int binding, VkDescriptorType type, ShaderType stage, int count)
+DsLayoutBuilder& DsLayoutBuilder::AddBinding(int binding, VkDescriptorType type, eShaderType stage, int count)
 {
     const VkSampler* pcImmutableSamplers = nullptr;
 

@@ -19,7 +19,7 @@ private:
     friend void CheckKeyForContinuedPress(Control* key);
 
 public:
-    static const uint32 scMaxKeys = static_cast<uint32>(Key::FX_KEY_MAX);
+    static const uint32 scMaxKeys = static_cast<uint32>(eKey::FX_KEY_MAX);
 
     ControlManager() = default;
 
@@ -36,12 +36,12 @@ public:
     /**
      * Check if a key is currently pressed.
      */
-    static bool IsKeyDown(Key scancode);
+    static bool IsKeyDown(eKey scancode);
 
     /**
      * Check if a key is currently released.
      */
-    static bool IsKeyUp(Key scancode);
+    static bool IsKeyUp(eKey scancode);
 
     /**
      * Check if a key was pressed once.
@@ -58,12 +58,12 @@ public:
      * the bit that determines if the key is on the next frame returns false positives.
      * This *ONLY* pertains to if the key is held down.
      */
-    static bool IsKeyPressed(Key scancode);
+    static bool IsKeyPressed(eKey scancode);
 
     /**
      * Checks if a combination of keys is currently pressed down.
      */
-    template <std::same_as<Key>... KeyV>
+    template <std::same_as<eKey>... KeyV>
     static bool IsComboDown(KeyV... keys)
     {
         return (IsKeyDown(keys) && ...);
@@ -72,7 +72,7 @@ public:
     /**
      * Checks if a combination of keys is no longer pressed.
      */
-    template <std::same_as<Key>... KeyV>
+    template <std::same_as<eKey>... KeyV>
     static bool IsComboUp(KeyV... keys)
     {
         return (IsKeyUp(keys) && ...);
@@ -84,7 +84,7 @@ public:
      * This function will only return true if at least one of the keys satisifies `IsKeyPressed()`,
      * and all of the keys are pressed down.
      */
-    template <std::same_as<Key>... KeyV>
+    template <std::same_as<eKey>... KeyV>
     static bool IsComboPressed(KeyV... keys)
     {
         // If all keys are down and at least one key has just been pressed, then return true
@@ -95,9 +95,9 @@ public:
      * Get a pointer to the control associated with the given keycode.
      * Returns `nullptr` if the keycode does not exist or is out of range.
      */
-    static Control* GetKey(Key scancode);
+    static Control* GetKey(eKey scancode);
 
-    static void ResetKey(Key scancode);
+    static void ResetKey(eKey scancode);
 
     ////////////////////////////////
     // Update functions
@@ -111,7 +111,7 @@ private:
     static void UpdateFromMouseMoveEvent(SDL_Event* event);
 
     // General, used by UpdateFromKeyboardEvent and UpdateFromMouseButtonEvent
-    static void UpdateButtonFromEvent(Key key_id, bool is_now_down);
+    static void UpdateButtonFromEvent(eKey key_id, bool is_now_down);
 
 public:
     using WindowEventFunc = void (*)();

@@ -89,7 +89,7 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
     ShadowPushConstants consts;
 
-    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData,
+    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
            sizeof(float32) * 16);
 
     bool in_skinned_shader = false;

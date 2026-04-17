@@ -64,7 +64,7 @@ public:
     void Init(Vec2u window_size);
     void Destroy();
 
-    FrameResult BeginFrame();
+    eFrameResult BeginFrame();
     void BeginGeometry();
     void BeginLighting();
     void BeginUnlit();
@@ -169,7 +169,7 @@ private:
     void InitFrames();
     void DestroyFrames();
 
-    FrameResult GetNextSwapchainImage(FrameData* frame);
+    eFrameResult GetNextSwapchainImage(FrameData* frame);
 
     ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);

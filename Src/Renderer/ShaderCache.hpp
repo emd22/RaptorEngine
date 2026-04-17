@@ -14,7 +14,7 @@ class ShaderCache
 public:
     ShaderCache();
 
-    Ref<Shader> Request(const ShaderName name);
+    Ref<Shader> Request(const eShaderName name);
 
 private:
     SizedArray<Ref<Shader>> mCache;

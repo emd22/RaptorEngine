@@ -35,25 +35,25 @@ void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray
 {
     Assert(mLocalBuffer.IsEmpty());
 
-    VertexType = VertexType::Slim;
+    VertexType = eVertexType::Slim;
 
     // Assume default vertex is requested if there are non-null values passed in for the additional components
     if (normals.IsInited() || uvs.IsInited() || tangents.IsInited()) {
-        VertexType = VertexType::Default;
+        VertexType = eVertexType::Default;
     }
 
     // Only switch to the skinned vertex if there is animation data passed in. Otherwise, the caller should fallback to
     // the default vertex pipelines.
     if (bone_weights.IsNotEmpty() && bone_ids.IsNotEmpty()) {
-        VertexType = VertexType::Skinned;
+        VertexType = eVertexType::Skinned;
     }
 
     const uint32 vertex_size = VertexUtil::GetSize(VertexType);
 
     mLocalBuffer.Create(vertex_size, positions.Size);
 
-    const bool supports_default = (VertexType != VertexType::Slim);
-    const bool supports_skinning = (VertexType == VertexType::Skinned);
+    const bool supports_default = (VertexType != eVertexType::Slim);
+    const bool supports_skinning = (VertexType == eVertexType::Skinned);
 
     bContainsNormals = normals.IsNotEmpty();
     bContainsUVs = uvs.IsNotEmpty();
@@ -91,17 +91,17 @@ void VertexList::CreateFrom(const SizedArray<float32>& positions, const SizedArr
     Assert(positions.Size > 0);
     Assert(((positions.Size) % 3) == 0);
 
-    VertexType = VertexType::Slim;
+    VertexType = eVertexType::Slim;
 
     // Assume default vertex is requested if there are non-null values passed in for the additional components
     if (normals.IsInited() || uvs.IsInited() || tangents.IsInited()) {
-        VertexType = VertexType::Default;
+        VertexType = eVertexType::Default;
     }
 
     // Only switch to the skinned vertex if there is animation data passed in. Otherwise, the caller should fallback to
     // the default vertex pipelines.
     if (bone_weights.IsNotEmpty() && bone_ids.IsNotEmpty()) {
-        VertexType = VertexType::Skinned;
+        VertexType = eVertexType::Skinned;
     }
 
     const uint32 vertex_size = VertexUtil::GetSize(VertexType);
@@ -109,8 +109,8 @@ void VertexList::CreateFrom(const SizedArray<float32>& positions, const SizedArr
 
     mLocalBuffer.Create(vertex_size, amount_of_vertices);
 
-    const bool supports_default = (VertexType != VertexType::Slim);
-    const bool supports_skinning = (VertexType == VertexType::Skinned);
+    const bool supports_default = (VertexType != eVertexType::Slim);
+    const bool supports_skinning = (VertexType == eVertexType::Skinned);
 
     bContainsNormals = normals.IsNotEmpty();
     bContainsUVs = uvs.IsNotEmpty();
@@ -146,12 +146,12 @@ void VertexList::CreateSlimFrom(const SizedArray<float32>& positions)
     Assert(positions.Size > 0);
     Assert((positions.Size % 3) == 0);
 
-    VertexType = VertexType::Slim;
+    VertexType = eVertexType::Slim;
 
-    mLocalBuffer.Create(sizeof(Vertex<VertexType::Slim>), positions.Size / 3);
+    mLocalBuffer.Create(sizeof(Vertex<eVertexType::Slim>), positions.Size / 3);
 
     for (int i = 0; i < mLocalBuffer.Capacity; i++) {
-        Vertex<VertexType::Slim> vertex;
+        Vertex<eVertexType::Slim> vertex;
         memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
 
         mLocalBuffer.Insert(vertex);
@@ -162,12 +162,12 @@ void VertexList::CreateSlimFrom(const SizedArray<Vec3f>& positions)
 {
     Assert(positions.Size > 0);
 
-    VertexType = VertexType::Slim;
+    VertexType = eVertexType::Slim;
 
-    mLocalBuffer.Create(sizeof(Vertex<VertexType::Slim>), positions.Size);
+    mLocalBuffer.Create(sizeof(Vertex<eVertexType::Slim>), positions.Size);
 
     for (int i = 0; i < mLocalBuffer.Capacity; i++) {
-        Vertex<VertexType::Slim> vertex;
+        Vertex<eVertexType::Slim> vertex;
         memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
 
         mLocalBuffer.Insert(vertex);

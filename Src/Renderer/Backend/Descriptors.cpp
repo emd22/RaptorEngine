@@ -165,7 +165,7 @@ void DescriptorSet::Build()
     for (const DescriptorEntry& entry : mDescriptorEntries) {
         if (entry.pImage) {
             VkDescriptorImageInfo image_info {
-                .sampler = entry.pSampler->Sampler,
+                .sampler = entry.pSampler->InternalSampler,
                 .imageView = entry.pImage->View,
                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             };

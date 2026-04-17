@@ -23,29 +23,29 @@ class Pipeline;
 using ShaderId = Hash64;
 
 namespace ShaderUtil {
-static constexpr uint32 scNumShaderTypes = static_cast<uint32>(ShaderType::Fragment) + 1;
+static constexpr uint32 scNumShaderTypes = static_cast<uint32>(eShaderType::Fragment) + 1;
 
 /**
  * @brief Get the underlying Vulkan shader stage bit for an ShaderType.
  */
-static constexpr VkShaderStageFlagBits ToUnderlyingType(ShaderType type)
+static constexpr VkShaderStageFlagBits ToUnderlyingType(eShaderType type)
 {
     switch (type) {
-    case ShaderType::Vertex:
+    case eShaderType::Vertex:
         return VK_SHADER_STAGE_VERTEX_BIT;
-    case ShaderType::Fragment:
+    case eShaderType::Fragment:
         return VK_SHADER_STAGE_FRAGMENT_BIT;
     }
 
     return VK_SHADER_STAGE_VERTEX_BIT;
 }
 
-static FX_FORCE_INLINE const char* TypeToName(ShaderType type)
+static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
 {
     switch (type) {
-    case ShaderType::Vertex:
+    case eShaderType::Vertex:
         return "Vertex";
-    case ShaderType::Fragment:
+    case eShaderType::Fragment:
         return "Fragment";
     }
     return "Unknown";
@@ -63,14 +63,14 @@ enum class eShaderOutlineEntryType : uint16
 class ShaderOutlineUtil
 {
 public:
-    static const char* GetTypeName(ShaderOutlineEntryType type)
+    static const char* GetTypeName(eShaderOutlineEntryType type)
     {
         switch (type) {
-        case ShaderOutlineEntryType::StructuredBuffer:
+        case eShaderOutlineEntryType::StructuredBuffer:
             return "Structured Buffer";
-        case ShaderOutlineEntryType::UniformBuffer:
+        case eShaderOutlineEntryType::UniformBuffer:
             return "Uniform Buffer";
-        case ShaderOutlineEntryType::Sampler2D:
+        case eShaderOutlineEntryType::Sampler2D:
             return "Sampler 2D";
         }
         return "Unknown";
@@ -80,15 +80,15 @@ public:
 struct ShaderOutlineEntry
 {
     ShaderOutlineEntry() = default;
-    ShaderOutlineEntry(ShaderOutlineEntryType type, ShaderType shader_type, bool use_dynamic_type, Hash32 name_hash,
+    ShaderOutlineEntry(eShaderOutlineEntryType type, eShaderType shader_type, bool use_dynamic_type, Hash32 name_hash,
                        uint32 set, uint32 binding)
         : Type(type), ShaderType(shader_type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)),
           NameHash(name_hash), Set(set), Binding(binding)
     {
     }
 
-    ShaderOutlineEntryType Type; // uint16
-    ShaderType ShaderType;
+    eShaderOutlineEntryType Type; // uint16
+    eShaderType ShaderType;
     uint16 bUseDynamicType = 0;
     Hash32 NameHash = 0;
     uint32 Set = 0;
@@ -114,7 +114,7 @@ public:
     static constexpr uint32 scMaxEntriesPerBucket = 10;
 
     using DescEntry = ShaderOutlineEntry;
-    using DescType = ShaderOutlineEntryType;
+    using DescType = eShaderOutlineEntryType;
 
     using EntryList = SizedArray<DescEntry>;
 
@@ -136,7 +136,7 @@ public:
      */
     uint32 ReadFromBuffer(const Slice<uint32>& data);
 
-    void AddEntry(ShaderOutlineEntryType type, ShaderType shader_type, bool use_dynamic_type, Hash32 name_hash,
+    void AddEntry(eShaderOutlineEntryType type, eShaderType shader_type, bool use_dynamic_type, Hash32 name_hash,
                   uint32 set, uint32 binding)
     {
         SizedArray<DescEntry>& bucket = SetBuckets[set];
@@ -172,7 +172,7 @@ class ShaderProgram
 {
 public:
     ShaderProgram() = default;
-    ShaderProgram(nullptr_t np) : InternalShader(nullptr), ShaderType(ShaderType::Vertex) {}
+    ShaderProgram(nullptr_t np) : InternalShader(nullptr), ShaderType(eShaderType::Vertex) {}
 
     ShaderProgram(ShaderProgram&& other)
     {
@@ -210,7 +210,7 @@ public:
 
     SizedArray<ShaderDescriptorId> Descriptors;
 
-    ShaderType ShaderType = ShaderType::Vertex;
+    eShaderType ShaderType = eShaderType::Vertex;
 };
 
 class Shader
@@ -230,7 +230,7 @@ class Shader
     };
 
 public:
-    static ShaderId GenerateShaderId(ShaderType type, const SizedArray<ShaderMacro>& macros);
+    static ShaderId GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros);
 
     Shader() = delete;
     Shader(const char* path)
@@ -242,12 +242,12 @@ public:
     /**
      * @brief Returns a cached program if it has previously been queried or loads the uncached version from disk.
      */
-    Ref<ShaderProgram> GetProgram(ShaderType shader_type, const SizedArray<ShaderMacro>& macros);
+    Ref<ShaderProgram> GetProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
 
     /**
      * @brief Loads a shader program from the DataPack or compiles it if it does not exist.
      */
-    Ref<ShaderProgram> LoadUncachedProgram(ShaderType shader_type, const SizedArray<ShaderMacro>& macros);
+    Ref<ShaderProgram> LoadUncachedProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros);
 
     void Load(const char* path);
 

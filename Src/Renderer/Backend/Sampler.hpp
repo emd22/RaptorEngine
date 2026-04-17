@@ -42,13 +42,13 @@ enum class eSamplerCompareOp : uint8
 
 struct SamplerProps
 {
-    SamplerFilter MinFilter = SamplerFilter::Linear;
-    SamplerFilter MagFilter = SamplerFilter::Linear;
-    SamplerFilter MipFilter = SamplerFilter::Linear;
+    eSamplerFilter MinFilter = eSamplerFilter::Linear;
+    eSamplerFilter MagFilter = eSamplerFilter::Linear;
+    eSamplerFilter MipFilter = eSamplerFilter::Linear;
 
-    SamplerAddressMode AddressMode = SamplerAddressMode::Repeat;
-    SamplerBorderColor BorderColor = SamplerBorderColor::IntBlack;
-    SamplerCompareOp CompareOp = SamplerCompareOp::None;
+    eSamplerAddressMode AddressMode = eSamplerAddressMode::Repeat;
+    eSamplerBorderColor BorderColor = eSamplerBorderColor::IntBlack;
+    eSamplerCompareOp CompareOp = eSamplerCompareOp::None;
 };
 
 

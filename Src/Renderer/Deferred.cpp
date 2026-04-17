@@ -45,16 +45,16 @@ void DeferredRenderer::CreateGPass()
     GPass.Create(gRenderer->Swapchain.Extent);
 
     // Albedo target
-    GPass.AddTarget(ImageFormat::BGRA8_UNorm, Target::scFullScreen,
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, ImageAspectFlag::Color);
+    GPass.AddTarget(eImageFormat::BGRA8_UNorm, Target::scFullScreen,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
     // Normals target
-    GPass.AddTarget(ImageFormat::RGBA16_Float, Target::scFullScreen,
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, ImageAspectFlag::Color);
+    GPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
     // Depth target
-    GPass.AddTarget(ImageFormat::eD32_Float, Target::scFullScreen,
-                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, ImageAspectFlag::Depth);
+    GPass.AddTarget(eImageFormat::eD32_Float, Target::scFullScreen,
+                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
 
     GPass.BuildRenderStage();
 }
@@ -69,23 +69,23 @@ VkPipelineLayout DeferredRenderer::CreateGPassPipelineLayout()
     {
         // Create material properties DS layout
         DsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, ShaderType::Fragment);
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, eShaderType::Fragment);
         DsLayoutLightingMaterialProperties = builder.Build();
     }
 
 
     {
         DsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
-        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
-        builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
+        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
+        builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
         // builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, ShaderType::Vertex);
         DsLayoutGPassMaterial = builder.Build();
     }
 
     {
         DsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
         DsLayoutGPassMaterialAlbedoOnly = builder.Build();
     }
 
@@ -114,10 +114,10 @@ VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
 {
     {
         DsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
-        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
-        builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
-        builder.AddBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, ShaderType::Vertex);
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
+        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
+        builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
+        builder.AddBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Vertex);
         DsLayoutGPassSkinned = builder.Build();
     }
 
@@ -168,32 +168,32 @@ void DeferredRenderer::CreateUnlitPipeline()
 {
     VkPipelineLayout layout = CreateUnlitPipelineLayout();
 
-    Ref<Shader> shader_unlit = gShaderCache->Request(ShaderName::Unlit);
-    Ref<ShaderProgram> vertex_shader = shader_unlit->GetProgram(ShaderType::Vertex, {});
-    Ref<ShaderProgram> fragment_shader = shader_unlit->GetProgram(ShaderType::Fragment, {});
+    Ref<Shader> shader_unlit = gShaderCache->Request(eShaderName::Unlit);
+    Ref<ShaderProgram> vertex_shader = shader_unlit->GetProgram(eShaderType::Vertex, {});
+    Ref<ShaderProgram> fragment_shader = shader_unlit->GetProgram(eShaderType::Fragment, {});
 
-    VertexDescription vertex_info = VertexUtil::BuildDescription<VertexType::Default>();
+    VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
 
     PipelineBuilder builder {};
     TargetList attachments {};
 
-    Target* lp_light_attachment = LightPass.GetTarget(ImageFormat::RGBA16_Float);
-    Target* lp_depth_attachment = GPass.GetTarget(ImageFormat::eD32_Float);
+    Target* lp_light_attachment = LightPass.GetTarget(eImageFormat::RGBA16_Float);
+    Target* lp_depth_attachment = GPass.GetTarget(eImageFormat::eD32_Float);
 
     Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
 
-    Target depth_attachment(ImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
-    depth_attachment.LoadOp = LoadOp::Load;
-    depth_attachment.StoreOp = StoreOp::DontCare;
-    depth_attachment.Aspect = ImageAspectFlag::Depth;
+    Target depth_attachment(eImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
+    depth_attachment.LoadOp = eLoadOp::Load;
+    depth_attachment.StoreOp = eStoreOp::DontCare;
+    depth_attachment.Aspect = eImageAspectFlag::Depth;
     depth_attachment.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     depth_attachment.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     depth_attachment.SetImage(lp_depth_attachment->GetImage());
     attachments.Add(depth_attachment);
 
-    Target light_attachment(ImageFormat::RGBA16_Float, gRenderer->Swapchain.Extent);
-    light_attachment.LoadOp = LoadOp::Load;
-    light_attachment.StoreOp = StoreOp::Store;
+    Target light_attachment(eImageFormat::RGBA16_Float, gRenderer->Swapchain.Extent);
+    light_attachment.LoadOp = eLoadOp::Load;
+    light_attachment.StoreOp = eStoreOp::Store;
     light_attachment.InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     light_attachment.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     light_attachment.SetImage(lp_light_attachment->GetImage());
@@ -223,11 +223,11 @@ void DeferredRenderer::CreateGPassPipeline()
 
     CreateGPass();
 
-    Ref<Shader> shader_geometry = gShaderCache->Request(ShaderName::Geometry);
-    Ref<ShaderProgram> vertex_shader = shader_geometry->GetProgram(ShaderType::Vertex, {});
-    Ref<ShaderProgram> fragment_shader = shader_geometry->GetProgram(ShaderType::Fragment, {});
+    Ref<Shader> shader_geometry = gShaderCache->Request(eShaderName::Geometry);
+    Ref<ShaderProgram> vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, {});
+    Ref<ShaderProgram> fragment_shader = shader_geometry->GetProgram(eShaderType::Fragment, {});
 
-    VertexDescription vertex_info = VertexUtil::BuildDescription<VertexType::Default>();
+    VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
 
     PipelineBuilder builder;
 
@@ -249,9 +249,10 @@ void DeferredRenderer::CreateGPassPipeline()
     {
         SizedArray<ShaderMacro> normal_mapped_macros { ShaderMacro { "USE_NORMAL_MAPS", "1" } };
 
-        Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(ShaderType::Vertex, normal_mapped_macros);
+        Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, normal_mapped_macros);
 
-        Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(ShaderType::Fragment, normal_mapped_macros);
+        Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(eShaderType::Fragment,
+                                                                            normal_mapped_macros);
 
         builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
             .SetShaders(nm_vertex_shader, nm_fragment_shader)
@@ -259,13 +260,13 @@ void DeferredRenderer::CreateGPassPipeline()
     }
 
     {
-        vertex_info = VertexUtil::BuildDescription<VertexType::Skinned>();
+        vertex_info = VertexUtil::BuildDescription<eVertexType::Skinned>();
 
         SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_NORMAL_MAPS", "1" },
                                            ShaderMacro { "USE_SKINNING", "1" } };
 
-        Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(ShaderType::Vertex, macros);
-        Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(ShaderType::Fragment, macros);
+        Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, macros);
+        Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(eShaderType::Fragment, macros);
 
         VkPipelineLayout skinned_layout = CreateGPassSkinnedPipelineLayout();
 
@@ -317,15 +318,15 @@ void DeferredRenderer::CreateLightingDSLayout()
     DsLayoutBuilder builder {};
 
     // sDepth
-    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
     // sAlbedo
-    builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
+    builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
     // sNormal
-    builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
+    builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
     // sShadowDepth
-    builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
+    builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
 
-    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, ShaderType::Fragment);
+    builder.AddBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Fragment);
 
     DsLayoutLightingFrag = builder.Build();
 }
@@ -360,10 +361,10 @@ void DeferredRenderer::CreateLightingPipeline()
     LightPass.Create(gRenderer->Swapchain.Extent);
 
 
-    LightPass.AddTarget(ImageFormat::RGBA16_Float, Target::scFullScreen,
-                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, ImageAspectFlag::Color);
+    LightPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
-    Target* light_target = LightPass.GetTarget(ImageFormat::RGBA16_Float);
+    Target* light_target = LightPass.GetTarget(eImageFormat::RGBA16_Float);
     Assert(light_target != nullptr);
     light_target->FinalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
@@ -383,13 +384,13 @@ void DeferredRenderer::CreateLightingPipeline()
     DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
 
     // sDepth
-    DsLighting.AddImageFromTarget(0, GPass.GetTarget(ImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+    DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
     // sAlbedo
-    DsLighting.AddImageFromTarget(1, GPass.GetTarget(ImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+    DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
     // sNormals
-    DsLighting.AddImageFromTarget(2, GPass.GetTarget(ImageFormat::RGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
+    DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
     // Skip 3 for the shadow target, added by DirectionalShadows
-    DsLighting.AddBuffer(4, &gRenderer->Uniforms.GetGpuBuffer(), 0, gRenderer->Uniforms.Size);
+    DsLighting.AddBuffer(4, &gRenderer->ShaderUniform.GetGpuBuffer(), 0, gRenderer->ShaderUniform.Size);
 
     DsLighting.Build();
 
@@ -398,10 +399,10 @@ void DeferredRenderer::CreateLightingPipeline()
     VkPipelineLayout layout = CreateLightingPipelineLayout();
 
     {
-        Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(ShaderType::Vertex, {});
-        Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(ShaderType::Fragment, {});
+        Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, {});
+        Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Fragment, {});
 
-        VertexDescription vertex_info = VertexUtil::BuildDescription<VertexType::Slim>();
+        VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Slim>();
 
         PipelineBuilder builder {};
         builder.SetLayout(layout)
@@ -427,8 +428,8 @@ void DeferredRenderer::CreateLightingPipeline()
     {
         SizedArray<ShaderMacro> directional_macros { ShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
 
-        Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(ShaderType::Vertex, directional_macros);
-        Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(ShaderType::Fragment, directional_macros);
+        Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, directional_macros);
+        Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Fragment, directional_macros);
 
         PipelineBuilder builder {};
 
@@ -485,10 +486,10 @@ VkPipelineLayout DeferredRenderer::CreateCompPipelineLayout()
     {
         DsLayoutBuilder builder {};
 
-        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment)
-            .AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment)
-            .AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment)
-            .AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, ShaderType::Fragment);
+        builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment)
+            .AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment)
+            .AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment)
+            .AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Fragment);
 
         DsLayoutCompFrag = builder.Build();
     }
@@ -519,8 +520,8 @@ void DeferredRenderer::CreateCompPipeline()
 
     Shader shader_composition("Composition");
 
-    Ref<ShaderProgram> lit_vertex_shader = shader_composition.GetProgram(ShaderType::Vertex, {});
-    Ref<ShaderProgram> lit_fragment_shader = shader_composition.GetProgram(ShaderType::Fragment, {});
+    Ref<ShaderProgram> lit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, {});
+    Ref<ShaderProgram> lit_fragment_shader = shader_composition.GetProgram(eShaderType::Fragment, {});
 
     PipelineBuilder builder;
 
@@ -541,8 +542,8 @@ void DeferredRenderer::CreateCompPipeline()
 
     SizedArray<ShaderMacro> unlit_macros { ShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } };
 
-    Ref<ShaderProgram> unlit_vertex_shader = shader_composition.GetProgram(ShaderType::Vertex, unlit_macros);
-    Ref<ShaderProgram> unlit_fragment_shader = shader_composition.GetProgram(ShaderType::Fragment, unlit_macros);
+    Ref<ShaderProgram> unlit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, unlit_macros);
+    Ref<ShaderProgram> unlit_fragment_shader = shader_composition.GetProgram(eShaderType::Fragment, unlit_macros);
 
     builder.SetShaders(unlit_vertex_shader, unlit_fragment_shader).Build(PlCompositionUnlit);
 }
@@ -573,14 +574,14 @@ void DeferredRenderer::CreateCompPass()
     CompPass.MarkFinalStage();
     CompPass.BuildRenderStage();
 
-    DsComposition.AddImageFromTarget(1, GPass.GetTarget(ImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+    DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
 
-    DsComposition.AddImageFromTarget(2, GPass.GetTarget(ImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+    DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
 
-    DsComposition.AddImageFromTarget(3, GPass.GetTarget(ImageFormat::RGBA16_Float),
+    DsComposition.AddImageFromTarget(3, GPass.GetTarget(eImageFormat::RGBA16_Float),
                                      &gRenderer->Swapchain.NormalsSampler);
 
-    DsComposition.AddImageFromTarget(4, LightPass.GetTarget(ImageFormat::RGBA16_Float),
+    DsComposition.AddImageFromTarget(4, LightPass.GetTarget(eImageFormat::RGBA16_Float),
                                      &gRenderer->Swapchain.LightsSampler);
 
 

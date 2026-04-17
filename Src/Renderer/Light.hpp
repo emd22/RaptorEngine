@@ -25,17 +25,17 @@ enum class eLightType
     Point,
 };
 
-FX_DEFINE_ENUM_AS_FLAGS(LightFlags);
+FX_DEFINE_ENUM_AS_FLAGS(eLightFlags);
 
 class LightBase : public Entity
 {
 public:
-    using VertexType = renderer::Vertex<renderer::VertexType::Slim>;
+    using VertexType = renderer::Vertex<renderer::eVertexType::Slim>;
 
-    static constexpr EntityType scEntityType = EntityType::Light;
+    static constexpr eEntityType scEntityType = eEntityType::Light;
 
 public:
-    LightBase(LightFlags flags = LF_None);
+    LightBase(eLightFlags flags = LF_None);
 
     void SetLightVolume(const Ref<PrimitiveMesh>& volume);
     void SetLightVolume(const Ref<MeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
@@ -57,9 +57,9 @@ public:
     struct Color Color = Color::sWhite;
     struct Color AmbientColor { 0x101f1f1f };
 
-    LightFlags Flags = LF_None;
+    eLightFlags Flags = LF_None;
 
-    LightType Type = LightType::Unknown;
+    eLightType Type = eLightType::Unknown;
 
     bool bEnabled = true;
 

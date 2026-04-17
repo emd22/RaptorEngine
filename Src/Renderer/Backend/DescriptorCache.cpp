@@ -10,7 +10,7 @@
 
 namespace fx::renderer {
 
-ShaderDescriptorId DescriptorCache::Register(uint32 set, ShaderType shader_type,
+ShaderDescriptorId DescriptorCache::Register(uint32 set, eShaderType shader_type,
                                              const SizedArray<ShaderOutlineEntry>& entries)
 {
     Section& section = mSections[set];
@@ -37,7 +37,7 @@ ShaderDescriptorId DescriptorCache::Register(uint32 set, ShaderType shader_type,
     bool has_dynamic_offsets = false;
 
     for (const ShaderOutlineEntry& entry : entries) {
-        using SOType = ShaderOutlineEntryType;
+        using SOType = eShaderOutlineEntryType;
 
         if (entry.ShaderType != shader_type) {
             continue;

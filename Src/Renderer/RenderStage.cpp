@@ -5,7 +5,7 @@
 
 namespace fx::renderer {
 
-Target* RenderStage::GetTarget(ImageFormat format, int sub_index)
+Target* RenderStage::GetTarget(eImageFormat format, int sub_index)
 {
     for (Target& attachment : mOutputTargets.Targets) {
         if (attachment.Image.Format == format) {
@@ -67,7 +67,7 @@ void RenderStage::Begin(CommandBuffer& cmd, Pipeline& pipeline)
     pipeline.Bind(cmd);
 }
 
-void RenderStage::AddTarget(ImageFormat format, const Vec2u& size, VkImageUsageFlags usage, ImageAspectFlag aspect)
+void RenderStage::AddTarget(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
     mOutputTargets.Add(Target(format, size, usage, aspect));
 }
@@ -82,10 +82,10 @@ void RenderStage::MakeClearValues()
             continue;
         }
 
-        if (attachment.Aspect == ImageAspectFlag::Depth) {
+        if (attachment.Aspect == eImageAspectFlag::Depth) {
             ClearValues.Insert(VkClearValue { .depthStencil = { 0.0f, 0U } });
         }
-        else if (attachment.Aspect == ImageAspectFlag::Color) {
+        else if (attachment.Aspect == eImageAspectFlag::Color) {
             ClearValues.Insert(VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } });
         }
     }
@@ -118,8 +118,8 @@ void RenderStage::MarkFinalStage()
 
 void RenderStage::AddPresentTarget()
 {
-    mOutputTargets.Add(Target(gRenderer->Swapchain.Surface.Format, Target::scFullScreen, LoadOp::DontCare,
-                              StoreOp::Store, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
+    mOutputTargets.Add(Target(gRenderer->Swapchain.Surface.Format, Target::scFullScreen, eLoadOp::DontCare,
+                              eStoreOp::Store, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 }
 
 } // namespace fx::renderer

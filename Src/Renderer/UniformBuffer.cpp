@@ -12,8 +12,8 @@ void Uniforms::Create(uint32 size)
     Size = size;
     uint32 size_in_frames = Size * FramesInFlight;
 
-    mGpuBuffer.Create(GpuBufferType::UniformWithOffset, size_in_frames, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                      GpuBufferFlags::PersistentMapped);
+    mGpuBuffer.Create(eGpuBufferType::UniformWithOffset, size_in_frames, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                      eGpuBufferFlags::PersistentMapped);
 }
 
 void Uniforms::Rewind() { mUniformIndex = 0; }

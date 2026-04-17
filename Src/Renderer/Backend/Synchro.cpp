@@ -61,7 +61,8 @@ void Semaphore::Create()
                                               .pNext = nullptr,
                                               .flags = 0 };
 
-    const VkResult status = vkCreateSemaphore(gRenderer->GetDevice()->Device, &create_info, nullptr, &Semaphore);
+    const VkResult status = vkCreateSemaphore(gRenderer->GetDevice()->Device, &create_info, nullptr,
+                                              &InternalSemaphore);
 
     if (status != VK_SUCCESS) {
         PanicVulkan("Semaphore", "Could not create semaphore", status);
@@ -70,8 +71,8 @@ void Semaphore::Create()
 
 void Semaphore::Destroy()
 {
-    vkDestroySemaphore(gRenderer->GetDevice()->Device, Semaphore, nullptr);
-    Semaphore = nullptr;
+    vkDestroySemaphore(gRenderer->GetDevice()->Device, InternalSemaphore, nullptr);
+    InternalSemaphore = nullptr;
 }
 
 

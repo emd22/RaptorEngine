@@ -7,30 +7,30 @@
 #include <Core/Ref.hpp>
 #include <Core/StackArray.hpp>
 
-namespace fx::renderer {
+// namespace fx::renderer {
 
-class RenderPass;
+// class RenderPass;
 
-class State
-{
-public:
-    State();
+// class State
+// {
+// public:
+//     State();
 
-    void BufferOffset(ShaderType shader_type, uint32 buffer_offset);
-    void Pipeline(Pipeline* pipeline);
-    void RenderPass(RenderPass* rp);
+//     void BufferOffset(eShaderType shader_type, uint32 buffer_offset);
+//     void Pipeline(Pipeline* pipeline);
+//     void RenderPass(RenderPass* rp);
 
-    void Apply(const CommandBuffer& cmd);
+//     void Apply(const CommandBuffer& cmd);
 
-    void Reset();
+//     void Reset();
 
-    ~State();
+//     ~State();
 
-private:
-    Pipeline* mpPipeline;
-    RenderPass* mpRenderPass = nullptr;
+// private:
+//     Pipeline* mpPipeline;
+//     RenderPass* mpRenderPass = nullptr;
 
-    StackArray<ShaderBindOptions, ShaderUtil::scNumShaderTypes> mBindOptions;
-};
+//     StackArray<ShaderBindOptions, ShaderUtil::scNumShaderTypes> mBindOptions;
+// };
 
-} // namespace fx::renderer
+// } // namespace fx::renderer

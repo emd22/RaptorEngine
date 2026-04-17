@@ -27,7 +27,7 @@ Target::Target(eImageFormat format, const Vec2u& size, eLoadOp load_op, eStoreOp
     }
 }
 
-Target::Target(ImageFormat format, const Vec2u& size, VkImageUsageFlags usage, ImageAspectFlag aspect)
+Target::Target(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)
     : Usage(usage), Aspect(aspect)
 {
     Image.Format = format;
@@ -51,7 +51,7 @@ void Target::CreateImage()
 
 VkAttachmentDescription Target::BuildDescription() const
 {
-    Assert(Image.Format != ImageFormat::None);
+    Assert(Image.Format != eImageFormat::None);
 
     return VkAttachmentDescription {
         .format = ImageFormatUtil::ToUnderlying(Image.Format),

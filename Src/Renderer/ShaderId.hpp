@@ -4,7 +4,7 @@
 
 namespace fx::renderer {
 
-enum eShaderName : uint32
+enum class eShaderName : uint32
 {
     Geometry,    // 0
     Lighting,    // 1
@@ -18,22 +18,22 @@ enum eShaderName : uint32
 namespace ShaderNameUtil {
 
 
-constexpr uint32 scNumShaders = static_cast<uint32>(eNumShaders);
+constexpr uint32 scNumShaders = static_cast<uint32>(eShaderName::NumShaders);
 
-constexpr const char* GetName(const ShaderName id)
+constexpr const char* GetName(const eShaderName id)
 {
     switch (id) {
-    case Geometry:
+    case eShaderName::Geometry:
         return "Geometry";
-    case Lighting:
+    case eShaderName::Lighting:
         return "Lighting";
-    case Composition:
+    case eShaderName::Composition:
         return "Composition";
-    case Shadows:
+    case eShaderName::Shadows:
         return "Shadows";
-    case Unlit:
+    case eShaderName::Unlit:
         return "Unlit";
-    case NumShaders:
+    case eShaderName::NumShaders:
         break;
     }
     return nullptr;

@@ -11,34 +11,34 @@
 namespace fx {
 
 /** Converts an SDL scancode to its corresponding Key ID. */
-static inline Key ConvertScancodeToKey(int32 sdl_scancode)
+static inline eKey ConvertScancodeToKey(int32 sdl_scancode)
 {
-    if (sdl_scancode <= static_cast<uint32>(Key::FX_KEYBOARD_STANDARD_END)) {
+    if (sdl_scancode <= static_cast<uint32>(eKey::FX_KEYBOARD_STANDARD_END)) {
         // Key is the direct scancode
-        return static_cast<Key>(sdl_scancode);
+        return static_cast<eKey>(sdl_scancode);
     }
     // Check for ctrl, alt, meta keys
-    else if (sdl_scancode >= static_cast<uint32>(Key::FX_KEYBOARD_STANDARD_END) &&
-             sdl_scancode <= static_cast<uint32>(Key::FX_KEYBOARD_MODIFIERS_END) + FX_KEYBOARD_MODIFIERS_OFFSET) {
-        return static_cast<Key>(sdl_scancode - FX_KEYBOARD_MODIFIERS_OFFSET);
+    else if (sdl_scancode >= static_cast<uint32>(eKey::FX_KEYBOARD_STANDARD_END) &&
+             sdl_scancode <= static_cast<uint32>(eKey::FX_KEYBOARD_MODIFIERS_END) + FX_KEYBOARD_MODIFIERS_OFFSET) {
+        return static_cast<eKey>(sdl_scancode - FX_KEYBOARD_MODIFIERS_OFFSET);
     }
 
-    return Key::FX_KEY_UNKNOWN;
+    return eKey::FX_KEY_UNKNOWN;
 }
 
 /** Converts an SDL mouse button index to its corresponding Key ID. */
-static inline Key ConvertMouseButtonToKey(int32 mouse_button)
+static inline eKey ConvertMouseButtonToKey(int32 mouse_button)
 {
-    constexpr uint32 mouse_buttons_start = static_cast<uint32>(Key::FX_MOUSE_BUTTONS_START);
-    constexpr uint32 mouse_buttons_end = static_cast<uint32>(Key::FX_MOUSE_BUTTONS_END);
+    constexpr uint32 mouse_buttons_start = static_cast<uint32>(eKey::FX_MOUSE_BUTTONS_START);
+    constexpr uint32 mouse_buttons_end = static_cast<uint32>(eKey::FX_MOUSE_BUTTONS_END);
 
     // If the button is not defined in Key, return FX_KEY_UNKNOWN.
     if (mouse_buttons_start + mouse_button > mouse_buttons_end) {
-        return Key::FX_KEY_UNKNOWN;
+        return eKey::FX_KEY_UNKNOWN;
     }
 
     // If it exists, get the mouse button Key ID.
-    return static_cast<Key>(mouse_buttons_start + mouse_button);
+    return static_cast<eKey>(mouse_buttons_start + mouse_button);
 }
 
 void ControlManager::Init()
@@ -87,7 +87,7 @@ void ControlManager::ReleaseMouse()
 
 Vec2f& ControlManager::GetMouseDelta() { return GetInstance().mMouseDelta; }
 
-static inline bool IsKeyInRange(Key key_id)
+static inline bool IsKeyInRange(eKey key_id)
 {
     bool in_range = (static_cast<int32>(key_id) >= 0 && static_cast<int32>(key_id) < ControlManager::scMaxKeys);
 
@@ -100,7 +100,7 @@ static inline bool IsKeyInRange(Key key_id)
 }
 
 
-Control* ControlManager::GetKey(Key key_id)
+Control* ControlManager::GetKey(eKey key_id)
 {
     if (!IsKeyInRange(key_id)) {
         return nullptr;
@@ -137,7 +137,7 @@ inline void CheckKeyForContinuedPress(Control* key)
     }
 }
 
-bool ControlManager::IsKeyDown(Key scancode)
+bool ControlManager::IsKeyDown(eKey scancode)
 {
     Control* key = GetInstance().GetKey(scancode);
     if (!key) {
@@ -149,7 +149,7 @@ bool ControlManager::IsKeyDown(Key scancode)
     return key->IsKeyDown();
 }
 
-bool ControlManager::IsKeyPressed(Key scancode)
+bool ControlManager::IsKeyPressed(eKey scancode)
 {
     Control* key = GetInstance().GetKey(scancode);
     if (!key) {
@@ -161,7 +161,7 @@ bool ControlManager::IsKeyPressed(Key scancode)
     return key->IsKeyPressed();
 }
 
-bool ControlManager::IsKeyUp(Key scancode)
+bool ControlManager::IsKeyUp(eKey scancode)
 {
     Control* key = GetInstance().GetKey(scancode);
     if (!key) {
@@ -171,7 +171,7 @@ bool ControlManager::IsKeyUp(Key scancode)
     return key->IsKeyUp();
 }
 
-void ControlManager::ResetKey(Key scancode) { GetInstance().GetKey(scancode)->Reset(); }
+void ControlManager::ResetKey(eKey scancode) { GetInstance().GetKey(scancode)->Reset(); }
 
 ////////////////////////////////
 // Update functions
@@ -213,7 +213,7 @@ void ControlManager::Update()
     }
 }
 
-void ControlManager::UpdateButtonFromEvent(Key key_id, bool is_now_down)
+void ControlManager::UpdateButtonFromEvent(eKey key_id, bool is_now_down)
 {
     Control* button = GetInstance().GetKey(key_id);
     if (!button) {
@@ -232,9 +232,9 @@ void ControlManager::UpdateButtonFromEvent(Key key_id, bool is_now_down)
 
 void ControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
 {
-    const Key key_id = ConvertScancodeToKey(event->key.scancode);
+    const eKey key_id = ConvertScancodeToKey(event->key.scancode);
 
-    if (key_id == Key::FX_KEY_UNKNOWN) {
+    if (key_id == eKey::FX_KEY_UNKNOWN) {
         LogWarning("Unknown scancode {:d}!", static_cast<int>(event->key.scancode));
         return;
     }
@@ -249,8 +249,8 @@ void ControlManager::UpdateFromMouseMoveEvent(SDL_Event* event)
 
 void ControlManager::UpdateFromMouseButtonEvent(SDL_Event* event)
 {
-    const Key key_id = ConvertMouseButtonToKey(event->button.button);
-    if (key_id == Key::FX_KEY_UNKNOWN) {
+    const eKey key_id = ConvertMouseButtonToKey(event->button.button);
+    if (key_id == eKey::FX_KEY_UNKNOWN) {
         LogWarning("Unknown mouse button {:d}!", static_cast<int>(event->button.button));
         return;
     }

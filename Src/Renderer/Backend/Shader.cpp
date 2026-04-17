@@ -120,17 +120,17 @@ uint32 ShaderOutline::ReadFromBuffer(const Slice<uint32>& data)
 // Shader Functions
 /////////////////////////////////////
 
-ShaderId Shader::GenerateShaderId(ShaderType type, const SizedArray<ShaderMacro>& macros)
+ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro>& macros)
 {
     Hash64 hash = FX_HASH64_FNV1A_INIT;
 
     constexpr Hash64 cPrefixHashVS = HashStr64("VERTSHADER");
     constexpr Hash64 cPrefixHashFS = HashStr64("FRAGSHADER");
 
-    if (type == ShaderType::Vertex) {
+    if (type == eShaderType::Vertex) {
         hash = cPrefixHashVS;
     }
-    else if (type == ShaderType::Fragment) {
+    else if (type == eShaderType::Fragment) {
         hash = cPrefixHashFS;
     }
 
@@ -162,15 +162,15 @@ void Shader::Load(const char* shader_name)
 }
 
 
-const String Shader::GetSourcePath() const { return String(AssetPath(AxPathQuery::Shaders)) + Name + ".hlsl"; }
+const String Shader::GetSourcePath() const { return String(AssetPath(eAxPathQuery::Shaders)) + Name + ".hlsl"; }
 const String Shader::GetProgramPath() const
 {
-    String compiled_folder = String(AssetPath(AxPathQuery::Shaders)) + "Spirv/";
+    String compiled_folder = String(AssetPath(eAxPathQuery::Shaders)) + "Spirv/";
     return (compiled_folder + Name + ".spack");
 }
 
 
-Ref<ShaderProgram> Shader::LoadUncachedProgram(ShaderType shader_type, const SizedArray<ShaderMacro>& macros)
+Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros)
 {
     String source_path = GetSourcePath();
     const char* c_source_path = source_path.CStr();
@@ -252,7 +252,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(ShaderType shader_type, const Siz
 }
 
 
-Ref<ShaderProgram> Shader::GetProgram(ShaderType shader_type, const SizedArray<ShaderMacro>& macros)
+Ref<ShaderProgram> Shader::GetProgram(eShaderType shader_type, const SizedArray<ShaderMacro>& macros)
 {
     ProgramCache& cached_type = mCachedTypes[static_cast<uint32>(shader_type)];
 
@@ -274,9 +274,9 @@ void Shader::RecompileShader(const String& source_path, const String& compiled_p
                              const SizedArray<ShaderMacro>& macros)
 {
     // Compile to the shader pack
-    ShaderCompiler::Result compile_result = ShaderCompiler::Compile(source_path.CStr(), mDataPack, macros);
+    ShaderCompiler::eResult compile_result = ShaderCompiler::Compile(source_path.CStr(), mDataPack, macros);
 
-    if (compile_result != ShaderCompiler::Result::Failed) {
+    if (compile_result != ShaderCompiler::eResult::Failed) {
         mDataPack.WriteToFile(compiled_path.CStr());
     }
 }

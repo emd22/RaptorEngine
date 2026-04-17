@@ -1,7 +1,6 @@
 #pragma once
 
-namespace fx {
-namespace renderer {
+namespace fx::renderer {
 
 class ShadowDirectional;
 class RenderBackend;
@@ -15,8 +14,6 @@ extern ShaderCache* gShaderCache;
 extern DescriptorCache* gDescriptorCache;
 extern State* gState;
 
-} // namespace renderer
-
 namespace Globals {
 
 void Init();
@@ -24,4 +21,4 @@ void Destroy();
 
 }; // namespace Globals
 
-} // namespace fx
+} // namespace fx::renderer

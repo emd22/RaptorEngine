@@ -19,7 +19,8 @@ public:
     void WaitFor(uint64 timeout = UINT64_MAX) const;
     void Reset();
 
-    FX_FORCE_INLINE VkFence Get() const { return Fence; }
+    FX_FORCE_INLINE VkFence Get() { return Fence; }
+    FX_FORCE_INLINE const VkFence Get() const { return Fence; }
 
     void Destroy();
 
@@ -38,7 +39,8 @@ public:
 
     void Create();
 
-    FX_FORCE_INLINE VkSemaphore Get() const { return InternalSemaphore; }
+    FX_FORCE_INLINE VkSemaphore Get() { return InternalSemaphore; }
+    FX_FORCE_INLINE const VkSemaphore Get() const { return InternalSemaphore; }
 
     void SetCacheId(uint32 id)
     {

@@ -95,7 +95,7 @@ void RenderBackend::Init(Vec2u window_size)
 
     gObjectManager->Create();
 
-    Uniforms.Create(scDefaultUniformSize);
+    ShaderUniform.Create(scDefaultUniformSize);
 
     BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f));
 
@@ -143,13 +143,13 @@ void RenderBackend::InitFrames()
         frame.Create(device);
 
         auto synchro_label = std::format("Frame {} I.A.", i);
-        Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.ImageAvailable.Semaphore);
+        Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.ImageAvailable.Get());
 
         synchro_label = std::format("Frame {} G.P", i);
-        Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.OffscreenSem.Semaphore);
+        Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.OffscreenSem.Get());
 
         synchro_label = std::format("Frame {} R.F", i);
-        Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Semaphore);
+        Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Get());
     }
 }
 
@@ -465,11 +465,11 @@ void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
 }
 
 
-FrameResult RenderBackend::BeginFrame()
+eFrameResult RenderBackend::BeginFrame()
 {
     FrameData* frame = GetFrame();
 
-    Uniforms.Rewind();
+    ShaderUniform.Rewind();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -477,18 +477,17 @@ FrameResult RenderBackend::BeginFrame()
     frame->InFlight.Reset();
 
 
-    FrameResult result = GetNextSwapchainImage(frame);
-    if (result != FrameResult::Success) {
+    eFrameResult result = GetNextSwapchainImage(frame);
+    if (result != eFrameResult::Success) {
         return result;
     }
 
-    return FrameResult::Success;
+    return eFrameResult::Success;
 }
 
 void RenderBackend::BeginGeometry()
 {
     FrameData* frame = GetFrame();
-
 
     pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
 }
@@ -501,20 +500,22 @@ void RenderBackend::PresentFrame()
         VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
     };
 
-    VkSemaphore* submit_semaphore = &mSubmitSemaphores[mImageIndex].Semaphore;
+    VkSemaphore submit_semaphore = mSubmitSemaphores[mImageIndex].Get();
+
+    VkSemaphore wait_semaphore = frame->ImageAvailable.Get();
 
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &frame->ImageAvailable.Semaphore,
+        .pWaitSemaphores = &wait_semaphore,
         .pWaitDstStageMask = wait_stages,
 
         .commandBufferCount = 1,
         .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
 
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = submit_semaphore,
+        .pSignalSemaphores = &submit_semaphore,
     };
 
     {
@@ -538,7 +539,7 @@ void RenderBackend::PresentFrame()
     const VkPresentInfoKHR present_info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = submit_semaphore,
+        .pWaitSemaphores = &submit_semaphore,
 
         .swapchainCount = 1,
         .pSwapchains = swapchains,
@@ -566,7 +567,7 @@ void RenderBackend::BeginLighting()
 
     pDeferredRenderer->GPass.End();
 
-    Target* depth_target = pDeferredRenderer->GPass.GetTarget(ImageFormat::eD32_Float, 0);
+    Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::eD32_Float, 0);
     Assert(depth_target != nullptr);
     depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
@@ -638,25 +639,25 @@ void RenderBackend::DoComposition(Camera& render_cam)
     mFrameNumber = (mInternalFrameCounter % FramesInFlight);
 }
 
-FrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
+eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
 {
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
     const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
-                                                  frame->ImageAvailable.Semaphore, nullptr, &mImageIndex);
+                                                  frame->ImageAvailable.Get(), nullptr, &mImageIndex);
 
     if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
-        return FrameResult::Success;
+        return eFrameResult::Success;
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         // Swapchain.Rebuild()..
-        return FrameResult::GraphicsOutOfDate;
+        return eFrameResult::GraphicsOutOfDate;
     }
     else {
         LogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
     }
 
-    return FrameResult::RenderError;
+    return eFrameResult::RenderError;
 }
 
 void RenderBackend::CreateSurfaceFromWindow()

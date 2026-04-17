@@ -45,6 +45,14 @@ FoxtrotGame::FoxtrotGame()
     CreateGame();
 }
 
+enum class eFlags
+{
+    SomeFlag = 0x01,
+    OtherFlag = 0x02,
+};
+
+FxEnumFlags(eFlags);
+
 void FoxtrotGame::InitEngine()
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
@@ -157,16 +165,16 @@ static FX_FORCE_INLINE Vec3f GetMovementVector()
 {
     Vec3f movement = Vec3f::sZero;
 
-    if (ControlManager::IsKeyDown(Key::FX_KEY_W)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_W)) {
         movement.Z += 1.0f;
     }
-    if (ControlManager::IsKeyDown(Key::FX_KEY_S)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_S)) {
         movement.Z += -1.0f;
     }
-    if (ControlManager::IsKeyDown(Key::FX_KEY_A)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_A)) {
         movement.X += 1.0f;
     }
-    if (ControlManager::IsKeyDown(Key::FX_KEY_D)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_D)) {
         movement.X += -1.0f;
     }
 
@@ -175,22 +183,22 @@ static FX_FORCE_INLINE Vec3f GetMovementVector()
 
 void FoxtrotGame::ProcessControls()
 {
-    if (ControlManager::IsKeyPressed(Key::FX_KEY_GRAVE)) {
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_GRAVE)) {
         // Release the mouse before quitting the game incase there is a crash.
         ControlManager::ReleaseMouse();
         sbRunning = false;
     }
 
     // Click to lock mouse
-    if (ControlManager::IsKeyPressed(Key::FX_MOUSE_LEFT) && !ControlManager::IsMouseLocked()) {
+    if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT) && !ControlManager::IsMouseLocked()) {
         ControlManager::CaptureMouse();
     }
     // Escape to unlock mouse
-    else if (ControlManager::IsKeyPressed(Key::FX_KEY_ESCAPE) && ControlManager::IsMouseLocked()) {
+    else if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && ControlManager::IsMouseLocked()) {
         ControlManager::ReleaseMouse();
     }
 
-    if (ControlManager::IsKeyPressed(Key::FX_KEY_8)) {
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
         sbShowShadowCam = !sbShowShadowCam;
 
 
@@ -215,30 +223,30 @@ void FoxtrotGame::ProcessControls()
     }
 
 
-    if (ControlManager::IsKeyDown(Key::FX_KEY_SPACE)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_SPACE)) {
         if (!Player.IsFlyMode()) {
             Player.Jump();
         }
     }
 
     // Elevate up
-    if (ControlManager::IsKeyDown(Key::FX_KEY_E)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_E)) {
         Player.Move(DeltaTime, Vec3f::sUp);
     }
     // Elevate down
-    if (ControlManager::IsKeyDown(Key::FX_KEY_Q)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
         Player.Move(DeltaTime, -Vec3f::sUp);
     }
 
 
-    if (ControlManager::IsKeyDown(Key::FX_KEY_LSHIFT)) {
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
         Player.bIsSprinting = true;
     }
     else {
         Player.bIsSprinting = false;
     }
 
-    if (ControlManager::IsComboDown(Key::FX_KEY_LSHIFT, Key::FX_KEY_R)) {
+    if (ControlManager::IsComboDown(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
         // Reload the object properties from the scene
         SceneFile scene_file;
         scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr64("Scene"))->Get<const char*>()),
@@ -247,17 +255,17 @@ void FoxtrotGame::ProcessControls()
         LoadOffsetsFile();
     }
 
-    if (ControlManager::IsKeyPressed(Key::FX_KEY_P)) {
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
         pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
     }
 
-    if (ControlManager::IsKeyPressed(Key::FX_KEY_0)) {
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
         Player.SetFlyMode(true);
         Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
     }
 
 
-    if (ControlManager::IsKeyPressed(Key::FX_KEY_N)) {
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
         // Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
         Player.SetFlyMode(!Player.IsFlyMode());
     }
@@ -343,7 +351,7 @@ void FoxtrotGame::Tick()
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
-    if (gRenderer->BeginFrame() != FrameResult::Success) {
+    if (gRenderer->BeginFrame() != eFrameResult::Success) {
         mLastTick = current_tick;
         return;
     }

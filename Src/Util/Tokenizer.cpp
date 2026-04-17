@@ -6,7 +6,7 @@
 
 namespace fx {
 
-const char* Token::GetTypeName(TokenType type)
+const char* Token::GetTypeName(eTokenType type)
 {
     const char* type_names[] = {
         "Unknown",    "Identifier",
@@ -34,31 +34,31 @@ const char* Token::GetTypeName(TokenType type)
 }
 
 
-Token::IsNumericResult Token::IsNumeric() const
+Token::eIsNumericResult Token::IsNumeric() const
 {
     char ch;
 
-    Token::IsNumericResult result = Token::IsNumericResult::NaN;
+    Token::eIsNumericResult result = Token::eIsNumericResult::NaN;
 
     for (int i = 0; i < Length; i++) {
         ch = Start[i];
 
         // If there is a number preceding the dot then we are a frfunctional
-        if (ch == '.' && result != Token::IsNumericResult::NaN) {
-            result = Token::IsNumericResult::Fractional;
+        if (ch == '.' && result != Token::eIsNumericResult::NaN) {
+            result = Token::eIsNumericResult::Fractional;
             continue;
         }
 
         if ((ch >= '0' && ch <= '9')) {
             // If no numbers have been found yet then set to integer
-            if (result == Token::IsNumericResult::NaN) {
-                result = Token::IsNumericResult::Integer;
+            if (result == Token::eIsNumericResult::NaN) {
+                result = Token::eIsNumericResult::Integer;
             }
             continue;
         }
 
         // Not a number
-        return Token::IsNumericResult::NaN;
+        return Token::eIsNumericResult::NaN;
     }
 
     // Is numeric
@@ -70,63 +70,63 @@ Token::IsNumericResult Token::IsNumeric() const
 // Tokenizer
 /////////////////////////////////////
 
-TokenType Tokenizer::GetTokenType(Token& token)
+eTokenType Tokenizer::GetTokenType(Token& token)
 {
-    if (token.Type == TokenType::DocComment) {
-        return TokenType::DocComment;
+    if (token.Type == eTokenType::DocComment) {
+        return eTokenType::DocComment;
     }
 
     // Check if the token is a number
-    Token::IsNumericResult is_numeric = token.IsNumeric();
+    Token::eIsNumericResult is_numeric = token.IsNumeric();
 
     switch (is_numeric) {
-    case Token::IsNumericResult::Integer:
-        return TokenType::Integer;
-    case Token::IsNumericResult::Fractional:
-        return TokenType::Float;
-    case Token::IsNumericResult::NaN:
+    case Token::eIsNumericResult::Integer:
+        return eTokenType::Integer;
+    case Token::eIsNumericResult::Fractional:
+        return eTokenType::Float;
+    case Token::eIsNumericResult::NaN:
         break;
     }
 
     if (token.Length > 2) {
         // Checks if the token is a string
         if (token.Start[0] == '"' && token.Start[token.Length - 1] == '"') {
-            return TokenType::String;
+            return eTokenType::String;
         }
     }
 
     if (token.Length == 1) {
         switch (token.Start[0]) {
         case '=':
-            return TokenType::Equals;
+            return eTokenType::Equals;
         case '(':
-            return TokenType::LParen;
+            return eTokenType::LParen;
         case ')':
-            return TokenType::RParen;
+            return eTokenType::RParen;
         case '[':
-            return TokenType::LBracket;
+            return eTokenType::LBracket;
         case ']':
-            return TokenType::RBracket;
+            return eTokenType::RBracket;
         case '{':
-            return TokenType::LBrace;
+            return eTokenType::LBrace;
         case '}':
-            return TokenType::RBrace;
+            return eTokenType::RBrace;
         case '+':
-            return TokenType::Plus;
+            return eTokenType::Plus;
         case '-':
-            return TokenType::Minus;
+            return eTokenType::Minus;
         case '$':
-            return TokenType::Dollar;
+            return eTokenType::Dollar;
         case '.':
-            return TokenType::Dot;
+            return eTokenType::Dot;
         case ',':
-            return TokenType::Comma;
+            return eTokenType::Comma;
         case ';':
-            return TokenType::Semicolon;
+            return eTokenType::Semicolon;
         }
     }
 
-    return TokenType::Identifier;
+    return eTokenType::Identifier;
 }
 
 
@@ -164,7 +164,7 @@ void Tokenizer::SubmitTokenIfData(Token& token, char* end_ptr, char* start_ptr)
 
 bool Tokenizer::CheckOperators(Token& current_token, char ch)
 {
-    if (ch == '.' && current_token.IsNumeric() != Token::IsNumericResult::NaN) {
+    if (ch == '.' && current_token.IsNumeric() != Token::eIsNumericResult::NaN) {
         return false;
     }
 
@@ -357,10 +357,10 @@ void Tokenizer::Tokenize()
             }
 
             if (is_doccomment) {
-                current_token.Type = TokenType::DocComment;
+                current_token.Type = eTokenType::DocComment;
                 SubmitTokenIfData(current_token);
 
-                current_token.Type = TokenType::Unknown;
+                current_token.Type = eTokenType::Unknown;
 
                 is_doccomment = false;
             }

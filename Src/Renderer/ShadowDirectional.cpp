@@ -18,9 +18,9 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 {
     RenderStage.Create(size);
 
-    RenderStage.AddTarget(ImageFormat::eD32_Float, size,
+    RenderStage.AddTarget(eImageFormat::eD32_Float, size,
                           VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                          ImageAspectFlag::Depth);
+                          eImageAspectFlag::Depth);
 
     RenderStage.BuildRenderStage();
 
@@ -37,7 +37,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
     VkPipelineLayout pipeline_layout = Pipeline::CreateLayout(Slice(push_consts), Slice(desc_sets));
 
     Shader shader_shadow("Shadows");
-    VertexDescription vertex_info = VertexUtil::BuildDescription<VertexType::Default>();
+    VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
 
     PipelineProperties pipeline_properties {
         .ViewportSize = size,
@@ -45,8 +45,8 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
     };
 
 
-    Ref<ShaderProgram> vertex_shader = shader_shadow.GetProgram(ShaderType::Vertex, {});
-    Ref<ShaderProgram> fragment_shader = shader_shadow.GetProgram(ShaderType::Fragment, {});
+    Ref<ShaderProgram> vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, {});
+    Ref<ShaderProgram> fragment_shader = shader_shadow.GetProgram(eShaderType::Fragment, {});
 
     PipelineBuilder builder {};
     builder.SetLayout(pipeline_layout)
@@ -65,10 +65,10 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
     {
         SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_SKINNING", "1" } };
 
-        vertex_shader = shader_shadow.GetProgram(ShaderType::Vertex, macros);
-        fragment_shader = shader_shadow.GetProgram(ShaderType::Fragment, macros);
+        vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, macros);
+        fragment_shader = shader_shadow.GetProgram(eShaderType::Fragment, macros);
 
-        vertex_info = VertexUtil::BuildDescription<VertexType::Skinned>();
+        vertex_info = VertexUtil::BuildDescription<eVertexType::Skinned>();
         builder.SetVertexDescription(&vertex_info).SetShaders(vertex_shader, fragment_shader).Build(mPipelineSkinned);
     }
 
@@ -94,7 +94,7 @@ void ShadowDirectional::End() { RenderStage.End(); }
 void ShadowDirectional::UpdateLightDescriptors()
 {
     DescriptorSet& ds = gRenderer->pDeferredRenderer->DsLighting;
-    ds.AddImageFromTarget(3, RenderStage.GetTarget(ImageFormat::eD32_Float), &gRenderer->Swapchain.ShadowDepthSampler);
+    ds.AddImageFromTarget(3, RenderStage.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.ShadowDepthSampler);
     ds.Build();
 }
 

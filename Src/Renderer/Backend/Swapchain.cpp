@@ -40,7 +40,7 @@ void Swapchain::CreateSwapchainImages()
 
     for (VkImage& raw_image : raw_images) {
         Image* image = OutputImages.Insert();
-        image->Image = raw_image;
+        image->InternalImage = raw_image;
         image->View = nullptr;
         image->Allocation = nullptr;
         image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -55,7 +55,7 @@ void Swapchain::CreateImageViews()
     for (int32 i = 0; i < OutputImages.Size; i++) {
         const VkImageViewCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .image = OutputImages[i].Image,
+            .image = OutputImages[i].InternalImage,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
             .format = ImageFormatUtil::ToUnderlying(Surface.Format),
             .components = {
@@ -115,10 +115,10 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR& surface)
                surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
 
         if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
-            Surface.Format = ImageFormat::RGBA16_Float;
+            Surface.Format = eImageFormat::RGBA16_Float;
         }
         else if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM) {
-            Surface.Format = ImageFormat::RGBA8_UNorm;
+            Surface.Format = eImageFormat::RGBA8_UNorm;
         }
 
         Surface.ColorSpace = surface_format.colorSpace;
@@ -164,18 +164,18 @@ void Swapchain::CreateSamplers()
     ColorSampler.Create();
 
     DepthSampler.Create(SamplerProps {
-        SamplerFilter::Nearest,
-        SamplerFilter::Nearest,
-        SamplerFilter::Nearest,
+        eSamplerFilter::Nearest,
+        eSamplerFilter::Nearest,
+        eSamplerFilter::Nearest,
     });
 
     ShadowDepthSampler.Create(SamplerProps {
-        SamplerFilter::Linear,
-        SamplerFilter::Linear,
-        SamplerFilter::Linear,
-        SamplerAddressMode::ClampToBorder,
-        SamplerBorderColor::FloatWhite,
-        SamplerCompareOp::Greater,
+        eSamplerFilter::Linear,
+        eSamplerFilter::Linear,
+        eSamplerFilter::Linear,
+        eSamplerAddressMode::ClampToBorder,
+        eSamplerBorderColor::FloatWhite,
+        eSamplerCompareOp::Greater,
     });
 
     NormalsSampler.Create();
@@ -186,7 +186,7 @@ void Swapchain::DestroyFramebuffersAndImageViews()
 {
     for (int i = 0; i < FramesInFlight; i++) {
         // HACK: Clears the image so that we only destroy the image view. This should be updated!
-        OutputImages[i].Image = nullptr;
+        OutputImages[i].InternalImage = nullptr;
         OutputImages[i].DecRef();
     }
 

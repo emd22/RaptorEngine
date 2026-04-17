@@ -31,7 +31,7 @@ public:
      * @brief Registers a new descriptor set in the cache.
      * @returns The identifier to access it by
      */
-    ShaderDescriptorId Register(uint32 set, ShaderType shader_type, const SizedArray<ShaderOutlineEntry>& entry_list);
+    ShaderDescriptorId Register(uint32 set, eShaderType shader_type, const SizedArray<ShaderOutlineEntry>& entry_list);
 
     Ref<DescriptorSet> Request(const ShaderDescriptorId& id);
 

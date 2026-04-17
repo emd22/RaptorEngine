@@ -13,7 +13,7 @@ namespace fx {
 class AxLoaderJpeg : public AxLoaderImageBase
 {
 public:
-    using Status = AxLoaderBase::Status;
+    using Status = AxLoaderBase::eStatus;
 
     AxLoaderJpeg() = default;
 

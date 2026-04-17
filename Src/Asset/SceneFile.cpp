@@ -118,8 +118,8 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
     if (layer != nullptr) {
         int64 layer_value = layer->Get<int64>();
 
-        if (layer_value == static_cast<int64>(ObjectLayer::PlayerLayer)) {
-            object->SetObjectLayer(ObjectLayer::PlayerLayer);
+        if (layer_value == static_cast<int64>(eObjectLayer::PlayerLayer)) {
+            object->SetObjectLayer(eObjectLayer::PlayerLayer);
         }
     }
 

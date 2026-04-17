@@ -18,13 +18,13 @@ void ObjectManager::Create()
     }
 
     renderer::DsLayoutBuilder builder {};
-    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, renderer::ShaderType::Vertex);
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, renderer::eShaderType::Vertex);
     DsLayoutObjectBuffer = builder.Build();
 
     uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * FramesInFlight;
 
-    mObjectGpuBuffer.Create(renderer::GpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
-                            renderer::GpuBufferFlags::PersistentMapped);
+    mObjectGpuBuffer.Create(renderer::eGpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
+                            renderer::eGpuBufferFlags::PersistentMapped);
 
 
     mObjectSlotsInUse.InitZero(scMaxObjects);

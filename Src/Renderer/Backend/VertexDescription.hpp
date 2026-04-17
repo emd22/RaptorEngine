@@ -18,7 +18,7 @@ struct VertexDescription
 namespace VertexUtil {
 
 
-template <VertexType TVertexType>
+template <eVertexType TVertexType>
 VertexDescription BuildDescription()
 {
     VkVertexInputBindingDescription binding_desc = {
@@ -29,7 +29,7 @@ VertexDescription BuildDescription()
 
     SizedArray<VkVertexInputAttributeDescription> attribs;
 
-    if constexpr (TVertexType == VertexType::Slim) {
+    if constexpr (TVertexType == eVertexType::Slim) {
         attribs = {
             {
                 .location = 0,
@@ -39,8 +39,8 @@ VertexDescription BuildDescription()
             },
         };
     }
-    else if constexpr (TVertexType == VertexType::Default) {
-        using VertexType = Vertex<VertexType::Default>;
+    else if constexpr (TVertexType == eVertexType::Default) {
+        using VertexType = Vertex<eVertexType::Default>;
         attribs = {
             // Position
             {
@@ -73,8 +73,8 @@ VertexDescription BuildDescription()
         };
     }
 
-    else if constexpr (TVertexType == VertexType::Skinned) {
-        using VertexType = Vertex<VertexType::Skinned>;
+    else if constexpr (TVertexType == eVertexType::Skinned) {
+        using VertexType = Vertex<eVertexType::Skinned>;
         attribs = {
             // Position
             {
@@ -127,15 +127,15 @@ VertexDescription BuildDescription()
     return { binding_desc, std::move(attribs), true };
 }
 
-FX_FORCE_INLINE VertexDescription BuildDescription(VertexType vertex_type)
+FX_FORCE_INLINE VertexDescription BuildDescription(eVertexType vertex_type)
 {
     switch (vertex_type) {
-    case VertexType::Slim:
-        return VertexUtil::BuildDescription<VertexType::Slim>();
-    case VertexType::Default:
-        return VertexUtil::BuildDescription<VertexType::Default>();
-    case VertexType::Skinned:
-        return VertexUtil::BuildDescription<VertexType::Skinned>();
+    case eVertexType::Slim:
+        return VertexUtil::BuildDescription<eVertexType::Slim>();
+    case eVertexType::Default:
+        return VertexUtil::BuildDescription<eVertexType::Default>();
+    case eVertexType::Skinned:
+        return VertexUtil::BuildDescription<eVertexType::Skinned>();
     default:;
     }
 

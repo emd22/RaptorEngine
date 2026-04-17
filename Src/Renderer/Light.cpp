@@ -13,7 +13,7 @@ using namespace fx::renderer;
 
 using VertexType = LightBase::VertexType;
 
-LightBase::LightBase(LightFlags flags) : Flags(flags)
+LightBase::LightBase(eLightFlags flags) : Flags(flags)
 {
     ObjectId = gObjectManager->GenerateObjectId();
 
@@ -111,7 +111,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 
     {
         LightVertPushConstants push_constants {};
-        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
 
         push_constants.ObjectId = ObjectId;
@@ -121,7 +121,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
     }
 
 
-    gRenderer->ShaderUniform.WritePtr(shadow_camera->GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+    gRenderer->ShaderUniform.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     gRenderer->ShaderUniform.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
     gRenderer->ShaderUniform.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
@@ -153,7 +153,7 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
     Ref<DeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
     DrawPushConstants push_constants {};
-    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     push_constants.ObjectId = ObjectId;
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout,
@@ -175,7 +175,7 @@ LightPoint::LightPoint()
     pPipelineInside = &gRenderer->pDeferredRenderer->PlLightingInsideVolume;
     pPipelineOutside = &gRenderer->pDeferredRenderer->PlLightingOutsideVolume;
 
-    Type = LightType::Point;
+    Type = eLightType::Point;
 }
 
 
@@ -183,7 +183,7 @@ LightDirectional::LightDirectional()
 {
     pPipeline = &gRenderer->pDeferredRenderer->PlLightingDirectional;
 
-    Type = LightType::Directional;
+    Type = eLightType::Directional;
 }
 
 void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
@@ -199,7 +199,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 
     {
         LightVertPushConstants push_constants {};
-        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
         push_constants.ObjectId = ObjectId;
 
@@ -210,11 +210,11 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
     gRenderer->ShaderUniform.Rewind();
 
     if (shadow_camera) {
-        gRenderer->ShaderUniform.WritePtr(shadow_camera->GetCameraMatrix(ObjectLayer::WorldLayer).RawData,
+        gRenderer->ShaderUniform.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
                                           sizeof(Mat4f));
     }
     else {
-        gRenderer->ShaderUniform.WritePtr(camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+        gRenderer->ShaderUniform.WritePtr(camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     }
 
     gRenderer->ShaderUniform.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));

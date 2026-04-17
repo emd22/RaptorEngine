@@ -41,8 +41,8 @@ void MaterialManager::Create(uint32 entities_per_page)
     // Material properties buffer descriptors
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
-    MaterialPropertiesBuffer.Create(GpuBufferType::Storage, sizeof(MaterialProperties) * material_buffer_size,
-                                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, GpuBufferFlags::PersistentMapped);
+    MaterialPropertiesBuffer.Create(eGpuBufferType::Storage, sizeof(MaterialProperties) * material_buffer_size,
+                                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
 
     if (!mMaterialPropertiesDS.IsInited()) {
@@ -177,7 +177,7 @@ void Material::Destroy()
 }
 
 
-template <ImageFormat TFormat>
+template <eImageFormat TFormat>
 static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 {
     if (!component.pAssetImage && component.pDataToLoad) {
@@ -197,7 +197,7 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 
 #define BUILD_MATERIAL_COMPONENT(component_)                                                                           \
     {                                                                                                                  \
-        if (component_.Build() == MaterialComponentStatus::NotReady) {                                                 \
+        if (component_.Build() == eMaterialComponentStatus::NotReady) {                                                \
             return;                                                                                                    \
         }                                                                                                              \
     }
@@ -235,7 +235,7 @@ void Material::Build()
         // To reduce permutations -- the metallic roughness map should only be
         // enabled if there is also a normal map.
         if (!MetallicRoughness.Exists()) {
-            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<ImageFormat::RGBA8_SRGB>();
+            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_SRGB>();
         }
 
         mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
