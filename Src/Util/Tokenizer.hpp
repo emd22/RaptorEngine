@@ -12,46 +12,46 @@
 
 namespace fx {
 
-enum class TokenType
+enum class eTokenType
 {
-    eUnknown,
-    eIdentifier,
+    Unknown,
+    Identifier,
 
-    eString,
-    eInteger,
-    eFloat,
+    String,
+    Integer,
+    Float,
 
-    eEquals,
+    Equals,
 
-    eLParen,
-    eRParen,
+    LParen,
+    RParen,
 
-    eLBracket,
-    eRBracket,
+    LBracket,
+    RBracket,
 
-    eLBrace,
-    eRBrace,
+    LBrace,
+    RBrace,
 
-    ePlus,
-    eDollar,
-    eMinus,
+    Plus,
+    Dollar,
+    Minus,
 
-    eQuestion,
+    Question,
 
-    eDot,
-    eComma,
-    eSemicolon,
+    Dot,
+    Comma,
+    Semicolon,
 
-    eDocComment,
+    DocComment,
 };
 
 struct Token
 {
-    enum class IsNumericResult
+    enum class eIsNumericResult
     {
-        eNaN,
-        eInteger,
-        eFractional
+        NaN,
+        Integer,
+        Fractional
     };
 
 public:
@@ -87,8 +87,8 @@ public:
         return (Hash = HashData64(Slice<char>(Start, Length)));
     }
 
-    IsNumericResult IsNumeric() const;
-    static const char* GetTypeName(TokenType type);
+    eIsNumericResult IsNumeric() const;
+    static const char* GetTypeName(eTokenType type);
 
     int64 ToInt() const
     {
@@ -128,7 +128,7 @@ public:
     char* End = nullptr;
 
     Hash64 Hash = HashNull64;
-    TokenType Type = TokenType::eUnknown;
+    eTokenType Type = eTokenType::Unknown;
     uint32 Length = 0;
 
     uint16 FileColumn = 0;
@@ -162,7 +162,7 @@ public:
 
     void SubmitTokenIfData(Token& token, char* end_ptr = nullptr, char* start_ptr = nullptr);
 
-    TokenType GetTokenType(Token& token);
+    eTokenType GetTokenType(Token& token);
     bool CheckOperators(Token& current_token, char ch);
     uint32 ReadQuotedString(char* buffer, uint32 max_size, bool skip_on_success = true);
     bool ExpectString(const char* expected_value, bool skip_on_success = true);

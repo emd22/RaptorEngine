@@ -38,27 +38,27 @@ Token::IsNumericResult Token::IsNumeric() const
 {
     char ch;
 
-    Token::IsNumericResult result = Token::IsNumericResult::eNaN;
+    Token::IsNumericResult result = Token::IsNumericResult::NaN;
 
     for (int i = 0; i < Length; i++) {
         ch = Start[i];
 
         // If there is a number preceding the dot then we are a frfunctional
-        if (ch == '.' && result != Token::IsNumericResult::eNaN) {
-            result = Token::IsNumericResult::eFractional;
+        if (ch == '.' && result != Token::IsNumericResult::NaN) {
+            result = Token::IsNumericResult::Fractional;
             continue;
         }
 
         if ((ch >= '0' && ch <= '9')) {
             // If no numbers have been found yet then set to integer
-            if (result == Token::IsNumericResult::eNaN) {
-                result = Token::IsNumericResult::eInteger;
+            if (result == Token::IsNumericResult::NaN) {
+                result = Token::IsNumericResult::Integer;
             }
             continue;
         }
 
         // Not a number
-        return Token::IsNumericResult::eNaN;
+        return Token::IsNumericResult::NaN;
     }
 
     // Is numeric
@@ -72,61 +72,61 @@ Token::IsNumericResult Token::IsNumeric() const
 
 TokenType Tokenizer::GetTokenType(Token& token)
 {
-    if (token.Type == TokenType::eDocComment) {
-        return TokenType::eDocComment;
+    if (token.Type == TokenType::DocComment) {
+        return TokenType::DocComment;
     }
 
     // Check if the token is a number
     Token::IsNumericResult is_numeric = token.IsNumeric();
 
     switch (is_numeric) {
-    case Token::IsNumericResult::eInteger:
-        return TokenType::eInteger;
-    case Token::IsNumericResult::eFractional:
-        return TokenType::eFloat;
-    case Token::IsNumericResult::eNaN:
+    case Token::IsNumericResult::Integer:
+        return TokenType::Integer;
+    case Token::IsNumericResult::Fractional:
+        return TokenType::Float;
+    case Token::IsNumericResult::NaN:
         break;
     }
 
     if (token.Length > 2) {
         // Checks if the token is a string
         if (token.Start[0] == '"' && token.Start[token.Length - 1] == '"') {
-            return TokenType::eString;
+            return TokenType::String;
         }
     }
 
     if (token.Length == 1) {
         switch (token.Start[0]) {
         case '=':
-            return TokenType::eEquals;
+            return TokenType::Equals;
         case '(':
-            return TokenType::eLParen;
+            return TokenType::LParen;
         case ')':
-            return TokenType::eRParen;
+            return TokenType::RParen;
         case '[':
-            return TokenType::eLBracket;
+            return TokenType::LBracket;
         case ']':
-            return TokenType::eRBracket;
+            return TokenType::RBracket;
         case '{':
-            return TokenType::eLBrace;
+            return TokenType::LBrace;
         case '}':
-            return TokenType::eRBrace;
+            return TokenType::RBrace;
         case '+':
-            return TokenType::ePlus;
+            return TokenType::Plus;
         case '-':
-            return TokenType::eMinus;
+            return TokenType::Minus;
         case '$':
-            return TokenType::eDollar;
+            return TokenType::Dollar;
         case '.':
-            return TokenType::eDot;
+            return TokenType::Dot;
         case ',':
-            return TokenType::eComma;
+            return TokenType::Comma;
         case ';':
-            return TokenType::eSemicolon;
+            return TokenType::Semicolon;
         }
     }
 
-    return TokenType::eIdentifier;
+    return TokenType::Identifier;
 }
 
 
@@ -164,7 +164,7 @@ void Tokenizer::SubmitTokenIfData(Token& token, char* end_ptr, char* start_ptr)
 
 bool Tokenizer::CheckOperators(Token& current_token, char ch)
 {
-    if (ch == '.' && current_token.IsNumeric() != Token::IsNumericResult::eNaN) {
+    if (ch == '.' && current_token.IsNumeric() != Token::IsNumericResult::NaN) {
         return false;
     }
 
@@ -267,7 +267,7 @@ bool Tokenizer::ExpectString(const char* expected_value, bool skip_on_success)
 
 void Tokenizer::IncludeFile(const char* path)
 {
-    File file(path, File::ModType::eRead, File::DataType::eBinary);
+    File file(path, File::eModType::Read, File::eDataType::Binary);
 
 
     if (!file.IsFileOpen()) {
@@ -357,10 +357,10 @@ void Tokenizer::Tokenize()
             }
 
             if (is_doccomment) {
-                current_token.Type = TokenType::eDocComment;
+                current_token.Type = TokenType::DocComment;
                 SubmitTokenIfData(current_token);
 
-                current_token.Type = TokenType::eUnknown;
+                current_token.Type = TokenType::Unknown;
 
                 is_doccomment = false;
             }

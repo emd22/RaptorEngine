@@ -30,33 +30,33 @@ public:
 };
 
 
-enum class PhMotionType
+enum class ePhMotionType
 {
-    eStatic,
-    eDynamic,
+    Static,
+    Dynamic,
 };
 
-enum class PhPrimitiveType
+enum class ePhPrimitiveType
 {
-    eBox,
+    Box,
 };
 
 
 class PhObject
 {
 public:
-    enum Flags
+    enum eFlags
     {
-        eNone = 0x00,
-        eCreateInactive = 0x01,
+        None = 0x00,
+        CreateInactive = 0x01,
     };
 
 
 public:
-    void CreatePrimitiveBody(PhPrimitiveType primitive_type, const Vec3f& dimensions, PhMotionType motion_type,
+    void CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                              const PhProperties& object_properties);
 
-    void CreateMeshBody(const PrimitiveMesh& mesh, PhMotionType motion_type, const PhProperties& object_properties);
+    void CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_type, const PhProperties& object_properties);
 
     void DestroyPhysicsBody();
 
@@ -68,14 +68,14 @@ public:
     FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
     FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
 
-    FX_FORCE_INLINE PhMotionType GetMotionType() const { return mMotionType; }
+    FX_FORCE_INLINE ePhMotionType GetMotionType() const { return mMotionType; }
 
 private:
-    void CreateJoltBody(JPH::ShapeRefC shape, Flags flags, PhMotionType type, const PhProperties& properties);
+    void CreateJoltBody(JPH::ShapeRefC shape, eFlags flags, ePhMotionType type, const PhProperties& properties);
 
 public:
     JPH::Body* mpPhysicsBody = nullptr;
-    PhMotionType mMotionType = PhMotionType::eStatic;
+    ePhMotionType mMotionType = ePhMotionType::Static;
 
     bool mbHasPhysicsBody : 1 = false;
 };

@@ -4,11 +4,11 @@
 /**
  * @brief Enum of all scancode values accepted by Foxtrot.
  *
- * This enum uses scancode values to provide a position independent representation of the keyboard.
+ * This enum euses scancode values to provide a position independent representation of the keyboard.
  *
- * This enum is based on a modified version of the SDL_Scancode enum.
+ * This enum eis based on a modified version of the SDL_Scancode enum.
  */
-enum class Key
+enum class eKey
 {
     FX_KEY_UNKNOWN = 0,
 

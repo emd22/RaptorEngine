@@ -53,7 +53,7 @@ public:
 
 public:
     AxQueueItem Item;
-    AxLoaderBase::Status LoadStatus = AxLoaderBase::Status::eNone;
+    AxLoaderBase::eStatus LoadStatus = AxLoaderBase::eStatus::None;
 
     DataNotifier ItemReady;
 
@@ -120,7 +120,7 @@ public:
         return asset;
     }
 
-    TSRef<AxImage> LoadImage(renderer::RxImageType image_type, renderer::RxImageFormat format, const std::string& path)
+    TSRef<AxImage> LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, const std::string& path)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
         LoadImage(image_type, format, asset, path);
@@ -128,16 +128,16 @@ public:
         return asset;
     }
 
-    inline TSRef<AxImage> LoadImage(const std::string& path, renderer::RxImageFormat format)
+    inline TSRef<AxImage> LoadImage(const std::string& path, renderer::eImageFormat format)
     {
-        return LoadImage(renderer::RxImageType::e2d, format, path);
+        return LoadImage(renderer::eImageType::Flat, format, path);
     }
 
     /**
      * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    TSRef<AxImage> LoadImageFromMemory(renderer::RxImageType image_type, renderer::RxImageFormat format,
+    TSRef<AxImage> LoadImageFromMemory(renderer::eImageType image_type, renderer::eImageFormat format,
                                        const uint8* data, uint32 data_size)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
@@ -146,9 +146,9 @@ public:
         return asset;
     }
 
-    inline TSRef<AxImage> LoadImageFromMemory(renderer::RxImageFormat format, const uint8* data, uint32 data_size)
+    inline TSRef<AxImage> LoadImageFromMemory(renderer::eImageFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(renderer::RxImageType::e2d, format, data, data_size);
+        return LoadImageFromMemory(renderer::eImageType::Flat, format, data, data_size);
     }
 
 
@@ -156,7 +156,7 @@ public:
     // Methods to load into existing containers
     ////////////////////////////////////////////////
 
-    void LoadImageFromMemory(renderer::RxImageType image_type, renderer::RxImageFormat format, TSRef<AxImage>& asset,
+    void LoadImageFromMemory(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
                              const uint8* data, uint32 data_size);
 
     /**
@@ -172,22 +172,22 @@ public:
                     LoadObjectOptions options = {});
 
 
-    void LoadImage(renderer::RxImageType image_type, renderer::RxImageFormat format, TSRef<AxImage>& asset,
+    void LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
                    const std::string& path);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    inline void LoadImage(TSRef<AxImage>& asset, renderer::RxImageFormat format, const std::string& path)
+    inline void LoadImage(TSRef<AxImage>& asset, renderer::eImageFormat format, const std::string& path)
     {
-        return LoadImage(renderer::RxImageType::e2d, format, asset, path);
+        return LoadImage(renderer::eImageType::Flat, format, asset, path);
     }
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
-    void LoadImageFromMemory(TSRef<AxImage>& asset, renderer::RxImageFormat format, const uint8* data, uint32 data_size)
+    void LoadImageFromMemory(TSRef<AxImage>& asset, renderer::eImageFormat format, const uint8* data, uint32 data_size)
     {
-        LoadImageFromMemory(renderer::RxImageType::e2d, format, asset, data, data_size);
+        LoadImageFromMemory(renderer::eImageType::Flat, format, asset, data, data_size);
     }
 
     ~AxManager() { Shutdown(); }
@@ -204,7 +204,7 @@ private:
     void AddWorkerThread();
     void AssetManagerUpdate();
 
-    template <typename TAssetType, typename TLoaderType, AxType TEnumValue>
+    template <typename TAssetType, typename TLoaderType, eAxType TEnumValue>
         requires C_IsAsset<TAssetType>
     static void SubmitAssetToLoad(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader, const std::string& path,
                                   const uint8* data = nullptr, uint32 data_size = 0)

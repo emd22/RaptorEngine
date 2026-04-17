@@ -10,10 +10,10 @@
 #include <Engine.hpp>
 #include <ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
+#include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/RenderBackend.hpp>
 #include <Scene.hpp>
 
 namespace fx {
@@ -86,7 +86,7 @@ bool Object::CheckIfReady()
 }
 
 
-void Object::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const Vec3f& dimensions, PhMotionType motion_type,
+void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                                     const PhProperties& physics_properties)
 {
     OnLoaded(
@@ -102,7 +102,7 @@ void Object::PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const Vec3f&
 }
 
 
-void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, PhMotionType motion_type,
+void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotionType motion_type,
                                const PhProperties& physics_properties)
 {
     OnLoaded(
@@ -142,7 +142,7 @@ void Object::OnAttached(Scene* scene)
 //     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
 // }
 
-void Object::SetGraphicsPipeline(RxPipeline* pipeline, bool update_children)
+void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 {
     OnLoaded(
         [&pipeline, update_children](TSRef<AxBase> base_asset)
@@ -221,7 +221,7 @@ void Object::ReserveInstances(uint32 num)
 
 void Object::Render(const Camera& camera)
 {
-    RxFrameData* frame = gRenderer->GetFrame();
+    FrameData* frame = gRenderer->GetFrame();
 
     if (pMaterial && !pMaterial->bIsBuilt) {
         pMaterial->Build();
@@ -298,8 +298,8 @@ void Object::RenderUnlit(const Camera& camera)
     DrawPushConstants push_constants {};
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(GetObjectLayer()).RawData, sizeof(Mat4f));
 
-    RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-    RxPipeline& pipeline = gRenderer->pDeferredRenderer->PlUnlit;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    Pipeline& pipeline = gRenderer->pDeferredRenderer->PlUnlit;
 
     pipeline.Bind(cmd);
 
@@ -369,7 +369,7 @@ void Object::RenderUnlit(const Camera& camera)
 }
 
 
-void Object::RenderPrimitive(const RxCommandBuffer& cmd)
+void Object::RenderPrimitive(const CommandBuffer& cmd)
 {
     if (pMesh) {
         pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
@@ -396,9 +396,9 @@ void Object::RenderMesh()
         return;
     }
 
-    RxFrameData* frame = gRenderer->GetFrame();
+    FrameData* frame = gRenderer->GetFrame();
 
-    RxCommandBuffer& cmd = frame->CommandBuffer;
+    CommandBuffer& cmd = frame->CommandBuffer;
 
     pMaterial->Bind(&cmd);
 
@@ -483,7 +483,7 @@ void Object::PrintDebug() const
     LogInfo("Object '{}' (Id={}) {{", Name.Get(), ObjectId);
     LogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
     LogInfo("\tHasPhys?={}, Enabled?={}, Type={}", Physics.mbHasPhysicsBody, mbPhysicsEnabled,
-            Physics.GetMotionType() == PhMotionType::eStatic ? "Static" : "Dynamic");
+            Physics.GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
     LogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}", mbIsInstance, mbReadyToRender,
             mbIsShadowCaster, pMesh && pMesh->VertexList.IsSkinned());
     LogInfo("}}");

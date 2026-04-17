@@ -3,7 +3,7 @@
 #include <Core/DynArray.hpp>
 #include <Core/Slice.hpp>
 #include <Core/Types.hpp>
-#include <Renderer/Backend/RxShader.hpp>
+#include <Renderer/Backend/Shader.hpp>
 #include <array>
 #include <vector>
 
@@ -14,19 +14,19 @@ namespace ShaderPreproc {
 
 using DataBuffer = DynArray<char, GrowthFunctions::InPages>;
 
-enum EntryType : uint16
+enum eEntryType : uint16
 {
-    eStructuredBuffer,
-    eUniformBuffer,
-    eSampler2D,
+    StructuredBuffer,
+    UniformBuffer,
+    Sampler2D,
 };
 
 struct Entry
 {
     Entry() = delete;
-    Entry(EntryType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding) {}
+    Entry(eEntryType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding) {}
 
-    EntryType Type;
+    eEntryType Type;
     uint8 Set;
     uint8 Binding;
 };
@@ -38,7 +38,7 @@ public:
     Result() = default;
 
     DataBuffer& GetBuffer() { return ProgramData[static_cast<uint32>(CurrentType)]; }
-    DataBuffer& GetBuffer(renderer::RxShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
+    DataBuffer& GetBuffer(renderer::eShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
 
     void InsertString(const std::string& str)
     {
@@ -48,16 +48,16 @@ public:
         }
     }
 
-    void SetCurrentShader(renderer::RxShaderType type)
+    void SetCurrentShader(renderer::eShaderType type)
     {
         bBroadcastToAllPrograms = false;
         CurrentType = type;
     }
 
 public:
-    std::array<DataBuffer, renderer::RxShaderUtil::scNumShaderTypes> ProgramData;
+    std::array<DataBuffer, renderer::ShaderUtil::scNumShaderTypes> ProgramData;
 
-    renderer::RxShaderType CurrentType = renderer::RxShaderType::eVertex;
+    renderer::eShaderType CurrentType = renderer::eShaderType::Vertex;
 
     // Before a program definition, broadcast to all
     bool bBroadcastToAllPrograms = true;

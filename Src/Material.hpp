@@ -8,26 +8,26 @@
 #include <Core/Bitset.hpp>
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
-#include <Renderer/Backend/RxDescriptors.hpp>
-#include <Renderer/Backend/RxGpuBuffer.hpp>
+#include <Renderer/Backend/Descriptors.hpp>
+#include <Renderer/Backend/GpuBuffer.hpp>
 
 
 namespace fx {
 
 #define FX_MAX_MATERIALS 128
 
-enum class MaterialComponentStatus
+enum class eMaterialComponentStatus
 {
-    eReady,
-    eMissingComponent,
-    eNotReady,
+    Ready,
+    MissingComponent,
+    NotReady,
 };
 
 /////////////////////////////////////
 // Material Component
 /////////////////////////////////////
 
-template <renderer::RxImageFormat TFormat>
+template <renderer::eImageFormat TFormat>
 struct MaterialComponent
 {
 public:
@@ -35,7 +35,7 @@ public:
     TSRef<AxImage> pAssetImage { nullptr };
     Slice<const uint8> pDataToLoad { nullptr };
 
-    using Status = MaterialComponentStatus;
+    using Status = eMaterialComponentStatus;
 
 public:
     MaterialComponent::Status Build()
@@ -43,15 +43,15 @@ public:
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pAssetImage && !pDataToLoad) {
             // pAssetImage = AxImage::GetEmptyImage<TFormat>();
-            return Status::eMissingComponent;
+            return Status::MissingComponent;
         }
 
         if (!CheckIfReady()) {
             // The texture is not ready, return the status to the material build function
-            return Status::eNotReady;
+            return Status::NotReady;
         }
 
-        return Status::eReady;
+        return Status::Ready;
     }
 
     bool Exists() const { return (pAssetImage != nullptr); }
@@ -92,28 +92,28 @@ struct MaterialProperties
 class Material
 {
 public:
-    enum ResourceType : uint32
+    enum class eResourceType : uint32
     {
-        eDiffuse,
-        eNormal,
-        eMetallicRoughness,
+        Diffuse,
+        Normal,
+        MetallicRoughness,
 
-        eMaxImages,
+        MaxImages,
     };
 
 public:
     Material() = default;
 
-    void Attach(ResourceType type, const TSRef<AxImage>& image)
+    void Attach(eResourceType type, const TSRef<AxImage>& image)
     {
         switch (type) {
-        case ResourceType::eDiffuse:
+        case eResourceType::Diffuse:
             Diffuse.pAssetImage = image;
             break;
-        case ResourceType::eNormal:
+        case eResourceType::Normal:
             NormalMap.pAssetImage = image;
             break;
-        case ResourceType::eMetallicRoughness:
+        case eResourceType::MetallicRoughness:
             MetallicRoughness.pAssetImage = image;
             break;
 
@@ -132,28 +132,28 @@ public:
      * Binds the material to be used in the given command buffer.
      * @returns True if the material was bound succesfully.
      */
-    bool Bind(renderer::RxCommandBuffer* cmd);
-    bool BindWithPipeline(renderer::RxCommandBuffer& cmd, renderer::RxPipeline& pipeline, bool albedo_only = false);
+    bool Bind(renderer::CommandBuffer* cmd);
+    bool BindWithPipeline(renderer::CommandBuffer& cmd, renderer::Pipeline& pipeline, bool albedo_only = false);
 
     void Build();
 
-    renderer::RxDescriptorSet& GetDescriptorSet() { return mDsDefault; }
-    renderer::RxDescriptorSet& GetDescriptorSetAlbedoOnly();
+    renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
+    renderer::DescriptorSet& GetDescriptorSetAlbedoOnly();
 
     void Destroy();
     ~Material() { Destroy(); }
 
 public:
     //    Ref<AssetImage> DiffuseTexture{nullptr};
-    MaterialComponent<renderer::RxImageFormat::eRGBA8_UNorm> Diffuse {};
-    MaterialComponent<renderer::RxImageFormat::eRGBA8_UNorm> NormalMap {};
-    MaterialComponent<renderer::RxImageFormat::eRGBA8_UNorm> MetallicRoughness {};
+    MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> Diffuse {};
+    MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> NormalMap {};
+    MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> MetallicRoughness {};
 
     MaterialProperties Properties {};
 
     Name Name;
 
-    renderer::RxPipeline* pPipeline = nullptr;
+    renderer::Pipeline* pPipeline = nullptr;
 
     std::atomic_bool bIsBuilt { false };
 
@@ -165,8 +165,8 @@ public:
     uint32 mMaterialPropertiesIndex = UINT32_MAX;
 
 private:
-    renderer::RxDescriptorSet mDsDefault;
-    renderer::RxDescriptorSet mDsAlbedoOnly;
+    renderer::DescriptorSet mDsDefault;
+    renderer::DescriptorSet mDsAlbedoOnly;
 
 
     bool mbIsReady : 1 = false;
@@ -180,9 +180,9 @@ class MaterialManager
 {
 public:
     void Create(uint32 materials_per_page = 64);
-    TSRef<Material> New(const std::string& name, renderer::RxPipeline* pipeline, bool supports_skinning);
+    TSRef<Material> New(const std::string& name, renderer::Pipeline* pipeline, bool supports_skinning);
 
-    renderer::RxDescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
+    renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 
     void Destroy();
 
@@ -191,7 +191,7 @@ public:
     /**
      * @brief A large GPU buffer containing all loaded in material properties.
      */
-    renderer::RxRawGpuBuffer MaterialPropertiesBuffer {};
+    renderer::RawGpuBuffer MaterialPropertiesBuffer {};
     uint32 NumMaterialsInBuffer = 0;
 
     Bitset MaterialsInUse;
@@ -199,11 +199,11 @@ public:
     /**
      * @brief Descriptor set for material properties. Used in the light pass.
      */
-    renderer::RxDescriptorSet mMaterialPropertiesDS {};
+    renderer::DescriptorSet mMaterialPropertiesDS {};
 
 private:
     PagedArray<Material> mMaterials;
-    renderer::RxDescriptorPool mDescriptorPool;
+    renderer::DescriptorPool mDescriptorPool;
 
     bool mbInitialized : 1 = false;
 

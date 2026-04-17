@@ -12,7 +12,7 @@
 namespace fx::SSE {
 
 
-enum ShuffleComponent
+enum eShuffleComponent
 {
     /* A Vector */
     Shuffle_AX = 0,
@@ -38,7 +38,7 @@ FX_FORCE_INLINE __m128 RemoveSign(__m128 vec)
     return _mm_andnot_ps(sign_mask, vec);
 }
 
-template <ShuffleComponent TComp1, ShuffleComponent TComp2, ShuffleComponent TComp3, ShuffleComponent TComp4>
+template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
 FX_FORCE_INLINE __m128 Permute4(__m128 a)
 {
     // Assert that all components are for A
@@ -51,7 +51,7 @@ FX_FORCE_INLINE __m128 Permute4(__m128 a)
     return _mm_permute_ps(a, permute);
 }
 
-template <ShuffleComponent TComp>
+template <eShuffleComponent TComp>
 FX_FORCE_INLINE __m128 Permute4(__m128 a)
 {
     static_assert(TComp < Shuffle_BX);

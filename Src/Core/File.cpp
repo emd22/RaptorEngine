@@ -5,33 +5,33 @@
 
 namespace fx {
 
-using DataType = File::DataType;
-using ModType = File::ModType;
+using eDataType = File::eDataType;
+using eModType = File::eModType;
 
-File::File(const char* path, File::ModType mt, File::DataType dt) { Open(path, mt, dt); }
+File::File(const char* path, File::eModType mt, File::eDataType dt) { Open(path, mt, dt); }
 
-static const char* MakeModeStr(File::ModType mt, File::DataType dt)
+static const char* MakeModeStr(File::eModType mt, File::eDataType dt)
 {
-    if (dt == DataType::eBinary) {
-        if (mt == ModType::eRead) {
+    if (dt == eDataType::Binary) {
+        if (mt == eModType::Read) {
             return "rb";
         }
-        else if (mt == ModType::eWrite) {
+        else if (mt == eModType::Write) {
             return "wb";
         }
     }
 
-    if (mt == ModType::eRead) {
+    if (mt == eModType::Read) {
         return "r";
     }
-    else if (mt == ModType::eWrite) {
+    else if (mt == eModType::Write) {
         return "w";
     }
 
     return "r";
 }
 
-void File::Open(const char* path, File::ModType mt, DataType dt)
+void File::Open(const char* path, eModType mt, eDataType dt)
 {
     mModType = mt;
     mDataType = dt;

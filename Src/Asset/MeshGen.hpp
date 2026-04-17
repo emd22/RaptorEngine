@@ -14,14 +14,14 @@ struct MeshGenOptions
 class MeshGen
 {
 public:
-    using PositionVertex = renderer::RxVertex<renderer::RxVertexType::eSlim>;
+    using PositionVertex = renderer::Vertex<renderer::eVertexType::Slim>;
 
     struct GeneratedMesh
     {
         SizedArray<Vec3f> Positions;
         SizedArray<uint32> Indices;
 
-        Ref<PrimitiveMesh> AsMesh(renderer::RxVertexType vertex_type);
+        Ref<PrimitiveMesh> AsMesh(renderer::eVertexType vertex_type);
 
         Ref<PrimitiveMesh> AsSlimMesh();
         Ref<PrimitiveMesh> AsDefaultMesh();

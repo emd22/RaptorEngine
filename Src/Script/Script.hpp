@@ -58,7 +58,7 @@
 // {
 //     static ScriptValue None;
 
-//     enum ValueType : uint16
+//     enum eValueType : uint16
 //     {
 //         NONETYPE = 0x00,
 //         INT = 0x01,
@@ -128,7 +128,7 @@
 //     inline bool IsRef() { return (Type == REF); }
 // };
 
-// enum AstType
+// enum eAstType
 // {
 //     FX_AST_LITERAL,
 //     // FX_AST_NAME,
@@ -611,7 +611,7 @@
 // // Script Bytecode Emitter
 // /////////////////////////////////////////////
 
-// enum ScriptRegister : uint8
+// enum eScriptRegister : uint8
 // {
 //     FX_REG_NONE = 0x00,
 //     FX_REG_X0,
@@ -637,7 +637,7 @@
 //     FX_REG_SIZE,
 // };
 
-// enum ScriptRegisterFlag : uint16
+// enum eScriptRegisterFlag : uint16
 // {
 //     FX_REGFLAG_NONE = 0x00,
 //     FX_REGFLAG_X0 = 0x01,
@@ -682,7 +682,7 @@
 //     void BeginEmitting(AstNode* node);
 //     void Emit(AstNode* node);
 
-//     enum RhsMode
+//     enum eRhsMode
 //     {
 //         RHS_FETCH_TO_REGISTER,
 
@@ -701,7 +701,7 @@
 
 //     PagedArray<uint8> mBytecode {};
 
-//     enum VarDeclareMode
+//     enum eVarDeclareMode
 //     {
 //         DECLARE_DEFAULT,
 //         DECLARE_NO_EMIT,

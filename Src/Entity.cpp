@@ -2,7 +2,7 @@
 
 #include <Engine.hpp>
 #include <ObjectManager.hpp>
-#include <Renderer/RxDeferred.hpp>
+#include <Renderer/Deferred.hpp>
 
 namespace fx {
 
@@ -97,16 +97,16 @@ void Entity::SubmitMatrixIfNeeded()
 
 void Entity::RecalculateModelMatrix()
 {
-    if (TransformMode == TransformMode::eDefault) {
+    if (TransformMode == eTransformMode::Default) {
         mModelMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(mPosition);
     }
-    else if (TransformMode == TransformMode::eTransformFromOrigin) {
+    else if (TransformMode == eTransformMode::TransformFromOrigin) {
         mModelMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsTranslation(RotationOrigin) *
                        Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(-RotationOrigin) *
                        Mat4f::AsTranslation(mPosition);
     }
 
-    mMatrixUpdateFramesRemaining = RxFramesInFlight;
+    mMatrixUpdateFramesRemaining = FramesInFlight;
 
     // mNormalMatrix = mModelMatrix.Inverse().Transposed();
     mbMatrixOutOfDate = false;

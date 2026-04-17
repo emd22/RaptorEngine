@@ -3,7 +3,7 @@
 #include "AxBase.hpp"
 
 #include <Core/Ref.hpp>
-#include <Renderer/Backend/RxImage.hpp>
+#include <Renderer/Backend/Image.hpp>
 
 namespace fx {
 
@@ -18,7 +18,7 @@ public:
 
     static PagedArray<TSRef<AxImage>>& GetEmptyImagesArray();
 
-    template <renderer::RxImageFormat TFormat>
+    template <renderer::eImageFormat TFormat>
     static TSRef<AxImage> GetEmptyImage()
     {
         // Stashed ptr for the image
@@ -34,14 +34,14 @@ public:
             empty_images.Create(10);
         }
 
-        constexpr uint32 pixel_size = renderer::RxImageFormatUtil::GetSize(TFormat);
+        constexpr uint32 pixel_size = renderer::ImageFormatUtil::GetSize(TFormat);
 
         SizedArray<uint8> image_data(pixel_size);
         memset(image_data.pData, 1, pixel_size);
         image_data.MarkFull();
 
         spEmptyImage = TSRef<AxImage>::New();
-        spEmptyImage->Image.CreateGpuOnly(renderer::RxImageType::e2d, Vec2u(1, 1), TFormat, image_data);
+        spEmptyImage->Image.CreateGpuOnly(renderer::eImageType::Flat, Vec2u(1, 1), TFormat, image_data);
         spEmptyImage->MarkAndSignalLoaded();
 
         empty_images.Insert(spEmptyImage);
@@ -62,9 +62,9 @@ public:
     void Destroy() override;
 
 public:
-    renderer::RxImage Image {};
+    renderer::Image Image {};
 
-    renderer::RxImageType ImageType = renderer::RxImageType::e2d;
+    renderer::eImageType ImageType = renderer::eImageType::Flat;
     Vec2u Size = Vec2u::sZero;
 };
 

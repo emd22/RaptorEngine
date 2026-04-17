@@ -6,12 +6,12 @@
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
 #include <ObjectManager.hpp>
-#include <Renderer/Backend/RxCommands.hpp>
-#include <Renderer/Backend/RxDevice.hpp>
-#include <Renderer/Backend/RxPipeline.hpp>
-#include <Renderer/RxDeferred.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/Backend/Commands.hpp>
+#include <Renderer/Backend/Device.hpp>
+#include <Renderer/Backend/Pipeline.hpp>
+#include <Renderer/Deferred.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 
 FX_SET_MODULE_NAME("Material")
 
@@ -29,7 +29,7 @@ void MaterialManager::Create(uint32 entities_per_page)
 
     MaterialsInUse.InitZero(FX_MAX_MATERIALS);
 
-    RxDescriptorPool& dp = mDescriptorPool;
+    DescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20);
@@ -41,8 +41,8 @@ void MaterialManager::Create(uint32 entities_per_page)
     // Material properties buffer descriptors
     const uint32 material_buffer_size = FX_MAX_MATERIALS;
 
-    MaterialPropertiesBuffer.Create(RxGpuBufferType::eStorage, sizeof(MaterialProperties) * material_buffer_size,
-                                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, RxGpuBufferFlags::ePersistentMapped);
+    MaterialPropertiesBuffer.Create(GpuBufferType::Storage, sizeof(MaterialProperties) * material_buffer_size,
+                                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, GpuBufferFlags::PersistentMapped);
 
 
     if (!mMaterialPropertiesDS.IsInited()) {
@@ -53,12 +53,12 @@ void MaterialManager::Create(uint32 entities_per_page)
     mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);
     mMaterialPropertiesDS.Build();
 
-    RxUtil::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Get());
+    Util::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Get());
 
     mbInitialized = true;
 }
 
-TSRef<Material> MaterialManager::New(const std::string& name, RxPipeline* pipeline, bool supports_skinning)
+TSRef<Material> MaterialManager::New(const std::string& name, Pipeline* pipeline, bool supports_skinning)
 {
     std::lock_guard guard(mInUse);
 
@@ -117,7 +117,7 @@ bool Material::IsReady()
     return (mbIsReady = true);
 }
 
-RxDescriptorSet& Material::GetDescriptorSetAlbedoOnly()
+DescriptorSet& Material::GetDescriptorSetAlbedoOnly()
 {
     if (mDsAlbedoOnly.IsInited()) {
         return mDsAlbedoOnly;
@@ -134,9 +134,9 @@ RxDescriptorSet& Material::GetDescriptorSetAlbedoOnly()
 }
 
 
-bool Material::Bind(RxCommandBuffer* cmd) { return BindWithPipeline(*cmd, *pPipeline, false); }
+bool Material::Bind(CommandBuffer* cmd) { return BindWithPipeline(*cmd, *pPipeline, false); }
 
-bool Material::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bool albedo_only)
+bool Material::BindWithPipeline(CommandBuffer& cmd, Pipeline& pipeline, bool albedo_only)
 {
     if (!bIsBuilt.load()) {
         Build();
@@ -159,8 +159,8 @@ bool Material::BindWithPipeline(RxCommandBuffer& cmd, RxPipeline& pipeline, bool
     }
 
 
-    RxDescriptorSet::BindMultipleOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-                                        MakeSlice(sets_to_bind, std::size(sets_to_bind)), Slice<uint32>(offsets));
+    DescriptorSet::BindMultipleOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+                                      MakeSlice(sets_to_bind, std::size(sets_to_bind)), Slice<uint32>(offsets));
 
     return true;
 }
@@ -177,7 +177,7 @@ void Material::Destroy()
 }
 
 
-template <RxImageFormat TFormat>
+template <ImageFormat TFormat>
 static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 {
     if (!component.pAssetImage && component.pDataToLoad) {
@@ -197,7 +197,7 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 
 #define BUILD_MATERIAL_COMPONENT(component_)                                                                           \
     {                                                                                                                  \
-        if (component_.Build() == MaterialComponentStatus::eNotReady) {                                                \
+        if (component_.Build() == MaterialComponentStatus::NotReady) {                                                 \
             return;                                                                                                    \
         }                                                                                                              \
     }
@@ -235,7 +235,7 @@ void Material::Build()
         // To reduce permutations -- the metallic roughness map should only be
         // enabled if there is also a normal map.
         if (!MetallicRoughness.Exists()) {
-            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_SRGB>();
+            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<ImageFormat::RGBA8_SRGB>();
         }
 
         mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);

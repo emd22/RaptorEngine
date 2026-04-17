@@ -16,10 +16,10 @@
 #include <Engine.hpp>
 #include <Material.hpp>
 #include <Physics/PhJolt.hpp>
-#include <Renderer/Backend/RxGpuBuffer.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
-#include <Renderer/RxShadowDirectional.hpp>
+#include <Renderer/Backend/GpuBuffer.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
+#include <Renderer/ShadowDirectional.hpp>
 #include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
@@ -58,7 +58,7 @@ void FoxtrotGame::InitEngine()
     }
 
     // Create the global engine variables
-    fx::RxGlobals::Init();
+    fx::Globals::Init();
 
 
     ControlManager::Init();
@@ -139,7 +139,7 @@ void FoxtrotGame::CreateGame()
 
     CreateLights();
 
-    gShadowRenderer = new RxShadowDirectional(Vec2u(2048, 2048));
+    gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
     gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
     gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);
     gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
@@ -343,14 +343,14 @@ void FoxtrotGame::Tick()
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
-    if (gRenderer->BeginFrame() != RxFrameResult::Success) {
+    if (gRenderer->BeginFrame() != FrameResult::Success) {
         mLastTick = current_tick;
         return;
     }
 
     gPhysics->Update();
 
-    RxFrameData* frame = gRenderer->GetFrame();
+    FrameData* frame = gRenderer->GetFrame();
 
     frame->CommandBuffer.Reset();
     frame->CommandBuffer.Record();

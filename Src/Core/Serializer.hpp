@@ -3,6 +3,8 @@
 #include "PagedArray.hpp"
 #include "Types.hpp"
 
+namespace fx {
+
 template <typename T>
 concept C_IsIntType = C_IsAnyOf<T, int16, uint16, int32, uint32, int64, uint64>;
 
@@ -16,10 +18,10 @@ concept C_IsSerializable = C_IsIntType<T> || C_IsFloatType<T>;
 struct SerializerValue
 {
 public:
-    enum Type
+    enum eType
     {
-        eInt,
-        eFloat,
+        Int,
+        Float,
     };
 
 public:
@@ -27,18 +29,18 @@ public:
 
     template <typename T>
         requires C_IsIntType<T>
-    explicit SerializerValue(T value) : Type(eInt), IntValue(value)
+    explicit SerializerValue(T value) : Type(eType::Int), IntValue(value)
     {
     }
 
     template <typename T>
         requires C_IsFloatType<T>
-    explicit SerializerValue(T value) : Type(eFloat), FloatValue(value)
+    explicit SerializerValue(T value) : Type(eType::Float), FloatValue(value)
     {
     }
 
 public:
-    Type Type;
+    eType Type;
 
     union
     {
@@ -110,6 +112,7 @@ public:
     bool bInWriteMode = true;
 };
 
+} // namespace fx
 
 #define FX_SERIALIZABLE_MEMBERS(...)                                                                                   \
     template <typename... TMemberTypes>                                                                                \

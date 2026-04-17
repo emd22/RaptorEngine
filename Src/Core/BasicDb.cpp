@@ -6,14 +6,14 @@ void BasicDb::Open(const char* path)
 {
     mPath = path;
 
-    mInFile.Open(path, File::eRead, File::eText);
+    mInFile.Open(path, File::Read, File::Text);
 
     // Error opening file, create it instead
     if (!mInFile.IsFileOpen()) {
-        mInFile.Open(path, File::eWrite, File::eText);
+        mInFile.Open(path, File::Write, File::Text);
         // mInFile.Close();
 
-        mInFile.Open(path, File::eRead, File::eText);
+        mInFile.Open(path, File::Read, File::Text);
     }
 
     // Eh, something else is wrong here
@@ -53,7 +53,7 @@ void BasicDb::SaveToFile()
         return;
     }
 
-    mOutFile.Open(mPath.c_str(), File::eWrite, File::eText);
+    mOutFile.Open(mPath.c_str(), File::Write, File::Text);
 
     for (const BasicDbEntry& entry : mEntryMarkers) {
         std::string key_str = std::to_string(entry.KeyHash);

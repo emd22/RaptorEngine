@@ -11,7 +11,7 @@ namespace ShaderPreproc {
 
 static constexpr uint32 scDataPageSize = 512;
 
-enum StringId
+enum eStringId
 {
     // Program type definitions
     F_PROGRAM,
@@ -46,8 +46,8 @@ static constexpr const char* scStrings[] = {
     "F_PARAMTEST",
 };
 
-constexpr const char* FStr(StringId id) { return scStrings[static_cast<uint32>(id)]; }
-constexpr Hash32 FHash(StringId id) { return HashStr32(FStr(id)); }
+constexpr const char* FStr(eStringId id) { return scStrings[static_cast<uint32>(id)]; }
+constexpr Hash32 FHash(eStringId id) { return HashStr32(FStr(id)); }
 
 struct State
 {
@@ -103,10 +103,10 @@ public:
     uint32 CurrentLine = 0;
 };
 
-enum class ParseResult
+enum class eParseResult
 {
-    eError,
-    eSuccess,
+    Error,
+    Success,
 };
 
 struct PPFuncEntry
@@ -156,10 +156,10 @@ static void ParseProgramDefinition(const std::vector<Slice<char>>& params, State
 
     switch (type_hash) {
     case FHash(FPT_VERTEX):
-        result.SetCurrentShader(renderer::RxShaderType::eVertex);
+        result.SetCurrentShader(renderer::eShaderType::Vertex);
         break;
     case FHash(FPT_PIXEL):
-        result.SetCurrentShader(renderer::RxShaderType::eFragment);
+        result.SetCurrentShader(renderer::eShaderType::Fragment);
         break;
     case FHash(FPT_ALL):
         result.bBroadcastToAllPrograms = true;
@@ -182,17 +182,17 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
     const int32 binding = ParamGetInt(params[2]);
 
     Hash32 refl_hash = HashData32(refl_type);
-    EntryType type = EntryType::eStructuredBuffer;
+    eEntryType type = eEntryType::StructuredBuffer;
 
     switch (refl_hash) {
     case FHash(FR_STRUCTBUFFER):
-        type = EntryType::eStructuredBuffer;
+        type = eEntryType::StructuredBuffer;
         break;
     case FHash(FR_UNIFORMBUFFER):
-        type = EntryType::eUniformBuffer;
+        type = eEntryType::UniformBuffer;
         break;
     case FHash(FR_SAMPLER2D):
-        type = EntryType::eSampler2D;
+        type = eEntryType::Sampler2D;
         break;
     default:;
     }
@@ -228,8 +228,8 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
     }
 
     if (result.bBroadcastToAllPrograms) {
-        result.GetBuffer(renderer::RxShaderType::eVertex).Insert(ch);
-        result.GetBuffer(renderer::RxShaderType::eFragment).Insert(ch);
+        result.GetBuffer(renderer::eShaderType::Vertex).Insert(ch);
+        result.GetBuffer(renderer::eShaderType::Fragment).Insert(ch);
 
         return;
     }
@@ -401,13 +401,13 @@ Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
 }
 
 
-static void SaveProgramToDisk(const char* name, renderer::RxShaderType shader_type, const Result& result)
+static void SaveProgramToDisk(const char* name, renderer::eShaderType shader_type, const Result& result)
 {
     const DataBuffer& buffer = result.ProgramData[static_cast<uint32>(shader_type)];
 
     if (buffer.Size > 0) {
-        std::string sname = std::string(name) + "_" + renderer::RxShaderUtil::TypeToName(shader_type) + ".hlsl";
-        File file(sname.c_str(), File::ModType::eWrite, File::DataType::eBinary);
+        std::string sname = std::string(name) + "_" + renderer::ShaderUtil::TypeToName(shader_type) + ".hlsl";
+        File file(sname.c_str(), File::eModType::Write, File::eDataType::Binary);
         file.Write(Slice<char>(buffer.pData, buffer.Size));
         file.Close();
     }
@@ -415,8 +415,8 @@ static void SaveProgramToDisk(const char* name, renderer::RxShaderType shader_ty
 
 void DebugSaveToDisk(const char* name, const Result& result)
 {
-    SaveProgramToDisk(name, renderer::RxShaderType::eVertex, result);
-    SaveProgramToDisk(name, renderer::RxShaderType::eFragment, result);
+    SaveProgramToDisk(name, renderer::eShaderType::Vertex, result);
+    SaveProgramToDisk(name, renderer::eShaderType::Fragment, result);
 }
 
 }; // namespace ShaderPreproc

@@ -11,7 +11,7 @@
 
 namespace fx::Neon {
 
-enum ShuffleComponent
+enum eShuffleComponent
 {
     /* A Vector */
     Shuffle_AX = 0,
@@ -30,15 +30,15 @@ enum ShuffleComponent
 constexpr uint32 scSignMask32 = 0x80000000;
 static_assert(scSignMask32 == std::bit_cast<uint32>(-0.0f));
 
-template <ShuffleComponent TA, ShuffleComponent TB, ShuffleComponent TC, ShuffleComponent TD>
+template <eShuffleComponent TA, eShuffleComponent TB, eShuffleComponent TC, eShuffleComponent TD>
 concept C_SinglePermute = (TA <= Shuffle_AW) && (TB <= Shuffle_AW) && (TC <= Shuffle_AW) && (TD <= Shuffle_AW);
 
 
-template <ShuffleComponent TA, ShuffleComponent TB, ShuffleComponent TC, ShuffleComponent TD>
+template <eShuffleComponent TA, eShuffleComponent TB, eShuffleComponent TC, eShuffleComponent TD>
 concept C_SinglePermuteForB = (TA >= Shuffle_BX) && (TB >= Shuffle_BX) && (TC >= Shuffle_BX) && (TD >= Shuffle_BX);
 
 
-template <ShuffleComponent TA, ShuffleComponent TB, ShuffleComponent TC, ShuffleComponent TD>
+template <eShuffleComponent TA, eShuffleComponent TB, eShuffleComponent TC, eShuffleComponent TD>
 concept C_AllComponentsSame = (TA == TB == TC == TD);
 
 FX_FORCE_INLINE float32 LengthSquared(float32x4_t vec)
@@ -95,7 +95,7 @@ FX_FORCE_INLINE float32x4_t Floor(float32x4_t vec) { return vrndmq_f32(vec); }
 /**
  * @brief Returns a single vector rearranged to the template parameter values.
  */
-template <ShuffleComponent TComp1, ShuffleComponent TComp2, ShuffleComponent TComp3, ShuffleComponent TComp4>
+template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
 FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
     requires C_SinglePermute<TComp1, TComp2, TComp3, TComp4>
 {
@@ -183,7 +183,7 @@ FX_FORCE_INLINE float32x4_t Permute4<Shuffle_AY, Shuffle_AZ, Shuffle_AX, Shuffle
     return vcombine_f32(a_lo, a_hi);
 }
 
-template <ShuffleComponent TComp1, ShuffleComponent TComp2, ShuffleComponent TComp3, ShuffleComponent TComp4>
+template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
     requires C_AllComponentsSame<TComp1, TComp2, TComp3, TComp4>
 FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
 {
@@ -200,7 +200,7 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a)
  * ```
  *
  */
-template <ShuffleComponent TComp1, ShuffleComponent TComp2, ShuffleComponent TComp3, ShuffleComponent TComp4>
+template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
 FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
 {
     // Unspecialized shuffle, reorder the lanes directly
@@ -218,7 +218,7 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
  * @brief Returns the single permutation of the two vectors A and B, using the components passed in via template
  * parameters.
  */
-template <ShuffleComponent TComp1, ShuffleComponent TComp2, ShuffleComponent TComp3, ShuffleComponent TComp4>
+template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
 FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
     requires C_SinglePermute<TComp1, TComp2, TComp3, TComp4>
 {
@@ -228,7 +228,7 @@ FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
 /**
  * @brief Returns the vector B shuffled to the order passed in from the template arguments.
  */
-template <ShuffleComponent TComp1, ShuffleComponent TComp2, ShuffleComponent TComp3, ShuffleComponent TComp4>
+template <eShuffleComponent TComp1, eShuffleComponent TComp2, eShuffleComponent TComp3, eShuffleComponent TComp4>
 FX_FORCE_INLINE float32x4_t Permute4(float32x4_t a, float32x4_t b)
     requires C_SinglePermuteForB<TComp1, TComp2, TComp3, TComp4>
 {

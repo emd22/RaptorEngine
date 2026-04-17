@@ -15,10 +15,10 @@ struct ShaderMacro
 class ShaderCompiler
 {
 public:
-    enum class Result
+    enum class eResult
     {
-        eSuccess,
-        eFailed,
+        Success,
+        Failed,
     };
 
 public:
@@ -27,8 +27,8 @@ public:
 
     static void CompileAllShaders(const char* folder_path);
 
-    static Result Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
-                          bool do_db_flush = true);
+    static eResult Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
+                           bool do_db_flush = true);
 
 
     static bool CompileIfOutOfDate(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros);

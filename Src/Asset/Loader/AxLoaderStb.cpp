@@ -12,7 +12,7 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const std::st
 
     const char* c_path = path.c_str();
 
-    const int pixel_size = renderer::RxImageFormatUtil::GetSize(ImageFormat);
+    const int pixel_size = renderer::ImageFormatUtil::GetSize(ImageFormat);
     Assert(pixel_size > 0);
 
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
@@ -26,22 +26,22 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const std::st
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
     if (mImageData == nullptr) {
         LogError("Could not load image file at '{}'", c_path);
-        return AxLoaderStb::Status::eError;
+        return AxLoaderStb::eStatus::Error;
     }
 
-    return AxLoaderStb::Status::eSuccess;
+    return AxLoaderStb::eStatus::Success;
 }
 
 AxLoaderStb::Status AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
 {
     TSRef<AxImage> image(asset);
 
-    const int pixel_size = renderer::RxImageFormatUtil::GetSize(ImageFormat);
+    const int pixel_size = renderer::ImageFormatUtil::GetSize(ImageFormat);
     Assert(pixel_size > 0);
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         LogError("Could not retrieve info from image in memory! (Size={})", size);
-        return AxLoaderStb::Status::eError;
+        return AxLoaderStb::Status::Error;
     }
 
     mChannels = pixel_size;
@@ -55,10 +55,10 @@ AxLoaderStb::Status AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8
 
     if (mImageData == nullptr) {
         LogError("Could not load image file from memory!");
-        return AxLoaderStb::Status::eError;
+        return AxLoaderStb::eStatus::Error;
     }
 
-    return AxLoaderStb::Status::eSuccess;
+    return AxLoaderStb::eStatus::Success;
 }
 
 void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
@@ -83,7 +83,7 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
     asset->bIsUploadedToGpu.notify_all();
 }
 
-// void LoaderStb::LoadCubemapToLayeredImage(const RxImage&)
+// void LoaderStb::LoadCubemapToLayeredImage(const Image&)
 // {
 //     Vec2u cubemap_size = cubemap_image.Size;
 

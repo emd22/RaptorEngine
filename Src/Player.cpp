@@ -2,8 +2,8 @@
 
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 
 namespace fx {
 

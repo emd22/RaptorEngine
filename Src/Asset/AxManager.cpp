@@ -168,7 +168,7 @@ void AxManager::LoadObject(const std::string& name, TSRef<Object>& asset, const 
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, AxType::eObject>(asset, loader, path);
+    SubmitAssetToLoad<Object, AxLoaderGltf, AxType::Object>(asset, loader, path);
     asset->Name = name;
 }
 
@@ -177,12 +177,12 @@ void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& ass
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, AxType::eObject>(asset, loader, "", data, data_size);
+    SubmitAssetToLoad<Object, AxLoaderGltf, AxType::Object>(asset, loader, "", data, data_size);
     asset->Name = name;
 }
 
 
-void AxManager::LoadImage(renderer::RxImageType image_type, renderer::RxImageFormat format, TSRef<AxImage>& asset,
+void AxManager::LoadImage(renderer::ImageType image_type, renderer::ImageFormat format, TSRef<AxImage>& asset,
                           const std::string& path)
 {
     bool is_jpeg = IsFileJpeg(path);
@@ -192,20 +192,20 @@ void AxManager::LoadImage(renderer::RxImageType image_type, renderer::RxImageFor
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::eImage>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, path);
     }
     else {
         TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::eImage>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, path);
     }
 }
 
 
-void AxManager::LoadImageFromMemory(renderer::RxImageType image_type, renderer::RxImageFormat format,
-                                    TSRef<AxImage>& asset, const uint8* data, uint32 data_size)
+void AxManager::LoadImageFromMemory(renderer::ImageType image_type, renderer::ImageFormat format, TSRef<AxImage>& asset,
+                                    const uint8* data, uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
@@ -213,7 +213,7 @@ void AxManager::LoadImageFromMemory(renderer::RxImageType image_type, renderer::
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::eImage>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, AxType::Image>(asset, loader, "", data, data_size);
     }
     else {
         // Load the image using stb_image
@@ -221,7 +221,7 @@ void AxManager::LoadImageFromMemory(renderer::RxImageType image_type, renderer::
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::eImage>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, AxType::Image>(asset, loader, "", data, data_size);
     }
 }
 
@@ -237,7 +237,7 @@ void AxManager::CheckForUploadableData()
         LockContext<AxItemData> asset_data = worker.Item.GetDataContext();
 
         // The asset was successfully loaded, upload to GPU
-        if (worker.LoadStatus == AxLoaderBase::Status::eSuccess) {
+        if (worker.LoadStatus == AxLoaderBase::Status::Success) {
             // Load the resouce into GPU memory
             asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
 
@@ -257,7 +257,7 @@ void AxManager::CheckForUploadableData()
             // Destroy the loader(clearing the loading buffers)
             asset_data->pLoader->Destroy(asset_data->pAsset);
         }
-        else if (worker.LoadStatus == AxLoaderBase::Status::eError) {
+        else if (worker.LoadStatus == AxLoaderBase::Status::Error) {
             asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
 
             // There was an error, call the OnError callback if it was registered
@@ -265,7 +265,7 @@ void AxManager::CheckForUploadableData()
                 asset_data->pAsset->mOnErrorCallback(asset_data->pAsset);
             }
         }
-        else if (worker.LoadStatus == AxLoaderBase::Status::eNone) {
+        else if (worker.LoadStatus == AxLoaderBase::Status::None) {
             asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
 
             Panic("AssetManager", "Worker status is none!");
@@ -273,7 +273,7 @@ void AxManager::CheckForUploadableData()
 
         ItemsEnqueued.clear();
         worker.bIsBusy.clear();
-        worker.LoadStatus = AxLoaderBase::Status::eNone;
+        worker.LoadStatus = AxLoaderBase::Status::None;
 
         worker.bDataPendingUpload.clear();
     }

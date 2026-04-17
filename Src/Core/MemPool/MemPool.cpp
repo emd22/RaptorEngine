@@ -71,7 +71,7 @@ FX_FORCE_INLINE static const void* BlockToPtr(const MemBlock* block);
 static void* align_ptr(const void* ptr, size_t align);
 
 /* Public constants: may be modified. */
-enum tlsf_public
+enum etlsf_public
 {
     /* log2 of number of linear subdivisions of block sizes. Larger
     ** values require more memory in the control structure. Values of
@@ -80,7 +80,7 @@ enum tlsf_public
     SL_INDEX_COUNT_LOG2 = 5,
 };
 
-enum tlsf_private
+enum etlsf_private
 {
     /*
     ** TODO: We can increase this to support larger sizes, at the expense

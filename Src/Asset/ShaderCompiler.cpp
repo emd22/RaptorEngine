@@ -22,16 +22,16 @@
 #include <Core/File.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/StackArray.hpp>
-#include <Renderer/Backend/RxShader.hpp>
+#include <Renderer/Backend/Shader.hpp>
 
 namespace fx {
 
 
 static BasicDb sShaderCompileDb;
 
-using CompileResult = ShaderCompiler::Result;
+using CompileResult = ShaderCompiler::eResult;
 
-static bool IsShaderUpToDate(renderer::RxShaderId entry_id, const char* path)
+static bool IsShaderUpToDate(renderer::ShaderId entry_id, const char* path)
 {
     BasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
     if (!entry) {
@@ -55,7 +55,7 @@ bool ShaderCompiler::IsOutOfDate(const char* path)
         sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
     }
 
-    renderer::RxShaderId compile_entry_id = HashStr64(path);
+    renderer::ShaderId compile_entry_id = HashStr64(path);
 
     return !IsShaderUpToDate(compile_entry_id, path);
 }
@@ -73,12 +73,12 @@ bool ShaderCompiler::CompileIfOutOfDate(const char* path, DataPack& pack, const 
 
 #define SHADER_VERSION L"6_7"
 
-static const wchar_t* ShaderTypeToDxName(renderer::RxShaderType type)
+static const wchar_t* ShaderTypeToDxName(renderer::eShaderType type)
 {
     switch (type) {
-    case renderer::RxShaderType::eVertex:
+    case renderer::eShaderType::Vertex:
         return L"vs_" SHADER_VERSION;
-    case renderer::RxShaderType::eFragment:
+    case renderer::eShaderType::Fragment:
         return L"ps_" SHADER_VERSION;
     }
     return L"";
@@ -96,7 +96,7 @@ struct CompileState
 };
 
 
-static CompileResult CompileProgram(const CompileState& state, renderer::RxShaderType shader_type)
+static CompileResult CompileProgram(const CompileState& state, renderer::eShaderType shader_type)
 {
     constexpr uint32 cCodePage = DXC_CP_UTF8;
 
@@ -147,14 +147,14 @@ static CompileResult CompileProgram(const CompileState& state, renderer::RxShade
         if (SUCCEEDED(hresult) && error_blob) {
             LogError("Failed to compile shader '{}'!", state.pcPath);
             LogError("Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
-            return CompileResult::eFailed;
+            return CompileResult::Failed;
         }
     }
 
     CComPtr<IDxcBlob> spirv_bin;
     result->GetResult(&spirv_bin);
 
-    const renderer::RxShaderId shader_id = renderer::RxShader::GenerateShaderId(shader_type, state.pcMacros);
+    const renderer::ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
 
     LogInfo("IS 4 byte aligned? {:s}", !(spirv_bin->GetBufferSize() % 4));
 
@@ -164,7 +164,7 @@ static CompileResult CompileProgram(const CompileState& state, renderer::RxShade
                                                     spirv_bin->GetBufferSize()));
 
 
-    return CompileResult::eSuccess;
+    return CompileResult::Success;
 }
 
 #define SOURCE_EXISTS(_shader_type) (preproc.GetBuffer(_shader_type).Size > 0)
@@ -172,17 +172,17 @@ static CompileResult CompileProgram(const CompileState& state, renderer::RxShade
     CompileProgram(CompileState(path, pack, macros, preproc, utils, compiler, include_handler), _shader_type)
 
 #define TRY_COMPILE_PROGRAM(_shader_type)                                                                              \
-    if (SOURCE_EXISTS(_shader_type) && COMPILE_DEFAULT(_shader_type) != CompileResult::eSuccess) {                     \
-        return CompileResult::eFailed;                                                                                 \
+    if (SOURCE_EXISTS(_shader_type) && COMPILE_DEFAULT(_shader_type) != CompileResult::Success) {                      \
+        return CompileResult::Failed;                                                                                  \
     }
 
 
-ShaderCompiler::Result ShaderCompiler::Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
-                                               bool do_db_flush)
+ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
+                                                bool do_db_flush)
 {
     LogInfo("Compiling shader {} with {} macros", path, macros.Size);
 
-    File file(path, File::ModType::eRead, File::DataType::eBinary);
+    File file(path, File::eModType::Read, File::eDataType::Binary);
     Slice<char> file_data = file.Read<char>();
 
     ShaderPreproc::Result preproc = ShaderPreproc::Process(file_data, macros);
@@ -196,10 +196,10 @@ ShaderCompiler::Result ShaderCompiler::Compile(const char* path, DataPack& pack,
     CComPtr<IDxcIncludeHandler> include_handler;
     utils->CreateDefaultIncludeHandler(&include_handler);
 
-    TRY_COMPILE_PROGRAM(renderer::RxShaderType::eVertex);
-    TRY_COMPILE_PROGRAM(renderer::RxShaderType::eFragment);
+    TRY_COMPILE_PROGRAM(renderer::eShaderType::Vertex);
+    TRY_COMPILE_PROGRAM(renderer::eShaderType::Fragment);
 
-    return CompileResult::eSuccess;
+    return CompileResult::Success;
 }
 
 void ShaderCompiler::Destroy() { sShaderCompileDb.Close(); }

@@ -2,9 +2,9 @@
 
 #include <Engine.hpp>
 #include <ObjectManager.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
-#include <Renderer/RxShadowDirectional.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
+#include <Renderer/ShadowDirectional.hpp>
 
 namespace fx {
 
@@ -87,16 +87,16 @@ void Scene::RenderShadows(Camera* shadow_camera)
 {
     gShadowRenderer->Begin();
 
-    RxShadowPushConstants consts;
+    ShadowPushConstants consts;
 
-    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(ObjectLayer::eWorldLayer).RawData,
+    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData,
            sizeof(float32) * 16);
 
     bool in_skinned_shader = false;
 
-    RxPipeline* pipeline = &gShadowRenderer->GetPipeline();
+    Pipeline* pipeline = &gShadowRenderer->GetPipeline();
 
-    RxCommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
 
     for (const TSRef<Object>& obj : mObjects) {
         if (!obj->IsShadowCaster()) {
@@ -125,7 +125,7 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
         consts.ObjectId = obj->ObjectId;
 
-        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RxShadowPushConstants),
+        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ShadowPushConstants),
                            &consts);
 
         obj->RenderPrimitive(cmd);

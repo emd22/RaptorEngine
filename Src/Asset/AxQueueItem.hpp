@@ -10,12 +10,12 @@
 
 namespace fx {
 
-enum class AxType
+enum class eAxType
 {
-    eNone,
-    eBinary,
-    eObject,
-    eImage,
+    None,
+    Binary,
+    Object,
+    Image,
 };
 
 struct AxItemData
@@ -45,13 +45,13 @@ struct AxQueueItem
     AxQueueItem() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, AxType type, const std::string& path)
+    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAxType type, const std::string& path)
         : Path(path), pcRawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
     {
     }
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, AxType type, const uint8* data,
+    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAxType type, const uint8* data,
                 uint32 data_size)
         : Path(""), pcRawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
     {
@@ -86,7 +86,7 @@ public:
     const uint8* pcRawData = nullptr;
     uint32 DataSize = 0;
 
-    AxType AssetType;
+    eAxType AssetType;
 
 private:
     AxItemData Data;

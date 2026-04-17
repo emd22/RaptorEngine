@@ -5,8 +5,8 @@
 #include <SDL3/SDL.h>
 
 #include <Core/Log.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 
 namespace fx {
 

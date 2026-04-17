@@ -39,13 +39,13 @@ public:
     {
         Type = other.Type;
 
-        if (Type == ValueType::eString) {
+        if (Type == eValueType::String) {
             mStringValue = strdup(other.mStringValue);
         }
-        else if (Type == ValueType::eInt) {
+        else if (Type == eValueType::Int) {
             mIntValue = other.mIntValue;
         }
-        else if (Type == ValueType::eFloat) {
+        else if (Type == eValueType::Float) {
             mFloatValue = other.mFloatValue;
         }
 
@@ -61,7 +61,7 @@ public:
         requires std::is_integral_v<TIntType>
     TIntType Get() const
     {
-        if (Type != ValueType::eInt) {
+        if (Type != eValueType::Int) {
             LogWarning("Attempting to retrieve int type from non-int!");
             return 0;
         }
@@ -73,7 +73,7 @@ public:
         requires std::is_floating_point_v<TFloatType>
     TFloatType Get() const
     {
-        if (Type != ValueType::eFloat) {
+        if (Type != eValueType::Float) {
             LogWarning("Attempting to retrieve float type from non-float!");
             return 0.0f;
         }
@@ -84,7 +84,7 @@ public:
     template <>
     const char* Get() const
     {
-        Assert(Type == ValueType::eString);
+        Assert(Type == eValueType::String);
 
         return mStringValue;
     }
@@ -95,38 +95,38 @@ public:
     void Set(TType value)
     {
         if constexpr (std::is_integral_v<TType>) {
-            Type = ValueType::eInt;
+            Type = eValueType::Int;
             mIntValue = value;
         }
         else if constexpr (std::is_floating_point_v<TType>) {
-            Type = ValueType::eFloat;
+            Type = eValueType::Float;
             mFloatValue = value;
         }
         else if constexpr (std::is_same_v<char*, std::remove_const_t<TType>>) {
-            Type = ValueType::eString;
+            Type = eValueType::String;
             mStringValue = strdup(value);
         }
     }
 
     void Set(const std::string& str)
     {
-        Type = ValueType::eString;
+        Type = eValueType::String;
         mStringValue = strdup(str.c_str());
     }
 
     std::string AsString() const;
 
 public:
-    enum class ValueType
+    enum class eValueType
     {
-        eNone,
-        eInt,
-        eFloat,
-        eString,
-        eStruct,
+        None,
+        Int,
+        Float,
+        String,
+        Struct,
     };
 
-    ValueType Type = ValueType::eNone;
+    eValueType Type = eValueType::None;
 
     union
     {
@@ -145,7 +145,7 @@ public:
 class ConfigEntry : public ConfigValue
 {
 public:
-    static ConfigEntry Array(const std::string& name, ConfigValue::ValueType type)
+    static ConfigEntry Array(const std::string& name, ConfigValue::eValueType type)
     {
         ConfigEntry entry(name);
         entry.Type = type;
@@ -154,7 +154,7 @@ public:
     }
 
     template <typename TType>
-    static ConfigEntry Array(const std::string& name, ConfigValue::ValueType type, const Slice<TType>& data)
+    static ConfigEntry Array(const std::string& name, ConfigValue::eValueType type, const Slice<TType>& data)
     {
         ConfigEntry entry = ConfigEntry::Array(name, type);
 
@@ -168,7 +168,7 @@ public:
     static ConfigEntry Struct(const std::string& name)
     {
         ConfigEntry entry(name);
-        entry.Type = ConfigValue::ValueType::eStruct;
+        entry.Type = ConfigValue::eValueType::Struct;
         return entry;
     }
 
@@ -239,7 +239,7 @@ public:
         requires std::is_integral_v<TIntType>
     TIntType GetValue() const
     {
-        if (Type != ValueType::eInt) {
+        if (Type != eValueType::Int) {
             LogWarning("Attempting to retrieve int type from non-int!");
             return 0;
         }
@@ -251,7 +251,7 @@ public:
         requires std::is_floating_point_v<TFloatType>
     TFloatType GetValue() const
     {
-        if (Type != ValueType::eFloat) {
+        if (Type != eValueType::Float) {
             LogWarning("Attempting to retrieve float type from non-float!");
             return 0.0f;
         }
@@ -262,7 +262,7 @@ public:
     template <>
     const char* GetValue() const
     {
-        Assert(Type == ValueType::eString);
+        Assert(Type == eValueType::String);
 
         return mStringValue;
     }
@@ -348,7 +348,7 @@ public:
 
 private:
     void Parse(PagedArray<Token>& tokens);
-    bool EatToken(TokenType type);
+    bool EatToken(eTokenType type);
     ConfigEntry ParseEntry();
     void ParseValue(ConfigValue& value);
 

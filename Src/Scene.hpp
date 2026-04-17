@@ -30,7 +30,7 @@ public:
     Ref<LightDirectional> GetDirectionalLight()
     {
         for (Ref<LightBase>& light : mLights) {
-            if (light->Type == LightType::eDirectional) {
+            if (light->Type == LightType::Directional) {
                 return Ref<LightDirectional>(light);
             }
         }

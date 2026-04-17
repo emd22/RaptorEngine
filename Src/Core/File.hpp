@@ -19,25 +19,25 @@ private:
     static constexpr const char* spcErrCannotReadUnopened = "Cannot read from file as it has not been opened!";
 
 public:
-    enum DataType
+    enum class eDataType
     {
-        eText = 0,
-        eBinary,
+        Text = 0,
+        Binary,
     };
 
-    enum ModType
+    enum class eModType
     {
-        eRead = 0,
-        eWrite,
+        Read = 0,
+        Write,
     };
 
 public:
     File() {}
-    File(const char* path, ModType mt, DataType dt);
+    File(const char* path, eModType mt, eDataType dt);
 
     static std::filesystem::file_time_type GetLastModifiedTime(const std::string& path);
 
-    void Open(const char* path, ModType mt, DataType dt);
+    void Open(const char* path, eModType mt, eDataType dt);
     uint64 GetFileSize();
 
     template <typename TDataType>
@@ -89,7 +89,7 @@ public:
             return;
         }
 
-        if (mDataType == eBinary) {
+        if (mDataType == eDataType::Binary) {
             fwrite(&value, sizeof(value), 1, pFileHandle);
         }
         else {
@@ -122,8 +122,8 @@ public:
     FILE* pFileHandle = nullptr;
 
 private:
-    ModType mModType = ModType::eRead;
-    DataType mDataType = DataType::eText;
+    eModType mModType = eModType::Read;
+    eDataType mDataType = eDataType::Text;
 
     uint64 mFileSize = 0;
     bool mbSizeOutOfDate : 1 = true;

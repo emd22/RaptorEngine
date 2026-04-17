@@ -10,11 +10,11 @@
 
 namespace fx {
 
-enum class CameraType
+enum class eCameraType
 {
-    eNone,
-    eOrthographic,
-    ePerspective,
+    None,
+    Orthographic,
+    Perspective,
 };
 
 class Camera
@@ -26,7 +26,7 @@ public:
     FX_FORCE_INLINE Vec3f GetRightVector() { return GetForwardVector().Cross(Vec3f::sUp).Normalize(); }
     FX_FORCE_INLINE Vec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
 
-    virtual const Mat4f& GetCameraMatrix(ObjectLayer layer) const { return mCameraMatrix; }
+    virtual const Mat4f& GetCameraMatrix(eObjectLayer layer) const { return mCameraMatrix; }
 
     FX_FORCE_INLINE void SetNearPlane(float32 near)
     {
@@ -105,7 +105,7 @@ protected:
 class OrthoCamera final : public Camera
 {
 public:
-    static constexpr CameraType scType = CameraType::eOrthographic;
+    static constexpr eCameraType scType = eCameraType::Orthographic;
 
 public:
     OrthoCamera() { Update(); }
@@ -137,7 +137,7 @@ private:
 class PerspectiveCamera final : public Camera
 {
 public:
-    static constexpr CameraType scType = CameraType::ePerspective;
+    static constexpr eCameraType scType = eCameraType::Perspective;
 
     static constexpr float32 scWeaponFarPlane = 0.01f;
     static constexpr float32 scWeaponNearPlane = 20.0f;
@@ -195,12 +195,12 @@ public:
 
     FX_FORCE_INLINE Vec3f GetRotation() { return Vec3f(mAngleY, mAngleX, 0); }
 
-    const Mat4f& GetCameraMatrix(ObjectLayer layer) const override
+    const Mat4f& GetCameraMatrix(eObjectLayer layer) const override
     {
         switch (layer) {
-        case ObjectLayer::eWorldLayer:
+        case eObjectLayer::WorldLayer:
             return mCameraMatrix;
-        case ObjectLayer::ePlayerLayer:
+        case fx::ePhMotionTypeObjectLayer::PlayerLayer:
             return mWeaponCameraMatrix;
         }
 

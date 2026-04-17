@@ -27,7 +27,7 @@ class Object : public AxBase, public Entity
 public:
     static const ::fx::ObjectId sNone = UINT32_MAX;
 
-    static constexpr EntityType scEntityType = EntityType::eObject;
+    static constexpr eEntityType scEntityType = eEntityType::Object;
 
 public:
     Object();
@@ -39,7 +39,7 @@ public:
     /**
      * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
      */
-    void RenderPrimitive(const renderer::RxCommandBuffer& cmd);
+    void RenderPrimitive(const renderer::CommandBuffer& cmd);
     void Render(const Camera& camera);
     void RenderUnlit(const Camera& camera);
 
@@ -50,12 +50,12 @@ public:
 
     void OnAttached(Scene* scene) override;
 
-    void SetGraphicsPipeline(renderer::RxPipeline* pipeline, bool update_children = true);
+    void SetGraphicsPipeline(renderer::Pipeline* pipeline, bool update_children = true);
 
-    void PhysicsCreatePrimitive(PhPrimitiveType primitive_type, const Vec3f& dimensions, PhMotionType motion_type,
+    void PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                                 const PhProperties& physics_properties);
 
-    void PhysicsCreateMesh(Ref<PrimitiveMesh> physics_mesh, PhMotionType motion_type,
+    void PhysicsCreateMesh(Ref<PrimitiveMesh> physics_mesh, ePhMotionType motion_type,
                            const PhProperties& physics_properties);
 
     void PrintDebug() const;
@@ -72,8 +72,8 @@ public:
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
 
-    FX_FORCE_INLINE void SetObjectLayer(ObjectLayer layer) { mObjectLayer = layer; }
-    FX_FORCE_INLINE ObjectLayer GetObjectLayer() const { return mObjectLayer; }
+    FX_FORCE_INLINE void SetObjectLayer(eObjectLayer layer) { mObjectLayer = layer; }
+    FX_FORCE_INLINE eObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
     FX_FORCE_INLINE void SetShadowCaster(const bool value) { mbIsShadowCaster = value; }
     FX_FORCE_INLINE bool IsShadowCaster() const { return mbIsShadowCaster; }
@@ -118,7 +118,7 @@ private:
     bool mbIsShadowCaster : 1 = false;
     bool mbRenderUnlit : 1 = false;
 
-    ObjectLayer mObjectLayer = ObjectLayer::eWorldLayer;
+    eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 };
 
 

@@ -20,7 +20,7 @@ namespace fx {
 
 ConfigEntry& ConfigEntry::operator=(ConfigEntry&& other)
 {
-    if (other.Type == ConfigEntry::ValueType::eString) {
+    if (other.Type == ConfigEntry::eValueType::String) {
         mStringValue = other.mStringValue;
         other.mStringValue = nullptr;
     }
@@ -29,7 +29,7 @@ ConfigEntry& ConfigEntry::operator=(ConfigEntry&& other)
     }
 
     Type = other.Type;
-    other.Type = ConfigEntry::ValueType::eNone;
+    other.Type = ConfigEntry::eValueType::None;
 
     Members = std::move(other.Members);
     ArrayData = std::move(other.ArrayData);
@@ -57,15 +57,15 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
 std::string ConfigValue::AsString() const
 {
     switch (Type) {
-    case ValueType::eNone:
+    case eValueType::None:
         return "";
-    case ValueType::eInt:
+    case eValueType::Int:
         return std::to_string(mIntValue);
-    case ValueType::eFloat:
+    case eValueType::Float:
         return std::to_string(mFloatValue);
-    case ValueType::eString:
+    case eValueType::String:
         return std::format("\"{}\"", mStringValue);
-    case ValueType::eStruct:
+    case eValueType::Struct:
         break;
     }
 
@@ -83,7 +83,7 @@ std::string ConfigEntry::AsString(uint32 indent) const
     }
 
 
-    if (Type == ValueType::eStruct) {
+    if (Type == eValueType::Struct) {
         for (const ConfigEntry& entry : Members) {
             member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
         }
@@ -153,11 +153,11 @@ void ConfigEntry::AppendValue(const Quat& quat)
 
 ConfigEntry::~ConfigEntry()
 {
-    if (Type == ValueType::eString && mStringValue != nullptr) {
+    if (Type == eValueType::String && mStringValue != nullptr) {
         free(mStringValue);
     }
 
-    Type = ValueType::eNone;
+    Type = eValueType::None;
 
     mStringValue = nullptr;
     if (Members.IsInited()) {
@@ -172,7 +172,7 @@ ConfigEntry::~ConfigEntry()
 
 void ConfigFile::Load(const std::string& path)
 {
-    File file(path.c_str(), File::eRead, File::eBinary);
+    File file(path.c_str(), File::eModType::Read, File::eDataType::Binary);
 
     if (!file.IsFileOpen()) {
         return;
@@ -188,19 +188,19 @@ void ConfigFile::Load(const std::string& path)
     Parse(tokenizer.GetTokens());
 }
 
-static ConfigEntry::ValueType GetValueTokenType(const Token& token)
+static ConfigEntry::eValueType GetValueTokenType(const Token& token)
 {
-    using VType = ConfigEntry::ValueType;
+    using VType = ConfigEntry::eValueType;
 
-    VType current_type = VType::eNone;
+    VType current_type = VType::None;
 
-    Token::IsNumericResult numeric_result = token.IsNumeric();
-    if (numeric_result != Token::IsNumericResult::eNaN) {
-        if (numeric_result == Token::IsNumericResult::eInteger) {
-            return VType::eInt;
+    Token::eIsNumericResult numeric_result = token.IsNumeric();
+    if (numeric_result != Token::eIsNumericResult::NaN) {
+        if (numeric_result == Token::eIsNumericResult::Integer) {
+            return VType::Int;
         }
         else {
-            return VType::eFloat;
+            return VType::Float;
         }
     }
 
@@ -208,14 +208,14 @@ static ConfigEntry::ValueType GetValueTokenType(const Token& token)
         char ch = token.Start[i];
 
         if (ch == '"') {
-            current_type = VType::eString;
+            current_type = VType::String;
         }
     }
 
     return current_type;
 }
 
-bool ConfigFile::EatToken(TokenType type)
+bool ConfigFile::EatToken(eTokenType type)
 {
     const bool correct_token = (GetToken()->Type == type);
 
@@ -241,12 +241,12 @@ void ConfigFile::PrintEntries()
 
 void ConfigFile::ParseValue(ConfigValue& value)
 {
-    using VType = ConfigEntry::ValueType;
+    using VType = ConfigEntry::eValueType;
 
     Token* value_token = GetToken();
 
     // Check for constants
-    if (value_token->Type == TokenType::eIdentifier) {
+    if (value_token->Type == eTokenType::Identifier) {
         for (const ConfigEntry& entry : mConstants) {
             if (entry.Name == value_token->GetHash()) {
                 value.Set(entry);
@@ -259,17 +259,17 @@ void ConfigFile::ParseValue(ConfigValue& value)
     }
 
     // Handle unary minus (in a simple way, but still handles recursive negatives)
-    if (value_token->Type == TokenType::eMinus) {
-        EatToken(TokenType::eMinus);
+    if (value_token->Type == eTokenType::Minus) {
+        EatToken(eTokenType::Minus);
 
         ConfigValue temp;
         ParseValue(temp);
 
         switch (temp.Type) {
-        case VType::eInt:
+        case VType::Int:
             value.Set<int64>(-temp.Get<int64>());
             break;
-        case VType::eFloat:
+        case VType::Float:
             value.Set<float32>(-temp.Get<float32>());
             break;
         default:
@@ -283,9 +283,9 @@ void ConfigFile::ParseValue(ConfigValue& value)
 
 
     switch (value.Type) {
-    case VType::eNone:
+    case VType::None:
         break;
-    case VType::eString:
+    case VType::String:
         // Remove the first quote
         value_token->Start++;
         value_token->Length--;
@@ -294,10 +294,10 @@ void ConfigFile::ParseValue(ConfigValue& value)
         value_token->Length--;
         value.Set(value_token->GetStr());
         break;
-    case VType::eInt:
+    case VType::Int:
         value.Set<int64>(value_token->ToInt());
         break;
-    case VType::eFloat:
+    case VType::Float:
         value.Set<float32>(value_token->ToFloat());
         break;
     default:
@@ -326,50 +326,50 @@ ConfigEntry ConfigFile::ParseEntry()
 
     entry.Name = token->GetStr();
 
-    EatToken(TokenType::eIdentifier);
-    EatToken(TokenType::eEquals);
+    EatToken(eTokenType::Identifier);
+    EatToken(eTokenType::Equals);
 
     // Parse struct
     // [IDENTIFIER] = { [ENTRY]... }
-    if (GetToken()->Type == TokenType::eLBrace) {
-        EatToken(TokenType::eLBrace);
+    if (GetToken()->Type == eTokenType::LBrace) {
+        EatToken(eTokenType::LBrace);
 
-        entry.Type = ConfigEntry::ValueType::eStruct;
+        entry.Type = ConfigEntry::eValueType::Struct;
 
         // Add each entry as a member of the current entry
-        while (GetToken()->Type != TokenType::eRBrace) {
+        while (GetToken()->Type != eTokenType::RBrace) {
             ConfigEntry member = ParseEntry();
             entry.AddMember(std::move(member));
         }
 
-        EatToken(TokenType::eRBrace);
+        EatToken(eTokenType::RBrace);
 
         return entry;
     }
 
     // Parse array
-    else if (GetToken()->Type == TokenType::eLBracket) {
-        EatToken(TokenType::eLBracket);
+    else if (GetToken()->Type == eTokenType::LBracket) {
+        EatToken(eTokenType::LBracket);
 
         entry.bIsArray = true;
 
         Token* value_token = GetToken();
         entry.Type = GetValueTokenType(*value_token);
 
-        while (GetToken()->Type != TokenType::eRBracket) {
+        while (GetToken()->Type != eTokenType::RBracket) {
             ConfigValue value;
             value.Type = entry.Type;
             ParseValue(value);
             entry.AppendValue(std::move(value));
 
-            if (GetToken()->Type == TokenType::eRBracket) {
+            if (GetToken()->Type == eTokenType::RBracket) {
                 break;
             }
 
-            EatToken(TokenType::eComma);
+            EatToken(eTokenType::Comma);
         }
 
-        EatToken(TokenType::eRBracket);
+        EatToken(eTokenType::RBracket);
 
         return entry;
     }
@@ -413,7 +413,7 @@ ConfigEntry* ConfigFile::GetEntry(Hash64 requested_name_hash) const
 
 void ConfigFile::Write(const std::string& path)
 {
-    File file(path.c_str(), File::eWrite, File::eText);
+    File file(path.c_str(), File::eModType::Write, File::eDataType::Text);
 
     if (!file.IsFileOpen()) {
         return;

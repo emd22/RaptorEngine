@@ -14,7 +14,7 @@ namespace fx {
 class AxLoaderStb : public AxLoaderImageBase
 {
 public:
-    using Status = AxLoaderBase::Status;
+    using Status = AxLoaderBase::eStatus;
 
     AxLoaderStb() = default;
 

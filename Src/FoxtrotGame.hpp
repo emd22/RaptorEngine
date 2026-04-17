@@ -7,7 +7,7 @@
 #include <Player.hpp>
 #include <Scene.hpp>
 
-class RxShadowDirectional;
+class ShadowDirectional;
 
 namespace fx {
 

@@ -12,13 +12,13 @@ namespace fx {
 
 using namespace renderer;
 
-static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(RxImageFormat format)
+static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(ImageFormat format)
 {
     switch (format) {
-    case RxImageFormat::eBGRA8_UNorm:
+    case ImageFormat::BGRA8_UNorm:
         return JCS_EXT_BGRA;
-    case RxImageFormat::eRGBA8_UNorm:
-    case RxImageFormat::eRGBA8_SRGB:
+    case ImageFormat::RGBA8_UNorm:
+    case ImageFormat::RGBA8_SRGB:
         return JCS_EXT_RGBA;
     default:;
     }
@@ -37,7 +37,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const std::
 
     if (!fp) {
         LogError("Could not find JPEG file at '{:s}'", c_path);
-        return AxLoaderJpeg::Status::eError;
+        return AxLoaderJpeg::Status::Error;
     }
 
     struct jpeg_error_mgr error_mgr;
@@ -73,7 +73,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const std::
 
     fclose(fp);
 
-    return Status::eSuccess;
+    return Status::Success;
 }
 
 AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
@@ -92,7 +92,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
     jpeg_read_header(&mJpegInfo, true);
 
 
-    const uint32 num_components = RxImageFormatUtil::GetSize(ImageFormat);
+    const uint32 num_components = ImageFormatUtil::GetSize(ImageFormat);
 
     J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
 
@@ -117,7 +117,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
 
     jpeg_finish_decompress(&mJpegInfo);
 
-    return Status::eSuccess;
+    return Status::Success;
 }
 
 void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)

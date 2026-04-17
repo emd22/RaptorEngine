@@ -2,7 +2,7 @@
 
 #include "AxLoaderBase.hpp"
 
-#include <Renderer/Backend/RxImage.hpp>
+#include <Renderer/Backend/Image.hpp>
 
 namespace fx {
 
@@ -10,11 +10,11 @@ namespace fx {
 class AxLoaderImageBase : public AxLoaderBase
 {
 public:
-    using Status = AxLoaderBase::Status;
+    using Status = fx::AxLoaderBase::eStatus;
 
 public:
-    renderer::RxImageType ImageType = renderer::RxImageType::e2d;
-    renderer::RxImageFormat ImageFormat = renderer::RxImageFormat::eNone;
+    renderer::eImageType ImageType = renderer::eImageType::Flat;
+    renderer::eImageFormat ImageFormat = renderer::eImageFormat::None;
     // int16 ImageNumComponents = 0;
 };
 

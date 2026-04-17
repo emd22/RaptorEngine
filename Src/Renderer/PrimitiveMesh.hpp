@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Backend/RxGpuBuffer.hpp"
-#include "RxVertexList.hpp"
+#include "Backend/GpuBuffer.hpp"
+#include "VertexList.hpp"
 
 #include <Math/Quat.hpp>
 
@@ -18,14 +18,14 @@ class PrimitiveMesh
 public:
     PrimitiveMesh() = default;
 
-    template <renderer::RxVertexType TVertexType>
-    PrimitiveMesh(SizedArray<renderer::RxVertex<TVertexType>>& vertices)
+    template <renderer::eVertexType TVertexType>
+    PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices)
     {
         UploadVertices(vertices);
     }
 
-    template <renderer::RxVertexType TVertexType>
-    PrimitiveMesh(SizedArray<renderer::RxVertex<TVertexType>>& vertices, SizedArray<uint32>& indices)
+    template <renderer::eVertexType TVertexType>
+    PrimitiveMesh(SizedArray<renderer::Vertex<TVertexType>>& vertices, SizedArray<uint32>& indices)
     {
         CreateFromData(vertices, indices);
     }
@@ -47,15 +47,15 @@ public:
      * @brief Uploads the vertices to the mesh's GPU buffers and copies the data into a cpu-side buffer if the property
      * `KeepInMemory` is true.
      */
-    template <renderer::RxVertexType TVertexType>
-    void UploadVertices(const SizedArray<renderer::RxVertex<TVertexType>>& vertices)
+    template <renderer::eVertexType TVertexType>
+    void UploadVertices(const SizedArray<renderer::Vertex<TVertexType>>& vertices)
     {
         VertexList.CreateAsCopyOf<TVertexType>(vertices);
         UploadVertices();
     }
 
-    template <renderer::RxVertexType TVertexType>
-    void UploadVertices(SizedArray<renderer::RxVertex<TVertexType>>&& vertices)
+    template <renderer::eVertexType TVertexType>
+    void UploadVertices(SizedArray<renderer::Vertex<TVertexType>>&& vertices)
     {
         VertexList.CreateFrom<TVertexType>(std::move(vertices));
         UploadVertices();
@@ -65,7 +65,7 @@ public:
     void UploadIndices(const SizedArray<uint32>& indices)
     {
         LocalIndexBuffer.InitAsCopyOf(indices);
-        GpuIndexBuffer.Create(renderer::RxGpuBufferType::eIndexBuffer, Slice(indices));
+        GpuIndexBuffer.Create(renderer::eGpuBufferType::IndexBuffer, Slice(indices));
     }
 
     /**
@@ -74,11 +74,11 @@ public:
      */
     void UploadIndices(SizedArray<uint32>&& indices)
     {
-        GpuIndexBuffer.Create<uint32>(renderer::RxGpuBufferType::eIndexBuffer, indices);
+        GpuIndexBuffer.Create<uint32>(renderer::eGpuBufferType::IndexBuffer, indices);
         LocalIndexBuffer = std::move(indices);
     }
 
-    renderer::RxVertexList& GetVertices()
+    renderer::VertexList& GetVertices()
     {
         if (!bKeepInMemory) {
             LogWarning("Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
@@ -100,13 +100,13 @@ public:
 
     bool IsWritable() { return (VertexList.GpuBuffer.Initialized && GpuIndexBuffer.Initialized); }
 
-    renderer::RxGpuBuffer& GetVertexBuffer() { return VertexList.GpuBuffer; }
-    renderer::RxGpuBuffer& GetIndexBuffer() { return GpuIndexBuffer; }
+    renderer::GpuBuffer& GetVertexBuffer() { return VertexList.GpuBuffer; }
+    renderer::GpuBuffer& GetIndexBuffer() { return GpuIndexBuffer; }
 
-    void Render(const renderer::RxCommandBuffer& cmd, uint32 num_instances)
+    void Render(const renderer::CommandBuffer& cmd, uint32 num_instances)
     {
         const VkDeviceSize offset = 0;
-        //        RxFrameData* frame = Rx_Fwd_GetFrame();
+        //        FrameData* frame = Fwd_GetFrame();
 
         vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(cmd.CommandBuffer, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
@@ -117,7 +117,7 @@ public:
 
     void RecalculateNormals()
     {
-        using VertexType = renderer::RxVertex<renderer::RxVertexType::eDefault>;
+        using VertexType = renderer::Vertex<renderer::eVertexType::Default>;
 
         if (LocalIndexBuffer.IsEmpty()) {
             LogWarning("Cannot recalculate normals as local indices are missing!");
@@ -213,7 +213,7 @@ public:
 
 
 public:
-    renderer::RxVertexList VertexList;
+    renderer::VertexList VertexList;
 
     SizedArray<MeshBone> Bones;
 
@@ -222,7 +222,7 @@ public:
     bool bIsReference = false;
     bool bKeepInMemory = false;
 
-    renderer::RxGpuBuffer GpuIndexBuffer;
+    renderer::GpuBuffer GpuIndexBuffer;
     SizedArray<uint32> LocalIndexBuffer;
 };
 

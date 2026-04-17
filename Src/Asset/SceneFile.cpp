@@ -12,11 +12,11 @@ namespace fx {
 // {
 //     ConfigEntry entry = ConfigEntry::Struct(object.Name);
 
-//     ConfigEntry positions = ConfigEntry::Array("pos", ConfigEntry::ValueType::eFloat);
+//     ConfigEntry positions = ConfigEntry::Array("pos", ConfigEntry::ValueType::Float);
 //     positions.AppendValue(object.mPosition);
 //     entry.AddMember(std::move(positions));
 
-//     ConfigEntry rotation = ConfigEntry::Array("rot", ConfigEntry::ValueType::eFloat);
+//     ConfigEntry rotation = ConfigEntry::Array("rot", ConfigEntry::ValueType::Float);
 //     rotation.AppendValue(object.mRotation);
 //     entry.AddMember(std::move(rotation));
 
@@ -118,8 +118,8 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
     if (layer != nullptr) {
         int64 layer_value = layer->Get<int64>();
 
-        if (layer_value == static_cast<int64>(ObjectLayer::ePlayerLayer)) {
-            object->SetObjectLayer(ObjectLayer::ePlayerLayer);
+        if (layer_value == static_cast<int64>(ObjectLayer::PlayerLayer)) {
+            object->SetObjectLayer(ObjectLayer::PlayerLayer);
         }
     }
 
@@ -132,11 +132,11 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
 
     ConfigEntry* physics = object_entry.GetMember(HashStr64("Physics"));
     if (physics != nullptr && !object->Physics.mbHasPhysicsBody) {
-        PhMotionType motion_type = PhMotionType::eStatic;
+        ePhMotionType motion_type = ePhMotionType::Static;
 
         ConfigEntry* type = physics->GetMember(HashStr64("Type"));
-        if (type && type->Get<uint32>() == static_cast<uint32>(PhMotionType::eDynamic)) {
-            motion_type = PhMotionType::eDynamic;
+        if (type && type->Get<uint32>() == static_cast<uint32>(ePhMotionType::Dynamic)) {
+            motion_type = ePhMotionType::Dynamic;
         }
 
         ConfigEntry* from_mesh = physics->GetMember(HashStr64("FromMesh"));
@@ -147,7 +147,7 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
         ConfigEntry* box_collider = physics->GetMember(HashStr64("BoxCollider"));
         if (box_collider != nullptr) {
             Vec3f box_size = box_collider->GetMemberValue(HashStr64("Size"), Vec3f::sOne);
-            object->PhysicsCreatePrimitive(PhPrimitiveType::eBox, box_size, motion_type, physics_properties);
+            object->PhysicsCreatePrimitive(ePhPrimitiveType::Box, box_size, motion_type, physics_properties);
         }
     }
 

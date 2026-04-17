@@ -7,7 +7,7 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Camera.hpp>
-#include <Renderer/RxConstants.hpp>
+#include <Renderer/Constants.hpp>
 
 #define FX_VALIDATE_ENTITY_TYPE(TType_) static_assert(C_IsEntity<TType_>);
 
@@ -16,17 +16,17 @@ namespace fx {
 
 class Scene;
 
-enum class EntityType
+enum class eEntityType
 {
-    eUnknown,
-    eObject,
-    eLight
+    Unknown,
+    Object,
+    Light
 };
 
-enum class TransformMode
+enum class eTransformMode
 {
-    eDefault,
-    eTransformFromOrigin
+    Default,
+    TransformFromOrigin
 };
 
 
@@ -73,7 +73,7 @@ public:
     FX_FORCE_INLINE void SetRotationOrigin(const Vec3f& origin)
     {
         RotationOrigin = origin;
-        TransformMode = TransformMode::eTransformFromOrigin;
+        TransformMode = eTransformMode::TransformFromOrigin;
         MarkMatrixOutOfDate();
     }
 
@@ -110,7 +110,7 @@ public:
 
     Vec3f RotationOrigin = Vec3f::sZero;
 
-    TransformMode TransformMode = TransformMode::eDefault;
+    eTransformMode TransformMode = eTransformMode::Default;
 
 protected:
     bool mbPhysicsTransformOutOfDate : 1 = true;
@@ -118,7 +118,7 @@ protected:
 
     Mat4f mModelMatrix = Mat4f::sIdentity;
 
-    uint32 mMatrixUpdateFramesRemaining = RxFramesInFlight;
+    uint32 mMatrixUpdateFramesRemaining = FramesInFlight;
     // Mat4f mNormalMatrix = Mat4f::Identity;
 };
 
@@ -139,7 +139,7 @@ private:
 template <typename TEntityType>
 concept C_IsEntity = requires() {
     // Ensure that there is a const(expr) scEntity type parameter
-    requires std::is_same_v<const EntityType, decltype(TEntityType::scEntityType)>;
+    requires std::is_same_v<const eEntityType, decltype(TEntityType::scEntityType)>;
 
     // TEntity type is derived from Entity
     requires std::is_base_of_v<Entity, TEntityType>;

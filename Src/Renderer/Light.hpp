@@ -10,19 +10,19 @@ namespace fx {
 class Camera;
 
 namespace renderer {
-class RxPipeline;
+class Pipeline;
 } // namespace renderer
 
-enum LightFlags : uint16
+enum eLightFlags : uint16
 {
     LF_None = 0x0000,
 };
 
-enum class LightType
+enum class eLightType
 {
-    eUnknown,
-    eDirectional,
-    ePoint,
+    Unknown,
+    Directional,
+    Point,
 };
 
 FX_DEFINE_ENUM_AS_FLAGS(LightFlags);
@@ -30,9 +30,9 @@ FX_DEFINE_ENUM_AS_FLAGS(LightFlags);
 class LightBase : public Entity
 {
 public:
-    using VertexType = renderer::RxVertex<renderer::RxVertexType::eSlim>;
+    using VertexType = renderer::Vertex<renderer::VertexType::Slim>;
 
-    static constexpr EntityType scEntityType = EntityType::eLight;
+    static constexpr EntityType scEntityType = EntityType::Light;
 
 public:
     LightBase(LightFlags flags = LF_None);
@@ -51,21 +51,21 @@ public:
     Ref<PrimitiveMesh> pLightVolume { nullptr };
     Ref<MeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
 
-    renderer::RxPipeline* pPipelineInside = nullptr;
-    renderer::RxPipeline* pPipelineOutside = nullptr;
+    renderer::Pipeline* pPipelineInside = nullptr;
+    renderer::Pipeline* pPipelineOutside = nullptr;
 
     struct Color Color = Color::sWhite;
     struct Color AmbientColor { 0x101f1f1f };
 
     LightFlags Flags = LF_None;
 
-    LightType Type = LightType::eUnknown;
+    LightType Type = LightType::Unknown;
 
     bool bEnabled = true;
 
 protected:
     Ref<PrimitiveMesh> mpDebugMesh { nullptr };
-    renderer::RxPipeline* pPipeline = nullptr;
+    renderer::Pipeline* pPipeline = nullptr;
 
     float32 mRadius = 1.0f;
 };

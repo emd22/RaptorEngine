@@ -44,7 +44,7 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsSlimMesh()
 {
     Ref<PrimitiveMesh> mesh = MakeRef<PrimitiveMesh>();
 
-    SizedArray<renderer::RxVertex<renderer::RxVertexType::eSlim>> points(Positions.Size);
+    SizedArray<renderer::Vertex<renderer::VertexType::Slim>> points(Positions.Size);
 
     for (uint32 i = 0; i < Positions.Size; i++) {
         auto* vertex = points.Insert();
@@ -57,7 +57,7 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsSlimMesh()
 
     mesh->UploadIndices(Indices);
 
-    mesh->VertexList.CreateFrom<renderer::RxVertexType::eSlim>(std::move(points));
+    mesh->VertexList.CreateFrom<renderer::VertexType::Slim>(std::move(points));
     mesh->UploadVertices();
 
     mesh->bIsReady.store(true);
@@ -72,7 +72,7 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
 
     mesh->UploadIndices(Indices);
 
-    // mesh->VertexList.CreateFrom<RxVertexType::eDefault>(Positions, {}, {}, {});
+    // mesh->VertexList.CreateFrom<VertexType::Default>(Positions, {}, {}, {});
     mesh->VertexList.CreateFrom(Positions, {}, {}, {}, {}, {});
     mesh->UploadVertices();
 
@@ -81,12 +81,12 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
     return mesh;
 }
 
-Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsMesh(renderer::RxVertexType vertex_type)
+Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsMesh(renderer::VertexType vertex_type)
 {
     switch (vertex_type) {
-    case renderer::RxVertexType::eDefault:
+    case renderer::VertexType::Default:
         return AsDefaultMesh();
-    case renderer::RxVertexType::eSlim:
+    case renderer::VertexType::Slim:
         return AsSlimMesh();
     default:
         LogError("Mesh type is not supported!");

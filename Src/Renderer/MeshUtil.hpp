@@ -2,7 +2,7 @@
 
 #include <Core/AnonArray.hpp>
 #include <Math/Vec3.hpp>
-#include <Renderer/RxVertexList.hpp>
+#include <Renderer/VertexList.hpp>
 #include <cfloat>
 
 namespace fx {
@@ -10,7 +10,7 @@ namespace fx {
 class MeshUtil
 {
 public:
-    static Vec3f CalculateDimensions(const renderer::RxVertexList& vertex_list)
+    static Vec3f CalculateDimensions(const renderer::VertexList& vertex_list)
     {
         const AnonArray& vertices = vertex_list.GetLocalBuffer();
 
@@ -24,10 +24,10 @@ public:
 
         for (uint32 i = 0; i < vertices.Size; i++) {
             // Since the position resides at the same location for each vertex type (see static_assert in
-            // RxVertexUtil::GetPosition), the vertex type used here can be anything, and offsets are preserved as the
+            // VertexUtil::GetPosition), the vertex type used here can be anything, and offsets are preserved as the
             // size of the object is stored in the anonymous buffer.
-            Vec3f position = renderer::RxVertexUtil::GetPosition(
-                *reinterpret_cast<const renderer::RxVertex<renderer::RxVertexType::eDefault>*>(vertices.GetRaw(i)));
+            Vec3f position = renderer::VertexUtil::GetPosition(
+                *reinterpret_cast<const renderer::Vertex<renderer::VertexType::Default>*>(vertices.GetRaw(i)));
 
             min_vertex = Vec3f::Min(min_vertex, position);
             max_vertex = Vec3f::Max(max_vertex, position);

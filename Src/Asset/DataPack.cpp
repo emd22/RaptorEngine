@@ -213,7 +213,7 @@ void DataPack::WriteToFile(const char* name)
         File.Close();
     }
 
-    File.Open(name, File::eWrite, File::eBinary);
+    File.Open(name, File::eModType::Write, File::eDataType::Binary);
 
     if (!File.IsFileOpen()) {
         LogError("Data pack '{}' could not be written to", name);
@@ -238,7 +238,7 @@ bool DataPack::ReadFromFile(const char* name)
         Entries.Clear();
     }
 
-    File.Open(name, File::eRead, File::eBinary);
+    File.Open(name, File::eModType::Read, File::eDataType::Binary);
 
     if (!File.IsFileOpen()) {
         LogError("Error opening data pack '{}'", name);
@@ -249,7 +249,7 @@ bool DataPack::ReadFromFile(const char* name)
     if (!successful) {
         File.Close();
         // Open the file in write mode to clear it
-        File.Open(name, File::eWrite, File::eBinary);
+        File.Open(name, File::eModType::Write, File::eDataType::Binary);
         File.Close();
 
         // Return unsuccessful

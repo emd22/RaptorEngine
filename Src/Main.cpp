@@ -12,7 +12,7 @@
 #include <Engine.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
-#include <Renderer/RxGlobals.hpp>
+#include <Renderer/Globals.hpp>
 
 FX_SET_MODULE_NAME("Main")
 
@@ -28,7 +28,7 @@ int main()
     }
 
     fx::Globals::Destroy();
-    fx::RxGlobals::Destroy();
+    fx::Globals::Destroy();
 
     Defer(
         []()

@@ -2,7 +2,7 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Log.hpp>
-#include <Renderer/Backend/RxUtil.hpp>
+#include <Renderer/Backend/Util.hpp>
 
 namespace fx {
 
@@ -38,7 +38,7 @@ void PanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&.
     }
 
     LogFatal(fmt, std::forward<TTypes>(items)...);
-    LogFatal("=> Vulkan Err: {:s}", renderer::RxUtil::ResultToStr(result));
+    LogFatal("=> Vulkan Err: {:s}", renderer::Util::ResultToStr(result));
 
     Terminate();
 }

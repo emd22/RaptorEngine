@@ -372,7 +372,7 @@ public:
 
     void Print()
     {
-        LogChannelText<LogChannel::Info>();
+        eLogChannelText<eLogChannel::Info>();
 
         LogDirect("Array: {{ ");
 

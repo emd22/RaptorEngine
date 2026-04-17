@@ -15,8 +15,8 @@ PhMesh::PhMesh(const PrimitiveMesh& mesh)
     VertexList.reserve(positions.Size);
 
     for (uint64 index = 0; index < positions.Size; index++) {
-        const renderer::RxVertex<renderer::RxVertexType::eDefault>& vertex =
-            positions.Get<renderer::RxVertex<renderer::RxVertexType::eDefault>>(index);
+        const renderer::Vertex<renderer::VertexType::Default>& vertex =
+            positions.Get<renderer::Vertex<renderer::VertexType::Default>>(index);
 
         VertexList.emplace_back(JPH::Float3 {
             vertex.Position[0],

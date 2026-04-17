@@ -3,9 +3,9 @@
 #include <Engine.hpp>
 #include <Math/Mat4.hpp>
 #include <Object.hpp>
-#include <Renderer/Backend/RxDsLayoutBuilder.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 
 namespace fx {
 
@@ -17,14 +17,14 @@ void ObjectManager::Create()
         mDescriptorPool.Create(renderer::gRenderer->GetDevice(), 2);
     }
 
-    renderer::RxDsLayoutBuilder builder {};
-    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, renderer::RxShaderType::eVertex);
+    renderer::DsLayoutBuilder builder {};
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, renderer::ShaderType::Vertex);
     DsLayoutObjectBuffer = builder.Build();
 
-    uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * RxFramesInFlight;
+    uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * FramesInFlight;
 
-    mObjectGpuBuffer.Create(renderer::RxGpuBufferType::eStorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
-                            renderer::RxGpuBufferFlags::ePersistentMapped);
+    mObjectGpuBuffer.Create(renderer::GpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
+                            renderer::GpuBufferFlags::PersistentMapped);
 
 
     mObjectSlotsInUse.InitZero(scMaxObjects);

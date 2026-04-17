@@ -4,8 +4,8 @@
 #include "Engine.hpp"
 
 #include <ObjectManager.hpp>
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 
 namespace fx {
 
@@ -102,16 +102,16 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
         pPipeline = pPipelineOutside;
     }
 
-    RxFrameData* frame = gRenderer->GetFrame();
+    FrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
-    gRenderer->Uniforms.Rewind();
+    gRenderer->ShaderUniform.Rewind();
 
     pPipeline->Bind(frame->CommandBuffer);
 
     {
         LightVertPushConstants push_constants {};
-        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::eWorldLayer).RawData, sizeof(Mat4f));
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
 
         push_constants.ObjectId = ObjectId;
@@ -121,23 +121,23 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
     }
 
 
-    gRenderer->Uniforms.WritePtr(shadow_camera->GetCameraMatrix(ObjectLayer::eWorldLayer).RawData, sizeof(Mat4f));
-    gRenderer->Uniforms.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
-    gRenderer->Uniforms.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
+    gRenderer->ShaderUniform.WritePtr(shadow_camera->GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+    gRenderer->ShaderUniform.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
+    gRenderer->ShaderUniform.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
     // Note that the light position is packed with the light colour as the fourth component!
-    gRenderer->Uniforms.WritePtr(mPosition.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Write(Color.Value);
+    gRenderer->ShaderUniform.WritePtr(mPosition.mData, sizeof(float32) * 3);
+    gRenderer->ShaderUniform.Write(Color.Value);
 
-    gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Write(mRadius);
+    gRenderer->ShaderUniform.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+    gRenderer->ShaderUniform.Write(mRadius);
 
-    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
-    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
+    gRenderer->ShaderUniform.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
+    gRenderer->ShaderUniform.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
 
-    gRenderer->Uniforms.Write(AmbientColor.Value);
+    gRenderer->ShaderUniform.Write(AmbientColor.Value);
 
-    gRenderer->Uniforms.FlushToGpu();
+    gRenderer->ShaderUniform.FlushToGpu();
 
     pLightVolume->Render(frame->CommandBuffer, 1);
 }
@@ -149,11 +149,11 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
         return;
     }
 
-    RxFrameData* frame = gRenderer->GetFrame();
-    Ref<RxDeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
+    FrameData* frame = gRenderer->GetFrame();
+    Ref<DeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
     DrawPushConstants push_constants {};
-    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::eWorldLayer).RawData, sizeof(Mat4f));
+    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     push_constants.ObjectId = ObjectId;
 
     vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout,
@@ -175,7 +175,7 @@ LightPoint::LightPoint()
     pPipelineInside = &gRenderer->pDeferredRenderer->PlLightingInsideVolume;
     pPipelineOutside = &gRenderer->pDeferredRenderer->PlLightingOutsideVolume;
 
-    Type = LightType::ePoint;
+    Type = LightType::Point;
 }
 
 
@@ -183,7 +183,7 @@ LightDirectional::LightDirectional()
 {
     pPipeline = &gRenderer->pDeferredRenderer->PlLightingDirectional;
 
-    Type = LightType::eDirectional;
+    Type = LightType::Directional;
 }
 
 void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
@@ -192,14 +192,14 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
         return;
     }
 
-    RxFrameData* frame = gRenderer->GetFrame();
+    FrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
     pPipeline->Bind(frame->CommandBuffer);
 
     {
         LightVertPushConstants push_constants {};
-        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::eWorldLayer).RawData, sizeof(Mat4f));
+        memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
         push_constants.ObjectId = ObjectId;
 
@@ -207,31 +207,32 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
                            sizeof(push_constants), &push_constants);
     }
 
-    gRenderer->Uniforms.Rewind();
+    gRenderer->ShaderUniform.Rewind();
 
     if (shadow_camera) {
-        gRenderer->Uniforms.WritePtr(shadow_camera->GetCameraMatrix(ObjectLayer::eWorldLayer).RawData, sizeof(Mat4f));
+        gRenderer->ShaderUniform.WritePtr(shadow_camera->GetCameraMatrix(ObjectLayer::WorldLayer).RawData,
+                                          sizeof(Mat4f));
     }
     else {
-        gRenderer->Uniforms.WritePtr(camera.GetCameraMatrix(ObjectLayer::eWorldLayer).RawData, sizeof(Mat4f));
+        gRenderer->ShaderUniform.WritePtr(camera.GetCameraMatrix(ObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     }
 
-    gRenderer->Uniforms.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
-    gRenderer->Uniforms.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
+    gRenderer->ShaderUniform.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
+    gRenderer->ShaderUniform.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
     // // Note that the light position is packed with the light colour as the fourth component!
-    gRenderer->Uniforms.WritePtr(camera.Position.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Write(mRadius);
+    gRenderer->ShaderUniform.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+    gRenderer->ShaderUniform.Write(mRadius);
 
-    gRenderer->Uniforms.WritePtr(mPosition.mData, sizeof(float32) * 3);
-    gRenderer->Uniforms.Write(Color.Value);
+    gRenderer->ShaderUniform.WritePtr(mPosition.mData, sizeof(float32) * 3);
+    gRenderer->ShaderUniform.Write(Color.Value);
 
-    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
-    gRenderer->Uniforms.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
+    gRenderer->ShaderUniform.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
+    gRenderer->ShaderUniform.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
 
-    gRenderer->Uniforms.Write(AmbientColor.Value);
+    gRenderer->ShaderUniform.Write(AmbientColor.Value);
 
-    gRenderer->Uniforms.FlushToGpu();
+    gRenderer->ShaderUniform.FlushToGpu();
 
     // gRenderer->Uniforms.AssertSize(sizeof(LightFragPushConstants));
 

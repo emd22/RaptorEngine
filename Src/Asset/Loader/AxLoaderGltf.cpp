@@ -11,8 +11,8 @@
 #include <Renderer/PrimitiveMesh.hpp>
 
 // Renderer includes
-#include <Renderer/RxGlobals.hpp>
-#include <Renderer/RxRenderBackend.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 
 namespace fx {
 
@@ -103,7 +103,7 @@ void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<Primiti
 //     LogInfo("Loaded skin '{}' with {} joints", skin->name ? skin->name : "Unnamed", skin->joints_count);
 // }
 
-template <RxImageFormat TFormat>
+template <ImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(TSRef<Material>& material, MaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
@@ -137,7 +137,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
 
         if (!texture_view.texture) {
             // MakeEmptyMaterialTexture(material, material->Diffuse);
-            material->Diffuse.pAssetImage = AxImage::GetEmptyImage<RxImageFormat::eRGBA8_UNorm>();
+            material->Diffuse.pAssetImage = AxImage::GetEmptyImage<ImageFormat::RGBA8_UNorm>();
 
             material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
         }
@@ -364,18 +364,18 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const std::
     cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mpGltfData);
     if (status != cgltf_result_success) {
         LogError("Error parsing GLTF file! (path: {:s})", path);
-        return AxLoaderGltf::Status::eError;
+        return AxLoaderGltf::Status::Error;
     }
 
     status = cgltf_load_buffers(&options, mpGltfData, path.c_str());
     if (status != cgltf_result_success) {
         LogError("Error loading buffers from GLTF file! (path: {:s})", path);
 
-        return AxLoaderGltf::Status::eError;
+        return AxLoaderGltf::Status::Error;
     }
 
 
-    return AxLoaderGltf::Status::eSuccess;
+    return AxLoaderGltf::Status::Success;
 }
 
 AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
@@ -385,10 +385,10 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(TSRef<AxBase> asset, const uin
     cgltf_result status = cgltf_parse(&options, data, size, &mpGltfData);
     if (status != cgltf_result_success) {
         LogError("Error parsing GLTF file from data");
-        return AxLoaderGltf::Status::eError;
+        return AxLoaderGltf::Status::Error;
     }
 
-    return AxLoaderGltf::Status::eSuccess;
+    return AxLoaderGltf::Status::Success;
 }
 
 void AxLoaderGltf::CreateGpuResource(TSRef<AxBase>& asset)

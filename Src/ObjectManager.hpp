@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Core/Bitset.hpp>
-#include <Renderer/Backend/RxDescriptors.hpp>
-#include <Renderer/Backend/RxGpuBuffer.hpp>
+#include <Renderer/Backend/Descriptors.hpp>
+#include <Renderer/Backend/GpuBuffer.hpp>
 
 namespace fx {
 
@@ -53,13 +53,13 @@ private:
     ObjectGpuEntry* GetBufferAtFrame(uint32 object_id);
 
 public:
-    renderer::RxDescriptorPool mDescriptorPool {};
+    renderer::DescriptorPool mDescriptorPool {};
 
 public:
-    renderer::RxRawGpuBuffer mObjectGpuBuffer {};
+    renderer::RawGpuBuffer mObjectGpuBuffer {};
     Bitset mObjectSlotsInUse;
 
-    renderer::RxDescriptorSet mObjectBufferDS {};
+    renderer::DescriptorSet mObjectBufferDS {};
     VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
 
     std::mutex mInUse;

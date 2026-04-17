@@ -7,7 +7,7 @@ static std::ofstream sCurrentLogFile;
 std::ofstream& LogGetFile(bool* can_write)
 {
     if (!sCurrentLogFile.is_open()) {
-        LogToStdout<LogChannel::Error>("Attempting to write to log file that has not been opened");
+        LogToStdout<eLogChannel::Error>("Attempting to write to log file that has not been opened");
         (*can_write) = false;
     }
     else {

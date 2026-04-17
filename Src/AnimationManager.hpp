@@ -2,19 +2,19 @@
 
 
 #include <Core/Types.hpp>
-#include <Renderer/Backend/RxGpuBuffer.hpp>
+#include <Renderer/Backend/GpuBuffer.hpp>
 
 namespace fx {
 
-class RxAnimationManager
+class AnimationManager
 {
 public:
-    RxAnimationManager() = default;
+    AnimationManager() = default;
 
-    ~RxAnimationManager() = default;
+    ~AnimationManager() = default;
 
 private:
-    renderer::RxRawGpuBuffer PoseBuffer;
+    renderer::RawGpuBuffer PoseBuffer;
 };
 
 } // namespace fx
