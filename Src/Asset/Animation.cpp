@@ -106,8 +106,31 @@ BoneTransform Skeleton::GetBoneTransform(const Ref<Animation>& anim, float32 tim
     }
 
     const BoneTrack& track = anim->BoneTracks[bone_id];
-    return BoneTransform(SkinningMatrices[bone_id].GetTranslation() * Vec3f(-1, 1, -1),
+
+    // The rotation should be taken from the matrix to have all of the parents propagated into the rotation. Currently
+    // thats a pretty gnarly function to have to write, so im just going with this mess for now.
+    //
+    // Another strange oddity (likely due to converting from GLTF's horrid coordinates) is that Z is
+    // negated. But also negating that component in the matrix causes spaghetti limbs.
+
+    return BoneTransform(Vec3f::FlipSigns<1, 1, -1, 1>(SkinningMatrices[bone_id].GetTranslation()),
                          GetComponentAtTime(time, track.Rotation));
+}
+
+Mat4f Skeleton::GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const
+{
+    Mat4f xform {};
+    if (!anim.IsValid() || bone_id == BoneNull) {
+        return xform;
+    }
+
+    if (bone_id > anim->BoneTracks.Size) {
+        LogError("Bone ID({}) out of range", bone_id);
+        return xform;
+    }
+
+    const BoneTrack& track = anim->BoneTracks[bone_id];
+    return SkinningMatrices[bone_id];
 }
 
 

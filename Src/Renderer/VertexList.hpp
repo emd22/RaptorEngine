@@ -6,24 +6,35 @@
 #include <Core/AnonArray.hpp>
 #include <Core/SizedArray.hpp>
 
-namespace fx::renderer {
+namespace fx {
+
+enum class eVertexCreateFlags
+{
+    None = 0x00,
+    NegativeX = 0x01,
+};
+
+FxEnumFlags(eVertexCreateFlags);
+
+namespace renderer {
 
 class VertexList
 {
 public:
     VertexList() = default;
 
-    void CreateSlimFrom(const SizedArray<float32>& positions);
-    void CreateSlimFrom(const SizedArray<Vec3f>& positions);
+    void CreateSlimFrom(const SizedArray<float32>& positions, eVertexCreateFlags create_flags);
+    void CreateSlimFrom(const SizedArray<Vec3f>& positions, eVertexCreateFlags create_flags);
 
     void CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals, const SizedArray<Vec2f>& uvs,
                     const SizedArray<Vec3f>& tangents, const SizedArray<Vec4f>& bone_weights,
-                    const SizedArray<Vec4u>& bone_ids);
+                    const SizedArray<Vec4u>& bone_ids, eVertexCreateFlags create_flags);
 
 
     void CreateFrom(const SizedArray<float32>& positions, const SizedArray<float32>& normals,
                     const SizedArray<float32>& uvs, const SizedArray<float32>& tangents,
-                    const SizedArray<float32>& bone_weights, const SizedArray<uint32>& bone_ids);
+                    const SizedArray<float32>& bone_weights, const SizedArray<uint32>& bone_ids,
+                    eVertexCreateFlags create_flags);
 
     template <renderer::eVertexType TVertexType>
     void CreateFrom(SizedArray<renderer::Vertex<TVertexType>>&& vertices)
@@ -75,4 +86,5 @@ private:
     AnonArray mLocalBuffer;
 };
 
-} // namespace fx::renderer
+} // namespace renderer
+} // namespace fx

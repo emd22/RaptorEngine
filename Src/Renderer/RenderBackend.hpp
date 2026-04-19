@@ -5,7 +5,7 @@
 #include "Backend/Pipeline.hpp"
 #include "Backend/Swapchain.hpp"
 #include "Backend/Synchro.hpp"
-#include "Deferred.hpp"
+#include "DeferredRenderer.hpp"
 #include "DeletionObject.hpp"
 #include "UniformBuffer.hpp"
 #include "Window.hpp"

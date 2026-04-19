@@ -330,7 +330,7 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
     return result;
 }
 
-void Mat4f::Rotate(Vec3f rotation)
+void Mat4f::Rotate(const Vec3f& rotation)
 {
     /*
      *  0  -z   y
@@ -469,7 +469,7 @@ Mat4f Mat4f::TransposeMat3() { return Transposed(); }
 
 void Mat4f::CopyAsMat3To(float* dest) const { memcpy(dest, RawData, sizeof(float32) * 12); }
 
-void Mat4f::LookAt(Vec3f eye, Vec3f target, Vec3f upvec)
+void Mat4f::LookAt(const Vec3f& eye, const Vec3f& target, const Vec3f& upvec)
 {
     Vec3f forward = (target - eye);
     forward.NormalizeIP();
@@ -497,6 +497,5 @@ void Mat4f::LookAt(Vec3f eye, Vec3f target, Vec3f upvec)
 //     return result;
 // }
 
-
+} // namespace fx
 #endif
-};

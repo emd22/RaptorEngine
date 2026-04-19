@@ -63,7 +63,10 @@ VSOutput main(VSInput input)
     float4x4 MVP = mul(VSConst.mViewProjection, model_matrix);
 
 #ifdef USE_SKINNING
-    float4x4 skin_xform = input.vJointWeights.x * bBones[input.vJointIndices.x] + input.vJointWeights.y * bBones[input.vJointIndices.y] + input.vJointWeights.z * bBones[input.vJointIndices.z] + input.vJointWeights.w * bBones[input.vJointIndices.w];
+    float4x4 skin_xform = input.vJointWeights.x * bBones[input.vJointIndices.x]
+        + input.vJointWeights.y * bBones[input.vJointIndices.y]
+        + input.vJointWeights.z * bBones[input.vJointIndices.z]
+        + input.vJointWeights.w * bBones[input.vJointIndices.w];
 
     output.vPosition = mul(MVP, mul(skin_xform, float4(input.vPosition, 1.0)));
     output.vNormalWS = normalize(mul((float3x3)model_matrix, mul((float3x3)skin_xform, input.vNormal)));

@@ -73,7 +73,7 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
     mesh->UploadIndices(Indices);
 
     // mesh->VertexList.CreateFrom<VertexType::Default>(Positions, {}, {}, {});
-    mesh->VertexList.CreateFrom(Positions, {}, {}, {}, {}, {});
+    mesh->VertexList.CreateFrom(Positions, {}, {}, {}, {}, {}, eVertexCreateFlags::None);
     mesh->UploadVertices();
 
     mesh->bIsReady.store(true);

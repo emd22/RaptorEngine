@@ -5,7 +5,7 @@
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Backend/VertexDescription.hpp>
-#include <Renderer/Deferred.hpp>
+#include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineBuilder.hpp>
 #include <Renderer/RenderBackend.hpp>

@@ -66,18 +66,10 @@ void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<Primiti
         }
     }
 
-    uint32 max_bone_id = 0;
-    uint32 min_bone_id = 0;
-    for (uint32 bone_id : boneids) {
-        max_bone_id = std::max(max_bone_id, bone_id);
-        min_bone_id = std::min(min_bone_id, bone_id);
-    }
-
-    if (max_bone_id > Limits::MaxBones) {
-        LogError("Bone ID ({}) is larger than max number of bones!", max_bone_id);
-    }
-
-    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids);
+    // Since GLTF is stored with right handed coordinates (-x, y, z), we need to flip X when creating the vertex
+    // buffers.
+    constexpr eVertexCreateFlags create_flags = eVertexCreateFlags::NegativeX;
+    mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids, create_flags);
 
     LogInfo("Weights size: {}, ids size: {}", weights.Size, boneids.Size);
     mesh->UploadVertices();
@@ -189,7 +181,7 @@ void AxLoaderGltf::UploadMeshToGpu(TSRef<Object>& object, cgltf_mesh* gltf_mesh,
         // Keep the primitive mesh's vertices and indices in memory if `KeepInMemory` is set
         primitive_mesh->bKeepInMemory = bKeepInMemory;
 
-        // if there are indices in the mesh, add them to the PrimitiveMesh
+        // If there are indices in the mesh, add them to the PrimitiveMesh
         if (primitive->indices != nullptr) {
             indices.InitSize(primitive->indices->count);
 
@@ -201,11 +193,9 @@ void AxLoaderGltf::UploadMeshToGpu(TSRef<Object>& object, cgltf_mesh* gltf_mesh,
 
         UnpackMeshAttributes(current_object, primitive_mesh, primitive);
         current_object->pMesh = primitive_mesh;
-
         MakeMaterialForPrimitive(current_object, primitive);
 
         primitive_mesh->bIsReady = true;
-
 
         if (has_multiple_primitives) {
             // Attach the current object to the object container (our output)
@@ -225,8 +215,17 @@ int32 AxLoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) con
             return static_cast<int32>(i);
         }
     }
+
     return BoneNull;
 }
+
+void ConvertFromGltfMatrix(Mat4f& m)
+{
+    // m.Columns[1] = Vec4f::FlipSigns<1, 1, -1, 1>(m.Columns[1]);
+    // m.Columns[2] = Vec4f::FlipSigns<1, -1, 1, 1>(m.Columns[2]);
+    // m.Columns[3] = Vec4f::FlipSigns<-1, 1, 1, 1>(m.Columns[3]);
+}
+
 
 void AxLoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 {
@@ -245,6 +244,19 @@ void AxLoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
         skel.InvBindTransforms.InitSize(joint_count);
         cgltf_accessor_unpack_floats(accessor, reinterpret_cast<float32*>(skel.InvBindTransforms.pData),
                                      joint_count * 16);
+
+        // The GLTF coordinate system is garbage, reflect so -X becomes X (this also changes rotation back from CCW to
+        // CW).
+        Mat4f reflection = Mat4f::sIdentity;
+        reflection.Columns[0].X = -1.0f;
+
+        for (uint32 i = 0; i < joint_count; i++) {
+            Mat4f& m = skel.InvBindTransforms[i];
+
+            m = reflection * m * reflection;
+
+            ConvertFromGltfMatrix(m);
+        }
     }
 
     // Parent indices and names
@@ -312,7 +324,9 @@ void AxLoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& ani
 
                 cgltf_accessor_read_float(sampler->output, key_index, buffer, 3);
 
+                buffer[0] = -buffer[0];
                 buffer[3] = 0.0f;
+
                 joint_track.Translation.Values[key_index] = (Vec3f(buffer));
             }
         }
@@ -327,6 +341,9 @@ void AxLoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& ani
                 float32 buffer[4];
 
                 cgltf_accessor_read_float(sampler->output, key_index, buffer, 4);
+                // buffer[0] = -buffer[0];
+                buffer[1] = -buffer[1];
+                buffer[2] = -buffer[2];
 
                 joint_track.Rotation.Values[key_index] = Quat(buffer);
             }

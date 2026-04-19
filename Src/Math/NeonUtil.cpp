@@ -5,6 +5,7 @@
 #include "MathConsts.hpp"
 #include "NeonUtil.hpp"
 
+namespace fx {
 namespace Neon {
 
 #define AsFloat(value_) vreinterpretq_u32_f32(value_)
@@ -82,5 +83,6 @@ void SinCos4(float32x4_t in_values, float32x4_t* ysin, float32x4_t* ycos)
 
 
 }; // namespace Neon
+} // namespace fx
 
 #endif // #ifdef FX_USE_NEON

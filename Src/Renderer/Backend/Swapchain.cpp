@@ -6,7 +6,7 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Panic.hpp>
-#include <Renderer/Deferred.hpp>
+#include <Renderer/DeferredRenderer.hpp>
 
 namespace fx::renderer {
 

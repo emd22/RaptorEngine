@@ -1,4 +1,4 @@
-#include "Deferred.hpp"
+#include "DeferredRenderer.hpp"
 
 #include "Backend/DsLayoutBuilder.hpp"
 #include "Backend/Shader.hpp"
@@ -212,7 +212,7 @@ void DeferredRenderer::CreateUnlitPipeline()
         .SetRenderPass(&RpForward)
         .SetVertexDescription(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
-        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+        .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
     builder.Build(PlUnlit);
 }
 
@@ -240,7 +240,7 @@ void DeferredRenderer::CreateGPassPipeline()
         .SetRenderPass(&GPass.GetRenderPass())
         .SetVertexDescription(&vertex_info)
         .SetCullMode(VK_CULL_MODE_BACK_BIT)
-        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+        .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
     builder.SetPolygonMode(VK_POLYGON_MODE_FILL).Build(PlGeometry);
     builder.SetPolygonMode(VK_POLYGON_MODE_LINE).Build(PlGeometryWireframe);
@@ -533,7 +533,7 @@ void DeferredRenderer::CreateCompPipeline()
         .SetRenderPass(&CompPass.GetRenderPass())
         .SetVertexDescription(nullptr)
         .SetCullMode(VK_CULL_MODE_NONE)
-        .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE)
+        .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE)
         .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true });
 
 

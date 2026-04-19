@@ -75,7 +75,7 @@ public:
     template <int TX, int TY, int TZ, int TW>
     FX_FORCE_INLINE static Vec4f FlipSigns(const Vec4f& vec)
     {
-        return Vec4f(SSE::SetSigns<TX, TY, TZ, TW>(vec.mIntrin));
+        return Vec4f(SSE::FlipSigns<TX, TY, TZ, TW>(vec.mIntrin));
     }
 #else
     template <int TX, int TY, int TZ, int TW>

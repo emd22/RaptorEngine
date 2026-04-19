@@ -2,7 +2,7 @@
 
 #include <Engine.hpp>
 #include <ObjectManager.hpp>
-#include <Renderer/Deferred.hpp>
+#include <Renderer/DeferredRenderer.hpp>
 
 namespace fx {
 

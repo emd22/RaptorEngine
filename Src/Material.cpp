@@ -9,7 +9,7 @@
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
-#include <Renderer/Deferred.hpp>
+#include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 

@@ -2,6 +2,8 @@
 
 #include <Core/Log.hpp>
 
+namespace fx {
+
 VkResult Rx_EXT_SetDebugUtilsObjectName(VkInstance instance, VkDevice device,
                                         const VkDebugUtilsObjectNameInfoEXT* pNameInfo)
 {
@@ -31,3 +33,5 @@ void Rx_EXT_DestroyDebugUtilsMessenger(VkInstance instance, VkDebugUtilsMessenge
     const auto ext_function = GetExtensionFunc<TFn>(instance, "vkDestroyDebugUtilsMessengerEXT");
     return ext_function(instance, messenger, pAllocator);
 }
+
+} // namespace fx

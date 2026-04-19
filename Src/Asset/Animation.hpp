@@ -50,6 +50,7 @@ struct Skeleton
 public:
     void EvaluatePose(Animation& anim, float32 time);
     BoneTransform GetBoneTransform(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
+    Mat4f GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time, BoneId bone_id) const;
 
     BoneId FindBone(const Ref<Animation>& anim, const String& name) const;
 

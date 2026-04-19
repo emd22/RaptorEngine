@@ -2,6 +2,8 @@
 
 #include <fstream>
 
+namespace fx {
+
 static std::ofstream sCurrentLogFile;
 
 std::ofstream& LogGetFile(bool* can_write)
@@ -18,3 +20,5 @@ std::ofstream& LogGetFile(bool* can_write)
 }
 
 void LogCreateFile(const std::string& path) { sCurrentLogFile.open(path.c_str()); }
+
+} // namespace fx

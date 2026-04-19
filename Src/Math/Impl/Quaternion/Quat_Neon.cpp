@@ -26,7 +26,7 @@ Quat::Quat(const JPH::Quat& other) { mIntrin = other.mValue.mValue; }
 Quat Quat::FromAxisAngle(Vec3f axis, float32 angle)
 {
     float32 sv, cv;
-    mathutil::SinCos(angle * 0.5f, &sv, &cv);
+    MathUtil::SinCos(angle * 0.5f, &sv, &cv);
 
     // Build the multiplier ({ sin A, sin A, sin A, cos A })
     float32x4_t mp_v = vsetq_lane_f32(cv, vdupq_n_f32(sv), 3);
@@ -99,17 +99,6 @@ Quat Quat::operator*(const Quat& other) const
                 lw * ry - lx * rz + ly * rw + lz * rx, /* */
                 lw * rz + lx * ry - ly * rx + lz * rw, /* */
                 lw * rw - lx * rx - ly * ry - lz * rz);
-}
-
-Vec3f Quat::operator*(const Vec3f& other) const
-{
-    Quat offq = Quat(vsetq_lane_f32(0.0f, other.mIntrin, 3));
-    Quat conj = Conjugate();
-
-    Quat result = conj * offq;
-    result = (result * (*this));
-
-    return Vec3f(result.mIntrin);
 }
 
 // Quat Quat::FromEulerAngles_NeonTest(Vec3f angles)

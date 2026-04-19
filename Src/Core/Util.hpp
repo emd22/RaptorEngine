@@ -81,32 +81,3 @@ public:
 };
 
 */
-
-
-/**
- * @brief Defines an enum class as a set of bitflags.
- */
-#define FX_DEFINE_AS_FLAG_ENUM FlagMax
-
-template <typename T>
-decltype(T::FlagMax) operator|(T lhs, T rhs)
-{
-    return static_cast<T>(static_cast<unsigned int>(lhs) | static_cast<unsigned int>(rhs));
-}
-
-template <typename T>
-unsigned int operator&(T lhs, T rhs)
-{
-    return static_cast<unsigned int>(lhs) & static_cast<unsigned int>(rhs);
-}
-
-// https://en.cppreference.com/w/cpp/types/remove_reference
-// template <class T> struct RemoveReference { typedef T type; };
-// template <class T> struct RemoveReference<T &> { typedef T type; };
-// template <class T> struct RemoveReference<T &&> { typedef T type; };
-
-// template <typename T>
-// constexpr RemoveReference<T>::type &&PtrMove(T &&object) noexcept
-// {
-//     return static_cast<RemoveReference<T>::type &&>(object);
-// }

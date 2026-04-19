@@ -4,7 +4,7 @@
 
 #include <Core/RefUtil.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
-#include <Renderer/Deferred.hpp>
+#include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 

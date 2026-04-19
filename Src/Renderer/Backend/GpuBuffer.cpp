@@ -16,13 +16,13 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
     VmaAllocationCreateFlags vma_create_flags = 0;
 
-    if ((mBufferFlags & eGpuBufferFlags::PersistentMapped)) {
+    if ((mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0) {
         vma_create_flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     }
 
     VkBufferUsageFlags usage_flags = GpuBufferUtil::BufferTypeToUnderlying(buffer_type);
 
-    if (buffer_flags & eGpuBufferFlags::TransferReceiver) {
+    if ((buffer_flags & eGpuBufferFlags::TransferReceiver) != 0) {
         usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 

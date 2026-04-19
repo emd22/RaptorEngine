@@ -83,11 +83,11 @@ public:
 
     static Mat4f AsRotation(const Quat& quat);
 
-    void Rotate(Vec3f rotation);
+    void Rotate(const Vec3f& rotation);
 
-    void LookAt(Vec3f position, Vec3f target, Vec3f up);
+    void LookAt(const Vec3f& position, const Vec3f& target, const Vec3f& up);
 
-    Mat4f(float scalar) noexcept
+    Mat4f(const float scalar) noexcept
     {
         Columns[0].Set(scalar);
         Columns[1].Set(scalar);
@@ -95,7 +95,7 @@ public:
         Columns[3].Set(scalar);
     }
 
-    Mat4f(Vec4f c0, Vec4f c1, Vec4f c2, Vec4f c3) noexcept
+    Mat4f(const Vec4f& c0, const Vec4f& c1, const Vec4f& c2, const Vec4f& c3) noexcept
     {
         Columns[0] = c0;
         Columns[1] = c1;
@@ -149,7 +149,7 @@ public:
 
     Mat4f operator*(const Mat4f& other) const;
 
-    void Print()
+    void Print() const
     {
         printf("\t=== Matrix ===\n");
         for (int i = 0; i < 4; i++) {

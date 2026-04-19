@@ -5,7 +5,7 @@
 #include "Backend/Synchro.hpp"
 #include "Backend/Util.hpp"
 #include "Constants.hpp"
-#include "Deferred.hpp"
+#include "DeferredRenderer.hpp"
 #include "Engine.hpp"
 #include "ObjectManager.hpp"
 

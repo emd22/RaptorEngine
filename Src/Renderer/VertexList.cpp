@@ -31,7 +31,8 @@ FX_FORCE_INLINE void WriteOrZeroVec(TType* dst, const SizedArray<TVecType>& src,
 
 void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals,
                             const SizedArray<Vec2f>& uvs, const SizedArray<Vec3f>& tangents,
-                            const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids)
+                            const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids,
+                            eVertexCreateFlags create_flags)
 {
     Assert(mLocalBuffer.IsEmpty());
 
@@ -64,6 +65,10 @@ void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray
 
         memcpy(vertex.Position, &positions[vertex_index].mData, sizeof(vertex.Position));
 
+        if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+            vertex.Position[0] = -vertex.Position[0];
+        }
+
         // Write the components for a default vertex if the type supports it
         if (supports_default) {
             WriteOrZeroVec<float32, Vec3f, 3>(vertex.Normal, normals, vertex_index, bContainsNormals);
@@ -85,7 +90,8 @@ void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray
 
 void VertexList::CreateFrom(const SizedArray<float32>& positions, const SizedArray<float32>& normals,
                             const SizedArray<float32>& uvs, const SizedArray<float32>& tangents,
-                            const SizedArray<float32>& bone_weights, const SizedArray<uint32>& bone_ids)
+                            const SizedArray<float32>& bone_weights, const SizedArray<uint32>& bone_ids,
+                            eVertexCreateFlags create_flags)
 {
     Assert(mLocalBuffer.IsEmpty());
     Assert(positions.Size > 0);
@@ -121,11 +127,20 @@ void VertexList::CreateFrom(const SizedArray<float32>& positions, const SizedArr
 
         memcpy(vertex.Position, &positions[vertex_index * 3], sizeof(vertex.Position));
 
+        if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+            vertex.Position[0] = -vertex.Position[0];
+        }
+
         // Write the components for a default vertex if the type supports it
         if (supports_default) {
             WriteOrZero<float32, 3>(vertex.Normal, normals, vertex_index, bContainsNormals);
             WriteOrZero<float32, 2>(vertex.UV, uvs, vertex_index, bContainsUVs);
             WriteOrZero<float32, 3>(vertex.Tangent, tangents, vertex_index, bContainsTangents);
+
+            if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+                vertex.Normal[0] = -vertex.Normal[0];
+                vertex.Tangent[0] = -vertex.Tangent[0];
+            }
 
 
             if (supports_skinning) {
@@ -141,7 +156,7 @@ void VertexList::CreateFrom(const SizedArray<float32>& positions, const SizedArr
 }
 
 
-void VertexList::CreateSlimFrom(const SizedArray<float32>& positions)
+void VertexList::CreateSlimFrom(const SizedArray<float32>& positions, eVertexCreateFlags create_flags)
 {
     Assert(positions.Size > 0);
     Assert((positions.Size % 3) == 0);
@@ -154,11 +169,15 @@ void VertexList::CreateSlimFrom(const SizedArray<float32>& positions)
         Vertex<eVertexType::Slim> vertex;
         memcpy(&vertex.Position, &positions.pData[i * 3], sizeof(float32) * 3);
 
+        if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+            vertex.Position[0] = -vertex.Position[0];
+        }
+
         mLocalBuffer.Insert(vertex);
     }
 }
 
-void VertexList::CreateSlimFrom(const SizedArray<Vec3f>& positions)
+void VertexList::CreateSlimFrom(const SizedArray<Vec3f>& positions, eVertexCreateFlags create_flags)
 {
     Assert(positions.Size > 0);
 
@@ -169,6 +188,10 @@ void VertexList::CreateSlimFrom(const SizedArray<Vec3f>& positions)
     for (int i = 0; i < mLocalBuffer.Capacity; i++) {
         Vertex<eVertexType::Slim> vertex;
         memcpy(&vertex.Position, &positions.pData[i].mData, sizeof(float32) * 3);
+
+        if ((create_flags & eVertexCreateFlags::NegativeX) != 0) {
+            vertex.Position[0] = -vertex.Position[0];
+        }
 
         mLocalBuffer.Insert(vertex);
     }

@@ -63,6 +63,7 @@ concept C_IsSameOrConst = std::is_same_v<typename std::remove_const<TPossiblyCon
         static constexpr bool bValue = true;                                                                           \
     }
 
+
 template <typename T>
 struct EnumFlagsOptIn
 {
@@ -84,6 +85,45 @@ operator|(T lhs, T rhs)
     typedef typename std::underlying_type<T>::type InternalType;
     return static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
 }
+
+template <typename T>
+constexpr bool operator!=(T lhs, int rhs)
+{
+    typedef typename std::underlying_type<T>::type InternalType;
+    return (static_cast<InternalType>(lhs)) != rhs;
+}
+
+
+namespace renderer {
+// template <typename T>
+// struct EnumFlagsOptIn
+// {
+//     static constexpr bool bValue = false;
+// };
+
+// template <typename T>
+// constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
+// operator&(T lhs, T rhs)
+// {
+//     typedef typename std::underlying_type<T>::type InternalType;
+//     return static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
+// }
+
+// template <typename T>
+// constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
+// operator|(T lhs, T rhs)
+// {
+//     typedef typename std::underlying_type<T>::type InternalType;
+//     return static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
+// }
+
+// template <typename T>
+// constexpr bool operator!=(T lhs, int rhs)
+// {
+//     typedef typename std::underlying_type<T>::type InternalType;
+//     return (static_cast<InternalType>(lhs)) != rhs;
+// }
+} // namespace renderer
 
 
 // template <typename ValueType>

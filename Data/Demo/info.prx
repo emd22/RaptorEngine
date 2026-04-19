@@ -27,7 +27,8 @@ Objects = {
     AnimTest = {
         Mesh = "/Model2.glb"
         Shadows = FALSE
-        Scale = 1.16
+        Scale = 1.20
+        Pos = [0.0, 0.0, -1.0]
         Layer = OBJLAYER_PLAYER
     }
 

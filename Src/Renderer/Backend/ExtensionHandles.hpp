@@ -4,6 +4,8 @@
 
 #include <Core/Log.hpp>
 
+namespace fx {
+
 using VoidFunction = void (*)(void);
 
 template <typename TFunc>
@@ -27,3 +29,5 @@ VkResult Rx_EXT_CreateDebugUtilsMessenger(VkInstance instance, const VkDebugUtil
 
 void Rx_EXT_DestroyDebugUtilsMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger,
                                        const VkAllocationCallbacks* pAllocator);
+
+} // namespace fx

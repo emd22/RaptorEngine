@@ -7,6 +7,8 @@
 #include <iostream>
 #include <string>
 
+namespace fx {
+
 enum class eLogChannel
 {
     None,
@@ -238,3 +240,5 @@ constexpr void eLogChannelText()
     LogDirectToFile("{}", LogGetChannelText<TChannel, false>());
 #endif
 }
+
+} // namespace fx

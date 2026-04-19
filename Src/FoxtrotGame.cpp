@@ -45,13 +45,6 @@ FoxtrotGame::FoxtrotGame()
     CreateGame();
 }
 
-enum class eFlags
-{
-    SomeFlag = 0x01,
-    OtherFlag = 0x02,
-};
-
-FxEnumFlags(eFlags);
 
 void FoxtrotGame::InitEngine()
 {
@@ -306,9 +299,7 @@ void FoxtrotGame::Tick()
 
 
     pArmsObject->SetRotationOrigin(ArmsOffset);
-
     pArmsObject->SetPosition(camera->Position + ArmsOffset);
-
 
     PistolRotationGoal = Quat::FromEulerAngles(Vec3f(-camera->mAngleY, camera->mAngleX, 0));
     pArmsObject->mRotation = PistolRotationGoal;
@@ -328,7 +319,6 @@ void FoxtrotGame::Tick()
         pPistolObject->SetRotationOrigin(ArmsOffset + hand_transform.Position + PistolOffset);
         pPistolObject->SetPosition(pArmsObject->mPosition + hand_transform.Position + PistolOffset);
 
-        LogInfo("{}", hand_transform.Position);
         pPistolObject->mRotation = PistolRotationGoal;
         pPistolObject->UpdateIfOutOfDate();
         // pPistolObject->SetRotationOrigin(pistol_destination);

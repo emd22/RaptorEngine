@@ -9,7 +9,18 @@
 #include <Core/Types.hpp>
 #include <Core/Util.hpp>
 
-namespace fx::renderer {
+namespace fx {
+
+enum class eGpuBufferFlags : uint16
+{
+    None = 0x00,
+    /** The buffer is mapped for the lifetime of the buffer. */
+    PersistentMapped = 0x01,
+    TransferReceiver = 0x02,
+};
+FxEnumFlags(eGpuBufferFlags);
+
+namespace renderer {
 
 // #define FX_DEBUG_GPU_BUFFER_ALLOCATION_NAMES 1
 
@@ -22,15 +33,6 @@ enum class eBufferUsageType
     Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 };
 
-enum class eGpuBufferFlags : uint16
-{
-    None = 0x00,
-    /** The buffer is mapped for the lifetime of the buffer. */
-    PersistentMapped = 0x01,
-    TransferReceiver = 0x02,
-
-    FX_DEFINE_AS_FLAG_ENUM,
-};
 
 // FX_DEFINE_ENUM_AS_FLAGS(GpuBufferFlags);
 
@@ -225,4 +227,6 @@ public:
     }
 };
 
-} // namespace fx::renderer
+} // namespace renderer
+
+} // namespace fx

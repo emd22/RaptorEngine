@@ -33,62 +33,6 @@ void LightBase::SetLightVolume(const Ref<MeshGen::GeneratedMesh>& volume_gen, bo
     }
 }
 
-
-// void LightBase::MoveTo(const Vec3f& position)
-// {
-//     if ((Flags & LF_IndependentMeshPosition)) {
-//         mLightPosition = position;
-
-//         // The model matrix does not need to be updated as we won't move the mesh
-//         return;
-//     }
-
-//     this->Entity::MoveTo(position);
-//     mLightPosition = mPosition;
-// }
-
-
-// void LightBase::MoveTo(const Vec3f& position, bool force_move_mesh)
-// {
-//     this->MoveTo(position);
-
-//     if (force_move_mesh && !(Flags & LF_IndependentMeshPosition)) {
-//         this->Entity::MoveTo(position);
-//         mLightPosition = mPosition;
-//     }
-// }
-
-
-// void LightBase::MoveBy(const Vec3f& offset)
-// {
-//     if ((Flags & LF_IndependentMeshPosition)) {
-//         mLightPosition += offset;
-
-//         // The model matrix does not need to be updated as we won't move the mesh
-//         return;
-//     }
-
-//     this->Entity::MoveBy(offset);
-//     mLightPosition = mPosition;
-// }
-
-
-// void LightBase::MoveBy(const Vec3f& offset, bool force_move_mesh)
-// {
-//     this->MoveBy(offset);
-
-//     if (force_move_mesh && !(Flags & LF_IndependentMeshPosition)) {
-//         this->Entity::MoveBy(offset);
-//         mLightPosition = mPosition;
-//     }
-// }
-
-// void LightBase::Scale(const Vec3f& scale)
-// {
-//     this->Entity::Scale(scale);
-//     Radius *= scale.X;
-// }
-
 void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 {
     if (!bEnabled) {
