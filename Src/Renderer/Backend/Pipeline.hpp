@@ -23,6 +23,11 @@ struct alignas(16) DrawPushConstants
     uint32 MaterialIndex = 0;
 };
 
+struct alignas(16) DebugLayerPushConstants
+{
+    float32 CombinedMatrix[16];
+};
+
 struct alignas(16) LightVertPushConstants
 {
     float32 CameraMatrix[16];

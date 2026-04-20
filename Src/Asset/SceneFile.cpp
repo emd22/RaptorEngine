@@ -88,6 +88,7 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
     }
 
     TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), scene_path + mesh_path, load_options);
+    object->pScene = &scene;
 
     ApplyPropertiesToObject(object, object_entry);
 
@@ -130,8 +131,10 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
 
     PhProperties physics_properties {};
 
+
     ConfigEntry* physics = object_entry.GetMember(HashStr64("Physics"));
-    if (physics != nullptr && !object->Physics.mbHasPhysicsBody) {
+
+    if (physics != nullptr && object->PhysicsId == PhObjectIdNull) {
         ePhMotionType motion_type = ePhMotionType::Static;
 
         ConfigEntry* type = physics->GetMember(HashStr64("Type"));

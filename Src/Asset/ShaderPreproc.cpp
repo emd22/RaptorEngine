@@ -159,7 +159,7 @@ static void ParseProgramDefinition(const std::vector<Slice<char>>& params, State
         result.SetCurrentShader(renderer::eShaderType::Vertex);
         break;
     case FHash(FPT_PIXEL):
-        result.SetCurrentShader(renderer::eShaderType::Fragment);
+        result.SetCurrentShader(renderer::eShaderType::Pixel);
         break;
     case FHash(FPT_ALL):
         result.bBroadcastToAllPrograms = true;
@@ -229,7 +229,7 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
 
     if (result.bBroadcastToAllPrograms) {
         result.GetBuffer(renderer::eShaderType::Vertex).Insert(ch);
-        result.GetBuffer(renderer::eShaderType::Fragment).Insert(ch);
+        result.GetBuffer(renderer::eShaderType::Pixel).Insert(ch);
 
         return;
     }
@@ -416,7 +416,7 @@ static void SaveProgramToDisk(const char* name, renderer::eShaderType shader_typ
 void DebugSaveToDisk(const char* name, const Result& result)
 {
     SaveProgramToDisk(name, renderer::eShaderType::Vertex, result);
-    SaveProgramToDisk(name, renderer::eShaderType::Fragment, result);
+    SaveProgramToDisk(name, renderer::eShaderType::Pixel, result);
 }
 
 }; // namespace ShaderPreproc

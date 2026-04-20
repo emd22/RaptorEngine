@@ -44,6 +44,7 @@ private:
     VkPipelineLayout CreateGPassPipelineLayout();
     VkPipelineLayout CreateGPassSkinnedPipelineLayout();
     VkPipelineLayout CreateUnlitPipelineLayout();
+    VkPipelineLayout CreateDebugLayerPipelineLayout();
 
     // Lighting
     // void CreateLightVolumePipeline();
@@ -110,6 +111,7 @@ public:
     /////////////////////////////////////////////////
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
     Pipeline PlUnlit;
+    Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;
 
     RenderPass RpForward;

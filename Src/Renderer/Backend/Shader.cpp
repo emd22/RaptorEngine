@@ -130,7 +130,7 @@ ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro
     if (type == eShaderType::Vertex) {
         hash = cPrefixHashVS;
     }
-    else if (type == eShaderType::Fragment) {
+    else if (type == eShaderType::Pixel) {
         hash = cPrefixHashFS;
     }
 

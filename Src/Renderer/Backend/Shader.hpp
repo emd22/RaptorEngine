@@ -13,7 +13,7 @@ namespace fx::renderer {
 enum class eShaderType : uint16
 {
     Vertex,
-    Fragment,
+    Pixel,
 };
 
 class Shader;
@@ -23,7 +23,7 @@ class Pipeline;
 using ShaderId = Hash64;
 
 namespace ShaderUtil {
-static constexpr uint32 scNumShaderTypes = static_cast<uint32>(eShaderType::Fragment) + 1;
+static constexpr uint32 scNumShaderTypes = static_cast<uint32>(eShaderType::Pixel) + 1;
 
 /**
  * @brief Get the underlying Vulkan shader stage bit for an ShaderType.
@@ -33,7 +33,7 @@ static constexpr VkShaderStageFlagBits ToUnderlyingType(eShaderType type)
     switch (type) {
     case eShaderType::Vertex:
         return VK_SHADER_STAGE_VERTEX_BIT;
-    case eShaderType::Fragment:
+    case eShaderType::Pixel:
         return VK_SHADER_STAGE_FRAGMENT_BIT;
     }
 
@@ -45,7 +45,7 @@ static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
     switch (type) {
     case eShaderType::Vertex:
         return "Vertex";
-    case eShaderType::Fragment:
+    case eShaderType::Pixel:
         return "Fragment";
     }
     return "Unknown";

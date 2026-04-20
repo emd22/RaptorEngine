@@ -19,10 +19,14 @@ public:
     void Attach(const TSRef<Object>& object);
     void Attach(const Ref<LightBase>& light);
 
+    PhObjectId NewPhysicsObject();
+    PhObject* GetPhysicsObject(PhObjectId id);
+
     void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
     void Render(Camera* shadow_camera);
     void RenderShadows(Camera* shadow_camera);
+
 
     const PagedArray<TSRef<Object>>& GetAllObjects() { return mObjects; }
     const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
@@ -45,15 +49,22 @@ public:
 
 private:
     void RenderUnlitObjects(const Camera& camera) const;
+    void RenderPhysicsObjects(const Camera& camera);
 
 public:
     Name Name = "(unnamed)";
 
+    bool bRenderPhysicsObjects = true;
+
 private:
     PagedArray<TSRef<Object>> mObjects;
     PagedArray<Ref<LightBase>> mLights;
+    PagedArray<PhObject> mPhysicsObjects;
 
     Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
+
+
+    Ref<PrimitiveMesh> mpDebugCube { nullptr };
 };
 
 } // namespace fx

@@ -11,6 +11,9 @@
 
 namespace fx {
 
+using PhObjectId = uint32;
+constexpr PhObjectId PhObjectIdNull = UINT32_MAX;
+
 class PrimitiveMesh;
 
 struct PhProperties
@@ -51,8 +54,9 @@ public:
         CreateInactive = 0x01,
     };
 
-
 public:
+    PhObject() = default;
+
     void CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                              const PhProperties& object_properties);
 
@@ -69,6 +73,8 @@ public:
     FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
 
     FX_FORCE_INLINE ePhMotionType GetMotionType() const { return mMotionType; }
+
+    ~PhObject() = default;
 
 private:
     void CreateJoltBody(JPH::ShapeRefC shape, eFlags flags, ePhMotionType type, const PhProperties& properties);

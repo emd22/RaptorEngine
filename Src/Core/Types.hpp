@@ -71,60 +71,68 @@ struct EnumFlagsOptIn
 };
 
 template <typename T>
-constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
-operator&(T lhs, T rhs)
+concept C_IsEnumFlags = std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue;
+
+template <typename T>
+using EnumFlagsIntType = typename std::underlying_type<T>::type;
+
+
+template <typename T>
+    requires C_IsEnumFlags<T>
+constexpr T operator&(T lhs, T rhs)
 {
-    typedef typename std::underlying_type<T>::type InternalType;
+    using InternalType = EnumFlagsIntType<T>;
     return static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
 }
 
 template <typename T>
-constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
-operator|(T lhs, T rhs)
+    requires C_IsEnumFlags<T>
+constexpr T& operator&=(T& lhs, T rhs)
 {
-    typedef typename std::underlying_type<T>::type InternalType;
+    using InternalType = EnumFlagsIntType<T>;
+    lhs = static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
+
+    return lhs;
+}
+
+template <typename T>
+    requires C_IsEnumFlags<T>
+constexpr T operator|(T lhs, T rhs)
+{
+    using InternalType = EnumFlagsIntType<T>;
     return static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
 }
 
 template <typename T>
-constexpr bool operator!=(T lhs, int rhs)
+    requires C_IsEnumFlags<T>
+constexpr T& operator|=(T& lhs, T rhs)
 {
-    typedef typename std::underlying_type<T>::type InternalType;
-    return (static_cast<InternalType>(lhs)) != rhs;
+    using InternalType = EnumFlagsIntType<T>;
+    lhs = static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
+    return lhs;
 }
 
+template <typename T>
+    requires C_IsEnumFlags<T>
+constexpr T& operator^=(T& lhs, T rhs)
+{
+    using InternalType = EnumFlagsIntType<T>;
+    lhs = static_cast<T>(static_cast<InternalType>(lhs) ^ static_cast<InternalType>(rhs));
+    return lhs;
+}
 
-namespace renderer {
-// template <typename T>
-// struct EnumFlagsOptIn
-// {
-//     static constexpr bool bValue = false;
-// };
+template <typename T>
+    requires C_IsEnumFlags<T>
+constexpr bool operator!=(T lhs, int rhs)
+{
+    return (static_cast<EnumFlagsIntType<T>>(lhs)) != rhs;
+}
 
-// template <typename T>
-// constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
-// operator&(T lhs, T rhs)
-// {
-//     typedef typename std::underlying_type<T>::type InternalType;
-//     return static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
-// }
-
-// template <typename T>
-// constexpr typename std::enable_if<std::is_enum_v<T> && EnumFlagsOptIn<T>::bValue, T>::type /* */
-// operator|(T lhs, T rhs)
-// {
-//     typedef typename std::underlying_type<T>::type InternalType;
-//     return static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
-// }
-
-// template <typename T>
-// constexpr bool operator!=(T lhs, int rhs)
-// {
-//     typedef typename std::underlying_type<T>::type InternalType;
-//     return (static_cast<InternalType>(lhs)) != rhs;
-// }
-} // namespace renderer
-
+template <typename T>
+constexpr T operator~(T v)
+{
+    return static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(v)));
+}
 
 // template <typename ValueType>
 // class Optional {

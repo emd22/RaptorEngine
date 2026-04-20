@@ -102,7 +102,7 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE PipelineBuilder& SetAttachments(TargetList* attachment_list)
+    FX_FORCE_INLINE PipelineBuilder& SetOutputTargets(TargetList* attachment_list)
     {
         mpAttachmentList = attachment_list;
 

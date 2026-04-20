@@ -30,8 +30,8 @@ void Object::Create(const Ref<PrimitiveMesh>& mesh, const TSRef<Material>& mater
 
 bool Object::CheckIfReady()
 {
-    if (mbReadyToRender) {
-        return mbReadyToRender;
+    if ((Flags & eObjectFlags::ReadyToRender) != 0) {
+        return true;
     }
 
     // If this is a container object, check that the attached nodes are ready
@@ -39,40 +39,37 @@ bool Object::CheckIfReady()
         // If there is a mesh attached to the container as well, check it
         if (pMesh) {
             if (!pMesh->bIsReady) {
-                return (mbReadyToRender = false);
+                return (Flags &= ~(eObjectFlags::ReadyToRender)) != 0;
             }
 
-
             Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
-            // Dimensions = pMesh->GetDimensions();
         }
 
         if (pMaterial && !pMaterial->IsReady()) {
-            return (mbReadyToRender = false);
+            Flags &= ~(eObjectFlags::ReadyToRender);
+            return false;
         }
 
         for (TSRef<Object>& object : AttachedNodes) {
             if (!object->CheckIfReady()) {
-                return (mbReadyToRender = false);
+                Flags &= ~(eObjectFlags::ReadyToRender);
+                return false;
             }
         }
 
-        return (mbReadyToRender = true);
-    }
-
-
-    if (!pMesh) {
-        FX_BREAKPOINT;
+        return (Flags |= (eObjectFlags::ReadyToRender)) != 0;
     }
 
     // Not a container, ensure there is a material
     if (!pMaterial || !pMaterial->IsReady()) {
-        return (mbReadyToRender = false);
+        Flags &= ~(eObjectFlags::ReadyToRender);
+        return false;
     }
 
     // This is not a container object, just check that the mesh is loaded
     if (!pMesh || !pMesh->bIsReady.load()) {
-        return (mbReadyToRender = false);
+        Flags &= ~(eObjectFlags::ReadyToRender);
+        return false;
     }
 
     // Dimensions = pMesh->GetDimensions();
@@ -82,7 +79,7 @@ bool Object::CheckIfReady()
         pMaterial->pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
     }
 
-    return (mbReadyToRender = true);
+    return (Flags |= (eObjectFlags::ReadyToRender)) != 0;
 }
 
 
@@ -92,12 +89,26 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
     OnLoaded(
         [primitive_type, dimensions, motion_type, physics_properties](TSRef<AxBase> base_asset)
         {
-            TSRef<Object> asset = base_asset;
-            asset->Physics.CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
-            asset->mbPhysicsTransformOutOfDate = true;
-            asset->SetPhysicsEnabled(true);
+            TSRef<Object> object = base_asset;
 
-            asset->PrintDebug();
+            Scene* scene = object->pScene;
+            if (!scene) {
+                return;
+            }
+
+            object->PhysicsId = scene->NewPhysicsObject();
+            PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
+
+            if (!phys) {
+                LogError("Error creating physics object");
+                return;
+            }
+
+            phys->CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
+            object->mbPhysicsTransformOutOfDate = true;
+            object->SetPhysicsEnabled(true);
+
+            object->PrintDebug();
         });
 }
 
@@ -108,26 +119,41 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
     OnLoaded(
         [custom_physics_mesh, motion_type, physics_properties](TSRef<AxBase> base_asset)
         {
-            TSRef<Object> asset = base_asset;
+            TSRef<Object> object = base_asset;
+
+            Scene* scene = object->pScene;
+            if (!scene) {
+                return;
+            }
+
+            object->PhysicsId = scene->NewPhysicsObject();
+            PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
+
+            if (!phys) {
+                LogError("Error creating physics object");
+                return;
+            }
 
             Ref<PrimitiveMesh> physics_mesh { nullptr };
-            physics_mesh = custom_physics_mesh ? custom_physics_mesh : asset->pMesh;
+            physics_mesh = custom_physics_mesh ? custom_physics_mesh : object->pMesh;
 
             Assert(physics_mesh.IsValid());
 
-            asset->Physics.CreateMeshBody(*physics_mesh, motion_type, physics_properties);
-            asset->mbPhysicsTransformOutOfDate = true;
-            asset->SetPhysicsEnabled(true);
+            phys->CreateMeshBody(*physics_mesh, motion_type, physics_properties);
+            object->mbPhysicsTransformOutOfDate = true;
+            object->SetPhysicsEnabled(true);
 
-            asset->PrintDebug();
+            object->PrintDebug();
         });
 }
 
 void Object::OnAttached(Scene* scene)
 {
+    PhObject* phys = scene->GetPhysicsObject(PhysicsId);
+
     // When the object is attached to the scene, enable physics if the physics object is active.
-    if (Physics.mbHasPhysicsBody) {
-        mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+    if (phys && phys->mbHasPhysicsBody) {
+        SetPhysicsEnabled(gPhysics->GetBodyInterface().IsActive(phys->GetBodyId()));
     }
 }
 
@@ -202,13 +228,11 @@ void Object::MakeInstanceOf(const TSRef<Object>& source_ref)
     gObjectManager->FreeObjectId(ObjectId);
 
     mpInstanceSource = source_ref;
-    mbIsInstance = true;
+    Flags |= eObjectFlags::IsInstance;
 
     ++source.mInstanceSlotsInUse;
 
     ObjectId = source.ObjectId + source.mInstanceSlotsInUse;
-
-    // Acquire the transformations from the source object
 }
 
 void Object::ReserveInstances(uint32 num)
@@ -412,13 +436,15 @@ void Object::RenderMesh()
 
 void Object::Update()
 {
-    if (mbPhysicsEnabled) {
+    if ((Flags & eObjectFlags::PhysicsEnabled) != 0 && pScene) {
+        PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
+
         if (mbPhysicsTransformOutOfDate) {
-            Physics.Teleport(mPosition, mRotation);
+            phys->Teleport(mPosition, mRotation);
             mbPhysicsTransformOutOfDate = false;
         }
 
-        SyncObjectWithPhysics();
+        SyncObjectWithPhysics(phys);
     }
 
     UpdateAnimation();
@@ -436,11 +462,11 @@ void Object::AttachObject(const TSRef<Object>& object)
     AttachedNodes.Insert(object);
 }
 
-void Object::SyncObjectWithPhysics()
+void Object::SyncObjectWithPhysics(PhObject* phys)
 {
-    if ((!mPosition.IsCloseTo(Physics.GetPosition()) || !mRotation.IsCloseTo(Physics.GetRotation()))) {
-        mPosition = Physics.GetPosition();
-        mRotation = Physics.GetRotation();
+    if ((!mPosition.IsCloseTo(phys->GetPosition()) || !mRotation.IsCloseTo(phys->GetRotation()))) {
+        mPosition = phys->GetPosition();
+        mRotation = phys->GetRotation();
 
         MarkMatrixOutOfDate();
     }
@@ -450,42 +476,61 @@ void Object::SetRenderUnlit(const bool value)
 {
     if (value) {
         SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
+        Flags |= eObjectFlags::Unlit;
     }
     else {
         SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps);
+        Flags &= (~eObjectFlags::Unlit);
     }
-
-    mbRenderUnlit = value;
 }
 
 
 void Object::SetPhysicsEnabled(bool enabled)
 {
-    if (!Physics.mbHasPhysicsBody) {
+    if (!pScene) {
+        return;
+    }
+
+    PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
+
+    if (!phys->mbHasPhysicsBody) {
         LogWarning("Object does not have physics body!");
         return;
     }
 
     if (enabled) {
         LogInfo("Activate physics body");
-        gPhysics->GetBodyInterface().ActivateBody(Physics.GetBodyId());
+        gPhysics->GetBodyInterface().ActivateBody(phys->GetBodyId());
+        Flags |= eObjectFlags::PhysicsEnabled;
     }
     else {
         LogInfo("Deactivate physics body");
-        gPhysics->GetBodyInterface().DeactivateBody(Physics.GetBodyId());
-    }
+        gPhysics->GetBodyInterface().DeactivateBody(phys->GetBodyId());
 
-    mbPhysicsEnabled = enabled;
+        Flags &= (~eObjectFlags::PhysicsEnabled);
+    }
 }
 
 void Object::PrintDebug() const
 {
     LogInfo("Object '{}' (Id={}) {{", Name.Get(), ObjectId);
     LogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
-    LogInfo("\tHasPhys?={}, Enabled?={}, Type={}", Physics.mbHasPhysicsBody, mbPhysicsEnabled,
-            Physics.GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
-    LogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}", mbIsInstance, mbReadyToRender,
-            mbIsShadowCaster, pMesh && pMesh->VertexList.IsSkinned());
+
+    PhObject* phys = nullptr;
+
+    if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
+        bool has_body = phys->mbHasPhysicsBody;
+        LogInfo("\tHasPhys?={}, Enabled?={}, Type={}", has_body,
+                static_cast<bool>((Flags & eObjectFlags::PhysicsEnabled) != 0),
+                phys->GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
+    }
+
+    LogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
+            static_cast<bool>((Flags & eObjectFlags::IsInstance) != 0),    /* */
+            static_cast<bool>((Flags & eObjectFlags::ReadyToRender) != 0), /* */
+            static_cast<bool>((Flags & eObjectFlags::ShadowCaster) != 0),  /* */
+            (pMesh && pMesh->VertexList.IsSkinned()));
+
     LogInfo("}}");
 }
 
@@ -499,7 +544,10 @@ void Object::Destroy()
         pMaterial->Destroy();
     }
 
-    Physics.DestroyPhysicsBody();
+    PhObject* phys = nullptr;
+    if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
+        phys->DestroyPhysicsBody();
+    }
 
     if (!AttachedNodes.IsEmpty()) {
         for (TSRef<Object>& obj : AttachedNodes) {
@@ -507,7 +555,8 @@ void Object::Destroy()
         }
     }
 
-    mbReadyToRender = false;
+    Flags &= ~(eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled);
+
     bIsUploadedToGpu = false;
 }
 

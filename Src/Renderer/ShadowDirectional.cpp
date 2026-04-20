@@ -46,14 +46,14 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 
 
     Ref<ShaderProgram> vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, {});
-    Ref<ShaderProgram> fragment_shader = shader_shadow.GetProgram(eShaderType::Fragment, {});
+    Ref<ShaderProgram> fragment_shader = shader_shadow.GetProgram(eShaderType::Pixel, {});
 
     PipelineBuilder builder {};
     builder.SetLayout(pipeline_layout)
         .SetName("Shadow Pipeline")
         .AddBlendAttachment({ .Enabled = false })
         .SetProperties(pipeline_properties)
-        .SetAttachments(&RenderStage.GetTargets())
+        .SetOutputTargets(&RenderStage.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&RenderStage.GetRenderPass())
         .SetVertexDescription(&vertex_info)
@@ -66,7 +66,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
         SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_SKINNING", "1" } };
 
         vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, macros);
-        fragment_shader = shader_shadow.GetProgram(eShaderType::Fragment, macros);
+        fragment_shader = shader_shadow.GetProgram(eShaderType::Pixel, macros);
 
         vertex_info = VertexUtil::BuildDescription<eVertexType::Skinned>();
         builder.SetVertexDescription(&vertex_info).SetShaders(vertex_shader, fragment_shader).Build(mPipelineSkinned);

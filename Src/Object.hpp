@@ -17,6 +17,19 @@
 
 namespace fx {
 
+enum class eObjectFlags : uint16
+{
+    None = 0,
+    ReadyToRender = (1 << 0),
+    PhysicsEnabled = (1 << 1),
+    IsInstance = (1 << 2),
+    ShadowCaster = (1 << 3),
+    Unlit = (1 << 4),
+};
+
+FxEnumFlags(eObjectFlags);
+
+
 class PrimitiveMesh;
 
 class Object : public AxBase, public Entity
@@ -70,16 +83,25 @@ public:
     void ReserveInstances(uint32 num_instances);
 
     void SetPhysicsEnabled(bool enabled);
-    FX_FORCE_INLINE bool GetPhysicsEnabled() { return mbPhysicsEnabled; }
+    FX_FORCE_INLINE bool GetPhysicsEnabled() { return (Flags & eObjectFlags::PhysicsEnabled) != 0; }
 
     FX_FORCE_INLINE void SetObjectLayer(eObjectLayer layer) { mObjectLayer = layer; }
     FX_FORCE_INLINE eObjectLayer GetObjectLayer() const { return mObjectLayer; }
 
-    FX_FORCE_INLINE void SetShadowCaster(const bool value) { mbIsShadowCaster = value; }
-    FX_FORCE_INLINE bool IsShadowCaster() const { return mbIsShadowCaster; }
+    FX_FORCE_INLINE void SetShadowCaster(const bool value)
+    {
+        if (value) {
+            Flags |= eObjectFlags::ShadowCaster;
+        }
+        else {
+            Flags &= ~(eObjectFlags::ShadowCaster);
+        }
+    }
+
+    FX_FORCE_INLINE bool IsShadowCaster() const { return (Flags & eObjectFlags::ShadowCaster) != 0; }
 
     void SetRenderUnlit(const bool value);
-    FX_FORCE_INLINE bool GetRenderUnlit() const { return mbRenderUnlit; }
+    FX_FORCE_INLINE bool GetRenderUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
@@ -89,21 +111,23 @@ public:
 private:
     void RenderMesh();
 
-    void SyncObjectWithPhysics();
+    void SyncObjectWithPhysics(PhObject* phys);
 
 public:
     Ref<PrimitiveMesh> pMesh { nullptr };
     TSRef<Material> pMaterial { nullptr };
+    PhObjectId PhysicsId = PhObjectIdNull;
 
     Ref<Skeleton> pSkeleton { nullptr };
     SizedArray<Animation> Animations;
     Animation* pCurrentAnimation = nullptr;
     float32 AnimationTime = 0.0f;
 
+    Scene* pScene = nullptr;
+
     PagedArray<TSRef<Object>> AttachedNodes;
 
     Vec3f Dimensions = Vec3f::sZero;
-    PhObject Physics;
 
 private:
     /// Object slots allocated following this object. Used by other instances of this object.
@@ -112,11 +136,7 @@ private:
 
     TSRef<Object> mpInstanceSource { nullptr };
 
-    bool mbReadyToRender : 1 = false;
-    bool mbPhysicsEnabled : 1 = false;
-    bool mbIsInstance : 1 = false;
-    bool mbIsShadowCaster : 1 = false;
-    bool mbRenderUnlit : 1 = false;
+    eObjectFlags Flags = eObjectFlags::None;
 
     eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 };

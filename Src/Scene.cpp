@@ -14,17 +14,37 @@ void Scene::Create()
 {
     mObjects.Create(32);
     mLights.Create(32);
+    mPhysicsObjects.Create(32);
 }
 
 void Scene::Attach(const TSRef<Object>& object)
 {
     mObjects.Insert(object);
+    object->pScene = this;
     object->OnAttached(this);
 }
+
 void Scene::Attach(const Ref<LightBase>& light)
 {
     mLights.Insert(light);
     light->OnAttached(this);
+}
+
+PhObjectId Scene::NewPhysicsObject()
+{
+    PhObjectId id = mPhysicsObjects.Size();
+    mPhysicsObjects.Insert();
+
+    return id;
+}
+
+PhObject* Scene::GetPhysicsObject(PhObjectId id)
+{
+    if (id == PhObjectIdNull || id > mPhysicsObjects.Size()) {
+        return nullptr;
+    }
+
+    return &mPhysicsObjects[id];
 }
 
 TSRef<Object> Scene::FindObject(Hash64 name_hash)
@@ -64,10 +84,16 @@ void Scene::Render(Camera* shadow_camera)
         light->Render(camera, shadow_camera);
     }
 
+
     RenderUnlitObjects(camera);
+
+    if (bRenderPhysicsObjects) {
+        RenderPhysicsObjects(camera);
+    }
 
     gRenderer->DoComposition(camera);
 }
+
 
 void Scene::RenderUnlitObjects(const Camera& camera) const
 {
@@ -82,6 +108,35 @@ void Scene::RenderUnlitObjects(const Camera& camera) const
         obj->RenderUnlit(camera);
     }
 }
+
+void Scene::RenderPhysicsObjects(const Camera& camera)
+{
+    // if (!mpDebugCube.IsValid()) {
+    //     mpDebugCube = MeshGen::MakeCube()->AsMesh(renderer::eVertexType::Default);
+    // }
+
+
+    // CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    // gRenderer->pDeferredRenderer->PlGeometryWireframe.Bind(cmd);
+
+    // DrawPushConstants push_constants {};
+
+    // push_constants.ObjectId = ObjectId;
+
+    // memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
+
+    // push_constants.MaterialIndex = 0;
+
+    // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
+    //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
+    //                    &push_constants);
+
+
+    // for (const PhObject& obj : mPhysicsObjects) {
+    //     mpDebugCube->Render(cmd, 1);
+    // }
+}
+
 
 void Scene::RenderShadows(Camera* shadow_camera)
 {

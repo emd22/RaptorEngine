@@ -78,7 +78,7 @@ static const wchar_t* ShaderTypeToDxName(renderer::eShaderType type)
     switch (type) {
     case renderer::eShaderType::Vertex:
         return L"vs_" SHADER_VERSION;
-    case renderer::eShaderType::Fragment:
+    case renderer::eShaderType::Pixel:
         return L"ps_" SHADER_VERSION;
     }
     return L"";
@@ -197,7 +197,7 @@ ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack
     utils->CreateDefaultIncludeHandler(&include_handler);
 
     TRY_COMPILE_PROGRAM(renderer::eShaderType::Vertex);
-    TRY_COMPILE_PROGRAM(renderer::eShaderType::Fragment);
+    TRY_COMPILE_PROGRAM(renderer::eShaderType::Pixel);
 
     return CompileResult::Success;
 }
