@@ -37,7 +37,7 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
 file(GLOB_RECURSE SHADER_FILES "${CMAKE_SOURCE_DIR}/Shaders/*")
 source_group("Shaders" FILES ${SHADER_FILES})
 
-# we don't want to build shader files to be compiled by fxc but we want them in the solution
+# we don't want to build shader files to be compiled by c but we want them in the solution
 foreach(SHADER_FILE ${SHADER_FILES})
     if(MSVC)
         set_property(SOURCE ${SHADER_FILE} PROPERTY VS_TOOL_OVERRIDE "None")

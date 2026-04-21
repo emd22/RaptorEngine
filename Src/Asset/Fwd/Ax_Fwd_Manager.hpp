@@ -2,8 +2,8 @@
 
 #include <Asset/AxImage.hpp>
 
-namespace Fwd::AssetManager {
+namespace fx::Fwd::AssetManager {
 
-FxTSRef<AxImage> LoadImageFromMemory(RxImageFormat format, const uint8* data, uint32 data_size);
+TSRef<AxImage> LoadImageFromMemory(renderer::eImageFormat format, const uint8* data, uint32 data_size);
 
-}; // namespace Fwd::AssetManager
+}; // namespace fx::Fwd::AssetManager

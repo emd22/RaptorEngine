@@ -1,12 +1,14 @@
 #include "AxImage.hpp"
 
-#include <Core/FxPagedArray.hpp>
-#include <Core/FxRef.hpp>
+#include <Core/PagedArray.hpp>
+#include <Core/Ref.hpp>
+
+namespace fx {
 
 
-static FxPagedArray<FxTSRef<AxImage>> mEmptyImagesPerFormat;
+static PagedArray<TSRef<AxImage>> mEmptyImagesPerFormat;
 
-FxPagedArray<FxTSRef<AxImage>>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
+PagedArray<TSRef<AxImage>>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
 
 AxImage::AxImage(const AxImage& other) { (*this) = other; }
 
@@ -40,3 +42,5 @@ void AxImage::Destroy()
 
     bIsUploadedToGpu = false;
 }
+
+} // namespace fx

@@ -4,12 +4,17 @@
 #include <ThirdParty/Jolt/Physics/Body/Body.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
-#include <Core/FxPagedArray.hpp>
-#include <FxEntity.hpp>
-#include <FxMaterial.hpp>
-#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Core/PagedArray.hpp>
+#include <Entity.hpp>
+#include <Material.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
 
-class FxPrimitiveMesh;
+namespace fx {
+
+using PhObjectId = uint32;
+constexpr PhObjectId PhObjectIdNull = UINT32_MAX;
+
+class PrimitiveMesh;
 
 struct PhProperties
 {
@@ -28,52 +33,57 @@ public:
 };
 
 
-enum class PhMotionType
+enum class ePhMotionType
 {
-    eStatic,
-    eDynamic,
+    Static,
+    Dynamic,
 };
 
-enum class PhPrimitiveType
+enum class ePhPrimitiveType
 {
-    eBox,
+    Box,
 };
 
 
 class PhObject
 {
 public:
-    enum Flags
+    enum eFlags
     {
-        eNone = 0x00,
-        eCreateInactive = 0x01,
+        None = 0x00,
+        CreateInactive = 0x01,
     };
 
-
 public:
-    void CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+    PhObject() = default;
+
+    void CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                              const PhProperties& object_properties);
 
-    void CreateMeshBody(const FxPrimitiveMesh& mesh, PhMotionType motion_type, const PhProperties& object_properties);
+    void CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_type, const PhProperties& object_properties);
 
     void DestroyPhysicsBody();
 
-    void Teleport(FxVec3f position, FxQuat rotation);
+    void Teleport(Vec3f position, Quat rotation);
 
-    FX_FORCE_INLINE FxVec3f GetPosition() { return FxVec3f(mpPhysicsBody->GetPosition()); }
-    FX_FORCE_INLINE FxQuat GetRotation() { return FxQuat(mpPhysicsBody->GetRotation()); }
+    FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
+    FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
 
     FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
     FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
 
-    FX_FORCE_INLINE PhMotionType GetMotionType() const { return mMotionType; }
+    FX_FORCE_INLINE ePhMotionType GetMotionType() const { return mMotionType; }
+
+    ~PhObject() = default;
 
 private:
-    void CreateJoltBody(JPH::ShapeRefC shape, Flags flags, PhMotionType type, const PhProperties& properties);
+    void CreateJoltBody(JPH::ShapeRefC shape, eFlags flags, ePhMotionType type, const PhProperties& properties);
 
 public:
     JPH::Body* mpPhysicsBody = nullptr;
-    PhMotionType mMotionType = PhMotionType::eStatic;
+    ePhMotionType mMotionType = ePhMotionType::Static;
 
     bool mbHasPhysicsBody : 1 = false;
 };
+
+} // namespace fx

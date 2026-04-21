@@ -2,15 +2,20 @@
 
 #include "AxLoaderBase.hpp"
 
-#include <Renderer/Backend/RxImage.hpp>
+#include <Renderer/Backend/Image.hpp>
+
+namespace fx {
+
 
 class AxLoaderImageBase : public AxLoaderBase
 {
 public:
-    using Status = AxLoaderBase::Status;
+    using Status = fx::AxLoaderBase::eStatus;
 
 public:
-    RxImageType ImageType = RxImageType::e2d;
-    RxImageFormat ImageFormat = RxImageFormat::eNone;
+    renderer::eImageType ImageType = renderer::eImageType::Flat;
+    renderer::eImageFormat ImageFormat = renderer::eImageFormat::None;
     // int16 ImageNumComponents = 0;
 };
+
+} // namespace fx

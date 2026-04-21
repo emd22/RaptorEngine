@@ -1,0 +1,198 @@
+#include "Scene.hpp"
+
+#include <Engine.hpp>
+#include <ObjectManager.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
+#include <Renderer/ShadowDirectional.hpp>
+
+namespace fx {
+
+using namespace renderer;
+
+void Scene::Create()
+{
+    mObjects.Create(32);
+    mLights.Create(32);
+    mPhysicsObjects.Create(32);
+}
+
+void Scene::Attach(const TSRef<Object>& object)
+{
+    mObjects.Insert(object);
+    object->pScene = this;
+    object->OnAttached(this);
+}
+
+void Scene::Attach(const Ref<LightBase>& light)
+{
+    mLights.Insert(light);
+    light->OnAttached(this);
+}
+
+PhObjectId Scene::NewPhysicsObject()
+{
+    PhObjectId id = mPhysicsObjects.Size();
+    mPhysicsObjects.Insert();
+
+    return id;
+}
+
+PhObject* Scene::GetPhysicsObject(PhObjectId id)
+{
+    if (id == PhObjectIdNull || id > mPhysicsObjects.Size()) {
+        return nullptr;
+    }
+
+    return &mPhysicsObjects[id];
+}
+
+TSRef<Object> Scene::FindObject(Hash64 name_hash)
+{
+    for (TSRef<Object>& obj : mObjects) {
+        if (obj->Name == name_hash) {
+            return obj;
+        }
+    }
+
+    return TSRef<Object>(nullptr);
+}
+
+
+void Scene::Render(Camera* shadow_camera)
+{
+    PerspectiveCamera& camera = *mpCurrentCamera;
+
+    gRenderer->BeginGeometry();
+
+    for (const TSRef<Object>& obj : mObjects) {
+        obj->Update();
+
+
+        if (obj->GetRenderUnlit()) {
+            continue;
+        }
+
+        obj->Render(camera);
+    }
+
+    // Render lights
+    gRenderer->BeginLighting();
+
+
+    for (const Ref<LightBase>& light : mLights) {
+        light->Render(camera, shadow_camera);
+    }
+
+
+    RenderUnlitObjects(camera);
+
+    if (bRenderPhysicsObjects) {
+        RenderPhysicsObjects(camera);
+    }
+
+    gRenderer->DoComposition(camera);
+}
+
+
+void Scene::RenderUnlitObjects(const Camera& camera) const
+{
+    // gRenderer->pDeferredRenderer->PlUnlit.Bind(gRenderer->GetFrame()->CommandBuffer);
+    gRenderer->BeginUnlit();
+
+
+    for (const TSRef<Object>& obj : mObjects) {
+        if (!obj->GetRenderUnlit()) {
+            continue;
+        }
+        obj->RenderUnlit(camera);
+    }
+}
+
+void Scene::RenderPhysicsObjects(const Camera& camera)
+{
+    // if (!mpDebugCube.IsValid()) {
+    //     mpDebugCube = MeshGen::MakeCube()->AsMesh(renderer::eVertexType::Default);
+    // }
+
+
+    // CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    // gRenderer->pDeferredRenderer->PlGeometryWireframe.Bind(cmd);
+
+    // DrawPushConstants push_constants {};
+
+    // push_constants.ObjectId = ObjectId;
+
+    // memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
+
+    // push_constants.MaterialIndex = 0;
+
+    // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
+    //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
+    //                    &push_constants);
+
+
+    // for (const PhObject& obj : mPhysicsObjects) {
+    //     mpDebugCube->Render(cmd, 1);
+    // }
+}
+
+
+void Scene::RenderShadows(Camera* shadow_camera)
+{
+    gShadowRenderer->Begin();
+
+    ShadowPushConstants consts;
+
+    memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
+           sizeof(float32) * 16);
+
+    bool in_skinned_shader = false;
+
+    Pipeline* pipeline = &gShadowRenderer->GetPipeline();
+
+    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+
+    for (const TSRef<Object>& obj : mObjects) {
+        if (!obj->IsShadowCaster()) {
+            continue;
+        }
+
+
+        if (in_skinned_shader && !obj->IsSkinned()) {
+            pipeline = &gShadowRenderer->GetPipeline();
+            in_skinned_shader = false;
+            pipeline->Bind(cmd);
+
+            gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                                                           gObjectManager->GetBaseOffset());
+        }
+        if (obj->IsSkinned()) {
+            pipeline = &gShadowRenderer->GetSkinnedPipeline();
+            in_skinned_shader = true;
+            pipeline->Bind(cmd);
+
+            gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                                                           gObjectManager->GetBaseOffset());
+        }
+
+        obj->Update();
+
+        consts.ObjectId = obj->ObjectId;
+
+        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ShadowPushConstants),
+                           &consts);
+
+        obj->RenderPrimitive(cmd);
+    }
+
+    gShadowRenderer->End();
+}
+
+void Scene::Destroy()
+{
+    mObjects.Destroy();
+    mLights.Destroy();
+}
+
+} // namespace fx

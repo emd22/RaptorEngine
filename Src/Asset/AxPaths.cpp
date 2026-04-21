@@ -1,14 +1,14 @@
 #include "AxPaths.hpp"
 
-#include <Core/FxFilesystemIO.hpp>
+#include <Core/FilesystemIO.hpp>
 
 // TODO: Find asset path based on current dir
-const char* FxAssetPath(AxPathQuery query)
+const char* AssetPath(eAxPathQuery query)
 {
     switch (query) {
-    case AxPathQuery::eShaders:
+    case eAxPathQuery::Shaders:
         return FX_BASE_DIR "/Shaders/";
-    case AxPathQuery::eDataPacks:
+    case eAxPathQuery::DataPacks:
         return FX_BASE_DIR "/build/";
     }
 }

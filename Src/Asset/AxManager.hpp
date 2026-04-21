@@ -3,14 +3,16 @@
 #include "Asset/AxQueue.hpp"
 #include "Asset/AxQueueItem.hpp"
 #include "AxImage.hpp"
-#include "FxObject.hpp"
+#include "Object.hpp"
 
-#include <Core/FxDataNotifier.hpp>
-#include <Core/FxRef.hpp>
-#include <Core/FxTSRef.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/DataNotifier.hpp>
+#include <Core/Ref.hpp>
+#include <Core/TSRef.hpp>
+#include <Core/Types.hpp>
 #include <atomic>
 #include <thread>
+
+namespace fx {
 
 template <typename T>
 concept C_IsAsset = std::is_base_of_v<AxBase, T>;
@@ -51,9 +53,9 @@ public:
 
 public:
     AxQueueItem Item;
-    AxLoaderBase::Status LoadStatus = AxLoaderBase::Status::eNone;
+    AxLoaderBase::eStatus LoadStatus = AxLoaderBase::eStatus::None;
 
-    FxDataNotifier ItemReady;
+    DataNotifier ItemReady;
 
     std::atomic_bool bRunning = true;
 
@@ -63,7 +65,7 @@ public:
     std::thread Thread;
 };
 
-struct FxLoadObjectOptions
+struct LoadObjectOptions
 {
     bool bKeepInMemory : 1 = true;
     bool bGeneratePhysicsMesh : 1 = false;
@@ -83,9 +85,9 @@ public:
 
     template <typename T>
         requires C_IsAsset<T>
-    FxTSRef<T> NewAsset()
+    TSRef<T> NewAsset()
     {
-        return FxTSRef<T>::New();
+        return TSRef<T>::New();
     }
 
 
@@ -95,58 +97,58 @@ public:
 
 
     /**
-     * @brief Creates a new `FxObject` and loads the provided asset into it from
+     * @brief Creates a new `Object` and loads the provided asset into it from
      * the path provided.
      */
-    FxTSRef<FxObject> LoadObject(const std::string& name, const std::string& path, FxLoadObjectOptions options = {})
+    TSRef<Object> LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
     {
-        FxTSRef<FxObject> asset = FxTSRef<FxObject>::New();
+        TSRef<Object> asset = TSRef<Object>::New();
         LoadObject(name, asset, path, options);
 
         return asset;
     }
 
     /**
-     * @brief Creates a new `FxObject` and loads the asset into it from
+     * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    FxTSRef<FxObject> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
+    TSRef<Object> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
     {
-        FxTSRef<FxObject> asset = FxTSRef<FxObject>::New();
+        TSRef<Object> asset = TSRef<Object>::New();
         LoadObjectFromMemory(name, asset, data, data_size);
 
         return asset;
     }
 
-    FxTSRef<AxImage> LoadImage(RxImageType image_type, RxImageFormat format, const std::string& path)
+    TSRef<AxImage> LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, const std::string& path)
     {
-        FxTSRef<AxImage> asset = FxTSRef<AxImage>::New();
+        TSRef<AxImage> asset = TSRef<AxImage>::New();
         LoadImage(image_type, format, asset, path);
 
         return asset;
     }
 
-    inline FxTSRef<AxImage> LoadImage(const std::string& path, RxImageFormat format)
+    inline TSRef<AxImage> LoadImage(const std::string& path, renderer::eImageFormat format)
     {
-        return LoadImage(RxImageType::e2d, format, path);
+        return LoadImage(renderer::eImageType::Flat, format, path);
     }
 
     /**
-     * @brief Creates a new `FxObject` and loads the asset into it from
+     * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    FxTSRef<AxImage> LoadImageFromMemory(RxImageType image_type, RxImageFormat format, const uint8* data,
-                                         uint32 data_size)
+    TSRef<AxImage> LoadImageFromMemory(renderer::eImageType image_type, renderer::eImageFormat format,
+                                       const uint8* data, uint32 data_size)
     {
-        FxTSRef<AxImage> asset = FxTSRef<AxImage>::New();
+        TSRef<AxImage> asset = TSRef<AxImage>::New();
         LoadImageFromMemory(image_type, format, asset, data, data_size);
 
         return asset;
     }
 
-    inline FxTSRef<AxImage> LoadImageFromMemory(RxImageFormat format, const uint8* data, uint32 data_size)
+    inline TSRef<AxImage> LoadImageFromMemory(renderer::eImageFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(RxImageType::e2d, format, data, data_size);
+        return LoadImageFromMemory(renderer::eImageType::Flat, format, data, data_size);
     }
 
 
@@ -154,37 +156,38 @@ public:
     // Methods to load into existing containers
     ////////////////////////////////////////////////
 
-    void LoadImageFromMemory(RxImageType image_type, RxImageFormat format, FxTSRef<AxImage>& asset, const uint8* data,
-                             uint32 data_size);
+    void LoadImageFromMemory(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
+                             const uint8* data, uint32 data_size);
 
     /**
      * @brief Loads an asset into the provided asset from the provided data.
      */
-    void LoadObjectFromMemory(const std::string& name, FxTSRef<FxObject>& asset, const uint8* data, uint32 data_size);
+    void LoadObjectFromMemory(const std::string& name, TSRef<Object>& asset, const uint8* data, uint32 data_size);
 
 
     /**
      * @brief Loads an object into the provided asset from a path.
      */
-    void LoadObject(const std::string& name, FxTSRef<FxObject>& asset, const std::string& path,
-                    FxLoadObjectOptions options = {});
+    void LoadObject(const std::string& name, TSRef<Object>& asset, const std::string& path,
+                    LoadObjectOptions options = {});
 
 
-    void LoadImage(RxImageType image_type, RxImageFormat format, FxTSRef<AxImage>& asset, const std::string& path);
+    void LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
+                   const std::string& path);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    inline void LoadImage(FxTSRef<AxImage>& asset, RxImageFormat format, const std::string& path)
+    inline void LoadImage(TSRef<AxImage>& asset, renderer::eImageFormat format, const std::string& path)
     {
-        return LoadImage(RxImageType::e2d, format, asset, path);
+        return LoadImage(renderer::eImageType::Flat, format, asset, path);
     }
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
-    void LoadImageFromMemory(FxTSRef<AxImage>& asset, RxImageFormat format, const uint8* data, uint32 data_size)
+    void LoadImageFromMemory(TSRef<AxImage>& asset, renderer::eImageFormat format, const uint8* data, uint32 data_size)
     {
-        LoadImageFromMemory(RxImageType::e2d, format, asset, data, data_size);
+        LoadImageFromMemory(renderer::eImageType::Flat, format, asset, data, data_size);
     }
 
     ~AxManager() { Shutdown(); }
@@ -201,14 +204,14 @@ private:
     void AddWorkerThread();
     void AssetManagerUpdate();
 
-    template <typename TAssetType, typename TLoaderType, AxType TEnumValue>
+    template <typename TAssetType, typename TLoaderType, eAxType TEnumValue>
         requires C_IsAsset<TAssetType>
-    static void SubmitAssetToLoad(const FxTSRef<TAssetType>& asset, FxTSRef<TLoaderType>& loader,
-                                  const std::string& path, const uint8* data = nullptr, uint32 data_size = 0)
+    static void SubmitAssetToLoad(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader, const std::string& path,
+                                  const uint8* data = nullptr, uint32 data_size = 0)
     {
-        FxAssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
+        AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
 
-        // FxRef<LoaderType> loader = FxRef<LoaderType>::New();
+        // Ref<LoaderType> loader = Ref<LoaderType>::New();
 
         AxManager* mgr = GetInstance();
 
@@ -226,17 +229,19 @@ private:
     }
 
 public:
-    //    FxDataNotifier DataLoaded;
+    //    DataNotifier DataLoaded;
 private:
     AxQueue mLoadQueue;
 
     std::atomic_flag mbActive;
 
-    FxDataNotifier ItemsEnqueuedNotifier;
+    DataNotifier ItemsEnqueuedNotifier;
     std::atomic_flag ItemsEnqueued;
 
     uint32 mMinThreads = 2;
-    // FxSizedArray<std::thread *> mWorkerThreads;
-    FxSizedArray<AxWorker> mWorkerThreads;
+    // SizedArray<std::thread *> mWorkerThreads;
+    SizedArray<AxWorker> mWorkerThreads;
     std::thread* mpAssetManagerThread;
 };
+
+} // namespace fx

@@ -1,13 +1,15 @@
 #pragma once
 
-#include "FxObjectManager.hpp"
+#include "ObjectManager.hpp"
 
-#include <Asset/FxConfigFile.hpp>
-#include <FxObject.hpp>
-#include <FxPlayer.hpp>
-#include <FxScene.hpp>
+#include <Asset/ConfigFile.hpp>
+#include <Object.hpp>
+#include <Player.hpp>
+#include <Scene.hpp>
 
-class RxShadowDirectional;
+class ShadowDirectional;
+
+namespace fx {
 
 class FoxtrotGame
 {
@@ -26,32 +28,37 @@ private:
     void Tick();
     void ProcessControls();
 
+    void LoadOffsetsFile();
 
     void DestroyGame();
 
 
 public:
-    FxPlayer Player {};
+    Player Player {};
 
-    FxRef<FxLightDirectional> pSun { nullptr };
+    Ref<LightDirectional> pSun { nullptr };
 
     // TODO: Player attachment system
-    FxTSRef<FxObject> pPistolObject { nullptr };
-    FxTSRef<FxObject> pArmsObject { nullptr };
-    FxTSRef<FxObject> pHelmetObject { nullptr };
+    TSRef<Object> pPistolObject { nullptr };
+    TSRef<Object> pArmsObject { nullptr };
+    TSRef<Object> pHelmetObject { nullptr };
+
+    BoneId RHandBone = BoneNull;
 
     double FrameTimeAvg = 0.0f;
-
-
-    FxQuat PistolRotationGoal = FxQuat::sIdentity;
-
     double DeltaTime = 1.0f / 60.0f;
 
-    FxObjectManager ObjectManager;
+    Quat PistolRotationGoal = Quat::sIdentity;
+    ObjectManager ObjectManager;
+
+    Vec3f PistolOffset = Vec3f::sZero;
+    Vec3f ArmsOffset = Vec3f::sZero;
 
 private:
     uint64 mLastTick = 0;
-    FxScene mMainScene {};
+    Scene mMainScene {};
 
-    FxConfigFile Config;
+    ConfigFile Config;
 };
+
+} // namespace fx

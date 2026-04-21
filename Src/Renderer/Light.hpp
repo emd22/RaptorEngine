@@ -1,0 +1,100 @@
+#pragma once
+
+#include <Asset/MeshGen.hpp>
+#include <Color.hpp>
+#include <Entity.hpp>
+#include <Math/Mat4.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
+
+namespace fx {
+class Camera;
+
+namespace renderer {
+class Pipeline;
+} // namespace renderer
+
+enum eLightFlags : uint16
+{
+    LF_None = 0x0000,
+};
+
+enum class eLightType
+{
+    Unknown,
+    Directional,
+    Point,
+};
+
+FX_DEFINE_ENUM_AS_FLAGS(eLightFlags);
+
+class LightBase : public Entity
+{
+public:
+    using VertexType = renderer::Vertex<renderer::eVertexType::Slim>;
+
+    static constexpr eEntityType scEntityType = eEntityType::Light;
+
+public:
+    LightBase(eLightFlags flags = LF_None);
+
+    void SetLightVolume(const Ref<PrimitiveMesh>& volume);
+    void SetLightVolume(const Ref<MeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
+
+    void SetRadius(const float radius);
+
+    virtual void Render(const PerspectiveCamera& camera, Camera* shadow_camera);
+    virtual void RenderDebugMesh(const PerspectiveCamera& camera);
+
+    virtual ~LightBase() {}
+
+public:
+    Ref<PrimitiveMesh> pLightVolume { nullptr };
+    Ref<MeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
+
+    renderer::Pipeline* pPipelineInside = nullptr;
+    renderer::Pipeline* pPipelineOutside = nullptr;
+
+    struct Color Color = Color::sWhite;
+    struct Color AmbientColor { 0x101f1f1f };
+
+    eLightFlags Flags = LF_None;
+
+    eLightType Type = eLightType::Unknown;
+
+    bool bEnabled = true;
+
+protected:
+    Ref<PrimitiveMesh> mpDebugMesh { nullptr };
+    renderer::Pipeline* pPipeline = nullptr;
+
+    float32 mRadius = 1.0f;
+};
+
+
+/**
+ * @brief
+ */
+class LightPoint : public LightBase
+{
+public:
+    LightPoint();
+};
+
+/**
+ * @brief
+ */
+class LightDirectional : public LightBase
+{
+public:
+    LightDirectional();
+
+    void Render(const PerspectiveCamera& camera, Camera* shadow_camera) override;
+};
+
+////////////////////////////////////
+// Entity Validations
+////////////////////////////////////
+
+FX_VALIDATE_ENTITY_TYPE(LightBase)
+
+} // namespace fx

@@ -1,10 +1,10 @@
 #pragma once
 
-enum class AxPathQuery
+enum class eAxPathQuery
 {
-    eShaders,
-    eDataPacks,
+    Shaders,
+    DataPacks,
 };
 
 
-const char* FxAssetPath(AxPathQuery query);
+const char* AssetPath(eAxPathQuery query);

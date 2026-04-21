@@ -5,6 +5,8 @@
 #include <deque>
 #include <mutex>
 
+namespace fx {
+
 class AxQueue
 {
 public:
@@ -45,3 +47,5 @@ private:
 
     std::mutex mMutex;
 };
+
+} // namespace fx

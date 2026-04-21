@@ -10,11 +10,13 @@
 #include <ThirdParty/Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <ThirdParty/Jolt/Physics/EActivation.h>
 
-#include <FxEngine.hpp>
-#include <Renderer/FxPrimitiveMesh.hpp>
+#include <Engine.hpp>
+#include <Renderer/PrimitiveMesh.hpp>
 
 
-void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f& dimensions, PhMotionType motion_type,
+namespace fx {
+
+void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                                    const PhProperties& object_properties)
 {
     mMotionType = motion_type;
@@ -22,10 +24,10 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f
     JPH::RVec3 jolt_dimensions;
     (dimensions * 0.5).ToJoltVec3(jolt_dimensions);
 
-    FxLogInfo("Creating primitive collider with dimensions {}", dimensions);
+    LogInfo("Creating primitive collider with dimensions {}", dimensions);
 
     switch (primitive_type) {
-    case PhPrimitiveType::eBox: {
+    case ePhPrimitiveType::Box: {
         JPH::BoxShapeSettings box_shape_settings(jolt_dimensions);
         box_shape_settings.SetDensity(object_properties.Density);
         box_shape_settings.mConvexRadius = object_properties.ConvexRadius;
@@ -33,12 +35,12 @@ void PhObject::CreatePrimitiveBody(PhPrimitiveType primitive_type, const FxVec3f
         JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
         JPH::ShapeRefC box_shape = box_shape_result.Get();
 
-        CreateJoltBody(box_shape, PhObject::Flags::eNone, motion_type, object_properties);
+        CreateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
     } break;
     }
 }
 
-void PhObject::CreateMeshBody(const FxPrimitiveMesh& mesh, PhMotionType motion_type,
+void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_type,
                               const PhProperties& object_properties)
 {
     mMotionType = motion_type;
@@ -52,22 +54,22 @@ void PhObject::CreateMeshBody(const FxPrimitiveMesh& mesh, PhMotionType motion_t
     JPH::ShapeRefC box_shape = mesh_shape_result.Get();
 
 
-    CreateJoltBody(box_shape, PhObject::Flags::eNone, motion_type, object_properties);
+    CreateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
 }
 
 
-void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMotionType motion_type,
+void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
                               const PhProperties& properties)
 {
     if (mbHasPhysicsBody) {
-        FxLogWarning("Attempting to create physics body when one is already created!");
+        LogWarning("Attempting to create physics body when one is already created!");
         return;
     }
 
 
     JPH::EActivation activation_mode = JPH::EActivation::Activate;
 
-    if (flags & PhObject::Flags::eCreateInactive) {
+    if (flags & PhObject::eFlags::CreateInactive) {
         activation_mode = JPH::EActivation::DontActivate;
     }
 
@@ -75,11 +77,11 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::Flags flags, PhMot
     PhLayer::Type object_layer = PhLayer::Static;
 
     switch (motion_type) {
-    case PhMotionType::eStatic:
+    case ePhMotionType::Static:
         jolt_motion_type = JPH::EMotionType::Static;
         object_layer = PhLayer::Static;
         break;
-    case PhMotionType::eDynamic:
+    case ePhMotionType::Dynamic:
         jolt_motion_type = JPH::EMotionType::Dynamic;
         object_layer = PhLayer::Dynamic;
         break;
@@ -118,7 +120,7 @@ void PhObject::DestroyPhysicsBody()
 }
 
 
-void PhObject::Teleport(FxVec3f position, FxQuat rotation)
+void PhObject::Teleport(Vec3f position, Quat rotation)
 {
     if (!mbHasPhysicsBody) {
         return;
@@ -133,5 +135,7 @@ void PhObject::Teleport(FxVec3f position, FxQuat rotation)
     gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetBodyId(), jolt_position, jolt_rotation,
                                                                       JPH::EActivation::Activate);
 
-    FxLogInfo("Teleporting to sync physics object");
+    LogInfo("Teleporting to sync physics object");
 }
+
+} // namespace fx

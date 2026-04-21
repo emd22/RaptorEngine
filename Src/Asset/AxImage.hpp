@@ -2,8 +2,10 @@
 
 #include "AxBase.hpp"
 
-#include <Core/FxRef.hpp>
-#include <Renderer/Backend/RxImage.hpp>
+#include <Core/Ref.hpp>
+#include <Renderer/Backend/Image.hpp>
+
+namespace fx {
 
 class AxImage : public AxBase
 {
@@ -14,32 +16,32 @@ public:
     AxImage() = default;
     AxImage(const AxImage& other);
 
-    static FxPagedArray<FxTSRef<AxImage>>& GetEmptyImagesArray();
+    static PagedArray<TSRef<AxImage>>& GetEmptyImagesArray();
 
-    template <RxImageFormat TFormat>
-    static FxTSRef<AxImage> GetEmptyImage()
+    template <renderer::eImageFormat TFormat>
+    static TSRef<AxImage> GetEmptyImage()
     {
         // Stashed ptr for the image
-        static FxTSRef<AxImage> spEmptyImage { nullptr };
+        static TSRef<AxImage> spEmptyImage { nullptr };
 
         if (spEmptyImage) {
             return spEmptyImage;
         }
 
-        FxPagedArray<FxTSRef<AxImage>>& empty_images = GetEmptyImagesArray();
+        PagedArray<TSRef<AxImage>>& empty_images = GetEmptyImagesArray();
 
         if (!empty_images.IsInited()) {
             empty_images.Create(10);
         }
 
-        constexpr uint32 pixel_size = RxImageFormatUtil::GetSize(TFormat);
+        constexpr uint32 pixel_size = renderer::ImageFormatUtil::GetSize(TFormat);
 
-        FxSizedArray<uint8> image_data(pixel_size);
+        SizedArray<uint8> image_data(pixel_size);
         memset(image_data.pData, 1, pixel_size);
         image_data.MarkFull();
 
-        spEmptyImage = FxTSRef<AxImage>::New();
-        spEmptyImage->Image.CreateGpuOnly(RxImageType::e2d, FxVec2u(1, 1), TFormat, image_data);
+        spEmptyImage = TSRef<AxImage>::New();
+        spEmptyImage->Image.CreateGpuOnly(renderer::eImageType::Flat, Vec2u(1, 1), TFormat, image_data);
         spEmptyImage->MarkAndSignalLoaded();
 
         empty_images.Insert(spEmptyImage);
@@ -60,8 +62,10 @@ public:
     void Destroy() override;
 
 public:
-    RxImage Image {};
+    renderer::Image Image {};
 
-    RxImageType ImageType = RxImageType::e2d;
-    FxVec2u Size = FxVec2u::sZero;
+    renderer::eImageType ImageType = renderer::eImageType::Flat;
+    Vec2u Size = Vec2u::sZero;
 };
+
+} // namespace fx

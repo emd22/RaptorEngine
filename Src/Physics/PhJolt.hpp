@@ -6,14 +6,17 @@
 #include <ThirdParty/Jolt/Physics/Collision/ObjectLayer.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
 
-#include <Core/FxLog.hpp>
-#include <Core/FxMemberRef.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/Log.hpp>
+#include <Core/MemberRef.hpp>
+#include <Core/Types.hpp>
 
 namespace JPH {
 class JobSystemThreadPool;
 class TempAllocatorImpl;
 }; // namespace JPH
+
+namespace fx {
+
 
 namespace PhLayer {
 using Type = JPH::ObjectLayer;
@@ -125,18 +128,18 @@ public:
     virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
                                 const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
     {
-        FxLogInfo("A contact was added");
+        LogInfo("A contact was added");
     }
 
     virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
                                     const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
     {
-        // FxLogInfo("A contact was persisted");
+        // LogInfo("A contact was persisted");
     }
 
     virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override
     {
-        FxLogInfo("A contact was removed");
+        LogInfo("A contact was removed");
     }
 };
 
@@ -146,12 +149,12 @@ class PhBodyActivationListener : public JPH::BodyActivationListener
 public:
     virtual void OnBodyActivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override
     {
-        FxLogInfo("A body got activated");
+        LogInfo("A body got activated");
     }
 
     virtual void OnBodyDeactivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override
     {
-        FxLogInfo("A body went to sleep");
+        LogInfo("A body went to sleep");
     }
 };
 
@@ -177,8 +180,8 @@ public:
     bool bPhysicsPaused = false;
     const float cTimeStep = 1.0f / 60.0f;
 
-    FxMemberRef<JPH::TempAllocatorImpl> pTempAllocator;
-    FxMemberRef<JPH::JobSystemThreadPool> pJobSystem;
+    MemberRef<JPH::TempAllocatorImpl> pTempAllocator;
+    MemberRef<JPH::JobSystemThreadPool> pJobSystem;
 
 private:
     PhBPLayerInterfaceImpl mBroadPhaseInterface;
@@ -191,3 +194,5 @@ private:
 
     bool mbIsInited = false;
 };
+
+} // namespace fx

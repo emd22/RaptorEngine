@@ -4,26 +4,29 @@
 
 #include <ThirdParty/stb_image.h>
 
-#include <Core/FxSizedArray.hpp>
-#include <Core/FxTypes.hpp>
+#include <Core/SizedArray.hpp>
+#include <Core/Types.hpp>
 #include <string>
+
+namespace fx {
+
 
 class AxLoaderStb : public AxLoaderImageBase
 {
 public:
-    using Status = AxLoaderBase::Status;
+    using Status = AxLoaderBase::eStatus;
 
     AxLoaderStb() = default;
 
-    Status LoadFromFile(FxTSRef<AxBase> asset, const std::string& path) override;
-    Status LoadFromMemory(FxTSRef<AxBase> asset, const uint8* data, uint32 size) override;
+    Status LoadFromFile(TSRef<AxBase> asset, const std::string& path) override;
+    Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
-    void Destroy(FxTSRef<AxBase>& asset) override;
+    void Destroy(TSRef<AxBase>& asset) override;
 
     ~AxLoaderStb() override = default;
 
 protected:
-    void CreateGpuResource(FxTSRef<AxBase>& asset) override;
+    void CreateGpuResource(TSRef<AxBase>& asset) override;
 
 private:
     void LoadCubemapToLayeredImage();
@@ -36,3 +39,5 @@ private:
     uint32 mDataSize = 0;
     uint8* mImageData = nullptr;
 };
+
+} // namespace fx
