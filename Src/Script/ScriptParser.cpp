@@ -401,8 +401,16 @@ void FoxScript::Execute()
 
 
     ScriptVM vm;
-
     vm.Start(std::move(bc_emitter.mBytecode));
+
+    VMSymbol* entrypoint = vm.GetSymbol("ScriptEntry");
+    if (entrypoint) {
+        LogInfo("Found entrypoint! {}", entrypoint->Offset);
+        uint32 value = vm.CallFunction(entrypoint);
+
+        LogInfo("RETURN VALUE: {}", value);
+    }
+
 
     gEnginePool->Free(mpFileData);
 

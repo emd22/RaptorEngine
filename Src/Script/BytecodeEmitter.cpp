@@ -490,7 +490,7 @@ void FoxBytecodeEmitter::EmitVariableDefineInt32(uint16 var_index, Hash32 name_h
 
 void FoxBytecodeEmitter::EmitVariableIndex(uint16 var_index) { Write16(var_index); }
 
-void FoxBytecodeEmitter::EmitParamsStart() { WriteOp(BcBase_Marker, BcSpecMarker_ParamsBegin); }
+void FoxBytecodeEmitter::EmitParamsStart() {}
 
 void FoxBytecodeEmitter::EmitType(FoxValue::eValueType type)
 {
@@ -1225,9 +1225,9 @@ void FoxBytecodeEmitter::EmitBlock(FoxAstBlock* block, int params_to_save, bool 
         }
     }
 
-    if (does_block_branch) {
-        EmitMarker(BcSpecMarker_FunctionBranches);
-    }
+    // if (does_block_branch) {
+    //     EmitMarker(BcSpecMarker_FunctionBranches);
+    // }
 
     if (!is_function_body) {
         // After the stack allocations, mark the start of the frame.

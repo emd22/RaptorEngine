@@ -32,6 +32,12 @@ struct VMSymbol
     uint32 Offset;
 };
 
+
+struct VMScope
+{
+    VMVariable Variables[32];
+};
+
 class ScriptVM
 {
     static constexpr uint32 scStackSize = 1024 * 16;
@@ -41,7 +47,11 @@ public:
 
     void Start(PagedArray<uint8>&& bytecode);
 
-    void CallFunction();
+    VMSymbol* GetSymbol(const String& name) const;
+    VMSymbol* GetSymbol(Hash32 name_hash) const;
+    uint32 GetFunctionAddr(Hash32 name_hash) const;
+
+    uint32 CallFunction(VMSymbol* sym);
 
     void Push16(uint16 value);
     void Push32(uint32 value);
@@ -64,6 +74,7 @@ private:
     void DoMove(uint8 op_base, uint8 op_spec);
     void DoVariable(uint8 op_base, uint8 op_spec);
 
+    VMScope& ThisScope();
 
     uint16 Read16();
     uint16 Read16Rev();
@@ -79,8 +90,9 @@ public:
 
     PagedArray<uint8> mBytecode;
 
-    VMVariable Variables[32];
-    VMSymbol* SymTable = nullptr;
+    SizedArray<VMSymbol> SymTable;
+    SizedArray<VMScope> Scopes;
+    int32 ScopeIndex = 0;
 
 private:
     uint32 mPC = 0;
@@ -92,6 +104,8 @@ private:
 
     bool mIsInParams = false;
     PagedArray<FoxValue::eValueType> mPushedTypes;
+
+    bool mbReturnValueOnStack = false;
 
     FoxValue::eValueType mCurrentType = FoxValue::NONETYPE;
 };

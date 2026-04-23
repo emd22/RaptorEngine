@@ -1,53 +1,15 @@
-proc AdditionTest(int x) int
+
+
+proc Test(int z)
 {
-    local int z = x + 5;
-    return z;
+    local int v = z + 20;
+
+    return v;
 }
 
-proc Test(int v) int
+proc ScriptEntry() int
 {
-    return AdditionTest(10);
+    local int x = Test(5);
+
+    return x;
 }
-
-
-proc ScriptEntry()
-{
-    Test(15);
-    return;
-}
-
-/*
-
-@FrameBegin
-
-PROC
-VDEFINE [int32] 4245442695 AS $0
-VPOP [int32] $0
-VDEFINE [int32] 4278997933 AS $1
-VPUSH [int32] $0
-PUSH [int32] 5
-ADD [int32]
-VPOP [int32] $1
-VPUSH [int32] $1
-VRET
-PROC END
-
-PROC
-VDEFINE [int32] 4077666505 AS $0
-VPOP [int32] $0
-@Params
-PUSH [int32] 10
-calla 745289313
-VRET
-PROC END
-
-PROC
-@Branches
-@Params
-PUSH [int32] 15
-calla 805092869
-RET
-PROC END
-@FrameEnd
-
-*/
