@@ -216,6 +216,8 @@ struct FoxAstFunctionDecl : public FoxAstNode
     FoxAstBlock* Params = nullptr;
     FoxAstBlock* Block = nullptr;
 
+    uint32 SymbolTableOffset = 0;
+
     std::vector<FoxIRRegister> ClobberList;
     std::vector<FoxAstDocComment*> DocComments;
 };

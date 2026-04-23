@@ -27,7 +27,7 @@ static constexpr uint16 ReverseInt16(uint16 value) { return (value >> 8) | (valu
 
 using TT = eTokenType;
 
-void FoxBytecodeEmitter::BeginEmitting(FoxAstNode* node)
+void FoxBytecodeEmitter::BeginEmitting(FoxAstNode* root)
 {
     mStackSize = 1024;
 
@@ -37,7 +37,10 @@ void FoxBytecodeEmitter::BeginEmitting(FoxAstNode* node)
     mBytecode.Create(4096);
     VarHandles.Create(64);
 
-    Emit(node);
+    Assert(root->NodeType == FX_AST_BLOCK);
+    EmitSymbolTable(static_cast<FoxAstBlock*>(root));
+
+    Emit(root);
 
     PrintBytecode();
 }
@@ -1036,6 +1039,30 @@ void FoxBytecodeEmitter::EmitFunctionDefinitionsInBlock(FoxAstBlock* block)
     }
 }
 
+void FoxBytecodeEmitter::EmitSymbolTable(FoxAstBlock* root)
+{
+    uint32 num_symbols = 0;
+    for (FoxAstNode* stmt : root->Statements) {
+        if (stmt->NodeType == FX_AST_PROCDECL) {
+            ++num_symbols;
+        }
+    }
+
+    Write32(num_symbols);
+
+    for (FoxAstNode* stmt : root->Statements) {
+        if (stmt->NodeType == FX_AST_PROCDECL) {
+            FoxAstFunctionDecl* proc_decl = static_cast<FoxAstFunctionDecl*>(stmt);
+
+            EmitDataString(proc_decl->Name->Start, proc_decl->Name->Length);
+
+            proc_decl->SymbolTableOffset = mBytecode.TrackedSize;
+            // Write a temporary address (will be updated after bytecode is written)
+            Write32(0);
+        }
+    }
+}
+
 void FoxBytecodeEmitter::EmitFunction(FoxAstFunctionDecl* function)
 {
     RETURN_IF_NO_NODE(function);
@@ -1074,7 +1101,17 @@ void FoxBytecodeEmitter::EmitFunction(FoxAstFunctionDecl* function)
 
             // EmitMarker(BcSpecMarker_FunctionName);
             LogDebug("Data Name: {:.{}}\n", function->Name->Start, function->Name->Length);
-            EmitDataString(function->Name->Start, function->Name->Length);
+
+            uint32 sym_offset = function->SymbolTableOffset;
+            uint32 bc_offset = mBytecode.Size();
+
+            // Overwrite the offset in the symbol table
+            mBytecode[sym_offset] = static_cast<uint8>(bc_offset >> 24);
+            mBytecode[sym_offset + 1] = static_cast<uint8>(bc_offset >> 16);
+            mBytecode[sym_offset + 2] = static_cast<uint8>(bc_offset >> 8);
+            mBytecode[sym_offset + 3] = static_cast<uint8>(bc_offset);
+
+            // EmitDataString(function->Name->Start, function->Name->Length);
         }
 
         int parameter_index = 0;
@@ -1534,7 +1571,7 @@ void FoxBytecodePrinter::DoMarker(char* s, uint8 op_base, uint8 op_spec)
         BC_PRINT_OP("@ExtFn");
     }
     else if (op_spec == BcSpecMarker_Proc) {
-        BC_PRINT_OP("\nPROC {}", ReadString(temp_buffer, cTempBufferSize));
+        BC_PRINT_OP("\nPROC");
     }
     else if (op_spec == BcSpecMarker_ProcEnd) {
         BC_PRINT_OP("PROC END");
@@ -1576,8 +1613,30 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
 }
 
 
+void FoxBytecodePrinter::PrintSymbolTable()
+{
+    uint32 num_symbols = Read32();
+
+    constexpr uint32 cTempBufferSize = 512;
+    char buffer[cTempBufferSize];
+
+    LogInfo("--- Symbols ---");
+
+
+    for (uint32 index = 0; index < num_symbols; index++) {
+        ReadString(buffer, cTempBufferSize);
+        uint32 offset = Read32();
+
+        LogInfo("{} -> {}", buffer, offset);
+    }
+
+    LogInfo("----------------");
+}
+
 void FoxBytecodePrinter::Print()
 {
+    PrintSymbolTable();
+
     while (mBytecodeIndex < mBytecode.Size()) {
         PrintOp();
     }

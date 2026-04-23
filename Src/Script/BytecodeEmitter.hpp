@@ -69,6 +69,8 @@ private:
                                               bool alloc_stack_space = false);
     FoxBytecodeVarHandle* DefineReturnVar(FoxAstVarDecl* decl);
 
+    void EmitSymbolTable(FoxAstBlock* root);
+
     FoxIRRegister EmitVarFetch(FoxAstVarRef* ref, RhsMode mode);
 
     uint16 GetSizeOfType(Token* type);
@@ -170,7 +172,6 @@ private:
     uint32 mStackSize = 0;
 
     uint16 mVarsInScope = 0;
-
     uint16 mScopeIndex = 0;
 
     bool mEntryPointEmitted = false;
@@ -186,6 +187,7 @@ public:
         mBytecode.bDoNotDestroy = true;
     }
 
+    void PrintSymbolTable();
     void Print();
     void PrintOp();
 
