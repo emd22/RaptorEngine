@@ -68,13 +68,8 @@ void FoxBytecodeEmitter::EmitReturn(FoxAstReturn* return_node)
         FoxAstNode* return_rhs = return_node->pRhs;
 
         // Check to see if its a literal
-        if (return_rhs->NodeType == FX_AST_LITERAL) {
-            FoxAstLiteral* literal = reinterpret_cast<FoxAstLiteral*>(return_rhs);
 
-            EmitPushVarOrLiteral(literal);
-            EmitJumpReturnToCallerValue();
-        }
-        else if (return_rhs->NodeType == FX_AST_PROCCALL) {
+        if (return_rhs->NodeType == FX_AST_PROCCALL) {
             FoxAstFunctionCall* call_node = reinterpret_cast<FoxAstFunctionCall*>(return_rhs);
 
             if (call_node->GetReturnType() == nullptr) {
@@ -90,8 +85,8 @@ void FoxBytecodeEmitter::EmitReturn(FoxAstReturn* return_node)
             EmitJumpReturnToCallerValue();
         }
         else {
-            LogError("EmitReturn: Return value type is not implemented!");
-            EmitJumpReturnToCaller();
+            EmitPushVarOrLiteral(return_rhs);
+            EmitJumpReturnToCallerValue();
         }
     }
 }
@@ -344,6 +339,12 @@ void FoxBytecodeEmitter::EmitPushVarOrLiteral(FoxAstNode* node)
             EmitPush32(literal->Value.ValueInt);
         }
     }
+    else if (node->NodeType == FX_AST_BINOP) {
+        EmitBinop(static_cast<FoxAstBinop*>(node));
+    }
+    else if (node->NodeType == FX_AST_PROCCALL) {
+        DoFunctionCall(static_cast<FoxAstFunctionCall*>(node));
+    }
     else {
         LogError("EmitPushVarOrLiteral: Unknown node type");
     }
@@ -428,11 +429,6 @@ void FoxBytecodeEmitter::EmitJumpReturnToCaller() { WriteOp(BcBase_Jump, BcSpecJ
 
 void FoxBytecodeEmitter::EmitJumpReturnToCallerValue() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_Value); }
 
-void FoxBytecodeEmitter::EmitJumpReturnToCallerInt32(int32 value)
-{
-    WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_Int32);
-    Write32(value);
-}
 
 void FoxBytecodeEmitter::EmitMoveInt32(FoxIRRegister reg, uint32 value)
 {
@@ -544,7 +540,7 @@ uint32 FoxBytecodeEmitter::EmitDataString(char* str, uint16 length)
 }
 
 
-void FoxBytecodeEmitter::EmitBinop(FoxAstBinop* binop, FoxBytecodeVarHandle* handle)
+void FoxBytecodeEmitter::EmitBinop(FoxAstBinop* binop)
 {
     // Push LHS and RHS to stack
     EmitPushVarOrLiteral(binop->pLeft);
@@ -841,7 +837,7 @@ FoxIRRegister FoxBytecodeEmitter::EmitRhsToRegister(FoxAstNode* rhs, FoxIRRegist
     }
 
     else if (rhs->NodeType == FX_AST_BINOP) {
-        EmitBinop(static_cast<FoxAstBinop*>(rhs), nullptr);
+        EmitBinop(static_cast<FoxAstBinop*>(rhs));
 
         return dest_register;
     }
@@ -878,7 +874,7 @@ void FoxBytecodeEmitter::EmitRhs(FoxAstNode* rhs, FoxBytecodeEmitter::RhsMode mo
     }
     else if (rhs->NodeType == FX_AST_PROCCALL || rhs->NodeType == FX_AST_BINOP) {
         if (rhs->NodeType == FX_AST_BINOP) {
-            EmitBinop(reinterpret_cast<FoxAstBinop*>(rhs), handle);
+            EmitBinop(reinterpret_cast<FoxAstBinop*>(rhs));
         }
 
         else if (rhs->NodeType == FX_AST_PROCCALL) {
@@ -1443,17 +1439,13 @@ void FoxBytecodePrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_CallAbsolute) {
         uint32 position = Read32();
-        BC_PRINT_OP("calla {}", position);
+        BC_PRINT_OP("CALLA {}", position);
     }
     else if (op_spec == BcSpecJump_ReturnToCaller) {
         BC_PRINT_OP("RET");
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Value) {
         BC_PRINT_OP("VRET");
-    }
-    else if (op_spec == BcSpecJump_ReturnToCaller_Int32) {
-        int32 value = Read32();
-        BC_PRINT_OP("ret [i32] {}", value);
     }
     else if (op_spec == BcSpecJump_CallExternal) {
         uint32 hashed_name = Read32();

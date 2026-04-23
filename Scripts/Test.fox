@@ -1,15 +1,10 @@
 
-
-proc Test(int z)
+proc tfunc() int
 {
-    local int v = z + 20;
-
-    return v;
+    return 5;
 }
 
 proc ScriptEntry() int
 {
-    local int x = Test(5);
-
-    return x;
+    return tfunc() + 2;
 }

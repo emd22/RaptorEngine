@@ -110,7 +110,7 @@ uint32 ScriptVM::CallFunction(VMSymbol* sym)
     while (mPC < mBytecode.Size()) {
         ExecuteOp();
 
-        if (ScopeIndex < 0) {
+        if (ScopeIndex <= 0) {
             break;
         }
     }

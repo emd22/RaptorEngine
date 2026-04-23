@@ -128,7 +128,7 @@ private:
 
     uint32 EmitDataString(char* str, uint16 length);
 
-    void EmitBinop(FoxAstBinop* binop, FoxBytecodeVarHandle* handle);
+    void EmitBinop(FoxAstBinop* binop);
 
     void EmitRhs(FoxAstNode* rhs, RhsMode mode, FoxBytecodeVarHandle* handle);
 
