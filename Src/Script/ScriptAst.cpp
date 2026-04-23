@@ -4,6 +4,9 @@
 
 namespace fx::script {
 
+const FoxValue FoxValue::scNone = FoxValue(0);
+
+
 FoxValue::eValueType FoxAstFunctionCall::GetReturnType() const
 {
     if (!pFunction || !pFunction->pDeclaration) {

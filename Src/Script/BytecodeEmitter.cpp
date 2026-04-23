@@ -302,11 +302,11 @@ void FoxBytecodeEmitter::EmitSaveAbsoluteReg32(uint32 position, FoxIRRegister re
     Write16(reg);
 }
 
-void FoxBytecodeEmitter::EmitPush32(uint32 value)
+void FoxBytecodeEmitter::EmitPush32(int32 value)
 {
     // PUSH32 [i32]
     WriteOp(BcBase_Push, BcSpecPush_Int32);
-    Write32(value);
+    Write32(std::bit_cast<uint32>(value));
 
     mStackOffset += 4;
 }
@@ -506,6 +506,16 @@ void FoxBytecodeEmitter::EmitVariableDefine(uint16 var_index, Hash32 name_hash)
 }
 void FoxBytecodeEmitter::EmitVariableIndex(uint16 var_index) { Write16(var_index); }
 
+void FoxBytecodeEmitter::EmitVariableCastInt32(VarIndex var_index)
+{
+    WriteOp(BcBase_Variable, BcSpecVariable_Cast_Int32);
+}
+
+void FoxBytecodeEmitter::EmitVariableCastFloat32(VarIndex var_index)
+{
+    WriteOp(BcBase_Variable, BcSpecVariable_Cast_Float32);
+}
+
 void FoxBytecodeEmitter::EmitParamsStart() {}
 
 void FoxBytecodeEmitter::EmitType(FoxValue::eValueType type)
@@ -678,7 +688,7 @@ FoxIRRegister FoxBytecodeEmitter::EmitLiteralString(FoxAstLiteral* literal, RhsM
     if (mode == RhsMode::RHS_DEFINE_IN_MEMORY) {
         // Push the location and mark it as a pointer to a string
         EmitType(FoxValue::STRING);
-        EmitPush32(string_position);
+        EmitPush32(static_cast<int32>(string_position));
 
         return FX_IR_GW3;
     }
@@ -1525,6 +1535,16 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
         BC_PRINT_OP("VDEFINEF [float32] {} AS ${}", name_hash, var_index);
+    }
+
+    else if (op_spec == BcSpecVariable_Cast_Int32) {
+        uint16 var_index = Read16();
+        BC_PRINT_OP("VCAST [int32] {}", var_index);
+    }
+
+    else if (op_spec == BcSpecVariable_Cast_Float32) {
+        uint16 var_index = Read16();
+        BC_PRINT_OP("VCASTF [float32] {}", var_index);
     }
 }
 

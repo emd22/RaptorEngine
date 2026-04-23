@@ -77,7 +77,7 @@ private:
     void DoSaveInt32(uint32 stack_offset, uint32 value, bool force_absolute = false);
     void DoSaveReg32(uint32 stack_offset, FoxIRRegister reg, bool force_absolute = false);
 
-    void EmitPush32(uint32 value);
+    void EmitPush32(int32 value);
     void EmitPushFloat32(float32 value);
     void EmitPushVar(VarIndex var);
 
@@ -118,6 +118,9 @@ private:
 
     void EmitVariableDefine(uint16 var_index, Hash32 name_hash);
     void EmitVariableIndex(uint16 var_index);
+
+    void EmitVariableCastInt32(VarIndex var_index);
+    void EmitVariableCastFloat32(VarIndex var_index);
 
     void EmitMoveInt32(FoxIRRegister reg, uint32 value);
     void EmitMoveReg32(FoxIRRegister dest_reg, FoxIRRegister src_reg);

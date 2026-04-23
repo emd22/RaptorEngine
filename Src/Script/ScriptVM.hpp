@@ -50,7 +50,7 @@ public:
     VMSymbol* GetSymbol(Hash32 name_hash) const;
     uint32 GetFunctionAddr(Hash32 name_hash) const;
 
-    uint32 CallFunction(VMSymbol* sym);
+    FoxValue CallFunction(VMSymbol* sym);
 
     void Push16(uint16 value);
     void Push32(uint32 value);
@@ -105,6 +105,7 @@ private:
     PagedArray<FoxValue::eValueType> mPushedTypes;
 
     bool mbReturnValueOnStack = false;
+    FoxValue::eValueType LastPushType = FoxValue::eValueType::NONETYPE;
 
     FoxValue::eValueType mCurrentType = FoxValue::NONETYPE;
 };

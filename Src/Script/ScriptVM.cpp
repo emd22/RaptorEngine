@@ -97,10 +97,10 @@ uint32 ScriptVM::GetFunctionAddr(Hash32 name_hash) const
     return sym->Offset;
 }
 
-uint32 ScriptVM::CallFunction(VMSymbol* sym)
+FoxValue ScriptVM::CallFunction(VMSymbol* sym)
 {
     if (!sym) {
-        return 0;
+        return FoxValue::scNone;
     }
 
     ScopeIndex++;
@@ -117,10 +117,10 @@ uint32 ScriptVM::CallFunction(VMSymbol* sym)
 
 
     if (mbReturnValueOnStack) {
-        return Pop32();
+        return FoxValue::NumberFromRaw(LastPushType, Pop32());
     }
 
-    return 0;
+    return FoxValue::scNone;
 }
 
 
@@ -241,12 +241,20 @@ VMScope& ScriptVM::ThisScope() { return Scopes[ScopeIndex]; }
 void ScriptVM::DoPush(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPush_Int32) {
-        uint32 value = Read32();
-        Push32(value);
+        LastPushType = FoxValue::eValueType::INT;
+        Push32(Read32());
+    }
+    else if (op_spec == BcSpecPush_Float32) {
+        LastPushType = FoxValue::eValueType::FLOAT;
+        Push32(Read32());
     }
     else if (op_spec == BcSpecPush_Var) {
         uint16 var_index = Read16();
-        Push32(ThisScope().Variables[var_index].Value.Get<uint32>());
+
+        VMVariable& var = ThisScope().Variables[var_index];
+        LastPushType = var.Value.Type;
+
+        Push32(var.Value.Get<int32>());
     }
 }
 
@@ -254,7 +262,7 @@ void ScriptVM::DoPop(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPop_Variable_Int32) {
         uint16 var_index = Read16();
-        ThisScope().Variables[var_index].Value.Set<uint32>(Pop32());
+        ThisScope().Variables[var_index].Value.Set<int32>(Pop32());
     }
 }
 
@@ -417,7 +425,7 @@ void ScriptVM::DoVariable(uint8 op_base, uint8 op_spec)
         uint32 value = Read32();
         LogInfo("VSET [int32] ${}, {}", var_index, value);
 
-        ThisScope().Variables[var_index].Value.Set<uint32>(value);
+        ThisScope().Variables[var_index].Value.Set<int32>(value);
     }
     else if (op_spec == BcSpecVariable_Set_Var) {
         VarIndex dst_index = Read16();
@@ -430,9 +438,16 @@ void ScriptVM::DoVariable(uint8 op_base, uint8 op_spec)
         Hash32 name_hash = Read32();
 
         ThisScope().Variables[var_index].NameHash = name_hash;
-        ThisScope().Variables[var_index].Value.Set<uint32>(0);
+        ThisScope().Variables[var_index].Value.Set<int32>(0);
 
         LogInfo("Define variable {}", var_index);
+    }
+    else if (op_spec == BcSpecVariable_Cast_Int32) {
+        uint16 var_index = Read16();
+
+        FoxValue& var_value = ThisScope().Variables[var_index].Value;
+        float32 fvalue = var_value.Get<float32>();
+        var_value.Set<int32>(fvalue);
     }
 }
 } // namespace fx::script

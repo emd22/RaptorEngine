@@ -406,7 +406,7 @@ void FoxScript::Execute()
     VMSymbol* entrypoint = vm.GetSymbol("ScriptEntry");
     if (entrypoint) {
         LogInfo("Found entrypoint! {}", entrypoint->Offset);
-        uint32 value = vm.CallFunction(entrypoint);
+        FoxValue value = vm.CallFunction(entrypoint);
 
         LogInfo("RETURN VALUE: {}", value);
     }

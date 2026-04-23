@@ -45,7 +45,7 @@ enum FoxIRRegister : uint8
 
 struct FoxValue
 {
-    static FoxValue scNone;
+    static const FoxValue scNone;
 
     enum eValueType : uint16
     {
@@ -61,9 +61,9 @@ struct FoxValue
 
     union
     {
-        int ValueInt = 0;
-        float ValueFloat;
-        float ValueVec3[3];
+        int32 ValueInt = 0;
+        float32 ValueFloat;
+        float32 ValueVec3[3];
         char* ValueString;
 
         FoxAstVarRef* pValueRef;
@@ -73,6 +73,26 @@ struct FoxValue
 
     explicit FoxValue(int value) : Type(eValueType::INT), ValueInt(value) {}
     explicit FoxValue(float value) : Type(eValueType::FLOAT), ValueFloat(value) {}
+
+    static FoxValue NumberFromRaw(eValueType type, uint32 raw_value)
+    {
+        FoxValue value = FoxValue::scNone;
+
+        switch (type) {
+        case eValueType::INT:
+            value.ValueInt = std::bit_cast<int32>(raw_value);
+            value.Type = type;
+            break;
+
+        case eValueType::FLOAT:
+            value.ValueFloat = std::bit_cast<float32>(raw_value);
+            value.Type = type;
+            break;
+        default:
+            break;
+        }
+        return value;
+    }
 
     FoxValue(const FoxValue& other)
     {
@@ -119,7 +139,7 @@ struct FoxValue
     void Set(T value);
 
     template <>
-    void Set<uint32>(uint32 value)
+    void Set<int32>(int32 value)
     {
         Type = eValueType::INT;
         ValueInt = value;
@@ -140,7 +160,7 @@ struct FoxValue
     T Get() const;
 
     template <>
-    uint32 Get<uint32>() const
+    int32 Get<int32>() const
     {
         return ValueInt;
     }
@@ -347,3 +367,32 @@ struct FoxBytecodeFunctionHandle
 };
 
 } // namespace fx::script
+
+template <>
+struct std::formatter<fx::script::FoxValue>
+{
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    auto format(const fx::script::FoxValue& obj, std::format_context& ctx) const
+    {
+        using VT = fx::script::FoxValue::eValueType;
+
+        if (obj.Type == VT::NONETYPE) {
+            return std::format_to(ctx.out(), "Null");
+        }
+        else if (obj.Type == VT::INT) {
+            return std::format_to(ctx.out(), "{}", obj.ValueInt);
+        }
+        else if (obj.Type == VT::FLOAT) {
+            return std::format_to(ctx.out(), "{}", obj.ValueFloat);
+        }
+        else if (obj.Type == VT::STRING) {
+            return std::format_to(ctx.out(), "{}", obj.ValueString);
+        }
+        else if (obj.Type == VT::REF) {
+            return std::format_to(ctx.out(), "{:p}", reinterpret_cast<void*>(obj.pValueRef));
+        }
+
+        return std::format_to(ctx.out(), "Unknown");
+    }
+};
