@@ -15,3 +15,39 @@ proc ScriptEntry()
     Test(15);
     return;
 }
+
+/*
+
+@FrameBegin
+
+PROC
+VDEFINE [int32] 4245442695 AS $0
+VPOP [int32] $0
+VDEFINE [int32] 4278997933 AS $1
+VPUSH [int32] $0
+PUSH [int32] 5
+ADD [int32]
+VPOP [int32] $1
+VPUSH [int32] $1
+VRET
+PROC END
+
+PROC
+VDEFINE [int32] 4077666505 AS $0
+VPOP [int32] $0
+@Params
+PUSH [int32] 10
+calla 745289313
+VRET
+PROC END
+
+PROC
+@Branches
+@Params
+PUSH [int32] 15
+calla 805092869
+RET
+PROC END
+@FrameEnd
+
+*/

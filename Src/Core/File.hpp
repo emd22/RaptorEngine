@@ -5,6 +5,7 @@
 
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Slice.hpp>
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Engine.hpp>
 #include <Math/MathUtil.hpp>
@@ -73,6 +74,7 @@ public:
 
     void Write(const char* str);
     void Write(const std::string& str) { Write(str.c_str()); }
+    void Write(const String& str) { Write(str.CStr()); }
 
     template <typename... TTypes>
     void WriteMulti(TTypes... values)

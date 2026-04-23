@@ -4,9 +4,9 @@
 #include "Loader/AxLoaderBase.hpp"
 
 #include <Core/LockContext.hpp>
+#include <Core/String.hpp>
 #include <Core/TSRef.hpp>
 #include <mutex>
-#include <string>
 
 namespace fx {
 
@@ -45,7 +45,7 @@ struct AxQueueItem
     AxQueueItem() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAxType type, const std::string& path)
+    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAxType type, const String& path)
         : Path(path), pcRawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
     {
     }
@@ -77,7 +77,7 @@ struct AxQueueItem
     LockContext<AxItemData> GetDataContext() { return LockContext<AxItemData>(mMutex, Data); }
 
 public:
-    std::string Path;
+    String Path;
 
     std::mutex mMutex;
 

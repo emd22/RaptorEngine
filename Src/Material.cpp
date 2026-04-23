@@ -58,7 +58,7 @@ void MaterialManager::Create(uint32 entities_per_page)
     mbInitialized = true;
 }
 
-TSRef<Material> MaterialManager::New(const std::string& name, Pipeline* pipeline, bool supports_skinning)
+TSRef<Material> MaterialManager::New(const String& name, Pipeline* pipeline, bool supports_skinning)
 {
     std::lock_guard guard(mInUse);
 

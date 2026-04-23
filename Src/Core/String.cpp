@@ -113,11 +113,7 @@ String& String::operator=(const char* str)
     return *this;
 }
 
-
-const char String::operator[](size_t index) const { return CStr()[index]; }
-char& String::operator[](size_t index) { return GetInternalPtr()[index]; }
-
-String::~String()
+void String::Clear()
 {
     if (mpHeapStr) {
         gEnginePool->Free<char>(mpHeapStr);
@@ -126,5 +122,11 @@ String::~String()
     mpHeapStr = nullptr;
     Length = 0;
 }
+
+
+const char String::operator[](size_t index) const { return CStr()[index]; }
+char& String::operator[](size_t index) { return GetInternalPtr()[index]; }
+
+String::~String() { Clear(); }
 
 } // namespace fx

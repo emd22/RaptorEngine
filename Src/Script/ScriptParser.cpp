@@ -2,6 +2,8 @@
 
 #include "BytecodeEmitter.hpp"
 // #include "FoxCGArm64.hpp"
+#include "ScriptVM.hpp"
+
 #include <Core/File.hpp>
 #include <Core/Log.hpp>
 #include <Core/MemPool/MemPool.hpp>
@@ -396,6 +398,11 @@ void FoxScript::Execute()
     bc_printer.Print();
 
     printf("\n=====\n");
+
+
+    ScriptVM vm;
+
+    vm.Start(std::move(bc_emitter.mBytecode));
 
     gEnginePool->Free(mpFileData);
 

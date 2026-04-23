@@ -27,11 +27,11 @@ static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
 }
 
 
-AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const std::string& path)
+AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const String& path)
 {
     TSRef<AxImage> image(asset);
 
-    const char* c_path = path.c_str();
+    const char* c_path = path.CStr();
 
     FILE* fp = fopen(c_path, "rb");
 
