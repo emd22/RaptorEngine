@@ -2,5 +2,7 @@
 proc ScriptEntry() float
 {
     local float x = 2.5;
-    return x;
+    local float y = 10.0;
+    local float z = x + y;
+    return z;
 }

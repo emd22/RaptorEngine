@@ -158,13 +158,14 @@ void ScriptVM::Push16(uint16 value)
     StackPointer += sizeof(uint16);
 }
 
-void ScriptVM::Push32(uint32 value)
+void ScriptVM::Push32(eFoxType type, uint32 value)
 {
     uint32* dptr = reinterpret_cast<uint32*>(Stack + StackPointer);
     (*dptr) = value;
 
     LogInfo("Push32: {}", value);
 
+    LastPushType = type;
     StackPointer += sizeof(uint32);
 }
 
@@ -241,20 +242,16 @@ VMScope& ScriptVM::ThisScope() { return Scopes[ScopeIndex]; }
 void ScriptVM::DoPush(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPush_Int32) {
-        LastPushType = FoxValue::eValueType::INT;
-        Push32(Read32());
+        Push32(eFoxType::INT, Read32());
     }
     else if (op_spec == BcSpecPush_Float32) {
-        LastPushType = FoxValue::eValueType::FLOAT;
-        Push32(Read32());
+        Push32(eFoxType::FLOAT, Read32());
     }
     else if (op_spec == BcSpecPush_Var) {
         uint16 var_index = Read16();
 
         VMVariable& var = ThisScope().Variables[var_index];
-        LastPushType = var.Value.Type;
-
-        Push32(var.Value.Get<int32>());
+        Push32(var.Value.Type, var.Value.Get<int32>());
     }
 }
 
@@ -277,8 +274,7 @@ void ScriptVM::DoArith(uint8 op_base, uint8 op_spec)
         int32 result = a + b;
 
         LogInfo("Addition result: {}", result);
-
-        Push32(static_cast<uint32>(result));
+        Push32(eFoxType::INT, static_cast<uint32>(result));
     }
 
     else if (op_spec == BcSpecArith_Add_Float32) {
@@ -288,9 +284,8 @@ void ScriptVM::DoArith(uint8 op_base, uint8 op_spec)
 
         float32 result = a + b;
 
-        LogInfo("Addition result: {}", result);
-
-        Push32(static_cast<uint32>(result));
+        LogInfo("Addition result (float32): {}", result);
+        Push32(eFoxType::FLOAT, std::bit_cast<uint32>(result));
     }
 }
 
@@ -326,7 +321,16 @@ void ScriptVM::DoJump(uint8 op_base, uint8 op_spec)
         --ScopeIndex;
         mPC = ReturnAddress;
     }
-    else if (op_spec == BcSpecJump_ReturnToCaller_Value) {
+    else if (op_spec == BcSpecJump_ReturnToCaller_Int32) {
+        LastPushType = eFoxType::INT;
+
+        LogInfo("Returning from scope (valued)...");
+        --ScopeIndex;
+        mbReturnValueOnStack = true;
+        mPC = ReturnAddress;
+    }
+    else if (op_spec == BcSpecJump_ReturnToCaller_Float32) {
+        LastPushType = eFoxType::FLOAT;
         LogInfo("Returning from scope (valued)...");
         --ScopeIndex;
         mbReturnValueOnStack = true;
@@ -426,6 +430,13 @@ void ScriptVM::DoVariable(uint8 op_base, uint8 op_spec)
         LogInfo("VSET [int32] ${}, {}", var_index, value);
 
         ThisScope().Variables[var_index].Value.Set<int32>(value);
+    }
+    else if (op_spec == BcSpecVariable_Set_Float32) {
+        uint16 var_index = Read16();
+        float32 value = std::bit_cast<float32>(Read32());
+        LogInfo("VSET [float32] ${}, {}", var_index, value);
+
+        ThisScope().Variables[var_index].Value.Set<float32>(value);
     }
     else if (op_spec == BcSpecVariable_Set_Var) {
         VarIndex dst_index = Read16();

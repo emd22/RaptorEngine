@@ -53,7 +53,7 @@ public:
     FoxValue CallFunction(VMSymbol* sym);
 
     void Push16(uint16 value);
-    void Push32(uint32 value);
+    void Push32(eFoxType type, uint32 value);
 
     uint32 Pop32();
 
@@ -102,12 +102,12 @@ private:
     int mCallFrameIndex = 0;
 
     bool mIsInParams = false;
-    PagedArray<FoxValue::eValueType> mPushedTypes;
+    PagedArray<eFoxType> mPushedTypes;
 
     bool mbReturnValueOnStack = false;
-    FoxValue::eValueType LastPushType = FoxValue::eValueType::NONETYPE;
+    eFoxType LastPushType = eFoxType::NONETYPE;
 
-    FoxValue::eValueType mCurrentType = FoxValue::NONETYPE;
+    eFoxType mCurrentType = eFoxType::NONETYPE;
 };
 
 

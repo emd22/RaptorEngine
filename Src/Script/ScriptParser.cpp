@@ -162,8 +162,6 @@ FoxAstNode* FoxScript::TryParseKeyword(FoxAstBlock* parent_block)
     // help [name of function] ;
     constexpr Hash32 kw_help = HashStr32("help");
 
-    LogInfo("TK = {}, TK HASH = {}, PROC HASH = {}", tk.GetStr(), hash, kw_proc);
-
     // extern [name of function] ;
 
     if (hash == kw_proc) {
@@ -263,9 +261,11 @@ FoxAstVarDecl* FoxScript::InternalVarDeclare(Token* name_token, Token* type_toke
     // Allocate the declaration node
     FoxAstVarDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstVarDecl);
 
-    node->Name = name_token;
-    node->pType = type_token;
-    node->DefineAsGlobal = (scope == &mScopes[0]);
+    node->pNameToken = name_token;
+    node->pTypeToken = type_token;
+    node->Type = LabelToType(type_token);
+
+    node->bDefineAsGlobal = (scope == &mScopes[0]);
 
     // Push the variable to the scope
     FoxVar var { name_token, type_token, scope };
@@ -285,13 +285,15 @@ FoxAstVarDecl* FoxScript::ParseVarDeclare(FoxScope* scope)
 
     FoxAstVarDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstVarDecl);
 
-    node->Name = &name;
-    node->pType = &type;
-    node->DefineAsGlobal = (scope == &mScopes[0]);
+    node->pNameToken = &name;
+    node->pTypeToken = &type;
+    node->Type = LabelToType(node->pTypeToken);
+
+    node->bDefineAsGlobal = (scope == &mScopes[0]);
 
     FoxVar var { &type, &name, scope };
 
-    node->Assignment = TryParseAssignment(node->Name);
+    node->pAssignment = TryParseAssignment(node->pNameToken);
     /*if (node->Assignment) {
         var.Value = node->Assignment->Value;
     }*/
@@ -408,7 +410,7 @@ void FoxScript::Execute()
         LogInfo("Found entrypoint! {}", entrypoint->Offset);
         FoxValue value = vm.CallFunction(entrypoint);
 
-        LogInfo("RETURN VALUE: {}", value);
+        LogInfo("RETURN VALUE: {}, {}", value, static_cast<int32>(value.Type));
     }
 
 
@@ -427,7 +429,7 @@ FoxValue FoxScript::ParseValue()
         FoxVar* var = FindVar(token.GetHash());
 
         if (var) {
-            value.Type = FoxValue::REF;
+            value.Type = eFoxType::REF;
 
             FoxAstVarRef* var_ref = FX_SCRIPT_ALLOC_NODE(FoxAstVarRef);
             var_ref->pName = var->Name;
@@ -454,17 +456,17 @@ FoxValue FoxScript::ParseValue()
     switch (token_type) {
     case TT::Integer:
         EatToken(TT::Integer);
-        value.Type = FoxValue::INT;
+        value.Type = eFoxType::INT;
         value.ValueInt = token.ToInt();
         break;
     case TT::Float:
         EatToken(TT::Float);
-        value.Type = FoxValue::FLOAT;
+        value.Type = eFoxType::FLOAT;
         value.ValueFloat = token.ToFloat();
         break;
     case TT::String:
         EatToken(TT::String);
-        value.Type = FoxValue::STRING;
+        value.Type = eFoxType::STRING;
         value.ValueString = token.GetHeapStr();
         break;
     default:;
@@ -553,20 +555,20 @@ FoxAstNode* FoxScript::ParseRhs()
     return lhs;
 }
 
-FoxValue::eValueType FoxScript::LabelToType(Token* token)
+eFoxType FoxScript::LabelToType(Token* token)
 {
     static constexpr Hash32 scIntType = HashStr32("int");
     static constexpr Hash32 scFloatType = HashStr32("float");
 
     switch (token->GetHash()) {
     case scIntType:
-        return FoxValue::eValueType::INT;
+        return eFoxType::INT;
     case scFloatType:
-        return FoxValue::eValueType::FLOAT;
+        return eFoxType::FLOAT;
     default:;
     }
 
-    return FoxValue::eValueType::NONETYPE;
+    return eFoxType::NONETYPE;
 }
 
 FoxAstAssign* FoxScript::TryParseAssignment(Token* var_name)
@@ -702,8 +704,6 @@ FoxAstNode* FoxScript::ParseStatement(FoxAstBlock* parent_block)
     }
 
     RETURN_IF_NO_TOKENS(nullptr);
-
-    LogInfo("PARSE STMT {}", mTokens.Size());
 
     if (GetToken().Type == TT::Dollar) {
         EatToken(TT::Dollar);
@@ -1052,7 +1052,7 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
     else if (node->NodeType == FX_AST_VARDECL) {
         FoxAstVarDecl* vardecl = reinterpret_cast<FoxAstVarDecl*>(node);
 
-        Do(vardecl->Assignment);
+        Do(vardecl->pAssignment);
 
         FX_SCRIPT_FREE(FoxAstVarDecl, vardecl);
     }

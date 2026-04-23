@@ -60,7 +60,7 @@ public:
 
 private:
     void EmitBlock(FoxAstBlock* block, int params_to_save, bool is_function_body);
-    void EmitFunction(FoxAstFunctionDecl* function);
+    void EmitFunctionDeclaration(FoxAstFunctionDecl* function);
     void EmitFunctionDefinitionsInBlock(FoxAstBlock* block);
     void DoFunctionCall(FoxAstFunctionCall* call);
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
@@ -82,7 +82,7 @@ private:
     void EmitPushVar(VarIndex var);
 
     void EmitPushVarOrLiteral(FoxAstNode* node);
-    FoxValue::eValueType GetVarOrLiteralType(FoxAstNode* node);
+    eFoxType GetVarOrLiteralType(FoxAstNode* node);
 
     void EmitStackAlloc(uint16 size);
 
@@ -104,8 +104,8 @@ private:
     void EmitJumpCallAbsolute(uint32 position);
 
     void EmitJumpReturnToCaller();
-    void EmitJumpReturnToCallerValue();
-    void EmitJumpReturnToCallerInt32(int32 value);
+    void EmitJumpReturnToCallerInt32();
+    void EmitJumpReturnToCallerFloat32();
 
     void EmitJumpCallExternal(Hash32 hashed_name);
 
@@ -126,7 +126,7 @@ private:
     void EmitMoveReg32(FoxIRRegister dest_reg, FoxIRRegister src_reg);
 
     void EmitParamsStart();
-    void EmitType(FoxValue::eValueType type);
+    void EmitType(eFoxType type);
 
     uint32 EmitDataString(char* str, uint16 length);
 
@@ -173,6 +173,8 @@ private:
 
     uint16 mVarsInScope = 0;
     uint16 mScopeIndex = 0;
+
+    FoxAstFunctionDecl* mpCurrentFunctionBody = nullptr;
 
     bool mEntryPointEmitted = false;
 };

@@ -7,10 +7,10 @@ namespace fx::script {
 const FoxValue FoxValue::scNone = FoxValue(0);
 
 
-FoxValue::eValueType FoxAstFunctionCall::GetReturnType() const
+eFoxType FoxAstFunctionCall::GetReturnType() const
 {
     if (!pFunction || !pFunction->pDeclaration) {
-        return FoxValue::eValueType::NONETYPE;
+        return eFoxType::NONETYPE;
     }
 
     return pFunction->pDeclaration->ReturnType;
@@ -51,9 +51,9 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         FoxAstVarDecl* vardecl = reinterpret_cast<FoxAstVarDecl*>(node);
 
         printf("[VARDECL] ");
-        vardecl->Name->Print();
+        vardecl->pNameToken->Print();
 
-        Print(vardecl->Assignment, depth + 1);
+        Print(vardecl->pAssignment, depth + 1);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
         FoxAstAssign* assign = reinterpret_cast<FoxAstAssign*>(node);

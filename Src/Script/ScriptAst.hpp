@@ -3,7 +3,18 @@
 #include <Core/Types.hpp>
 #include <Util/Tokenizer.hpp>
 
-namespace fx::script {
+namespace fx {
+
+enum class eFoxType : uint16
+{
+    NONETYPE,
+    INT,
+    FLOAT,
+    STRING,
+    REF,
+};
+
+namespace script {
 
 struct FoxAstVarRef;
 struct FoxScope;
@@ -47,17 +58,8 @@ struct FoxValue
 {
     static const FoxValue scNone;
 
-    enum eValueType : uint16
-    {
-        NONETYPE = 0x00,
-        INT = 0x01,
-        FLOAT = 0x02,
-        STRING = 0x04,
-        VEC3 = 0x08,
-        REF = 0x10
-    };
 
-    eValueType Type = NONETYPE;
+    eFoxType Type = eFoxType::NONETYPE;
 
     union
     {
@@ -71,42 +73,43 @@ struct FoxValue
 
     FoxValue() {}
 
-    explicit FoxValue(int value) : Type(eValueType::INT), ValueInt(value) {}
-    explicit FoxValue(float value) : Type(eValueType::FLOAT), ValueFloat(value) {}
+    explicit FoxValue(int value) : Type(eFoxType::INT), ValueInt(value) {}
+    explicit FoxValue(float value) : Type(eFoxType::FLOAT), ValueFloat(value) {}
 
-    static FoxValue NumberFromRaw(eValueType type, uint32 raw_value)
+    static FoxValue NumberFromRaw(eFoxType type, uint32 raw_value)
     {
         FoxValue value = FoxValue::scNone;
 
         switch (type) {
-        case eValueType::INT:
+        case eFoxType::INT:
             value.ValueInt = std::bit_cast<int32>(raw_value);
             value.Type = type;
             break;
 
-        case eValueType::FLOAT:
+        case eFoxType::FLOAT:
             value.ValueFloat = std::bit_cast<float32>(raw_value);
             value.Type = type;
             break;
         default:
             break;
         }
+
         return value;
     }
 
     FoxValue(const FoxValue& other)
     {
         Type = other.Type;
-        if (other.Type == INT) {
+        if (other.Type == eFoxType::INT) {
             ValueInt = other.ValueInt;
         }
-        else if (other.Type == FLOAT) {
+        else if (other.Type == eFoxType::FLOAT) {
             ValueFloat = other.ValueFloat;
         }
-        else if (other.Type == STRING) {
+        else if (other.Type == eFoxType::STRING) {
             ValueString = other.ValueString;
         }
-        else if (other.Type == REF) {
+        else if (other.Type == eFoxType::REF) {
             pValueRef = other.pValueRef;
         }
     }
@@ -114,19 +117,19 @@ struct FoxValue
     void Print() const
     {
         printf("[Value: ");
-        if (Type == NONETYPE) {
+        if (Type == eFoxType::NONETYPE) {
             printf("Null]\n");
         }
-        else if (Type == INT) {
+        else if (Type == eFoxType::INT) {
             printf("Int, %d]\n", ValueInt);
         }
-        else if (Type == FLOAT) {
+        else if (Type == eFoxType::FLOAT) {
             printf("Float, %f]\n", ValueFloat);
         }
-        else if (Type == STRING) {
+        else if (Type == eFoxType::STRING) {
             printf("String, %s]\n", ValueString);
         }
-        else if (Type == REF) {
+        else if (Type == eFoxType::REF) {
             printf("Ref, %p]\n", pValueRef);
         }
     }
@@ -141,14 +144,14 @@ struct FoxValue
     template <>
     void Set<int32>(int32 value)
     {
-        Type = eValueType::INT;
+        Type = eFoxType::INT;
         ValueInt = value;
     }
 
     template <>
     void Set<float32>(float32 value)
     {
-        Type = eValueType::FLOAT;
+        Type = eFoxType::FLOAT;
         ValueFloat = value;
     }
 
@@ -172,9 +175,9 @@ struct FoxValue
     }
 
 
-    inline bool IsNumber() { return (Type == INT || Type == FLOAT); }
+    inline bool IsNumber() { return (Type == eFoxType::INT || Type == eFoxType::FLOAT); }
 
-    inline bool IsRef() { return (Type == REF); }
+    inline bool IsRef() { return (Type == eFoxType::REF); }
 };
 
 enum FoxAstType
@@ -252,12 +255,14 @@ struct FoxAstVarDecl : public FoxAstNode
 {
     FoxAstVarDecl() { this->NodeType = FX_AST_VARDECL; }
 
-    Token* Name = nullptr;
-    Token* pType = nullptr;
-    FoxAstAssign* Assignment = nullptr;
+    Token* pNameToken = nullptr;
+    Token* pTypeToken = nullptr;
+    eFoxType Type = eFoxType::INT;
+
+    FoxAstAssign* pAssignment = nullptr;
 
     /// Ignore the scope that the variable is declared in, force it to be global.
-    bool DefineAsGlobal = false;
+    bool bDefineAsGlobal = false;
 };
 
 struct FoxAstDocComment : public FoxAstNode
@@ -275,7 +280,7 @@ struct FoxAstFunctionDecl : public FoxAstNode
     FoxAstBlock* pParams = nullptr;
     FoxAstBlock* pBlock = nullptr;
 
-    FoxValue::eValueType ReturnType = FoxValue::eValueType::NONETYPE;
+    eFoxType ReturnType = eFoxType::NONETYPE;
 
     uint32 SymbolTableOffset = 0;
 
@@ -293,7 +298,7 @@ struct FoxAstFunctionCall : public FoxAstNode
 {
     FoxAstFunctionCall() { this->NodeType = FX_AST_PROCCALL; }
 
-    FoxValue::eValueType GetReturnType() const;
+    eFoxType GetReturnType() const;
 
     FoxFunction* pFunction = nullptr;
     Hash32 HashedName = HashNull32;
@@ -349,7 +354,7 @@ public:
 struct FoxBytecodeVarHandle
 {
     Hash32 HashedName = HashNull32;
-    FoxValue::eValueType Type = FoxValue::INT;
+    eFoxType Type = eFoxType::INT;
     int64 Offset = 0;
 
     FoxIRRegister Register = FX_IR_NONE;
@@ -366,7 +371,10 @@ struct FoxBytecodeFunctionHandle
     uint32 BytecodeIndex = 0;
 };
 
-} // namespace fx::script
+} // namespace script
+
+} // namespace fx
+
 
 template <>
 struct std::formatter<fx::script::FoxValue>
@@ -375,7 +383,7 @@ struct std::formatter<fx::script::FoxValue>
 
     auto format(const fx::script::FoxValue& obj, std::format_context& ctx) const
     {
-        using VT = fx::script::FoxValue::eValueType;
+        using VT = fx::eFoxType;
 
         if (obj.Type == VT::NONETYPE) {
             return std::format_to(ctx.out(), "Null");

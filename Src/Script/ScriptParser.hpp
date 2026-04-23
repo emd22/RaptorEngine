@@ -87,7 +87,7 @@ public:
 
     void DefineExternalVar(const char* type, const char* name, const FoxValue& value);
 
-    FoxValue::eValueType LabelToType(Token* token);
+    eFoxType LabelToType(Token* token);
 
 private:
     template <typename T>
