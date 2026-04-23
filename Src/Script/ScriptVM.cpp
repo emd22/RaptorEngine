@@ -246,7 +246,7 @@ void ScriptVM::DoPush(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecPush_Var) {
         uint16 var_index = Read16();
-        Push32(ThisScope().Variables[var_index].IntValue);
+        Push32(ThisScope().Variables[var_index].Value.Get<uint32>());
     }
 }
 
@@ -254,7 +254,7 @@ void ScriptVM::DoPop(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPop_Variable_Int32) {
         uint16 var_index = Read16();
-        ThisScope().Variables[var_index].IntValue = Pop32();
+        ThisScope().Variables[var_index].Value.Set<uint32>(Pop32());
     }
 }
 
@@ -267,6 +267,18 @@ void ScriptVM::DoArith(uint8 op_base, uint8 op_spec)
         int32 b = static_cast<int32>(Pop32());
 
         int32 result = a + b;
+
+        LogInfo("Addition result: {}", result);
+
+        Push32(static_cast<uint32>(result));
+    }
+
+    else if (op_spec == BcSpecArith_Add_Float32) {
+        // Pull values off the stack, push result back onto stack
+        float32 a = std::bit_cast<float32>(Pop32());
+        float32 b = std::bit_cast<float32>(Pop32());
+
+        float32 result = a + b;
 
         LogInfo("Addition result: {}", result);
 
@@ -405,20 +417,20 @@ void ScriptVM::DoVariable(uint8 op_base, uint8 op_spec)
         uint32 value = Read32();
         LogInfo("VSET [int32] ${}, {}", var_index, value);
 
-        ThisScope().Variables[var_index].IntValue = value;
+        ThisScope().Variables[var_index].Value.Set<uint32>(value);
     }
     else if (op_spec == BcSpecVariable_Set_Var) {
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
-        ThisScope().Variables[dst_index].IntValue = ThisScope().Variables[src_index].IntValue;
+        ThisScope().Variables[dst_index].Value = ThisScope().Variables[src_index].Value;
     }
-    else if (op_spec == BcSpecVariable_Define_Int32) {
+    else if (op_spec == BcSpecVariable_Define) {
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
 
         ThisScope().Variables[var_index].NameHash = name_hash;
-        ThisScope().Variables[var_index].IntValue = 0;
+        ThisScope().Variables[var_index].Value.Set<uint32>(0);
 
         LogInfo("Define variable {}", var_index);
     }

@@ -21,8 +21,7 @@ struct ScriptVMCallFrame
 struct VMVariable
 {
     Hash32 NameHash = HashNull32;
-
-    uint32 IntValue = 0;
+    FoxValue Value;
 };
 
 

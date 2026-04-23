@@ -4,13 +4,13 @@
 
 namespace fx::script {
 
-Token* FoxAstFunctionCall::GetReturnType() const
+FoxValue::eValueType FoxAstFunctionCall::GetReturnType() const
 {
-    if (!pFunction || !pFunction->pDeclaration->pReturnVar) {
-        return nullptr;
+    if (!pFunction || !pFunction->pDeclaration) {
+        return FoxValue::eValueType::NONETYPE;
     }
 
-    return pFunction->pDeclaration->pReturnVar->pType;
+    return pFunction->pDeclaration->ReturnType;
 }
 
 void FoxAstPrinter::Print(FoxAstNode* node, int depth)
@@ -36,13 +36,13 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
     else if (node->NodeType == FX_AST_PROCDECL) {
         FoxAstFunctionDecl* functiondecl = reinterpret_cast<FoxAstFunctionDecl*>(node);
         printf("[PROCDECL] ");
-        functiondecl->Name->Print();
+        functiondecl->pNameToken->Print();
 
-        for (FoxAstNode* param : functiondecl->Params->Statements) {
+        for (FoxAstNode* param : functiondecl->pParams->Statements) {
             Print(param, depth + 1);
         }
 
-        Print(functiondecl->Block, depth + 1);
+        Print(functiondecl->pBlock, depth + 1);
     }
     else if (node->NodeType == FX_AST_VARDECL) {
         FoxAstVarDecl* vardecl = reinterpret_cast<FoxAstVarDecl*>(node);

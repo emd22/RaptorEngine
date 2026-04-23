@@ -1,10 +1,6 @@
 
-proc tfunc() int
+proc ScriptEntry() float
 {
-    return 5;
-}
-
-proc ScriptEntry() int
-{
-    return tfunc() + 2;
+    local float x = 2.5;
+    return x;
 }

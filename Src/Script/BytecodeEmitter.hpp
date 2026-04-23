@@ -71,8 +71,6 @@ private:
 
     void EmitSymbolTable(FoxAstBlock* root);
 
-    FoxIRRegister EmitVarFetch(FoxAstVarRef* ref, RhsMode mode);
-
     uint16 GetSizeOfType(Token* type);
 
     void DoLoad(uint32 stack_offset, FoxIRRegister output_reg, bool force_absolute = false);
@@ -80,9 +78,11 @@ private:
     void DoSaveReg32(uint32 stack_offset, FoxIRRegister reg, bool force_absolute = false);
 
     void EmitPush32(uint32 value);
-    void EmitPush32r(FoxIRRegister reg);
+    void EmitPushFloat32(float32 value);
     void EmitPushVar(VarIndex var);
+
     void EmitPushVarOrLiteral(FoxAstNode* node);
+    FoxValue::eValueType GetVarOrLiteralType(FoxAstNode* node);
 
     void EmitStackAlloc(uint16 size);
 
@@ -111,13 +111,12 @@ private:
 
     void EmitReturn(FoxAstReturn* return_node);
 
-    void EmitVariableGetInt32(uint16 var_index, FoxIRRegister dest_reg);
     void EmitVariableSetInt32(uint16 var_index, int32 value);
-    void EmitVariableSetReg32(uint16 var_index, FoxIRRegister reg);
+    void EmitVariableSetFloat32(uint16 var_index, float32 value);
     void EmitVariableSetVar(VarIndex dst, VarIndex src);
 
 
-    void EmitVariableDefineInt32(uint16 var_index, Hash32 name_hash);
+    void EmitVariableDefine(uint16 var_index, Hash32 name_hash);
     void EmitVariableIndex(uint16 var_index);
 
     void EmitMoveInt32(FoxIRRegister reg, uint32 value);
@@ -133,9 +132,7 @@ private:
     void EmitRhs(FoxAstNode* rhs, RhsMode mode, FoxBytecodeVarHandle* handle);
 
     FoxIRRegister EmitRhsToRegister(FoxAstNode* rhs, FoxIRRegister dest_register, bool auto_register = false);
-    // FoxIRRegister EmitRhs(FoxAstNode* rhs, RhsMode mode, FoxBytecodeVarHandle* handle);
-
-    FoxIRRegister EmitLiteralInt(FoxAstLiteral* literal, RhsMode mode, FoxBytecodeVarHandle* handle);
+    // FoxIRRegister EmitRhs(FoxAstNode* rhs, RhsMode mode, FoxBytecodeVarHandle* handle
     FoxIRRegister EmitLiteralString(FoxAstLiteral* literal, RhsMode mode, FoxBytecodeVarHandle* handle);
 
     void EmitMarker(BcSpecMarker spec);

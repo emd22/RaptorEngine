@@ -553,6 +553,22 @@ FoxAstNode* FoxScript::ParseRhs()
     return lhs;
 }
 
+FoxValue::eValueType FoxScript::LabelToType(Token* token)
+{
+    static constexpr Hash32 scIntType = HashStr32("int");
+    static constexpr Hash32 scFloatType = HashStr32("float");
+
+    switch (token->GetHash()) {
+    case scIntType:
+        return FoxValue::eValueType::INT;
+    case scFloatType:
+        return FoxValue::eValueType::FLOAT;
+    default:;
+    }
+
+    return FoxValue::eValueType::NONETYPE;
+}
+
 FoxAstAssign* FoxScript::TryParseAssignment(Token* var_name)
 {
     if (GetToken().Type != TT::Equals) {
@@ -786,7 +802,7 @@ FoxAstFunctionDecl* FoxScript::ParseProcedureDeclare()
     // Name of the function
     Token& name = EatToken(TT::Identifier);
 
-    node->Name = &name;
+    node->pNameToken = &name;
 
     PushScope();
     EatToken(TT::LParen);
@@ -807,30 +823,21 @@ FoxAstFunctionDecl* FoxScript::ParseProcedureDeclare()
 
     EatToken(TT::RParen);
 
-    // Parse the return type
-    /*if (GetToken().Type != TT::LBrace) {
-        FoxAstVarDecl* return_decl = ParseVarDeclare();
-        node->ReturnVar = return_decl;
-    }*/
-
     // Check to see if there is a return type provided
     if (GetToken().Type != TT::LBrace) {
-        // There is a return type, declare the __ReturnVal__ variable
+        node->ReturnType = LabelToType(&EatToken(TT::Identifier));
 
-        // Get the token for the type
-        Token& type_token = EatToken(TT::Identifier);
-
-        FoxAstVarDecl* return_decl = InternalVarDeclare(mTokenReturnVar, &type_token);
-        node->pReturnVar = return_decl;
+        // FoxAstVarDecl* return_decl = InternalVarDeclare(mTokenReturnVar, &type_token);
+        // node->pReturnVar = return_decl;
     }
 
 
-    node->Block = ParseBlock();
+    node->pBlock = ParseBlock();
     PopScope();
 
-    node->Params = params;
+    node->pParams = params;
 
-    FoxFunction function(&name, mCurrentScope, node->Block, node);
+    FoxFunction function(&name, mCurrentScope, node->pBlock, node);
     mCurrentScope->Functions.Insert(function);
 
     return node;
@@ -887,7 +894,7 @@ FoxAstFunctionDecl* FoxScript::ParseExtfnDeclare()
     // Name of the function
     Token& name = EatToken(TT::Identifier);
 
-    node->Name = &name;
+    node->pNameToken = &name;
 
     PushScope();
     EatToken(TT::LParen);
@@ -915,42 +922,14 @@ FoxAstFunctionDecl* FoxScript::ParseExtfnDeclare()
     }*/
 
 
-    // Parse clobber list
-
-    constexpr Hash32 clobber_hash = HashStr32("CLOBBERS");
-
     // Check to see if there is a return type provided
-    if (GetToken().Type != TT::Semicolon && GetToken().GetHash() != clobber_hash) {
-        // There is a return type, declare the __ReturnVal__ variable
-
-        // Get the token for the type
-        Token& type_token = EatToken(TT::Identifier);
-
-        FoxAstVarDecl* return_decl = InternalVarDeclare(mTokenReturnVar, &type_token);
-        node->pReturnVar = return_decl;
-    }
-
-    // Check if there is a clobber list provided
-    if (GetToken().Type == TT::Identifier && GetToken().GetHash() == clobber_hash) {
-        EatToken(TT::Identifier);
-
-
-        while (1) {
-            FoxIRRegister reg = IrRegisterFromToken(EatToken(TT::Identifier));
-            node->ClobberList.push_back(reg);
-
-            if (GetToken().Type == TT::Comma) {
-                EatToken(TT::Comma);
-                continue;
-            }
-
-            break;
-        }
+    if (GetToken().Type != TT::Semicolon) {
+        node->ReturnType = LabelToType(&EatToken(TT::Identifier));
     }
 
     PopScope();
 
-    node->Params = params;
+    node->pParams = params;
 
     FoxFunction function(&name, mCurrentScope, nullptr, node);
     mCurrentScope->Functions.Insert(function);
@@ -1062,11 +1041,11 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
     else if (node->NodeType == FX_AST_PROCDECL) {
         FoxAstFunctionDecl* functiondecl = reinterpret_cast<FoxAstFunctionDecl*>(node);
 
-        for (FoxAstNode* param : functiondecl->Params->Statements) {
+        for (FoxAstNode* param : functiondecl->pParams->Statements) {
             Do(param);
         }
 
-        Do(functiondecl->Block);
+        Do(functiondecl->pBlock);
 
         FX_SCRIPT_FREE(FoxAstFunctionDecl, functiondecl);
     }

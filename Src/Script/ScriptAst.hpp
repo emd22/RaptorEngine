@@ -45,7 +45,7 @@ enum FoxIRRegister : uint8
 
 struct FoxValue
 {
-    static FoxValue None;
+    static FoxValue scNone;
 
     enum eValueType : uint16
     {
@@ -71,9 +71,8 @@ struct FoxValue
 
     FoxValue() {}
 
-    explicit FoxValue(eValueType type, int value) : Type(type), ValueInt(value) {}
-
-    explicit FoxValue(eValueType type, float value) : Type(type), ValueFloat(value) {}
+    explicit FoxValue(int value) : Type(eValueType::INT), ValueInt(value) {}
+    explicit FoxValue(float value) : Type(eValueType::FLOAT), ValueFloat(value) {}
 
     FoxValue(const FoxValue& other)
     {
@@ -111,6 +110,47 @@ struct FoxValue
             printf("Ref, %p]\n", pValueRef);
         }
     }
+
+    /////////////////////////////////////
+    // Value set functions
+    /////////////////////////////////////
+
+    template <typename T>
+    void Set(T value);
+
+    template <>
+    void Set<uint32>(uint32 value)
+    {
+        Type = eValueType::INT;
+        ValueInt = value;
+    }
+
+    template <>
+    void Set<float32>(float32 value)
+    {
+        Type = eValueType::FLOAT;
+        ValueFloat = value;
+    }
+
+    /////////////////////////////////////
+    // Value get functions
+    /////////////////////////////////////
+
+    template <typename T>
+    T Get() const;
+
+    template <>
+    uint32 Get<uint32>() const
+    {
+        return ValueInt;
+    }
+
+    template <>
+    float32 Get<float32>() const
+    {
+        return ValueFloat;
+    }
+
 
     inline bool IsNumber() { return (Type == INT || Type == FLOAT); }
 
@@ -211,14 +251,14 @@ struct FoxAstFunctionDecl : public FoxAstNode
 {
     FoxAstFunctionDecl() { this->NodeType = FX_AST_PROCDECL; }
 
-    Token* Name = nullptr;
-    FoxAstVarDecl* pReturnVar = nullptr;
-    FoxAstBlock* Params = nullptr;
-    FoxAstBlock* Block = nullptr;
+    Token* pNameToken = nullptr;
+    FoxAstBlock* pParams = nullptr;
+    FoxAstBlock* pBlock = nullptr;
+
+    FoxValue::eValueType ReturnType = FoxValue::eValueType::NONETYPE;
 
     uint32 SymbolTableOffset = 0;
 
-    std::vector<FoxIRRegister> ClobberList;
     std::vector<FoxAstDocComment*> DocComments;
 };
 
@@ -233,7 +273,7 @@ struct FoxAstFunctionCall : public FoxAstNode
 {
     FoxAstFunctionCall() { this->NodeType = FX_AST_PROCCALL; }
 
-    Token* GetReturnType() const;
+    FoxValue::eValueType GetReturnType() const;
 
     FoxFunction* pFunction = nullptr;
     Hash32 HashedName = HashNull32;

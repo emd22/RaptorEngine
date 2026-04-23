@@ -87,6 +87,8 @@ public:
 
     void DefineExternalVar(const char* type, const char* name, const FoxValue& value);
 
+    FoxValue::eValueType LabelToType(Token* token);
+
 private:
     template <typename T>
         requires std::is_base_of_v<FoxLabelledData, T>
