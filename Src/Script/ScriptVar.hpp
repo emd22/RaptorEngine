@@ -87,7 +87,7 @@ struct FoxVar : public FoxLabelledData
 
         Name = nullptr;
         Type = nullptr;
-        HashedName = 0;
+        HashedName = HashNull32;
 
         return *this;
     }

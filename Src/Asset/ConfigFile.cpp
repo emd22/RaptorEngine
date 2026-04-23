@@ -186,6 +186,8 @@ void ConfigFile::Load(const std::string& path)
     tokenizer.Tokenize();
 
     Parse(tokenizer.GetTokens());
+
+    gEnginePool->Free(file_buffer.pData);
 }
 
 static ConfigEntry::eValueType GetValueTokenType(const Token& token)

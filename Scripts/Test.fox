@@ -1,0 +1,17 @@
+proc AdditionTest(int x) int
+{
+    local int z = x + 5;
+    return z;
+}
+
+proc Test(int v) int
+{
+    return AdditionTest(10);
+}
+
+
+proc ScriptEntry()
+{
+    Test(15);
+    return;
+}

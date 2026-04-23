@@ -20,7 +20,7 @@ constexpr VarIndex VarIndexNull = UINT16_MAX;
 struct FoxIRFunctionRef
 {
     char* Name = nullptr;
-    uint32 HashedName = 0;
+    uint32 HashedName = HashNull32;
     uint32 Position = 0;
 };
 

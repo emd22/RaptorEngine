@@ -18,12 +18,12 @@
 
 namespace fx::script {
 
-class FoxConfigScript
+class FoxScript
 {
     using TT = eTokenType;
 
 public:
-    FoxConfigScript() = default;
+    FoxScript() = default;
 
     void LoadFile(const char* path);
 
@@ -113,7 +113,7 @@ private:
 
 private:
     PagedArray<FoxScope> mScopes;
-    FoxScope* mCurrentScope;
+    FoxScope* mCurrentScope = nullptr;
 
     // std::vector<FoxExternalFunc> mExternalFuncs;
 
@@ -124,7 +124,7 @@ private:
     bool mHasErrors = false;
     bool mInCommandMode = false;
 
-    char* mFileData;
+    char* mpFileData;
     PagedArray<Token> mTokens = {};
     uint32 mTokenIndex = 0;
 

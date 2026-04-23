@@ -147,6 +147,7 @@ public:
         CurrentPageIndex = other.CurrentPageIndex;
 
         TrackedSize = other.TrackedSize;
+        bDoNotDestroy = other.bDoNotDestroy;
 
         other.pFirstPage = nullptr;
         other.pCurrentPage = nullptr;
@@ -155,6 +156,7 @@ public:
         other.CurrentPageIndex = 0;
 
         other.TrackedSize = 0;
+        other.bDoNotDestroy = false;
 
         return *this;
     }
@@ -436,8 +438,25 @@ public:
             current_page = next_page;
         }
 
+        TrackedSize = 0;
 
+        pCurrentPage = nullptr;
         pFirstPage = nullptr;
+    }
+
+    void PrintDebugInfo() const
+    {
+        LogInfo("");
+        LogInfo("=== Paged Array Debug Info ===");
+        LogInfo("PageNodeCapacity={}", PageNodeCapacity);
+        LogInfo("pFirstPage={:p}", reinterpret_cast<void*>(pFirstPage));
+        LogInfo("pCurrentPage={:p}", reinterpret_cast<void*>(pCurrentPage));
+        if (pCurrentPage) {
+            LogInfo("CurrentPageSize={}", pCurrentPage->Size);
+        }
+        LogInfo("TrackedSize={}", TrackedSize);
+        LogInfo("bDoNotDestroy={}", bDoNotDestroy);
+        LogInfo("");
     }
 
     ~PagedArray()

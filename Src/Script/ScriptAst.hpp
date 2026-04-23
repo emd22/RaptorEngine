@@ -234,7 +234,7 @@ struct FoxAstFunctionCall : public FoxAstNode
     Token* GetReturnType() const;
 
     FoxFunction* pFunction = nullptr;
-    Hash32 HashedName = 0;
+    Hash32 HashedName = HashNull32;
     std::vector<FoxAstNode*> Params {}; // FoxAstLiteral or FoxAstVarRef
 };
 
@@ -286,7 +286,7 @@ public:
 
 struct FoxBytecodeVarHandle
 {
-    Hash32 HashedName = 0;
+    Hash32 HashedName = HashNull32;
     FoxValue::eValueType Type = FoxValue::INT;
     int64 Offset = 0;
 
@@ -300,7 +300,7 @@ struct FoxBytecodeVarHandle
 
 struct FoxBytecodeFunctionHandle
 {
-    Hash32 HashedName = 0;
+    Hash32 HashedName = HashNull32;
     uint32 BytecodeIndex = 0;
 };
 

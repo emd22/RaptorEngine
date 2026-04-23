@@ -38,7 +38,7 @@ public:
         return *this;
     }
 
-    bool operator==(Hash64 hash) const { return mHash == hash; }
+    bool operator==(Hash32 hash) const { return mHash == hash; }
 
     void Clear()
     {

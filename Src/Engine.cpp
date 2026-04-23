@@ -15,6 +15,7 @@ AxManager* gAssetManager = nullptr;
 ObjectManager* gObjectManager = nullptr;
 MaterialManager* gMaterialManager = nullptr;
 MemPool* gEnginePool = nullptr;
+MemPool* gScriptMemPool = nullptr;
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
     delete name_;                                                                                                      \

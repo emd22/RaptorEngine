@@ -1429,7 +1429,7 @@ void FoxBytecodePrinter::DoData(char* s, uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecData_String) {
         uint16 length = Read16();
-        char* data_str = reinterpret_cast<char*>(malloc(length));
+        char* data_str = static_cast<char*>(malloc(length));
         uint16* data_str16 = reinterpret_cast<uint16*>(data_str);
 
         uint32 bytecode_end = mBytecodeIndex + length;
