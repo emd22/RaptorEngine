@@ -8,22 +8,22 @@ class Name
 {
 public:
     Name() = default;
-    Name(const char* name) : mName(name), mHash(HashStr64(name)) {}
-    Name(const std::string& name) : mName(name), mHash(HashStr64(name.c_str())) {}
+    Name(const char* name) : mName(name), mHash(HashStr32(name)) {}
+    Name(const std::string& name) : mName(name), mHash(HashStr32(name.c_str())) {}
 
     const std::string& Get() const { return mName; }
-    Hash64 GetHash() const { return mHash; }
+    Hash32 GetHash() const { return mHash; }
 
     void Set(const std::string& name)
     {
         mName = name;
-        mHash = HashStr64(name.c_str());
+        mHash = HashStr32(name.c_str());
     }
 
     void Set(const char* name)
     {
         mName = name;
-        mHash = HashStr64(name);
+        mHash = HashStr32(name);
     }
 
     Name& operator=(const char* name)
@@ -43,12 +43,12 @@ public:
     void Clear()
     {
         mName.clear();
-        mHash = HashNull64;
+        mHash = HashNull32;
     }
 
 private:
     std::string mName = "";
-    Hash64 mHash = HashNull64;
+    Hash32 mHash = HashNull32;
 };
 
 } // namespace fx

@@ -553,9 +553,21 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Script/Script.cpp.o -c /Users/emd22/Projects/a2/Src/Script/Script.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Script/Script.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/Script.cpp.o"
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Script/BytecodeEmitter.cpp.o -c /Users/emd22/Projects/a2/Src/Script/BytecodeEmitter.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Script/BytecodeEmitter.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/BytecodeEmitter.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Script/ScriptAst.cpp.o -c /Users/emd22/Projects/a2/Src/Script/ScriptAst.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Script/ScriptAst.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/ScriptAst.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Script/ScriptParser.cpp.o -c /Users/emd22/Projects/a2/Src/Script/ScriptParser.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Script/ScriptParser.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/ScriptParser.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

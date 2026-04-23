@@ -106,7 +106,7 @@ void Entity::RecalculateModelMatrix()
                        Mat4f::AsTranslation(mPosition);
     }
 
-    mMatrixUpdateFramesRemaining = FramesInFlight;
+    mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
 
     // mNormalMatrix = mModelMatrix.Inverse().Transposed();
     mbMatrixOutOfDate = false;

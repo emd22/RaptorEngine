@@ -102,7 +102,7 @@ std::string ConfigEntry::AsString(uint32 indent) const
     return this->ConfigValue::AsString();
 }
 
-ConfigEntry* ConfigEntry::GetMember(const Hash64 name_hash) const
+ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 {
     for (ConfigEntry& entry : Members) {
         if (entry.Name == name_hash) {
@@ -399,7 +399,7 @@ void ConfigFile::Parse(PagedArray<Token>& tokens)
     mpTokens = nullptr;
 }
 
-ConfigEntry* ConfigFile::GetEntry(Hash64 requested_name_hash) const
+ConfigEntry* ConfigFile::GetEntry(Hash32 requested_name_hash) const
 {
     for (ConfigEntry& entry : mConfigEntries) {
         if (entry.Name == requested_name_hash) {

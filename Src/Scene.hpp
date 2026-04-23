@@ -41,7 +41,7 @@ public:
         return Ref<LightDirectional>(nullptr);
     }
 
-    TSRef<Object> FindObject(Hash64 name_hash);
+    TSRef<Object> FindObject(Hash32 name_hash);
 
     void Destroy();
 

@@ -79,12 +79,12 @@ public:
         return str;
     }
 
-    Hash64 GetHash()
+    Hash32 GetHash()
     {
-        if (Hash != HashNull64) {
+        if (Hash != HashNull32) {
             return Hash;
         }
-        return (Hash = HashData64(Slice<char>(Start, Length)));
+        return (Hash = HashData32(Slice<char>(Start, Length)));
     }
 
     eIsNumericResult IsNumeric() const;
@@ -127,7 +127,7 @@ public:
     char* Start = nullptr;
     char* End = nullptr;
 
-    Hash64 Hash = HashNull64;
+    Hash32 Hash = HashNull32;
     eTokenType Type = eTokenType::Unknown;
     uint32 Length = 0;
 

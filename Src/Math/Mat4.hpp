@@ -51,7 +51,7 @@ public:
                      Vec4f(data[2], data[6], data[10], data[14]), Vec4f(data[3], data[7], data[11], data[15]));
     }
 
-    static Mat4f AsTranslation(Vec3f position)
+    static Mat4f AsTranslation(const Vec3f& position)
     {
         Mat4f result = Mat4f::sIdentity;
         result.Columns[3].Set(position.X, position.Y, position.Z, 1.0f);
@@ -64,7 +64,7 @@ public:
             position.X, position.Y, position.Z, 1 });*/
     }
 
-    static Mat4f AsScale(Vec3f scale)
+    static Mat4f AsScale(const Vec3f& scale)
     {
         Mat4f result = Mat4f::sIdentity;
 
@@ -82,8 +82,6 @@ public:
     static Mat4f AsRotationZ(float rad);
 
     static Mat4f AsRotation(const Quat& quat);
-
-    void Rotate(const Vec3f& rotation);
 
     void LookAt(const Vec3f& position, const Vec3f& target, const Vec3f& up);
 

@@ -84,6 +84,8 @@ public:
     ePhMotionType mMotionType = ePhMotionType::Static;
 
     bool mbHasPhysicsBody : 1 = false;
+
+    Vec3f Scale = Vec3f::sOne;
 };
 
 } // namespace fx

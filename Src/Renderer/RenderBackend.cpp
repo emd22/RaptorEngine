@@ -586,8 +586,6 @@ void RenderBackend::BeginLighting()
 }
 
 
-static_assert(FramesInFlight == 3);
-
 void RenderBackend::BeginUnlit()
 {
     FrameData* frame = GetFrame();

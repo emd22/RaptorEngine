@@ -15,6 +15,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(VS_STARTUP_PROJECT foxtrot)
 
 option(USE_SIMDE "Use SIMDe to use AVX on a non-AVX platform" OFF)
+option(USE_MOLTENVK "Compile with support for MoltenVK. Defaults to KosmicKrisp on macOS" OFF)
 
 file(GLOB_RECURSE SOURCES
     "Src/*.hpp" "Src/*.inl" "Src/*.cpp"
@@ -94,6 +95,9 @@ if(USE_SIMDE)
     target_compile_definitions(foxtrot PRIVATE FX_USE_SIMDE SIMDE_ENABLE_NATIVE_ALIASES)
 endif()
 
+if(USE_MOLTENVK)
+    target_compile_definitions(foxtrot PRIVATE FX_USE_PORTABILITY_EXTENSION)
+endif()
 
 if(MSVC)
     target_compile_options(foxtrot PRIVATE
