@@ -18,7 +18,7 @@ public:
 
     AxLoaderStb() = default;
 
-    Status LoadFromFile(TSRef<AxBase> asset, const std::string& path) override;
+    Status LoadFromFile(TSRef<AxBase> asset, const String& path) override;
     Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
     void Destroy(TSRef<AxBase>& asset) override;

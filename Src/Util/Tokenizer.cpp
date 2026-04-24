@@ -288,7 +288,7 @@ void Tokenizer::IncludeFile(const char* path)
     // Tokenize all of the included file
     Tokenize();
 
-    gEnginePool->Free<char>(mpData);
+    // gEnginePool->Free<char>(mpData);
 
     // Restore back to previous state
     RestoreState();
@@ -305,7 +305,6 @@ void Tokenizer::Tokenize()
     current_token.Start = mpData;
 
     bool in_comment = false;
-    bool is_doccomment = false;
 
     char ch;
 
@@ -320,15 +319,6 @@ void Tokenizer::Tokenize()
             in_comment = true;
 
             ++mpData;
-            if (*(++mpData) == '?') {
-                while ((ch = *(++mpData))) {
-                    if (isalnum(ch) || ch == '\n') {
-                        current_token.Start = mpData;
-                        break;
-                    }
-                }
-                is_doccomment = true;
-            }
         }
 
         if (ch == '/' && ((mpData + 1) < mpDataEnd) && ((*(mpData + 1)) == '*')) {
@@ -350,19 +340,7 @@ void Tokenizer::Tokenize()
         if (in_comment) {
             if (!IsNewline(ch)) {
                 ++mpData;
-                if (is_doccomment) {
-                    current_token.Increment();
-                }
                 continue;
-            }
-
-            if (is_doccomment) {
-                current_token.Type = eTokenType::DocComment;
-                SubmitTokenIfData(current_token);
-
-                current_token.Type = eTokenType::Unknown;
-
-                is_doccomment = false;
             }
 
             // We hit a newline, mark as no longer in comment
@@ -410,6 +388,7 @@ void Tokenizer::Tokenize()
         mpData++;
         current_token.Increment();
     }
+
     SubmitTokenIfData(current_token);
 }
 
@@ -428,10 +407,6 @@ void Tokenizer::TryReadInternalCall()
     }
 }
 
-Tokenizer::~Tokenizer()
-{
-    gEnginePool->Free(mpDataStart);
-    mTokens.Destroy();
-}
+Tokenizer::~Tokenizer() { mTokens.Destroy(); }
 
 } // namespace fx

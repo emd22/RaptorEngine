@@ -180,7 +180,7 @@ class MaterialManager
 {
 public:
     void Create(uint32 materials_per_page = 64);
-    TSRef<Material> New(const std::string& name, renderer::Pipeline* pipeline, bool supports_skinning);
+    TSRef<Material> New(const String& name, renderer::Pipeline* pipeline, bool supports_skinning);
 
     renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 

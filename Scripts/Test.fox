@@ -1,0 +1,23 @@
+
+/*
+    SG-10 Shotgun Script
+*/
+
+@include "./Scripts/WeaponBase.fox"
+
+proc SetupVars()
+{
+    WB_InitAmmoVars(
+        10,     // Mag size
+        6       // Num mags
+    );
+
+    WB_InitStatVars(
+        15      // Damage
+    );
+}
+
+proc ScriptEntry()
+{
+    SetupVars();
+}

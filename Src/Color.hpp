@@ -28,6 +28,8 @@ public:
     static FX_FORCE_INLINE Color FromRGBA(uint8 r, uint8 g, uint8 b, uint8 a);
     static FX_FORCE_INLINE Color FromFloats(float32 rgba[4]);
 
+    FX_FORCE_INLINE uint32 AsUInt() const { return Value; }
+
 public:
     union
     {

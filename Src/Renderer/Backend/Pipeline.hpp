@@ -26,6 +26,7 @@ struct alignas(16) DrawPushConstants
 struct alignas(16) DebugLayerPushConstants
 {
     float32 CombinedMatrix[16];
+    uint32 DebugColor;
 };
 
 struct alignas(16) LightVertPushConstants

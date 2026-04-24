@@ -47,7 +47,7 @@ PhObject* Scene::GetPhysicsObject(PhObjectId id)
     return &mPhysicsObjects[id];
 }
 
-TSRef<Object> Scene::FindObject(Hash64 name_hash)
+TSRef<Object> Scene::FindObject(Hash32 name_hash)
 {
     for (TSRef<Object>& obj : mObjects) {
         if (obj->Name == name_hash) {
@@ -111,15 +111,32 @@ void Scene::RenderUnlitObjects(const Camera& camera) const
 
 void Scene::RenderPhysicsObjects(const Camera& camera)
 {
-    // if (!mpDebugCube.IsValid()) {
-    //     mpDebugCube = MeshGen::MakeCube()->AsMesh(renderer::eVertexType::Default);
-    // }
+    if (!mpDebugCube.IsValid()) {
+        mpDebugCube = MeshGen::MakeCube()->AsMesh(renderer::eVertexType::Default);
+    }
 
+    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
-    // CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-    // gRenderer->pDeferredRenderer->PlGeometryWireframe.Bind(cmd);
+    renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
 
-    // DrawPushConstants push_constants {};
+    DebugLayerPushConstants push_constants {};
+
+    Color debug_color = Color::FromRGBA(40, 255, 40, 255);
+
+    for (PhObject& phys : mPhysicsObjects) {
+        Mat4f model_matrix = Mat4f::AsScale(phys.Scale) * Mat4f::AsRotation(phys.GetRotation()) *
+                             Mat4f::AsTranslation(phys.GetPosition());
+        Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+
+        memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+        push_constants.DebugColor = debug_color.AsUInt();
+
+        vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
+                           &push_constants);
+
+        mpDebugCube->Render(cmd, 1);
+    }
 
     // push_constants.ObjectId = ObjectId;
 

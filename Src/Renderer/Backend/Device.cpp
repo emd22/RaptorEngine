@@ -1,6 +1,7 @@
+#include "Device.hpp"
+
 #include "Core/Defines.hpp"
 #include "Core/SizedArray.hpp"
-#include "Device.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -25,6 +26,8 @@ void QueueFamilies::FindGraphicsFamily(VkPhysicalDevice device, VkSurfaceKHR sur
         if ((family_props.queueFlags & VK_QUEUE_GRAPHICS_BIT) && FamilyHasPresentSupport(device, surface, index)) {
             mGraphicsIndex = index;
             mPresentIndex = index;
+
+            return;
         }
     }
 }
@@ -34,9 +37,10 @@ void QueueFamilies::FindTransferFamily(VkPhysicalDevice device, VkSurfaceKHR sur
     for (int32 index = 0; index < RawFamilies.Size; index++) {
         VkQueueFamilyProperties& family_props = RawFamilies[index];
 
-        // We want a separate queue here for
+        // We want a separate queue here for loading data onto the graphics card
         if ((family_props.queueFlags & VK_QUEUE_TRANSFER_BIT) && index != mGraphicsIndex) {
             mTransferIndex = index;
+            return;
         }
     }
 

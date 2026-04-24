@@ -68,10 +68,15 @@ inline Hash32 HashObj32(const TObj& obj, Hash32 thash = FX_HASH32_FNV1A_INIT)
  */
 inline constexpr Hash32 HashStr32(const char* str, Hash32 thash = FX_HASH32_FNV1A_INIT)
 {
-    uint8 ch;
-    while ((ch = static_cast<uint8>(*(str++)))) {
+    uint8 ch = 0;
+    while ((ch = *str)) {
+        /* xor the bottom with the current octet */
         thash ^= static_cast<Hash32>(ch);
+
+        /* multiply by the 32 bit FNV magic prime mod 2^32 */
         thash += (thash << 1) + (thash << 4) + (thash << 7) + (thash << 8) + (thash << 24);
+
+        ++str;
     }
 
     return thash;

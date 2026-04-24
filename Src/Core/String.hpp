@@ -29,6 +29,8 @@ public:
 
     FX_FORCE_INLINE uint32 GetLength() const { return Length; }
 
+    void Clear();
+
     const char* CStr() const
     {
         if (IsHeapAllocated()) {

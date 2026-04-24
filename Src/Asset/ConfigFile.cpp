@@ -85,7 +85,8 @@ std::string ConfigEntry::AsString(uint32 indent) const
 
     if (Type == eValueType::Struct) {
         for (const ConfigEntry& entry : Members) {
-            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
+            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get().CStr(),
+                                       entry.AsString(indent + 1));
         }
 
         return std::format("{{\n{}{}}}", member_list, indent_str);
@@ -102,7 +103,7 @@ std::string ConfigEntry::AsString(uint32 indent) const
     return this->ConfigValue::AsString();
 }
 
-ConfigEntry* ConfigEntry::GetMember(const Hash64 name_hash) const
+ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 {
     for (ConfigEntry& entry : Members) {
         if (entry.Name == name_hash) {
@@ -186,6 +187,8 @@ void ConfigFile::Load(const std::string& path)
     tokenizer.Tokenize();
 
     Parse(tokenizer.GetTokens());
+
+    gEnginePool->Free(file_buffer.pData);
 }
 
 static ConfigEntry::eValueType GetValueTokenType(const Token& token)
@@ -399,7 +402,7 @@ void ConfigFile::Parse(PagedArray<Token>& tokens)
     mpTokens = nullptr;
 }
 
-ConfigEntry* ConfigFile::GetEntry(Hash64 requested_name_hash) const
+ConfigEntry* ConfigFile::GetEntry(Hash32 requested_name_hash) const
 {
     for (ConfigEntry& entry : mConfigEntries) {
         if (entry.Name == requested_name_hash) {

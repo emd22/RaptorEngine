@@ -1,0 +1,6 @@
+/*
+    Base Weapon Script
+*/
+
+extproc WB_InitAmmoVars(int magsize, int nummags);
+extproc WB_InitStatVars(int damage);

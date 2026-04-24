@@ -15,6 +15,7 @@ extern ObjectManager* gObjectManager;
 extern ShaderCompiler* gShaderCompiler;
 extern MaterialManager* gMaterialManager;
 extern MemPool* gEnginePool;
+extern MemPool* gScriptMemPool;
 
 namespace Globals {
 void Init();

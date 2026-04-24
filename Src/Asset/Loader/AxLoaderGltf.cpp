@@ -374,17 +374,17 @@ void AxLoaderGltf::LoadAnimations(TSRef<Object>& output_object, Skeleton& skel)
     LogInfo("Loaded {} animations", mpGltfData->animations_count);
 }
 
-AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const std::string& path)
+AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const String& path)
 {
     cgltf_options options {};
 
-    cgltf_result status = cgltf_parse_file(&options, path.c_str(), &mpGltfData);
+    cgltf_result status = cgltf_parse_file(&options, path.CStr(), &mpGltfData);
     if (status != cgltf_result_success) {
         LogError("Error parsing GLTF file! (path: {:s})", path);
         return AxLoaderGltf::Status::Error;
     }
 
-    status = cgltf_load_buffers(&options, mpGltfData, path.c_str());
+    status = cgltf_load_buffers(&options, mpGltfData, path.CStr());
     if (status != cgltf_result_success) {
         LogError("Error loading buffers from GLTF file! (path: {:s})", path);
 

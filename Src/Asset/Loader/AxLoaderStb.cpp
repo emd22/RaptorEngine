@@ -6,11 +6,11 @@
 namespace fx {
 
 
-AxLoaderStb::Status AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const std::string& path)
+AxLoaderStb::Status AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String& path)
 {
     TSRef<AxImage> image(asset);
 
-    const char* c_path = path.c_str();
+    const char* c_path = path.CStr();
 
     const int pixel_size = renderer::ImageFormatUtil::GetSize(ImageFormat);
     Assert(pixel_size > 0);

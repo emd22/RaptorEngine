@@ -6,6 +6,7 @@
 #include <Core/Panic.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
+#include <cstring>
 
 namespace fx {
 
@@ -237,16 +238,6 @@ Mat4f Mat4f::operator*(const Mat4f& other) const
     return result;
 }
 
-void Mat4f::Rotate(const Vec3f& rotation)
-{
-    /*
-     *  0  -z   y
-     *  z   0  -x
-     * -y   x   0
-     */
-}
-
-#include <string.h>
 
 Mat4f::Mat4f(float data[4][4]) noexcept
 {

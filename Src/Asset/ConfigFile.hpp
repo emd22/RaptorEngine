@@ -268,10 +268,10 @@ public:
     }
 
 
-    ConfigEntry* GetMember(const Hash64 name) const;
+    ConfigEntry* GetMember(const Hash32 name) const;
 
     template <typename T>
-    T GetMemberValue(const Hash64 name, const T& fallback) const
+    T GetMemberValue(const Hash32 name, const T& fallback) const
     {
         ConfigEntry* entry = GetMember(name);
         if (!entry) {
@@ -310,13 +310,13 @@ public:
     void Load(const std::string& path);
     void Write(const std::string& path);
 
-    ConfigEntry* GetEntry(Hash64 requested_name_hash) const;
+    ConfigEntry* GetEntry(Hash32 requested_name_hash) const;
     PagedArray<ConfigEntry>& GetEntries() { return mConfigEntries; }
 
     void PrintEntries();
 
     template <typename T>
-    T GetEntryValue(const Hash64 entry_name_hash, const T& fallback) const
+    T GetEntryValue(const Hash32 entry_name_hash, const T& fallback) const
     {
         const ConfigEntry* entry = GetEntry(entry_name_hash);
         if (!entry) {

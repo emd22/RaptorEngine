@@ -21,7 +21,7 @@ void PhPlayer::Create()
     ConfigFile player_config;
     player_config.Load(FX_BASE_DIR "/Data/Player.conf");
 
-    const float32 collider_radius = player_config.GetEntry(HashStr64("ColliderRadius"))->Get<float32>();
+    const float32 collider_radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>();
 
     Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
 
@@ -34,8 +34,8 @@ void PhPlayer::Create()
     settings->mMaxSlopeAngle = scMaxSlopeAngle;
     settings->mShape = pPhysicsShape;
 
-    settings->mMaxStrength = player_config.GetEntry(HashStr64("Strength"))->Get<float32>();
-    settings->mMass = player_config.GetEntry(HashStr64("Mass"))->Get<float32>();
+    settings->mMaxStrength = player_config.GetEntry(HashStr32("Strength"))->Get<float32>();
+    settings->mMass = player_config.GetEntry(HashStr32("Mass"))->Get<float32>();
     settings->mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
     settings->mSupportingVolume = Plane(Vec3::sAxisY(), -collider_radius);
     settings->mInnerBodyLayer = PhLayer::Dynamic;

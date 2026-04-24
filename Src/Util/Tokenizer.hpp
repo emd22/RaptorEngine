@@ -57,7 +57,7 @@ struct Token
 public:
     void Print(bool no_newline = false) const
     {
-        printf("Token: (T:%-10s) {%.*s} %c", GetTypeName(Type), Length, Start, (no_newline) ? ' ' : '\n');
+        printf("Token[%d]: (T:%-10s) {%.*s} %c", Length, GetTypeName(Type), Length, Start, (no_newline) ? ' ' : '\n');
     }
 
     void Increment() { ++Length; }
@@ -79,12 +79,12 @@ public:
         return str;
     }
 
-    Hash64 GetHash()
+    Hash32 GetHash()
     {
-        if (Hash != HashNull64) {
+        if (Hash != HashNull32) {
             return Hash;
         }
-        return (Hash = HashData64(Slice<char>(Start, Length)));
+        return (Hash = HashData32(Slice<char>(Start, Length)));
     }
 
     eIsNumericResult IsNumeric() const;
@@ -127,12 +127,14 @@ public:
     char* Start = nullptr;
     char* End = nullptr;
 
-    Hash64 Hash = HashNull64;
     eTokenType Type = eTokenType::Unknown;
     uint32 Length = 0;
 
     uint16 FileColumn = 0;
     uint32 FileLine = 0;
+
+private:
+    Hash32 Hash = HashNull32;
 };
 
 class Tokenizer
@@ -208,6 +210,7 @@ public:
         mpLinePtr = mSavedState.pStartOfLine;
     }
 
+
     ~Tokenizer();
 
 private:
@@ -223,6 +226,7 @@ private:
         return is_newline;
     }
 
+
 private:
     State mSavedState;
 
@@ -235,6 +239,7 @@ private:
     uint32 mLineNumber = 0;
     char* mpLinePtr = nullptr;
 
+public:
     PagedArray<Token> mTokens;
 };
 

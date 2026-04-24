@@ -220,17 +220,4 @@ private:
 };
 
 
-// template <typename TResultType>
-// struct Optional
-// {
-//     using Type = TResultType;
-
-//     std::aligned_storage_t<sizeof(Type), alignof(Type)> Result;
-//     bool bExists;
-
-// public:
-//     Optional() : bExists(false) {}
-//     Optional(const TResultType& result) : bExists(true) { ::new ((void*)&result) TResultType(result); }
-// };
-
 } // namespace fx

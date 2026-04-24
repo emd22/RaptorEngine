@@ -73,12 +73,12 @@ void FoxtrotGame::InitEngine()
                exit(1);
            });
 
-    ConfigEntry* window_entry = Config.GetEntry(HashStr64("Window"));
+    ConfigEntry* window_entry = Config.GetEntry(HashStr32("Window"));
 
-    const uint32 window_width = window_entry->GetMember(HashStr64("Width"))->Get<uint32>();
-    const uint32 window_height = window_entry->GetMember(HashStr64("Height"))->Get<uint32>();
+    const uint32 window_width = window_entry->GetMember(HashStr32("Width"))->Get<uint32>();
+    const uint32 window_height = window_entry->GetMember(HashStr32("Height"))->Get<uint32>();
 
-    Ref<Window> window = Window::New(window_entry->GetMember(HashStr64("Title"))->Get<const char*>(),
+    Ref<Window> window = Window::New(window_entry->GetMember(HashStr32("Title"))->Get<const char*>(),
                                      Vec2i(window_width, window_height));
 
     gRenderer->SelectWindow(window);
@@ -108,8 +108,8 @@ void FoxtrotGame::LoadOffsetsFile()
 
     info.Load(FX_BASE_DIR "/Config/Offsets.conf");
 
-    PistolOffset = info.GetEntryValue(HashStr64("PistolOffset"), Vec3f::sZero);
-    ArmsOffset = info.GetEntryValue(HashStr64("ArmsOffset"), Vec3f::sZero);
+    PistolOffset = info.GetEntryValue(HashStr32("PistolOffset"), Vec3f::sZero);
+    ArmsOffset = info.GetEntryValue(HashStr32("ArmsOffset"), Vec3f::sZero);
 }
 
 void FoxtrotGame::CreateGame()
@@ -126,15 +126,15 @@ void FoxtrotGame::CreateGame()
 
     SceneFile scene_file;
 
-    const char* scene_to_load = Config.GetEntry(HashStr64("Scene"))->Get<const char*>();
+    const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
     scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
     gPhysics->OptimizeBroadPhase();
 
     pSun = mMainScene.GetDirectionalLight();
 
-    pPistolObject = mMainScene.FindObject(HashStr64("Pistol"));
-    pArmsObject = mMainScene.FindObject(HashStr64("AnimTest"));
+    pPistolObject = mMainScene.FindObject(HashStr32("Pistol"));
+    pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));
 
     LoadOffsetsFile();
 
@@ -242,7 +242,7 @@ void FoxtrotGame::ProcessControls()
     if (ControlManager::IsComboDown(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
         // Reload the object properties from the scene
         SceneFile scene_file;
-        scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr64("Scene"))->Get<const char*>()),
+        scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr32("Scene"))->Get<const char*>()),
                         mMainScene);
 
         LoadOffsetsFile();
