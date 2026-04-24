@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "ScriptAst.hpp"
+#include "FoxAst.hpp"
 
 #include <Core/Hash.hpp>
 #include <Core/PagedArray.hpp>

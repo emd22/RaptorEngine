@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ScriptAst.hpp"
+#include "FoxAst.hpp"
 #include "ScriptBytecode.hpp"
 
 #include <Core/PagedArray.hpp>
@@ -55,8 +55,6 @@ public:
     void Compile(FoxAstNode* root_node);
     void EmitNode(FoxAstNode* node);
 
-    static const char* GetRegisterName(FoxIRRegister reg);
-
     void PrintBytecode();
     bool HasErrors() const { return mErrorCount > 0; }
 
@@ -84,9 +82,7 @@ private:
 
     uint16 GetSizeOfType(Token* type);
 
-    void DoLoad(uint32 stack_offset, FoxIRRegister output_reg, bool force_absolute = false);
     void DoSaveInt32(uint32 stack_offset, uint32 value, bool force_absolute = false);
-    void DoSaveReg32(uint32 stack_offset, FoxIRRegister reg, bool force_absolute = false);
 
     void EmitPush32(int32 value);
     void EmitPushFloat32(float32 value);
@@ -97,21 +93,15 @@ private:
 
     void EmitStackAlloc(uint16 size);
 
-    void EmitPop32(FoxIRRegister output_reg);
     void EmitPopVar(VarIndex var);
 
-    void EmitLoad32(int offset, FoxIRRegister output_reg);
-    void EmitLoadAbsolute32(uint32 position, FoxIRRegister output_reg);
 
     void EmitSave32(int16 offset, uint32 value);
-    void EmitSaveReg32(int16 offset, FoxIRRegister reg);
 
     void EmitSaveAbsolute32(uint32 offset, uint32 value);
-    void EmitSaveAbsoluteReg32(uint32 offset, FoxIRRegister reg);
 
     void EmitJumpRelative(uint16 offset);
     void EmitJumpAbsolute(uint32 position);
-    void EmitJumpAbsoluteReg32(FoxIRRegister reg);
     void EmitJumpCallAbsolute(uint32 position);
 
     void EmitJumpReturnToCaller();
@@ -133,9 +123,6 @@ private:
     void EmitVariableCastInt32(VarIndex var_index);
     void EmitVariableCastFloat32(VarIndex var_index);
 
-    void EmitMoveInt32(FoxIRRegister reg, uint32 value);
-    void EmitMoveReg32(FoxIRRegister dest_reg, FoxIRRegister src_reg);
-
     void EmitParamsStart();
     void EmitType(eFoxType type);
 
@@ -145,18 +132,11 @@ private:
 
     void EmitRhs(FoxAstNode* rhs, RhsMode mode, FoxBytecodeVarHandle* handle);
 
-    FoxIRRegister EmitRhsToRegister(FoxAstNode* rhs, FoxIRRegister dest_register, bool auto_register = false);
-    // FoxIRRegister EmitRhs(FoxAstNode* rhs, RhsMode mode, FoxBytecodeVarHandle* handle
-    FoxIRRegister EmitLiteralString(FoxAstLiteral* literal, RhsMode mode, FoxBytecodeVarHandle* handle);
-
     void EmitMarker(BcSpecMarker spec);
 
     void WriteOp(uint8 base_op, uint8 spec_op);
     void Write16(uint16 value);
     void Write32(uint32 value);
-
-    FoxIRRegister FindFreeReg32();
-    FoxIRRegister FindFreeReg64();
 
     FoxBytecodeVarHandle* FindVarHandle(Hash32 hashed_name);
     VarIndex FindVarInScope(Hash32 hashed_name);
@@ -164,12 +144,7 @@ private:
     FoxBytecodeFunctionHandle* FindFunctionHandle(Hash32 hashed_name);
 
 
-    void MarkRegisterUsed(FoxIRRegister reg);
-    void MarkRegisterFree(FoxIRRegister reg);
-
     bool DoesNodeBranch(FoxAstNode* node);
-
-    void MarkVariablesAsClobbered(FoxIRRegister start_reg, FoxIRRegister end_reg);
 
 
 public:
@@ -222,7 +197,6 @@ private:
     void DoJump(char* s, uint8 op_base, uint8 op_spec);
     void DoData(char* s, uint8 op_base, uint8 op_spec);
     void DoType(char* s, uint8 op_base, uint8 op_spec);
-    void DoMove(char* s, uint8 op_base, uint8 op_spec);
     void DoMarker(char* s, uint8 op_base, uint8 op_spec);
     void DoVariable(char* s, uint8 op_base, uint8 op_spec);
 

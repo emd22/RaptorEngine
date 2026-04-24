@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ScriptAst.hpp"
+#include "FoxAst.hpp"
 #include "ScriptVar.hpp"
 
 #include <Util/Tokenizer.hpp>

@@ -1,4 +1,4 @@
-#include "ScriptAst.hpp"
+#include "FoxAst.hpp"
 
 #include "ScriptVar.hpp"
 
@@ -80,7 +80,6 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         FoxAstLiteral* literal = reinterpret_cast<FoxAstLiteral*>(node);
 
         printf("[LITERAL] ");
-        literal->Value.Print();
     }
     else if (node->NodeType == FX_AST_BINOP) {
         FoxAstBinop* binop = reinterpret_cast<FoxAstBinop*>(node);

@@ -854,45 +854,6 @@ FoxAstFunctionDecl* FoxParser::ParseProcedureDeclare()
     return node;
 }
 
-FoxIRRegister IrRegisterFromToken(const Token& token)
-{
-    if (token.Type != eTokenType::Identifier) {
-        return FX_IR_NONE;
-    }
-
-    std::string reg = token.GetStr();
-
-    if (reg.starts_with("PARAMREG")) {
-        char num = reg[reg.length()];
-        switch (num) {
-        case '0':
-            return FX_IR_PARAMREG0;
-        case '1':
-            return FX_IR_PARAMREG1;
-        case '2':
-            return FX_IR_PARAMREG2;
-        case '3':
-            return FX_IR_PARAMREG3;
-        }
-    }
-
-    if (reg.starts_with("GW")) {
-        char num = reg[reg.length()];
-        if ((num - '0') <= 7) {
-            return static_cast<FoxIRRegister>(FX_IR_GW0 + (num - '0'));
-        }
-    }
-
-    if (reg.starts_with("GX")) {
-        char num = reg[reg.length()];
-        if ((num - '0') <= 3) {
-            return static_cast<FoxIRRegister>(FX_IR_GX0 + (num - '0'));
-        }
-    }
-
-    return FX_IR_NONE;
-}
-
 FoxAstFunctionDecl* FoxParser::ParseExtfnDeclare()
 {
     FoxAstFunctionDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionDecl);

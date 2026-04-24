@@ -174,77 +174,6 @@ FoxBytecodeFunctionHandle* FoxBytecodeCompiler::FindFunctionHandle(Hash32 hashed
 }
 
 
-FoxIRRegister FoxBytecodeCompiler::FindFreeReg32()
-{
-    for (int register_index = FX_IR_GW0; register_index <= FX_IR_GW7; register_index++) {
-        uint32 gp_r = (1 << register_index);
-
-        if (!(mRegsInUse & gp_r)) {
-            return static_cast<FoxIRRegister>(register_index);
-        }
-    }
-
-    return FX_IR_GW6;
-}
-
-FoxIRRegister FoxBytecodeCompiler::FindFreeReg64()
-{
-    for (int register_index = FX_IR_GX0; register_index <= FX_IR_GX3; register_index++) {
-        uint32 gp_r = (1 << register_index);
-
-        if (!(mRegsInUse & gp_r)) {
-            return static_cast<FoxIRRegister>(register_index);
-        }
-    }
-
-    return FX_IR_GX3;
-}
-
-const char* FoxBytecodeCompiler::GetRegisterName(FoxIRRegister reg)
-{
-    switch (reg) {
-    case FX_IR_PARAMREG0:
-        return "PARAMREG0";
-    case FX_IR_PARAMREG1:
-        return "PARAMREG1";
-    case FX_IR_PARAMREG2:
-        return "PARAMREG2";
-    case FX_IR_PARAMREG3:
-        return "PARAMREG3";
-    case FX_IR_GW0:
-        return "GW0";
-    case FX_IR_GW1:
-        return "GW1";
-    case FX_IR_GW2:
-        return "GW2";
-    case FX_IR_GW3:
-        return "GW3";
-    case FX_IR_GW4:
-        return "GW4";
-    case FX_IR_GW5:
-        return "GW5";
-    case FX_IR_GW6:
-        return "GW6";
-    case FX_IR_GW7:
-        return "GW7";
-    case FX_IR_GX0:
-        return "GX0";
-    case FX_IR_GX1:
-        return "GX1";
-    case FX_IR_GX2:
-        return "GX2";
-    case FX_IR_GX3:
-        return "GX3";
-    case FX_IR_SP:
-        return "SP";
-    case FX_IR_REG_RETURN_VALUE:
-        return "RETVAL";
-    default:;
-    };
-
-    return "NONE";
-}
-
 void FoxBytecodeCompiler::Write16(uint16 value)
 {
     mBytecode.Insert(static_cast<uint8>(value >> 8));
@@ -274,17 +203,6 @@ using IRRhsMode = FoxBytecodeCompiler::RhsMode;
         MarkRegisterFree(regn_);                                                                                       \
     }
 
-void FoxBytecodeCompiler::MarkRegisterUsed(FoxIRRegister reg)
-{
-    uint16 register_flag = (1 << reg);
-    mRegsInUse = static_cast<uint32>(uint16(mRegsInUse) | register_flag);
-}
-
-void FoxBytecodeCompiler::MarkRegisterFree(FoxIRRegister reg)
-{
-    uint16 register_flag = (1 << reg);
-    mRegsInUse = static_cast<uint32>(uint16(mRegsInUse) & (~register_flag));
-}
 
 void FoxBytecodeCompiler::EmitSave32(int16 offset, uint32 value)
 {
@@ -295,16 +213,6 @@ void FoxBytecodeCompiler::EmitSave32(int16 offset, uint32 value)
     Write32(value);
 }
 
-void FoxBytecodeCompiler::EmitSaveReg32(int16 offset, FoxIRRegister reg)
-{
-    // SAVE32r [i16 offset] [%r32]
-    WriteOp(BcBase_Save, BcSpecSave_Reg32);
-
-    Write16(offset);
-    Write16(reg);
-}
-
-
 void FoxBytecodeCompiler::EmitSaveAbsolute32(uint32 position, uint32 value)
 {
     // SAVE32a [i32 offset] [i32]
@@ -314,14 +222,6 @@ void FoxBytecodeCompiler::EmitSaveAbsolute32(uint32 position, uint32 value)
     Write32(value);
 }
 
-void FoxBytecodeCompiler::EmitSaveAbsoluteReg32(uint32 position, FoxIRRegister reg)
-{
-    // SAVE32r [i32 offset] [%r32]
-    WriteOp(BcBase_Save, BcSpecSave_AbsoluteReg32);
-
-    Write32(position);
-    Write16(reg);
-}
 
 void FoxBytecodeCompiler::EmitPush32(int32 value)
 {
@@ -421,14 +321,6 @@ void FoxBytecodeCompiler::EmitStackAlloc(uint16 size)
 }
 
 
-void FoxBytecodeCompiler::EmitPop32(FoxIRRegister output_reg)
-{
-    // POP32 [%r32]
-    // WriteOp(BcBase_Pop, (BcSpecPop_Int32 << 4) | (output_reg & 0x0F));
-
-    // mStackOffset -= 4;
-}
-
 void FoxBytecodeCompiler::EmitPopVar(VarIndex var)
 {
     // VPOP [%var]
@@ -438,20 +330,6 @@ void FoxBytecodeCompiler::EmitPopVar(VarIndex var)
     mStackOffset -= 4;
 }
 
-
-void FoxBytecodeCompiler::EmitLoad32(int offset, FoxIRRegister output_reg)
-{
-    // LOAD [i16] [%r32]
-    WriteOp(BcBase_Load, (BcSpecLoad_Int32 << 4) | (output_reg & 0x0F));
-    Write16(static_cast<uint16>(offset));
-}
-
-void FoxBytecodeCompiler::EmitLoadAbsolute32(uint32 position, FoxIRRegister output_reg)
-{
-    // LOADA [i32] [%r32]
-    WriteOp(BcBase_Load, (BcSpecLoad_AbsoluteInt32 << 4) | (output_reg & 0x0F));
-    Write32(position);
-}
 
 void FoxBytecodeCompiler::EmitJumpRelative(uint16 offset)
 {
@@ -465,12 +343,6 @@ void FoxBytecodeCompiler::EmitJumpAbsolute(uint32 position)
     Write32(position);
 }
 
-
-void FoxBytecodeCompiler::EmitJumpAbsoluteReg32(FoxIRRegister reg)
-{
-    WriteOp(BcBase_Jump, BcSpecJump_AbsoluteReg32);
-    Write16(reg);
-}
 
 void FoxBytecodeCompiler::EmitJumpCallAbsolute(uint32 position)
 {
@@ -490,23 +362,6 @@ void FoxBytecodeCompiler::EmitJumpReturnToCaller() { WriteOp(BcBase_Jump, BcSpec
 void FoxBytecodeCompiler::EmitJumpReturnToCallerInt32() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_Int32); }
 void FoxBytecodeCompiler::EmitJumpReturnToCallerFloat32() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_Float32); }
 
-
-void FoxBytecodeCompiler::EmitMoveInt32(FoxIRRegister reg, uint32 value)
-{
-    WriteOp(BcBase_Move, (BcSpecMove_Int32 << 4) | (reg & 0x0F));
-    Write32(value);
-}
-
-void FoxBytecodeCompiler::EmitMoveReg32(FoxIRRegister dest_reg, FoxIRRegister src_reg)
-{
-    // Ignore if there is no work to do
-    if (dest_reg == src_reg) {
-        return;
-    }
-
-    WriteOp(BcBase_Move, (BcSpecMove_Reg32 << 4) | (dest_reg & 0x0F));
-    Write16(src_reg);
-}
 
 void FoxBytecodeCompiler::EmitVariableSetInt32(uint16 var_index, int32 value)
 {
@@ -638,22 +493,6 @@ uint16 FoxBytecodeCompiler::GetSizeOfType(Token* token)
 }
 
 
-void FoxBytecodeCompiler::DoLoad(uint32 stack_offset, FoxIRRegister output_reg, bool force_absolute)
-{
-    if (stack_offset < 0xFFFE && !force_absolute) {
-        // Relative load
-
-        // Calculate the relative index to the current stack offset
-        int input_offset = -(static_cast<int>(mStackOffset) - static_cast<int>(stack_offset));
-
-        EmitLoad32(input_offset, output_reg);
-    }
-    else {
-        // Absolute load
-        EmitLoadAbsolute32(stack_offset, output_reg);
-    }
-}
-
 void FoxBytecodeCompiler::DoSaveInt32(uint32 stack_offset, uint32 value, bool force_absolute)
 {
     if (stack_offset < 0xFFFE && !force_absolute) {
@@ -670,21 +509,6 @@ void FoxBytecodeCompiler::DoSaveInt32(uint32 stack_offset, uint32 value, bool fo
     }
 }
 
-void FoxBytecodeCompiler::DoSaveReg32(uint32 stack_offset, FoxIRRegister reg, bool force_absolute)
-{
-    if (stack_offset < 0xFFFE && !force_absolute) {
-        // Relative save
-
-        // Calculate the relative index to the current stack offset
-        int input_offset = -(static_cast<int>(mStackOffset) - static_cast<int>(stack_offset));
-
-        EmitSaveReg32(input_offset, reg);
-    }
-    else {
-        // Absolute save
-        EmitSaveAbsoluteReg32(stack_offset, reg);
-    }
-}
 
 void FoxBytecodeCompiler::EmitAssign(FoxAstAssign* assign)
 {
@@ -710,128 +534,7 @@ void FoxBytecodeCompiler::EmitAssign(FoxAstAssign* assign)
     EmitRhs(assign->Rhs, RhsMode::RHS_ASSIGN_TO_HANDLE, var_handle);
 }
 
-FoxIRRegister FoxBytecodeCompiler::EmitLiteralString(FoxAstLiteral* literal, RhsMode mode, FoxBytecodeVarHandle* handle)
-{
-    const uint32 string_length = strlen(literal->Value.ValueString);
-
-    // Emit the length and string data
-    const uint32 string_position = EmitDataString(literal->Value.ValueString, string_length);
-
-    // local string some_value = "Some String";
-    if (mode == RhsMode::RHS_DEFINE_IN_MEMORY) {
-        // Push the location and mark it as a pointer to a string
-        EmitType(eFoxType::STRING);
-        EmitPush32(static_cast<int32>(string_position));
-
-        return FX_IR_GW3;
-    }
-
-    // some_function("Some String")
-    else if (mode == RhsMode::RHS_FETCH_TO_REGISTER) {
-        // Push the location for the string and pop it back to a register.
-        EmitType(eFoxType::STRING);
-
-        // Push the string position
-        // EmitPush32(string_position);
-
-        // Find a register to output to and write the index
-        FoxIRRegister output_reg = FindFreeReg32();
-        // EmitPop32(output_reg);
-
-        EmitMoveInt32(output_reg, string_position);
-
-        // Mark the output register as used to store it
-        MARK_REGISTER_USED(output_reg);
-
-        return output_reg;
-    }
-
-    // some_previous_value = "Some String";
-    else if (mode == RhsMode::RHS_ASSIGN_TO_HANDLE) {
-        const bool force_absolute_save = (handle->ScopeIndex < mScopeIndex);
-
-        DoSaveInt32(handle->Offset, string_position, force_absolute_save);
-        handle->Type = eFoxType::STRING;
-
-        return FX_IR_GW3;
-    }
-
-    return FX_IR_GW3;
-}
-
 void FoxBytecodeCompiler::EmitMarker(BcSpecMarker spec) { WriteOp(BcBase_Marker, spec); }
-
-
-FoxIRRegister FoxBytecodeCompiler::EmitRhsToRegister(FoxAstNode* rhs, FoxIRRegister dest_register, bool auto_register)
-{
-    if (auto_register) {
-        dest_register = FindFreeReg32();
-    }
-
-    MarkRegisterUsed(dest_register);
-
-    if (rhs->NodeType == FX_AST_LITERAL) {
-        FoxAstLiteral* literal = reinterpret_cast<FoxAstLiteral*>(rhs);
-
-        // Move the integer directly into the register
-        if (literal->Value.Type == eFoxType::INT) {
-            EmitMoveInt32(dest_register, literal->Value.ValueInt);
-            return dest_register;
-        }
-
-        else if (literal->Value.Type == eFoxType::REF) {
-            Hash32 var_name_hash = literal->Value.pValueRef->pName->GetHash();
-            FoxBytecodeVarHandle* var_handle = FindVarHandle(var_name_hash);
-
-            if (!var_handle) {
-                CompileError("Could not find variable handle with hash {}!", var_name_hash);
-                return dest_register;
-            }
-
-            // If the variable is already loaded into a register and we automatically select the register,
-            // return the register that the value is currently loaded into.
-            if (var_handle->Register != FX_IR_NONE && auto_register) {
-                MarkRegisterFree(dest_register);
-
-                return var_handle->Register;
-            }
-
-            // If the variable is already loaded into a register and we want it in `dest_register`, move it into
-            // the destination register.
-            if (var_handle->Register != FX_IR_NONE) {
-                EmitMoveReg32(dest_register, var_handle->Register);
-                return dest_register;
-            }
-
-            // The variable is not already loaded, so we can load it from the stack into our destination.
-            // EmitVariableGetInt32(var_handle->VarIndexInScope, dest_register);
-
-            var_handle->Register = dest_register;
-
-            return dest_register;
-        }
-    }
-
-    else if (rhs->NodeType == FX_AST_BINOP) {
-        EmitBinop(static_cast<FoxAstBinop*>(rhs));
-
-        return dest_register;
-    }
-    else if (rhs->NodeType == FX_AST_PROCCALL) {
-        DoFunctionCall(static_cast<FoxAstFunctionCall*>(rhs));
-
-        // Move return value into our destination register
-        EmitMoveReg32(dest_register, FX_IR_REG_RETURN_VALUE);
-
-        return dest_register;
-    }
-
-    LogWarning("No instructions emitted for RHS");
-
-    MarkRegisterFree(dest_register);
-
-    return FX_IR_NONE;
-}
 
 void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode mode, FoxBytecodeVarHandle* handle)
 {
@@ -843,9 +546,6 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
         }
         else if (literal->Value.Type == eFoxType::FLOAT) {
             EmitVariableSetFloat32(handle->VarIndexInScope, literal->Value.ValueFloat);
-        }
-        else if (literal->Value.Type == eFoxType::STRING) {
-            EmitLiteralString(literal, mode, handle);
         }
         else if (literal->Value.Type == eFoxType::REF) {
             EmitVariableSetVar(handle->VarIndexInScope, FindVarInScope(literal->Value.pValueRef->pName->GetHash()));
@@ -957,14 +657,6 @@ void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call)
     EmitJumpCallAbsolute(handle->HashedName);
 }
 
-void FoxBytecodeCompiler::MarkVariablesAsClobbered(FoxIRRegister start_reg, FoxIRRegister end_reg)
-{
-    for (FoxBytecodeVarHandle& var_handle : VarHandles) {
-        if (var_handle.Register >= start_reg && var_handle.Register <= end_reg) {
-            var_handle.Register = FX_IR_NONE;
-        }
-    }
-}
 
 FoxBytecodeVarHandle* FoxBytecodeCompiler::DefineAndFetchParam(FoxAstNode* param_decl_node, uint16 index,
                                                                bool alloc_stack_space)
@@ -1302,23 +994,6 @@ uint32 FoxBytecodePrinter::Read32()
 }
 
 
-void FoxBytecodePrinter::DoLoad(char* s, uint8 op_base, uint8 op_spec_raw)
-{
-    uint8 op_spec = ((op_spec_raw >> 4) & 0x0F);
-    uint8 op_reg = (op_spec_raw & 0x0F);
-
-    if (op_spec == BcSpecLoad_Int32) {
-        int16 offset = Read16();
-        BC_PRINT_OP("load [i32] {}, {}", offset,
-                    FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(op_reg)));
-    }
-    else if (op_spec == BcSpecLoad_AbsoluteInt32) {
-        uint32 offset = Read32();
-        BC_PRINT_OP("loada [i32] {}, {}", offset,
-                    FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(op_reg)));
-    }
-}
-
 void FoxBytecodePrinter::DoPush(char* s, uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPush_Int32) {
@@ -1371,25 +1046,11 @@ void FoxBytecodePrinter::DoSave(char* s, uint8 op_base, uint8 op_spec)
         BC_PRINT_OP("save [i32] {}, {}", offset, value);
     }
 
-    // Save a register into an offset in the stack
-    else if (op_spec == BcSpecSave_Reg32) {
-        const int16 offset = Read16();
-        uint16 reg = Read16();
-
-        BC_PRINT_OP("save [r32] {}, {}", offset, FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(reg)));
-    }
     else if (op_spec == BcSpecSave_AbsoluteInt32) {
         const uint32 offset = Read32();
         const uint32 value = Read32();
 
         BC_PRINT_OP("savea [i32] {}, {}", offset, value);
-    }
-    else if (op_spec == BcSpecSave_AbsoluteReg32) {
-        const uint32 offset = Read32();
-        uint16 reg = Read16();
-
-        BC_PRINT_OP("savea [r32] {}, {}", offset,
-                    FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(reg)));
     }
 }
 
@@ -1402,10 +1063,6 @@ void FoxBytecodePrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
     else if (op_spec == BcSpecJump_Absolute) {
         uint32 position = Read32();
         BC_PRINT_OP("jmpa {}", position);
-    }
-    else if (op_spec == BcSpecJump_AbsoluteReg32) {
-        uint16 reg = Read16();
-        BC_PRINT_OP("jmpar {}", FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(reg)));
     }
     else if (op_spec == BcSpecJump_CallAbsolute) {
         uint32 position = Read32();
@@ -1460,23 +1117,6 @@ void FoxBytecodePrinter::DoType(char* s, uint8 op_base, uint8 op_spec)
     }
 }
 
-void FoxBytecodePrinter::DoMove(char* s, uint8 op_base, uint8 op_spec_raw)
-{
-    uint8 op_spec = ((op_spec_raw >> 4) & 0x0F);
-    uint8 op_reg = (op_spec_raw & 0x0F);
-
-    if (op_spec == BcSpecMove_Int32) {
-        uint32 value = Read32();
-        BC_PRINT_OP("move [i32] {}, {}", FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(op_reg)),
-                    value);
-    }
-    else if (op_spec == BcSpecMove_Reg32) {
-        const char* dest_reg = FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(op_reg));
-        const char* src_reg = FoxBytecodeCompiler::GetRegisterName(static_cast<FoxIRRegister>(Read16()));
-
-        BC_PRINT_OP("move [r32] {}, {}", dest_reg, src_reg);
-    }
-}
 
 char* FoxBytecodePrinter::ReadString(char* buffer, uint32 buffer_size)
 {
@@ -1631,9 +1271,6 @@ void FoxBytecodePrinter::PrintOp()
     case BcBase_Pop:
         DoPop(s, op_base, op_spec);
         break;
-    case BcBase_Load:
-        DoLoad(s, op_base, op_spec);
-        break;
     case BcBase_Arith:
         DoArith(s, op_base, op_spec);
         break;
@@ -1649,9 +1286,7 @@ void FoxBytecodePrinter::PrintOp()
     case BcBase_Type:
         DoType(s, op_base, op_spec);
         break;
-    case BcBase_Move:
-        DoMove(s, op_base, op_spec);
-        break;
+
     case BcBase_Marker:
         DoMarker(s, op_base, op_spec);
         break;
