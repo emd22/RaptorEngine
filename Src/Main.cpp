@@ -27,7 +27,7 @@ int main()
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
 
-    fx::script::FoxScript script {};
+    fx::script::FoxParser script {};
 
     script.LoadFile(FX_BASE_DIR "/Scripts/Test.fox");
     script.Execute();

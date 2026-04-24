@@ -1,6 +1,6 @@
 #include "ScriptVM.hpp"
 
-#include "BytecodeEmitter.hpp"
+#include "BytecodeCompiler.hpp"
 #include "ScriptBytecode.hpp"
 
 namespace fx::script {
@@ -291,6 +291,33 @@ void ScriptVM::DoArith(uint8 op_base, uint8 op_spec)
 
 void ScriptVM::DoSave(uint8 op_base, uint8 op_spec) {}
 
+void ScriptVM::RegisterFunction(Hash32 hashed_name, uint32 arg_count, VMExternalFunction func)
+{
+    VMExternalFunctionEntry entry { .Func = func, .ArgCount = arg_count };
+
+    ExternalFunctions[hashed_name] = entry;
+    LogInfo("Registered external function {}", hashed_name);
+}
+
+void ScriptVM::CallExternalFunction(Hash32 hashed_name)
+{
+    auto it = ExternalFunctions.find(hashed_name);
+    if (it == ExternalFunctions.end()) {
+        LogWarning("External function {} not found", hashed_name);
+        return;
+    }
+
+    SizedArray<FoxValue> args {};
+    args.InitSize(it->second.ArgCount);
+
+    for (uint32 i = 0; i < it->second.ArgCount; i++) {
+        args[it->second.ArgCount - i - 1] = (FoxValue(static_cast<int32>(Pop32())));
+    }
+
+    it->second.Func(args);
+}
+
+
 void ScriptVM::DoJump(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecJump_Relative) {
@@ -335,6 +362,10 @@ void ScriptVM::DoJump(uint8 op_base, uint8 op_spec)
         --ScopeIndex;
         mbReturnValueOnStack = true;
         mPC = ReturnAddress;
+    }
+    else if (op_spec == BcSpecJump_CallExternal) {
+        Hash32 hashed_name = Read32();
+        CallExternalFunction(hashed_name);
     }
     // else if (op_spec == BcSpecJump_CallExternal) {
     //     uint32 hashed_name = Read32();

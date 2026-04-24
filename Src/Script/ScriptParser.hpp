@@ -18,12 +18,12 @@
 
 namespace fx::script {
 
-class FoxScript
+class FoxParser
 {
     using TT = eTokenType;
 
 public:
-    FoxScript() = default;
+    FoxParser() = default;
 
     void LoadFile(const char* path);
 

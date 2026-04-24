@@ -288,7 +288,7 @@ void Tokenizer::IncludeFile(const char* path)
     // Tokenize all of the included file
     Tokenize();
 
-    gEnginePool->Free<char>(mpData);
+    // gEnginePool->Free<char>(mpData);
 
     // Restore back to previous state
     RestoreState();

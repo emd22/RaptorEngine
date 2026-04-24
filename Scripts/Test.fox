@@ -1,8 +1,23 @@
 
-proc ScriptEntry() float
+/*
+    SG-10 Shotgun Script
+*/
+
+@include "./Scripts/WeaponBase.fox"
+
+proc SetupVars()
 {
-    local float x = 2.5;
-    local float y = 10.0;
-    local float z = x + y;
-    return z;
+    WB_InitAmmoVars(
+        10,     // Mag size
+        6       // Num mags
+    );
+
+    WB_InitStatVars(
+        15      // Damage
+    );
+}
+
+proc ScriptEntry()
+{
+    SetupVars();
 }

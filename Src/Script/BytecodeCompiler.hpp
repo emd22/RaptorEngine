@@ -25,14 +25,9 @@ struct FoxIRFunctionRef
 };
 
 
-class FoxBytecodeEmitter
+class FoxBytecodeCompiler
 {
 public:
-    FoxBytecodeEmitter() = default;
-
-    void BeginEmitting(FoxAstNode* node);
-    void Emit(FoxAstNode* node);
-
     enum RhsMode
     {
         RHS_FETCH_TO_REGISTER,
@@ -47,9 +42,6 @@ public:
         RHS_NO_OPERATION,
     };
 
-    static const char* GetRegisterName(FoxIRRegister reg);
-
-    PagedArray<uint8> mBytecode {};
 
     enum VarDeclareMode
     {
@@ -57,6 +49,18 @@ public:
         DECLARE_NO_EMIT,
     };
 
+public:
+    FoxBytecodeCompiler() = default;
+
+    void Compile(FoxAstNode* root_node);
+    void EmitNode(FoxAstNode* node);
+
+    static const char* GetRegisterName(FoxIRRegister reg);
+
+    void PrintBytecode();
+    bool HasErrors() const { return mErrorCount > 0; }
+
+    ~FoxBytecodeCompiler() = default;
 
 private:
     void EmitBlock(FoxAstBlock* block, int params_to_save, bool is_function_body);
@@ -70,6 +74,13 @@ private:
     FoxBytecodeVarHandle* DefineReturnVar(FoxAstVarDecl* decl);
 
     void EmitSymbolTable(FoxAstBlock* root);
+
+    template <typename... TTypes>
+    void CompileError(const char* fmt, TTypes&&... args)
+    {
+        LogError(fmt, args...);
+        ++mErrorCount;
+    }
 
     uint16 GetSizeOfType(Token* type);
 
@@ -152,7 +163,6 @@ private:
 
     FoxBytecodeFunctionHandle* FindFunctionHandle(Hash32 hashed_name);
 
-    void PrintBytecode();
 
     void MarkRegisterUsed(FoxIRRegister reg);
     void MarkRegisterFree(FoxIRRegister reg);
@@ -161,9 +171,11 @@ private:
 
     void MarkVariablesAsClobbered(FoxIRRegister start_reg, FoxIRRegister end_reg);
 
+
 public:
     PagedArray<FoxBytecodeVarHandle> VarHandles;
     std::vector<FoxBytecodeFunctionHandle> FunctionHandles;
+    PagedArray<uint8> mBytecode {};
 
 private:
     uint32 mRegsInUse = 0;
@@ -173,6 +185,8 @@ private:
 
     uint16 mVarsInScope = 0;
     uint16 mScopeIndex = 0;
+
+    uint32 mErrorCount = 0;
 
     FoxAstFunctionDecl* mpCurrentFunctionBody = nullptr;
 

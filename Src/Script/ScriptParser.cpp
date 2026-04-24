@@ -1,9 +1,10 @@
 #include "ScriptParser.hpp"
 
-#include "BytecodeEmitter.hpp"
+#include "BytecodeCompiler.hpp"
 // #include "FoxCGArm64.hpp"
 #include "ScriptVM.hpp"
 
+#include <Core/Defer.hpp>
 #include <Core/File.hpp>
 #include <Core/Log.hpp>
 #include <Core/MemPool/MemPool.hpp>
@@ -16,7 +17,7 @@ namespace fx::script {
 #define FX_SCRIPT_ALLOC_MEMORY(type_, size_) gScriptMemPool->Alloc<type_>(size_)
 #define FX_SCRIPT_FREE(type_, ptr_)          gScriptMemPool->Free<type_>(ptr_);
 
-void FoxScript::LoadFile(const char* path)
+void FoxParser::LoadFile(const char* path)
 {
     File fp(path, File::eModType::Read, File::eDataType::Binary);
 
@@ -45,7 +46,7 @@ void FoxScript::LoadFile(const char* path)
     CreateInternalVariableTokens();
 }
 
-Token& FoxScript::GetToken(int offset)
+Token& FoxParser::GetToken(int offset)
 {
     const uint32 idx = mTokenIndex + offset;
     if (idx < 0 || idx >= mTokens.Size()) {
@@ -55,7 +56,7 @@ Token& FoxScript::GetToken(int offset)
     return mTokens[idx];
 }
 
-Token& FoxScript::EatToken(TT token_type)
+Token& FoxParser::EatToken(TT token_type)
 {
     Token& token = GetToken();
     if (token.Type != token_type) {
@@ -67,7 +68,7 @@ Token& FoxScript::EatToken(TT token_type)
     return token;
 }
 
-Token* FoxScript::CreateTokenFromString(eTokenType type, const char* text)
+Token* FoxParser::CreateTokenFromString(eTokenType type, const char* text)
 {
     const uint32 name_len = strlen(text);
 
@@ -83,7 +84,7 @@ Token* FoxScript::CreateTokenFromString(eTokenType type, const char* text)
     return token;
 }
 
-void FoxScript::CreateInternalVariableTokens()
+void FoxParser::CreateInternalVariableTokens()
 {
     mTokenReturnVar = CreateTokenFromString(TT::Identifier, FX_SCRIPT_VAR_RETURN_VAL);
 }
@@ -136,7 +137,7 @@ static void PrintDocComment(Token* comment, bool is_command_mode)
     printf("%.*s\n", comment->Length, start);
 }
 
-FoxAstNode* FoxScript::TryParseKeyword(FoxAstBlock* parent_block)
+FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
 {
     if (mTokenIndex >= mTokens.Size()) {
         return nullptr;
@@ -148,7 +149,7 @@ FoxAstNode* FoxScript::TryParseKeyword(FoxAstBlock* parent_block)
     // function [name] ( < [arg type] [arg name] ...> ) { <statements...> }
     constexpr Hash32 kw_proc = HashStr32("proc");
 
-    constexpr Hash32 kw_extfn = HashStr32("extfn");
+    constexpr Hash32 kw_extfn = HashStr32("extproc");
 
     // local [type] [name] <?assignment> ;
     constexpr Hash32 kw_local = HashStr32("local");
@@ -230,7 +231,7 @@ FoxAstNode* FoxScript::TryParseKeyword(FoxAstBlock* parent_block)
     return nullptr;
 }
 
-void FoxScript::PushScope()
+void FoxParser::PushScope()
 {
     FoxScope* current = mCurrentScope;
 
@@ -242,7 +243,7 @@ void FoxScript::PushScope()
     mCurrentScope = new_scope;
 }
 
-void FoxScript::PopScope()
+void FoxParser::PopScope()
 {
     FoxScope* new_scope = mCurrentScope->Parent;
     mScopes.RemoveLast();
@@ -252,7 +253,7 @@ void FoxScript::PopScope()
     mCurrentScope = new_scope;
 }
 
-FoxAstVarDecl* FoxScript::InternalVarDeclare(Token* name_token, Token* type_token, FoxScope* scope)
+FoxAstVarDecl* FoxParser::InternalVarDeclare(Token* name_token, Token* type_token, FoxScope* scope)
 {
     if (scope == nullptr) {
         scope = mCurrentScope;
@@ -274,7 +275,7 @@ FoxAstVarDecl* FoxScript::InternalVarDeclare(Token* name_token, Token* type_toke
     return node;
 }
 
-FoxAstVarDecl* FoxScript::ParseVarDeclare(FoxScope* scope)
+FoxAstVarDecl* FoxParser::ParseVarDeclare(FoxScope* scope)
 {
     if (scope == nullptr) {
         scope = mCurrentScope;
@@ -316,7 +317,7 @@ FoxAstVarDecl* FoxScript::ParseVarDeclare(FoxScope* scope)
 //     return mCurrentScope->Vars.GetLast();
 // }
 
-FoxVar* FoxScript::FindVar(Hash32 hashed_name)
+FoxVar* FoxParser::FindVar(Hash32 hashed_name)
 {
     FoxScope* scope = mCurrentScope;
 
@@ -343,7 +344,7 @@ FoxVar* FoxScript::FindVar(Hash32 hashed_name)
 //     return nullptr;
 // }
 
-FoxFunction* FoxScript::FindFunction(Hash32 hashed_name)
+FoxFunction* FoxParser::FindFunction(Hash32 hashed_name)
 {
     FoxScope* scope = mCurrentScope;
 
@@ -359,7 +360,7 @@ FoxFunction* FoxScript::FindFunction(Hash32 hashed_name)
     return nullptr;
 }
 
-void FoxScript::PrintFunctionTable(const FoxScope& scope) const
+void FoxParser::PrintFunctionTable(const FoxScope& scope) const
 {
     LogInfo("||-------------------------------------||");
     LogInfo("|| Name             | Hash             ||");
@@ -372,12 +373,17 @@ void FoxScript::PrintFunctionTable(const FoxScope& scope) const
     LogInfo("||-------------------------------------||");
 }
 
-void FoxScript::Execute()
+static void WB_InitAmmoVars(const SizedArray<FoxValue>& args)
 {
-    mTokens.PrintDebugInfo();
-    // for (const Token& token : mTokens) {
-    //     token.Print();
-    // }
+    LogInfo("Mag size: {}, Num mags: {}", args[0].Get<int32>(), args[1].Get<int32>());
+}
+
+static void WB_InitStatVars(const SizedArray<FoxValue>& args) { LogInfo("Damage: {}", args[0].Get<int32>()); }
+
+
+void FoxParser::Execute()
+{
+    Defer([&]() { gEnginePool->Free(mpFileData); });
 
     mRootBlock = Parse();
 
@@ -391,8 +397,13 @@ void FoxScript::Execute()
 
     PrintFunctionTable(*mCurrentScope);
 
-    FoxBytecodeEmitter bc_emitter;
-    bc_emitter.BeginEmitting(mRootBlock);
+    FoxBytecodeCompiler bc_emitter;
+    bc_emitter.Compile(mRootBlock);
+
+    if (bc_emitter.HasErrors()) {
+        LogError("Errors found during script compilation, cannot continue");
+        return;
+    }
 
     printf("\n=====\n");
 
@@ -401,9 +412,12 @@ void FoxScript::Execute()
 
     printf("\n=====\n");
 
-
     ScriptVM vm;
+
     vm.Start(std::move(bc_emitter.mBytecode));
+
+    vm.RegisterFunction(HashStr32("WB_InitAmmoVars"), 2, &WB_InitAmmoVars);
+    vm.RegisterFunction(HashStr32("WB_InitStatVars"), 1, &WB_InitStatVars);
 
     VMSymbol* entrypoint = vm.GetSymbol("ScriptEntry");
     if (entrypoint) {
@@ -413,13 +427,10 @@ void FoxScript::Execute()
         LogInfo("RETURN VALUE: {}, {}", value, static_cast<int32>(value.Type));
     }
 
-
-    gEnginePool->Free(mpFileData);
-
     FoxAstDestroyer destroyer(mRootBlock);
 }
 
-FoxValue FoxScript::ParseValue()
+FoxValue FoxParser::ParseValue()
 {
     Token& token = GetToken();
     TT token_type = token.Type;
@@ -487,7 +498,7 @@ static bool IsTokenTypeLiteral(eTokenType type)
     return (type == eTokenType::Integer || type == eTokenType::Float || type == eTokenType::String);
 }
 
-FoxAstNode* FoxScript::ParseRhs()
+FoxAstNode* FoxParser::ParseRhs()
 {
     RETURN_IF_NO_TOKENS(nullptr);
 
@@ -555,7 +566,7 @@ FoxAstNode* FoxScript::ParseRhs()
     return lhs;
 }
 
-eFoxType FoxScript::LabelToType(Token* token)
+eFoxType FoxParser::LabelToType(Token* token)
 {
     static constexpr Hash32 scIntType = HashStr32("int");
     static constexpr Hash32 scFloatType = HashStr32("float");
@@ -571,7 +582,7 @@ eFoxType FoxScript::LabelToType(Token* token)
     return eFoxType::NONETYPE;
 }
 
-FoxAstAssign* FoxScript::TryParseAssignment(Token* var_name)
+FoxAstAssign* FoxParser::TryParseAssignment(Token* var_name)
 {
     if (GetToken().Type != TT::Equals) {
         return nullptr;
@@ -592,7 +603,7 @@ FoxAstAssign* FoxScript::TryParseAssignment(Token* var_name)
     return node;
 }
 
-void FoxScript::DefineExternalVar(const char* type, const char* name, const FoxValue& value)
+void FoxParser::DefineExternalVar(const char* type, const char* name, const FoxValue& value)
 {
     Token* name_token = FX_SCRIPT_ALLOC_MEMORY(Token, sizeof(Token));
     Token* type_token = FX_SCRIPT_ALLOC_MEMORY(Token, sizeof(Token));
@@ -633,7 +644,7 @@ void FoxScript::DefineExternalVar(const char* type, const char* name, const FoxV
     var.Type = nullptr;
 }
 
-FoxAstNode* FoxScript::ParseStatementAsCommand(FoxAstBlock* parent_block)
+FoxAstNode* FoxParser::ParseStatementAsCommand(FoxAstBlock* parent_block)
 {
     if (mHasErrors) {
         return nullptr;
@@ -697,7 +708,7 @@ FoxAstNode* FoxScript::ParseStatementAsCommand(FoxAstBlock* parent_block)
     return node;
 }
 
-FoxAstNode* FoxScript::ParseStatement(FoxAstBlock* parent_block)
+FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
 {
     if (mHasErrors) {
         return nullptr;
@@ -767,7 +778,7 @@ FoxAstNode* FoxScript::ParseStatement(FoxAstBlock* parent_block)
     return node;
 }
 
-FoxAstBlock* FoxScript::ParseBlock()
+FoxAstBlock* FoxParser::ParseBlock()
 {
     bool in_command = mInCommandMode;
     mInCommandMode = false;
@@ -790,7 +801,7 @@ FoxAstBlock* FoxScript::ParseBlock()
     return block;
 }
 
-FoxAstFunctionDecl* FoxScript::ParseProcedureDeclare()
+FoxAstFunctionDecl* FoxParser::ParseProcedureDeclare()
 {
     FoxAstFunctionDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionDecl);
 
@@ -882,7 +893,7 @@ FoxIRRegister IrRegisterFromToken(const Token& token)
     return FX_IR_NONE;
 }
 
-FoxAstFunctionDecl* FoxScript::ParseExtfnDeclare()
+FoxAstFunctionDecl* FoxParser::ParseExtfnDeclare()
 {
     FoxAstFunctionDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionDecl);
 
@@ -934,6 +945,8 @@ FoxAstFunctionDecl* FoxScript::ParseExtfnDeclare()
     FoxFunction function(&name, mCurrentScope, nullptr, node);
     mCurrentScope->Functions.Insert(function);
 
+    node->bIsExternal = true;
+
     return node;
 }
 
@@ -951,7 +964,7 @@ FoxAstFunctionDecl* FoxScript::ParseExtfnDeclare()
 //     return return_value;
 // }
 
-FoxAstFunctionCall* FoxScript::ParseFunctionCall()
+FoxAstFunctionCall* FoxParser::ParseFunctionCall()
 {
     FoxAstFunctionCall* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionCall);
 
@@ -1001,7 +1014,7 @@ FoxAstFunctionCall* FoxScript::ParseFunctionCall()
     return node;
 }
 
-FoxAstBlock* FoxScript::Parse()
+FoxAstBlock* FoxParser::Parse()
 {
     FoxAstBlock* root_block = FX_SCRIPT_ALLOC_NODE(FoxAstBlock);
 

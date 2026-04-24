@@ -280,6 +280,8 @@ struct FoxAstFunctionDecl : public FoxAstNode
     FoxAstBlock* pParams = nullptr;
     FoxAstBlock* pBlock = nullptr;
 
+    bool bIsExternal = false;
+
     eFoxType ReturnType = eFoxType::NONETYPE;
 
     uint32 SymbolTableOffset = 0;

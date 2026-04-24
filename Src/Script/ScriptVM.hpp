@@ -5,6 +5,7 @@
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Types.hpp>
+#include <unordered_map>
 
 namespace fx::script {
 
@@ -37,6 +38,14 @@ struct VMScope
     VMVariable Variables[32];
 };
 
+using VMExternalFunction = void (*)(const SizedArray<FoxValue>& args);
+
+struct VMExternalFunctionEntry
+{
+    VMExternalFunction Func;
+    uint32 ArgCount = 0;
+};
+
 class ScriptVM
 {
     static constexpr uint32 scStackSize = 1024 * 16;
@@ -45,6 +54,8 @@ public:
     ScriptVM() = default;
 
     void Start(PagedArray<uint8>&& bytecode);
+
+    void RegisterFunction(Hash32 hashed_name, uint32 arg_count, VMExternalFunction func);
 
     VMSymbol* GetSymbol(const String& name) const;
     VMSymbol* GetSymbol(Hash32 name_hash) const;
@@ -73,6 +84,8 @@ private:
     void DoMove(uint8 op_base, uint8 op_spec);
     void DoVariable(uint8 op_base, uint8 op_spec);
 
+    void CallExternalFunction(Hash32 hashed_name);
+
     VMScope& ThisScope();
 
     uint16 Read16();
@@ -92,6 +105,8 @@ public:
     SizedArray<VMSymbol> SymTable;
     SizedArray<VMScope> Scopes;
     int32 ScopeIndex = 0;
+
+    std::unordered_map<Hash32, VMExternalFunctionEntry, Hash32Stl> ExternalFunctions;
 
 private:
     uint32 mPC = 0;
