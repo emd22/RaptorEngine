@@ -13,7 +13,7 @@
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
-#include <Script/ScriptParser.hpp>
+#include <Script/FoxScript.hpp>
 
 FX_SET_MODULE_NAME("Main")
 
@@ -26,11 +26,8 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
-
-    fx::script::FoxParser script {};
-
-    script.LoadFile(FX_BASE_DIR "/Scripts/Test.fox");
-    script.Execute();
+    fx::script::FoxScript script;
+    script.Load(FX_BASE_DIR "/Scripts/Test.fox");
 
 
     // fx::renderer::Globals::Init();

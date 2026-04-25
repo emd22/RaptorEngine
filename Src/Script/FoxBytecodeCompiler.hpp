@@ -1,9 +1,10 @@
 #pragma once
 
 #include "FoxAst.hpp"
-#include "ScriptBytecode.hpp"
+#include "FoxBytecode.hpp"
 
 #include <Core/PagedArray.hpp>
+#include <Core/Ref.hpp>
 #include <Core/Types.hpp>
 
 namespace fx::script {
@@ -52,7 +53,7 @@ public:
 public:
     FoxBytecodeCompiler() = default;
 
-    void Compile(FoxAstNode* root_node);
+    SizedArray<uint8> Compile(FoxAstNode* root_node);
     void EmitNode(FoxAstNode* node);
 
     void PrintBytecode();
@@ -67,8 +68,7 @@ private:
     void DoFunctionCall(FoxAstFunctionCall* call);
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
     void EmitAssign(FoxAstAssign* assign);
-    FoxBytecodeVarHandle* DefineAndFetchParam(FoxAstNode* param_decl_node, uint16 index,
-                                              bool alloc_stack_space = false);
+    FoxBytecodeVarHandle* DefineParam(FoxAstNode* param_decl_node);
     FoxBytecodeVarHandle* DefineReturnVar(FoxAstVarDecl* decl);
 
     void EmitSymbolTable(FoxAstBlock* root);
@@ -153,11 +153,6 @@ public:
     PagedArray<uint8> mBytecode {};
 
 private:
-    uint32 mRegsInUse = 0;
-
-    int64 mStackOffset = 0;
-    uint32 mStackSize = 0;
-
     uint16 mVarsInScope = 0;
     uint16 mScopeIndex = 0;
 
@@ -172,11 +167,7 @@ private:
 class FoxBytecodePrinter
 {
 public:
-    FoxBytecodePrinter(PagedArray<uint8>& bytecode)
-    {
-        mBytecode = bytecode;
-        mBytecode.bDoNotDestroy = true;
-    }
+    FoxBytecodePrinter(const SizedArray<uint8>& bytecode) { mpBytecode = Slice(bytecode); }
 
     void PrintSymbolTable();
     void Print();
@@ -204,7 +195,7 @@ private:
 
 private:
     uint32 mBytecodeIndex = 0;
-    PagedArray<uint8> mBytecode;
+    Slice<uint8> mpBytecode { nullptr };
 };
 
 } // namespace fx::script

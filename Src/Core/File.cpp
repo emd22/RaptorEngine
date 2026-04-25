@@ -8,7 +8,7 @@ namespace fx {
 using eDataType = File::eDataType;
 using eModType = File::eModType;
 
-File::File(const char* path, File::eModType mt, File::eDataType dt) { Open(path, mt, dt); }
+File::File(const String& path, File::eModType mt, File::eDataType dt) { Open(path, mt, dt); }
 
 static const char* MakeModeStr(File::eModType mt, File::eDataType dt)
 {
@@ -31,7 +31,7 @@ static const char* MakeModeStr(File::eModType mt, File::eDataType dt)
     return "r";
 }
 
-void File::Open(const char* path, eModType mt, eDataType dt)
+void File::Open(const String& path, eModType mt, eDataType dt)
 {
     mModType = mt;
     mDataType = dt;
@@ -48,7 +48,7 @@ void File::Open(const char* path, eModType mt, eDataType dt)
 
         return;
 #else
-        freopen(path, mode, pFileHandle);
+        freopen(path.CStr(), mode, pFileHandle);
         return;
 #endif
     }
@@ -61,7 +61,7 @@ void File::Open(const char* path, eModType mt, eDataType dt)
     }
 
 #else
-    pFileHandle = fopen(path, mode);
+    pFileHandle = fopen(path.CStr(), mode);
 #endif
 }
 

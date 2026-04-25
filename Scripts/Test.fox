@@ -5,6 +5,9 @@
 
 @include "./Scripts/WeaponBase.fox"
 
+
+
+
 proc SetupVars()
 {
     WB_InitAmmoVars(
@@ -17,7 +20,14 @@ proc SetupVars()
     );
 }
 
-proc ScriptEntry()
+
+proc OnLoad() void
+{
+}
+
+proc ScriptEntry() int
 {
     SetupVars();
+
+    return 5;
 }

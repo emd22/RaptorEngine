@@ -1,7 +1,7 @@
 #pragma once
 
 #include "FoxAst.hpp"
-#include "ScriptVar.hpp"
+#include "FoxVariable.hpp"
 
 #include <Util/Tokenizer.hpp>
 
@@ -25,7 +25,7 @@ class FoxParser
 public:
     FoxParser() = default;
 
-    void LoadFile(const char* path);
+    void LoadFile(const String& path);
 
     void PushScope();
     void PopScope();
@@ -33,10 +33,8 @@ public:
     FoxVar* FindVar(Hash32 hashed_name);
 
     FoxFunction* FindFunction(Hash32 hashed_name);
-    // FoxExternalFunc* FindExternalFunction(FoxHash hashed_name);
 
     FoxAstNode* TryParseKeyword(FoxAstBlock* parent_block);
-
     FoxAstAssign* TryParseAssignment(Token* var_name);
 
     FoxValue ParseValue();
@@ -113,20 +111,20 @@ private:
     Token* CreateTokenFromString(eTokenType type, const char* text);
     void CreateInternalVariableTokens();
 
+public:
+    char* pFileData = nullptr;
+    bool bHasErrors = false;
+
 private:
     PagedArray<FoxScope> mScopes;
     FoxScope* mCurrentScope = nullptr;
 
-    // std::vector<FoxExternalFunc> mExternalFuncs;
-
     std::vector<FoxAstDocComment*> CurrentDocComments;
 
-    FoxAstBlock* mRootBlock = nullptr;
+    FoxAstBlock* mpRootBlock = nullptr;
 
-    bool mHasErrors = false;
     bool mInCommandMode = false;
 
-    char* mpFileData;
     PagedArray<Token> mTokens = {};
     uint32 mTokenIndex = 0;
 

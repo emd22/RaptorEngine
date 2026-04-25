@@ -22,8 +22,8 @@ enum FoxBytecodeBase : uint8
 
 enum BcSpecPush : uint8
 {
-    BcSpecPush_Int32 = 1, // PUSH32  [imm]
-    BcSpecPush_Float32,   // PUSH32r [%r32]
+    BcSpecPush_Int32 = 1, // PUSH  [int32]
+    BcSpecPush_Float32,   // PUSHF [float32]
     BcSpecPush_Var,       // VPUSH [%var]
 
     BcSpecPush_StackAlloc,
@@ -31,15 +31,8 @@ enum BcSpecPush : uint8
 
 enum BrSpecPop : uint8
 {
-    BcSpecPop_Int32 = 1, // PIr32 [%r32]
     BcSpecPop_Variable_Int32,
     BcSpecPop_Variable_Float32,
-};
-
-enum BrSpecLoad : uint8
-{
-    BcSpecLoad_Int32 = 1, // LOAD32 [offset] [%r32]
-    BcSpecLoad_AbsoluteInt32,
 };
 
 enum BcSpecArith : uint8
@@ -53,7 +46,6 @@ enum BcSpecSave : uint8
     BcSpecSave_Int32 = 1,
     BcSpecSave_Reg32,
     BcSpecSave_AbsoluteInt32,
-    BcSpecSave_AbsoluteReg32
 };
 
 enum BcSpecJump : uint8
@@ -83,12 +75,6 @@ enum BcSpecType : uint8
     BcSpecType_String,
 };
 
-enum BcSpecMove : uint8
-{
-    BcSpecMove_Int32 = 1,
-    BcSpecMove_Reg32,
-};
-
 enum BcSpecMarker : uint8
 {
     // Function frame ops
@@ -99,8 +85,8 @@ enum BcSpecMarker : uint8
     BcSpecMarker_FunctionName,
 
     BcSpecMarker_ExtFn,
-    BcSpecMarker_Proc,
-    BcSpecMarker_ExternalProc,
+
+    BcSpecMarker_Proc, // PROC [name hash]
     BcSpecMarker_ProcEnd,
 
 };

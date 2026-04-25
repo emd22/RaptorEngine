@@ -131,6 +131,8 @@ public:
     }
 
 
+    uint32 AsUInt() const { return std::bit_cast<uint32>(ValueInt); }
+
     inline bool IsNumber() { return (Type == eFoxType::INT || Type == eFoxType::FLOAT); }
 
     inline bool IsRef() { return (Type == eFoxType::REF); }

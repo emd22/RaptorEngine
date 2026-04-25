@@ -1,8 +1,8 @@
-#include "ScriptParser.hpp"
+#include "FoxParser.hpp"
 
-#include "BytecodeCompiler.hpp"
+#include "FoxBytecodeCompiler.hpp"
 // #include "FoxCGArm64.hpp"
-#include "ScriptVM.hpp"
+#include "FoxVM.hpp"
 
 #include <Core/Defer.hpp>
 #include <Core/File.hpp>
@@ -17,7 +17,7 @@ namespace fx::script {
 #define FX_SCRIPT_ALLOC_MEMORY(type_, size_) gScriptMemPool->Alloc<type_>(size_)
 #define FX_SCRIPT_FREE(type_, ptr_)          gScriptMemPool->Free<type_>(ptr_);
 
-void FoxParser::LoadFile(const char* path)
+void FoxParser::LoadFile(const String& path)
 {
     File fp(path, File::eModType::Read, File::eDataType::Binary);
 
@@ -28,13 +28,12 @@ void FoxParser::LoadFile(const char* path)
     }
 
     Slice<char> file_data = fp.Read<char>();
-    mpFileData = file_data.pData;
+    pFileData = file_data.pData;
 
     LogInfo("Length: {}", file_data.Size);
 
-    Tokenizer tokenizer(mpFileData, file_data.Size);
+    Tokenizer tokenizer(pFileData, file_data.Size);
     tokenizer.Tokenize();
-
 
     mTokens = std::move(tokenizer.mTokens);
 
@@ -62,7 +61,7 @@ Token& FoxParser::EatToken(TT token_type)
     if (token.Type != token_type) {
         LogError("{}:{}: Unexpected token type {} when expecting {}!", token.FileLine, token.FileColumn,
                  Token::GetTypeName(token.Type), Token::GetTypeName(token_type));
-        mHasErrors = true;
+        bHasErrors = true;
     }
     ++mTokenIndex;
     return token;
@@ -373,61 +372,59 @@ void FoxParser::PrintFunctionTable(const FoxScope& scope) const
     LogInfo("||-------------------------------------||");
 }
 
-static void WB_InitAmmoVars(const SizedArray<FoxValue>& args)
-{
-    LogInfo("Mag size: {}, Num mags: {}", args[0].Get<int32>(), args[1].Get<int32>());
-}
-
-static void WB_InitStatVars(const SizedArray<FoxValue>& args) { LogInfo("Damage: {}", args[0].Get<int32>()); }
-
 
 void FoxParser::Execute()
 {
-    Defer([&]() { gEnginePool->Free(mpFileData); });
+    // Defer([&]() { gEnginePool->Free(pFileData); });
 
-    mRootBlock = Parse();
+    // mpRootBlock = Parse();
 
-    // If there are errors, exit early
-    if (mHasErrors || mRootBlock == nullptr) {
-        LogInfo("Execute: Returning early...");
-        return;
-    }
+    // // If there are errors, exit early
+    // if (bHasErrors || mpRootBlock == nullptr) {
+    //     LogInfo("Execute: Returning early...");
+    //     return;
+    // }
 
-    printf("\n=====\n");
+    // printf("\n=====\n");
 
-    PrintFunctionTable(*mCurrentScope);
+    // PrintFunctionTable(*mCurrentScope);
 
-    FoxBytecodeCompiler bc_emitter;
-    bc_emitter.Compile(mRootBlock);
+    // FoxBytecodeCompiler bc_emitter;
+    // SizedArray<uint8> bytecode = bc_emitter.Compile(mpRootBlock);
 
-    if (bc_emitter.HasErrors()) {
-        LogError("Errors found during script compilation, cannot continue");
-        return;
-    }
+    // if (bc_emitter.HasErrors()) {
+    //     LogError("Errors found during script compilation, cannot continue");
+    //     return;
+    // }
 
-    printf("\n=====\n");
+    // FoxBytecodePrinter bc_printer(bytecode);
+    // bc_printer.Print();
 
-    FoxBytecodePrinter bc_printer(bc_emitter.mBytecode);
-    bc_printer.Print();
+    // FoxVM vm;
 
-    printf("\n=====\n");
+    // vm.InitVM(std::move(bytecode));
 
-    ScriptVM vm;
+    // vm.RegisterFunction(HashStr32("WB_InitAmmoVars"), false, 2, &WB_InitAmmoVars);
+    // vm.RegisterFunction(HashStr32("WB_InitStatVars"), false, 1, &WB_InitStatVars);
 
-    vm.Start(std::move(bc_emitter.mBytecode));
+    // vm.RegisterFunction(HashStr32("N_GetAddition"), true, 2, &N_GetAddition);
 
-    vm.RegisterFunction(HashStr32("WB_InitAmmoVars"), 2, &WB_InitAmmoVars);
-    vm.RegisterFunction(HashStr32("WB_InitStatVars"), 1, &WB_InitStatVars);
+    // FoxSymbol* entrypoint = vm.GetSymbol("ScriptEntry");
+    // if (entrypoint) {
+    //     LogInfo("Found entrypoint! {}", entrypoint->Offset);
+    //     FoxValue value = vm.CallFunction(entrypoint, {});
 
-    VMSymbol* entrypoint = vm.GetSymbol("ScriptEntry");
-    if (entrypoint) {
-        LogInfo("Found entrypoint! {}", entrypoint->Offset);
-        FoxValue value = vm.CallFunction(entrypoint);
+    //     LogInfo("RETURN VALUE: {}, {}", value, static_cast<int32>(value.Type));
+    // }
 
-        LogInfo("RETURN VALUE: {}, {}", value, static_cast<int32>(value.Type));
-    }
 
-    FoxAstDestroyer destroyer(mRootBlock);
+    // FoxSymbol* sym = vm.GetSymbol("TestFunction");
+    // if (sym) {
+    //     FoxValue value = vm.CallFunction(sym, { FoxValue(8), FoxValue(5) });
+    //     LogInfo("Test return value: {}", value);
+    // }
+
+    // FoxAstDestroyer destroyer(mpRootBlock);
 }
 
 FoxValue FoxParser::ParseValue()
@@ -646,7 +643,7 @@ void FoxParser::DefineExternalVar(const char* type, const char* name, const FoxV
 
 FoxAstNode* FoxParser::ParseStatementAsCommand(FoxAstBlock* parent_block)
 {
-    if (mHasErrors) {
+    if (bHasErrors) {
         return nullptr;
     }
 
@@ -710,7 +707,7 @@ FoxAstNode* FoxParser::ParseStatementAsCommand(FoxAstBlock* parent_block)
 
 FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
 {
-    if (mHasErrors) {
+    if (bHasErrors) {
         return nullptr;
     }
 
@@ -988,7 +985,7 @@ FoxAstBlock* FoxParser::Parse()
         var.Print();
     }*/
 
-    if (mHasErrors) {
+    if (bHasErrors) {
         return nullptr;
     }
 

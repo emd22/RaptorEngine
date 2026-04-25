@@ -174,11 +174,8 @@ public:
 class FoxAstDestroyer
 {
 public:
-    FoxAstDestroyer(FoxAstBlock* root_block)
-    //: mRootBlock(root_block)
-    {
-        Do(root_block);
-    }
+    FoxAstDestroyer() = default;
+    FoxAstDestroyer(FoxAstBlock* root_block) { Do(root_block); }
 
     void Do(FoxAstNode* node);
 

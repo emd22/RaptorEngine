@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ScriptVar.hpp"
+#include "FoxValue.hpp"
 
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
@@ -13,7 +13,7 @@ namespace fx::script {
 // Bytecode VM
 ///////////////////////////////////////////
 
-struct ScriptVMCallFrame
+struct VMCallFrame
 {
     uint32 StartStackIndex = 0;
 };
@@ -26,7 +26,7 @@ struct VMVariable
 };
 
 
-struct VMSymbol
+struct FoxSymbol
 {
     Name Symbol;
     uint32 Offset;
@@ -38,40 +38,39 @@ struct VMScope
     VMVariable Variables[32];
 };
 
-using VMExternalFunction = void (*)(const SizedArray<FoxValue>& args);
+class FoxVM;
+
+using VMExternalFunction = void (*)(FoxVM* vm, const SizedArray<FoxValue>& args);
 
 struct VMExternalFunctionEntry
 {
-    VMExternalFunction Func;
+    VMExternalFunction pFunc;
     uint32 ArgCount = 0;
+    bool bReturnsValue = false;
 };
 
-class ScriptVM
+class FoxVM
 {
     static constexpr uint32 scStackSize = 1024 * 16;
 
 public:
-    ScriptVM() = default;
+    FoxVM() = default;
 
-    void Start(PagedArray<uint8>&& bytecode);
+    void InitVM(SizedArray<uint8>&& bytecode);
 
-    void RegisterFunction(Hash32 hashed_name, uint32 arg_count, VMExternalFunction func);
+    FX_FORCE_INLINE uint32 GetStackPointer() const { return StackPointer; }
 
-    VMSymbol* GetSymbol(const String& name) const;
-    VMSymbol* GetSymbol(Hash32 name_hash) const;
-    uint32 GetFunctionAddr(Hash32 name_hash) const;
-
-    FoxValue CallFunction(VMSymbol* sym);
+    FoxSymbol* GetSymbol(const Hash32 name_hash) const;
+    uint32 GetFunctionAddr(const Hash32 name_hash) const;
 
     void Push16(uint16 value);
     void Push32(eFoxType type, uint32 value);
-
     uint32 Pop32();
+
+    void ExecuteOp();
 
 private:
     void LoadSymTable();
-
-    void ExecuteOp();
 
     void DoPush(uint8 op_base, uint8 op_spec);
     void DoPop(uint8 op_base, uint8 op_spec);
@@ -93,34 +92,34 @@ private:
     uint32 Read32();
     char* ReadString(char* buffer, uint32 buffer_size);
 
-    ScriptVMCallFrame* GetCurrentCallFrame();
+    VMCallFrame* GetCurrentCallFrame();
 
 public:
     uint8* Stack = nullptr;
     uint32 StackPointer = 0;
     uint32 ReturnAddress = 0;
 
-    PagedArray<uint8> mBytecode;
+    SizedArray<uint8> mBytecode;
 
-    SizedArray<VMSymbol> SymTable;
+    SizedArray<FoxSymbol> SymTable;
     SizedArray<VMScope> Scopes;
     int32 ScopeIndex = 0;
 
     std::unordered_map<Hash32, VMExternalFunctionEntry, Hash32Stl> ExternalFunctions;
 
-private:
-    uint32 mPC = 0;
+    uint32 PC = 0;
+    bool bReturnValueOnStack = false;
 
+    eFoxType LastPushType = eFoxType::NONETYPE;
+
+private:
     bool mIsInCallFrame = false;
 
-    ScriptVMCallFrame mCallFrames[8];
+    VMCallFrame mCallFrames[8];
     int mCallFrameIndex = 0;
 
     bool mIsInParams = false;
-    PagedArray<eFoxType> mPushedTypes;
 
-    bool mbReturnValueOnStack = false;
-    eFoxType LastPushType = eFoxType::NONETYPE;
 
     eFoxType mCurrentType = eFoxType::NONETYPE;
 };

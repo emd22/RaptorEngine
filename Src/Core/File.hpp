@@ -34,11 +34,11 @@ public:
 
 public:
     File() {}
-    File(const char* path, eModType mt, eDataType dt);
+    File(const String& path, eModType mt, eDataType dt);
 
     static std::filesystem::file_time_type GetLastModifiedTime(const std::string& path);
 
-    void Open(const char* path, eModType mt, eDataType dt);
+    void Open(const String& path, eModType mt, eDataType dt);
     uint64 GetFileSize();
 
     template <typename TDataType>
