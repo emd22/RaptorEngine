@@ -24,6 +24,7 @@ public:
     String(const char* str, uint32 length);
     String(const std::string& str);
     String(const char* str);
+    String(const String& other) { (*this) = other; }
 
     FX_FORCE_INLINE bool IsHeapAllocated() const { return (mpHeapStr != nullptr); }
 
@@ -40,7 +41,11 @@ public:
         return mpStackStr;
     }
 
+    std::string Str() const { return std::string(CStr(), Length); }
+
     String& operator=(const char* str);
+    String& operator=(const String& other);
+
     bool operator==(const String& other) const;
 
     String operator+(const String& other) const;

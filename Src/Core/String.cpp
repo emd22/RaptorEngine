@@ -33,7 +33,7 @@ String::String(const char* str, uint32 length)
 
 String::String(const char* str) : String(str, strlen(str)) {}
 
-String::String(const std::string& str) : String(str.data(), str.length()) {}
+String::String(const std::string& str) : String(str.c_str(), str.length()) {}
 
 String::String(uint32 allocation_size)
 {
@@ -113,9 +113,16 @@ String& String::operator=(const char* str)
     return *this;
 }
 
+String& String::operator=(const String& other)
+{
+    (*this) = other.CStr();
+
+    return *this;
+}
+
 void String::Clear()
 {
-    if (mpHeapStr) {
+    if (mpHeapStr && Length > scStackAllocSize) {
         gEnginePool->Free<char>(mpHeapStr);
     }
 

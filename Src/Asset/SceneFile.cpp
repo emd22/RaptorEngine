@@ -81,13 +81,13 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 {
     const char* mesh_path = object_entry.GetMember(HashStr32("Mesh"))->Get<const char*>();
 
-
     LoadObjectOptions load_options {};
     if (object_entry.GetMember(HashStr32("Physics")) != nullptr) {
         load_options.bGeneratePhysicsMesh = true;
     }
 
-    TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), scene_path + mesh_path, load_options);
+    std::string path = (scene_path) + mesh_path;
+    TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), path, load_options);
     object->pScene = &scene;
 
     ApplyPropertiesToObject(object, object_entry);

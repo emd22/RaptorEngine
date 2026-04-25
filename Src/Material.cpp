@@ -72,7 +72,7 @@ TSRef<Material> MaterialManager::New(const String& name, Pipeline* pipeline, boo
 
     TSRef<Material> ref = TSRef<Material>::New();
 
-    ref->Name = name;
+    ref->Name = name.Str();
     ref->pPipeline = pipeline;
     ref->mMaterialPropertiesIndex = free_material_index;
     ref->SetSupportsSkinning(supports_skinning);

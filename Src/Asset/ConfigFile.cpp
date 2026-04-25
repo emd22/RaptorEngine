@@ -85,8 +85,7 @@ std::string ConfigEntry::AsString(uint32 indent) const
 
     if (Type == eValueType::Struct) {
         for (const ConfigEntry& entry : Members) {
-            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get().CStr(),
-                                       entry.AsString(indent + 1));
+            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
         }
 
         return std::format("{{\n{}{}}}", member_list, indent_str);

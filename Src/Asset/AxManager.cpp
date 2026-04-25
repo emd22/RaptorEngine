@@ -135,9 +135,9 @@ inline bool IsMemoryJpeg(const uint8* data, uint32 data_size)
 }
 
 
-inline bool IsFileJpeg(const String& path)
+inline bool IsFileJpeg(const std::string& path)
 {
-    const char* path_cstr = path.CStr();
+    const char* path_cstr = path.c_str();
 
     FILE* fp = fopen(path_cstr, "rb");
 
@@ -162,7 +162,8 @@ inline bool IsFileJpeg(const String& path)
     return false;
 }
 
-void AxManager::LoadObject(const String& name, TSRef<Object>& asset, const String& path, LoadObjectOptions options)
+void AxManager::LoadObject(const std::string& name, TSRef<Object>& asset, const std::string& path,
+                           LoadObjectOptions options)
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
@@ -172,7 +173,7 @@ void AxManager::LoadObject(const String& name, TSRef<Object>& asset, const Strin
 }
 
 
-void AxManager::LoadObjectFromMemory(const String& name, TSRef<Object>& asset, const uint8* data, uint32 data_size)
+void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& asset, const uint8* data, uint32 data_size)
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
 
@@ -182,7 +183,7 @@ void AxManager::LoadObjectFromMemory(const String& name, TSRef<Object>& asset, c
 
 
 void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
-                          const String& path)
+                          const std::string& path)
 {
     bool is_jpeg = IsFileJpeg(path);
 

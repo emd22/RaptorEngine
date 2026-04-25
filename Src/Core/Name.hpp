@@ -10,15 +10,15 @@ class Name
 public:
     Name() = default;
     Name(const char* name) : mName(name), mHash(HashStr32(name)) {}
-    Name(const String& name) : mName(name), mHash(HashStr32(name.CStr())) {}
+    Name(const std::string& name) : mName(name), mHash(HashStr32(name.c_str())) {}
 
-    const String& Get() const { return mName; }
+    const std::string& Get() const { return mName; }
     Hash32 GetHash() const { return mHash; }
 
-    void Set(const String& name)
+    void Set(const std::string& name)
     {
         mName = name;
-        mHash = HashStr32(name.CStr());
+        mHash = HashStr32(name.c_str());
     }
 
     void Set(const char* name)
@@ -33,7 +33,7 @@ public:
         return *this;
     }
 
-    Name& operator=(const String& name)
+    Name& operator=(const std::string& name)
     {
         Set(name);
         return *this;
@@ -43,12 +43,12 @@ public:
 
     void Clear()
     {
-        mName.Clear();
+        mName.clear();
         mHash = HashNull32;
     }
 
 private:
-    String mName = "";
+    std::string mName;
     Hash32 mHash = HashNull32;
 };
 

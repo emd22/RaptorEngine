@@ -100,7 +100,7 @@ public:
      * @brief Creates a new `Object` and loads the provided asset into it from
      * the path provided.
      */
-    TSRef<Object> LoadObject(const String& name, const String& path, LoadObjectOptions options = {})
+    TSRef<Object> LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
     {
         TSRef<Object> asset = TSRef<Object>::New();
         LoadObject(name, asset, path, options);
@@ -112,7 +112,7 @@ public:
      * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    TSRef<Object> LoadObjectFromMemory(const String& name, const uint8* data, uint32 data_size)
+    TSRef<Object> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
     {
         TSRef<Object> asset = TSRef<Object>::New();
         LoadObjectFromMemory(name, asset, data, data_size);
@@ -120,7 +120,7 @@ public:
         return asset;
     }
 
-    TSRef<AxImage> LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, const String& path)
+    TSRef<AxImage> LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, const std::string& path)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
         LoadImage(image_type, format, asset, path);
@@ -128,7 +128,7 @@ public:
         return asset;
     }
 
-    inline TSRef<AxImage> LoadImage(const String& path, renderer::eImageFormat format)
+    inline TSRef<AxImage> LoadImage(const std::string& path, renderer::eImageFormat format)
     {
         return LoadImage(renderer::eImageType::Flat, format, path);
     }
@@ -162,22 +162,23 @@ public:
     /**
      * @brief Loads an asset into the provided asset from the provided data.
      */
-    void LoadObjectFromMemory(const String& name, TSRef<Object>& asset, const uint8* data, uint32 data_size);
+    void LoadObjectFromMemory(const std::string& name, TSRef<Object>& asset, const uint8* data, uint32 data_size);
 
 
     /**
      * @brief Loads an object into the provided asset from a path.
      */
-    void LoadObject(const String& name, TSRef<Object>& asset, const String& path, LoadObjectOptions options = {});
+    void LoadObject(const std::string& name, TSRef<Object>& asset, const std::string& path,
+                    LoadObjectOptions options = {});
 
 
     void LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
-                   const String& path);
+                   const std::string& path);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    inline void LoadImage(TSRef<AxImage>& asset, renderer::eImageFormat format, const String& path)
+    inline void LoadImage(TSRef<AxImage>& asset, renderer::eImageFormat format, const std::string& path)
     {
         return LoadImage(renderer::eImageType::Flat, format, asset, path);
     }
@@ -205,7 +206,7 @@ private:
 
     template <typename TAssetType, typename TLoaderType, eAxType TEnumValue>
         requires C_IsAsset<TAssetType>
-    static void SubmitAssetToLoad(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader, const String& path,
+    static void SubmitAssetToLoad(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader, const std::string& path,
                                   const uint8* data = nullptr, uint32 data_size = 0)
     {
         AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
