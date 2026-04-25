@@ -1,0 +1,5 @@
+/*
+    General object functions
+*/
+
+extproc ObjMove(float x, float y, float z);

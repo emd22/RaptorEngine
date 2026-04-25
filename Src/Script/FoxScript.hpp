@@ -33,15 +33,15 @@ public:
 
     void PushValue(const FoxValue& value);
 
-    FoxValue Call(FoxSymbol* sym, const SizedArray<FoxValue>& args);
-    FoxValue CallIfExists(const Hash32 name_hash, const SizedArray<FoxValue>& args);
+    FoxValue CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args);
+    FoxValue CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args);
 
-    void RegisterFunction(Hash32 name_hash, bool returns_value, uint32 parameter_count, VMExternalFunction function);
+    void RegisterProc(Hash32 name_hash, bool returns_value, uint32 parameter_count, VMExternalFunction function);
 
     FX_FORCE_INLINE FoxSymbol* GetSymbol(const String& name) const { return Vm.GetSymbol(HashStr32(name.CStr())); }
     FX_FORCE_INLINE FoxSymbol* GetSymbol(const Hash32 name_hash) const { return Vm.GetSymbol(name_hash); };
 
-    FX_FORCE_INLINE uint32 GetFunctionAddr(Hash32 name_hash) const { return Vm.GetFunctionAddr(name_hash); };
+    FX_FORCE_INLINE uint32 GetProcAddr(Hash32 name_hash) const { return Vm.GetProcAddr(name_hash); };
 
 public:
     FoxVM Vm;

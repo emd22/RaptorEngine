@@ -30,8 +30,6 @@ void FoxParser::LoadFile(const String& path)
     Slice<char> file_data = fp.Read<char>();
     pFileData = file_data.pData;
 
-    LogInfo("Length: {}", file_data.Size);
-
     Tokenizer tokenizer(pFileData, file_data.Size);
     tokenizer.Tokenize();
 
@@ -989,8 +987,8 @@ FoxAstBlock* FoxParser::Parse()
         return nullptr;
     }
 
-    FoxAstPrinter printer(root_block);
-    printer.Print(root_block);
+    // FoxAstPrinter printer(root_block);
+    // printer.Print(root_block);
 
     return root_block;
 }

@@ -42,8 +42,6 @@ void FoxVM::LoadSymTable()
 
         sym.Symbol = Name(name_buffer);
         sym.Offset = Read32();
-
-        LogInfo("Symbol loaded: {} at offset {}", sym.Symbol.Get(), sym.Offset);
     }
 }
 
@@ -211,8 +209,6 @@ void FoxVM::DoArith(uint8 op_base, uint8 op_spec)
         int32 b = static_cast<int32>(Pop32());
 
         int32 result = a + b;
-
-        LogInfo("Addition result: {}", result);
         Push32(eFoxType::INT, static_cast<uint32>(result));
     }
 
@@ -222,8 +218,6 @@ void FoxVM::DoArith(uint8 op_base, uint8 op_spec)
         float32 b = std::bit_cast<float32>(Pop32());
 
         float32 result = a + b;
-
-        LogInfo("Addition result (float32): {}", result);
         Push32(eFoxType::FLOAT, std::bit_cast<uint32>(result));
     }
 }
@@ -232,13 +226,13 @@ void FoxVM::DoSave(uint8 op_base, uint8 op_spec) {}
 
 void FoxVM::CallExternalFunction(Hash32 hashed_name)
 {
-    auto it = ExternalFunctions.find(hashed_name);
-    if (it == ExternalFunctions.end()) {
+    auto it = ExternalProcs.find(hashed_name);
+    if (it == ExternalProcs.end()) {
         LogWarning("External function {} not found", hashed_name);
         return;
     }
 
-    VMExternalFunctionEntry& func = it->second;
+    VMExternalProcEntry& func = it->second;
 
     SizedArray<FoxValue> args {};
     args.InitSize(func.ArgCount);
@@ -270,7 +264,7 @@ FoxSymbol* FoxVM::GetSymbol(const Hash32 name_hash) const
     return nullptr;
 }
 
-uint32 FoxVM::GetFunctionAddr(const Hash32 name_hash) const
+uint32 FoxVM::GetProcAddr(const Hash32 name_hash) const
 {
     FoxSymbol* sym = GetSymbol(name_hash);
     if (!sym) {
@@ -293,9 +287,7 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_CallAbsolute) {
         uint32 name_hash = Read32();
-        uint32 call_offset = GetFunctionAddr(name_hash);
-
-        LogInfo("Call addr: {}", call_offset);
+        uint32 call_offset = GetProcAddr(name_hash);
 
         mIsInParams = false;
 
@@ -306,21 +298,17 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         PC = call_offset;
     }
     else if (op_spec == BcSpecJump_ReturnToCaller) {
-        LogInfo("Returning from scope...");
         --ScopeIndex;
         PC = ReturnAddress;
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Int32) {
         LastPushType = eFoxType::INT;
-
-        LogInfo("Returning from scope (valued)...");
         --ScopeIndex;
         bReturnValueOnStack = true;
         PC = ReturnAddress;
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Float32) {
         LastPushType = eFoxType::FLOAT;
-        LogInfo("Returning from scope (valued)...");
         --ScopeIndex;
         bReturnValueOnStack = true;
         PC = ReturnAddress;
@@ -337,35 +325,11 @@ void FoxVM::DoData(uint8 op_base, uint8 op_spec)
         uint16 length = Read16();
         PC += length;
     }
-    // else if (op_spec == BcSpecData_ParamsStart) {
-    //     mIsInParams = true;
-
-    //     // Push the current return address pointer. This is so nested action calls
-    //     // can correctly navigate back to the caller.
-    //     // Push32(Registers[FX_REG_RA]);
-    // }
 }
 
-void FoxVM::DoType(uint8 op_base, uint8 op_spec)
-{
-    // if (op_spec == OpSpecType_Int) {
-    //     mCurrentType = ScriptValue::INT;
-    // }
-    // else if (op_spec == OpSpecType_String) {
-    //     mCurrentType = ScriptValue::STRING;
-    // }
-}
+void FoxVM::DoType(uint8 op_base, uint8 op_spec) {}
 
-void FoxVM::DoMove(uint8 op_base, uint8 op_spec_raw)
-{
-    // uint8 op_spec = ((op_spec_raw >> 4) & 0x0F);
-    // ScriptRegister op_reg = static_cast<ScriptRegister>(op_spec_raw & 0x0F);
-
-    // if (op_spec == OpSpecMove_Int32) {
-    //     int32 value = Read32();
-    //     Registers[op_reg] = value;
-    // }
-}
+void FoxVM::DoMove(uint8 op_base, uint8 op_spec_raw) {}
 
 void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 {
@@ -395,8 +359,6 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 
         ThisScope().Variables[var_index].NameHash = name_hash;
         ThisScope().Variables[var_index].Value.Set<int32>(0);
-
-        LogInfo("Define variable {}", var_index);
     }
     else if (op_spec == BcSpecVariable_Cast_Int32) {
         uint16 var_index = Read16();

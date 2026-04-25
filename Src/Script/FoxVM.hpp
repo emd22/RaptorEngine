@@ -42,7 +42,7 @@ class FoxVM;
 
 using VMExternalFunction = void (*)(FoxVM* vm, const SizedArray<FoxValue>& args);
 
-struct VMExternalFunctionEntry
+struct VMExternalProcEntry
 {
     VMExternalFunction pFunc;
     uint32 ArgCount = 0;
@@ -61,7 +61,7 @@ public:
     FX_FORCE_INLINE uint32 GetStackPointer() const { return StackPointer; }
 
     FoxSymbol* GetSymbol(const Hash32 name_hash) const;
-    uint32 GetFunctionAddr(const Hash32 name_hash) const;
+    uint32 GetProcAddr(const Hash32 name_hash) const;
 
     void Push16(uint16 value);
     void Push32(eFoxType type, uint32 value);
@@ -105,7 +105,7 @@ public:
     SizedArray<VMScope> Scopes;
     int32 ScopeIndex = 0;
 
-    std::unordered_map<Hash32, VMExternalFunctionEntry, Hash32Stl> ExternalFunctions;
+    std::unordered_map<Hash32, VMExternalProcEntry, Hash32Stl> ExternalProcs;
 
     uint32 PC = 0;
     bool bReturnValueOnStack = false;

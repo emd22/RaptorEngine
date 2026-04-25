@@ -36,7 +36,6 @@ void FoxScript::Load(const String& path)
         return;
     }
 
-
     FoxBytecodeCompiler compiler {};
     SizedArray<uint8> bytecode = compiler.Compile(root_node);
     if (compiler.HasErrors()) {
@@ -44,38 +43,38 @@ void FoxScript::Load(const String& path)
         return;
     }
 
-    FoxBytecodePrinter bc_printer(bytecode);
-    bc_printer.Print();
+    // FoxBytecodePrinter bc_printer(bytecode);
+    // bc_printer.Print();
 
     Vm.InitVM(std::move(bytecode));
 
-    RegisterFunction(HashStr32("WB_InitAmmoVars"), false, 2, &WB_InitAmmoVars);
-    RegisterFunction(HashStr32("WB_InitStatVars"), false, 1, &WB_InitStatVars);
+    RegisterProc(HashStr32("WB_InitAmmoVars"), false, 2, &WB_InitAmmoVars);
+    RegisterProc(HashStr32("WB_InitStatVars"), false, 1, &WB_InitStatVars);
 
     // Since all we need is the bytecode now, we can destroy the AST.
     FoxAstDestroyer destroyer;
     destroyer.Do(root_node);
 
-    CallIfExists(HashStr32("OnLoad"), {});
+    // Call OnLoad if it exists
+    CallProc(HashStr32("OnLoad"), {});
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
 
-void FoxScript::RegisterFunction(Hash32 name_hash, bool returns_value, uint32 parameter_count,
-                                 VMExternalFunction function)
+void FoxScript::RegisterProc(Hash32 name_hash, bool returns_value, uint32 parameter_count, VMExternalFunction function)
 {
-    VMExternalFunctionEntry entry {
+    VMExternalProcEntry entry {
         .pFunc = function,
         .ArgCount = parameter_count,
         .bReturnsValue = returns_value,
     };
 
-    Vm.ExternalFunctions[name_hash] = entry;
+    Vm.ExternalProcs[name_hash] = entry;
 
     LogInfo("Registered external function {}", name_hash);
 }
 
-FoxValue FoxScript::Call(FoxSymbol* sym, const SizedArray<FoxValue>& args)
+FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
 {
     if (!sym) {
         return FoxValue::scNone;
@@ -104,15 +103,9 @@ FoxValue FoxScript::Call(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     return FoxValue::scNone;
 }
 
-
-FoxValue FoxScript::CallIfExists(const Hash32 name_hash, const SizedArray<FoxValue>& args)
+FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
 {
-    FoxSymbol* sym = GetSymbol(name_hash);
-    if (sym) {
-        return Call(sym, args);
-    }
-
-    return FoxValue::scNone;
+    return CallProc(GetSymbol(name_hash), args);
 }
 
 

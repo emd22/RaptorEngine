@@ -36,7 +36,7 @@ SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
 
     EmitNode(root);
 
-    PrintBytecode();
+    // PrintBytecode();
 
     return ArrayUtil::LinearizePagedArray(mBytecode);
 }
@@ -422,23 +422,14 @@ uint32 FoxBytecodeCompiler::EmitDataString(char* str, uint16 length)
 
     Write16(final_length);
 
-    printf("String[Len=%02X %02X]: ", final_length >> 8, final_length & 0xFF);
-
     for (int i = 0; i < final_length; i++) {
         if (i >= length) {
-            printf("%02X ", 0);
-
             mBytecode.Insert(0);
             continue;
         }
 
-        printf("%02X ", str[i]);
-
         mBytecode.Insert(str[i]);
     }
-
-    printf("\n");
-
 
     return start_index;
 }
@@ -649,8 +640,6 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DefineParam(FoxAstNode* param_decl_no
 
     // Emit variable without emitting pushes or pops
     FoxBytecodeVarHandle* handle = DoVarDeclare(var_decl_node, DECLARE_NO_EMIT);
-    LogDebug("DEFINING PARAMETER {}", var_decl_node->pNameToken->GetStr());
-
     uint32 parameter_var_index = mVarsInScope++;
 
     EmitVariableDefine(parameter_var_index, var_decl_node->pNameToken->GetHash());

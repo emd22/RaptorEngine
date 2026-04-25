@@ -6,9 +6,7 @@
 @include "./Scripts/WeaponBase.fox"
 
 
-
-
-proc SetupVars()
+proc OnLoad() void
 {
     WB_InitAmmoVars(
         10,     // Mag size
@@ -18,16 +16,4 @@ proc SetupVars()
     WB_InitStatVars(
         15      // Damage
     );
-}
-
-
-proc OnLoad() void
-{
-}
-
-proc ScriptEntry() int
-{
-    SetupVars();
-
-    return 5;
 }

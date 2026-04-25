@@ -30,21 +30,26 @@ int main()
     script.Load(FX_BASE_DIR "/Scripts/Test.fox");
 
 
-    // fx::renderer::Globals::Init();
+    using FoxValue = fx::script::FoxValue;
 
-    // {
-    //     fx::FoxtrotGame game {};
-    // }
+    FoxValue result = script.CallProc(fx::HashStr32("TestFunction"), { FoxValue(5), FoxValue(10) });
+    fx::LogInfo("Result = {}", result);
 
-    // fx::renderer::Globals::Destroy();
-    // fx::Globals::Destroy();
+    fx::renderer::Globals::Init();
 
-    // Defer(
-    //     []()
-    //     {
-    //         delete fx::gEnginePool;
-    //         fx::gEnginePool = nullptr;
-    //     });
+    {
+        fx::FoxtrotGame game {};
+    }
 
-    // return 0;
+    fx::renderer::Globals::Destroy();
+    fx::Globals::Destroy();
+
+    Defer(
+        []()
+        {
+            delete fx::gEnginePool;
+            fx::gEnginePool = nullptr;
+        });
+
+    return 0;
 }
