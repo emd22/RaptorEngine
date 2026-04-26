@@ -5,29 +5,29 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 ## Features
 - Fast math library using SIMD
 	- Supports Arm NEON and SSE/AVX.
-- Vulkan rendering backend
-- Super fast custom memory pool
-- Multithreaded and extensible asset manager that works seamlessly in the background
+- Vulkan graphics backend
+- Custom scripting language
+- Super fast memory pool
 - Custom core library and containers
-- GLTF loading with cgltf, JPEG loading with turbojpeg and other format loading using stb-image
-- Integration with Jolt Physics
+- Multithreaded and extensible asset manager that works seamlessly in the background
+- Jolt Physics
 - Deferred rendering with light volumes
 
 ## Building
-To build the engine, make sure you have Premake5 installed.
+To build the engine, make sure you have CMake installed.
 
 ### Building for MacOS
-You can use `premake5 [build system]` to generate the project files. To build with Ninja, you use one of the generated build targets.
+You can use `cmake` to generate the project files. To build with Ninja, you use one of the generated build targets.
 For example,
 ```
 # Generate the project or build files
-premake5 ninja
+cmake -GNinja -DUSE_SIMDE=Off -DUSE_MOLTENVK=On .
 
-# Build the engine and third party libraries
-ninja RelWithDebInfo_macOS
+# Build Foxtrot
+ninja
 
-# Run the engine
-./build/RelWithDebInfo/foxtrot
+# Run the executable. Replace `Debug` with the optimization level you built with.
+./build/Debug/foxtrot
 ```
 
 
