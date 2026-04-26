@@ -448,8 +448,33 @@ void Object::Update()
     }
 
     UpdateAnimation();
+
+    if (pScript.IsValid()) {
+        pScript->CallTickProc();
+    }
 }
 
+void Object::SetScriptVars()
+{
+    if (!pScript.IsValid()) {
+        return;
+    }
+
+    pScript->SetGlobal(HashStr32("OBJECTID"), script::FoxValue(static_cast<int32>(ObjectId)));
+    pScript->CallProc(HashStr32("ObjectInit"), {});
+}
+
+void Object::AttachScript(const Ref<script::FoxScript>& script)
+{
+    pScript = script;
+    SetScriptVars();
+}
+
+void Object::LoadScript(const String& path)
+{
+    pScript = MakeRef<script::FoxScript>(path);
+    SetScriptVars();
+}
 
 void Object::AttachObject(const TSRef<Object>& object)
 {

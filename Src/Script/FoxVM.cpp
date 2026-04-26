@@ -338,14 +338,27 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         uint32 value = Read32();
         LogInfo("VSET [int32] ${}, {}", var_index, value);
 
-        ThisScope().Variables[var_index].Value.Set<int32>(value);
+
+        VMVariable& var = ThisScope().Variables[var_index];
+        var.Value.Set<int32>(value);
+
+        // Update global variable
+        if (var.bIsGlobalRef) {
+            Globals[var.NameHash].Set<int32>(value);
+        }
     }
     else if (op_spec == BcSpecVariable_Set_Float32) {
         uint16 var_index = Read16();
         float32 value = std::bit_cast<float32>(Read32());
         LogInfo("VSET [float32] ${}, {}", var_index, value);
 
-        ThisScope().Variables[var_index].Value.Set<float32>(value);
+        VMVariable& var = ThisScope().Variables[var_index];
+        var.Value.Set<float32>(value);
+
+        // Update global variable
+        if (var.bIsGlobalRef) {
+            Globals[var.NameHash].Set<float32>(value);
+        }
     }
     else if (op_spec == BcSpecVariable_Set_Var) {
         VarIndex dst_index = Read16();
@@ -357,8 +370,26 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
 
-        ThisScope().Variables[var_index].NameHash = name_hash;
-        ThisScope().Variables[var_index].Value.Set<int32>(0);
+        VMVariable& var = ThisScope().Variables[var_index];
+
+        var.NameHash = name_hash;
+        var.Value.Set<int32>(0);
+    }
+
+    else if (op_spec == BcSpecVariable_DefineGlobal) {
+        uint16 var_index = Read16();
+        Hash32 name_hash = Read32();
+
+        auto it = Globals.find(name_hash);
+        if (it == Globals.end()) {
+            Globals[name_hash].Set<int32>(0);
+        }
+
+        VMVariable& var = ThisScope().Variables[var_index];
+
+        var.NameHash = name_hash;
+        var.bIsGlobalRef = true;
+        var.Value.Set<int32>(Globals[name_hash].Get<int32>());
     }
     else if (op_spec == BcSpecVariable_Cast_Int32) {
         uint16 var_index = Read16();

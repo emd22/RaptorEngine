@@ -47,7 +47,7 @@ public:
     enum VarDeclareMode
     {
         DECLARE_DEFAULT,
-        DECLARE_NO_EMIT,
+        DO_NOT_ALLOW_ASSIGNMENT,
     };
 
 public:
@@ -117,7 +117,7 @@ private:
     void EmitVariableSetVar(VarIndex dst, VarIndex src);
 
 
-    void EmitVariableDefine(uint16 var_index, Hash32 name_hash);
+    void EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global);
     void EmitVariableIndex(uint16 var_index);
 
     void EmitVariableCastInt32(VarIndex var_index);

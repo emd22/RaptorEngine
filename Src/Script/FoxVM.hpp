@@ -22,6 +22,7 @@ struct VMCallFrame
 struct VMVariable
 {
     Hash32 NameHash = HashNull32;
+    bool bIsGlobalRef = false;
     FoxValue Value;
 };
 
@@ -102,6 +103,9 @@ public:
     SizedArray<uint8> mBytecode;
 
     SizedArray<FoxSymbol> SymTable;
+
+    std::unordered_map<Hash32, FoxValue, Hash32Stl> Globals;
+
     SizedArray<VMScope> Scopes;
     int32 ScopeIndex = 0;
 

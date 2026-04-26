@@ -987,8 +987,8 @@ FoxAstBlock* FoxParser::Parse()
         return nullptr;
     }
 
-    // FoxAstPrinter printer(root_block);
-    // printer.Print(root_block);
+    FoxAstPrinter printer(root_block);
+    printer.Print(root_block);
 
     return root_block;
 }

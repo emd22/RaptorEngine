@@ -36,7 +36,7 @@ SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
 
     EmitNode(root);
 
-    // PrintBytecode();
+    PrintBytecode();
 
     return ArrayUtil::LinearizePagedArray(mBytecode);
 }
@@ -372,12 +372,20 @@ void FoxBytecodeCompiler::EmitVariableSetVar(VarIndex dst, VarIndex src)
 }
 
 
-void FoxBytecodeCompiler::EmitVariableDefine(uint16 var_index, Hash32 name_hash)
+void FoxBytecodeCompiler::EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global)
 {
-    WriteOp(BcBase_Variable, BcSpecVariable_Define);
+    if (is_global) {
+        WriteOp(BcBase_Variable, BcSpecVariable_DefineGlobal);
+    }
+    else {
+        WriteOp(BcBase_Variable, BcSpecVariable_Define);
+    }
+
     Write16(var_index);
     Write32(name_hash);
 }
+
+
 void FoxBytecodeCompiler::EmitVariableIndex(uint16 var_index) { Write16(var_index); }
 
 void FoxBytecodeCompiler::EmitVariableCastInt32(VarIndex var_index)
@@ -584,7 +592,7 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
         return nullptr;
     }
 
-    if (mode == DECLARE_NO_EMIT) {
+    if (mode == DO_NOT_ALLOW_ASSIGNMENT) {
         return var_handle;
     }
 
@@ -639,10 +647,10 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DefineParam(FoxAstNode* param_decl_no
     FoxAstVarDecl* var_decl_node = reinterpret_cast<FoxAstVarDecl*>(param_decl_node);
 
     // Emit variable without emitting pushes or pops
-    FoxBytecodeVarHandle* handle = DoVarDeclare(var_decl_node, DECLARE_NO_EMIT);
+    FoxBytecodeVarHandle* handle = DoVarDeclare(var_decl_node, DO_NOT_ALLOW_ASSIGNMENT);
     uint32 parameter_var_index = mVarsInScope++;
 
-    EmitVariableDefine(parameter_var_index, var_decl_node->pNameToken->GetHash());
+    EmitVariableDefine(parameter_var_index, var_decl_node->pNameToken->GetHash(), false);
 
     if (!handle) {
         CompileError("DefineParam: Could not define and fetch param!");
@@ -815,9 +823,7 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int params_to_save, bool
         else if (node->NodeType == FX_AST_VARDECL) {
             FoxAstVarDecl* var_decl = reinterpret_cast<FoxAstVarDecl*>(node);
 
-
-            EmitVariableDefine(mVarsInScope, var_decl->pNameToken->GetHash());
-            // EmitStackAlloc(GetSizeOfType(var_decl->Type));
+            EmitVariableDefine(mVarsInScope, var_decl->pNameToken->GetHash(), var_decl->bDefineAsGlobal);
 
             FoxBytecodeVarHandle var_handle {
                 .HashedName = var_decl->pNameToken->GetHash(),
@@ -1149,6 +1155,17 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
         BC_PRINT_OP("VDEFINEF [float32] {} AS ${}", name_hash, var_index);
+    }
+
+    else if (op_spec == BcSpecVariable_DefineGlobal) {
+        uint16 var_index = Read16();
+        Hash32 name_hash = Read32();
+        BC_PRINT_OP("VGLOBAL {} AS ${}", name_hash, var_index);
+    }
+    else if (op_spec == BcSpecVariable_DefineGlobal_Float32) {
+        uint16 var_index = Read16();
+        Hash32 name_hash = Read32();
+        BC_PRINT_OP("VGLOBALF [float32] {} AS ${}", name_hash, var_index);
     }
 
     else if (op_spec == BcSpecVariable_Cast_Int32) {

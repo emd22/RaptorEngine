@@ -14,6 +14,7 @@
 #include <Entity.hpp>
 #include <Material.hpp>
 #include <ObjectManager.hpp>
+#include <Script/FoxScript.hpp>
 
 namespace fx {
 
@@ -58,7 +59,11 @@ public:
 
     bool CheckIfReady();
 
+    void AttachScript(const Ref<script::FoxScript>& script);
+    void LoadScript(const String& path);
+
     void AttachObject(const TSRef<Object>& object);
+
     void Update();
 
     void OnAttached(Scene* scene) override;
@@ -105,11 +110,13 @@ public:
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
+
     void Destroy() override;
     ~Object();
 
 private:
     void RenderMesh();
+    void SetScriptVars();
 
     void SyncObjectWithPhysics(PhObject* phys);
 
@@ -128,6 +135,8 @@ public:
     PagedArray<TSRef<Object>> AttachedNodes;
 
     Vec3f Dimensions = Vec3f::sZero;
+
+    Ref<script::FoxScript> pScript { nullptr };
 
 private:
     /// Object slots allocated following this object. Used by other instances of this object.

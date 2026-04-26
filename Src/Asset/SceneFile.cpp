@@ -86,9 +86,14 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
         load_options.bGeneratePhysicsMesh = true;
     }
 
-    std::string path = (scene_path) + mesh_path;
-    TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), path, load_options);
+    String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
+    TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
     object->pScene = &scene;
+
+    ConfigEntry* script = object_entry.GetMember(HashStr32("Script"));
+    if (script != nullptr) {
+        object->LoadScript(String::Fmt("{}/Scripts{}", scene_path, script->GetValue<const char*>()));
+    }
 
     ApplyPropertiesToObject(object, object_entry);
 

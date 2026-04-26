@@ -32,12 +32,11 @@ Objects = {
         Layer = OBJLAYER_PLAYER
     }
 
-
-
     Pistol = {
         Mesh = "/Pistol.glb"
         Shadows = TRUE
         Layer = OBJLAYER_PLAYER
+        Script = "/Pistol.fox"
     }
 
 

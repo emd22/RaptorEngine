@@ -1,5 +1,5 @@
 /*
-    General object functions
+    Base object functions
 */
 
-extproc ObjMove(float x, float y, float z);
+extproc OB_MoveTo(float x, float y, float z);

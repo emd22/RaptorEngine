@@ -21,6 +21,8 @@ static void WB_InitStatVars(FoxVM* vm, const SizedArray<FoxValue>& args)
     LogInfo("Damage: {}", args[0].Get<int32>());
 }
 
+FoxScript::FoxScript(const String& path) { Load(path); }
+
 void FoxScript::Load(const String& path)
 {
     FoxParser parser {};
@@ -43,8 +45,8 @@ void FoxScript::Load(const String& path)
         return;
     }
 
-    // FoxBytecodePrinter bc_printer(bytecode);
-    // bc_printer.Print();
+    FoxBytecodePrinter bc_printer(bytecode);
+    bc_printer.Print();
 
     Vm.InitVM(std::move(bytecode));
 
@@ -57,6 +59,8 @@ void FoxScript::Load(const String& path)
 
     // Call OnLoad if it exists
     CallProc(HashStr32("OnLoad"), {});
+
+    mpSymTick = GetSymbol(HashStr32("OnTick"));
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
@@ -106,6 +110,19 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
 FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
 {
     return CallProc(GetSymbol(name_hash), args);
+}
+
+
+void FoxScript::SetGlobal(const Hash32 name_hash, const FoxValue& value) { Vm.Globals[name_hash] = value; }
+
+FoxValue FoxScript::GetGlobal(const Hash32 name_hash) const
+{
+    auto it = Vm.Globals.find(name_hash);
+    if (it == Vm.Globals.end()) {
+        return FoxValue::scNone;
+    }
+
+    return it->second;
 }
 
 

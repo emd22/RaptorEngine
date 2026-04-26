@@ -104,6 +104,9 @@ enum BcSpecVariable : uint8
     BcSpecVariable_Define,
     BcSpecVariable_Define_Float32,
 
+    BcSpecVariable_DefineGlobal,
+    BcSpecVariable_DefineGlobal_Float32,
+
     BcSpecVariable_Cast_Int32,
     BcSpecVariable_Cast_Float32,
 };

@@ -26,14 +26,10 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
-    fx::script::FoxScript script;
-    script.Load(FX_BASE_DIR "/Scripts/Test.fox");
+    // fx::script::FoxScript script;
+    // script.Load(FX_BASE_DIR "/Scripts/Test.fox");
 
-
-    using FoxValue = fx::script::FoxValue;
-
-    FoxValue result = script.CallProc(fx::HashStr32("TestFunction"), { FoxValue(5), FoxValue(10) });
-    fx::LogInfo("Result = {}", result);
+    // script.CallProc(script.GetSymbol("ScriptEntry"), {});
 
     fx::renderer::Globals::Init();
 
