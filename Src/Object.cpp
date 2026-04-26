@@ -96,7 +96,10 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
                 return;
             }
 
-            object->PhysicsId = scene->NewPhysicsObject();
+            if (object->PhysicsId == PhObjectIdNull) {
+                object->PhysicsId = scene->NewPhysicsObject();
+            }
+
             PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
 
             if (!phys) {

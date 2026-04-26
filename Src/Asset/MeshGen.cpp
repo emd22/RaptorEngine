@@ -187,7 +187,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(MeshGenOptions options)
 {
     Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 
-    const float s = options.Scale;
+    const float32 s = options.Scale * 0.5f;
 
     mesh->Positions = {
         Vec3f(-s, -s, -s), // 0
@@ -200,17 +200,17 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(MeshGenOptions options)
         Vec3f(-s, s, s)    // 7
     };
 
-    mesh->Indices = { // Front (z = +5)
+    mesh->Indices = { // Front (z = +scale)
                       4, 5, 6, 4, 6, 7,
-                      // Back (z = -5)
+                      // Back (z = -scale)
                       1, 0, 3, 1, 3, 2,
-                      // Left (x = -5)
+                      // Left (x = -scale)
                       0, 4, 7, 0, 7, 3,
-                      // Right (x = +5)
+                      // Right (x = +scale)
                       5, 1, 2, 5, 2, 6,
-                      // Top (y = +5)
+                      // Top (y = +scale)
                       3, 7, 6, 3, 6, 2,
-                      // Bottom (y = -5)
+                      // Bottom (y = -scale)
                       0, 1, 5, 0, 5, 4
     };
 

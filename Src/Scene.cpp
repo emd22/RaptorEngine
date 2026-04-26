@@ -112,7 +112,7 @@ void Scene::RenderUnlitObjects(const Camera& camera) const
 void Scene::RenderPhysicsObjects(const Camera& camera)
 {
     if (!mpDebugCube.IsValid()) {
-        mpDebugCube = MeshGen::MakeCube()->AsMesh(renderer::eVertexType::Default);
+        mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
     }
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
@@ -122,10 +122,10 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
 
     DebugLayerPushConstants push_constants {};
 
-    Color debug_color = Color::FromRGBA(40, 255, 40, 255);
+    Color debug_color = Color::FromRGBA(255, 40, 40, 255);
 
     for (PhObject& phys : mPhysicsObjects) {
-        Mat4f model_matrix = Mat4f::AsScale(phys.Scale) * Mat4f::AsRotation(phys.GetRotation()) *
+        Mat4f model_matrix = Mat4f::AsScale(phys.Dimensions) * Mat4f::AsRotation(phys.GetRotation()) *
                              Mat4f::AsTranslation(phys.GetPosition());
         Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 

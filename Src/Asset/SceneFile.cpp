@@ -136,10 +136,9 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
 
     PhProperties physics_properties {};
 
-
     ConfigEntry* physics = object_entry.GetMember(HashStr32("Physics"));
 
-    if (physics != nullptr && object->PhysicsId == PhObjectIdNull) {
+    if (physics != nullptr) {
         ePhMotionType motion_type = ePhMotionType::Static;
 
         ConfigEntry* type = physics->GetMember(HashStr32("Type"));
@@ -147,9 +146,11 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
             motion_type = ePhMotionType::Dynamic;
         }
 
-        ConfigEntry* from_mesh = physics->GetMember(HashStr32("FromMesh"));
-        if (from_mesh != nullptr && from_mesh->Get<bool>() == true) {
-            object->PhysicsCreateMesh(nullptr, motion_type, physics_properties);
+        if (object->PhysicsId == PhObjectIdNull) {
+            ConfigEntry* from_mesh = physics->GetMember(HashStr32("FromMesh"));
+            if (from_mesh != nullptr && from_mesh->Get<bool>() == true) {
+                object->PhysicsCreateMesh(nullptr, motion_type, physics_properties);
+            }
         }
 
         ConfigEntry* box_collider = physics->GetMember(HashStr32("BoxCollider"));

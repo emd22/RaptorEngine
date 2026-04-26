@@ -10,19 +10,24 @@ F_PROGRAM(FPT_VERTEX)
 struct VSOutput
 {
     float4 vPosition : SV_POSITION;
-    float2 vUV       : TEXCOORD0;
 #ifdef IS_DEBUG_LAYER
     float4 vDebugColor : ATTR0;
+#else
+    float2 vUV       : TEXCOORD0;
 #endif
 };
 
 struct VSInput
 {
     float3 vPosition : POSITION;
+#ifdef IS_DEBUG_LAYER
+    // Skip
+#else
     float3 vNormal : NORMAL;
     float2 vUV : TEXCOORD0;
     float3 vTangent : TANGENT;
     uint uiInstanceId : SV_InstanceID;
+#endif
 };
 
 struct VSPushConsts
@@ -57,10 +62,11 @@ VSOutput main(VSInput input)
 #endif
 
     output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
-    output.vUV = input.vUV;
 
 #ifdef IS_DEBUG_LAYER
     output.vDebugColor = F_UnpackUIntToFloat4(VSConst.uiDebugColor);
+#else
+    output.vUV = input.vUV;
 #endif
 
     return output;
@@ -75,9 +81,10 @@ F_PROGRAM(FPT_PIXEL)
 struct FSInput
 {
     float4 vPosition: SV_POSITION;
-    float2 vUV : TEXCOORD0;
 #ifdef IS_DEBUG_LAYER
     float4 vDebugColor : ATTR0;
+#else
+    float2 vUV : TEXCOORD0;
 #endif
 };
 

@@ -78,6 +78,8 @@ public:
 
 private:
     void CreateJoltBody(JPH::ShapeRefC shape, eFlags flags, ePhMotionType type, const PhProperties& properties);
+    void UpdateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
+                        const PhProperties& properties);
 
 public:
     JPH::Body* mpPhysicsBody = nullptr;
@@ -85,7 +87,7 @@ public:
 
     bool mbHasPhysicsBody : 1 = false;
 
-    Vec3f Scale = Vec3f::sOne;
+    Vec3f Dimensions = Vec3f::sOne;
 };
 
 } // namespace fx

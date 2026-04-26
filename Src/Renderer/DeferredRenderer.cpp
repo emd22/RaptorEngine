@@ -244,9 +244,13 @@ void DeferredRenderer::CreateUnlitPipeline()
                                             { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
 
 
+    VertexDescription debug_vertex_description = VertexUtil::BuildDescription<eVertexType::Slim>();
+
     builder.SetLayout(debug_layout)
         .SetName("Debug Layer Pipeline")
         .SetShaders(vertex_shader, pixel_shader)
+        .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE)
+        .SetVertexDescription(&debug_vertex_description)
         .SetProperties({ .PolygonMode = VK_POLYGON_MODE_LINE })
         .Build(PlDebugLayer);
 }

@@ -24,6 +24,8 @@ void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f&
     JPH::RVec3 jolt_dimensions;
     (dimensions * 0.5).ToJoltVec3(jolt_dimensions);
 
+    Dimensions = dimensions;
+
     LogInfo("Creating primitive collider with dimensions {}", dimensions);
 
     switch (primitive_type) {
@@ -35,7 +37,7 @@ void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f&
         JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
         JPH::ShapeRefC box_shape = box_shape_result.Get();
 
-        CreateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
+        UpdateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
     } break;
     }
 }
@@ -57,7 +59,6 @@ void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_ty
     CreateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
 }
 
-
 void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
                               const PhProperties& properties)
 {
@@ -66,15 +67,33 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhM
         return;
     }
 
+    UpdateJoltBody(shape, flags, motion_type, properties);
+}
 
+
+void PhObject::UpdateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
+                              const PhProperties& properties)
+{
+    JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
+
+    Vec3f previous_position = Vec3f::sZero;
+    Quat previous_rotation = Quat::sIdentity;
+
+    if (mpPhysicsBody) {
+        previous_position = GetPosition();
+        previous_rotation = GetRotation();
+
+        body_interface.RemoveBody(mpPhysicsBody->GetID());
+        body_interface.DestroyBody(mpPhysicsBody->GetID());
+    }
+
+    JPH::EMotionType jolt_motion_type = JPH::EMotionType::Static;
+    PhLayer::Type object_layer = PhLayer::Static;
     JPH::EActivation activation_mode = JPH::EActivation::Activate;
 
     if (flags & PhObject::eFlags::CreateInactive) {
         activation_mode = JPH::EActivation::DontActivate;
     }
-
-    JPH::EMotionType jolt_motion_type = JPH::EMotionType::Static;
-    PhLayer::Type object_layer = PhLayer::Static;
 
     switch (motion_type) {
     case ePhMotionType::Static:
@@ -89,20 +108,22 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhM
         break;
     }
 
-    JPH::BodyCreationSettings body_settings(shape, JPH::Vec3::sZero(), JPH::Quat::sIdentity(), jolt_motion_type,
-                                            object_layer);
+    JPH::RVec3 start_position;
+    previous_position.ToJoltVec3(start_position);
+
+    JPH::Quat start_rotation;
+    previous_rotation.ToJoltQuaternion(start_rotation);
+
+    JPH::BodyCreationSettings body_settings(shape, start_position, start_rotation, jolt_motion_type, object_layer);
 
     body_settings.mFriction = properties.Friction;
     body_settings.mRestitution = properties.Restitution;
-
-    JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
 
     mpPhysicsBody = body_interface.CreateBody(body_settings);
     body_interface.AddBody(mpPhysicsBody->GetID(), activation_mode);
 
     mbHasPhysicsBody = true;
 }
-
 
 void PhObject::DestroyPhysicsBody()
 {

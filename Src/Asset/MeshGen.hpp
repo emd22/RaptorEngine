@@ -8,7 +8,7 @@ namespace fx {
 
 struct MeshGenOptions
 {
-    float32 Scale = 1;
+    float32 Scale = 1.0f;
 };
 
 class MeshGen
@@ -39,7 +39,6 @@ public:
 
 public:
     static Ref<GeneratedMesh> MakeIcoSphere(int resolution);
-    // static Ref<GeneratedMesh> MakeQuad();
     static Ref<GeneratedMesh> MakeCube(MeshGenOptions options = {});
     static Ref<GeneratedMesh> MakeQuad(MeshGenOptions options = {});
 
