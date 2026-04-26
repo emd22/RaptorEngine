@@ -57,6 +57,9 @@ public:
 public:
     PhObject() = default;
 
+    void SetId(PhObjectId id) { Id = id; }
+    PhObjectId GetId() const { return Id; }
+
     void CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                              const PhProperties& object_properties);
 
@@ -88,6 +91,8 @@ public:
     bool mbHasPhysicsBody : 1 = false;
 
     Vec3f Dimensions = Vec3f::sOne;
+
+    PhObjectId Id = PhObjectIdNull;
 };
 
 } // namespace fx

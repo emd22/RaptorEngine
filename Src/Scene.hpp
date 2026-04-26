@@ -43,6 +43,8 @@ public:
 
     TSRef<Object> FindObject(Hash32 name_hash);
 
+    void SelectPhysicsObject(const JPH::BodyID& body_id);
+
     void Destroy();
 
     ~Scene() { Destroy(); }
@@ -63,6 +65,7 @@ private:
 
     Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 
+    PhObjectId mSelectedPhysicsObjectId = PhObjectIdNull;
 
     Ref<PrimitiveMesh> mpDebugCube { nullptr };
 };

@@ -2,6 +2,7 @@
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyActivationListener.h>
+#include <ThirdParty/Jolt/Physics/Body/BodyManager.h>
 #include <ThirdParty/Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
 #include <ThirdParty/Jolt/Physics/Collision/ObjectLayer.h>
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
@@ -161,6 +162,8 @@ public:
 
 class PhJolt
 {
+    static constexpr uint32 scMaxBodies = 512;
+
 public:
     PhJolt();
 
@@ -182,6 +185,7 @@ public:
 
     MemberRef<JPH::TempAllocatorImpl> pTempAllocator;
     MemberRef<JPH::JobSystemThreadPool> pJobSystem;
+
 
 private:
     PhBPLayerInterfaceImpl mBroadPhaseInterface;

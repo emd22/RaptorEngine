@@ -72,14 +72,14 @@ void PhJolt::Create()
 
     pJobSystem.InitRef(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, JPH::thread::hardware_concurrency() - 1);
 
-    const uint32 max_bodies = 1024;
+    // const uint32 max_bodies = 1024;
     const uint32 num_body_mutexes = 0;
     const uint32 max_body_pairs = 1024;
 
     const uint32 max_contact_constraints = 1024;
 
     // Now we can create the actual physics system.
-    PhysicsSystem.Init(max_bodies, num_body_mutexes, max_body_pairs, max_contact_constraints, mBroadPhaseInterface,
+    PhysicsSystem.Init(scMaxBodies, num_body_mutexes, max_body_pairs, max_contact_constraints, mBroadPhaseInterface,
                        mObjectVsBPLayerFilter, mObjectLayerPairFilter);
 
 

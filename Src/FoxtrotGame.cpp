@@ -191,6 +191,19 @@ void FoxtrotGame::ProcessControls()
         ControlManager::ReleaseMouse();
     }
 
+
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
+        SizedArray<JPH::BodyID> hits = Player.Physics.Raycast(Player.pCamera->GetForwardVector() * 50.0f);
+        LogInfo("HIT {} BODIES", hits.Size);
+        if (hits.Size > 0) {
+            mMainScene.SelectPhysicsObject(hits[0]);
+        }
+
+        for (JPH::BodyID body_id : hits) {
+            LogInfo("HIT {}", body_id.GetIndex());
+        }
+    }
+
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
         sbShowShadowCam = !sbShowShadowCam;
 

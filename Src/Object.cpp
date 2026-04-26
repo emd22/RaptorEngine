@@ -548,8 +548,8 @@ void Object::PrintDebug() const
 
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
         bool has_body = phys->mbHasPhysicsBody;
-        LogInfo("\tHasPhys?={}, Enabled?={}, Type={}", has_body,
-                static_cast<bool>((Flags & eObjectFlags::PhysicsEnabled) != 0),
+        LogInfo("\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
+                static_cast<bool>((Flags & eObjectFlags::PhysicsEnabled) != 0), phys->GetBodyId().GetIndex(),
                 phys->GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
     }
 

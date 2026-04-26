@@ -3,6 +3,7 @@
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Character/CharacterVirtual.h>
 
+#include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
@@ -20,6 +21,8 @@ public:
     void Create();
     void Teleport(const Vec3f& position);
     void ApplyMovement(const Vec3f& direction);
+
+    SizedArray<JPH::BodyID> Raycast(Vec3f direction) const;
 
     void Update(float64 delta_time);
 

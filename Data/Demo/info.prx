@@ -15,10 +15,10 @@ Objects = {
     }
 
     Level = {
-        Mesh = "/TestFloor.glb"
+        Mesh = "/BasicScene.glb"
         Physics = {
             Type = PHYS_STATIC
-            BoxCollider = { Size = [16.0, 1.0, 16.0] }
+            BoxCollider = { Size = [64.0, 1.0, 64.0] }
         }
 
         Pos=[0.0, -2.25, 0.0]

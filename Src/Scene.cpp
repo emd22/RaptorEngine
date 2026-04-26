@@ -33,7 +33,8 @@ void Scene::Attach(const Ref<LightBase>& light)
 PhObjectId Scene::NewPhysicsObject()
 {
     PhObjectId id = mPhysicsObjects.Size();
-    mPhysicsObjects.Insert();
+    PhObject* phys = mPhysicsObjects.Insert();
+    phys->SetId(id);
 
     return id;
 }
@@ -45,6 +46,16 @@ PhObject* Scene::GetPhysicsObject(PhObjectId id)
     }
 
     return &mPhysicsObjects[id];
+}
+
+void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
+{
+    for (const PhObject& phys : mPhysicsObjects) {
+        if (phys.mpPhysicsBody->GetID() == body_id) {
+            mSelectedPhysicsObjectId = phys.GetId();
+            return;
+        }
+    }
 }
 
 TSRef<Object> Scene::FindObject(Hash32 name_hash)
@@ -122,15 +133,22 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
 
     DebugLayerPushConstants push_constants {};
 
-    Color debug_color = Color::FromRGBA(255, 40, 40, 255);
+    const Color debug_color = Color::FromRGBA(255, 40, 40, 255);
+    const Color selected_color = Color::FromRGBA(100, 255, 40, 255);
 
     for (PhObject& phys : mPhysicsObjects) {
         Mat4f model_matrix = Mat4f::AsScale(phys.Dimensions) * Mat4f::AsRotation(phys.GetRotation()) *
                              Mat4f::AsTranslation(phys.GetPosition());
         Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
+
         memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-        push_constants.DebugColor = debug_color.AsUInt();
+        if (phys.GetId() == mSelectedPhysicsObjectId) {
+            push_constants.DebugColor = selected_color.AsUInt();
+        }
+        else {
+            push_constants.DebugColor = debug_color.AsUInt();
+        }
 
         vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
                            &push_constants);

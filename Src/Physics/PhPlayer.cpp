@@ -2,7 +2,13 @@
 
 #include "PhJolt.hpp"
 
+#include <Jolt/Physics/Body/Body.h>
+#include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollector.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 
@@ -58,6 +64,29 @@ void PhPlayer::ApplyMovement(const Vec3f& direction)
 
     mMovementVector = jolt_dir;
     // pPlayerVirt->SetLinearVelocity(jolt_dir);
+}
+
+SizedArray<JPH::BodyID> PhPlayer::Raycast(Vec3f direction) const
+{
+    JPH::RayCast rc;
+    rc.mOrigin = pPlayerVirt->GetPosition();
+    direction.ToJoltVec3(rc.mDirection);
+
+    JPH::AllHitCollisionCollector<RayCastBodyCollector> collector;
+
+    gPhysics->PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
+
+    LogInfo("Capacity: {}", collector.mHits.size());
+    SizedArray<JPH::BodyID> hits;
+    hits.InitCapacity(collector.mHits.size());
+
+    for (JPH::BroadPhaseCastResult& hit : collector.mHits) {
+        hits.Insert(hit.mBodyID);
+    }
+
+    // return {};
+
+    return hits;
 }
 
 void PhPlayer::Update(float64 delta_time)

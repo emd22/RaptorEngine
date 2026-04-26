@@ -396,6 +396,10 @@ protected:
 #ifdef FX_SIZED_ARRAY_DEBUG
         LogDebug("Allocating SizedArray of capacity {:d} (type: {:s})", element_count, typeid(TElementType).name());
 #endif
+        if (element_count == 0) {
+            return;
+        }
+
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         pData = static_cast<TElementType*>(gEnginePool->AllocRaw(sizeof(TElementType) * element_count));
         // for (uint32 i = 0; i < Capacity; i++) {
