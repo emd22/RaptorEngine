@@ -17,6 +17,7 @@ public:
 
 private:
     void AddObjectFromEntry(const std::string& path, const ConfigEntry& object, Scene& scene);
+    void AddColliderFromEntry(const std::string& path, const ConfigEntry& collider, Scene& scene);
 
     void ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry& object_entry);
 

@@ -8,6 +8,11 @@ Sun = {
     AmbientColor = [250, 210, 192, 6]
 }
 
+
+// Colliders = {
+//     Floor = { Box = { Size = [64.0, 0.5, 64.0] } }
+// }
+
 Objects = {
     Skybox = {
         Mesh = "/Skybox.glb"

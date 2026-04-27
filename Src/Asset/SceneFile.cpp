@@ -60,6 +60,17 @@ void SceneFile::Load(const std::string& path, Scene& scene)
         sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("Color"), Color::FromRGBA(100, 100, 100, 1));
     }
 
+    ConfigEntry* collider_list = info.GetEntry(HashStr32("Colliders"));
+    if (collider_list) {
+        for (const ConfigEntry& collider_entry : collider_list->Members) {
+            if (first_time) {
+                AddColliderFromEntry(path, collider_entry, scene);
+            }
+            else {
+            }
+        }
+    }
+
 
     // Load objects
 
@@ -76,6 +87,11 @@ void SceneFile::Load(const std::string& path, Scene& scene)
     }
 }
 
+
+void SceneFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry, Scene& scene)
+{
+    // std::string
+}
 
 void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry, Scene& scene)
 {
