@@ -14,12 +14,15 @@ namespace fx {
 class AxLoaderStb : public AxLoaderImageBase
 {
 public:
-    using Status = AxLoaderBase::eStatus;
+    using eStatus = AxLoaderBase::eStatus;
 
     AxLoaderStb() = default;
 
-    Status LoadFromFile(TSRef<AxBase> asset, const String& path) override;
-    Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
+    eStatus LoadFromFile(TSRef<AxBase> asset, const String& path) override;
+    eStatus LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
+
+    static eStatus SaveToFile(eImageSaveFormat format, const SizedArray<uint8>& data, const Vec2u& size,
+                              const String& path);
 
     void Destroy(TSRef<AxBase>& asset) override;
 

@@ -50,6 +50,8 @@ struct PipelineProperties
     bool bDisableDepthTest : 1 = false;
     bool bDisableDepthWrite : 1 = false;
 
+    bool bRenderLines : 1 = false;
+
     Vec2u ViewportSize = Vec2u::sZero;
     VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
 };

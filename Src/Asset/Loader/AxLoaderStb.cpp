@@ -6,7 +6,7 @@
 namespace fx {
 
 
-AxLoaderStb::Status AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String& path)
+AxLoaderStb::eStatus AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String& path)
 {
     TSRef<AxImage> image(asset);
 
@@ -32,7 +32,7 @@ AxLoaderStb::Status AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String&
     return AxLoaderStb::eStatus::Success;
 }
 
-AxLoaderStb::Status AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
+AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
 {
     TSRef<AxImage> image(asset);
 
@@ -41,7 +41,7 @@ AxLoaderStb::Status AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         LogError("Could not retrieve info from image in memory! (Size={})", size);
-        return AxLoaderStb::Status::Error;
+        return AxLoaderStb::eStatus::Error;
     }
 
     mChannels = pixel_size;
@@ -61,6 +61,23 @@ AxLoaderStb::Status AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8
     return AxLoaderStb::eStatus::Success;
 }
 
+
+AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const SizedArray<uint8>& data,
+                                             const Vec2u& size, const String& path)
+{
+    stbi_flip_vertically_on_write(1);
+
+    switch (file_format) {
+    case eImageSaveFormat::Jpeg:
+        stbi_write_jpg(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, 90);
+        break;
+    case eImageSaveFormat::Png:
+        stbi_write_png(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, size.GetX() * 4);
+    }
+
+    return AxLoaderStb::eStatus::Success;
+}
+
 void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 {
     TSRef<AxImage> image(asset);
@@ -69,7 +86,7 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 
     // Since the image data in mImageData is not ours(it is stb's),
     // we need to set this flag to prevent it from attemping to be freed.
-    data_arr.DoNotDestroy = true;
+    data_arr.bDoNotDestroy = true;
 
     data_arr.pData = mImageData;
     data_arr.Size = mDataSize;

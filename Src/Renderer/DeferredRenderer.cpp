@@ -251,7 +251,7 @@ void DeferredRenderer::CreateUnlitPipeline()
         .SetShaders(vertex_shader, pixel_shader)
         .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE)
         .SetVertexDescription(&debug_vertex_description)
-        .SetProperties({ .PolygonMode = VK_POLYGON_MODE_LINE })
+        .SetProperties({ .bRenderLines = true })
         .Build(PlDebugLayer);
 }
 

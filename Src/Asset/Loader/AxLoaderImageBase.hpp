@@ -6,11 +6,10 @@
 
 namespace fx {
 
-
 class AxLoaderImageBase : public AxLoaderBase
 {
 public:
-    using Status = fx::AxLoaderBase::eStatus;
+    using eStatus = fx::AxLoaderBase::eStatus;
 
 public:
     renderer::eImageType ImageType = renderer::eImageType::Flat;
