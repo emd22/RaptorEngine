@@ -46,7 +46,7 @@ static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
     case eShaderType::Vertex:
         return "Vertex";
     case eShaderType::Pixel:
-        return "Fragment";
+        return "Pixel";
     }
     return "Unknown";
 }

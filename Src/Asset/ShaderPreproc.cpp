@@ -302,9 +302,11 @@ static bool SkipUntilElse(State& state)
     while (scope_index > 0) {
         if (state.TryReadString("#endif")) {
             --scope_index;
+            continue;
         }
         else if (state.TryReadString("#ifdef")) {
             ++scope_index;
+            continue;
         }
         else if (state.TryReadString("#else") && scope_index <= 1) {
             return true;
@@ -404,7 +406,10 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
             }
 
             if (read_index >= scBufferSize) {
-                break;
+                LogError("ShaderPreproc: Variable index is larger than the allocated buffer size");
+
+                // It will cause more issues to break than to just reset the index
+                read_index = 0;
             }
 
             read_macro[read_index++] = ch;

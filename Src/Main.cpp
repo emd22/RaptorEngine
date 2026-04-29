@@ -28,32 +28,32 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
+    // fx::File fp = fx::File(FX_BASE_DIR "/Shaders/Geometry.hlsl", fx::File::eModType::Read,
+    // fx::File::eDataType::Binary);
 
-    fx::File fp = fx::File(FX_BASE_DIR "/PreprocTest.txt", fx::File::eModType::Read, fx::File::eDataType::Binary);
+    // fx::Slice<char> data = fp.Read<char>();
 
-    fx::Slice<char> data = fp.Read<char>();
+    // fx::SizedArray<fx::ShaderMacro> macros = { fx::ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } };
 
-    fx::SizedArray<fx::ShaderMacro> macros = { fx::ShaderMacro { .pcName = "C", .pcValue = "1" } };
-
-    fx::ShaderPreproc::Result preproc = fx::ShaderPreproc::Process(data, macros);
-    fx::ShaderPreproc::DebugSaveToDisk("./PreprocResult", preproc);
+    // fx::ShaderPreproc::Result preproc = fx::ShaderPreproc::Process(data, macros);
+    // fx::ShaderPreproc::DebugSaveToDisk("./PreprocResult", preproc);
 
 
-    // fx::renderer::Globals::Init();
+    fx::renderer::Globals::Init();
 
-    // {
-    //     fx::FoxtrotGame game {};
-    // }
+    {
+        fx::FoxtrotGame game {};
+    }
 
-    // fx::renderer::Globals::Destroy();
-    // fx::Globals::Destroy();
+    fx::renderer::Globals::Destroy();
+    fx::Globals::Destroy();
 
-    // Defer(
-    //     []()
-    //     {
-    //         delete fx::gEnginePool;
-    //         fx::gEnginePool = nullptr;
-    //     });
+    Defer(
+        []()
+        {
+            delete fx::gEnginePool;
+            fx::gEnginePool = nullptr;
+        });
 
     return 0;
 }
