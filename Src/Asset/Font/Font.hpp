@@ -16,7 +16,7 @@ namespace fx::renderer {
 struct GlyphMetrics
 {
     Vec2f Bearing = Vec2f::sZero;
-    Vec2f Size = Vec2f::sZero;
+    Vec2u Size = Vec2u::sZero;
 
     float Advance = 0.0f;
 
@@ -35,9 +35,10 @@ public:
     void Upload(renderer::Image& out_image);
 
     float GetFontSize() const { return FontSize; }
-    Vec2u GetAtlasSize() const { return AtlasSize; }
+    Vec2u GetSize() const { return AtlasSize; }
 
-    SizedArray<uint8>& GetAtlasData() { return AtlasData; }
+    // SizedArray<uint8>& GetAtlasData() { return AtlasData; }
+    SizedArray<uint8> GetImageData(eImageFormat format) const;
 
     const GlyphMetrics* GetGlyph(uint32 codepoint) const
     {
@@ -52,15 +53,17 @@ public:
 private:
     Vec2u FindSlot(uint32 width, uint32 height);
 
-private:
-    Vec2u Cursor = Vec2u::sZero;
-    uint32 RowHeight = 0;
+public:
+    std::unordered_map<uint32, GlyphMetrics> Glyphs;
 
     Vec2u AtlasSize = Vec2u::sZero;
     float32 FontSize = 0.0f;
 
     SizedArray<uint8> AtlasData;
-    std::unordered_map<uint32, GlyphMetrics> Glyphs;
+
+private:
+    Vec2u Cursor = Vec2u::sZero;
+    uint32 RowHeight = 0;
 };
 
 struct Font
@@ -78,6 +81,8 @@ public:
 
     void RenderAtlasToImage(Image& out_image);
 
+    void SaveToFile(const String& path, eImageSaveFormat file_format) const;
+
     float GetFontSize() const { return FontSize; }
     const String& GetFamilyName() const { return FamilyName; }
     const String& GetStyleName() const { return StyleName; }
@@ -88,6 +93,8 @@ public:
 private:
     void InitCommon(float32 font_size);
     void BakeAtlas();
+
+    void WriteMetaFile(const String& atlas_path) const;
 
 public:
     String FamilyName;

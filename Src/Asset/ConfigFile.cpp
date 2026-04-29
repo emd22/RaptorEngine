@@ -52,6 +52,8 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
     }
 
     Members.Insert(std::move(entry));
+
+    Type = ConfigEntry::eValueType::Struct;
 }
 
 std::string ConfigValue::AsString() const
@@ -91,8 +93,16 @@ std::string ConfigEntry::AsString(uint32 indent) const
         return std::format("{{\n{}{}}}", member_list, indent_str);
     }
     else if (bIsArray) {
-        for (const ConfigValue& value : ArrayData) {
-            member_list += std::format("{}, ", value.AsString());
+        uint32 array_size = ArrayData.Size();
+
+        for (uint32 value_index = 0; value_index < array_size; value_index++) {
+            const ConfigValue& value = ArrayData[value_index];
+            if (value_index == array_size - 1) {
+                member_list += std::format("{}", value.AsString());
+            }
+            else {
+                member_list += std::format("{}, ", value.AsString());
+            }
         }
 
         return std::format("[ {} ]", member_list);
@@ -232,6 +242,23 @@ bool ConfigFile::EatToken(eTokenType type)
     return true;
 }
 
+bool ConfigFile::EatToken(const Slice<eTokenType>& expected_types)
+{
+    bool type_is_correct = false;
+
+    Token* token = GetToken();
+
+    for (const eTokenType type : expected_types) {
+        if (token->Type == type) {
+            NextToken();
+            return true;
+        }
+    }
+
+    LogError("Config: found type '{}' but can only allow one of {}", Token::GetTypeName(GetToken()->Type));
+    return false;
+}
+
 void ConfigFile::PrintEntries()
 {
     PagedArray<ConfigEntry>& entries = GetEntries();
@@ -328,7 +355,8 @@ ConfigEntry ConfigFile::ParseEntry()
 
     entry.Name = token->GetStr();
 
-    EatToken(eTokenType::Identifier);
+    eTokenType allowed_name_types[] = { eTokenType::Identifier, eTokenType::Integer };
+    EatToken(MakeSlice(allowed_name_types, std::size(allowed_name_types)));
     EatToken(eTokenType::Equals);
 
     // Parse struct

@@ -5,7 +5,6 @@
 
 @include "./Scripts/WeaponBase.fox"
 
-
 proc OnLoad()
 {
     WB_InitAmmoVars(

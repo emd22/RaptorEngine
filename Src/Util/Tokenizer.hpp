@@ -45,6 +45,7 @@ enum class eTokenType
     DocComment,
 };
 
+
 struct Token
 {
     enum class eIsNumericResult
@@ -254,5 +255,17 @@ struct std::formatter<fx::Token>
     {
         const std::string str(obj.Start, obj.Length);
         return std::format_to(ctx.out(), "(Type={}, {})", fx::Token::GetTypeName(obj.Type), str);
+    }
+};
+
+
+template <>
+struct std::formatter<fx::eTokenType>
+{
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    auto format(fx::eTokenType type, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "{}", fx::Token::GetTypeName(type));
     }
 };

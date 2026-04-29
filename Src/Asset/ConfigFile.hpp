@@ -346,9 +346,24 @@ public:
         return mConfigEntries.Insert(std::move(entry));
     }
 
+    ConfigEntry* AddEntry(const std::string& name)
+    {
+        if (!mConfigEntries.IsInited()) {
+            mConfigEntries.Create();
+        }
+
+        ConfigEntry* entry = mConfigEntries.Insert();
+        entry->Name = name;
+
+        return entry;
+    }
+
 private:
     void Parse(PagedArray<Token>& tokens);
+
     bool EatToken(eTokenType type);
+    bool EatToken(const Slice<eTokenType>& expected_types);
+
     ConfigEntry ParseEntry();
     void ParseValue(ConfigValue& value);
 

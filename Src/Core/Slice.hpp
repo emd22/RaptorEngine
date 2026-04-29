@@ -40,7 +40,7 @@ public:
     template <typename TOtherType>
     Slice(const Slice<TOtherType>& other)
     {
-        pData = reinterpret_cast<TDataType*>(other.pData);
+        pData = static_cast<TDataType*>(other.pData);
         Size = other.Size;
     }
 
@@ -67,3 +67,27 @@ Slice<T> MakeSlice(T* ptr, uint32 size)
 }
 
 } // namespace fx
+
+
+template <typename T>
+struct std::formatter<fx::Slice<T>>
+{
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    auto format(const fx::Slice<T>& slice, std::format_context& ctx) const
+    {
+        std::string str = "";
+
+        for (fx::uint32 i = 0; i < slice.Size; i++) {
+            const T& value = slice.pData[i];
+            if (i == slice.Size - 1) {
+                str += std::format("{}", value);
+            }
+            else {
+                str += std::format("{}, ", value);
+            }
+        }
+
+        return std::format("[ {} ]", str);
+    }
+};

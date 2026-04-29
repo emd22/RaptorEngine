@@ -112,6 +112,7 @@ public:
     bool bInWriteMode = true;
 };
 
+
 } // namespace fx
 
 #define FX_SERIALIZABLE_MEMBERS(...)                                                                                   \

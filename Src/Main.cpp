@@ -5,6 +5,7 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <Asset/DataPack.hpp>
+#include <Asset/Font/Font.hpp>
 #include <Asset/ShaderCompiler.hpp>
 #include <Core/Defer.hpp>
 #include <Core/MemPool/MemPool.hpp>
@@ -26,26 +27,28 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
-    // fx::script::FoxScript script;
-    // script.Load(FX_BASE_DIR "/Scripts/Test.fox");
 
-    // script.CallProc(script.GetSymbol("ScriptEntry"), {});
-
-    fx::renderer::Globals::Init();
-
-    {
-        fx::FoxtrotGame game {};
+    fx::renderer::Font font;
+    if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
+        font.SaveToFile("./Font2.jpeg", fx::eImageSaveFormat::Jpeg);
     }
 
-    fx::renderer::Globals::Destroy();
-    fx::Globals::Destroy();
 
-    Defer(
-        []()
-        {
-            delete fx::gEnginePool;
-            fx::gEnginePool = nullptr;
-        });
+    // fx::renderer::Globals::Init();
+
+    // {
+    //     fx::FoxtrotGame game {};
+    // }
+
+    // fx::renderer::Globals::Destroy();
+    // fx::Globals::Destroy();
+
+    // Defer(
+    //     []()
+    //     {
+    //         delete fx::gEnginePool;
+    //         fx::gEnginePool = nullptr;
+    //     });
 
     return 0;
 }

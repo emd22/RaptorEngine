@@ -24,6 +24,14 @@ enum class eImageSaveFormat
     Png,
 };
 
+enum class eImageSaveFlags
+{
+    None = 0,
+    FlipY = (1 << 0),
+};
+
+FxEnumFlags(eImageSaveFlags);
+
 
 namespace renderer {
 

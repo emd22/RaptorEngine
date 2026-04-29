@@ -679,7 +679,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
         });
 
 
-    AxLoaderStb::SaveToFile(file_format, image_data, Size, path);
+    AxLoaderStb::SaveToFile(file_format, image_data, Size, path, eImageSaveFlags::None);
 }
 
 

@@ -63,9 +63,11 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
 
 
 AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const SizedArray<uint8>& data,
-                                             const Vec2u& size, const String& path)
+                                             const Vec2u& size, const String& path, eImageSaveFlags flags)
 {
-    stbi_flip_vertically_on_write(1);
+    if ((flags & eImageSaveFlags::FlipY) != 0) {
+        stbi_flip_vertically_on_write(1);
+    }
 
     switch (file_format) {
     case eImageSaveFormat::Jpeg:

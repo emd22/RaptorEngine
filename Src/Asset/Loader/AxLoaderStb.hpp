@@ -6,7 +6,6 @@
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
-#include <string>
 
 namespace fx {
 
@@ -22,7 +21,7 @@ public:
     eStatus LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
     static eStatus SaveToFile(eImageSaveFormat format, const SizedArray<uint8>& data, const Vec2u& size,
-                              const String& path);
+                              const String& path, eImageSaveFlags flags);
 
     void Destroy(TSRef<AxBase>& asset) override;
 
