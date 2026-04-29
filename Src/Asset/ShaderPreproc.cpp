@@ -49,6 +49,7 @@ static constexpr const char* scStrings[] = {
 constexpr const char* FStr(eStringId id) { return scStrings[static_cast<uint32>(id)]; }
 constexpr Hash32 FHash(eStringId id) { return HashStr32(FStr(id)); }
 
+
 struct State
 {
 public:
@@ -68,8 +69,20 @@ public:
 
     char Get() const { return Get(0); }
 
-    void NextChar() { Index++; };
-    void Skip(uint32 skip) { Index += skip; };
+    void NextChar()
+    {
+        ++Index;
+
+        if (Get() == '\n') {
+            ++CurrentLine;
+        }
+    };
+    void Skip(uint32 skip)
+    {
+        for (uint32 i = 0; i < skip; i++) {
+            NextChar();
+        }
+    };
 
     void NextIfEqual(char p)
     {
@@ -78,6 +91,10 @@ public:
         }
     }
 
+    /**
+     * @brief Attempts to read the string `s` from the buffer. If it exists, the function returns true and skips past
+     * the string. If it was not found, the buffer remains in the original position.
+     */
     bool TryReadString(const char* s)
     {
         uint32 offset = 0;
@@ -148,6 +165,10 @@ static int32 ParamGetInt(const Slice<char>& param)
 // Preprocessor Definitions
 /////////////////////////////////////
 
+
+static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacro>& macros,
+                       bool ifdef_directive_is_eaten);
+
 static void ParseProgramDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
 {
     REQUIRE_PARAMS(params, 1);
@@ -168,7 +189,7 @@ static void ParseProgramDefinition(const std::vector<Slice<char>>& params, State
     }
 
     // Notify DXC about the actual line number to make the HLSL error messages less ass
-    result.InsertString(std::format("#line {}\n", state.CurrentLine + 1));
+    result.InsertString(std::format("#line {}\n", state.CurrentLine));
 }
 
 
@@ -223,10 +244,6 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
 {
     char ch = state.Get();
 
-    if (ch == '\n') {
-        ++state.CurrentLine;
-    }
-
     if (result.bBroadcastToAllPrograms) {
         result.GetBuffer(renderer::eShaderType::Vertex).Insert(ch);
         result.GetBuffer(renderer::eShaderType::Pixel).Insert(ch);
@@ -237,30 +254,145 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
     result.GetBuffer().Insert(ch);
 }
 
-static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacro>& macros)
+
+static void WriteUntilHash(State& state, Result& result)
 {
-    char read_macro[256];
+    while (state.Get() != '#') {
+        // Continue saving each character until the condition is closed
+        WriteCurrentCharToProgram(state, result);
+        state.NextChar();
+    }
+};
+
+
+static void SkipUntilHash(State& state)
+{
+    while (state.Get() != '#') {
+        // Continue saving each character until the condition is closed
+        state.NextChar();
+    }
+};
+
+static void SkipUntilEndif(State& state)
+{
+    int32 scope_index = 1;
+
+    while (scope_index > 0) {
+        if (state.TryReadString("#endif")) {
+            --scope_index;
+            continue;
+        }
+        else if (state.TryReadString("#ifdef")) {
+            ++scope_index;
+            continue;
+        }
+        else {
+            // Skip the hash character to be able to jump to the next one
+            state.NextChar();
+        }
+
+        SkipUntilHash(state);
+    }
+}
+
+static bool SkipUntilElse(State& state)
+{
+    int32 scope_index = 1;
+
+    while (scope_index > 0) {
+        if (state.TryReadString("#endif")) {
+            --scope_index;
+        }
+        else if (state.TryReadString("#ifdef")) {
+            ++scope_index;
+        }
+        else if (state.TryReadString("#else") && scope_index <= 1) {
+            return true;
+        }
+        else {
+            // Skip the hash character to be able to jump to the next one
+            state.NextChar();
+        }
+
+        SkipUntilHash(state);
+    }
+
+    return false;
+}
+
+static void EmitLineMarker(State& state, Result& result)
+{
+    result.InsertString(std::format("#line {}\n", state.CurrentLine));
+}
+
+
+static void DoIfSection(State& state, Result& result, const SizedArray<ShaderMacro>& macros)
+{
+    while (true) {
+        EmitLineMarker(state, result);
+
+        // Write until the next hash character is encountered.
+        WriteUntilHash(state, result);
+
+        // If it is an ifdef, parse it. This also eats the else's and endifs for that ifdef block.
+        if (state.TryReadString("#ifdef")) {
+            ParseIfdef(state, result, macros, true);
+
+            // Continue back to writing after encountering the nested ifdef.
+            continue;
+        }
+
+        // We encountered an else block. Since this condition is true, skip all data inside of the else directive.
+        if (state.TryReadString("#else")) {
+            SkipUntilEndif(state);
+            break;
+        }
+
+
+        // There are no else directives or nested blocks, just a direct endif. End the loop.
+        if (state.TryReadString("#endif")) {
+            break;
+        }
+    }
+}
+
+static void DoElseSection(State& state, Result& result, const SizedArray<ShaderMacro>& macros)
+{
+    bool found_else = SkipUntilElse(state);
+
+    while (found_else) {
+        EmitLineMarker(state, result);
+
+        // Write until the next hash character is encountered.
+        WriteUntilHash(state, result);
+
+        // If it is an ifdef, parse it. This also eats the else's and endifs for that ifdef block.
+        if (state.TryReadString("#ifdef")) {
+            ParseIfdef(state, result, macros, true);
+
+            // Continue back to writing after encountering the nested ifdef.
+            continue;
+        }
+
+        if (state.TryReadString("#endif")) {
+            break;
+        }
+    }
+}
+
+static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacro>& macros,
+                       bool ifdef_directive_is_eaten)
+{
+    static constexpr uint32 scBufferSize = 256;
+    char read_macro[scBufferSize];
     uint32 read_index = 0;
 
-
-    auto WriteUntilHash = [&]()
-    {
-        while (state.Get() != '#') {
-            // Continue saving each character until the condition is closed
-            WriteCurrentCharToProgram(state, result);
+    if (ifdef_directive_is_eaten || state.TryReadString("#ifdef")) {
+        // Skip whitespace
+        while (isspace(state.Get())) {
             state.NextChar();
         }
-    };
 
-    auto SkipUntilHash = [&]()
-    {
-        while (state.Get() != '#') {
-            // Continue saving each character until the condition is closed
-            state.NextChar();
-        }
-    };
-
-    if (state.TryReadString("#ifdef ")) {
         read_index = 0;
 
         while (state.Get() != '\n') {
@@ -269,6 +401,10 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
             if (ch == '\r') {
                 state.NextChar();
                 continue;
+            }
+
+            if (read_index >= scBufferSize) {
+                break;
             }
 
             read_macro[read_index++] = ch;
@@ -282,9 +418,6 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
 
         bool macro_found = false;
 
-        printf("MACRO SIZE: %d\n", read_index);
-        printf("MACRO: '%.*s'\n", read_index, read_macro);
-
         for (const ShaderMacro& macro : macros) {
             if (!std::strncmp(macro.pcName, read_macro, read_index)) {
                 macro_found = true;
@@ -293,24 +426,13 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
         }
 
         if (macro_found) {
-            WriteUntilHash();
-
-            if (state.TryReadString("#else")) {
-                SkipUntilHash();
-            }
+            DoIfSection(state, result, macros);
         }
         else {
-            // Skip the body of the ifdef
-            SkipUntilHash();
-
-            // Write the else condition
-            if (state.TryReadString("#else")) {
-                WriteUntilHash();
-            }
+            DoElseSection(state, result, macros);
         }
 
-        // Eat the final endif
-        state.TryReadString("#endif");
+        // Hit endif, finish
         state.NextIfEqual('\r');
         state.NextIfEqual('\n');
 
@@ -366,6 +488,9 @@ static void ParsePPFuncCall(State& state, Result& result)
         param_list.push_back(param);
         state.NextChar(); // Skip RParen
 
+        state.NextIfEqual('\r');
+        state.NextIfEqual('\n');
+
         func->Func(param_list, state, result);
     }
 }
@@ -389,7 +514,7 @@ Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
 
         ParsePPFuncCall(state, result);
 
-        if (state.Get() == '#' && ParseIfdef(state, result, macros)) {
+        if (state.Get() == '#' && ParseIfdef(state, result, macros, false)) {
             continue;
         }
 

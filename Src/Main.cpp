@@ -7,6 +7,7 @@
 #include <Asset/DataPack.hpp>
 #include <Asset/Font/Font.hpp>
 #include <Asset/ShaderCompiler.hpp>
+#include <Asset/ShaderPreproc.hpp>
 #include <Core/Defer.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/String.hpp>
@@ -28,10 +29,14 @@ int main()
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
 
-    fx::renderer::Font font;
-    if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
-        font.SaveToFile("./Font2.jpeg", fx::eImageSaveFormat::Jpeg);
-    }
+    fx::File fp = fx::File(FX_BASE_DIR "/PreprocTest.txt", fx::File::eModType::Read, fx::File::eDataType::Binary);
+
+    fx::Slice<char> data = fp.Read<char>();
+
+    fx::SizedArray<fx::ShaderMacro> macros = { fx::ShaderMacro { .pcName = "C", .pcValue = "1" } };
+
+    fx::ShaderPreproc::Result preproc = fx::ShaderPreproc::Process(data, macros);
+    fx::ShaderPreproc::DebugSaveToDisk("./PreprocResult", preproc);
 
 
     // fx::renderer::Globals::Init();

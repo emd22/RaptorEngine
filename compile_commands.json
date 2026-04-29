@@ -43,6 +43,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -isystem /opt/homebrew/include/freetype2 -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/Font/Font.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Font/Font.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/Font/Font.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Font/Font.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -isystem /opt/homebrew/include/freetype2 -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Fwd/Ax_Fwd_Definitions.cpp.o"
@@ -478,12 +484,6 @@
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -isystem /opt/homebrew/include/freetype2 -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/DeferredRenderer.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/DeferredRenderer.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/DeferredRenderer.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/DeferredRenderer.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.341.1/macOS/include -isystem /opt/homebrew/include/freetype2 -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Font/Font.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Font/Font.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/Font/Font.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Font/Font.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

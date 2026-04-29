@@ -186,6 +186,7 @@ ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack
     Slice<char> file_data = file.Read<char>();
 
     ShaderPreproc::Result preproc = ShaderPreproc::Process(file_data, macros);
+    ShaderPreproc::DebugSaveToDisk(path, preproc);
 
     CComPtr<IDxcUtils> utils;
     CComPtr<IDxcCompiler3> compiler;
