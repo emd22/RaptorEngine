@@ -366,6 +366,7 @@ private:
 
     ConfigEntry ParseEntry();
     void ParseValue(ConfigValue& value);
+    void ParseReference(ConfigValue& value);
 
     FX_FORCE_INLINE Token* GetToken() const
     {

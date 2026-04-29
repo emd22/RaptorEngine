@@ -268,11 +268,46 @@ void ConfigFile::PrintEntries()
     }
 }
 
+void ConfigFile::ParseReference(ConfigValue& value)
+{
+    Token* ident_token = GetToken();
+    EatToken(eTokenType::Identifier);
+
+    ConfigEntry* value_entry = GetEntry(ident_token->GetHash());
+
+    // If there is a dot following, search for a nested member
+    while (value_entry != nullptr) {
+        if (GetToken()->Type != eTokenType::Dot) {
+            break;
+        }
+
+        NextToken();
+
+        ident_token = GetToken();
+        if (!EatToken(eTokenType::Identifier)) {
+            break;
+        }
+
+        value_entry = value_entry->GetMember(ident_token->GetHash());
+    }
+
+    if (value_entry) {
+        value = *value_entry;
+    }
+}
+
 void ConfigFile::ParseValue(ConfigValue& value)
 {
     using VType = ConfigEntry::eValueType;
 
     Token* value_token = GetToken();
+
+    if (value_token->Type == eTokenType::Dollar) {
+        EatToken(eTokenType::Dollar);
+
+        ParseReference(value);
+        return;
+    }
 
     // Check for constants
     if (value_token->Type == eTokenType::Identifier) {

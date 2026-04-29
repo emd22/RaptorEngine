@@ -28,32 +28,28 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
-    // fx::File fp = fx::File(FX_BASE_DIR "/Shaders/Geometry.hlsl", fx::File::eModType::Read,
-    // fx::File::eDataType::Binary);
+    fx::ConfigFile cf;
+    cf.Load("./ConfTest.conf");
+    fx::ConfigEntry* obj_entry = cf.GetEntry(fx::HashStr32("Obj"));
 
-    // fx::Slice<char> data = fp.Read<char>();
+    fx::int32 value = obj_entry->GetMember(fx::HashStr32("X"))->Get<fx::int32>();
+    fx::LogInfo("Value: {}", value);
 
-    // fx::SizedArray<fx::ShaderMacro> macros = { fx::ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } };
+    // fx::renderer::Globals::Init();
 
-    // fx::ShaderPreproc::Result preproc = fx::ShaderPreproc::Process(data, macros);
-    // fx::ShaderPreproc::DebugSaveToDisk("./PreprocResult", preproc);
+    // {
+    //     fx::FoxtrotGame game {};
+    // }
 
+    // fx::renderer::Globals::Destroy();
+    // fx::Globals::Destroy();
 
-    fx::renderer::Globals::Init();
-
-    {
-        fx::FoxtrotGame game {};
-    }
-
-    fx::renderer::Globals::Destroy();
-    fx::Globals::Destroy();
-
-    Defer(
-        []()
-        {
-            delete fx::gEnginePool;
-            fx::gEnginePool = nullptr;
-        });
+    // Defer(
+    //     []()
+    //     {
+    //         delete fx::gEnginePool;
+    //         fx::gEnginePool = nullptr;
+    //     });
 
     return 0;
 }
