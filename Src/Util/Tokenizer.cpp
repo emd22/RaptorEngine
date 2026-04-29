@@ -147,7 +147,7 @@ void Tokenizer::SubmitTokenIfData(Token& token, char* end_ptr, char* start_ptr)
     token.End = mpData;
     token.Type = GetTokenType(token);
 
-    mTokens.Insert(token);
+    TokenBuffer.Insert(token);
     token.Clear();
 
     token.Start = mpData;
@@ -281,6 +281,8 @@ void Tokenizer::IncludeFile(const char* path)
 
     Slice<char> include_data = file.Read<char>();
 
+    DataPtrs.Insert(include_data.pData);
+
     SetDataPtr(include_data.pData);
     mpDataEnd = include_data.pData + include_data.Size;
     mbInString = false;
@@ -297,8 +299,8 @@ void Tokenizer::IncludeFile(const char* path)
 
 void Tokenizer::Tokenize()
 {
-    if (!mTokens.IsInited()) {
-        mTokens.Create(512);
+    if (!TokenBuffer.IsInited()) {
+        TokenBuffer.Create(512);
     }
 
     Token current_token;
@@ -407,6 +409,6 @@ void Tokenizer::TryReadInternalCall()
     }
 }
 
-Tokenizer::~Tokenizer() { mTokens.Destroy(); }
+Tokenizer::~Tokenizer() { TokenBuffer.Destroy(); }
 
 } // namespace fx

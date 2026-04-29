@@ -25,7 +25,7 @@ class FoxParser
 public:
     FoxParser() = default;
 
-    void LoadFile(const String& path);
+    void Init(PagedArray<Token>&& tokens);
 
     void PushScope();
     void PopScope();

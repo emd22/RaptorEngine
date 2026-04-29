@@ -187,7 +187,7 @@ public:
         return (token.Start - mpData);
     }
 
-    PagedArray<Token>& GetTokens() { return mTokens; }
+    PagedArray<Token>& GetTokens() { return TokenBuffer; }
 
     void SaveState()
     {
@@ -211,6 +211,8 @@ public:
         mpLinePtr = mSavedState.pStartOfLine;
     }
 
+    PagedArray<char*>& GetDataPtrs() { return DataPtrs; }
+
 
     ~Tokenizer();
 
@@ -228,6 +230,10 @@ private:
     }
 
 
+public:
+    PagedArray<Token> TokenBuffer;
+    PagedArray<char*> DataPtrs;
+
 private:
     State mSavedState;
 
@@ -239,9 +245,6 @@ private:
 
     uint32 mLineNumber = 0;
     char* mpLinePtr = nullptr;
-
-public:
-    PagedArray<Token> mTokens;
 };
 
 } // namespace fx

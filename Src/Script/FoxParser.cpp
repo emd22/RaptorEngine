@@ -17,23 +17,9 @@ namespace fx::script {
 #define FX_SCRIPT_ALLOC_MEMORY(type_, size_) gScriptMemPool->Alloc<type_>(size_)
 #define FX_SCRIPT_FREE(type_, ptr_)          gScriptMemPool->Free<type_>(ptr_);
 
-void FoxParser::LoadFile(const String& path)
+void FoxParser::Init(PagedArray<Token>&& tokens)
 {
-    File fp(path, File::eModType::Read, File::eDataType::Binary);
-
-    if (!fp.IsFileOpen()) {
-        // printf("[ERROR] Could not open config file at '%s'\n", path);
-        LogError("Could not open script file at '{}'", path);
-        return;
-    }
-
-    Slice<char> file_data = fp.Read<char>();
-    pFileData = file_data.pData;
-
-    Tokenizer tokenizer(pFileData, file_data.Size);
-    tokenizer.Tokenize();
-
-    mTokens = std::move(tokenizer.mTokens);
+    mTokens = std::move(tokens);
 
     mScopes.Create(8);
     mCurrentScope = mScopes.Insert();
