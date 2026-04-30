@@ -16,8 +16,15 @@ enum FoxBytecodeBase : uint8
     BcBase_Type,
     BcBase_Move,
     BcBase_Marker,
+    BcBase_Compare,
 
     BcBase_Variable,
+};
+
+enum BcSpecCompare : uint8
+{
+    BcSpecCompare_Default,
+    BcSpecCompare_NotZero,
 };
 
 enum BcSpecPush : uint8
@@ -51,6 +58,7 @@ enum BcSpecSave : uint8
 enum BcSpecJump : uint8
 {
     BcSpecJump_Relative = 1,
+    BcSpecJump_Equal,
     BcSpecJump_Absolute,
     BcSpecJump_AbsoluteReg32,
 

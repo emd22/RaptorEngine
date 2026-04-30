@@ -27,6 +27,8 @@ const char* Token::GetTypeName(eTokenType type)
 
         "Dot",        "Comma",      "Semicolon",
 
+        "Equality",
+
         "DocComment",
     };
 
@@ -95,6 +97,7 @@ eTokenType Tokenizer::GetTokenType(Token& token)
         }
     }
 
+
     if (token.Length == 1) {
         switch (token.Start[0]) {
         case '=':
@@ -123,6 +126,11 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Comma;
         case ';':
             return eTokenType::Semicolon;
+        }
+    }
+    else if (token.Length == 2) {
+        if (token.Start[0] == '=' && token.Start[1] == '=') {
+            return eTokenType::Equality;
         }
     }
 
@@ -169,6 +177,22 @@ bool Tokenizer::CheckOperators(Token& current_token, char ch)
     }
 
     bool is_operator = (strchr(SingleCharOperators, ch) != NULL);
+
+    if (is_operator && (mpData[0] == '=' && mpData[1] == '=')) {
+        // If there is data waiting, submit to the token list
+        SubmitTokenIfData(current_token, mpData);
+
+        current_token.Increment();
+        current_token.Increment();
+
+        char* end_of_operator = mpData;
+        ++mpData;
+        ++mpData;
+
+        SubmitTokenIfData(current_token, end_of_operator, mpData);
+
+        return true;
+    }
 
     if (is_operator) {
         // If there is data waiting, submit to the token list
@@ -299,10 +323,6 @@ void Tokenizer::IncludeFile(const char* path)
 
 void Tokenizer::Tokenize()
 {
-    if (!TokenBuffer.IsInited()) {
-        TokenBuffer.Create(512);
-    }
-
     Token current_token;
     current_token.Start = mpData;
 

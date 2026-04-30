@@ -1,25 +1,24 @@
 
-/*
-    SG-10 Shotgun Script
-*/
 
-@include "./Scripts/WeaponBase.fox"
+extproc PrintX(int x);
 
-proc OnLoad()
+
+proc GetValue() int
 {
-    WB_InitAmmoVars(
-        10,     // Mag size
-        6       // Num mags
-    );
+    local int x = 3;
 
-    WB_InitStatVars(
-        15      // Damage
-    );
+    return x;
 }
 
 proc Init() int
 {
-    global int OBJECTID;
+    local int x = 10;
 
-    return OBJECTID;
+    // VPUSH $0
+    // PUSH 10
+    if (x == 10) {
+        return 20;
+    };
+
+    return 0;
 }

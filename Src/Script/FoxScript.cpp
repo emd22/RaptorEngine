@@ -32,12 +32,15 @@ void FoxScript::Load(const String& path)
         return;
     }
 
+
     Slice<char> file_data = fp.Read<char>();
 
     Tokenizer tokenizer(file_data.pData, file_data.Size);
     tokenizer.Tokenize();
 
-    PagedArray<Token> tokens = std::move(tokenizer.TokenBuffer);
+    for (const Token& token : tokenizer.TokenBuffer) {
+        LogInfo("{}", token);
+    }
 
     FoxParser parser {};
 
@@ -56,15 +59,8 @@ void FoxScript::Load(const String& path)
         return;
     }
 
+    LogInfo("Compiled script {}", path);
     // Script is compiled, we can now start freeing loaded file data.
-
-    {
-        gEnginePool->Free(file_data.pData);
-
-        for (char* ptr : tokenizer.DataPtrs) {
-            gEnginePool->Free(ptr);
-        }
-    }
 
 
     FoxBytecodePrinter bc_printer(bytecode);
@@ -83,6 +79,14 @@ void FoxScript::Load(const String& path)
     CallProc(HashStr32("OnLoad"), {});
 
     mpSymTick = GetSymbol(HashStr32("OnTick"));
+
+    // {
+    //     gEnginePool->Free(file_data.pData);
+
+    //     for (char* ptr : tokenizer.DataPtrs) {
+    //         gEnginePool->Free(ptr);
+    //     }
+    // }
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }

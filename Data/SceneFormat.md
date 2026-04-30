@@ -22,13 +22,15 @@ Name = "String Thing"
 SomeFloat = 10.05
 SomeInt = 5
 ```
-### Booleans
-Booleans are treated internally as integers and are typed as so. They can be read as any integral type.
 
-Defined in the script are the constants for `TRUE` and `FALSE`, which should be used for clarity.
+### Booleans
+Booleans are treated internally as integers and can be retrieved as any integral type.
+
+Defined in the script are the constants for `True` and `False`, which should be referenced using the dollar sign operator.
+
 ```
-IsBoolean = TRUE
-IsCool = FALSE
+IsBoolean = $True
+IsCool = $False
 ```
 
 ### Arrays
@@ -43,6 +45,24 @@ Objects allow an entry to store a number of other named members inside of it.
 ```
 SomeObject = { X = 10 }
 ```
+
+## Referencing other entries
+To reference other values in a config file, prefix an identifier with a dollar sign. Nested objects can be referenced by using the dot operator.
+
+Example:
+```
+// Referencing a root entry 
+X = $DefinedValue
+
+// Referencing a nested entry
+Y = $DefinedObject.NestedValue
+```
+
+The value referenced will be retrieved at call time as a copy of the value.
+
+
+## Constants
+Builtin constant values are located at `/Config/Internal/Constants.conf`, which is automatically imported into all config files.
 
 ## Including other files
 PRX scripts also give the ability to include other PRX scripts directly by substitution.

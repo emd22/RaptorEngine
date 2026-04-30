@@ -42,6 +42,8 @@ enum class eTokenType
     Comma,
     Semicolon,
 
+    Equality,
+
     DocComment,
 };
 
@@ -161,6 +163,9 @@ public:
     Tokenizer(char* data, uint32 buffer_size)
         : mpDataStart(data), mpData(data), mpDataEnd(data + buffer_size), mpLinePtr(data)
     {
+        if (!TokenBuffer.IsInited()) {
+            TokenBuffer.Create(512);
+        }
     }
 
     void SubmitTokenIfData(Token& token, char* end_ptr = nullptr, char* start_ptr = nullptr);

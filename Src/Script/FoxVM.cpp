@@ -48,11 +48,11 @@ void FoxVM::LoadSymTable()
 void FoxVM::InitVM(SizedArray<uint8>&& bytecode)
 {
     mBytecode = std::move(bytecode);
-    Scopes.InitSize(16);
 
     LoadSymTable();
 
     Stack = gScriptMemPool->Alloc<uint8>(scStackSize);
+    pVariables = gScriptMemPool->Alloc<VMVariable>(sizeof(VMVariable) * 32);
 }
 
 
@@ -169,12 +169,13 @@ void FoxVM::ExecuteOp()
     case BcBase_Variable:
         DoVariable(op_base, op_spec);
         break;
+    case BcBase_Compare:
+        DoCompare(op_base, op_spec);
+        break;
     }
 }
 
 void FoxVM::DoLoad(uint8 op_base, uint8 op_spec_raw) {}
-
-VMScope& FoxVM::ThisScope() { return Scopes[ScopeIndex]; }
 
 void FoxVM::DoPush(uint8 op_base, uint8 op_spec)
 {
@@ -187,7 +188,7 @@ void FoxVM::DoPush(uint8 op_base, uint8 op_spec)
     else if (op_spec == BcSpecPush_Var) {
         uint16 var_index = Read16();
 
-        VMVariable& var = ThisScope().Variables[var_index];
+        VMVariable& var = GetVar(var_index);
         Push32(var.Value.Type, var.Value.Get<int32>());
     }
 }
@@ -196,7 +197,7 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPop_Variable_Int32) {
         uint16 var_index = Read16();
-        ThisScope().Variables[var_index].Value.Set<int32>(Pop32());
+        GetVar(var_index).Value.Set<int32>(Pop32());
     }
 }
 
@@ -274,6 +275,23 @@ uint32 FoxVM::GetProcAddr(const Hash32 name_hash) const
     return sym->Offset;
 }
 
+void FoxVM::StashVariables()
+{
+    if (ScopeIndex < 0) {
+        LogWarning("Scope index < 0");
+        return;
+    }
+    VariableBaseIndex += ScopeVarCounts[ScopeIndex];
+}
+void FoxVM::RevertVariables()
+{
+    if (ScopeIndex < 0) {
+        LogWarning("Scope index < 0");
+        return;
+    }
+
+    VariableBaseIndex -= ScopeVarCounts[ScopeIndex - 1];
+}
 
 void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
 {
@@ -281,11 +299,20 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         uint16 offset = Read16();
         PC += offset;
     }
+    else if (op_spec == BcSpecJump_Equal) {
+        uint16 offset = Read16();
+
+        if (CompareResult == 0) {
+            PC += offset;
+        }
+    }
     else if (op_spec == BcSpecJump_Absolute) {
         uint32 position = Read32();
         PC = position;
     }
     else if (op_spec == BcSpecJump_CallAbsolute) {
+        StashVariables();
+
         uint32 name_hash = Read32();
         uint32 call_offset = GetProcAddr(name_hash);
 
@@ -297,25 +324,31 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         // Jump to the action address
         PC = call_offset;
     }
+    else if (op_spec == BcSpecJump_CallExternal) {
+        Hash32 hashed_name = Read32();
+        CallExternalFunction(hashed_name);
+    }
     else if (op_spec == BcSpecJump_ReturnToCaller) {
+        RevertVariables();
+
         --ScopeIndex;
         PC = ReturnAddress;
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Int32) {
+        RevertVariables();
+
         LastPushType = eFoxType::INT;
         --ScopeIndex;
         bReturnValueOnStack = true;
         PC = ReturnAddress;
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Float32) {
+        RevertVariables();
+
         LastPushType = eFoxType::FLOAT;
         --ScopeIndex;
         bReturnValueOnStack = true;
         PC = ReturnAddress;
-    }
-    else if (op_spec == BcSpecJump_CallExternal) {
-        Hash32 hashed_name = Read32();
-        CallExternalFunction(hashed_name);
     }
 }
 
@@ -339,7 +372,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         LogInfo("VSET [int32] ${}, {}", var_index, value);
 
 
-        VMVariable& var = ThisScope().Variables[var_index];
+        VMVariable& var = GetVar(var_index);
         var.Value.Set<int32>(value);
 
         // Update global variable
@@ -352,7 +385,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         float32 value = std::bit_cast<float32>(Read32());
         LogInfo("VSET [float32] ${}, {}", var_index, value);
 
-        VMVariable& var = ThisScope().Variables[var_index];
+        VMVariable& var = GetVar(var_index);
         var.Value.Set<float32>(value);
 
         // Update global variable
@@ -364,13 +397,14 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
-        ThisScope().Variables[dst_index].Value = ThisScope().Variables[src_index].Value;
+        GetVar(dst_index).Value = GetVar(src_index).Value;
     }
     else if (op_spec == BcSpecVariable_Define) {
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
 
-        VMVariable& var = ThisScope().Variables[var_index];
+        VMVariable& var = GetVar(var_index);
+        ScopeVarCounts[ScopeIndex] = var_index + 1;
 
         var.NameHash = name_hash;
         var.Value.Set<int32>(0);
@@ -385,7 +419,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
             Globals[name_hash].Set<int32>(0);
         }
 
-        VMVariable& var = ThisScope().Variables[var_index];
+        VMVariable& var = GetVar(var_index);
 
         var.NameHash = name_hash;
         var.bIsGlobalRef = true;
@@ -394,9 +428,28 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
     else if (op_spec == BcSpecVariable_Cast_Int32) {
         uint16 var_index = Read16();
 
-        FoxValue& var_value = ThisScope().Variables[var_index].Value;
+        FoxValue& var_value = GetVar(var_index).Value;
         float32 fvalue = var_value.Get<float32>();
         var_value.Set<int32>(fvalue);
     }
 }
+
+void FoxVM::DoCompare(uint8 op_base, uint8 op_spec)
+{
+    if (op_spec == BcSpecCompare_Default) {
+        int32 a = std::bit_cast<int32>(Pop32());
+        int32 b = std::bit_cast<int32>(Pop32());
+
+        CompareResult = (a - b);
+    }
+    else if (op_spec == BcSpecCompare_NotZero) {
+        int32 value = std::bit_cast<int32>(Pop32());
+
+        // Compare result is zero if value does not equal zero
+        CompareResult = (value == 0);
+    }
+}
+
+FoxVM::~FoxVM() { gScriptMemPool->Free(pVariables); }
+
 } // namespace fx::script

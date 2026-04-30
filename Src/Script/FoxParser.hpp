@@ -45,6 +45,8 @@ public:
     FoxAstNode* ParseRhs();
     FoxAstFunctionCall* ParseFunctionCall();
 
+    FoxAstIf* ParseIfStatement();
+
     /**
      * @brief Declares a variable for internal uses as if it was declared in the script.
      * @param name Name of the variable
@@ -59,6 +61,7 @@ public:
 
     FoxAstNode* ParseStatement(FoxAstBlock* parent_block);
     FoxAstNode* ParseStatementAsCommand(FoxAstBlock* parent_block);
+
 
     FoxAstBlock* Parse();
 
@@ -112,7 +115,7 @@ private:
     void CreateInternalVariableTokens();
 
 public:
-    char* pFileData = nullptr;
+    // char* pFileData = nullptr;
     bool bHasErrors = false;
 
 private:

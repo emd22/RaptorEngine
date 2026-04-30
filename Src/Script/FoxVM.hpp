@@ -34,11 +34,6 @@ struct FoxSymbol
 };
 
 
-struct VMScope
-{
-    VMVariable Variables[32];
-};
-
 class FoxVM;
 
 using VMExternalFunction = void (*)(FoxVM* vm, const SizedArray<FoxValue>& args);
@@ -70,6 +65,8 @@ public:
 
     void ExecuteOp();
 
+    ~FoxVM();
+
 private:
     void LoadSymTable();
 
@@ -83,10 +80,15 @@ private:
     void DoType(uint8 op_base, uint8 op_spec);
     void DoMove(uint8 op_base, uint8 op_spec);
     void DoVariable(uint8 op_base, uint8 op_spec);
+    void DoCompare(uint8 op_base, uint8 op_spec);
+
+    VMVariable& GetVar(uint16 index) { return pVariables[index + VariableBaseIndex]; }
 
     void CallExternalFunction(Hash32 hashed_name);
 
-    VMScope& ThisScope();
+    void StashVariables();
+    void RevertVariables();
+
 
     uint16 Read16();
     uint16 Read16Rev();
@@ -99,6 +101,7 @@ public:
     uint8* Stack = nullptr;
     uint32 StackPointer = 0;
     uint32 ReturnAddress = 0;
+    int32 CompareResult = 0;
 
     SizedArray<uint8> mBytecode;
 
@@ -106,8 +109,15 @@ public:
 
     std::unordered_map<Hash32, FoxValue, Hash32Stl> Globals;
 
-    SizedArray<VMScope> Scopes;
+    VMVariable* pVariables = nullptr;
+
+    /// The base index for variables. When calling another function, the variable indexes will start from 0, but will be
+    /// offset by this value. This avoids clobbering variables when calling other functions.
+    int32 VariableBaseIndex = 0;
+    uint16 ScopeVarCounts[32];
+
     int32 ScopeIndex = 0;
+
 
     std::unordered_map<Hash32, VMExternalProcEntry, Hash32Stl> ExternalProcs;
 
