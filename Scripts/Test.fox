@@ -3,15 +3,9 @@
 extproc PrintX(int x);
 
 
-proc DefineGlobal(int x)
-{
-    global int GLOB = 4;
-}
-
 proc Init() int
 {
-    global int GLOB;
-    DefineGlobal(4);
+    local int x = 1;
 
-    return GLOB;
+    return x;
 }
