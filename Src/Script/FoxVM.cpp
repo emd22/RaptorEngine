@@ -283,6 +283,7 @@ void FoxVM::StashVariables()
     }
     VariableBaseIndex += ScopeVarCounts[ScopeIndex];
 }
+
 void FoxVM::RevertVariables()
 {
     if (ScopeIndex < 0) {
@@ -303,6 +304,43 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         uint16 offset = Read16();
 
         if (CompareResult == 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_NotEqual) {
+        uint16 offset = Read16();
+
+        if (CompareResult != 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_Less) {
+        uint16 offset = Read16();
+
+        if (CompareResult < 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_LessEqual) {
+        uint16 offset = Read16();
+
+        if (CompareResult <= 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_Greater) {
+        uint16 offset = Read16();
+
+        LogInfo("Res: {}", CompareResult);
+
+        if (CompareResult > 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_GreaterEqual) {
+        uint16 offset = Read16();
+
+        if (CompareResult >= 0) {
             PC += offset;
         }
     }
@@ -437,8 +475,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 void FoxVM::DoCompare(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecCompare_Default) {
-        int32 a = std::bit_cast<int32>(Pop32());
         int32 b = std::bit_cast<int32>(Pop32());
+        int32 a = std::bit_cast<int32>(Pop32());
 
         CompareResult = (a - b);
     }

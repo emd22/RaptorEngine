@@ -154,8 +154,8 @@ struct FoxAstIf : public FoxAstNode
     FoxAstIf() { this->NodeType = FX_AST_IF; }
 
     FoxAstNode* pCondition = nullptr;
-    FoxAstBlock* pBlock = nullptr;
-    FoxAstBlock* pElseBlock = nullptr;
+    FoxAstNode* pBlock = nullptr;
+    FoxAstNode* pElseBlock = nullptr;
 };
 
 

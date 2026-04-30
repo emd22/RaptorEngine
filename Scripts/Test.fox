@@ -12,13 +12,14 @@ proc GetValue() int
 
 proc Init() int
 {
-    local int x = 10;
+    local int x = 5;
 
-    // VPUSH $0
-    // PUSH 10
-    if (x == 10) {
+    if (x != 5) {
         return 20;
-    };
+    }
+    else if (x == 5) {
+        return 12;
+    }
 
     return 0;
 }

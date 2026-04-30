@@ -32,6 +32,9 @@ enum class eTokenType
     LBrace,
     RBrace,
 
+    LessThan,
+    GreaterThan,
+
     Plus,
     Dollar,
     Minus,
@@ -43,6 +46,9 @@ enum class eTokenType
     Semicolon,
 
     Equality,
+    NotEqual,
+    LessEqual,
+    GreaterEqual,
 
     DocComment,
 };
@@ -58,6 +64,24 @@ struct Token
     };
 
 public:
+    static const char* GetTypeName(eTokenType type);
+    static bool IsTypeEqualityCheck(eTokenType type)
+    {
+        switch (type) {
+        case eTokenType::LessThan:
+        case eTokenType::GreaterThan:
+        case eTokenType::LessEqual:
+        case eTokenType::GreaterEqual:
+        case eTokenType::Equality:
+        case eTokenType::NotEqual:
+            return true;
+        default:;
+        }
+
+        return false;
+    }
+
+
     void Print(bool no_newline = false) const
     {
         printf("Token[%d]: (T:%-10s) {%.*s} %c", Length, GetTypeName(Type), Length, Start, (no_newline) ? ' ' : '\n');
@@ -91,7 +115,7 @@ public:
     }
 
     eIsNumericResult IsNumeric() const;
-    static const char* GetTypeName(eTokenType type);
+
 
     int64 ToInt() const
     {
@@ -144,7 +168,7 @@ class Tokenizer
 {
 private:
 public:
-    const char* SingleCharOperators = "=()[]{}+-$.,;?";
+    const char* SingleCharOperators = "=()[]{}<>+-$.,;?!";
 
     struct State
     {
