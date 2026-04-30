@@ -197,6 +197,14 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPop_Variable_Int32) {
         uint16 var_index = Read16();
+
+        VMVariable& var = GetVar(var_index);
+
+        if (var.bIsGlobalRef) {
+            Globals[var.NameHash].Set<int32>(Pop32());
+            return;
+        }
+
         GetVar(var_index).Value.Set<int32>(Pop32());
     }
 }
@@ -435,7 +443,14 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
-        GetVar(dst_index).Value = GetVar(src_index).Value;
+        VMVariable& dst_var = GetVar(dst_index);
+
+        if (dst_var.bIsGlobalRef) {
+            Globals[dst_var.NameHash] = GetVar(src_index).Value;
+        }
+        else {
+            GetVar(dst_index).Value = GetVar(src_index).Value;
+        }
     }
     else if (op_spec == BcSpecVariable_Define) {
         uint16 var_index = Read16();

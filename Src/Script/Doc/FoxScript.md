@@ -84,3 +84,22 @@ vm.CallFunction(entrypoint, args);
 ```
 
 The symbol retrieved can be saved if it is used often in a hot path.
+
+
+
+# Language Syntax
+
+## Defining variables
+
+To define a new variable, use either the `local` or `global` keyword as well as the type and then identifier for the variable.
+
+For example:
+```
+// Variable local to the current scope
+local int x = 10;
+
+// Variable that is a reference to a globally accessible variable
+global int OBJECTID;
+
+
+```

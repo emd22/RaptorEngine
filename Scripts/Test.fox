@@ -3,23 +3,15 @@
 extproc PrintX(int x);
 
 
-proc GetValue() int
+proc DefineGlobal(int x)
 {
-    local int x = 3;
-
-    return x;
+    global int GLOB = 4;
 }
 
 proc Init() int
 {
-    local int x = 5;
+    global int GLOB;
+    DefineGlobal(4);
 
-    if (x != 5) {
-        return 20;
-    }
-    else if (x == 5) {
-        return 12;
-    }
-
-    return 0;
+    return GLOB;
 }
