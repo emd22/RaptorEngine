@@ -7,15 +7,33 @@
 #include "Commands.hpp"
 #include "GpuBuffer.hpp"
 
+#include <ThirdParty/stb_image_write.h>
 #include <ThirdParty/vk_mem_alloc.h>
 
 #include <Core/Ref.hpp>
+#include <Core/SizedArray.hpp>
+#include <Core/String.hpp>
 #include <Math/Vec2.hpp>
 #include <optional>
 
+namespace fx {
 
-namespace fx::renderer {
+enum class eImageSaveFormat
+{
+    Jpeg,
+    Png,
+};
 
+enum class eImageSaveFlags
+{
+    None = 0,
+    FlipY = (1 << 0),
+};
+
+FxEnumFlags(eImageSaveFlags);
+
+
+namespace renderer {
 
 enum class eImageFormat
 {
@@ -202,6 +220,9 @@ public:
     void CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
                                        ImageCubemapOptions options);
 
+
+    void SaveToFile(const String& path, eImageSaveFormat file_format);
+
     VkImage Get() const { return InternalImage; }
     FX_FORCE_INLINE bool IsInited() const { return (Get() != nullptr); }
 
@@ -227,4 +248,6 @@ public:
     RefCount* mpRefCnt = nullptr;
 };
 
-} // namespace fx::renderer
+} // namespace renderer
+
+} // namespace fx

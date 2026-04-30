@@ -106,6 +106,18 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
             Print(return_node->pRhs, depth + 1);
         }
     }
+    else if (node->NodeType == FX_AST_IF) {
+        FoxAstIf* if_block = reinterpret_cast<FoxAstIf*>(node);
+
+        puts("[IF]");
+
+        Print(if_block->pCondition, depth + 1);
+        Print(if_block->pBlock, depth + 1);
+
+        if (if_block->pElseBlock) {
+            Print(if_block->pElseBlock, depth + 1);
+        }
+    }
     else {
         puts("[UNKNOWN]");
     }

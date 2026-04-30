@@ -128,7 +128,7 @@ public:
 
     void Free()
     {
-        if (pData == nullptr || DoNotDestroy) {
+        if (pData == nullptr || bDoNotDestroy) {
             return;
         }
 
@@ -428,7 +428,7 @@ public:
     SizeType Capacity = 0;
 
 
-    bool DoNotDestroy = false;
+    bool bDoNotDestroy = false;
 };
 
 } // namespace fx

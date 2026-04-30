@@ -5,7 +5,9 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <Asset/DataPack.hpp>
+#include <Asset/Font/Font.hpp>
 #include <Asset/ShaderCompiler.hpp>
+#include <Asset/ShaderPreproc.hpp>
 #include <Core/Defer.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/String.hpp>
@@ -18,6 +20,11 @@
 FX_SET_MODULE_NAME("Main")
 
 
+static void N_PrintX(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::FoxValue>& args)
+{
+    fx::LogInfo("Printed Value: {}", args[0].Get<fx::int32>());
+}
+
 int main()
 {
     fx::gEnginePool = new fx::MemPool;
@@ -26,26 +33,35 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
-    // fx::script::FoxScript script;
-    // script.Load(FX_BASE_DIR "/Scripts/Test.fox");
+    fx::script::FoxScript script;
 
-    // script.CallProc(script.GetSymbol("ScriptEntry"), {});
+    script.Load(FX_BASE_DIR "/Scripts/Test.fox");
+    script.RegisterProc(fx::HashStr32("PrintX"), false, 1, &N_PrintX);
 
-    fx::renderer::Globals::Init();
+    fx::script::FoxSymbol* sym = script.GetSymbol(fx::HashStr32("Init"));
 
-    {
-        fx::FoxtrotGame game {};
+    if (!sym) {
+        fx::LogError("Cannot find symbol!");
     }
+    fx::script::FoxValue result = script.CallProc(sym, {});
 
-    fx::renderer::Globals::Destroy();
-    fx::Globals::Destroy();
+    fx::LogInfo("result: {}", result);
 
-    Defer(
-        []()
-        {
-            delete fx::gEnginePool;
-            fx::gEnginePool = nullptr;
-        });
+    // fx::renderer::Globals::Init();
+
+    // {
+    //     fx::FoxtrotGame game {};
+    // }
+
+    // fx::renderer::Globals::Destroy();
+    // fx::Globals::Destroy();
+
+    // Defer(
+    //     []()
+    //     {
+    //         delete fx::gEnginePool;
+    //         fx::gEnginePool = nullptr;
+    //     });
 
     return 0;
 }

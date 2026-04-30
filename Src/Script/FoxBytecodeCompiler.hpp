@@ -15,6 +15,17 @@ namespace fx::script {
 ////////////////////////////////////////////
 
 
+enum class eFoxConditionResult
+{
+    Less,
+    LessEqual,
+    Equal,
+    NotEqual,
+    GreaterEqual,
+    Greater,
+    Literal,
+};
+
 using VarIndex = uint16;
 constexpr VarIndex VarIndexNull = UINT16_MAX;
 
@@ -101,6 +112,7 @@ private:
     void EmitSaveAbsolute32(uint32 offset, uint32 value);
 
     void EmitJumpRelative(uint16 offset);
+    void EmitJumpEqual(uint16 offset);
     void EmitJumpAbsolute(uint32 position);
     void EmitJumpCallAbsolute(uint32 position);
 
@@ -111,17 +123,21 @@ private:
     void EmitJumpCallExternal(Hash32 hashed_name);
 
     void EmitReturn(FoxAstReturn* return_node);
+    void EmitIfStatement(FoxAstIf* if_node);
+    eFoxConditionResult EmitPushConditionResult(FoxAstNode* condition_node);
 
     void EmitVariableSetInt32(uint16 var_index, int32 value);
     void EmitVariableSetFloat32(uint16 var_index, float32 value);
     void EmitVariableSetVar(VarIndex dst, VarIndex src);
-
 
     void EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global);
     void EmitVariableIndex(uint16 var_index);
 
     void EmitVariableCastInt32(VarIndex var_index);
     void EmitVariableCastFloat32(VarIndex var_index);
+
+    void EmitCompare();
+    void EmitCompareNotZero();
 
     void EmitParamsStart();
     void EmitType(eFoxType type);
@@ -133,6 +149,9 @@ private:
     void EmitRhs(FoxAstNode* rhs, RhsMode mode, FoxBytecodeVarHandle* handle);
 
     void EmitMarker(BcSpecMarker spec);
+
+    void Fixup16(uint32 addr, uint16 value);
+    void Fixup32(uint32 addr, uint32 value);
 
     void WriteOp(uint8 base_op, uint8 spec_op);
     void Write16(uint16 value);
@@ -153,8 +172,7 @@ public:
     PagedArray<uint8> mBytecode {};
 
 private:
-    uint16 mVarsInScope = 0;
-    uint16 mScopeIndex = 0;
+    uint16 mVariableIndex = 0;
 
     uint32 mErrorCount = 0;
 
@@ -190,6 +208,7 @@ private:
     void DoType(char* s, uint8 op_base, uint8 op_spec);
     void DoMarker(char* s, uint8 op_base, uint8 op_spec);
     void DoVariable(char* s, uint8 op_base, uint8 op_spec);
+    void DoCompare(char* s, uint8 op_base, uint8 op_spec);
 
     char* ReadString(char* buffer, uint32 buffer_size);
 

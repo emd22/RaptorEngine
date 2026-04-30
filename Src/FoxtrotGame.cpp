@@ -7,6 +7,7 @@
 
 #include <Asset/AxManager.hpp>
 #include <Asset/ConfigFile.hpp>
+#include <Asset/Font/Font.hpp>
 #include <Asset/SceneFile.hpp>
 #include <Controls.hpp>
 #include <Core/Defer.hpp>
@@ -16,7 +17,7 @@
 #include <Engine.hpp>
 #include <Material.hpp>
 #include <Physics/PhJolt.hpp>
-#include <Renderer/Backend/GpuBuffer.hpp>
+#include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
@@ -147,6 +148,21 @@ void FoxtrotGame::CreateGame()
     gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
     gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
+
+    {
+        renderer::Font font;
+        if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
+            renderer::Image atlas_image;
+            font.RenderAtlasToImage(atlas_image);
+            LogInfo("Font atlas created: {}x{}", atlas_image.Size.X, atlas_image.Size.Y);
+            LogInfo("Font: {} / {}", font.GetFamilyName(), font.GetStyleName());
+
+            atlas_image.SaveToFile("./font_atlas.jpeg", eImageSaveFormat::Jpeg);
+        }
+        else {
+            LogError("Failed to load font!");
+        }
+    }
 
     while (sbRunning) {
         Tick();

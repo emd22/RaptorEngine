@@ -17,23 +17,9 @@ namespace fx::script {
 #define FX_SCRIPT_ALLOC_MEMORY(type_, size_) gScriptMemPool->Alloc<type_>(size_)
 #define FX_SCRIPT_FREE(type_, ptr_)          gScriptMemPool->Free<type_>(ptr_);
 
-void FoxParser::LoadFile(const String& path)
+void FoxParser::Init(PagedArray<Token>&& tokens)
 {
-    File fp(path, File::eModType::Read, File::eDataType::Binary);
-
-    if (!fp.IsFileOpen()) {
-        // printf("[ERROR] Could not open config file at '%s'\n", path);
-        LogError("Could not open script file at '{}'", path);
-        return;
-    }
-
-    Slice<char> file_data = fp.Read<char>();
-    pFileData = file_data.pData;
-
-    Tokenizer tokenizer(pFileData, file_data.Size);
-    tokenizer.Tokenize();
-
-    mTokens = std::move(tokenizer.mTokens);
+    mTokens = std::move(tokens);
 
     mScopes.Create(8);
     mCurrentScope = mScopes.Insert();
@@ -160,47 +146,41 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
     // help [name of function] ;
     constexpr Hash32 kw_help = HashStr32("help");
 
+    constexpr Hash32 kw_if = HashStr32("if");
+
     // extern [name of function] ;
 
-    if (hash == kw_proc) {
+    switch (hash) {
+    case kw_proc:
         EatToken(TT::Identifier);
         // ParseFunctionDeclare();
         return ParseProcedureDeclare();
-    }
-    if (hash == kw_extfn) {
+
+    case kw_extfn:
         EatToken(TT::Identifier);
         // ParseFunctionDeclare();
         return ParseExtfnDeclare();
-    }
-    if (hash == kw_local) {
+
+    case kw_local:
         EatToken(TT::Identifier);
         return ParseVarDeclare();
-    }
-    if (hash == kw_global) {
+
+    case kw_global:
         EatToken(TT::Identifier);
         return ParseVarDeclare(&mScopes[0]);
-    }
-    if (hash == kw_return) {
+
+    case kw_if:
+        EatToken(TT::Identifier);
+        return ParseIfStatement();
+
+    case kw_return: {
         EatToken(TT::Identifier);
 
         FoxAstNode* return_rhs = nullptr;
 
         if (GetToken().Type != TT::Semicolon) {
             // There is a value that follows, get the value
-            // FoxAstNode* rhs = ParseRhs();
             return_rhs = ParseRhs();
-
-
-            // Assign the return value to __ReturnVal__
-
-            // FoxAstVarRef* var_ref = FX_SCRIPT_ALLOC_NODE(FoxAstVarRef);
-            // var_ref->Name = mTokenReturnVar;
-
-            // FoxAstAssign* assign = FX_SCRIPT_ALLOC_NODE(FoxAstAssign);
-            // assign->Var = var_ref;
-            // assign->Rhs = rhs;
-
-            // parent_block->Statements.push_back(assign);
         }
 
         FoxAstReturn* ret = FX_SCRIPT_ALLOC_NODE(FoxAstReturn);
@@ -208,7 +188,7 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
 
         return ret;
     }
-    if (hash == kw_help) {
+    case kw_help: {
         EatToken(TT::Identifier);
 
         Token& func_ref = EatToken(TT::Identifier);
@@ -223,6 +203,7 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
         }
 
         return nullptr;
+    }
     }
 
     return nullptr;
@@ -548,7 +529,8 @@ FoxAstNode* FoxParser::ParseRhs()
     // literal->Value = value;
 
     TT op_type = GetToken(0).Type;
-    if (op_type == TT::Plus || op_type == TT::Minus) {
+
+    if (op_type == TT::Plus || op_type == TT::Minus || op_type == TT::Equality) {
         FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
 
         binop->pLeft = lhs;
@@ -722,6 +704,10 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
         mInCommandMode = false;
 
         return cmd_mode;
+    }
+
+    if (GetToken().Type == TT::LBrace) {
+        return ParseBlock();
     }
 
     while (GetToken().Type == TT::DocComment) {
@@ -968,6 +954,21 @@ FoxAstFunctionCall* FoxParser::ParseFunctionCall()
     }
 
     return node;
+}
+
+FoxAstIf* FoxParser::ParseIfStatement()
+{
+    // if ( [CONDITION] ) [BLOCK]
+
+    FoxAstIf* if_node = FX_SCRIPT_ALLOC_NODE(FoxAstIf);
+
+    EatToken(TT::LParen);
+    if_node->pCondition = ParseRhs();
+    EatToken(TT::RParen);
+
+    if_node->pBlock = ParseBlock();
+
+    return if_node;
 }
 
 FoxAstBlock* FoxParser::Parse()

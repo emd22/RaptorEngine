@@ -42,8 +42,11 @@ enum class eTokenType
     Comma,
     Semicolon,
 
+    Equality,
+
     DocComment,
 };
+
 
 struct Token
 {
@@ -160,6 +163,9 @@ public:
     Tokenizer(char* data, uint32 buffer_size)
         : mpDataStart(data), mpData(data), mpDataEnd(data + buffer_size), mpLinePtr(data)
     {
+        if (!TokenBuffer.IsInited()) {
+            TokenBuffer.Create(512);
+        }
     }
 
     void SubmitTokenIfData(Token& token, char* end_ptr = nullptr, char* start_ptr = nullptr);
@@ -186,7 +192,7 @@ public:
         return (token.Start - mpData);
     }
 
-    PagedArray<Token>& GetTokens() { return mTokens; }
+    PagedArray<Token>& GetTokens() { return TokenBuffer; }
 
     void SaveState()
     {
@@ -210,6 +216,8 @@ public:
         mpLinePtr = mSavedState.pStartOfLine;
     }
 
+    PagedArray<char*>& GetDataPtrs() { return DataPtrs; }
+
 
     ~Tokenizer();
 
@@ -227,6 +235,10 @@ private:
     }
 
 
+public:
+    PagedArray<Token> TokenBuffer;
+    PagedArray<char*> DataPtrs;
+
 private:
     State mSavedState;
 
@@ -238,9 +250,6 @@ private:
 
     uint32 mLineNumber = 0;
     char* mpLinePtr = nullptr;
-
-public:
-    PagedArray<Token> mTokens;
 };
 
 } // namespace fx
@@ -254,5 +263,17 @@ struct std::formatter<fx::Token>
     {
         const std::string str(obj.Start, obj.Length);
         return std::format_to(ctx.out(), "(Type={}, {})", fx::Token::GetTypeName(obj.Type), str);
+    }
+};
+
+
+template <>
+struct std::formatter<fx::eTokenType>
+{
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    auto format(fx::eTokenType type, std::format_context& ctx) const
+    {
+        return std::format_to(ctx.out(), "{}", fx::Token::GetTypeName(type));
     }
 };

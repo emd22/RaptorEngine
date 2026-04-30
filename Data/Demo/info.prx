@@ -13,16 +13,17 @@ Sun = {
 //     Floor = { Box = { Size = [64.0, 0.5, 64.0] } }
 // }
 
+
 Objects = {
     Skybox = {
         Mesh = "/Skybox.glb"
-        Unlit = TRUE
+        Unlit = $True
     }
 
     Level = {
         Mesh = "/BasicScene.glb"
         Physics = {
-            Type = PHYS_STATIC
+            Type = $CPhys.Static
             BoxCollider = { Size = [64.0, 1.0, 64.0] }
         }
 
@@ -31,25 +32,25 @@ Objects = {
 
     AnimTest = {
         Mesh = "/Model2.glb"
-        Shadows = FALSE
+        Shadows = $False
         Scale = 1.20
         Pos = [0.0, 0.0, -1.0]
-        Layer = OBJLAYER_PLAYER
+        Layer = $CObjectLayer.Player
     }
 
     Pistol = {
         Mesh = "/Pistol.glb"
-        Shadows = TRUE
-        Layer = OBJLAYER_PLAYER
+        Shadows = $True
+        Layer = $CObjectLayer.Player
         Script = "/Pistol.fox"
     }
 
 
     BrickTest = {
         Mesh = "/BrickTest.glb"
-        Shadows = TRUE
+        Shadows = $True
         Physics={
-            Type = PHYS_STATIC
+            Type = $CPhys.Static
             BoxCollider = { Size = [4.0, 4.0, 0.5] }
         }
         Pos = [0.0, 0.5, 1.0]

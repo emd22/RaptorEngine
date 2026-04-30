@@ -52,6 +52,8 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
     }
 
     Members.Insert(std::move(entry));
+
+    Type = ConfigEntry::eValueType::Struct;
 }
 
 std::string ConfigValue::AsString() const
@@ -91,8 +93,16 @@ std::string ConfigEntry::AsString(uint32 indent) const
         return std::format("{{\n{}{}}}", member_list, indent_str);
     }
     else if (bIsArray) {
-        for (const ConfigValue& value : ArrayData) {
-            member_list += std::format("{}, ", value.AsString());
+        uint32 array_size = ArrayData.Size();
+
+        for (uint32 value_index = 0; value_index < array_size; value_index++) {
+            const ConfigValue& value = ArrayData[value_index];
+            if (value_index == array_size - 1) {
+                member_list += std::format("{}", value.AsString());
+            }
+            else {
+                member_list += std::format("{}, ", value.AsString());
+            }
         }
 
         return std::format("[ {} ]", member_list);
@@ -183,6 +193,7 @@ void ConfigFile::Load(const std::string& path)
     Slice<char> file_buffer = file.Read<char>();
 
     Tokenizer tokenizer(file_buffer.pData, file_buffer.Size);
+    tokenizer.IncludeFile(FX_BASE_DIR "/Config/Internal/Constants.conf");
     tokenizer.Tokenize();
 
     Parse(tokenizer.GetTokens());
@@ -232,6 +243,23 @@ bool ConfigFile::EatToken(eTokenType type)
     return true;
 }
 
+bool ConfigFile::EatToken(const Slice<eTokenType>& expected_types)
+{
+    bool type_is_correct = false;
+
+    Token* token = GetToken();
+
+    for (const eTokenType type : expected_types) {
+        if (token->Type == type) {
+            NextToken();
+            return true;
+        }
+    }
+
+    LogError("Config: found type '{}' but can only allow one of {}", Token::GetTypeName(GetToken()->Type));
+    return false;
+}
+
 void ConfigFile::PrintEntries()
 {
     PagedArray<ConfigEntry>& entries = GetEntries();
@@ -241,11 +269,46 @@ void ConfigFile::PrintEntries()
     }
 }
 
+void ConfigFile::ParseReference(ConfigValue& value)
+{
+    Token* ident_token = GetToken();
+    EatToken(eTokenType::Identifier);
+
+    ConfigEntry* value_entry = GetEntry(ident_token->GetHash());
+
+    // If there is a dot following, search for a nested member
+    while (value_entry != nullptr) {
+        if (GetToken()->Type != eTokenType::Dot) {
+            break;
+        }
+
+        NextToken();
+
+        ident_token = GetToken();
+        if (!EatToken(eTokenType::Identifier)) {
+            break;
+        }
+
+        value_entry = value_entry->GetMember(ident_token->GetHash());
+    }
+
+    if (value_entry) {
+        value = *value_entry;
+    }
+}
+
 void ConfigFile::ParseValue(ConfigValue& value)
 {
     using VType = ConfigEntry::eValueType;
 
     Token* value_token = GetToken();
+
+    if (value_token->Type == eTokenType::Dollar) {
+        EatToken(eTokenType::Dollar);
+
+        ParseReference(value);
+        return;
+    }
 
     // Check for constants
     if (value_token->Type == eTokenType::Identifier) {
@@ -328,7 +391,8 @@ ConfigEntry ConfigFile::ParseEntry()
 
     entry.Name = token->GetStr();
 
-    EatToken(eTokenType::Identifier);
+    eTokenType allowed_name_types[] = { eTokenType::Identifier, eTokenType::Integer };
+    EatToken(MakeSlice(allowed_name_types, std::size(allowed_name_types)));
     EatToken(eTokenType::Equals);
 
     // Parse struct

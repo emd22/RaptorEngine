@@ -25,12 +25,26 @@ FoxScript::FoxScript(const String& path) { Load(path); }
 
 void FoxScript::Load(const String& path)
 {
+    File fp(path, File::eModType::Read, File::eDataType::Binary);
+
+    if (!fp.IsFileOpen()) {
+        LogError("Could not open script file at '{}'", path);
+        return;
+    }
+
+
+    Slice<char> file_data = fp.Read<char>();
+
+    Tokenizer tokenizer(file_data.pData, file_data.Size);
+    tokenizer.Tokenize();
+
+    for (const Token& token : tokenizer.TokenBuffer) {
+        LogInfo("{}", token);
+    }
+
     FoxParser parser {};
 
-    parser.LoadFile(path);
-
-    Defer([&]() { gEnginePool->Free(parser.pFileData); });
-
+    parser.Init(std::move(tokenizer.TokenBuffer));
 
     FoxAstNode* root_node = parser.Parse();
     if (parser.bHasErrors || root_node == nullptr) {
@@ -44,6 +58,10 @@ void FoxScript::Load(const String& path)
         LogError("Errors found during script compilation, cannot continue");
         return;
     }
+
+    LogInfo("Compiled script {}", path);
+    // Script is compiled, we can now start freeing loaded file data.
+
 
     FoxBytecodePrinter bc_printer(bytecode);
     bc_printer.Print();
@@ -61,6 +79,14 @@ void FoxScript::Load(const String& path)
     CallProc(HashStr32("OnLoad"), {});
 
     mpSymTick = GetSymbol(HashStr32("OnTick"));
+
+    // {
+    //     gEnginePool->Free(file_data.pData);
+
+    //     for (char* ptr : tokenizer.DataPtrs) {
+    //         gEnginePool->Free(ptr);
+    //     }
+    // }
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }

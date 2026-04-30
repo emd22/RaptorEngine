@@ -35,6 +35,8 @@ enum FoxAstType
     FX_AST_DOCCOMMENT,
 
     FX_AST_COMMANDMODE,
+
+    FX_AST_IF,
 };
 
 struct FoxAstNode
@@ -147,6 +149,15 @@ struct FoxAstReturn : public FoxAstNode
     FoxAstNode* pRhs = nullptr;
 };
 
+struct FoxAstIf : public FoxAstNode
+{
+    FoxAstIf() { this->NodeType = FX_AST_IF; }
+
+    FoxAstNode* pCondition = nullptr;
+    FoxAstBlock* pBlock = nullptr;
+    FoxAstBlock* pElseBlock = nullptr;
+};
+
 
 //////////////////////////////////
 // Script AST Printer
@@ -189,10 +200,9 @@ struct FoxBytecodeVarHandle
     eFoxType Type = eFoxType::INT;
     int64 Offset = 0;
 
-    uint16 VarIndexInScope = 0;
+    uint16 VariableIndex = 0;
 
     uint16 SizeOnStack = 4;
-    uint32 ScopeIndex = 0;
 };
 
 struct FoxBytecodeFunctionHandle

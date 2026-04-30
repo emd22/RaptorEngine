@@ -1,15 +1,16 @@
 
 #include "Image.hpp"
 
-#include "../RenderBackend.hpp"
-
+#include <Asset/Loader/AxLoaderStb.hpp>
 #include <Core/Defines.hpp>
+#include <Core/File.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Panic.hpp>
 #include <Core/StackArray.hpp>
 #include <Engine.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 
 namespace fx::renderer {
 
@@ -539,6 +540,146 @@ void Image::DecRef()
     InternalImage = nullptr;
     Allocation = nullptr;
     View = nullptr;
+}
+
+
+// bool Image::Readback(CommandBuffer& cmd)
+// {
+//     const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetSize(Format);
+
+//     RawGpuBuffer staging_buffer;
+//     staging_buffer.Create(eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::None);
+
+//     TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd, 1,
+//                      TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+//                                                  .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+
+//     VkBufferImageCopy copy {
+//         .bufferOffset = 0,
+//         .bufferRowLength = 0,
+//         .bufferImageHeight = 0,
+//         .imageSubresource {
+//             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+//             .mipLevel = 0,
+//             .baseArrayLayer = 0,
+//             .layerCount = 1,
+//         },
+//         .imageExtent = VkExtent3D { .width = Size.X, .height = Size.Y, .depth = 1 },
+//     };
+
+//     vkCmdCopyImageToBuffer(cmd, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_buffer.Buffer, 1,
+//     &copy);
+
+//     TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
+//                      TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+//                                                  .DstAccessMask = VK_ACCESS_SHADER_READ_BIT });
+
+//     return true;
+// }
+
+
+// bool Image::SaveToFile(const String& path, eImageFormat output_format, int jpeg_quality)
+// {
+//     SizedArray<uint8> data = SaveToMemory(output_format, jpeg_quality);
+//     if (data.Size == 0) {
+//         return false;
+//     }
+
+//     File fp = File(path, File::eModType::Write, File::eDataType::Binary);
+//     if (!fp.IsFileOpen()) {
+//         LogError("Cannot save image to disk");
+//         return false;
+//     }
+
+//     fp.WriteRaw(data.pData, data.Size);
+//     fp.Close();
+
+//     return true;
+// }
+
+
+void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
+{
+    const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetSize(Format);
+
+    SizedArray<uint8> image_data;
+    image_data.InitSize(data_size);
+
+    gRenderer->SubmitOneTimeCmd(
+        [&](CommandBuffer& cmd)
+        {
+            RawGpuBuffer staging_buffer;
+            staging_buffer.Create(eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU,
+                                  eGpuBufferFlags::TransferReceiver);
+
+            VkImageMemoryBarrier pre_barrier {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask = 0,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = ImageLayout,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = InternalImage,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+            };
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
+                                 0, nullptr, 1, &pre_barrier);
+
+            VkBufferImageCopy copy {
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+                .imageExtent = VkExtent3D { .width = Size.X, .height = Size.Y, .depth = 1 },
+            };
+
+            vkCmdCopyImageToBuffer(cmd, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_buffer.Buffer, 1,
+                                   &copy);
+
+            VkImageMemoryBarrier post_barrier {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = InternalImage,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+            };
+
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                                 nullptr, 0, nullptr, 1, &post_barrier);
+
+            ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            staging_buffer.Map();
+            memcpy(image_data.pData, staging_buffer.pMappedBuffer, data_size);
+            staging_buffer.UnMap();
+            staging_buffer.Destroy();
+        });
+
+
+    AxLoaderStb::SaveToFile(file_format, image_data, Size, path, eImageSaveFlags::None);
 }
 
 

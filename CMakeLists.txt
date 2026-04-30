@@ -111,4 +111,6 @@ else()
     )
 endif()
 
-target_link_libraries(foxtrot PRIVATE turbojpeg SDL3)
+find_package(Freetype REQUIRED)
+
+target_link_libraries(foxtrot PRIVATE turbojpeg SDL3 Freetype::Freetype)
