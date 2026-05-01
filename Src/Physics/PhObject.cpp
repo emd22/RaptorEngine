@@ -20,6 +20,7 @@ void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f&
                                    const PhProperties& object_properties)
 {
     mMotionType = motion_type;
+    PrimitiveType = primitive_type;
 
     JPH::RVec3 jolt_dimensions;
     (dimensions * 0.5).ToJoltVec3(jolt_dimensions);
@@ -29,6 +30,8 @@ void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f&
     LogInfo("Creating primitive collider with dimensions {}", dimensions);
 
     switch (primitive_type) {
+    case ePhPrimitiveType::None:
+        break;
     case ePhPrimitiveType::Box: {
         JPH::BoxShapeSettings box_shape_settings(jolt_dimensions);
         box_shape_settings.SetDensity(object_properties.Density);
@@ -141,7 +144,7 @@ void PhObject::DestroyPhysicsBody()
 }
 
 
-void PhObject::Teleport(Vec3f position, Quat rotation)
+void PhObject::Teleport(const Vec3f& position, const Quat& rotation)
 {
     if (!mbHasPhysicsBody) {
         return;
@@ -155,8 +158,6 @@ void PhObject::Teleport(Vec3f position, Quat rotation)
 
     gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetBodyId(), jolt_position, jolt_rotation,
                                                                       JPH::EActivation::Activate);
-
-    LogInfo("Teleporting to sync physics object");
 }
 
 } // namespace fx

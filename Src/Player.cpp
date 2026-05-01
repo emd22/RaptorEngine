@@ -44,7 +44,7 @@ void Player::SetFlyMode(bool value)
 void Player::Move(float64 delta_time, const Vec3f& offset)
 {
     const Vec3f forward = MovementDirection * offset.Z;
-    const Vec3f right = MovementDirection.Cross(Vec3f::sUp) * offset.X;
+    const Vec3f right = MovementDirection.Cross(Vec3f::sUp) * -offset.X;
     const Vec3f up = Vec3f::sUp * offset.Y;
 
 

@@ -87,6 +87,8 @@ public:
      */
     void ReserveInstances(uint32 num_instances);
 
+    FX_FORCE_INLINE void SetPhysicsId(PhObjectId phys_id) { PhysicsId = phys_id; }
+    FX_FORCE_INLINE PhObjectId GetPhysicsId() const { return PhysicsId; }
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return (Flags & eObjectFlags::PhysicsEnabled) != 0; }
 

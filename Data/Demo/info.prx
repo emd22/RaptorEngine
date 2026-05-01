@@ -9,9 +9,17 @@ Sun = {
 }
 
 
-// Colliders = {
-//     Floor = { Box = { Size = [64.0, 0.5, 64.0] } }
-// }
+Colliders = {
+    Floor = {
+        Pos = [0.0, -2.25, 0.0]
+        Box = { Size = [64.0, 1.0, 64.0] }
+    }
+    BrickWall = {
+        Pos = [0.0, 0.5, 1.0]
+        Box = { Size = [4.0, 4.0, 0.5] }
+    }
+
+}
 
 
 Objects = {
@@ -22,11 +30,7 @@ Objects = {
 
     Level = {
         Mesh = "/BasicScene.glb"
-        Physics = {
-            Type = $CPhys.Static
-            BoxCollider = { Size = [64.0, 1.0, 64.0] }
-        }
-
+        ColliderRef = "Floor"
         Pos=[0.0, -2.25, 0.0]
     }
 
@@ -42,17 +46,13 @@ Objects = {
         Mesh = "/Pistol.glb"
         Shadows = $True
         Layer = $CObjectLayer.Player
-        Script = "/Pistol.fox"
     }
 
 
     BrickTest = {
         Mesh = "/BrickTest.glb"
         Shadows = $True
-        Physics={
-            Type = $CPhys.Static
-            BoxCollider = { Size = [4.0, 4.0, 0.5] }
-        }
+        ColliderRef = "BrickWall"
         Pos = [0.0, 0.5, 1.0]
     }
 

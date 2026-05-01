@@ -1,11 +1,7 @@
 
-
-extproc PrintX(int x);
-
-
 proc Init() int
 {
-    local int x = 1;
+    local int x = 10;
 
     return x;
 }

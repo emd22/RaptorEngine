@@ -164,6 +164,7 @@ private:
     Hash32 Hash = HashNull32;
 };
 
+
 class Tokenizer
 {
 private:

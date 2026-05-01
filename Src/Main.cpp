@@ -33,35 +33,35 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
-    fx::script::FoxScript script;
+    // fx::script::FoxScript script;
 
-    script.Load(FX_BASE_DIR "/Scripts/Test.fox");
-    script.RegisterProc(fx::HashStr32("PrintX"), false, 1, &N_PrintX);
+    // script.Load(FX_BASE_DIR "/Scripts/Test.fox");
+    // script.RegisterProc(fx::HashStr32("PrintX"), false, 1, &N_PrintX);
 
-    fx::script::FoxSymbol* sym = script.GetSymbol(fx::HashStr32("Init"));
+    // fx::script::FoxSymbol* sym = script.GetSymbol(fx::HashStr32("Init"));
 
-    if (!sym) {
-        fx::LogError("Cannot find symbol!");
-    }
-    fx::script::FoxValue result = script.CallProc(sym, {});
-
-    fx::LogInfo("result: {}", result);
-
-    // fx::renderer::Globals::Init();
-
-    // {
-    //     fx::FoxtrotGame game {};
+    // if (!sym) {
+    //     fx::LogError("Cannot find symbol!");
     // }
+    // fx::script::FoxValue result = script.CallProc(sym, {});
 
-    // fx::renderer::Globals::Destroy();
-    // fx::Globals::Destroy();
+    // fx::LogInfo("result: {}", result);
 
-    // Defer(
-    //     []()
-    //     {
-    //         delete fx::gEnginePool;
-    //         fx::gEnginePool = nullptr;
-    //     });
+    fx::renderer::Globals::Init();
+
+    {
+        fx::FoxtrotGame game {};
+    }
+
+    fx::renderer::Globals::Destroy();
+    fx::Globals::Destroy();
+
+    Defer(
+        []()
+        {
+            delete fx::gEnginePool;
+            fx::gEnginePool = nullptr;
+        });
 
     return 0;
 }

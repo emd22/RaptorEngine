@@ -449,6 +449,8 @@ void Tokenizer::TryReadInternalCall()
 
         IncludeFile(include_path);
     }
+    else if (ExpectString("macro")) {
+    }
 }
 
 Tokenizer::~Tokenizer() { TokenBuffer.Destroy(); }

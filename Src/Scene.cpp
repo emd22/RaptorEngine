@@ -39,7 +39,7 @@ PhObjectId Scene::NewPhysicsObject()
     return id;
 }
 
-PhObject* Scene::GetPhysicsObject(PhObjectId id)
+PhObject* Scene::GetPhysicsObject(PhObjectId id) const
 {
     if (id == PhObjectIdNull || id > mPhysicsObjects.Size()) {
         return nullptr;
@@ -58,7 +58,7 @@ void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
     }
 }
 
-TSRef<Object> Scene::FindObject(Hash32 name_hash)
+TSRef<Object> Scene::FindObject(const Hash32 name_hash)
 {
     for (TSRef<Object>& obj : mObjects) {
         if (obj->Name == name_hash) {
@@ -67,6 +67,17 @@ TSRef<Object> Scene::FindObject(Hash32 name_hash)
     }
 
     return TSRef<Object>(nullptr);
+}
+
+PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
+{
+    for (PhObject& phys : mPhysicsObjects) {
+        if (phys.GetName().GetHash() == name_hash) {
+            return &phys;
+        }
+    }
+
+    return nullptr;
 }
 
 
