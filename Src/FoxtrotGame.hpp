@@ -89,6 +89,7 @@ private:
     void ProcessControls();
 
     void LoadOffsetsFile();
+    void CreateFontObject();
 
     void DestroyGame();
 

@@ -113,6 +113,33 @@ void FoxtrotGame::LoadOffsetsFile()
     ArmsOffset = info.GetEntryValue(HashStr32("ArmsOffset"), Vec3f::sZero);
 }
 
+void FoxtrotGame::CreateFontObject()
+{
+    TSRef<Object> object = TSRef<Object>::New();
+    object->Name.Set("FontObject");
+
+    Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad({});
+
+    object->pMesh = quad->AsMesh(eVertexType::Default);
+
+    TSRef<Material> material = gMaterialManager->New("Font material", &gRenderer->pDeferredRenderer->PlUnlit, false);
+    TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+                                                    FX_BASE_DIR "/DefaultFont.png");
+    material->Attach(Material::eResourceType::Diffuse, image);
+    object->pMaterial = material;
+
+    object->SetRenderUnlit(true);
+
+    object->MarkReadyToRender();
+    object->bIsUploadedToGpu = true;
+    object->IsFinishedNotifier.SignalDataWritten();
+
+    mMainScene.Attach(object);
+
+    LogInfo("ATTACHING FONT OBJECT");
+    object->PrintDebug();
+}
+
 void FoxtrotGame::CreateGame()
 {
     mMainScene.Create();
@@ -157,19 +184,16 @@ void FoxtrotGame::CreateGame()
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
 
     {
-        renderer::Font font;
-        if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
-            renderer::Image atlas_image;
-            font.RenderAtlasToImage(atlas_image);
-            LogInfo("Font atlas created: {}x{}", atlas_image.Size.X, atlas_image.Size.Y);
-            LogInfo("Font: {} / {}", font.GetFamilyName(), font.GetStyleName());
-
-            atlas_image.SaveToFile("./font_atlas.jpeg", eImageSaveFormat::Jpeg);
-        }
-        else {
-            LogError("Failed to load font!");
-        }
+        // renderer::Font font;
+        // if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
+        //     font.SaveToFile("./DefaultFont.png", eImageSaveFormat::Png);
+        // }
+        // else {
+        //     LogError("Failed to load font!");
+        // }
     }
+
+    CreateFontObject();
 
     while (sbRunning) {
         Tick();

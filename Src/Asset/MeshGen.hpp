@@ -19,6 +19,9 @@ public:
     struct GeneratedMesh
     {
         SizedArray<Vec3f> Positions;
+        SizedArray<Vec3f> Normals;
+        SizedArray<Vec2f> Uvs;
+
         SizedArray<uint32> Indices;
 
         Ref<PrimitiveMesh> AsMesh(renderer::eVertexType vertex_type);

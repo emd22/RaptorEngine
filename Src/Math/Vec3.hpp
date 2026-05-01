@@ -53,6 +53,14 @@ public:
 
     FX_FORCE_INLINE static Vec3f MulAdd(const Vec3f& a, const Vec3f& b, const Vec3f& accum);
 
+    static Vec3f GetSurfaceNormal(const Vec3f& a, const Vec3f& b, const Vec3f& c)
+    {
+        Vec3f edge1 = b - a;
+        const Vec3f edge2 = c - b;
+
+        return edge1.Cross(edge2).NormalizeIP();
+    }
+
 #ifdef FX_USE_SIMD
     explicit Vec3f(SimdType intrin) : mIntrin(intrin) {}
     Vec3f(const Vec4f& other);
@@ -91,6 +99,7 @@ public:
 
         return dist2 <= sphere_radius * sphere_radius;
     }
+
 
     FX_FORCE_INLINE bool operator==(const Vec3f& other) const;
     bool operator==(const JPH::Vec3& other) const;

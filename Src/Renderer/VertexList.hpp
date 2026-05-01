@@ -36,6 +36,7 @@ public:
                     const SizedArray<float32>& bone_weights, const SizedArray<uint32>& bone_ids,
                     eVertexCreateFlags create_flags);
 
+
     template <renderer::eVertexType TVertexType>
     void CreateFrom(SizedArray<renderer::Vertex<TVertexType>>&& vertices)
     {

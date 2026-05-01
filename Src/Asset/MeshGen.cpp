@@ -70,10 +70,11 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
     // Create a mesh using the default vertex format (positions, normals, uvs)
     Ref<PrimitiveMesh> mesh = MakeRef<PrimitiveMesh>();
 
+    mesh->bKeepInMemory = true;
+
     mesh->UploadIndices(Indices);
 
-    // mesh->VertexList.CreateFrom<VertexType::Default>(Positions, {}, {}, {});
-    mesh->VertexList.CreateFrom(Positions, {}, {}, {}, {}, {}, eVertexCreateFlags::None);
+    mesh->VertexList.CreateFrom(Positions, Normals, Uvs, {}, {}, {}, eVertexCreateFlags::None);
     mesh->UploadVertices();
 
     mesh->bIsReady.store(true);
@@ -221,7 +222,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(MeshGenOptions options)
 {
     Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 
-    const float s = options.Scale;
+    const float32 s = options.Scale;
 
     /*
         0-------1
@@ -233,16 +234,35 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(MeshGenOptions options)
 
     mesh->Positions = {
         // Top Left
-        Vec3f(-s, -s, 0.0f), // 0
+        Vec3f(-s, s, 0.0f), // 0
         // Top Right
-        Vec3f(s, -s, 0.0f), // 1
+        Vec3f(s, s, 0.0f), // 1
 
         // Bottom Right
-        Vec3f(s, s, 0.0f), // 2
+        Vec3f(s, -s, 0.0f), // 2
 
         // Bottom Left
-        Vec3f(-s, s, 0.0f), // 3
+        Vec3f(-s, -s, 0.0f), // 3
     };
+
+    Vec3f surface_normal = Vec3f::GetSurfaceNormal(mesh->Positions[0], mesh->Positions[1], mesh->Positions[2]);
+
+    mesh->Normals = { surface_normal, surface_normal, surface_normal, surface_normal };
+
+    mesh->Uvs = {
+        // Top Left
+        Vec2f(0, -s), // 0
+
+        // Top Right
+        Vec2f(s, -s), // 1
+
+        // Bottom Right
+        Vec2f(s, 0), // 2
+
+        // Bottom Left
+        Vec2f(0, 0), // 3
+    };
+
 
     mesh->Indices = { // Top left triangle
                       1, 0, 3,

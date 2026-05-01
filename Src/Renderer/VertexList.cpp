@@ -28,7 +28,6 @@ FX_FORCE_INLINE void WriteOrZeroVec(TType* dst, const SizedArray<TVecType>& src,
     memset(dst, 0, size);
 }
 
-
 void VertexList::CreateFrom(const SizedArray<Vec3f>& positions, const SizedArray<Vec3f>& normals,
                             const SizedArray<Vec2f>& uvs, const SizedArray<Vec3f>& tangents,
                             const SizedArray<Vec4f>& bone_weights, const SizedArray<Vec4u>& bone_ids,

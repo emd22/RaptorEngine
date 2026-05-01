@@ -112,6 +112,7 @@ public:
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
+    void MarkReadyToRender() { Flags |= eObjectFlags::ReadyToRender; }
 
     void Destroy() override;
     ~Object();
