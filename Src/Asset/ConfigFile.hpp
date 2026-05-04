@@ -7,6 +7,7 @@
 #include <Core/PagedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Quat.hpp>
+#include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Util/Tokenizer.hpp>
 #include <string>
@@ -212,6 +213,13 @@ public:
     T GetValue() const;
 
     template <>
+    Vec2i GetValue<Vec2i>() const
+    {
+        Assert(bIsArray == true && ArrayData.Size() >= 2);
+        return Vec2i(ArrayData[0].Get<int32>(), ArrayData[1].Get<int32>());
+    }
+
+    template <>
     Vec3f GetValue<Vec3f>() const
     {
         Assert(bIsArray == true && ArrayData.Size() >= 3);
@@ -281,6 +289,8 @@ public:
         return entry->GetValue<T>();
     }
 
+    const PagedArray<ConfigEntry>& GetAllMembers() const { return Members; }
+    const PagedArray<ConfigValue>& GetArrayData() const { return ArrayData; }
 
     ConfigEntry& operator=(const ConfigEntry& other) = delete;
 

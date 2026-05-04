@@ -251,16 +251,16 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(MeshGenOptions options)
 
     mesh->Uvs = {
         // Top Left
-        Vec2f(0, -s), // 0
+        Vec2f(options.UvMin.X, options.UvMin.Y), // 0
 
         // Top Right
-        Vec2f(s, -s), // 1
+        Vec2f(options.UvMax.X, options.UvMin.Y), // 1
 
         // Bottom Right
-        Vec2f(s, 0), // 2
+        Vec2f(options.UvMax.X, options.UvMax.Y), // 2
 
         // Bottom Left
-        Vec2f(0, 0), // 3
+        Vec2f(options.UvMin.X, options.UvMax.Y), // 3
     };
 
 

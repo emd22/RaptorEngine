@@ -385,28 +385,14 @@ public:
 
     TElementType& Get(size_t index) const
     {
-        Page* page = nullptr;
         const uint32 dest_page_index = (index / PageNodeCapacity);
         uint32 start_index = 0;
 
-        // If the page index is closer to the end, start from the last page
-        if ((CurrentPageIndex - dest_page_index) < dest_page_index) {
-            page = pCurrentPage;
-            start_index = CurrentPageIndex;
+        Page* page = pFirstPage;
 
-            while (start_index != dest_page_index) {
-                page = page->pPrev;
-                --start_index;
-            }
-        }
-        // Start from the first page
-        else {
-            page = pFirstPage;
-
-            while (start_index != dest_page_index) {
-                page = page->pNext;
-                ++start_index;
-            }
+        while (start_index != dest_page_index) {
+            page = page->pNext;
+            ++start_index;
         }
 
         const uint32 item_index = index - (dest_page_index * PageNodeCapacity);

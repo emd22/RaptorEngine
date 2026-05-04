@@ -113,13 +113,36 @@ void FoxtrotGame::LoadOffsetsFile()
     ArmsOffset = info.GetEntryValue(HashStr32("ArmsOffset"), Vec3f::sZero);
 }
 
+Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / size.X, pos.Y / size.Y); }
+
 void FoxtrotGame::CreateFontObject()
 {
+    Vec2f atlas_size = Vec2f(512.0f, 256.0f);
+
+    Vec2i glyph_size = Vec2i::sZero;
+    Vec2i glyph_offset = Vec2i::sZero;
+
+    {
+        ConfigFile font_meta;
+        font_meta.Load(FX_BASE_DIR "/Meta.conf");
+
+        ConfigEntry* glyphs_entry = font_meta.GetEntry(HashStr32("Glyphs"));
+
+        ConfigEntry* glyph = glyphs_entry->GetMember(HashStr32("65"));
+
+        glyph_size = glyph->GetMemberValue(HashStr32("Size"), Vec2i(5, 5));
+        glyph_offset = glyph->GetMemberValue(HashStr32("Offset"), Vec2i::sZero);
+    }
+
+
     TSRef<Object> object = TSRef<Object>::New();
     object->Name.Set("FontObject");
 
-    Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad({});
+    MeshGenOptions options { .Scale = 0.5 };
+    options.UvMin = PixelsToUV(glyph_offset, atlas_size);
+    options.UvMax = options.UvMin + PixelsToUV(glyph_size, atlas_size);
 
+    Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
     object->pMesh = quad->AsMesh(eVertexType::Default);
 
     TSRef<Material> material = gMaterialManager->New("Font material", &gRenderer->pDeferredRenderer->PlUnlit, false);
@@ -129,14 +152,12 @@ void FoxtrotGame::CreateFontObject()
     object->pMaterial = material;
 
     object->SetRenderUnlit(true);
+    object->SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
 
     object->MarkReadyToRender();
-    object->bIsUploadedToGpu = true;
-    object->IsFinishedNotifier.SignalDataWritten();
 
     mMainScene.Attach(object);
 
-    LogInfo("ATTACHING FONT OBJECT");
     object->PrintDebug();
 }
 

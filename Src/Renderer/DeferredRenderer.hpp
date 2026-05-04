@@ -111,6 +111,7 @@ public:
     /////////////////////////////////////////////////
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
     Pipeline PlUnlit;
+    Pipeline PlText;
     Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;
 

@@ -122,7 +122,6 @@ void Scene::RenderUnlitObjects(const Camera& camera) const
     // gRenderer->pDeferredRenderer->PlUnlit.Bind(gRenderer->GetFrame()->CommandBuffer);
     gRenderer->BeginUnlit();
 
-
     for (const TSRef<Object>& obj : mObjects) {
         if (!obj->GetRenderUnlit()) {
             continue;

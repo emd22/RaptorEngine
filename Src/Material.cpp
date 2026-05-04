@@ -202,6 +202,20 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
         }                                                                                                              \
     }
 
+void Material::SetDefaultPipeline()
+{
+    if (NormalMap.Exists()) {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
+    }
+    else {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
+    }
+
+    if (bSupportsSkinning) {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
+    }
+}
+
 void Material::Build()
 {
     if (!mDsDefault.IsInited()) {
@@ -255,16 +269,10 @@ void Material::Build()
     MaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
 
-    if (NormalMap.Exists()) {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
-    }
-    else {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
+    if (!pPipeline) {
+        SetDefaultPipeline();
     }
 
-    if (bSupportsSkinning) {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
-    }
 
     bIsBuilt.store(true);
 }

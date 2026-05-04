@@ -33,19 +33,21 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
 
-    // fx::script::FoxScript script;
+    { // fx::script::FoxScript script;
 
-    // script.Load(FX_BASE_DIR "/Scripts/Test.fox");
-    // script.RegisterProc(fx::HashStr32("PrintX"), false, 1, &N_PrintX);
+        // script.Load(FX_BASE_DIR "/Scripts/Test.fox");
+        // script.RegisterProc(fx::HashStr32("PrintX"), false, 1, &N_PrintX);
 
-    // fx::script::FoxSymbol* sym = script.GetSymbol(fx::HashStr32("Init"));
+        // fx::script::FoxSymbol* sym = script.GetSymbol(fx::HashStr32("Init"));
 
-    // if (!sym) {
-    //     fx::LogError("Cannot find symbol!");
-    // }
-    // fx::script::FoxValue result = script.CallProc(sym, {});
+        // if (!sym) {
+        //     fx::LogError("Cannot find symbol!");
+        // }
+        // fx::script::FoxValue result = script.CallProc(sym, {});
 
-    // fx::LogInfo("result: {}", result);
+        // fx::LogInfo("result: {}", result);
+    }
+
 
     fx::renderer::Globals::Init();
 

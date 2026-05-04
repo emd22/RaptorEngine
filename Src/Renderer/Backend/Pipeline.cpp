@@ -26,6 +26,8 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 {
     mDevice = gRenderer->GetDevice();
 
+    Name = name;
+
     bool has_depth_attachment = false;
 
     // XXX: TEMP

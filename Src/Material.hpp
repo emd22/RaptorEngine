@@ -140,6 +140,8 @@ public:
     renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
     renderer::DescriptorSet& GetDescriptorSetAlbedoOnly();
 
+    void SetDefaultPipeline();
+
     void Destroy();
     ~Material() { Destroy(); }
 

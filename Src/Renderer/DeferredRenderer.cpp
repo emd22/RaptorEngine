@@ -233,6 +233,24 @@ void DeferredRenderer::CreateUnlitPipeline()
         .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
     builder.Build(PlUnlit);
 
+    {
+        Ref<Shader> shader_text = gShaderCache->Request(eShaderName::Text);
+        vertex_shader = shader_text->GetProgram(eShaderType::Vertex, {});
+        pixel_shader = shader_text->GetProgram(eShaderType::Pixel, {});
+
+
+        builder.SetLayout(layout)
+            .SetName("Text Pipeline")
+            .AddBlendAttachment({ .Enabled = false })
+            .SetOutputTargets(&targets)
+            .SetShaders(vertex_shader, pixel_shader)
+            .SetRenderPass(&RpForward)
+            .SetVertexDescription(&vertex_info)
+            .SetCullMode(VK_CULL_MODE_BACK_BIT)
+            .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
+        builder.Build(PlText);
+    }
+
     // Create debug layer pipeline
 
     VkPipelineLayout debug_layout = CreateDebugLayerPipelineLayout();

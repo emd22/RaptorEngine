@@ -87,6 +87,8 @@ public:
     VkPipelineLayout Layout = nullptr;
     VkPipeline Pipeline = nullptr;
 
+    String Name;
+
     // XXX: TEMP
     Ref<ShaderProgram> VertexShader { nullptr };
     Ref<ShaderProgram> FragmentShader { nullptr };

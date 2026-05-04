@@ -11,6 +11,7 @@ enum class eShaderName : uint32
     Composition, // 2
     Shadows,     // 3
     Unlit,       // 4
+    Text,        // 5
 
     NumShaders,
 };
@@ -33,6 +34,8 @@ constexpr const char* GetName(const eShaderName id)
         return "Shadows";
     case eShaderName::Unlit:
         return "Unlit";
+    case eShaderName::Text:
+        return "Text";
     case eShaderName::NumShaders:
         break;
     }

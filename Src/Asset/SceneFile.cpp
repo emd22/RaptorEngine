@@ -128,7 +128,6 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
     String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
     TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
     object->pScene = &scene;
-
     ApplyPropertiesToObject(object, object_entry);
 
     scene.Attach(object);
@@ -187,30 +186,6 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
     if (script != nullptr) {
         object->LoadScript(String::Fmt("./Scripts{}", script->GetValue<const char*>()));
     }
-
-    // ConfigEntry* physics = object_entry.GetMember(HashStr32("Physics"));
-
-    // if (physics != nullptr) {
-    //     ePhMotionType motion_type = ePhMotionType::Static;
-
-    //     ConfigEntry* type = physics->GetMember(HashStr32("Type"));
-    //     if (type && type->Get<uint32>() == static_cast<uint32>(ePhMotionType::Dynamic)) {
-    //         motion_type = ePhMotionType::Dynamic;
-    //     }
-
-    //     if (object->PhysicsId == PhObjectIdNull) {
-    //         ConfigEntry* from_mesh = physics->GetMember(HashStr32("FromMesh"));
-    //         if (from_mesh != nullptr && from_mesh->Get<bool>() == true) {
-    //             object->PhysicsCreateMesh(nullptr, motion_type, physics_properties);
-    //         }
-    //     }
-
-    //     ConfigEntry* box_collider = physics->GetMember(HashStr32("BoxCollider"));
-    //     if (box_collider != nullptr) {
-    //         Vec3f box_size = box_collider->GetMemberValue(HashStr32("Size"), Vec3f::sOne);
-    //         object->PhysicsCreatePrimitive(ePhPrimitiveType::Box, box_size, motion_type, physics_properties);
-    //     }
-    // }
 
     object->OnLoaded(
         [](TSRef<AxBase> base_asset)

@@ -245,11 +245,21 @@ void AxManager::CheckForUploadableData()
                 asset_data->pAsset->bIsUploadedToGpu.wait(true);
             }
 
-            if (!asset_data->pAsset->mOnLoadedCallbacks.empty()) {
-                for (auto& callback : asset_data->pAsset->mOnLoadedCallbacks) {
-                    callback(asset_data->pAsset);
+
+            {
+                std::lock_guard guard(asset_data->pAsset->mCallbackMutex);
+
+                // Call OnLoaded callbacks if they are attached
+                if (!asset_data->pAsset->mOnLoadedCallbacks.empty()) {
+                    for (auto& callback : asset_data->pAsset->mOnLoadedCallbacks) {
+                        callback(asset_data->pAsset);
+                    }
                 }
+
+                asset_data->pAsset->mOnLoadedCallbacks.clear();
             }
+
+            // Notify the asset thread that loading is finished
 
             asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
             asset_data->pAsset->mIsLoaded.store(true);

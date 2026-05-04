@@ -9,6 +9,8 @@ namespace fx {
 struct MeshGenOptions
 {
     float32 Scale = 1.0f;
+    Vec2f UvMin = Vec2f(0.0f, 0.0f);
+    Vec2f UvMax = Vec2f(1.0f, 1.0f);
 };
 
 class MeshGen

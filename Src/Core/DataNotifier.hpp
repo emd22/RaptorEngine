@@ -10,13 +10,14 @@ public:
 
     void SignalDataWritten()
     {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
 
         if (mKilled) {
             return;
         }
 
         mDone = true;
+
 
         // Notify the other thread
         mCV.notify_one();
@@ -35,13 +36,13 @@ public:
 
     bool IsDone()
     {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
         return mDone;
     }
 
     void Reset()
     {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
 
         mKilled = false;
         mDone = false;
@@ -49,14 +50,14 @@ public:
 
     bool IsKilled()
     {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
 
         return mKilled;
     }
 
     void Kill()
     {
-        std::unique_lock<std::mutex> lock(mMutex);
+        std::lock_guard<std::mutex> lock(mMutex);
 
         mKilled = true;
         mDone = true;
