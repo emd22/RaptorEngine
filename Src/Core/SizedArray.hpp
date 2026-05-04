@@ -359,11 +359,9 @@ public:
 
         Size = Capacity;
 
-#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (uint64 i = 0; i < Size; i++) {
             new (&pData[i]) TElementType;
         }
-#endif
     }
 
     size_t GetSizeInBytes() const { return Size * sizeof(TElementType); }

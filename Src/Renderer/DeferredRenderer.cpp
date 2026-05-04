@@ -224,7 +224,7 @@ void DeferredRenderer::CreateUnlitPipeline()
 
     builder.SetLayout(layout)
         .SetName("Unlit Pipeline")
-        .AddBlendAttachment({ .Enabled = false })
+        .AddBlendAttachment(0, { .Enabled = false })
         .SetOutputTargets(&targets)
         .SetShaders(vertex_shader, pixel_shader)
         .SetRenderPass(&RpForward)
@@ -238,10 +238,9 @@ void DeferredRenderer::CreateUnlitPipeline()
         vertex_shader = shader_text->GetProgram(eShaderType::Vertex, {});
         pixel_shader = shader_text->GetProgram(eShaderType::Pixel, {});
 
-
         builder.SetLayout(layout)
             .SetName("Text Pipeline")
-            .AddBlendAttachment({ .Enabled = false })
+            .AddBlendAttachment(0, { .Enabled = false })
             .SetOutputTargets(&targets)
             .SetShaders(vertex_shader, pixel_shader)
             .SetRenderPass(&RpForward)
@@ -290,8 +289,8 @@ void DeferredRenderer::CreateGPassPipeline()
 
     builder.SetLayout(gpass_layout)
         .SetName("Geometry Pipeline")
-        .AddBlendAttachment({ .Enabled = false })
-        .AddBlendAttachment({ .Enabled = false })
+        .AddBlendAttachment(0, { .Enabled = false })
+        .AddBlendAttachment(1, { .Enabled = false })
         .SetOutputTargets(&GPass.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)
         .SetRenderPass(&GPass.GetRenderPass())
@@ -463,14 +462,16 @@ void DeferredRenderer::CreateLightingPipeline()
         PipelineBuilder builder {};
         builder.SetLayout(layout)
             .SetName("Lighting(Point)")
-            .AddBlendAttachment({
-                .Enabled = true,
-                .AlphaBlend { .Ops {
-                    .Src = VK_BLEND_FACTOR_ONE,
-                    .Dst = VK_BLEND_FACTOR_ZERO,
-                } },
-                .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-            })
+            .AddBlendAttachment(
+                0,
+                {
+                    .Enabled = true,
+                    .AlphaBlend { .Ops {
+                        .Src = VK_BLEND_FACTOR_ONE,
+                        .Dst = VK_BLEND_FACTOR_ZERO,
+                    } },
+                    .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+                })
             .SetOutputTargets(&LightPass.GetTargets())
             .SetShaders(vertex_shader, fragment_shader)
             .SetRenderPass(&LightPass.GetRenderPass())
@@ -491,14 +492,16 @@ void DeferredRenderer::CreateLightingPipeline()
 
         builder.SetLayout(layout)
             .SetName("Lighting(Directional)")
-            .AddBlendAttachment({
-                .Enabled = true,
-                .AlphaBlend { .Ops {
-                    .Src = VK_BLEND_FACTOR_ONE,
-                    .Dst = VK_BLEND_FACTOR_ZERO,
-                } },
-                .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-            })
+            .AddBlendAttachment(
+                0,
+                {
+                    .Enabled = true,
+                    .AlphaBlend { .Ops {
+                        .Src = VK_BLEND_FACTOR_ONE,
+                        .Dst = VK_BLEND_FACTOR_ZERO,
+                    } },
+                    .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+                })
             .SetOutputTargets(&LightPass.GetTargets())
             .SetShaders(vertex_shader, fragment_shader)
             .SetRenderPass(&LightPass.GetRenderPass())
@@ -583,7 +586,7 @@ void DeferredRenderer::CreateCompPipeline()
 
     builder.SetLayout(comp_layout)
         .SetName("Composition Pipeline")
-        .AddBlendAttachment({ .Enabled = false })
+        .AddBlendAttachment(0, { .Enabled = false })
         .SetOutputTargets(&CompPass.GetTargets())
         .SetShaders(lit_vertex_shader, lit_fragment_shader)
         .SetRenderPass(&CompPass.GetRenderPass())

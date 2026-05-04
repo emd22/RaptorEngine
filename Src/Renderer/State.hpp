@@ -1,13 +1,58 @@
 #pragma once
 
+#include "Backend/BlendAttachment.hpp"
 #include "Backend/Pipeline.hpp"
 #include "Backend/Shader.hpp"
+#include "PipelineNames.hpp"
+#include "ShaderNames.hpp"
 
-#include <Core/Hash.hpp>
-#include <Core/Ref.hpp>
-#include <Core/StackArray.hpp>
+#include <Core/SizedArray.hpp>
 
-// namespace fx::renderer {
+
+namespace fx::renderer {
+
+class State
+{
+public:
+    /**
+     * @brief Selects a pipeline to create.
+     */
+    void BeginPipeline(ePipelineName pipeline);
+    void EndPipeline();
+
+    /**
+     * @brief Sets the pipeline layout from a preexisting layout.
+     */
+    void SetLayout(VkPipelineLayout layout);
+
+    void SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment);
+    void SetOutputTargets(const TargetList& targets);
+
+    void SetPushConstants();
+
+    void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
+    void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
+
+private:
+    void BuildPipeline();
+    void Reset();
+
+public:
+    TargetList OutputTargets;
+    BlendAttachmentList BlendAttachments;
+
+private:
+    Pipeline* mpPipeline = nullptr;
+    ePipelineName mPipelineName = ePipelineName::Geometry;
+
+    eVertexType mVertexType = eVertexType::Default;
+
+    Ref<ShaderProgram> mpVertexShader { nullptr };
+    Ref<ShaderProgram> mpPixelShader { nullptr };
+
+    StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
+};
+
 
 // class RenderPass;
 
@@ -33,4 +78,4 @@
 //     StackArray<ShaderBindOptions, ShaderUtil::scNumShaderTypes> mBindOptions;
 // };
 
-// } // namespace fx::renderer
+} // namespace fx::renderer

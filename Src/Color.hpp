@@ -62,4 +62,18 @@ FX_FORCE_INLINE Color Color::FromFloats(float32 rgba[4])
     return colour;
 }
 
+enum class eColorComponent
+{
+    R = (1 << 0),
+    G = (1 << 1),
+    B = (1 << 2),
+    A = (1 << 3),
+
+    RG = R | G,
+    RGB = RG | B,
+    RGBA = RGB | A,
+};
+
+FxEnumFlags(eColorComponent);
+
 } // namespace fx

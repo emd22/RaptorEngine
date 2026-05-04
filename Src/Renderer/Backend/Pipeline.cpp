@@ -149,7 +149,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .logicOpEnable = VK_FALSE,
         .attachmentCount = color_blend_attachments.Size,
-        .pAttachments = color_blend_attachments,
+        .pAttachments = color_blend_attachments.pData,
     };
 
     VkBool32 depth_test_enabled = VK_TRUE;
@@ -194,13 +194,14 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
         .subpass = 0,
     };
 
-    const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr, &Pipeline);
+    const VkResult status = vkCreateGraphicsPipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr,
+                                                      &InternalPipeline);
 
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Could not create graphics pipeline", status);
     }
 
-    Util::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, Pipeline);
+    Util::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
 
     LogInfo("Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
             reinterpret_cast<void*>(Layout));
@@ -208,13 +209,13 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 
 void Pipeline::Bind(const CommandBuffer& cmd)
 {
-    if (this->Pipeline == spBoundPipeline) {
+    if (this->InternalPipeline == spBoundPipeline) {
         return;
     }
 
-    vkCmdBindPipeline(cmd.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline);
+    vkCmdBindPipeline(cmd.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, InternalPipeline);
 
-    spBoundPipeline = this->Pipeline;
+    spBoundPipeline = this->InternalPipeline;
 }
 
 void Pipeline::Destroy()
@@ -225,9 +226,9 @@ void Pipeline::Destroy()
 
     mDevice->WaitForIdle();
 
-    if (Pipeline) {
-        vkDestroyPipeline(mDevice->Device, Pipeline, nullptr);
-        Pipeline = nullptr;
+    if (InternalPipeline) {
+        vkDestroyPipeline(mDevice->Device, InternalPipeline, nullptr);
+        InternalPipeline = nullptr;
     }
     if (Layout && !mbDoNotDestroyLayout) {
         vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);

@@ -5,7 +5,6 @@
 #include "Backend/Framebuffer.hpp"
 #include "Backend/Image.hpp"
 #include "Backend/Sampler.hpp"
-#include "PipelineList.hpp"
 #include "RenderStage.hpp"
 
 namespace fx {

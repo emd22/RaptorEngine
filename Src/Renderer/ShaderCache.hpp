@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Backend/Shader.hpp"
-#include "ShaderId.hpp"
+#include "ShaderNames.hpp"
 
 #include <Core/Hash.hpp>
 #include <Core/Ref.hpp>

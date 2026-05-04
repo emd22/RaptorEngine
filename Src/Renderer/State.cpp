@@ -1,42 +1,57 @@
 #include "State.hpp"
 
-#include "Backend/RenderPass.hpp"
-#include "Backend/Shader.hpp"
-#include "PipelineBuilder.hpp"
+#include "Backend/VertexDescription.hpp"
+#include "Globals.hpp"
+#include "PipelineCache.hpp"
+#include "ShaderCache.hpp"
 
-#include <Core/Slice.hpp>
+namespace fx::renderer {
 
-// namespace fx::renderer {
+void State::BeginPipeline(ePipelineName pipeline) { mpPipeline = gPipelineCache->Request(pipeline); }
 
-// State::State() {}
-
-// void State::Pipeline(Pipeline* pipeline) { mpPipeline = pipeline; }
-
-// void State::BufferOffset(ShaderType shader_type, uint32 buffer_offset)
-// {
-//     ShaderBindOptions& dyn = mBindOptions[static_cast<uint32>(shader_type)];
-//     dyn.bUseOffset = true;
-//     dyn.BufferOffset = buffer_offset;
-// }
-
-// void State::RenderPass(RenderPass* rp) { mpRenderPass = rp; }
-
-// void State::Apply(const CommandBuffer& cmd)
-// {
-//     // mpPipeline->Bind(cmd);
-
-//     mpPipeline->VertexShader->Bind(cmd, *mpPipeline, mBindOptions[static_cast<uint32>(ShaderType::Vertex)]);
-//     mpPipeline->FragmentShader->Bind(cmd, *mpPipeline, mBindOptions[static_cast<uint32>(ShaderType::Fragment)]);
-// }
-
-// void State::Reset()
-// {
-//     memset(mBindOptions.pData, 0, mBindOptions.GetSizeInBytes());
-//     mpPipeline = nullptr;
-//     mpRenderPass = nullptr;
-// }
+void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
+{
+    Ref<Shader> shader = gShaderCache->Request(shader_name);
+    mpVertexShader = shader->GetProgram(eShaderType::Vertex, macros);
+    mpPixelShader = shader->GetProgram(eShaderType::Pixel, macros);
+}
 
 
-// State::~State() {}
+void State::SetLayout(VkPipelineLayout layout) { mpPipeline->SetLayout(layout); }
 
-// } // namespace fx::renderer
+void State::BuildPipeline()
+{
+    SizedArray<Ref<ShaderProgram>> shader_list = { mpVertexShader, mpPixelShader };
+    if (!mpVertexShader.IsValid() || !mpPixelShader.IsValid()) {
+        LogError("Cannot build pipeline due to invalid shaders");
+        return;
+    }
+
+    VertexDescription vertex_desc = VertexUtil::BuildDescription(mVertexType);
+
+    // mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, OutputTargets.GetImageViews(),
+    //                    BlendAttachments.GetVkAttachments(OutputTargets.Targets.Size), &vertex_desc);
+}
+
+void State::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
+{
+    BlendAttachments.AddAttachment(target_index, blend_attachment);
+}
+
+void State::SetOutputTargets(const TargetList& targets) { OutputTargets = targets; }
+
+void State::EndPipeline()
+{
+    BuildPipeline();
+    Reset();
+}
+
+void State::Reset()
+{
+    mpPipeline = nullptr;
+
+    OutputTargets.Reset();
+    mPushConstants.Clear();
+}
+
+} // namespace fx::renderer

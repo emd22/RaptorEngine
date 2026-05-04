@@ -1,5 +1,7 @@
-#include "Device.hpp"
 #include "Framebuffer.hpp"
+
+#include "Device.hpp"
+#include "RenderPass.hpp"
 
 #include <Core/Defines.hpp>
 #include <Core/Panic.hpp>
@@ -27,9 +29,7 @@ void Framebuffer::Create(const SizedArray<VkImageView>& image_views, const Rende
         .layers = 1,
     };
 
-    mDevice = gRenderer->GetDevice();
-
-    const VkResult status = vkCreateFramebuffer(mDevice->Device, &create_info, nullptr, &Framebuffer);
+    const VkResult status = vkCreateFramebuffer(gRenderer->GetDevice()->Device, &create_info, nullptr, &Framebuffer);
 
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Failed to create framebuffer", status);
@@ -41,7 +41,8 @@ void Framebuffer::Destroy()
     if (!Framebuffer) {
         return;
     }
-    vkDestroyFramebuffer(mDevice->Device, Framebuffer, nullptr);
+
+    vkDestroyFramebuffer(gRenderer->GetDevice()->Device, Framebuffer, nullptr);
     Framebuffer = nullptr;
 }
 

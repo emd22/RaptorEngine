@@ -66,12 +66,20 @@ struct PushConstants
 class Pipeline
 {
 public:
+    Pipeline() = default;
+
     void Create(const std::string& name, const Slice<Ref<ShaderProgram>>& shaders,
                 const Slice<VkAttachmentDescription>& attachments,
                 const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                 VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
 
-    FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout) { Layout = layout; }
+    FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout)
+    {
+        Layout = layout;
+
+        // Layout is referenced from another pipeline or modified externally, do not destroy
+        mbDoNotDestroyLayout = true;
+    }
 
     static VkPipelineLayout CreateLayout(const Slice<const PushConstants>& push_constant_defs,
                                          const Slice<VkDescriptorSetLayout>& descriptor_set_layouts);
@@ -85,14 +93,13 @@ public:
 private:
 public:
     VkPipelineLayout Layout = nullptr;
-    VkPipeline Pipeline = nullptr;
+    VkPipeline InternalPipeline = nullptr;
 
     String Name;
 
     // XXX: TEMP
     Ref<ShaderProgram> VertexShader { nullptr };
     Ref<ShaderProgram> FragmentShader { nullptr };
-
 
 private:
     GpuDevice* mDevice = nullptr;

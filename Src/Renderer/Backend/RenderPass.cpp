@@ -1,5 +1,6 @@
-#include "Device.hpp"
 #include "RenderPass.hpp"
+
+#include "Device.hpp"
 #include "Swapchain.hpp"
 
 #include <vulkan/vulkan.h>
@@ -17,6 +18,8 @@ void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset
     if (size == Target::scFullScreen) {
         size = gRenderer->Swapchain.Extent;
     }
+
+    AttachmentCount = attachments.Targets.Size;
 
     Size = size;
     Offset = offset;
