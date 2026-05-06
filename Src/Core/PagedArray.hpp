@@ -39,10 +39,10 @@ public:
         TElementType* pData = nullptr;
 
         /** The number of elements in use in `Data` */
-        uint32 Size;
+        uint32 Size = 0;
 
-        Page* pNext;
-        Page* pPrev;
+        Page* pNext = nullptr;
+        Page* pPrev = nullptr;
 
     public:
         void Destroy()
@@ -419,7 +419,7 @@ public:
                 current_page->Destroy();
             }
 
-            FX_PAGED_ARRAY_FREE(Page, current_page);
+            // FX_PAGED_ARRAY_FREE(Page, current_page);
 
             current_page = next_page;
         }

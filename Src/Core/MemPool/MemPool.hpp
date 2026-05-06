@@ -42,6 +42,9 @@ public:
     void* ReallocRaw(void* ptr, size_t size);
     void FreeRaw(void* ptr);
 
+    uint64 GetBytesUsed() const { return SizeUsed; }
+    uint64 GetCapacity() const { return SizeAllocated; }
+
     template <typename T, typename... TArgs>
     T* Alloc(uint32 size, TArgs&&... args)
     {
@@ -89,6 +92,10 @@ public:
     void* pMemory;
 
     std::mutex mMutex;
+
+private:
+    uint64 SizeUsed = 0;
+    uint64 SizeAllocated = 0;
 };
 
 } // namespace fx

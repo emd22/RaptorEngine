@@ -55,6 +55,11 @@ int main()
         fx::FoxtrotGame game {};
     }
 
+    fx::LogInfo("===== MEMPOOL STATS =====");
+    fx::LogInfo("Bytes Used: {}", fx::gEnginePool->GetBytesUsed());
+    fx::LogInfo("Pool Size:  {}", fx::gEnginePool->GetCapacity());
+    fx::LogInfo("=========================");
+
     fx::renderer::Globals::Destroy();
     fx::Globals::Destroy();
 

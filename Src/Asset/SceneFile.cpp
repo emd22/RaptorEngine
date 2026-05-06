@@ -57,7 +57,8 @@ void SceneFile::Load(const std::string& path, Scene& scene)
         sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("Pos"), Vec3f::sZero));
 
         sun->Color = sun_entry->GetMemberValue<Color>(HashStr32("Color"), Color::FromRGBA(100, 100, 100, 4));
-        sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("Color"), Color::FromRGBA(100, 100, 100, 1));
+        sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("AmbientColor"),
+                                                             Color::FromRGBA(100, 100, 100, 1));
     }
 
     ConfigEntry* collider_list = info.GetEntry(HashStr32("Colliders"));

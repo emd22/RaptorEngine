@@ -5,14 +5,15 @@
 
 namespace fx {
 
+
 void AnonArray::Create(uint32 object_size, uint32 size)
 {
     ObjectSize = object_size;
     Capacity = size;
     Size = 0;
 
-    // pData = MemPool::AllocRaw(object_size * size);
-    pData = gEnginePool->AllocRaw(object_size * size);
+    // pData = gEnginePool->AllocRaw(object_size * size);
+    pData = malloc(object_size * size);
 }
 
 AnonArray::AnonArray(AnonArray&& other) { (*this) = std::move(other); }
@@ -39,7 +40,8 @@ void AnonArray::Free()
     }
 
     // MemPool::Free(pData);
-    gEnginePool->FreeRaw(pData);
+    // gEnginePool->FreeRaw(pData);
+    free(pData);
 
     Capacity = 0;
     Size = 0;

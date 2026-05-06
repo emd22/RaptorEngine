@@ -71,7 +71,6 @@ void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<Primiti
     constexpr eVertexCreateFlags create_flags = eVertexCreateFlags::NegativeX;
     mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids, create_flags);
 
-    LogInfo("Weights size: {}, ids size: {}", weights.Size, boneids.Size);
     mesh->UploadVertices();
 }
 
@@ -105,7 +104,7 @@ static void MakeMaterialTextureForPrimitive(TSRef<Material>& material, MaterialC
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
 
     // Stage that shit so we can nuke mGltfData as soon as we can
-    uint8* goober_buffer = gEnginePool->Alloc<uint8>(image_buffer_size);
+    uint8* goober_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
     // Submit as data to be loaded later by the asset manager
