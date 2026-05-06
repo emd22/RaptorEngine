@@ -173,9 +173,19 @@ void Object::OnAttached(Scene* scene)
 
 void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 {
+    LogInfo("QUEUED PIPELINE UPDATE");
+
+    if (pipeline == &gRenderer->pDeferredRenderer->PlUnlit) {
+        LogInfo("SETTING TO TEXT THING 1");
+    }
+
     OnLoaded(
-        [&pipeline, update_children](TSRef<AxBase> base_asset)
+        [pipeline, update_children](TSRef<AxBase> base_asset)
         {
+            LogInfo("*** UPDATED PIPELINE");
+            if (pipeline == &gRenderer->pDeferredRenderer->PlUnlit) {
+                LogInfo("SETTING TO TEXT THING 2");
+            }
             TSRef<Object> asset = base_asset;
 
             if (asset->pMaterial) {
@@ -326,33 +336,34 @@ void Object::RenderUnlit(const Camera& camera)
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(GetObjectLayer()).RawData, sizeof(Mat4f));
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-    Pipeline& pipeline = gRenderer->pDeferredRenderer->PlUnlit;
+    Pipeline* pipeline = &gRenderer->pDeferredRenderer->PlUnlit;
+    if (pMaterial && pMaterial->pPipeline) {
+        pipeline = pMaterial->pPipeline;
+    }
 
-    pipeline.Bind(cmd);
-
+    pipeline->Bind(cmd);
 
     if (pMaterial) {
         push_constants.ObjectId = ObjectId;
         push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
 
-        vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                            sizeof(push_constants), &push_constants);
 
 
-        bool material_bound = pMaterial->BindWithPipeline(cmd, pipeline, false);
+        bool material_bound = pMaterial->BindWithPipeline(cmd, *pipeline, false);
         if (!material_bound) {
             LogWarning("Material not bound!");
             return;
         }
 
-        gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+        gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
                                                        gObjectManager->GetBaseOffset());
 
         RenderPrimitive(cmd);
     }
 
-
-    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
                                                    gObjectManager->GetBaseOffset());
 
     if (AttachedNodes.IsEmpty()) {
@@ -381,11 +392,11 @@ void Object::RenderUnlit(const Camera& camera)
         push_constants.ObjectId = ObjectId;
         push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
 
-        vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                            sizeof(push_constants), &push_constants);
 
 
-        bool material_bound = obj->pMaterial->BindWithPipeline(cmd, pipeline, false);
+        bool material_bound = obj->pMaterial->BindWithPipeline(cmd, *pipeline, false);
         if (!material_bound) {
             LogWarning("Material not bound!");
             return;

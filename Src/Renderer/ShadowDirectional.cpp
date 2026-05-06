@@ -31,7 +31,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
     };
 
     StackArray<PushConstants, 1> push_consts = {
-        PushConstants { .Size = sizeof(ShadowPushConstants), .StageFlags = VK_SHADER_STAGE_VERTEX_BIT },
+        PushConstants { .Size = sizeof(ShadowPushConstants), .ShaderTypes = eShaderType::Vertex },
     };
 
     VkPipelineLayout pipeline_layout = Pipeline::CreateLayout(Slice(push_consts), Slice(desc_sets));
@@ -51,7 +51,6 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
     PipelineBuilder builder {};
     builder.SetLayout(pipeline_layout)
         .SetName("Shadow Pipeline")
-        .AddBlendAttachment({ .Enabled = false })
         .SetProperties(pipeline_properties)
         .SetOutputTargets(&RenderStage.GetTargets())
         .SetShaders(vertex_shader, fragment_shader)

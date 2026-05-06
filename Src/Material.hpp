@@ -14,7 +14,7 @@
 
 namespace fx {
 
-#define FX_MAX_MATERIALS 128
+#define FX_MAX_MATERIALS 512
 
 enum class eMaterialComponentStatus
 {
@@ -139,6 +139,8 @@ public:
 
     renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
     renderer::DescriptorSet& GetDescriptorSetAlbedoOnly();
+
+    void SetDefaultPipeline();
 
     void Destroy();
     ~Material() { Destroy(); }

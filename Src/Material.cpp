@@ -32,7 +32,7 @@ void MaterialManager::Create(uint32 entities_per_page)
     DescriptorPool& dp = mDescriptorPool;
 
     if (!dp.Pool) {
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 3);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
@@ -202,6 +202,20 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
         }                                                                                                              \
     }
 
+void Material::SetDefaultPipeline()
+{
+    if (NormalMap.Exists()) {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
+    }
+    else {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
+    }
+
+    if (bSupportsSkinning) {
+        pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
+    }
+}
+
 void Material::Build()
 {
     if (!mDsDefault.IsInited()) {
@@ -255,16 +269,10 @@ void Material::Build()
     MaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
     material->BaseColor = Properties.BaseColor;
 
-    if (NormalMap.Exists()) {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
-    }
-    else {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
+    if (!pPipeline) {
+        SetDefaultPipeline();
     }
 
-    if (bSupportsSkinning) {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
-    }
 
     bIsBuilt.store(true);
 }

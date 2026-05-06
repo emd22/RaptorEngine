@@ -120,7 +120,8 @@ static void PrintDocComment(Token* comment, bool is_command_mode)
     printf("%.*s\n", comment->Length, start);
 }
 
-FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
+
+FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_semicolon)
 {
     if (mTokenIndex >= mTokens.Size()) {
         return nullptr;
@@ -128,6 +129,11 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
 
     Token& tk = GetToken();
     Hash32 hash = tk.GetHash();
+
+    bool discard;
+    if (ignore_semicolon == nullptr) {
+        ignore_semicolon = &discard;
+    }
 
     // function [name] ( < [arg type] [arg name] ...> ) { <statements...> }
     constexpr Hash32 kw_proc = HashStr32("proc");
@@ -150,6 +156,8 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
 
     // extern [name of function] ;
 
+    (*ignore_semicolon) = false;
+
     switch (hash) {
     case kw_proc:
         EatToken(TT::Identifier);
@@ -171,7 +179,8 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block)
 
     case kw_if:
         EatToken(TT::Identifier);
-        return ParseIfStatement();
+        (*ignore_semicolon) = true;
+        return ParseIfStatement(parent_block);
 
     case kw_return: {
         EatToken(TT::Identifier);
@@ -530,7 +539,7 @@ FoxAstNode* FoxParser::ParseRhs()
 
     TT op_type = GetToken(0).Type;
 
-    if (op_type == TT::Plus || op_type == TT::Minus || op_type == TT::Equality) {
+    if (op_type == TT::Plus || op_type == TT::Minus || Token::IsTypeEqualityCheck(op_type)) {
         FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
 
         binop->pLeft = lhs;
@@ -637,13 +646,18 @@ FoxAstNode* FoxParser::ParseStatementAsCommand(FoxAstBlock* parent_block)
         }
     }
 
+
+    bool ignore_semicolon = false;
     // Try to parse as a keyword first
-    FoxAstNode* node = TryParseKeyword(parent_block);
+    FoxAstNode* node = TryParseKeyword(parent_block, &ignore_semicolon);
 
     if (node) {
         RETURN_IF_NO_TOKENS(node);
 
-        EatToken(TT::Semicolon);
+        if (!ignore_semicolon || GetToken().Type == TT::Semicolon) {
+            EatToken(TT::Semicolon);
+        }
+
         return node;
     }
 
@@ -729,7 +743,8 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
         }
     }
 
-    FoxAstNode* node = TryParseKeyword(parent_block);
+    bool ignore_semicolon = false;
+    FoxAstNode* node = TryParseKeyword(parent_block, &ignore_semicolon);
 
     if (!node && (mTokenIndex < mTokens.Size() && GetToken().Type == TT::Identifier)) {
         if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::LParen) {
@@ -754,7 +769,10 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
         return node;
     }
 
-    EatToken(TT::Semicolon);
+
+    if (!ignore_semicolon || GetToken().Type == TT::Semicolon) {
+        EatToken(TT::Semicolon);
+    }
 
     return node;
 }
@@ -956,7 +974,7 @@ FoxAstFunctionCall* FoxParser::ParseFunctionCall()
     return node;
 }
 
-FoxAstIf* FoxParser::ParseIfStatement()
+FoxAstIf* FoxParser::ParseIfStatement(FoxAstBlock* parent_block)
 {
     // if ( [CONDITION] ) [BLOCK]
 
@@ -966,7 +984,14 @@ FoxAstIf* FoxParser::ParseIfStatement()
     if_node->pCondition = ParseRhs();
     EatToken(TT::RParen);
 
-    if_node->pBlock = ParseBlock();
+    if_node->pBlock = ParseStatement(parent_block);
+
+    static constexpr Hash32 kw_else = HashStr32("else");
+
+    if (GetToken().GetHash() == kw_else) {
+        EatToken(TT::Identifier);
+        if_node->pElseBlock = ParseStatement(parent_block);
+    }
 
     return if_node;
 }

@@ -3,15 +3,23 @@ Meta = {
 }
 
 Sun = {
-    Pos = [0.5, 5.0, -1.5]
+    Pos = [0.5, 8.0, -1.5]
     Color = [250, 220, 192, 4]
-    AmbientColor = [250, 210, 192, 6]
+    AmbientColor = [75, 75, 72, 3]
 }
 
 
-// Colliders = {
-//     Floor = { Box = { Size = [64.0, 0.5, 64.0] } }
-// }
+Colliders = {
+    Floor = {
+        Pos = [0.0, -1.25, 0.0]
+        Box = { Size = [64.0, 1.0, 64.0] }
+    }
+    BrickWall = {
+        Pos = [0.0, 0.5, 1.0]
+        Box = { Size = [4.0, 4.0, 0.5] }
+    }
+
+}
 
 
 Objects = {
@@ -21,13 +29,11 @@ Objects = {
     }
 
     Level = {
-        Mesh = "/BasicScene.glb"
-        Physics = {
-            Type = $CPhys.Static
-            BoxCollider = { Size = [64.0, 1.0, 64.0] }
-        }
-
-        Pos=[0.0, -2.25, 0.0]
+        Mesh = "/Sponza.glb"
+        Scale = 0.01
+        Shadows = $True
+        ColliderRef = "Floor"
+        Pos = [0.0, -1.25, 0.0]
     }
 
     AnimTest = {
@@ -42,18 +48,13 @@ Objects = {
         Mesh = "/Pistol.glb"
         Shadows = $True
         Layer = $CObjectLayer.Player
-        Script = "/Pistol.fox"
     }
 
 
     BrickTest = {
         Mesh = "/BrickTest.glb"
         Shadows = $True
-        Physics={
-            Type = $CPhys.Static
-            BoxCollider = { Size = [4.0, 4.0, 0.5] }
-        }
-        Pos = [0.0, 0.5, 1.0]
+        ColliderRef = "BrickWall"
+        Pos = [0.0, 0.5, 5.0]
     }
-
 }

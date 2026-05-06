@@ -197,6 +197,14 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPop_Variable_Int32) {
         uint16 var_index = Read16();
+
+        VMVariable& var = GetVar(var_index);
+
+        if (var.bIsGlobalRef) {
+            Globals[var.NameHash].Set<int32>(Pop32());
+            return;
+        }
+
         GetVar(var_index).Value.Set<int32>(Pop32());
     }
 }
@@ -283,6 +291,7 @@ void FoxVM::StashVariables()
     }
     VariableBaseIndex += ScopeVarCounts[ScopeIndex];
 }
+
 void FoxVM::RevertVariables()
 {
     if (ScopeIndex < 0) {
@@ -303,6 +312,43 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         uint16 offset = Read16();
 
         if (CompareResult == 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_NotEqual) {
+        uint16 offset = Read16();
+
+        if (CompareResult != 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_Less) {
+        uint16 offset = Read16();
+
+        if (CompareResult < 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_LessEqual) {
+        uint16 offset = Read16();
+
+        if (CompareResult <= 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_Greater) {
+        uint16 offset = Read16();
+
+        LogInfo("Res: {}", CompareResult);
+
+        if (CompareResult > 0) {
+            PC += offset;
+        }
+    }
+    else if (op_spec == BcSpecJump_GreaterEqual) {
+        uint16 offset = Read16();
+
+        if (CompareResult >= 0) {
             PC += offset;
         }
     }
@@ -397,7 +443,14 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
-        GetVar(dst_index).Value = GetVar(src_index).Value;
+        VMVariable& dst_var = GetVar(dst_index);
+
+        if (dst_var.bIsGlobalRef) {
+            Globals[dst_var.NameHash] = GetVar(src_index).Value;
+        }
+        else {
+            GetVar(dst_index).Value = GetVar(src_index).Value;
+        }
     }
     else if (op_spec == BcSpecVariable_Define) {
         uint16 var_index = Read16();
@@ -437,8 +490,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 void FoxVM::DoCompare(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecCompare_Default) {
-        int32 a = std::bit_cast<int32>(Pop32());
         int32 b = std::bit_cast<int32>(Pop32());
+        int32 a = std::bit_cast<int32>(Pop32());
 
         CompareResult = (a - b);
     }

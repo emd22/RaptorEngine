@@ -4,7 +4,7 @@
 
 #include <Core/Slice.hpp>
 #include <Math/Vec2.hpp>
-#include <Renderer/Attachment.hpp>
+#include <Renderer/Target.hpp>
 
 namespace fx::renderer {
 
@@ -33,6 +33,8 @@ public:
 
     Vec2u Size = Vec2u::sZero;
     Vec2u Offset = Vec2u::sZero;
+
+    uint32 AttachmentCount = 0;
 
 private:
     GpuDevice* mpDevice = nullptr;

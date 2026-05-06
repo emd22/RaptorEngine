@@ -1,36 +1,69 @@
 #pragma once
 
+#include "Backend/BlendAttachment.hpp"
 #include "Backend/Pipeline.hpp"
 #include "Backend/Shader.hpp"
+#include "PipelineNames.hpp"
+#include "ShaderNames.hpp"
 
-#include <Core/Hash.hpp>
-#include <Core/Ref.hpp>
-#include <Core/StackArray.hpp>
+#include <Core/SizedArray.hpp>
 
-// namespace fx::renderer {
+namespace fx::renderer {
 
-// class RenderPass;
+class RenderPass;
 
-// class State
-// {
-// public:
-//     State();
+class State
+{
+public:
+    /**
+     * @brief Selects a pipeline to create.
+     */
+    void BeginPipeline(ePipelineName pipeline);
+    void EndPipeline();
 
-//     void BufferOffset(eShaderType shader_type, uint32 buffer_offset);
-//     void Pipeline(Pipeline* pipeline);
-//     void RenderPass(RenderPass* rp);
+    /**
+     * @brief Sets the pipeline layout from a preexisting layout.
+     */
+    void SetLayout(VkPipelineLayout layout);
+    void SetPushConstants(eShaderType shader_type, uint32 pc_size);
+    void AddDescriptor(VkDescriptorSetLayout layout);
+    VkPipelineLayout BuildLayout();
 
-//     void Apply(const CommandBuffer& cmd);
+    void SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment);
+    void SetOutputTargets(TargetList* targets);
 
-//     void Reset();
+    void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
+    void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
 
-//     ~State();
+    void SetRenderPass(RenderPass* renderpass);
 
-// private:
-//     Pipeline* mpPipeline;
-//     RenderPass* mpRenderPass = nullptr;
+    void SetRenderLines(bool value) { mProperties.bRenderLines = value; }
+    void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }
+    void SetCullMode(eCullMode mode) { mProperties.CullMode = CullModeToVk(mode); }
 
-//     StackArray<ShaderBindOptions, ShaderUtil::scNumShaderTypes> mBindOptions;
-// };
+private:
+    void BuildPipeline();
+    void Reset();
 
-// } // namespace fx::renderer
+public:
+    TargetList* pOutputTargets;
+    BlendAttachmentList BlendAttachments;
+
+private:
+    Pipeline* mpPipeline = nullptr;
+    ePipelineName mPipelineName = ePipelineName::Geometry;
+
+    RenderPass* mpRenderPass = nullptr;
+
+    eVertexType mVertexType = eVertexType::Default;
+
+    Ref<ShaderProgram> mpVertexShader { nullptr };
+    Ref<ShaderProgram> mpPixelShader { nullptr };
+
+    StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
+    SizedArray<VkDescriptorSetLayout> mDescriptors;
+
+    PipelineProperties mProperties;
+};
+
+} // namespace fx::renderer

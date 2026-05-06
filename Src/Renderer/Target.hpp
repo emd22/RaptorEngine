@@ -8,7 +8,20 @@
 #include <Core/Slice.hpp>
 
 
-namespace fx::renderer {
+namespace fx {
+
+enum class eTargetListFlags : uint16
+{
+    None = 0,
+    DescriptionsBuilt = (1 << 0),
+    ImageViewsBuilt = (1 << 1),
+    ImagesCreated = (1 << 2),
+};
+
+FxEnumFlags(eTargetListFlags);
+
+
+namespace renderer {
 
 enum class eLoadOp
 {
@@ -74,13 +87,18 @@ public:
     bool bRenderPassOnly : 1 = false;
 };
 
+
+/////////////////////////////////////
+// Target List
+/////////////////////////////////////
+
 class TargetList
 {
 public:
     TargetList() = default;
     TargetList(uint32 max_targets) : mMaxTargets(max_targets) {}
-    TargetList(const TargetList& other) { Targets.InitAsCopyOf(other.Targets); }
-    TargetList(TargetList&& other) noexcept { Targets = std::move(other.Targets); }
+    TargetList(const TargetList& other) { (*this) = other; }
+    TargetList(TargetList&& other) noexcept { (*this) = std::move(other); }
 
     static TargetList New() { return {}; }
 
@@ -93,6 +111,46 @@ public:
     SizedArray<VkAttachmentDescription>& GetDescriptions();
     SizedArray<VkImageView>& GetImageViews();
 
+
+    SizedArray<Target> GetTargetByType(eImageAspectFlag aspect) const
+    {
+        SizedArray<Target> targets(Targets.Size);
+
+        for (const Target& tg : Targets) {
+            const bool is_depth = tg.IsDepth();
+
+            if (aspect == eImageAspectFlag::Color && !is_depth) {
+                targets.Insert(tg);
+            }
+            else if (aspect == eImageAspectFlag::Depth && is_depth) {
+                targets.Insert(tg);
+            }
+        }
+
+        return targets;
+    }
+
+    void Clear()
+    {
+        mFlags = eTargetListFlags::None;
+        mBuiltAttachmentDescriptions.Clear();
+        mBuiltImageViews.Clear();
+        Targets.Clear();
+    }
+
+
+    FX_FORCE_INLINE TargetList& operator=(const TargetList& other)
+    {
+        Targets.InitAsCopyOf(other.Targets);
+        return *this;
+    }
+
+    FX_FORCE_INLINE TargetList& operator=(TargetList&& other)
+    {
+        Targets = std::move(other.Targets);
+        return *this;
+    }
+
 private:
     FX_FORCE_INLINE void CheckInited()
     {
@@ -101,15 +159,12 @@ private:
         }
     }
 
-
 public:
     SizedArray<Target> Targets;
 
 
 private:
-    bool mbDescriptionsBuilt : 1 = false;
-    bool mbImageViewsBuilt : 1 = false;
-    bool mbImagesCreated : 1 = false;
+    eTargetListFlags mFlags = eTargetListFlags::None;
 
     SizedArray<VkAttachmentDescription> mBuiltAttachmentDescriptions;
     SizedArray<VkImageView> mBuiltImageViews;
@@ -117,4 +172,6 @@ private:
     uint32 mMaxTargets = 10;
 };
 
-} // namespace fx::renderer
+} // namespace renderer
+
+} // namespace fx

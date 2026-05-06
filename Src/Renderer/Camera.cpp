@@ -29,7 +29,11 @@ void Camera::Update()
 
 void Camera::UpdateViewMatrix()
 {
-    ViewMatrix.LookAt(Position, Position + Direction, Vec3f::sUp);
+    if (!bLookatTarget) {
+        Target = Position + Direction;
+    }
+
+    ViewMatrix.LookAt(Position, Target, Vec3f::sUp);
     UpdateCameraMatrix();
 }
 

@@ -85,6 +85,8 @@ public:
     Vec3f Position = Vec3f::sZero;
     Vec3f Direction = Vec3f::sForward;
 
+    Vec3f Target = Vec3f::sZero;
+
     float mAngleX = 0.0f;
     float mAngleY = 0.0f;
 
@@ -93,6 +95,8 @@ public:
 
     float32 mNearPlane = 1000.0f;
     float32 mFarPlane = 0.01f;
+
+    bool bLookatTarget = false;
 
 protected:
     Mat4f mCameraMatrix = Mat4f::sIdentity;

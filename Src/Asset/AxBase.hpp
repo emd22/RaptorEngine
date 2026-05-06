@@ -5,6 +5,7 @@
 #include <Core/TSRef.hpp>
 #include <atomic>
 #include <functional>
+#include <mutex>
 
 namespace fx {
 
@@ -40,7 +41,6 @@ public:
     /** Returns true if the asset has been loaded and is in GPU memory. */
     inline bool IsLoaded() const { return mIsLoaded.load(); }
 
-
     virtual void Destroy() = 0;
 
     virtual ~AxBase() {}
@@ -54,13 +54,13 @@ public:
 
     void OnLoaded(const OnLoadFunc& on_loaded_callback)
     {
+        std::lock_guard guard(mCallbackMutex);
         // If the asset has already been loaded, call the callback immediately.
         if (IsFinishedNotifier.IsDone()) {
+            LogInfo("CALLING EARLY");
             on_loaded_callback(this);
             return;
         }
-
-        printf("Registered onload callback\n");
 
         mOnLoadedCallbacks.push_back(on_loaded_callback);
     }
@@ -72,7 +72,10 @@ public:
             return;
         }
 
-        mOnErrorCallback = on_error_callback;
+        {
+            std::lock_guard guard(mCallbackMutex);
+            mOnErrorCallback = on_error_callback;
+        }
     }
 
 public:
@@ -83,6 +86,9 @@ protected:
     friend class AxLoaderGltf;
 
     std::vector<OnLoadFunc> mOnLoadedCallbacks;
+
+    std::mutex mCallbackMutex;
+
     // OnLoadFunc mOnLoadedCallback = nullptr;
     OnErrorFunc mOnErrorCallback = nullptr;
     std::atomic_bool mIsLoaded = false;

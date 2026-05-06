@@ -2,16 +2,22 @@
 
 namespace fx::renderer {
 
-class ShadowDirectional;
 class RenderBackend;
-class ShaderCache;
-class DescriptorCache;
-class State;
-
 extern RenderBackend* gRenderer;
+
+class ShadowDirectional;
 extern ShadowDirectional* gShadowRenderer;
+
+class ShaderCache;
 extern ShaderCache* gShaderCache;
+
+class PipelineCache;
+extern PipelineCache* gPipelineCache;
+
+class DescriptorCache;
 extern DescriptorCache* gDescriptorCache;
+
+class State;
 extern State* gState;
 
 namespace Globals {

@@ -8,12 +8,15 @@
 #include <unordered_map>
 
 
-namespace fx::renderer {
+namespace fx {
+
+enum class eShaderType : uint16;
+
+namespace renderer {
 
 struct ShaderDescriptorId;
 struct ShaderOutlineEntry;
 
-enum class eShaderType : uint16;
 
 class DescriptorCache
 {
@@ -41,4 +44,6 @@ public:
     StackArray<Section, scMaxSections> mSections;
 };
 
-} // namespace fx::renderer
+} // namespace renderer
+
+} // namespace fx

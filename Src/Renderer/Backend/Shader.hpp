@@ -8,13 +8,18 @@
 #include <unordered_map>
 
 
-namespace fx::renderer {
+namespace fx {
 
 enum class eShaderType : uint16
 {
-    Vertex,
-    Pixel,
+    Vertex = (1 << 0),
+    Pixel = (1 << 1),
 };
+
+FxEnumFlags(eShaderType);
+
+
+namespace renderer {
 
 class Shader;
 class CommandBuffer;
@@ -28,16 +33,19 @@ static constexpr uint32 scNumShaderTypes = static_cast<uint32>(eShaderType::Pixe
 /**
  * @brief Get the underlying Vulkan shader stage bit for an ShaderType.
  */
-static constexpr VkShaderStageFlagBits ToUnderlyingType(eShaderType type)
+static constexpr VkShaderStageFlags ToUnderlyingType(eShaderType type)
 {
-    switch (type) {
-    case eShaderType::Vertex:
-        return VK_SHADER_STAGE_VERTEX_BIT;
-    case eShaderType::Pixel:
-        return VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkShaderStageFlags flags = 0;
+
+    if ((type & eShaderType::Vertex) != 0) {
+        flags |= VK_SHADER_STAGE_VERTEX_BIT;
     }
 
-    return VK_SHADER_STAGE_VERTEX_BIT;
+    if ((type & eShaderType::Pixel) != 0) {
+        flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
+
+    return flags;
 }
 
 static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
@@ -48,6 +56,7 @@ static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
     case eShaderType::Pixel:
         return "Pixel";
     }
+
     return "Unknown";
 }
 }; // namespace ShaderUtil
@@ -216,8 +225,8 @@ public:
 class Shader
 {
     /**
-     * @brief Holds a collection of shader programs that have already been loaded from the DataPack or created with the
-     * ShaderCompiler.
+     * @brief Holds a collection of shader programs that have already been loaded from the DataPack or created with
+     * the ShaderCompiler.
      *
      * A cached shader can be retrieved from mCachedTypes using the shader type as a key, using the helper function
      * `RetrieveCachedShaderProgram`.
@@ -277,4 +286,6 @@ private:
     DataPack mDataPack;
 };
 
-} // namespace fx::renderer
+} // namespace renderer
+
+} // namespace fx

@@ -3,6 +3,7 @@
 #include <Engine.hpp>
 #include <ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 
@@ -39,7 +40,7 @@ PhObjectId Scene::NewPhysicsObject()
     return id;
 }
 
-PhObject* Scene::GetPhysicsObject(PhObjectId id)
+PhObject* Scene::GetPhysicsObject(PhObjectId id) const
 {
     if (id == PhObjectIdNull || id > mPhysicsObjects.Size()) {
         return nullptr;
@@ -58,7 +59,7 @@ void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
     }
 }
 
-TSRef<Object> Scene::FindObject(Hash32 name_hash)
+TSRef<Object> Scene::FindObject(const Hash32 name_hash)
 {
     for (TSRef<Object>& obj : mObjects) {
         if (obj->Name == name_hash) {
@@ -67,6 +68,17 @@ TSRef<Object> Scene::FindObject(Hash32 name_hash)
     }
 
     return TSRef<Object>(nullptr);
+}
+
+PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
+{
+    for (PhObject& phys : mPhysicsObjects) {
+        if (phys.GetName().GetHash() == name_hash) {
+            return &phys;
+        }
+    }
+
+    return nullptr;
 }
 
 
@@ -111,7 +123,6 @@ void Scene::RenderUnlitObjects(const Camera& camera) const
     // gRenderer->pDeferredRenderer->PlUnlit.Bind(gRenderer->GetFrame()->CommandBuffer);
     gRenderer->BeginUnlit();
 
-
     for (const TSRef<Object>& obj : mObjects) {
         if (!obj->GetRenderUnlit()) {
             continue;
@@ -127,9 +138,12 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     }
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-    gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
+    // gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
-    renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
+    renderer::Pipeline* pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
+
+    // renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
+    pipeline->Bind(cmd);
 
     DebugLayerPushConstants push_constants {};
 
@@ -150,7 +164,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
             push_constants.DebugColor = debug_color.AsUInt();
         }
 
-        vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
+        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
                            &push_constants);
 
         mpDebugCube->Render(cmd, 1);

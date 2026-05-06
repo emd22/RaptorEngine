@@ -34,7 +34,7 @@ public:
 
     FoxFunction* FindFunction(Hash32 hashed_name);
 
-    FoxAstNode* TryParseKeyword(FoxAstBlock* parent_block);
+    FoxAstNode* TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_semicolon);
     FoxAstAssign* TryParseAssignment(Token* var_name);
 
     FoxValue ParseValue();
@@ -45,7 +45,7 @@ public:
     FoxAstNode* ParseRhs();
     FoxAstFunctionCall* ParseFunctionCall();
 
-    FoxAstIf* ParseIfStatement();
+    FoxAstIf* ParseIfStatement(FoxAstBlock* parent_block);
 
     /**
      * @brief Declares a variable for internal uses as if it was declared in the script.

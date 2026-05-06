@@ -35,6 +35,9 @@
 ** SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+
+#define FX_DEBUG_DISABLE_MEMPOOL 1
+
 #include "MemPool.hpp"
 
 #include <assert.h>
@@ -336,6 +339,8 @@ public:
 */
 static constexpr size_t scBlockHeaderSize = sizeof(uint64);
 
+static constexpr size_t scPoolOverhead = 2 * scBlockHeaderSize;
+
 /* User data starts directly after the size field in a used block. */
 static constexpr size_t scBlockStartOffset = offsetof(MemBlock, Size) + sizeof(size_t);
 
@@ -416,7 +421,7 @@ static size_t adjust_request_size(size_t size, size_t align)
 {
     size_t adjust = 0;
     if (size) {
-        const size_t aligned = MathUtil::AlignValue(size, align);
+        const size_t aligned = align_up(size, align);
 
         /* aligned sized must not exceed block_size_max or we'll go out of bounds on sl_bitmap */
         if (aligned < block_size_max) {
@@ -754,7 +759,6 @@ size_t tlsf_block_size_max(void) { return block_size_max; }
 ** tlsf_add_pool, equal to the overhead of a free block and the
 ** sentinel block.
 */
-static constexpr size_t scPoolOverhead = 4 * scBlockHeaderSize;
 static constexpr size_t scAllocOverhead = scBlockHeaderSize;
 
 pool_t MemPool::AddPool(void* mem, size_t bytes)
@@ -882,6 +886,8 @@ void MemPool::Create(uint64 size)
     void* ptr = std::malloc(size);
     AssertMsg(ptr != nullptr, "Could not allocate memory pool!");
 
+    SizeAllocated = size;
+
     CreateFromPtr(ptr);
     AddPool(reinterpret_cast<void*>(reinterpret_cast<uint8*>(ptr) + sizeof(ControlBlock)), size - sizeof(ControlBlock));
 
@@ -921,18 +927,28 @@ pool_t MemPool::GetPool() { return reinterpret_cast<pool_t>(reinterpret_cast<uin
 
 void* MemPool::AllocRaw(size_t size)
 {
+#ifdef FX_DEBUG_DISABLE_MEMPOOL
+    return std::malloc(size);
+#else
     std::lock_guard<std::mutex> guard(mMutex);
+    Assert(pMemory != nullptr);
 
     ControlBlock* control = GetControlBlock();
 
     const size_t adjust = adjust_request_size(size, scAlignmentSize);
 
+    SizeUsed += size;
+
     MemBlock* block = block_locate_free(control, adjust);
     return block_prepare_used(control, block, adjust);
+#endif
 }
 
 void* MemPool::AlignedAllocRaw(uint32 alignment, size_t size)
 {
+#ifdef FX_DEBUG_DISABLE_MEMPOOL
+    return aligned_alloc(alignment, size);
+#else
     std::lock_guard<std::mutex> guard(mMutex);
 
     ControlBlock* control = GetControlBlock();
@@ -982,25 +998,36 @@ void* MemPool::AlignedAllocRaw(uint32 alignment, size_t size)
         }
     }
 
+    SizeUsed += size;
+
     return block_prepare_used(control, block, adjust);
+#endif
 }
 
 void MemPool::FreeRaw(void* ptr)
 {
+#ifdef FX_DEBUG_DISABLE_MEMPOOL
+    free(ptr);
+#else
     if (!ptr) {
         return;
     }
 
     std::lock_guard<std::mutex> guard(mMutex);
 
+    Assert(pMemory != nullptr);
+
     ControlBlock* control = GetControlBlock();
 
     MemBlock* block = BlockFromPtr(ptr);
     tlsf_assert(!(block->IsFree()) && "block already marked as free");
+    SizeUsed -= block->Size;
+
     block->MarkFree();
     block = block_merge_prev(control, block);
     block = block_merge_next(control, block);
     control->AddBlockToFreeList(block);
+#endif
 }
 
 /*
@@ -1018,6 +1045,9 @@ void MemPool::FreeRaw(void* ptr)
 */
 void* MemPool::ReallocRaw(void* ptr, size_t size)
 {
+#ifdef FX_DEBUG_DISABLE_MEMPOOL
+    return realloc(ptr, size);
+#else
     std::lock_guard<std::mutex> guard(mMutex);
 
     ControlBlock* control = GetControlBlock();
@@ -1067,6 +1097,7 @@ void* MemPool::ReallocRaw(void* ptr, size_t size)
     }
 
     return p;
+#endif
 }
 
 

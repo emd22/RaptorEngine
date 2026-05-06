@@ -1,4 +1,4 @@
-#include "Attachment.hpp"
+#include "Target.hpp"
 
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -77,7 +77,7 @@ VkAttachmentDescription Target::BuildDescription() const
 SizedArray<VkAttachmentDescription>& TargetList::GetDescriptions()
 {
     // Return the descriptions if they are already built
-    if (mbDescriptionsBuilt) {
+    if ((mFlags & eTargetListFlags::DescriptionsBuilt) != 0) {
         return mBuiltAttachmentDescriptions;
     }
 
@@ -91,7 +91,7 @@ SizedArray<VkAttachmentDescription>& TargetList::GetDescriptions()
         mBuiltAttachmentDescriptions.Insert(at.BuildDescription());
     }
 
-    mbDescriptionsBuilt = true;
+    mFlags |= eTargetListFlags::DescriptionsBuilt;
 
     return mBuiltAttachmentDescriptions;
 }
@@ -102,7 +102,7 @@ TargetList& TargetList::Add(const Target& attachment)
     CheckInited();
     Targets.Insert(attachment);
 
-    mbImageViewsBuilt = false;
+    mFlags &= ~(eTargetListFlags::ImageViewsBuilt);
 
     return *this;
 }
@@ -115,17 +115,21 @@ TargetList& TargetList::Add(const Target* attachment)
 
 void TargetList::CreateImages()
 {
+    if ((mFlags & eTargetListFlags::ImagesCreated) != 0) {
+        return;
+    }
+
     for (Target& attachment : Targets) {
         attachment.CreateImage();
     }
 
-    mbImagesCreated = true;
+    mFlags |= eTargetListFlags::ImagesCreated;
 }
 
 SizedArray<VkImageView>& TargetList::GetImageViews()
 {
     // Return the list of views if it is already populated
-    if (mbImageViewsBuilt) {
+    if ((mFlags & eTargetListFlags::ImageViewsBuilt) != 0) {
         return mBuiltImageViews;
     }
 
@@ -144,10 +148,11 @@ SizedArray<VkImageView>& TargetList::GetImageViews()
         mBuiltImageViews.Insert(attachment.Image.View);
     }
 
-    mbImageViewsBuilt = true;
+    mFlags |= eTargetListFlags::ImageViewsBuilt;
 
     return mBuiltImageViews;
 }
+
 
 bool TargetList::IsCompatible(const TargetList& other) const
 {

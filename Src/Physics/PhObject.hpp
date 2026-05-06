@@ -41,6 +41,7 @@ enum class ePhMotionType
 
 enum class ePhPrimitiveType
 {
+    None,
     Box,
 };
 
@@ -67,7 +68,7 @@ public:
 
     void DestroyPhysicsBody();
 
-    void Teleport(Vec3f position, Quat rotation);
+    void Teleport(const Vec3f& position, const Quat& rotation);
 
     FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
     FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
@@ -76,6 +77,10 @@ public:
     FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
 
     FX_FORCE_INLINE ePhMotionType GetMotionType() const { return mMotionType; }
+
+    FX_FORCE_INLINE Name& GetName() { return mColliderName; }
+    FX_FORCE_INLINE void SetName(const String& name) { mColliderName.Set(name); }
+    FX_FORCE_INLINE void SetName(const std::string& name) { mColliderName.Set(name); }
 
     ~PhObject() = default;
 
@@ -91,8 +96,12 @@ public:
     bool mbHasPhysicsBody : 1 = false;
 
     Vec3f Dimensions = Vec3f::sOne;
+    ePhPrimitiveType PrimitiveType = ePhPrimitiveType::None;
 
     PhObjectId Id = PhObjectIdNull;
+
+private:
+    Name mColliderName;
 };
 
 } // namespace fx

@@ -113,6 +113,54 @@ void FoxtrotGame::LoadOffsetsFile()
     ArmsOffset = info.GetEntryValue(HashStr32("ArmsOffset"), Vec3f::sZero);
 }
 
+Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / size.X, pos.Y / size.Y); }
+
+void FoxtrotGame::CreateFontObject()
+{
+    Vec2f atlas_size = Vec2f(512.0f, 256.0f);
+
+    Vec2i glyph_size = Vec2i::sZero;
+    Vec2i glyph_offset = Vec2i::sZero;
+
+    {
+        ConfigFile font_meta;
+        font_meta.Load(FX_BASE_DIR "/Meta.conf");
+
+        ConfigEntry* glyphs_entry = font_meta.GetEntry(HashStr32("Glyphs"));
+
+        ConfigEntry* glyph = glyphs_entry->GetMember(HashStr32("65"));
+
+        glyph_size = glyph->GetMemberValue(HashStr32("Size"), Vec2i(5, 5));
+        glyph_offset = glyph->GetMemberValue(HashStr32("Offset"), Vec2i::sZero);
+    }
+
+
+    TSRef<Object> object = TSRef<Object>::New();
+    object->Name.Set("FontObject");
+
+    MeshGenOptions options { .Scale = 0.5 };
+    options.UvMin = PixelsToUV(glyph_offset, atlas_size);
+    options.UvMax = options.UvMin + PixelsToUV(glyph_size, atlas_size);
+
+    Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
+    object->pMesh = quad->AsMesh(eVertexType::Default);
+
+    TSRef<Material> material = gMaterialManager->New("Font material", &gRenderer->pDeferredRenderer->PlUnlit, false);
+    TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+                                                    FX_BASE_DIR "/DefaultFont.png");
+    material->Attach(Material::eResourceType::Diffuse, image);
+    object->pMaterial = material;
+
+    object->SetRenderUnlit(true);
+    object->SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
+
+    object->MarkReadyToRender();
+
+    // mMainScene.Attach(object);
+
+    object->PrintDebug();
+}
+
 void FoxtrotGame::CreateGame()
 {
     mMainScene.Create();
@@ -123,7 +171,14 @@ void FoxtrotGame::CreateGame()
     Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
     Player.SetFlyMode(true);
 
+    pEditorCamera = MakeRef<PerspectiveCamera>();
+
+    pEditorCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
+    pEditorCamera->SetFov(80.0f);
+
     mMainScene.SelectCamera(Player.pCamera);
+
+    AddEditorModes();
 
     SceneFile scene_file;
 
@@ -150,19 +205,16 @@ void FoxtrotGame::CreateGame()
     gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
 
     {
-        renderer::Font font;
-        if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
-            renderer::Image atlas_image;
-            font.RenderAtlasToImage(atlas_image);
-            LogInfo("Font atlas created: {}x{}", atlas_image.Size.X, atlas_image.Size.Y);
-            LogInfo("Font: {} / {}", font.GetFamilyName(), font.GetStyleName());
-
-            atlas_image.SaveToFile("./font_atlas.jpeg", eImageSaveFormat::Jpeg);
-        }
-        else {
-            LogError("Failed to load font!");
-        }
+        // renderer::Font font;
+        // if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
+        //     font.SaveToFile("./DefaultFont.png", eImageSaveFormat::Png);
+        // }
+        // else {
+        //     LogError("Failed to load font!");
+        // }
     }
+
+    CreateFontObject();
 
     while (sbRunning) {
         Tick();
@@ -181,14 +233,62 @@ static FX_FORCE_INLINE Vec3f GetMovementVector()
         movement.Z += -1.0f;
     }
     if (ControlManager::IsKeyDown(eKey::FX_KEY_A)) {
-        movement.X += 1.0f;
+        movement.X += -1.0f;
     }
     if (ControlManager::IsKeyDown(eKey::FX_KEY_D)) {
-        movement.X += -1.0f;
+        movement.X += 1.0f;
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_E)) {
+        movement.Y += 1.0f;
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
+        movement.Y += -1.0f;
     }
 
     return movement;
 }
+
+void FoxtrotGame::NextEditorMode()
+{
+    if (SelectedEditorMode != nullptr) {
+        SelectedEditorMode->OnLeave(mMainScene);
+    }
+
+
+    EditorModeType = static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1);
+    if (static_cast<int32>(EditorModeType) > static_cast<int32>(eEditorMode::Default)) {
+        EditorModeType = eEditorMode::MoveCollider;
+    }
+}
+
+void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
+{
+    if (SelectedEditorMode != nullptr) {
+        SelectedEditorMode->OnLeave(mMainScene);
+    }
+
+
+    EditorModeType = mode;
+
+    if (static_cast<int32>(EditorModeType) > static_cast<int32>(eEditorMode::Default)) {
+        EditorModeType = eEditorMode::MoveCollider;
+    }
+
+    if (static_cast<int32>(EditorModeType) < static_cast<int32>(eEditorMode::MoveCollider)) {
+        EditorModeType = eEditorMode::Default;
+    }
+
+    // Update cameras + current editor mode ptr
+    if (EditorModeType != eEditorMode::Default) {
+        SelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
+        mMainScene.SelectCamera(pEditorCamera);
+    }
+    else {
+        mMainScene.SelectCamera(Player.pCamera);
+        SelectedEditorMode = nullptr;
+    }
+}
+
 
 void FoxtrotGame::ProcessControls()
 {
@@ -207,6 +307,11 @@ void FoxtrotGame::ProcessControls()
         ControlManager::ReleaseMouse();
     }
 
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && (EditorModeType != eEditorMode::Default)) {
+        EditorModeType = eEditorMode::Default;
+        mMainScene.SelectCamera(Player.pCamera);
+    }
+
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
         SizedArray<JPH::BodyID> hits = Player.Physics.Raycast(Player.pCamera->GetForwardVector() * 50.0f);
@@ -218,6 +323,13 @@ void FoxtrotGame::ProcessControls()
         for (JPH::BodyID body_id : hits) {
             LogInfo("HIT {}", body_id.GetIndex());
         }
+    }
+
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_PERIOD)) {
+        SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1));
+    }
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_COMMA)) {
+        SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) - 1));
     }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
@@ -251,14 +363,14 @@ void FoxtrotGame::ProcessControls()
         }
     }
 
-    // Elevate up
-    if (ControlManager::IsKeyDown(eKey::FX_KEY_E)) {
-        Player.Move(DeltaTime, Vec3f::sUp);
-    }
-    // Elevate down
-    if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
-        Player.Move(DeltaTime, -Vec3f::sUp);
-    }
+    // // Elevate up
+    // if (ControlManager::IsKeyDown(eKey::FX_KEY_E)) {
+    //     Player.Move(DeltaTime, Vec3f::sUp);
+    // }
+    // // Elevate down
+    // if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
+    //     Player.Move(DeltaTime, -Vec3f::sUp);
+    // }
 
 
     if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
@@ -293,6 +405,7 @@ void FoxtrotGame::ProcessControls()
     }
 }
 
+
 void FoxtrotGame::Tick()
 {
     const uint64 current_tick = SDL_GetPerformanceCounter();
@@ -315,9 +428,13 @@ void FoxtrotGame::Tick()
     ProcessControls();
 
 
-    if (!sbShowShadowCam) {
+    if (!sbShowShadowCam && EditorModeType == eEditorMode::Default) {
         Player.Move(DeltaTime, GetMovementVector());
         Player.Update(DeltaTime);
+    }
+
+    if (EditorModeType != eEditorMode::Default) {
+        SelectedEditorMode->Update(mMainScene, GetMovementVector());
     }
 
     Ref<PerspectiveCamera> camera = Player.pCamera;
@@ -390,6 +507,11 @@ void FoxtrotGame::Tick()
 
 void FoxtrotGame::DestroyGame()
 {
+    fx::LogInfo("===== MEMPOOL STATS =====");
+    fx::LogInfo("Bytes Used: {}", fx::gEnginePool->GetBytesUsed());
+    fx::LogInfo("Pool Size:  {}", fx::gEnginePool->GetCapacity());
+    fx::LogInfo("=========================");
+
     gRenderer->GetDevice()->WaitForIdle();
 
     gMaterialManager->Destroy();
@@ -402,11 +524,77 @@ void FoxtrotGame::DestroyGame()
     gRenderer->pDeferredRenderer.DestroyRef();
 }
 
+void FoxtrotGame::AddEditorModes()
+{
+    EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Default));
+
+    EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), pEditorCamera));
+    EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), pEditorCamera));
+}
+
 
 FoxtrotGame::~FoxtrotGame()
 {
     DestroyGame();
     mMainScene.Destroy();
 }
+
+
+/////////////////////////////////////
+// Editor modes
+/////////////////////////////////////
+
+void EditorModeMoveCollider::Update(const Scene& scene, const Vec3f& movement_vector)
+{
+    PhObjectId phys_id = scene.GetSelectedPhysicsObject();
+    if (phys_id != PhObjectIdNull) {
+        PhObject* phys = scene.GetPhysicsObject(phys_id);
+        phys->Teleport(phys->GetPosition() + (movement_vector * Vec3f(0.05)), phys->GetRotation());
+
+        Vec3f target = phys->GetPosition();
+        pCamera->MoveTo(target + Vec3f(0, 10, -10));
+        pCamera->Target = target;
+        pCamera->bLookatTarget = true;
+
+        pCamera->Update();
+    }
+}
+
+void EditorModeMoveCollider::OnLeave(const Scene& scene) {}
+
+void EditorModeScaleCollider::Update(const Scene& scene, const Vec3f& movement_vector)
+{
+    PhObjectId phys_id = scene.GetSelectedPhysicsObject();
+    if (phys_id != PhObjectIdNull) {
+        PhObject* phys = scene.GetPhysicsObject(phys_id);
+        phys->Dimensions = phys->Dimensions + (movement_vector * Vec3f(0.05));
+        if (phys->Dimensions.X < 0.01) {
+            phys->Dimensions.X = 0.01;
+        }
+        if (phys->Dimensions.Y < 0.01) {
+            phys->Dimensions.Y = 0.01;
+        }
+        if (phys->Dimensions.Z < 0.01) {
+            phys->Dimensions.Z = 0.01;
+        }
+
+        Vec3f target = phys->GetPosition();
+        pCamera->MoveTo(target + Vec3f(0, 10, -10));
+        pCamera->Target = target;
+        pCamera->bLookatTarget = true;
+
+        pCamera->Update();
+    }
+}
+
+void EditorModeScaleCollider::OnLeave(const Scene& scene)
+{
+    PhObjectId phys_id = scene.GetSelectedPhysicsObject();
+    if (phys_id != PhObjectIdNull) {
+        PhObject* phys = scene.GetPhysicsObject(phys_id);
+        phys->CreatePrimitiveBody(phys->PrimitiveType, phys->Dimensions, phys->mMotionType, {});
+    }
+}
+
 
 } // namespace fx

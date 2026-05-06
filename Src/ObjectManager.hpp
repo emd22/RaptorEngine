@@ -9,6 +9,7 @@ namespace fx {
 struct alignas(16) ObjectGpuEntry
 {
     float ModelMatrix[16];
+    float UvOffsets[4];
 };
 
 class Mat4f;
@@ -18,7 +19,7 @@ using ObjectId = uint32;
 class ObjectManager
 {
 public:
-    static constexpr uint32 scMaxObjects = 128;
+    static constexpr uint32 scMaxObjects = 512;
 
 
 public:

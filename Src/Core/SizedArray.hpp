@@ -18,7 +18,7 @@
 
 namespace fx {
 
-// #define FX_SIZED_ARRAY_NO_MEMPOOL 1
+#define FX_SIZED_ARRAY_NO_MEMPOOL 1
 
 static inline void NoMemError()
 {
@@ -132,12 +132,12 @@ public:
             return;
         }
 
-#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (size_t i = 0; i < Size; i++) {
             TElementType& element = pData[i];
             element.~TElementType();
         }
 
+#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         if (gEnginePool) {
             gEnginePool->FreeRaw(static_cast<void*>(pData));
         }
@@ -359,11 +359,9 @@ public:
 
         Size = Capacity;
 
-#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         for (uint64 i = 0; i < Size; i++) {
             new (&pData[i]) TElementType;
         }
-#endif
     }
 
     size_t GetSizeInBytes() const { return Size * sizeof(TElementType); }
@@ -402,22 +400,13 @@ protected:
 
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
         pData = static_cast<TElementType*>(gEnginePool->AllocRaw(sizeof(TElementType) * element_count));
-        // for (uint32 i = 0; i < Capacity; i++) {
-        //     ::new (pData[i]) TElementType();
-        // }
-
-        if (pData == nullptr) {
-            NoMemError();
-        }
 #else
-        // pData = new TElementType[element_count];
         pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * element_count));
+#endif
 
         if (pData == nullptr) {
             NoMemError();
         }
-
-#endif
 
         Capacity = element_count;
     }

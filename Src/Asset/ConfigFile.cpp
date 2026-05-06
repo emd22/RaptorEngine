@@ -233,7 +233,7 @@ bool ConfigFile::EatToken(eTokenType type)
     const bool correct_token = (GetToken()->Type == type);
 
     if (!correct_token) {
-        LogError("Config: Expected '{}' but found '{}'", Token::GetTypeName(type),
+        LogError("Config({}): Expected '{}' but found '{}'", mTokenIndex, Token::GetTypeName(type),
                  Token::GetTypeName(GetToken()->Type));
         return false;
     }

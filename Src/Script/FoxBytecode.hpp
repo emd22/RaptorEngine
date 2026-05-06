@@ -58,7 +58,14 @@ enum BcSpecSave : uint8
 enum BcSpecJump : uint8
 {
     BcSpecJump_Relative = 1,
+
     BcSpecJump_Equal,
+    BcSpecJump_NotEqual,
+    BcSpecJump_Greater,
+    BcSpecJump_Less,
+    BcSpecJump_LessEqual,
+    BcSpecJump_GreaterEqual,
+
     BcSpecJump_Absolute,
     BcSpecJump_AbsoluteReg32,
 

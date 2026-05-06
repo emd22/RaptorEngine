@@ -177,10 +177,10 @@ static void ParseProgramDefinition(const std::vector<Slice<char>>& params, State
 
     switch (type_hash) {
     case FHash(FPT_VERTEX):
-        result.SetCurrentShader(renderer::eShaderType::Vertex);
+        result.SetCurrentShader(eShaderType::Vertex);
         break;
     case FHash(FPT_PIXEL):
-        result.SetCurrentShader(renderer::eShaderType::Pixel);
+        result.SetCurrentShader(eShaderType::Pixel);
         break;
     case FHash(FPT_ALL):
         result.bBroadcastToAllPrograms = true;
@@ -245,8 +245,8 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
     char ch = state.Get();
 
     if (result.bBroadcastToAllPrograms) {
-        result.GetBuffer(renderer::eShaderType::Vertex).Insert(ch);
-        result.GetBuffer(renderer::eShaderType::Pixel).Insert(ch);
+        result.GetBuffer(eShaderType::Vertex).Insert(ch);
+        result.GetBuffer(eShaderType::Pixel).Insert(ch);
 
         return;
     }
@@ -531,7 +531,7 @@ Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
 }
 
 
-static void SaveProgramToDisk(const char* name, renderer::eShaderType shader_type, const Result& result)
+static void SaveProgramToDisk(const char* name, eShaderType shader_type, const Result& result)
 {
     const DataBuffer& buffer = result.ProgramData[static_cast<uint32>(shader_type)];
 
@@ -545,8 +545,8 @@ static void SaveProgramToDisk(const char* name, renderer::eShaderType shader_typ
 
 void DebugSaveToDisk(const char* name, const Result& result)
 {
-    SaveProgramToDisk(name, renderer::eShaderType::Vertex, result);
-    SaveProgramToDisk(name, renderer::eShaderType::Pixel, result);
+    SaveProgramToDisk(name, eShaderType::Vertex, result);
+    SaveProgramToDisk(name, eShaderType::Pixel, result);
 }
 
 }; // namespace ShaderPreproc

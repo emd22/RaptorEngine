@@ -1,13 +1,14 @@
 #pragma once
 
 #include "Math/Vec2.hpp"
-#include "Pipeline.hpp"
 
 #include <vulkan/vulkan.h>
 
 #include <Core/SizedArray.hpp>
 
 namespace fx::renderer {
+
+class RenderPass;
 
 class Framebuffer
 {
@@ -21,7 +22,6 @@ public:
 
 public:
     VkFramebuffer Framebuffer = nullptr;
-    GpuDevice* mDevice = nullptr;
 };
 
 } // namespace fx::renderer

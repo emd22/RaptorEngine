@@ -18,7 +18,7 @@ void ObjectManager::Create()
     }
 
     renderer::DsLayoutBuilder builder {};
-    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, renderer::eShaderType::Vertex);
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Vertex);
     DsLayoutObjectBuffer = builder.Build();
 
     uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * renderer::FramesInFlight;

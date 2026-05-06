@@ -123,6 +123,16 @@ eFoxConditionResult FoxBytecodeCompiler::EmitPushConditionResult(FoxAstNode* con
         switch (binop->OpToken->Type) {
         case eTokenType::Equality:
             return eFoxConditionResult::Equal;
+        case eTokenType::NotEqual:
+            return eFoxConditionResult::NotEqual;
+        case eTokenType::LessThan:
+            return eFoxConditionResult::Less;
+        case eTokenType::LessEqual:
+            return eFoxConditionResult::LessEqual;
+        case eTokenType::GreaterThan:
+            return eFoxConditionResult::Greater;
+        case eTokenType::GreaterEqual:
+            return eFoxConditionResult::GreaterEqual;
         default:
             break;
         }
@@ -136,33 +146,29 @@ eFoxConditionResult FoxBytecodeCompiler::EmitPushConditionResult(FoxAstNode* con
         return eFoxConditionResult::Equal;
     }
 
-    return eFoxConditionResult::Literal;
+    return eFoxConditionResult::Equal;
 }
 
 
 void FoxBytecodeCompiler::EmitIfStatement(FoxAstIf* if_node)
 {
     eFoxConditionResult cond_result = EmitPushConditionResult(if_node->pCondition);
+    // Jump over else block jump if the condition is true
+    EmitJumpConditional(sizeof(uint16), cond_result);
 
-    switch (cond_result) {
-    case eFoxConditionResult::Equal:
-        EmitJumpEqual(sizeof(uint16));
-        break;
-    default:
-        break;
-    }
-
+    // Else block jump
     EmitJumpRelative(0);
 
     uint32 original_offset = mBytecode.Size();
     uint32 fixup_addr = mBytecode.Size() - sizeof(uint16);
 
-    EmitBlock(if_node->pBlock, 0, false);
+    EmitNode(if_node->pBlock);
 
+    // Fixup else block address after emitting if block
     Fixup16(fixup_addr, mBytecode.Size() - original_offset);
 
     if (if_node->pElseBlock) {
-        EmitBlock(if_node->pElseBlock, 0, false);
+        EmitNode(if_node->pElseBlock);
     }
 }
 
@@ -383,9 +389,33 @@ void FoxBytecodeCompiler::EmitJumpRelative(uint16 offset)
     Write16(offset);
 }
 
-void FoxBytecodeCompiler::EmitJumpEqual(uint16 offset)
+void FoxBytecodeCompiler::EmitJumpConditional(uint16 offset, eFoxConditionResult cond)
 {
-    WriteOp(BcBase_Jump, BcSpecJump_Equal);
+    BcSpecJump cond_spec = BcSpecJump_Equal;
+
+    switch (cond) {
+    case eFoxConditionResult::Less:
+        cond_spec = BcSpecJump_Less;
+        break;
+    case eFoxConditionResult::LessEqual:
+        cond_spec = BcSpecJump_LessEqual;
+        break;
+    case eFoxConditionResult::Equal:
+        cond_spec = BcSpecJump_Equal;
+        break;
+    case eFoxConditionResult::NotEqual:
+        cond_spec = BcSpecJump_NotEqual;
+        break;
+    case eFoxConditionResult::Greater:
+        cond_spec = BcSpecJump_Greater;
+        break;
+    case eFoxConditionResult::GreaterEqual:
+        cond_spec = BcSpecJump_GreaterEqual;
+        break;
+    default:;
+    }
+
+    WriteOp(BcBase_Jump, cond_spec);
     Write16(offset);
 }
 
@@ -1064,6 +1094,26 @@ void FoxBytecodePrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
     else if (op_spec == BcSpecJump_Equal) {
         uint16 offset = Read16();
         BC_PRINT_OP("JMPEQ {}", offset);
+    }
+    else if (op_spec == BcSpecJump_NotEqual) {
+        uint16 offset = Read16();
+        BC_PRINT_OP("JMPNEQ {}", offset);
+    }
+    else if (op_spec == BcSpecJump_Less) {
+        uint16 offset = Read16();
+        BC_PRINT_OP("JMPLT {}", offset);
+    }
+    else if (op_spec == BcSpecJump_LessEqual) {
+        uint16 offset = Read16();
+        BC_PRINT_OP("JMPLTEQ {}", offset);
+    }
+    else if (op_spec == BcSpecJump_Greater) {
+        uint16 offset = Read16();
+        BC_PRINT_OP("JMPGT {}", offset);
+    }
+    else if (op_spec == BcSpecJump_GreaterEqual) {
+        uint16 offset = Read16();
+        BC_PRINT_OP("JMPGTEQ {}", offset);
     }
     else if (op_spec == BcSpecJump_Absolute) {
         uint32 position = Read32();

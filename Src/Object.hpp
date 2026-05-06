@@ -87,6 +87,8 @@ public:
      */
     void ReserveInstances(uint32 num_instances);
 
+    FX_FORCE_INLINE void SetPhysicsId(PhObjectId phys_id) { PhysicsId = phys_id; }
+    FX_FORCE_INLINE PhObjectId GetPhysicsId() const { return PhysicsId; }
     void SetPhysicsEnabled(bool enabled);
     FX_FORCE_INLINE bool GetPhysicsEnabled() { return (Flags & eObjectFlags::PhysicsEnabled) != 0; }
 
@@ -110,6 +112,13 @@ public:
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
+    void MarkReadyToRender()
+    {
+        Flags |= eObjectFlags::ReadyToRender;
+
+        bIsUploadedToGpu = true;
+        IsFinishedNotifier.SignalDataWritten();
+    }
 
     void Destroy() override;
     ~Object();

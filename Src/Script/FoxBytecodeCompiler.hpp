@@ -23,7 +23,6 @@ enum class eFoxConditionResult
     NotEqual,
     GreaterEqual,
     Greater,
-    Literal,
 };
 
 using VarIndex = uint16;
@@ -112,7 +111,7 @@ private:
     void EmitSaveAbsolute32(uint32 offset, uint32 value);
 
     void EmitJumpRelative(uint16 offset);
-    void EmitJumpEqual(uint16 offset);
+    void EmitJumpConditional(uint16 offset, eFoxConditionResult cond);
     void EmitJumpAbsolute(uint32 position);
     void EmitJumpCallAbsolute(uint32 position);
 

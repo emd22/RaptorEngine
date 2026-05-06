@@ -10,11 +10,57 @@
 #include <Core/Slice.hpp>
 #include <Renderer/Vertex.hpp>
 
+
+namespace fx {
+enum class eFaceOrder
+{
+    Default,
+    Reverse,
+};
+
+enum class eCullMode
+{
+    None,
+    Back,
+    Front,
+};
+
+FX_FORCE_INLINE constexpr VkFrontFace FaceOrderToVk(eFaceOrder order)
+{
+    switch (order) {
+    case eFaceOrder::Default:
+        return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    case fx::eFaceOrder::Reverse:
+        return VK_FRONT_FACE_CLOCKWISE;
+    default:;
+    }
+
+    return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+}
+
+FX_FORCE_INLINE constexpr VkCullModeFlags CullModeToVk(eCullMode mode)
+{
+    switch (mode) {
+    case eCullMode::None:
+        return VK_CULL_MODE_NONE;
+    case eCullMode::Back:
+        return VK_CULL_MODE_BACK_BIT;
+    case eCullMode::Front:
+        return VK_CULL_MODE_FRONT_BIT;
+    }
+
+    return VK_CULL_MODE_NONE;
+}
+
+
+} // namespace fx
+
 namespace fx::renderer {
 
 struct VertexDescription;
 class CommandBuffer;
 class GpuDevice;
+
 
 struct alignas(16) DrawPushConstants
 {
@@ -59,19 +105,29 @@ struct PipelineProperties
 struct PushConstants
 {
     uint32 Size;
-    VkShaderStageFlags StageFlags;
+    eShaderType ShaderTypes;
 };
 
 
 class Pipeline
 {
 public:
+    Pipeline() = default;
+
     void Create(const std::string& name, const Slice<Ref<ShaderProgram>>& shaders,
                 const Slice<VkAttachmentDescription>& attachments,
                 const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                 VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
 
-    FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout) { Layout = layout; }
+    FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout)
+    {
+        Layout = layout;
+
+        // Layout is referenced from another pipeline or modified externally, do not destroy
+        mbDoNotDestroyLayout = true;
+    }
+
+    FX_FORCE_INLINE bool HasLayout() const { return Layout != nullptr; }
 
     static VkPipelineLayout CreateLayout(const Slice<const PushConstants>& push_constant_defs,
                                          const Slice<VkDescriptorSetLayout>& descriptor_set_layouts);
@@ -85,12 +141,13 @@ public:
 private:
 public:
     VkPipelineLayout Layout = nullptr;
-    VkPipeline Pipeline = nullptr;
+    VkPipeline InternalPipeline = nullptr;
+
+    String Name;
 
     // XXX: TEMP
     Ref<ShaderProgram> VertexShader { nullptr };
     Ref<ShaderProgram> FragmentShader { nullptr };
-
 
 private:
     GpuDevice* mDevice = nullptr;

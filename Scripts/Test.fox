@@ -1,24 +1,7 @@
 
-
-extproc PrintX(int x);
-
-
-proc GetValue() int
-{
-    local int x = 3;
-
-    return x;
-}
-
 proc Init() int
 {
     local int x = 10;
 
-    // VPUSH $0
-    // PUSH 10
-    if (x == 10) {
-        return 20;
-    };
-
-    return 0;
+    return x;
 }

@@ -11,7 +11,7 @@ const char* Token::GetTypeName(eTokenType type)
     const char* type_names[] = {
         "Unknown",    "Identifier",
 
-        "String",     "Integer",    "Float",
+        "String",     "Integer",     "Float",
 
         "Equals",
 
@@ -21,13 +21,15 @@ const char* Token::GetTypeName(eTokenType type)
 
         "LBrace",     "RBrace",
 
-        "Plus",       "Dollar",     "Minus",
+        "LessThan",   "GreaterThan",
+
+        "Plus",       "Dollar",      "Minus",
 
         "Question",
 
-        "Dot",        "Comma",      "Semicolon",
+        "Dot",        "Comma",       "Semicolon",
 
-        "Equality",
+        "Equality",   "NotEqual",    "LessEqual", "GreaterEqual",
 
         "DocComment",
     };
@@ -114,6 +116,10 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::LBrace;
         case '}':
             return eTokenType::RBrace;
+        case '<':
+            return eTokenType::LessThan;
+        case '>':
+            return eTokenType::GreaterThan;
         case '+':
             return eTokenType::Plus;
         case '-':
@@ -128,9 +134,20 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Semicolon;
         }
     }
+
     else if (token.Length == 2) {
-        if (token.Start[0] == '=' && token.Start[1] == '=') {
-            return eTokenType::Equality;
+        // Find equality tokens (e.g !=, >=, ==)
+        if (token.Start[1] == '=') {
+            switch (token.Start[0]) {
+            case '=':
+                return eTokenType::Equality;
+            case '!':
+                return eTokenType::NotEqual;
+            case '<':
+                return eTokenType::LessEqual;
+            case '>':
+                return eTokenType::GreaterEqual;
+            }
         }
     }
 
@@ -178,20 +195,25 @@ bool Tokenizer::CheckOperators(Token& current_token, char ch)
 
     bool is_operator = (strchr(SingleCharOperators, ch) != NULL);
 
-    if (is_operator && (mpData[0] == '=' && mpData[1] == '=')) {
-        // If there is data waiting, submit to the token list
-        SubmitTokenIfData(current_token, mpData);
+    if (is_operator) {
+        const char* double_operators = "=!<>";
 
-        current_token.Increment();
-        current_token.Increment();
+        bool is_double_operator = (strchr(double_operators, ch) != NULL);
 
-        char* end_of_operator = mpData;
-        ++mpData;
-        ++mpData;
+        if ((is_double_operator && mpData[1] == '=')) {
+            // If there is data waiting, submit to the token list
+            SubmitTokenIfData(current_token, mpData);
 
-        SubmitTokenIfData(current_token, end_of_operator, mpData);
+            current_token.Increment();
+            current_token.Increment();
 
-        return true;
+            char* end_of_operator = mpData;
+            ++mpData;
+            ++mpData;
+
+            SubmitTokenIfData(current_token, end_of_operator, mpData);
+            return true;
+        }
     }
 
     if (is_operator) {
@@ -426,6 +448,8 @@ void Tokenizer::TryReadInternalCall()
         }
 
         IncludeFile(include_path);
+    }
+    else if (ExpectString("macro")) {
     }
 }
 

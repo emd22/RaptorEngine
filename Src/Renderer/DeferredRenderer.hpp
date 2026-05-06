@@ -5,7 +5,6 @@
 #include "Backend/Framebuffer.hpp"
 #include "Backend/Image.hpp"
 #include "Backend/Sampler.hpp"
-#include "PipelineList.hpp"
 #include "RenderStage.hpp"
 
 namespace fx {
@@ -84,7 +83,6 @@ public:
 
     Pipeline PlGeometry;
     Pipeline PlGeometryNoDepthTest;
-    Pipeline PlGeometryWireframe;
     Pipeline PlGeometryWithNormalMaps;
 
     Pipeline PlGeometrySkinned;
@@ -111,7 +109,8 @@ public:
     /////////////////////////////////////////////////
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
     Pipeline PlUnlit;
-    Pipeline PlDebugLayer;
+    Pipeline PlText;
+    // Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;
 
     RenderPass RpForward;

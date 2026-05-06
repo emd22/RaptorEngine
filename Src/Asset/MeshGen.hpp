@@ -9,6 +9,8 @@ namespace fx {
 struct MeshGenOptions
 {
     float32 Scale = 1.0f;
+    Vec2f UvMin = Vec2f(0.0f, 0.0f);
+    Vec2f UvMax = Vec2f(1.0f, 1.0f);
 };
 
 class MeshGen
@@ -19,6 +21,9 @@ public:
     struct GeneratedMesh
     {
         SizedArray<Vec3f> Positions;
+        SizedArray<Vec3f> Normals;
+        SizedArray<Vec2f> Uvs;
+
         SizedArray<uint32> Indices;
 
         Ref<PrimitiveMesh> AsMesh(renderer::eVertexType vertex_type);

@@ -58,6 +58,7 @@ public:
     }
 
     void MarkFull() { Size = Capacity; };
+    void Clear() { Size = 0; }
 
     uint32 GetSizeInBytes() const { return Size * sizeof(T); }
 

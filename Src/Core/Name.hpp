@@ -21,6 +21,12 @@ public:
         mHash = HashStr32(name.c_str());
     }
 
+    void Set(const String& name)
+    {
+        mName = name.Str();
+        mHash = HashStr32(name.CStr());
+    }
+
     void Set(const char* name)
     {
         mName = name;
