@@ -1,5 +1,6 @@
 #include "State.hpp"
 
+#include "Backend/RenderPass.hpp"
 #include "Backend/VertexDescription.hpp"
 #include "Globals.hpp"
 #include "PipelineCache.hpp"
@@ -7,7 +8,11 @@
 
 namespace fx::renderer {
 
-void State::BeginPipeline(ePipelineName pipeline) { mpPipeline = gPipelineCache->Request(pipeline); }
+void State::BeginPipeline(ePipelineName pipeline)
+{
+    mpPipeline = gPipelineCache->Request(pipeline);
+    mDescriptors.InitCapacity(10);
+}
 
 void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
 {
@@ -21,16 +26,29 @@ void State::SetLayout(VkPipelineLayout layout) { mpPipeline->SetLayout(layout); 
 
 void State::BuildPipeline()
 {
+    if (!mpPipeline->HasLayout()) {
+        BuildLayout();
+    }
+
     SizedArray<Ref<ShaderProgram>> shader_list = { mpVertexShader, mpPixelShader };
     if (!mpVertexShader.IsValid() || !mpPixelShader.IsValid()) {
-        LogError("Cannot build pipeline due to invalid shaders");
+        LogError("Invalid shaders provided");
+        return;
+    }
+
+    if (mpRenderPass == nullptr) {
+        LogError("No valid renderpass provided");
         return;
     }
 
     VertexDescription vertex_desc = VertexUtil::BuildDescription(mVertexType);
 
-    // mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, OutputTargets.GetImageViews(),
-    //                    BlendAttachments.GetVkAttachments(OutputTargets.Targets.Size), &vertex_desc);
+    // Since the blend attachments apply _only_ to colour targets, we want to get the amount of non-depth targets.
+    SizedArray<Target> color_only_targets = pOutputTargets->GetTargetByType(eImageAspectFlag::Color);
+
+    mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, pOutputTargets->GetDescriptions(),
+                       BlendAttachments.GetVkAttachments(color_only_targets.Size), &vertex_desc, *mpRenderPass,
+                       mProperties);
 }
 
 void State::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
@@ -38,7 +56,27 @@ void State::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_att
     BlendAttachments.AddAttachment(target_index, blend_attachment);
 }
 
-void State::SetOutputTargets(const TargetList& targets) { OutputTargets = targets; }
+
+void State::SetPushConstants(eShaderType type, uint32 pc_size)
+{
+    mPushConstants.MarkFull();
+    PushConstants& pc = mPushConstants[static_cast<uint32>(type)];
+    pc.ShaderTypes = type;
+    pc.Size = pc_size;
+}
+
+
+VkPipelineLayout State::BuildLayout()
+{
+    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(mPushConstants), Slice(mDescriptors));
+    mpPipeline->Layout = layout;
+    return layout;
+}
+
+
+void State::SetRenderPass(RenderPass* renderpass) { mpRenderPass = renderpass; }
+
+void State::SetOutputTargets(TargetList* targets) { pOutputTargets = targets; }
 
 void State::EndPipeline()
 {
@@ -49,9 +87,14 @@ void State::EndPipeline()
 void State::Reset()
 {
     mpPipeline = nullptr;
+    mpRenderPass = nullptr;
 
-    OutputTargets.Reset();
     mPushConstants.Clear();
+    mDescriptors.Clear();
+
+    memset(mPushConstants.pData, 0, mPushConstants.GetSizeInBytes());
+
+    mProperties = PipelineProperties {};
 }
 
 } // namespace fx::renderer

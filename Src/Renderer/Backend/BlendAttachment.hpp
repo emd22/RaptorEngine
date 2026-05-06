@@ -63,7 +63,21 @@ public:
         SizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments;
 
         vk_blend_attachments.InitSize(count);
-        memset(vk_blend_attachments.pData, 0, vk_blend_attachments.GetSizeInBytes());
+
+        for (uint32 i = 0; i < count; i++) {
+            BlendAttachment am {};
+
+            vk_blend_attachments[i] = (VkPipelineColorBlendAttachmentState {
+                .blendEnable = am.Enabled ? 1U : 0U,
+                .srcColorBlendFactor = am.ColorBlend.Ops.Src,
+                .dstColorBlendFactor = am.ColorBlend.Ops.Dst,
+                .colorBlendOp = am.BlendOp.Ops.Color,
+                .srcAlphaBlendFactor = am.AlphaBlend.Ops.Src,
+                .dstAlphaBlendFactor = am.AlphaBlend.Ops.Dst,
+                .alphaBlendOp = am.BlendOp.Ops.Alpha,
+                .colorWriteMask = static_cast<VkColorComponentFlags>(am.Mask),
+            });
+        }
 
         for (const BlendAttachment& am : mBlendAttachments) {
             vk_blend_attachments[am.TargetIndex] = (VkPipelineColorBlendAttachmentState {

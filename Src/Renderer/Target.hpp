@@ -112,7 +112,25 @@ public:
     SizedArray<VkImageView>& GetImageViews();
 
 
-    void Reset()
+    SizedArray<Target> GetTargetByType(eImageAspectFlag aspect) const
+    {
+        SizedArray<Target> targets(Targets.Size);
+
+        for (const Target& tg : Targets) {
+            const bool is_depth = tg.IsDepth();
+
+            if (aspect == eImageAspectFlag::Color && !is_depth) {
+                targets.Insert(tg);
+            }
+            else if (aspect == eImageAspectFlag::Depth && is_depth) {
+                targets.Insert(tg);
+            }
+        }
+
+        return targets;
+    }
+
+    void Clear()
     {
         mFlags = eTargetListFlags::None;
         mBuiltAttachmentDescriptions.Clear();

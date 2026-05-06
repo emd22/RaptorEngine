@@ -12,28 +12,6 @@
 
 namespace fx::renderer {
 
-// PipelineBuilder::Build() // Build pipeline
-//     .AddBlendAttachment({ .Enabled = true, .AlphaBlend = { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ZERO }
-//     }) .AddBlendAttachment(ColorComponent_RGBA, false) .AddColorAttachment({
-//         .Format = VK_FORMAT_B8G8R8A8_UNORM,
-//     });
-
-
-// using BlendFactorFlags = uint32;
-// enum eBlendFactor : uint32
-// {
-//     BlendFactorSrc_Zero = (VK_BLEND_FACTOR_ZERO << 8),
-//     BlendFactorSrc_One = (VK_BLEND_FACTOR_ONE << 8),
-//     BlendFactorSrc_SrcAlpha = (VK_BLEND_FACTOR_SRC_ALPHA << 8),
-//     BlendFactorSrc_DstAlpha = (VK_BLEND_FACTOR_DST_ALPHA << 8),
-
-//     BlendFactorDst_Zero = (VK_BLEND_FACTOR_ZERO & 0xFF),
-//     BlendFactorDst_One = (VK_BLEND_FACTOR_ONE & 0xFF),
-//     BlendFactorDst_SrcAlpha = (VK_BLEND_FACTOR_SRC_ALPHA & 0xFF),
-//     BlendFactorDst_DstAlpha = (VK_BLEND_FACTOR_DST_ALPHA & 0xFF),
-// };
-
-
 class PipelineBuilder
 {
     static constexpr uint32 scMinAttachmentCount = 10;
@@ -121,8 +99,9 @@ public:
 
     void Build(Pipeline& pipeline)
     {
+        SizedArray<Target> color_only_targets = mpAttachmentList->GetTargetByType(eImageAspectFlag::Color);
         SizedArray<VkPipelineColorBlendAttachmentState> vk_blend_attachments = mBlendAttachments.GetVkAttachments(
-            mBlendAttachments.GetAttachments().Size);
+            color_only_targets.Size);
 
         SizedArray<Ref<ShaderProgram>> shader_list = { mVertexShader, mFragmentShader };
 

@@ -83,7 +83,6 @@ public:
 
     Pipeline PlGeometry;
     Pipeline PlGeometryNoDepthTest;
-    Pipeline PlGeometryWireframe;
     Pipeline PlGeometryWithNormalMaps;
 
     Pipeline PlGeometrySkinned;
@@ -111,7 +110,7 @@ public:
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
     Pipeline PlUnlit;
     Pipeline PlText;
-    Pipeline PlDebugLayer;
+    // Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;
 
     RenderPass RpForward;

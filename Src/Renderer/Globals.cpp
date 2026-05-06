@@ -27,10 +27,12 @@ namespace Globals {
 
 void Init()
 {
+    gPipelineCache = new PipelineCache;
+    gState = new State;
+
     gRenderer = new RenderBackend;
     gShaderCache = new ShaderCache;
     gDescriptorCache = new DescriptorCache;
-    // gState = new State;
 }
 
 void Destroy()
@@ -43,6 +45,9 @@ void Destroy()
     DESTROY_GLOBAL(gDescriptorCache);
     DESTROY_GLOBAL(gShaderCache);
     DESTROY_GLOBAL(gRenderer);
+
+    DESTROY_GLOBAL(gPipelineCache);
+    DESTROY_GLOBAL(gState);
 }
 
 }; // namespace Globals

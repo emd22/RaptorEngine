@@ -73,12 +73,12 @@ bool ShaderCompiler::CompileIfOutOfDate(const char* path, DataPack& pack, const 
 
 #define SHADER_VERSION L"6_7"
 
-static const wchar_t* ShaderTypeToDxName(renderer::eShaderType type)
+static const wchar_t* ShaderTypeToDxName(eShaderType type)
 {
     switch (type) {
-    case renderer::eShaderType::Vertex:
+    case eShaderType::Vertex:
         return L"vs_" SHADER_VERSION;
-    case renderer::eShaderType::Pixel:
+    case eShaderType::Pixel:
         return L"ps_" SHADER_VERSION;
     }
     return L"";
@@ -96,7 +96,7 @@ struct CompileState
 };
 
 
-static CompileResult CompileProgram(const CompileState& state, renderer::eShaderType shader_type)
+static CompileResult CompileProgram(const CompileState& state, eShaderType shader_type)
 {
     constexpr uint32 cCodePage = DXC_CP_UTF8;
 
@@ -196,8 +196,8 @@ ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack
     CComPtr<IDxcIncludeHandler> include_handler;
     utils->CreateDefaultIncludeHandler(&include_handler);
 
-    TRY_COMPILE_PROGRAM(renderer::eShaderType::Vertex);
-    TRY_COMPILE_PROGRAM(renderer::eShaderType::Pixel);
+    TRY_COMPILE_PROGRAM(eShaderType::Vertex);
+    TRY_COMPILE_PROGRAM(eShaderType::Pixel);
 
     return CompileResult::Success;
 }

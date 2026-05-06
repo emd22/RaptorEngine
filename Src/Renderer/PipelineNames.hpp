@@ -4,7 +4,7 @@
 
 namespace fx::renderer {
 
-enum class ePipelineName : uint32
+enum class ePipelineName : uint16
 {
     Geometry,
     GeometryNormalMaps,
@@ -14,6 +14,7 @@ enum class ePipelineName : uint32
     LightingInsideVolume,
     LightingDirectional,
     Unlit,
+    DebugLayer,
 
     TextRendering,
     Composition,
@@ -43,16 +44,16 @@ constexpr const char* GetName(const ePipelineName id)
         PN_READABLE_NAME(LightingInsideVolume);
         PN_READABLE_NAME(LightingDirectional);
         PN_READABLE_NAME(Unlit);
+        PN_READABLE_NAME(DebugLayer);
 
         PN_READABLE_NAME(TextRendering);
         PN_READABLE_NAME(Composition);
 
         PN_READABLE_NAME(ShadowDirectional);
-    default:
-        return "Unknown";
+    default:;
     }
 
-    return "";
+    return "Unknown";
 }
 
 

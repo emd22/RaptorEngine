@@ -38,7 +38,7 @@ public:
     Result() = default;
 
     DataBuffer& GetBuffer() { return ProgramData[static_cast<uint32>(CurrentType)]; }
-    DataBuffer& GetBuffer(renderer::eShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
+    DataBuffer& GetBuffer(eShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
 
     void InsertString(const std::string& str)
     {
@@ -48,7 +48,7 @@ public:
         }
     }
 
-    void SetCurrentShader(renderer::eShaderType type)
+    void SetCurrentShader(eShaderType type)
     {
         bBroadcastToAllPrograms = false;
         CurrentType = type;
@@ -57,7 +57,7 @@ public:
 public:
     std::array<DataBuffer, renderer::ShaderUtil::scNumShaderTypes> ProgramData;
 
-    renderer::eShaderType CurrentType = renderer::eShaderType::Vertex;
+    eShaderType CurrentType = eShaderType::Vertex;
 
     // Before a program definition, broadcast to all
     bool bBroadcastToAllPrograms = true;

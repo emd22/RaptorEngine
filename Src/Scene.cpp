@@ -3,6 +3,7 @@
 #include <Engine.hpp>
 #include <ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 
@@ -137,9 +138,12 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     }
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-    gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
+    // gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
-    renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
+    renderer::Pipeline* pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
+
+    // renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
+    pipeline->Bind(cmd);
 
     DebugLayerPushConstants push_constants {};
 
@@ -160,7 +164,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
             push_constants.DebugColor = debug_color.AsUInt();
         }
 
-        vkCmdPushConstants(cmd.Get(), pipeline.Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
+        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
                            &push_constants);
 
         mpDebugCube->Render(cmd, 1);

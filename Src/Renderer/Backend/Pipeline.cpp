@@ -58,7 +58,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
     for (const Ref<ShaderProgram>& shader_program : shaders) {
         const VkPipelineShaderStageCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = ShaderUtil::ToUnderlyingType(shader_program->ShaderType),
+            .stage = static_cast<VkShaderStageFlagBits>(ShaderUtil::ToUnderlyingType(shader_program->ShaderType)),
             .module = shader_program->Get(),
             .pName = "main",
             .pSpecializationInfo = &specialization_info,
@@ -252,10 +252,14 @@ VkPipelineLayout Pipeline::CreateLayout(const Slice<const PushConstants>& push_c
     for (int i = 0; i < push_constant_defs.Size; i++) {
         const PushConstants& pc_def = push_constant_defs[i];
 
+        if (pc_def.ShaderTypes == static_cast<eShaderType>(0)) {
+            continue;
+        }
+
         LogDebug("Adding push constant (Off={}, Sz={})", current_pc_offset, pc_def.Size);
 
         VkPushConstantRange range {
-            .stageFlags = pc_def.StageFlags,
+            .stageFlags = ShaderUtil::ToUnderlyingType(pc_def.ShaderTypes),
             .offset = current_pc_offset,
             .size = pc_def.Size,
         };
