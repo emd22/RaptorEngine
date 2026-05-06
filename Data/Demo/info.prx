@@ -28,10 +28,16 @@ Objects = {
         Unlit = $True
     }
 
-    Level = {
+    /*Level = {
         Mesh = "/Sponza.glb"
         Scale = 0.01
         Shadows = $True
+        ColliderRef = "Floor"
+        Pos = [0.0, -1.25, 0.0]
+    }*/
+
+    Level = {
+        Mesh = "/TestFloor.glb"
         ColliderRef = "Floor"
         Pos = [0.0, -1.25, 0.0]
     }

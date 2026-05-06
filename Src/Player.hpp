@@ -10,8 +10,8 @@ namespace fx {
 
 class Player
 {
-    const Vec3f scMaxWalkSpeed = Vec3f(8.0f);
-    const Vec3f scMaxSprintSpeed = Vec3f(14.0f);
+    const Vec3f scMaxWalkSpeed = Vec3f(4.0f);
+    const Vec3f scMaxSprintSpeed = Vec3f(6.5f);
 
     static constexpr float32 scMovementLerpSpeed = 10.0f;
 
@@ -111,6 +111,11 @@ public:
 
 private:
     Vec3f mCameraOffset = Vec3f::sZero;
+    float32 mHeadBobX = 0.0f;
+    float32 mHeadBobY = 0.0f;
+    float32 mBobCounterX = 0.0f;
+    float32 mBobCounter = 0.0f;
+
     Vec3f mUserForce = Vec3f::sZero;
 
     bool mbIsApplyingUserForce : 1 = false;

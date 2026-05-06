@@ -76,6 +76,22 @@ void Player::Update(float64 delta_time)
 
     pCamera->MoveTo(Position + mCameraOffset);
 
+    mBobCounter += 12.0f * delta_time;
+    mBobCounterX += 10.5f * delta_time;
+
+    mHeadBobX = 0.005f * sinf(mBobCounterX);
+    mHeadBobY = 0.0025f * cosf(mBobCounter);
+
+    Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
+    pCamera->MoveBy(bob_vector * Physics.mMovementVector.Length());
+
+    if (mBobCounter > FX_PI) {
+        mBobCounter = -FX_PI;
+    }
+    if (mBobCounterX > FX_PI) {
+        mBobCounterX = -FX_PI;
+    }
+
     if (!mUserForce.IsNearZero(0.1)) {
         if (bIsSprinting && pCamera->GetFov() < scSprintFov) {
             pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scSprintFov, 8.0f, delta_time));
