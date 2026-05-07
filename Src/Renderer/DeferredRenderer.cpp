@@ -7,6 +7,7 @@
 #include "Engine.hpp"
 #include "Globals.hpp"
 #include "PipelineBuilder.hpp"
+#include "PipelineCache.hpp"
 #include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
 #include "State.hpp"
@@ -122,24 +123,24 @@ VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
     }
 
 
-    StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
-        DsLayoutGPassSkinned,
-        DsLayoutLightingMaterialProperties,
-        gObjectManager->DsLayoutObjectBuffer,
-    };
+    // StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+    //     DsLayoutGPassSkinned,
+    //     DsLayoutLightingMaterialProperties,
+    //     gObjectManager->DsLayoutObjectBuffer,
+    // };
 
-    StackArray<PushConstants, 1> push_consts = {
-        PushConstants {
-            .Size = sizeof(DrawPushConstants),
-            .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
-        },
-    };
+    // StackArray<PushConstants, 1> push_consts = {
+    //     PushConstants {
+    //         .Size = sizeof(DrawPushConstants),
+    //         .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
+    //     },
+    // };
 
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
+    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
 
-    Util::SetDebugLabel("Geometry(Skinned) PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+    // Util::SetDebugLabel("Geometry(Skinned) PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
-    return layout;
+    return nullptr;
 }
 
 VkPipelineLayout DeferredRenderer::CreateUnlitPipelineLayout()
@@ -222,15 +223,31 @@ void DeferredRenderer::CreateUnlitPipeline()
     RpForward.Create(targets, Target::scFullScreen);
     FbForward.Create(targets.GetImageViews(), RpForward, Target::scFullScreen);
 
-    builder.SetLayout(layout)
-        .SetName("Unlit Pipeline")
-        .SetOutputTargets(&targets)
-        .SetShaders(vertex_shader, pixel_shader)
-        .SetRenderPass(&RpForward)
-        .SetVertexDescription(&vertex_info)
-        .SetCullMode(VK_CULL_MODE_BACK_BIT)
-        .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    builder.Build(PlUnlit);
+    // builder.SetLayout(layout)
+    //     .SetName("Unlit Pipeline")
+    //     .SetOutputTargets(&targets)
+    //     .SetShaders(vertex_shader, pixel_shader)
+    //     .SetRenderPass(&RpForward)
+    //     .SetVertexDescription(&vertex_info)
+    //     .SetCullMode(VK_CULL_MODE_BACK_BIT)
+    //     .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    // builder.Build(PlUnlit);
+
+    // Unlit pipeline
+    gState->BeginPipeline(ePipelineName::Unlit);
+    gState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+    // Descriptors
+    gState->AddDescriptor(DsLayoutGPassMaterial);
+    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+
+    gState->SetShader(eShaderName::Unlit, {});
+    gState->SetOutputTargets(&targets);
+    gState->SetRenderPass(&RpForward);
+    gState->SetVertexType(eVertexType::Default);
+    gState->SetCullMode(eCullMode::Back);
+
+    gState->EndPipeline();
 
     {
         Ref<Shader> shader_text = gShaderCache->Request(eShaderName::Text);
@@ -249,6 +266,7 @@ void DeferredRenderer::CreateUnlitPipeline()
     }
 
 
+    // Debug Layer pipeline
     gState->BeginPipeline(ePipelineName::DebugLayer);
     gState->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
     gState->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
@@ -284,7 +302,7 @@ void DeferredRenderer::CreateUnlitPipeline()
 
 void DeferredRenderer::CreateGPassPipeline()
 {
-    VkPipelineLayout gpass_layout = CreateGPassPipelineLayout();
+    CreateGPassPipelineLayout();
 
     CreateGPass();
 
@@ -297,57 +315,84 @@ void DeferredRenderer::CreateGPassPipeline()
         // gState->EndPipeline();
     }
 
-    Ref<Shader> shader_geometry = gShaderCache->Request(eShaderName::Geometry);
-    Ref<ShaderProgram> vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, {});
-    Ref<ShaderProgram> fragment_shader = shader_geometry->GetProgram(eShaderType::Pixel, {});
+    // Ref<Shader> shader_geometry = gShaderCache->Request(eShaderName::Geometry);
+    // Ref<ShaderProgram> vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, {});
+    // Ref<ShaderProgram> fragment_shader = shader_geometry->GetProgram(eShaderType::Pixel, {});
 
-    VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
+    // VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
 
-    PipelineBuilder builder;
+    // PipelineBuilder builder;
 
-    builder.SetLayout(gpass_layout)
-        .SetName("Geometry Pipeline")
-        .SetOutputTargets(&GPass.GetTargets())
-        .SetShaders(vertex_shader, fragment_shader)
-        .SetRenderPass(&GPass.GetRenderPass())
-        .SetVertexDescription(&vertex_info)
-        .SetCullMode(VK_CULL_MODE_BACK_BIT)
-        .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    // builder.SetLayout(gpass_layout)
+    //     .SetName("Geometry Pipeline")
+    //     .SetOutputTargets(&GPass.GetTargets())
+    //     .SetShaders(vertex_shader, fragment_shader)
+    //     .SetRenderPass(&GPass.GetRenderPass())
+    //     .SetVertexDescription(&vertex_info)
+    //     .SetCullMode(VK_CULL_MODE_BACK_BIT)
+    //     .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
-    builder.SetPolygonMode(VK_POLYGON_MODE_FILL).Build(PlGeometry);
+    gState->BeginPipeline(ePipelineName::Geometry);
+    // Descriptors
+    gState->AddDescriptor(DsLayoutGPassMaterial);
+    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+    gState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
-    // Create geometry pipeline with normal maps
-    {
-        SizedArray<ShaderMacro> normal_mapped_macros { ShaderMacro { "USE_NORMAL_MAPS", "1" } };
+    gState->UseRenderStage(GPass);
+    gState->SetShader(eShaderName::Geometry, {});
+    gState->SetVertexType(eVertexType::Default);
+    gState->SetCullMode(eCullMode::Back);
 
-        Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, normal_mapped_macros);
+    gState->EndPipeline();
 
-        Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(eShaderType::Pixel, normal_mapped_macros);
 
-        builder.SetPolygonMode(VK_POLYGON_MODE_FILL)
-            .SetShaders(nm_vertex_shader, nm_fragment_shader)
-            .Build(PlGeometryWithNormalMaps);
-    }
+    // Normal mapped pipeline
+    gState->BeginPipeline(ePipelineName::GeometryNormalMaps);
+    // Use previous layout
+    gState->SetLayout(ePipelineName::Geometry);
 
-    {
-        vertex_info = VertexUtil::BuildDescription<eVertexType::Skinned>();
+    gState->UseRenderStage(GPass);
+    gState->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+    gState->SetVertexType(eVertexType::Default);
+    gState->SetCullMode(eCullMode::Back);
 
-        SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_NORMAL_MAPS", "1" },
-                                           ShaderMacro { "USE_SKINNING", "1" } };
+    gState->EndPipeline();
 
-        Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, macros);
-        Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(eShaderType::Pixel, macros);
+    CreateGPassSkinnedPipelineLayout();
 
-        VkPipelineLayout skinned_layout = CreateGPassSkinnedPipelineLayout();
+    // Skinned + Normal mapped pipeline
+    gState->BeginPipeline(ePipelineName::GeometrySkinned);
+    gState->AddDescriptor(DsLayoutGPassSkinned);
+    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+    gState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
-        builder.SetLayout(skinned_layout)
-            .SetPolygonMode(VK_POLYGON_MODE_FILL)
-            .SetVertexDescription(&vertex_info)
-            .SetShaders(nm_vertex_shader, nm_fragment_shader)
-            .Build(PlGeometrySkinned);
-    }
+    gState->UseRenderStage(GPass);
+    gState->SetVertexType(eVertexType::Skinned);
+    gState->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
+                                               ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
+    gState->SetCullMode(eCullMode::Back);
+    gState->EndPipeline();
 
-    pGeometryPipeline = &PlGeometry;
+    // {
+    //     vertex_info = VertexUtil::BuildDescription<eVertexType::Skinned>();
+
+    //     SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_NORMAL_MAPS", "1" },
+    //                                        ShaderMacro { "USE_SKINNING", "1" } };
+
+    //     Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, macros);
+    //     Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(eShaderType::Pixel, macros);
+
+
+    //     builder.SetLayout(skinned_layout)
+    //         .SetPolygonMode(VK_POLYGON_MODE_FILL)
+    //         .SetVertexDescription(&vertex_info)
+    //         .SetShaders(nm_vertex_shader, nm_fragment_shader)
+    //         .Build(PlGeometrySkinned);
+    // }
+
+    pGeometryPipeline = gPipelineCache->Request(ePipelineName::Geometry);
 }
 
 void DeferredRenderer::DestroyGPassPipeline()
@@ -369,12 +414,14 @@ void DeferredRenderer::DestroyGPassPipeline()
         DsLayoutGPassMaterialAlbedoOnly = nullptr;
     }
 
-    PlGeometry.Destroy();
+    // PlGeometry.Destroy();
+    gPipelineCache->Request(ePipelineName::Geometry)->Destroy();
+    gPipelineCache->Request(ePipelineName::GeometryNormalMaps)->Destroy();
 
-    PlGeometryWithNormalMaps.Layout = nullptr;
-    PlGeometryWithNormalMaps.Destroy();
+    // PlGeometryWithNormalMaps.Layout = nullptr;
+    // PlGeometryWithNormalMaps.Destroy();
 
-    PlGeometrySkinned.Destroy();
+    // PlGeometrySkinned.Destroy();
 }
 
 

@@ -109,12 +109,14 @@ public:
 
     bool bIsSprinting : 1 = false;
 
+    bool bEnableHeadBob : 1 = true;
+
 private:
     Vec3f mCameraOffset = Vec3f::sZero;
     float32 mHeadBobX = 0.0f;
     float32 mHeadBobY = 0.0f;
     float32 mBobCounterX = 0.0f;
-    float32 mBobCounter = 0.0f;
+    float32 mBobCounterY = 0.0f;
 
     Vec3f mUserForce = Vec3f::sZero;
 

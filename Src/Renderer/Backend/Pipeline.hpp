@@ -119,6 +119,7 @@ public:
                 const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
                 VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
 
+
     FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout)
     {
         Layout = layout;

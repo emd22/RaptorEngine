@@ -5,6 +5,7 @@
 
 #include <ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 
 namespace fx {
@@ -94,15 +95,18 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
     }
 
     FrameData* frame = gRenderer->GetFrame();
-    Ref<DeferredRenderer>& deferred = gRenderer->pDeferredRenderer;
 
     DrawPushConstants push_constants {};
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     push_constants.ObjectId = ObjectId;
 
-    vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, deferred->PlGeometry.Layout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                       &push_constants);
+    Pipeline* pl = gPipelineCache->Request(ePipelineName::Geometry);
+
+    gRenderer->SubmitPushConstants(frame->CommandBuffer, *pl, eShaderType::Vertex | eShaderType::Pixel, push_constants);
+
+    // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pl->Layout,
+    //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
+    //                    &push_constants);
 
     mpDebugMesh->Render(frame->CommandBuffer, 1);
 }

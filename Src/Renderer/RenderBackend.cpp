@@ -20,6 +20,7 @@
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/State.hpp>
 #include <thread>
 #include <vector>
@@ -405,6 +406,21 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
     return mAvailableExtensions;
 }
 
+void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+                                           const void* data, uint32 data_size) const
+{
+    DebugAssert(pipeline.Layout != nullptr);
+
+    // Currently, there is nowhere in the engine that requires two separate PC buffers and therefore requires an offset.
+    // As well, the small required size of a PC kind of makes this useless. For now, we will ignore this and if needed
+    // there will be an updated version of this function.
+    // I'm pretty sure when I was using Slang I had one shader that required this, but thats since been cacked..
+    static constexpr uint32 scOffset = 0;
+    vkCmdPushConstants(cmd.Get(), pipeline.Layout, ShaderUtil::ToUnderlyingType(shader_types), scOffset, data_size,
+                       data);
+}
+
+
 void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
 {
     CommandBuffer& cmd = UploadContext.CommandBuffer;
@@ -600,7 +616,8 @@ void RenderBackend::BeginUnlit()
     pDeferredRenderer->RpForward.Begin(&frame->CommandBuffer, pDeferredRenderer->FbForward.Get(),
                                        Slice<VkClearValue>({}, 0));
 
-    pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
+    // pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
+    gPipelineCache->Request(ePipelineName::Unlit)->Bind(frame->CommandBuffer);
 }
 
 void RenderBackend::DoComposition(Camera& render_cam)

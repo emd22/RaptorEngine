@@ -19,6 +19,7 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <csignal>
@@ -81,6 +82,8 @@ void FoxtrotGame::InitEngine()
 
     Ref<Window> window = Window::New(window_entry->GetMember(HashStr32("Title"))->Get<const char*>(),
                                      Vec2i(window_width, window_height));
+
+    Player.bEnableHeadBob = static_cast<bool>(Config.GetEntryValue<int32>(HashStr32("EnableHeadBob"), 1));
 
     gRenderer->SelectWindow(window);
     gRenderer->Init(Vec2u(window_width, window_height));
@@ -145,14 +148,15 @@ void FoxtrotGame::CreateFontObject()
     Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
     object->pMesh = quad->AsMesh(eVertexType::Default);
 
-    TSRef<Material> material = gMaterialManager->New("Font material", &gRenderer->pDeferredRenderer->PlUnlit, false);
+    TSRef<Material> material = gMaterialManager->New("Font material", gPipelineCache->Request(ePipelineName::Unlit),
+                                                     false);
     TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
                                                     FX_BASE_DIR "/DefaultFont.png");
     material->Attach(Material::eResourceType::Diffuse, image);
     object->pMaterial = material;
 
     object->SetRenderUnlit(true);
-    object->SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
+    object->SetGraphicsPipeline(gPipelineCache->Request(ePipelineName::Unlit));
 
     object->MarkReadyToRender();
 

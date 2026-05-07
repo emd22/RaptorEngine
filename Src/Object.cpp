@@ -12,6 +12,7 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Scene.hpp>
@@ -76,7 +77,7 @@ bool Object::CheckIfReady()
     Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
 
     if (pMesh->VertexList.IsSkinned()) {
-        pMaterial->pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
+        pMaterial->pPipeline = gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 
     return (Flags |= (eObjectFlags::ReadyToRender)) != 0;
@@ -173,23 +174,20 @@ void Object::OnAttached(Scene* scene)
 
 void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 {
-    LogInfo("QUEUED PIPELINE UPDATE");
-
-    if (pipeline == &gRenderer->pDeferredRenderer->PlUnlit) {
-        LogInfo("SETTING TO TEXT THING 1");
-    }
-
     OnLoaded(
         [pipeline, update_children](TSRef<AxBase> base_asset)
         {
-            LogInfo("*** UPDATED PIPELINE");
-            if (pipeline == &gRenderer->pDeferredRenderer->PlUnlit) {
-                LogInfo("SETTING TO TEXT THING 2");
-            }
             TSRef<Object> asset = base_asset;
 
+            const bool should_set_default = (pipeline == nullptr);
+
             if (asset->pMaterial) {
-                asset->pMaterial->pPipeline = pipeline;
+                if (should_set_default) {
+                    asset->pMaterial->SetDefaultPipeline();
+                }
+                else {
+                    asset->pMaterial->pPipeline = pipeline;
+                }
             }
 
             if (update_children) {
@@ -198,7 +196,12 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
                         continue;
                     }
 
-                    node->pMaterial->pPipeline = pipeline;
+                    if (should_set_default) {
+                        asset->pMaterial->SetDefaultPipeline();
+                    }
+                    else {
+                        node->pMaterial->pPipeline = pipeline;
+                    }
                 }
             }
         });
@@ -336,7 +339,7 @@ void Object::RenderUnlit(const Camera& camera)
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(GetObjectLayer()).RawData, sizeof(Mat4f));
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-    Pipeline* pipeline = &gRenderer->pDeferredRenderer->PlUnlit;
+    Pipeline* pipeline = gPipelineCache->Request(ePipelineName::Unlit);
     if (pMaterial && pMaterial->pPipeline) {
         pipeline = pMaterial->pPipeline;
     }
@@ -514,11 +517,12 @@ void Object::SyncObjectWithPhysics(PhObject* phys)
 void Object::SetRenderUnlit(const bool value)
 {
     if (value) {
-        SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
+        SetGraphicsPipeline(gPipelineCache->Request(ePipelineName::Unlit));
         Flags |= eObjectFlags::Unlit;
     }
     else {
-        SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps);
+        // Set to default graphics pipeline
+        SetGraphicsPipeline(nullptr);
         Flags &= (~eObjectFlags::Unlit);
     }
 }

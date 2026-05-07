@@ -81,11 +81,11 @@ public:
 
     RenderStage GPass;
 
-    Pipeline PlGeometry;
+    // Pipeline PlGeometry;
     Pipeline PlGeometryNoDepthTest;
-    Pipeline PlGeometryWithNormalMaps;
+    // Pipeline PlGeometryWithNormalMaps;
 
-    Pipeline PlGeometrySkinned;
+    // Pipeline PlGeometrySkinned;
 
     Pipeline* pGeometryPipeline = nullptr;
 
@@ -108,7 +108,6 @@ public:
     // Forward pass / Unlit
     /////////////////////////////////////////////////
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
-    Pipeline PlUnlit;
     Pipeline PlText;
     // Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;

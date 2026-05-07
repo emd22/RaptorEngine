@@ -96,6 +96,14 @@ public:
     uint32 GetImageIndex() const { return mImageIndex; }
     VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
 
+    template <typename T>
+    void SubmitPushConstants(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+                             const T& value) const
+    {
+        SubmitPushConstantsRaw(cmd, pipeline, shader_types, &value, sizeof(T));
+    }
+
+
     void SubmitUploadCmd(SubmitFunc func);
     void SubmitOneTimeCmd(SubmitFunc func);
 
@@ -174,6 +182,9 @@ private:
     ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
     ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
+
+    void SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+                                const void* data, uint32 data_size) const;
 
     SizedArray<VkLayerProperties> GetAvailableValidationLayers();
 

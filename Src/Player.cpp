@@ -76,20 +76,22 @@ void Player::Update(float64 delta_time)
 
     pCamera->MoveTo(Position + mCameraOffset);
 
-    mBobCounter += 12.0f * delta_time;
-    mBobCounterX += 10.5f * delta_time;
+    if (bEnableHeadBob && Physics.bIsGrounded) {
+        mBobCounterY += 12.0f * delta_time;
+        mBobCounterX += 10.5f * delta_time;
 
-    mHeadBobX = 0.005f * sinf(mBobCounterX);
-    mHeadBobY = 0.0025f * cosf(mBobCounter);
+        mHeadBobX = 0.005f * sinf(mBobCounterX);
+        mHeadBobY = 0.0025f * cosf(mBobCounterY);
 
-    Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
-    pCamera->MoveBy(bob_vector * Physics.mMovementVector.Length());
+        Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
+        pCamera->MoveBy(bob_vector * mUserForce.Length());
 
-    if (mBobCounter > FX_PI) {
-        mBobCounter = -FX_PI;
-    }
-    if (mBobCounterX > FX_PI) {
-        mBobCounterX = -FX_PI;
+        if (mBobCounterY > FX_PI) {
+            mBobCounterY = -FX_PI;
+        }
+        if (mBobCounterX > FX_PI) {
+            mBobCounterX = -FX_PI;
+        }
     }
 
     if (!mUserForce.IsNearZero(0.1)) {

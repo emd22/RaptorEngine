@@ -4,6 +4,7 @@
 #include "Backend/VertexDescription.hpp"
 #include "Globals.hpp"
 #include "PipelineCache.hpp"
+#include "RenderStage.hpp"
 #include "ShaderCache.hpp"
 
 namespace fx::renderer {
@@ -11,7 +12,10 @@ namespace fx::renderer {
 void State::BeginPipeline(ePipelineName pipeline)
 {
     mpPipeline = gPipelineCache->Request(pipeline);
-    mDescriptors.InitCapacity(10);
+
+    if (!mDescriptors.IsInited()) {
+        mDescriptors.InitCapacity(10);
+    }
 }
 
 void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
@@ -21,8 +25,14 @@ void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& ma
     mpPixelShader = shader->GetProgram(eShaderType::Pixel, macros);
 }
 
+void State::UseRenderStage(RenderStage& stage)
+{
+    SetOutputTargets(&stage.GetTargets());
+    SetRenderPass(&stage.GetRenderPass());
+}
 
 void State::SetLayout(VkPipelineLayout layout) { mpPipeline->SetLayout(layout); }
+void State::SetLayout(ePipelineName other_pl) { mpPipeline->SetLayout(gPipelineCache->Request(other_pl)->Layout); }
 
 void State::BuildPipeline()
 {
@@ -59,10 +69,10 @@ void State::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_att
 
 void State::SetPushConstants(eShaderType type, uint32 pc_size)
 {
-    mPushConstants.MarkFull();
-    PushConstants& pc = mPushConstants[static_cast<uint32>(type)];
-    pc.ShaderTypes = type;
-    pc.Size = pc_size;
+    PushConstants* pc = mPushConstants.Insert();
+
+    pc->ShaderTypes = type;
+    pc->Size = pc_size;
 }
 
 
@@ -73,6 +83,7 @@ VkPipelineLayout State::BuildLayout()
     return layout;
 }
 
+void State::AddDescriptor(VkDescriptorSetLayout layout) { mDescriptors.Insert(layout); }
 
 void State::SetRenderPass(RenderPass* renderpass) { mpRenderPass = renderpass; }
 

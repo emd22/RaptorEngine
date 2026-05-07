@@ -11,6 +11,7 @@
 namespace fx::renderer {
 
 class RenderPass;
+class RenderStage;
 
 class State
 {
@@ -25,12 +26,18 @@ public:
      * @brief Sets the pipeline layout from a preexisting layout.
      */
     void SetLayout(VkPipelineLayout layout);
+    /**
+     * @brief Sets the pipeline layout to the layout used by pipeline `other_pl`
+     */
+    void SetLayout(ePipelineName other_pl);
+
     void SetPushConstants(eShaderType shader_type, uint32 pc_size);
     void AddDescriptor(VkDescriptorSetLayout layout);
     VkPipelineLayout BuildLayout();
 
     void SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment);
     void SetOutputTargets(TargetList* targets);
+    void UseRenderStage(RenderStage& stage);
 
     void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
     void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
