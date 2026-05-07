@@ -30,14 +30,14 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
     if (node->NodeType == FX_AST_BLOCK) {
         puts("[BLOCK]");
 
-        FoxAstBlock* block = reinterpret_cast<FoxAstBlock*>(node);
+        FoxAstBlock* block = static_cast<FoxAstBlock*>(node);
         for (FoxAstNode* child : block->Statements) {
             Print(child, depth + 1);
         }
         return;
     }
     else if (node->NodeType == FX_AST_PROCDECL) {
-        FoxAstFunctionDecl* functiondecl = reinterpret_cast<FoxAstFunctionDecl*>(node);
+        FoxAstFunctionDecl* functiondecl = static_cast<FoxAstFunctionDecl*>(node);
         printf("[PROCDECL] ");
         functiondecl->pNameToken->Print();
 
@@ -48,7 +48,7 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         Print(functiondecl->pBlock, depth + 1);
     }
     else if (node->NodeType == FX_AST_VARDECL) {
-        FoxAstVarDecl* vardecl = reinterpret_cast<FoxAstVarDecl*>(node);
+        FoxAstVarDecl* vardecl = static_cast<FoxAstVarDecl*>(node);
 
         printf("[VARDECL] ");
         vardecl->pNameToken->Print();
@@ -56,7 +56,7 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         Print(vardecl->pAssignment, depth + 1);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
-        FoxAstAssign* assign = reinterpret_cast<FoxAstAssign*>(node);
+        FoxAstAssign* assign = static_cast<FoxAstAssign*>(node);
 
         printf("[ASSIGN] ");
 
@@ -64,7 +64,7 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         Print(assign->Rhs, depth + 1);
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
-        FoxAstFunctionCall* functioncall = reinterpret_cast<FoxAstFunctionCall*>(node);
+        FoxAstFunctionCall* functioncall = static_cast<FoxAstFunctionCall*>(node);
 
         printf("[PROCCALL] ");
         if (functioncall->pFunction == nullptr) {
@@ -77,13 +77,13 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         printf(" (%zu params)\n", functioncall->Params.size());
     }
     else if (node->NodeType == FX_AST_LITERAL) {
-        FoxAstLiteral* literal = reinterpret_cast<FoxAstLiteral*>(node);
+        FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
 
         printf("[LITERAL] ");
         literal->Value.Print();
     }
     else if (node->NodeType == FX_AST_BINOP) {
-        FoxAstBinop* binop = reinterpret_cast<FoxAstBinop*>(node);
+        FoxAstBinop* binop = static_cast<FoxAstBinop*>(node);
 
         printf("[BINOP] ");
         binop->OpToken->Print();
@@ -92,13 +92,13 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         Print(binop->pRight, depth + 1);
     }
     else if (node->NodeType == FX_AST_COMMANDMODE) {
-        FoxAstCommandMode* command_mode = reinterpret_cast<FoxAstCommandMode*>(node);
+        FoxAstCommandMode* command_mode = static_cast<FoxAstCommandMode*>(node);
         printf("[COMMANDMODE]\n");
 
         Print(command_mode->Node, depth + 1);
     }
     else if (node->NodeType == FX_AST_RETURN) {
-        FoxAstReturn* return_node = reinterpret_cast<FoxAstReturn*>(node);
+        FoxAstReturn* return_node = static_cast<FoxAstReturn*>(node);
 
         puts("[RETURN]");
 
@@ -107,7 +107,7 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         }
     }
     else if (node->NodeType == FX_AST_IF) {
-        FoxAstIf* if_block = reinterpret_cast<FoxAstIf*>(node);
+        FoxAstIf* if_block = static_cast<FoxAstIf*>(node);
 
         puts("[IF]");
 

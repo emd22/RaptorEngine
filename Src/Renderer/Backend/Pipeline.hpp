@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 
 #include <Core/Ref.hpp>
+#include <Core/RefCountedBase.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
 #include <Renderer/Vertex.hpp>
@@ -108,6 +109,38 @@ struct PushConstants
     eShaderType ShaderTypes;
 };
 
+class PipelineLayout : public RefCountedBase
+{
+public:
+    PipelineLayout() = default;
+
+    PipelineLayout(const PipelineLayout& other);
+
+    PipelineLayout(const Slice<const PushConstants>& push_constant_defs,
+                   const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
+    {
+        Create(push_constant_defs, descriptor_set_layouts);
+    }
+
+    void Create(const Slice<const PushConstants>& push_constant_defs,
+                const Slice<VkDescriptorSetLayout>& descriptor_set_layouts);
+
+
+    FX_FORCE_INLINE VkPipelineLayout Get() const { return InternalLayout; }
+    FX_FORCE_INLINE bool IsValid() const { return InternalLayout != nullptr; }
+
+    PipelineLayout& operator=(const PipelineLayout& other);
+
+    void DestroyObject() override;
+
+    ~PipelineLayout() = default;
+
+public:
+    VkPipelineLayout InternalLayout = nullptr;
+
+    StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstDefs;
+};
+
 
 class Pipeline
 {
@@ -120,35 +153,31 @@ public:
                 VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
 
 
-    FX_FORCE_INLINE void SetLayout(VkPipelineLayout layout)
+    FX_FORCE_INLINE void SetLayout(PipelineLayout layout)
     {
-        Layout = layout;
+        Layout2 = layout;
 
         // Layout is referenced from another pipeline or modified externally, do not destroy
         mbDoNotDestroyLayout = true;
     }
 
-    FX_FORCE_INLINE bool HasLayout() const { return Layout != nullptr; }
-
-    static VkPipelineLayout CreateLayout(const Slice<const PushConstants>& push_constant_defs,
-                                         const Slice<VkDescriptorSetLayout>& descriptor_set_layouts);
-
-    void Destroy();
+    FX_FORCE_INLINE bool HasLayout() const { return Layout2.IsValid(); }
 
     void Bind(const CommandBuffer& command_buffer);
 
+    void Destroy();
     ~Pipeline() { Destroy(); }
 
 private:
 public:
-    VkPipelineLayout Layout = nullptr;
+    // VkPipelineLayout Layout = nullptr;
+    PipelineLayout Layout2;
     VkPipeline InternalPipeline = nullptr;
 
     String Name;
 
-    // XXX: TEMP
     Ref<ShaderProgram> VertexShader { nullptr };
-    Ref<ShaderProgram> FragmentShader { nullptr };
+    Ref<ShaderProgram> PixelShader { nullptr };
 
 private:
     GpuDevice* mDevice = nullptr;

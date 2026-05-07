@@ -9,6 +9,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineBuilder.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Renderer/State.hpp>
 
 namespace fx::renderer {
 
@@ -34,7 +35,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
         PushConstants { .Size = sizeof(ShadowPushConstants), .ShaderTypes = eShaderType::Vertex },
     };
 
-    VkPipelineLayout pipeline_layout = Pipeline::CreateLayout(Slice(push_consts), Slice(desc_sets));
+    PipelineLayout pipeline_layout = PipelineLayout(Slice(push_consts), Slice(desc_sets));
 
     Shader shader_shadow("Shadows");
     VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
@@ -60,6 +61,11 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
     builder.Build(mPipeline);
+
+    // gState->BeginPipeline(ePipelineName::ShadowDirectional);
+
+
+    // gState->EndPipeline();
 
     {
         SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_SKINNING", "1" } };

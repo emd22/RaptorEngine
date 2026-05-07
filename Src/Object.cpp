@@ -281,9 +281,13 @@ void Object::Render(const Camera& camera)
     }
 
     if (pMaterial && CheckIfReady()) {
-        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                           &push_constants);
+        // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
+        //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
+        //                    &push_constants);
+
+        gRenderer->SubmitPushConstants(frame->CommandBuffer, *pMaterial->pPipeline,
+                                       eShaderType::Vertex | eShaderType::Pixel, push_constants);
+
 
         RenderMesh();
     }
@@ -309,9 +313,8 @@ void Object::Render(const Camera& camera)
         push_constants.ObjectId = ObjectId;
         push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
 
-        vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, obj->pMaterial->pPipeline->Layout,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                           &push_constants);
+        gRenderer->SubmitPushConstants(frame->CommandBuffer, *obj->pMaterial->pPipeline,
+                                       eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
         obj->RenderMesh();
     }
@@ -350,8 +353,7 @@ void Object::RenderUnlit(const Camera& camera)
         push_constants.ObjectId = ObjectId;
         push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
 
-        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                           sizeof(push_constants), &push_constants);
+        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
 
         bool material_bound = pMaterial->BindWithPipeline(cmd, *pipeline, false);
@@ -395,9 +397,7 @@ void Object::RenderUnlit(const Camera& camera)
         push_constants.ObjectId = ObjectId;
         push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
 
-        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                           sizeof(push_constants), &push_constants);
-
+        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
         bool material_bound = obj->pMaterial->BindWithPipeline(cmd, *pipeline, false);
         if (!material_bound) {

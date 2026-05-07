@@ -26,6 +26,17 @@ public:
         }
     }
 
+    StackArray<T, TCapacity>& operator=(const StackArray<T, TCapacity>& other)
+    {
+        Clear();
+
+        for (uint32 i = 0; i < other.Size; i++) {
+            Insert(other.pData[i]);
+        }
+
+        return *this;
+    }
+
     T* Insert(const T& value)
     {
         if (Size >= Capacity) {

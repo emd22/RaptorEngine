@@ -47,7 +47,7 @@ public:
         return *this;
     }
 
-    FX_FORCE_INLINE PipelineBuilder& SetLayout(VkPipelineLayout layout)
+    FX_FORCE_INLINE PipelineBuilder& SetLayout(PipelineLayout layout)
     {
         // This is a new pipeline
         mbDidFirstBuild = false;
@@ -105,7 +105,7 @@ public:
 
         SizedArray<Ref<ShaderProgram>> shader_list = { mVertexShader, mFragmentShader };
 
-        pipeline.Layout = mLayout;
+        pipeline.Layout2 = mLayout;
 
         pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetDescriptions(), vk_blend_attachments,
                         mVertexInfo, *mRenderPass, mProperties);
@@ -121,7 +121,7 @@ private:
     BlendAttachmentList mBlendAttachments;
     TargetList* mpAttachmentList = nullptr;
 
-    VkPipelineLayout mLayout = nullptr;
+    PipelineLayout mLayout;
 
     std::string mPipelineName = "Unnamed Pipeline";
 

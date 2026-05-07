@@ -31,8 +31,8 @@ void State::UseRenderStage(RenderStage& stage)
     SetRenderPass(&stage.GetRenderPass());
 }
 
-void State::SetLayout(VkPipelineLayout layout) { mpPipeline->SetLayout(layout); }
-void State::SetLayout(ePipelineName other_pl) { mpPipeline->SetLayout(gPipelineCache->Request(other_pl)->Layout); }
+void State::SetLayout(const PipelineLayout& layout) { mpPipeline->SetLayout(layout); }
+void State::SetLayout(ePipelineName other_pl) { mpPipeline->SetLayout(gPipelineCache->Request(other_pl)->Layout2); }
 
 void State::BuildPipeline()
 {
@@ -51,13 +51,19 @@ void State::BuildPipeline()
         return;
     }
 
+    VertexDescription* vertex_ptr = nullptr;
     VertexDescription vertex_desc = VertexUtil::BuildDescription(mVertexType);
+
+    // If there is no `NoVertices` flag set, use the built vertex description.
+    if ((mFlags & eStateFlags::NoVertices) == 0) {
+        vertex_ptr = &vertex_desc;
+    }
 
     // Since the blend attachments apply _only_ to colour targets, we want to get the amount of non-depth targets.
     SizedArray<Target> color_only_targets = pOutputTargets->GetTargetByType(eImageAspectFlag::Color);
 
     mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, pOutputTargets->GetDescriptions(),
-                       BlendAttachments.GetVkAttachments(color_only_targets.Size), &vertex_desc, *mpRenderPass,
+                       BlendAttachments.GetVkAttachments(color_only_targets.Size), vertex_ptr, *mpRenderPass,
                        mProperties);
 }
 
@@ -76,10 +82,10 @@ void State::SetPushConstants(eShaderType type, uint32 pc_size)
 }
 
 
-VkPipelineLayout State::BuildLayout()
+PipelineLayout State::BuildLayout()
 {
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(mPushConstants), Slice(mDescriptors));
-    mpPipeline->Layout = layout;
+    PipelineLayout layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
+    mpPipeline->Layout2 = layout;
     return layout;
 }
 
@@ -106,6 +112,7 @@ void State::Reset()
     memset(mPushConstants.pData, 0, mPushConstants.GetSizeInBytes());
 
     mProperties = PipelineProperties {};
+    mFlags = eStateFlags::None;
 }
 
 } // namespace fx::renderer

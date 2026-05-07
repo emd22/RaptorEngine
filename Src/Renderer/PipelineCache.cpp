@@ -9,4 +9,9 @@ Pipeline* PipelineCache::Request(const ePipelineName id)
     return pipeline;
 }
 
+void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd)
+{
+    mCache[static_cast<uint32>(name)].Bind(cmd);
+}
+
 } // namespace fx::renderer

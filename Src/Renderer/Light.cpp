@@ -61,8 +61,10 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 
         push_constants.ObjectId = ObjectId;
 
-        vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(push_constants), &push_constants);
+        gRenderer->SubmitPushConstants(frame->CommandBuffer, *pPipeline, eShaderType::Vertex, push_constants);
+
+        // vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+        //                    sizeof(push_constants), &push_constants);
     }
 
 
@@ -120,8 +122,8 @@ void LightBase::SetRadius(const float radius)
 
 LightPoint::LightPoint()
 {
-    pPipelineInside = &gRenderer->pDeferredRenderer->PlLightingInsideVolume;
-    pPipelineOutside = &gRenderer->pDeferredRenderer->PlLightingOutsideVolume;
+    pPipelineInside = gPipelineCache->Request(ePipelineName::LightingInsideVolume);
+    pPipelineOutside = gPipelineCache->Request(ePipelineName::LightingOutsideVolume);
 
     Type = eLightType::Point;
 }
@@ -129,7 +131,7 @@ LightPoint::LightPoint()
 
 LightDirectional::LightDirectional()
 {
-    pPipeline = &gRenderer->pDeferredRenderer->PlLightingDirectional;
+    pPipeline = gPipelineCache->Request(ePipelineName::LightingDirectional);
 
     Type = eLightType::Directional;
 }
@@ -151,8 +153,10 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 
         push_constants.ObjectId = ObjectId;
 
-        vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(push_constants), &push_constants);
+        // vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+        //                    sizeof(push_constants), &push_constants);
+
+        gRenderer->SubmitPushConstants(frame->CommandBuffer, *pPipeline, eShaderType::Vertex, push_constants);
     }
 
     gRenderer->ShaderUniform.Rewind();

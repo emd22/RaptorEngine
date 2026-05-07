@@ -80,6 +80,7 @@ static const wchar_t* ShaderTypeToDxName(eShaderType type)
         return L"vs_" SHADER_VERSION;
     case eShaderType::Pixel:
         return L"ps_" SHADER_VERSION;
+    default:;
     }
     return L"";
 }

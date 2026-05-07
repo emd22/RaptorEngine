@@ -409,15 +409,15 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
                                            const void* data, uint32 data_size) const
 {
-    DebugAssert(pipeline.Layout != nullptr);
+    DebugAssert(pipeline.Layout2.IsValid());
 
     // Currently, there is nowhere in the engine that requires two separate PC buffers and therefore requires an offset.
     // As well, the small required size of a PC kind of makes this useless. For now, we will ignore this and if needed
     // there will be an updated version of this function.
     // I'm pretty sure when I was using Slang I had one shader that required this, but thats since been cacked..
     static constexpr uint32 scOffset = 0;
-    vkCmdPushConstants(cmd.Get(), pipeline.Layout, ShaderUtil::ToUnderlyingType(shader_types), scOffset, data_size,
-                       data);
+    vkCmdPushConstants(cmd.Get(), pipeline.Layout2.Get(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
+                       data_size, data);
 }
 
 
@@ -588,7 +588,8 @@ void RenderBackend::BeginLighting()
     depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
 
 
-    pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
+    pDeferredRenderer->LightPass.Begin(frame->CommandBuffer,
+                                       *gPipelineCache->Request(ePipelineName::LightingDirectional));
 
     // gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
     // gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -597,7 +598,7 @@ void RenderBackend::BeginLighting()
 
 
     pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                 pDeferredRenderer->PlLightingDirectional,
+                                                 *gPipelineCache->Request(ePipelineName::LightingDirectional),
                                                  gRenderer->ShaderUniform.GetBaseOffset());
 }
 
@@ -627,7 +628,7 @@ void RenderBackend::DoComposition(Camera& render_cam)
     pDeferredRenderer->RpForward.End();
     // pDeferredRenderer->LightPass.End();
 
-    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlComposition);
+    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, *gPipelineCache->Request(ePipelineName::Composition));
     pDeferredRenderer->DoCompPass(render_cam);
 
     {

@@ -129,6 +129,13 @@ constexpr bool operator!=(T lhs, int rhs)
 }
 
 template <typename T>
+    requires C_IsEnumFlags<T>
+constexpr bool operator==(T lhs, int rhs)
+{
+    return (static_cast<EnumFlagsIntType<T>>(lhs)) == rhs;
+}
+
+template <typename T>
 constexpr T operator~(T v)
 {
     return static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(v)));

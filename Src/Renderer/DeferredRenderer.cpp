@@ -90,24 +90,24 @@ VkPipelineLayout DeferredRenderer::CreateGPassPipelineLayout()
         DsLayoutGPassMaterialAlbedoOnly = builder.Build();
     }
 
-    StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
-        DsLayoutGPassMaterial,
-        DsLayoutLightingMaterialProperties,
-        gObjectManager->DsLayoutObjectBuffer,
-    };
+    // StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+    //     DsLayoutGPassMaterial,
+    //     DsLayoutLightingMaterialProperties,
+    //     gObjectManager->DsLayoutObjectBuffer,
+    // };
 
-    StackArray<PushConstants, 1> push_consts = {
-        PushConstants {
-            .Size = sizeof(DrawPushConstants),
-            .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
-        },
-    };
+    // StackArray<PushConstants, 1> push_consts = {
+    //     PushConstants {
+    //         .Size = sizeof(DrawPushConstants),
+    //         .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
+    //     },
+    // };
 
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
+    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
 
-    Util::SetDebugLabel("Geometry PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+    // Util::SetDebugLabel("Geometry PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
-    return layout;
+    return nullptr;
 }
 
 
@@ -145,42 +145,43 @@ VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
 
 VkPipelineLayout DeferredRenderer::CreateUnlitPipelineLayout()
 {
-    StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
-        DsLayoutGPassMaterial,
-        DsLayoutLightingMaterialProperties,
-        gObjectManager->DsLayoutObjectBuffer,
-    };
+    // StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
+    //     DsLayoutGPassMaterial,
+    //     DsLayoutLightingMaterialProperties,
+    //     gObjectManager->DsLayoutObjectBuffer,
+    // };
 
-    StackArray<PushConstants, 1> push_consts = {
-        PushConstants {
-            .Size = sizeof(DrawPushConstants),
-            .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
-        },
-    };
+    // StackArray<PushConstants, 1> push_consts = {
+    //     PushConstants {
+    //         .Size = sizeof(DrawPushConstants),
+    //         .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
+    //     },
+    // };
 
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
+    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
 
-    Util::SetDebugLabel("Unlit PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+    // Util::SetDebugLabel("Unlit PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
-    return layout;
+    return nullptr;
 }
 
 VkPipelineLayout DeferredRenderer::CreateDebugLayerPipelineLayout()
 {
-    StackArray<VkDescriptorSetLayout, 1> ds_layouts = {};
+    // StackArray<VkDescriptorSetLayout, 1> ds_layouts = {};
 
-    StackArray<PushConstants, 1> push_consts = {
-        PushConstants {
-            .Size = sizeof(DebugLayerPushConstants),
-            .ShaderTypes = eShaderType::Vertex,
-        },
-    };
+    // StackArray<PushConstants, 1> push_consts = {
+    //     PushConstants {
+    //         .Size = sizeof(DebugLayerPushConstants),
+    //         .ShaderTypes = eShaderType::Vertex,
+    //     },
+    // };
 
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
+    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
 
-    Util::SetDebugLabel("Debug Layer PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+    // Util::SetDebugLabel("Debug Layer PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
-    return layout;
+    // return layout;
+    return nullptr;
 }
 
 
@@ -249,21 +250,30 @@ void DeferredRenderer::CreateUnlitPipeline()
 
     gState->EndPipeline();
 
-    {
-        Ref<Shader> shader_text = gShaderCache->Request(eShaderName::Text);
-        vertex_shader = shader_text->GetProgram(eShaderType::Vertex, {});
-        pixel_shader = shader_text->GetProgram(eShaderType::Pixel, {});
+    // {
+    //     Ref<Shader> shader_text = gShaderCache->Request(eShaderName::Text);
+    //     vertex_shader = shader_text->GetProgram(eShaderType::Vertex, {});
+    //     pixel_shader = shader_text->GetProgram(eShaderType::Pixel, {});
 
-        builder.SetLayout(layout)
-            .SetName("Text Pipeline")
-            .SetOutputTargets(&targets)
-            .SetShaders(vertex_shader, pixel_shader)
-            .SetRenderPass(&RpForward)
-            .SetVertexDescription(&vertex_info)
-            .SetCullMode(VK_CULL_MODE_BACK_BIT)
-            .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
-        builder.Build(PlText);
-    }
+    //     builder.SetLayout(layout)
+    //         .SetName("Text Pipeline")
+    //         .SetOutputTargets(&targets)
+    //         .SetShaders(vertex_shader, pixel_shader)
+    //         .SetRenderPass(&RpForward)
+    //         .SetVertexDescription(&vertex_info)
+    //         .SetCullMode(VK_CULL_MODE_BACK_BIT)
+    //         .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    //     builder.Build(PlText);
+    // }
+
+
+    gState->BeginPipeline(ePipelineName::TextRendering);
+    gState->SetLayout(ePipelineName::Unlit);
+    gState->SetOutputTargets(&targets);
+    gState->SetRenderPass(&RpForward);
+    gState->SetShader(eShaderName::Text, {});
+    gState->SetCullMode(eCullMode::None);
+    gState->EndPipeline();
 
 
     // Debug Layer pipeline
@@ -445,26 +455,26 @@ void DeferredRenderer::CreateLightingDSLayout()
     DsLayoutLightingFrag = builder.Build();
 }
 
-VkPipelineLayout DeferredRenderer::CreateLightingPipelineLayout()
-{
-    VkDescriptorSetLayout layouts[] = {
-        DsLayoutLightingFrag,
-        DsLayoutLightingMaterialProperties,
-        gObjectManager->DsLayoutObjectBuffer,
-    };
+// PipelineLayout DeferredRenderer::CreateLightingPipelineLayout()
+// {
+// VkDescriptorSetLayout layouts[] = {
+//     DsLayoutLightingFrag,
+//     DsLayoutLightingMaterialProperties,
+//     gObjectManager->DsLayoutObjectBuffer,
+// };
 
-    StackArray<PushConstants, 2> push_consts = {
-        PushConstants { .Size = sizeof(LightVertPushConstants), .ShaderTypes = eShaderType::Vertex },
-    };
+// StackArray<PushConstants, 2> push_consts = {
+//     PushConstants { .Size = sizeof(LightVertPushConstants), .ShaderTypes = eShaderType::Vertex },
+// };
 
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
-    Util::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+// PipelineLayout layout = PipelineLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
+// Util::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
 
-    PlLightingOutsideVolume.SetLayout(layout);
-    PlLightingInsideVolume.SetLayout(layout);
+// PlLightingOutsideVolume.SetLayout(layout);
+// PlLightingInsideVolume.SetLayout(layout);
 
-    return layout;
-}
+// return layout;
+// }
 
 void DeferredRenderer::CreateLightingPipeline()
 {
@@ -510,65 +520,139 @@ void DeferredRenderer::CreateLightingPipeline()
 
     Shader lighting_shader("Lighting");
 
-    VkPipelineLayout layout = CreateLightingPipelineLayout();
+    // CreateLightingPipelineLayout();
 
-    {
-        Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, {});
-        Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Pixel, {});
 
-        VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Slim>();
+    BlendAttachment lighting_blend = BlendAttachment {
+        .Enabled = true,
+        .AlphaBlend { .Ops {
+            .Src = VK_BLEND_FACTOR_ONE,
+            .Dst = VK_BLEND_FACTOR_ZERO,
+        } },
+        .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+    };
 
-        PipelineBuilder builder {};
-        builder.SetLayout(layout)
-            .SetName("Lighting(Point)")
-            .AddBlendAttachment(
-                0,
-                {
-                    .Enabled = true,
-                    .AlphaBlend { .Ops {
-                        .Src = VK_BLEND_FACTOR_ONE,
-                        .Dst = VK_BLEND_FACTOR_ZERO,
-                    } },
-                    .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-                })
-            .SetOutputTargets(&LightPass.GetTargets())
-            .SetShaders(vertex_shader, fragment_shader)
-            .SetRenderPass(&LightPass.GetRenderPass())
-            .SetVertexDescription(&vertex_info)
-            .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true })
-            .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
 
-        builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingOutsideVolume);
-        builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
-    }
-    {
-        SizedArray<ShaderMacro> directional_macros { ShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
+    // Point light pipeline (inside)
+    gState->BeginPipeline(ePipelineName::LightingInsideVolume);
+    // Layout info
+    gState->AddDescriptor(DsLayoutLightingFrag);
+    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+    gState->SetPushConstants(eShaderType::Vertex, sizeof(LightVertPushConstants));
 
-        Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, directional_macros);
-        Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Pixel, directional_macros);
 
-        PipelineBuilder builder {};
+    gState->UseRenderStage(LightPass);
+    gState->SetTargetBlend(0, lighting_blend);
+    gState->SetShader(eShaderName::Lighting, {});
+    gState->SetVertexType(eVertexType::Slim);
 
-        builder.SetLayout(layout)
-            .SetName("Lighting(Directional)")
-            .AddBlendAttachment(
-                0,
-                {
-                    .Enabled = true,
-                    .AlphaBlend { .Ops {
-                        .Src = VK_BLEND_FACTOR_ONE,
-                        .Dst = VK_BLEND_FACTOR_ZERO,
-                    } },
-                    .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-                })
-            .SetOutputTargets(&LightPass.GetTargets())
-            .SetShaders(vertex_shader, fragment_shader)
-            .SetRenderPass(&LightPass.GetRenderPass())
-            .SetVertexDescription(nullptr)
-            .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+    gState->SetDepthTest(false);
+    gState->SetDepthWrite(false);
 
-        builder.Build(PlLightingDirectional);
-    }
+    gState->SetFaceOrder(eFaceOrder::Reverse);
+    gState->SetCullMode(eCullMode::Front);
+
+    gState->EndPipeline();
+
+    // Point light pipeline (outside)
+
+    gState->BeginPipeline(ePipelineName::LightingOutsideVolume);
+    gState->SetLayout(ePipelineName::LightingInsideVolume);
+
+    gState->UseRenderStage(LightPass);
+    gState->SetTargetBlend(0, lighting_blend);
+    gState->SetShader(eShaderName::Lighting, {});
+    gState->SetVertexType(eVertexType::Slim);
+
+    gState->SetDepthTest(false);
+    gState->SetDepthWrite(false);
+
+    gState->SetFaceOrder(eFaceOrder::Reverse);
+    gState->SetCullMode(eCullMode::Back);
+
+    gState->EndPipeline();
+
+    // {
+    //     Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, {});
+    //     Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Pixel, {});
+
+    //     VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Slim>();
+
+    //     PipelineBuilder builder {};
+    //     builder.SetLayout(layout)
+    //         .SetName("Lighting(Point)")
+    //         .AddBlendAttachment(
+    //             0,
+    //             {
+    //                 .Enabled = true,
+    //                 .AlphaBlend { .Ops {
+    //                     .Src = VK_BLEND_FACTOR_ONE,
+    //                     .Dst = VK_BLEND_FACTOR_ZERO,
+    //                 } },
+    //                 .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+    //             })
+    //         .SetOutputTargets(&LightPass.GetTargets())
+    //         .SetShaders(vertex_shader, fragment_shader)
+    //         .SetRenderPass(&LightPass.GetRenderPass())
+    //         .SetVertexDescription(&vertex_info)
+    //         .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true })
+    //         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+
+    //     builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingOutsideVolume);
+    //     builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
+    // }
+
+
+    // Directional lighting pipeline
+    gState->BeginPipeline(ePipelineName::LightingDirectional);
+    gState->SetLayout(ePipelineName::LightingInsideVolume);
+
+    gState->UseRenderStage(LightPass);
+    gState->SetTargetBlend(0, lighting_blend);
+    gState->SetShader(eShaderName::Lighting, { ShaderMacro { .pcName = "FX_LIGHT_DIRECTIONAL", .pcValue = "1" } });
+    gState->SetVertexType(eVertexType::Slim);
+
+    gState->SetDepthTest(false);
+    gState->SetDepthWrite(false);
+
+    gState->SetFaceOrder(eFaceOrder::Reverse);
+    gState->SetCullMode(eCullMode::None);
+
+    // Since the directional light is a triangle built from the screen coordinates, we won't be passing in vertices.
+    gState->SetFlags(eStateFlags::NoVertices);
+
+    gState->EndPipeline();
+
+
+    // {
+    //     SizedArray<ShaderMacro> directional_macros { ShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
+
+    //     Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, directional_macros);
+    //     Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Pixel, directional_macros);
+
+    //     PipelineBuilder builder {};
+
+    //     builder.SetLayout(layout)
+    //         .SetName("Lighting(Directional)")
+    //         .AddBlendAttachment(
+    //             0,
+    //             {
+    //                 .Enabled = true,
+    //                 .AlphaBlend { .Ops {
+    //                     .Src = VK_BLEND_FACTOR_ONE,
+    //                     .Dst = VK_BLEND_FACTOR_ZERO,
+    //                 } },
+    //                 .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
+    //             })
+    //         .SetOutputTargets(&LightPass.GetTargets())
+    //         .SetShaders(vertex_shader, fragment_shader)
+    //         .SetRenderPass(&LightPass.GetRenderPass())
+    //         .SetVertexDescription(nullptr)
+    //         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
+
+    //     builder.Build(PlLightingDirectional);
+    // }
 }
 
 void DeferredRenderer::DestroyLightingPipeline()
@@ -586,13 +670,13 @@ void DeferredRenderer::DestroyLightingPipeline()
         DsLayoutLightingMaterialProperties = nullptr;
     }
 
-    PlLightingOutsideVolume.Destroy();
+    // PlLightingOutsideVolume.Destroy();
 
-    PlLightingInsideVolume.Layout = nullptr;
-    PlLightingInsideVolume.Destroy();
+    // PlLightingInsideVolume.Layout = nullptr;
+    // PlLightingInsideVolume.Destroy();
 
-    PlLightingDirectional.Layout = nullptr;
-    PlLightingDirectional.Destroy();
+    // PlLightingDirectional.Layout = nullptr;
+    // PlLightingDirectional.Destroy();
 }
 
 //////////////////////////////////////////
@@ -613,56 +697,67 @@ VkPipelineLayout DeferredRenderer::CreateCompPipelineLayout()
     }
 
 
-    VkDescriptorSetLayout layouts[] = {
-        DsLayoutCompFrag,
-    };
+    // VkDescriptorSetLayout layouts[] = {
+    //     DsLayoutCompFrag,
+    // };
 
-    StackArray<PushConstants, 1> push_consts = { PushConstants { .Size = sizeof(CompositionPushConstants),
-                                                                 .ShaderTypes = eShaderType::Pixel } };
+    // StackArray<PushConstants, 1> push_consts = { PushConstants { .Size = sizeof(CompositionPushConstants),
+    //                                                              .ShaderTypes = eShaderType::Pixel } };
 
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
+    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
 
-    Util::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
-    PlComposition.SetLayout(layout);
+    // Util::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
+    // PlComposition.SetLayout(layout);
 
 
-    return layout;
+    return nullptr;
 }
 
 void DeferredRenderer::CreateCompPipeline()
 {
-    VkPipelineLayout comp_layout = CreateCompPipelineLayout();
+    CreateCompPipelineLayout();
 
     CreateCompPass();
 
+    // Shader shader_composition("Composition");
 
-    Shader shader_composition("Composition");
+    // Ref<ShaderProgram> lit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, {});
+    // Ref<ShaderProgram> lit_fragment_shader = shader_composition.GetProgram(eShaderType::Pixel, {});
 
-    Ref<ShaderProgram> lit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, {});
-    Ref<ShaderProgram> lit_fragment_shader = shader_composition.GetProgram(eShaderType::Pixel, {});
+    // PipelineBuilder builder;
 
-    PipelineBuilder builder;
-
-    builder.SetLayout(comp_layout)
-        .SetName("Composition Pipeline")
-        .SetOutputTargets(&CompPass.GetTargets())
-        .SetShaders(lit_vertex_shader, lit_fragment_shader)
-        .SetRenderPass(&CompPass.GetRenderPass())
-        .SetVertexDescription(nullptr)
-        .SetCullMode(VK_CULL_MODE_NONE)
-        .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE)
-        .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true });
-
-
-    builder.Build(PlComposition);
+    // builder.SetLayout(comp_layout)
+    //     .SetName("Composition Pipeline")
+    //     .SetOutputTargets(&CompPass.GetTargets())
+    //     .SetShaders(lit_vertex_shader, lit_fragment_shader)
+    //     .SetRenderPass(&CompPass.GetRenderPass())
+    //     .SetVertexDescription(nullptr)
+    //     .SetCullMode(VK_CULL_MODE_NONE)
+    //     .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE)
+    //     .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true });
 
 
-    SizedArray<ShaderMacro> unlit_macros { ShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } };
+    // builder.Build(PlComposition);
 
-    Ref<ShaderProgram> unlit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, unlit_macros);
-    Ref<ShaderProgram> unlit_fragment_shader = shader_composition.GetProgram(eShaderType::Pixel, unlit_macros);
 
-    builder.SetShaders(unlit_vertex_shader, unlit_fragment_shader).Build(PlCompositionUnlit);
+    gState->BeginPipeline(ePipelineName::Composition);
+    gState->AddDescriptor(DsLayoutCompFrag);
+    gState->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
+
+    gState->UseRenderStage(CompPass);
+    gState->SetShader(eShaderName::Composition, {});
+    gState->SetFlags(eStateFlags::NoVertices);
+    gState->SetDepthTest(false);
+    gState->SetDepthWrite(false);
+    gState->SetCullMode(eCullMode::None);
+    gState->EndPipeline();
+
+    // SizedArray<ShaderMacro> unlit_macros { ShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } };
+
+    // Ref<ShaderProgram> unlit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, unlit_macros);
+    // Ref<ShaderProgram> unlit_fragment_shader = shader_composition.GetProgram(eShaderType::Pixel, unlit_macros);
+
+    // builder.SetShaders(unlit_vertex_shader, unlit_fragment_shader).Build(PlCompositionUnlit);
 }
 
 void DeferredRenderer::DestroyCompPipeline()
@@ -675,9 +770,9 @@ void DeferredRenderer::DestroyCompPipeline()
         DsLayoutCompFrag = nullptr;
     }
 
-    PlComposition.Destroy();
-    PlCompositionUnlit.Layout = nullptr;
-    PlCompositionUnlit.Destroy();
+    // PlComposition.Destroy();
+    // PlCompositionUnlit.Layout = nullptr;
+    // PlCompositionUnlit.Destroy();
 }
 
 void DeferredRenderer::CreateCompPass()
@@ -713,13 +808,16 @@ void DeferredRenderer::DoCompPass(Camera& camera)
     memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(Mat4f));
     memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
+    Pipeline* composition_pipeline = gPipelineCache->Request(ePipelineName::Composition);
 
-    vkCmdPushConstants(cmd.Get(), PlComposition.Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-                       &push_constants);
+    gRenderer->SubmitPushConstants(cmd, *composition_pipeline, eShaderType::Pixel, push_constants);
+
+    // vkCmdPushConstants(cmd.Get(), PlComposition.Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
+    //                    &push_constants);
 
     // CompPass.Begin(cmd, PlComposition);
 
-    DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, PlComposition);
+    DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *composition_pipeline);
 
     // Use single triangle instead of two triangles as it removes the overlapping quads the gpu
     // renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html

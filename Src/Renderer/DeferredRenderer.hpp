@@ -54,7 +54,7 @@ private:
     // void DestroyLightVolumePipeline();
     void DestroyLightingPipeline();
 
-    VkPipelineLayout CreateLightingPipelineLayout();
+    // PipelineLayout CreateLightingPipelineLayout();
 
     // Composition
     void CreateCompPipeline();
@@ -82,7 +82,7 @@ public:
     RenderStage GPass;
 
     // Pipeline PlGeometry;
-    Pipeline PlGeometryNoDepthTest;
+    // Pipeline PlGeometryNoDepthTest;
     // Pipeline PlGeometryWithNormalMaps;
 
     // Pipeline PlGeometrySkinned;
@@ -100,9 +100,9 @@ public:
 
     RenderStage LightPass;
 
-    Pipeline PlLightingOutsideVolume;
-    Pipeline PlLightingInsideVolume;
-    Pipeline PlLightingDirectional;
+    // Pipeline PlLightingOutsideVolume;
+    // Pipeline PlLightingInsideVolume;
+    // Pipeline PlLightingDirectional;
 
     /////////////////////////////////////////////////
     // Forward pass / Unlit
@@ -125,8 +125,8 @@ public:
 
     RenderStage CompPass;
 
-    Pipeline PlComposition;
-    Pipeline PlCompositionUnlit;
+    // Pipeline PlComposition;
+    // Pipeline PlCompositionUnlit;
 };
 
 } // namespace fx::renderer

@@ -164,9 +164,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
             push_constants.DebugColor = debug_color.AsUInt();
         }
 
-        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
-                           &push_constants);
-
+        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex, push_constants);
         mpDebugCube->Render(cmd, 1);
     }
 
@@ -229,8 +227,7 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
         consts.ObjectId = obj->ObjectId;
 
-        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ShadowPushConstants),
-                           &consts);
+        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex, consts);
 
         obj->RenderPrimitive(cmd);
     }

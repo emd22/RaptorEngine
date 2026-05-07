@@ -8,6 +8,16 @@
 
 #include <Core/SizedArray.hpp>
 
+namespace fx {
+enum class eStateFlags
+{
+    None = 0,
+    NoVertices = (1 << 0),
+};
+
+FxEnumFlags(eStateFlags);
+} // namespace fx
+
 namespace fx::renderer {
 
 class RenderPass;
@@ -25,7 +35,7 @@ public:
     /**
      * @brief Sets the pipeline layout from a preexisting layout.
      */
-    void SetLayout(VkPipelineLayout layout);
+    void SetLayout(const PipelineLayout& layout);
     /**
      * @brief Sets the pipeline layout to the layout used by pipeline `other_pl`
      */
@@ -33,14 +43,21 @@ public:
 
     void SetPushConstants(eShaderType shader_type, uint32 pc_size);
     void AddDescriptor(VkDescriptorSetLayout layout);
-    VkPipelineLayout BuildLayout();
+    PipelineLayout BuildLayout();
 
     void SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment);
     void SetOutputTargets(TargetList* targets);
     void UseRenderStage(RenderStage& stage);
 
     void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
-    void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
+
+    FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
+
+    FX_FORCE_INLINE void SetFlags(eStateFlags flags) { mFlags = flags; }
+    FX_FORCE_INLINE eStateFlags GetFlags() const { return mFlags; }
+
+    FX_FORCE_INLINE void SetDepthTest(bool value) { mProperties.bDisableDepthTest = !value; }
+    FX_FORCE_INLINE void SetDepthWrite(bool value) { mProperties.bDisableDepthWrite = !value; }
 
     void SetRenderPass(RenderPass* renderpass);
 
@@ -71,6 +88,8 @@ private:
     SizedArray<VkDescriptorSetLayout> mDescriptors;
 
     PipelineProperties mProperties;
+
+    eStateFlags mFlags = eStateFlags::None;
 };
 
 } // namespace fx::renderer
