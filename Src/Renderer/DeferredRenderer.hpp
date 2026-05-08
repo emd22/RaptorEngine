@@ -62,7 +62,7 @@ private:
 
     void CreateUnlitPipeline();
 
-    VkPipelineLayout CreateCompPipelineLayout();
+    PipelineLayout CreateCompPipelineLayout();
 
     void CreateCompPass();
     void BuildLightDescriptors();

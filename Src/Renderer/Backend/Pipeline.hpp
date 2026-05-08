@@ -158,7 +158,7 @@ public:
         Layout2 = layout;
 
         // Layout is referenced from another pipeline or modified externally, do not destroy
-        mbDoNotDestroyLayout = true;
+        // mbDoNotDestroyLayout = true;
     }
 
     FX_FORCE_INLINE bool HasLayout() const { return Layout2.IsValid(); }

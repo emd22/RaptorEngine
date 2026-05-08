@@ -48,10 +48,16 @@ void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs
             .offset = current_pc_offset,
             .size = pc_def.Size,
         };
+
+        LogInfo("!! PC (Flags={}, Offset={}, Size={})", static_cast<uint32>(pc_def.ShaderTypes), current_pc_offset,
+                pc_def.Size);
+
         push_const_ranges.Insert(range);
 
         current_pc_offset += pc_def.Size;
     }
+
+    LogInfo("!! Built pipeline layout");
 
     VkPipelineLayoutCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,

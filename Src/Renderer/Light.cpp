@@ -102,9 +102,8 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     push_constants.ObjectId = ObjectId;
 
-    Pipeline* pl = gPipelineCache->Request(ePipelineName::Geometry);
-
-    gRenderer->SubmitPushConstants(frame->CommandBuffer, *pl, eShaderType::Vertex | eShaderType::Pixel, push_constants);
+    gRenderer->SubmitPushConstants(frame->CommandBuffer, gPipelineCache->Request(ePipelineName::Geometry),
+                                   eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
     // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pl->Layout,
     //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
@@ -122,8 +121,8 @@ void LightBase::SetRadius(const float radius)
 
 LightPoint::LightPoint()
 {
-    pPipelineInside = gPipelineCache->Request(ePipelineName::LightingInsideVolume);
-    pPipelineOutside = gPipelineCache->Request(ePipelineName::LightingOutsideVolume);
+    pPipelineInside = &gPipelineCache->Request(ePipelineName::LightingInsideVolume);
+    pPipelineOutside = &gPipelineCache->Request(ePipelineName::LightingOutsideVolume);
 
     Type = eLightType::Point;
 }
@@ -131,7 +130,7 @@ LightPoint::LightPoint()
 
 LightDirectional::LightDirectional()
 {
-    pPipeline = gPipelineCache->Request(ePipelineName::LightingDirectional);
+    pPipeline = &gPipelineCache->Request(ePipelineName::LightingDirectional);
 
     Type = eLightType::Directional;
 }

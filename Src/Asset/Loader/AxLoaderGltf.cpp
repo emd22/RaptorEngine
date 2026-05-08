@@ -121,7 +121,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
     }
 
     TSRef<Material> material = gMaterialManager->New(
-        object->Name.Get(), gPipelineCache->Request(ePipelineName::Geometry), object->IsSkinned());
+        object->Name.Get(), &gPipelineCache->Request(ePipelineName::Geometry), object->IsSkinned());
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {

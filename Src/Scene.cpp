@@ -140,10 +140,10 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
     // gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
-    renderer::Pipeline* pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
+    renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
 
     // renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
-    pipeline->Bind(cmd);
+    pipeline.Bind(cmd);
 
     DebugLayerPushConstants push_constants {};
 
@@ -164,7 +164,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
             push_constants.DebugColor = debug_color.AsUInt();
         }
 
-        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex, push_constants);
+        gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
         mpDebugCube->Render(cmd, 1);
     }
 

@@ -589,7 +589,7 @@ void RenderBackend::BeginLighting()
 
 
     pDeferredRenderer->LightPass.Begin(frame->CommandBuffer,
-                                       *gPipelineCache->Request(ePipelineName::LightingDirectional));
+                                       gPipelineCache->Request(ePipelineName::LightingDirectional));
 
     // gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
     // gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -598,7 +598,7 @@ void RenderBackend::BeginLighting()
 
 
     pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                 *gPipelineCache->Request(ePipelineName::LightingDirectional),
+                                                 gPipelineCache->Request(ePipelineName::LightingDirectional),
                                                  gRenderer->ShaderUniform.GetBaseOffset());
 }
 
@@ -618,7 +618,7 @@ void RenderBackend::BeginUnlit()
                                        Slice<VkClearValue>({}, 0));
 
     // pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
-    gPipelineCache->Request(ePipelineName::Unlit)->Bind(frame->CommandBuffer);
+    gPipelineCache->Bind(ePipelineName::Unlit, frame->CommandBuffer);
 }
 
 void RenderBackend::DoComposition(Camera& render_cam)
@@ -626,28 +626,14 @@ void RenderBackend::DoComposition(Camera& render_cam)
     FrameData* frame = GetFrame();
 
     pDeferredRenderer->RpForward.End();
-    // pDeferredRenderer->LightPass.End();
 
-    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, *gPipelineCache->Request(ePipelineName::Composition));
+    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, gPipelineCache->Request(ePipelineName::Composition));
     pDeferredRenderer->DoCompPass(render_cam);
 
-    {
-        /*StackArray<CommandBuffer, 1> commands;
-        commands.Insert(frame->CommandBuffer);
-
-        StackArray<Semaphore, 1> wait_semaphores;
-        wait_semaphores.Insert(frame->ShadowsSem);
-
-        StackArray<Semaphore, 1> signal_semaphores;
-        signal_semaphores.Insert(frame->OffscreenSem);*/
-
-
-        // pDeferredRenderer->GPass.Submit(Slice(commands), Slice(wait_semaphores), Slice(signal_semaphores));
-    }
-
+    pDeferredRenderer->CompPass.End();
+    frame->CommandBuffer.End();
 
     PresentFrame();
-
     ProcessDeletionQueue();
 
     mInternalFrameCounter++;

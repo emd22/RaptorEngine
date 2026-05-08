@@ -187,7 +187,7 @@ VkPipelineLayout DeferredRenderer::CreateDebugLayerPipelineLayout()
 
 void DeferredRenderer::CreateUnlitPipeline()
 {
-    VkPipelineLayout layout = CreateUnlitPipelineLayout();
+    CreateUnlitPipelineLayout();
 
     Ref<Shader> shader_unlit = gShaderCache->Request(eShaderName::Unlit);
     Ref<ShaderProgram> vertex_shader = shader_unlit->GetProgram(eShaderType::Vertex, {});
@@ -402,7 +402,7 @@ void DeferredRenderer::CreateGPassPipeline()
     //         .Build(PlGeometrySkinned);
     // }
 
-    pGeometryPipeline = gPipelineCache->Request(ePipelineName::Geometry);
+    pGeometryPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
 }
 
 void DeferredRenderer::DestroyGPassPipeline()
@@ -425,8 +425,8 @@ void DeferredRenderer::DestroyGPassPipeline()
     }
 
     // PlGeometry.Destroy();
-    gPipelineCache->Request(ePipelineName::Geometry)->Destroy();
-    gPipelineCache->Request(ePipelineName::GeometryNormalMaps)->Destroy();
+    gPipelineCache->Request(ePipelineName::Geometry).Destroy();
+    gPipelineCache->Request(ePipelineName::GeometryNormalMaps).Destroy();
 
     // PlGeometryWithNormalMaps.Layout = nullptr;
     // PlGeometryWithNormalMaps.Destroy();
@@ -683,7 +683,7 @@ void DeferredRenderer::DestroyLightingPipeline()
 // DeferredRenderer CompPass Functions
 //////////////////////////////////////////
 
-VkPipelineLayout DeferredRenderer::CreateCompPipelineLayout()
+PipelineLayout DeferredRenderer::CreateCompPipelineLayout()
 {
     {
         DsLayoutBuilder builder {};
@@ -697,25 +697,25 @@ VkPipelineLayout DeferredRenderer::CreateCompPipelineLayout()
     }
 
 
-    // VkDescriptorSetLayout layouts[] = {
-    //     DsLayoutCompFrag,
-    // };
+    VkDescriptorSetLayout layouts[] = {
+        DsLayoutCompFrag,
+    };
 
-    // StackArray<PushConstants, 1> push_consts = { PushConstants { .Size = sizeof(CompositionPushConstants),
-    //                                                              .ShaderTypes = eShaderType::Pixel } };
+    StackArray<PushConstants, 1> push_consts = { PushConstants { .Size = sizeof(CompositionPushConstants),
+                                                                 .ShaderTypes = eShaderType::Pixel } };
 
-    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
+    PipelineLayout layout = PipelineLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
 
     // Util::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
     // PlComposition.SetLayout(layout);
 
 
-    return nullptr;
+    return layout;
 }
 
 void DeferredRenderer::CreateCompPipeline()
 {
-    CreateCompPipelineLayout();
+    PipelineLayout layout = CreateCompPipelineLayout();
 
     CreateCompPass();
 
@@ -726,7 +726,10 @@ void DeferredRenderer::CreateCompPipeline()
 
     // PipelineBuilder builder;
 
-    // builder.SetLayout(comp_layout)
+    // PipelineLayout layout = CreateCompPipelineLayout();
+
+
+    // builder.SetLayout(layout)
     //     .SetName("Composition Pipeline")
     //     .SetOutputTargets(&CompPass.GetTargets())
     //     .SetShaders(lit_vertex_shader, lit_fragment_shader)
@@ -737,19 +740,21 @@ void DeferredRenderer::CreateCompPipeline()
     //     .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true });
 
 
-    // builder.Build(PlComposition);
+    // builder.Build(gPipelineCache->Request(ePipelineName::Composition));
 
 
     gState->BeginPipeline(ePipelineName::Composition);
-    gState->AddDescriptor(DsLayoutCompFrag);
-    gState->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
+    gState->SetLayout(layout);
+    // gState->AddDescriptor(DsLayoutCompFrag);
+    // gState->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
 
     gState->UseRenderStage(CompPass);
     gState->SetShader(eShaderName::Composition, {});
     gState->SetFlags(eStateFlags::NoVertices);
+    gState->SetCullMode(eCullMode::None);
+    gState->SetFaceOrder(eFaceOrder::Default);
     gState->SetDepthTest(false);
     gState->SetDepthWrite(false);
-    gState->SetCullMode(eCullMode::None);
     gState->EndPipeline();
 
     // SizedArray<ShaderMacro> unlit_macros { ShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } };
@@ -781,8 +786,6 @@ void DeferredRenderer::CreateCompPass()
 
     CompPass.Create(gRenderer->Swapchain.Extent);
 
-    CompPass.ClearValues.Insert(VkClearValue { .color = { { 0.0f, 0.3f, 0.0f, 1.0f } } });
-
     CompPass.MarkFinalStage();
     CompPass.BuildRenderStage();
 
@@ -808,24 +811,20 @@ void DeferredRenderer::DoCompPass(Camera& camera)
     memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(Mat4f));
     memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
-    Pipeline* composition_pipeline = gPipelineCache->Request(ePipelineName::Composition);
+    Pipeline& composition_pipeline = gPipelineCache->Request(ePipelineName::Composition);
 
-    gRenderer->SubmitPushConstants(cmd, *composition_pipeline, eShaderType::Pixel, push_constants);
+    gRenderer->SubmitPushConstants(cmd, composition_pipeline, eShaderType::Pixel, push_constants);
 
     // vkCmdPushConstants(cmd.Get(), PlComposition.Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
     //                    &push_constants);
 
-    // CompPass.Begin(cmd, PlComposition);
+    // CompPass.Begin(cmd, composition_pipeline);
 
-    DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *composition_pipeline);
+    DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, composition_pipeline);
 
     // Use single triangle instead of two triangles as it removes the overlapping quads the gpu
     // renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html
     vkCmdDraw(cmd.CommandBuffer, 3, 1, 0, 0);
-
-    CompPass.End();
-
-    cmd.End();
 }
 
 } // namespace fx::renderer

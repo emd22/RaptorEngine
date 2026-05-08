@@ -97,6 +97,8 @@ public:
 
     const SizedArray<BlendAttachment>& GetAttachments() const { return mBlendAttachments; }
 
+    void Clear() { mBlendAttachments.Clear(); }
+
 private:
     SizedArray<BlendAttachment> mBlendAttachments {};
 };

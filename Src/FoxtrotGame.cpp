@@ -148,7 +148,7 @@ void FoxtrotGame::CreateFontObject()
     Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
     object->pMesh = quad->AsMesh(eVertexType::Default);
 
-    TSRef<Material> material = gMaterialManager->New("Font material", gPipelineCache->Request(ePipelineName::Unlit),
+    TSRef<Material> material = gMaterialManager->New("Font material", &gPipelineCache->Request(ePipelineName::Unlit),
                                                      false);
     TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
                                                     FX_BASE_DIR "/DefaultFont.png");
@@ -156,7 +156,7 @@ void FoxtrotGame::CreateFontObject()
     object->pMaterial = material;
 
     object->SetRenderUnlit(true);
-    object->SetGraphicsPipeline(gPipelineCache->Request(ePipelineName::Unlit));
+    object->SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
 
     object->MarkReadyToRender();
 

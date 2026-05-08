@@ -206,14 +206,14 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 void Material::SetDefaultPipeline()
 {
     if (NormalMap.Exists()) {
-        pPipeline = gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
+        pPipeline = &gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
     }
     else {
-        pPipeline = gPipelineCache->Request(ePipelineName::Geometry);
+        pPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
     }
 
     if (bSupportsSkinning) {
-        pPipeline = gPipelineCache->Request(ePipelineName::GeometrySkinned);
+        pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 }
 

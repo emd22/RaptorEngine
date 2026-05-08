@@ -59,7 +59,7 @@ public:
     FX_FORCE_INLINE void SetDepthTest(bool value) { mProperties.bDisableDepthTest = !value; }
     FX_FORCE_INLINE void SetDepthWrite(bool value) { mProperties.bDisableDepthWrite = !value; }
 
-    void SetRenderPass(RenderPass* renderpass);
+    void SetRenderPass(RenderPass* rp);
 
     void SetRenderLines(bool value) { mProperties.bRenderLines = value; }
     void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }

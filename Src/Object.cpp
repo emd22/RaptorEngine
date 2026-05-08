@@ -77,7 +77,7 @@ bool Object::CheckIfReady()
     Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
 
     if (pMesh->VertexList.IsSkinned()) {
-        pMaterial->pPipeline = gPipelineCache->Request(ePipelineName::GeometrySkinned);
+        pMaterial->pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 
     return (Flags |= (eObjectFlags::ReadyToRender)) != 0;
@@ -342,7 +342,7 @@ void Object::RenderUnlit(const Camera& camera)
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(GetObjectLayer()).RawData, sizeof(Mat4f));
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
-    Pipeline* pipeline = gPipelineCache->Request(ePipelineName::Unlit);
+    Pipeline* pipeline = &gPipelineCache->Request(ePipelineName::Unlit);
     if (pMaterial && pMaterial->pPipeline) {
         pipeline = pMaterial->pPipeline;
     }
@@ -517,7 +517,7 @@ void Object::SyncObjectWithPhysics(PhObject* phys)
 void Object::SetRenderUnlit(const bool value)
 {
     if (value) {
-        SetGraphicsPipeline(gPipelineCache->Request(ePipelineName::Unlit));
+        SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
         Flags |= eObjectFlags::Unlit;
     }
     else {
