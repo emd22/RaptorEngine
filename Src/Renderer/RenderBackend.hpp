@@ -50,7 +50,7 @@ class RenderBackend
 {
     const uint32 scDeletionFrameSpacing = 3;
 
-    static constexpr uint32 scDefaultUniformSize = 512;
+    static constexpr uint32 scLightUniformSize = 240;
 
 public:
     using SubmitFunc = std::function<void(CommandBuffer& cmd)>;
@@ -207,7 +207,7 @@ public:
 
     Ref<DeferredRenderer> pDeferredRenderer { nullptr };
 
-    Uniforms ShaderUniform;
+    Uniforms LightBuffer;
     Uniforms BoneBuffer;
 
     // SamplerCache SamplerCache;

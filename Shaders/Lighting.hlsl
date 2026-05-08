@@ -18,6 +18,7 @@ struct VSInput
 struct VSOutput
 {
     float4 vPosition : SV_POSITION;
+    uint uiLightIndex : ATTR0;
 };
 
 
@@ -25,6 +26,7 @@ struct VSPushConsts
 {
     float4x4 CameraMatrix;
     uint uiObjectIndex;
+    uint uiLightIndex;
 };
 
 [[vk::push_constant]] VSPushConsts VSConst;
@@ -44,6 +46,8 @@ VSOutput main(VSInput input)
     output.vPosition = mul(mvp, float4(input.vPosition, 1.0));
 #endif
 
+    output.uiLightIndex = VSConst.uiLightIndex;
+
     return output;
 }
 
@@ -56,7 +60,8 @@ F_PROGRAM(FPT_PIXEL)
 
 struct FSInput
 {
-    float4 vPosition: SV_POSITION;
+    float4 vPosition : SV_POSITION;
+    uint uiLightIndex : ATTR0;
 };
 
 struct FSOutput
@@ -69,7 +74,7 @@ F_Texture2D(tAlbedo, 1);
 F_Texture2D(tNormal, 2);
 F_ShadowTexture2D(tShadow, 3);
 
-[[vk::binding(4, 0)]] cbuffer FSUniforms
+struct Light
 {
     // 64
     float4x4 LightCameraMatrix;
@@ -77,15 +82,20 @@ F_ShadowTexture2D(tShadow, 3);
     float4x4 mInvView;
     // 192
     float4x4 mInvProjection;
-    // 196
+    // 208
     float3 vEyePosition;
     float1 fLightRadius;
-    // 200
+    // 224
     float3 vLightPosition;
     uint1 uiLightColor;
-
+    // 236
     float2 vCameraSize;
     uint1 uiAmbient;
+};
+
+[[vk::binding(4, 0)]] cbuffer FSUniforms
+{
+    Light Lights[LIGHT_COUNT];
 };
 
 #define FX_MATH_PI 3.14159265359
@@ -138,11 +148,11 @@ float Fr_FrostbiteDisneyDiffuse(float NdotV, float NdotL, float LdotH, float lin
     return light_scatter * view_scatter * energy_factor;
 }
 
-float3 WorldPosFromDepth(float2 uv, float depth)
+float3 WorldPosFromDepth(Light light, float2 uv, float depth)
 {
     float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
 
-    float4 world_space = mul(mul(mInvView, mInvProjection), ndc);
+    float4 world_space = mul(mul(light.mInvView, light.mInvProjection), ndc);
 
     return world_space.xyz / world_space.w;
 }
@@ -160,7 +170,9 @@ FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    float2 screen_uv = input.vPosition.xy / vCameraSize;
+    Light light = Lights[input.uiLightIndex];
+
+    float2 screen_uv = input.vPosition.xy / light.vCameraSize;
 
     float depth = 1.0 - F_Sample(tDepth, screen_uv).r;
     float4 albedo_rgba = F_Sample(tAlbedo, screen_uv);
@@ -168,9 +180,9 @@ FSOutput main(FSInput input)
 
 
     float4 normal_rgba = F_Sample(tNormal, screen_uv);
-    float3 world_position = WorldPosFromDepth(screen_uv, depth);
+    float3 world_position = WorldPosFromDepth(light, screen_uv, depth);
 
-    float4 light_color = F_UnpackUIntToFloat4(uiLightColor);
+    float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
 
     float roughness = normal_rgba.w;
     float metallic = albedo_rgba.w;
@@ -183,7 +195,7 @@ FSOutput main(FSInput input)
     float visibility = 1.0f;
 
 #ifdef FX_LIGHT_DIRECTIONAL
-    float4 shadow_pos_light_space = mul(LightCameraMatrix, float4(world_position, 1.0));
+    float4 shadow_pos_light_space = mul(light.LightCameraMatrix, float4(world_position, 1.0));
 
     float2 shadow_uv;
     shadow_uv.x = 0.5f + (shadow_pos_light_space.x / shadow_pos_light_space.w * 0.5f);
@@ -198,13 +210,13 @@ FSOutput main(FSInput input)
         visibility = clamp(visibility, 0.05f, 1.0f);
     }
 
-    float3 L = normalize(vLightPosition);
+    float3 L = normalize(light.vLightPosition);
 #else
-    float3 light_position_local = vLightPosition - world_position;
+    float3 light_position_local = light.vLightPosition - world_position;
     float3 L = normalize(light_position_local);
 #endif
     float3 N = normalize(normal_rgba.rgb);
-    float3 V = normalize(vEyePosition - world_position);
+    float3 V = normalize(light.vEyePosition - world_position);
     float3 H = normalize(V + L);
 
     float NdotL = DotC(N, L);
@@ -218,9 +230,8 @@ FSOutput main(FSInput input)
     float dist_sq = dot(light_position_local, light_position_local);
     float light_distance = sqrt(dist_sq);
 
-    float inv_radius_sq = 1.0 / (fLightRadius * fLightRadius);
+    float inv_radius_sq = 1.0 / (light.fLightRadius * light.fLightRadius);
     float attenuation = light_intensity * AttenuationSmooth(dist_sq, inv_radius_sq);
-    // float attenuation = light_intensity * (1.0 / max(light_distance * light_distance, 1e-5));
 #endif
 
     float3 F = F_Schlick(F0, 1.0, LdotH);
@@ -235,13 +246,9 @@ FSOutput main(FSInput input)
     float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
     float3 specular_term = Fr;
 
-    float4 ambient = F_UnpackUIntToFloat4(uiAmbient) * float4(albedo, 1.0f);
+    float4 ambient = F_UnpackUIntToFloat4(light.uiAmbient) * float4(albedo, 1.0f);
 
     output.vColor = float4(attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL + ambient.rgb, 1.0);
-
-#ifdef FX_LIGHT_DIRECTIONAL
-    // output.vColor = float4(world_position, 1.0f);
-#endif
 
     return output;
 }

@@ -257,7 +257,7 @@ void Material::Build()
     }
 
     if (bSupportsSkinning) {
-        mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.Size);
+        mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.PageSize);
     }
 
     mDsDefault.Build();

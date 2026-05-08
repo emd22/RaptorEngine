@@ -4,6 +4,7 @@ namespace fx {
 
 
 const Color Color::sNone = Color(0x00000000);
+const Color Color::sTransparent = Color(0xFFFFFF00);
 
 const Color Color::sBlack = Color(0x000000FF);
 const Color Color::sWhite = Color(0xFFFFFFFF);

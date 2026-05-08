@@ -102,6 +102,7 @@ void Scene::Render(Camera* shadow_camera)
     // Render lights
     gRenderer->BeginLighting();
 
+    gRenderer->LightBuffer.Rewind();
 
     for (const Ref<LightBase>& light : mLights) {
         light->Render(camera, shadow_camera);

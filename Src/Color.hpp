@@ -9,6 +9,7 @@ struct Color
 public:
     // Colour definitions
     static const Color sNone;
+    static const Color sTransparent;
 
     static const Color sWhite;
     static const Color sBlack;

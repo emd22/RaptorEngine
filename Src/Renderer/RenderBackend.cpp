@@ -20,6 +20,7 @@
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/Limits.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/State.hpp>
 #include <thread>
@@ -96,9 +97,8 @@ void RenderBackend::Init(Vec2u window_size)
 
     gObjectManager->Create();
 
-    ShaderUniform.Create(scDefaultUniformSize);
-
-    BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f));
+    LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
+    BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), 1);
 
     Mat4f initial_matrix = Mat4f::sIdentity;
     BoneBuffer.SetAllValues(initial_matrix.RawData, true);
@@ -485,7 +485,7 @@ eFrameResult RenderBackend::BeginFrame()
 {
     FrameData* frame = GetFrame();
 
-    ShaderUniform.Rewind();
+    LightBuffer.Rewind();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -599,7 +599,7 @@ void RenderBackend::BeginLighting()
 
     pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                  gPipelineCache->Request(ePipelineName::LightingDirectional),
-                                                 gRenderer->ShaderUniform.GetBaseOffset());
+                                                 gRenderer->LightBuffer.GetBaseOffset());
 }
 
 
@@ -687,7 +687,7 @@ void RenderBackend::Destroy()
         sem.Destroy();
     }
 
-    ShaderUniform.Destroy();
+    LightBuffer.Destroy();
     BoneBuffer.Destroy();
 
 

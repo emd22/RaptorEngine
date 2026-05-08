@@ -13,6 +13,9 @@ namespace renderer {
 class Pipeline;
 } // namespace renderer
 
+using LightId = uint32;
+static constexpr LightId LightIdNull = UINT32_MAX;
+
 enum eLightFlags : uint16
 {
     LF_None = 0x0000,
@@ -48,6 +51,8 @@ public:
     virtual ~LightBase() {}
 
 public:
+    LightId Id = LightIdNull;
+
     Ref<PrimitiveMesh> pLightVolume { nullptr };
     Ref<MeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
 
@@ -58,7 +63,6 @@ public:
     struct Color AmbientColor { 0x101f1f1f };
 
     eLightFlags Flags = LF_None;
-
     eLightType Type = eLightType::Unknown;
 
     bool bEnabled = true;

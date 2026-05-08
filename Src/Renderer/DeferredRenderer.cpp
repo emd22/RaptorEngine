@@ -492,17 +492,6 @@ void DeferredRenderer::CreateLightingPipeline()
     Assert(light_target != nullptr);
     light_target->FinalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    // LightPass.AddTarget(ImageFormat::eD32_Float, Target::scFullScreen,
-    //                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-    //                     ImageAspectFlag::Depth);
-
-    // Target* depth_attachment = LightPass.GetTarget(ImageFormat::eD32_Float);
-    // depth_attachment->LoadOp = LoadOp::Load;
-    // depth_attachment->StoreOp = StoreOp::DontCare;
-    // depth_attachment->bRenderPassOnly = true;
-    // depth_attachment->SetImage(GPass.GetTarget(ImageFormat::eD32_Float)->GetImage());
-
-
     LightPass.BuildRenderStage();
 
     DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
@@ -514,7 +503,7 @@ void DeferredRenderer::CreateLightingPipeline()
     // sNormals
     DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
     // Skip 3 for the shadow target, added by DirectionalShadows
-    DsLighting.AddBuffer(4, &gRenderer->ShaderUniform.GetGpuBuffer(), 0, gRenderer->ShaderUniform.Size);
+    DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
 
     DsLighting.Build();
 
@@ -531,7 +520,6 @@ void DeferredRenderer::CreateLightingPipeline()
         } },
         .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
     };
-
 
     // Point light pipeline (inside)
     gState->BeginPipeline(ePipelineName::LightingInsideVolume);
@@ -551,7 +539,7 @@ void DeferredRenderer::CreateLightingPipeline()
     gState->SetDepthWrite(false);
 
     gState->SetFaceOrder(eFaceOrder::Reverse);
-    gState->SetCullMode(eCullMode::Front);
+    gState->SetCullMode(eCullMode::Back);
 
     gState->EndPipeline();
 
@@ -573,36 +561,6 @@ void DeferredRenderer::CreateLightingPipeline()
 
     gState->EndPipeline();
 
-    // {
-    //     Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, {});
-    //     Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Pixel, {});
-
-    //     VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Slim>();
-
-    //     PipelineBuilder builder {};
-    //     builder.SetLayout(layout)
-    //         .SetName("Lighting(Point)")
-    //         .AddBlendAttachment(
-    //             0,
-    //             {
-    //                 .Enabled = true,
-    //                 .AlphaBlend { .Ops {
-    //                     .Src = VK_BLEND_FACTOR_ONE,
-    //                     .Dst = VK_BLEND_FACTOR_ZERO,
-    //                 } },
-    //                 .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-    //             })
-    //         .SetOutputTargets(&LightPass.GetTargets())
-    //         .SetShaders(vertex_shader, fragment_shader)
-    //         .SetRenderPass(&LightPass.GetRenderPass())
-    //         .SetVertexDescription(&vertex_info)
-    //         .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true })
-    //         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
-
-    //     builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingOutsideVolume);
-    //     builder.SetCullMode(VK_CULL_MODE_BACK_BIT).Build(PlLightingInsideVolume);
-    // }
-
 
     // Directional lighting pipeline
     gState->BeginPipeline(ePipelineName::LightingDirectional);
@@ -623,36 +581,6 @@ void DeferredRenderer::CreateLightingPipeline()
     gState->SetFlags(eStateFlags::NoVertices);
 
     gState->EndPipeline();
-
-
-    // {
-    //     SizedArray<ShaderMacro> directional_macros { ShaderMacro { "FX_LIGHT_DIRECTIONAL", "1" } };
-
-    //     Ref<ShaderProgram> vertex_shader = lighting_shader.GetProgram(eShaderType::Vertex, directional_macros);
-    //     Ref<ShaderProgram> fragment_shader = lighting_shader.GetProgram(eShaderType::Pixel, directional_macros);
-
-    //     PipelineBuilder builder {};
-
-    //     builder.SetLayout(layout)
-    //         .SetName("Lighting(Directional)")
-    //         .AddBlendAttachment(
-    //             0,
-    //             {
-    //                 .Enabled = true,
-    //                 .AlphaBlend { .Ops {
-    //                     .Src = VK_BLEND_FACTOR_ONE,
-    //                     .Dst = VK_BLEND_FACTOR_ZERO,
-    //                 } },
-    //                 .ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
-    //             })
-    //         .SetOutputTargets(&LightPass.GetTargets())
-    //         .SetShaders(vertex_shader, fragment_shader)
-    //         .SetRenderPass(&LightPass.GetRenderPass())
-    //         .SetVertexDescription(nullptr)
-    //         .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
-
-    //     builder.Build(PlLightingDirectional);
-    // }
 }
 
 void DeferredRenderer::DestroyLightingPipeline()
@@ -719,34 +647,9 @@ void DeferredRenderer::CreateCompPipeline()
 
     CreateCompPass();
 
-    // Shader shader_composition("Composition");
-
-    // Ref<ShaderProgram> lit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, {});
-    // Ref<ShaderProgram> lit_fragment_shader = shader_composition.GetProgram(eShaderType::Pixel, {});
-
-    // PipelineBuilder builder;
-
-    // PipelineLayout layout = CreateCompPipelineLayout();
-
-
-    // builder.SetLayout(layout)
-    //     .SetName("Composition Pipeline")
-    //     .SetOutputTargets(&CompPass.GetTargets())
-    //     .SetShaders(lit_vertex_shader, lit_fragment_shader)
-    //     .SetRenderPass(&CompPass.GetRenderPass())
-    //     .SetVertexDescription(nullptr)
-    //     .SetCullMode(VK_CULL_MODE_NONE)
-    //     .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE)
-    //     .SetProperties({ .bDisableDepthTest = true, .bDisableDepthWrite = true });
-
-
-    // builder.Build(gPipelineCache->Request(ePipelineName::Composition));
-
-
     gState->BeginPipeline(ePipelineName::Composition);
-    gState->SetLayout(layout);
-    // gState->AddDescriptor(DsLayoutCompFrag);
-    // gState->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
+    gState->AddDescriptor(DsLayoutCompFrag);
+    gState->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
 
     gState->UseRenderStage(CompPass);
     gState->SetShader(eShaderName::Composition, {});
@@ -756,13 +659,6 @@ void DeferredRenderer::CreateCompPipeline()
     gState->SetDepthTest(false);
     gState->SetDepthWrite(false);
     gState->EndPipeline();
-
-    // SizedArray<ShaderMacro> unlit_macros { ShaderMacro { .pcName = "RENDER_UNLIT", .pcValue = "1" } };
-
-    // Ref<ShaderProgram> unlit_vertex_shader = shader_composition.GetProgram(eShaderType::Vertex, unlit_macros);
-    // Ref<ShaderProgram> unlit_fragment_shader = shader_composition.GetProgram(eShaderType::Pixel, unlit_macros);
-
-    // builder.SetShaders(unlit_vertex_shader, unlit_fragment_shader).Build(PlCompositionUnlit);
 }
 
 void DeferredRenderer::DestroyCompPipeline()

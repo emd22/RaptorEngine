@@ -13,7 +13,7 @@ public:
 public:
     Uniforms() = default;
 
-    void Create(uint32 size);
+    void Create(uint32 size, uint32 slot_size);
 
     uint8* GetBasePtr();
 
@@ -23,7 +23,7 @@ public:
     uint8* GetCurrentBuffer()
     {
         // Offset by the frame currently in flight
-        return GetBasePtr() + GetBaseOffset();
+        return GetBasePtr() + GetBaseOffset() + GetSlotOffset();
     }
 
     RawGpuBuffer& GetGpuBuffer() { return mGpuBuffer; }
@@ -43,7 +43,7 @@ public:
     {
         Assert(mGpuBuffer.IsMapped());
 
-        if (mUniformIndex + size >= Size) {
+        if (mUniformIndex + size >= PageSize) {
             LogError("Could not submit uniform as buffer is full!");
             return;
         }
@@ -60,7 +60,7 @@ public:
     {
         Assert(mGpuBuffer.IsMapped());
 
-        if (size >= Size) {
+        if (size >= PageSize) {
             LogError("Could not write buffer that is larger than uniform!");
             return;
         }
@@ -69,6 +69,12 @@ public:
     }
 
     void AssertSize(uint32 expected_size) { Assert(mUniformIndex == expected_size); }
+
+    void NextSlot()
+    {
+        ++SlotIndex;
+        mUniformIndex = 0;
+    }
 
     template <typename TValueType>
     void SetAllValues(const TValueType& value, bool all_frames)
@@ -82,6 +88,11 @@ public:
     uint32 GetBaseOffset() const;
     uint32 GetBaseOffset(uint32 frame_index) const;
 
+    uint32 GetSlotOffset() const;
+    uint32 GetUniformIndex() const { return mUniformIndex; }
+
+    FX_FORCE_INLINE uint32 GetSlotSize() const { return SlotSize; }
+
     /**
      * @brief Resets the uniform buffer back to the start.
      */
@@ -93,7 +104,12 @@ private:
     void SetAllValuesRaw(const void* data, uint32 value_size, bool all_frames);
 
 public:
-    uint32 Size = 0;
+    uint32 SlotIndex = 0;
+    uint32 SlotSize = 0;
+
+    uint32 Count = 0;
+
+    uint32 PageSize = 0;
 
 private:
     /// Gpu buffer that stores current uniform buffer data. Note that this is a continguous buffer that stores

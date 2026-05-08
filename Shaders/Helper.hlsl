@@ -44,3 +44,4 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define BoneMtx float4x4
 
 #define BONE_COUNT 100
+#define LIGHT_COUNT 64
