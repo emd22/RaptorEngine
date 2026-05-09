@@ -99,32 +99,26 @@ void FoxtrotGame::InitEngine()
 
 void FoxtrotGame::CreateLights()
 {
-    Ref<LightPoint> pl = Ref<LightPoint>::New();
+    // Ref<LightPoint> pl = Ref<LightPoint>::New();
 
-    Ref<MeshGen::GeneratedMesh> sphere = MeshGen::MakeIcoSphere(4);
-    pl->SetLightVolume(sphere);
-    pl->Color = Color::FromRGBA(50, 250, 100, 3);
-    pl->MoveBy(Vec3f(0, 1, 0));
-    pl->SetRadius(5.0);
-    pl->SetScale(15);
+    // Ref<MeshGen::GeneratedMesh> sphere = MeshGen::MakeIcoSphere(4);
+    // pl->SetLightVolume(sphere);
+    // pl->Color = Color::FromRGBA(50, 250, 100, 3);
+    // pl->MoveBy(Vec3f(0, 1, 0));
+    // pl->SetRadius(5.0);
+    // pl->SetScale(15);
 
-    mMainScene.Attach(pl);
+    // mMainScene.Attach(pl);
 
-    Ref<LightPoint> pl2 = Ref<LightPoint>::New();
+    // Ref<LightPoint> pl2 = Ref<LightPoint>::New();
 
-    pl2->SetLightVolume(sphere);
-    pl2->Color = Color::FromRGBA(200, 80, 80, 3);
-    pl2->MoveBy(Vec3f(1, 0.5, 0));
-    pl2->SetRadius(5.0);
-    pl2->SetScale(15);
+    // pl2->SetLightVolume(sphere);
+    // pl2->Color = Color::FromRGBA(200, 80, 80, 3);
+    // pl2->MoveBy(Vec3f(1, 0.5, 0));
+    // pl2->SetRadius(5.0);
+    // pl2->SetScale(15);
 
-    mMainScene.Attach(pl2);
-
-    // pSun = MakeRef<LightDirectional>();
-    // pSun->MoveTo(Vec3f(0.5, 5, -1.0).Normalize());
-    // pSun->Color = Color::FromRGBA(0xFA, 0xD2, 0xC0, 6);
-    // pSun->AmbientColor = Color::FromRGBA(0x4A, 0x3A, 0x2A, 1);
-    // mMainScene.Attach(pSun);
+    // mMainScene.Attach(pl2);
 }
 
 void FoxtrotGame::LoadOffsetsFile()

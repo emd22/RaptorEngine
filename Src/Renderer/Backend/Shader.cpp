@@ -203,7 +203,6 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
     // Create the program
     Ref<ShaderProgram> program = MakeRef<ShaderProgram>();
-    LogInfo("** SETTING program type to {}", ShaderUtil::TypeToName(shader_type));
     program->ShaderType = shader_type;
     program->pShader = this;
 

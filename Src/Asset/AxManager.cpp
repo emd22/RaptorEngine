@@ -91,6 +91,13 @@ void AxManager::Start(int32 min_threads)
     mpAssetManagerThread = new std::thread([this]() { AxManager::AssetManagerUpdate(); });
 }
 
+void AxManager::DebugPrintWorkers() const
+{
+    for (const AxWorker& worker : mWorkerThreads) {
+        worker.DebugPrint();
+    }
+}
+
 void AxManager::Shutdown()
 {
     LogInfo("Shutting down asset manager...");
@@ -331,11 +338,13 @@ void AxManager::CheckForItemsToLoad()
     while (worker == nullptr) {
         if (tries_remaining <= 0) {
             LogError("Could not find worker thread, skipping load of object...");
+            DebugPrintWorkers();
             break;
         }
 
         // AddWorkerThread();
 
+        LogWarning("Currently {} items are enqueued...", mLoadQueue.Size());
         LogError("No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -377,9 +386,9 @@ void AxManager::AssetManagerUpdate()
             for (uint32 index = amount_threads; index > mMinThreads; index--) {
                 LogInfo("Killing asset manager worker thread...");
 
-                mWorkerThreads[index].Kill();
-                mWorkerThreads[index].Thread.join();
-                mWorkerThreads.RemoveLast();
+                // mWorkerThreads[index].Kill();
+                // mWorkerThreads[index].Thread.join();
+                // mWorkerThreads.RemoveLast();
             }
         }
 

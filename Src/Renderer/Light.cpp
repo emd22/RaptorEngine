@@ -68,9 +68,6 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
         push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
 
         gRenderer->SubmitPushConstants(frame->CommandBuffer, *pPipeline, eShaderType::Vertex, push_constants);
-
-        // vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-        //                    sizeof(push_constants), &push_constants);
     }
 
 
@@ -111,10 +108,6 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
 
     gRenderer->SubmitPushConstants(frame->CommandBuffer, gPipelineCache->Request(ePipelineName::Geometry),
                                    eShaderType::Vertex | eShaderType::Pixel, push_constants);
-
-    // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pl->Layout,
-    //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-    //                    &push_constants);
 
     mpDebugMesh->Render(frame->CommandBuffer, 1);
 }
@@ -160,9 +153,6 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
         push_constants.ObjectId = ObjectId;
         push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
 
-        // vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-        //                    sizeof(push_constants), &push_constants);
-
         gRenderer->SubmitPushConstants(frame->CommandBuffer, *pPipeline, eShaderType::Vertex, push_constants);
     }
 
@@ -177,7 +167,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
     gRenderer->LightBuffer.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
     gRenderer->LightBuffer.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
-    // // Note that the light position is packed with the light colour as the fourth component!
+    // Note that the light position is packed with the light colour as the fourth component!
     gRenderer->LightBuffer.WritePtr(camera.Position.mData, sizeof(float32) * 3);
     gRenderer->LightBuffer.Write(mRadius);
 
@@ -191,8 +181,6 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 
     gRenderer->LightBuffer.FlushToGpu();
     gRenderer->LightBuffer.NextSlot();
-
-    // gRenderer->Uniforms.AssertSize(sizeof(LightFragPushConstants));
 
     vkCmdDraw(frame->CommandBuffer.Get(), 3, 1, 0, 0);
 }

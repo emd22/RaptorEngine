@@ -19,6 +19,23 @@ enum class eAxType
     Image,
 };
 
+constexpr const char* AssetTypeToString(eAxType type)
+{
+    switch (type) {
+    case eAxType::None:
+        return "None";
+    case eAxType::Binary:
+        return "Binary";
+    case eAxType::Object:
+        return "Object";
+    case eAxType::Image:
+        return "Image";
+    default:;
+    }
+    return "None";
+}
+
+
 struct AxItemData
 {
     AxItemData() = default;
