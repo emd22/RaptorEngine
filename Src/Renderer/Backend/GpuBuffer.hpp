@@ -220,7 +220,7 @@ public:
             [&](CommandBuffer& cmd)
             {
                 VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
-                vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
+                vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
             });
 
         staging_buffer.Destroy();

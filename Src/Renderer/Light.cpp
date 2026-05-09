@@ -50,14 +50,14 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
     FrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
-    gRenderer->pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    gRenderer->pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                             *pPipeline, gRenderer->LightBuffer.GetBaseOffset());
 
-    gObjectManager->mObjectBufferDS.BindWithOffset(2, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pPipeline,
                                                    gObjectManager->GetBaseOffset());
 
 
-    pPipeline->Bind(frame->CommandBuffer);
+    pPipeline->Bind(frame->CmdBuffer);
 
     {
         LightVertPushConstants push_constants {};
@@ -67,7 +67,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
         push_constants.ObjectId = ObjectId;
         push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
 
-        gRenderer->SubmitPushConstants(frame->CommandBuffer, *pPipeline, eShaderType::Vertex, push_constants);
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, *pPipeline, eShaderType::Vertex, push_constants);
 
         // vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
         //                    sizeof(push_constants), &push_constants);
@@ -93,7 +93,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
     gRenderer->LightBuffer.FlushToGpu();
     gRenderer->LightBuffer.NextSlot();
 
-    pLightVolume->Render(frame->CommandBuffer, 1);
+    pLightVolume->Render(frame->CmdBuffer, 1);
 }
 
 
@@ -109,14 +109,14 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
     push_constants.ObjectId = ObjectId;
 
-    gRenderer->SubmitPushConstants(frame->CommandBuffer, gPipelineCache->Request(ePipelineName::Geometry),
+    gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
                                    eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
     // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pl->Layout,
     //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
     //                    &push_constants);
 
-    mpDebugMesh->Render(frame->CommandBuffer, 1);
+    mpDebugMesh->Render(frame->CmdBuffer, 1);
 }
 
 
@@ -151,7 +151,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
     FrameData* frame = gRenderer->GetFrame();
     UpdateIfOutOfDate();
 
-    pPipeline->Bind(frame->CommandBuffer);
+    pPipeline->Bind(frame->CmdBuffer);
 
     {
         LightVertPushConstants push_constants {};
@@ -163,7 +163,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
         // vkCmdPushConstants(frame->CommandBuffer.Get(), pPipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
         //                    sizeof(push_constants), &push_constants);
 
-        gRenderer->SubmitPushConstants(frame->CommandBuffer, *pPipeline, eShaderType::Vertex, push_constants);
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, *pPipeline, eShaderType::Vertex, push_constants);
     }
 
     if (shadow_camera) {
@@ -194,7 +194,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 
     // gRenderer->Uniforms.AssertSize(sizeof(LightFragPushConstants));
 
-    vkCmdDraw(frame->CommandBuffer.Get(), 3, 1, 0, 0);
+    vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 }
 
 } // namespace fx

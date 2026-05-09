@@ -701,7 +701,7 @@ void DeferredRenderer::CreateCompPass()
 
 void DeferredRenderer::DoCompPass(Camera& camera)
 {
-    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
     CompositionPushConstants push_constants {};
     memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(Mat4f));
@@ -720,7 +720,7 @@ void DeferredRenderer::DoCompPass(Camera& camera)
 
     // Use single triangle instead of two triangles as it removes the overlapping quads the gpu
     // renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html
-    vkCmdDraw(cmd.CommandBuffer, 3, 1, 0, 0);
+    vkCmdDraw(cmd.Get(), 3, 1, 0, 0);
 }
 
 } // namespace fx::renderer

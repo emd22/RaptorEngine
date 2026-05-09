@@ -947,7 +947,11 @@ void* MemPool::AllocRaw(size_t size)
 void* MemPool::AlignedAllocRaw(uint32 alignment, size_t size)
 {
 #ifdef FX_DEBUG_DISABLE_MEMPOOL
+#ifdef FX_PLATFORM_WINDOWS
+    return _aligned_malloc(alignment, size);
+#else
     return aligned_alloc(alignment, size);
+#endif
 #else
     std::lock_guard<std::mutex> guard(mMutex);
 

@@ -523,8 +523,8 @@ void FoxtrotGame::Tick()
 
     FrameData* frame = gRenderer->GetFrame();
 
-    frame->CommandBuffer.Reset();
-    frame->CommandBuffer.Record();
+    frame->CmdBuffer.Reset();
+    frame->CmdBuffer.Record();
 
     mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
     mMainScene.Render(&gShadowRenderer->ShadowCamera);

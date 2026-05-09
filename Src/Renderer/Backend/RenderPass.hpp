@@ -23,12 +23,12 @@ public:
 
     void Destroy();
 
-    FX_FORCE_INLINE VkRenderPass Get() const { return RenderPass; }
+    FX_FORCE_INLINE VkRenderPass Get() const { return InternalRenderPass; }
 
     ~RenderPass() { Destroy(); }
 
 public:
-    VkRenderPass RenderPass = nullptr;
+    VkRenderPass InternalRenderPass = nullptr;
     CommandBuffer* pCommandBuffer = nullptr;
 
     Vec2u Size = Vec2u::sZero;

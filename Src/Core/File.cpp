@@ -41,7 +41,7 @@ void File::Open(const String& path, eModType mt, eDataType dt)
     // If the file handle is already set, reopen it with the new path or mode.
     if (pFileHandle != nullptr) {
 #ifdef FX_PLATFORM_WINDOWS
-        errno_t result = freopen_s(&pFileHandle, path, mode, pFileHandle);
+        errno_t result = freopen_s(&pFileHandle, path.CStr(), mode, pFileHandle);
         if (result) {
             pFileHandle = nullptr;
         }
@@ -54,7 +54,7 @@ void File::Open(const String& path, eModType mt, eDataType dt)
     }
 
 #ifdef FX_PLATFORM_WINDOWS
-    errno_t result = fopen_s(&pFileHandle, path, mode);
+    errno_t result = fopen_s(&pFileHandle, path.CStr(), mode);
 
     if (result) {
         pFileHandle = nullptr;

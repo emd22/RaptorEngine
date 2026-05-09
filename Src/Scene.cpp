@@ -138,7 +138,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
         mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
     }
 
-    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
     // gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
     renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
@@ -199,7 +199,7 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
     Pipeline* pipeline = &gShadowRenderer->GetPipeline();
 
-    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
     for (const TSRef<Object>& obj : mObjects) {
         if (!obj->IsShadowCaster()) {

@@ -274,7 +274,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 
         .layout = Layout2.Get(),
 
-        .renderPass = render_pass.RenderPass,
+        .renderPass = render_pass.Get(),
         .subpass = 0,
     };
 
@@ -297,7 +297,7 @@ void Pipeline::Bind(const CommandBuffer& cmd)
         return;
     }
 
-    vkCmdBindPipeline(cmd.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, InternalPipeline);
+    vkCmdBindPipeline(cmd.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, InternalPipeline);
 
     spBoundPipeline = this->InternalPipeline;
 }

@@ -37,8 +37,8 @@ class DeferredCompPass;
 
 struct GpuUploadContext
 {
-    CommandPool CommandPool;
-    CommandBuffer CommandBuffer;
+    CommandPool CmdPool;
+    CommandBuffer CmdBuffer;
 
     Fence UploadFence;
 

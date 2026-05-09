@@ -111,8 +111,8 @@ void RenderBackend::Init(Vec2u window_size)
 
 void RenderBackend::InitUploadContext()
 {
-    UploadContext.CommandPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
-    UploadContext.CommandBuffer.Create(&UploadContext.CommandPool);
+    UploadContext.CmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
+    UploadContext.CmdBuffer.Create(&UploadContext.CmdPool);
 
     UploadContext.UploadFence.Create();
     UploadContext.UploadFence.Reset();
@@ -121,8 +121,8 @@ void RenderBackend::InitUploadContext()
 void RenderBackend::DestroyUploadContext()
 {
     UploadContext.UploadFence.Destroy();
-    UploadContext.CommandBuffer.Destroy();
-    UploadContext.CommandPool.Destroy();
+    UploadContext.CmdBuffer.Destroy();
+    UploadContext.CmdPool.Destroy();
 }
 
 void RenderBackend::InitFrames()
@@ -135,8 +135,8 @@ void RenderBackend::InitFrames()
 
     for (int i = 0; i < Frames.Size; i++) {
         FrameData& frame = Frames.pData[i];
-        frame.CommandPool.Create(device, graphics_family);
-        frame.CommandBuffer.Create(&frame.CommandPool);
+        frame.CmdPool.Create(device, graphics_family);
+        frame.CmdBuffer.Create(&frame.CmdPool);
         /*frame.ShadowCommandBuffer.Create(&frame.CommandPool);
         frame.CompCommandBuffer.Create(&frame.CommandPool);
         frame.LightCommandBuffer.Create(&frame.CommandPool);*/
@@ -166,7 +166,7 @@ void RenderBackend::DestroyFrames()
         // frame.DescriptorSet.Destroy();
         frame.CompDescriptorSet.Destroy();
 
-        frame.CommandBuffer.Destroy();
+        frame.CmdBuffer.Destroy();
 
         frame.Destroy();
     }
@@ -423,7 +423,7 @@ void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipel
 
 void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
 {
-    CommandBuffer& cmd = UploadContext.CommandBuffer;
+    CommandBuffer& cmd = UploadContext.CmdBuffer;
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     upload_func(cmd);
@@ -433,7 +433,7 @@ void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &cmd.CommandBuffer,
+        .pCommandBuffers = &cmd.Cmd,
     };
 
     // Log::Debug(
@@ -443,20 +443,20 @@ void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
 
     SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
 
-    VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Fence),
+    VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Get()),
           "Error submitting upload buffer");
 
     UploadContext.UploadFence.WaitFor();
     UploadContext.UploadFence.Reset();
 
-    UploadContext.CommandPool.Reset();
+    UploadContext.CmdPool.Reset();
 }
 
 
 void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
 {
     CommandBuffer cmd;
-    cmd.Create(&GetFrame()->CommandPool);
+    cmd.Create(&GetFrame()->CmdPool);
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     submit_func(cmd);
@@ -466,7 +466,7 @@ void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &cmd.CommandBuffer,
+        .pCommandBuffers = &cmd.Cmd,
     };
 
     SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
@@ -505,7 +505,7 @@ void RenderBackend::BeginGeometry()
 {
     FrameData* frame = GetFrame();
 
-    pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
+    pDeferredRenderer->GPass.Begin(frame->CmdBuffer, *pDeferredRenderer->pGeometryPipeline);
 }
 
 void RenderBackend::PresentFrame()
@@ -528,7 +528,7 @@ void RenderBackend::PresentFrame()
         .pWaitDstStageMask = wait_stages,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
+        .pCommandBuffers = &frame->CmdBuffer.Cmd,
 
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = &submit_semaphore,
@@ -537,7 +537,7 @@ void RenderBackend::PresentFrame()
     {
         SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 
-        VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, frame->InFlight.Fence),
+        VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, frame->InFlight.Get()),
               "Error submitting draw buffer");
     }
 
@@ -585,10 +585,10 @@ void RenderBackend::BeginLighting()
 
     Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::eD32_Float, 0);
     Assert(depth_target != nullptr);
-    depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
+    depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
-    pDeferredRenderer->LightPass.Begin(frame->CommandBuffer,
+    pDeferredRenderer->LightPass.Begin(frame->CmdBuffer,
                                        gPipelineCache->Request(ePipelineName::LightingDirectional));
 
     // gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
@@ -597,7 +597,7 @@ void RenderBackend::BeginLighting()
     // gState->Reset();
 
 
-    pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                  gPipelineCache->Request(ePipelineName::LightingDirectional),
                                                  gRenderer->LightBuffer.GetBaseOffset());
 }
@@ -614,11 +614,11 @@ void RenderBackend::BeginUnlit()
     // Assert(depth_target != nullptr);
     // depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
-    pDeferredRenderer->RpForward.Begin(&frame->CommandBuffer, pDeferredRenderer->FbForward.Get(),
+    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
                                        Slice<VkClearValue>({}, 0));
 
     // pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
-    gPipelineCache->Bind(ePipelineName::Unlit, frame->CommandBuffer);
+    gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
 }
 
 void RenderBackend::DoComposition(Camera& render_cam)
@@ -627,11 +627,11 @@ void RenderBackend::DoComposition(Camera& render_cam)
 
     pDeferredRenderer->RpForward.End();
 
-    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, gPipelineCache->Request(ePipelineName::Composition));
+    pDeferredRenderer->CompPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Composition));
     pDeferredRenderer->DoCompPass(render_cam);
 
     pDeferredRenderer->CompPass.End();
-    frame->CommandBuffer.End();
+    frame->CmdBuffer.End();
 
     PresentFrame();
     ProcessDeletionQueue();

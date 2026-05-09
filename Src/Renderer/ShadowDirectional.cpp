@@ -82,7 +82,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 
 void ShadowDirectional::Begin()
 {
-    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
     RenderStage.Begin(cmd, mPipeline);
 

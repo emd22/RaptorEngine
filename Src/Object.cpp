@@ -285,7 +285,7 @@ void Object::Render(const Camera& camera)
         //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
         //                    &push_constants);
 
-        gRenderer->SubmitPushConstants(frame->CommandBuffer, *pMaterial->pPipeline,
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, *pMaterial->pPipeline,
                                        eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
 
@@ -313,7 +313,7 @@ void Object::Render(const Camera& camera)
         push_constants.ObjectId = ObjectId;
         push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
 
-        gRenderer->SubmitPushConstants(frame->CommandBuffer, *obj->pMaterial->pPipeline,
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, *obj->pMaterial->pPipeline,
                                        eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
         obj->RenderMesh();
@@ -341,7 +341,7 @@ void Object::RenderUnlit(const Camera& camera)
     DrawPushConstants push_constants {};
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(GetObjectLayer()).RawData, sizeof(Mat4f));
 
-    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
     Pipeline* pipeline = &gPipelineCache->Request(ePipelineName::Unlit);
     if (pMaterial && pMaterial->pPipeline) {
         pipeline = pMaterial->pPipeline;
@@ -439,7 +439,7 @@ void Object::RenderMesh()
 
     FrameData* frame = gRenderer->GetFrame();
 
-    CommandBuffer& cmd = frame->CommandBuffer;
+    CommandBuffer& cmd = frame->CmdBuffer;
 
     pMaterial->Bind(&cmd);
 

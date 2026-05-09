@@ -21,9 +21,9 @@ public:
     void Destroy();
 
 public:
-    CommandPool CommandPool;
+    CommandPool CmdPool;
 
-    CommandBuffer CommandBuffer;
+    CommandBuffer CmdBuffer;
 
     // DescriptorSet DescriptorSet;
     DescriptorSet CompDescriptorSet;
