@@ -157,8 +157,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
     const renderer::ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
 
-    LogInfo("IS 4 byte aligned? {:s}", !(spirv_bin->GetBufferSize() % 4));
-
     LogInfo("Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
 
     state.Pack.AddEntry(shader_id, MakeSlice<uint8>(reinterpret_cast<uint8*>(spirv_bin->GetBufferPointer()),

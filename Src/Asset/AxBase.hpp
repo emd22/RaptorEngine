@@ -57,7 +57,6 @@ public:
         std::lock_guard guard(mCallbackMutex);
         // If the asset has already been loaded, call the callback immediately.
         if (IsFinishedNotifier.IsDone()) {
-            LogInfo("CALLING EARLY");
             on_loaded_callback(this);
             return;
         }
