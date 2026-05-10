@@ -118,7 +118,7 @@ protected:
 
     Mat4f mModelMatrix = Mat4f::sIdentity;
 
-    uint32 mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
+    int32 mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
     // Mat4f mNormalMatrix = Mat4f::Identity;
 };
 

@@ -86,7 +86,7 @@ Mat4f& Entity::GetModelMatrix()
 void Entity::SubmitMatrixIfNeeded()
 {
     // There is no object id assigned to the object yet, break
-    if (ObjectId == UINT32_MAX || mMatrixUpdateFramesRemaining == 0) {
+    if (ObjectId == UINT32_MAX || mMatrixUpdateFramesRemaining <= 0) {
         return;
     }
 

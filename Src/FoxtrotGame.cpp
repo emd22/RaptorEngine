@@ -486,24 +486,14 @@ void FoxtrotGame::Tick()
                                                                                 pArmsObject->AnimationTime, RHandBone);
 
         hand_transform.Position *= Vec3f(pArmsObject->mScale);
-
-        pArmsObject->UpdateIfOutOfDate();
+        //pArmsObject->MarkTransformOutOfDate();
+        //pArmsObject->UpdateIfOutOfDate();
 
         pPistolObject->SetRotationOrigin(ArmsOffset + hand_transform.Position + PistolOffset);
         pPistolObject->SetPosition(pArmsObject->mPosition + hand_transform.Position + PistolOffset);
 
         pPistolObject->mRotation = PistolRotationGoal;
-        pPistolObject->UpdateIfOutOfDate();
-        // pPistolObject->SetRotationOrigin(pistol_destination);
     }
-
-    // pPistolObject->SetRotationOrigin(ArmsOffset);
-
-
-    // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
-    // pArmsObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
-    // pArmsObject->mRotation = PistolRotationGoal;
-
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 
