@@ -18,28 +18,26 @@ enum class eShaderName : uint32
 
 namespace ShaderNameUtil {
 
-#define SN_READABLE_NAME(name_)                                                                                        \
-    case eShaderName::name_:                                                                                           \
-        return #name_
+#define ENUM_TYPE eShaderName
 
 constexpr uint32 scNumShaders = static_cast<uint32>(eShaderName::NumShaders);
 
 constexpr const char* GetName(const eShaderName id)
 {
     switch (id) {
-        SN_READABLE_NAME(Geometry);
-        SN_READABLE_NAME(Lighting);
-        SN_READABLE_NAME(Composition);
-        SN_READABLE_NAME(Shadows);
-        SN_READABLE_NAME(Unlit);
-        SN_READABLE_NAME(Text);
+        FX_ENUM_CASE_NAME(Geometry);
+        FX_ENUM_CASE_NAME(Lighting);
+        FX_ENUM_CASE_NAME(Composition);
+        FX_ENUM_CASE_NAME(Shadows);
+        FX_ENUM_CASE_NAME(Unlit);
+        FX_ENUM_CASE_NAME(Text);
     default:
         return "Unknown";
     }
     return nullptr;
 }
 
-#undef SN_READABLE_NAME
+#undef ENUM_TYPE
 
 } // namespace ShaderNameUtil
 

@@ -207,9 +207,9 @@ void FoxtrotGame::CreateGame()
     gPhysics->OptimizeBroadPhase();
 
     pSun = mMainScene.GetDirectionalLight();
-
+/*
     pPistolObject = mMainScene.FindObject(HashStr32("Pistol"));
-    pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));
+    pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));*/
 
     LoadOffsetsFile();
 
@@ -465,7 +465,7 @@ void FoxtrotGame::Tick()
     //                              Vec3f(0.15);
 
 
-    pArmsObject->SetRotationOrigin(ArmsOffset);
+    /*pArmsObject->SetRotationOrigin(ArmsOffset);
     pArmsObject->SetPosition(camera->Position + ArmsOffset);
 
     PistolRotationGoal = Quat::FromEulerAngles(Vec3f(-camera->mAngleY, camera->mAngleX, 0));
@@ -480,14 +480,12 @@ void FoxtrotGame::Tick()
                                                                                 pArmsObject->AnimationTime, RHandBone);
 
         hand_transform.Position *= Vec3f(pArmsObject->mScale);
-        //pArmsObject->MarkTransformOutOfDate();
-        //pArmsObject->UpdateIfOutOfDate();
 
         pPistolObject->SetRotationOrigin(ArmsOffset + hand_transform.Position + PistolOffset);
         pPistolObject->SetPosition(pArmsObject->mPosition + hand_transform.Position + PistolOffset);
 
         pPistolObject->mRotation = PistolRotationGoal;
-    }
+    }*/
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 

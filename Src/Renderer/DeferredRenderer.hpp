@@ -42,8 +42,6 @@ private:
 
     VkPipelineLayout CreateGPassPipelineLayout();
     VkPipelineLayout CreateGPassSkinnedPipelineLayout();
-    VkPipelineLayout CreateUnlitPipelineLayout();
-    VkPipelineLayout CreateDebugLayerPipelineLayout();
 
 
     // Lighting
@@ -62,8 +60,6 @@ private:
     void DestroyCompPipeline();
 
     void CreateUnlitPipeline();
-
-    PipelineLayout CreateCompPipelineLayout();
 
     void CreateCompPass();
     void BuildLightDescriptors();

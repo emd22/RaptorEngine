@@ -145,6 +145,10 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
         ModulePanicVulkan("Could not create vulkan image", status);
     }
 
+    static uint32 alloc_number = 0;
+
+    std::string alloc_name = std::to_string(alloc_number++);
+    vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
 
     // LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
     //           reinterpret_cast<void*>(Allocation));

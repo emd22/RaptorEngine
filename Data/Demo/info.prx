@@ -36,6 +36,11 @@ Objects = {
         Mesh = "/Skybox.glb"
         Unlit = $True
     }
+	
+	FireExtinguisher = {
+		Mesh = "/FireExtinguisher.glb"
+		Shadows = $True
+	}
 
     /*Level = {
         Mesh = "/Sponza.glb"
@@ -51,16 +56,17 @@ Objects = {
         Pos = [0.0, -1.25, 0.0]
     }
 
-    Building = {
+    /*Building = {
         Mesh = "/Building.glb"
         Pos = [0.0, -0.8, 10.0]
     }
 
-    /*Mallard = {
+    Mallard = {
         Mesh = "Mallard.glb"
         Shadows = $True
     }*/
 
+	/*
     AnimTest = {
         Mesh = "/Model2.glb"
         Shadows = $False
@@ -74,6 +80,7 @@ Objects = {
         Shadows = $True
         Layer = $CObjectLayer.Player
     }
+	*/
 
 
     BrickTest = {

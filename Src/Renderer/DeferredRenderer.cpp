@@ -90,23 +90,6 @@ VkPipelineLayout DeferredRenderer::CreateGPassPipelineLayout()
         DsLayoutGPassMaterialAlbedoOnly = builder.Build();
     }
 
-    // StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
-    //     DsLayoutGPassMaterial,
-    //     DsLayoutLightingMaterialProperties,
-    //     gObjectManager->DsLayoutObjectBuffer,
-    // };
-
-    // StackArray<PushConstants, 1> push_consts = {
-    //     PushConstants {
-    //         .Size = sizeof(DrawPushConstants),
-    //         .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
-    //     },
-    // };
-
-    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
-
-    // Util::SetDebugLabel("Geometry PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
-
     return nullptr;
 }
 
@@ -122,73 +105,12 @@ VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
         DsLayoutGPassSkinned = builder.Build();
     }
 
-
-    // StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
-    //     DsLayoutGPassSkinned,
-    //     DsLayoutLightingMaterialProperties,
-    //     gObjectManager->DsLayoutObjectBuffer,
-    // };
-
-    // StackArray<PushConstants, 1> push_consts = {
-    //     PushConstants {
-    //         .Size = sizeof(DrawPushConstants),
-    //         .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
-    //     },
-    // };
-
-    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
-
-    // Util::SetDebugLabel("Geometry(Skinned) PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
-
-    return nullptr;
-}
-
-VkPipelineLayout DeferredRenderer::CreateUnlitPipelineLayout()
-{
-    // StackArray<VkDescriptorSetLayout, 3> ds_layouts = {
-    //     DsLayoutGPassMaterial,
-    //     DsLayoutLightingMaterialProperties,
-    //     gObjectManager->DsLayoutObjectBuffer,
-    // };
-
-    // StackArray<PushConstants, 1> push_consts = {
-    //     PushConstants {
-    //         .Size = sizeof(DrawPushConstants),
-    //         .ShaderTypes = eShaderType::Vertex | eShaderType::Pixel,
-    //     },
-    // };
-
-    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
-
-    // Util::SetDebugLabel("Unlit PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
-
-    return nullptr;
-}
-
-VkPipelineLayout DeferredRenderer::CreateDebugLayerPipelineLayout()
-{
-    // StackArray<VkDescriptorSetLayout, 1> ds_layouts = {};
-
-    // StackArray<PushConstants, 1> push_consts = {
-    //     PushConstants {
-    //         .Size = sizeof(DebugLayerPushConstants),
-    //         .ShaderTypes = eShaderType::Vertex,
-    //     },
-    // };
-
-    // VkPipelineLayout layout = Pipeline::CreateLayout(Slice(push_consts), Slice(ds_layouts));
-
-    // Util::SetDebugLabel("Debug Layer PL L", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
-
-    // return layout;
     return nullptr;
 }
 
 
 void DeferredRenderer::CreateUnlitPipeline()
 {
-    CreateUnlitPipelineLayout();
-
     Ref<Shader> shader_unlit = gShaderCache->Request(eShaderName::Unlit);
     Ref<ShaderProgram> vertex_shader = shader_unlit->GetProgram(eShaderType::Vertex, {});
     Ref<ShaderProgram> pixel_shader = shader_unlit->GetProgram(eShaderType::Pixel, {});
@@ -224,16 +146,6 @@ void DeferredRenderer::CreateUnlitPipeline()
     RpForward.Create(targets, Target::scFullScreen);
     FbForward.Create(targets.GetImageViews(), RpForward, Target::scFullScreen);
 
-    // builder.SetLayout(layout)
-    //     .SetName("Unlit Pipeline")
-    //     .SetOutputTargets(&targets)
-    //     .SetShaders(vertex_shader, pixel_shader)
-    //     .SetRenderPass(&RpForward)
-    //     .SetVertexDescription(&vertex_info)
-    //     .SetCullMode(VK_CULL_MODE_BACK_BIT)
-    //     .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    // builder.Build(PlUnlit);
-
     // Unlit pipeline
     gState->BeginPipeline(ePipelineName::Unlit);
     gState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
@@ -250,23 +162,7 @@ void DeferredRenderer::CreateUnlitPipeline()
 
     gState->EndPipeline();
 
-    // {
-    //     Ref<Shader> shader_text = gShaderCache->Request(eShaderName::Text);
-    //     vertex_shader = shader_text->GetProgram(eShaderType::Vertex, {});
-    //     pixel_shader = shader_text->GetProgram(eShaderType::Pixel, {});
-
-    //     builder.SetLayout(layout)
-    //         .SetName("Text Pipeline")
-    //         .SetOutputTargets(&targets)
-    //         .SetShaders(vertex_shader, pixel_shader)
-    //         .SetRenderPass(&RpForward)
-    //         .SetVertexDescription(&vertex_info)
-    //         .SetCullMode(VK_CULL_MODE_BACK_BIT)
-    //         .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
-    //     builder.Build(PlText);
-    // }
-
-
+    // Text rendering pipeline
     gState->BeginPipeline(ePipelineName::TextRendering);
     gState->SetLayout(ePipelineName::Unlit);
     gState->SetOutputTargets(&targets);
@@ -286,27 +182,6 @@ void DeferredRenderer::CreateUnlitPipeline()
     gState->SetRenderPass(&RpForward);
     gState->SetOutputTargets(&targets);
     gState->EndPipeline();
-
-    // Create debug layer pipeline
-
-    // VkPipelineLayout debug_layout = CreateDebugLayerPipelineLayout();
-
-    // vertex_shader = shader_unlit->GetProgram(eShaderType::Vertex,
-    //                                          { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
-
-    // pixel_shader = shader_unlit->GetProgram(eShaderType::Pixel,
-    //                                         { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
-
-
-    // VertexDescription debug_vertex_description = VertexUtil::BuildDescription<eVertexType::Slim>();
-
-    // builder.SetLayout(debug_layout)
-    //     .SetName("Debug Layer Pipeline")
-    //     .SetShaders(vertex_shader, pixel_shader)
-    //     .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE)
-    //     .SetVertexDescription(&debug_vertex_description)
-    //     .SetProperties({ .bRenderLines = true })
-    //     .Build(PlDebugLayer);
 }
 
 
@@ -315,32 +190,6 @@ void DeferredRenderer::CreateGPassPipeline()
     CreateGPassPipelineLayout();
 
     CreateGPass();
-
-    {
-        // gState->BeginPipeline(ePipelineName::Geometry);
-        // gState->SetOutputTargets(GPass.GetTargets());
-        // gState->SetShader(eShaderName::Geometry, {});
-        // gState->SetCullMode(eCullMode::Back);
-        // gState->SetRenderPass(&GPass.GetRenderPass());
-        // gState->EndPipeline();
-    }
-
-    // Ref<Shader> shader_geometry = gShaderCache->Request(eShaderName::Geometry);
-    // Ref<ShaderProgram> vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, {});
-    // Ref<ShaderProgram> fragment_shader = shader_geometry->GetProgram(eShaderType::Pixel, {});
-
-    // VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
-
-    // PipelineBuilder builder;
-
-    // builder.SetLayout(gpass_layout)
-    //     .SetName("Geometry Pipeline")
-    //     .SetOutputTargets(&GPass.GetTargets())
-    //     .SetShaders(vertex_shader, fragment_shader)
-    //     .SetRenderPass(&GPass.GetRenderPass())
-    //     .SetVertexDescription(&vertex_info)
-    //     .SetCullMode(VK_CULL_MODE_BACK_BIT)
-    //     .SetWindingOrder(VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
     gState->BeginPipeline(ePipelineName::Geometry);
     // Descriptors
@@ -385,23 +234,6 @@ void DeferredRenderer::CreateGPassPipeline()
     gState->SetCullMode(eCullMode::Back);
     gState->EndPipeline();
 
-    // {
-    //     vertex_info = VertexUtil::BuildDescription<eVertexType::Skinned>();
-
-    //     SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_NORMAL_MAPS", "1" },
-    //                                        ShaderMacro { "USE_SKINNING", "1" } };
-
-    //     Ref<ShaderProgram> nm_vertex_shader = shader_geometry->GetProgram(eShaderType::Vertex, macros);
-    //     Ref<ShaderProgram> nm_fragment_shader = shader_geometry->GetProgram(eShaderType::Pixel, macros);
-
-
-    //     builder.SetLayout(skinned_layout)
-    //         .SetPolygonMode(VK_POLYGON_MODE_FILL)
-    //         .SetVertexDescription(&vertex_info)
-    //         .SetShaders(nm_vertex_shader, nm_fragment_shader)
-    //         .Build(PlGeometrySkinned);
-    // }
-
     pGeometryPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
 }
 
@@ -424,14 +256,8 @@ void DeferredRenderer::DestroyGPassPipeline()
         DsLayoutGPassMaterialAlbedoOnly = nullptr;
     }
 
-    // PlGeometry.Destroy();
     gPipelineCache->Request(ePipelineName::Geometry).Destroy();
     gPipelineCache->Request(ePipelineName::GeometryNormalMaps).Destroy();
-
-    // PlGeometryWithNormalMaps.Layout = nullptr;
-    // PlGeometryWithNormalMaps.Destroy();
-
-    // PlGeometrySkinned.Destroy();
 }
 
 
@@ -455,62 +281,43 @@ void DeferredRenderer::CreateLightingDSLayout()
     DsLayoutLightingFrag = builder.Build();
 }
 
-// PipelineLayout DeferredRenderer::CreateLightingPipelineLayout()
-// {
-// VkDescriptorSetLayout layouts[] = {
-//     DsLayoutLightingFrag,
-//     DsLayoutLightingMaterialProperties,
-//     gObjectManager->DsLayoutObjectBuffer,
-// };
-
-// StackArray<PushConstants, 2> push_consts = {
-//     PushConstants { .Size = sizeof(LightVertPushConstants), .ShaderTypes = eShaderType::Vertex },
-// };
-
-// PipelineLayout layout = PipelineLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
-// Util::SetDebugLabel("Lighting Pipeline Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
-
-// PlLightingOutsideVolume.SetLayout(layout);
-// PlLightingInsideVolume.SetLayout(layout);
-
-// return layout;
-// }
-
 void DeferredRenderer::CreateLightingPipeline()
 {
     if (DsLayoutLightingFrag == nullptr) {
         CreateLightingDSLayout();
     }
 
-    LightPass.Create(gRenderer->Swapchain.Extent);
+    {
+        LightPass.Create(gRenderer->Swapchain.Extent);
 
 
-    LightPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+        LightPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
-    Target* light_target = LightPass.GetTarget(eImageFormat::RGBA16_Float);
-    Assert(light_target != nullptr);
-    light_target->FinalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        Target* light_target = LightPass.GetTarget(eImageFormat::RGBA16_Float);
+        Assert(light_target != nullptr);
+        light_target->FinalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    LightPass.BuildRenderStage();
+        LightPass.BuildRenderStage();
+    }
+    {
+        DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
 
-    DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
+        // sDepth
+        DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+        // sAlbedo
+        DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
+                                      &gRenderer->Swapchain.ColorSampler);
+        // sNormals
+        DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float),
+                                      &gRenderer->Swapchain.NormalsSampler);
+        // Skip 3 for the shadow target, added by DirectionalShadows
+        DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
 
-    // sDepth
-    DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-    // sAlbedo
-    DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
-    // sNormals
-    DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
-    // Skip 3 for the shadow target, added by DirectionalShadows
-    DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
-
-    DsLighting.Build();
+        DsLighting.Build();
+    }
 
     Shader lighting_shader("Lighting");
-
-    // CreateLightingPipelineLayout();
-
 
     BlendAttachment lighting_blend = BlendAttachment {
         .Enabled = true,
@@ -588,30 +395,22 @@ void DeferredRenderer::DestroyLightingPipeline()
     VkDevice device = gRenderer->GetDevice()->Device;
 
     // Destroy descriptor set layouts
-    if (DsLayoutLightingFrag) {
+    if (DsLayoutLightingFrag != nullptr) {
         vkDestroyDescriptorSetLayout(device, DsLayoutLightingFrag, nullptr);
         DsLayoutLightingFrag = nullptr;
     }
 
-    if (DsLayoutLightingMaterialProperties) {
+    if (DsLayoutLightingMaterialProperties != nullptr) {
         vkDestroyDescriptorSetLayout(device, DsLayoutLightingMaterialProperties, nullptr);
         DsLayoutLightingMaterialProperties = nullptr;
     }
-
-    // PlLightingOutsideVolume.Destroy();
-
-    // PlLightingInsideVolume.Layout = nullptr;
-    // PlLightingInsideVolume.Destroy();
-
-    // PlLightingDirectional.Layout = nullptr;
-    // PlLightingDirectional.Destroy();
 }
 
 //////////////////////////////////////////
 // DeferredRenderer CompPass Functions
 //////////////////////////////////////////
 
-PipelineLayout DeferredRenderer::CreateCompPipelineLayout()
+void DeferredRenderer::CreateCompPipeline()
 {
     {
         DsLayoutBuilder builder {};
@@ -623,27 +422,6 @@ PipelineLayout DeferredRenderer::CreateCompPipelineLayout()
 
         DsLayoutCompFrag = builder.Build();
     }
-
-
-    VkDescriptorSetLayout layouts[] = {
-        DsLayoutCompFrag,
-    };
-
-    StackArray<PushConstants, 1> push_consts = { PushConstants { .Size = sizeof(CompositionPushConstants),
-                                                                 .ShaderTypes = eShaderType::Pixel } };
-
-    PipelineLayout layout = PipelineLayout(Slice(push_consts), MakeSlice(layouts, std::size(layouts)));
-
-    // Util::SetDebugLabel("Composition Layout", VK_OBJECT_TYPE_PIPELINE_LAYOUT, layout);
-    // PlComposition.SetLayout(layout);
-
-
-    return layout;
-}
-
-void DeferredRenderer::CreateCompPipeline()
-{
-    PipelineLayout layout = CreateCompPipelineLayout();
 
     CreateCompPass();
 
@@ -710,11 +488,6 @@ void DeferredRenderer::DoCompPass(Camera& camera)
     Pipeline& composition_pipeline = gPipelineCache->Request(ePipelineName::Composition);
 
     gRenderer->SubmitPushConstants(cmd, composition_pipeline, eShaderType::Pixel, push_constants);
-
-    // vkCmdPushConstants(cmd.Get(), PlComposition.Layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-    //                    &push_constants);
-
-    // CompPass.Begin(cmd, composition_pipeline);
 
     DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, composition_pipeline);
 

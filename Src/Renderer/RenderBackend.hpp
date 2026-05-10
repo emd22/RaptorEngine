@@ -194,10 +194,6 @@ public:
 
     VmaAllocator GpuAllocator = nullptr;
 
-    // XXX: temporary
-    // DescriptorPool GPassDescriptorPool;
-    DescriptorPool CompDescriptorPool;
-
     GpuUploadContext UploadContext;
 
     bool bInitialized = false;
@@ -209,12 +205,6 @@ public:
 
     Uniforms LightBuffer;
     Uniforms BoneBuffer;
-
-    // SamplerCache SamplerCache;
-
-    // PipelineCache PipelineCache;
-
-    // Semaphore OffscreenSemaphore;
 
 private:
     VkInstance mInstance = nullptr;

@@ -183,6 +183,10 @@ constexpr T operator~(T v)
 // #define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX 1
 
 
+#define FX_ENUM_CASE_NAME(member_)                                                                                     \
+    case ENUM_TYPE::member_:                                                                                                \
+        return #member_
+
 struct SpinThreadGuard
 {
 public:

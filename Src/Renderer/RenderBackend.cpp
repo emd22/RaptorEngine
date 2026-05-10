@@ -436,11 +436,6 @@ void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
         .pCommandBuffers = &cmd.Cmd,
     };
 
-    // Log::Debug(
-    //     "cmd thread: %lu",
-    //     std::this_thread::get_id()
-    // );
-
     SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
 
     VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Get()),
@@ -690,7 +685,6 @@ void RenderBackend::Destroy()
     LightBuffer.Destroy();
     BoneBuffer.Destroy();
 
-
     while (!mDeletionQueue.empty()) {
         ProcessDeletionQueue(true);
 
@@ -699,11 +693,9 @@ void RenderBackend::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
-
-    CompDescriptorPool.Destroy();
+    GpuBufferPrintUndestroyed();
 
     GetDevice()->WaitForIdle();
-
     Swapchain.Destroy();
 
     DestroyGPUAllocator();

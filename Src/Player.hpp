@@ -118,6 +118,8 @@ private:
     float32 mBobCounterX = 0.0f;
     float32 mBobCounterY = 0.0f;
 
+    bool bBobReverse = false;
+
     Vec3f mUserForce = Vec3f::sZero;
 
     bool mbIsApplyingUserForce : 1 = false;
