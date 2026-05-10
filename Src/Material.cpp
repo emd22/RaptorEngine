@@ -11,6 +11,7 @@
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 
 FX_SET_MODULE_NAME("Material")
@@ -205,14 +206,14 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 void Material::SetDefaultPipeline()
 {
     if (NormalMap.Exists()) {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometryWithNormalMaps;
+        pPipeline = &gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
     }
     else {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometry;
+        pPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
     }
 
     if (bSupportsSkinning) {
-        pPipeline = &gRenderer->pDeferredRenderer->PlGeometrySkinned;
+        pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 }
 
@@ -256,7 +257,7 @@ void Material::Build()
     }
 
     if (bSupportsSkinning) {
-        mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.Size);
+        mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.PageSize);
     }
 
     mDsDefault.Build();

@@ -102,6 +102,7 @@ void Scene::Render(Camera* shadow_camera)
     // Render lights
     gRenderer->BeginLighting();
 
+    gRenderer->LightBuffer.Rewind();
 
     for (const Ref<LightBase>& light : mLights) {
         light->Render(camera, shadow_camera);
@@ -137,13 +138,13 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
         mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
     }
 
-    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
     // gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
-    renderer::Pipeline* pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
+    renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
 
     // renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
-    pipeline->Bind(cmd);
+    pipeline.Bind(cmd);
 
     DebugLayerPushConstants push_constants {};
 
@@ -164,9 +165,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
             push_constants.DebugColor = debug_color.AsUInt();
         }
 
-        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push_constants),
-                           &push_constants);
-
+        gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
         mpDebugCube->Render(cmd, 1);
     }
 
@@ -200,7 +199,7 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
     Pipeline* pipeline = &gShadowRenderer->GetPipeline();
 
-    CommandBuffer& cmd = gRenderer->GetFrame()->CommandBuffer;
+    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
     for (const TSRef<Object>& obj : mObjects) {
         if (!obj->IsShadowCaster()) {
@@ -229,8 +228,7 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
         consts.ObjectId = obj->ObjectId;
 
-        vkCmdPushConstants(cmd.Get(), pipeline->Layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ShadowPushConstants),
-                           &consts);
+        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex, consts);
 
         obj->RenderPrimitive(cmd);
     }

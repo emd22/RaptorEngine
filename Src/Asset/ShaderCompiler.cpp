@@ -80,6 +80,7 @@ static const wchar_t* ShaderTypeToDxName(eShaderType type)
         return L"vs_" SHADER_VERSION;
     case eShaderType::Pixel:
         return L"ps_" SHADER_VERSION;
+    default:;
     }
     return L"";
 }
@@ -155,8 +156,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
     result->GetResult(&spirv_bin);
 
     const renderer::ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
-
-    LogInfo("IS 4 byte aligned? {:s}", !(spirv_bin->GetBufferSize() % 4));
 
     LogInfo("Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
 

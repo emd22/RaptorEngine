@@ -6,12 +6,9 @@
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
+#include <Renderer/Limits.hpp>
 
 namespace fx {
-
-namespace Limits {
-static constexpr uint32 MaxBones = 100;
-}
 
 using BoneId = uint32;
 static constexpr BoneId BoneNull = UINT32_MAX;

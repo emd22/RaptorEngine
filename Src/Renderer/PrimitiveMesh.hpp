@@ -108,10 +108,10 @@ public:
         const VkDeviceSize offset = 0;
         //        FrameData* frame = Fwd_GetFrame();
 
-        vkCmdBindVertexBuffers(cmd.CommandBuffer, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
-        vkCmdBindIndexBuffer(cmd.CommandBuffer, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
+        vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(cmd.CommandBuffer, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0,
+        vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0,
                          0, 0);
     }
 

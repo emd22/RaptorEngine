@@ -19,4 +19,10 @@ void PerspectiveCamera::UpdateCameraMatrix()
     InvProjectionMatrix = ProjectionMatrix.Inverse();
 }
 
+void PerspectiveCamera::OnWindowResize(const Vec2u& size) 
+{ 
+    float32 aspect_ratio = static_cast<float32>(size.X) / static_cast<float32>(size.Y); 
+    SetAspectRatio(aspect_ratio);
+}
+
 } // namespace fx

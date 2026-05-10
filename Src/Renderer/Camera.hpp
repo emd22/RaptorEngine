@@ -27,6 +27,7 @@ public:
     FX_FORCE_INLINE Vec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
 
     virtual const Mat4f& GetCameraMatrix(eObjectLayer layer) const { return mCameraMatrix; }
+    virtual void OnWindowResize(const Vec2u& size) {};
 
     FX_FORCE_INLINE void SetNearPlane(float32 near)
     {
@@ -117,6 +118,8 @@ public:
     void UpdateProjectionMatrix() override;
     void UpdateCameraMatrix() override;
 
+    void OnWindowResize(const Vec2u& size) override;
+
     void ResolveViewToTexels(float32 texture_res);
 
     FX_FORCE_INLINE void SetBounds(float32 width, float32 height)
@@ -161,6 +164,7 @@ public:
 
     void UpdateProjectionMatrix() override;
     void UpdateCameraMatrix() override;
+    void OnWindowResize(const Vec2u& size) override;
 
     float32 GetFov() const { return RadToDeg(mFovRad); }
     float32 GetFovRad() const { return mFovRad; }

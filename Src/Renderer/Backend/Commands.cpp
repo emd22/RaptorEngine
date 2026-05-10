@@ -22,7 +22,7 @@ void CommandPool::Create(GpuDevice* device, uint32 queue_family)
 
     mpDevice = device;
 
-    const VkResult status = vkCreateCommandPool(mpDevice->Device, &create_info, nullptr, &CommandPool);
+    const VkResult status = vkCreateCommandPool(mpDevice->Device, &create_info, nullptr, &CmdPool);
 
     if (status != VK_SUCCESS) {
         PanicVulkan("CommandPool", "Error creating command pool", status);
@@ -35,19 +35,19 @@ void CommandBuffer::Create(CommandPool* pool)
 
     const VkCommandBufferAllocateInfo buffer_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = pool->CommandPool,
+        .commandPool = pool->Get(),
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
 
     mpDevice = gRenderer->GetDevice();
 
-    const VkResult status = vkAllocateCommandBuffers(mpDevice->Device, &buffer_info, &CommandBuffer);
+    const VkResult status = vkAllocateCommandBuffers(mpDevice->Device, &buffer_info, &Cmd);
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Could not allocate command buffer", status);
     }
 
-    LogDebug("Creating Command buffer 0x{:p} from queue family {:d}", reinterpret_cast<void*>(CommandBuffer),
+    LogDebug("Creating Command buffer 0x{:p} from queue family {:d}", reinterpret_cast<void*>(Cmd),
              pool->QueueFamilyIndex);
 
     mbInitialized = true;
@@ -70,7 +70,7 @@ void CommandBuffer::Record(VkCommandBufferUsageFlags usage_flags)
         .pInheritanceInfo = nullptr,
     };
 
-    const VkResult status = vkBeginCommandBuffer(CommandBuffer, &begin_info);
+    const VkResult status = vkBeginCommandBuffer(Cmd, &begin_info);
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Failed to begin recording command buffer", status);
     }
@@ -80,19 +80,19 @@ void CommandBuffer::Reset()
 {
     CheckInitialized();
 
-    vkResetCommandBuffer(CommandBuffer, 0);
+    vkResetCommandBuffer(Cmd, 0);
 }
 
 void CommandBuffer::End()
 {
     CheckInitialized();
 
-    const VkResult status = vkEndCommandBuffer(CommandBuffer);
+    const VkResult status = vkEndCommandBuffer(Cmd);
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Failed to create command buffer!", status);
     }
 }
 
-void CommandBuffer::Destroy() { vkFreeCommandBuffers(mpDevice->Device, mpCommandPool->CommandPool, 1, &CommandBuffer); }
+void CommandBuffer::Destroy() { vkFreeCommandBuffers(mpDevice->Device, mpCommandPool->Get(), 1, &Cmd); }
 
 } // namespace fx::renderer

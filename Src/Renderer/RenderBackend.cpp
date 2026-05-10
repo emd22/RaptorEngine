@@ -20,6 +20,8 @@
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/Limits.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/State.hpp>
 #include <thread>
 #include <vector>
@@ -95,9 +97,8 @@ void RenderBackend::Init(Vec2u window_size)
 
     gObjectManager->Create();
 
-    ShaderUniform.Create(scDefaultUniformSize);
-
-    BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f));
+    LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
+    BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), 1);
 
     Mat4f initial_matrix = Mat4f::sIdentity;
     BoneBuffer.SetAllValues(initial_matrix.RawData, true);
@@ -110,8 +111,8 @@ void RenderBackend::Init(Vec2u window_size)
 
 void RenderBackend::InitUploadContext()
 {
-    UploadContext.CommandPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
-    UploadContext.CommandBuffer.Create(&UploadContext.CommandPool);
+    UploadContext.CmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
+    UploadContext.CmdBuffer.Create(&UploadContext.CmdPool);
 
     UploadContext.UploadFence.Create();
     UploadContext.UploadFence.Reset();
@@ -120,8 +121,8 @@ void RenderBackend::InitUploadContext()
 void RenderBackend::DestroyUploadContext()
 {
     UploadContext.UploadFence.Destroy();
-    UploadContext.CommandBuffer.Destroy();
-    UploadContext.CommandPool.Destroy();
+    UploadContext.CmdBuffer.Destroy();
+    UploadContext.CmdPool.Destroy();
 }
 
 void RenderBackend::InitFrames()
@@ -134,8 +135,8 @@ void RenderBackend::InitFrames()
 
     for (int i = 0; i < Frames.Size; i++) {
         FrameData& frame = Frames.pData[i];
-        frame.CommandPool.Create(device, graphics_family);
-        frame.CommandBuffer.Create(&frame.CommandPool);
+        frame.CmdPool.Create(device, graphics_family);
+        frame.CmdBuffer.Create(&frame.CmdPool);
         /*frame.ShadowCommandBuffer.Create(&frame.CommandPool);
         frame.CompCommandBuffer.Create(&frame.CommandPool);
         frame.LightCommandBuffer.Create(&frame.CommandPool);*/
@@ -165,12 +166,31 @@ void RenderBackend::DestroyFrames()
         // frame.DescriptorSet.Destroy();
         frame.CompDescriptorSet.Destroy();
 
-        frame.CommandBuffer.Destroy();
+        frame.CmdBuffer.Destroy();
 
         frame.Destroy();
     }
 
     Frames.Free();
+}
+
+void RenderBackend::RebuildRenderStages()
+{ 
+    DeferredRenderer* rd = pDeferredRenderer.mpPtr;
+
+    Vec2u size = GetWindow()->GetSize();
+
+    rd->GPass.Rebuild(size);
+    rd->CompPass.Rebuild(size);
+    rd->LightPass.Rebuild(size);
+    rd->ForwardPass.Rebuild(size);
+
+    rd->DescriptorPool.Recreate();
+    rd->CreateDescriptorSets();
+
+    /*for (FrameData& frame : Frames) {
+        frame.InFlight.Reset();
+    }*/
 }
 
 void RenderBackend::InitVulkan()
@@ -405,9 +425,24 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
     return mAvailableExtensions;
 }
 
+void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+                                           const void* data, uint32 data_size) const
+{
+    DebugAssert(pipeline.Layout2.IsValid());
+
+    // Currently, there is nowhere in the engine that requires two separate PC buffers and therefore requires an offset.
+    // As well, the small required size of a PC kind of makes this useless. For now, we will ignore this and if needed
+    // there will be an updated version of this function.
+    // I'm pretty sure when I was using Slang I had one shader that required this, but thats since been cacked..
+    static constexpr uint32 scOffset = 0;
+    vkCmdPushConstants(cmd.Get(), pipeline.Layout2.Get(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
+                       data_size, data);
+}
+
+
 void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
 {
-    CommandBuffer& cmd = UploadContext.CommandBuffer;
+    CommandBuffer& cmd = UploadContext.CmdBuffer;
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     upload_func(cmd);
@@ -417,30 +452,25 @@ void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &cmd.CommandBuffer,
+        .pCommandBuffers = &cmd.Cmd,
     };
-
-    // Log::Debug(
-    //     "cmd thread: %lu",
-    //     std::this_thread::get_id()
-    // );
 
     SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
 
-    VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Fence),
+    VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Get()),
           "Error submitting upload buffer");
 
     UploadContext.UploadFence.WaitFor();
     UploadContext.UploadFence.Reset();
 
-    UploadContext.CommandPool.Reset();
+    UploadContext.CmdPool.Reset();
 }
 
 
 void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
 {
     CommandBuffer cmd;
-    cmd.Create(&GetFrame()->CommandPool);
+    cmd.Create(&GetFrame()->CmdPool);
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     submit_func(cmd);
@@ -450,7 +480,7 @@ void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &cmd.CommandBuffer,
+        .pCommandBuffers = &cmd.Cmd,
     };
 
     SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
@@ -469,7 +499,9 @@ eFrameResult RenderBackend::BeginFrame()
 {
     FrameData* frame = GetFrame();
 
-    ShaderUniform.Rewind();
+    bDidFrameResize = false;
+
+    LightBuffer.Rewind();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
 
@@ -489,7 +521,7 @@ void RenderBackend::BeginGeometry()
 {
     FrameData* frame = GetFrame();
 
-    pDeferredRenderer->GPass.Begin(frame->CommandBuffer, *pDeferredRenderer->pGeometryPipeline);
+    pDeferredRenderer->GPass.Begin(frame->CmdBuffer, *pDeferredRenderer->pGeometryPipeline);
 }
 
 void RenderBackend::PresentFrame()
@@ -512,7 +544,7 @@ void RenderBackend::PresentFrame()
         .pWaitDstStageMask = wait_stages,
 
         .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CommandBuffer.CommandBuffer,
+        .pCommandBuffers = &frame->CmdBuffer.Cmd,
 
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = &submit_semaphore,
@@ -521,7 +553,7 @@ void RenderBackend::PresentFrame()
     {
         SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
 
-        VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, frame->InFlight.Fence),
+        VkTry(vkQueueSubmit(graphics_queue.Get(), 1, &submit_info, frame->InFlight.Get()),
               "Error submitting draw buffer");
     }
 
@@ -569,10 +601,11 @@ void RenderBackend::BeginLighting()
 
     Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::eD32_Float, 0);
     Assert(depth_target != nullptr);
-    depth_target->Image.TransitionDepthToShaderRO(frame->CommandBuffer);
+    depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
-    pDeferredRenderer->LightPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlLightingDirectional);
+    pDeferredRenderer->LightPass.Begin(frame->CmdBuffer,
+                                       gPipelineCache->Request(ePipelineName::LightingDirectional));
 
     // gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
     // gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -580,9 +613,9 @@ void RenderBackend::BeginLighting()
     // gState->Reset();
 
 
-    pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                 pDeferredRenderer->PlLightingDirectional,
-                                                 gRenderer->ShaderUniform.GetBaseOffset());
+    pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                 gPipelineCache->Request(ePipelineName::LightingDirectional),
+                                                 gRenderer->LightBuffer.GetBaseOffset());
 }
 
 
@@ -597,40 +630,34 @@ void RenderBackend::BeginUnlit()
     // Assert(depth_target != nullptr);
     // depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
-    pDeferredRenderer->RpForward.Begin(&frame->CommandBuffer, pDeferredRenderer->FbForward.Get(),
-                                       Slice<VkClearValue>({}, 0));
+    Pipeline& pl = gPipelineCache->Request(ePipelineName::Unlit);
 
-    pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
+    pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer, pl);
+    /*    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
+                                       Slice<VkClearValue>({}, 0));*/
+
+    // pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
+    
 }
 
 void RenderBackend::DoComposition(Camera& render_cam)
 {
     FrameData* frame = GetFrame();
 
-    pDeferredRenderer->RpForward.End();
-    // pDeferredRenderer->LightPass.End();
+    pDeferredRenderer->ForwardPass.End();
 
-    pDeferredRenderer->CompPass.Begin(frame->CommandBuffer, pDeferredRenderer->PlComposition);
+    //pDeferredRenderer->RpForward.End();
+
+    pDeferredRenderer->CompPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Composition));
     pDeferredRenderer->DoCompPass(render_cam);
 
-    {
-        /*StackArray<CommandBuffer, 1> commands;
-        commands.Insert(frame->CommandBuffer);
-
-        StackArray<Semaphore, 1> wait_semaphores;
-        wait_semaphores.Insert(frame->ShadowsSem);
-
-        StackArray<Semaphore, 1> signal_semaphores;
-        signal_semaphores.Insert(frame->OffscreenSem);*/
-
-
-        // pDeferredRenderer->GPass.Submit(Slice(commands), Slice(wait_semaphores), Slice(signal_semaphores));
-    }
-
+    pDeferredRenderer->CompPass.End();
+    frame->CmdBuffer.End();
 
     PresentFrame();
-
     ProcessDeletionQueue();
+
+    RequirePipelineDynamicStates();
 
     mInternalFrameCounter++;
 
@@ -648,8 +675,12 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
         return eFrameResult::Success;
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // Swapchain.Rebuild()..
-        return eFrameResult::GraphicsOutOfDate;
+        bDidFrameResize = true;
+        gRenderer->GetWindow()->HandleResize();
+        Swapchain.Rebuild(gRenderer->GetWindow()->GetSize(), mWindowSurface);
+        RebuildRenderStages();
+        
+        return eFrameResult::Success;
     }
     else {
         LogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
@@ -683,9 +714,8 @@ void RenderBackend::Destroy()
         sem.Destroy();
     }
 
-    ShaderUniform.Destroy();
+    LightBuffer.Destroy();
     BoneBuffer.Destroy();
-
 
     while (!mDeletionQueue.empty()) {
         ProcessDeletionQueue(true);
@@ -695,11 +725,9 @@ void RenderBackend::Destroy()
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
 
-
-    CompDescriptorPool.Destroy();
+    GpuBufferPrintUndestroyed();
 
     GetDevice()->WaitForIdle();
-
     Swapchain.Destroy();
 
     DestroyGPUAllocator();

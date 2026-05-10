@@ -10,30 +10,30 @@ namespace fx {
 class Window
 {
 public:
-    static Ref<Window> New(const char* title, const Vec2i& size) { return Ref<Window>::New(title, size); }
+    static Ref<Window> New(const char* title, const Vec2u& size) { return Ref<Window>::New(title, size); }
 
 public:
     Window() = default;
     Window(const Window& other) = delete;
-    Window(const char* title, const Vec2i& size) { Create(title, size); }
+    Window(const char* title, const Vec2u& size) { Create(title, size); }
 
-    void Create(const char* title, const Vec2i& size);
+    void Create(const char* title, const Vec2u& size);
 
-    Vec2i GetSize();
+    void HandleResize();
 
-    float32 GetAspectRatio()
+    float32 GetAspectRatio() const
     {
-        Vec2i size = GetSize();
-        return static_cast<float32>(size.X) / (size.Y);
+        return static_cast<float32>(mSize.X) / static_cast<float32>(mSize.Y);
     }
 
-    SDL_Window* GetWindow() { return mWindow; }
+    FX_FORCE_INLINE const Vec2u& GetSize() const { return mSize; }
+    FX_FORCE_INLINE SDL_Window* GetWindow() { return mWindow; }
 
     ~Window();
 
 public:
 private:
-    Vec2i mSize = Vec2i::sZero;
+    Vec2u mSize = Vec2u::sZero;
     SDL_Window* mWindow;
 };
 

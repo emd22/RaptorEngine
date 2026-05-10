@@ -4,14 +4,19 @@
 #include "Backend/VertexDescription.hpp"
 #include "Globals.hpp"
 #include "PipelineCache.hpp"
+#include "RenderStage.hpp"
 #include "ShaderCache.hpp"
 
 namespace fx::renderer {
 
-void State::BeginPipeline(ePipelineName pipeline)
+void State::BeginPipeline(ePipelineName name)
 {
-    mpPipeline = gPipelineCache->Request(pipeline);
-    mDescriptors.InitCapacity(10);
+    mPipelineName = name;
+    mpPipeline = &gPipelineCache->Request(name);
+
+    if (!mDescriptors.IsInited()) {
+        mDescriptors.InitCapacity(10);
+    }
 }
 
 void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
@@ -21,8 +26,14 @@ void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& ma
     mpPixelShader = shader->GetProgram(eShaderType::Pixel, macros);
 }
 
+void State::UseRenderStage(RenderStage& stage)
+{
+    SetOutputTargets(&stage.GetTargets());
+    SetRenderPass(&stage.GetRenderPass());
+}
 
-void State::SetLayout(VkPipelineLayout layout) { mpPipeline->SetLayout(layout); }
+void State::SetLayout(const PipelineLayout& layout) { mpPipeline->SetLayout(layout); }
+void State::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout2); }
 
 void State::BuildPipeline()
 {
@@ -30,7 +41,6 @@ void State::BuildPipeline()
         BuildLayout();
     }
 
-    SizedArray<Ref<ShaderProgram>> shader_list = { mpVertexShader, mpPixelShader };
     if (!mpVertexShader.IsValid() || !mpPixelShader.IsValid()) {
         LogError("Invalid shaders provided");
         return;
@@ -41,14 +51,25 @@ void State::BuildPipeline()
         return;
     }
 
+    SizedArray<Ref<ShaderProgram>> shader_list = { mpVertexShader, mpPixelShader };
+
+    VertexDescription* vertex_ptr = nullptr;
     VertexDescription vertex_desc = VertexUtil::BuildDescription(mVertexType);
+
+    // If there is no `NoVertices` flag set, use the built vertex description.
+    if ((mFlags & eStateFlags::NoVertices) == 0) {
+        vertex_ptr = &vertex_desc;
+    }
 
     // Since the blend attachments apply _only_ to colour targets, we want to get the amount of non-depth targets.
     SizedArray<Target> color_only_targets = pOutputTargets->GetTargetByType(eImageAspectFlag::Color);
+    SizedArray<VkPipelineColorBlendAttachmentState> blend_attachments = BlendAttachments.GetVkAttachments(
+        color_only_targets.Size);
+
+    LogInfo("!! Built pipeline {}", PipelineNameUtil::GetName(mPipelineName));
 
     mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, pOutputTargets->GetDescriptions(),
-                       BlendAttachments.GetVkAttachments(color_only_targets.Size), &vertex_desc, *mpRenderPass,
-                       mProperties);
+                       blend_attachments, vertex_ptr, *mpRenderPass, mProperties);
 }
 
 void State::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
@@ -59,23 +80,21 @@ void State::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_att
 
 void State::SetPushConstants(eShaderType type, uint32 pc_size)
 {
-    mPushConstants.MarkFull();
-    PushConstants& pc = mPushConstants[static_cast<uint32>(type)];
-    pc.ShaderTypes = type;
-    pc.Size = pc_size;
+    PushConstants* pc = mPushConstants.Insert();
+
+    pc->ShaderTypes = type;
+    pc->Size = pc_size;
 }
 
 
-VkPipelineLayout State::BuildLayout()
+PipelineLayout State::BuildLayout()
 {
-    VkPipelineLayout layout = Pipeline::CreateLayout(Slice(mPushConstants), Slice(mDescriptors));
-    mpPipeline->Layout = layout;
-    return layout;
+    mpPipeline->Layout2 = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
+    return mpPipeline->Layout2;
 }
 
-
-void State::SetRenderPass(RenderPass* renderpass) { mpRenderPass = renderpass; }
-
+void State::AddDescriptor(VkDescriptorSetLayout layout) { mDescriptors.Insert(layout); }
+void State::SetRenderPass(RenderPass* rp) { mpRenderPass = rp; }
 void State::SetOutputTargets(TargetList* targets) { pOutputTargets = targets; }
 
 void State::EndPipeline()
@@ -92,9 +111,12 @@ void State::Reset()
     mPushConstants.Clear();
     mDescriptors.Clear();
 
+    BlendAttachments.Clear();
+
     memset(mPushConstants.pData, 0, mPushConstants.GetSizeInBytes());
 
     mProperties = PipelineProperties {};
+    mFlags = eStateFlags::None;
 }
 
 } // namespace fx::renderer

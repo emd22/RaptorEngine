@@ -12,6 +12,7 @@ namespace fx {
 
 enum class eShaderType : uint16
 {
+    None = 0,
     Vertex = (1 << 0),
     Pixel = (1 << 1),
 };
@@ -55,6 +56,7 @@ static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
         return "Vertex";
     case eShaderType::Pixel:
         return "Pixel";
+    default:;
     }
 
     return "Unknown";

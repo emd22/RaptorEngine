@@ -19,6 +19,7 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <csignal>
@@ -80,7 +81,9 @@ void FoxtrotGame::InitEngine()
     const uint32 window_height = window_entry->GetMember(HashStr32("Height"))->Get<uint32>();
 
     Ref<Window> window = Window::New(window_entry->GetMember(HashStr32("Title"))->Get<const char*>(),
-                                     Vec2i(window_width, window_height));
+                                     Vec2u(window_width, window_height));
+
+    Player.bEnableHeadBob = static_cast<bool>(Config.GetEntryValue<int32>(HashStr32("EnableHeadBob"), 1));
 
     gRenderer->SelectWindow(window);
     gRenderer->Init(Vec2u(window_width, window_height));
@@ -96,11 +99,26 @@ void FoxtrotGame::InitEngine()
 
 void FoxtrotGame::CreateLights()
 {
-    // pSun = MakeRef<LightDirectional>();
-    // pSun->MoveTo(Vec3f(0.5, 5, -1.0).Normalize());
-    // pSun->Color = Color::FromRGBA(0xFA, 0xD2, 0xC0, 6);
-    // pSun->AmbientColor = Color::FromRGBA(0x4A, 0x3A, 0x2A, 1);
-    // mMainScene.Attach(pSun);
+    // Ref<LightPoint> pl = Ref<LightPoint>::New();
+
+    // Ref<MeshGen::GeneratedMesh> sphere = MeshGen::MakeIcoSphere(4);
+    // pl->SetLightVolume(sphere);
+    // pl->Color = Color::FromRGBA(50, 250, 100, 3);
+    // pl->MoveBy(Vec3f(0, 1, 0));
+    // pl->SetRadius(5.0);
+    // pl->SetScale(15);
+
+    // mMainScene.Attach(pl);
+
+    // Ref<LightPoint> pl2 = Ref<LightPoint>::New();
+
+    // pl2->SetLightVolume(sphere);
+    // pl2->Color = Color::FromRGBA(200, 80, 80, 3);
+    // pl2->MoveBy(Vec3f(1, 0.5, 0));
+    // pl2->SetRadius(5.0);
+    // pl2->SetScale(15);
+
+    // mMainScene.Attach(pl2);
 }
 
 void FoxtrotGame::LoadOffsetsFile()
@@ -145,14 +163,15 @@ void FoxtrotGame::CreateFontObject()
     Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
     object->pMesh = quad->AsMesh(eVertexType::Default);
 
-    TSRef<Material> material = gMaterialManager->New("Font material", &gRenderer->pDeferredRenderer->PlUnlit, false);
+    TSRef<Material> material = gMaterialManager->New("Font material", &gPipelineCache->Request(ePipelineName::Unlit),
+                                                     false);
     TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
                                                     FX_BASE_DIR "/DefaultFont.png");
     material->Attach(Material::eResourceType::Diffuse, image);
     object->pMaterial = material;
 
     object->SetRenderUnlit(true);
-    object->SetGraphicsPipeline(&gRenderer->pDeferredRenderer->PlUnlit);
+    object->SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
 
     object->MarkReadyToRender();
 
@@ -188,13 +207,12 @@ void FoxtrotGame::CreateGame()
     gPhysics->OptimizeBroadPhase();
 
     pSun = mMainScene.GetDirectionalLight();
-
+/*
     pPistolObject = mMainScene.FindObject(HashStr32("Pistol"));
-    pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));
+    pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));*/
 
     LoadOffsetsFile();
 
-    CreateLights();
 
     gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
     gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
@@ -214,7 +232,10 @@ void FoxtrotGame::CreateGame()
         // }
     }
 
+    CreateLights();
+
     CreateFontObject();
+
 
     while (sbRunning) {
         Tick();
@@ -444,7 +465,7 @@ void FoxtrotGame::Tick()
     //                              Vec3f(0.15);
 
 
-    pArmsObject->SetRotationOrigin(ArmsOffset);
+    /*pArmsObject->SetRotationOrigin(ArmsOffset);
     pArmsObject->SetPosition(camera->Position + ArmsOffset);
 
     PistolRotationGoal = Quat::FromEulerAngles(Vec3f(-camera->mAngleY, camera->mAngleX, 0));
@@ -460,23 +481,11 @@ void FoxtrotGame::Tick()
 
         hand_transform.Position *= Vec3f(pArmsObject->mScale);
 
-        pArmsObject->UpdateIfOutOfDate();
-
         pPistolObject->SetRotationOrigin(ArmsOffset + hand_transform.Position + PistolOffset);
         pPistolObject->SetPosition(pArmsObject->mPosition + hand_transform.Position + PistolOffset);
 
         pPistolObject->mRotation = PistolRotationGoal;
-        pPistolObject->UpdateIfOutOfDate();
-        // pPistolObject->SetRotationOrigin(pistol_destination);
-    }
-
-    // pPistolObject->SetRotationOrigin(ArmsOffset);
-
-
-    // pPistolObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
-    // pArmsObject->mRotation.SmoothInterpolate(PistolRotationGoal, 40.0, DeltaTime);
-    // pArmsObject->mRotation = PistolRotationGoal;
-
+    }*/
 
     gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 
@@ -496,11 +505,16 @@ void FoxtrotGame::Tick()
 
     FrameData* frame = gRenderer->GetFrame();
 
-    frame->CommandBuffer.Reset();
-    frame->CommandBuffer.Record();
+    frame->CmdBuffer.Reset();
+    frame->CmdBuffer.Record();
 
     mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
     mMainScene.Render(&gShadowRenderer->ShadowCamera);
+
+    if (gRenderer->DidResize()) {
+        LogInfo("Setting aspect ratio");
+        camera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
+    }
 
     mLastTick = current_tick;
 }

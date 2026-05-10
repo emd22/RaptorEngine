@@ -8,6 +8,8 @@
 #include <map>
 #include <unordered_map>
 
+namespace fx {
+
 /**
  * @brief Cache section that can hold any number of items.
  */
@@ -252,3 +254,5 @@ public:
 private:
     CacheType* mCache;
 };
+
+} // namespace fx

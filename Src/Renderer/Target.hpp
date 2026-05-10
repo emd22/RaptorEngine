@@ -56,9 +56,10 @@ public:
     Image& GetImage() { return Image; }
     VkImageView& GetImageView() { return Image.View; }
 
-    void SetImage(const Image& image)
+    void UseImageFromTarget(Target* ref_target)
     {
-        Image = image;
+        mpReferenceTarget = ref_target;
+        Image = ref_target->GetImage();
         bReuseImage = true;
     }
 
@@ -83,8 +84,15 @@ public:
 
     Image Image {};
 
+    /// The target that contains the original image when bReuseImage is true.
+    /// This is used to reload the Image and ImageView when recreating images.
+    Target* mpReferenceTarget = nullptr;
+
     bool bReuseImage : 1 = false;
     bool bRenderPassOnly : 1 = false;
+
+    /// True if the image size matches the size of the surface
+    bool bIsFullscreen : 1 = false;
 };
 
 
@@ -130,12 +138,17 @@ public:
         return targets;
     }
 
+    void RecreateImages() { 
+        mFlags = eTargetListFlags::None;
+        CreateImages();
+    }
+
     void Clear()
     {
         mFlags = eTargetListFlags::None;
-        mBuiltAttachmentDescriptions.Clear();
-        mBuiltImageViews.Clear();
-        Targets.Clear();
+        mBuiltAttachmentDescriptions.Free();
+        mBuiltImageViews.Free();
+        Targets.Free();
     }
 
 

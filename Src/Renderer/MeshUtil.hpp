@@ -27,7 +27,7 @@ public:
             // VertexUtil::GetPosition), the vertex type used here can be anything, and offsets are preserved as the
             // size of the object is stored in the anonymous buffer.
             Vec3f position = renderer::VertexUtil::GetPosition(
-                *reinterpret_cast<const renderer::Vertex<renderer::eVertexType::Default>*>(vertices.GetRaw(i)));
+                *static_cast<const renderer::Vertex<renderer::eVertexType::Default>*>(vertices.GetRaw(i)));
 
             min_vertex = Vec3f::Min(min_vertex, position);
             max_vertex = Vec3f::Max(max_vertex, position);

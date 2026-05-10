@@ -30,6 +30,8 @@ public:
 
     void DoCompPass(Camera& camera);
 
+    void CreateDescriptorSets();
+
     void Destroy();
     ~DeferredRenderer() { Destroy(); }
 
@@ -38,12 +40,13 @@ private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
+    void CreateUnlitPass();
     void CreateGPass();
+
 
     VkPipelineLayout CreateGPassPipelineLayout();
     VkPipelineLayout CreateGPassSkinnedPipelineLayout();
-    VkPipelineLayout CreateUnlitPipelineLayout();
-    VkPipelineLayout CreateDebugLayerPipelineLayout();
+
 
     // Lighting
     // void CreateLightVolumePipeline();
@@ -54,7 +57,7 @@ private:
     // void DestroyLightVolumePipeline();
     void DestroyLightingPipeline();
 
-    VkPipelineLayout CreateLightingPipelineLayout();
+    // PipelineLayout CreateLightingPipelineLayout();
 
     // Composition
     void CreateCompPipeline();
@@ -62,10 +65,7 @@ private:
 
     void CreateUnlitPipeline();
 
-    VkPipelineLayout CreateCompPipelineLayout();
-
     void CreateCompPass();
-    void BuildLightDescriptors();
 
 public:
     DescriptorPool DescriptorPool;
@@ -79,13 +79,14 @@ public:
 
     VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
 
+    RenderStage ForwardPass;
     RenderStage GPass;
 
-    Pipeline PlGeometry;
-    Pipeline PlGeometryNoDepthTest;
-    Pipeline PlGeometryWithNormalMaps;
+    // Pipeline PlGeometry;
+    // Pipeline PlGeometryNoDepthTest;
+    // Pipeline PlGeometryWithNormalMaps;
 
-    Pipeline PlGeometrySkinned;
+    // Pipeline PlGeometrySkinned;
 
     Pipeline* pGeometryPipeline = nullptr;
 
@@ -100,21 +101,20 @@ public:
 
     RenderStage LightPass;
 
-    Pipeline PlLightingOutsideVolume;
-    Pipeline PlLightingInsideVolume;
-    Pipeline PlLightingDirectional;
+    // Pipeline PlLightingOutsideVolume;
+    // Pipeline PlLightingInsideVolume;
+    // Pipeline PlLightingDirectional;
 
     /////////////////////////////////////////////////
     // Forward pass / Unlit
     /////////////////////////////////////////////////
     // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
-    Pipeline PlUnlit;
     Pipeline PlText;
     // Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;
 
-    RenderPass RpForward;
-    Framebuffer FbForward;
+/*    RenderPass RpForward;
+    Framebuffer FbForward;*/
 
     //////////////////////
     // Composition Pass
@@ -126,8 +126,8 @@ public:
 
     RenderStage CompPass;
 
-    Pipeline PlComposition;
-    Pipeline PlCompositionUnlit;
+    // Pipeline PlComposition;
+    // Pipeline PlCompositionUnlit;
 };
 
 } // namespace fx::renderer

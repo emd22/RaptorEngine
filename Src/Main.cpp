@@ -60,8 +60,8 @@ int main()
     fx::LogInfo("Pool Size:  {}", fx::gEnginePool->GetCapacity());
     fx::LogInfo("=========================");
 
-    fx::renderer::Globals::Destroy();
     fx::Globals::Destroy();
+    fx::renderer::Globals::Destroy();
 
     Defer(
         []()

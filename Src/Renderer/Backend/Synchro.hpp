@@ -19,13 +19,13 @@ public:
     void WaitFor(uint64 timeout = UINT64_MAX) const;
     void Reset();
 
-    FX_FORCE_INLINE VkFence Get() { return Fence; }
-    FX_FORCE_INLINE const VkFence Get() const { return Fence; }
+    FX_FORCE_INLINE VkFence Get() { return InternalFence; }
+    FX_FORCE_INLINE const VkFence Get() const { return InternalFence; }
 
     void Destroy();
 
 public:
-    VkFence Fence = nullptr;
+    VkFence InternalFence = nullptr;
 };
 
 

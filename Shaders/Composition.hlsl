@@ -87,6 +87,7 @@ FSOutput main(FSInput input)
     output.vColor = float4(ACESFilm(lighting.rgb * exposure), 1.0);
 
 #endif
+
     return output;
 
 }

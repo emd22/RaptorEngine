@@ -37,8 +37,8 @@ class DeferredCompPass;
 
 struct GpuUploadContext
 {
-    CommandPool CommandPool;
-    CommandBuffer CommandBuffer;
+    CommandPool CmdPool;
+    CommandBuffer CmdBuffer;
 
     Fence UploadFence;
 
@@ -50,7 +50,7 @@ class RenderBackend
 {
     const uint32 scDeletionFrameSpacing = 3;
 
-    static constexpr uint32 scDefaultUniformSize = 512;
+    static constexpr uint32 scLightUniformSize = 240;
 
 public:
     using SubmitFunc = std::function<void(CommandBuffer& cmd)>;
@@ -75,8 +75,6 @@ public:
     FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
     FX_FORCE_INLINE GpuDevice* GetDevice() { return &mDevice; }
 
-    UniformBufferObject& GetUbo();
-
     void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
         std::lock_guard<std::mutex> guard(mInDeletionQueue);
@@ -95,6 +93,14 @@ public:
 
     uint32 GetImageIndex() const { return mImageIndex; }
     VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
+
+    template <typename T>
+    void SubmitPushConstants(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+                             const T& value) const
+    {
+        SubmitPushConstantsRaw(cmd, pipeline, shader_types, &value, sizeof(T));
+    }
+
 
     void SubmitUploadCmd(SubmitFunc func);
     void SubmitOneTimeCmd(SubmitFunc func);
@@ -154,6 +160,8 @@ public:
     uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
     uint32 GetFrameNumber() const { return mFrameNumber; }
 
+    FX_FORCE_INLINE bool DidResize() const { return bDidFrameResize; }
+
 private:
     void InitVulkan();
     void CreateSurfaceFromWindow();
@@ -169,13 +177,20 @@ private:
     void InitFrames();
     void DestroyFrames();
 
+    void RebuildRenderStages();
+
     eFrameResult GetNextSwapchainImage(FrameData* frame);
 
     ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
     ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
     ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
 
+    void SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+                                const void* data, uint32 data_size) const;
+
     SizedArray<VkLayerProperties> GetAvailableValidationLayers();
+
+
 
 public:
     Swapchain Swapchain;
@@ -183,27 +198,18 @@ public:
 
     VmaAllocator GpuAllocator = nullptr;
 
-    // XXX: temporary
-    // DescriptorPool GPassDescriptorPool;
-    DescriptorPool CompDescriptorPool;
-
     GpuUploadContext UploadContext;
 
     bool bInitialized = false;
+    bool bDidFrameResize = false;
 
     DeferredCompPass* pCurrentCompPass = nullptr;
     DeferredLightingPass* pCurrentLightingPass = nullptr;
 
     Ref<DeferredRenderer> pDeferredRenderer { nullptr };
 
-    Uniforms ShaderUniform;
+    Uniforms LightBuffer;
     Uniforms BoneBuffer;
-
-    // SamplerCache SamplerCache;
-
-    // PipelineCache PipelineCache;
-
-    // Semaphore OffscreenSemaphore;
 
 private:
     VkInstance mInstance = nullptr;
@@ -219,6 +225,7 @@ private:
     SizedArray<Semaphore> mSubmitSemaphores;
 
     uint32 mImageIndex = 0;
+
 
 protected:
     uint32 mFrameNumber = 0;

@@ -41,6 +41,8 @@ public:
         ItemReady.SignalDataWritten();
     }
 
+    void DebugPrint() const { LogInfo("Worker: Loading {}, {}", Item.Path, AssetTypeToString(Item.AssetType)); }
+
     void Update();
 
     void Kill()
@@ -82,6 +84,8 @@ public:
     void WorkerUpdate();
 
     static AxManager* GetInstance();
+
+    void DebugPrintWorkers() const;
 
     template <typename T>
         requires C_IsAsset<T>

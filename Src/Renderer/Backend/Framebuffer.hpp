@@ -16,12 +16,12 @@ public:
     void Create(const SizedArray<VkImageView>& image_views, const RenderPass& render_pass, Vec2u size);
     void Destroy();
 
-    FX_FORCE_INLINE VkFramebuffer Get() const { return Framebuffer; }
+    FX_FORCE_INLINE VkFramebuffer Get() const { return InternalFramebuffer; }
 
     ~Framebuffer() { Destroy(); }
 
 public:
-    VkFramebuffer Framebuffer = nullptr;
+    VkFramebuffer InternalFramebuffer = nullptr;
 };
 
 } // namespace fx::renderer

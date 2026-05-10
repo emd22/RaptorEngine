@@ -6575,6 +6575,13 @@ VmaDedicatedAllocationList::~VmaDedicatedAllocationList()
 
     if (!m_AllocationList.IsEmpty())
     {
+        auto* node = m_AllocationList.Front();
+
+        while (node != nullptr) {
+            printf("[UNFREED ALLOCATION] %s of size %zu of type %d (sub %d)\n", node->GetName(), node->GetSize(), node->GetType(), node->GetSuballocationType());
+            node = m_AllocationList.GetNext(node);
+        }
+
         VMA_ASSERT_LEAK(false && "Unfreed dedicated allocations found!");
     }
 }

@@ -8,7 +8,7 @@
 
 namespace fx {
 
-void Window::Create(const char* title, const Vec2i& size)
+void Window::Create(const char* title, const Vec2u& size)
 {
     mSize = size;
 
@@ -16,7 +16,7 @@ void Window::Create(const char* title, const Vec2i& size)
         Panic("Window", "Window size is too large! (Size: {})", size);
     }
 
-    const uint64 window_flags = SDL_WINDOW_VULKAN;
+    const uint64 window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
 
     mWindow = SDL_CreateWindow(title, static_cast<int32>(size.X), static_cast<int32>(size.Y), window_flags);
 
@@ -24,17 +24,21 @@ void Window::Create(const char* title, const Vec2i& size)
     if (mWindow == nullptr) {
         Panic("Window", "Could not create SDL window (SDL err: {})", SDL_GetError());
     }
+
+    HandleResize();
 }
 
-Vec2i Window::GetSize()
+void Window::HandleResize()
 {
-    bool success = SDL_GetWindowSize(mWindow, &mSize.X, &mSize.Y);
-    if (!success) {
+    int width, height;
+
+    // Get window size from SDL
+    if (!SDL_GetWindowSize(mWindow, &width, &height)) {
         LogError("Error retrieving window size from SDL! (SDL err: {})", SDL_GetError());
-        return mSize;
+        return;
     }
 
-    return mSize;
+    mSize = Vec2u(static_cast<uint32>(width), static_cast<uint32>(height));
 }
 
 Window::~Window() { SDL_DestroyWindow(mWindow); }

@@ -19,7 +19,8 @@ public:
     Swapchain() = default;
     ~Swapchain();
 
-    void Init(Vec2u size, VkSurfaceKHR& surface, GpuDevice* device);
+    void Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device);
+    void Rebuild(Vec2u new_size, VkSurfaceKHR surface);
 
     VkSwapchainKHR GetSwapchain() const { return mSwapchain; }
 
@@ -32,7 +33,7 @@ public:
     void Destroy();
 
 private:
-    void CreateSwapchain(Vec2u size, VkSurfaceKHR& surface);
+    void CreateSwapchain(Vec2u size, VkSurfaceKHR surface);
     void CreateSwapchainImages();
     void CreateImageViews();
     void CreateFramebuffers();

@@ -14,7 +14,7 @@ public:
     ~AnimationManager() = default;
 
 private:
-    renderer::RawGpuBuffer PoseBuffer;
+    //renderer::RawGpuBuffer PoseBuffer;
 };
 
 } // namespace fx

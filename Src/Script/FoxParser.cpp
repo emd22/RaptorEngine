@@ -1026,7 +1026,7 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
     }
 
     if (node->NodeType == FX_AST_BLOCK) {
-        FoxAstBlock* block = reinterpret_cast<FoxAstBlock*>(node);
+        FoxAstBlock* block = static_cast<FoxAstBlock*>(node);
         for (FoxAstNode* child : block->Statements) {
             Do(child);
         }
@@ -1034,7 +1034,7 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
         FX_SCRIPT_FREE(FoxAstBlock, block);
     }
     else if (node->NodeType == FX_AST_PROCDECL) {
-        FoxAstFunctionDecl* functiondecl = reinterpret_cast<FoxAstFunctionDecl*>(node);
+        FoxAstFunctionDecl* functiondecl = static_cast<FoxAstFunctionDecl*>(node);
 
         for (FoxAstNode* param : functiondecl->pParams->Statements) {
             Do(param);
@@ -1045,31 +1045,31 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
         FX_SCRIPT_FREE(FoxAstFunctionDecl, functiondecl);
     }
     else if (node->NodeType == FX_AST_VARDECL) {
-        FoxAstVarDecl* vardecl = reinterpret_cast<FoxAstVarDecl*>(node);
+        FoxAstVarDecl* vardecl = static_cast<FoxAstVarDecl*>(node);
 
         Do(vardecl->pAssignment);
 
         FX_SCRIPT_FREE(FoxAstVarDecl, vardecl);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
-        FoxAstAssign* assign = reinterpret_cast<FoxAstAssign*>(node);
+        FoxAstAssign* assign = static_cast<FoxAstAssign*>(node);
 
         Do(assign->Rhs);
 
         FX_SCRIPT_FREE(FoxAstAssign, assign);
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
-        FoxAstFunctionCall* functioncall = reinterpret_cast<FoxAstFunctionCall*>(node);
+        FoxAstFunctionCall* functioncall = static_cast<FoxAstFunctionCall*>(node);
 
         FX_SCRIPT_FREE(FoxAstFunctionCall, functioncall);
     }
     else if (node->NodeType == FX_AST_LITERAL) {
-        FoxAstLiteral* literal = reinterpret_cast<FoxAstLiteral*>(node);
+        FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
 
         FX_SCRIPT_FREE(FoxAstLiteral, literal);
     }
     else if (node->NodeType == FX_AST_BINOP) {
-        FoxAstBinop* binop = reinterpret_cast<FoxAstBinop*>(node);
+        FoxAstBinop* binop = static_cast<FoxAstBinop*>(node);
 
         Do(binop->pLeft);
         Do(binop->pRight);
@@ -1077,14 +1077,14 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
         FX_SCRIPT_FREE(FoxAstBinop, binop);
     }
     else if (node->NodeType == FX_AST_COMMANDMODE) {
-        FoxAstCommandMode* command_mode = reinterpret_cast<FoxAstCommandMode*>(node);
+        FoxAstCommandMode* command_mode = static_cast<FoxAstCommandMode*>(node);
 
         Do(command_mode->Node);
 
         FX_SCRIPT_FREE(FoxAstCommandMode, command_mode);
     }
     else if (node->NodeType == FX_AST_RETURN) {
-        FoxAstReturn* return_node = reinterpret_cast<FoxAstReturn*>(node);
+        FoxAstReturn* return_node = static_cast<FoxAstReturn*>(node);
 
         if (return_node->pRhs) {
             Do(return_node->pRhs);

@@ -12,7 +12,7 @@ namespace fx::renderer {
 
 FX_SET_MODULE_NAME("Swapchain")
 
-void Swapchain::Init(Vec2u size, VkSurfaceKHR& surface, GpuDevice* device)
+void Swapchain::Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device)
 {
     mDevice = device;
 
@@ -25,8 +25,21 @@ void Swapchain::Init(Vec2u size, VkSurfaceKHR& surface, GpuDevice* device)
     bInitialized = true;
 }
 
+void Swapchain::Rebuild(Vec2u new_size, VkSurfaceKHR surface) { 
+    // Wait until the GPU has stopped processing commands and all images are unbound
+    mDevice->WaitForIdle(); 
+
+    LogInfo("Recreating Swapchain");
+    
+    CreateSwapchain(new_size, surface);
+    CreateSwapchainImages();
+    CreateImageViews();
+}
+
 void Swapchain::CreateSwapchainImages()
 {
+    OutputImages.Free();
+
     uint32 image_count;
 
     vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
@@ -53,6 +66,10 @@ void Swapchain::CreateFramebuffers() {}
 void Swapchain::CreateImageViews()
 {
     for (int32 i = 0; i < OutputImages.Size; i++) {
+        if (OutputImages[i].View != nullptr) {
+            vkDestroyImageView(mDevice->Device, OutputImages[i].View, nullptr);
+        }
+
         const VkImageViewCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .image = OutputImages[i].InternalImage,
@@ -80,7 +97,7 @@ void Swapchain::CreateImageViews()
     }
 }
 
-void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR& surface)
+void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 {
     Extent = size;
 

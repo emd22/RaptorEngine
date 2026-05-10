@@ -136,7 +136,7 @@ void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset
         .pDependencies = subpass_dependencies,
     };
 
-    const VkResult status = vkCreateRenderPass(mpDevice->Device, &create_info, nullptr, &RenderPass);
+    const VkResult status = vkCreateRenderPass(mpDevice->Device, &create_info, nullptr, &InternalRenderPass);
 
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Failed to create render pass", status);
@@ -147,13 +147,13 @@ void RenderPass::Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slic
 {
     pCommandBuffer = cmd;
 
-    if (RenderPass == nullptr) {
+    if (InternalRenderPass == nullptr) {
         ModulePanic("Render pass has not been previously created", 0);
     }
 
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass = RenderPass,
+        .renderPass = InternalRenderPass,
         .framebuffer = framebuffer,
         .renderArea = { .offset = { .x = static_cast<int32>(Offset.X), .y = static_cast<int32>(Offset.Y) },
                         .extent = { .width = Size.Width(), .height = Size.Height() } },
@@ -162,22 +162,22 @@ void RenderPass::Begin(CommandBuffer* cmd, VkFramebuffer framebuffer, const Slic
         .pClearValues = clear_values.pData,
     };
 
-    vkCmdBeginRenderPass(cmd->CommandBuffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(cmd->Cmd, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void RenderPass::End()
 {
     Assert(pCommandBuffer != nullptr);
 
-    vkCmdEndRenderPass(pCommandBuffer->CommandBuffer);
+    vkCmdEndRenderPass(pCommandBuffer->Cmd);
 }
 
 void RenderPass::Destroy()
 {
-    if (RenderPass != nullptr) {
-        vkDestroyRenderPass(mpDevice->Device, RenderPass, nullptr);
+    if (InternalRenderPass != nullptr) {
+        vkDestroyRenderPass(mpDevice->Device, InternalRenderPass, nullptr);
     }
-    RenderPass = nullptr;
+    InternalRenderPass = nullptr;
 }
 
 } // namespace fx::renderer

@@ -16,7 +16,7 @@ void Fence::Create()
                                             .pNext = nullptr,
                                             .flags = VK_FENCE_CREATE_SIGNALED_BIT };
 
-    const VkResult status = vkCreateFence(gRenderer->GetDevice()->Device, &create_info, nullptr, &Fence);
+    const VkResult status = vkCreateFence(gRenderer->GetDevice()->Device, &create_info, nullptr, &InternalFence);
     if (status != VK_SUCCESS) {
         PanicVulkan("Fence", "Could not create fence", status);
     }
@@ -24,9 +24,9 @@ void Fence::Create()
 
 void Fence::WaitFor(uint64 timeout) const
 {
-    Assert(Fence != nullptr);
+    Assert(InternalFence != nullptr);
 
-    const VkResult status = vkWaitForFences(gRenderer->GetDevice()->Device, 1, &Fence, true, timeout);
+    const VkResult status = vkWaitForFences(gRenderer->GetDevice()->Device, 1, &InternalFence, true, timeout);
 
     if (status != VK_SUCCESS) {
         PanicVulkan("Fence", "Could not create fence", status);
@@ -35,9 +35,9 @@ void Fence::WaitFor(uint64 timeout) const
 
 void Fence::Reset()
 {
-    Assert(Fence != nullptr);
+    Assert(InternalFence != nullptr);
 
-    const VkResult status = vkResetFences(gRenderer->GetDevice()->Device, 1, &Fence);
+    const VkResult status = vkResetFences(gRenderer->GetDevice()->Device, 1, &InternalFence);
 
     if (status != VK_SUCCESS) {
         PanicVulkan("Fence", "Could not reset fence", status);
@@ -46,8 +46,11 @@ void Fence::Reset()
 
 void Fence::Destroy()
 {
-    vkDestroyFence(gRenderer->GetDevice()->Device, Fence, nullptr);
-    Fence = nullptr;
+    if (InternalFence == nullptr) {
+        return;
+    }
+    vkDestroyFence(gRenderer->GetDevice()->Device, InternalFence, nullptr);
+    InternalFence = nullptr;
 }
 
 

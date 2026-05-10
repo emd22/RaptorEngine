@@ -90,7 +90,19 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
                    VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
     Assert(size.X > 0 && size.Y > 0);
-    Assert(InternalImage == nullptr && Allocation == nullptr);
+ 
+    // Destroy image if it already has been created
+    if (InternalImage != nullptr && Allocation != nullptr) {
+        if (View != nullptr) {
+            vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
+        }
+
+        vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
+
+        InternalImage = nullptr;
+        Allocation = nullptr;
+        View = nullptr;
+    }
 
     Aspect = aspect;
     Size = size;
@@ -145,6 +157,10 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
         ModulePanicVulkan("Could not create vulkan image", status);
     }
 
+    static uint32 alloc_number = 0;
+
+    std::string alloc_name = std::to_string(alloc_number++);
+    vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
 
     // LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
     //           reinterpret_cast<void*>(Allocation));
@@ -509,7 +525,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_for
             cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd);
             TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 6);
 
-            vkCmdCopyImage(cmd.CommandBuffer, cubemap.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            vkCmdCopyImage(cmd.Get(), cubemap.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.pData);
 
             TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 6);

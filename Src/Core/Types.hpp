@@ -129,6 +129,13 @@ constexpr bool operator!=(T lhs, int rhs)
 }
 
 template <typename T>
+    requires C_IsEnumFlags<T>
+constexpr bool operator==(T lhs, int rhs)
+{
+    return (static_cast<EnumFlagsIntType<T>>(lhs)) == rhs;
+}
+
+template <typename T>
 constexpr T operator~(T v)
 {
     return static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(v)));
@@ -175,6 +182,10 @@ constexpr T operator~(T v)
 
 // #define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX 1
 
+
+#define FX_ENUM_CASE_NAME(member_)                                                                                     \
+    case ENUM_TYPE::member_:                                                                                                \
+        return #member_
 
 struct SpinThreadGuard
 {

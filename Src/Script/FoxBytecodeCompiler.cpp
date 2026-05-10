@@ -66,7 +66,7 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
         // Check to see if its a literal
 
         if (return_rhs->NodeType == FX_AST_PROCCALL) {
-            FoxAstFunctionCall* call_node = reinterpret_cast<FoxAstFunctionCall*>(return_rhs);
+            FoxAstFunctionCall* call_node = static_cast<FoxAstFunctionCall*>(return_rhs);
 
             if (call_node->GetReturnType() == eFoxType::NONETYPE) {
                 CompileError("EmitReturn: Cannot return a result that is void. The function called in this return "
@@ -647,11 +647,11 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
     }
     else if (rhs->NodeType == FX_AST_PROCCALL || rhs->NodeType == FX_AST_BINOP) {
         if (rhs->NodeType == FX_AST_BINOP) {
-            EmitBinop(reinterpret_cast<FoxAstBinop*>(rhs));
+            EmitBinop(static_cast<FoxAstBinop*>(rhs));
         }
 
         else if (rhs->NodeType == FX_AST_PROCCALL) {
-            DoFunctionCall(reinterpret_cast<FoxAstFunctionCall*>(rhs));
+            DoFunctionCall(static_cast<FoxAstFunctionCall*>(rhs));
         }
 
         if (mode == FoxBytecodeCompiler::RhsMode::RHS_ASSIGN_TO_HANDLE) {
@@ -760,7 +760,7 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DefineParam(FoxAstNode* param_decl_no
         return nullptr;
     }
 
-    FoxAstVarDecl* var_decl_node = reinterpret_cast<FoxAstVarDecl*>(param_decl_node);
+    FoxAstVarDecl* var_decl_node = static_cast<FoxAstVarDecl*>(param_decl_node);
 
     // Emit variable without emitting pushes or pops
     FoxBytecodeVarHandle* handle = DoVarDeclare(var_decl_node, DO_NOT_ALLOW_ASSIGNMENT);
@@ -793,7 +793,7 @@ void FoxBytecodeCompiler::EmitFunctionDefinitionsInBlock(FoxAstBlock* block)
 
     for (FoxAstNode* stmt : block->Statements) {
         if (stmt->NodeType == FX_AST_PROCDECL) {
-            EmitFunctionDeclaration(reinterpret_cast<FoxAstFunctionDecl*>(stmt));
+            EmitFunctionDeclaration(static_cast<FoxAstFunctionDecl*>(stmt));
         }
     }
 }
@@ -971,7 +971,7 @@ bool FoxBytecodeCompiler::DoesNodeBranch(FoxAstNode* node)
     }
 
     else if (node->NodeType == FX_AST_BLOCK) {
-        FoxAstBlock* block = reinterpret_cast<FoxAstBlock*>(node);
+        FoxAstBlock* block = static_cast<FoxAstBlock*>(node);
         for (FoxAstNode* stmt : block->Statements) {
             if (DoesNodeBranch(stmt)) {
                 return true;
@@ -982,17 +982,17 @@ bool FoxBytecodeCompiler::DoesNodeBranch(FoxAstNode* node)
     }
 
     else if (node->NodeType == FX_AST_VARDECL) {
-        FoxAstVarDecl* vardecl = reinterpret_cast<FoxAstVarDecl*>(node);
+        FoxAstVarDecl* vardecl = static_cast<FoxAstVarDecl*>(node);
 
         return DoesNodeBranch(vardecl->pAssignment);
     }
     else if (node->NodeType == FX_AST_BINOP) {
-        FoxAstBinop* binop = reinterpret_cast<FoxAstBinop*>(node);
+        FoxAstBinop* binop = static_cast<FoxAstBinop*>(node);
         return (DoesNodeBranch(binop->pLeft) || DoesNodeBranch(binop->pRight));
     }
 
     else if (node->NodeType == FX_AST_ASSIGN) {
-        FoxAstAssign* assign = reinterpret_cast<FoxAstAssign*>(node);
+        FoxAstAssign* assign = static_cast<FoxAstAssign*>(node);
 
         return DoesNodeBranch(assign->Rhs);
     }

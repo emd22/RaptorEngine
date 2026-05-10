@@ -8,6 +8,7 @@
 #include <Core/Ref.hpp>
 #include <Material.hpp>
 #include <Object.hpp>
+#include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 
 // Renderer includes
@@ -119,8 +120,8 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
         return;
     }
 
-    TSRef<Material> material = gMaterialManager->New(object->Name.Get(), &gRenderer->pDeferredRenderer->PlGeometry,
-                                                     object->IsSkinned());
+    TSRef<Material> material = gMaterialManager->New(
+        object->Name.Get(), &gPipelineCache->Request(ePipelineName::Geometry), object->IsSkinned());
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
@@ -379,7 +380,7 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const Strin
 
     cgltf_result status = cgltf_parse_file(&options, path.CStr(), &mpGltfData);
     if (status != cgltf_result_success) {
-        LogError("Error parsing GLTF file! (path: {:s})", path);
+        LogError("Error parsing GLTF file! (path: {})", path);
         return AxLoaderGltf::Status::Error;
     }
 

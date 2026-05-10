@@ -11,7 +11,8 @@ class PipelineCache
 public:
     PipelineCache();
 
-    Pipeline* Request(const ePipelineName name);
+    Pipeline& Request(const ePipelineName name);
+    void Bind(const ePipelineName name, const CommandBuffer& cmd);
 
 private:
     SizedArray<Pipeline> mCache;

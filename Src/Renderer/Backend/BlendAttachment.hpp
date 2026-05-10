@@ -68,7 +68,7 @@ public:
             BlendAttachment am {};
 
             vk_blend_attachments[i] = (VkPipelineColorBlendAttachmentState {
-                .blendEnable = am.Enabled ? 1U : 0U,
+                .blendEnable = 0U,
                 .srcColorBlendFactor = am.ColorBlend.Ops.Src,
                 .dstColorBlendFactor = am.ColorBlend.Ops.Dst,
                 .colorBlendOp = am.BlendOp.Ops.Color,
@@ -80,6 +80,7 @@ public:
         }
 
         for (const BlendAttachment& am : mBlendAttachments) {
+            LogInfo("Blend Attachmemt : {} => {}", am.TargetIndex, am.Enabled);
             vk_blend_attachments[am.TargetIndex] = (VkPipelineColorBlendAttachmentState {
                 .blendEnable = am.Enabled ? 1U : 0U,
                 .srcColorBlendFactor = am.ColorBlend.Ops.Src,
@@ -96,6 +97,8 @@ public:
     }
 
     const SizedArray<BlendAttachment>& GetAttachments() const { return mBlendAttachments; }
+
+    void Clear() { mBlendAttachments.Clear(); }
 
 private:
     SizedArray<BlendAttachment> mBlendAttachments {};

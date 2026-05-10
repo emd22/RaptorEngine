@@ -17,6 +17,95 @@ FX_SET_MODULE_NAME("Pipeline")
 namespace fx::renderer {
 
 static VkPipeline spBoundPipeline = nullptr;
+static bool sbHaveDynamicStatesBeenBound = false;
+
+void RequirePipelineDynamicStates() { sbHaveDynamicStatesBeenBound = false; }
+
+
+/////////////////////////////////////
+// Pipeline Layout
+/////////////////////////////////////
+
+
+void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs,
+                            const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
+
+{
+    // Copy PC definitions to this layout
+    for (uint32 i = 0; i < push_constant_defs.Size; i++) {
+        mPushConstDefs.Insert(push_constant_defs[i]);
+    }
+
+    // Define push constants with proper offsets and shader flags
+    StackArray<VkPushConstantRange, 3> push_const_ranges;
+    uint32 current_pc_offset = 0;
+
+    for (int i = 0; i < push_constant_defs.Size; i++) {
+        const PushConstants& pc_def = push_constant_defs[i];
+
+        if (pc_def.ShaderTypes == static_cast<eShaderType>(0)) {
+            continue;
+        }
+
+        VkPushConstantRange range {
+            .stageFlags = ShaderUtil::ToUnderlyingType(pc_def.ShaderTypes),
+            .offset = current_pc_offset,
+            .size = pc_def.Size,
+        };
+
+        LogInfo("!! PC (Flags={}, Offset={}, Size={})", static_cast<uint32>(pc_def.ShaderTypes), current_pc_offset,
+                pc_def.Size);
+
+        push_const_ranges.Insert(range);
+
+        current_pc_offset += pc_def.Size;
+    }
+
+    LogInfo("!! Built pipeline layout");
+
+    VkPipelineLayoutCreateInfo create_info {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = descriptor_set_layouts.Size,
+        .pSetLayouts = descriptor_set_layouts.pData,
+
+        .pushConstantRangeCount = push_const_ranges.Size,
+        .pPushConstantRanges = push_const_ranges.pData,
+    };
+
+    VkResult status = vkCreatePipelineLayout(gRenderer->GetDevice()->Device, &create_info, nullptr, &InternalLayout);
+
+    if (status != VK_SUCCESS) {
+        ModulePanicVulkan("Failed to create pipeline layout", status);
+    }
+}
+
+PipelineLayout::PipelineLayout(const PipelineLayout& other) { (*this) = other; }
+
+
+PipelineLayout& PipelineLayout::operator=(const PipelineLayout& other)
+{
+    InheritRef(other);
+
+    InternalLayout = other.InternalLayout;
+    mPushConstDefs = other.mPushConstDefs;
+
+    return *this;
+}
+
+void PipelineLayout::DestroyObject()
+{
+    if (InternalLayout == nullptr) {
+        return;
+    }
+
+    vkDestroyPipelineLayout(gRenderer->GetDevice()->Device, InternalLayout, nullptr);
+    InternalLayout = nullptr;
+}
+
+
+/////////////////////////////////////
+// Pipeline
+/////////////////////////////////////
 
 void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& shaders,
                       const Slice<VkAttachmentDescription>& attachments,
@@ -30,9 +119,8 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 
     bool has_depth_attachment = false;
 
-    // XXX: TEMP
     VertexShader = shaders[0];
-    FragmentShader = shaders[1];
+    PixelShader = shaders[1];
 
     // Depth attachment is usually the last attachment, check last first
     for (int32 i = attachments.Size - 1; i >= 0; i--) {
@@ -70,7 +158,10 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
     }
 
     // Dynamic states (scissor & viewport updates dynamically)
-    SizedArray<VkDynamicState> dynamic_states = {};
+    SizedArray<VkDynamicState> dynamic_states = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+    };
 
     const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -78,26 +169,27 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
         .pDynamicStates = dynamic_states,
     };
 
-    Vec2u viewport_size = properties.ViewportSize;
+    bHasDynamicViewport = true;
+    ViewportSize = properties.ViewportSize;
 
     // If there is no viewport size passed in, assume the swapchain size.
-    if (properties.ViewportSize.X == 0 || properties.ViewportSize.Y == 0) {
-        viewport_size = gRenderer->Swapchain.Extent;
+    if (ViewportSize.X == 0 || ViewportSize.Y == 0) {
+        bIsViewportFullscreen = true;
+        ViewportSize = gRenderer->Swapchain.Extent;
     }
-
 
     VkViewport viewport = {
         .x = 0.0f,
         .y = 0.0f,
-        .width = static_cast<float32>(viewport_size.X),
-        .height = static_cast<float32>(viewport_size.Y),
+        .width = static_cast<float32>(ViewportSize.X),
+        .height = static_cast<float32>(ViewportSize.Y),
         .minDepth = 1.0f,
         .maxDepth = 0.0f,
     };
 
     VkRect2D scissor = {
         .offset = { 0, 0 },
-        .extent = { .width = viewport_size.X, .height = viewport_size.Y },
+        .extent = { .width = ViewportSize.X, .height = ViewportSize.Y },
     };
 
     const VkPipelineViewportStateCreateInfo viewport_state_info = {
@@ -188,9 +280,9 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 
         .pDynamicState = &dynamic_state_info,
 
-        .layout = Layout,
+        .layout = Layout2.Get(),
 
-        .renderPass = render_pass.RenderPass,
+        .renderPass = render_pass.Get(),
         .subpass = 0,
     };
 
@@ -204,16 +296,43 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
     Util::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
 
     LogInfo("Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
-            reinterpret_cast<void*>(Layout));
+            reinterpret_cast<void*>(Layout2.Get()));
 }
 
 void Pipeline::Bind(const CommandBuffer& cmd)
 {
-    if (this->InternalPipeline == spBoundPipeline) {
+    if (InternalPipeline == spBoundPipeline) {
         return;
     }
 
-    vkCmdBindPipeline(cmd.CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, InternalPipeline);
+    
+    if (bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
+        if (bIsViewportFullscreen) {
+            ViewportSize = gRenderer->GetWindow()->GetSize();
+        }
+
+        VkViewport viewport = {
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = static_cast<float32>(ViewportSize.X),
+            .height = static_cast<float32>(ViewportSize.Y),
+            .minDepth = 1.0f,
+            .maxDepth = 0.0f,
+        };
+
+        VkRect2D scissor = {
+            .offset = { 0, 0 },
+            .extent = { .width = ViewportSize.X, .height = ViewportSize.Y },
+        };
+
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
+    }
+    else if (!bHasDynamicViewport) {
+        sbHaveDynamicStatesBeenBound = false;
+    }
+
+    vkCmdBindPipeline(cmd.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, InternalPipeline);
 
     spBoundPipeline = this->InternalPipeline;
 }
@@ -224,69 +343,20 @@ void Pipeline::Destroy()
         return;
     }
 
+    // TODO: Remove this
     mDevice->WaitForIdle();
 
     if (InternalPipeline) {
         vkDestroyPipeline(mDevice->Device, InternalPipeline, nullptr);
         InternalPipeline = nullptr;
     }
-    if (Layout && !mbDoNotDestroyLayout) {
-        vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
-    }
 
-    Layout = nullptr;
-    // RenderPass.Destroy();
+    // if (Layout && !mbDoNotDestroyLayout) {
+    //     vkDestroyPipelineLayout(mDevice->Device, Layout, nullptr);
+    // }
+
+    // Layout = nullptr;
 }
 
-
-VkPipelineLayout Pipeline::CreateLayout(const Slice<const PushConstants>& push_constant_defs,
-                                        const Slice<VkDescriptorSetLayout>& descriptor_set_layouts)
-{
-    StackArray<VkPushConstantRange, 3> push_const_ranges;
-
-    // VkPushConstantRange pc_ranges[3];
-    // uint32 pc_ranges_count = 0;
-    //
-    uint32 current_pc_offset = 0;
-
-    for (int i = 0; i < push_constant_defs.Size; i++) {
-        const PushConstants& pc_def = push_constant_defs[i];
-
-        if (pc_def.ShaderTypes == static_cast<eShaderType>(0)) {
-            continue;
-        }
-
-        LogDebug("Adding push constant (Off={}, Sz={})", current_pc_offset, pc_def.Size);
-
-        VkPushConstantRange range {
-            .stageFlags = ShaderUtil::ToUnderlyingType(pc_def.ShaderTypes),
-            .offset = current_pc_offset,
-            .size = pc_def.Size,
-        };
-        push_const_ranges.Insert(range);
-
-        current_pc_offset += pc_def.Size;
-    }
-
-    VkPipelineLayoutCreateInfo create_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = descriptor_set_layouts.Size,
-        .pSetLayouts = descriptor_set_layouts.pData,
-
-        .pushConstantRangeCount = push_const_ranges.Size,
-        .pPushConstantRanges = push_const_ranges.pData,
-    };
-
-    VkPipelineLayout layout;
-    VkResult status = vkCreatePipelineLayout(gRenderer->GetDevice()->Device, &create_info, nullptr, &layout);
-
-    if (status != VK_SUCCESS) {
-        ModulePanicVulkan("Failed to create pipeline layout", status);
-    }
-
-    LogDebug("Creating pipeline layout {:p}", reinterpret_cast<void*>(layout));
-
-    return layout;
-}
 
 } // namespace fx::renderer

@@ -13,10 +13,10 @@ namespace fx {
 
 enum class eGpuBufferFlags : uint16
 {
-    None = 0x00,
+    None = 0,
     /** The buffer is mapped for the lifetime of the buffer. */
-    PersistentMapped = 0x01,
-    TransferReceiver = 0x02,
+    PersistentMapped = (1 << 0),
+    TransferReceiver = (1 << 1),
 };
 FxEnumFlags(eGpuBufferFlags);
 
@@ -47,51 +47,72 @@ enum class eGpuBufferType
     IndexBuffer,
 };
 
-class GpuBufferUtil
+
+namespace GpuBufferUtil
 {
-public:
-    static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
-    {
-        switch (type) {
-        case eGpuBufferType::Storage:
-        case eGpuBufferType::StorageWithOffset:
-            return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-
-        case eGpuBufferType::Uniform:
-        case eGpuBufferType::UniformWithOffset:
-            return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-
-        case eGpuBufferType::Transfer:
-            return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        case eGpuBufferType::VertexBuffer:
-            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        case eGpuBufferType::IndexBuffer:
-            return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-        }
-
+static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
+{
+    switch (type) {
+    case eGpuBufferType::Storage:
+    case eGpuBufferType::StorageWithOffset:
         return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+    case eGpuBufferType::Uniform:
+    case eGpuBufferType::UniformWithOffset:
+        return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+    case eGpuBufferType::Transfer:
+        return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    case eGpuBufferType::VertexBuffer:
+        return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    case eGpuBufferType::IndexBuffer:
+        return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
 
-    static constexpr VkDescriptorType BufferTypeToDescriptorType(eGpuBufferType type)
-    {
-        switch (type) {
-        case eGpuBufferType::Storage:
-            return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        case eGpuBufferType::StorageWithOffset:
-            return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+    return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+}
 
-        case eGpuBufferType::Uniform:
-            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        case eGpuBufferType::UniformWithOffset:
-            return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+#define ENUM_TYPE eGpuBufferType
 
-        default:;
-        }
+static constexpr const char* BufferTypeToName(const eGpuBufferType type)
+{ 
+    switch (type) {
+        FX_ENUM_CASE_NAME(Storage);
+        FX_ENUM_CASE_NAME(StorageWithOffset);
+        FX_ENUM_CASE_NAME(Uniform);
+        FX_ENUM_CASE_NAME(UniformWithOffset);
+        FX_ENUM_CASE_NAME(Transfer);
+        FX_ENUM_CASE_NAME(VertexBuffer);
+        FX_ENUM_CASE_NAME(IndexBuffer);
+    }
 
+    return "";
+}
+
+#undef ENUM_TYPE
+
+
+static constexpr VkDescriptorType BufferTypeToDescriptorType(eGpuBufferType type)
+{
+    switch (type) {
+    case eGpuBufferType::Storage:
         return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    case eGpuBufferType::StorageWithOffset:
+        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+
+    case eGpuBufferType::Uniform:
+        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    case eGpuBufferType::UniformWithOffset:
+        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+
+    default:;
     }
+
+    return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+}
 };
 
+void GpuBufferPrintUndestroyed();
 
 /**
  * @brief Provides a GPU buffer that can be created with more complex parameters without staging.
@@ -137,6 +158,7 @@ public:
 
 public:
     eGpuBufferType Type = eGpuBufferType::Storage;
+    uint32 BufferId = 0;
 
     VkBuffer Buffer = nullptr;
     VmaAllocation Allocation = nullptr;
@@ -220,7 +242,7 @@ public:
             [&](CommandBuffer& cmd)
             {
                 VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
-                vkCmdCopyBuffer(cmd.CommandBuffer, staging_buffer.Buffer, this->Buffer, 1, &copy);
+                vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
             });
 
         staging_buffer.Destroy();
