@@ -50,6 +50,29 @@ void RenderStage::BuildRenderStage()
     mbIsBuilt = true;
 }
 
+void RenderStage::Rebuild(const Vec2u& size)
+{
+    mSize = size;
+
+    mbIsBuilt = false;
+
+    mOutputTargets.RecreateImages();
+
+    mFramebuffer.Destroy();
+    mRenderPass.Destroy();
+
+    mRenderPass.Create(mOutputTargets, mSize);
+
+    if (mbIsFinalStage) {
+        CreateFinalStageFramebuffers();
+    }
+    else {
+        mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize);
+    }
+
+    mbIsBuilt = true;
+}
+
 void RenderStage::Begin(CommandBuffer& cmd, Pipeline& pipeline)
 {
     Assert(mbIsBuilt);

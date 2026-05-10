@@ -10,21 +10,21 @@ namespace fx {
 class Window
 {
 public:
-    static Ref<Window> New(const char* title, const Vec2i& size) { return Ref<Window>::New(title, size); }
+    static Ref<Window> New(const char* title, const Vec2u& size) { return Ref<Window>::New(title, size); }
 
 public:
     Window() = default;
     Window(const Window& other) = delete;
-    Window(const char* title, const Vec2i& size) { Create(title, size); }
+    Window(const char* title, const Vec2u& size) { Create(title, size); }
 
-    void Create(const char* title, const Vec2i& size);
+    void Create(const char* title, const Vec2u& size);
 
-    Vec2i GetSize();
+    const Vec2u& GetSize();
 
     float32 GetAspectRatio()
     {
-        Vec2i size = GetSize();
-        return static_cast<float32>(size.X) / (size.Y);
+        Vec2u size = GetSize();
+        return static_cast<float32>(size.X) / static_cast<float32>(size.Y);
     }
 
     SDL_Window* GetWindow() { return mWindow; }
@@ -33,7 +33,7 @@ public:
 
 public:
 private:
-    Vec2i mSize = Vec2i::sZero;
+    Vec2u mSize = Vec2u::sZero;
     SDL_Window* mWindow;
 };
 

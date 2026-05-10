@@ -15,6 +15,9 @@ FX_SET_MODULE_NAME("Framebuffer")
 
 void Framebuffer::Create(const SizedArray<VkImageView>& image_views, const RenderPass& render_pass, Vec2u size)
 {
+    Assert(render_pass.Get() != nullptr);
+    Assert(image_views.Size > 0);
+
     if (size == Target::scFullScreen) {
         size = gRenderer->Swapchain.Extent;
     }

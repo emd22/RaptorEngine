@@ -81,7 +81,7 @@ void FoxtrotGame::InitEngine()
     const uint32 window_height = window_entry->GetMember(HashStr32("Height"))->Get<uint32>();
 
     Ref<Window> window = Window::New(window_entry->GetMember(HashStr32("Title"))->Get<const char*>(),
-                                     Vec2i(window_width, window_height));
+                                     Vec2u(window_width, window_height));
 
     Player.bEnableHeadBob = static_cast<bool>(Config.GetEntryValue<int32>(HashStr32("EnableHeadBob"), 1));
 

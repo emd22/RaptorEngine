@@ -38,6 +38,7 @@ private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
+    void CreateUnlitPass();
     void CreateGPass();
 
     VkPipelineLayout CreateGPassPipelineLayout();
@@ -76,6 +77,7 @@ public:
 
     VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
 
+    RenderStage ForwardPass;
     RenderStage GPass;
 
     // Pipeline PlGeometry;
@@ -109,8 +111,8 @@ public:
     // Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;
 
-    RenderPass RpForward;
-    Framebuffer FbForward;
+/*    RenderPass RpForward;
+    Framebuffer FbForward;*/
 
     //////////////////////
     // Composition Pass

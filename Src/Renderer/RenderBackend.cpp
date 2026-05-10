@@ -174,6 +174,21 @@ void RenderBackend::DestroyFrames()
     Frames.Free();
 }
 
+void RenderBackend::RebuildRenderStages()
+{ 
+    DeferredRenderer* rd = pDeferredRenderer.mpPtr;
+
+    Vec2u size = GetWindow()->GetSize();
+
+    rd->GPass.Rebuild(size);
+    rd->CompPass.Rebuild(size);
+    rd->LightPass.Rebuild(size);
+
+    /*for (FrameData& frame : Frames) {
+        frame.InFlight.Reset();
+    }*/
+}
+
 void RenderBackend::InitVulkan()
 {
     const char* app_name = "Foxtrot";
@@ -609,18 +624,23 @@ void RenderBackend::BeginUnlit()
     // Assert(depth_target != nullptr);
     // depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
-    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
-                                       Slice<VkClearValue>({}, 0));
+    Pipeline& pl = gPipelineCache->Request(ePipelineName::Unlit);
+
+    pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer, pl);
+    /*    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
+                                       Slice<VkClearValue>({}, 0));*/
 
     // pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
-    gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
+    
 }
 
 void RenderBackend::DoComposition(Camera& render_cam)
 {
     FrameData* frame = GetFrame();
 
-    pDeferredRenderer->RpForward.End();
+    pDeferredRenderer->ForwardPass.End();
+
+    //pDeferredRenderer->RpForward.End();
 
     pDeferredRenderer->CompPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Composition));
     pDeferredRenderer->DoCompPass(render_cam);
@@ -647,8 +667,11 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
         return eFrameResult::Success;
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // Swapchain.Rebuild()..
-        return eFrameResult::GraphicsOutOfDate;
+        Vec2u window_size = gRenderer->GetWindow()->GetSize();
+        Swapchain.Rebuild(window_size, mWindowSurface);
+        RebuildRenderStages();
+        
+        return eFrameResult::Success;
     }
     else {
         LogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));

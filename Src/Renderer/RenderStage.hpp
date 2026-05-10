@@ -53,8 +53,9 @@ public:
      */
     void BuildRenderStage();
 
-    void Begin(CommandBuffer& cmd, Pipeline& pipeline);
+    void Rebuild(const Vec2u& size);
 
+    void Begin(CommandBuffer& cmd, Pipeline& pipeline);
     void End() { mRenderPass.End(); }
 
     ~RenderStage() = default;

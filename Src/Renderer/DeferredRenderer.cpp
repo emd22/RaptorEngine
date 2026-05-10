@@ -41,6 +41,60 @@ void DeferredRenderer::Destroy()
     DestroyLightingPipeline();
 }
 
+void DeferredRenderer::CreateUnlitPass()
+{
+    TargetList targets {};
+
+    Target* lp_light_attachment = LightPass.GetTarget(eImageFormat::RGBA16_Float);
+    Target* lp_depth_attachment = GPass.GetTarget(eImageFormat::eD32_Float);
+
+    Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
+
+    /*Target depth_attachment(eImageFormat::eD32_Float, gRenderer->Swapchain.Extent);
+    depth_attachment.LoadOp = eLoadOp::Load;
+    depth_attachment.StoreOp = eStoreOp::DontCare;
+    depth_attachment.Aspect = eImageAspectFlag::Depth;
+    depth_attachment.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    depth_attachment.InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    depth_attachment.SetImage(lp_depth_attachment->GetImage());
+    targets.Add(depth_attachment);
+
+    Target light_attachment(eImageFormat::RGBA16_Float, gRenderer->Swapchain.Extent);
+    light_attachment.LoadOp = eLoadOp::Load;
+    light_attachment.StoreOp = eStoreOp::Store;
+    light_attachment.InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    light_attachment.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    light_attachment.SetImage(lp_light_attachment->GetImage());
+
+    targets.Add(light_attachment);
+
+    RpForward.Create(targets, Target::scFullScreen);
+    FbForward.Create(targets.GetImageViews(), RpForward, Target::scFullScreen);*/
+
+    ForwardPass.Create(gRenderer->Swapchain.Extent);
+
+    ForwardPass.AddTarget(eImageFormat::eD32_Float, Target::scFullScreen, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
+    {
+        Target* depth_target = ForwardPass.GetTarget(eImageFormat::eD32_Float);
+        depth_target->LoadOp = eLoadOp::Load;
+        depth_target->StoreOp = eStoreOp::DontCare;
+        depth_target->InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        depth_target->SetImage(lp_depth_attachment->GetImage());
+    }
+
+    ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+    {
+        Target* light_target = ForwardPass.GetTarget(eImageFormat::RGBA16_Float);
+        light_target->LoadOp = eLoadOp::Load;
+        light_target->StoreOp = eStoreOp::Store;
+        light_target->InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        light_target->FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        light_target->SetImage(lp_light_attachment->GetImage());
+    }
+
+    ForwardPass.BuildRenderStage();
+}
+
 void DeferredRenderer::CreateGPass()
 {
     GPass.Create(gRenderer->Swapchain.Extent);
@@ -117,7 +171,8 @@ void DeferredRenderer::CreateUnlitPipeline()
 
     VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
 
-    PipelineBuilder builder {};
+    CreateUnlitPass();
+    /*    PipelineBuilder builder {};
     TargetList targets {};
 
     Target* lp_light_attachment = LightPass.GetTarget(eImageFormat::RGBA16_Float);
@@ -144,7 +199,7 @@ void DeferredRenderer::CreateUnlitPipeline()
     targets.Add(light_attachment);
 
     RpForward.Create(targets, Target::scFullScreen);
-    FbForward.Create(targets.GetImageViews(), RpForward, Target::scFullScreen);
+    FbForward.Create(targets.GetImageViews(), RpForward, Target::scFullScreen);*/
 
     // Unlit pipeline
     gState->BeginPipeline(ePipelineName::Unlit);
@@ -155,8 +210,10 @@ void DeferredRenderer::CreateUnlitPipeline()
     gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
 
     gState->SetShader(eShaderName::Unlit, {});
-    gState->SetOutputTargets(&targets);
-    gState->SetRenderPass(&RpForward);
+    
+    gState->UseRenderStage(ForwardPass);
+    /*gState->SetOutputTargets(&targets);
+    gState->SetRenderPass(&RpForward);*/
     gState->SetVertexType(eVertexType::Default);
     gState->SetCullMode(eCullMode::Back);
 
@@ -165,8 +222,10 @@ void DeferredRenderer::CreateUnlitPipeline()
     // Text rendering pipeline
     gState->BeginPipeline(ePipelineName::TextRendering);
     gState->SetLayout(ePipelineName::Unlit);
-    gState->SetOutputTargets(&targets);
-    gState->SetRenderPass(&RpForward);
+    
+    gState->UseRenderStage(ForwardPass);
+    /*gState->SetOutputTargets(&targets);
+    gState->SetRenderPass(&RpForward);*/
     gState->SetShader(eShaderName::Text, {});
     gState->SetCullMode(eCullMode::None);
     gState->EndPipeline();
@@ -179,8 +238,10 @@ void DeferredRenderer::CreateUnlitPipeline()
     gState->SetVertexType(eVertexType::Slim);
     gState->SetRenderLines(true);
     gState->SetCullMode(eCullMode::Back);
-    gState->SetRenderPass(&RpForward);
-    gState->SetOutputTargets(&targets);
+    
+    gState->UseRenderStage(ForwardPass);
+    /*gState->SetRenderPass(&RpForward);
+    gState->SetOutputTargets(&targets);*/
     gState->EndPipeline();
 }
 

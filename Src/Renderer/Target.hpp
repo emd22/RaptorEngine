@@ -130,12 +130,17 @@ public:
         return targets;
     }
 
+    void RecreateImages() { 
+        mFlags = eTargetListFlags::None;
+        CreateImages();
+    }
+
     void Clear()
     {
         mFlags = eTargetListFlags::None;
-        mBuiltAttachmentDescriptions.Clear();
-        mBuiltImageViews.Clear();
-        Targets.Clear();
+        mBuiltAttachmentDescriptions.Free();
+        mBuiltImageViews.Free();
+        Targets.Free();
     }
 
 

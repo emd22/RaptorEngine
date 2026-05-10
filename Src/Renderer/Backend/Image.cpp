@@ -90,7 +90,21 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
                    VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
     Assert(size.X > 0 && size.Y > 0);
-    Assert(InternalImage == nullptr && Allocation == nullptr);
+ 
+    // Destroy image if it already has been created
+    if (InternalImage != nullptr && Allocation != nullptr) {
+        if (View != nullptr) {
+            vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
+        }
+
+        if (InternalImage != nullptr && Allocation != nullptr) {
+            vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
+        }
+
+        InternalImage = nullptr;
+        Allocation = nullptr;
+        View = nullptr;
+    }
 
     Aspect = aspect;
     Size = size;

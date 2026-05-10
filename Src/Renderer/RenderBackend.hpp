@@ -177,6 +177,8 @@ private:
     void InitFrames();
     void DestroyFrames();
 
+    void RebuildRenderStages();
+
     eFrameResult GetNextSwapchainImage(FrameData* frame);
 
     ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
