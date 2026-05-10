@@ -75,8 +75,6 @@ public:
     FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
     FX_FORCE_INLINE GpuDevice* GetDevice() { return &mDevice; }
 
-    UniformBufferObject& GetUbo();
-
     void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
         std::lock_guard<std::mutex> guard(mInDeletionQueue);
@@ -162,6 +160,8 @@ public:
     uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
     uint32 GetFrameNumber() const { return mFrameNumber; }
 
+    FX_FORCE_INLINE bool DidResize() const { return bDidFrameResize; }
+
 private:
     void InitVulkan();
     void CreateSurfaceFromWindow();
@@ -190,6 +190,8 @@ private:
 
     SizedArray<VkLayerProperties> GetAvailableValidationLayers();
 
+
+
 public:
     Swapchain Swapchain;
     SizedArray<FrameData> Frames;
@@ -199,6 +201,7 @@ public:
     GpuUploadContext UploadContext;
 
     bool bInitialized = false;
+    bool bDidFrameResize = false;
 
     DeferredCompPass* pCurrentCompPass = nullptr;
     DeferredLightingPass* pCurrentLightingPass = nullptr;
@@ -222,6 +225,7 @@ private:
     SizedArray<Semaphore> mSubmitSemaphores;
 
     uint32 mImageIndex = 0;
+
 
 protected:
     uint32 mFrameNumber = 0;

@@ -24,21 +24,21 @@ void Window::Create(const char* title, const Vec2u& size)
     if (mWindow == nullptr) {
         Panic("Window", "Could not create SDL window (SDL err: {})", SDL_GetError());
     }
+
+    HandleResize();
 }
 
-const Vec2u& Window::GetSize()
+void Window::HandleResize()
 {
     int width, height;
-    bool success = SDL_GetWindowSize(mWindow, &width, &height);
 
-    mSize = Vec2u(static_cast<uint32>(width), static_cast<uint32>(height));
-
-    if (!success) {
+    // Get window size from SDL
+    if (!SDL_GetWindowSize(mWindow, &width, &height)) {
         LogError("Error retrieving window size from SDL! (SDL err: {})", SDL_GetError());
-        return mSize;
+        return;
     }
 
-    return mSize;
+    mSize = Vec2u(static_cast<uint32>(width), static_cast<uint32>(height));
 }
 
 Window::~Window() { SDL_DestroyWindow(mWindow); }

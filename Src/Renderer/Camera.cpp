@@ -1,5 +1,8 @@
 #include "Camera.hpp"
 
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
+
 namespace fx {
 
 void Camera::Update()

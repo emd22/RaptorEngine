@@ -183,6 +183,10 @@ void RenderBackend::RebuildRenderStages()
     rd->GPass.Rebuild(size);
     rd->CompPass.Rebuild(size);
     rd->LightPass.Rebuild(size);
+    rd->ForwardPass.Rebuild(size);
+
+    rd->DescriptorPool.Recreate();
+    rd->CreateDescriptorSets();
 
     /*for (FrameData& frame : Frames) {
         frame.InFlight.Reset();
@@ -495,6 +499,8 @@ eFrameResult RenderBackend::BeginFrame()
 {
     FrameData* frame = GetFrame();
 
+    bDidFrameResize = false;
+
     LightBuffer.Rewind();
 
     // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
@@ -651,6 +657,8 @@ void RenderBackend::DoComposition(Camera& render_cam)
     PresentFrame();
     ProcessDeletionQueue();
 
+    RequirePipelineDynamicStates();
+
     mInternalFrameCounter++;
 
     mFrameNumber = (mInternalFrameCounter % FramesInFlight);
@@ -667,8 +675,9 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
         return eFrameResult::Success;
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        Vec2u window_size = gRenderer->GetWindow()->GetSize();
-        Swapchain.Rebuild(window_size, mWindowSurface);
+        bDidFrameResize = true;
+        gRenderer->GetWindow()->HandleResize();
+        Swapchain.Rebuild(gRenderer->GetWindow()->GetSize(), mWindowSurface);
         RebuildRenderStages();
         
         return eFrameResult::Success;

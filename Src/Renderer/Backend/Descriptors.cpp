@@ -35,6 +35,12 @@ void DescriptorPool::Create(GpuDevice* device, uint32 max_sets)
     }
 }
 
+void DescriptorPool::Recreate() 
+{ 
+    Destroy(); 
+    Create(gRenderer->GetDevice(), SetCapacity);
+}
+
 void DescriptorPool::Destroy()
 {
     if (!Pool) {
@@ -227,6 +233,8 @@ void DescriptorSet::Destroy()
     //     vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, Layout, nullptr);
     //     Layout = nullptr;
     // }
+
+    mDescriptorEntries.Clear();
 }
 
 } // namespace fx::renderer

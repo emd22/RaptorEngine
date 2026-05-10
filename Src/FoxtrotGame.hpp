@@ -94,9 +94,7 @@ private:
     void DestroyGame();
 
     void NextEditorMode();
-    void PrevEditorMode();
     void SwitchEditorMode(eEditorMode mode);
-
 
 public:
     Player Player {};

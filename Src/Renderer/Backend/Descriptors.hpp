@@ -26,6 +26,8 @@ public:
     FX_FORCE_INLINE VkDescriptorPool Get() const { return Pool; }
     void AddPoolSize(VkDescriptorType type, uint32_t count) { RemainingDescriptorCounts[type] = count; }
 
+    void Recreate();
+
     void Destroy();
     ~DescriptorPool() { Destroy(); }
 
@@ -50,6 +52,7 @@ enum class eDescriptorBufferType
 
 class DescriptorSet
 {
+private:
     struct DescriptorEntry
     {
         uint32 BindIndex = 0;

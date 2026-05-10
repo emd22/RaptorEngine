@@ -27,7 +27,6 @@ public:
     void Render(Camera* shadow_camera);
     void RenderShadows(Camera* shadow_camera);
 
-
     const PagedArray<TSRef<Object>>& GetAllObjects() { return mObjects; }
     const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
 

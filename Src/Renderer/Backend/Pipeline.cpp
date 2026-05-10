@@ -17,6 +17,10 @@ FX_SET_MODULE_NAME("Pipeline")
 namespace fx::renderer {
 
 static VkPipeline spBoundPipeline = nullptr;
+static bool sbHaveDynamicStatesBeenBound = false;
+
+void RequirePipelineDynamicStates() { sbHaveDynamicStatesBeenBound = false; }
+
 
 /////////////////////////////////////
 // Pipeline Layout
@@ -154,7 +158,10 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
     }
 
     // Dynamic states (scissor & viewport updates dynamically)
-    SizedArray<VkDynamicState> dynamic_states = {};
+    SizedArray<VkDynamicState> dynamic_states = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+    };
 
     const VkPipelineDynamicStateCreateInfo dynamic_state_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -162,26 +169,27 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
         .pDynamicStates = dynamic_states,
     };
 
-    Vec2u viewport_size = properties.ViewportSize;
+    bHasDynamicViewport = true;
+    ViewportSize = properties.ViewportSize;
 
     // If there is no viewport size passed in, assume the swapchain size.
-    if (properties.ViewportSize.X == 0 || properties.ViewportSize.Y == 0) {
-        viewport_size = gRenderer->Swapchain.Extent;
+    if (ViewportSize.X == 0 || ViewportSize.Y == 0) {
+        bIsViewportFullscreen = true;
+        ViewportSize = gRenderer->Swapchain.Extent;
     }
-
 
     VkViewport viewport = {
         .x = 0.0f,
         .y = 0.0f,
-        .width = static_cast<float32>(viewport_size.X),
-        .height = static_cast<float32>(viewport_size.Y),
+        .width = static_cast<float32>(ViewportSize.X),
+        .height = static_cast<float32>(ViewportSize.Y),
         .minDepth = 1.0f,
         .maxDepth = 0.0f,
     };
 
     VkRect2D scissor = {
         .offset = { 0, 0 },
-        .extent = { .width = viewport_size.X, .height = viewport_size.Y },
+        .extent = { .width = ViewportSize.X, .height = ViewportSize.Y },
     };
 
     const VkPipelineViewportStateCreateInfo viewport_state_info = {
@@ -293,8 +301,35 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 
 void Pipeline::Bind(const CommandBuffer& cmd)
 {
-    if (this->InternalPipeline == spBoundPipeline) {
+    if (InternalPipeline == spBoundPipeline) {
         return;
+    }
+
+    
+    if (bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
+        if (bIsViewportFullscreen) {
+            ViewportSize = gRenderer->GetWindow()->GetSize();
+        }
+
+        VkViewport viewport = {
+            .x = 0.0f,
+            .y = 0.0f,
+            .width = static_cast<float32>(ViewportSize.X),
+            .height = static_cast<float32>(ViewportSize.Y),
+            .minDepth = 1.0f,
+            .maxDepth = 0.0f,
+        };
+
+        VkRect2D scissor = {
+            .offset = { 0, 0 },
+            .extent = { .width = ViewportSize.X, .height = ViewportSize.Y },
+        };
+
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
+    }
+    else if (!bHasDynamicViewport) {
+        sbHaveDynamicStatesBeenBound = false;
     }
 
     vkCmdBindPipeline(cmd.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, InternalPipeline);

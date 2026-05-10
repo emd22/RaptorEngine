@@ -8,6 +8,7 @@
 #include "Globals.hpp"
 #include "PipelineBuilder.hpp"
 #include "PipelineCache.hpp"
+#include "ShadowDirectional.hpp"
 #include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
 #include "State.hpp"
@@ -30,8 +31,9 @@ void DeferredRenderer::Create(const Vec2u& extent)
     CreateGPassPipeline();
     CreateLightingPipeline();
     CreateCompPipeline();
-
     CreateUnlitPipeline();
+
+    CreateDescriptorSets();
 }
 
 void DeferredRenderer::Destroy()
@@ -79,7 +81,7 @@ void DeferredRenderer::CreateUnlitPass()
         depth_target->LoadOp = eLoadOp::Load;
         depth_target->StoreOp = eStoreOp::DontCare;
         depth_target->InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        depth_target->SetImage(lp_depth_attachment->GetImage());
+        depth_target->UseImageFromTarget(lp_depth_attachment);
     }
 
     ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
@@ -89,7 +91,7 @@ void DeferredRenderer::CreateUnlitPass()
         light_target->StoreOp = eStoreOp::Store;
         light_target->InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         light_target->FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        light_target->SetImage(lp_light_attachment->GetImage());
+        light_target->UseImageFromTarget(lp_light_attachment);
     }
 
     ForwardPass.BuildRenderStage();
@@ -165,11 +167,11 @@ VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
 
 void DeferredRenderer::CreateUnlitPipeline()
 {
-    Ref<Shader> shader_unlit = gShaderCache->Request(eShaderName::Unlit);
+    /*Ref<Shader> shader_unlit = gShaderCache->Request(eShaderName::Unlit);
     Ref<ShaderProgram> vertex_shader = shader_unlit->GetProgram(eShaderType::Vertex, {});
     Ref<ShaderProgram> pixel_shader = shader_unlit->GetProgram(eShaderType::Pixel, {});
 
-    VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
+    VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();*/
 
     CreateUnlitPass();
     /*    PipelineBuilder builder {};
@@ -361,22 +363,7 @@ void DeferredRenderer::CreateLightingPipeline()
 
         LightPass.BuildRenderStage();
     }
-    {
-        DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
 
-        // sDepth
-        DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-        // sAlbedo
-        DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
-                                      &gRenderer->Swapchain.ColorSampler);
-        // sNormals
-        DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float),
-                                      &gRenderer->Swapchain.NormalsSampler);
-        // Skip 3 for the shadow target, added by DirectionalShadows
-        DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
-
-        DsLighting.Build();
-    }
 
     Shader lighting_shader("Lighting");
 
@@ -515,27 +502,47 @@ void DeferredRenderer::DestroyCompPipeline()
     // PlCompositionUnlit.Destroy();
 }
 
+void DeferredRenderer::CreateDescriptorSets() 
+{     
+    DsComposition.Destroy();
+    DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
+    DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+    DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+    DsComposition.AddImageFromTarget(3, GPass.GetTarget(eImageFormat::RGBA16_Float),
+                                     &gRenderer->Swapchain.NormalsSampler);
+    DsComposition.AddImageFromTarget(4, LightPass.GetTarget(eImageFormat::RGBA16_Float),
+                                     &gRenderer->Swapchain.LightsSampler);
+    DsComposition.Build();
+
+
+    DsLighting.Destroy();
+    DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
+    // sDepth
+    DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+    // sAlbedo
+    DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
+                                    &gRenderer->Swapchain.ColorSampler);
+
+    // sNormals
+    DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float),
+                                    &gRenderer->Swapchain.NormalsSampler);
+
+    if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
+        DsLighting.AddImageFromTarget(3, gShadowRenderer->RenderStage.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.ShadowDepthSampler);
+    }
+
+    // Skip 3 for the shadow target, added by DirectionalShadows
+    DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
+
+    DsLighting.Build();
+}
+
 void DeferredRenderer::CreateCompPass()
 {
-    DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
-
     CompPass.Create(gRenderer->Swapchain.Extent);
 
     CompPass.MarkFinalStage();
     CompPass.BuildRenderStage();
-
-    DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-
-    DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
-
-    DsComposition.AddImageFromTarget(3, GPass.GetTarget(eImageFormat::RGBA16_Float),
-                                     &gRenderer->Swapchain.NormalsSampler);
-
-    DsComposition.AddImageFromTarget(4, LightPass.GetTarget(eImageFormat::RGBA16_Float),
-                                     &gRenderer->Swapchain.LightsSampler);
-
-
-    DsComposition.Build();
 }
 
 void DeferredRenderer::DoCompPass(Camera& camera)

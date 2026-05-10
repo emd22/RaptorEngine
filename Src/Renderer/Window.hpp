@@ -19,15 +19,15 @@ public:
 
     void Create(const char* title, const Vec2u& size);
 
-    const Vec2u& GetSize();
+    void HandleResize();
 
-    float32 GetAspectRatio()
+    float32 GetAspectRatio() const
     {
-        Vec2u size = GetSize();
-        return static_cast<float32>(size.X) / static_cast<float32>(size.Y);
+        return static_cast<float32>(mSize.X) / static_cast<float32>(mSize.Y);
     }
 
-    SDL_Window* GetWindow() { return mWindow; }
+    FX_FORCE_INLINE const Vec2u& GetSize() const { return mSize; }
+    FX_FORCE_INLINE SDL_Window* GetWindow() { return mWindow; }
 
     ~Window();
 

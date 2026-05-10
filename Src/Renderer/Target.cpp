@@ -12,6 +12,7 @@ Target::Target(eImageFormat format, const Vec2u& size)
 
     if (size == Target::scFullScreen) {
         Image.Size = gRenderer->Swapchain.Extent;
+        bIsFullscreen = true;
     }
 }
 
@@ -24,6 +25,7 @@ Target::Target(eImageFormat format, const Vec2u& size, eLoadOp load_op, eStoreOp
 
     if (size == Target::scFullScreen) {
         Image.Size = gRenderer->Swapchain.Extent;
+        bIsFullscreen = true;
     }
 }
 
@@ -35,6 +37,7 @@ Target::Target(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, 
 
     if (size == Target::scFullScreen) {
         Image.Size = gRenderer->Swapchain.Extent;
+        bIsFullscreen = true;
     }
 }
 
@@ -42,6 +45,11 @@ Target::Target(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, 
 void Target::CreateImage()
 {
     if (bReuseImage) {
+        // If we have the target that the image is from set, we can pull the updated Image from there
+        if (mpReferenceTarget != nullptr) {
+            Image = mpReferenceTarget->GetImage();
+        }
+
         return;
     }
 
@@ -119,8 +127,15 @@ void TargetList::CreateImages()
         return;
     }
 
-    for (Target& attachment : Targets) {
-        attachment.CreateImage();
+    Vec2u swapchain_size = gRenderer->Swapchain.Extent;
+
+    for (Target& target : Targets) {
+        if (target.bIsFullscreen) {
+            // This size will be the size of the newly created image after running `CreateImage`.
+            target.Image.Size = swapchain_size;
+        }
+        
+        target.CreateImage();
     }
 
     mFlags |= eTargetListFlags::ImagesCreated;

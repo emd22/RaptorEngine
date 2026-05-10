@@ -511,6 +511,11 @@ void FoxtrotGame::Tick()
     mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
     mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
+    if (gRenderer->DidResize()) {
+        LogInfo("Setting aspect ratio");
+        camera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
+    }
+
     mLastTick = current_tick;
 }
 

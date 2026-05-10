@@ -110,6 +110,12 @@ struct PushConstants
     eShaderType ShaderTypes;
 };
 
+/**
+ * @brief Marks an internal state to require the next pipeline bound to output its dynamic states.
+ */
+void RequirePipelineDynamicStates();
+
+
 class PipelineLayout : public RefCountedBase
 {
 public:
@@ -166,6 +172,8 @@ public:
 
     void Bind(const CommandBuffer& command_buffer);
 
+    void SetViewport(const Vec2u& size);
+
     void Destroy();
     ~Pipeline() { Destroy(); }
 
@@ -175,10 +183,18 @@ public:
     PipelineLayout Layout2;
     VkPipeline InternalPipeline = nullptr;
 
+    Vec2u ViewportSize = Vec2u::sZero;
+
     String Name;
 
     Ref<ShaderProgram> VertexShader { nullptr };
     Ref<ShaderProgram> PixelShader { nullptr };
+
+    bool bIsViewportFullscreen = false;
+
+    /// True if the pipeline uses dynamic states for viewport and scissor
+    bool bHasDynamicViewport = true;
+
 
 private:
     GpuDevice* mDevice = nullptr;

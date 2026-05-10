@@ -30,6 +30,8 @@ public:
 
     void DoCompPass(Camera& camera);
 
+    void CreateDescriptorSets();
+
     void Destroy();
     ~DeferredRenderer() { Destroy(); }
 
@@ -40,6 +42,7 @@ private:
 
     void CreateUnlitPass();
     void CreateGPass();
+
 
     VkPipelineLayout CreateGPassPipelineLayout();
     VkPipelineLayout CreateGPassSkinnedPipelineLayout();
@@ -63,7 +66,6 @@ private:
     void CreateUnlitPipeline();
 
     void CreateCompPass();
-    void BuildLightDescriptors();
 
 public:
     DescriptorPool DescriptorPool;

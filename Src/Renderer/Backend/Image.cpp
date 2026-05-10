@@ -97,9 +97,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
             vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
         }
 
-        if (InternalImage != nullptr && Allocation != nullptr) {
-            vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
-        }
+        vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
 
         InternalImage = nullptr;
         Allocation = nullptr;
