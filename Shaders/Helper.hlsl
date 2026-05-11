@@ -7,7 +7,7 @@
 
 #define F_REFLECT(_type, _set, _binding) ;
 #define FR_STRUCTBUFFER 0
-#define FR_UNIFORMBUFFER 1
+#define FR_CBUFFER 1
 #define FR_SAMPLER2D 2
 
 #define F_PARAMTEST() ;

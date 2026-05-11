@@ -685,7 +685,7 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         RebuildToResizedWindow();
-        return eFrameResult::Success;
+        return eFrameResult::GraphicsOutOfDate;
     }
     else {
         LogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));

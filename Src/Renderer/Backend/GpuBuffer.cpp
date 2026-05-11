@@ -20,23 +20,23 @@ private:
 
 public:
     void AddBuffer(uint32 id, eGpuBufferType type, uint64 size, eGpuBufferFlags flags)
-    { 
+    {
         Entries.emplace_back(id, true, type, size, flags);
     }
 
-    void RemoveBuffer(uint32 id)
-    { 
-        Entries[id].bExists = false;
-    }
+    void RemoveBuffer(uint32 id) { Entries[id].bExists = false; }
 
     void PrintUndestroyed()
-    { 
+    {
         for (const Entry& entry : Entries) {
             if (!entry.bExists) {
                 continue;
             }
 
-            LogWarning("[NOT DESTROYED]: Type={}, Size={}, Persistent?={}, TransferReciever?={}", GpuBufferUtil::BufferTypeToName(entry.BufferType), entry.Size, (entry.Flags & eGpuBufferFlags::PersistentMapped) != 0, (entry.Flags & eGpuBufferFlags::TransferReceiver) != 0);
+            LogWarning("[NOT DESTROYED]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
+                       GpuBufferUtil::BufferTypeToName(entry.BufferType), entry.Size,
+                       (entry.Flags & eGpuBufferFlags::PersistentMapped) != 0,
+                       (entry.Flags & eGpuBufferFlags::TransferReceiver) != 0);
         }
     }
 
@@ -64,7 +64,9 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
     gBufferTracker.AddBuffer(BufferId, Type, Size, mBufferFlags);
 
-    LogInfo("[Created GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}", GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped) != 0, (buffer_flags & eGpuBufferFlags::TransferReceiver) != 0);
+    // LogInfo("[Created GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
+    // GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)
+    // != 0, (buffer_flags & eGpuBufferFlags::TransferReceiver) != 0);
 
     VmaAllocationCreateFlags vma_create_flags = 0;
 
@@ -144,7 +146,9 @@ void RawGpuBuffer::Destroy()
 
     gBufferTracker.RemoveBuffer(BufferId);
 
-    LogInfo("[Destroyed GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}", GpuBufferUtil::BufferTypeToName(Type), Size, (mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0, (mBufferFlags & eGpuBufferFlags::TransferReceiver) != 0);
+    // LogInfo("[Destroyed GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
+    // GpuBufferUtil::BufferTypeToName(Type), Size, (mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0,
+    // (mBufferFlags & eGpuBufferFlags::TransferReceiver) != 0);
 
     gRenderer->AddGpuBufferToDeletionQueue(Buffer, Allocation);
 

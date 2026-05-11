@@ -54,7 +54,7 @@ public:
         return Status::Ready;
     }
 
-    bool Exists() const { return (pAssetImage != nullptr); }
+    bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr); }
 
     ~MaterialComponent() = default;
 

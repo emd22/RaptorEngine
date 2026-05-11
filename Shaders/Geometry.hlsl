@@ -44,13 +44,14 @@ struct VSPushConsts
 };
 
 #ifdef USE_SKINNING
+F_REFLECT(FR_CBUFFER, 3, 0)
 [[vk::binding(3, 0)]] cbuffer VSUniforms
 {
     BoneMtx bBones[BONE_COUNT];
 };
 #endif
 
-//F_REFLECT(FR_STRUCTBUFFER, 2, 0)
+F_REFLECT(FR_STRUCTBUFFER, 0, 2)
 [[vk::binding(0, 2)]] StructuredBuffer<Object> bObjectBuffer;
 
 [[vk::push_constant]] VSPushConsts VSConst;
@@ -114,8 +115,6 @@ struct FSInput
     // float4 vDebugColor : ATTR0;
 };
 
-//F_REFLECT(FR_SAMPLER2D, 0, 0)
-
 F_Texture2D(tAlbedo, 0)
 
 #ifdef USE_NORMAL_MAPS
@@ -147,10 +146,13 @@ FSOutput main(FSInput input)
     output.vNormal = float4(normalize(normal_ws), roughness_metallic.x);
     // Metalness
     output.vAlbedo.w = roughness_metallic.y;
+
+    // output.vAlbedo.rgb = float3(roughness_metallic.x, roughness_metallic.x, roughness_metallic.x);
 #else
     output.vNormal = float4(input.vNormalWS, 0.0);
     output.vAlbedo.w = 0.0;
 #endif
+
 
     // output.vAlbedo = float4(input.vDebugColor.rgb, 1.0);
 

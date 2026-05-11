@@ -197,7 +197,7 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
                     }
 
                     if (should_set_default) {
-                        asset->pMaterial->SetDefaultPipeline();
+                        node->pMaterial->SetDefaultPipeline();
                     }
                     else {
                         node->pMaterial->pPipeline = pipeline;

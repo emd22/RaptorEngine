@@ -218,6 +218,8 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
     default:;
     }
 
+    LogWarning("REFLECTED TYPE: {}", std::string(refl_type.pData, refl_type.Size));
+
     result.Reflection.emplace_back(type, set, binding);
 }
 

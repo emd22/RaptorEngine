@@ -154,6 +154,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
                                         gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
     }
 
+    material->SetDefaultPipeline();
 
     object->pMaterial = material;
 }

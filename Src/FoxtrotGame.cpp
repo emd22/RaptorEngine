@@ -268,6 +268,38 @@ static FX_FORCE_INLINE Vec3f GetMovementVector()
     return movement;
 }
 
+static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
+{
+    Vec3f movement = Vec3f::sZero;
+
+    const float speed = 0.25f;
+
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_UP)) {
+        if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+            movement.Y += speed;
+        }
+        else {
+            movement.Z += speed;
+        }
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_DOWN)) {
+        if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+            movement.Y += -speed;
+        }
+        else {
+            movement.Z += -speed;
+        }
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_LEFT)) {
+        movement.X += -speed;
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_RIGHT)) {
+        movement.X += speed;
+    }
+
+    return movement;
+}
+
 void FoxtrotGame::NextEditorMode()
 {
     if (SelectedEditorMode != nullptr) {
@@ -301,10 +333,10 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
     // Update cameras + current editor mode ptr
     if (EditorModeType != eEditorMode::Default) {
         SelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
-        mMainScene.SelectCamera(pEditorCamera);
+        // mMainScene.SelectCamera(pEditorCamera);
     }
     else {
-        mMainScene.SelectCamera(Player.pCamera);
+        // mMainScene.SelectCamera(Player.pCamera);
         SelectedEditorMode = nullptr;
     }
 }
@@ -448,13 +480,12 @@ void FoxtrotGame::Tick()
     ProcessControls();
 
 
-    if (!sbShowShadowCam && EditorModeType == eEditorMode::Default) {
-        Player.Move(DeltaTime, GetMovementVector());
-        Player.Update(DeltaTime);
-    }
+    Player.Move(DeltaTime, GetMovementVector());
+    Player.Update(DeltaTime);
+
 
     if (EditorModeType != eEditorMode::Default) {
-        SelectedEditorMode->Update(mMainScene, GetMovementVector());
+        SelectedEditorMode->Update(mMainScene, GetEditorMovementVector());
     }
 
     Ref<PerspectiveCamera> camera = Player.pCamera;

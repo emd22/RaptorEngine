@@ -206,13 +206,18 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 void Material::SetDefaultPipeline()
 {
     if (NormalMap.Exists()) {
+        LogInfo("SETTING TO NORMAL MAPPED PIPELINE");
         pPipeline = &gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
     }
     else {
+        LogInfo("SETTING TO BASIC PIPELINE");
+
         pPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
     }
 
     if (bSupportsSkinning) {
+        LogInfo("SETTING TO SKINNED PIPELINE");
+
         pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 }
@@ -272,6 +277,9 @@ void Material::Build()
 
     if (!pPipeline) {
         SetDefaultPipeline();
+    }
+    else {
+        LogWarning("PIPELINE IS ALREADY SET FOR MATERIAL {}", Name.Get());
     }
 
 
