@@ -69,11 +69,10 @@ void Player::Move(float64 delta_time, const Vec3f& offset)
 
 void Player::Update(float64 delta_time)
 {
-    UpdateDirection();
-
     Physics.Update(delta_time);
     SyncPhysicsToPlayer();
 
+    UpdateDirection();
     pCamera->MoveTo(Position + mCameraOffset);
 
     if (bEnableHeadBob && Physics.bIsGrounded) {
@@ -104,6 +103,7 @@ void Player::Update(float64 delta_time)
             pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scWalkingFov, 13.0f, delta_time));
         }
     }
+
     pCamera->Update();
 
     mbUpdatePhysicsTransform = false;

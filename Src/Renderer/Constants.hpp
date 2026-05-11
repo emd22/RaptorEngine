@@ -2,5 +2,5 @@
 
 
 namespace fx::renderer {
-constexpr int FramesInFlight = 3;
+constexpr int FramesInFlight = 2;
 }

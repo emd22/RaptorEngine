@@ -30,7 +30,7 @@ namespace fx {
 
 using namespace renderer;
 
-static constexpr float scMouseSensitivity = 0.25;
+static constexpr float scMouseSensitivity = 0.001;
 
 static constexpr uint32 scFramesForAvg = 10;
 
@@ -234,7 +234,7 @@ void FoxtrotGame::CreateGame()
 
     CreateLights();
 
-    CreateFontObject();
+    //CreateFontObject();
 
 
     while (sbRunning) {
@@ -302,10 +302,10 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
     // Update cameras + current editor mode ptr
     if (EditorModeType != eEditorMode::Default) {
         SelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
-        mMainScene.SelectCamera(pEditorCamera);
+        //mMainScene.SelectCamera(pEditorCamera);
     }
     else {
-        mMainScene.SelectCamera(Player.pCamera);
+        //mMainScene.SelectCamera(Player.pCamera);
         SelectedEditorMode = nullptr;
     }
 }
@@ -341,9 +341,9 @@ void FoxtrotGame::ProcessControls()
             mMainScene.SelectPhysicsObject(hits[0]);
         }
 
-        for (JPH::BodyID body_id : hits) {
+        /*for (JPH::BodyID body_id : hits) {
             LogInfo("HIT {}", body_id.GetIndex());
-        }
+        }*/
     }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_PERIOD)) {
@@ -353,7 +353,7 @@ void FoxtrotGame::ProcessControls()
         SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) - 1));
     }
 
-    if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
+    /*if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
         sbShowShadowCam = !sbShowShadowCam;
 
 
@@ -366,15 +366,16 @@ void FoxtrotGame::ProcessControls()
             Player.pCamera->UpdateProjectionMatrix();
             Player.pCamera->UpdateCameraMatrix();
         }
-    }
+    }*/
 
     if (ControlManager::IsMouseLocked()) {
         Vec2f mouse_delta = ControlManager::GetMouseDelta();
-        mouse_delta.X = (DeltaTime * mouse_delta.X * scMouseSensitivity);
-        mouse_delta.Y = (DeltaTime * mouse_delta.Y * -scMouseSensitivity);
+        mouse_delta.X = (mouse_delta.X * scMouseSensitivity);
+        mouse_delta.Y = (mouse_delta.Y * -scMouseSensitivity);
 
         // camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         Player.RotateHead(mouse_delta);
+
     }
 
 
@@ -444,10 +445,8 @@ void FoxtrotGame::Tick()
         FrameTimeAvg = 0;
     }
 
-
     ControlManager::Update();
     ProcessControls();
-
 
     if (!sbShowShadowCam && EditorModeType == eEditorMode::Default) {
         Player.Move(DeltaTime, GetMovementVector());

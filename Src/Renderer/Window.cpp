@@ -18,6 +18,8 @@ void Window::Create(const char* title, const Vec2u& size)
 
     const uint64 window_flags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE;
 
+    SDL_SetHint(SDL_HINT_WINDOWS_RAW_KEYBOARD, "1");
+
     mWindow = SDL_CreateWindow(title, static_cast<int32>(size.X), static_cast<int32>(size.Y), window_flags);
 
 
