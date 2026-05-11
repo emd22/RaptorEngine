@@ -48,6 +48,9 @@ public:
 
     void Destroy();
 
+
+    Ref<PerspectiveCamera>& GetCurrentCamera() { return mpCurrentCamera; }
+
     ~Scene() { Destroy(); }
 
 private:

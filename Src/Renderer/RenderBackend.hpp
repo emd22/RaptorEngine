@@ -70,6 +70,8 @@ public:
     void BeginUnlit();
     void DoComposition(Camera& render_cam);
 
+    void RebuildToResizedWindow();
+
     void SelectWindow(const Ref<Window>& window) { mpWindow = window; }
 
     FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
@@ -189,7 +191,6 @@ private:
                                 const void* data, uint32 data_size) const;
 
     SizedArray<VkLayerProperties> GetAvailableValidationLayers();
-
 
 
 public:

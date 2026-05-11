@@ -194,6 +194,10 @@ void ControlManager::Update()
             inst.OnQuit();
             break;
 
+        case SDL_EVENT_WINDOW_RESIZED:
+            renderer::gRenderer->RebuildToResizedWindow();
+            break;
+
         // Keyboard events
         case SDL_EVENT_KEY_DOWN: // fallthrough
         case SDL_EVENT_KEY_UP:

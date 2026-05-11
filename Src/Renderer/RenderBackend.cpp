@@ -175,7 +175,7 @@ void RenderBackend::DestroyFrames()
 }
 
 void RenderBackend::RebuildRenderStages()
-{ 
+{
     DeferredRenderer* rd = pDeferredRenderer.mpPtr;
 
     Vec2u size = GetWindow()->GetSize();
@@ -187,6 +187,8 @@ void RenderBackend::RebuildRenderStages()
 
     rd->DescriptorPool.Recreate();
     rd->CreateDescriptorSets();
+
+    LogInfo("Frame resized to {} x {}", size.X, size.Y);
 
     /*for (FrameData& frame : Frames) {
         frame.InFlight.Reset();
@@ -499,7 +501,6 @@ eFrameResult RenderBackend::BeginFrame()
 {
     FrameData* frame = GetFrame();
 
-    bDidFrameResize = false;
 
     LightBuffer.Rewind();
 
@@ -591,6 +592,8 @@ void RenderBackend::PresentFrame()
     else {
         LogError("Error submitting present queue. Status: {:x}", static_cast<int32>(status));
     }
+
+    bDidFrameResize = false;
 }
 
 void RenderBackend::BeginLighting()
@@ -604,8 +607,7 @@ void RenderBackend::BeginLighting()
     depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
-    pDeferredRenderer->LightPass.Begin(frame->CmdBuffer,
-                                       gPipelineCache->Request(ePipelineName::LightingDirectional));
+    pDeferredRenderer->LightPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::LightingDirectional));
 
     // gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
     // gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -637,7 +639,6 @@ void RenderBackend::BeginUnlit()
                                        Slice<VkClearValue>({}, 0));*/
 
     // pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
-    
 }
 
 void RenderBackend::DoComposition(Camera& render_cam)
@@ -646,7 +647,7 @@ void RenderBackend::DoComposition(Camera& render_cam)
 
     pDeferredRenderer->ForwardPass.End();
 
-    //pDeferredRenderer->RpForward.End();
+    // pDeferredRenderer->RpForward.End();
 
     pDeferredRenderer->CompPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Composition));
     pDeferredRenderer->DoCompPass(render_cam);
@@ -664,6 +665,14 @@ void RenderBackend::DoComposition(Camera& render_cam)
     mFrameNumber = (mInternalFrameCounter % FramesInFlight);
 }
 
+void RenderBackend::RebuildToResizedWindow()
+{
+    bDidFrameResize = true;
+    gRenderer->GetWindow()->HandleResize();
+    Swapchain.Rebuild(gRenderer->GetWindow()->GetSize(), mWindowSurface);
+    RebuildRenderStages();
+}
+
 eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
 {
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
@@ -671,15 +680,11 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
     const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
                                                   frame->ImageAvailable.Get(), nullptr, &mImageIndex);
 
-    if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
+    if (result == VK_SUCCESS) {
         return eFrameResult::Success;
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        bDidFrameResize = true;
-        gRenderer->GetWindow()->HandleResize();
-        Swapchain.Rebuild(gRenderer->GetWindow()->GetSize(), mWindowSurface);
-        RebuildRenderStages();
-        
+        RebuildToResizedWindow();
         return eFrameResult::Success;
     }
     else {
