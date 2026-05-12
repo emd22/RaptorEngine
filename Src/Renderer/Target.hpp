@@ -25,6 +25,7 @@ namespace renderer {
 
 enum class eLoadOp
 {
+    None = VK_ATTACHMENT_LOAD_OP_NONE,
     Clear = VK_ATTACHMENT_LOAD_OP_CLEAR,
     Load = VK_ATTACHMENT_LOAD_OP_LOAD,
     DontCare = VK_ATTACHMENT_LOAD_OP_DONT_CARE,

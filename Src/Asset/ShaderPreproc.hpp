@@ -14,22 +14,40 @@ namespace ShaderPreproc {
 
 using DataBuffer = DynArray<char, GrowthFunctions::InPages>;
 
-enum eEntryType : uint16
+enum eReflectionEntryType : uint16
 {
     StructuredBuffer,
     UniformBuffer,
-    Sampler2D,
+    Texture,
 };
 
-struct Entry
+struct ReflectionEntry
 {
-    Entry() = delete;
-    Entry(eEntryType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding) {}
+    ReflectionEntry() = delete;
+    ReflectionEntry(eReflectionEntryType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding) {}
 
-    eEntryType Type;
+    uint32 AsUInt() const
+    {
+        const uint32 value = (static_cast<uint32>(Type) << 16) | (static_cast<uint32>(Set) << 8) |
+                             static_cast<uint32>(Binding);
+        return value;
+    }
+
+    static ReflectionEntry FromUInt(uint32 value)
+    {
+        ReflectionEntry entry(static_cast<eReflectionEntryType>(static_cast<uint16>(value >> 16)),
+                              static_cast<uint8>(value >> 8), static_cast<uint8>(value));
+
+        return entry;
+    }
+
+public:
+    eReflectionEntryType Type;
     uint8 Set;
     uint8 Binding;
 };
+
+using ReflectionList = std::vector<ReflectionEntry>;
 
 
 struct Result
@@ -62,7 +80,8 @@ public:
     // Before a program definition, broadcast to all
     bool bBroadcastToAllPrograms = true;
 
-    std::vector<Entry> Reflection;
+    /// Reflection data read in by the preprocessor.
+    ReflectionList Reflection;
 };
 
 

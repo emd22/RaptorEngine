@@ -5,7 +5,7 @@
 /// Global, copy to all shader types
 #define FPT_ALL 2
 
-#define F_REFLECT(_type, _set, _binding) ;
+#define F_REFLECT(_type, _binding, _set) ;
 #define FR_STRUCTBUFFER 0
 #define FR_CBUFFER 1
 #define FR_SAMPLER2D 2

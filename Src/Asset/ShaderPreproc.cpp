@@ -22,8 +22,10 @@ enum eStringId
     // Reflection definitions
     F_REFLECT,
     FR_STRUCTBUFFER,
-    FR_UNIFORMBUFFER,
+    FR_CBUFFER,
     FR_SAMPLER2D,
+
+    F_Texture2D,
 
     // Test definitions
     F_PARAMTEST,
@@ -39,8 +41,10 @@ static constexpr const char* scStrings[] = {
     // Reflection definitions
     "F_REFLECT",
     "FR_STRUCTBUFFER",
-    "FR_UNIFORMBUFFER",
+    "FR_CBUFFER",
     "FR_SAMPLER2D",
+
+    "F_Texture2D",
 
     // Test definitions
     "F_PARAMTEST",
@@ -76,13 +80,14 @@ public:
         if (Get() == '\n') {
             ++CurrentLine;
         }
-    };
+    }
+
     void Skip(uint32 skip)
     {
         for (uint32 i = 0; i < skip; i++) {
             NextChar();
         }
-    };
+    }
 
     void NextIfEqual(char p)
     {
@@ -132,13 +137,14 @@ struct PPFuncEntry
 
     PPFuncEntry() = delete;
 
-    PPFuncEntry(const char* name, bool has_parameters, const std::function<FuncType> func)
-        : pName(name), bHasParameters(has_parameters), Func(func)
+    PPFuncEntry(const char* name, bool has_parameters, bool do_not_eat, const std::function<FuncType> func)
+        : pName(name), bHasParameters(has_parameters), bDoNotEat(do_not_eat), Func(func)
     {
     }
 
     const char* pName;
     bool bHasParameters;
+    bool bDoNotEat;
     const std::function<FuncType> Func;
 };
 
@@ -199,21 +205,18 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
 
     const Slice<char>& refl_type = params[0];
 
-    const int32 set = ParamGetInt(params[1]);
-    const int32 binding = ParamGetInt(params[2]);
+    const int32 binding = ParamGetInt(params[1]);
+    const int32 set = ParamGetInt(params[2]);
 
     Hash32 refl_hash = HashData32(refl_type);
-    eEntryType type = eEntryType::StructuredBuffer;
+    eReflectionEntryType type = eReflectionEntryType::StructuredBuffer;
 
     switch (refl_hash) {
     case FHash(FR_STRUCTBUFFER):
-        type = eEntryType::StructuredBuffer;
+        type = eReflectionEntryType::StructuredBuffer;
         break;
-    case FHash(FR_UNIFORMBUFFER):
-        type = eEntryType::UniformBuffer;
-        break;
-    case FHash(FR_SAMPLER2D):
-        type = eEntryType::Sampler2D;
+    case FHash(FR_CBUFFER):
+        type = eReflectionEntryType::UniformBuffer;
         break;
     default:;
     }
@@ -236,10 +239,27 @@ static void ParseParamTestDefinition(const std::vector<Slice<char>>& params, Sta
 }
 
 
+static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+    // F_Texture(texture, register_n))
+    REQUIRE_PARAMS(params, 2);
+
+    // Ignore texture name (params[0])
+
+    const Slice<char>& texture_name = params[0];
+    const int32 slot_n = ParamGetInt(params[1]);
+
+    LogWarning("Reflecting Texture {} at slot {}", std::string(texture_name.pData, texture_name.Size), slot_n);
+
+    result.Reflection.emplace_back(eReflectionEntryType::Texture, 0, slot_n);
+}
+
 static const PPFuncEntry PPFunctions[] = {
-    PPFuncEntry(FStr(F_PROGRAM), true, ParseProgramDefinition),
-    PPFuncEntry(FStr(F_REFLECT), true, ParseReflectionDefinition),
-    PPFuncEntry(FStr(F_PARAMTEST), true, ParseParamTestDefinition),
+    PPFuncEntry(FStr(F_PROGRAM), true, false, ParseProgramDefinition),
+    PPFuncEntry(FStr(F_REFLECT), true, false, ParseReflectionDefinition),
+    PPFuncEntry(FStr(F_PARAMTEST), true, false, ParseParamTestDefinition),
+    PPFuncEntry(FStr(F_Texture2D), true, true, ParseTexture2DDefinition),
+
 };
 
 static void WriteCurrentCharToProgram(State& state, Result& result)
@@ -453,6 +473,9 @@ static void ParsePPFuncCall(State& state, Result& result)
 {
     const PPFuncEntry* func = nullptr;
 
+    // The start index before parsing a preprocessor function
+    uint32 origin_index = state.Index;
+
     for (uint32 index = 0; index < std::size(PPFunctions); index++) {
         func = &PPFunctions[index];
 
@@ -462,6 +485,9 @@ static void ParsePPFuncCall(State& state, Result& result)
 
         func = nullptr;
     }
+
+    bool do_not_eat = (func) ? func->bDoNotEat : false;
+
 
     if (func && func->bHasParameters) {
         state.NextChar(); // Skip LParen
@@ -497,6 +523,15 @@ static void ParsePPFuncCall(State& state, Result& result)
 
         state.NextIfEqual('\r');
         state.NextIfEqual('\n');
+
+        // After parsing the preprocessor function, emit the call as text if the function is marked to.
+        uint32 final_index = state.Index;
+        if (do_not_eat) {
+            for (state.Index = origin_index; state.Index < final_index;) {
+                WriteCurrentCharToProgram(state, result);
+                state.NextChar();
+            }
+        }
 
         func->Func(param_list, state, result);
     }

@@ -5,9 +5,11 @@
 
 #include <Asset/AxPaths.hpp>
 #include <Asset/ShaderCompiler.hpp>
+#include <Asset/ShaderPreproc.hpp>
 #include <Core/File.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/RefUtil.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
@@ -207,45 +209,38 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
     program->pShader = this;
 
     // Check for the program in the DataPack
-    DataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
+    // DataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
+    ShaderCompiler::ProgramData program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
 
     // If there is no compiled version of the program in the DataPack, compile it and save it to disk.
-    if (dp_entry == nullptr) {
+    if (!program_data.IsValid()) {
         LogWarning("Shader was not found in datapack, recompiling...");
         RecompileShader(GetSourcePath(), program_path, macros);
 
-        dp_entry = mDataPack.QuerySection(program_id);
-        if (dp_entry == nullptr) {
+        program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
+
+        if (!program_data.IsValid()) {
             LogError("Pack entry does not exist after compilation! (Id={})", program_id);
             return program;
         }
     }
 
     // If there is data available, create the program.
-    if (dp_entry->Data.IsNotEmpty()) {
+    if (program_data.HasData()) {
         LogInfo("Data is available, creating shader...");
-        const SizedArray<uint8>& program_data = dp_entry->Data;
-        Assert(program_data.Size == MathUtil::AlignValue<4>(program_data.Size));
 
-        CreateShaderModule(*program, program_data.Size, reinterpret_cast<uint32*>(program_data.pData),
-                           program->InternalShader);
+        Assert(program_data.pProgramData.Size == MathUtil::AlignValue<4>(program_data.pProgramData.Size));
+        Assert(program_data.pProgramData.Size > 0);
+
+        CreateShaderModule(*program, program_data.pProgramData.Size,
+                           reinterpret_cast<uint32*>(program_data.pProgramData.pData), program->InternalShader);
 
         return program;
     }
 
-    // The entry exists in the DataPack but the data has not been loaded yet. Load only that section of the DataPack and
-    // create the program.
-    LogInfo("Loading data pack section for shader...");
-
-    uint32 buffer_size = MathUtil::AlignValue<4>(dp_entry->DataSize);
-    uint32* buffer = gEnginePool->Alloc<uint32>(buffer_size);
-    Slice<uint8> buffer_slice = MakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
-
-    mDataPack.ReadSection(dp_entry, buffer_slice);
-
-    CreateShaderModule(*program, buffer_size, buffer, program->InternalShader);
-
-    gEnginePool->Free(buffer);
+    // Previously, there used to be logic here to force load from the data pack. Since data pack loading is now handled
+    // by the shader compiler, we should not need to handle this case.
+    LogError("Shader: No data available");
 
     return program;
 }
@@ -331,20 +326,10 @@ void ShaderProgram::Destroy()
 void Shader::CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32* raw_data,
                                 VkShaderModule& shader_module)
 {
-    // Load the reflected data into the shader outline
-    program.ShaderOutline = Ref<ShaderOutline>::New();
-    uint32 reflected_size = 0;
-    // uint32 reflected_size = program.ShaderOutline->ReadFromBuffer(Slice<uint32>(raw_data, file_size));
-
-    // program.BuildDescriptors();
-    program.ShaderOutline.DestroyRef();
-
-    uint32* shader_data = reinterpret_cast<uint32*>(reinterpret_cast<uint8*>(raw_data) + reflected_size);
-
     const VkShaderModuleCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = file_size - reflected_size,
-        .pCode = shader_data,
+        .codeSize = file_size,
+        .pCode = raw_data,
     };
 
     GpuDevice* device = gRenderer->GetDevice();
