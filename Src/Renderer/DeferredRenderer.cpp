@@ -284,6 +284,11 @@ void DeferredRenderer::CreateGPassPipeline()
 
     gState->EndPipeline();
 
+
+    Pipeline& geometry_pl = gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
+    geometry_pl.PixelShader->PrintReflection();
+
+
     CreateGPassSkinnedPipelineLayout();
 
     // Skinned + Normal mapped pipeline

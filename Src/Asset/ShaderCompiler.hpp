@@ -5,9 +5,7 @@
 
 namespace fx {
 
-namespace ShaderPreproc {
-struct ReflectionEntry;
-}
+struct ProgramData;
 
 struct ShaderMacro
 {
@@ -24,14 +22,6 @@ public:
         Failed,
     };
 
-    struct ProgramData
-    {
-        SizedArray<ShaderPreproc::ReflectionEntry> Reflection;
-        Slice<uint8> pProgramData;
-
-        FX_FORCE_INLINE bool HasData() const { return pProgramData.Size > 0; }
-        FX_FORCE_INLINE bool IsValid() const { return pProgramData.pData != nullptr && HasData(); }
-    };
 
 public:
     ShaderCompiler() = default;

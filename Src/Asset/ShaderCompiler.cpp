@@ -1,6 +1,7 @@
 #include "ShaderCompiler.hpp"
 
 #include <Core/Defines.hpp>
+#include <Renderer/Backend/Shader.hpp>
 
 // #include <ThirdParty/Slang/slang-com-ptr.h>
 // #include <ThirdParty/Slang/slang.h>
@@ -104,11 +105,11 @@ struct CompileState
 };
 
 
-ShaderCompiler::ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pack)
+ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pack)
 {
     DataPackEntry* entry = pack.QuerySection(program_id);
 
-    ShaderCompiler::ProgramData program = { .Reflection = {}, .pProgramData = nullptr };
+    ProgramData program = { .Reflection = {}, .pProgramData = nullptr };
 
     // Entry was not found, return null data
     if (entry == nullptr) {
@@ -126,7 +127,7 @@ ShaderCompiler::ProgramData ShaderCompiler::GetProgramData(const Hash64 program_
 
     for (uint32 i = 0; i < num_reflected_entries; i++) {
         uint32 entry_data = bb.Get<uint32>();
-        program.Reflection.Insert(ShaderPreproc::ReflectionEntry::FromUInt(entry_data));
+        program.Reflection.Insert(ShaderReflectionEntry::FromUInt(entry_data));
     }
 #endif
 
@@ -141,7 +142,7 @@ static ByteBuffer BuildReflectionHeader(const CompileState& state)
 {
     ByteBuffer bb;
 
-    ShaderPreproc::ReflectionList& refl = state.Preproc.Reflection;
+    std::vector<ShaderReflectionEntry>& refl = state.Preproc.Reflection;
 
     // Each reflection entry contains a Type(uint16), Set(uint8) and Binding(uint8).
     constexpr uint32 entry_size = sizeof(uint32);
@@ -159,7 +160,7 @@ static ByteBuffer BuildReflectionHeader(const CompileState& state)
     bb.Insert<uint32>(static_cast<uint32>(refl.size()));
 
     // Output all entries
-    for (const ShaderPreproc::ReflectionEntry& entry : refl) {
+    for (const ShaderReflectionEntry& entry : refl) {
         bb.Insert<uint32>(entry.AsUInt());
     }
 

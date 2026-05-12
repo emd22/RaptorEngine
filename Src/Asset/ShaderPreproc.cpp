@@ -167,6 +167,8 @@ static int32 ParamGetInt(const Slice<char>& param)
     return value;
 }
 
+static bool ParsePPFuncCall(State& state, Result& result);
+
 /////////////////////////////////////
 // Preprocessor Definitions
 /////////////////////////////////////
@@ -209,19 +211,17 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
     const int32 set = ParamGetInt(params[2]);
 
     Hash32 refl_hash = HashData32(refl_type);
-    eReflectionEntryType type = eReflectionEntryType::StructuredBuffer;
+    eShaderReflectionType type = eShaderReflectionType::StructuredBuffer;
 
     switch (refl_hash) {
     case FHash(FR_STRUCTBUFFER):
-        type = eReflectionEntryType::StructuredBuffer;
+        type = eShaderReflectionType::StructuredBuffer;
         break;
     case FHash(FR_CBUFFER):
-        type = eReflectionEntryType::UniformBuffer;
+        type = eShaderReflectionType::UniformBuffer;
         break;
     default:;
     }
-
-    LogWarning("REFLECTED TYPE: {}", std::string(refl_type.pData, refl_type.Size));
 
     result.Reflection.emplace_back(type, set, binding);
 }
@@ -244,14 +244,12 @@ static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, Sta
     // F_Texture(texture, register_n))
     REQUIRE_PARAMS(params, 2);
 
-    // Ignore texture name (params[0])
-
     const Slice<char>& texture_name = params[0];
     const int32 slot_n = ParamGetInt(params[1]);
 
-    LogWarning("Reflecting Texture {} at slot {}", std::string(texture_name.pData, texture_name.Size), slot_n);
+    LogInfo("Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
 
-    result.Reflection.emplace_back(eReflectionEntryType::Texture, 0, slot_n);
+    result.Reflection.emplace_back(eShaderReflectionType::Texture, 0, slot_n);
 }
 
 static const PPFuncEntry PPFunctions[] = {
@@ -280,6 +278,10 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
 static void WriteUntilHash(State& state, Result& result)
 {
     while (state.Get() != '#') {
+        if (ParsePPFuncCall(state, result)) {
+            continue;
+        }
+
         // Continue saving each character until the condition is closed
         WriteCurrentCharToProgram(state, result);
         state.NextChar();
@@ -469,7 +471,7 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
     return false;
 }
 
-static void ParsePPFuncCall(State& state, Result& result)
+static bool ParsePPFuncCall(State& state, Result& result)
 {
     const PPFuncEntry* func = nullptr;
 
@@ -534,7 +536,10 @@ static void ParsePPFuncCall(State& state, Result& result)
         }
 
         func->Func(param_list, state, result);
+        return true;
     }
+
+    return false;
 }
 
 
@@ -554,7 +559,9 @@ Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
             }
         }
 
-        ParsePPFuncCall(state, result);
+        if (ParsePPFuncCall(state, result)) {
+            continue;
+        }
 
         if (state.Get() == '#' && ParseIfdef(state, result, macros, false)) {
             continue;

@@ -21,104 +21,6 @@
 namespace fx::renderer {
 
 /////////////////////////////////////
-// Shader Outline Functions
-/////////////////////////////////////
-
-
-uint32 ShaderOutline::GetReflectionSize() const
-{
-    uint32 reflection_header_size = sizeof(uint32);                              // Size of reflection header
-    reflection_header_size += sizeof(uint32) * ShaderUtil::scNumShaderTypes;     // Push constant buffer sizes
-    reflection_header_size += sizeof(uint32);                                    // Number of descriptor entries
-    reflection_header_size += DescriptorEntryCount * sizeof(ShaderOutlineEntry); // The descriptor entries data
-
-    return MathUtil::AlignValue<4>(reflection_header_size);
-}
-
-void ShaderOutline::Print() const
-{
-    LogInfo("=== Outline Debug ===");
-    LogInfo("Maximum Sets: {}", scNumSets);
-    for (uint32 bucket_index = 0; bucket_index < scNumSets; bucket_index++) {
-        const EntryList& list = SetBuckets[bucket_index];
-        LogInfo("Set {} -> {} entries", bucket_index, list.Size);
-
-        for (uint32 i = 0; i < list.Size; i++) {
-            const DescEntry& entry = list[i];
-            LogInfo("\tType={}, IsDynamic?={}, NameHash={}, Set={}, Binding={}",
-                    ShaderOutlineUtil::GetTypeName(entry.Type), entry.bUseDynamicType, entry.NameHash, entry.Set,
-                    entry.Binding);
-        }
-    }
-}
-
-
-void ShaderOutline::WriteToBuffer(uint32* buffer) const
-{
-    *(buffer++) = GetReflectionSize();
-
-    uint32 pc_index = 0;
-    // Write the push constant sizes for each shader type
-    for (; pc_index < ShaderUtil::scNumShaderTypes; pc_index++) {
-        *(buffer++) = PushConstantSizes[pc_index];
-    }
-
-    // Number of descriptor entries across buckets
-    *(buffer++) = static_cast<uint32>(DescriptorEntryCount);
-
-    uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
-
-
-    for (uint32 bucket_index = 0; bucket_index < SetBuckets.Size; bucket_index++) {
-        const EntryList& bucket = SetBuckets[bucket_index];
-
-        if (bucket.IsEmpty()) {
-            continue;
-        }
-
-        // Write each entry in the bucket
-        for (DescEntry& entry : bucket) {
-            LogInfo("ENTRY HAS SHADER TYPE {}", ShaderUtil::TypeToName(entry.ShaderType));
-
-            memcpy(sd_buffer, &entry, sizeof(ShaderOutlineEntry));
-            sd_buffer += sizeof(ShaderOutlineEntry);
-        }
-    }
-}
-
-
-uint32 ShaderOutline::ReadFromBuffer(const Slice<uint32>& data)
-{
-    uint32* buffer = data.pData;
-
-    const uint32 size_of_outline = *(buffer++);
-
-    // Read the push constant sizes for each shader type
-    for (uint32 pc_index = 0; pc_index < ShaderUtil::scNumShaderTypes; pc_index++) {
-        PushConstantSizes[pc_index] = *(buffer++);
-    }
-
-    const uint32 num_ds_entries = *(buffer++);
-
-    uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
-
-    for (uint32 entry_index = 0; entry_index < num_ds_entries; entry_index++) {
-        ShaderOutlineEntry desc_entry;
-        memcpy(&desc_entry, sd_buffer, sizeof(ShaderOutlineEntry));
-        sd_buffer += sizeof(ShaderOutlineEntry);
-
-        EntryList& entry_list = SetBuckets[desc_entry.Set];
-        if (!entry_list.IsInited()) {
-            entry_list.InitCapacity(scMaxEntriesPerBucket);
-        }
-
-        entry_list.Insert(desc_entry);
-    }
-
-    return size_of_outline;
-}
-
-/////////////////////////////////////
 // Shader Functions
 /////////////////////////////////////
 
@@ -210,7 +112,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
     // Check for the program in the DataPack
     // DataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
-    ShaderCompiler::ProgramData program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
+    ProgramData program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
 
     // If there is no compiled version of the program in the DataPack, compile it and save it to disk.
     if (!program_data.IsValid()) {
@@ -234,6 +136,9 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
         CreateShaderModule(*program, program_data.pProgramData.Size,
                            reinterpret_cast<uint32*>(program_data.pProgramData.pData), program->InternalShader);
+
+        // Now that the shader is officially loaded, move over the reflection data.
+        program->Reflection = std::move(program_data.Reflection);
 
         return program;
     }
@@ -310,6 +215,14 @@ void ShaderProgram::Bind(const CommandBuffer& cmd, const Pipeline& pipeline, con
 
     //     ds->Bind(ds_id.Set, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     // }
+}
+
+void ShaderProgram::PrintReflection()
+{
+    LogInfo("Shader reflection:");
+    for (const ShaderReflectionEntry& entry : Reflection) {
+        LogInfo("Type: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
+    }
 }
 
 void ShaderProgram::Destroy()
