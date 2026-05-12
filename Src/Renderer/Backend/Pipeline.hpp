@@ -162,13 +162,13 @@ public:
 
     FX_FORCE_INLINE void SetLayout(PipelineLayout layout)
     {
-        Layout2 = layout;
+        Layout = layout;
 
         // Layout is referenced from another pipeline or modified externally, do not destroy
         // mbDoNotDestroyLayout = true;
     }
 
-    FX_FORCE_INLINE bool HasLayout() const { return Layout2.IsValid(); }
+    FX_FORCE_INLINE bool HasLayout() const { return Layout.IsValid(); }
 
     void Bind(const CommandBuffer& command_buffer);
 
@@ -180,7 +180,7 @@ public:
 private:
 public:
     // VkPipelineLayout Layout = nullptr;
-    PipelineLayout Layout2;
+    PipelineLayout Layout;
     VkPipeline InternalPipeline = nullptr;
 
     Vec2u ViewportSize = Vec2u::sZero;

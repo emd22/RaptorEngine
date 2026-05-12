@@ -25,6 +25,9 @@ public:
     DataBuffer& GetBuffer() { return ProgramData[static_cast<uint32>(CurrentType)]; }
     DataBuffer& GetBuffer(eShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
 
+    ReflectionList& GetReflection() { return ReflectionData[static_cast<uint32>(CurrentType)]; }
+    ReflectionList& GetReflection(eShaderType type) { return ReflectionData[static_cast<uint32>(type)]; }
+
     void InsertString(const std::string& str)
     {
         DataBuffer& buffer = GetBuffer();
@@ -39,8 +42,10 @@ public:
         CurrentType = type;
     }
 
+
 public:
     std::array<DataBuffer, renderer::ShaderUtil::scNumShaderTypes> ProgramData;
+    std::array<ReflectionList, renderer::ShaderUtil::scNumShaderTypes> ReflectionData;
 
     eShaderType CurrentType = eShaderType::Vertex;
 
@@ -48,7 +53,6 @@ public:
     bool bBroadcastToAllPrograms = true;
 
     /// Reflection data read in by the preprocessor.
-    ReflectionList Reflection;
 };
 
 

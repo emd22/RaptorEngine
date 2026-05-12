@@ -223,7 +223,7 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
     default:;
     }
 
-    result.Reflection.emplace_back(type, set, binding);
+    result.GetReflection().emplace_back(type, set, binding);
 }
 
 
@@ -249,7 +249,7 @@ static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, Sta
 
     LogInfo("Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
 
-    result.Reflection.emplace_back(eShaderReflectionType::Texture, 0, slot_n);
+    result.GetReflection().emplace_back(eShaderReflectionType::Texture, 0, slot_n);
 }
 
 static const PPFuncEntry PPFunctions[] = {

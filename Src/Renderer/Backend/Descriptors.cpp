@@ -35,9 +35,9 @@ void DescriptorPool::Create(GpuDevice* device, uint32 max_sets)
     }
 }
 
-void DescriptorPool::Recreate() 
-{ 
-    Destroy(); 
+void DescriptorPool::Recreate()
+{
+    Destroy();
     Create(gRenderer->GetDevice(), SetCapacity);
 }
 
@@ -81,34 +81,33 @@ void DescriptorSet::Create(DescriptorPool& pool, VkDescriptorSetLayout layout, b
 void DescriptorSet::BindMultiple(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
                                  const Pipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count)
 {
-    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout2.Get(), first_set_index, sets_count, sets, 0, nullptr);
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, sets_count, sets, 0, nullptr);
 }
 
 void DescriptorSet::BindMultiple(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
                                  const Pipeline& pipeline, const Slice<VkDescriptorSet>& sets)
 {
-    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout2.Get(), first_set_index, sets.Size, sets.pData, 0,
-                            nullptr);
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, sets.Size, sets.pData, 0, nullptr);
 }
 
 void DescriptorSet::BindMultipleOffset(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
                                        const Pipeline& pipeline, const Slice<VkDescriptorSet>& sets,
                                        const Slice<uint32>& offsets)
 {
-    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout2.Get(), first_set_index, sets.Size, sets.pData,
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, sets.Size, sets.pData,
                             offsets.Size, offsets.pData);
 }
 
 void DescriptorSet::BindWithOffset(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
                                    const Pipeline& pipeline, uint32 offset) const
 {
-    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout2.Get(), first_set_index, 1, &Set, 1, &offset);
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, 1, &Set, 1, &offset);
 }
 
 void DescriptorSet::Bind(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
                          const Pipeline& pipeline) const
 {
-    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout2.Get(), first_set_index, 1, &Set, 0, nullptr);
+    vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, 1, &Set, 0, nullptr);
 }
 
 

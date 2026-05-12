@@ -138,11 +138,11 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
 }
 
 
-static ByteBuffer BuildReflectionHeader(const CompileState& state)
+static ByteBuffer BuildReflectionHeader(const CompileState& state, eShaderType shader_type)
 {
     ByteBuffer bb;
 
-    std::vector<ShaderReflectionEntry>& refl = state.Preproc.Reflection;
+    std::vector<ShaderReflectionEntry>& refl = state.Preproc.GetReflection(shader_type);
 
     // Each reflection entry contains a Type(uint16), Set(uint8) and Binding(uint8).
     constexpr uint32 entry_size = sizeof(uint32);
@@ -230,7 +230,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
     // Build the final buffer and write to the data pack
     {
 #ifndef FX_SHADER_NO_REFLECTION
-        ByteBuffer reflection_header = BuildReflectionHeader(state);
+        ByteBuffer reflection_header = BuildReflectionHeader(state, shader_type);
 #else
         ByteBuffer reflection_header;
 #endif

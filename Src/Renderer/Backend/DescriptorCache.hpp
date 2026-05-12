@@ -1,47 +1,26 @@
 #pragma once
 
-#include "Descriptors.hpp"
-
-#include <Core/Ref.hpp>
-#include <Core/StackArray.hpp>
+#include <Core/Hash.hpp>
 #include <Core/Types.hpp>
 #include <unordered_map>
 
 
 namespace fx {
 
+struct ShaderReflectionEntry;
 enum class eShaderType : uint16;
 
 namespace renderer {
 
-struct ShaderDescriptorId;
-struct ShaderOutlineEntry;
-
-
-class DescriptorCache
+class DsLayoutCache
 {
-    static constexpr uint32 scMaxSections = 6;
-    static constexpr uint32 scMaxSetsPerSection = 4;
+public:
+    DsLayoutCache() = default;
 
+    VkDescriptorSetLayout Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl, uint32 set);
 
 public:
-    using Section = std::unordered_map<Hash32, Ref<DescriptorSet>, Hash32Stl>;
-
-public:
-    DescriptorCache() { mSections.MarkFull(); };
-
-    /**
-     * @brief Registers a new descriptor set in the cache.
-     * @returns The identifier to access it by
-     */
-    ShaderDescriptorId Register(uint32 set, eShaderType shader_type, const SizedArray<ShaderOutlineEntry>& entry_list);
-
-    Ref<DescriptorSet> Request(const ShaderDescriptorId& id);
-
-    ~DescriptorCache();
-
-public:
-    StackArray<Section, scMaxSections> mSections;
+    std::unordered_map<Hash64, VkDescriptorSetLayout, Hash64Stl> Cache;
 };
 
 } // namespace renderer

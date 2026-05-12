@@ -1,5 +1,6 @@
 #include "State.hpp"
 
+#include "Backend/DescriptorCache.hpp"
 #include "Backend/RenderPass.hpp"
 #include "Backend/VertexDescription.hpp"
 #include "Globals.hpp"
@@ -33,7 +34,7 @@ void State::UseRenderStage(RenderStage& stage)
 }
 
 void State::SetLayout(const PipelineLayout& layout) { mpPipeline->SetLayout(layout); }
-void State::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout2); }
+void State::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout); }
 
 void State::BuildPipeline()
 {
@@ -89,8 +90,29 @@ void State::SetPushConstants(eShaderType type, uint32 pc_size)
 
 PipelineLayout State::BuildLayout()
 {
-    mpPipeline->Layout2 = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
-    return mpPipeline->Layout2;
+    mpPipeline->Layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
+    return mpPipeline->Layout;
+}
+
+void State::AddDescriptorsFromShaderReflection()
+{
+    SizedArray<ShaderReflectionEntry>& refl = mpVertexShader->Reflection;
+
+    uint32 min_set = 10;
+    uint32 max_set = 0;
+
+    for (const ShaderReflectionEntry& entry : refl) {
+        if (entry.Set > max_set) {
+            max_set = entry.Set;
+        }
+        else if (entry.Set < min_set) {
+            min_set = entry.Set;
+        }
+    }
+
+    for (int32 i = min_set; i < max_set; i++) {
+        // VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request();
+    }
 }
 
 void State::AddDescriptor(VkDescriptorSetLayout layout) { mDescriptors.Insert(layout); }

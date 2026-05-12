@@ -280,7 +280,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 
         .pDynamicState = &dynamic_state_info,
 
-        .layout = Layout2.Get(),
+        .layout = Layout.Get(),
 
         .renderPass = render_pass.Get(),
         .subpass = 0,
@@ -296,7 +296,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
     Util::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
 
     LogInfo("Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
-            reinterpret_cast<void*>(Layout2.Get()));
+            reinterpret_cast<void*>(Layout.Get()));
 }
 
 void Pipeline::Bind(const CommandBuffer& cmd)
@@ -305,7 +305,7 @@ void Pipeline::Bind(const CommandBuffer& cmd)
         return;
     }
 
-    
+
     if (bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
         if (bIsViewportFullscreen) {
             ViewportSize = gRenderer->GetWindow()->GetSize();

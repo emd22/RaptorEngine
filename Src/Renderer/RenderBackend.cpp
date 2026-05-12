@@ -430,14 +430,14 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
                                            const void* data, uint32 data_size) const
 {
-    DebugAssert(pipeline.Layout2.IsValid());
+    DebugAssert(pipeline.Layout.IsValid());
 
     // Currently, there is nowhere in the engine that requires two separate PC buffers and therefore requires an offset.
     // As well, the small required size of a PC kind of makes this useless. For now, we will ignore this and if needed
     // there will be an updated version of this function.
     // I'm pretty sure when I was using Slang I had one shader that required this, but thats since been cacked..
     static constexpr uint32 scOffset = 0;
-    vkCmdPushConstants(cmd.Get(), pipeline.Layout2.Get(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
+    vkCmdPushConstants(cmd.Get(), pipeline.Layout.Get(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
                        data_size, data);
 }
 

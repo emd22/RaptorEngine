@@ -67,6 +67,7 @@ public:
 
 private:
     void BuildPipeline();
+    void AddDescriptorsFromShaderReflection();
     void Reset();
 
 public:

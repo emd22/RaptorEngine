@@ -105,7 +105,7 @@ public:
 
         SizedArray<Ref<ShaderProgram>> shader_list = { mVertexShader, mFragmentShader };
 
-        pipeline.Layout2 = mLayout;
+        pipeline.Layout = mLayout;
 
         pipeline.Create(mPipelineName, shader_list, mpAttachmentList->GetDescriptions(), vk_blend_attachments,
                         mVertexInfo, *mRenderPass, mProperties);
