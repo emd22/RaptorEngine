@@ -90,13 +90,6 @@ void State::SetPushConstants(eShaderType type, uint32 pc_size)
 }
 
 
-PipelineLayout State::BuildLayout()
-{
-    mpPipeline->Layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
-    return mpPipeline->Layout;
-}
-
-
 static Vec2u GetMinMaxDescriptorSets(Ref<ShaderProgram>& program)
 {
     SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
@@ -112,22 +105,24 @@ static Vec2u GetMinMaxDescriptorSets(Ref<ShaderProgram>& program)
     return Vec2u(static_cast<uint32>(min_set), static_cast<uint32>(max_set));
 }
 
-void State::AddDescriptorsFromShaders()
+PipelineLayout State::BuildLayout()
 {
     Vec2u vertex_minmax = GetMinMaxDescriptorSets(mpVertexShader);
     Vec2u pixel_minmax = GetMinMaxDescriptorSets(mpPixelShader);
 
     Vec2u minmax = Vec2u(std::min(vertex_minmax.X, pixel_minmax.X), std::max(vertex_minmax.Y, pixel_minmax.Y));
 
-    mDescriptors.Size = (minmax.Y - minmax.X) + 1;
+    if (minmax.Y >= minmax.X) {
+        mDescriptors.Size = (minmax.Y - minmax.X) + 1;
 
-    LogInfo("NUM OF DESCRIPTORS {}", mDescriptors.Size);
+        AddDescriptorsFromShaderProgram(mpVertexShader);
+        AddDescriptorsFromShaderProgram(mpPixelShader);
+    }
 
-    AddDescriptorsFromShaderProgram(mpVertexShader);
-    AddDescriptorsFromShaderProgram(mpPixelShader);
+    mpPipeline->Layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
+    return mpPipeline->Layout;
 }
 
-void State::AddDescriptor(VkDescriptorSetLayout layout) { mDescriptors.Insert(layout); }
 void State::SetRenderPass(RenderPass* rp) { mpRenderPass = rp; }
 void State::SetOutputTargets(TargetList* targets) { pOutputTargets = targets; }
 

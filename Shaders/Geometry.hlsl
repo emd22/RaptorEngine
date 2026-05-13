@@ -116,13 +116,10 @@ struct FSInput
 };
 
 F_Texture2D(tAlbedo, 0)
-
 F_Texture2D(tNormalMap, 1)
 F_Texture2D(tMetallicRoughness, 2)
 
-
 F_REFLECT(FR_STRUCTBUFFER, 0, 1);
-
 [[vk::binding(0, 1)]] StructuredBuffer<Material> bMaterialBuffer;
 
 FSOutput main(FSInput input)

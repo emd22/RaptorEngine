@@ -210,9 +210,9 @@ void DeferredRenderer::CreateUnlitPipeline()
     gState->BeginPipeline(ePipelineName::Unlit);
     gState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
     // Descriptors
-    gState->AddDescriptor(DsLayoutGPassMaterial);
-    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
-    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+    // gState->AddDescriptor(DsLayoutGPassMaterial);
+    // gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    // gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
 
     gState->SetShader(eShaderName::Unlit, {});
 
@@ -266,7 +266,7 @@ void DeferredRenderer::CreateGPassPipeline()
 
     gState->UseRenderStage(GPass);
     gState->SetShader(eShaderName::Geometry, {});
-    gState->AddDescriptorsFromShaders();
+    // gState->AddDescriptorsFromShaders();
     gState->SetVertexType(eVertexType::Default);
     gState->SetCullMode(eCullMode::Back);
 
@@ -293,9 +293,9 @@ void DeferredRenderer::CreateGPassPipeline()
 
     // Skinned + Normal mapped pipeline
     gState->BeginPipeline(ePipelineName::GeometrySkinned);
-    gState->AddDescriptor(DsLayoutGPassSkinned);
-    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
-    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+    // gState->AddDescriptor(DsLayoutGPassSkinned);
+    // gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    // gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
     gState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
     gState->UseRenderStage(GPass);
@@ -387,9 +387,9 @@ void DeferredRenderer::CreateLightingPipeline()
     // Point light pipeline (inside)
     gState->BeginPipeline(ePipelineName::LightingInsideVolume);
     // Layout info
-    gState->AddDescriptor(DsLayoutLightingFrag);
-    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
-    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+    // gState->AddDescriptor(DsLayoutLightingFrag);
+    // gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    // gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
     gState->SetPushConstants(eShaderType::Vertex, sizeof(LightVertPushConstants));
 
 
@@ -482,7 +482,7 @@ void DeferredRenderer::CreateCompPipeline()
     CreateCompPass();
 
     gState->BeginPipeline(ePipelineName::Composition);
-    gState->AddDescriptor(DsLayoutCompFrag);
+    // gState->AddDescriptor(DsLayoutCompFrag);
     gState->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
 
     gState->UseRenderStage(CompPass);

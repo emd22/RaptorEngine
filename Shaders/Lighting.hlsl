@@ -94,6 +94,7 @@ struct Light
     uint1 uiAmbient;
 };
 
+F_REFLECT(FR_CBUFFER, 4, 0);
 [[vk::binding(4, 0)]] cbuffer FSUniforms
 {
     Light Lights[LIGHT_COUNT];

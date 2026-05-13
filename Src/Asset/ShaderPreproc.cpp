@@ -26,6 +26,7 @@ enum eStringId
     FR_SAMPLER2D,
 
     F_Texture2D,
+    F_ShadowTexture2D,
 
     // Test definitions
     F_PARAMTEST,
@@ -45,6 +46,7 @@ static constexpr const char* scStrings[] = {
     "FR_SAMPLER2D",
 
     "F_Texture2D",
+    "F_ShadowTexture2D",
 
     // Test definitions
     "F_PARAMTEST",
@@ -257,6 +259,7 @@ static const PPFuncEntry PPFunctions[] = {
     PPFuncEntry(FStr(F_REFLECT), true, false, ParseReflectionDefinition),
     PPFuncEntry(FStr(F_PARAMTEST), true, false, ParseParamTestDefinition),
     PPFuncEntry(FStr(F_Texture2D), true, true, ParseTexture2DDefinition),
+    PPFuncEntry(FStr(F_ShadowTexture2D), true, true, ParseTexture2DDefinition),
 
 };
 
