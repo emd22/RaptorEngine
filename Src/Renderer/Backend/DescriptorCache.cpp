@@ -3,6 +3,7 @@
 #include "Shader.hpp"
 
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/ShaderNames.hpp>
 
 
 namespace fx::renderer {
@@ -35,22 +36,32 @@ VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const Size
         }
     }
 
-    Hash64 entries_hash = HashData64(Slice(entries_for_set));
+    if (entries_for_set.IsEmpty()) {
+        LogInfo("SKIPPING");
+        return nullptr;
+    }
+
+    Hash64 entries_hash = HashData64(Slice(entries_for_set), HashStr32(ShaderUtil::TypeToName(shader_type)));
 
     auto it = Cache.find(entries_hash);
 
     // If the descriptor layout was not found in the cache, create it
-    if (it == Cache.end()) {
-        DsLayoutBuilder builder {};
-
-        for (const ShaderReflectionEntry& entry : entries_for_set) {
-            builder.AddBinding(entry.Binding, ReflectionTypeToDescriptorType(entry.Type), shader_type);
-        }
-
-        it->second = builder.Build();
+    if (it != Cache.end()) {
+        return it->second;
     }
 
-    return it->second;
+    DsLayoutBuilder builder {};
+
+    LogInfo("DSLAYOUT CREATED");
+    for (const ShaderReflectionEntry& entry : entries_for_set) {
+        LogInfo("Shader: {}, Set={}, Binding={}", ShaderUtil::TypeToName(shader_type), set, entry.Binding);
+        builder.AddBinding(entry.Binding, ReflectionTypeToDescriptorType(entry.Type), shader_type);
+    }
+
+    VkDescriptorSetLayout layout = builder.Build();
+    Cache[entries_hash] = layout;
+
+    return layout;
 }
 
 

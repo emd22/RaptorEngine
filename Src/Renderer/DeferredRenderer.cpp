@@ -129,7 +129,7 @@ VkPipelineLayout DeferredRenderer::CreateGPassPipelineLayout()
     {
         // Create material properties DS layout
         DsLayoutBuilder builder {};
-        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, eShaderType::Pixel);
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Pixel);
         DsLayoutLightingMaterialProperties = builder.Build();
     }
 
@@ -259,17 +259,22 @@ void DeferredRenderer::CreateGPassPipeline()
 
     gState->BeginPipeline(ePipelineName::Geometry);
     // Descriptors
-    gState->AddDescriptor(DsLayoutGPassMaterial);
-    gState->AddDescriptor(DsLayoutLightingMaterialProperties);
-    gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
+    // gState->AddDescriptor(DsLayoutGPassMaterial);
+    // gState->AddDescriptor(DsLayoutLightingMaterialProperties);
+    // gState->AddDescriptor(gObjectManager->DsLayoutObjectBuffer);
     gState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
     gState->UseRenderStage(GPass);
     gState->SetShader(eShaderName::Geometry, {});
+    gState->AddDescriptorsFromShaders();
     gState->SetVertexType(eVertexType::Default);
     gState->SetCullMode(eCullMode::Back);
 
     gState->EndPipeline();
+
+
+    Pipeline& geometry_pl = gPipelineCache->Request(ePipelineName::Geometry);
+    geometry_pl.VertexShader->PrintReflection();
 
 
     // Normal mapped pipeline
@@ -283,11 +288,6 @@ void DeferredRenderer::CreateGPassPipeline()
     gState->SetCullMode(eCullMode::Back);
 
     gState->EndPipeline();
-
-
-    Pipeline& geometry_pl = gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
-    geometry_pl.PixelShader->PrintReflection();
-
 
     CreateGPassSkinnedPipelineLayout();
 

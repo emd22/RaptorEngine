@@ -120,6 +120,8 @@ private:
     VkDescriptorSet Set = nullptr;
     VkDescriptorSetLayout Layout = nullptr;
 
+    uint32 NumBuffers = 0;
+
     bool mbHasDynamicOffsets : 1 = false;
     bool mbIsBuilt : 1 = false;
 

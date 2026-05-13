@@ -8,6 +8,8 @@
 #include "RenderStage.hpp"
 #include "ShaderCache.hpp"
 
+#include <algorithm>
+
 namespace fx::renderer {
 
 void State::BeginPipeline(ePipelineName name)
@@ -94,25 +96,35 @@ PipelineLayout State::BuildLayout()
     return mpPipeline->Layout;
 }
 
-void State::AddDescriptorsFromShaderReflection()
-{
-    SizedArray<ShaderReflectionEntry>& refl = mpVertexShader->Reflection;
 
-    uint32 min_set = 10;
-    uint32 max_set = 0;
+static Vec2u GetMinMaxDescriptorSets(Ref<ShaderProgram>& program)
+{
+    SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
+
+    uint8 min_set = 10;
+    uint8 max_set = 0;
 
     for (const ShaderReflectionEntry& entry : refl) {
-        if (entry.Set > max_set) {
-            max_set = entry.Set;
-        }
-        else if (entry.Set < min_set) {
-            min_set = entry.Set;
-        }
+        max_set = std::max(entry.Set, max_set);
+        min_set = std::min(entry.Set, min_set);
     }
 
-    for (int32 i = min_set; i < max_set; i++) {
-        // VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request();
-    }
+    return Vec2u(static_cast<uint32>(min_set), static_cast<uint32>(max_set));
+}
+
+void State::AddDescriptorsFromShaders()
+{
+    Vec2u vertex_minmax = GetMinMaxDescriptorSets(mpVertexShader);
+    Vec2u pixel_minmax = GetMinMaxDescriptorSets(mpPixelShader);
+
+    Vec2u minmax = Vec2u(std::min(vertex_minmax.X, pixel_minmax.X), std::max(vertex_minmax.Y, pixel_minmax.Y));
+
+    mDescriptors.Size = (minmax.Y - minmax.X) + 1;
+
+    LogInfo("NUM OF DESCRIPTORS {}", mDescriptors.Size);
+
+    AddDescriptorsFromShaderProgram(mpVertexShader);
+    AddDescriptorsFromShaderProgram(mpPixelShader);
 }
 
 void State::AddDescriptor(VkDescriptorSetLayout layout) { mDescriptors.Insert(layout); }
@@ -123,6 +135,20 @@ void State::EndPipeline()
 {
     BuildPipeline();
     Reset();
+}
+
+
+void State::AddDescriptorsFromShaderProgram(Ref<ShaderProgram>& program)
+{
+    Vec2u minmax = GetMinMaxDescriptorSets(program);
+
+    SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
+
+    for (int32 i = minmax.X; i <= minmax.Y; i++) {
+        VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, i);
+        mDescriptors[i] = (ds_layout);
+        LogInfo("Setting DS layout at index {}", i);
+    }
 }
 
 void State::Reset()

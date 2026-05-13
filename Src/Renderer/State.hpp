@@ -65,10 +65,13 @@ public:
     void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }
     void SetCullMode(eCullMode mode) { mProperties.CullMode = CullModeToVk(mode); }
 
+    void AddDescriptorsFromShaders();
+
 private:
     void BuildPipeline();
-    void AddDescriptorsFromShaderReflection();
     void Reset();
+
+    void AddDescriptorsFromShaderProgram(Ref<ShaderProgram>& program);
 
 public:
     TargetList* pOutputTargets;

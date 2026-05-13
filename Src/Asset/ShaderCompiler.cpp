@@ -129,6 +129,7 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
         uint32 entry_data = bb.Get<uint32>();
         program.Reflection.Insert(ShaderReflectionEntry::FromUInt(entry_data));
     }
+
 #endif
 
     // Get the SPIRV data

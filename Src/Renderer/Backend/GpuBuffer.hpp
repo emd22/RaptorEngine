@@ -48,8 +48,7 @@ enum class eGpuBufferType
 };
 
 
-namespace GpuBufferUtil
-{
+namespace GpuBufferUtil {
 static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
 {
     switch (type) {
@@ -75,7 +74,7 @@ static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
 #define ENUM_TYPE eGpuBufferType
 
 static constexpr const char* BufferTypeToName(const eGpuBufferType type)
-{ 
+{
     switch (type) {
         FX_ENUM_CASE_NAME(Storage);
         FX_ENUM_CASE_NAME(StorageWithOffset);
@@ -96,21 +95,21 @@ static constexpr VkDescriptorType BufferTypeToDescriptorType(eGpuBufferType type
 {
     switch (type) {
     case eGpuBufferType::Storage:
-        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
     case eGpuBufferType::StorageWithOffset:
         return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 
     case eGpuBufferType::Uniform:
-        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     case eGpuBufferType::UniformWithOffset:
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 
     default:;
     }
 
-    return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 }
-};
+}; // namespace GpuBufferUtil
 
 void GpuBufferPrintUndestroyed();
 

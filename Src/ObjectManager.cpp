@@ -12,8 +12,7 @@ namespace fx {
 void ObjectManager::Create()
 {
     if (!mDescriptorPool.Pool) {
-        mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1);
-        mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1);
+        mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4);
         mDescriptorPool.Create(renderer::gRenderer->GetDevice(), 2);
     }
 

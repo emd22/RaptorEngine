@@ -34,8 +34,7 @@ void MaterialManager::Create(uint32 entities_per_page)
 
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 3);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 8);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
 
@@ -154,7 +153,7 @@ bool Material::BindWithPipeline(CommandBuffer& cmd, Pipeline& pipeline, bool alb
         gMaterialManager->mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
     };
 
-    StackArray<uint32, 1> offsets;
+    StackArray<uint32, 2> offsets = { 0 };
     if (bSupportsSkinning) {
         offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
     }
