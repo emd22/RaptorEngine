@@ -101,7 +101,7 @@ BoneTransform Skeleton::GetBoneTransform(const Ref<Animation>& anim, float32 tim
     }
 
     if (bone_id > anim->BoneTracks.Size) {
-        LogError("Bone ID({}) out of range", bone_id);
+        LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
         return xform;
     }
 
@@ -125,7 +125,7 @@ Mat4f Skeleton::GetBoneTransformMatrix(const Ref<Animation>& anim, float32 time,
     }
 
     if (bone_id > anim->BoneTracks.Size) {
-        LogError("Bone ID({}) out of range", bone_id);
+        LogError(LC_ASSET, "Bone ID({}) out of range", bone_id);
         return xform;
     }
 

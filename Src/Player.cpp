@@ -81,8 +81,8 @@ void Player::Update(float64 delta_time)
 
         mBobCounterY += delta_time * counter_speed * body_speed;
 
-        mHeadBobX = 0.009f * cosf(mBobCounterY);
-        mHeadBobY = 0.015f * sinf(mBobCounterY);
+        mHeadBobX = 0.011f * cosf(mBobCounterY + FX_HALF_PI);
+        mHeadBobY = 0.018f * sinf(mBobCounterY);
 
         Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
         pCamera->MoveBy(bob_vector);

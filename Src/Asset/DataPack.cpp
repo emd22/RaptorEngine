@@ -186,7 +186,7 @@ void DataPack::JumpToEntry(Hash64 id)
     }
 
     if (!found_entry) {
-        LogError("Could not find entry {} in DataPack", id);
+        LogError(LC_ASSET, "Could not find entry {} in DataPack", id);
         return;
     }
 }
@@ -216,7 +216,7 @@ void DataPack::WriteToFile(const char* name)
     File.Open(name, File::eModType::Write, File::eDataType::Binary);
 
     if (!File.IsFileOpen()) {
-        LogWarning("Data pack '{}' could not be written to", name);
+        LogWarning(LC_ASSET, "Data pack '{}' could not be written to", name);
         return;
     }
 
@@ -241,7 +241,7 @@ bool DataPack::ReadFromFile(const char* name)
     File.Open(name, File::eModType::Read, File::eDataType::Binary);
 
     if (!File.IsFileOpen()) {
-        LogWarning("Could not open data pack '{}'", name);
+        LogWarning(LC_ASSET, "Could not open data pack '{}'", name);
         return false;
     }
 

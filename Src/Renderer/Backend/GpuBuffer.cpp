@@ -33,7 +33,7 @@ public:
                 continue;
             }
 
-            LogWarning("[NOT DESTROYED]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
+            LogWarning(LC_RENDER, "[NOT DESTROYED]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
                        GpuBufferUtil::BufferTypeToName(entry.BufferType), entry.Size,
                        (entry.Flags & eGpuBufferFlags::PersistentMapped) != 0,
                        (entry.Flags & eGpuBufferFlags::TransferReceiver) != 0);
@@ -114,7 +114,7 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 void RawGpuBuffer::Map()
 {
     if (IsMapped()) {
-        LogWarning("Buffer {:p} is already mapped!", reinterpret_cast<void*>(Buffer));
+        LogWarning(LC_RENDER, "Buffer {:p} is already mapped!", reinterpret_cast<void*>(Buffer));
         return;
     }
 

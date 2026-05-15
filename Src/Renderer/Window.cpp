@@ -36,7 +36,7 @@ void Window::HandleResize()
 
     // Get window size from SDL
     if (!SDL_GetWindowSize(mWindow, &width, &height)) {
-        LogError("Error retrieving window size from SDL! (SDL err: {})", SDL_GetError());
+        LogError(LC_RENDER, "Error retrieving window size from SDL! (SDL err: {})", SDL_GetError());
         return;
     }
 

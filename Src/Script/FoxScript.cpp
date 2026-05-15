@@ -28,7 +28,7 @@ void FoxScript::Load(const String& path)
     File fp(path, File::eModType::Read, File::eDataType::Binary);
 
     if (!fp.IsFileOpen()) {
-        LogError("Could not open script file at '{}'", path);
+        LogError(LC_SCRIPT, "Could not open script file at '{}'", path);
         return;
     }
 
@@ -48,14 +48,14 @@ void FoxScript::Load(const String& path)
 
     FoxAstNode* root_node = parser.Parse();
     if (parser.bHasErrors || root_node == nullptr) {
-        LogError("Errors found while parsing script, exitting...");
+        LogError(LC_SCRIPT, "Errors found while parsing script, exitting...");
         return;
     }
 
     FoxBytecodeCompiler compiler {};
     SizedArray<uint8> bytecode = compiler.Compile(root_node);
     if (compiler.HasErrors()) {
-        LogError("Errors found during script compilation, cannot continue");
+        LogError(LC_SCRIPT, "Errors found during script compilation, cannot continue");
         return;
     }
 

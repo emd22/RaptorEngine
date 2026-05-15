@@ -76,7 +76,6 @@ SizedArray<JPH::BodyID> PhPlayer::Raycast(Vec3f direction) const
 
     gPhysics->PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
 
-    LogInfo("Capacity: {}", collector.mHits.size());
     SizedArray<JPH::BodyID> hits;
     hits.InitCapacity(collector.mHits.size());
 

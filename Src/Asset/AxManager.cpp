@@ -100,7 +100,7 @@ void AxManager::DebugPrintWorkers() const
 
 void AxManager::Shutdown()
 {
-    LogInfo("Shutting down asset manager...");
+    LogInfo(LC_ASSET, "Shutting down asset manager...");
 
     if (!mbActive.test()) {
         return;
@@ -311,11 +311,9 @@ void AxManager::AddWorkerThread()
 {
     // At the maximum number of workers, break
     if (mWorkerThreads.Size >= mWorkerThreads.Capacity) {
-        LogError("Reached maximum number of worker threads");
+        LogError(LC_ASSET, "Reached maximum number of worker threads");
         return;
     }
-
-    LogInfo("Creating asset manager worker thread");
 
     AxWorker* worker = mWorkerThreads.Insert();
     worker->Create();
@@ -337,15 +335,15 @@ void AxManager::CheckForItemsToLoad()
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
         if (tries_remaining <= 0) {
-            LogError("Could not find worker thread, skipping load of object...");
+            LogError(LC_ASSET, "Could not find worker thread, skipping load of object...");
             DebugPrintWorkers();
             break;
         }
 
         // AddWorkerThread();
 
-        LogWarning("Currently {} items are enqueued...", mLoadQueue.Size());
-        LogError("No workers available; Polling for worker thread...");
+        LogWarning(LC_ASSET, "Currently {} items are enqueued...", mLoadQueue.Size());
+        LogError(LC_ASSET, "No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up
@@ -384,7 +382,7 @@ void AxManager::AssetManagerUpdate()
         else {
             const uint32 amount_threads = mWorkerThreads.Size;
             for (uint32 index = amount_threads; index > mMinThreads; index--) {
-                LogInfo("Killing asset manager worker thread...");
+                LogInfo(LC_ASSET, "Killing asset manager worker thread...");
 
                 // mWorkerThreads[index].Kill();
                 // mWorkerThreads[index].Thread.join();
@@ -409,11 +407,11 @@ AxWorker* AxManager::FindWorkerThread()
     for (AxWorker& worker : mWorkerThreads) {
         ++worker_id;
         if (!worker.bIsBusy.test()) {
-            LogInfo("Found worker (id={})", worker_id);
+            LogInfo(LC_ASSET, "Found worker (id={})", worker_id);
             return &worker;
         }
     }
-    LogInfo("Did not find any open worker!");
+    LogInfo(LC_ASSET, "Did not find any open worker!");
 
     return nullptr;
 }

@@ -31,7 +31,7 @@ struct VSPushConsts
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
-F_REFLECT(FR_STRUCTBUFFER, 0, 2)
+F_REFLECT(FR_STRUCTBUFFER, 0, 2);
 [[vk::binding(0, 2)]] StructuredBuffer<Object> bObjectBuffer;
 
 VSOutput main(VSInput input)

@@ -77,7 +77,7 @@ void QueueFamilies::FindQueueFamilies(VkPhysicalDevice physical_device, VkSurfac
     RawFamilies.InitSize(family_count);
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &family_count, RawFamilies.pData);
 
-    LogInfo("Amount of queue families: {:d}", family_count);
+    LogInfo(LC_RENDER, "Amount of queue families: {:d}", family_count);
 
 
     FindGraphicsFamily(physical_device, surface);
@@ -145,7 +145,7 @@ bool GpuDevice::IsPhysicalDeviceSuitable(VkPhysicalDevice& physical)
         return true;
     }
 
-    LogInfo("Device not suitable: (Vk: {}.{}.{}), Graphics?: {}, Present?: {}, Xfer?: {}, IsComplete?: {}",
+    LogInfo(LC_RENDER, "Device not suitable: (Vk: {}.{}.{}), Graphics?: {}, Present?: {}, Xfer?: {}, IsComplete?: {}",
             VK_VERSION_MAJOR(version), VK_VERSION_MINOR(version), VK_VERSION_PATCH(version),
             (new_families.GetGraphicsFamily() != QueueFamilies::scNullQueue),
             (new_families.GetPresentFamily() != QueueFamilies::scNullQueue),
@@ -241,9 +241,9 @@ void GpuDevice::CreateLogicalDevice()
         .ppEnabledLayerNames = nullptr,
 
         // device specific extensions
-        .enabledExtensionCount = sizeof(device_extensions) / sizeof(device_extensions[0]),
-
+        .enabledExtensionCount = std::size(device_extensions),
         .ppEnabledExtensionNames = device_extensions,
+
         .pEnabledFeatures = &device_features,
 
     };
@@ -268,7 +268,7 @@ void GpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 
     CreateLogicalDevice();
 
-    LogInfo("Device Queue Families: \n\tPresent: {:d}\n\tGraphics: {:d}\n\tTransfer: {:d}",
+    LogInfo(LC_RENDER, "Device Queue Families: \n\tPresent: {:d}\n\tGraphics: {:d}\n\tTransfer: {:d}",
             mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(), mQueueFamilies.GetTransferFamily());
 }
 

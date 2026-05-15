@@ -774,7 +774,7 @@ pool_t MemPool::AddPool(void* mem, size_t bytes)
         return 0;
     }
 
-    LogInfo("Pool bytes: {}, BSM: {}, BSMX: {}", pool_bytes, block_size_min, block_size_max);
+    LogInfo(LC_MEMORY, "Pool bytes: {}, BSM: {}, BSMX: {}", pool_bytes, block_size_min, block_size_max);
 
     if (pool_bytes < block_size_min || pool_bytes > block_size_max) {
         printf("tlsf_add_pool: Memory size must be between 0x%x and 0x%x00 bytes.\n",

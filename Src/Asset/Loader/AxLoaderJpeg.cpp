@@ -36,7 +36,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const Strin
     FILE* fp = fopen(c_path, "rb");
 
     if (!fp) {
-        LogError("Could not find JPEG file at '{:s}'", c_path);
+        LogError(LC_ASSET, "Could not find JPEG file at '{:s}'", c_path);
         return AxLoaderJpeg::Status::Error;
     }
 

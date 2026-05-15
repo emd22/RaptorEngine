@@ -96,7 +96,7 @@ void ObjectManager::FreeObjectId(ObjectId id)
 
     std::lock_guard<std::mutex> guard(mInUse);
 
-    LogInfo("Freeing object {} from object manager", id);
+    LogInfo(LC_CORE, "Freeing object {} from object manager", id);
 
     mObjectSlotsInUse.Unset(id);
 }
@@ -107,12 +107,13 @@ void ObjectManager::PrintActive(int limit)
 
     for (int i = 0; i < limit; i++) {
         if (mObjectSlotsInUse.Get(i)) {
-            LogInfo("Object [{}]", i);
+            LogInfo(LC_CORE, "Object [{}]", i);
 
             float* model1 = buffer[i].ModelMatrix;
 
             for (int j = 0; j < 4; j++) {
-                LogInfo("[{}, {}, {}, {}]", model1[j * 4 + 0], model1[j * 4 + 1], model1[j * 4 + 2], model1[j * 4 + 3]);
+                LogInfo(LC_CORE, "[{}, {}, {}, {}]", model1[j * 4 + 0], model1[j * 4 + 1], model1[j * 4 + 2],
+                        model1[j * 4 + 3]);
             }
         }
     }

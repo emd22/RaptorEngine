@@ -104,7 +104,7 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
             PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
 
             if (!phys) {
-                LogError("Error creating physics object");
+                LogError(LC_PHYSICS, "Error creating physics object");
                 return;
             }
 
@@ -134,7 +134,7 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
             PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
 
             if (!phys) {
-                LogError("Error creating physics object");
+                LogError(LC_PHYSICS, "Error creating physics object");
                 return;
             }
 
@@ -358,7 +358,7 @@ void Object::RenderUnlit(const Camera& camera)
 
         bool material_bound = pMaterial->BindWithPipeline(cmd, *pipeline, false);
         if (!material_bound) {
-            LogWarning("Material not bound!");
+            LogWarning(LC_CORE, "Material not bound!");
             return;
         }
 
@@ -401,7 +401,7 @@ void Object::RenderUnlit(const Camera& camera)
 
         bool material_bound = obj->pMaterial->BindWithPipeline(cmd, *pipeline, false);
         if (!material_bound) {
-            LogWarning("Material not bound!");
+            LogWarning(LC_CORE, "Material not bound!");
             return;
         }
 
@@ -537,7 +537,7 @@ void Object::SetPhysicsEnabled(bool enabled)
     PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
 
     if (!phys->mbHasPhysicsBody) {
-        LogWarning("Object does not have physics body!");
+        LogWarning(LC_CORE, "Object does not have physics body!");
         return;
     }
 
@@ -556,25 +556,25 @@ void Object::SetPhysicsEnabled(bool enabled)
 
 void Object::PrintDebug() const
 {
-    LogInfo("Object '{}' (Id={}) {{", Name.Get(), ObjectId);
-    LogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
+    LogInfo(LC_CORE, "Object '{}' (Id={}) {{", Name.Get(), ObjectId);
+    LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
 
     PhObject* phys = nullptr;
 
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
         bool has_body = phys->mbHasPhysicsBody;
-        LogInfo("\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
+        LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
                 static_cast<bool>((Flags & eObjectFlags::PhysicsEnabled) != 0), phys->GetBodyId().GetIndex(),
                 phys->GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
     }
 
-    LogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
+    LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
             static_cast<bool>((Flags & eObjectFlags::IsInstance) != 0),    /* */
             static_cast<bool>((Flags & eObjectFlags::ReadyToRender) != 0), /* */
             static_cast<bool>((Flags & eObjectFlags::ShadowCaster) != 0),  /* */
             (pMesh && pMesh->VertexList.IsSkinned()));
 
-    LogInfo("}}");
+    LogInfo(LC_CORE, "}}");
 }
 
 

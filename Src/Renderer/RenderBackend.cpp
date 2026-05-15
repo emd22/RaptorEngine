@@ -188,8 +188,6 @@ void RenderBackend::RebuildRenderStages()
     rd->DescriptorPool.Recreate();
     rd->CreateDescriptorSets();
 
-    LogInfo("Frame resized to {} x {}", size.X, size.Y);
-
     /*for (FrameData& frame : Frames) {
         frame.InFlight.Reset();
     }*/
@@ -218,7 +216,7 @@ void RenderBackend::InitVulkan()
     std::cout << "Requested to load " << all_extensions.size() << " extensions...\n";
 
     for (const auto& extension : all_extensions) {
-        LogDebug("Ext: {:s}", extension);
+        LogDebug(LC_RENDER, "Ext: {:s}", extension);
     }
 
     ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions);
@@ -280,34 +278,20 @@ uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_sever
 
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
-        LogError(fmt, message);
+        LogError(LC_RENDER, fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
-        LogWarning(fmt, message);
+        LogWarning(LC_RENDER, fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
         // Log::Info(fmt, message);
     }
     else {
-        LogDebug(fmt, message);
+        LogDebug(LC_RENDER, fmt, message);
     }
 
     return 0;
 }
-
-// template<typename FuncProt>
-// FuncProt GetExtensionFuncVk(VkInstance instance, const char *name)
-// {
-//     PFN_vkVoidFunction raw_ptr = vkGetInstanceProcAddr(instance, name);
-
-//     if (raw_ptr != nullptr) {
-//         return (FuncProt)raw_ptr;
-//     }
-
-//     Log::Error("Could not load extension function '%s'", name);
-//     return nullptr;
-// }
-
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 {
@@ -331,7 +315,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     const auto status = Rx_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        LogError("Could not create debug messenger! (err: {:s})", Util::ResultToStr(status));
+        LogError(LC_RENDER, "Could not create debug messenger! (err: {:s})", Util::ResultToStr(status));
         return nullptr;
     }
 
@@ -387,9 +371,6 @@ ExtensionNames RenderBackend::MakeInstanceExtensionList(ExtensionNames& user_req
 
 ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 {
-    LogDebug("Querying for instance extensions...");
-
-
     if (mAvailableExtensions.IsNotEmpty()) {
         if (invalidate_previous) {
             mAvailableExtensions.Free();
@@ -406,9 +387,6 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
         throw std::runtime_error("Could not query instance extensions!");
     }
 
-    std::cout << "Ext count: " << extension_count << "\n";
-
-    // resize to create the items in the vector
     mAvailableExtensions.InitSize(extension_count);
 
     // Get the available instance extensions
@@ -416,13 +394,6 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
     if (result != VK_SUCCESS) {
         throw std::runtime_error("Could not query instance extensions!");
     }
-
-    // std::cout << "=== Available Instance Extensions (" << extension_count << ") ===\n";
-
-    // for (uint32_t i = 0; i < extension_count; ++i) {
-    //     const VkExtensionProperties& extension = mAvailableExtensions[i];
-    //     std::cout << extension.extensionName << " : " << extension.specVersion << "\n";
-    // }
 
     return mAvailableExtensions;
 }
@@ -590,7 +561,7 @@ void RenderBackend::PresentFrame()
         // Swapchain.Rebuild()..
     }
     else {
-        LogError("Error submitting present queue. Status: {:x}", static_cast<int32>(status));
+        LogError(LC_RENDER, "Error submitting present queue. Status: {:x}", static_cast<int32>(status));
     }
 
     bDidFrameResize = false;
@@ -688,7 +659,7 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
         return eFrameResult::GraphicsOutOfDate;
     }
     else {
-        LogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
+        LogError(LC_RENDER, "Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
     }
 
     return eFrameResult::RenderError;

@@ -43,7 +43,7 @@ Token& FoxParser::EatToken(TT token_type)
 {
     Token& token = GetToken();
     if (token.Type != token_type) {
-        LogError("{}:{}: Unexpected token type {} when expecting {}!", token.FileLine, token.FileColumn,
+        LogError(LC_SCRIPT, "{}:{}: Unexpected token type {} when expecting {}!", token.FileLine, token.FileColumn,
                  Token::GetTypeName(token.Type), Token::GetTypeName(token_type));
         bHasErrors = true;
     }
@@ -441,7 +441,7 @@ FoxValue FoxParser::ParseValue()
             // We cannot find the definition for the variable, assume that it is an external variable that will be
             // defined during the interpret stage.
 
-            LogError("ERROR: Undefined reference to variable {}", token);
+            LogError(LC_SCRIPT, "Undefined reference to variable {}", token);
 
             // printf("Undefined reference to variable \"%.*s\"! (Hash:%u)\n", token.Length, token.Start,
             // token.GetHash());
@@ -1093,7 +1093,7 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
         FX_SCRIPT_FREE(FoxAstReturn, return_node);
     }
     else {
-        LogError("Cannot free unknown node!");
+        LogError(LC_SCRIPT, "Cannot free unknown node!");
     }
 }
 

@@ -43,7 +43,7 @@ static bool IsShaderUpToDate(renderer::ShaderId entry_id, const char* path)
 {
     BasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
     if (!entry) {
-        LogWarning("Cannot find entry for shader!");
+        LogWarning(LC_SHADER, "Cannot find entry for shader!");
         return false;
     }
 
@@ -113,7 +113,7 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
 
     // Entry was not found, return null data
     if (entry == nullptr) {
-        LogWarning("Could not find shader entry");
+        LogWarning(LC_SHADER, "Could not find shader entry");
         return std::move(program);
     }
 
@@ -215,8 +215,8 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
         hresult = result->GetErrorBuffer(&error_blob);
 
         if (SUCCEEDED(hresult) && error_blob) {
-            LogError("Failed to compile shader '{}'!", state.pcPath);
-            LogError("Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+            LogError(LC_SHADER, "Failed to compile shader '{}'!", state.pcPath);
+            LogError(LC_SHADER, "Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
             return CompileResult::Failed;
         }
     }
@@ -226,7 +226,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
     const renderer::ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
 
-    LogInfo("Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
+    LogInfo(LC_SHADER, "Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
 
     // Build the final buffer and write to the data pack
     {
@@ -237,7 +237,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 #endif
         ByteBuffer final_buffer(reflection_header.GetSize() + spirv_bin->GetBufferSize());
 
-        LogWarning("Reflection header: {:p}, {}", reflection_header.pData, reflection_header.GetSize());
+        LogWarning(LC_SHADER, "Reflection header: {:p}, {}", reflection_header.pData, reflection_header.GetSize());
         // Write the reflection header
         final_buffer.InsertRaw(reflection_header.pData, reflection_header.GetSize());
         // Write the SPIRV data
@@ -264,7 +264,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
                                                 bool do_db_flush)
 {
-    LogInfo("Compiling shader {} with {} macros", path, macros.Size);
+    LogInfo(LC_SHADER, "Compiling shader {} with {} macros", path, macros.Size);
 
     File file(path, File::eModType::Read, File::eDataType::Binary);
     Slice<char> file_data = file.Read<char>();

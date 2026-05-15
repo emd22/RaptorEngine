@@ -195,6 +195,7 @@ public:
     /// True if the pipeline uses dynamic states for viewport and scissor
     bool bHasDynamicViewport = true;
 
+    SizedArray<VkDescriptorSetLayout> DescriptorSetLayouts;
 
 private:
     GpuDevice* mDevice = nullptr;

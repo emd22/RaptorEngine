@@ -10,8 +10,8 @@ char* FoxVM::ReadString(char* buffer, uint32 buffer_size)
     uint32 string_length = Read16();
 
     if (string_length > buffer_size) {
-        LogWarning("ReadString: String length is greater than the read buffer size! ({} > {})", string_length,
-                   buffer_size);
+        LogWarning(LC_SCRIPT, "ReadString: String length is greater than the read buffer size! ({} > {})",
+                   string_length, buffer_size);
         string_length = buffer_size;
     }
 
@@ -83,7 +83,7 @@ uint32 FoxVM::Read32()
 void FoxVM::Push16(uint16 value)
 {
     if (StackPointer + 2 > scStackSize) {
-        LogError("Push16: Out of stack memory!");
+        LogError(LC_SCRIPT, "Push16: Out of stack memory!");
         return;
     }
 
@@ -96,7 +96,7 @@ void FoxVM::Push16(uint16 value)
 void FoxVM::Push32(eFoxType type, uint32 value)
 {
     if (StackPointer + 4 > scStackSize) {
-        LogError("Push32: Out of stack memory!");
+        LogError(LC_SCRIPT, "Push32: Out of stack memory!");
         return;
     }
 
@@ -110,7 +110,7 @@ void FoxVM::Push32(eFoxType type, uint32 value)
 uint32 FoxVM::Pop32()
 {
     if (StackPointer <= 0) {
-        LogError("Pop32: No values on stack");
+        LogError(LC_SCRIPT, "Pop32: No values on stack");
         return 0;
     }
 
@@ -237,7 +237,7 @@ void FoxVM::CallExternalFunction(Hash32 hashed_name)
 {
     auto it = ExternalProcs.find(hashed_name);
     if (it == ExternalProcs.end()) {
-        LogWarning("External function {} not found", hashed_name);
+        LogWarning(LC_SCRIPT, "External function {} not found", hashed_name);
         return;
     }
 
@@ -254,7 +254,7 @@ void FoxVM::CallExternalFunction(Hash32 hashed_name)
     func.pFunc(this, args);
 
     if (func.bReturnsValue && GetStackPointer() <= pre_stack_size) {
-        LogError("Native function registered with a return type did not push a return value");
+        LogError(LC_SCRIPT, "Native function registered with a return type did not push a return value");
 
         // Sketchy, but we need to save this sinking ship somehow
         Push32(eFoxType::INT, 0U);
@@ -286,7 +286,7 @@ uint32 FoxVM::GetProcAddr(const Hash32 name_hash) const
 void FoxVM::StashVariables()
 {
     if (ScopeIndex < 0) {
-        LogWarning("Scope index < 0");
+        LogWarning(LC_SCRIPT, "Scope index < 0");
         return;
     }
     VariableBaseIndex += ScopeVarCounts[ScopeIndex];
@@ -295,7 +295,7 @@ void FoxVM::StashVariables()
 void FoxVM::RevertVariables()
 {
     if (ScopeIndex < 0) {
-        LogWarning("Scope index < 0");
+        LogWarning(LC_SCRIPT, "Scope index < 0");
         return;
     }
 

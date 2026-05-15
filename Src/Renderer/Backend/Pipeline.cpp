@@ -53,15 +53,15 @@ void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs
             .size = pc_def.Size,
         };
 
-        LogInfo("!! PC (Flags={}, Offset={}, Size={})", static_cast<uint32>(pc_def.ShaderTypes), current_pc_offset,
-                pc_def.Size);
+        // LogInfo("!! PC (Flags={}, Offset={}, Size={})", static_cast<uint32>(pc_def.ShaderTypes), current_pc_offset,
+        //         pc_def.Size);
 
         push_const_ranges.Insert(range);
 
         current_pc_offset += pc_def.Size;
     }
 
-    LogInfo("!! Built pipeline layout");
+    // LogInfo("!! Built pipeline layout");
 
     VkPipelineLayoutCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -130,7 +130,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
     }
 
     if (!has_depth_attachment) {
-        LogInfo("Pipeline '{}' does not have a depth attachment", name);
+        LogInfo(LC_RENDER, "Pipeline '{}' does not have a depth attachment", name);
     }
 
     VkSpecializationInfo specialization_info = {
@@ -295,7 +295,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 
     Util::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
 
-    LogInfo("Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
+    LogInfo(LC_RENDER, "Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
             reinterpret_cast<void*>(Layout.Get()));
 }
 

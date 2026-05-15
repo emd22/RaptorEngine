@@ -44,11 +44,13 @@ struct VSPushConsts
 };
 
 #ifdef USE_SKINNING
-F_REFLECT(FR_CBUFFER, 3, 0)
+
+F_REFLECT(FR_CBUFFER, 3, 0);
 [[vk::binding(3, 0)]] cbuffer VSUniforms
 {
     BoneMtx bBones[BONE_COUNT];
 };
+
 #endif
 
 F_REFLECT(FR_STRUCTBUFFER, 0, 2);

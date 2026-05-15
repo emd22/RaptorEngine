@@ -34,7 +34,7 @@ void MaterialManager::Create(uint32 entities_per_page)
 
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 8);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
 
@@ -67,7 +67,6 @@ TSRef<Material> MaterialManager::New(const String& name, Pipeline* pipeline, boo
     }
 
     uint32 free_material_index = MaterialsInUse.FindNextFreeBit();
-    LogInfo("Free mat index: {}", free_material_index);
     Assert(free_material_index != Bitset::scNoFreeBits);
 
     TSRef<Material> ref = TSRef<Material>::New();

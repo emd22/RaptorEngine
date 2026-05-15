@@ -129,34 +129,23 @@ public:
     virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
                                 const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
     {
-        LogInfo("A contact was added");
     }
 
     virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
                                     const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
     {
-        // LogInfo("A contact was persisted");
     }
 
-    virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override
-    {
-        LogInfo("A contact was removed");
-    }
+    virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
 };
 
 // An example activation listener
 class PhBodyActivationListener : public JPH::BodyActivationListener
 {
 public:
-    virtual void OnBodyActivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override
-    {
-        LogInfo("A body got activated");
-    }
+    virtual void OnBodyActivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override {}
 
-    virtual void OnBodyDeactivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override
-    {
-        LogInfo("A body went to sleep");
-    }
+    virtual void OnBodyDeactivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override {}
 };
 
 

@@ -152,7 +152,7 @@ struct PPFuncEntry
 
 #define REQUIRE_PARAMS(_params, _amt_req)                                                                              \
     if (_params.size() < _amt_req) {                                                                                   \
-        LogError("SHADER: Not enough parameters found in preprocessor function!");                                     \
+        LogError(LC_SHADER, "Not enough parameters found in preprocessor function!");                                  \
         return;                                                                                                        \
     }
 
@@ -225,6 +225,11 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
     default:;
     }
 
+    const char* shader_refl_type[] = { "Structured Buffer", "Uniform Buffer", "Texture2D" };
+
+    LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", shader_refl_type[static_cast<uint32>(type)],
+            binding, set);
+
     result.GetReflection().emplace_back(type, set, binding);
 }
 
@@ -249,7 +254,7 @@ static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, Sta
     const Slice<char>& texture_name = params[0];
     const int32 slot_n = ParamGetInt(params[1]);
 
-    LogInfo("Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
+    LogInfo(LC_SHADER, "Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
 
     result.GetReflection().emplace_back(eShaderReflectionType::Texture, 0, slot_n);
 }
@@ -433,7 +438,7 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
             }
 
             if (read_index >= scBufferSize) {
-                LogError("ShaderPreproc: Variable index is larger than the allocated buffer size");
+                LogError(LC_SHADER, "Preproc: Variable index is larger than the allocated buffer size");
 
                 // It will cause more issues to break than to just reset the index
                 read_index = 0;
@@ -525,6 +530,8 @@ static bool ParsePPFuncCall(State& state, Result& result)
         // Push the final parameter
         param_list.push_back(param);
         state.NextChar(); // Skip RParen
+
+        state.NextIfEqual(';');
 
         state.NextIfEqual('\r');
         state.NextIfEqual('\n');

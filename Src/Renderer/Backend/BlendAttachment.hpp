@@ -80,7 +80,6 @@ public:
         }
 
         for (const BlendAttachment& am : mBlendAttachments) {
-            LogInfo("Blend Attachmemt : {} => {}", am.TargetIndex, am.Enabled);
             vk_blend_attachments[am.TargetIndex] = (VkPipelineColorBlendAttachmentState {
                 .blendEnable = am.Enabled ? 1U : 0U,
                 .srcColorBlendFactor = am.ColorBlend.Ops.Src,

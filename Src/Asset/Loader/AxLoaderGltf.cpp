@@ -351,7 +351,7 @@ void AxLoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& ani
         }
     }
 
-    LogInfo("Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
+    LogInfo(LC_ASSET, "Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
 }
 
 void AxLoaderGltf::LoadAnimations(TSRef<Object>& output_object, Skeleton& skel)
@@ -372,7 +372,7 @@ void AxLoaderGltf::LoadAnimations(TSRef<Object>& output_object, Skeleton& skel)
         output_object->Animations.Insert(std::move(anim));
     }
 
-    LogInfo("Loaded {} animations", mpGltfData->animations_count);
+    LogInfo(LC_ASSET, "Loaded {} animations", mpGltfData->animations_count);
 }
 
 AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const String& path)
@@ -381,13 +381,13 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const Strin
 
     cgltf_result status = cgltf_parse_file(&options, path.CStr(), &mpGltfData);
     if (status != cgltf_result_success) {
-        LogError("Error parsing GLTF file! (path: {})", path);
+        LogError(LC_ASSET, "Error parsing GLTF file! (path: {})", path);
         return AxLoaderGltf::Status::Error;
     }
 
     status = cgltf_load_buffers(&options, mpGltfData, path.CStr());
     if (status != cgltf_result_success) {
-        LogError("Error loading buffers from GLTF file! (path: {:s})", path);
+        LogError(LC_ASSET, "Error loading buffers from GLTF file! (path: {:s})", path);
 
         return AxLoaderGltf::Status::Error;
     }
@@ -402,7 +402,7 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(TSRef<AxBase> asset, const uin
 
     cgltf_result status = cgltf_parse(&options, data, size, &mpGltfData);
     if (status != cgltf_result_success) {
-        LogError("Error parsing GLTF file from data");
+        LogError(LC_ASSET, "Error parsing GLTF file from data");
         return AxLoaderGltf::Status::Error;
     }
 
@@ -425,7 +425,7 @@ void AxLoaderGltf::CreateGpuResource(TSRef<AxBase>& asset)
     }
 
 
-    LogInfo("Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
+    LogInfo(LC_ASSET, "Unpacking GLTF object with {} meshes", mpGltfData->meshes_count);
 
     for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
         cgltf_node* node = &mpGltfData->nodes[node_index];

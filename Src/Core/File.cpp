@@ -87,7 +87,7 @@ uint64 File::GetFileSize()
 void File::Write(const char* str)
 {
     if (!pFileHandle) {
-        LogWarning(spcErrCannotWriteUnopened);
+        LogWarning(LC_CORE, spcErrCannotWriteUnopened);
         return;
     }
 
@@ -97,7 +97,7 @@ void File::Write(const char* str)
 void File::WriteRaw(const void* data, uint64 size)
 {
     if (!pFileHandle) {
-        LogWarning(spcErrCannotWriteUnopened);
+        LogWarning(LC_CORE, spcErrCannotWriteUnopened);
         return;
     }
 

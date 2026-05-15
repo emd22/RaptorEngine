@@ -38,7 +38,7 @@ ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro
         hash = cPrefixHashFS;
     }
 
-    LogInfo("Building entry ID with {} macros", macros.Size);
+    LogInfo(LC_SHADER, "Building entry ID with {} macros", macros.Size);
 
     return HashData64(Slice<ShaderMacro>(macros), hash);
 }
@@ -48,7 +48,7 @@ bool Shader::PreloadCompiledPrograms(const char* pack_path)
     bool did_read = mDataPack.ReadFromFile(pack_path);
 
     if (!did_read) {
-        LogInfo("Could not read compiled shader from {}. Recompiling...", pack_path);
+        LogInfo(LC_SHADER, "Could not read compiled shader from {}. Recompiling...", pack_path);
         return false;
     }
 
@@ -93,7 +93,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 #endif
 
     if (is_out_of_date) {
-        LogWarning("Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
+        LogWarning(LC_SHADER, "Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
 
         RecompileShader(source_path, program_path, macros);
 
@@ -103,7 +103,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
     // Generate an ID based on the shader type and macros. This is used for querying for the program in the DataPack.
     Hash64 program_id = Shader::GenerateShaderId(shader_type, macros);
-    LogDebug("Getting program from {} (Id={})", Name, program_id);
+    LogDebug(LC_SHADER, "Getting program from {} (Id={})", Name, program_id);
 
     // Create the program
     Ref<ShaderProgram> program = MakeRef<ShaderProgram>();
@@ -116,20 +116,20 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
     // If there is no compiled version of the program in the DataPack, compile it and save it to disk.
     if (!program_data.IsValid()) {
-        LogWarning("Shader was not found in datapack, recompiling...");
+        LogWarning(LC_SHADER, "Shader was not found in datapack, recompiling...");
         RecompileShader(GetSourcePath(), program_path, macros);
 
         program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
 
         if (!program_data.IsValid()) {
-            LogError("Pack entry does not exist after compilation! (Id={})", program_id);
+            LogError(LC_SHADER, "Pack entry does not exist after compilation! (Id={})", program_id);
             return program;
         }
     }
 
     // If there is data available, create the program.
     if (program_data.HasData()) {
-        LogInfo("Data is available, creating shader...");
+        LogInfo(LC_SHADER, "Data is available, creating shader...");
 
         Assert(program_data.pProgramData.Size == MathUtil::AlignValue<4>(program_data.pProgramData.Size));
         Assert(program_data.pProgramData.Size > 0);
@@ -145,7 +145,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
     // Previously, there used to be logic here to force load from the data pack. Since data pack loading is now handled
     // by the shader compiler, we should not need to handle this case.
-    LogError("Shader: No data available");
+    LogError(LC_SHADER, "Shader: No data available");
 
     return program;
 }
@@ -219,9 +219,9 @@ void ShaderProgram::Bind(const CommandBuffer& cmd, const Pipeline& pipeline, con
 
 void ShaderProgram::PrintReflection()
 {
-    LogInfo("Shader reflection:");
+    LogInfo(LC_SHADER, "Shader reflection:");
     for (const ShaderReflectionEntry& entry : Reflection) {
-        LogInfo("Type: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
+        LogInfo(LC_SHADER, "Type: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
     }
 }
 
@@ -250,7 +250,7 @@ void Shader::CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32
     const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &shader_module);
 
     if (status != VK_SUCCESS) {
-        LogError("Could not create Vulkan shader module: {}", Util::ResultToStr(status));
+        LogError(LC_SHADER, "Could not create Vulkan shader module: {}", Util::ResultToStr(status));
         return;
     }
 }

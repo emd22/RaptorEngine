@@ -233,7 +233,7 @@ bool ConfigFile::EatToken(eTokenType type)
     const bool correct_token = (GetToken()->Type == type);
 
     if (!correct_token) {
-        LogError("Config({}): Expected '{}' but found '{}'", mTokenIndex, Token::GetTypeName(type),
+        LogError(LC_CORE, "Config({}): Expected '{}' but found '{}'", mTokenIndex, Token::GetTypeName(type),
                  Token::GetTypeName(GetToken()->Type));
         return false;
     }
@@ -256,7 +256,7 @@ bool ConfigFile::EatToken(const Slice<eTokenType>& expected_types)
         }
     }
 
-    LogError("Config: found type '{}' but can only allow one of {}", Token::GetTypeName(GetToken()->Type));
+    LogError(LC_CORE, "Config: found type '{}' but can only allow one of {}", Token::GetTypeName(GetToken()->Type));
     return false;
 }
 
@@ -265,7 +265,7 @@ void ConfigFile::PrintEntries()
     PagedArray<ConfigEntry>& entries = GetEntries();
 
     for (const ConfigEntry& entry : entries) {
-        LogInfo("Entry: {} -> {}", entry.Name.Get(), entry.AsString());
+        LogInfo(LC_CORE, "Entry: {} -> {}", entry.Name.Get(), entry.AsString());
     }
 }
 
@@ -320,7 +320,7 @@ void ConfigFile::ParseValue(ConfigValue& value)
             }
         }
 
-        LogError("Could not find reference to constant {}!", value_token->GetStr());
+        LogError(LC_CORE, "Could not find reference to constant {}!", value_token->GetStr());
     }
 
     // Handle unary minus (in a simple way, but still handles recursive negatives)

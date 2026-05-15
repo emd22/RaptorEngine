@@ -370,7 +370,7 @@ public:
 
     void Print()
     {
-        eLogChannelText<eLogChannel::Info>();
+        LogSeverityText<eLogSeverity::Info>();
 
         LogDirect("Array: {{ ");
 

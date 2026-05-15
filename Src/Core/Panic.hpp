@@ -17,13 +17,13 @@ void Terminate();
 template <typename... TTypes>
 void Panic(const char* module, const char* fmt, TTypes&&... items)
 {
-    LogFatal("An irrecoverable error has occurred");
+    LogFatal(LC_CORE, "An irrecoverable error has occurred");
 
     if (module != nullptr) {
-        LogFatal("{:s}: ", module);
+        LogFatal(LC_CORE, "{:s}: ", module);
     }
 
-    LogFatal(fmt, std::forward<TTypes>(items)...);
+    LogFatal(LC_CORE, fmt, std::forward<TTypes>(items)...);
 
     Terminate();
 }
@@ -31,14 +31,14 @@ void Panic(const char* module, const char* fmt, TTypes&&... items)
 template <typename... TTypes>
 void PanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&... items)
 {
-    LogFatal("An irrecoverable error has occurred");
+    LogFatal(LC_RENDER, "An irrecoverable error has occurred");
 
     if (module != nullptr) {
-        LogFatal("{:s}: ", module);
+        LogFatal(LC_RENDER, "{:s}: ", module);
     }
 
-    LogFatal(fmt, std::forward<TTypes>(items)...);
-    LogFatal("=> Vulkan Err: {:s}", renderer::Util::ResultToStr(result));
+    LogFatal(LC_RENDER, fmt, std::forward<TTypes>(items)...);
+    LogFatal(LC_RENDER, "=> Vulkan Err: {:s}", renderer::Util::ResultToStr(result));
 
     Terminate();
 }

@@ -44,7 +44,7 @@ public:
         Assert(mGpuBuffer.IsMapped());
 
         if (mUniformIndex + size >= PageSize) {
-            LogError("Could not submit uniform as buffer is full!");
+            LogError(LC_RENDER, "Could not submit uniform as buffer is full!");
             return;
         }
 
@@ -61,7 +61,7 @@ public:
         Assert(mGpuBuffer.IsMapped());
 
         if (size >= PageSize) {
-            LogError("Could not write buffer that is larger than uniform!");
+            LogError(LC_RENDER, "Could not write buffer that is larger than uniform!");
             return;
         }
 

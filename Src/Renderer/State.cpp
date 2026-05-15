@@ -45,12 +45,12 @@ void State::BuildPipeline()
     }
 
     if (!mpVertexShader.IsValid() || !mpPixelShader.IsValid()) {
-        LogError("Invalid shaders provided");
+        LogError(LC_RENDER, "Invalid shaders provided");
         return;
     }
 
     if (mpRenderPass == nullptr) {
-        LogError("No valid renderpass provided");
+        LogError(LC_RENDER, "No valid renderpass provided");
         return;
     }
 
@@ -68,8 +68,6 @@ void State::BuildPipeline()
     SizedArray<Target> color_only_targets = pOutputTargets->GetTargetByType(eImageAspectFlag::Color);
     SizedArray<VkPipelineColorBlendAttachmentState> blend_attachments = BlendAttachments.GetVkAttachments(
         color_only_targets.Size);
-
-    LogInfo("!! Built pipeline {}", PipelineNameUtil::GetName(mPipelineName));
 
     mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, pOutputTargets->GetDescriptions(),
                        blend_attachments, vertex_ptr, *mpRenderPass, mProperties);
@@ -90,7 +88,7 @@ void State::SetPushConstants(eShaderType type, uint32 pc_size)
 }
 
 
-static Vec2u GetMinMaxDescriptorSets(Ref<ShaderProgram>& program)
+static Vec2u GetDescriptorIndexRangeForShader(Ref<ShaderProgram>& program)
 {
     SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
 
@@ -107,16 +105,24 @@ static Vec2u GetMinMaxDescriptorSets(Ref<ShaderProgram>& program)
 
 PipelineLayout State::BuildLayout()
 {
-    Vec2u vertex_minmax = GetMinMaxDescriptorSets(mpVertexShader);
-    Vec2u pixel_minmax = GetMinMaxDescriptorSets(mpPixelShader);
+    // Create the descriptor set layout
+    {
+        // Get the minimum and maximum descriptor sets used by each shader
+        Vec2u vertex_ds_range = GetDescriptorIndexRangeForShader(mpVertexShader);
+        Vec2u pixel_ds_range = GetDescriptorIndexRangeForShader(mpPixelShader);
 
-    Vec2u minmax = Vec2u(std::min(vertex_minmax.X, pixel_minmax.X), std::max(vertex_minmax.Y, pixel_minmax.Y));
+        Vec2u ds_range_combined = Vec2u(std::min(vertex_ds_range.X, pixel_ds_range.X),
+                                        std::max(vertex_ds_range.Y, pixel_ds_range.Y));
 
-    if (minmax.Y >= minmax.X) {
-        mDescriptors.Size = (minmax.Y - minmax.X) + 1;
+        const uint32 max_ds_index = ds_range_combined.Y;
+        const uint32 min_ds_index = ds_range_combined.X;
 
-        AddDescriptorsFromShaderProgram(mpVertexShader);
-        AddDescriptorsFromShaderProgram(mpPixelShader);
+        if (max_ds_index >= min_ds_index) {
+            mDescriptors.Size = (max_ds_index - min_ds_index) + 1;
+
+            AddDescriptorsForShaderProgram(mpVertexShader);
+            AddDescriptorsForShaderProgram(mpPixelShader);
+        }
     }
 
     mpPipeline->Layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
@@ -133,16 +139,15 @@ void State::EndPipeline()
 }
 
 
-void State::AddDescriptorsFromShaderProgram(Ref<ShaderProgram>& program)
+void State::AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program)
 {
-    Vec2u minmax = GetMinMaxDescriptorSets(program);
+    Vec2u ds_index_range = GetDescriptorIndexRangeForShader(program);
 
-    SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
+    const SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
 
-    for (int32 i = minmax.X; i <= minmax.Y; i++) {
-        VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, i);
-        mDescriptors[i] = (ds_layout);
-        LogInfo("Setting DS layout at index {}", i);
+    for (int32 ds_index = ds_index_range.X; ds_index <= ds_index_range.Y; ds_index++) {
+        VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
+        mDescriptors[ds_index] = (ds_layout);
     }
 }
 

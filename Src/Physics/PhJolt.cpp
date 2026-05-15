@@ -32,7 +32,7 @@ static void JoltTrace(const char* fmt, ...)
     va_end(list);
 
     // Print to the TTY
-    LogInfo("{}", buffer);
+    LogInfo(LC_PHYSICS, "{}", buffer);
 }
 
 
@@ -57,7 +57,7 @@ void PhJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
 void PhJolt::Create()
 {
     if (mbIsInited) {
-        LogWarning("PhJolt is already initialized!");
+        LogWarning(LC_PHYSICS, "PhJolt is already initialized!");
         return;
     }
 

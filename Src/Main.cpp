@@ -1,5 +1,5 @@
 
-#define VMA_DEBUG_LOG(...) LogWarning(__VA_ARGS__)
+#define VMA_DEBUG_LOG(...) LogWarning(LC_MEMORY, __VA_ARGS__)
 
 #include "FoxtrotGame.hpp"
 
@@ -22,7 +22,7 @@ FX_SET_MODULE_NAME("Main")
 
 static void N_PrintX(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::FoxValue>& args)
 {
-    fx::LogInfo("Printed Value: {}", args[0].Get<fx::int32>());
+    fx::LogInfo(fx::LC_SCRIPT, "Printed Value: {}", args[0].Get<fx::int32>());
 }
 
 int main()

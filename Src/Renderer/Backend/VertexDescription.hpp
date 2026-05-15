@@ -121,7 +121,7 @@ VertexDescription BuildDescription()
         };
     }
     else {
-        LogError("Unsupported vertex type!");
+        LogError(LC_RENDER, "Unsupported vertex type!");
     }
 
     return { binding_desc, std::move(attribs), true };

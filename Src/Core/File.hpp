@@ -60,7 +60,7 @@ public:
     Slice<TDataType> Read()
     {
         if (!pFileHandle) {
-            LogWarning(spcErrCannotReadUnopened);
+            LogWarning(LC_CORE, spcErrCannotReadUnopened);
             return nullptr;
         }
 
@@ -87,7 +87,7 @@ public:
     void Write(TType value)
     {
         if (!pFileHandle) {
-            LogWarning(spcErrCannotWriteUnopened);
+            LogWarning(LC_CORE, spcErrCannotWriteUnopened);
             return;
         }
 

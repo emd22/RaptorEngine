@@ -54,8 +54,6 @@ void Uniforms::SetAllValuesRaw(const void* data, uint32 value_size, bool all_fra
         memcpy(dst, tmp_buffer, PageSize);
     }
 
-    LogInfo("Writing {} values to {} frames for uniform buffer", num_values, frame_count);
-
     gEnginePool->FreeRaw(tmp_buffer);
 }
 

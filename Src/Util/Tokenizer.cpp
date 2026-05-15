@@ -317,7 +317,7 @@ void Tokenizer::IncludeFile(const char* path)
 
 
     if (!file.IsFileOpen()) {
-        LogError("Could not open include file '{}'", path);
+        LogError(LC_SCRIPT, "Could not open include file '{}'", path);
         return;
     }
 

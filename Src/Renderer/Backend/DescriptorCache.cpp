@@ -37,7 +37,6 @@ VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const Size
     }
 
     if (entries_for_set.IsEmpty()) {
-        LogInfo("SKIPPING");
         return nullptr;
     }
 
@@ -52,9 +51,8 @@ VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const Size
 
     DsLayoutBuilder builder {};
 
-    LogInfo("DSLAYOUT CREATED");
     for (const ShaderReflectionEntry& entry : entries_for_set) {
-        LogInfo("Shader: {}, Set={}, Binding={}", ShaderUtil::TypeToName(shader_type), set, entry.Binding);
+        LogInfo(LC_RENDER, "Shader: {}, Set={}, Binding={}", ShaderUtil::TypeToName(shader_type), set, entry.Binding);
         builder.AddBinding(entry.Binding, ReflectionTypeToDescriptorType(entry.Type), shader_type);
     }
 

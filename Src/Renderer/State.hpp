@@ -68,7 +68,7 @@ private:
     void BuildPipeline();
     void Reset();
 
-    void AddDescriptorsFromShaderProgram(Ref<ShaderProgram>& program);
+    void AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program);
 
 public:
     TargetList* pOutputTargets;

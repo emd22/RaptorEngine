@@ -41,7 +41,10 @@ public:
         ItemReady.SignalDataWritten();
     }
 
-    void DebugPrint() const { LogInfo("Worker: Loading {}, {}", Item.Path, AssetTypeToString(Item.AssetType)); }
+    void DebugPrint() const
+    {
+        LogInfo(LC_ASSET, "Worker: Loading {}, {}", Item.Path, AssetTypeToString(Item.AssetType));
+    }
 
     void Update();
 

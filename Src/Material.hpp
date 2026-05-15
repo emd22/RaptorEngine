@@ -118,7 +118,7 @@ public:
             break;
 
         default:
-            LogError("Unsupported resource type to attach to material!");
+            LogError(LC_CORE, "Unsupported resource type to attach to material!");
             break;
         }
     }
