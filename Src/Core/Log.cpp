@@ -24,13 +24,13 @@ void LogCreateFile(const std::string& path) { sCurrentLogFile.open(path.c_str())
 void LogCategoryText(eLogCategory category)
 {
     static const char* scCatNames[] = {
-        "[CORE]    ", /* Core */
-        "[SHADER]  ", /* Shader */
-        "[RENDER]  ", /* Render */
+        "[CORE] ",    /* Core */
+        "[SHADER] ",  /* Shader */
+        "[RENDER] ",  /* Render */
         "[PHYSICS] ", /* Physics */
-        "[MEMORY]  ", /* Memory */
-        "[ASSET]   ", /* Asset */
-        "[SCRIPT]  ", /* Script */
+        "[MEMORY] ",  /* Memory */
+        "[ASSET] ",   /* Asset */
+        "[SCRIPT] ",  /* Script */
     };
 
     static const char* scCatColors[] = {

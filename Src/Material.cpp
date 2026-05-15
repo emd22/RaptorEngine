@@ -35,6 +35,7 @@ void MaterialManager::Create(uint32 entities_per_page)
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
 

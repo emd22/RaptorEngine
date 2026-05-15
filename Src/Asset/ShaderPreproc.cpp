@@ -28,6 +28,9 @@ enum eStringId
     F_Texture2D,
     F_ShadowTexture2D,
 
+    F_StructBuffer,
+    F_CBuffer,
+
     // Test definitions
     F_PARAMTEST,
 };
@@ -47,6 +50,9 @@ static constexpr const char* scStrings[] = {
 
     "F_Texture2D",
     "F_ShadowTexture2D",
+
+    "F_StructBuffer",
+    "F_CBuffer",
 
     // Test definitions
     "F_PARAMTEST",
@@ -220,7 +226,7 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
         type = eShaderReflectionType::StructuredBuffer;
         break;
     case FHash(FR_CBUFFER):
-        type = eShaderReflectionType::UniformBuffer;
+        type = eShaderReflectionType::CBuffer;
         break;
     default:;
     }
@@ -259,12 +265,49 @@ static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, Sta
     result.GetReflection().emplace_back(eShaderReflectionType::Texture, 0, slot_n);
 }
 
+static void ParseStructBufferDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+    // F_StructBuffer(name, objtype, binding, set)
+    REQUIRE_PARAMS(params, 4);
+
+    const Slice<char>& buffer_name = params[0];
+    const Slice<char>& objtype = params[1];
+    const int32 binding = ParamGetInt(params[2]);
+    const int32 set = ParamGetInt(params[3]);
+
+    LogInfo(LC_SHADER, "Reflected shader: {} (type={}) at Binding={}, Set={}",
+            String(buffer_name.pData, buffer_name.Size), String(objtype.pData, objtype.Size), binding, set);
+
+    result.GetReflection().emplace_back(eShaderReflectionType::StructuredBuffer, set, binding);
+}
+
+static void ParseCBufferDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+    // F_CBuffer(name, binding, set)
+    REQUIRE_PARAMS(params, 3);
+
+    const Slice<char>& buffer_name = params[0];
+    const int32 binding = ParamGetInt(params[1]);
+    const int32 set = ParamGetInt(params[2]);
+
+    LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", String(buffer_name.pData, buffer_name.Size),
+            binding, set);
+
+    result.GetReflection().emplace_back(eShaderReflectionType::CBuffer, set, binding);
+}
+
 static const PPFuncEntry PPFunctions[] = {
     PPFuncEntry(FStr(F_PROGRAM), true, false, ParseProgramDefinition),
     PPFuncEntry(FStr(F_REFLECT), true, false, ParseReflectionDefinition),
     PPFuncEntry(FStr(F_PARAMTEST), true, false, ParseParamTestDefinition),
+
+    // Texture definition macros
     PPFuncEntry(FStr(F_Texture2D), true, true, ParseTexture2DDefinition),
     PPFuncEntry(FStr(F_ShadowTexture2D), true, true, ParseTexture2DDefinition),
+
+    // Buffer definition macros
+    PPFuncEntry(FStr(F_StructBuffer), true, true, ParseStructBufferDefinition),
+    PPFuncEntry(FStr(F_CBuffer), true, true, ParseCBufferDefinition),
 
 };
 

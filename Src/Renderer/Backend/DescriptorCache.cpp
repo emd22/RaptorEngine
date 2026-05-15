@@ -13,7 +13,7 @@ static VkDescriptorType ReflectionTypeToDescriptorType(eShaderReflectionType typ
     switch (type) {
     case eShaderReflectionType::StructuredBuffer:
         return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-    case eShaderReflectionType::UniformBuffer:
+    case eShaderReflectionType::CBuffer:
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     case eShaderReflectionType::Texture:
         return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

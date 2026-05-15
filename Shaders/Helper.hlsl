@@ -40,6 +40,12 @@ float4 F_UnpackUIntToFloat4(uint x);
     Texture2D F_TextureName(_name) : register(t##_reg_n, space0); \
     SamplerComparisonState _name : register(s##_reg_n, space0);
 
+#define F_StructBuffer(name_, obj_type_, binding_, set_) \
+    [[vk::binding(binding_, set_)]] StructuredBuffer<obj_type_> name_
+
+#define F_CBuffer(name_, binding_, set_) \
+    [[vk::binding(binding_, set_)]] cbuffer name_
+
 
 #define BoneMtx float4x4
 

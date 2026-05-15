@@ -23,7 +23,7 @@ FxEnumFlags(eShaderType);
 enum eShaderReflectionType : uint16
 {
     StructuredBuffer,
-    UniformBuffer,
+    CBuffer,
     Texture,
 };
 
