@@ -63,7 +63,6 @@ void FoxtrotGame::InitEngine()
     // Create the global engine variables
     fx::Globals::Init();
 
-
     ControlManager::Init();
     ControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
 
@@ -90,8 +89,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    gAssetManager->Start(3);
-
+    gAssetManager->Start(4);
     gMaterialManager->Create();
 
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
@@ -207,9 +205,9 @@ void FoxtrotGame::CreateGame()
     gPhysics->OptimizeBroadPhase();
 
     pSun = mMainScene.GetDirectionalLight();
-/*
-    pPistolObject = mMainScene.FindObject(HashStr32("Pistol"));
-    pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));*/
+    /*
+        pPistolObject = mMainScene.FindObject(HashStr32("Pistol"));
+        pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));*/
 
     LoadOffsetsFile();
 
@@ -233,9 +231,7 @@ void FoxtrotGame::CreateGame()
     }
 
     CreateLights();
-
     CreateFontObject();
-
 
     while (sbRunning) {
         Tick();
@@ -264,6 +260,38 @@ static FX_FORCE_INLINE Vec3f GetMovementVector()
     }
     if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
         movement.Y += -1.0f;
+    }
+
+    return movement;
+}
+
+static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
+{
+    Vec3f movement = Vec3f::sZero;
+
+    const float speed = 0.25f;
+
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_UP)) {
+        if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+            movement.Y += speed;
+        }
+        else {
+            movement.Z += speed;
+        }
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_DOWN)) {
+        if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+            movement.Y += -speed;
+        }
+        else {
+            movement.Z += -speed;
+        }
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_LEFT)) {
+        movement.X += -speed;
+    }
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_RIGHT)) {
+        movement.X += speed;
     }
 
     return movement;
@@ -302,10 +330,10 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
     // Update cameras + current editor mode ptr
     if (EditorModeType != eEditorMode::Default) {
         SelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
-        mMainScene.SelectCamera(pEditorCamera);
+        // mMainScene.SelectCamera(pEditorCamera);
     }
     else {
-        mMainScene.SelectCamera(Player.pCamera);
+        // mMainScene.SelectCamera(Player.pCamera);
         SelectedEditorMode = nullptr;
     }
 }
@@ -449,13 +477,12 @@ void FoxtrotGame::Tick()
     ProcessControls();
 
 
-    if (!sbShowShadowCam && EditorModeType == eEditorMode::Default) {
-        Player.Move(DeltaTime, GetMovementVector());
-        Player.Update(DeltaTime);
-    }
+    Player.Move(DeltaTime, GetMovementVector());
+    Player.Update(DeltaTime);
+
 
     if (EditorModeType != eEditorMode::Default) {
-        SelectedEditorMode->Update(mMainScene, GetMovementVector());
+        SelectedEditorMode->Update(mMainScene, GetEditorMovementVector());
     }
 
     Ref<PerspectiveCamera> camera = Player.pCamera;
@@ -515,6 +542,8 @@ void FoxtrotGame::Tick()
         LogInfo("Setting aspect ratio");
         camera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
     }
+
+    gRenderer->DoComposition(*mMainScene.GetCurrentCamera());
 
     mLastTick = current_tick;
 }

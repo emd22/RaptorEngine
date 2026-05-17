@@ -20,6 +20,52 @@ enum class eShaderType : uint16
 FxEnumFlags(eShaderType);
 
 
+enum eShaderReflectionType : uint16
+{
+    StructuredBuffer,
+    CBuffer,
+    Texture,
+};
+
+struct ShaderReflectionEntry
+{
+    ShaderReflectionEntry() = delete;
+    ShaderReflectionEntry(eShaderReflectionType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding)
+    {
+    }
+
+    uint32 AsUInt() const
+    {
+        const uint32 value = (static_cast<uint32>(Type) << 16) | (static_cast<uint32>(Set) << 8) |
+                             static_cast<uint32>(Binding);
+        return value;
+    }
+
+    static ShaderReflectionEntry FromUInt(uint32 value)
+    {
+        ShaderReflectionEntry entry(static_cast<eShaderReflectionType>(static_cast<uint16>(value >> 16)),
+                                    static_cast<uint8>(value >> 8), static_cast<uint8>(value));
+
+        return entry;
+    }
+
+public:
+    eShaderReflectionType Type;
+    uint8 Set;
+    uint8 Binding;
+};
+
+
+struct ProgramData
+{
+    SizedArray<ShaderReflectionEntry> Reflection;
+    Slice<uint8> pProgramData;
+
+    FX_FORCE_INLINE bool HasData() const { return pProgramData.Size > 0; }
+    FX_FORCE_INLINE bool IsValid() const { return pProgramData.pData != nullptr && HasData(); }
+};
+
+
 namespace renderer {
 
 class Shader;
@@ -64,47 +110,48 @@ static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
 }; // namespace ShaderUtil
 
 
-enum class eShaderOutlineEntryType : uint16
-{
-    StructuredBuffer,
-    UniformBuffer,
-    Sampler2D,
-};
+// enum class eShaderOutlineEntryType : uint16
+// {
+//     StructuredBuffer,
+//     UniformBuffer,
+//     Sampler2D,
+// };
 
-class ShaderOutlineUtil
-{
-public:
-    static const char* GetTypeName(eShaderOutlineEntryType type)
-    {
-        switch (type) {
-        case eShaderOutlineEntryType::StructuredBuffer:
-            return "Structured Buffer";
-        case eShaderOutlineEntryType::UniformBuffer:
-            return "Uniform Buffer";
-        case eShaderOutlineEntryType::Sampler2D:
-            return "Sampler 2D";
-        }
-        return "Unknown";
-    }
-};
+// class ShaderOutlineUtil
+// {
+// public:
+//     static const char* GetTypeName(eShaderOutlineEntryType type)
+//     {
+//         switch (type) {
+//         case eShaderOutlineEntryType::StructuredBuffer:
+//             return "Structured Buffer";
+//         case eShaderOutlineEntryType::UniformBuffer:
+//             return "Uniform Buffer";
+//         case eShaderOutlineEntryType::Sampler2D:
+//             return "Sampler 2D";
+//         }
+//         return "Unknown";
+//     }
+// };
 
-struct ShaderOutlineEntry
-{
-    ShaderOutlineEntry() = default;
-    ShaderOutlineEntry(eShaderOutlineEntryType type, eShaderType shader_type, bool use_dynamic_type, Hash32 name_hash,
-                       uint32 set, uint32 binding)
-        : Type(type), ShaderType(shader_type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)),
-          NameHash(name_hash), Set(set), Binding(binding)
-    {
-    }
+// struct ShaderOutlineEntry
+// {
+//     ShaderOutlineEntry() = default;
+//     ShaderOutlineEntry(eShaderOutlineEntryType type, eShaderType shader_type, bool use_dynamic_type, Hash32
+//     name_hash,
+//                        uint32 set, uint32 binding)
+//         : Type(type), ShaderType(shader_type), bUseDynamicType(static_cast<uint16>(use_dynamic_type)),
+//           NameHash(name_hash), Set(set), Binding(binding)
+//     {
+//     }
 
-    eShaderOutlineEntryType Type; // uint16
-    eShaderType ShaderType;
-    uint16 bUseDynamicType = 0;
-    Hash32 NameHash = 0;
-    uint32 Set = 0;
-    uint32 Binding = 0;
-};
+//     eShaderOutlineEntryType Type; // uint16
+//     eShaderType ShaderType;
+//     uint16 bUseDynamicType = 0;
+//     Hash32 NameHash = 0;
+//     uint32 Set = 0;
+//     uint32 Binding = 0;
+// };
 
 
 struct ShaderDescriptorId
@@ -117,67 +164,12 @@ struct ShaderDescriptorId
 };
 
 
-struct ShaderOutline
-{
-public:
-    /// The maximum number of sets that can be bound in shader
-    static constexpr uint32 scNumSets = 6;
-    static constexpr uint32 scMaxEntriesPerBucket = 10;
-
-    using DescEntry = ShaderOutlineEntry;
-    using DescType = eShaderOutlineEntryType;
-
-    using EntryList = SizedArray<DescEntry>;
-
-public:
-    ShaderOutline()
-    {
-        PushConstantSizes.MarkFull();
-        SetBuckets.MarkFull();
-    }
-
-    void Print() const;
-    uint32 GetReflectionSize() const;
-
-    void WriteToBuffer(uint32* raw_buffer) const;
-
-    /**
-     * @brief Reads the outline from a data buffer
-     * @returns The size of the outline
-     */
-    uint32 ReadFromBuffer(const Slice<uint32>& data);
-
-    void AddEntry(eShaderOutlineEntryType type, eShaderType shader_type, bool use_dynamic_type, Hash32 name_hash,
-                  uint32 set, uint32 binding)
-    {
-        SizedArray<DescEntry>& bucket = SetBuckets[set];
-
-        if (!bucket.IsInited()) {
-            bucket.InitCapacity(scMaxEntriesPerBucket);
-        }
-
-        bucket.Insert(ShaderOutlineEntry(type, shader_type, use_dynamic_type, name_hash, set, binding));
-
-        ++DescriptorEntryCount;
-    }
-
-public:
-    StackArray<EntryList, scNumSets> SetBuckets;
-
-    // SizedArray<ShaderDescriptorEntry> DescriptorEntries;
-    StackArray<uint32, ShaderUtil::scNumShaderTypes> PushConstantSizes = { 0, 0 };
-
-    /// The number of descriptor entries stored.
-    uint32 DescriptorEntryCount = 0;
-
-private:
-};
-
 struct ShaderBindOptions
 {
     bool bUseOffset = false;
     uint32 BufferOffset = 0;
 };
+
 
 class ShaderProgram
 {
@@ -190,8 +182,7 @@ public:
         InternalShader = other.InternalShader;
         ShaderType = other.ShaderType;
         pShader = other.pShader;
-        ShaderOutline = other.ShaderOutline;
-        Descriptors.CloneFrom(other.Descriptors);
+        Reflection = std::move(other.Reflection);
 
         other.InternalShader = nullptr;
         other.pShader = nullptr;
@@ -201,10 +192,6 @@ public:
 
     void Bind(const CommandBuffer& cmd, const Pipeline& pipeline, const ShaderBindOptions& bind_options);
 
-    void Destroy();
-
-    ~ShaderProgram() { Destroy(); }
-
     FX_FORCE_INLINE bool operator==(nullptr_t np) const { return InternalShader == nullptr; }
 
     FX_FORCE_INLINE VkShaderModule& Get()
@@ -213,14 +200,16 @@ public:
         return InternalShader;
     }
 
+    void PrintReflection();
+
+    void Destroy();
+    ~ShaderProgram() { Destroy(); }
+
 public:
     VkShaderModule InternalShader = nullptr;
     Shader* pShader = nullptr;
 
-    Ref<ShaderOutline> ShaderOutline { nullptr };
-
-    SizedArray<ShaderDescriptorId> Descriptors;
-
+    SizedArray<ShaderReflectionEntry> Reflection;
     eShaderType ShaderType = eShaderType::Vertex;
 };
 

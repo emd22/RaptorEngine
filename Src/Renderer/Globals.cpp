@@ -13,7 +13,7 @@ RenderBackend* gRenderer = nullptr;
 ShadowDirectional* gShadowRenderer = nullptr;
 
 ShaderCache* gShaderCache = nullptr;
-DescriptorCache* gDescriptorCache = nullptr;
+DsLayoutCache* gDsLayoutCache = nullptr;
 PipelineCache* gPipelineCache = nullptr;
 
 State* gState = nullptr;
@@ -32,7 +32,7 @@ void Init()
 
     gRenderer = new RenderBackend;
     gShaderCache = new ShaderCache;
-    gDescriptorCache = new DescriptorCache;
+    gDsLayoutCache = new DsLayoutCache;
 }
 
 void Destroy()
@@ -42,7 +42,7 @@ void Destroy()
     }
 
     // DESTROY_GLOBAL(gState);
-    DESTROY_GLOBAL(gDescriptorCache);
+    DESTROY_GLOBAL(gDsLayoutCache);
     DESTROY_GLOBAL(gShaderCache);
     DESTROY_GLOBAL(gRenderer);
 

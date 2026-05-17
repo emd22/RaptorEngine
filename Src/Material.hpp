@@ -54,7 +54,7 @@ public:
         return Status::Ready;
     }
 
-    bool Exists() const { return (pAssetImage != nullptr); }
+    bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr); }
 
     ~MaterialComponent() = default;
 
@@ -118,7 +118,7 @@ public:
             break;
 
         default:
-            LogError("Unsupported resource type to attach to material!");
+            LogError(LC_CORE, "Unsupported resource type to attach to material!");
             break;
         }
     }

@@ -1,6 +1,7 @@
 #include "ShaderCompiler.hpp"
 
 #include <Core/Defines.hpp>
+#include <Renderer/Backend/Shader.hpp>
 
 // #include <ThirdParty/Slang/slang-com-ptr.h>
 // #include <ThirdParty/Slang/slang.h>
@@ -15,14 +16,21 @@
 #include <atlbase.h>
 #include <windows.h>
 #endif
+
+#include "ShaderPreproc.hpp"
+
 #include <dxc/dxcapi.h>
 
 #include <Asset/DataPack.hpp>
 #include <Core/BasicDb.hpp>
+#include <Core/ByteBuffer.hpp>
 #include <Core/File.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/StackArray.hpp>
 #include <Renderer/Backend/Shader.hpp>
+
+// #define FX_SHADER_NO_REFLECTION 1
+
 
 namespace fx {
 
@@ -35,7 +43,7 @@ static bool IsShaderUpToDate(renderer::ShaderId entry_id, const char* path)
 {
     BasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
     if (!entry) {
-        LogWarning("Cannot find entry for shader!");
+        LogWarning(LC_SHADER, "Cannot find entry for shader!");
         return false;
     }
 
@@ -97,6 +105,70 @@ struct CompileState
 };
 
 
+ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pack)
+{
+    DataPackEntry* entry = pack.QuerySection(program_id);
+
+    ProgramData program = { .Reflection = {}, .pProgramData = nullptr };
+
+    // Entry was not found, return null data
+    if (entry == nullptr) {
+        LogWarning(LC_SHADER, "Could not find shader entry");
+        return std::move(program);
+    }
+
+    const SizedArray<uint8>& entry_data = entry->Data;
+
+    ByteBuffer bb = ByteBuffer::FromData(entry_data.pData, entry_data.Size);
+
+#ifndef FX_SHADER_NO_REFLECTION
+    uint32 num_reflected_entries = bb.Get<uint32>();
+    program.Reflection.InitCapacity(num_reflected_entries);
+
+    for (uint32 i = 0; i < num_reflected_entries; i++) {
+        uint32 entry_data = bb.Get<uint32>();
+        program.Reflection.Insert(ShaderReflectionEntry::FromUInt(entry_data));
+    }
+
+#endif
+
+    // Get the SPIRV data
+    program.pProgramData = Slice<uint8>(bb.GetPtr<uint8>(), bb.GetRemainingSize());
+
+    return std::move(program);
+}
+
+
+static ByteBuffer BuildReflectionHeader(const CompileState& state, eShaderType shader_type)
+{
+    ByteBuffer bb;
+
+    std::vector<ShaderReflectionEntry>& refl = state.Preproc.GetReflection(shader_type);
+
+    // Each reflection entry contains a Type(uint16), Set(uint8) and Binding(uint8).
+    constexpr uint32 entry_size = sizeof(uint32);
+
+    // The header contains the number of reflected entries.
+    constexpr uint32 header_size = sizeof(uint32);
+
+    // The final size composed of the header and all entries.
+    uint32 final_size = header_size + (entry_size * refl.size());
+
+
+    bb.Create(final_size);
+
+    // Output the header
+    bb.Insert<uint32>(static_cast<uint32>(refl.size()));
+
+    // Output all entries
+    for (const ShaderReflectionEntry& entry : refl) {
+        bb.Insert<uint32>(entry.AsUInt());
+    }
+
+    return std::move(bb);
+}
+
+
 static CompileResult CompileProgram(const CompileState& state, eShaderType shader_type)
 {
     constexpr uint32 cCodePage = DXC_CP_UTF8;
@@ -130,9 +202,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
     buffer.Size = source_blob->GetBufferSize();
 
     HRESULT hresult;
-
-    // printf("CODE:\n%.*s\n", shader_raw_data.Size, shader_raw_data.pData);
-
     CComPtr<IDxcResult> result { nullptr };
     hresult = state.pCompiler->Compile(&buffer, compile_args.pData, static_cast<uint32>(compile_args.Size),
                                        state.pIncludeHandler, IID_PPV_ARGS(&result));
@@ -146,8 +215,8 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
         hresult = result->GetErrorBuffer(&error_blob);
 
         if (SUCCEEDED(hresult) && error_blob) {
-            LogError("Failed to compile shader '{}'!", state.pcPath);
-            LogError("Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
+            LogError(LC_SHADER, "Failed to compile shader '{}'!", state.pcPath);
+            LogError(LC_SHADER, "Err: {}", reinterpret_cast<const char*>(error_blob->GetBufferPointer()));
             return CompileResult::Failed;
         }
     }
@@ -157,11 +226,27 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
     const renderer::ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
 
-    LogInfo("Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
+    LogInfo(LC_SHADER, "Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
 
-    state.Pack.AddEntry(shader_id, MakeSlice<uint8>(reinterpret_cast<uint8*>(spirv_bin->GetBufferPointer()),
-                                                    spirv_bin->GetBufferSize()));
+    // Build the final buffer and write to the data pack
+    {
+#ifndef FX_SHADER_NO_REFLECTION
+        ByteBuffer reflection_header = BuildReflectionHeader(state, shader_type);
+#else
+        ByteBuffer reflection_header;
+#endif
+        ByteBuffer final_buffer(reflection_header.GetSize() + spirv_bin->GetBufferSize());
 
+        LogWarning(LC_SHADER, "Reflection header: {:p}, {}", reflection_header.pData, reflection_header.GetSize());
+        // Write the reflection header
+        final_buffer.InsertRaw(reflection_header.pData, reflection_header.GetSize());
+        // Write the SPIRV data
+        final_buffer.InsertRaw(reinterpret_cast<uint8*>(spirv_bin->GetBufferPointer()), spirv_bin->GetBufferSize());
+
+        // Add the final buffer to the data pack
+        state.Pack.AddEntry(shader_id,
+                            MakeSlice<uint8>(reinterpret_cast<uint8*>(final_buffer.pData), final_buffer.GetSize()));
+    }
 
     return CompileResult::Success;
 }
@@ -179,7 +264,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
                                                 bool do_db_flush)
 {
-    LogInfo("Compiling shader {} with {} macros", path, macros.Size);
+    LogInfo(LC_SHADER, "Compiling shader {} with {} macros", path, macros.Size);
 
     File file(path, File::eModType::Read, File::eDataType::Binary);
     Slice<char> file_data = file.Read<char>();

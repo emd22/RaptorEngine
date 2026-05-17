@@ -72,16 +72,13 @@ public:
      * @brief Uploads mesh indices to a primtive mesh, and stores the indices without copy if the property
      * `KeepInMemory` is true.
      */
-    void UploadIndices(SizedArray<uint32>&& indices)
-    {
-        GpuIndexBuffer.Create<uint32>(renderer::eGpuBufferType::IndexBuffer, indices);
-        LocalIndexBuffer = std::move(indices);
-    }
+    void UploadIndices() { GpuIndexBuffer.Create<uint32>(renderer::eGpuBufferType::IndexBuffer, LocalIndexBuffer); }
+    void SetIndices(SizedArray<uint32>&& indices) { LocalIndexBuffer = std::move(indices); }
 
     renderer::VertexList& GetVertices()
     {
         if (!bKeepInMemory) {
-            LogWarning("Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
+            LogWarning(LC_ASSET, "Requesting vertices from a primitive mesh while `KeepInMemory` != true!");
         }
 
         // Note that VertexList.LocalBuffer will be empty given bKeepInMemory is false.
@@ -91,7 +88,7 @@ public:
     SizedArray<uint32>& GetIndices()
     {
         if (!bKeepInMemory) {
-            LogWarning("Requesting indices from a primitive mesh while `KeepInMemory` != true!");
+            LogWarning(LC_ASSET, "Requesting indices from a primitive mesh while `KeepInMemory` != true!");
         }
 
         // This will return an empty array if `KeepInMemory` is false!
@@ -108,11 +105,14 @@ public:
         const VkDeviceSize offset = 0;
         //        FrameData* frame = Fwd_GetFrame();
 
+        if (VertexList.GpuBuffer.Buffer == nullptr) {
+            FX_BREAKPOINT;
+        }
+
         vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0,
-                         0, 0);
+        vkCmdDrawIndexed(cmd.Cmd, static_cast<uint32>(GpuIndexBuffer.Size / sizeof(uint32)), num_instances, 0, 0, 0);
     }
 
     void RecalculateNormals()
@@ -120,14 +120,14 @@ public:
         using VertexType = renderer::Vertex<renderer::eVertexType::Default>;
 
         if (LocalIndexBuffer.IsEmpty()) {
-            LogWarning("Cannot recalculate normals as local indices are missing!");
+            LogWarning(LC_ASSET, "Cannot recalculate normals as local indices are missing!");
             return;
         }
 
         AnonArray& vertices = VertexList.GetLocalBuffer();
 
         if (vertices.IsEmpty()) {
-            LogWarning("Cannot recalculate normals as local vertices are missing!");
+            LogWarning(LC_ASSET, "Cannot recalculate normals as local vertices are missing!");
             return;
         }
 

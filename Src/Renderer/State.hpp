@@ -42,7 +42,6 @@ public:
     void SetLayout(ePipelineName other_pl);
 
     void SetPushConstants(eShaderType shader_type, uint32 pc_size);
-    void AddDescriptor(VkDescriptorSetLayout layout);
     PipelineLayout BuildLayout();
 
     void SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment);
@@ -68,6 +67,8 @@ public:
 private:
     void BuildPipeline();
     void Reset();
+
+    void AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program);
 
 public:
     TargetList* pOutputTargets;

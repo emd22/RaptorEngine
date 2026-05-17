@@ -25,6 +25,7 @@ namespace renderer {
 
 enum class eLoadOp
 {
+    None = VK_ATTACHMENT_LOAD_OP_NONE,
     Clear = VK_ATTACHMENT_LOAD_OP_CLEAR,
     Load = VK_ATTACHMENT_LOAD_OP_LOAD,
     DontCare = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -58,9 +59,9 @@ public:
 
     void UseImageFromTarget(Target* ref_target)
     {
-        mpReferenceTarget = ref_target;
         Image = ref_target->GetImage();
-        bReuseImage = true;
+        mpReferenceTarget = ref_target;
+        bImageIsReference = true;
     }
 
     bool IsDepth() const { return Aspect == eImageAspectFlag::Depth; }
@@ -88,7 +89,7 @@ public:
     /// This is used to reload the Image and ImageView when recreating images.
     Target* mpReferenceTarget = nullptr;
 
-    bool bReuseImage : 1 = false;
+    bool bImageIsReference : 1 = false;
     bool bRenderPassOnly : 1 = false;
 
     /// True if the image size matches the size of the surface
@@ -138,7 +139,8 @@ public:
         return targets;
     }
 
-    void RecreateImages() { 
+    void RecreateImages()
+    {
         mFlags = eTargetListFlags::None;
         CreateImages();
     }

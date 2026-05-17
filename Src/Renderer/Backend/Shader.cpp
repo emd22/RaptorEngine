@@ -5,9 +5,11 @@
 
 #include <Asset/AxPaths.hpp>
 #include <Asset/ShaderCompiler.hpp>
+#include <Asset/ShaderPreproc.hpp>
 #include <Core/File.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/RefUtil.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
@@ -17,104 +19,6 @@
 #define DEBUG_FORCE_OUT_OF_DATE 1
 
 namespace fx::renderer {
-
-/////////////////////////////////////
-// Shader Outline Functions
-/////////////////////////////////////
-
-
-uint32 ShaderOutline::GetReflectionSize() const
-{
-    uint32 reflection_header_size = sizeof(uint32);                              // Size of reflection header
-    reflection_header_size += sizeof(uint32) * ShaderUtil::scNumShaderTypes;     // Push constant buffer sizes
-    reflection_header_size += sizeof(uint32);                                    // Number of descriptor entries
-    reflection_header_size += DescriptorEntryCount * sizeof(ShaderOutlineEntry); // The descriptor entries data
-
-    return MathUtil::AlignValue<4>(reflection_header_size);
-}
-
-void ShaderOutline::Print() const
-{
-    LogInfo("=== Outline Debug ===");
-    LogInfo("Maximum Sets: {}", scNumSets);
-    for (uint32 bucket_index = 0; bucket_index < scNumSets; bucket_index++) {
-        const EntryList& list = SetBuckets[bucket_index];
-        LogInfo("Set {} -> {} entries", bucket_index, list.Size);
-
-        for (uint32 i = 0; i < list.Size; i++) {
-            const DescEntry& entry = list[i];
-            LogInfo("\tType={}, IsDynamic?={}, NameHash={}, Set={}, Binding={}",
-                    ShaderOutlineUtil::GetTypeName(entry.Type), entry.bUseDynamicType, entry.NameHash, entry.Set,
-                    entry.Binding);
-        }
-    }
-}
-
-
-void ShaderOutline::WriteToBuffer(uint32* buffer) const
-{
-    *(buffer++) = GetReflectionSize();
-
-    uint32 pc_index = 0;
-    // Write the push constant sizes for each shader type
-    for (; pc_index < ShaderUtil::scNumShaderTypes; pc_index++) {
-        *(buffer++) = PushConstantSizes[pc_index];
-    }
-
-    // Number of descriptor entries across buckets
-    *(buffer++) = static_cast<uint32>(DescriptorEntryCount);
-
-    uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
-
-
-    for (uint32 bucket_index = 0; bucket_index < SetBuckets.Size; bucket_index++) {
-        const EntryList& bucket = SetBuckets[bucket_index];
-
-        if (bucket.IsEmpty()) {
-            continue;
-        }
-
-        // Write each entry in the bucket
-        for (DescEntry& entry : bucket) {
-            LogInfo("ENTRY HAS SHADER TYPE {}", ShaderUtil::TypeToName(entry.ShaderType));
-
-            memcpy(sd_buffer, &entry, sizeof(ShaderOutlineEntry));
-            sd_buffer += sizeof(ShaderOutlineEntry);
-        }
-    }
-}
-
-
-uint32 ShaderOutline::ReadFromBuffer(const Slice<uint32>& data)
-{
-    uint32* buffer = data.pData;
-
-    const uint32 size_of_outline = *(buffer++);
-
-    // Read the push constant sizes for each shader type
-    for (uint32 pc_index = 0; pc_index < ShaderUtil::scNumShaderTypes; pc_index++) {
-        PushConstantSizes[pc_index] = *(buffer++);
-    }
-
-    const uint32 num_ds_entries = *(buffer++);
-
-    uint8* sd_buffer = reinterpret_cast<uint8*>(buffer);
-
-    for (uint32 entry_index = 0; entry_index < num_ds_entries; entry_index++) {
-        ShaderOutlineEntry desc_entry;
-        memcpy(&desc_entry, sd_buffer, sizeof(ShaderOutlineEntry));
-        sd_buffer += sizeof(ShaderOutlineEntry);
-
-        EntryList& entry_list = SetBuckets[desc_entry.Set];
-        if (!entry_list.IsInited()) {
-            entry_list.InitCapacity(scMaxEntriesPerBucket);
-        }
-
-        entry_list.Insert(desc_entry);
-    }
-
-    return size_of_outline;
-}
 
 /////////////////////////////////////
 // Shader Functions
@@ -134,7 +38,7 @@ ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro
         hash = cPrefixHashFS;
     }
 
-    LogInfo("Building entry ID with {} macros", macros.Size);
+    LogInfo(LC_SHADER, "Building entry ID with {} macros", macros.Size);
 
     return HashData64(Slice<ShaderMacro>(macros), hash);
 }
@@ -144,7 +48,7 @@ bool Shader::PreloadCompiledPrograms(const char* pack_path)
     bool did_read = mDataPack.ReadFromFile(pack_path);
 
     if (!did_read) {
-        LogInfo("Could not read compiled shader from {}. Recompiling...", pack_path);
+        LogInfo(LC_SHADER, "Could not read compiled shader from {}. Recompiling...", pack_path);
         return false;
     }
 
@@ -189,7 +93,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 #endif
 
     if (is_out_of_date) {
-        LogWarning("Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
+        LogWarning(LC_SHADER, "Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
 
         RecompileShader(source_path, program_path, macros);
 
@@ -199,7 +103,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
     // Generate an ID based on the shader type and macros. This is used for querying for the program in the DataPack.
     Hash64 program_id = Shader::GenerateShaderId(shader_type, macros);
-    LogDebug("Getting program from {} (Id={})", Name, program_id);
+    LogDebug(LC_SHADER, "Getting program from {} (Id={})", Name, program_id);
 
     // Create the program
     Ref<ShaderProgram> program = MakeRef<ShaderProgram>();
@@ -207,45 +111,41 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
     program->pShader = this;
 
     // Check for the program in the DataPack
-    DataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
+    // DataPackEntry* dp_entry = mDataPack.QuerySection(program_id);
+    ProgramData program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
 
     // If there is no compiled version of the program in the DataPack, compile it and save it to disk.
-    if (dp_entry == nullptr) {
-        LogWarning("Shader was not found in datapack, recompiling...");
+    if (!program_data.IsValid()) {
+        LogWarning(LC_SHADER, "Shader was not found in datapack, recompiling...");
         RecompileShader(GetSourcePath(), program_path, macros);
 
-        dp_entry = mDataPack.QuerySection(program_id);
-        if (dp_entry == nullptr) {
-            LogError("Pack entry does not exist after compilation! (Id={})", program_id);
+        program_data = ShaderCompiler::GetProgramData(program_id, mDataPack);
+
+        if (!program_data.IsValid()) {
+            LogError(LC_SHADER, "Pack entry does not exist after compilation! (Id={})", program_id);
             return program;
         }
     }
 
     // If there is data available, create the program.
-    if (dp_entry->Data.IsNotEmpty()) {
-        LogInfo("Data is available, creating shader...");
-        const SizedArray<uint8>& program_data = dp_entry->Data;
-        Assert(program_data.Size == MathUtil::AlignValue<4>(program_data.Size));
+    if (program_data.HasData()) {
+        LogInfo(LC_SHADER, "Data is available, creating shader...");
 
-        CreateShaderModule(*program, program_data.Size, reinterpret_cast<uint32*>(program_data.pData),
-                           program->InternalShader);
+        Assert(program_data.pProgramData.Size == MathUtil::AlignValue<4>(program_data.pProgramData.Size));
+        Assert(program_data.pProgramData.Size > 0);
+
+        CreateShaderModule(*program, program_data.pProgramData.Size,
+                           reinterpret_cast<uint32*>(program_data.pProgramData.pData), program->InternalShader);
+
+        // Now that the shader is officially loaded, move over the reflection data.
+        program->Reflection = std::move(program_data.Reflection);
 
         return program;
     }
 
-    // The entry exists in the DataPack but the data has not been loaded yet. Load only that section of the DataPack and
-    // create the program.
-    LogInfo("Loading data pack section for shader...");
-
-    uint32 buffer_size = MathUtil::AlignValue<4>(dp_entry->DataSize);
-    uint32* buffer = gEnginePool->Alloc<uint32>(buffer_size);
-    Slice<uint8> buffer_slice = MakeSlice<uint8>(reinterpret_cast<uint8*>(buffer), buffer_size);
-
-    mDataPack.ReadSection(dp_entry, buffer_slice);
-
-    CreateShaderModule(*program, buffer_size, buffer, program->InternalShader);
-
-    gEnginePool->Free(buffer);
+    // Previously, there used to be logic here to force load from the data pack. Since data pack loading is now handled
+    // by the shader compiler, we should not need to handle this case.
+    LogError(LC_SHADER, "Shader: No data available");
 
     return program;
 }
@@ -317,6 +217,14 @@ void ShaderProgram::Bind(const CommandBuffer& cmd, const Pipeline& pipeline, con
     // }
 }
 
+void ShaderProgram::PrintReflection()
+{
+    LogInfo(LC_SHADER, "Shader reflection:");
+    for (const ShaderReflectionEntry& entry : Reflection) {
+        LogInfo(LC_SHADER, "Type: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
+    }
+}
+
 void ShaderProgram::Destroy()
 {
     if (InternalShader == nullptr) {
@@ -331,20 +239,10 @@ void ShaderProgram::Destroy()
 void Shader::CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32* raw_data,
                                 VkShaderModule& shader_module)
 {
-    // Load the reflected data into the shader outline
-    program.ShaderOutline = Ref<ShaderOutline>::New();
-    uint32 reflected_size = 0;
-    // uint32 reflected_size = program.ShaderOutline->ReadFromBuffer(Slice<uint32>(raw_data, file_size));
-
-    // program.BuildDescriptors();
-    program.ShaderOutline.DestroyRef();
-
-    uint32* shader_data = reinterpret_cast<uint32*>(reinterpret_cast<uint8*>(raw_data) + reflected_size);
-
     const VkShaderModuleCreateInfo create_info {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = file_size - reflected_size,
-        .pCode = shader_data,
+        .codeSize = file_size,
+        .pCode = raw_data,
     };
 
     GpuDevice* device = gRenderer->GetDevice();
@@ -352,7 +250,7 @@ void Shader::CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32
     const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &shader_module);
 
     if (status != VK_SUCCESS) {
-        LogError("Could not create Vulkan shader module: {}", Util::ResultToStr(status));
+        LogError(LC_SHADER, "Could not create Vulkan shader module: {}", Util::ResultToStr(status));
         return;
     }
 }

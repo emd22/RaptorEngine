@@ -92,7 +92,7 @@ Sampler::Sampler(const SamplerProps& props) { Create(props); }
 void Sampler::Create(const SamplerProps& props)
 {
     if (InternalSampler) {
-        LogWarning("Sampler has been previously initialized!");
+        LogWarning(LC_RENDER, "Sampler has been previously initialized!");
         return;
     }
 
@@ -129,7 +129,7 @@ void Sampler::Create(const SamplerProps& props)
     VkResult result = vkCreateSampler(gRenderer->GetDevice()->Device, &sampler_info, nullptr, &InternalSampler);
 
     if (result != VK_SUCCESS) {
-        LogError("Error creating texture sampler!");
+        LogError(LC_RENDER, "Error creating texture sampler!");
         InternalSampler = nullptr;
     }
 }

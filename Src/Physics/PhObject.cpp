@@ -27,7 +27,7 @@ void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f&
 
     Dimensions = dimensions;
 
-    LogInfo("Creating primitive collider with dimensions {}", dimensions);
+    LogInfo(LC_PHYSICS, "Creating primitive collider with dimensions {}", dimensions);
 
     switch (primitive_type) {
     case ePhPrimitiveType::None:
@@ -66,7 +66,7 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhM
                               const PhProperties& properties)
 {
     if (mbHasPhysicsBody) {
-        LogWarning("Attempting to create physics body when one is already created!");
+        LogWarning(LC_PHYSICS, "Attempting to create physics body when one is already created!");
         return;
     }
 

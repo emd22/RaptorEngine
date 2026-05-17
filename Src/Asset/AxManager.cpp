@@ -54,10 +54,8 @@ void AxWorker::Update()
         }
         // There is no data passed in, load from file
         else {
-            LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
-
             // Call our specialized loader to load the asset file
-            // LoadStatus = Item.pLoader->LoadFromFile(Item.pAsset, Item.Path);
+            LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
         }
 
 
@@ -100,7 +98,7 @@ void AxManager::DebugPrintWorkers() const
 
 void AxManager::Shutdown()
 {
-    LogInfo("Shutting down asset manager...");
+    LogInfo(LC_ASSET, "Shutting down asset manager...");
 
     if (!mbActive.test()) {
         return;
@@ -176,7 +174,7 @@ void AxManager::LoadObject(const std::string& name, TSRef<Object>& asset, const 
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, eAxType::Object>(asset, loader, path);
+    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetType::Object>(asset, loader, path);
     asset->Name = name;
 }
 
@@ -185,7 +183,7 @@ void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& ass
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, eAxType::Object>(asset, loader, "", data, data_size);
+    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetType::Object>(asset, loader, "", data, data_size);
     asset->Name = name;
 }
 
@@ -200,14 +198,14 @@ void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageForma
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAxType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAssetType::Image>(asset, loader, path);
     }
     else {
         TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, eAxType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetType::Image>(asset, loader, path);
     }
 }
 
@@ -221,7 +219,7 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::e
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAxType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAssetType::Image>(asset, loader, "", data, data_size);
     }
     else {
         // Load the image using stb_image
@@ -229,7 +227,7 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::e
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, eAxType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetType::Image>(asset, loader, "", data, data_size);
     }
 }
 
@@ -294,6 +292,9 @@ void AxManager::CheckForUploadableData()
         worker.LoadStatus = AxLoaderBase::eStatus::None;
 
         worker.bDataPendingUpload.clear();
+
+        // Only upload one object per tick
+        break;
     }
 }
 
@@ -311,11 +312,9 @@ void AxManager::AddWorkerThread()
 {
     // At the maximum number of workers, break
     if (mWorkerThreads.Size >= mWorkerThreads.Capacity) {
-        LogError("Reached maximum number of worker threads");
+        LogError(LC_ASSET, "Reached maximum number of worker threads");
         return;
     }
-
-    LogInfo("Creating asset manager worker thread");
 
     AxWorker* worker = mWorkerThreads.Insert();
     worker->Create();
@@ -337,15 +336,15 @@ void AxManager::CheckForItemsToLoad()
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
         if (tries_remaining <= 0) {
-            LogError("Could not find worker thread, skipping load of object...");
+            LogError(LC_ASSET, "Could not find worker thread, skipping load of object...");
             DebugPrintWorkers();
             break;
         }
 
         // AddWorkerThread();
 
-        LogWarning("Currently {} items are enqueued...", mLoadQueue.Size());
-        LogError("No workers available; Polling for worker thread...");
+        LogWarning(LC_ASSET, "Currently {} items are enqueued...", mLoadQueue.Size());
+        LogError(LC_ASSET, "No workers available; Polling for worker thread...");
         std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
         // Check to see if any threads opened up
@@ -355,6 +354,15 @@ void AxManager::CheckForItemsToLoad()
     }
 
     if (worker) {
+        if (worker->bIsBusy.test()) {
+            // Return to sender
+            mLoadQueue.Push(std::move(item));
+            return;
+        }
+
+        // Set busy
+        worker->bIsBusy.test_and_set();
+
         // Submit the item we want to load
         worker->SubmitItemToLoad(std::move(item));
     }
@@ -381,16 +389,16 @@ void AxManager::AssetManagerUpdate()
             }
         }
         // There is no data being loaded or uploaded, we can unload the extra worker threads.
-        else {
-            const uint32 amount_threads = mWorkerThreads.Size;
-            for (uint32 index = amount_threads; index > mMinThreads; index--) {
-                LogInfo("Killing asset manager worker thread...");
+        // else {
+        //     const uint32 amount_threads = mWorkerThreads.Size;
+        //     for (uint32 index = amount_threads; index > mMinThreads; index--) {
+        //         LogInfo(LC_ASSET, "Killing asset manager worker thread...");
 
-                // mWorkerThreads[index].Kill();
-                // mWorkerThreads[index].Thread.join();
-                // mWorkerThreads.RemoveLast();
-            }
-        }
+        //         // mWorkerThreads[index].Kill();
+        //         // mWorkerThreads[index].Thread.join();
+        //         // mWorkerThreads.RemoveLast();
+        //     }
+        // }
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
         ItemsEnqueuedNotifier.WaitForData();
@@ -409,11 +417,11 @@ AxWorker* AxManager::FindWorkerThread()
     for (AxWorker& worker : mWorkerThreads) {
         ++worker_id;
         if (!worker.bIsBusy.test()) {
-            LogInfo("Found worker (id={})", worker_id);
+            LogInfo(LC_ASSET, "Found worker (id={})", worker_id);
             return &worker;
         }
     }
-    LogInfo("Did not find any open worker!");
+    LogInfo(LC_ASSET, "Did not find any open worker!");
 
     return nullptr;
 }

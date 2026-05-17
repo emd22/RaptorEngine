@@ -5,9 +5,9 @@
 /// Global, copy to all shader types
 #define FPT_ALL 2
 
-#define F_REFLECT(_type, _set, _binding) ;
+#define F_REFLECT(_type, _binding, _set) ;
 #define FR_STRUCTBUFFER 0
-#define FR_UNIFORMBUFFER 1
+#define FR_CBUFFER 1
 #define FR_SAMPLER2D 2
 
 #define F_PARAMTEST() ;
@@ -39,6 +39,12 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define F_ShadowTexture2D(_name, _reg_n) \
     Texture2D F_TextureName(_name) : register(t##_reg_n, space0); \
     SamplerComparisonState _name : register(s##_reg_n, space0);
+
+#define F_StructBuffer(name_, obj_type_, binding_, set_) \
+    [[vk::binding(binding_, set_)]] StructuredBuffer<obj_type_> name_
+
+#define F_CBuffer(name_, binding_, set_) \
+    [[vk::binding(binding_, set_)]] cbuffer name_
 
 
 #define BoneMtx float4x4

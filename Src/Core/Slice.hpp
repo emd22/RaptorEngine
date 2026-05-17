@@ -6,28 +6,28 @@
 
 namespace fx {
 
-template <typename TDataType>
+template <typename T>
 struct Slice
 {
-    TDataType* pData = nullptr;
+    T* pData = nullptr;
     uint32 Size;
 
 public:
-    using Iterator = TDataType*;
-    using ConstIterator = TDataType*;
+    using Iterator = T*;
+    using ConstIterator = T*;
 
     Iterator begin() const { return pData; }
 
     Iterator end() const { return pData + Size; }
 
-    Slice(const SizedArray<TDataType>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
+    Slice(const SizedArray<T>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
 
     template <uint32 TSize>
-    Slice(StackArray<TDataType, TSize>& stack_arr) : pData(stack_arr.pData), Size(stack_arr.Size)
+    Slice(StackArray<T, TSize>& stack_arr) : pData(stack_arr.pData), Size(stack_arr.Size)
     {
     }
 
-    Slice(TDataType* ptr, uint32 size) : pData(ptr), Size(size) {}
+    Slice(T* ptr, uint32 size) : pData(ptr), Size(size) {}
 
     Slice(nullptr_t np) : pData(nullptr), Size(0) {}
 
@@ -37,20 +37,34 @@ public:
         Size = other.Size;
     }
 
+    Slice(Slice<T>&& other) { (*this) = std::move(other); }
+
     template <typename TOtherType>
     Slice(const Slice<TOtherType>& other)
     {
-        pData = static_cast<TDataType*>(other.pData);
+        pData = static_cast<T*>(other.pData);
         Size = other.Size;
     }
 
-    Slice& operator=(TDataType* value) = delete;
+
+    Slice& operator=(T* value) = delete;
+
+    Slice& operator=(Slice<T>&& other)
+    {
+        pData = other.pData;
+        Size = other.Size;
+
+        other.pData = nullptr;
+        other.Size = 0;
+
+        return *this;
+    }
 
     bool operator==(nullptr_t np) { return pData == nullptr; }
 
-    operator TDataType*() const { return pData; }
+    operator T*() const { return pData; }
 
-    TDataType& operator[](size_t index)
+    T& operator[](size_t index)
     {
         if (index > Size) {
             Panic("Slice", "Index out of range! ({:d} > {:d})\n", index, Size);
@@ -69,25 +83,25 @@ Slice<T> MakeSlice(T* ptr, uint32 size)
 } // namespace fx
 
 
-template <typename T>
-struct std::formatter<fx::Slice<T>>
+template <>
+struct std::formatter<fx::Slice<fx::uint8>>
 {
     auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    auto format(const fx::Slice<T>& slice, std::format_context& ctx) const
+    auto format(const fx::Slice<fx::uint8>& slice, std::format_context& ctx) const
     {
         std::string str = "";
 
         for (fx::uint32 i = 0; i < slice.Size; i++) {
-            const T& value = slice.pData[i];
+            const fx::uint8& value = slice.pData[i];
             if (i == slice.Size - 1) {
-                str += std::format("{}", value);
+                str += std::format("{:x}", static_cast<unsigned int>(value));
             }
             else {
-                str += std::format("{}, ", value);
+                str += std::format("{:x}, ", static_cast<unsigned int>(value));
             }
         }
 
-        return std::format("[ {} ]", str);
+        return std::format_to(ctx.out(), "[ {} ]", str);
     }
 };

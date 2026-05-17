@@ -93,7 +93,7 @@ static inline bool IsKeyInRange(eKey key_id)
 
     if (!in_range) {
         int max_keys = ControlManager::scMaxKeys;
-        LogWarning("Invalid Control Key ID! (0 <= {:d} < {:d})", static_cast<int>(key_id), max_keys);
+        LogWarning(LC_CORE, "Invalid Control Key ID! (0 <= {:d} < {:d})", static_cast<int>(key_id), max_keys);
     }
 
     return in_range;
@@ -194,6 +194,10 @@ void ControlManager::Update()
             inst.OnQuit();
             break;
 
+        case SDL_EVENT_WINDOW_RESIZED:
+            renderer::gRenderer->RebuildToResizedWindow();
+            break;
+
         // Keyboard events
         case SDL_EVENT_KEY_DOWN: // fallthrough
         case SDL_EVENT_KEY_UP:
@@ -235,7 +239,7 @@ void ControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
     const eKey key_id = ConvertScancodeToKey(event->key.scancode);
 
     if (key_id == eKey::FX_KEY_UNKNOWN) {
-        LogWarning("Unknown scancode {:d}!", static_cast<int>(event->key.scancode));
+        LogWarning(LC_CORE, "Unknown scancode {:d}!", static_cast<int>(event->key.scancode));
         return;
     }
 
@@ -251,7 +255,7 @@ void ControlManager::UpdateFromMouseButtonEvent(SDL_Event* event)
 {
     const eKey key_id = ConvertMouseButtonToKey(event->button.button);
     if (key_id == eKey::FX_KEY_UNKNOWN) {
-        LogWarning("Unknown mouse button {:d}!", static_cast<int>(event->button.button));
+        LogWarning(LC_CORE, "Unknown mouse button {:d}!", static_cast<int>(event->button.button));
         return;
     }
 

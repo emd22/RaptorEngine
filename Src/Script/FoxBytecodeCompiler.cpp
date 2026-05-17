@@ -7,7 +7,7 @@
 #include <Core/PagedArray.hpp>
 #include <Util/Tokenizer.hpp>
 
-#define BC_PRINT_OP(fmt_, ...) fx::Log<fx::eLogChannel::None>(fmt_, ##__VA_ARGS__)
+#define BC_PRINT_OP(fmt_, ...) fx::Log<fx::eLogSeverity::None>(fmt_, ##__VA_ARGS__)
 
 namespace fx::script {
 
@@ -1178,8 +1178,8 @@ char* FoxBytecodePrinter::ReadString(char* buffer, uint32 buffer_size)
     uint32 string_length = Read16();
 
     if (string_length > buffer_size) {
-        LogWarning("ReadString: String length is greater than the read buffer size! ({} > {})", string_length,
-                   buffer_size);
+        LogWarning(LC_SCRIPT, "ReadString: String length is greater than the read buffer size! ({} > {})",
+                   string_length, buffer_size);
         string_length = buffer_size;
     }
 

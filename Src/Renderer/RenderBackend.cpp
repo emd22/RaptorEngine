@@ -175,7 +175,7 @@ void RenderBackend::DestroyFrames()
 }
 
 void RenderBackend::RebuildRenderStages()
-{ 
+{
     DeferredRenderer* rd = pDeferredRenderer.mpPtr;
 
     Vec2u size = GetWindow()->GetSize();
@@ -216,7 +216,7 @@ void RenderBackend::InitVulkan()
     std::cout << "Requested to load " << all_extensions.size() << " extensions...\n";
 
     for (const auto& extension : all_extensions) {
-        LogDebug("Ext: {:s}", extension);
+        LogDebug(LC_RENDER, "Ext: {:s}", extension);
     }
 
     ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions);
@@ -278,34 +278,20 @@ uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_sever
 
 
     if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
-        LogError(fmt, message);
+        LogError(LC_RENDER, fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
-        LogWarning(fmt, message);
+        LogWarning(LC_RENDER, fmt, message);
     }
     else if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)) {
         // Log::Info(fmt, message);
     }
     else {
-        LogDebug(fmt, message);
+        LogDebug(LC_RENDER, fmt, message);
     }
 
     return 0;
 }
-
-// template<typename FuncProt>
-// FuncProt GetExtensionFuncVk(VkInstance instance, const char *name)
-// {
-//     PFN_vkVoidFunction raw_ptr = vkGetInstanceProcAddr(instance, name);
-
-//     if (raw_ptr != nullptr) {
-//         return (FuncProt)raw_ptr;
-//     }
-
-//     Log::Error("Could not load extension function '%s'", name);
-//     return nullptr;
-// }
-
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 {
@@ -329,7 +315,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 
     const auto status = Rx_EXT_CreateDebugUtilsMessenger(instance, &create_info, nullptr, &messenger);
     if (status != VK_SUCCESS) {
-        LogError("Could not create debug messenger! (err: {:s})", Util::ResultToStr(status));
+        LogError(LC_RENDER, "Could not create debug messenger! (err: {:s})", Util::ResultToStr(status));
         return nullptr;
     }
 
@@ -385,9 +371,6 @@ ExtensionNames RenderBackend::MakeInstanceExtensionList(ExtensionNames& user_req
 
 ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 {
-    LogDebug("Querying for instance extensions...");
-
-
     if (mAvailableExtensions.IsNotEmpty()) {
         if (invalidate_previous) {
             mAvailableExtensions.Free();
@@ -404,9 +387,6 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
         throw std::runtime_error("Could not query instance extensions!");
     }
 
-    std::cout << "Ext count: " << extension_count << "\n";
-
-    // resize to create the items in the vector
     mAvailableExtensions.InitSize(extension_count);
 
     // Get the available instance extensions
@@ -415,27 +395,20 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
         throw std::runtime_error("Could not query instance extensions!");
     }
 
-    // std::cout << "=== Available Instance Extensions (" << extension_count << ") ===\n";
-
-    // for (uint32_t i = 0; i < extension_count; ++i) {
-    //     const VkExtensionProperties& extension = mAvailableExtensions[i];
-    //     std::cout << extension.extensionName << " : " << extension.specVersion << "\n";
-    // }
-
     return mAvailableExtensions;
 }
 
 void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
                                            const void* data, uint32 data_size) const
 {
-    DebugAssert(pipeline.Layout2.IsValid());
+    DebugAssert(pipeline.Layout.IsValid());
 
     // Currently, there is nowhere in the engine that requires two separate PC buffers and therefore requires an offset.
     // As well, the small required size of a PC kind of makes this useless. For now, we will ignore this and if needed
     // there will be an updated version of this function.
     // I'm pretty sure when I was using Slang I had one shader that required this, but thats since been cacked..
     static constexpr uint32 scOffset = 0;
-    vkCmdPushConstants(cmd.Get(), pipeline.Layout2.Get(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
+    vkCmdPushConstants(cmd.Get(), pipeline.Layout.Get(), ShaderUtil::ToUnderlyingType(shader_types), scOffset,
                        data_size, data);
 }
 
@@ -499,7 +472,6 @@ eFrameResult RenderBackend::BeginFrame()
 {
     FrameData* frame = GetFrame();
 
-    bDidFrameResize = false;
 
     LightBuffer.Rewind();
 
@@ -589,8 +561,10 @@ void RenderBackend::PresentFrame()
         // Swapchain.Rebuild()..
     }
     else {
-        LogError("Error submitting present queue. Status: {:x}", static_cast<int32>(status));
+        LogError(LC_RENDER, "Error submitting present queue. Status: {:x}", static_cast<int32>(status));
     }
+
+    bDidFrameResize = false;
 }
 
 void RenderBackend::BeginLighting()
@@ -604,8 +578,7 @@ void RenderBackend::BeginLighting()
     depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
-    pDeferredRenderer->LightPass.Begin(frame->CmdBuffer,
-                                       gPipelineCache->Request(ePipelineName::LightingDirectional));
+    pDeferredRenderer->LightPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::LightingDirectional));
 
     // gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
     // gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -637,7 +610,6 @@ void RenderBackend::BeginUnlit()
                                        Slice<VkClearValue>({}, 0));*/
 
     // pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
-    
 }
 
 void RenderBackend::DoComposition(Camera& render_cam)
@@ -646,7 +618,7 @@ void RenderBackend::DoComposition(Camera& render_cam)
 
     pDeferredRenderer->ForwardPass.End();
 
-    //pDeferredRenderer->RpForward.End();
+    // pDeferredRenderer->RpForward.End();
 
     pDeferredRenderer->CompPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Composition));
     pDeferredRenderer->DoCompPass(render_cam);
@@ -664,6 +636,14 @@ void RenderBackend::DoComposition(Camera& render_cam)
     mFrameNumber = (mInternalFrameCounter % FramesInFlight);
 }
 
+void RenderBackend::RebuildToResizedWindow()
+{
+    bDidFrameResize = true;
+    gRenderer->GetWindow()->HandleResize();
+    Swapchain.Rebuild(gRenderer->GetWindow()->GetSize(), mWindowSurface);
+    RebuildRenderStages();
+}
+
 eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
 {
     const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
@@ -671,19 +651,15 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
     const VkResult result = vkAcquireNextImageKHR(GetDevice()->Device, Swapchain.GetSwapchain(), timeout,
                                                   frame->ImageAvailable.Get(), nullptr, &mImageIndex);
 
-    if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
+    if (result == VK_SUCCESS) {
         return eFrameResult::Success;
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        bDidFrameResize = true;
-        gRenderer->GetWindow()->HandleResize();
-        Swapchain.Rebuild(gRenderer->GetWindow()->GetSize(), mWindowSurface);
-        RebuildRenderStages();
-        
-        return eFrameResult::Success;
+        RebuildToResizedWindow();
+        return eFrameResult::GraphicsOutOfDate;
     }
     else {
-        LogError("Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
+        LogError(LC_RENDER, "Error getting next swapchain image! Status: {:x}", static_cast<int>(result));
     }
 
     return eFrameResult::RenderError;

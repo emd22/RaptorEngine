@@ -29,8 +29,6 @@ Quat Quat::FromAxisAngle(Vec3f axis, float32 angle)
     float32 sv, cv;
     MathUtil::SinCos(angle, &sv, &cv);
 
-    LogInfo("Sin {} = {}, Cos {} = {}", angle, sv, angle, cv);
-
     const __m128 vec = _mm_mul_ps(SSE::Normalize(axis.mIntrin), _mm_set1_ps(sv));
 
     // return Quat(vsetq_lane_f32(cv, vec, 3));

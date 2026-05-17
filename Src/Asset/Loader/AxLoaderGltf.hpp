@@ -35,7 +35,7 @@ public:
     Status LoadFromFile(TSRef<AxBase> asset, const String& path) override;
     Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
-    void UploadMeshToGpu(TSRef<Object>& object, cgltf_mesh* gltf_mesh, int mesh_index);
+    void UploadMeshToGpu(TSRef<Object>& object);
 
     void Destroy(TSRef<AxBase>& asset) override;
 
@@ -52,6 +52,13 @@ private:
     void LoadSkeleton(Skeleton& skel, cgltf_skin* skin); // now takes skel by ref
     void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
     void LoadAnimations(TSRef<Object>& output_object, Skeleton& skel);
+
+    void BuildObjectsFromPrimitives(TSRef<Object>& object, cgltf_mesh* gltf_mesh);
+
+    /**
+     * @brief Process the GLTF data and build out the object tree.
+     */
+    void ProcessData(TSRef<Object>& output_object);
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;

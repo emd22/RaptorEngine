@@ -227,8 +227,6 @@ public:
 
             pCurrentPage->pNext = new_page;
             pCurrentPage = new_page;
-
-            LogDebug("Allocating new page for PagedArray");
         }
 
         return element;
@@ -260,8 +258,6 @@ public:
 
             pCurrentPage->pNext = new_page;
             pCurrentPage = new_page;
-
-            LogDebug("Allocating new page for PagedArray");
         }
 
         return *new_element;
@@ -293,8 +289,6 @@ public:
 
             pCurrentPage->pNext = new_page;
             pCurrentPage = new_page;
-
-            LogDebug("Allocating new page for PagedArray");
         }
 
         return *new_element;
@@ -432,17 +426,17 @@ public:
 
     void PrintDebugInfo() const
     {
-        LogInfo("");
-        LogInfo("=== Paged Array Debug Info ===");
-        LogInfo("PageNodeCapacity={}", PageNodeCapacity);
-        LogInfo("pFirstPage={:p}", reinterpret_cast<void*>(pFirstPage));
-        LogInfo("pCurrentPage={:p}", reinterpret_cast<void*>(pCurrentPage));
+        LogInfo(LC_MEMORY, "");
+        LogInfo(LC_MEMORY, "=== Paged Array Debug Info ===");
+        LogInfo(LC_MEMORY, "PageNodeCapacity={}", PageNodeCapacity);
+        LogInfo(LC_MEMORY, "pFirstPage={:p}", reinterpret_cast<void*>(pFirstPage));
+        LogInfo(LC_MEMORY, "pCurrentPage={:p}", reinterpret_cast<void*>(pCurrentPage));
         if (pCurrentPage) {
-            LogInfo("CurrentPageSize={}", pCurrentPage->Size);
+            LogInfo(LC_MEMORY, "CurrentPageSize={}", pCurrentPage->Size);
         }
-        LogInfo("TrackedSize={}", TrackedSize);
-        LogInfo("bDoNotDestroy={}", bDoNotDestroy);
-        LogInfo("");
+        LogInfo(LC_MEMORY, "TrackedSize={}", TrackedSize);
+        LogInfo(LC_MEMORY, "bDoNotDestroy={}", bDoNotDestroy);
+        LogInfo(LC_MEMORY, "");
     }
 
     ~PagedArray()

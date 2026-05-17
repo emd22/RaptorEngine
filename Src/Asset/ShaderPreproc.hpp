@@ -14,22 +14,7 @@ namespace ShaderPreproc {
 
 using DataBuffer = DynArray<char, GrowthFunctions::InPages>;
 
-enum eEntryType : uint16
-{
-    StructuredBuffer,
-    UniformBuffer,
-    Sampler2D,
-};
-
-struct Entry
-{
-    Entry() = delete;
-    Entry(eEntryType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding) {}
-
-    eEntryType Type;
-    uint8 Set;
-    uint8 Binding;
-};
+using ReflectionList = std::vector<ShaderReflectionEntry>;
 
 
 struct Result
@@ -39,6 +24,9 @@ public:
 
     DataBuffer& GetBuffer() { return ProgramData[static_cast<uint32>(CurrentType)]; }
     DataBuffer& GetBuffer(eShaderType type) { return ProgramData[static_cast<uint32>(type)]; }
+
+    ReflectionList& GetReflection() { return ReflectionData[static_cast<uint32>(CurrentType)]; }
+    ReflectionList& GetReflection(eShaderType type) { return ReflectionData[static_cast<uint32>(type)]; }
 
     void InsertString(const std::string& str)
     {
@@ -54,15 +42,17 @@ public:
         CurrentType = type;
     }
 
+
 public:
     std::array<DataBuffer, renderer::ShaderUtil::scNumShaderTypes> ProgramData;
+    std::array<ReflectionList, renderer::ShaderUtil::scNumShaderTypes> ReflectionData;
 
     eShaderType CurrentType = eShaderType::Vertex;
 
     // Before a program definition, broadcast to all
     bool bBroadcastToAllPrograms = true;
 
-    std::vector<Entry> Reflection;
+    /// Reflection data read in by the preprocessor.
 };
 
 

@@ -114,8 +114,6 @@ void Scene::Render(Camera* shadow_camera)
     if (bRenderPhysicsObjects) {
         RenderPhysicsObjects(camera);
     }
-
-    gRenderer->DoComposition(camera);
 }
 
 

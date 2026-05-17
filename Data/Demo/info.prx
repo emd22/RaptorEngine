@@ -36,7 +36,7 @@ Objects = {
         Mesh = "/Skybox.glb"
         Unlit = $True
     }
-	
+
 	FireExtinguisher = {
 		Mesh = "/FireExtinguisher.glb"
 		Shadows = $True

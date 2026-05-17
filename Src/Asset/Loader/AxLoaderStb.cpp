@@ -25,7 +25,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String
 
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
     if (mImageData == nullptr) {
-        LogError("Could not load image file at '{}'", c_path);
+        LogError(LC_ASSET, "Could not load image file at '{}'", c_path);
         return AxLoaderStb::eStatus::Error;
     }
 
@@ -40,7 +40,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
     Assert(pixel_size > 0);
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
-        LogError("Could not retrieve info from image in memory! (Size={})", size);
+        LogError(LC_ASSET, "Could not retrieve info from image in memory! (Size={})", size);
         return AxLoaderStb::eStatus::Error;
     }
 
@@ -54,7 +54,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
     mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
     if (mImageData == nullptr) {
-        LogError("Could not load image file from memory!");
+        LogError(LC_ASSET, "Could not load image file from memory!");
         return AxLoaderStb::eStatus::Error;
     }
 

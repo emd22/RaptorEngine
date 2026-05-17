@@ -36,7 +36,7 @@ void SceneFile::Load(const std::string& path, Scene& scene)
         ConfigEntry* meta = info.GetEntry(HashStr32("Meta"));
 
         if (!meta) {
-            LogError("Project missing metadata!");
+            LogError(LC_ASSET, "Project missing metadata!");
             return;
         }
 

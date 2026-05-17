@@ -40,7 +40,7 @@ private:
     void CreateGPassPipeline();
     void DestroyGPassPipeline();
 
-    void CreateUnlitPass();
+    void CreateForwardPass();
     void CreateGPass();
 
 
@@ -113,8 +113,8 @@ public:
     // Pipeline PlDebugLayer;
     // DescriptorSet DsUnlit;
 
-/*    RenderPass RpForward;
-    Framebuffer FbForward;*/
+    /*    RenderPass RpForward;
+        Framebuffer FbForward;*/
 
     //////////////////////
     // Composition Pass

@@ -34,8 +34,8 @@ void MaterialManager::Create(uint32 entities_per_page)
 
     if (!dp.Pool) {
         dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 3);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
+        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
         dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
     }
 
@@ -68,7 +68,6 @@ TSRef<Material> MaterialManager::New(const String& name, Pipeline* pipeline, boo
     }
 
     uint32 free_material_index = MaterialsInUse.FindNextFreeBit();
-    LogInfo("Free mat index: {}", free_material_index);
     Assert(free_material_index != Bitset::scNoFreeBits);
 
     TSRef<Material> ref = TSRef<Material>::New();
@@ -154,7 +153,7 @@ bool Material::BindWithPipeline(CommandBuffer& cmd, Pipeline& pipeline, bool alb
         gMaterialManager->mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
     };
 
-    StackArray<uint32, 1> offsets;
+    StackArray<uint32, 2> offsets = { 0 };
     if (bSupportsSkinning) {
         offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
     }
@@ -207,13 +206,13 @@ void Material::SetDefaultPipeline()
 {
     if (NormalMap.Exists()) {
         pPipeline = &gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
+
+        if (bSupportsSkinning) {
+            pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
+        }
     }
     else {
         pPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
-    }
-
-    if (bSupportsSkinning) {
-        pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 }
 

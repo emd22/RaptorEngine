@@ -14,8 +14,8 @@ extern ShaderCache* gShaderCache;
 class PipelineCache;
 extern PipelineCache* gPipelineCache;
 
-class DescriptorCache;
-extern DescriptorCache* gDescriptorCache;
+class DsLayoutCache;
+extern DsLayoutCache* gDsLayoutCache;
 
 class State;
 extern State* gState;

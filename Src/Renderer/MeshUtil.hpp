@@ -15,7 +15,7 @@ public:
         const AnonArray& vertices = vertex_list.GetLocalBuffer();
 
         if (vertices.IsEmpty()) {
-            LogWarning("Cannot calculate dimensions as there are no vertices!");
+            LogWarning(LC_ASSET, "Cannot calculate dimensions as there are no vertices!");
             return Vec3f::sZero;
         }
 

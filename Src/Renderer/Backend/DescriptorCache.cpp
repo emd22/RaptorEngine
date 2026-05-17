@@ -2,103 +2,65 @@
 
 #include "Shader.hpp"
 
-#include <Core/RefUtil.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
-#include <Renderer/DeferredRenderer.hpp>
-#include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/ShaderNames.hpp>
+
 
 namespace fx::renderer {
 
-ShaderDescriptorId DescriptorCache::Register(uint32 set, eShaderType shader_type,
-                                             const SizedArray<ShaderOutlineEntry>& entries)
+static VkDescriptorType ReflectionTypeToDescriptorType(eShaderReflectionType type)
 {
-    Section& section = mSections[set];
-
-    // Hash -> shader type and outline entries
-    Hash32 hash = HashData32(Slice(entries), HashStr32(ShaderUtil::TypeToName(shader_type)));
-
-    LogInfo("");
-    LogInfo("=== Registering Set {} for {} ===", set, ShaderUtil::TypeToName(shader_type));
-
-    // Check if the DS already exists
-    if (section.find(hash) != section.end()) {
-        LogInfo("");
-        return ShaderDescriptorId { .Set = set, .Hash = hash };
+    switch (type) {
+    case eShaderReflectionType::StructuredBuffer:
+        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+    case eShaderReflectionType::CBuffer:
+        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    case eShaderReflectionType::Texture:
+        return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    default:;
     }
 
-    // Insert the entry into the hashmap
-    Ref<DescriptorSet>& entry = section[hash];
-    entry = MakeRef<DescriptorSet>();
-
-    DescriptorPool& dp = gRenderer->pDeferredRenderer->DescriptorPool;
-    DsLayoutBuilder layout_builder {};
-
-    bool has_dynamic_offsets = false;
-
-    for (const ShaderOutlineEntry& entry : entries) {
-        using SOType = eShaderOutlineEntryType;
-
-        if (entry.ShaderType != shader_type) {
-            continue;
-        }
-
-        VkDescriptorType ds_type;
-
-        if (entry.bUseDynamicType) {
-            has_dynamic_offsets = true;
-        }
-
-        const char* binding_name = "None";
-
-        switch (entry.Type) {
-        case SOType::Sampler2D:
-            ds_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            binding_name = "Sampler2D";
-            break;
-        case SOType::StructuredBuffer:
-            ds_type = entry.bUseDynamicType ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
-                                            : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            binding_name = "Structured Buffer";
-            break;
-        case SOType::UniformBuffer:
-            ds_type = entry.bUseDynamicType ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
-                                            : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            binding_name = "Uniform Buffer";
-
-            break;
-        }
-
-        LogInfo("\tBinding {} => {} ({}) -> ST: {}", entry.Binding, binding_name,
-                entry.bUseDynamicType ? "Dynamic" : "Normal", ShaderUtil::TypeToName(shader_type));
-
-        layout_builder.AddBinding(entry.Binding, ds_type, shader_type);
-    }
-
-    LogInfo("");
-
-    entry->Create(dp, layout_builder.Build(), has_dynamic_offsets);
-
-    return ShaderDescriptorId { .Set = set, .Hash = hash, .bContainsDynamicEntry = has_dynamic_offsets };
-}
-
-Ref<DescriptorSet> DescriptorCache::Request(const ShaderDescriptorId& id)
-{
-    Section& section = mSections[id.Set];
-    return section[id.Hash];
+    return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 }
 
 
-DescriptorCache::~DescriptorCache()
+VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl,
+                                             uint32 set)
 {
-    for (uint32 section_index = 0; section_index < scMaxSections; section_index++) {
-        Section& section = mSections[section_index];
+    SizedArray<ShaderReflectionEntry> entries_for_set(refl.Size);
 
-        for (auto& [key, ref] : section) {
-            ref->DestroyLayout();
-            ref.DestroyRef();
+    // Get the entries for the requested set index
+    for (const ShaderReflectionEntry& entry : refl) {
+        if (entry.Set == set) {
+            entries_for_set.Insert(entry);
         }
     }
+
+    if (entries_for_set.IsEmpty()) {
+        return nullptr;
+    }
+
+    Hash64 entries_hash = HashData64(Slice(entries_for_set), HashStr32(ShaderUtil::TypeToName(shader_type)));
+
+    auto it = Cache.find(entries_hash);
+
+    // If the descriptor layout was not found in the cache, create it
+    if (it != Cache.end()) {
+        return it->second;
+    }
+
+    DsLayoutBuilder builder {};
+
+    for (const ShaderReflectionEntry& entry : entries_for_set) {
+        LogInfo(LC_RENDER, "Shader: {}, Set={}, Binding={}", ShaderUtil::TypeToName(shader_type), set, entry.Binding);
+        builder.AddBinding(entry.Binding, ReflectionTypeToDescriptorType(entry.Type), shader_type);
+    }
+
+    VkDescriptorSetLayout layout = builder.Build();
+    Cache[entries_hash] = layout;
+
+    return layout;
 }
+
 
 } // namespace fx::renderer

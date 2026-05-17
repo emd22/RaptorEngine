@@ -63,7 +63,7 @@ public:
     TIntType Get() const
     {
         if (Type != eValueType::Int) {
-            LogWarning("Attempting to retrieve int type from non-int!");
+            LogWarning(LC_CORE, "Attempting to retrieve int type from non-int!");
             return 0;
         }
 
@@ -75,7 +75,7 @@ public:
     TFloatType Get() const
     {
         if (Type != eValueType::Float) {
-            LogWarning("Attempting to retrieve float type from non-float!");
+            LogWarning(LC_CORE, "Attempting to retrieve float type from non-float!");
             return 0.0f;
         }
 
@@ -248,7 +248,7 @@ public:
     TIntType GetValue() const
     {
         if (Type != eValueType::Int) {
-            LogWarning("Attempting to retrieve int type from non-int!");
+            LogWarning(LC_CORE, "Attempting to retrieve int type from non-int!");
             return 0;
         }
 
@@ -260,7 +260,7 @@ public:
     TFloatType GetValue() const
     {
         if (Type != eValueType::Float) {
-            LogWarning("Attempting to retrieve float type from non-float!");
+            LogWarning(LC_CORE, "Attempting to retrieve float type from non-float!");
             return 0.0f;
         }
 
@@ -330,7 +330,7 @@ public:
     {
         const ConfigEntry* entry = GetEntry(entry_name_hash);
         if (!entry) {
-            LogError("Cannot find config entry {}!", entry_name_hash);
+            LogError(LC_CORE, "Cannot find config entry {}!", entry_name_hash);
             return fallback;
         }
 

@@ -29,46 +29,48 @@ void Object::Create(const Ref<PrimitiveMesh>& mesh, const TSRef<Material>& mater
     pMaterial = material;
 }
 
-bool Object::CheckIfReady()
+bool Object::CheckIfReady(bool require_material)
 {
     if ((Flags & eObjectFlags::ReadyToRender) != 0) {
         return true;
     }
 
     // If this is a container object, check that the attached nodes are ready
-    if (!AttachedNodes.IsEmpty()) {
-        // If there is a mesh attached to the container as well, check it
-        if (pMesh) {
-            if (!pMesh->bIsReady) {
-                return (Flags &= ~(eObjectFlags::ReadyToRender)) != 0;
-            }
+    // if (!AttachedNodes.IsEmpty()) {
+    //     // If there is a mesh attached to the container as well, check it
+    //     if (pMesh) {
+    //         if (!pMesh->bIsReady) {
+    //             Flags &= ~(eObjectFlags::ReadyToRender);
+    //             return false;
+    //         }
 
-            Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
-        }
+    //         Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
+    //     }
 
-        if (pMaterial && !pMaterial->IsReady()) {
-            Flags &= ~(eObjectFlags::ReadyToRender);
-            return false;
-        }
+    //     if (pMaterial && !pMaterial->IsReady()) {
+    //         Flags &= ~(eObjectFlags::ReadyToRender);
+    //         return false;
+    //     }
 
-        for (TSRef<Object>& object : AttachedNodes) {
-            if (!object->CheckIfReady()) {
-                Flags &= ~(eObjectFlags::ReadyToRender);
-                return false;
-            }
-        }
+    //     for (TSRef<Object>& object : AttachedNodes) {
+    //         if (!object->CheckIfReady()) {
+    //             Flags &= ~(eObjectFlags::ReadyToRender);
+    //             return false;
+    //         }
+    //     }
 
-        return (Flags |= (eObjectFlags::ReadyToRender)) != 0;
-    }
+    //     Flags |= (eObjectFlags::ReadyToRender);
+    //     return true;
+    // }
 
     // Not a container, ensure there is a material
-    if (!pMaterial || !pMaterial->IsReady()) {
+    if (require_material && (!pMaterial || !pMaterial->IsReady())) {
         Flags &= ~(eObjectFlags::ReadyToRender);
         return false;
     }
 
     // This is not a container object, just check that the mesh is loaded
-    if (!pMesh || !pMesh->bIsReady.load()) {
+    if (!pMesh || !pMesh->bIsReady) {
         Flags &= ~(eObjectFlags::ReadyToRender);
         return false;
     }
@@ -76,11 +78,13 @@ bool Object::CheckIfReady()
     // Dimensions = pMesh->GetDimensions();
     Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
 
-    if (pMesh->VertexList.IsSkinned()) {
+    // TODO: Remove this
+    if (require_material && pMesh->VertexList.IsSkinned()) {
         pMaterial->pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 
-    return (Flags |= (eObjectFlags::ReadyToRender)) != 0;
+    Flags |= (eObjectFlags::ReadyToRender);
+    return true;
 }
 
 
@@ -104,7 +108,7 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
             PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
 
             if (!phys) {
-                LogError("Error creating physics object");
+                LogError(LC_PHYSICS, "Error creating physics object");
                 return;
             }
 
@@ -134,7 +138,7 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
             PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
 
             if (!phys) {
-                LogError("Error creating physics object");
+                LogError(LC_PHYSICS, "Error creating physics object");
                 return;
             }
 
@@ -197,7 +201,7 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
                     }
 
                     if (should_set_default) {
-                        asset->pMaterial->SetDefaultPipeline();
+                        node->pMaterial->SetDefaultPipeline();
                     }
                     else {
                         node->pMaterial->pPipeline = pipeline;
@@ -280,7 +284,7 @@ void Object::Render(const Camera& camera)
         push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
     }
 
-    if (pMaterial && CheckIfReady()) {
+    if (pMaterial && CheckIfReady(true)) {
         // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
         //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
         //                    &push_constants);
@@ -310,6 +314,10 @@ void Object::Render(const Camera& camera)
 
         obj->UpdateIfOutOfDate();
 
+        if (!obj->CheckIfReady(true)) {
+            continue;
+        }
+
         push_constants.ObjectId = ObjectId;
         push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
 
@@ -333,7 +341,7 @@ void Object::RenderUnlit(const Camera& camera)
         return;
     }
 
-    if (pMaterial && !CheckIfReady()) {
+    if (pMaterial && !CheckIfReady(true)) {
         return;
     }
 
@@ -358,7 +366,7 @@ void Object::RenderUnlit(const Camera& camera)
 
         bool material_bound = pMaterial->BindWithPipeline(cmd, *pipeline, false);
         if (!material_bound) {
-            LogWarning("Material not bound!");
+            LogWarning(LC_CORE, "Material not bound!");
             return;
         }
 
@@ -390,7 +398,7 @@ void Object::RenderUnlit(const Camera& camera)
             return;
         }
 
-        if (!obj->CheckIfReady()) {
+        if (!obj->CheckIfReady(true)) {
             return;
         }
 
@@ -401,7 +409,7 @@ void Object::RenderUnlit(const Camera& camera)
 
         bool material_bound = obj->pMaterial->BindWithPipeline(cmd, *pipeline, false);
         if (!material_bound) {
-            LogWarning("Material not bound!");
+            LogWarning(LC_CORE, "Material not bound!");
             return;
         }
 
@@ -412,7 +420,7 @@ void Object::RenderUnlit(const Camera& camera)
 
 void Object::RenderPrimitive(const CommandBuffer& cmd)
 {
-    if (pMesh) {
+    if (pMesh && CheckIfReady(false)) {
         pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
     }
 
@@ -421,7 +429,7 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
     }
 
     for (const TSRef<Object>& node : AttachedNodes) {
-        if (node->pMesh) {
+        if (node->pMesh && node->CheckIfReady(false)) {
             node->pMesh->Render(cmd, (node->mInstanceSlotsInUse + 1)); // + 1 for source object!
         }
     }
@@ -429,7 +437,7 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
 
 void Object::RenderMesh()
 {
-    if (!CheckIfReady()) {
+    if (!CheckIfReady(true)) {
         return;
     }
 
@@ -499,8 +507,6 @@ void Object::AttachObject(const TSRef<Object>& object)
         AttachedNodes.Create(8);
     }
 
-    Dimensions += object->Dimensions;
-
     AttachedNodes.Insert(object);
 }
 
@@ -537,7 +543,7 @@ void Object::SetPhysicsEnabled(bool enabled)
     PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
 
     if (!phys->mbHasPhysicsBody) {
-        LogWarning("Object does not have physics body!");
+        LogWarning(LC_CORE, "Object does not have physics body!");
         return;
     }
 
@@ -556,25 +562,30 @@ void Object::SetPhysicsEnabled(bool enabled)
 
 void Object::PrintDebug() const
 {
-    LogInfo("Object '{}' (Id={}) {{", Name.Get(), ObjectId);
-    LogInfo("\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
+    LogInfo(LC_CORE, "Object '{}' (Id={}) {{", Name.Get(), ObjectId);
+    LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
 
     PhObject* phys = nullptr;
 
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
         bool has_body = phys->mbHasPhysicsBody;
-        LogInfo("\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
+        LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
                 static_cast<bool>((Flags & eObjectFlags::PhysicsEnabled) != 0), phys->GetBodyId().GetIndex(),
                 phys->GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
     }
 
-    LogInfo("\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
+    LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
             static_cast<bool>((Flags & eObjectFlags::IsInstance) != 0),    /* */
             static_cast<bool>((Flags & eObjectFlags::ReadyToRender) != 0), /* */
             static_cast<bool>((Flags & eObjectFlags::ShadowCaster) != 0),  /* */
             (pMesh && pMesh->VertexList.IsSkinned()));
 
-    LogInfo("}}");
+    LogInfo(LC_CORE, "}}");
+
+    LogInfo(LC_CORE, "Attached({}): ", AttachedNodes.Size());
+    for (const TSRef<Object>& obj : AttachedNodes) {
+        obj->PrintDebug();
+    }
 }
 
 

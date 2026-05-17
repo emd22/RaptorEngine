@@ -41,7 +41,7 @@ Vec2u FontAtlas::FindSlot(uint32 width, uint32 height)
     }
 
     if (Cursor.Y + height > AtlasSize.Y) {
-        LogError("Font atlas out of space");
+        LogError(LC_ASSET, "Font atlas out of space");
         return Vec2u(0, 0);
     }
 
@@ -179,7 +179,7 @@ bool Font::LoadFromFile(const String& path, float font_size)
     FT_Face face;
     error = FT_New_Face(library, path.CStr(), 0, &face);
     if (error != 0) {
-        LogError("Failed to load font from file: {}", path);
+        LogError(LC_ASSET, "Failed to load font from file: {}", path);
         FT_Done_FreeType(library);
         return false;
     }
@@ -267,7 +267,7 @@ bool Font::LoadFromMemory(const uint8* data, uint64 data_size, float font_size)
     FT_Face face;
     error = FT_New_Memory_Face(library, data, static_cast<FT_Long>(data_size), 0, &face);
     if (error != 0) {
-        LogError("Failed to load font from memory");
+        LogError(LC_ASSET, "Failed to load font from memory");
         FT_Done_FreeType(library);
         return false;
     }
@@ -302,7 +302,7 @@ void Font::BakeAtlas()
         FT_Error error = FT_Load_Char(Face, char_code, FT_LOAD_RENDER);
 
         if (error != 0) {
-            LogError("Error loading glyph");
+            LogError(LC_ASSET, "Error loading glyph");
             continue;
         }
 

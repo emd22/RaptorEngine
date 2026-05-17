@@ -1,11 +1,14 @@
 #include "State.hpp"
 
+#include "Backend/DescriptorCache.hpp"
 #include "Backend/RenderPass.hpp"
 #include "Backend/VertexDescription.hpp"
 #include "Globals.hpp"
 #include "PipelineCache.hpp"
 #include "RenderStage.hpp"
 #include "ShaderCache.hpp"
+
+#include <algorithm>
 
 namespace fx::renderer {
 
@@ -33,7 +36,7 @@ void State::UseRenderStage(RenderStage& stage)
 }
 
 void State::SetLayout(const PipelineLayout& layout) { mpPipeline->SetLayout(layout); }
-void State::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout2); }
+void State::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout); }
 
 void State::BuildPipeline()
 {
@@ -42,12 +45,12 @@ void State::BuildPipeline()
     }
 
     if (!mpVertexShader.IsValid() || !mpPixelShader.IsValid()) {
-        LogError("Invalid shaders provided");
+        LogError(LC_RENDER, "Invalid shaders provided");
         return;
     }
 
     if (mpRenderPass == nullptr) {
-        LogError("No valid renderpass provided");
+        LogError(LC_RENDER, "No valid renderpass provided");
         return;
     }
 
@@ -65,8 +68,6 @@ void State::BuildPipeline()
     SizedArray<Target> color_only_targets = pOutputTargets->GetTargetByType(eImageAspectFlag::Color);
     SizedArray<VkPipelineColorBlendAttachmentState> blend_attachments = BlendAttachments.GetVkAttachments(
         color_only_targets.Size);
-
-    LogInfo("!! Built pipeline {}", PipelineNameUtil::GetName(mPipelineName));
 
     mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, pOutputTargets->GetDescriptions(),
                        blend_attachments, vertex_ptr, *mpRenderPass, mProperties);
@@ -87,13 +88,47 @@ void State::SetPushConstants(eShaderType type, uint32 pc_size)
 }
 
 
-PipelineLayout State::BuildLayout()
+static Vec2u GetDescriptorIndexRangeForShader(Ref<ShaderProgram>& program)
 {
-    mpPipeline->Layout2 = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
-    return mpPipeline->Layout2;
+    SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
+
+    uint8 min_set = 10;
+    uint8 max_set = 0;
+
+    for (const ShaderReflectionEntry& entry : refl) {
+        max_set = std::max(entry.Set, max_set);
+        min_set = std::min(entry.Set, min_set);
+    }
+
+    return Vec2u(static_cast<uint32>(min_set), static_cast<uint32>(max_set));
 }
 
-void State::AddDescriptor(VkDescriptorSetLayout layout) { mDescriptors.Insert(layout); }
+PipelineLayout State::BuildLayout()
+{
+    // Create the descriptor set layout
+    {
+        // Get the minimum and maximum descriptor sets used by each shader
+        Vec2u vertex_ds_range = GetDescriptorIndexRangeForShader(mpVertexShader);
+        Vec2u pixel_ds_range = GetDescriptorIndexRangeForShader(mpPixelShader);
+
+        Vec2u ds_range_combined = Vec2u(std::min(vertex_ds_range.X, pixel_ds_range.X),
+                                        std::max(vertex_ds_range.Y, pixel_ds_range.Y));
+
+        const uint32 max_ds_index = ds_range_combined.Y;
+        const uint32 min_ds_index = ds_range_combined.X;
+
+        if (max_ds_index >= min_ds_index) {
+            mDescriptors.Size = (max_ds_index - min_ds_index) + 1;
+
+            AddDescriptorsForShaderProgram(mpVertexShader);
+            AddDescriptorsForShaderProgram(mpPixelShader);
+        }
+    }
+
+    mpPipeline->Layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
+    return mpPipeline->Layout;
+}
+
 void State::SetRenderPass(RenderPass* rp) { mpRenderPass = rp; }
 void State::SetOutputTargets(TargetList* targets) { pOutputTargets = targets; }
 
@@ -101,6 +136,19 @@ void State::EndPipeline()
 {
     BuildPipeline();
     Reset();
+}
+
+
+void State::AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program)
+{
+    Vec2u ds_index_range = GetDescriptorIndexRangeForShader(program);
+
+    const SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
+
+    for (int32 ds_index = ds_index_range.X; ds_index <= ds_index_range.Y; ds_index++) {
+        VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
+        mDescriptors[ds_index] = (ds_layout);
+    }
 }
 
 void State::Reset()

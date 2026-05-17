@@ -63,7 +63,7 @@ public:
     SizedArray<TDataType> ReadSection(DataPackEntry* entry)
     {
         if (!entry) {
-            LogWarning("Cannot read section of null entry!");
+            LogWarning(LC_ASSET, "Cannot read section of null entry!");
 
             return SizedArray<TDataType>::CreateEmpty();
         }
@@ -84,7 +84,7 @@ public:
     void ReadSection(DataPackEntry* entry, const Slice<TDataType>& buffer)
     {
         if (!entry) {
-            LogWarning("Cannot read section of null entry!");
+            LogWarning(LC_ASSET, "Cannot read section of null entry!");
 
             return;
         }

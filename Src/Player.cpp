@@ -69,11 +69,10 @@ void Player::Move(float64 delta_time, const Vec3f& offset)
 
 void Player::Update(float64 delta_time)
 {
-    UpdateDirection();
-
     Physics.Update(delta_time);
     SyncPhysicsToPlayer();
 
+    UpdateDirection();
     pCamera->MoveTo(Position + mCameraOffset);
 
     if (bEnableHeadBob && Physics.bIsGrounded) {
@@ -82,8 +81,8 @@ void Player::Update(float64 delta_time)
 
         mBobCounterY += delta_time * counter_speed * body_speed;
 
-        mHeadBobX = 0.009f * cosf(mBobCounterY);
-        mHeadBobY = 0.015f * sinf(mBobCounterY);
+        mHeadBobX = 0.011f * cosf(mBobCounterY + FX_HALF_PI);
+        mHeadBobY = 0.018f * sinf(mBobCounterY);
 
         Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
         pCamera->MoveBy(bob_vector);
@@ -104,6 +103,7 @@ void Player::Update(float64 delta_time)
             pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scWalkingFov, 13.0f, delta_time));
         }
     }
+
     pCamera->Update();
 
     mbUpdatePhysicsTransform = false;

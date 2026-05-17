@@ -31,7 +31,7 @@ struct VSPushConsts
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
-[[vk::binding(0, 2)]] StructuredBuffer<Object> bObjectBuffer;
+F_StructBuffer(bObjectBuffer, Object, 0, 2);
 
 VSOutput main(VSInput input)
 {
@@ -93,7 +93,7 @@ struct Light
     uint1 uiAmbient;
 };
 
-[[vk::binding(4, 0)]] cbuffer FSUniforms
+F_CBuffer(FSUniforms, 4, 0)
 {
     Light Lights[LIGHT_COUNT];
 };

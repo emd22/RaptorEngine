@@ -25,12 +25,13 @@ void Swapchain::Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device)
     bInitialized = true;
 }
 
-void Swapchain::Rebuild(Vec2u new_size, VkSurfaceKHR surface) { 
+void Swapchain::Rebuild(Vec2u new_size, VkSurfaceKHR surface)
+{
     // Wait until the GPU has stopped processing commands and all images are unbound
-    mDevice->WaitForIdle(); 
+    mDevice->WaitForIdle();
 
-    LogInfo("Recreating Swapchain");
-    
+    LogInfo(LC_RENDER, "Recreating Swapchain");
+
     CreateSwapchain(new_size, surface);
     CreateSwapchainImages();
     CreateImageViews();
@@ -119,8 +120,8 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
         image_count = capabilities.maxImageCount;
     }
 
-    LogInfo("Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount, capabilities.maxImageCount,
-            image_count);
+    LogInfo(LC_RENDER, "Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount,
+            capabilities.maxImageCount, image_count);
 
     // Retrieve the image format for the surface (the window's render target)
     {

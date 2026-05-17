@@ -22,8 +22,14 @@ enum eStringId
     // Reflection definitions
     F_REFLECT,
     FR_STRUCTBUFFER,
-    FR_UNIFORMBUFFER,
+    FR_CBUFFER,
     FR_SAMPLER2D,
+
+    F_Texture2D,
+    F_ShadowTexture2D,
+
+    F_StructBuffer,
+    F_CBuffer,
 
     // Test definitions
     F_PARAMTEST,
@@ -39,8 +45,14 @@ static constexpr const char* scStrings[] = {
     // Reflection definitions
     "F_REFLECT",
     "FR_STRUCTBUFFER",
-    "FR_UNIFORMBUFFER",
+    "FR_CBUFFER",
     "FR_SAMPLER2D",
+
+    "F_Texture2D",
+    "F_ShadowTexture2D",
+
+    "F_StructBuffer",
+    "F_CBuffer",
 
     // Test definitions
     "F_PARAMTEST",
@@ -76,13 +88,14 @@ public:
         if (Get() == '\n') {
             ++CurrentLine;
         }
-    };
+    }
+
     void Skip(uint32 skip)
     {
         for (uint32 i = 0; i < skip; i++) {
             NextChar();
         }
-    };
+    }
 
     void NextIfEqual(char p)
     {
@@ -132,19 +145,20 @@ struct PPFuncEntry
 
     PPFuncEntry() = delete;
 
-    PPFuncEntry(const char* name, bool has_parameters, const std::function<FuncType> func)
-        : pName(name), bHasParameters(has_parameters), Func(func)
+    PPFuncEntry(const char* name, bool has_parameters, bool do_not_eat, const std::function<FuncType> func)
+        : pName(name), bHasParameters(has_parameters), bDoNotEat(do_not_eat), Func(func)
     {
     }
 
     const char* pName;
     bool bHasParameters;
+    bool bDoNotEat;
     const std::function<FuncType> Func;
 };
 
 #define REQUIRE_PARAMS(_params, _amt_req)                                                                              \
     if (_params.size() < _amt_req) {                                                                                   \
-        LogError("SHADER: Not enough parameters found in preprocessor function!");                                     \
+        LogError(LC_SHADER, "Not enough parameters found in preprocessor function!");                                  \
         return;                                                                                                        \
     }
 
@@ -160,6 +174,8 @@ static int32 ParamGetInt(const Slice<char>& param)
 
     return value;
 }
+
+static bool ParsePPFuncCall(State& state, Result& result);
 
 /////////////////////////////////////
 // Preprocessor Definitions
@@ -199,26 +215,28 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
 
     const Slice<char>& refl_type = params[0];
 
-    const int32 set = ParamGetInt(params[1]);
-    const int32 binding = ParamGetInt(params[2]);
+    const int32 binding = ParamGetInt(params[1]);
+    const int32 set = ParamGetInt(params[2]);
 
     Hash32 refl_hash = HashData32(refl_type);
-    eEntryType type = eEntryType::StructuredBuffer;
+    eShaderReflectionType type = eShaderReflectionType::StructuredBuffer;
 
     switch (refl_hash) {
     case FHash(FR_STRUCTBUFFER):
-        type = eEntryType::StructuredBuffer;
+        type = eShaderReflectionType::StructuredBuffer;
         break;
-    case FHash(FR_UNIFORMBUFFER):
-        type = eEntryType::UniformBuffer;
-        break;
-    case FHash(FR_SAMPLER2D):
-        type = eEntryType::Sampler2D;
+    case FHash(FR_CBUFFER):
+        type = eShaderReflectionType::CBuffer;
         break;
     default:;
     }
 
-    result.Reflection.emplace_back(type, set, binding);
+    const char* shader_refl_type[] = { "Structured Buffer", "Uniform Buffer", "Texture2D" };
+
+    LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", shader_refl_type[static_cast<uint32>(type)],
+            binding, set);
+
+    result.GetReflection().emplace_back(type, set, binding);
 }
 
 
@@ -234,10 +252,63 @@ static void ParseParamTestDefinition(const std::vector<Slice<char>>& params, Sta
 }
 
 
+static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+    // F_Texture(texture, register_n))
+    REQUIRE_PARAMS(params, 2);
+
+    const Slice<char>& texture_name = params[0];
+    const int32 slot_n = ParamGetInt(params[1]);
+
+    LogInfo(LC_SHADER, "Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
+
+    result.GetReflection().emplace_back(eShaderReflectionType::Texture, 0, slot_n);
+}
+
+static void ParseStructBufferDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+    // F_StructBuffer(name, objtype, binding, set)
+    REQUIRE_PARAMS(params, 4);
+
+    const Slice<char>& buffer_name = params[0];
+    const Slice<char>& objtype = params[1];
+    const int32 binding = ParamGetInt(params[2]);
+    const int32 set = ParamGetInt(params[3]);
+
+    LogInfo(LC_SHADER, "Reflected shader: {} (type={}) at Binding={}, Set={}",
+            String(buffer_name.pData, buffer_name.Size), String(objtype.pData, objtype.Size), binding, set);
+
+    result.GetReflection().emplace_back(eShaderReflectionType::StructuredBuffer, set, binding);
+}
+
+static void ParseCBufferDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+    // F_CBuffer(name, binding, set)
+    REQUIRE_PARAMS(params, 3);
+
+    const Slice<char>& buffer_name = params[0];
+    const int32 binding = ParamGetInt(params[1]);
+    const int32 set = ParamGetInt(params[2]);
+
+    LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", String(buffer_name.pData, buffer_name.Size),
+            binding, set);
+
+    result.GetReflection().emplace_back(eShaderReflectionType::CBuffer, set, binding);
+}
+
 static const PPFuncEntry PPFunctions[] = {
-    PPFuncEntry(FStr(F_PROGRAM), true, ParseProgramDefinition),
-    PPFuncEntry(FStr(F_REFLECT), true, ParseReflectionDefinition),
-    PPFuncEntry(FStr(F_PARAMTEST), true, ParseParamTestDefinition),
+    PPFuncEntry(FStr(F_PROGRAM), true, false, ParseProgramDefinition),
+    PPFuncEntry(FStr(F_REFLECT), true, false, ParseReflectionDefinition),
+    PPFuncEntry(FStr(F_PARAMTEST), true, false, ParseParamTestDefinition),
+
+    // Texture definition macros
+    PPFuncEntry(FStr(F_Texture2D), true, true, ParseTexture2DDefinition),
+    PPFuncEntry(FStr(F_ShadowTexture2D), true, true, ParseTexture2DDefinition),
+
+    // Buffer definition macros
+    PPFuncEntry(FStr(F_StructBuffer), true, true, ParseStructBufferDefinition),
+    PPFuncEntry(FStr(F_CBuffer), true, true, ParseCBufferDefinition),
+
 };
 
 static void WriteCurrentCharToProgram(State& state, Result& result)
@@ -258,6 +329,10 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
 static void WriteUntilHash(State& state, Result& result)
 {
     while (state.Get() != '#') {
+        if (ParsePPFuncCall(state, result)) {
+            continue;
+        }
+
         // Continue saving each character until the condition is closed
         WriteCurrentCharToProgram(state, result);
         state.NextChar();
@@ -406,7 +481,7 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
             }
 
             if (read_index >= scBufferSize) {
-                LogError("ShaderPreproc: Variable index is larger than the allocated buffer size");
+                LogError(LC_SHADER, "Preproc: Variable index is larger than the allocated buffer size");
 
                 // It will cause more issues to break than to just reset the index
                 read_index = 0;
@@ -447,9 +522,12 @@ static bool ParseIfdef(State& state, Result& result, const SizedArray<ShaderMacr
     return false;
 }
 
-static void ParsePPFuncCall(State& state, Result& result)
+static bool ParsePPFuncCall(State& state, Result& result)
 {
     const PPFuncEntry* func = nullptr;
+
+    // The start index before parsing a preprocessor function
+    uint32 origin_index = state.Index;
 
     for (uint32 index = 0; index < std::size(PPFunctions); index++) {
         func = &PPFunctions[index];
@@ -460,6 +538,9 @@ static void ParsePPFuncCall(State& state, Result& result)
 
         func = nullptr;
     }
+
+    bool do_not_eat = (func) ? func->bDoNotEat : false;
+
 
     if (func && func->bHasParameters) {
         state.NextChar(); // Skip LParen
@@ -493,11 +574,25 @@ static void ParsePPFuncCall(State& state, Result& result)
         param_list.push_back(param);
         state.NextChar(); // Skip RParen
 
+        state.NextIfEqual(';');
+
         state.NextIfEqual('\r');
         state.NextIfEqual('\n');
 
+        // After parsing the preprocessor function, emit the call as text if the function is marked to.
+        uint32 final_index = state.Index;
+        if (do_not_eat) {
+            for (state.Index = origin_index; state.Index < final_index;) {
+                WriteCurrentCharToProgram(state, result);
+                state.NextChar();
+            }
+        }
+
         func->Func(param_list, state, result);
+        return true;
     }
+
+    return false;
 }
 
 
@@ -517,7 +612,9 @@ Result Process(const Slice<char>& data, const SizedArray<ShaderMacro>& macros)
             }
         }
 
-        ParsePPFuncCall(state, result);
+        if (ParsePPFuncCall(state, result)) {
+            continue;
+        }
 
         if (state.Get() == '#' && ParseIfdef(state, result, macros, false)) {
             continue;

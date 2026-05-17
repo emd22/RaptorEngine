@@ -123,7 +123,7 @@ public:
 
     SizedArray() = default;
 
-    ~SizedArray() { SizedArray::Free(); }
+    ~SizedArray() { Free(); }
 
 
     void Free()
@@ -151,7 +151,7 @@ public:
 
         pData = nullptr;
         Capacity = 0;
-        Size = 0;   
+        Size = 0;
     }
 
     Iterator begin() const { return Iterator(pData, 0); }
@@ -370,7 +370,7 @@ public:
 
     void Print()
     {
-        eLogChannelText<eLogChannel::Info>();
+        LogSeverityText<eLogSeverity::Info>();
 
         LogDirect("Array: {{ ");
 

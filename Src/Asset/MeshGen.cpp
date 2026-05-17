@@ -90,7 +90,7 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsMesh(renderer::eVertexType vertex_t
     case renderer::eVertexType::Slim:
         return AsSlimMesh();
     default:
-        LogError("Mesh type is not supported!");
+        LogError(LC_ASSET, "Mesh type is not supported!");
     }
 
     return nullptr;
