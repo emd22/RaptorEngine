@@ -94,6 +94,10 @@ static void MakeMaterialTextureForPrimitive(TSRef<Material>& material, MaterialC
 
 void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive)
 {
+    if (object->pMaterial.IsValid()) {
+        return;
+    }
+
     cgltf_material* gltf_material = primitive->material;
 
     if (!gltf_material) {

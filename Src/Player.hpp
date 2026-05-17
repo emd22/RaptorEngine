@@ -115,7 +115,6 @@ private:
     Vec3f mCameraOffset = Vec3f::sZero;
     float32 mHeadBobX = 0.0f;
     float32 mHeadBobY = 0.0f;
-    float32 mBobCounterX = 0.0f;
     float32 mBobCounterY = 0.0f;
 
     bool bBobReverse = false;

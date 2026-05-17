@@ -96,6 +96,8 @@ private:
     void NextEditorMode();
     void SwitchEditorMode(eEditorMode mode);
 
+    void ReloadAllObjects();
+
 public:
     Player Player {};
 

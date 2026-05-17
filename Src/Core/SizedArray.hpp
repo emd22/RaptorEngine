@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include <Core/Allocator.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Engine.hpp>
 #include <cstdlib>
@@ -26,7 +27,8 @@ static inline void NoMemError()
     Terminate();
 }
 
-template <typename TElementType>
+template <typename TElementType, typename TAllocator = StdAllocator>
+    requires C_IsAllocator<TAllocator>
 class SizedArray
 {
 public:

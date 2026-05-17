@@ -86,7 +86,7 @@ private:
 
 struct MaterialProperties
 {
-    alignas(16) Color BaseColor = 0xFFFFFFFFu;
+    alignas(16) Color BaseColor = 0xFF010101u;
 };
 
 class Material
@@ -166,12 +166,15 @@ public:
      */
     uint32 mMaterialPropertiesIndex = UINT32_MAX;
 
+    bool bNearestFiltering : 1 = false;
+
 private:
     renderer::DescriptorSet mDsDefault;
     renderer::DescriptorSet mDsAlbedoOnly;
 
 
     bool mbIsReady : 1 = false;
+    bool mbIsBeingBuilt : 1 = false;
 };
 
 /////////////////////////////////////
@@ -185,11 +188,16 @@ public:
     TSRef<Material> New(const String& name, renderer::Pipeline* pipeline, bool supports_skinning);
 
     renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
+    TSRef<Material> GetNullMaterial();
 
     void Destroy();
 
     ~MaterialManager() { Destroy(); }
 
+private:
+    uint32 GetNewMaterialIndex();
+
+public:
     /**
      * @brief A large GPU buffer containing all loaded in material properties.
      */
@@ -203,9 +211,12 @@ public:
      */
     renderer::DescriptorSet mMaterialPropertiesDS {};
 
+
 private:
     PagedArray<Material> mMaterials;
     renderer::DescriptorPool mDescriptorPool;
+
+    TSRef<Material> mNullMaterial { nullptr };
 
     bool mbInitialized : 1 = false;
 

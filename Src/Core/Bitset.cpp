@@ -2,6 +2,7 @@
 
 namespace fx {
 
+
 uint32 Bitset::Init(uint32 max_bits)
 {
     // 0 0 1 1 1 1 1 1 -> 63 -> 3F
@@ -38,18 +39,7 @@ void Bitset::InitOne(uint32 max_bits)
     }
 }
 
-
-// void Bitset::Set(uint32 index)
-// {
-//     // The index into the int array (index / 64)
-//     const uint16 int_index = (index >> 6);
-
-//     // The mask for the bit that we are querying
-//     const uint64 mask = (1ULL << (index & 0x3F));
-
-//     mBits.Data[int_index] |= mask;
-// }
-
+void Bitset::ClearAll() { memset(mBits.pData, 0, mBits.GetCapacityInBytes()); }
 
 static constexpr uint8 GetBit(uint8 byte, uint8 bit) { return ((byte >> bit) & 0x01); }
 

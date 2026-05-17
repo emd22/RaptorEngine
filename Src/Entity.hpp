@@ -9,7 +9,7 @@
 #include <Renderer/Camera.hpp>
 #include <Renderer/Constants.hpp>
 
-#define FX_VALIDATE_ENTITY_TYPE(TType_) static_assert(C_IsEntity<TType_>);
+#define FX_VALIDATE_ENTITY_TYPE(TType_) static_assert(C_IsEntity<TType_>)
 
 namespace fx {
 

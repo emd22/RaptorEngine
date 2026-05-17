@@ -28,7 +28,8 @@ public:
     ObjectId GenerateObjectId();
     void Submit(ObjectId id, ObjectGpuEntry& entry);
     void Submit(ObjectId id, const Mat4f& model_matrix);
-    void FreeObjectId(ObjectId id);
+    void ReleaseObject(ObjectId id);
+    void ReleaseAllObjects();
 
     void PrintActive(int limit = 20);
 

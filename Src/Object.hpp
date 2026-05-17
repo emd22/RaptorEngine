@@ -160,6 +160,6 @@ private:
 };
 
 
-FX_VALIDATE_ENTITY_TYPE(Object)
+FX_VALIDATE_ENTITY_TYPE(Object);
 
 } // namespace fx

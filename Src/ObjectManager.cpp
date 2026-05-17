@@ -88,7 +88,7 @@ void ObjectManager::Submit(ObjectId object_id, const Mat4f& model_matrix)
 }
 
 
-void ObjectManager::FreeObjectId(ObjectId id)
+void ObjectManager::ReleaseObject(ObjectId id)
 {
     if (id == UINT32_MAX) {
         return;
@@ -99,6 +99,12 @@ void ObjectManager::FreeObjectId(ObjectId id)
     LogInfo(LC_CORE, "Freeing object {} from object manager", id);
 
     mObjectSlotsInUse.Unset(id);
+}
+
+void ObjectManager::ReleaseAllObjects()
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+    mObjectSlotsInUse.ClearAll();
 }
 
 void ObjectManager::PrintActive(int limit)

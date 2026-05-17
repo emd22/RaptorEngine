@@ -99,6 +99,6 @@ public:
 // Entity Validations
 ////////////////////////////////////
 
-FX_VALIDATE_ENTITY_TYPE(LightBase)
+FX_VALIDATE_ENTITY_TYPE(LightBase);
 
 } // namespace fx

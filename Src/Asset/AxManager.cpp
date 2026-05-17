@@ -234,6 +234,10 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::e
 
 void AxManager::CheckForUploadableData()
 {
+    constexpr int32 scMaxUploadsPerTick = 2;
+
+    int32 upload_counter = scMaxUploadsPerTick;
+
     for (auto& worker : mWorkerThreads) {
         // If there are no uploads pending, skip the worker
         if (!worker.bDataPendingUpload.test()) {
@@ -293,8 +297,9 @@ void AxManager::CheckForUploadableData()
 
         worker.bDataPendingUpload.clear();
 
-        // Only upload one object per tick
-        break;
+        if ((--upload_counter) <= 0) {
+            break;
+        }
     }
 }
 

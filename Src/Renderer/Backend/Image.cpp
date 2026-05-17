@@ -90,7 +90,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
                    VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
     Assert(size.X > 0 && size.Y > 0);
- 
+
     // Destroy image if it already has been created
     if (InternalImage != nullptr && Allocation != nullptr) {
         if (View != nullptr) {
@@ -525,8 +525,8 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_for
             cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd);
             TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 6);
 
-            vkCmdCopyImage(cmd.Get(), cubemap.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                           InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.pData);
+            vkCmdCopyImage(cmd.Get(), cubemap.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, InternalImage,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copy_infos.pData);
 
             TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 6);
         });

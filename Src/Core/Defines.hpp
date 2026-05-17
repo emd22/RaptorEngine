@@ -137,3 +137,5 @@
     FX_ENUM_DEFINE_BITWISE_AND(EnumType_)                                                                              \
     FX_ENUM_DEFINE_BITWISE_NOT(EnumType_)                                                                              \
     using EnumType_##Bits = std::underlying_type_t<EnumType_>;
+
+#define FX_UNUSED [[maybe_unused]]

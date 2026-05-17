@@ -180,6 +180,11 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 void Swapchain::CreateSamplers()
 {
     ColorSampler.Create();
+    ColorSamplerNearest.Create(SamplerProps {
+        eSamplerFilter::Nearest,
+        eSamplerFilter::Nearest,
+        eSamplerFilter::Nearest,
+    });
 
     DepthSampler.Create(SamplerProps {
         eSamplerFilter::Nearest,

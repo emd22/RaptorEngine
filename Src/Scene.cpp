@@ -88,6 +88,7 @@ void Scene::Render(Camera* shadow_camera)
 
     gRenderer->BeginGeometry();
 
+
     for (const TSRef<Object>& obj : mObjects) {
         obj->Update();
 

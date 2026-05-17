@@ -31,6 +31,11 @@ public:
     FX_FORCE_INLINE bool Get(uint32 index) const;
     FX_FORCE_INLINE void Unset(uint32 index);
 
+    /**
+     * @brief Sets all bits to zero.
+     */
+    void ClearAll();
+
     void Print();
 
 private:

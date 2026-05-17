@@ -46,8 +46,9 @@ public:
     void SelectPhysicsObject(const JPH::BodyID& body_id);
     PhObjectId GetSelectedPhysicsObject() const { return mSelectedPhysicsObjectId; }
 
-    void Destroy();
+    void ReleaseAllObjects() { mObjects.Clear(); }
 
+    void Destroy();
 
     Ref<PerspectiveCamera>& GetCurrentCamera() { return mpCurrentCamera; }
 

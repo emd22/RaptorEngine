@@ -95,6 +95,16 @@ void FoxtrotGame::InitEngine()
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 }
 
+void FoxtrotGame::ReloadAllObjects()
+{
+    mMainScene.ReleaseAllObjects();
+    gObjectManager->ReleaseAllObjects();
+
+    SceneFile scene_file;
+    const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
+    scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
+}
+
 void FoxtrotGame::CreateLights()
 {
     // Ref<LightPoint> pl = Ref<LightPoint>::New();
@@ -205,12 +215,15 @@ void FoxtrotGame::CreateGame()
     gPhysics->OptimizeBroadPhase();
 
     pSun = mMainScene.GetDirectionalLight();
+
     /*
         pPistolObject = mMainScene.FindObject(HashStr32("Pistol"));
         pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));*/
 
     LoadOffsetsFile();
 
+
+    TSRef<Object> level_object = mMainScene.FindObject(HashStr32("Level"));
 
     gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
     gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
@@ -436,6 +449,10 @@ void FoxtrotGame::ProcessControls()
                         mMainScene);
 
         LoadOffsetsFile();
+    }
+
+    if (ControlManager::IsKeyDown(eKey::FX_KEY_L)) {
+        ReloadAllObjects();
     }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {

@@ -35,39 +35,11 @@ bool Object::CheckIfReady(bool require_material)
         return true;
     }
 
-    // If this is a container object, check that the attached nodes are ready
-    // if (!AttachedNodes.IsEmpty()) {
-    //     // If there is a mesh attached to the container as well, check it
-    //     if (pMesh) {
-    //         if (!pMesh->bIsReady) {
-    //             Flags &= ~(eObjectFlags::ReadyToRender);
-    //             return false;
-    //         }
-
-    //         Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
-    //     }
-
-    //     if (pMaterial && !pMaterial->IsReady()) {
-    //         Flags &= ~(eObjectFlags::ReadyToRender);
-    //         return false;
-    //     }
-
-    //     for (TSRef<Object>& object : AttachedNodes) {
-    //         if (!object->CheckIfReady()) {
-    //             Flags &= ~(eObjectFlags::ReadyToRender);
-    //             return false;
-    //         }
-    //     }
-
-    //     Flags |= (eObjectFlags::ReadyToRender);
-    //     return true;
-    // }
-
     // Not a container, ensure there is a material
-    if (require_material && (!pMaterial || !pMaterial->IsReady())) {
-        Flags &= ~(eObjectFlags::ReadyToRender);
-        return false;
-    }
+    // if (require_material && (!pMaterial || !pMaterial->IsReady())) {
+    //     Flags &= ~(eObjectFlags::ReadyToRender);
+    //     return false;
+    // }
 
     // This is not a container object, just check that the mesh is loaded
     if (!pMesh || !pMesh->bIsReady) {
@@ -245,7 +217,7 @@ void Object::MakeInstanceOf(const TSRef<Object>& source_ref)
     AssertMsg((source.mInstanceSlots - source.mInstanceSlotsInUse) > 0,
               "Object has no instance slots remaining! Did you reserve any instances on the source object?");
 
-    gObjectManager->FreeObjectId(ObjectId);
+    gObjectManager->ReleaseObject(ObjectId);
 
     mpInstanceSource = source_ref;
     Flags |= eObjectFlags::IsInstance;
@@ -275,7 +247,6 @@ void Object::Render(const Camera& camera)
     UpdateIfOutOfDate();
 
     DrawPushConstants push_constants {};
-
     push_constants.ObjectId = ObjectId;
 
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));

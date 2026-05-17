@@ -1,49 +1,63 @@
-// #pragma once
+#pragma once
 
-// #include "Types.hpp"
+#include "Types.hpp"
 
-// #include <concepts>
+#define FX_VALIDATE_ALLOCATOR(TType_) static_assert(C_IsAllocator<TType_>)
 
-// /**
-//  * Concept to determine if a type is an allocator
-//  */
-// template <typename T>
-// concept C_IsAllocator = requires() {
-//     { T::Alloc(0xB00B) };
-//     { T::Free(nullptr) };
-// };
 
-// /**
-//  * Allocates and frees memory using `new` and `delete`.
-//  */
-// template <typename T>
-// class CppAllocator
-// {
-// public:
-//     template <typename... Args>
-//     static T* Alloc(uint32 size, Args... args)
-//     {
-//         return new T[size];
-//     }
+namespace fx {
 
-//     static void Free(T* ptr) { delete[] ptr; }
-// };
+template <typename T>
+concept C_IsAllocator = requires(T t, int* ptr) {
+    // Function requirements
+    { T::AllocRaw(64) } -> std::same_as<void*>;
+    { T::FreeRaw(nullptr) };
+    { T::template Alloc<int>(64) } -> std::same_as<int*>;
+    { T::template Free<int>(ptr) };
+};
 
-// #include "Memory.hpp"
 
-// /**
-//  * Allocated and frees memory on the global memory pool
-//  * @see MemPool
-//  */
-// template <typename T>
-// class GlobalPoolAllocator
-// {
-// public:
-//     template <typename... Args>
-//     static T* Alloc(uint32 size, Args... args)
-//     {
-//         return MemPool::Alloc<T>(size, std::forward<Args>(args)...);
-//     }
+class NullAllocator
+{
+public:
+    static void* AllocRaw(uint32 size) { return nullptr; }
+    static void FreeRaw(FX_UNUSED void* ptr) {}
 
-//     static void Free(T* ptr) { MemPool::Free<T>(ptr); }
-// };
+    template <typename T>
+    static T* Alloc(uint32 size)
+    {
+        return static_cast<T*>(nullptr);
+    };
+
+    template <typename T>
+    static void Free(FX_UNUSED T* ptr)
+    {
+    }
+};
+
+FX_VALIDATE_ALLOCATOR(NullAllocator);
+
+
+class StdAllocator
+{
+public:
+    static void* AllocRaw(uint32 size);
+    static void FreeRaw(void* ptr);
+
+    template <typename T>
+    static T* Alloc(uint32 size)
+    {
+        return static_cast<T*>(AllocRaw(size));
+    };
+
+    template <typename T>
+    static void Free(T* ptr)
+    {
+        Free(reinterpret_cast<void*>(ptr));
+    }
+};
+
+FX_VALIDATE_ALLOCATOR(StdAllocator);
+
+
+} // namespace fx

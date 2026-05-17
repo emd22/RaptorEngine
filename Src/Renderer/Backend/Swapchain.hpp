@@ -46,6 +46,7 @@ public:
     SizedArray<Image> OutputImages;
 
     Sampler ColorSampler;
+    Sampler ColorSamplerNearest;
     Sampler DepthSampler;
     Sampler ShadowDepthSampler;
     Sampler NormalsSampler;

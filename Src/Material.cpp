@@ -59,6 +59,59 @@ void MaterialManager::Create(uint32 entities_per_page)
     mbInitialized = true;
 }
 
+uint32 MaterialManager::GetNewMaterialIndex()
+{
+    uint32 free_material_index = MaterialsInUse.FindNextFreeBit();
+    Assert(free_material_index != Bitset::scNoFreeBits);
+    MaterialsInUse.Set(free_material_index);
+
+    return free_material_index;
+}
+
+#define NM_PINK  255, 80, 203, 255
+#define NM_BLACK 0, 0, 0, 255
+
+TSRef<Material> MaterialManager::GetNullMaterial()
+{
+    std::lock_guard guard(mInUse);
+
+    if (mNullMaterial.IsValid()) {
+        return mNullMaterial;
+    }
+
+    uint32 material_index = GetNewMaterialIndex();
+
+    TSRef<Material> ref = TSRef<Material>::New();
+    ref->Name = "NullMaterial";
+    ref->pPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
+    ref->mMaterialPropertiesIndex = material_index;
+    ref->SetSupportsSkinning(false);
+
+
+    SizedArray<uint8> diffuse_data = {
+        NM_PINK,  NM_PINK,  NM_BLACK, NM_BLACK, /* 0 */
+        NM_PINK,  NM_PINK,  NM_BLACK, NM_BLACK, /* 1 */
+        NM_BLACK, NM_BLACK, NM_PINK,  NM_PINK,  /* 2 */
+        NM_BLACK, NM_BLACK, NM_PINK,  NM_PINK,  /* 3 */
+    };
+
+    TSRef<AxImage> diffuse = TSRef<AxImage>::New();
+    diffuse->Image.CreateGpuOnly(eImageType::Flat, Vec2u(4, 4), eImageFormat::RGBA8_UNorm, diffuse_data);
+    diffuse->MarkAndSignalLoaded();
+
+    ref->Attach(Material::eResourceType::Diffuse, diffuse);
+    ref->Attach(Material::eResourceType::Normal, AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>());
+    ref->Attach(Material::eResourceType::MetallicRoughness, AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>());
+
+    ref->bNearestFiltering = true;
+
+    ref->Build();
+
+    mNullMaterial = ref;
+
+    return ref;
+}
+
 TSRef<Material> MaterialManager::New(const String& name, Pipeline* pipeline, bool supports_skinning)
 {
     std::lock_guard guard(mInUse);
@@ -67,17 +120,13 @@ TSRef<Material> MaterialManager::New(const String& name, Pipeline* pipeline, boo
         Create();
     }
 
-    uint32 free_material_index = MaterialsInUse.FindNextFreeBit();
-    Assert(free_material_index != Bitset::scNoFreeBits);
+    uint32 material_index = GetNewMaterialIndex();
 
     TSRef<Material> ref = TSRef<Material>::New();
-
     ref->Name = name.Str();
     ref->pPipeline = pipeline;
-    ref->mMaterialPropertiesIndex = free_material_index;
+    ref->mMaterialPropertiesIndex = material_index;
     ref->SetSupportsSkinning(supports_skinning);
-
-    MaterialsInUse.Set(free_material_index);
 
     return ref;
 }
@@ -143,6 +192,7 @@ bool Material::BindWithPipeline(CommandBuffer& cmd, Pipeline& pipeline, bool alb
     }
 
     if (!IsReady() || !mDsDefault) {
+        // gMaterialManager->GetNullMaterial()->BindWithPipeline(cmd, pipeline);
         return false;
     }
 
@@ -238,7 +288,12 @@ void Material::Build()
 
     // Fill material descriptor
 
-    mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
+    Sampler* diffuse_sampler = &gRenderer->Swapchain.ColorSampler;
+    if (bNearestFiltering) {
+        diffuse_sampler = &gRenderer->Swapchain.ColorSamplerNearest;
+    }
+
+    mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, diffuse_sampler);
 
     // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
     // not need to.

@@ -112,6 +112,6 @@ void Entity::RecalculateModelMatrix()
     mbMatrixOutOfDate = false;
 }
 
-Entity::~Entity() { gObjectManager->FreeObjectId(ObjectId); }
+Entity::~Entity() { gObjectManager->ReleaseObject(ObjectId); }
 
 } // namespace fx
