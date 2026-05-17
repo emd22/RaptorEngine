@@ -89,8 +89,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    gAssetManager->Start(3);
-
+    gAssetManager->Start(4);
     gMaterialManager->Create();
 
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
@@ -232,9 +231,7 @@ void FoxtrotGame::CreateGame()
     }
 
     CreateLights();
-
     CreateFontObject();
-
 
     while (sbRunning) {
         Tick();

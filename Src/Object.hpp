@@ -57,7 +57,7 @@ public:
     void Render(const Camera& camera);
     void RenderUnlit(const Camera& camera);
 
-    bool CheckIfReady();
+    bool CheckIfReady(bool require_material);
 
     void AttachScript(const Ref<script::FoxScript>& script);
     void LoadScript(const String& path);

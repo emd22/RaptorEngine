@@ -37,9 +37,7 @@ struct VSPushConsts
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
-F_REFLECT(FR_STRUCTBUFFER, 0, 0);
-[[vk::binding(0, 0)]] StructuredBuffer<Object> bObjectBuffer;
-
+F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
 VSOutput main(VSInput input) : SV_POSITION
 {

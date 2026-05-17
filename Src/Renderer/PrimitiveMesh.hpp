@@ -72,11 +72,8 @@ public:
      * @brief Uploads mesh indices to a primtive mesh, and stores the indices without copy if the property
      * `KeepInMemory` is true.
      */
-    void UploadIndices(SizedArray<uint32>&& indices)
-    {
-        GpuIndexBuffer.Create<uint32>(renderer::eGpuBufferType::IndexBuffer, indices);
-        LocalIndexBuffer = std::move(indices);
-    }
+    void UploadIndices() { GpuIndexBuffer.Create<uint32>(renderer::eGpuBufferType::IndexBuffer, LocalIndexBuffer); }
+    void SetIndices(SizedArray<uint32>&& indices) { LocalIndexBuffer = std::move(indices); }
 
     renderer::VertexList& GetVertices()
     {
@@ -107,6 +104,10 @@ public:
     {
         const VkDeviceSize offset = 0;
         //        FrameData* frame = Fwd_GetFrame();
+
+        if (VertexList.GpuBuffer.Buffer == nullptr) {
+            FX_BREAKPOINT;
+        }
 
         vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);

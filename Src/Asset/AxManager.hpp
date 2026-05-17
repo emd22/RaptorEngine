@@ -29,14 +29,6 @@ public:
 
     void SubmitItemToLoad(AxQueueItem&& item)
     {
-        // Wait for item to no longer be busy
-        while (bIsBusy.test()) {
-            bIsBusy.wait(true);
-        }
-
-        // Set busy
-        bIsBusy.test_and_set();
-
         Item = std::move(item);
         ItemReady.SignalDataWritten();
     }
@@ -211,7 +203,7 @@ private:
     void AddWorkerThread();
     void AssetManagerUpdate();
 
-    template <typename TAssetType, typename TLoaderType, eAxType TEnumValue>
+    template <typename TAssetType, typename TLoaderType, eAssetType TEnumValue>
         requires C_IsAsset<TAssetType>
     static void SubmitAssetToLoad(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader, const std::string& path,
                                   const uint8* data = nullptr, uint32 data_size = 0)

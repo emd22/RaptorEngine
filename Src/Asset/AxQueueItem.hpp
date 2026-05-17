@@ -11,7 +11,7 @@
 
 namespace fx {
 
-enum class eAxType
+enum class eAssetType
 {
     None,
     Binary,
@@ -19,16 +19,16 @@ enum class eAxType
     Image,
 };
 
-constexpr const char* AssetTypeToString(eAxType type)
+constexpr const char* AssetTypeToString(eAssetType type)
 {
     switch (type) {
-    case eAxType::None:
+    case eAssetType::None:
         return "None";
-    case eAxType::Binary:
+    case eAssetType::Binary:
         return "Binary";
-    case eAxType::Object:
+    case eAssetType::Object:
         return "Object";
-    case eAxType::Image:
+    case eAssetType::Image:
         return "Image";
     default:;
     }
@@ -63,13 +63,14 @@ struct AxQueueItem
     AxQueueItem() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAxType type, const std::string& path)
+    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAssetType type,
+                const std::string& path)
         : Path(path), pcRawData(nullptr), DataSize(0), AssetType(type), Data(loader, asset)
     {
     }
 
     template <typename TLoaderType, typename TAssetType>
-    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAxType type, const uint8* data,
+    AxQueueItem(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAssetType type, const uint8* data,
                 uint32 data_size)
         : Path(""), pcRawData(data), DataSize(data_size), AssetType(type), Data(loader, asset)
     {
@@ -104,7 +105,7 @@ public:
     const uint8* pcRawData = nullptr;
     uint32 DataSize = 0;
 
-    eAxType AssetType;
+    eAssetType AssetType;
 
 private:
     AxItemData Data;
