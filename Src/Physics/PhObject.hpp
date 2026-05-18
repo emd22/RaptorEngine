@@ -6,7 +6,6 @@
 
 #include <Core/PagedArray.hpp>
 #include <Entity.hpp>
-#include <Material.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 
 namespace fx {

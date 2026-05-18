@@ -3,7 +3,7 @@
 #include "AxLoaderBase.hpp"
 
 #include <Asset/Animation.hpp>
-#include <Material.hpp>
+#include <Material/Material.hpp>
 #include <Object.hpp>
 #include <string>
 

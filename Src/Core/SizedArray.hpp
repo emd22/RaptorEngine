@@ -139,7 +139,7 @@ public:
             element.~TElementType();
         }
 
-#if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
+#ifndef FX_SIZED_ARRAY_NO_MEMPOOL
         if (gEnginePool) {
             gEnginePool->FreeRaw(static_cast<void*>(pData));
         }

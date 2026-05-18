@@ -1,5 +1,7 @@
 #include "Material.hpp"
 
+#include "MaterialManagerFwd.hpp"
+
 #include <vulkan/vulkan.h>
 
 #include <Asset/AxManager.hpp>
@@ -20,129 +22,6 @@ namespace fx {
 
 using namespace renderer;
 
-void MaterialManager::Create(uint32 entities_per_page)
-{
-    if (mbInitialized) {
-        return;
-    }
-
-    mMaterials.Create(entities_per_page);
-
-    MaterialsInUse.InitZero(FX_MAX_MATERIALS);
-
-    DescriptorPool& dp = mDescriptorPool;
-
-    if (!dp.Pool) {
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
-        dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
-        dp.Create(gRenderer->GetDevice(), FX_MAX_MATERIALS);
-    }
-
-    // Material properties buffer descriptors
-    const uint32 material_buffer_size = FX_MAX_MATERIALS;
-
-    MaterialPropertiesBuffer.Create(eGpuBufferType::Storage, sizeof(MaterialProperties) * material_buffer_size,
-                                    VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
-
-
-    if (!mMaterialPropertiesDS.IsInited()) {
-        Assert(gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
-        mMaterialPropertiesDS.Create(dp, gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties, false);
-    }
-
-    mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);
-    mMaterialPropertiesDS.Build();
-
-    Util::SetDebugLabel("Material Properties DS", VK_OBJECT_TYPE_DESCRIPTOR_SET, mMaterialPropertiesDS.Get());
-
-    mbInitialized = true;
-}
-
-uint32 MaterialManager::GetNewMaterialIndex()
-{
-    uint32 free_material_index = MaterialsInUse.FindNextFreeBit();
-    Assert(free_material_index != Bitset::scNoFreeBits);
-    MaterialsInUse.Set(free_material_index);
-
-    return free_material_index;
-}
-
-#define NM_PINK  255, 80, 203, 255
-#define NM_BLACK 0, 0, 0, 255
-
-TSRef<Material> MaterialManager::GetNullMaterial()
-{
-    std::lock_guard guard(mInUse);
-
-    if (mNullMaterial.IsValid()) {
-        return mNullMaterial;
-    }
-
-    uint32 material_index = GetNewMaterialIndex();
-
-    TSRef<Material> ref = TSRef<Material>::New();
-    ref->Name = "NullMaterial";
-    ref->pPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
-    ref->mMaterialPropertiesIndex = material_index;
-    ref->SetSupportsSkinning(false);
-
-
-    SizedArray<uint8> diffuse_data = {
-        NM_PINK,  NM_PINK,  NM_BLACK, NM_BLACK, /* 0 */
-        NM_PINK,  NM_PINK,  NM_BLACK, NM_BLACK, /* 1 */
-        NM_BLACK, NM_BLACK, NM_PINK,  NM_PINK,  /* 2 */
-        NM_BLACK, NM_BLACK, NM_PINK,  NM_PINK,  /* 3 */
-    };
-
-    TSRef<AxImage> diffuse = TSRef<AxImage>::New();
-    diffuse->Image.CreateGpuOnly(eImageType::Flat, Vec2u(4, 4), eImageFormat::RGBA8_UNorm, diffuse_data);
-    diffuse->MarkAndSignalLoaded();
-
-    ref->Attach(Material::eResourceType::Diffuse, diffuse);
-    ref->Attach(Material::eResourceType::Normal, AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>());
-    ref->Attach(Material::eResourceType::MetallicRoughness, AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>());
-
-    ref->bNearestFiltering = true;
-
-    ref->Build();
-
-    mNullMaterial = ref;
-
-    return ref;
-}
-
-TSRef<Material> MaterialManager::New(const String& name, Pipeline* pipeline, bool supports_skinning)
-{
-    std::lock_guard guard(mInUse);
-
-    if (!mMaterials.IsInited()) {
-        Create();
-    }
-
-    uint32 material_index = GetNewMaterialIndex();
-
-    TSRef<Material> ref = TSRef<Material>::New();
-    ref->Name = name.Str();
-    ref->pPipeline = pipeline;
-    ref->mMaterialPropertiesIndex = material_index;
-    ref->SetSupportsSkinning(supports_skinning);
-
-    return ref;
-}
-
-void MaterialManager::Destroy()
-{
-    if (!mbInitialized) {
-        return;
-    }
-
-    MaterialPropertiesBuffer.Destroy();
-
-    mDescriptorPool.Destroy();
-
-    mbInitialized = false;
-}
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
     if (component_.Exists() && !component_.pAssetImage->IsLoaded()) {                                                  \
@@ -172,7 +51,7 @@ DescriptorSet& Material::GetDescriptorSetAlbedoOnly()
         return mDsAlbedoOnly;
     }
 
-    mDsAlbedoOnly.Create(gMaterialManager->GetDescriptorPool(),
+    mDsAlbedoOnly.Create(MaterialManagerFwd::GetDescriptorPool(),
                          gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, false, 1);
 
 
@@ -183,9 +62,9 @@ DescriptorSet& Material::GetDescriptorSetAlbedoOnly()
 }
 
 
-bool Material::Bind(CommandBuffer* cmd) { return BindWithPipeline(*cmd, *pPipeline, false); }
+bool Material::Bind(const CommandBuffer& cmd) { return BindWithPipeline(cmd, *pPipeline, false); }
 
-bool Material::BindWithPipeline(CommandBuffer& cmd, Pipeline& pipeline, bool albedo_only)
+bool Material::BindWithPipeline(const CommandBuffer& cmd, Pipeline& pipeline, bool albedo_only)
 {
     if (!bIsBuilt.load()) {
         Build();
@@ -199,8 +78,8 @@ bool Material::BindWithPipeline(CommandBuffer& cmd, Pipeline& pipeline, bool alb
     pipeline.Bind(cmd);
 
     VkDescriptorSet sets_to_bind[] = {
-        mDsDefault.Get(),                              // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
-        gMaterialManager->mMaterialPropertiesDS.Get(), // Set 1: Material Properties Buffer
+        mDsDefault.Get(),                             // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
+        MaterialManagerFwd::GetDescriptorSet().Get(), // Set 1: Material Properties Buffer
     };
 
     StackArray<uint32, 2> offsets = { 0 };
@@ -219,10 +98,6 @@ void Material::Destroy()
 {
     if (bIsBuilt) {
         bIsBuilt.store(false);
-    }
-
-    if (mMaterialPropertiesIndex != UINT32_MAX) {
-        gMaterialManager->MaterialsInUse.Unset(mMaterialPropertiesIndex);
     }
 }
 
@@ -266,6 +141,14 @@ void Material::SetDefaultPipeline()
     }
 }
 
+void Material::SubmitProperties(const MaterialProperties& properties)
+{
+    MaterialProperties* properties_buffer = static_cast<MaterialProperties*>(
+        MaterialManagerFwd::GetMaterialPropertiesBuffer().pMappedBuffer);
+
+    memcpy(&properties_buffer[ID.GetID()], &properties, sizeof(MaterialProperties));
+}
+
 void Material::Build()
 {
     if (!mDsDefault.IsInited()) {
@@ -275,7 +158,7 @@ void Material::Build()
             layout = gRenderer->pDeferredRenderer->DsLayoutGPassSkinned;
         }
 
-        mDsDefault.Create(gMaterialManager->GetDescriptorPool(), layout, false, 1);
+        mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
     }
 
     // Build components
@@ -316,13 +199,7 @@ void Material::Build()
 
     mDsDefault.Build();
 
-    Assert(mMaterialPropertiesIndex != UINT32_MAX);
-
-    MaterialProperties* materials_buffer = static_cast<MaterialProperties*>(
-        gMaterialManager->MaterialPropertiesBuffer.pMappedBuffer);
-
-    MaterialProperties* material = &materials_buffer[mMaterialPropertiesIndex];
-    material->BaseColor = Properties.BaseColor;
+    SubmitProperties(Properties);
 
     if (!pPipeline) {
         SetDefaultPipeline();

@@ -21,7 +21,7 @@ namespace fx {
 /** The internal reference count for `TSRef`. */
 struct TSRefCount
 {
-    using IntType = std::atomic<uint32>;
+    using IntType = std::atomic<int32>;
     using RefCountType = IntType;
 
     /** Increments the reference count */

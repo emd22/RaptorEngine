@@ -8,6 +8,8 @@
 
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
+#include <Material/Material.hpp>
+#include <Material/MaterialManager.hpp>
 #include <ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Globals.hpp>
@@ -23,10 +25,10 @@ using namespace renderer;
 
 Object::Object() { ObjectId = gObjectManager->GenerateObjectId(); }
 
-void Object::Create(const Ref<PrimitiveMesh>& mesh, const TSRef<Material>& material)
+void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 {
     pMesh = mesh;
-    pMaterial = material;
+    SetMaterialID(material);
 }
 
 bool Object::CheckIfReady(bool require_material)
@@ -52,7 +54,8 @@ bool Object::CheckIfReady(bool require_material)
 
     // TODO: Remove this
     if (require_material && pMesh->VertexList.IsSkinned()) {
-        pMaterial->pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
+        Material* material = gMaterialManager->GetMaterial(mMaterialID);
+        material->pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
     }
 
     Flags |= (eObjectFlags::ReadyToRender);
@@ -157,26 +160,31 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 
             const bool should_set_default = (pipeline == nullptr);
 
-            if (asset->pMaterial) {
+
+            if (!asset->GetMaterialID().IsNull()) {
+                Material* material = gMaterialManager->GetMaterial(asset->mMaterialID);
+
                 if (should_set_default) {
-                    asset->pMaterial->SetDefaultPipeline();
+                    material->SetDefaultPipeline();
                 }
                 else {
-                    asset->pMaterial->pPipeline = pipeline;
+                    material->pPipeline = pipeline;
                 }
             }
 
             if (update_children) {
                 for (TSRef<Object>& node : asset->AttachedNodes) {
-                    if (!node->pMaterial) {
+                    if (!node->GetMaterialID().IsNull()) {
                         continue;
                     }
 
+                    Material* material = gMaterialManager->GetMaterial(node->GetMaterialID());
+
                     if (should_set_default) {
-                        node->pMaterial->SetDefaultPipeline();
+                        material->SetDefaultPipeline();
                     }
                     else {
-                        node->pMaterial->pPipeline = pipeline;
+                        material->pPipeline = pipeline;
                     }
                 }
             }
@@ -239,8 +247,10 @@ void Object::Render(const Camera& camera)
 {
     FrameData* frame = gRenderer->GetFrame();
 
-    if (pMaterial && !pMaterial->bIsBuilt) {
-        pMaterial->Build();
+    Material* material = gMaterialManager->GetMaterial(mMaterialID);
+
+    if (!mMaterialID.IsNull() && !material->bIsBuilt) {
+        material->Build();
         return;
     }
 
@@ -248,21 +258,12 @@ void Object::Render(const Camera& camera)
 
     DrawPushConstants push_constants {};
     push_constants.ObjectId = ObjectId;
-
+    push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
-    if (pMaterial) {
-        push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
-    }
-
-    if (pMaterial && CheckIfReady(true)) {
-        // vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
-        //                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-        //                    &push_constants);
-
-        gRenderer->SubmitPushConstants(frame->CmdBuffer, *pMaterial->pPipeline,
-                                       eShaderType::Vertex | eShaderType::Pixel, push_constants);
-
+    if (CheckIfReady(true)) {
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, *material->pPipeline, eShaderType::Vertex | eShaderType::Pixel,
+                                       push_constants);
 
         RenderMesh();
     }
@@ -272,30 +273,8 @@ void Object::Render(const Camera& camera)
         return;
     }
 
-    // If there are attached objects, then iterate through each and render each
-    // This will use the MVP and uniforms from above
     for (TSRef<Object>& obj : AttachedNodes) {
-        if (!obj->pMaterial) {
-            continue;
-        }
-
-        if (!obj->pMaterial->bIsBuilt) {
-            obj->pMaterial->Build();
-        }
-
-        obj->UpdateIfOutOfDate();
-
-        if (!obj->CheckIfReady(true)) {
-            continue;
-        }
-
-        push_constants.ObjectId = ObjectId;
-        push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
-
-        gRenderer->SubmitPushConstants(frame->CmdBuffer, *obj->pMaterial->pPipeline,
-                                       eShaderType::Vertex | eShaderType::Pixel, push_constants);
-
-        obj->RenderMesh();
+        obj->Render(camera);
     }
 }
 
@@ -305,86 +284,43 @@ void Object::RenderUnlit(const Camera& camera)
         return;
     }
 
+    FrameData* frame = gRenderer->GetFrame();
+
+    Material* material = gMaterialManager->GetMaterial(mMaterialID);
+
+    if (!mMaterialID.IsNull() && !material->bIsBuilt) {
+        material->Build();
+        return;
+    }
+
     UpdateIfOutOfDate();
 
-    if (pMaterial && !pMaterial->bIsBuilt) {
-        pMaterial->Build();
-        return;
-    }
-
-    if (pMaterial && !CheckIfReady(true)) {
-        return;
-    }
-
-
     DrawPushConstants push_constants {};
-    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(GetObjectLayer()).RawData, sizeof(Mat4f));
+    push_constants.ObjectId = ObjectId;
+    push_constants.MaterialIndex = mMaterialID.GetID();
+    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
-    CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
-    Pipeline* pipeline = &gPipelineCache->Request(ePipelineName::Unlit);
-    if (pMaterial && pMaterial->pPipeline) {
-        pipeline = pMaterial->pPipeline;
+
+    if (!gMaterialManager->Bind(frame->CmdBuffer, mMaterialID)) {
+        gMaterialManager->Bind(frame->CmdBuffer, MaterialID::Null);
     }
 
-    pipeline->Bind(cmd);
-
-    if (pMaterial) {
-        push_constants.ObjectId = ObjectId;
-        push_constants.MaterialIndex = pMaterial->GetMaterialIndex();
-
-        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
-
-
-        bool material_bound = pMaterial->BindWithPipeline(cmd, *pipeline, false);
-        if (!material_bound) {
-            LogWarning(LC_CORE, "Material not bound!");
-            return;
-        }
-
-        gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
-                                                       gObjectManager->GetBaseOffset());
-
-        RenderPrimitive(cmd);
-    }
-
-    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                   *gMaterialManager->GetMaterial(mMaterialID)->pPipeline,
                                                    gObjectManager->GetBaseOffset());
+
+    if (CheckIfReady(true)) {
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, *material->pPipeline, eShaderType::Vertex | eShaderType::Pixel,
+                                       push_constants);
+        RenderPrimitive(frame->CmdBuffer);
+    }
 
     if (AttachedNodes.IsEmpty()) {
         return;
     }
 
-
     for (TSRef<Object>& obj : AttachedNodes) {
-        if (!obj->pMaterial) {
-            continue;
-        }
-
-        obj->Update();
-
-        obj->UpdateIfOutOfDate();
-
-        if (obj->pMaterial && !obj->pMaterial->bIsBuilt) {
-            obj->pMaterial->Build();
-            return;
-        }
-
-        if (!obj->CheckIfReady(true)) {
-            return;
-        }
-
-        push_constants.ObjectId = ObjectId;
-        push_constants.MaterialIndex = obj->pMaterial->GetMaterialIndex();
-
-        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex | eShaderType::Pixel, push_constants);
-
-        bool material_bound = obj->pMaterial->BindWithPipeline(cmd, *pipeline, false);
-        if (!material_bound) {
-            LogWarning(LC_CORE, "Material not bound!");
-            return;
-        }
-
-        obj->RenderPrimitive(cmd);
+        obj->RenderUnlit(camera);
     }
 }
 
@@ -395,15 +331,15 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
         pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
     }
 
-    if (AttachedNodes.IsEmpty()) {
-        return;
-    }
+    // if (AttachedNodes.IsEmpty()) {
+    //     return;
+    // }
 
-    for (const TSRef<Object>& node : AttachedNodes) {
-        if (node->pMesh && node->CheckIfReady(false)) {
-            node->pMesh->Render(cmd, (node->mInstanceSlotsInUse + 1)); // + 1 for source object!
-        }
-    }
+    // for (const TSRef<Object>& node : AttachedNodes) {
+    //     if (node->pMesh && node->CheckIfReady(false)) {
+    //         node->pMesh->Render(cmd, (node->mInstanceSlotsInUse + 1)); // + 1 for source object!
+    //     }
+    // }
 }
 
 void Object::RenderMesh()
@@ -412,17 +348,15 @@ void Object::RenderMesh()
         return;
     }
 
-    if (!pMaterial) {
-        return;
-    }
-
     FrameData* frame = gRenderer->GetFrame();
-
     CommandBuffer& cmd = frame->CmdBuffer;
 
-    pMaterial->Bind(&cmd);
+    if (!gMaterialManager->Bind(cmd, mMaterialID)) {
+        gMaterialManager->Bind(cmd, MaterialID::Null);
+    }
 
-    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pMaterial->pPipeline,
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                   *gMaterialManager->GetMaterial(mMaterialID)->pPipeline,
                                                    gObjectManager->GetBaseOffset());
 
     if (pMesh) {
@@ -533,7 +467,7 @@ void Object::SetPhysicsEnabled(bool enabled)
 
 void Object::PrintDebug() const
 {
-    LogInfo(LC_CORE, "Object '{}' (Id={}) {{", Name.Get(), ObjectId);
+    LogInfo(LC_CORE, "Object '{}' (Id={}, Material={}) {{", Name.Get(), ObjectId, mMaterialID);
     LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
 
     PhObject* phys = nullptr;
@@ -565,9 +499,12 @@ void Object::Destroy()
     if (pMesh) {
         pMesh->Destroy();
     }
-    if (pMaterial) {
-        pMaterial->Destroy();
-    }
+
+    // gMaterialManager->DestroyMaterial(mMaterialID);
+
+    // if (pMaterial) {
+    //     pMaterial->Destroy();
+    // }
 
     PhObject* phys = nullptr;
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {

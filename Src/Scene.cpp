@@ -113,7 +113,7 @@ void Scene::Render(Camera* shadow_camera)
     RenderUnlitObjects(camera);
 
     if (bRenderPhysicsObjects) {
-        RenderPhysicsObjects(camera);
+        // RenderPhysicsObjects(camera);
     }
 }
 
@@ -184,11 +184,8 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     // }
 }
 
-
-void Scene::RenderShadows(Camera* shadow_camera)
+void Scene::RenderObjectShadows(const TSRef<Object>& obj)
 {
-    gShadowRenderer->Begin();
-
     ShadowPushConstants consts;
 
     memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
@@ -200,37 +197,49 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
-    for (const TSRef<Object>& obj : mObjects) {
-        if (!obj->IsShadowCaster()) {
-            continue;
-        }
+    if (in_skinned_shader && !obj->IsSkinned()) {
+        pipeline = &gShadowRenderer->GetPipeline();
+        in_skinned_shader = false;
+        pipeline->Bind(cmd);
 
-
-        if (in_skinned_shader && !obj->IsSkinned()) {
-            pipeline = &gShadowRenderer->GetPipeline();
-            in_skinned_shader = false;
-            pipeline->Bind(cmd);
-
-            gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
-                                                           gObjectManager->GetBaseOffset());
-        }
-        if (obj->IsSkinned()) {
-            pipeline = &gShadowRenderer->GetSkinnedPipeline();
-            in_skinned_shader = true;
-            pipeline->Bind(cmd);
-
-            gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
-                                                           gObjectManager->GetBaseOffset());
-        }
-
-        obj->Update();
-
-        consts.ObjectId = obj->ObjectId;
-
-        gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex, consts);
-
-        obj->RenderPrimitive(cmd);
+        gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                                                       gObjectManager->GetBaseOffset());
     }
+    if (obj->IsSkinned()) {
+        pipeline = &gShadowRenderer->GetSkinnedPipeline();
+        in_skinned_shader = true;
+        pipeline->Bind(cmd);
+
+        gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+                                                       gObjectManager->GetBaseOffset());
+    }
+
+    obj->Update();
+
+    consts.ObjectId = obj->ObjectId;
+
+    gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex, consts);
+
+    obj->RenderPrimitive(cmd);
+
+    for (const TSRef<Object>& attached : obj->AttachedNodes) {
+        RenderObjectShadows(attached);
+    }
+}
+
+
+void Scene::RenderShadows(Camera* shadow_camera)
+{
+    gShadowRenderer->Begin();
+
+    // for (const TSRef<Object>& obj : mObjects) {
+    //     if (!obj->IsShadowCaster()) {
+    //         continue;
+    //     }
+
+    //     RenderObjectShadows(obj);
+    // }
+
 
     gShadowRenderer->End();
 }

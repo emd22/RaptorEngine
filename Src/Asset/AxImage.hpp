@@ -28,11 +28,11 @@ public:
             return spEmptyImage;
         }
 
-        PagedArray<TSRef<AxImage>>& empty_images = GetEmptyImagesArray();
+        // PagedArray<TSRef<AxImage>>& empty_images = GetEmptyImagesArray();
 
-        if (!empty_images.IsInited()) {
-            empty_images.Create(10);
-        }
+        // if (!empty_images.IsInited()) {
+        //     empty_images.Create(10);
+        // }
 
         constexpr uint32 pixel_size = renderer::ImageFormatUtil::GetSize(TFormat);
 
@@ -44,7 +44,7 @@ public:
         spEmptyImage->Image.CreateGpuOnly(renderer::eImageType::Flat, Vec2u(1, 1), TFormat, image_data);
         spEmptyImage->MarkAndSignalLoaded();
 
-        empty_images.Insert(spEmptyImage);
+        // empty_images.Insert(spEmptyImage);
 
         return spEmptyImage;
     }

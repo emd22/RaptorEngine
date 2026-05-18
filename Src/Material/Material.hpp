@@ -1,6 +1,13 @@
+/*
+ * File:        Material.hpp
+ * Author:      emd22
+ * Created:     15/07/2025 by emd22
+ * Description:
+ */
+
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include "MaterialID.hpp"
 
 #include <Asset/AxImage.hpp>
 #include <Asset/Fwd/Ax_Fwd_Manager.hpp>
@@ -13,8 +20,6 @@
 
 
 namespace fx {
-
-#define FX_MAX_MATERIALS 512
 
 enum class eMaterialComponentStatus
 {
@@ -126,14 +131,15 @@ public:
     bool IsReady();
 
     void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
-    inline uint32 GetMaterialIndex() { return mMaterialPropertiesIndex; }
+
+    FX_FORCE_INLINE MaterialID GetID() const { return ID; }
 
     /**
      * Binds the material to be used in the given command buffer.
      * @returns True if the material was bound succesfully.
      */
-    bool Bind(renderer::CommandBuffer* cmd);
-    bool BindWithPipeline(renderer::CommandBuffer& cmd, renderer::Pipeline& pipeline, bool albedo_only = false);
+    bool Bind(const renderer::CommandBuffer& cmd);
+    bool BindWithPipeline(const renderer::CommandBuffer& cmd, renderer::Pipeline& pipeline, bool albedo_only = false);
 
     void Build();
 
@@ -141,12 +147,14 @@ public:
     renderer::DescriptorSet& GetDescriptorSetAlbedoOnly();
 
     void SetDefaultPipeline();
+    void SubmitProperties(const MaterialProperties& properties);
 
     void Destroy();
     ~Material() { Destroy(); }
 
 public:
-    //    Ref<AssetImage> DiffuseTexture{nullptr};
+    MaterialID ID = MaterialID::Null;
+
     MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> Diffuse {};
     MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> NormalMap {};
     MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> MetallicRoughness {};
@@ -164,7 +172,7 @@ public:
     /**
      * @brief Offset into `MaterialPropertiesBuffer` for this material.
      */
-    uint32 mMaterialPropertiesIndex = UINT32_MAX;
+    // uint32 mMaterialPropertiesIndex = UINT32_MAX;
 
     bool bNearestFiltering : 1 = false;
 
@@ -177,50 +185,5 @@ private:
     bool mbIsBeingBuilt : 1 = false;
 };
 
-/////////////////////////////////////
-// Material Manager
-/////////////////////////////////////
-
-class MaterialManager
-{
-public:
-    void Create(uint32 materials_per_page = 64);
-    TSRef<Material> New(const String& name, renderer::Pipeline* pipeline, bool supports_skinning);
-
-    renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
-    TSRef<Material> GetNullMaterial();
-
-    void Destroy();
-
-    ~MaterialManager() { Destroy(); }
-
-private:
-    uint32 GetNewMaterialIndex();
-
-public:
-    /**
-     * @brief A large GPU buffer containing all loaded in material properties.
-     */
-    renderer::RawGpuBuffer MaterialPropertiesBuffer {};
-    uint32 NumMaterialsInBuffer = 0;
-
-    Bitset MaterialsInUse;
-
-    /**
-     * @brief Descriptor set for material properties. Used in the light pass.
-     */
-    renderer::DescriptorSet mMaterialPropertiesDS {};
-
-
-private:
-    PagedArray<Material> mMaterials;
-    renderer::DescriptorPool mDescriptorPool;
-
-    TSRef<Material> mNullMaterial { nullptr };
-
-    bool mbInitialized : 1 = false;
-
-    std::mutex mInUse;
-};
 
 } // namespace fx

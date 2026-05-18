@@ -15,7 +15,8 @@
 #include <Core/Ref.hpp>
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
-#include <Material.hpp>
+#include <Material/Material.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
@@ -143,49 +144,50 @@ Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / siz
 
 void FoxtrotGame::CreateFontObject()
 {
-    Vec2f atlas_size = Vec2f(512.0f, 256.0f);
+    // Vec2f atlas_size = Vec2f(512.0f, 256.0f);
 
-    Vec2i glyph_size = Vec2i::sZero;
-    Vec2i glyph_offset = Vec2i::sZero;
+    // Vec2i glyph_size = Vec2i::sZero;
+    // Vec2i glyph_offset = Vec2i::sZero;
 
-    {
-        ConfigFile font_meta;
-        font_meta.Load(FX_BASE_DIR "/Meta.conf");
+    // {
+    //     ConfigFile font_meta;
+    //     font_meta.Load(FX_BASE_DIR "/Meta.conf");
 
-        ConfigEntry* glyphs_entry = font_meta.GetEntry(HashStr32("Glyphs"));
+    //     ConfigEntry* glyphs_entry = font_meta.GetEntry(HashStr32("Glyphs"));
 
-        ConfigEntry* glyph = glyphs_entry->GetMember(HashStr32("65"));
+    //     ConfigEntry* glyph = glyphs_entry->GetMember(HashStr32("65"));
 
-        glyph_size = glyph->GetMemberValue(HashStr32("Size"), Vec2i(5, 5));
-        glyph_offset = glyph->GetMemberValue(HashStr32("Offset"), Vec2i::sZero);
-    }
+    //     glyph_size = glyph->GetMemberValue(HashStr32("Size"), Vec2i(5, 5));
+    //     glyph_offset = glyph->GetMemberValue(HashStr32("Offset"), Vec2i::sZero);
+    // }
 
 
-    TSRef<Object> object = TSRef<Object>::New();
-    object->Name.Set("FontObject");
+    // TSRef<Object> object = TSRef<Object>::New();
+    // object->Name.Set("FontObject");
 
-    MeshGenOptions options { .Scale = 0.5 };
-    options.UvMin = PixelsToUV(glyph_offset, atlas_size);
-    options.UvMax = options.UvMin + PixelsToUV(glyph_size, atlas_size);
+    // MeshGenOptions options { .Scale = 0.5 };
+    // options.UvMin = PixelsToUV(glyph_offset, atlas_size);
+    // options.UvMax = options.UvMin + PixelsToUV(glyph_size, atlas_size);
 
-    Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
-    object->pMesh = quad->AsMesh(eVertexType::Default);
+    // Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
+    // object->pMesh = quad->AsMesh(eVertexType::Default);
 
-    TSRef<Material> material = gMaterialManager->New("Font material", &gPipelineCache->Request(ePipelineName::Unlit),
-                                                     false);
-    TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-                                                    FX_BASE_DIR "/DefaultFont.png");
-    material->Attach(Material::eResourceType::Diffuse, image);
-    object->pMaterial = material;
+    // object->Material = gMaterialManager->NewMaterial("Font material", &gPipelineCache->Request(ePipelineName::Unlit),
+    //                                                  false);
+    // Material* material = gMaterialManager->GetMaterial(object->Material);
 
-    object->SetRenderUnlit(true);
-    object->SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
+    // TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+    //                                                 FX_BASE_DIR "/DefaultFont.png");
+    // material->Attach(Material::eResourceType::Diffuse, image);
 
-    object->MarkReadyToRender();
+    // object->SetRenderUnlit(true);
+    // object->SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
 
-    // mMainScene.Attach(object);
+    // object->MarkReadyToRender();
 
-    object->PrintDebug();
+    // // mMainScene.Attach(object);
+
+    // object->PrintDebug();
 }
 
 void FoxtrotGame::CreateGame()

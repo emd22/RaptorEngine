@@ -6,7 +6,8 @@
 #include <Asset/AxBase.hpp>
 #include <Asset/AxManager.hpp>
 #include <Core/Ref.hpp>
-#include <Material.hpp>
+#include <Material/Material.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Object.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
@@ -76,7 +77,7 @@ void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<Primiti
 }
 
 template <eImageFormat TFormat>
-static void MakeMaterialTextureForPrimitive(TSRef<Material>& material, MaterialComponent<TFormat>& component,
+static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
 {
     Assert(texture_view.texture != nullptr);
@@ -94,7 +95,7 @@ static void MakeMaterialTextureForPrimitive(TSRef<Material>& material, MaterialC
 
 void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive)
 {
-    if (object->pMaterial.IsValid()) {
+    if (object->mMaterialID.IsNull()) {
         return;
     }
 
@@ -104,8 +105,10 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
         return;
     }
 
-    TSRef<Material> material = gMaterialManager->New(
+    object->mMaterialID = gMaterialManager->NewMaterial(
         object->Name.Get(), &gPipelineCache->Request(ePipelineName::Geometry), object->IsSkinned());
+
+    Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
 
     // For some reason the peeber metallic roughness holds our diffuse texture
     if (gltf_material->has_pbr_metallic_roughness) {
@@ -139,8 +142,6 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
     }
 
     material->SetDefaultPipeline();
-
-    object->pMaterial = material;
 }
 
 void AxLoaderGltf::BuildObjectsFromPrimitives(TSRef<Object>& container_object, cgltf_mesh* gltf_mesh)

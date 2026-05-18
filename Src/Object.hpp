@@ -12,7 +12,7 @@
 #include <Core/Ref.hpp>
 #include <Core/TSRef.hpp>
 #include <Entity.hpp>
-#include <Material.hpp>
+#include <Material/MaterialID.hpp>
 #include <ObjectManager.hpp>
 #include <Script/FoxScript.hpp>
 
@@ -48,7 +48,7 @@ public:
 
     void MakeInstanceOf(const TSRef<Object>& source_ref);
 
-    void Create(const Ref<PrimitiveMesh>& mesh, const TSRef<Material>& material);
+    void Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material);
 
     /**
      * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
@@ -59,8 +59,6 @@ public:
 
     bool CheckIfReady(bool require_material);
 
-    void AttachScript(const Ref<script::FoxScript>& script);
-    void LoadScript(const String& path);
 
     void AttachObject(const TSRef<Object>& object);
 
@@ -87,6 +85,31 @@ public:
      */
     void ReserveInstances(uint32 num_instances);
 
+    /////////////////////////////////////
+    // Script
+    /////////////////////////////////////
+
+    void AttachScript(const Ref<script::FoxScript>& script);
+    void LoadScript(const String& path);
+
+    /////////////////////////////////////
+    // Material
+    /////////////////////////////////////
+
+    /**
+     * @brief Returns the ID of the material assigned to this object.
+     */
+    FX_FORCE_INLINE const MaterialID& GetMaterialID() const { return mMaterialID; };
+
+    /**
+     * @brief Sets the material ID for the object.
+     */
+    FX_FORCE_INLINE void SetMaterialID(const MaterialID& id) { mMaterialID = id; };
+
+    /////////////////////////////////////
+    // Physics
+    /////////////////////////////////////
+
     FX_FORCE_INLINE void SetPhysicsId(PhObjectId phys_id) { PhysicsId = phys_id; }
     FX_FORCE_INLINE PhObjectId GetPhysicsId() const { return PhysicsId; }
     void SetPhysicsEnabled(bool enabled);
@@ -94,6 +117,10 @@ public:
 
     FX_FORCE_INLINE void SetObjectLayer(eObjectLayer layer) { mObjectLayer = layer; }
     FX_FORCE_INLINE eObjectLayer GetObjectLayer() const { return mObjectLayer; }
+
+    /////////////////////////////////////
+    // Render options
+    /////////////////////////////////////
 
     FX_FORCE_INLINE void SetShadowCaster(const bool value)
     {
@@ -131,7 +158,6 @@ private:
 
 public:
     Ref<PrimitiveMesh> pMesh { nullptr };
-    TSRef<Material> pMaterial { nullptr };
     PhObjectId PhysicsId = PhObjectIdNull;
 
     Ref<Skeleton> pSkeleton { nullptr };
@@ -148,6 +174,8 @@ public:
     Ref<script::FoxScript> pScript { nullptr };
 
 private:
+    MaterialID mMaterialID = MaterialID::Null;
+
     /// Object slots allocated following this object. Used by other instances of this object.
     uint16 mInstanceSlots = 0;
     uint16 mInstanceSlotsInUse = 0;

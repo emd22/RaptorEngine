@@ -58,6 +58,8 @@ private:
     void RenderUnlitObjects(const Camera& camera) const;
     void RenderPhysicsObjects(const Camera& camera);
 
+    void RenderObjectShadows(const TSRef<Object>& obj);
+
 public:
     Name Name = "(unnamed)";
 
