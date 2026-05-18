@@ -116,16 +116,17 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
             // MakeEmptyMaterialTexture(material, material->Diffuse);
             material->Diffuse.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
 
-            material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+            // material->Properties.BaseColor =
+            // Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
         }
         else {
             MakeMaterialTextureForPrimitive(material, material->Diffuse, texture_view);
-            material->Properties.BaseColor = Color::FromRGBA(1, 1, 1, 255);
+            // material->Properties.BaseColor = Color::FromRGBA(1, 1, 1, 255);
         }
     }
     else {
         // There is no albedo texture on the model, use the base colour.
-        material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+        // material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
     }
 
     // Load the normalmap

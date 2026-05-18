@@ -117,6 +117,7 @@ Material* MaterialManager::GetNewMaterial()
     }
     else {
         material = &mMaterials[material_index];
+        new (material) Material;
     }
 
     MaterialsInUse.Set(material_index);
@@ -128,6 +129,8 @@ Material* MaterialManager::GetNewMaterial()
 Material* MaterialManager::GetMaterial(const MaterialID& id)
 {
     std::lock_guard guard(mInUse);
+
+    Assert(MaterialsInUse.Get(id.GetID()) == true);
 
     return &mMaterials[id.GetID()];
 }

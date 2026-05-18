@@ -515,6 +515,8 @@ void Object::Destroy()
     //     pMaterial->Destroy();
     // }
 
+    // gMaterialManager->DestroyMaterial(mMaterialID);
+
     PhObject* phys = nullptr;
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
         phys->DestroyPhysicsBody();

@@ -98,8 +98,8 @@ void FoxtrotGame::InitEngine()
 
 void FoxtrotGame::ReloadAllObjects()
 {
-    mMainScene.ReleaseAllObjects();
-    gObjectManager->ReleaseAllObjects();
+    mMainScene.Destroy();
+    mMainScene.Create();
 
     SceneFile scene_file;
     const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
@@ -453,9 +453,9 @@ void FoxtrotGame::ProcessControls()
         LoadOffsetsFile();
     }
 
-    if (ControlManager::IsKeyDown(eKey::FX_KEY_L)) {
-        ReloadAllObjects();
-    }
+    // if (ControlManager::IsKeyDown(eKey::FX_KEY_L)) {
+    //     ReloadAllObjects();
+    // }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
         pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
@@ -575,8 +575,6 @@ void FoxtrotGame::DestroyGame()
     fx::LogInfo("=========================");
 
     gRenderer->GetDevice()->WaitForIdle();
-
-    gMaterialManager->Destroy();
 
     delete gShadowRenderer;
     gShadowRenderer = nullptr;

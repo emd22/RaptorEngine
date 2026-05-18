@@ -124,6 +124,8 @@ void Material::Destroy()
     if (bIsBuilt) {
         bIsBuilt.store(false);
     }
+
+    MaterialManagerFwd::DestroyMaterial(ID);
 }
 
 

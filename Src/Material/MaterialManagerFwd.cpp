@@ -1,5 +1,6 @@
 #include "MaterialManagerFwd.hpp"
 
+#include "MaterialID.hpp"
 #include "MaterialManager.hpp"
 
 #include <Renderer/Globals.hpp>
@@ -11,6 +12,7 @@ namespace MaterialManagerFwd {
 renderer::DescriptorPool& GetDescriptorPool() { return gMaterialManager->GetDescriptorPool(); }
 renderer::DescriptorSet& GetDescriptorSet() { return gMaterialManager->mMaterialPropertiesDS; }
 renderer::RawGpuBuffer& GetMaterialPropertiesBuffer() { return gMaterialManager->MaterialPropertiesBuffer; }
+void DestroyMaterial(const MaterialID& id) { gMaterialManager->DestroyMaterial(id); }
 
 } // namespace MaterialManagerFwd
 
