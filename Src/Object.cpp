@@ -247,12 +247,15 @@ void Object::Render(const Camera& camera)
 {
     FrameData* frame = gRenderer->GetFrame();
 
-    Material* material = gMaterialManager->GetMaterial(mMaterialID);
+    MaterialID material_id = MaterialID::Null;
 
-    if (!mMaterialID.IsNull() && !material->bIsBuilt) {
-        material->Build();
-        return;
-    }
+    // const bool use_null_material = mMaterialID.IsNull();
+    Material* material = gMaterialManager->GetMaterial(material_id);
+
+    // if (!use_null_material && !material->bIsBuilt) {
+    //     material->Build();
+    //     return;
+    // }
 
     UpdateIfOutOfDate();
 
@@ -286,12 +289,15 @@ void Object::RenderUnlit(const Camera& camera)
 
     FrameData* frame = gRenderer->GetFrame();
 
-    Material* material = gMaterialManager->GetMaterial(mMaterialID);
+    MaterialID material_id = MaterialID::Null;
 
-    if (!mMaterialID.IsNull() && !material->bIsBuilt) {
-        material->Build();
-        return;
-    }
+    // bool use_null_material = mMaterialID.IsNull();
+    Material* material = gMaterialManager->GetMaterial(material_id);
+
+    // if (!use_null_material && !material->bIsBuilt) {
+    //     material->Build();
+    //     use_null_material = true;
+    // }
 
     UpdateIfOutOfDate();
 
@@ -351,12 +357,15 @@ void Object::RenderMesh()
     FrameData* frame = gRenderer->GetFrame();
     CommandBuffer& cmd = frame->CmdBuffer;
 
-    if (!gMaterialManager->Bind(cmd, mMaterialID)) {
+    MaterialID material_id = mMaterialID;
+
+
+    if (!gMaterialManager->Bind(cmd, material_id)) {
         gMaterialManager->Bind(cmd, MaterialID::Null);
     }
 
     gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                   *gMaterialManager->GetMaterial(mMaterialID)->pPipeline,
+                                                   *gMaterialManager->GetMaterial(material_id)->pPipeline,
                                                    gObjectManager->GetBaseOffset());
 
     if (pMesh) {

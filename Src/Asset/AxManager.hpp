@@ -54,7 +54,7 @@ public:
 
     DataNotifier ItemReady;
 
-    std::atomic_bool bRunning = true;
+    std::atomic_bool bRunning = { true };
 
     std::atomic_flag bIsBusy = ATOMIC_FLAG_INIT;
     std::atomic_flag bDataPendingUpload = ATOMIC_FLAG_INIT;

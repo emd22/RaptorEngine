@@ -20,11 +20,6 @@
 FX_SET_MODULE_NAME("Main")
 
 
-static void N_PrintX(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::FoxValue>& args)
-{
-    fx::LogInfo(fx::LC_SCRIPT, "Printed Value: {}", args[0].Get<fx::int32>());
-}
-
 int main()
 {
     fx::gEnginePool = new fx::MemPool;
@@ -32,22 +27,6 @@ int main()
 
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 1024 * 2);
-
-    { // fx::script::FoxScript script;
-
-        // script.Load(FX_BASE_DIR "/Scripts/Test.fox");
-        // script.RegisterProc(fx::HashStr32("PrintX"), false, 1, &N_PrintX);
-
-        // fx::script::FoxSymbol* sym = script.GetSymbol(fx::HashStr32("Init"));
-
-        // if (!sym) {
-        //     fx::LogError("Cannot find symbol!");
-        // }
-        // fx::script::FoxValue result = script.CallProc(sym, {});
-
-        // fx::LogInfo("result: {}", result);
-    }
-
 
     fx::renderer::Globals::Init();
 
@@ -69,6 +48,5 @@ int main()
             delete fx::gEnginePool;
             fx::gEnginePool = nullptr;
         });
-
     return 0;
 }

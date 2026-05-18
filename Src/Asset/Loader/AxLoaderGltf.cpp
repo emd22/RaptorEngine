@@ -20,8 +20,6 @@ namespace fx {
 
 using namespace renderer;
 
-TSRef<AxImage> LoadTexture(const TSRef<Material>& material, const cgltf_texture_view& texture_view);
-
 void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<PrimitiveMesh>& mesh,
                                         cgltf_primitive* primitive)
 {
@@ -95,9 +93,9 @@ static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponen
 
 void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive)
 {
-    if (object->mMaterialID.IsNull()) {
-        return;
-    }
+    // if (!object->mMaterialID.IsNull()) {
+    //     return;
+    // }
 
     cgltf_material* gltf_material = primitive->material;
 

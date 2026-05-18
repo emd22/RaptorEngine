@@ -12,7 +12,7 @@ struct MaterialID
     static const MaterialID Null;
 
 public:
-    MaterialID() = delete;
+    MaterialID() = default;
     MaterialID(IDType id) : ID(id) {}
     MaterialID(const MaterialID& other) : ID(other.ID) {}
 
@@ -27,7 +27,7 @@ public:
     FX_FORCE_INLINE bool IsNull() const { return ID == 0; }
 
 public:
-    IDType ID;
+    IDType ID = 0;
 };
 
 

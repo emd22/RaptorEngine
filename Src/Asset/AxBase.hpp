@@ -79,18 +79,18 @@ public:
 
 public:
     DataNotifier IsFinishedNotifier;
-    std::atomic_bool bIsUploadedToGpu = false;
+    std::atomic_bool bIsUploadedToGpu = { false };
 
 protected:
     friend class AxLoaderGltf;
 
-    std::vector<OnLoadFunc> mOnLoadedCallbacks;
 
     std::mutex mCallbackMutex;
 
-    // OnLoadFunc mOnLoadedCallback = nullptr;
+    std::vector<OnLoadFunc> mOnLoadedCallbacks;
     OnErrorFunc mOnErrorCallback = nullptr;
-    std::atomic_bool mIsLoaded = false;
+
+    std::atomic_bool mIsLoaded = { false };
 
     friend class AxManager;
 };

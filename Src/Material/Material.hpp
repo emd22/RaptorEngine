@@ -36,10 +36,6 @@ template <renderer::eImageFormat TFormat>
 struct MaterialComponent
 {
 public:
-public:
-    TSRef<AxImage> pAssetImage { nullptr };
-    Slice<const uint8> pDataToLoad { nullptr };
-
     using Status = eMaterialComponentStatus;
 
 public:
@@ -57,6 +53,16 @@ public:
         }
 
         return Status::Ready;
+    }
+
+    MaterialComponent& operator=(const MaterialComponent& other)
+    {
+        pAssetImage = other.pAssetImage;
+
+        pDataToLoad.pData = other.pDataToLoad.pData;
+        pDataToLoad.Size = other.pDataToLoad.Size;
+
+        return *this;
     }
 
     bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr); }
@@ -83,6 +89,10 @@ private:
 
         return true;
     }
+
+public:
+    TSRef<AxImage> pAssetImage { nullptr };
+    Slice<const uint8> pDataToLoad { nullptr };
 };
 
 /////////////////////////////////////
@@ -107,7 +117,7 @@ public:
     };
 
 public:
-    Material() = default;
+    Material() { Properties.BaseColor = 0xFF010101u; }
 
     void Attach(eResourceType type, const TSRef<AxImage>& image)
     {
@@ -149,6 +159,8 @@ public:
     void SetDefaultPipeline();
     void SubmitProperties(const MaterialProperties& properties);
 
+    Material& operator=(const Material& other);
+
     void Destroy();
     ~Material() { Destroy(); }
 
@@ -165,7 +177,7 @@ public:
 
     renderer::Pipeline* pPipeline = nullptr;
 
-    std::atomic_bool bIsBuilt { false };
+    std::atomic_bool bIsBuilt = { false };
 
     bool bSupportsSkinning = false;
 

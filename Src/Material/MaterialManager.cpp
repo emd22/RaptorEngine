@@ -14,6 +14,8 @@ const MaterialID MaterialID::Null = MaterialID(0);
 
 void MaterialManager::Create()
 {
+    std::lock_guard guard(mInUse);
+
     if (mbInitialized) {
         return;
     }
@@ -104,12 +106,13 @@ Material* MaterialManager::GetNewMaterial()
 {
     uint32 material_index = MaterialsInUse.FindNextFreeBit();
     Assert(material_index != Bitset::scNoFreeBits);
-
     Assert(material_index != 0);
 
     Material* material;
 
-    if (material_index > mMaterials.Size) {
+    if (material_index >= mMaterials.Size) {
+        LogInfo(LC_CORE, "Adding new material {}", material_index);
+        Assert(mMaterials.Size == material_index);
         material = mMaterials.Insert();
     }
     else {

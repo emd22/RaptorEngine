@@ -217,7 +217,7 @@ public:
 
     SizedArray<MeshBone> Bones;
 
-    std::atomic_bool bIsReady = std::atomic_bool(false);
+    std::atomic_bool bIsReady = { false };
 
     bool bIsReference = false;
     bool bKeepInMemory = false;

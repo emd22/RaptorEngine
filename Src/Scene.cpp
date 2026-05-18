@@ -109,11 +109,10 @@ void Scene::Render(Camera* shadow_camera)
         light->Render(camera, shadow_camera);
     }
 
-
     RenderUnlitObjects(camera);
 
     if (bRenderPhysicsObjects) {
-        // RenderPhysicsObjects(camera);
+        RenderPhysicsObjects(camera);
     }
 }
 
@@ -232,13 +231,13 @@ void Scene::RenderShadows(Camera* shadow_camera)
 {
     gShadowRenderer->Begin();
 
-    // for (const TSRef<Object>& obj : mObjects) {
-    //     if (!obj->IsShadowCaster()) {
-    //         continue;
-    //     }
+    for (const TSRef<Object>& obj : mObjects) {
+        if (!obj->IsShadowCaster()) {
+            continue;
+        }
 
-    //     RenderObjectShadows(obj);
-    // }
+        RenderObjectShadows(obj);
+    }
 
 
     gShadowRenderer->End();

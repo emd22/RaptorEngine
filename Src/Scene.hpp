@@ -63,7 +63,7 @@ private:
 public:
     Name Name = "(unnamed)";
 
-    bool bRenderPhysicsObjects = true;
+    bool bRenderPhysicsObjects = false;
 
 private:
     PagedArray<TSRef<Object>> mObjects;

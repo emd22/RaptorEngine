@@ -210,7 +210,7 @@ public:
 
     bool operator==(nullptr_t np) const noexcept { return mpPtr == nullptr; }
 
-    operator bool() const noexcept { return mpPtr != nullptr; }
+    explicit operator bool() const noexcept { return mpPtr != nullptr; }
 
     bool IsValid() const noexcept { return mpPtr != nullptr && mpRefCnt != nullptr; }
 

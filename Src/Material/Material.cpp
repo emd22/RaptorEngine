@@ -94,6 +94,31 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, Pipeline& pipeline, bo
     return true;
 }
 
+Material& Material::operator=(const Material& other)
+{
+    ID = other.ID;
+
+    Diffuse = other.Diffuse;
+    NormalMap = other.NormalMap;
+    MetallicRoughness = other.MetallicRoughness;
+
+    Properties = other.Properties;
+
+    Name = other.Name;
+
+    pPipeline = other.pPipeline;
+
+    bIsBuilt = false;
+
+    bSupportsSkinning = other.bSupportsSkinning;
+    bNearestFiltering = other.bNearestFiltering;
+
+    mbIsReady = false;
+    mbIsBeingBuilt = false;
+
+    return *this;
+}
+
 void Material::Destroy()
 {
     if (bIsBuilt) {
@@ -163,10 +188,7 @@ void Material::Build()
 
     // Build components
     BUILD_MATERIAL_COMPONENT(Diffuse);
-
     BUILD_MATERIAL_COMPONENT(NormalMap);
-
-    // MetallicRoughness.Build();
     BUILD_MATERIAL_COMPONENT(MetallicRoughness);
 
     // Fill material descriptor

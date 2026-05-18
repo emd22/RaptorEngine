@@ -164,7 +164,7 @@ public:
 
     void* pMappedBuffer = nullptr;
 
-    std::atomic_bool Initialized = false;
+    std::atomic_bool Initialized = { false };
     uint64 Size = 0;
 
 private:
