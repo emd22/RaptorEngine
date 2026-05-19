@@ -20,6 +20,8 @@ std::string DirCurrent();
 PagedArray<std::string> DirListIfHasExtension(const char* path, const std::string& required_extension,
                                               bool return_filename_only);
 
+void DirCreate(const char* path);
+
 
 }; // namespace FilesystemIO
 

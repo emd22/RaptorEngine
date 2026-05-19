@@ -62,8 +62,8 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
 }
 
 
-AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const SizedArray<uint8>& data,
-                                             const Vec2u& size, const String& path, eImageSaveFlags flags)
+AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
+                                             const String& path, eImageSaveFlags flags)
 {
     if ((flags & eImageSaveFlags::FlipY) != 0) {
         stbi_flip_vertically_on_write(1);

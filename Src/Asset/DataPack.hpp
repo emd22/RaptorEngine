@@ -7,6 +7,12 @@
 
 namespace fx {
 
+enum class eDataPackMode
+{
+    Read,
+    Write,
+};
+
 class File;
 
 struct DataPackEntry
@@ -42,6 +48,8 @@ public:
     uint32 DataSize = 0;
 
     SizedArray<uint8> Data;
+
+    bool bIsRead = false;
 };
 
 class DataPack
@@ -51,6 +59,7 @@ class DataPack
 public:
     DataPack() = default;
     DataPack(const DataPack& other) = delete;
+    DataPack(eDataPackMode mode, const char* path);
 
     void AddEntry(Hash64 id, const Slice<uint8>& data);
 
@@ -74,6 +83,7 @@ public:
 
         File.SeekTo(entry->DataOffset);
         File.Read(Slice<TDataType>(arr));
+        entry->bIsRead = true;
 
         return std::move(arr);
     }
@@ -94,6 +104,7 @@ public:
 
         File.SeekTo(entry->DataOffset);
         File.Read(Slice<TDataType>(buffer.pData, read_size));
+        entry->bIsRead = true;
     }
 
     void ReadAllEntries() { BinaryReadAllData(); }

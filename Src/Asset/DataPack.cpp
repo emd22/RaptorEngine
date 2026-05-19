@@ -25,14 +25,17 @@ static const uint16 scBinHeaderEnd = 0x2B1A;
  * ENTRY N DATA
  */
 
-
-// static constexpr uint16 scByteAlignment = 16;
-// static constexpr uint8 scEntryStart[2] = { 0xFE, 0xED };
-
-// void DataPack::AddEntry(const Slice<uint8>& identifier, const Slice<uint8>& data)
-// {
-//     AddEntry(HashData64(MakeSlice<uint8>(identifier.pData, identifier.Size)), data);
-// }
+DataPack::DataPack(eDataPackMode mode, const char* path)
+{
+    switch (mode) {
+    case eDataPackMode::Read:
+        ReadFromFile(path);
+        break;
+    case eDataPackMode::Write:
+        WriteToFile(path);
+        break;
+    }
+}
 
 void DataPack::AddEntry(Hash64 id, const Slice<uint8>& data)
 {
@@ -117,14 +120,13 @@ bool DataPack::BinaryReadHeader()
 void DataPack::BinaryWriteHeader()
 {
     uint32 header_size = 0;
-    for (DataPackEntry& _ : Entries) {
-        constexpr int cSizeOfEntry = sizeof(uint64) + sizeof(uint32) +
-                                     sizeof(uint32); // identifier_hash, offset, data_size
-        header_size += cSizeOfEntry;
-    }
+
+    // identifier_hash, offset, data_size
+    constexpr int cSizeOfEntry = sizeof(uint64) + sizeof(uint32) + sizeof(uint32);
+    header_size += cSizeOfEntry * Entries.Size();
 
     // Header start(uint16), entry count (uint16), header end(uint16)
-    header_size += 6;
+    header_size += (sizeof(uint16) * 3);
 
     uint32 offset = header_size;
 
@@ -155,7 +157,6 @@ void DataPack::BinaryReadAllData()
         BinaryReadHeader();
     }
 
-    LogDebug("Reading all data...\n");
     for (DataPackEntry& entry : Entries) {
         entry.Data = ReadSection<uint8>(&entry);
     }

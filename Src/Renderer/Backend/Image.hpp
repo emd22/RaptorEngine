@@ -44,7 +44,7 @@ FxEnumFlags(eImageCreateFlags);
 
 namespace renderer {
 
-enum class eImageFormat
+enum class eImageFormat : uint16
 {
     None,
 

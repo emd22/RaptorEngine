@@ -8,7 +8,7 @@
 #include <Asset/AxManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Font/Font.hpp>
-#include <Asset/MipmapFile.hpp>
+#include <Asset/MipmapGen.hpp>
 #include <Asset/SceneFile.hpp>
 #include <Controls.hpp>
 #include <Core/Defer.hpp>
@@ -254,13 +254,14 @@ void FoxtrotGame::CreateGame()
                                                        eImageCreateFlags::KeepInMemory);
     test_img->WaitUntilLoaded();
 
-    MipmapFile mm;
-    mm.GenerateMips(test_img->Image.ImageData, test_img->Image.Size);
+    MipmapGen mm;
+    // mm.GenerateMipmaps(eImageFormat::RGBA8_UNorm, test_img->Image.ImageData, test_img->Image.Size);
+    mm.ExportMipmaps("TestMips.bin", "TestMipsExport");
 
-    DataPack dp;
-    dp.ReadFromFile("TestMips.bin");
-    dp.PrintInfo();
-    dp.Close();
+    // DataPack dp;
+    // dp.ReadFromFile("TestMips.bin");
+    // dp.PrintInfo();
+    // dp.Close();
 
     while (sbRunning) {
         Tick();

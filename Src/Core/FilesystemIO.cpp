@@ -57,4 +57,6 @@ PagedArray<std::string> DirListIfHasExtension(const char* path, const std::strin
     return file_paths;
 }
 
+void DirCreate(const char* path) { std::filesystem::create_directory(path); }
+
 }; // namespace fx::FilesystemIO
