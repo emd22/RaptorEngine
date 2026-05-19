@@ -231,13 +231,17 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
 }
 
 
-void Image::CreateGpuOnly(eImageType image_type, const Vec2u& size, eImageFormat format,
-                          const SizedArray<uint8>& image_data)
+void Image::CreateFromData(eImageType image_type, const Vec2u& size, eImageFormat format,
+                           const SizedArray<uint8>& image_data, eImageCreateFlags flags)
 {
     RawGpuBuffer staging_buffer;
     staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
                           eGpuBufferFlags::TransferReceiver);
     staging_buffer.Upload(image_data);
+
+    if ((flags & eImageCreateFlags::KeepInMemory) != 0) {
+        ImageData.CloneFrom(image_data);
+    }
 
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);

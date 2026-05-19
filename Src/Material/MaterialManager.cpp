@@ -86,8 +86,8 @@ void MaterialManager::MakeNullMaterial()
     };
 
     TSRef<AxImage> diffuse = TSRef<AxImage>::New();
-    diffuse->Image.CreateGpuOnly(renderer::eImageType::Flat, Vec2u(4, 4), renderer::eImageFormat::RGBA8_UNorm,
-                                 diffuse_data);
+    diffuse->Image.CreateFromData(renderer::eImageType::Flat, Vec2u(4, 4), renderer::eImageFormat::RGBA8_UNorm,
+                                  diffuse_data, eImageCreateFlags::None);
     diffuse->MarkAndSignalLoaded();
 
     material->Attach(Material::eResourceType::Diffuse, diffuse);

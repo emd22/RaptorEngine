@@ -41,7 +41,8 @@ public:
         image_data.MarkFull();
 
         spEmptyImage = TSRef<AxImage>::New();
-        spEmptyImage->Image.CreateGpuOnly(renderer::eImageType::Flat, Vec2u(1, 1), TFormat, image_data);
+        spEmptyImage->Image.CreateFromData(renderer::eImageType::Flat, Vec2u(1, 1), TFormat, image_data,
+                                           eImageCreateFlags::None);
         spEmptyImage->MarkAndSignalLoaded();
 
         // empty_images.Insert(spEmptyImage);

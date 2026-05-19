@@ -88,19 +88,14 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
     Assert(data != nullptr);
 
     jpeg_mem_src(&mJpegInfo, data, size);
-
     jpeg_read_header(&mJpegInfo, true);
-
 
     const uint32 num_components = ImageFormatUtil::GetSize(ImageFormat);
 
     J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
-
     mJpegInfo.out_color_space = color_space;
 
     jpeg_start_decompress(&mJpegInfo);
-
-    printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
     image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
@@ -124,10 +119,22 @@ void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
 {
     TSRef<AxImage> image(asset);
 
-    image->Image.CreateGpuOnly(image->ImageType, image->Size, ImageFormat, mImageData);
+    const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
-    asset->bIsUploadedToGpu = true;
-    asset->bIsUploadedToGpu.notify_all();
+    // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
+    image->Image.CreateFromData(image->ImageType, image->Size, ImageFormat, mImageData,
+                                (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
+
+    if (should_save_data) {
+        image->Image.ImageData = std::move(mImageData);
+
+        // Set image data to null to avoid it being destroyed.
+        mImageData.pData = nullptr;
+        mImageData.Size = 0;
+    }
+
+    image->bIsUploadedToGpu = true;
+    image->bIsUploadedToGpu.notify_all();
 }
 
 void AxLoaderJpeg::Destroy(TSRef<AxBase>& asset)

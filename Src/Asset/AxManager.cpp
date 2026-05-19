@@ -189,7 +189,7 @@ void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& ass
 
 
 void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
-                          const std::string& path)
+                          const std::string& path, eImageCreateFlags flags)
 {
     bool is_jpeg = IsFileJpeg(path);
 
@@ -197,6 +197,7 @@ void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageForma
         TSRef<AxLoaderJpeg> loader = TSRef<AxLoaderJpeg>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
+        loader->CreationFlags = flags;
 
         SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAssetType::Image>(asset, loader, path);
     }
@@ -204,6 +205,7 @@ void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageForma
         TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
+        loader->CreationFlags = flags;
 
         SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetType::Image>(asset, loader, path);
     }

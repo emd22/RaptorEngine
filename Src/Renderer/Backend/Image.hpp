@@ -33,6 +33,15 @@ enum class eImageSaveFlags
 FxEnumFlags(eImageSaveFlags);
 
 
+enum class eImageCreateFlags
+{
+    None = 0,
+    KeepInMemory = (1 << 0),
+};
+
+FxEnumFlags(eImageCreateFlags);
+
+
 namespace renderer {
 
 enum class eImageFormat
@@ -205,8 +214,8 @@ public:
     void Create(eImageType image_type, const Vec2u& size, eImageFormat format, VkImageUsageFlags usage,
                 eImageAspectFlag aspect);
 
-    void CreateGpuOnly(eImageType image_type, const Vec2u& size, eImageFormat format,
-                       const SizedArray<uint8>& image_data);
+    void CreateFromData(eImageType image_type, const Vec2u& size, eImageFormat format,
+                        const SizedArray<uint8>& image_data, eImageCreateFlags flags);
 
     void TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count = 1,
                           std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
@@ -238,6 +247,7 @@ public:
 
     VkImage InternalImage = nullptr;
     VkImageView View = nullptr;
+    SizedArray<uint8> ImageData { nullptr, 0 };
 
     eImageType ViewType = eImageType::Flat;
     eImageFormat Format = eImageFormat::None;

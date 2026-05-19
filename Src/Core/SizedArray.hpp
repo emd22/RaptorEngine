@@ -111,17 +111,7 @@ public:
         }
     };
 
-    SizedArray(SizedArray<TElementType>&& other)
-    {
-        pData = std::move(other.pData);
-        other.pData = nullptr;
-
-        Capacity = other.Capacity;
-        Size = other.Size;
-
-        other.Size = 0;
-        other.Capacity = 0;
-    }
+    SizedArray(SizedArray<TElementType>&& other) { (*this) = std::move(other); }
 
     SizedArray() = default;
 
@@ -199,6 +189,7 @@ public:
             Free();
         }
 
+
         pData = other.pData;
         other.pData = nullptr;
 
@@ -207,6 +198,9 @@ public:
 
         other.Size = 0;
         other.Capacity = 0;
+
+        bDoNotDestroy = other.bDoNotDestroy;
+        other.bDoNotDestroy = false;
 
         return *this;
     }
@@ -417,7 +411,6 @@ public:
     TElementType* pData = nullptr;
     SizeType Size = 0;
     SizeType Capacity = 0;
-
 
     bool bDoNotDestroy = false;
 };

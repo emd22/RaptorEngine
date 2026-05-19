@@ -8,6 +8,7 @@
 #include <Asset/AxManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Font/Font.hpp>
+#include <Asset/MipmapFile.hpp>
 #include <Asset/SceneFile.hpp>
 #include <Controls.hpp>
 #include <Core/Defer.hpp>
@@ -90,7 +91,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    gAssetManager->Start(4);
+    gAssetManager->Start(3);
     gMaterialManager->Create();
 
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
@@ -247,6 +248,19 @@ void FoxtrotGame::CreateGame()
 
     CreateLights();
     CreateFontObject();
+
+
+    TSRef<AxImage> test_img = gAssetManager->LoadImage(FX_BASE_DIR "/Textures/beach.jpg", eImageFormat::RGBA8_UNorm,
+                                                       eImageCreateFlags::KeepInMemory);
+    test_img->WaitUntilLoaded();
+
+    MipmapFile mm;
+    mm.GenerateMips(test_img->Image.ImageData, test_img->Image.Size);
+
+    DataPack dp;
+    dp.ReadFromFile("TestMips.bin");
+    dp.PrintInfo();
+    dp.Close();
 
     while (sbRunning) {
         Tick();
