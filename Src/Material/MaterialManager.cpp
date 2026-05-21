@@ -164,13 +164,6 @@ void MaterialManager::DestroyMaterial(const MaterialID& id)
     }
 
     std::lock_guard guard(mInUse);
-
-    // If the material exists, destroy it
-    if (MaterialsInUse.Get(id.GetID())) {
-        Material* mat = GetMaterial(id);
-        mat->~Material();
-    }
-
     MaterialsInUse.Unset(id.GetID());
 }
 
@@ -179,6 +172,9 @@ void MaterialManager::Destroy()
     if (!mbInitialized) {
         return;
     }
+
+    MaterialsInUse.ClearAll();
+    mMaterials.Free();
 
     MaterialPropertiesBuffer.Destroy();
     mDescriptorPool.Destroy();

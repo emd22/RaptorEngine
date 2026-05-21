@@ -12,6 +12,7 @@ public:
 
     /// Mask bits that are outside of a byte boundary
     static constexpr uint32 scBitIndexMask = 0x3F;
+    static constexpr uint32 scBitsPerInt = 64;
 
 public:
     Bitset() = default;
@@ -30,6 +31,8 @@ public:
     FX_FORCE_INLINE void Set(uint32 index);
     FX_FORCE_INLINE bool Get(uint32 index) const;
     FX_FORCE_INLINE void Unset(uint32 index);
+
+    FX_FORCE_INLINE uint64 GetBitCapacity() const;
 
     /**
      * @brief Sets all bits to zero.

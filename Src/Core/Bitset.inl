@@ -53,7 +53,7 @@ FX_FORCE_INLINE void Bitset::Unset(uint32 index)
 
 FX_FORCE_INLINE uint32 Bitset::FindNextFreeBit(uint32 start_index) const
 {
-    const uint32 start_byte = (start_index / 64);
+    const uint32 start_byte = (start_index / scBitsPerInt);
 
     uint64 byte_mask = 0;
 
@@ -88,7 +88,7 @@ FX_FORCE_INLINE uint32 Bitset::FindNextFreeBit(uint32 start_index) const
 
 FX_FORCE_INLINE uint32 Bitset::FindNextFreeBitGroup(uint32 group_size) const
 {
-    const uint32 max_size = mBits.Size * 64;
+    const uint32 max_size = mBits.Size * scBitsPerInt;
 
     uint32 start_index = FindNextFreeBit();
 
@@ -113,5 +113,8 @@ FX_FORCE_INLINE uint32 Bitset::FindNextFreeBitGroup(uint32 group_size) const
 
     return Bit::scBitNotFound;
 }
+
+FX_FORCE_INLINE uint64 Bitset::GetBitCapacity() const { return mBits.Size * scBitsPerInt; }
+
 
 } // namespace fx

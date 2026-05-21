@@ -118,15 +118,10 @@ public:
     ~SizedArray() { Free(); }
 
 
-    void Free()
+    void FreeNoDestructor()
     {
         if (pData == nullptr || bDoNotDestroy) {
             return;
-        }
-
-        for (size_t i = 0; i < Size; i++) {
-            TElementType& element = pData[i];
-            element.~TElementType();
         }
 
 #ifndef FX_SIZED_ARRAY_NO_MEMPOOL
@@ -144,6 +139,20 @@ public:
         pData = nullptr;
         Capacity = 0;
         Size = 0;
+    }
+
+    void Free()
+    {
+        if (pData == nullptr || bDoNotDestroy) {
+            return;
+        }
+
+        for (size_t i = 0; i < Size; i++) {
+            TElementType& element = pData[i];
+            element.~TElementType();
+        }
+
+        FreeNoDestructor();
     }
 
     Iterator begin() const { return Iterator(pData, 0); }
