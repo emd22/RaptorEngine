@@ -387,10 +387,6 @@ void Object::Update()
     }
 
     UpdateAnimation();
-
-    if (pScript.IsValid()) {
-        pScript->CallTickProc();
-    }
 }
 
 void Object::SetScriptVars()

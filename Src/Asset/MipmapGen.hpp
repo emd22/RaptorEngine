@@ -1,3 +1,10 @@
+/*
+ * File:        MipmapGen.hpp
+ * Author:      emd22
+ * Created:     18/05/2026 by emd22
+ * Description: Generates and loads mipmaps from images
+ */
+
 #pragma once
 
 #include <Core/Slice.hpp>
@@ -12,12 +19,13 @@ class MipmapGen
 {
 public:
     MipmapGen() = default;
-    MipmapGen(renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
+    MipmapGen(const char* path, renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
     {
-        GenerateMipmaps(format, pixels, size);
+        GenerateMipmaps(path, format, pixels, size);
     }
 
-    void GenerateMipmaps(renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size);
+    void GenerateMipmaps(const char* path, renderer::eImageFormat format, const Slice<uint8>& pixels,
+                         const Vec2u& size);
     Slice<uint8> GenerateMip(DataPack& dp, renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
                              uint8 mip_level);
 

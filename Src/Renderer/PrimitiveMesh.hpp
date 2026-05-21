@@ -33,14 +33,14 @@ public:
     /**
      * @brief Recalculates normals if needed and uploads the vertex list to the GPU.
      */
-    inline void UploadVertices()
+    inline void UploadVertices(renderer::CommandBuffer& cmd)
     {
         if (VertexList.SupportsNormals() && !VertexList.HasNormals()) {
             LogDebug("Calculating normals for mesh");
             RecalculateNormals();
         }
 
-        VertexList.UploadToGpu();
+        VertexList.UploadToGpu(cmd);
     }
 
     /**
@@ -48,31 +48,35 @@ public:
      * `KeepInMemory` is true.
      */
     template <renderer::eVertexType TVertexType>
-    void UploadVertices(const SizedArray<renderer::Vertex<TVertexType>>& vertices)
+    void UploadVertices(renderer::CommandBuffer& cmd, const SizedArray<renderer::Vertex<TVertexType>>& vertices)
     {
         VertexList.CreateAsCopyOf<TVertexType>(vertices);
-        UploadVertices();
+        UploadVertices(cmd);
     }
 
     template <renderer::eVertexType TVertexType>
-    void UploadVertices(SizedArray<renderer::Vertex<TVertexType>>&& vertices)
+    void UploadVertices(renderer::CommandBuffer& cmd, SizedArray<renderer::Vertex<TVertexType>>&& vertices)
     {
         VertexList.CreateFrom<TVertexType>(std::move(vertices));
-        UploadVertices();
+        UploadVertices(cmd);
     }
 
     /** @brief Uploads mesh indices to a primitive mesh. */
-    void UploadIndices(const SizedArray<uint32>& indices)
+    void UploadIndices(renderer::CommandBuffer& cmd, const SizedArray<uint32>& indices)
     {
         LocalIndexBuffer.InitAsCopyOf(indices);
-        GpuIndexBuffer.Create(renderer::eGpuBufferType::IndexBuffer, Slice(indices));
+        GpuIndexBuffer.Create(cmd, renderer::eGpuBufferType::IndexBuffer, Slice(indices));
     }
 
     /**
      * @brief Uploads mesh indices to a primtive mesh, and stores the indices without copy if the property
      * `KeepInMemory` is true.
      */
-    void UploadIndices() { GpuIndexBuffer.Create<uint32>(renderer::eGpuBufferType::IndexBuffer, LocalIndexBuffer); }
+    void UploadIndices(renderer::CommandBuffer& cmd)
+    {
+        GpuIndexBuffer.Create<uint32>(cmd, renderer::eGpuBufferType::IndexBuffer, LocalIndexBuffer);
+    }
+
     void SetIndices(SizedArray<uint32>&& indices) { LocalIndexBuffer = std::move(indices); }
 
     renderer::VertexList& GetVertices()
@@ -103,11 +107,6 @@ public:
     void Render(const renderer::CommandBuffer& cmd, uint32 num_instances)
     {
         const VkDeviceSize offset = 0;
-        //        FrameData* frame = Fwd_GetFrame();
-
-        if (VertexList.GpuBuffer.Buffer == nullptr) {
-            FX_BREAKPOINT;
-        }
 
         vkCmdBindVertexBuffers(cmd.Cmd, 0, 1, &VertexList.GpuBuffer.Buffer, &offset);
         vkCmdBindIndexBuffer(cmd.Cmd, GpuIndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);

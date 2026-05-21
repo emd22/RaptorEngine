@@ -2,6 +2,7 @@
 
 #include <Core/Log.hpp>
 #include <Core/MemPool/MemPool.hpp>
+#include <Core/Panic.hpp>
 #include <Engine.hpp>
 
 namespace fx {
@@ -43,6 +44,13 @@ String::String(uint32 allocation_size)
     if (Length >= scStackAllocSize) {
         mpHeapStr = gEnginePool->Alloc<char>(Length + 1);
     }
+}
+
+
+String String::SubStr(uint32 start, uint32 end) const
+{
+    Assert(start <= Length && end <= Length);
+    return String(GetInternalPtr() + start, (end - start));
 }
 
 bool String::operator==(const String& other) const

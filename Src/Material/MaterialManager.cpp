@@ -86,9 +86,15 @@ void MaterialManager::MakeNullMaterial()
     };
 
     TSRef<AxImage> diffuse = TSRef<AxImage>::New();
-    diffuse->Image.CreateFromData(renderer::eImageType::Flat, Vec2u(4, 4), renderer::eImageFormat::RGBA8_UNorm,
-                                  diffuse_data, eImageCreateFlags::None);
-    diffuse->MarkAndSignalLoaded();
+    renderer::gRenderer->SubmitImmediateUploadCmd(
+        [&](renderer::CommandBuffer& cmd)
+        {
+            diffuse->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(4, 4), 1,
+                                          renderer::eImageFormat::RGBA8_UNorm, diffuse_data, eImageCreateFlags::None);
+
+            diffuse->MarkAndSignalLoaded();
+        });
+
 
     material->Attach(Material::eResourceType::Diffuse, diffuse);
     material->Attach(Material::eResourceType::Normal, AxImage::GetEmptyImage<renderer::eImageFormat::RGBA8_UNorm>());

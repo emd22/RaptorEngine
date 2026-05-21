@@ -78,7 +78,6 @@ void FoxScript::Load(const String& path)
     // Call OnLoad if it exists
     CallProc(HashStr32("OnLoad"), {});
 
-    mpSymTick = GetSymbol(HashStr32("OnTick"));
 
     // {
     //     gEnginePool->Free(file_data.pData);

@@ -17,22 +17,11 @@ struct FrameData
 {
 public:
     void Create(GpuDevice* device);
-    void SubmitUbo(const UniformBufferObject& ubo);
     void Destroy();
 
 public:
     CommandPool CmdPool;
-
     CommandBuffer CmdBuffer;
-
-    // DescriptorSet DescriptorSet;
-    DescriptorSet CompDescriptorSet;
-
-    // RawGpuBuffer<UniformBufferObject> Ubo;
-
-    Semaphore OffscreenSem;
-    Semaphore LightingSem;
-    Semaphore ShadowsSem;
 
     Semaphore ImageAvailable;
     Semaphore RenderFinished;

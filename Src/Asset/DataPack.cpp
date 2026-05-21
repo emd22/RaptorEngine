@@ -162,6 +162,7 @@ void DataPack::BinaryReadAllData()
     }
 }
 
+void DataPack::ReadEntry(DataPackEntry* entry) { entry->Data = ReadSection<uint8>(entry); }
 
 void DataPack::PrintInfo() const
 {

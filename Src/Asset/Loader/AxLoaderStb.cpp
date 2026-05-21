@@ -2,6 +2,7 @@
 
 #include <Asset/AxBase.hpp>
 #include <Asset/AxImage.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {
 
@@ -96,8 +97,8 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
     const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(image->ImageType, image->Size, ImageFormat, data_arr,
-                                (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
+                                ImageFormat, data_arr, (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
     if (should_save_data) {
         image->Image.ImageData = std::move(data_arr);

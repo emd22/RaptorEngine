@@ -39,8 +39,10 @@ struct GpuUploadContext
 {
     CommandPool CmdPool;
     CommandBuffer CmdBuffer;
+    CommandBuffer ImmediateCmdBuffer;
 
     Fence UploadFence;
+    Fence ImmediateUploadFence;
 
     ~GpuUploadContext() = default;
 };
@@ -104,7 +106,11 @@ public:
     }
 
 
+    void BeginUploads();
+    void SubmitUploads();
+
     void SubmitUploadCmd(SubmitFunc func);
+    void SubmitImmediateUploadCmd(SubmitFunc func);
     void SubmitOneTimeCmd(SubmitFunc func);
 
     ~RenderBackend() { Destroy(); }

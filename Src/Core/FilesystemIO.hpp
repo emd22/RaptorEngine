@@ -4,12 +4,25 @@
 //
 #include "Types.hpp"
 
+#include <Core/String.hpp>
+
 namespace fx {
 
 namespace FilesystemIO {
 
+/////////////////////////////////////
+// File functions
+/////////////////////////////////////
 
 uint64 FileGetLastModified(const char* path);
+bool FileExists(const char* path);
+
+/////////////////////////////////////
+// Path functions
+/////////////////////////////////////
+
+String RemoveExtension(const String& path);
+String FilenameFromPath(const String& path, bool keep_extension);
 
 //////////////////////////////
 // Directory functions

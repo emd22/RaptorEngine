@@ -451,6 +451,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Backend/RenderBackendFwd.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Backend/RenderBackendFwd.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/Backend/RenderBackendFwd.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Backend/RenderBackendFwd.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Renderer/Backend/RenderPass.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Backend/RenderPass.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/Backend/RenderPass.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Backend/RenderPass.cpp.o"

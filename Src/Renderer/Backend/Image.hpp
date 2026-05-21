@@ -208,26 +208,29 @@ public:
     Image& operator=(const Image& other);
     Image& operator=(Ref<Image>&& ref);
 
-    void Create(eImageType image_type, const Vec2u& size, eImageFormat format, VkImageTiling tiling,
+    void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
                 VkImageUsageFlags usage, eImageAspectFlag aspect);
 
-    void Create(eImageType image_type, const Vec2u& size, eImageFormat format, VkImageUsageFlags usage,
-                eImageAspectFlag aspect);
+    void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
+                VkImageUsageFlags usage, eImageAspectFlag aspect);
 
-    void CreateFromData(eImageType image_type, const Vec2u& size, eImageFormat format,
-                        const SizedArray<uint8>& image_data, eImageCreateFlags flags);
+    void CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2u& size, uint16 mips_count,
+                        eImageFormat format, const SizedArray<uint8>& image_data, eImageCreateFlags flags);
 
-    void TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count = 1,
+    void TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
                           std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
 
     void TransitionDepthToShaderRO(CommandBuffer& cmd);
     void TransitionDepthToAttachment(CommandBuffer& cmd);
 
 
-    void CopyFromBuffer(const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size, uint32 base_layer = 0);
+    void CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
+                        uint32 base_layer);
 
     void CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
                                        ImageCubemapOptions options);
+
+    void MarkUploaded();
 
 
     void SaveToFile(const String& path, eImageSaveFormat file_format);
@@ -255,7 +258,11 @@ public:
 
     VmaAllocation Allocation = nullptr;
 
+
+private:
+    uint16 mMipsCount = 1;
     RefCount* mpRefCnt = nullptr;
+    uint8 mFrameUploadedBit = 0;
 };
 
 } // namespace renderer

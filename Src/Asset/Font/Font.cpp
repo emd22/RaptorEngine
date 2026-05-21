@@ -131,7 +131,7 @@ void FontAtlas::Upload(renderer::Image& out_image)
     const VkImageUsageFlags usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-    out_image.Create(eImageType::Flat, AtlasSize, eImageFormat::RGBA8_UNorm, VK_IMAGE_TILING_OPTIMAL, usage_flags,
+    out_image.Create(eImageType::Flat, AtlasSize, 1, eImageFormat::RGBA8_UNorm, VK_IMAGE_TILING_OPTIMAL, usage_flags,
                      eImageAspectFlag::Color);
 
     Fx_Fwd_SubmitUploadCmd(

@@ -22,14 +22,15 @@ struct MipHeader
 
 #pragma pack(pop)
 
-void MipmapGen::GenerateMipmaps(renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
+void MipmapGen::GenerateMipmaps(const char* path, renderer::eImageFormat format, const Slice<uint8>& pixels,
+                                const Vec2u& size)
 {
     DataPack dp;
     GenerateMip(dp, format, pixels, size, 0);
     GenerateMip(dp, format, pixels, size, 1);
     GenerateMip(dp, format, pixels, size, 2);
     GenerateMip(dp, format, pixels, size, 4);
-    dp.WriteToFile("TestMips.bin");
+    dp.WriteToFile(path);
 }
 
 Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, renderer::eImageFormat format, const Slice<uint8>& pixels,
@@ -85,9 +86,12 @@ void MipmapGen::ExportMipmaps(const char* dp_path, const char* output_path)
         return;
     }
 
-    dp.ReadAllEntries();
+    for (DataPackEntry& entry : dp.Entries) {
+        // If there is no data in this datapack entry, load it from the file.
+        if (!entry.HasData()) {
+            dp.ReadEntry(&entry);
+        }
 
-    for (const DataPackEntry& entry : dp.Entries) {
         MipHeader* header = reinterpret_cast<MipHeader*>(entry.Data.pData);
 
         Slice<uint8> image_data = Slice(entry.Data.pData + sizeof(MipHeader), entry.Data.Size - sizeof(MipHeader));

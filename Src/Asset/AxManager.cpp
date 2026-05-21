@@ -10,6 +10,8 @@
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
 #include <Object.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/RenderBackend.hpp>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -85,6 +87,8 @@ void AxManager::Start(int32 min_threads)
         // Create the worker from the newly inserted pointer
         worker->Create();
     }
+
+    WorkersWaitingToUpload.InitSize(scMaxWorkerThreads);
 
     mpAssetManagerThread = new std::thread([this]() { AxManager::AssetManagerUpdate(); });
 }
@@ -236,23 +240,68 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::e
 
 void AxManager::CheckForUploadableData()
 {
-    constexpr int32 scMaxUploadsPerTick = 2;
+    using namespace renderer;
 
-    int32 upload_counter = scMaxUploadsPerTick;
+    WorkersWaitingToUpload.Clear();
 
-    for (auto& worker : mWorkerThreads) {
-        // If there are no uploads pending, skip the worker
+    // Check with the workers to see if there is anything to load onto the GPU
+    for (AxWorker& worker : mWorkerThreads) {
         if (!worker.bDataPendingUpload.test()) {
             continue;
         }
 
-        LockContext<AxItemData> asset_data = worker.Item.GetDataContext();
+        WorkersWaitingToUpload.Insert(&worker);
+    }
+
+    const bool should_upload = WorkersWaitingToUpload.Size > 0;
+
+    if (!should_upload) {
+        return;
+    }
+
+    // Begin GPU upload
+    if (should_upload) {
+        gRenderer->UploadContext.UploadFence.WaitFor();
+        gRenderer->UploadContext.UploadFence.Reset();
+
+        gRenderer->UploadContext.CmdBuffer.Record();
+    }
+
+    for (AxWorker* worker : WorkersWaitingToUpload) {
+        LockContext<AxItemData> asset_data = worker->Item.GetDataContext();
 
         // The asset was successfully loaded, upload to GPU
-        if (worker.LoadStatus == AxLoaderBase::eStatus::Success) {
+        if (worker->LoadStatus == AxLoaderBase::eStatus::Success) {
             // Load the resouce into GPU memory
             asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
+        }
+    }
 
+    SpinLockContext<VkQueue> transfer_queue = gRenderer->GetDevice()->GetTransferQueue();
+
+    if (should_upload) {
+        CommandBuffer& cmd = gRenderer->UploadContext.CmdBuffer;
+        cmd.End();
+
+        const VkSubmitInfo submit_info = {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+
+            .commandBufferCount = 1,
+            .pCommandBuffers = &cmd.Cmd,
+        };
+
+
+        vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, gRenderer->UploadContext.UploadFence.Get());
+    }
+
+    transfer_queue.Unlock();
+
+    // Finally, notify the asset that it is loaded and tell the workers they are free
+
+    for (AxWorker* worker : WorkersWaitingToUpload) {
+        LockContext<AxItemData> asset_data = worker->Item.GetDataContext();
+
+        if (worker->LoadStatus == AxLoaderBase::eStatus::Success) {
             while (!asset_data->pAsset->bIsUploadedToGpu) {
                 asset_data->pAsset->bIsUploadedToGpu.wait(true);
             }
@@ -279,7 +328,7 @@ void AxManager::CheckForUploadableData()
             // Destroy the loader(clearing the loading buffers)
             asset_data->pLoader->Destroy(asset_data->pAsset);
         }
-        else if (worker.LoadStatus == AxLoaderBase::eStatus::Error) {
+        else if (worker->LoadStatus == AxLoaderBase::eStatus::Error) {
             asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
 
             // There was an error, call the OnError callback if it was registered
@@ -287,21 +336,16 @@ void AxManager::CheckForUploadableData()
                 asset_data->pAsset->mOnErrorCallback(asset_data->pAsset);
             }
         }
-        else if (worker.LoadStatus == AxLoaderBase::eStatus::None) {
+        else if (worker->LoadStatus == AxLoaderBase::eStatus::None) {
             asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
-
             Panic("AssetManager", "Worker status is none!");
         }
 
         ItemsEnqueued.clear();
-        worker.bIsBusy.clear();
-        worker.LoadStatus = AxLoaderBase::eStatus::None;
+        worker->bIsBusy.clear();
+        worker->LoadStatus = AxLoaderBase::eStatus::None;
 
-        worker.bDataPendingUpload.clear();
-
-        if ((--upload_counter) <= 0) {
-            break;
-        }
+        worker->bDataPendingUpload.clear();
     }
 }
 
@@ -377,6 +421,7 @@ void AxManager::CheckForItemsToLoad()
 
 void AxManager::AssetManagerUpdate()
 {
+    uint32 num_uploads = 0;
     while (mbActive.test()) {
         bool is_busy = CheckWorkersBusy();
 
@@ -386,13 +431,13 @@ void AxManager::AssetManagerUpdate()
             // Loop while we are busy to check for when we are pending upload, as well
             // as check for new arrivals.
             while (CheckWorkersBusy() && mbActive.test()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(80));
-
                 // Check if there is data to be uploaded to the GPU
                 CheckForUploadableData();
 
                 // Check if there are any items that can be loaded by a worker
                 CheckForItemsToLoad();
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(80));
             }
         }
         // There is no data being loaded or uploaded, we can unload the extra worker threads.

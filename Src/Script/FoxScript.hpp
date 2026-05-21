@@ -47,12 +47,9 @@ public:
 
     FX_FORCE_INLINE uint32 GetProcAddr(Hash32 name_hash) const { return Vm.GetProcAddr(name_hash); };
 
-    FX_FORCE_INLINE void CallTickProc() { CallProc(mpSymTick, {}); }
 
 public:
     FoxVM Vm;
-
-    FoxSymbol* mpSymTick = nullptr;
 };
 
 } // namespace script

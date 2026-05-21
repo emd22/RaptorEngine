@@ -3,6 +3,7 @@
 #include <Core/RefUtil.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <unordered_map>
 
@@ -55,10 +56,10 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsSlimMesh()
         vertex->Position[2] = vec.Z;
     }
 
-    mesh->UploadIndices(Indices);
+    mesh->UploadIndices(renderer::RenderBackendFwd::GetCmd(), Indices);
 
     mesh->VertexList.CreateFrom<renderer::eVertexType::Slim>(std::move(points));
-    mesh->UploadVertices();
+    mesh->UploadVertices(renderer::RenderBackendFwd::GetCmd());
 
     mesh->bIsReady.store(true);
 
@@ -72,10 +73,10 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
 
     mesh->bKeepInMemory = true;
 
-    mesh->UploadIndices(Indices);
+    mesh->UploadIndices(renderer::RenderBackendFwd::GetCmd(), Indices);
 
     mesh->VertexList.CreateFrom(Positions, Normals, Uvs, {}, {}, {}, eVertexCreateFlags::None);
-    mesh->UploadVertices();
+    mesh->UploadVertices(renderer::RenderBackendFwd::GetCmd());
 
     mesh->bIsReady.store(true);
 

@@ -9,6 +9,7 @@
 #include <Asset/ShaderCompiler.hpp>
 #include <Asset/ShaderPreproc.hpp>
 #include <Core/Defer.hpp>
+#include <Core/FilesystemIO.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/String.hpp>
 #include <Engine.hpp>
@@ -26,7 +27,7 @@ int main()
     fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
     fx::gScriptMemPool = new fx::MemPool;
-    fx::gScriptMemPool->Create(1024 * 1024 * 2);
+    fx::gScriptMemPool->Create(1024 * 64);
 
     fx::renderer::Globals::Init();
 
@@ -48,5 +49,7 @@ int main()
             delete fx::gEnginePool;
             fx::gEnginePool = nullptr;
         });
+
+
     return 0;
 }

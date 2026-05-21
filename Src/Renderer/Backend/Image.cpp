@@ -8,6 +8,7 @@
 #include <Core/Panic.hpp>
 #include <Core/StackArray.hpp>
 #include <Engine.hpp>
+#include <Renderer/Backend/Fwd/Fwd_GetFrame.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -73,6 +74,8 @@ Image& Image::operator=(const Image& other)
     ImageLayout = other.ImageLayout;
     Allocation = other.Allocation;
 
+    mMipsCount = other.mMipsCount;
+
     // Set the new ref count
     mpRefCnt = other.mpRefCnt;
 
@@ -86,8 +89,8 @@ Image& Image::operator=(const Image& other)
     return *this;
 }
 
-void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format, VkImageTiling tiling,
-                   VkImageUsageFlags usage, eImageAspectFlag aspect)
+void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
+                   VkImageTiling tiling, VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
     Assert(size.X > 0 && size.Y > 0);
 
@@ -108,6 +111,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
     Size = size;
     Format = format;
     ViewType = image_type;
+    mMipsCount = mips_count;
 
     if (!mpRefCnt) {
         mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
@@ -133,7 +137,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
 
         .extent = { .width = size.Width(), .height = size.Height(), .depth = 1 },
 
-        .mipLevels = 1,
+        .mipLevels = mips_count,
         .arrayLayers = image_type_props.LayerCount,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = tiling,
@@ -197,7 +201,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
             {
                 .aspectMask = static_cast<VkImageAspectFlags>(aspect),
                 .baseMipLevel = 0,
-                .levelCount = 1,
+                .levelCount = mips_count,
                 .baseArrayLayer = 0,
                 .layerCount = image_type_props.LayerCount,
             },
@@ -208,9 +212,8 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
         ModulePanicVulkan("Could not create swapchain image view", status);
     }
 
-    std::string image_view_name = "";
-
 #ifdef FX_DEBUG_IMAGE_VIEWS
+    std::string image_view_name = "";
     {
         static int view_allocation_number = 0;
         view_allocation_number++;
@@ -224,15 +227,15 @@ void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format
 #endif
 }
 
-void Image::Create(eImageType image_type, const Vec2u& size, eImageFormat format, VkImageUsageFlags usage,
-                   eImageAspectFlag aspect)
+void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
+                   VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
-    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect);
+    Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage, aspect);
 }
 
 
-void Image::CreateFromData(eImageType image_type, const Vec2u& size, eImageFormat format,
-                           const SizedArray<uint8>& image_data, eImageCreateFlags flags)
+void Image::CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2u& size, uint16 mips_count,
+                           eImageFormat format, const SizedArray<uint8>& image_data, eImageCreateFlags flags)
 {
     RawGpuBuffer staging_buffer;
     staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
@@ -246,10 +249,12 @@ void Image::CreateFromData(eImageType image_type, const Vec2u& size, eImageForma
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    Create(image_type, size, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, eImageAspectFlag::Color);
+    Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, eImageAspectFlag::Color);
 
-    CopyFromBuffer(staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size);
+    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0);
 }
+
+void Image::MarkUploaded() { gRenderer->GetFrameNumber(); }
 
 void Image::TransitionDepthToShaderRO(CommandBuffer& cmd)
 {
@@ -341,7 +346,7 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
             {
                 .aspectMask = aspect_flags,
                 .baseMipLevel = 0,
-                .levelCount = 1,
+                .levelCount = mMipsCount,
                 .baseArrayLayer = 0,
                 .layerCount = layer_count,
             },
@@ -385,40 +390,36 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
     ImageLayout = new_layout;
 }
 
-
-void Image::CopyFromBuffer(const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size, uint32 base_layer)
+void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
+                           uint32 base_layer)
 {
-    Fx_Fwd_SubmitUploadCmd(
-        [&](CommandBuffer& cmd)
-        {
-            TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1,
-                             TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                                         .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+    TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1,
+                     TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                 .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 
-            VkBufferImageCopy copy {
-                .bufferOffset = 0,
-                .bufferRowLength = 0,
-                .bufferImageHeight = 0,
-                .imageSubresource {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .mipLevel = 0,
-                    .baseArrayLayer = base_layer,
-                    .layerCount = 1,
-                },
-                .imageExtent =
-                    VkExtent3D {
-                        .width = size.X,
-                        .height = size.Y,
-                        .depth = 1,
-                    },
-            };
+    VkBufferImageCopy copy {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .baseArrayLayer = base_layer,
+            .layerCount = 1,
+        },
+        .imageExtent =
+            VkExtent3D {
+                .width = size.X,
+                .height = size.Y,
+                .depth = 1,
+            },
+    };
 
-            vkCmdCopyBufferToImage(cmd, buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    vkCmdCopyBufferToImage(cmd, buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
-            TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
-                             TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                                         .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
-        });
+    TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
+                     TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                                 .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 }
 
 enum eCubemapLayer
@@ -458,7 +459,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_for
     Assert(tile_width == tile_height);
 
 
-    Create(eImageType::Cubemap, Vec2u(tile_width, tile_height), image_format, VK_IMAGE_TILING_OPTIMAL,
+    Create(eImageType::Cubemap, Vec2u(tile_width, tile_height), 1, image_format, VK_IMAGE_TILING_OPTIMAL,
            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, Aspect);
 
     StackArray<VkImageCopy, 6> copy_infos;
@@ -526,7 +527,7 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_for
     gRenderer->SubmitOneTimeCmd(
         [&](CommandBuffer& cmd)
         {
-            cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd);
+            cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd, 1);
             TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 6);
 
             vkCmdCopyImage(cmd.Get(), cubemap.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, InternalImage,

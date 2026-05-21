@@ -41,6 +41,12 @@ public:
         return mpStackStr;
     }
 
+    /**
+     * @brief Creates a copy of this string from `start` to `end`.
+     * @returns The copy of the string
+     */
+    String SubStr(uint32 start, uint32 end) const;
+
     std::string Str() const { return std::string(CStr(), Length); }
 
     String& operator=(const char* str);

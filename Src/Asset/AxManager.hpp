@@ -234,6 +234,8 @@ public:
 private:
     AxQueue mLoadQueue;
 
+    SizedArray<AxWorker*> WorkersWaitingToUpload;
+
     std::atomic_flag mbActive;
 
     DataNotifier ItemsEnqueuedNotifier;

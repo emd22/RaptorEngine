@@ -4,6 +4,7 @@
 
 #include <Core/Ref.hpp>
 #include <Renderer/Backend/Image.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {
 
@@ -41,9 +42,15 @@ public:
         image_data.MarkFull();
 
         spEmptyImage = TSRef<AxImage>::New();
-        spEmptyImage->Image.CreateFromData(renderer::eImageType::Flat, Vec2u(1, 1), TFormat, image_data,
-                                           eImageCreateFlags::None);
-        spEmptyImage->MarkAndSignalLoaded();
+
+        renderer::RenderBackendFwd::SubmitImmediateUploadCmd(
+            [&](renderer::CommandBuffer& cmd)
+            {
+                spEmptyImage->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(1, 1), 1, TFormat, image_data,
+                                                   eImageCreateFlags::None);
+                spEmptyImage->MarkAndSignalLoaded();
+            });
+
 
         // empty_images.Insert(spEmptyImage);
 

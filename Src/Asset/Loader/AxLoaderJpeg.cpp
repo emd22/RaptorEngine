@@ -7,18 +7,18 @@
 #include <Asset/AxImage.hpp>
 #include <Core/Memory.hpp>
 #include <Core/Ref.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {
 
-using namespace renderer;
 
-static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
+static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(renderer::eImageFormat format)
 {
     switch (format) {
-    case eImageFormat::BGRA8_UNorm:
+    case renderer::eImageFormat::BGRA8_UNorm:
         return JCS_EXT_BGRA;
-    case eImageFormat::RGBA8_UNorm:
-    case eImageFormat::RGBA8_SRGB:
+    case renderer::eImageFormat::RGBA8_UNorm:
+    case renderer::eImageFormat::RGBA8_SRGB:
         return JCS_EXT_RGBA;
     default:;
     }
@@ -90,7 +90,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
     jpeg_mem_src(&mJpegInfo, data, size);
     jpeg_read_header(&mJpegInfo, true);
 
-    const uint32 num_components = ImageFormatUtil::GetSize(ImageFormat);
+    const uint32 num_components = renderer::ImageFormatUtil::GetSize(ImageFormat);
 
     J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
     mJpegInfo.out_color_space = color_space;
@@ -122,8 +122,8 @@ void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
     const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(image->ImageType, image->Size, ImageFormat, mImageData,
-                                (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
+                                ImageFormat, mImageData, (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
     if (should_save_data) {
         image->Image.ImageData = std::move(mImageData);
