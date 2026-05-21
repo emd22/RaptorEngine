@@ -50,7 +50,7 @@ void DeferredRenderer::CreateForwardPass()
 
     Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
 
-    ForwardPass.Create(gRenderer->Swapchain.Extent);
+    ForwardPass.Create("Forward", gRenderer->Swapchain.Extent);
 
     ForwardPass.AddTarget(eImageFormat::eD32_Float, Target::scFullScreen,
                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -79,7 +79,7 @@ void DeferredRenderer::CreateForwardPass()
 
 void DeferredRenderer::CreateGPass()
 {
-    GPass.Create(gRenderer->Swapchain.Extent);
+    GPass.Create("Geometry", gRenderer->Swapchain.Extent);
 
     // Albedo target
     GPass.AddTarget(eImageFormat::BGRA8_UNorm, Target::scFullScreen,
@@ -155,8 +155,6 @@ void DeferredRenderer::CreateUnlitPipeline()
     gState->SetShader(eShaderName::Unlit, {});
 
     gState->UseRenderStage(ForwardPass);
-    /*gState->SetOutputTargets(&targets);
-    gState->SetRenderPass(&RpForward);*/
     gState->SetVertexType(eVertexType::Default);
     gState->SetCullMode(eCullMode::Back);
 
@@ -167,8 +165,6 @@ void DeferredRenderer::CreateUnlitPipeline()
     gState->SetLayout(ePipelineName::Unlit);
 
     gState->UseRenderStage(ForwardPass);
-    /*gState->SetOutputTargets(&targets);
-    gState->SetRenderPass(&RpForward);*/
     gState->SetShader(eShaderName::Text, {});
     gState->SetCullMode(eCullMode::None);
     gState->EndPipeline();
@@ -183,8 +179,6 @@ void DeferredRenderer::CreateUnlitPipeline()
     gState->SetCullMode(eCullMode::Back);
 
     gState->UseRenderStage(ForwardPass);
-    /*gState->SetRenderPass(&RpForward);
-    gState->SetOutputTargets(&targets);*/
     gState->EndPipeline();
 }
 
@@ -289,7 +283,7 @@ void DeferredRenderer::CreateLightingPipeline()
     }
 
     {
-        LightPass.Create(gRenderer->Swapchain.Extent);
+        LightPass.Create("Lighting", gRenderer->Swapchain.Extent);
 
 
         LightPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
@@ -466,7 +460,7 @@ void DeferredRenderer::CreateDescriptorSets()
 
 void DeferredRenderer::CreateCompPass()
 {
-    CompPass.Create(gRenderer->Swapchain.Extent);
+    CompPass.Create("Compose", gRenderer->Swapchain.Extent);
 
     CompPass.MarkFinalStage();
     CompPass.BuildRenderStage();
