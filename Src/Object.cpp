@@ -311,12 +311,14 @@ void Object::RenderUnlit(const Camera& camera)
         gMaterialManager->Bind(frame->CmdBuffer, MaterialID::Null);
     }
 
-    gObjectManager->mObjectBufferDS.BindWithOffset(2, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                   *gMaterialManager->GetMaterial(mMaterialID)->pPipeline,
+    Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Unlit);
+    pipeline.Bind(frame->CmdBuffer);
+
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
                                                    gObjectManager->GetBaseOffset());
 
     if (CheckIfReady(true)) {
-        gRenderer->SubmitPushConstants(frame->CmdBuffer, *material->pPipeline, eShaderType::Vertex | eShaderType::Pixel,
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, pipeline, eShaderType::Vertex | eShaderType::Pixel,
                                        push_constants);
         RenderPrimitive(frame->CmdBuffer);
     }
