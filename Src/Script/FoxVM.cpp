@@ -284,7 +284,7 @@ const char* FoxVM::GetString(uint32 offset) const
 {
     // + 1 to remove length encoded at start of string. Everything here is aligned to 16 bits, so +1 will get us the
     // actual string data.
-    return reinterpret_cast<const char*>(&mBytecode[mStringsOffset + offset + 1]);
+    return reinterpret_cast<const char*>(&mBytecode[mStringsOffset + offset]);
 }
 
 FoxSymbol* FoxVM::GetSymbol(const Hash32 name_hash) const

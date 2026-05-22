@@ -154,7 +154,7 @@ private:
      * @brief Emits a null-terminated string to the bytecode with the length preceding it.
      * The length is 16-bit and is used to quickly read in the string and ensure we are not reading past boundaries.
      */
-    uint32 EmitDataString(const char* str, uint16 length);
+    uint32 EmitDataString(const char* str, uint16 length, bool emit_length_prefix);
 
     void EmitBinop(FoxAstBinop* binop);
 
@@ -193,6 +193,8 @@ private:
     FoxAstFunctionDecl* mpCurrentFunctionBody = nullptr;
 
     bool mEntryPointEmitted = false;
+
+    bool mbEmitDebugInfo = true;
 };
 
 
@@ -224,7 +226,7 @@ private:
     void DoVariable(char* s, uint8 op_base, uint8 op_spec);
     void DoCompare(char* s, uint8 op_base, uint8 op_spec);
 
-    char* ReadString(char* buffer, uint32 buffer_size);
+    char* ReadString(char* buffer, uint32 buffer_size, bool has_prefixed_length);
 
 private:
     uint32 mBytecodeIndex = 0;

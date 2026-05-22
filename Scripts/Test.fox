@@ -1,8 +1,11 @@
 
+BlahString() str
+{
+    return "Hello";
+}
+
+
 Init() str
 {
-    local int x = 10;
-    local str z = "Hello";
-
-    return z;
+    return BlahString();
 }

@@ -328,6 +328,11 @@ void FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
         else if (literal->Value.Type == eFoxType::FLOAT) {
             EmitPushFloat32(literal->Value.ValueFloat);
         }
+        else if (literal->Value.Type == eFoxType::STRING) {
+            // Add fixup for push, this will be update to the offset in the string data.
+            EmitPush32(0);
+            AddString(mBytecode.Size() - 4, literal->Value.ValueString);
+        }
     }
     else if (node->NodeType == FX_AST_BINOP) {
         EmitBinop(static_cast<FoxAstBinop*>(node));
@@ -532,10 +537,8 @@ void FoxBytecodeCompiler::EmitType(eFoxType type)
     WriteOp(BcBase_Type, op_type);
 }
 
-uint32 FoxBytecodeCompiler::EmitDataString(const char* str, uint16 length)
+uint32 FoxBytecodeCompiler::EmitDataString(const char* str, uint16 length, bool emit_length_prefix)
 {
-    // WriteOp(BcBase_Data, BcSpecData_String);
-
     uint32 start_index = mBytecode.Size();
     uint16 final_length = length;
 
@@ -549,7 +552,9 @@ uint32 FoxBytecodeCompiler::EmitDataString(const char* str, uint16 length)
         final_length += sizeof(uint16);
     }
 
-    Write16(final_length);
+    if (emit_length_prefix) {
+        Write16(final_length);
+    }
 
     for (int i = 0; i < final_length; i++) {
         if (i >= length) {
@@ -794,16 +799,11 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DefineParam(FoxAstNode* param_decl_no
 
     // Emit variable without emitting pushes or pops
     FoxBytecodeVarHandle* handle = DoVarDeclare(var_decl_node, DO_NOT_ALLOW_ASSIGNMENT);
-    uint32 parameter_var_index = mVariableIndex++;
-
-    EmitVariableDefine(parameter_var_index, var_decl_node->pNameToken->GetHash(), false);
 
     if (!handle) {
         CompileError("DefineParam: Could not define and fetch param!");
         return nullptr;
     }
-
-    // EmitPopVar(parameter_var_index);
 
     return handle;
 }
@@ -847,7 +847,7 @@ void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
         if (stmt->NodeType == FX_AST_PROCDECL) {
             FoxAstFunctionDecl* proc_decl = static_cast<FoxAstFunctionDecl*>(stmt);
 
-            EmitDataString(proc_decl->pNameToken->Start, proc_decl->pNameToken->Length);
+            EmitDataString(proc_decl->pNameToken->Start, proc_decl->pNameToken->Length, true);
 
             proc_decl->SymbolTableOffset = mBytecode.Size();
 
@@ -874,7 +874,7 @@ void FoxBytecodeCompiler::EmitStrings()
 
     for (const FoxBytecodeString& str : Strings) {
         Fixup32(str.FixupOffset, mBytecode.Size() - sto);
-        EmitDataString(str.StringValue.CStr(), str.StringValue.GetLength());
+        EmitDataString(str.StringValue.CStr(), str.StringValue.GetLength(), false);
     }
 
     EmitMarker(BcSpecMarker_StringsEnd);
@@ -966,7 +966,7 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int params_to_save, bool
 
     uint16 var_index_before_scope = mVariableIndex;
 
-    if (!is_function_body) {
+    if (!is_function_body && mbEmitDebugInfo) {
         // After the stack allocations, mark the start of the frame.
         EmitMarker(BcSpecMarker_FrameBegin);
     }
@@ -979,7 +979,7 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int params_to_save, bool
     // Clear all of the scope variables
     mVariableIndex = var_index_before_scope;
 
-    if (!is_function_body) {
+    if (!is_function_body && mbEmitDebugInfo) {
         EmitMarker(BcSpecMarker_FrameEnd);
     }
 }
@@ -1225,8 +1225,24 @@ void FoxBytecodePrinter::DoType(char* s, uint8 op_base, uint8 op_spec)
 }
 
 
-char* FoxBytecodePrinter::ReadString(char* buffer, uint32 buffer_size)
+char* FoxBytecodePrinter::ReadString(char* buffer, uint32 buffer_size, bool has_prefixed_length)
 {
+    if (!has_prefixed_length) {
+        uint16* u16_buffer = reinterpret_cast<uint16*>(buffer);
+        for (int index = 0;; index += sizeof(uint16)) {
+            uint16 value = Read16Rev();
+            (*u16_buffer) = value;
+            // Break if the rightmost byte is zero
+            if (((~value) & 0x00FF) != 0) {
+                break;
+            }
+            u16_buffer++;
+        }
+
+        return buffer;
+    }
+
+
     uint32 string_length = Read16();
 
     if (string_length > buffer_size) {
@@ -1302,7 +1318,7 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
 
         uint32 old_index = mBytecodeIndex;
         mBytecodeIndex = mStringTableOffset;
-        BC_PRINT_OP("VSET [str] ${}, \"{}\"", var_index, ReadString(string_buffer, 256));
+        BC_PRINT_OP("VSET [str] ${}, \"{}\"", var_index, ReadString(string_buffer, 256, false));
         mBytecodeIndex = old_index;
     }
     else if (op_spec == BcSpecVariable_Set_Var) {
@@ -1368,7 +1384,7 @@ void FoxBytecodePrinter::LoadSymbolTable()
 
 
     for (uint32 index = 0; index < num_symbols; index++) {
-        ReadString(buffer, cTempBufferSize);
+        ReadString(buffer, cTempBufferSize, true);
         uint32 offset = Read32();
 
         if (offset == UINT32_MAX) {

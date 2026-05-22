@@ -1111,6 +1111,16 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
 
         FX_SCRIPT_FREE(FoxAstReturn, return_node);
     }
+
+    else if (node->NodeType == FX_AST_IF) {
+        FoxAstIf* if_node = static_cast<FoxAstIf*>(node);
+
+        Do(if_node->pCondition);
+        Do(if_node->pBlock);
+        Do(if_node->pElseBlock);
+
+        FX_SCRIPT_FREE(FoxAstIf, if_node);
+    }
     else {
         LogError(LC_SCRIPT, "Cannot free unknown node!");
     }
