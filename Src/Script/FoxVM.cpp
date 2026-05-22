@@ -28,6 +28,8 @@ char* FoxVM::ReadString(char* buffer, uint32 buffer_size)
 void FoxVM::LoadSymTable()
 {
     uint32 num_symbols = Read32();
+    mStringsOffset = Read32();
+
     LogInfo("Loaded {} symbols", num_symbols);
 
     SymTable.InitSize(num_symbols);
@@ -207,6 +209,22 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
 
         GetVar(var_index).Value.Set<int32>(Pop32());
     }
+    else if (op_spec == BcSpecPop_Variable_Float32) {
+        uint16 var_index = Read16();
+
+        VMVariable& var = GetVar(var_index);
+
+        if (var.bIsGlobalRef) {
+            Globals[var.NameHash].Set<float32>(Pop32());
+            return;
+        }
+
+        GetVar(var_index).Value.Set<float32>(Pop32());
+    }
+
+    else if (op_spec == BcSpecPop_Discard) {
+        Pop32();
+    }
 }
 
 
@@ -261,6 +279,13 @@ void FoxVM::CallExternalFunction(Hash32 hashed_name)
     }
 }
 
+
+const char* FoxVM::GetString(uint32 offset) const
+{
+    // + 1 to remove length encoded at start of string. Everything here is aligned to 16 bits, so +1 will get us the
+    // actual string data.
+    return reinterpret_cast<const char*>(&mBytecode[mStringsOffset + offset + 1]);
+}
 
 FoxSymbol* FoxVM::GetSymbol(const Hash32 name_hash) const
 {
@@ -396,6 +421,14 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         bReturnValueOnStack = true;
         PC = ReturnAddress;
     }
+    else if (op_spec == BcSpecJump_ReturnToCaller_String) {
+        RevertVariables();
+
+        LastPushType = eFoxType::STRING;
+        --ScopeIndex;
+        bReturnValueOnStack = true;
+        PC = ReturnAddress;
+    }
 }
 
 void FoxVM::DoData(uint8 op_base, uint8 op_spec)
@@ -437,6 +470,18 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         // Update global variable
         if (var.bIsGlobalRef) {
             Globals[var.NameHash].Set<float32>(value);
+        }
+    }
+    else if (op_spec == BcSpecVariable_Set_String) {
+        uint16 var_index = Read16();
+        uint32 string_offset = Read32();
+
+        VMVariable& var = GetVar(var_index);
+        var.Value.Set<int32>(string_offset);
+
+        // Update global variable
+        if (var.bIsGlobalRef) {
+            Globals[var.NameHash].Set<int32>(string_offset);
         }
     }
     else if (op_spec == BcSpecVariable_Set_Var) {

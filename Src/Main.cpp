@@ -29,26 +29,27 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
 
-    fx::renderer::Globals::Init();
-
     {
-        fx::FoxtrotGame game {};
+        fx::script::FoxScript script(FX_BASE_DIR "/Scripts/Test.fox");
+        fx::script::FoxValue value = script.CallProc(script.GetSymbol("Init"), {});
+        value.Print();
     }
 
-    fx::LogInfo("===== MEMPOOL STATS =====");
-    fx::LogInfo("Bytes Used: {}", fx::gEnginePool->GetBytesUsed());
-    fx::LogInfo("Pool Size:  {}", fx::gEnginePool->GetCapacity());
-    fx::LogInfo("=========================");
+    // fx::renderer::Globals::Init();
 
-    fx::Globals::Destroy();
-    fx::renderer::Globals::Destroy();
+    // {
+    //     fx::FoxtrotGame game {};
+    // }
 
-    Defer(
-        []()
-        {
-            delete fx::gEnginePool;
-            fx::gEnginePool = nullptr;
-        });
+    // fx::Globals::Destroy();
+    // fx::renderer::Globals::Destroy();
+
+    // Defer(
+    //     []()
+    //     {
+    //         delete fx::gEnginePool;
+    //         fx::gEnginePool = nullptr;
+    //     });
 
 
     return 0;

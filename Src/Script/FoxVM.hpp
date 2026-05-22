@@ -56,12 +56,15 @@ public:
 
     FX_FORCE_INLINE uint32 GetStackPointer() const { return StackPointer; }
 
+    const char* GetString(uint32 offset) const;
+
     FoxSymbol* GetSymbol(const Hash32 name_hash) const;
     uint32 GetProcAddr(const Hash32 name_hash) const;
 
     void Push16(uint16 value);
     void Push32(eFoxType type, uint32 value);
     uint32 Pop32();
+
 
     void ExecuteOp();
 
@@ -94,6 +97,7 @@ private:
     uint16 Read16Rev();
     uint32 Read32();
     char* ReadString(char* buffer, uint32 buffer_size);
+
 
     VMCallFrame* GetCurrentCallFrame();
 
@@ -134,8 +138,9 @@ private:
 
     bool mIsInParams = false;
 
-
     eFoxType mCurrentType = eFoxType::NONETYPE;
+
+    uint32 mStringsOffset = 0;
 };
 
 

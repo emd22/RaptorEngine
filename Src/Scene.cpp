@@ -140,8 +140,6 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     // gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
     renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-
-    // renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
     pipeline.Bind(cmd);
 
     DebugLayerPushConstants push_constants {};

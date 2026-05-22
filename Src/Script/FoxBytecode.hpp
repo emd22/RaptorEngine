@@ -36,10 +36,11 @@ enum BcSpecPush : uint8
     BcSpecPush_StackAlloc,
 };
 
-enum BrSpecPop : uint8
+enum BcSpecPop : uint8
 {
     BcSpecPop_Variable_Int32,
     BcSpecPop_Variable_Float32,
+    BcSpecPop_Discard,
 };
 
 enum BcSpecArith : uint8
@@ -74,6 +75,7 @@ enum BcSpecJump : uint8
     BcSpecJump_ReturnToCaller,
     BcSpecJump_ReturnToCaller_Int32,
     BcSpecJump_ReturnToCaller_Float32,
+    BcSpecJump_ReturnToCaller_String,
 
     BcSpecJump_CallExternal,
 };
@@ -104,12 +106,17 @@ enum BcSpecMarker : uint8
     BcSpecMarker_Proc, // PROC [name hash]
     BcSpecMarker_ProcEnd,
 
+    BcSpecMarker_StringsBegin,
+    BcSpecMarker_StringsEnd,
+
+
 };
 
 enum BcSpecVariable : uint8
 {
     BcSpecVariable_Set_Int32 = 1,
     BcSpecVariable_Set_Float32,
+    BcSpecVariable_Set_String,
 
     BcSpecVariable_Set_Var,
 

@@ -30,8 +30,9 @@ public:
 
     explicit FoxValue(int value) : Type(eFoxType::INT), ValueInt(value) {}
     explicit FoxValue(float value) : Type(eFoxType::FLOAT), ValueFloat(value) {}
+    explicit FoxValue(const char* value) : Type(eFoxType::STRING), ValueString(value) {}
 
-    static FoxValue NumberFromRaw(eFoxType type, uint32 raw_value)
+    static FoxValue ValueFromRaw(eFoxType type, uint32 raw_value)
     {
         FoxValue value = FoxValue::scNone;
 
@@ -45,6 +46,7 @@ public:
             value.ValueFloat = std::bit_cast<float32>(raw_value);
             value.Type = type;
             break;
+
         default:
             break;
         }
@@ -145,8 +147,7 @@ public:
     {
         int32 ValueInt = 0;
         float32 ValueFloat;
-        float32 ValueVec3[3];
-        char* ValueString;
+        const char* ValueString;
 
         FoxAstVarRef* pValueRef;
     };

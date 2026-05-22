@@ -30,11 +30,13 @@ SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
 {
     mBytecode.Create(4096);
     VarHandles.Create(64);
+    Strings.Create(32);
 
     Assert(root->NodeType == FX_AST_BLOCK);
-    EmitSymbolTable(static_cast<FoxAstBlock*>(root));
 
+    EmitSymbolTable(static_cast<FoxAstBlock*>(root));
     EmitNode(root);
+    EmitStrings();
 
     PrintBytecode();
 
@@ -75,7 +77,7 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
                 return;
             }
 
-            DoFunctionCall(call_node);
+            DoFunctionCall(call_node, true);
 
             eFoxType return_type = mpCurrentFunctionBody ? mpCurrentFunctionBody->ReturnType : eFoxType::INT;
 
@@ -86,6 +88,9 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
             }
             else if (return_type == eFoxType::FLOAT) {
                 EmitJumpReturnToCallerFloat32();
+            }
+            else if (return_type == eFoxType::STRING) {
+                EmitJumpReturnToCallerString();
             }
             else {
                 CompileError("Unknown return type {}!", static_cast<uint32>(return_type));
@@ -102,6 +107,9 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
             }
             else if (return_type == eFoxType::FLOAT) {
                 EmitJumpReturnToCallerFloat32();
+            }
+            else if (return_type == eFoxType::STRING) {
+                EmitJumpReturnToCallerString();
             }
             else {
                 CompileError("Unknown return type {}!", static_cast<uint32>(return_type));
@@ -184,7 +192,7 @@ void FoxBytecodeCompiler::EmitNode(FoxAstNode* node)
         return EmitFunctionDeclaration(static_cast<FoxAstFunctionDecl*>(node));
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
-        return DoFunctionCall(static_cast<FoxAstFunctionCall*>(node));
+        return DoFunctionCall(static_cast<FoxAstFunctionCall*>(node), false);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
         return EmitAssign(static_cast<FoxAstAssign*>(node));
@@ -325,7 +333,7 @@ void FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
         EmitBinop(static_cast<FoxAstBinop*>(node));
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
-        DoFunctionCall(static_cast<FoxAstFunctionCall*>(node));
+        DoFunctionCall(static_cast<FoxAstFunctionCall*>(node), true);
     }
     else {
         CompileError("EmitPushVarOrLiteral: Unknown node type");
@@ -380,6 +388,12 @@ void FoxBytecodeCompiler::EmitPopVar(VarIndex var)
     // VPOP [%var]
     WriteOp(BcBase_Pop, BcSpecPop_Variable_Int32);
     Write16(var);
+}
+
+void FoxBytecodeCompiler::EmitPopDiscard()
+{
+    // VPOP
+    WriteOp(BcBase_Pop, BcSpecPop_Discard);
 }
 
 
@@ -443,6 +457,7 @@ void FoxBytecodeCompiler::EmitJumpReturnToCaller() { WriteOp(BcBase_Jump, BcSpec
 
 void FoxBytecodeCompiler::EmitJumpReturnToCallerInt32() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_Int32); }
 void FoxBytecodeCompiler::EmitJumpReturnToCallerFloat32() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_Float32); }
+void FoxBytecodeCompiler::EmitJumpReturnToCallerString() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_String); }
 
 
 void FoxBytecodeCompiler::EmitVariableSetInt32(uint16 var_index, int32 value)
@@ -450,6 +465,13 @@ void FoxBytecodeCompiler::EmitVariableSetInt32(uint16 var_index, int32 value)
     WriteOp(BcBase_Variable, BcSpecVariable_Set_Int32);
     Write16(var_index);
     Write32(value);
+}
+
+void FoxBytecodeCompiler::EmitVariableSetString(uint16 var_index)
+{
+    WriteOp(BcBase_Variable, BcSpecVariable_Set_String);
+    Write16(var_index);
+    Write32(0);
 }
 
 void FoxBytecodeCompiler::EmitVariableSetFloat32(uint16 var_index, float32 value)
@@ -510,7 +532,7 @@ void FoxBytecodeCompiler::EmitType(eFoxType type)
     WriteOp(BcBase_Type, op_type);
 }
 
-uint32 FoxBytecodeCompiler::EmitDataString(char* str, uint16 length)
+uint32 FoxBytecodeCompiler::EmitDataString(const char* str, uint16 length)
 {
     // WriteOp(BcBase_Data, BcSpecData_String);
 
@@ -562,6 +584,7 @@ uint16 FoxBytecodeCompiler::GetSizeOfType(Token* token)
 
     constexpr Hash32 type_int_hash = HashStr32("int");
     constexpr Hash32 type_float_hash = HashStr32("float");
+    constexpr Hash32 type_str_hash = HashStr32("str");
 
     if (type_hash == type_int_hash) {
         return sizeof(int32);
@@ -569,23 +592,14 @@ uint16 FoxBytecodeCompiler::GetSizeOfType(Token* token)
     else if (type_hash == type_float_hash) {
         return sizeof(float32);
     }
+    else if (type_hash == type_str_hash) {
+        return sizeof(int32);
+    }
     else {
         CompileError("GetSizeOfType: Unknown type");
     }
 
     return 0;
-}
-
-
-void FoxBytecodeCompiler::DoSaveInt32(uint32 stack_offset, uint32 value, bool force_absolute)
-{
-    if (stack_offset < 0xFFFE && !force_absolute) {
-        // Relative save
-    }
-    else {
-        // Absolute save
-        EmitSaveAbsolute32(stack_offset, value);
-    }
 }
 
 
@@ -629,6 +643,13 @@ void FoxBytecodeCompiler::Fixup32(uint32 addr, uint32 value)
     mBytecode[addr + 3] = static_cast<uint8>(value);
 }
 
+void FoxBytecodeCompiler::AddString(uint32 fixup_offset, const String& value)
+{
+    FoxBytecodeString* str = Strings.Insert();
+    str->StringValue = value;
+    str->FixupOffset = fixup_offset;
+}
+
 
 void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode mode, FoxBytecodeVarHandle* handle)
 {
@@ -641,6 +662,10 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
         else if (literal->Value.Type == eFoxType::FLOAT) {
             EmitVariableSetFloat32(handle->VariableIndex, literal->Value.ValueFloat);
         }
+        else if (literal->Value.Type == eFoxType::STRING) {
+            EmitVariableSetString(handle->VariableIndex);
+            AddString(mBytecode.Size() - sizeof(uint32), literal->Value.ValueString);
+        }
         else if (literal->Value.Type == eFoxType::REF) {
             EmitVariableSetVar(handle->VariableIndex, FindVarInScope(literal->Value.pValueRef->pName->GetHash()));
         }
@@ -651,7 +676,7 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
         }
 
         else if (rhs->NodeType == FX_AST_PROCCALL) {
-            DoFunctionCall(static_cast<FoxAstFunctionCall*>(rhs));
+            DoFunctionCall(static_cast<FoxAstFunctionCall*>(rhs), true);
         }
 
         if (mode == FoxBytecodeCompiler::RhsMode::RHS_ASSIGN_TO_HANDLE) {
@@ -721,7 +746,7 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
     return var_handle;
 }
 
-void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call)
+void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value)
 {
     RETURN_IF_NO_NODE(call);
 
@@ -750,6 +775,11 @@ void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call)
     }
 
     EmitJumpCallAbsolute(handle->HashedName);
+
+    // If there is no consumer for the return value, emit a discard instruction
+    if (!preserve_return_value) {
+        EmitPopDiscard();
+    }
 }
 
 
@@ -807,7 +837,11 @@ void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
         }
     }
 
+    // Number of symbols
     Write32(num_symbols);
+
+    // String table offset
+    Write32(0);
 
     for (FoxAstNode* stmt : root->Statements) {
         if (stmt->NodeType == FX_AST_PROCDECL) {
@@ -828,6 +862,24 @@ void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
         }
     }
 }
+
+void FoxBytecodeCompiler::EmitStrings()
+{
+    EmitMarker(BcSpecMarker_StringsBegin);
+
+    uint32 sto = mBytecode.Size();
+
+    // Fixup strings offset in symbol table
+    Fixup32(4, sto);
+
+    for (const FoxBytecodeString& str : Strings) {
+        Fixup32(str.FixupOffset, mBytecode.Size() - sto);
+        EmitDataString(str.StringValue.CStr(), str.StringValue.GetLength());
+    }
+
+    EmitMarker(BcSpecMarker_StringsEnd);
+}
+
 
 void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
 {
@@ -860,12 +912,6 @@ void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
 
             uint32 sym_offset = function->SymbolTableOffset;
             uint32 bc_offset = mBytecode.Size();
-
-            // Overwrite the offset in the symbol table
-            // mBytecode[sym_offset] = static_cast<uint8>(bc_offset >> 24);
-            // mBytecode[sym_offset + 1] = static_cast<uint8>(bc_offset >> 16);
-            // mBytecode[sym_offset + 2] = static_cast<uint8>(bc_offset >> 8);
-            // mBytecode[sym_offset + 3] = static_cast<uint8>(bc_offset);
 
             Fixup32(sym_offset, bc_offset);
         }
@@ -1055,6 +1101,9 @@ void FoxBytecodePrinter::DoPop(char* s, uint8 op_base, uint8 op_spec_raw)
         VarIndex variable_index = Read16();
         BC_PRINT_OP("VPOPF [float32] ${}", variable_index);
     }
+    else if (op_spec_raw == BcSpecPop_Discard) {
+        BC_PRINT_OP("DISCARD");
+    }
 }
 
 void FoxBytecodePrinter::DoArith(char* s, uint8 op_base, uint8 op_spec)
@@ -1131,6 +1180,9 @@ void FoxBytecodePrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Float32) {
         BC_PRINT_OP("VRETF [float32]");
+    }
+    else if (op_spec == BcSpecJump_ReturnToCaller_String) {
+        BC_PRINT_OP("VRETS [str]");
     }
     else if (op_spec == BcSpecJump_CallExternal) {
         uint32 hashed_name = Read32();
@@ -1232,6 +1284,8 @@ void FoxBytecodePrinter::DoMarker(char* s, uint8 op_base, uint8 op_spec)
 
 void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
 {
+    char string_buffer[256];
+
     if (op_spec == BcSpecVariable_Set_Int32) {
         uint16 var_index = Read16();
         uint32 value = Read32();
@@ -1241,6 +1295,15 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
         uint16 var_index = Read16();
         float32 value = std::bit_cast<float32>(Read32());
         BC_PRINT_OP("VSET [float32] ${}, {:f}", var_index, value);
+    }
+    else if (op_spec == BcSpecVariable_Set_String) {
+        uint16 var_index = Read16();
+        uint32 value = Read32();
+
+        uint32 old_index = mBytecodeIndex;
+        mBytecodeIndex = mStringTableOffset;
+        BC_PRINT_OP("VSET [str] ${}, \"{}\"", var_index, ReadString(string_buffer, 256));
+        mBytecodeIndex = old_index;
     }
     else if (op_spec == BcSpecVariable_Set_Var) {
         VarIndex dst_index = Read16();
@@ -1292,9 +1355,11 @@ void FoxBytecodePrinter::DoCompare(char* s, uint8 op_base, uint8 op_spec)
 }
 
 
-void FoxBytecodePrinter::PrintSymbolTable()
+void FoxBytecodePrinter::LoadSymbolTable()
 {
     uint32 num_symbols = Read32();
+
+    mStringTableOffset = Read32();
 
     constexpr uint32 cTempBufferSize = 512;
     char buffer[cTempBufferSize];
@@ -1319,7 +1384,7 @@ void FoxBytecodePrinter::PrintSymbolTable()
 
 void FoxBytecodePrinter::Print()
 {
-    PrintSymbolTable();
+    LoadSymbolTable();
 
     while (mBytecodeIndex < mpBytecode.Size) {
         PrintOp();
@@ -1349,9 +1414,6 @@ void FoxBytecodePrinter::PrintOp()
         break;
     case BcBase_Jump:
         DoJump(s, op_base, op_spec);
-        break;
-    case BcBase_Save:
-        DoSave(s, op_base, op_spec);
         break;
     case BcBase_Data:
         DoData(s, op_base, op_spec);

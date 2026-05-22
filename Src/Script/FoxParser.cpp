@@ -556,12 +556,15 @@ eFoxType FoxParser::LabelToType(Token* token)
 {
     static constexpr Hash32 scIntType = HashStr32("int");
     static constexpr Hash32 scFloatType = HashStr32("float");
+    static constexpr Hash32 scStringType = HashStr32("str");
 
     switch (token->GetHash()) {
     case scIntType:
         return eFoxType::INT;
     case scFloatType:
         return eFoxType::FLOAT;
+    case scStringType:
+        return eFoxType::STRING;
     default:;
     }
 
@@ -699,6 +702,15 @@ FoxAstNode* FoxParser::ParseStatementAsCommand(FoxAstBlock* parent_block)
     return node;
 }
 
+FoxAstNode* FoxParser::ParseGlobalDefinitions()
+{
+    if (GetToken().Type == TT::Identifier && GetToken(1).Type == TT::LParen) {
+        return ParseProcedureDeclare();
+    }
+
+    return nullptr;
+}
+
 FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
 {
     if (bHasErrors) {
@@ -740,6 +752,13 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
 
         if (mTokenIndex >= mTokens.Size()) {
             return nullptr;
+        }
+    }
+
+    if (IsGlobalScope()) {
+        FoxAstNode* global_def = ParseGlobalDefinitions();
+        if (global_def != nullptr) {
+            return global_def;
         }
     }
 

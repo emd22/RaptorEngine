@@ -47,7 +47,6 @@ public:
 
     FX_FORCE_INLINE uint32 GetProcAddr(Hash32 name_hash) const { return Vm.GetProcAddr(name_hash); };
 
-
 public:
     FoxVM Vm;
 };

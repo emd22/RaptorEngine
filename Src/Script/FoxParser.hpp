@@ -114,6 +114,10 @@ private:
     Token* CreateTokenFromString(eTokenType type, const char* text);
     void CreateInternalVariableTokens();
 
+    bool IsGlobalScope() const { return mScopes.Size() <= 1; }
+
+    FoxAstNode* ParseGlobalDefinitions();
+
 public:
     // char* pFileData = nullptr;
     bool bHasErrors = false;

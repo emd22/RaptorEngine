@@ -126,7 +126,11 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     }
 
     if (Vm.bReturnValueOnStack) {
-        return FoxValue::NumberFromRaw(Vm.LastPushType, Vm.Pop32());
+        if (Vm.LastPushType == eFoxType::STRING) {
+            return FoxValue(Vm.GetString(Vm.Pop32()));
+        }
+
+        return FoxValue::ValueFromRaw(Vm.LastPushType, Vm.Pop32());
     }
 
     return FoxValue::scNone;

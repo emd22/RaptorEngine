@@ -147,6 +147,7 @@ public:
         Start = nullptr;
         End = nullptr;
         Length = 0;
+        Type = eTokenType::Identifier;
     }
 
 

@@ -351,12 +351,6 @@ void ConfigFile::ParseValue(ConfigValue& value)
     case VType::None:
         break;
     case VType::String:
-        // Remove the first quote
-        value_token->Start++;
-        value_token->Length--;
-
-        // Remove the ending quote
-        value_token->Length--;
         value.Set(value_token->GetStr());
         break;
     case VType::Int:
