@@ -68,8 +68,8 @@ void FoxScript::Load(const String& path)
 
     Vm.InitVM(std::move(bytecode));
 
-    RegisterProc(HashStr32("WB_InitAmmoVars"), false, 2, &WB_InitAmmoVars);
-    RegisterProc(HashStr32("WB_InitStatVars"), false, 1, &WB_InitStatVars);
+    RegisterProc(HashStr32("WB_InitAmmoVars"), eFoxProcFlags::None, { eFoxType::INT, eFoxType::INT }, &WB_InitAmmoVars);
+    RegisterProc(HashStr32("WB_InitStatVars"), eFoxProcFlags::None, { eFoxType::INT }, &WB_InitStatVars);
 
     // Since all we need is the bytecode now, we can destroy the AST.
     FoxAstDestroyer destroyer;
@@ -90,15 +90,16 @@ void FoxScript::Load(const String& path)
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
 
-void FoxScript::RegisterProc(Hash32 name_hash, bool returns_value, uint32 parameter_count, VMExternalFunction function)
+void FoxScript::RegisterProc(Hash32 name_hash, eFoxProcFlags flags, const SizedArray<eFoxType> arg_types,
+                             VMExternalFunction function)
 {
     VMExternalProcEntry entry {
         .pFunc = function,
-        .ArgCount = parameter_count,
-        .bReturnsValue = returns_value,
+        .ArgTypes = SizedArray<eFoxType>::Clone(arg_types),
+        .bReturnsValue = (flags & eFoxProcFlags::ReturnsValue) != 0,
     };
 
-    Vm.ExternalProcs[name_hash] = entry;
+    Vm.ExternalProcs[name_hash] = std::move(entry);
 
     LogInfo("Registered external function {}", name_hash);
 }

@@ -187,6 +187,9 @@ void FoxVM::DoPush(uint8 op_base, uint8 op_spec)
     else if (op_spec == BcSpecPush_Float32) {
         Push32(eFoxType::FLOAT, Read32());
     }
+    else if (op_spec == BcSpecType_String) {
+        Push32(eFoxType::STRING, Read32());
+    }
     else if (op_spec == BcSpecPush_Var) {
         uint16 var_index = Read16();
 
@@ -262,10 +265,20 @@ void FoxVM::CallExternalFunction(Hash32 hashed_name)
     VMExternalProcEntry& func = it->second;
 
     SizedArray<FoxValue> args {};
-    args.InitSize(func.ArgCount);
+    args.InitSize(func.ArgTypes.Size);
 
-    for (uint32 i = 0; i < it->second.ArgCount; i++) {
-        args[func.ArgCount - i - 1] = (FoxValue(static_cast<int32>(Pop32())));
+    uint32 back_offset = func.ArgTypes.Size - 1;
+
+    for (uint32 i = 0; i < func.ArgTypes.Size; i++) {
+        eFoxType arg_type = func.ArgTypes[i];
+
+        if (arg_type == eFoxType::STRING) {
+            // Query the string
+            args[back_offset - i] = FoxValue(GetString(Pop32()));
+        }
+        else {
+            args[back_offset - i] = (FoxValue::ValueFromRaw(arg_type, Pop32()));
+        }
     }
 
     uint32 pre_stack_size = GetStackPointer();

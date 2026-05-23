@@ -18,6 +18,12 @@
 
 namespace fx::script {
 
+struct FoxFunctionFixup
+{
+    FoxAstFunctionCall* pCall;
+    Hash32 FunctionName;
+};
+
 class FoxParser
 {
     using TT = eTokenType;
@@ -65,6 +71,13 @@ public:
 
     FoxAstBlock* Parse();
 
+    template <typename... TTypes>
+    void ParseError(std::string_view fmt, TTypes&&... args)
+    {
+        LogError(LC_SCRIPT, fmt, std::forward<TTypes>(args)...);
+        bHasErrors = true;
+    }
+
     /**
      * @brief Parses and executes a script.
      * @param interpreter The interpreter to execute with
@@ -87,8 +100,6 @@ public:
     // FoxExternalFunc::FuncType func, bool is_variadic);
 
     void DefineExternalVar(const char* type, const char* name, const FoxValue& value);
-
-    eFoxType LabelToType(Token* token);
 
 private:
     template <typename T>
@@ -118,6 +129,8 @@ private:
 
     FoxAstNode* ParseGlobalDefinitions();
 
+    void FixupFunctionCalls();
+
 public:
     // char* pFileData = nullptr;
     bool bHasErrors = false;
@@ -127,6 +140,7 @@ private:
     FoxScope* mCurrentScope = nullptr;
 
     std::vector<FoxAstDocComment*> CurrentDocComments;
+    std::vector<FoxFunctionFixup> mFunctionFixups;
 
     FoxAstBlock* mpRootBlock = nullptr;
 

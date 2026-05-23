@@ -21,6 +21,24 @@
 FX_SET_MODULE_NAME("Main")
 
 
+static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::FoxValue>& args)
+{
+    for (fx::script::FoxValue& arg : args) {
+        switch (arg.Type) {
+        case fx::eFoxType::INT:
+            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<fx::int32>());
+            break;
+        case fx::eFoxType::FLOAT:
+            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<fx::float32>());
+            break;
+        case fx::eFoxType::STRING:
+            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<const char*>());
+            break;
+        default:;
+        }
+    }
+}
+
 int main()
 {
     fx::gEnginePool = new fx::MemPool;
@@ -31,6 +49,8 @@ int main()
 
     {
         fx::script::FoxScript script(FX_BASE_DIR "/Scripts/Test.fox");
+
+        script.RegisterProc(fx::HashStr32("LOG"), fx::eFoxProcFlags::None, { fx::eFoxType::STRING }, N_ScriptLog);
         fx::script::FoxValue value = script.CallProc(script.GetSymbol("Init"), {});
         value.Print();
     }

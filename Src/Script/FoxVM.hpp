@@ -41,7 +41,7 @@ using VMExternalFunction = void (*)(FoxVM* vm, const SizedArray<FoxValue>& args)
 struct VMExternalProcEntry
 {
     VMExternalFunction pFunc;
-    uint32 ArgCount = 0;
+    SizedArray<eFoxType> ArgTypes;
     bool bReturnsValue = false;
 };
 

@@ -16,6 +16,15 @@ eFoxType FoxAstFunctionCall::GetReturnType() const
     return pFunction->pDeclaration->ReturnType;
 }
 
+bool FoxAstFunctionCall::HasReturnType() const
+{
+    if (!pFunction || !pFunction->pDeclaration) {
+        return false;
+    }
+
+    return pFunction->pDeclaration->ReturnType != eFoxType::NONETYPE;
+}
+
 void FoxAstPrinter::Print(FoxAstNode* node, int depth)
 {
     if (node == nullptr) {

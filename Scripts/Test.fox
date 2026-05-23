@@ -1,11 +1,6 @@
+extproc LOG(str value);
 
-BlahString() str
+Init()
 {
-    return "Hello";
-}
-
-
-Init() str
-{
-    return BlahString();
+    LOG("Hello, World!");
 }

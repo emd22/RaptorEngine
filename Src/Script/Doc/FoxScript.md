@@ -1,29 +1,26 @@
-
 # Fox Script
 
 Fox Script is a scripting language designed for use in the Foxtrot game engine. It is a very simple language designed primarily for:
 
-* Calling native engine functions
-* Passing values to the engine and game
-* Basic conditional logic that can be easily updated
-* Adding code separation engine, replacing baked-in values with configurable scripts and the ability to build game-tailored features at a language level.
+- Calling native engine functions
+- Passing values to the engine and game
+- Basic conditional logic that can be easily updated
+- Adding code separation engine, replacing baked-in values with configurable scripts and the ability to build game-tailored features at a language level.
 
 This is NOT designed to be a general purpose language and is tailored to the game engine.
 
 For fast execution, each script is compiled to bytecode before being executed by the VM.
 
-## Bytecode 
+## Bytecode
 
 All operations are defined in `FoxBytecode.hpp`.
 
 Each opcode is 16 bits, or 2 bytes. Each opcode is broken down into two components:
 
-* Base component: The purpose or operation that the instruction performs.
-* Specialization component: The specialized function for the base operation.
+- Base component: The purpose or operation that the instruction performs.
+- Specialization component: The specialized function for the base operation.
 
 For example, popping a float off of the stack into a variable would use the base component `BcBase_Pop`, and the specialization component `BcSpecPop_Variable_Float32` to build the final opcode.
-
-
 
 ## Calling C++ functions from Fox Script
 
@@ -31,25 +28,29 @@ To add a native function with fox script, you will need to add both a definition
 
 The syntax to define an external procedure is similar to the syntax to define a normal procedure.
 Syntax:
+
 ```
 extproc [identifier] ( [arguments...]  ) [return type] ;
 ```
 
 For example, to define a native function that adds two numbers:
+
 ```
 extproc NativeAddition(int x, int y) int;
 ```
 
 Which can then be defined in C++ by
+
 ```
-script::FoxVM vm;
+script::FoxScript script("Some/File/Path.fox");
 
 // ...
 
-vm.RegisterFunction(
-    HashStr32("NativeAddition"),   // Function name hash
-    2,                             // Number of arguments
-    &NativeAddition_Impl           // Function handle
+vm.RegisterProc(
+    HashStr32("NativeAddition"),         // Function name hash
+    eFoxProcFlags::ReturnsValue,         // Flags
+    { eFoxType::INT, eFoxType::STRING }, // Argument types
+    &NativeAddition_Impl                 // Function handle
 );
 
 // Implmentation
@@ -57,35 +58,32 @@ void NativeAddition_Impl(script::FoxVM* vm, const SizedArray<script::FoxValue>& 
 {
     int32 x = args[0].Get<int32>();
     int32 y = args[1].Get<int32>();
-    
+
     const int32 result = x + y;
-    
+
     // Return the integer value
     vm->PushValue<int32>(result);
 }
 
 ```
 
-
 ## Calling Fox Script functions from C++
 
 Calling a function in Fox Script is extremely simple:
 
 ```
-script::FoxVM vm;
+script::FoxScript script("Some/Script.fox");
 
 // ...
 
-script::VMSymbol* entrypoint = vm.GetSymbol(HashStr32("ScriptEntry"));
+script::FoxSymbol* sym = script.GetSymbol("ScriptEntry");
 
 SizedArray<FoxValue> args = { FoxValue(20.0f) };
-vm.CallFunction(entrypoint, args);
+vm.CallProc(sym, args);
 
 ```
 
 The symbol retrieved can be saved if it is used often in a hot path.
-
-
 
 # Language Syntax
 
@@ -93,8 +91,8 @@ The symbol retrieved can be saved if it is used often in a hot path.
 
 To define a new variable, use either the `local` or `global` keyword as well as the type and then identifier for the variable.
 
-
 For example:
+
 ```
 // Variable local to the current scope
 local int x;
@@ -107,20 +105,22 @@ local int y = 10;
 global int z = 4;
 ```
 
-Currently, the only builtin types are `int` and `float`.
+Currently, the only builtin types are `int`, `float` and `str`.
 
 ## Procedures
 
 To separate code, you can define procedures.
+A procedure is defined in the following format:
+`[identifier] ( [argument]... ) [return type]?`
 
 ```
-proc FireWeapon(int gusto)
+FireWeapon(int gusto)
 {
     global float DIRX;
     global float DIRY;
     global float DIRZ;
-    
-    global int WEAPON_DAMAGE;    
+
+    global int WEAPON_DAMAGE;
     local int damage = WEAPON_DAMAGE + gusto;
 
     N_SetDirection(DIRX, DIRY, DIRZ);
@@ -131,16 +131,16 @@ proc FireWeapon(int gusto)
 To return values from procedures, follow the definition with a type:
 
 ```
-proc ProcThatReturns(int x, int y) int
+ProcThatReturns(int x, int y) int
 {
     return x + y;
 }
 ```
 
-
 ## Conditionals
 
 If statements in Fox work in the same way as C.
+
 ```
 if (x == 10) {
     return 0;
@@ -167,7 +167,7 @@ else
 Blocks can be anywhere in a function body. Any variables defined inside will be invalidated at the end of the block.
 
 ```
-proc DoX()
+DoX()
 {
     // Valid as x and y are invalidated at the end of this block
     {

@@ -87,6 +87,7 @@ private:
     FoxBytecodeVarHandle* DefineParam(FoxAstNode* param_decl_node);
     FoxBytecodeVarHandle* DefineReturnVar(FoxAstVarDecl* decl);
 
+    void ValidateParameters(FoxAstFunctionCall* call);
     void AddString(uint32 fixup_offset, const String& value);
 
     void EmitSymbolTable(FoxAstBlock* root);
@@ -103,6 +104,7 @@ private:
 
     void EmitPush32(int32 value);
     void EmitPushFloat32(float32 value);
+    void EmitPushString(uint32 value);
     void EmitPushVar(VarIndex var);
 
     void EmitPushVarOrLiteral(FoxAstNode* node);

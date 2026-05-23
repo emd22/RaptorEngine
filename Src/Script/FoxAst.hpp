@@ -136,6 +136,7 @@ struct FoxAstFunctionCall : public FoxAstNode
     FoxAstFunctionCall() { this->NodeType = FX_AST_PROCCALL; }
 
     eFoxType GetReturnType() const;
+    bool HasReturnType() const;
 
     FoxFunction* pFunction = nullptr;
     Hash32 HashedName = HashNull32;

@@ -643,6 +643,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/Script/FoxValue.cpp.o -c /Users/emd22/Projects/a2/Src/Script/FoxValue.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Script/FoxValue.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/FoxValue.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -o CMakeFiles/foxtrot.dir/Src/ThirdParty/Jolt/AABBTree/AABBTreeBuilder.cpp.o -c /Users/emd22/Projects/a2/Src/ThirdParty/Jolt/AABBTree/AABBTreeBuilder.cpp",
   "file": "/Users/emd22/Projects/a2/Src/ThirdParty/Jolt/AABBTree/AABBTreeBuilder.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/ThirdParty/Jolt/AABBTree/AABBTreeBuilder.cpp.o"

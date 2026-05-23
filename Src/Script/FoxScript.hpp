@@ -5,6 +5,12 @@
 namespace fx {
 class String;
 
+enum class eFoxProcFlags
+{
+    None = 0,
+    ReturnsValue = (1 << 0),
+};
+FxEnumFlags(eFoxProcFlags);
 
 namespace script {
 
@@ -37,7 +43,8 @@ public:
     FoxValue CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args);
     FoxValue CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args);
 
-    void RegisterProc(Hash32 name_hash, bool returns_value, uint32 parameter_count, VMExternalFunction function);
+    void RegisterProc(Hash32 name_hash, eFoxProcFlags flags, const SizedArray<eFoxType> arg_types,
+                      VMExternalFunction function);
 
     void SetGlobal(const Hash32 name_hash, const FoxValue& value);
     FoxValue GetGlobal(const Hash32 name_hash) const;

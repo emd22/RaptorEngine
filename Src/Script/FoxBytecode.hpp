@@ -31,6 +31,7 @@ enum BcSpecPush : uint8
 {
     BcSpecPush_Int32 = 1, // PUSH  [int32]
     BcSpecPush_Float32,   // PUSHF [float32]
+    BcSpecPush_String,    // PUSHS [str]
     BcSpecPush_Var,       // VPUSH [%var]
 
     BcSpecPush_StackAlloc,

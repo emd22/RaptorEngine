@@ -86,6 +86,16 @@ public:
 
     static SizedArray<TElementType> CreateEmpty() { return SizedArray<TElementType>(nullptr, 0); }
 
+    static SizedArray<TElementType> Clone(const SizedArray<TElementType>& other)
+    {
+        SizedArray<TElementType> clone;
+        clone.InitCapacity(other.Capacity);
+        for (uint32 i = 0; i < other.Size; i++) {
+            clone.Insert(other[i]);
+        }
+        return std::move(clone);
+    }
+
 public:
     SizedArray(TElementType* ptr, size_t size) : pData(ptr), Size(size), Capacity(size) {}
 
