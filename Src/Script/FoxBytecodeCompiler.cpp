@@ -13,18 +13,7 @@ namespace fx::script {
 
 static constexpr uint16 ReverseInt16(uint16 value) { return (value >> 8) | (value << 8); }
 
-
-#define MARK_REGISTER_USED(regn_)                                                                                      \
-    {                                                                                                                  \
-        MarkRegisterUsed(regn_);                                                                                       \
-    }
-#define MARK_REGISTER_FREE(regn_)                                                                                      \
-    {                                                                                                                  \
-        MarkRegisterFree(regn_);                                                                                       \
-    }
-
 using TT = eTokenType;
-
 
 SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
 {
@@ -70,30 +59,45 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
         if (return_rhs->NodeType == FX_AST_PROCCALL) {
             FoxAstFunctionCall* call_node = static_cast<FoxAstFunctionCall*>(return_rhs);
 
-            if (call_node->GetReturnType() == eFoxType::NONETYPE) {
+            eFoxType return_type = call_node->GetReturnType();
+            eFoxType builtin_call_type = DoBuiltin(call_node);
+
+            if (return_type == eFoxType::NONETYPE) {
+                return_type = builtin_call_type;
+            }
+
+            if (return_type == eFoxType::NONETYPE) {
                 CompileError("EmitReturn: Cannot return a result that is void. The function called in this return "
                              "statement does not return a value.");
                 EmitJumpReturnToCaller();
                 return;
             }
 
-            DoFunctionCall(call_node, true);
+            if (builtin_call_type == eFoxType::NONETYPE) {
+                DoFunctionCall(call_node, true);
+            }
 
-            eFoxType return_type = mpCurrentFunctionBody ? mpCurrentFunctionBody->ReturnType : eFoxType::INT;
+            eFoxType caller_return_type = mpCurrentFunctionBody ? mpCurrentFunctionBody->ReturnType : eFoxType::INT;
+            if (caller_return_type != return_type) {
+                CompileError("Cannot return type '{}' in a function that returns '{}'", return_type,
+                             caller_return_type);
+
+                // No need to return here
+            }
 
             // Function call returns a value and is pushed onto the stack.
             // Continue this value to the next caller.
-            if (return_type == eFoxType::INT) {
+            if (caller_return_type == eFoxType::INT) {
                 EmitJumpReturnToCallerInt32();
             }
-            else if (return_type == eFoxType::FLOAT) {
+            else if (caller_return_type == eFoxType::FLOAT) {
                 EmitJumpReturnToCallerFloat32();
             }
-            else if (return_type == eFoxType::STRING) {
+            else if (caller_return_type == eFoxType::STRING) {
                 EmitJumpReturnToCallerString();
             }
             else {
-                CompileError("Unknown return type {}!", static_cast<uint32>(return_type));
+                CompileError("Unknown return type {}!", static_cast<uint32>(caller_return_type));
             }
         }
         else {
@@ -191,7 +195,12 @@ void FoxBytecodeCompiler::EmitNode(FoxAstNode* node)
         return EmitFunctionDeclaration(static_cast<FoxAstFunctionDecl*>(node));
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
-        return DoFunctionCall(static_cast<FoxAstFunctionCall*>(node), false);
+        FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(node);
+        if (DoBuiltin(call) != eFoxType::NONETYPE) {
+            return;
+        }
+
+        return DoFunctionCall(call, false);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
         return EmitAssign(static_cast<FoxAstAssign*>(node));
@@ -261,37 +270,6 @@ void FoxBytecodeCompiler::WriteOp(uint8 op_base, uint8 op_spec)
     mBytecode.Insert(op_spec);
 }
 
-using IRRhsMode = FoxBytecodeCompiler::RhsMode;
-
-#define MARK_REGISTER_USED(regn_)                                                                                      \
-    {                                                                                                                  \
-        MarkRegisterUsed(regn_);                                                                                       \
-    }
-#define MARK_REGISTER_FREE(regn_)                                                                                      \
-    {                                                                                                                  \
-        MarkRegisterFree(regn_);                                                                                       \
-    }
-
-
-void FoxBytecodeCompiler::EmitSave32(int16 offset, uint32 value)
-{
-    // SAVE32 [i16 offset] [i32]
-    WriteOp(BcBase_Save, BcSpecSave_Int32);
-
-    Write16(offset);
-    Write32(value);
-}
-
-void FoxBytecodeCompiler::EmitSaveAbsolute32(uint32 position, uint32 value)
-{
-    // SAVE32a [i32 offset] [i32]
-    WriteOp(BcBase_Save, BcSpecSave_AbsoluteInt32);
-
-    Write32(position);
-    Write32(value);
-}
-
-
 void FoxBytecodeCompiler::EmitPush32(int32 value)
 {
     // PUSH32 [i32]
@@ -320,7 +298,7 @@ void FoxBytecodeCompiler::EmitPushVar(VarIndex var)
     Write16(var);
 }
 
-void FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
+eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
 {
     if (node->NodeType == FX_AST_LITERAL) {
         FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
@@ -330,6 +308,16 @@ void FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
         }
         else if (literal->Value.Type == eFoxType::REF) {
             EmitPushVar(FindVarInScope(literal->Value.pValueRef->pName->GetHash()));
+
+            // Get the type of the variable
+            FoxBytecodeVarHandle* vhandle = FindVarHandle(literal->Value.pValueRef->pName->GetHash());
+
+            if (vhandle) {
+                LogInfo("Handle type: {}", static_cast<int32>(vhandle->Type));
+                return vhandle->Type;
+            }
+
+            return eFoxType::NONETYPE;
         }
         else if (literal->Value.Type == eFoxType::FLOAT) {
             EmitPushFloat32(literal->Value.ValueFloat);
@@ -339,16 +327,30 @@ void FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
             EmitPushString(0);
             AddString(mBytecode.Size() - 4, literal->Value.ValueString);
         }
+
+        return literal->Value.Type;
     }
     else if (node->NodeType == FX_AST_BINOP) {
-        EmitBinop(static_cast<FoxAstBinop*>(node));
+        FoxAstBinop* binop = static_cast<FoxAstBinop*>(node);
+        EmitBinop(binop);
+        return GetVarOrLiteralType(binop->pLeft);
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
-        DoFunctionCall(static_cast<FoxAstFunctionCall*>(node), true);
+        FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(node);
+
+        eFoxType builtin_call_rvalue = DoBuiltin(call);
+        if (builtin_call_rvalue != eFoxType::NONETYPE) {
+            return builtin_call_rvalue;
+        }
+
+        DoFunctionCall(call, true);
+        return call->GetReturnType();
     }
     else {
         CompileError("EmitPushVarOrLiteral: Unknown node type");
     }
+
+    return eFoxType::NONETYPE;
 }
 
 eFoxType FoxBytecodeCompiler::GetVarOrLiteralType(FoxAstNode* node)
@@ -470,6 +472,12 @@ void FoxBytecodeCompiler::EmitJumpReturnToCallerInt32() { WriteOp(BcBase_Jump, B
 void FoxBytecodeCompiler::EmitJumpReturnToCallerFloat32() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_Float32); }
 void FoxBytecodeCompiler::EmitJumpReturnToCallerString() { WriteOp(BcBase_Jump, BcSpecJump_ReturnToCaller_String); }
 
+void FoxBytecodeCompiler::EmitJumpPause(uint16 time)
+{
+    WriteOp(BcBase_Jump, BcSpecJump_Pause);
+    Write16(time);
+}
+
 
 void FoxBytecodeCompiler::EmitVariableSetInt32(uint16 var_index, int32 value)
 {
@@ -517,15 +525,8 @@ void FoxBytecodeCompiler::EmitVariableDefine(uint16 var_index, Hash32 name_hash,
 
 void FoxBytecodeCompiler::EmitVariableIndex(uint16 var_index) { Write16(var_index); }
 
-void FoxBytecodeCompiler::EmitVariableCastInt32(VarIndex var_index)
-{
-    WriteOp(BcBase_Variable, BcSpecVariable_Cast_Int32);
-}
-
-void FoxBytecodeCompiler::EmitVariableCastFloat32(VarIndex var_index)
-{
-    WriteOp(BcBase_Variable, BcSpecVariable_Cast_Float32);
-}
+void FoxBytecodeCompiler::EmitVariableCastInt32() { WriteOp(BcBase_Variable, BcSpecVariable_Cast_Int32); }
+void FoxBytecodeCompiler::EmitVariableCastFloat32() { WriteOp(BcBase_Variable, BcSpecVariable_Cast_Float32); }
 
 void FoxBytecodeCompiler::EmitCompare() { WriteOp(BcBase_Compare, BcSpecCompare_Default); }
 void FoxBytecodeCompiler::EmitCompareNotZero() { WriteOp(BcBase_Compare, BcSpecCompare_NotZero); }
@@ -577,14 +578,22 @@ uint32 FoxBytecodeCompiler::EmitDataString(const char* str, uint16 length, bool 
 
 void FoxBytecodeCompiler::EmitBinop(FoxAstBinop* binop)
 {
-    eFoxType result_type = GetVarOrLiteralType(binop->pLeft);
+    // Push LHS and RHS to the stack
+    eFoxType left_type = EmitPushVarOrLiteral(binop->pLeft);
+    eFoxType right_type = EmitPushVarOrLiteral(binop->pRight);
 
-    // Push LHS and RHS to stack
-    EmitPushVarOrLiteral(binop->pLeft);
-    EmitPushVarOrLiteral(binop->pRight);
+    if (left_type != right_type) {
+        CompileError("Mismatched type: Cannot perform operation on '{}' and '{}'", left_type, right_type);
+        return;
+    }
+
+    const bool is_int = (left_type == eFoxType::INT);
 
     if (binop->OpToken->Type == TT::Plus) {
-        WriteOp(BcBase_Arith, (result_type == eFoxType::INT) ? BcSpecArith_Add : BcSpecArith_Add_Float32);
+        WriteOp(BcBase_Arith, (is_int) ? BcSpecArith_Add_Int32 : BcSpecArith_Add_Float32);
+    }
+    else if (binop->OpToken->Type == TT::Asterisk) {
+        WriteOp(BcBase_Arith, (is_int) ? BcSpecArith_Multiply_Int32 : BcSpecArith_Multiply_Float32);
     }
 }
 
@@ -696,16 +705,20 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
 
         else if (rhs->NodeType == FX_AST_PROCCALL) {
             FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(rhs);
-            if (call->GetReturnType() != handle->Type) {
-                CompileError("Type mismatch: assigning function return type '{}' to variable of type '{}'",
-                             call->GetReturnType(), handle->Type);
+
+            bool is_builtin_call = DoBuiltin(call) != eFoxType::NONETYPE;
+
+            if (!is_builtin_call) {
+                if (call->GetReturnType() != handle->Type) {
+                    CompileError("Type mismatch: assigning function return type '{}' to variable of type '{}'",
+                                 call->GetReturnType(), handle->Type);
+                }
+                DoFunctionCall(call, true);
             }
-            DoFunctionCall(call, true);
         }
 
-        if (mode == FoxBytecodeCompiler::RhsMode::RHS_ASSIGN_TO_HANDLE) {
-            EmitPopVar(handle->VariableIndex);
-        }
+        // Pop the newly pushed value to the variable
+        EmitPopVar(handle->VariableIndex);
     }
 }
 
@@ -719,6 +732,13 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
     const Hash32 type_string = HashStr32("str");
 
     Hash32 decl_hash = decl->pNameToken->GetHash();
+
+    FoxBytecodeVarHandle* existing_var = FindVarHandle(decl_hash);
+    if (existing_var) {
+        CompileError("Redefinition of variable '{}' from '{}' to '{}'", decl->pNameToken->GetStr(), existing_var->Type,
+                     decl->pTypeToken->GetStr());
+        return existing_var;
+    }
 
     eFoxType var_type = FoxStringToType(decl->pTypeToken);
     const uint16 size_of_type = GetSizeOfType(decl->pTypeToken);
@@ -779,6 +799,79 @@ void FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
         }
     }
 }
+
+#define BUILTIN_REQUIRE_PARAM_N(num_)                                                                                  \
+    if (call->Params.size() != num_) {                                                                                 \
+        CompileError("Not enough parameters for builtin function!");                                                   \
+        return eFoxType::NONETYPE;                                                                                     \
+    }
+
+eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
+{
+    static constexpr Hash32 scCastInt = HashStr32("castint");
+    static constexpr Hash32 scCastFloat = HashStr32("castfloat");
+    static constexpr Hash32 scPause = HashStr32("pause");
+    static constexpr Hash32 scVPush = HashStr32("vpush");
+    static constexpr Hash32 scVPop = HashStr32("vpop");
+
+    switch (call->HashedName) {
+    case scCastInt: {
+        BUILTIN_REQUIRE_PARAM_N(1);
+
+        eFoxType vtype = EmitPushVarOrLiteral(call->Params[0]);
+
+        if (vtype != eFoxType::INT) {
+            EmitVariableCastInt32();
+        }
+
+        // The cast builtins are transformation operations, so they pop the value off of the stack and push the
+        // converted value back onto it. If the type is already an int, preserve the original value by doing nothing to
+        // avoid mangling the value with casts.
+
+        return eFoxType::INT;
+    }
+    case scCastFloat: {
+        BUILTIN_REQUIRE_PARAM_N(1);
+
+        eFoxType vtype = EmitPushVarOrLiteral(call->Params[0]);
+
+        if (vtype != eFoxType::FLOAT) {
+            EmitVariableCastFloat32();
+        }
+
+        return eFoxType::FLOAT;
+    }
+
+    case scVPush: {
+        BUILTIN_REQUIRE_PARAM_N(1);
+        return EmitPushVarOrLiteral(call->Params[0]);
+    }
+
+    case scVPop: {
+        BUILTIN_REQUIRE_PARAM_N(1);
+        FoxAstLiteral* lit = static_cast<FoxAstLiteral*>(call->Params[0]);
+        if (lit->NodeType != FX_AST_LITERAL && !lit->Value.IsRef()) {
+            CompileError("Call to `vpop(var)` must have an output variable passed in");
+            return eFoxType::NONETYPE;
+        }
+
+        FoxBytecodeVarHandle* vh = FindVarHandle(lit->Value.pValueRef->pName->GetHash());
+        if (vh == nullptr) {
+            CompileError("Cannot find variable to pop into!");
+            return eFoxType::NONETYPE;
+        }
+
+        EmitPopVar(vh->VariableIndex);
+
+        return vh->Type;
+    }
+    default:;
+    }
+
+
+    return eFoxType::NONETYPE;
+}
+
 
 void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value)
 {
@@ -960,7 +1053,7 @@ void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
             EmitPopVar(parameter_index);
         }
 
-        EmitBlock(function->pBlock, parameter_index, true);
+        EmitBlock(function->pBlock, num_parameters, true);
 
         // Check to see if there has been a return statement in the function
 
@@ -991,14 +1084,17 @@ void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
     mpCurrentFunctionBody = nullptr;
 }
 
-void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int params_to_save, bool is_function_body)
+void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int num_parameters, bool is_function_body)
 {
     RETURN_IF_NO_NODE(block);
 
-    uint16 var_index_before_scope = mVariableIndex;
 
+    const uint16 var_index_before_scope = mVariableIndex;
+
+    // Frame markers were originally added for hints to the native compiler when this language used an abstract IR
+    // instance of a bytecode. This isn't for functional purposed anymore, and is more just for readability and
+    // debugging tools.
     if (!is_function_body && mbEmitDebugInfo) {
-        // After the stack allocations, mark the start of the frame.
         EmitMarker(BcSpecMarker_FrameBegin);
     }
 
@@ -1007,8 +1103,16 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int params_to_save, bool
         EmitNode(node);
     }
 
-    // Clear all of the scope variables
-    mVariableIndex = var_index_before_scope;
+    // Delete all variables allocated in the block + parameters
+    {
+        const uint32 num_vars_to_delete = num_parameters + (mVariableIndex - var_index_before_scope);
+
+        for (int32 i = 0; i < mVariableIndex; i++) {
+            VarHandles.RemoveLast();
+        }
+
+        mVariableIndex = var_index_before_scope;
+    }
 
     if (!is_function_body && mbEmitDebugInfo) {
         EmitMarker(BcSpecMarker_FrameEnd);
@@ -1143,11 +1247,19 @@ void FoxBytecodePrinter::DoPop(char* s, uint8 op_base, uint8 op_spec_raw)
 
 void FoxBytecodePrinter::DoArith(char* s, uint8 op_base, uint8 op_spec)
 {
-    if (op_spec == BcSpecArith_Add) {
+    switch (op_spec) {
+    case BcSpecArith_Add_Int32:
         BC_PRINT_OP("ADD [int32]");
-    }
-    else if (op_spec == BcSpecArith_Add_Float32) {
+        break;
+    case BcSpecArith_Add_Float32:
         BC_PRINT_OP("ADDF [float32]");
+        break;
+    case BcSpecArith_Multiply_Int32:
+        BC_PRINT_OP("MUL [int32]");
+        break;
+    case BcSpecArith_Multiply_Float32:
+        BC_PRINT_OP("MULF [float32]");
+        break;
     }
 }
 
@@ -1210,6 +1322,7 @@ void FoxBytecodePrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
     else if (op_spec == BcSpecJump_ReturnToCaller) {
         BC_PRINT_OP("RET");
     }
+
     else if (op_spec == BcSpecJump_ReturnToCaller_Int32) {
         BC_PRINT_OP("VRET [int32]");
     }
@@ -1218,6 +1331,10 @@ void FoxBytecodePrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_String) {
         BC_PRINT_OP("VRETS [str]");
+    }
+    else if (op_spec == BcSpecJump_Pause) {
+        uint16 value = Read16();
+        BC_PRINT_OP("PAUSE {}", value);
     }
     else if (op_spec == BcSpecJump_CallExternal) {
         uint32 hashed_name = Read32();
@@ -1385,13 +1502,11 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
     }
 
     else if (op_spec == BcSpecVariable_Cast_Int32) {
-        uint16 var_index = Read16();
-        BC_PRINT_OP("VCAST [int32] {}", var_index);
+        BC_PRINT_OP("VCAST [int32]");
     }
 
     else if (op_spec == BcSpecVariable_Cast_Float32) {
-        uint16 var_index = Read16();
-        BC_PRINT_OP("VCASTF [float32] {}", var_index);
+        BC_PRINT_OP("VCASTF [float32]");
     }
 }
 

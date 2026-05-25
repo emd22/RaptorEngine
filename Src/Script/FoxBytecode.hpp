@@ -46,8 +46,10 @@ enum BcSpecPop : uint8
 
 enum BcSpecArith : uint8
 {
-    BcSpecArith_Add = 1,     // ADD
-    BcSpecArith_Add_Float32, // ADDF
+    BcSpecArith_Add_Int32 = 1, // ADD
+    BcSpecArith_Add_Float32,   // ADDF
+    BcSpecArith_Multiply_Int32,
+    BcSpecArith_Multiply_Float32,
 };
 
 enum BcSpecSave : uint8
@@ -77,6 +79,8 @@ enum BcSpecJump : uint8
     BcSpecJump_ReturnToCaller_Int32,
     BcSpecJump_ReturnToCaller_Float32,
     BcSpecJump_ReturnToCaller_String,
+
+    BcSpecJump_Pause,
 
     BcSpecJump_CallExternal,
 };

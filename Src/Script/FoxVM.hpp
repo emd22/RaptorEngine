@@ -7,7 +7,17 @@
 #include <Core/Types.hpp>
 #include <unordered_map>
 
-namespace fx::script {
+namespace fx {
+
+enum class eFoxProcFlags
+{
+    None = 0,
+    ReturnsValue = (1 << 0),
+};
+FxEnumFlags(eFoxProcFlags);
+
+
+namespace script {
 
 ///////////////////////////////////////////
 // Bytecode VM
@@ -42,7 +52,7 @@ struct VMExternalProcEntry
 {
     VMExternalFunction pFunc;
     SizedArray<eFoxType> ArgTypes;
-    bool bReturnsValue = false;
+    eFoxProcFlags Flags;
 };
 
 class FoxVM
@@ -144,4 +154,6 @@ private:
 };
 
 
-} // namespace fx::script
+} // namespace script
+
+} // namespace fx

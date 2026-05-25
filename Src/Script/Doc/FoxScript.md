@@ -53,7 +53,7 @@ vm.RegisterProc(
     &NativeAddition_Impl                 // Function handle
 );
 
-// Implmentation
+// Implementation
 void NativeAddition_Impl(script::FoxVM* vm, const SizedArray<script::FoxValue>& args)
 {
     int32 x = args[0].Get<int32>();
@@ -94,18 +94,50 @@ To define a new variable, use either the `local` or `global` keyword as well as 
 For example:
 
 ```
-// Variable local to the current scope
-local int x;
+{
+    // Variable local to the current scope
+    local int x;
+}
+// Variable x is deleted
 
-// Variable that is a reference to a globally accessible variable
-global int OBJECTID;
+// Global variables can be defined or  brought into a scope by using the `global` keyword.
+{
+    // Variable that is a reference to a globally accessible variable
+    global int SOME_GLOBAL = 2;
+}
+{
+    global int SOME_GLOBAL; // Value is 2
+}
 
-// Both types can also be initialized with a value
-local int y = 10;
-global int z = 4;
+{
+    // Strings can also be defined, but they are immutable
+    local str hello = "Hello, World";
+}
+
+{
+    // Floats can be defined with or without `f`
+    local float x = 1.0;
+    local float y = 1.0f;
+
+    // Floats can be defined without a decimal by using the `f` postfix.
+    local float z = 1f;
+}
+
 ```
 
 Currently, the only builtin types are `int`, `float` and `str`.
+
+### Casting Variables
+
+To cast variables, you can use the builtin functions `castint()` and `castfloat()`.
+
+```
+hello() float
+{
+    local int x = 10 * 2;
+    return castfloat(x);
+}
+```
 
 ## Procedures
 
@@ -169,11 +201,12 @@ Blocks can be anywhere in a function body. Any variables defined inside will be 
 ```
 DoX()
 {
-    // Valid as x and y are invalidated at the end of this block
     {
         local int x = 1;
         local int y = 2;
     }
+
+    // Valid as x and y are invalidated at the end of the block
 
     local int x = 5;
     local int y = 6;
@@ -183,3 +216,63 @@ DoX()
 Note as well that the virtual machine prevents clobbering, not the bytecode compiler. Internally on a call to a function, a base offset is added to all variable indices on a function call to prevent writes to the callers variables.
 
 This is to prevent spamming `PUSHV` and `POPV` and avoid needing to compile-time interpret the bytecode for the function that you are calling to retrieve its clobber list.
+
+## Stack Manipulation
+
+There are builtin functions within the language to manipulate the stack. These can be used to either circumvent the type system or implement custom logic.
+
+Example:
+
+```
+// Helper function to return the value instead of pass by reference
+vpopi() int
+{
+    local int temp;
+    vpop(temp);
+    return temp;
+}
+
+Init()
+{
+    vpush(1.0f);
+
+    // Pass in an output variable. Internally, there is no way for a called
+    // (builtin) function to know what the type of the variable it will be
+    // assigned to is. Therefore, the output variable will need to be passed in.
+
+    local float value;
+    vpop(value);
+
+    // Using the helper function
+    vpush(20);
+    local int other_value = vpopi();
+}
+
+// Example for "objects"
+
+saveobject(str name)
+{
+    local float health;
+    local int ammo;
+    local int mags;
+
+    vpop(mags);
+    vpop(ammo);
+    vpop(health);
+
+    N_UpdateWeaponStats(ammo, mags);
+    N_UpdatePlayerState(name, health);
+}
+
+caller()
+{
+    vpush(10.0f); // Health
+    vpush(32); // Ammo
+    vpush(10); // Mags
+
+    saveobject("ploober");
+}
+
+
+
+```

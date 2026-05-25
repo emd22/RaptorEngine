@@ -25,16 +25,11 @@ void FoxParser::Init(PagedArray<Token>&& tokens)
     mCurrentScope = mScopes.Insert();
     mCurrentScope->Vars.Create(FX_SCRIPT_SCOPE_GLOBAL_VARS_START_SIZE);
     mCurrentScope->Functions.Create(FX_SCRIPT_SCOPE_GLOBAL_ACTIONS_START_SIZE);
-
-    CreateInternalVariableTokens();
 }
 
 Token& FoxParser::GetToken(int offset)
 {
     const uint32 idx = mTokenIndex + offset;
-    if (idx < 0 || idx >= mTokens.Size()) {
-        printf("SOMETHING IS MISSING\n");
-    }
     assert(idx >= 0 && idx <= mTokens.Size());
     return mTokens[idx];
 }
@@ -66,60 +61,6 @@ Token* FoxParser::CreateTokenFromString(eTokenType type, const char* text)
     return token;
 }
 
-void FoxParser::CreateInternalVariableTokens()
-{
-    mTokenReturnVar = CreateTokenFromString(TT::Identifier, FX_SCRIPT_VAR_RETURN_VAL);
-}
-
-static void PrintDocCommentExample(Token* comment, int example_tag_length, bool is_command_mode)
-{
-    char* start = comment->Start + example_tag_length;
-
-    for (int i = 0; i < comment->Length - example_tag_length; i++) {
-        char ch = start[i];
-
-        if (!is_command_mode) {
-            putchar(ch);
-            continue;
-        }
-
-        // If we are in command mode, print the example using the command syntax
-        if (ch == '(' || ch == ')' || ch == ',') {
-            putchar(' ');
-            continue;
-        }
-
-        if (ch == ' ' || ch == '\t' || ch == ';') {
-            continue;
-        }
-
-        putchar(ch);
-    }
-
-    puts("");
-}
-
-static void PrintDocComment(Token* comment, bool is_command_mode)
-{
-    const char* example_tag = "EX: ";
-    const int example_tag_length = 4;
-
-    char* start = comment->Start;
-
-    if (comment->Length > example_tag_length && !strncmp(start, example_tag, example_tag_length)) {
-        printf("\n\t-> Script : ");
-        PrintDocCommentExample(comment, example_tag_length, false);
-
-        printf("\t-> Command: ");
-        PrintDocCommentExample(comment, example_tag_length, true);
-
-        return;
-    }
-
-    printf("%.*s\n", comment->Length, start);
-}
-
-
 FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_semicolon)
 {
     if (mTokenIndex >= mTokens.Size()) {
@@ -134,7 +75,7 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_s
         ignore_semicolon = &discard;
     }
 
-    // function [name] ( < [arg type] [arg name] ...> ) { <statements...> }
+    // proc? [name] ( < [arg type] [arg name] ...> ) [return type]? { <statements...> }
     constexpr Hash32 kw_proc = HashStr32("proc");
 
     constexpr Hash32 kw_extfn = HashStr32("extproc");
@@ -152,10 +93,6 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_s
     constexpr Hash32 kw_help = HashStr32("help");
 
     constexpr Hash32 kw_if = HashStr32("if");
-
-    // extern [name of function] ;
-
-    (*ignore_semicolon) = false;
 
     switch (hash) {
     case kw_proc:
@@ -195,22 +132,6 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_s
         ret->pRhs = return_rhs;
 
         return ret;
-    }
-    case kw_help: {
-        EatToken(TT::Identifier);
-
-        Token& func_ref = EatToken(TT::Identifier);
-
-        FoxFunction* function = FindFunction(func_ref.GetHash());
-
-        if (function) {
-            for (FoxAstDocComment* comment : function->pDeclaration->DocComments) {
-                printf("[DOC] %.*s: ", function->Name->Length, function->Name->Start);
-                PrintDocComment(comment->Comment, mInCommandMode);
-            }
-        }
-
-        return nullptr;
     }
     }
 
@@ -289,19 +210,6 @@ FoxAstVarDecl* FoxParser::ParseVarDeclare(FoxScope* scope)
     return node;
 }
 
-// FoxVar& FoxConfigScript::ParseVarDeclare()
-//{
-//     Token& type = EatToken(TT::Identifier);
-//     Token& name = EatToken(TT::Identifier);
-//
-//     FoxVar var{ name.GetHash(), &type, &name };
-//
-//     TryParseAssignment(var);
-//
-//     mCurrentScope->Vars.Insert(var);
-//
-//     return mCurrentScope->Vars.GetLast();
-// }
 
 FoxVar* FoxParser::FindVar(Hash32 hashed_name)
 {
@@ -318,17 +226,6 @@ FoxVar* FoxParser::FindVar(Hash32 hashed_name)
 
     return nullptr;
 }
-
-// FoxExternalFunc* FoxConfigScript::FindExternalFunction(FoxHash hashed_name)
-// {
-//     for (FoxExternalFunc& func : mExternalFuncs) {
-//         if (func.HashedName == hashed_name) {
-//             return &func;
-//         }
-//     }
-
-//     return nullptr;
-// }
 
 FoxFunction* FoxParser::FindFunction(Hash32 hashed_name)
 {
@@ -359,60 +256,6 @@ void FoxParser::PrintFunctionTable(const FoxScope& scope) const
     LogInfo("||-------------------------------------||");
 }
 
-
-void FoxParser::Execute()
-{
-    // Defer([&]() { gEnginePool->Free(pFileData); });
-
-    // mpRootBlock = Parse();
-
-    // // If there are errors, exit early
-    // if (bHasErrors || mpRootBlock == nullptr) {
-    //     LogInfo("Execute: Returning early...");
-    //     return;
-    // }
-
-    // printf("\n=====\n");
-
-    // PrintFunctionTable(*mCurrentScope);
-
-    // FoxBytecodeCompiler bc_emitter;
-    // SizedArray<uint8> bytecode = bc_emitter.Compile(mpRootBlock);
-
-    // if (bc_emitter.HasErrors()) {
-    //     LogError("Errors found during script compilation, cannot continue");
-    //     return;
-    // }
-
-    // FoxBytecodePrinter bc_printer(bytecode);
-    // bc_printer.Print();
-
-    // FoxVM vm;
-
-    // vm.InitVM(std::move(bytecode));
-
-    // vm.RegisterFunction(HashStr32("WB_InitAmmoVars"), false, 2, &WB_InitAmmoVars);
-    // vm.RegisterFunction(HashStr32("WB_InitStatVars"), false, 1, &WB_InitStatVars);
-
-    // vm.RegisterFunction(HashStr32("N_GetAddition"), true, 2, &N_GetAddition);
-
-    // FoxSymbol* entrypoint = vm.GetSymbol("ScriptEntry");
-    // if (entrypoint) {
-    //     LogInfo("Found entrypoint! {}", entrypoint->Offset);
-    //     FoxValue value = vm.CallFunction(entrypoint, {});
-
-    //     LogInfo("RETURN VALUE: {}, {}", value, static_cast<int32>(value.Type));
-    // }
-
-
-    // FoxSymbol* sym = vm.GetSymbol("TestFunction");
-    // if (sym) {
-    //     FoxValue value = vm.CallFunction(sym, { FoxValue(8), FoxValue(5) });
-    //     LogInfo("Test return value: {}", value);
-    // }
-
-    // FoxAstDestroyer destroyer(mpRootBlock);
-}
 
 FoxValue FoxParser::ParseValue()
 {
@@ -491,11 +334,6 @@ FoxAstNode* FoxParser::ParseRhs()
     if (mTokenIndex + 1 < mTokens.Size()) {
         TT next_token_type = GetToken(1).Type;
         has_parameters = next_token_type == TT::LParen;
-
-        if (mInCommandMode) {
-            has_parameters = next_token_type == TT::Identifier || next_token_type == TT::Integer ||
-                             next_token_type == TT::Float || next_token_type == TT::String;
-        }
     }
 
     Token& token = GetToken();
@@ -538,7 +376,7 @@ FoxAstNode* FoxParser::ParseRhs()
 
     TT op_type = GetToken(0).Type;
 
-    if (op_type == TT::Plus || op_type == TT::Minus || Token::IsTypeEqualityCheck(op_type)) {
+    if (op_type == TT::Plus || op_type == TT::Minus || op_type == TT::Asterisk || Token::IsTypeEqualityCheck(op_type)) {
         FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
 
         binop->pLeft = lhs;
@@ -899,20 +737,6 @@ FoxAstFunctionDecl* FoxParser::ParseExtfnDeclare()
     return node;
 }
 
-// FoxValue FoxConfigScript::TryCallInternalFunc(FoxHash func_name, std::vector<FoxValue>& params)
-//{
-//     FoxValue return_value;
-//
-//     for (const FoxInternalFunc& func : mInternalFuncs) {
-//         if (func.HashedName == func_name) {
-//             func.Func(params, &return_value);
-//             return return_value;
-//         }
-//     }
-//
-//     return return_value;
-// }
-
 FoxAstFunctionCall* FoxParser::ParseFunctionCall()
 {
     FoxAstFunctionCall* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionCall);
@@ -1058,13 +882,6 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
         Do(binop->pRight);
 
         FX_SCRIPT_FREE(FoxAstBinop, binop);
-    }
-    else if (node->NodeType == FX_AST_COMMANDMODE) {
-        FoxAstCommandMode* command_mode = static_cast<FoxAstCommandMode*>(node);
-
-        Do(command_mode->Node);
-
-        FX_SCRIPT_FREE(FoxAstCommandMode, command_mode);
     }
     else if (node->NodeType == FX_AST_RETURN) {
         FoxAstReturn* return_node = static_cast<FoxAstReturn*>(node);

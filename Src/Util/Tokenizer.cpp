@@ -23,7 +23,7 @@ const char* Token::GetTypeName(eTokenType type)
 
         "LessThan",   "GreaterThan",
 
-        "Plus",       "Dollar",      "Minus",
+        "Plus",       "Dollar",      "Minus",     "Asterisk",
 
         "Question",
 
@@ -58,6 +58,11 @@ Token::eIsNumericResult Token::IsNumeric() const
             if (result == Token::eIsNumericResult::NaN) {
                 result = Token::eIsNumericResult::Integer;
             }
+            continue;
+        }
+
+        if (ch == 'f' && (i == Length - 1) && result != Token::eIsNumericResult::NaN) {
+            result = Token::eIsNumericResult::Fractional;
             continue;
         }
 
@@ -122,6 +127,8 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Minus;
         case '$':
             return eTokenType::Dollar;
+        case '*':
+            return eTokenType::Asterisk;
         case '.':
             return eTokenType::Dot;
         case ',':

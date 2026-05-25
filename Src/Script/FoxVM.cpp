@@ -233,7 +233,7 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
 
 void FoxVM::DoArith(uint8 op_base, uint8 op_spec)
 {
-    if (op_spec == BcSpecArith_Add) {
+    if (op_spec == BcSpecArith_Add_Int32) {
         // Pull values off the stack, push result back onto stack
         int32 a = static_cast<int32>(Pop32());
         int32 b = static_cast<int32>(Pop32());
@@ -248,6 +248,23 @@ void FoxVM::DoArith(uint8 op_base, uint8 op_spec)
         float32 b = std::bit_cast<float32>(Pop32());
 
         float32 result = a + b;
+        Push32(eFoxType::FLOAT, std::bit_cast<uint32>(result));
+    }
+
+    else if (op_spec == BcSpecArith_Multiply_Int32) {
+        int32 a = std::bit_cast<int32>(Pop32());
+        int32 b = std::bit_cast<int32>(Pop32());
+
+        int32 result = a * b;
+        Push32(eFoxType::INT, std::bit_cast<uint32>(result));
+    }
+
+    else if (op_spec == BcSpecArith_Multiply_Float32) {
+        // Pull values off the stack, push result back onto stack
+        float32 a = std::bit_cast<float32>(Pop32());
+        float32 b = std::bit_cast<float32>(Pop32());
+
+        float32 result = a * b;
         Push32(eFoxType::FLOAT, std::bit_cast<uint32>(result));
     }
 }
@@ -284,7 +301,9 @@ void FoxVM::CallExternalFunction(Hash32 hashed_name)
     uint32 pre_stack_size = GetStackPointer();
     func.pFunc(this, args);
 
-    if (func.bReturnsValue && GetStackPointer() <= pre_stack_size) {
+    const bool returns_value = (func.Flags & eFoxProcFlags::ReturnsValue) != 0;
+
+    if (returns_value && GetStackPointer() <= pre_stack_size) {
         LogError(LC_SCRIPT, "Native function registered with a return type did not push a return value");
 
         // Sketchy, but we need to save this sinking ship somehow
@@ -537,11 +556,12 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         var.Value.Set<int32>(Globals[name_hash].Get<int32>());
     }
     else if (op_spec == BcSpecVariable_Cast_Int32) {
-        uint16 var_index = Read16();
-
-        FoxValue& var_value = GetVar(var_index).Value;
-        float32 fvalue = var_value.Get<float32>();
-        var_value.Set<int32>(fvalue);
+        float32 fvalue = std::bit_cast<float32>(Pop32());
+        Push32(eFoxType::INT, std::bit_cast<uint32>(static_cast<int32>(fvalue)));
+    }
+    else if (op_spec == BcSpecVariable_Cast_Float32) {
+        int32 ivalue = std::bit_cast<int32>(Pop32());
+        Push32(eFoxType::FLOAT, std::bit_cast<uint32>(static_cast<float>(ivalue)));
     }
 }
 

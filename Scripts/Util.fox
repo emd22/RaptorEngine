@@ -1,0 +1,17 @@
+extproc LOG(str value);
+
+// Helpers to clean up vpop calls
+
+vpopi() int
+{
+    local int v;
+    vpop(v);
+    return v;
+}
+
+vpopf() float
+{
+    local float v;
+    vpop(v);
+    return v;
+}

@@ -77,15 +77,6 @@ void FoxScript::Load(const String& path)
 
     // Call OnLoad if it exists
     CallProc(HashStr32("OnLoad"), {});
-
-
-    // {
-    //     gEnginePool->Free(file_data.pData);
-
-    //     for (char* ptr : tokenizer.DataPtrs) {
-    //         gEnginePool->Free(ptr);
-    //     }
-    // }
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
@@ -93,11 +84,7 @@ void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.A
 void FoxScript::RegisterProc(Hash32 name_hash, eFoxProcFlags flags, const SizedArray<eFoxType> arg_types,
                              VMExternalFunction function)
 {
-    VMExternalProcEntry entry {
-        .pFunc = function,
-        .ArgTypes = SizedArray<eFoxType>::Clone(arg_types),
-        .bReturnsValue = (flags & eFoxProcFlags::ReturnsValue) != 0,
-    };
+    VMExternalProcEntry entry { .pFunc = function, .ArgTypes = SizedArray<eFoxType>::Clone(arg_types), .Flags = flags };
 
     Vm.ExternalProcs[name_hash] = std::move(entry);
 

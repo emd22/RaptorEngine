@@ -79,12 +79,6 @@ public:
     }
 
     /**
-     * @brief Parses and executes a script.
-     * @param interpreter The interpreter to execute with
-     */
-    void Execute();
-
-    /**
      * @brief Executes a command on a script. Defaults to parsing with command style syntax.
      * @param command The command to execute on the script.
      * @return If the command has been executed

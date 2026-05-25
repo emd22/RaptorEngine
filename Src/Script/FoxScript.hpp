@@ -5,12 +5,6 @@
 namespace fx {
 class String;
 
-enum class eFoxProcFlags
-{
-    None = 0,
-    ReturnsValue = (1 << 0),
-};
-FxEnumFlags(eFoxProcFlags);
 
 namespace script {
 
