@@ -137,6 +137,9 @@ public:
 
     uint32 PC = 0;
     bool bReturnValueOnStack = false;
+    bool bIsPaused = false;
+
+    uint16 PauseTime = 0;
 
     eFoxType LastPushType = eFoxType::NONETYPE;
 

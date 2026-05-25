@@ -5,6 +5,8 @@
 #include "FoxParser.hpp"
 #include "FoxVM.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <Core/Defer.hpp>
 #include <Core/String.hpp>
 
@@ -98,15 +100,40 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     }
 
     Vm.ScopeIndex++;
-
     Vm.PC = sym->Offset;
 
     for (uint32 arg_index = 0; arg_index < args.Size; arg_index++) {
         PushValue(args[arg_index]);
     }
 
+    return Resume();
+}
+
+FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
+{
+    return CallProc(GetSymbol(name_hash), args);
+}
+
+FoxValue FoxScript::Update()
+{
+    if (SDL_GetTicks() < ResumeTime) {
+        return FoxValue::scNone;
+    }
+
+    return Resume();
+}
+
+FoxValue FoxScript::Resume()
+{
+    Vm.bIsPaused = false;
+
     while (Vm.PC < Vm.mBytecode.Size) {
         Vm.ExecuteOp();
+
+        if (Vm.bIsPaused) {
+            ResumeTime = SDL_GetTicks() + Vm.PauseTime;
+            return FoxValue::scNone;
+        }
 
         if (Vm.ScopeIndex <= 0) {
             break;
@@ -122,11 +149,6 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     }
 
     return FoxValue::scNone;
-}
-
-FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
-{
-    return CallProc(GetSymbol(name_hash), args);
 }
 
 

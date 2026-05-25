@@ -17,6 +17,7 @@
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
 #include <Script/FoxScript.hpp>
+#include <thread>
 
 FX_SET_MODULE_NAME("Main")
 
@@ -53,6 +54,15 @@ int main()
         script.RegisterProc(fx::HashStr32("LOG"), fx::eFoxProcFlags::None, { fx::eFoxType::STRING }, N_ScriptLog);
         fx::script::FoxValue value = script.CallProc(script.GetSymbol("Init"), {});
         value.Print();
+
+        while (true) {
+            value = script.Update();
+            if (!script.IsPaused()) {
+                value.Print();
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
     }
 
     // fx::renderer::Globals::Init();

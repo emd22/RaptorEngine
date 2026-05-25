@@ -865,6 +865,18 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
 
         return vh->Type;
     }
+    case scPause: {
+        BUILTIN_REQUIRE_PARAM_N(1);
+        FoxAstLiteral* lit = static_cast<FoxAstLiteral*>(call->Params[0]);
+        if (lit->NodeType != FX_AST_LITERAL && lit->Value.Type != eFoxType::INT) {
+            CompileError("Call to `pause(time)` must be provided an integer time");
+            return eFoxType::NONETYPE;
+        }
+
+        EmitJumpPause(lit->Value.ValueInt);
+
+        return eFoxType::INT;
+    }
     default:;
     }
 

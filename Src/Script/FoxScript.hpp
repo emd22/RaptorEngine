@@ -37,11 +37,16 @@ public:
     FoxValue CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args);
     FoxValue CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args);
 
+    FoxValue Update();
+    FoxValue Resume();
+
     void RegisterProc(Hash32 name_hash, eFoxProcFlags flags, const SizedArray<eFoxType> arg_types,
                       VMExternalFunction function);
 
     void SetGlobal(const Hash32 name_hash, const FoxValue& value);
     FoxValue GetGlobal(const Hash32 name_hash) const;
+
+    FX_FORCE_INLINE bool IsPaused() const { return Vm.bIsPaused; }
 
     FX_FORCE_INLINE FoxSymbol* GetSymbol(const String& name) const { return Vm.GetSymbol(HashStr32(name.CStr())); }
     FX_FORCE_INLINE FoxSymbol* GetSymbol(const Hash32 name_hash) const { return Vm.GetSymbol(name_hash); };
@@ -50,6 +55,8 @@ public:
 
 public:
     FoxVM Vm;
+
+    uint64 ResumeTime = 0;
 };
 
 } // namespace script

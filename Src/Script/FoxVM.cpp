@@ -461,6 +461,11 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         bReturnValueOnStack = true;
         PC = ReturnAddress;
     }
+    else if (op_spec == BcSpecJump_Pause) {
+        LogInfo("Pausing VM...");
+        PauseTime = Read16();
+        bIsPaused = true;
+    }
 }
 
 void FoxVM::DoData(uint8 op_base, uint8 op_spec)

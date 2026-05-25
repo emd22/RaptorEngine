@@ -1,15 +1,11 @@
 
 
-seconds(float s) float
-{
-
-}
 
 Init() float
 {
     local int value = 10;
 
-    pause(0);
+    pause(100);
 
     return castfloat(castint(10f));
 }
