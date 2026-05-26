@@ -398,60 +398,29 @@ FoxAstNode* FoxParser::ParseRhs()
             lhs = ParseFunctionCall();
         }
         else {
-            // FoxExternalFunc* external_function = FindExternalFunction(token.GetHash());
-            // if (external_function != nullptr) {
-            //     lhs = ParseFunctionCall();
-            // }
-
             FoxFunction* function = FindFunction(token.GetHash());
             if (function != nullptr) {
                 lhs = ParseFunctionCall();
             }
         }
     }
-    // if (!lhs) {
-    //     if (IsTokenTypeLiteral(token.Type) || token.Type == TT::Identifier) {
-    //         FoxAstLiteral* literal = FX_SCRIPT_ALLOC_NODE(FoxAstLiteral);
 
-    //         FoxValue value = ParseValue();
-    //         literal->Value = value;
+    if (!lhs) {
+        TT op_type = GetToken(1).Type;
 
-    //         lhs = literal;
-    //     }
-    //     else {
-    //         lhs = ParseRhs();
-    //     }
-    // }
+        if (Token::IsTypeEqualityCheck(op_type)) {
+            FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
 
-    if (lhs) {
-        return lhs;
+            binop->pLeft = ParseTerm();
+            binop->OpToken = &EatToken(op_type);
+            binop->pRight = ParseRhs();
+
+            return binop;
+        }
+
+        return ParseAddExpr();
     }
 
-    TT op_type = GetToken(1).Type;
-
-    if (Token::IsTypeEqualityCheck(op_type)) {
-        FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
-
-        binop->pLeft = ParseTerm();
-        binop->OpToken = &EatToken(op_type);
-        binop->pRight = ParseRhs();
-
-        return binop;
-    }
-
-    return ParseAddExpr();
-
-
-    // if (op_type == TT::Plus || op_type == TT::Minus || op_type == TT::Asterisk ||
-    // Token::IsTypeEqualityCheck(op_type)) {
-    //     FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
-
-    //     binop->pLeft = lhs;
-    //     binop->OpToken = &EatToken(op_type);
-    //     binop->pRight = ParseRhs();
-
-    //     return binop;
-    // }
 
     return lhs;
 }

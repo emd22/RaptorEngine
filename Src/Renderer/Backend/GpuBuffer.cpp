@@ -64,9 +64,6 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
     gBufferTracker.AddBuffer(BufferId, Type, Size, mBufferFlags);
 
-    if (BufferId == 6) {
-        FX_BREAKPOINT;
-    }
 
     // LogInfo("[Created GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
     // GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)

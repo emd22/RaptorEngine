@@ -217,12 +217,8 @@ static ConfigEntry::eValueType GetValueTokenType(const Token& token)
         }
     }
 
-    for (uint32 i = 0; i < token.Length; i++) {
-        char ch = token.Start[i];
-
-        if (ch == '"') {
-            current_type = VType::String;
-        }
+    if (token.Type == eTokenType::String) {
+        current_type = VType::String;
     }
 
     return current_type;

@@ -1,7 +1,5 @@
 
 Init() int
 {
-    local int x = 10 * 2 + 20;
-
-    return x;
+    return 0;
 }
