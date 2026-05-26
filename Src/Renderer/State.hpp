@@ -64,6 +64,9 @@ public:
     void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }
     void SetCullMode(eCullMode mode) { mProperties.CullMode = CullModeToVk(mode); }
 
+    FX_FORCE_INLINE void SetViewportSize(const Vec2u& size) { mProperties.ViewportSize = size; }
+    FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
+
 private:
     void BuildPipeline();
     void Reset();

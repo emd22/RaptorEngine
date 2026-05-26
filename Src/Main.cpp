@@ -48,39 +48,39 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
 
-    {
-        fx::script::FoxScript script(FX_BASE_DIR "/Scripts/Test.fox");
-
-        script.RegisterProc(fx::HashStr32("LOG"), fx::eFoxProcFlags::None, { fx::eFoxType::STRING }, N_ScriptLog);
-        fx::script::FoxValue value = script.CallProc(script.GetSymbol("Init"), {});
-        value.Print();
-
-        // while (true) {
-        //     value = script.Update();
-        //     if (!script.IsPaused()) {
-        //         value.Print();
-        //         break;
-        //     }
-        //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        // }
-    }
-
-
-    // fx::renderer::Globals::Init();
-
     // {
-    //     fx::FoxtrotGame game {};
+    //     fx::script::FoxScript script(FX_BASE_DIR "/Scripts/Test.fox");
+
+    //     script.RegisterProc(fx::HashStr32("LOG"), fx::eFoxProcFlags::None, { fx::eFoxType::STRING }, N_ScriptLog);
+    //     fx::script::FoxValue value = script.CallProc(script.GetSymbol("Init"), {});
+    //     value.Print();
+
+    //     // while (true) {
+    //     //     value = script.Update();
+    //     //     if (!script.IsPaused()) {
+    //     //         value.Print();
+    //     //         break;
+    //     //     }
+    //     //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    //     // }
     // }
 
-    // fx::Globals::Destroy();
-    // fx::renderer::Globals::Destroy();
 
-    // Defer(
-    //     []()
-    //     {
-    //         delete fx::gEnginePool;
-    //         fx::gEnginePool = nullptr;
-    //     });
+    fx::renderer::Globals::Init();
+
+    {
+        fx::FoxtrotGame game {};
+    }
+
+    fx::Globals::Destroy();
+    fx::renderer::Globals::Destroy();
+
+    Defer(
+        []()
+        {
+            delete fx::gEnginePool;
+            fx::gEnginePool = nullptr;
+        });
 
 
     return 0;

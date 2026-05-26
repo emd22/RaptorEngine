@@ -29,11 +29,11 @@ public:
             return spEmptyImage;
         }
 
-        // PagedArray<TSRef<AxImage>>& empty_images = GetEmptyImagesArray();
+        PagedArray<TSRef<AxImage>>& empty_images = GetEmptyImagesArray();
 
-        // if (!empty_images.IsInited()) {
-        //     empty_images.Create(10);
-        // }
+        if (!empty_images.IsInited()) {
+            empty_images.Create(10);
+        }
 
         constexpr uint32 pixel_size = renderer::ImageFormatUtil::GetSize(TFormat);
 
@@ -52,7 +52,7 @@ public:
             });
 
 
-        // empty_images.Insert(spEmptyImage);
+        empty_images.Insert(spEmptyImage);
 
         return spEmptyImage;
     }
@@ -66,7 +66,6 @@ public:
 
     ~AxImage() override { Destroy(); }
 
-    // private:
     void Destroy() override;
 
 public:

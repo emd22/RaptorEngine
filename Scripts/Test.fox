@@ -1,19 +1,8 @@
 vpopi() int { vreti(); }
 
-getv(...) int
-{
-    local int argc = vpopi();
-    local int z = vpopi();
-    local int y = vpopi();
-    local int x = vpopi();
-
-    return z;
-}
-
 
 Init() int
 {
-    local int value = getv(10, 20, 30);
 
     return value;
 }

@@ -335,6 +335,7 @@ void FoxVM::CallExternalFunction(Hash32 hashed_name)
     VMExternalProcEntry& func = it->second;
 
     SizedArray<FoxValue> args {};
+
     args.InitSize(func.ArgTypes.Size);
 
     uint32 back_offset = func.ArgTypes.Size - 1;

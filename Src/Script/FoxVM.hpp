@@ -13,6 +13,7 @@ enum class eFoxProcFlags
 {
     None = 0,
     ReturnsValue = (1 << 0),
+    Variadic = (1 << 1),
 };
 FxEnumFlags(eFoxProcFlags);
 
