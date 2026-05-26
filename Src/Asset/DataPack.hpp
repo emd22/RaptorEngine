@@ -7,8 +7,18 @@
 
 namespace fx {
 
+enum class eDataPackMode
+{
+    Read,
+    Write,
+};
+
 class File;
 
+/**
+ * @brief An entry in the datapack. By default, an entry does not contain data unless `DataPack::ReadEntry` or
+ * `DataPack::ReadAllEntries` is called. The entry only contains the position and size of the data until it is read.
+ */
 struct DataPackEntry
 {
     DataPackEntry(Hash64 id, SizedArray<uint8>&& data) : Id(id), Data(std::move(data)) {};
@@ -32,6 +42,7 @@ struct DataPackEntry
         return *this;
     }
 
+    FX_FORCE_INLINE bool HasData() const { return bIsRead && Data.pData != nullptr; }
 
     DataPackEntry(const DataPackEntry& other) = delete;
     DataPackEntry& operator=(const DataPackEntry& other) = delete;
@@ -42,6 +53,8 @@ public:
     uint32 DataSize = 0;
 
     SizedArray<uint8> Data;
+
+    bool bIsRead = false;
 };
 
 class DataPack
@@ -51,14 +64,27 @@ class DataPack
 public:
     DataPack() = default;
     DataPack(const DataPack& other) = delete;
+    DataPack(eDataPackMode mode, const char* path);
 
     void AddEntry(Hash64 id, const Slice<uint8>& data);
 
     void WriteToFile(const char* name);
-    bool ReadFromFile(const char* name);
 
+    /**
+     * @brief Initializes the datapack from a file located at `path`.
+     */
+    bool ReadFromFile(const char* path);
+
+    /**
+     * @brief Finds the entry for a given ID
+     */
     DataPackEntry* QuerySection(Hash64 id) const;
 
+    /**
+     * @brief Reads data from the datapack using the offset and size from `entry`.
+     * @param entry The entry with the data offset and size
+     * @returns The buffer with the loaded data.
+     */
     template <typename TDataType>
     SizedArray<TDataType> ReadSection(DataPackEntry* entry)
     {
@@ -74,12 +100,18 @@ public:
 
         File.SeekTo(entry->DataOffset);
         File.Read(Slice<TDataType>(arr));
+        entry->bIsRead = true;
 
         return std::move(arr);
     }
 
     void PrintInfo() const;
 
+    /**
+     * @brief Reads data from the datapack using the offset and size from `entry`.
+     * @param entry The entry with the data offset and size
+     * @param buffer The buffer to read into
+     */
     template <typename TDataType>
     void ReadSection(DataPackEntry* entry, const Slice<TDataType>& buffer)
     {
@@ -90,17 +122,26 @@ public:
         }
 
         uint32 read_size = std::min(entry->DataSize, buffer.Size);
-        LogDebug("(EntSize={}, BufSize={}) => {}", entry->DataSize, buffer.Size, read_size);
 
         File.SeekTo(entry->DataOffset);
         File.Read(Slice<TDataType>(buffer.pData, read_size));
+        entry->bIsRead = true;
     }
 
+    /**
+     * @brief Populates an entry with data from its offset in the datapack
+     * @param entry The entry to read
+     */
+    void ReadEntry(DataPackEntry* entry);
+
+    /**
+     * @brief Reads data from the datapack into all entries.
+     */
     void ReadAllEntries() { BinaryReadAllData(); }
 
-    void Close();
     bool IsOpen() const { return File.IsFileOpen(); };
 
+    void Close();
     ~DataPack();
 
 private:
@@ -116,12 +157,5 @@ public:
 
     PagedArray<DataPackEntry> Entries;
 };
-
-/*
- * [EntryStart] [IdSize] [Id] [Location]
- * [EntryStart] ...
- *
- * [Data...]
- */
 
 } // namespace fx

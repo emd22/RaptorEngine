@@ -49,7 +49,6 @@ struct FoxAstLiteral : public FoxAstNode
 {
     FoxAstLiteral() { this->NodeType = FX_AST_LITERAL; }
 
-    // FoxTokenizer::Token* Token = nullptr;
     FoxValue Value;
 };
 
@@ -67,23 +66,34 @@ struct FoxAstBlock : public FoxAstNode
     FoxAstBlock() { this->NodeType = FX_AST_BLOCK; }
 
     std::vector<FoxAstNode*> Statements;
+
+    bool bHasExplicitReturn = false;
 };
+
 
 struct FoxAstVarRef : public FoxAstNode
 {
     FoxAstVarRef() { this->NodeType = FX_AST_VARREF; }
 
+    Hash32 GetNameHash() const
+    {
+        if (pName == nullptr) {
+            return HashNull32;
+        }
+
+        return pName->GetHash();
+    }
+
     Token* pName = nullptr;
-    FoxScope* Scope = nullptr;
+    FoxScope* pScope = nullptr;
 };
 
 struct FoxAstAssign : public FoxAstNode
 {
     FoxAstAssign() { this->NodeType = FX_AST_ASSIGN; }
 
-    FoxAstVarRef* Var = nullptr;
-    // FoxValue Value;
-    FoxAstNode* Rhs = nullptr;
+    FoxAstVarRef* pLhs = nullptr;
+    FoxAstNode* pRhs = nullptr;
 };
 
 struct FoxAstVarDecl : public FoxAstNode
@@ -100,13 +110,6 @@ struct FoxAstVarDecl : public FoxAstNode
     bool bDefineAsGlobal = false;
 };
 
-struct FoxAstDocComment : public FoxAstNode
-{
-    FoxAstDocComment() { this->NodeType = FX_AST_DOCCOMMENT; }
-
-    Token* Comment;
-};
-
 struct FoxAstFunctionDecl : public FoxAstNode
 {
     FoxAstFunctionDecl() { this->NodeType = FX_AST_PROCDECL; }
@@ -115,13 +118,12 @@ struct FoxAstFunctionDecl : public FoxAstNode
     FoxAstBlock* pParams = nullptr;
     FoxAstBlock* pBlock = nullptr;
 
+    bool bIsVariadic = false;
     bool bIsExternal = false;
 
     eFoxType ReturnType = eFoxType::NONETYPE;
 
     uint32 SymbolTableOffset = 0;
-
-    std::vector<FoxAstDocComment*> DocComments;
 };
 
 struct FoxAstCommandMode : public FoxAstNode
@@ -136,6 +138,7 @@ struct FoxAstFunctionCall : public FoxAstNode
     FoxAstFunctionCall() { this->NodeType = FX_AST_PROCCALL; }
 
     eFoxType GetReturnType() const;
+    bool HasReturnType() const;
 
     FoxFunction* pFunction = nullptr;
     Hash32 HashedName = HashNull32;

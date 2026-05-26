@@ -19,9 +19,7 @@ public:
     /**
      * @brief Destroys and deinitializes the object.
      */
-    virtual void DestroyObject() {};
-
-    virtual ~RefCountedBase();
+    virtual void DestroyObject() = 0;
 
 private:
 protected:

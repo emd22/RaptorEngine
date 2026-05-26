@@ -2,6 +2,7 @@
 
 #include <Asset/AxBase.hpp>
 #include <Asset/AxImage.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {
 
@@ -62,8 +63,8 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
 }
 
 
-AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const SizedArray<uint8>& data,
-                                             const Vec2u& size, const String& path, eImageSaveFlags flags)
+AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
+                                             const String& path, eImageSaveFlags flags)
 {
     if ((flags & eImageSaveFlags::FlipY) != 0) {
         stbi_flip_vertically_on_write(1);
@@ -88,18 +89,30 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 
     // Since the image data in mImageData is not ours(it is stb's),
     // we need to set this flag to prevent it from attemping to be freed.
-    data_arr.bDoNotDestroy = true;
 
     data_arr.pData = mImageData;
     data_arr.Size = mDataSize;
     data_arr.Capacity = mDataSize;
 
-    image->Image.CreateGpuOnly(image->ImageType, image->Size, ImageFormat, data_arr);
+    const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
-    asset = image;
+    // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
+                                ImageFormat, data_arr, (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
-    asset->bIsUploadedToGpu = true;
-    asset->bIsUploadedToGpu.notify_all();
+    if (should_save_data) {
+        image->Image.ImageData = std::move(data_arr);
+
+
+        // Set image data to null to avoid it being destroyed.
+        mImageData = nullptr;
+    }
+
+    // Set to nullptr so that the data is not freed by the SizedArray
+    data_arr.pData = nullptr;
+
+    image->bIsUploadedToGpu = true;
+    image->bIsUploadedToGpu.notify_all();
 }
 
 // void LoaderStb::LoadCubemapToLayeredImage(const Image&)
@@ -137,7 +150,9 @@ void AxLoaderStb::Destroy(TSRef<AxBase>& asset)
     //     asset->bIsUploadedToGpu.wait(true);
     // }
 
-    stbi_image_free(mImageData);
+    if (mImageData != nullptr) {
+        stbi_image_free(mImageData);
+    }
 }
 
 } // namespace fx

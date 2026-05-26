@@ -18,6 +18,12 @@
 
 namespace fx::script {
 
+struct FoxFunctionFixup
+{
+    FoxAstFunctionCall* pCall;
+    Hash32 FunctionName;
+};
+
 class FoxParser
 {
     using TT = eTokenType;
@@ -39,7 +45,7 @@ public:
 
     FoxValue ParseValue();
 
-    FoxAstFunctionDecl* ParseProcedureDeclare();
+    FoxAstFunctionDecl* ParseFunctionDeclare();
     FoxAstFunctionDecl* ParseExtfnDeclare();
 
     FoxAstNode* ParseRhs();
@@ -60,16 +66,15 @@ public:
     FoxAstBlock* ParseBlock();
 
     FoxAstNode* ParseStatement(FoxAstBlock* parent_block);
-    FoxAstNode* ParseStatementAsCommand(FoxAstBlock* parent_block);
-
 
     FoxAstBlock* Parse();
 
-    /**
-     * @brief Parses and executes a script.
-     * @param interpreter The interpreter to execute with
-     */
-    void Execute();
+    template <typename... TTypes>
+    void ParseError(std::string_view fmt, TTypes&&... args)
+    {
+        LogError(LC_SCRIPT, fmt, std::forward<TTypes>(args)...);
+        bHasErrors = true;
+    }
 
     /**
      * @brief Executes a command on a script. Defaults to parsing with command style syntax.
@@ -87,8 +92,6 @@ public:
     // FoxExternalFunc::FuncType func, bool is_variadic);
 
     void DefineExternalVar(const char* type, const char* name, const FoxValue& value);
-
-    eFoxType LabelToType(Token* token);
 
 private:
     template <typename T>
@@ -114,6 +117,16 @@ private:
     Token* CreateTokenFromString(eTokenType type, const char* text);
     void CreateInternalVariableTokens();
 
+    bool IsGlobalScope() const { return mScopes.Size() <= 1; }
+
+    FoxAstNode* ParseGlobalDefinitions();
+
+    FoxAstNode* ParseMulExpr();
+    FoxAstNode* ParseAddExpr();
+    FoxAstNode* ParseTerm();
+
+    void FixupFunctionCalls();
+
 public:
     // char* pFileData = nullptr;
     bool bHasErrors = false;
@@ -122,11 +135,9 @@ private:
     PagedArray<FoxScope> mScopes;
     FoxScope* mCurrentScope = nullptr;
 
-    std::vector<FoxAstDocComment*> CurrentDocComments;
+    std::vector<FoxFunctionFixup> mFunctionFixups;
 
     FoxAstBlock* mpRootBlock = nullptr;
-
-    bool mInCommandMode = false;
 
     PagedArray<Token> mTokens = {};
     uint32 mTokenIndex = 0;

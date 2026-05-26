@@ -16,6 +16,15 @@ eFoxType FoxAstFunctionCall::GetReturnType() const
     return pFunction->pDeclaration->ReturnType;
 }
 
+bool FoxAstFunctionCall::HasReturnType() const
+{
+    if (!pFunction || !pFunction->pDeclaration) {
+        return false;
+    }
+
+    return pFunction->pDeclaration->ReturnType != eFoxType::NONETYPE;
+}
+
 void FoxAstPrinter::Print(FoxAstNode* node, int depth)
 {
     if (node == nullptr) {
@@ -60,8 +69,8 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
 
         printf("[ASSIGN] ");
 
-        assign->Var->pName->Print();
-        Print(assign->Rhs, depth + 1);
+        assign->pLhs->pName->Print();
+        Print(assign->pRhs, depth + 1);
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
         FoxAstFunctionCall* functioncall = static_cast<FoxAstFunctionCall*>(node);

@@ -20,8 +20,8 @@ public:
     eStatus LoadFromFile(TSRef<AxBase> asset, const String& path) override;
     eStatus LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
 
-    static eStatus SaveToFile(eImageSaveFormat format, const SizedArray<uint8>& data, const Vec2u& size,
-                              const String& path, eImageSaveFlags flags);
+    static eStatus SaveToFile(eImageSaveFormat format, const Slice<uint8>& data, const Vec2u& size, const String& path,
+                              eImageSaveFlags flags);
 
     void Destroy(TSRef<AxBase>& asset) override;
 

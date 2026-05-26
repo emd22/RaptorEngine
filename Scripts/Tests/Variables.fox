@@ -1,0 +1,20 @@
+Test_Variables()
+{
+    // Int tests
+    {
+        local int int_test_na;
+        local int int_test_a = 10;
+
+        local int int_test_al;
+        int_test_al = 2;
+        int_test_al = int_test_a;
+
+    }
+
+    // Float tests
+    {
+        local float flt_test_a = 5.0;
+        flt_test_a = 2f;
+        flt_test_a = 3.0f;
+    }
+}

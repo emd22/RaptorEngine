@@ -64,12 +64,9 @@ public:
     bool bInitialized = false;
 
 private:
-    GpuDevice* mDevice = nullptr;
-
     SizedArray<Framebuffer> mFramebuffers;
 
-    // GraphicsPipeline* mPipeline = nullptr;
-    // GraphicsPipeline* mCompPipeline = nullptr;
+    GpuDevice* mDevice = nullptr;
     VkSwapchainKHR mSwapchain = nullptr;
 };
 

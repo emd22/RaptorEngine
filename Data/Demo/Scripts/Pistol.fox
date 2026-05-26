@@ -1,4 +1,4 @@
-@include "./Scripts/WeaponBase.fox"
+#include "./Scripts/WeaponBase.fox"
 
 proc OnLoad()
 {

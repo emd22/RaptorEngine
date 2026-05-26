@@ -43,11 +43,11 @@ void Destroy()
 
     // DESTROY_GLOBAL(gState);
     DESTROY_GLOBAL(gDsLayoutCache);
-    DESTROY_GLOBAL(gShaderCache);
-    DESTROY_GLOBAL(gRenderer);
-
     DESTROY_GLOBAL(gPipelineCache);
+    DESTROY_GLOBAL(gShaderCache);
+
     DESTROY_GLOBAL(gState);
+    DESTROY_GLOBAL(gRenderer);
 }
 
 }; // namespace Globals

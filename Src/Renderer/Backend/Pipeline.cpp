@@ -74,6 +74,10 @@ void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs
 
     VkResult status = vkCreatePipelineLayout(gRenderer->GetDevice()->Device, &create_info, nullptr, &InternalLayout);
 
+    // if (reinterpret_cast<uint64>(InternalLayout) == 0x420000000042ULL) {
+    //     FX_BREAKPOINT;
+    // }
+
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Failed to create pipeline layout", status);
     }
@@ -101,6 +105,8 @@ void PipelineLayout::DestroyObject()
     vkDestroyPipelineLayout(gRenderer->GetDevice()->Device, InternalLayout, nullptr);
     InternalLayout = nullptr;
 }
+
+PipelineLayout::~PipelineLayout() { ReleaseRef(); }
 
 
 /////////////////////////////////////

@@ -86,6 +86,16 @@ public:
 
     static SizedArray<TElementType> CreateEmpty() { return SizedArray<TElementType>(nullptr, 0); }
 
+    static SizedArray<TElementType> Clone(const SizedArray<TElementType>& other)
+    {
+        SizedArray<TElementType> clone;
+        clone.InitCapacity(other.Capacity);
+        for (uint32 i = 0; i < other.Size; i++) {
+            clone.Insert(other[i]);
+        }
+        return std::move(clone);
+    }
+
 public:
     SizedArray(TElementType* ptr, size_t size) : pData(ptr), Size(size), Capacity(size) {}
 
@@ -111,32 +121,17 @@ public:
         }
     };
 
-    SizedArray(SizedArray<TElementType>&& other)
-    {
-        pData = std::move(other.pData);
-        other.pData = nullptr;
-
-        Capacity = other.Capacity;
-        Size = other.Size;
-
-        other.Size = 0;
-        other.Capacity = 0;
-    }
+    SizedArray(SizedArray<TElementType>&& other) { (*this) = std::move(other); }
 
     SizedArray() = default;
 
     ~SizedArray() { Free(); }
 
 
-    void Free()
+    void FreeNoDestructor()
     {
         if (pData == nullptr || bDoNotDestroy) {
             return;
-        }
-
-        for (size_t i = 0; i < Size; i++) {
-            TElementType& element = pData[i];
-            element.~TElementType();
         }
 
 #ifndef FX_SIZED_ARRAY_NO_MEMPOOL
@@ -154,6 +149,20 @@ public:
         pData = nullptr;
         Capacity = 0;
         Size = 0;
+    }
+
+    void Free()
+    {
+        if (pData == nullptr || bDoNotDestroy) {
+            return;
+        }
+
+        for (size_t i = 0; i < Size; i++) {
+            TElementType& element = pData[i];
+            element.~TElementType();
+        }
+
+        FreeNoDestructor();
     }
 
     Iterator begin() const { return Iterator(pData, 0); }
@@ -199,6 +208,7 @@ public:
             Free();
         }
 
+
         pData = other.pData;
         other.pData = nullptr;
 
@@ -207,6 +217,9 @@ public:
 
         other.Size = 0;
         other.Capacity = 0;
+
+        bDoNotDestroy = other.bDoNotDestroy;
+        other.bDoNotDestroy = false;
 
         return *this;
     }
@@ -417,7 +430,6 @@ public:
     TElementType* pData = nullptr;
     SizeType Size = 0;
     SizeType Capacity = 0;
-
 
     bool bDoNotDestroy = false;
 };

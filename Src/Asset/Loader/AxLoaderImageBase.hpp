@@ -15,6 +15,8 @@ public:
     renderer::eImageType ImageType = renderer::eImageType::Flat;
     renderer::eImageFormat ImageFormat = renderer::eImageFormat::None;
     // int16 ImageNumComponents = 0;
+    //
+    eImageCreateFlags CreationFlags = eImageCreateFlags::None;
 };
 
 } // namespace fx

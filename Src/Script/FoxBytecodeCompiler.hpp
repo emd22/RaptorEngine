@@ -36,6 +36,12 @@ struct FoxIRFunctionRef
 };
 
 
+struct FoxBytecodeString
+{
+    uint32 FixupOffset = 0;
+    String StringValue;
+};
+
 class FoxBytecodeCompiler
 {
 public:
@@ -75,13 +81,20 @@ private:
     void EmitBlock(FoxAstBlock* block, int params_to_save, bool is_function_body);
     void EmitFunctionDeclaration(FoxAstFunctionDecl* function);
     void EmitFunctionDefinitionsInBlock(FoxAstBlock* block);
-    void DoFunctionCall(FoxAstFunctionCall* call);
+
+    eFoxType DoBuiltin(FoxAstFunctionCall* call);
+    void EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value);
+
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
     void EmitAssign(FoxAstAssign* assign);
     FoxBytecodeVarHandle* DefineParam(FoxAstNode* param_decl_node);
     FoxBytecodeVarHandle* DefineReturnVar(FoxAstVarDecl* decl);
 
+    void ValidateParameters(FoxAstFunctionCall* call);
+    void AddString(uint32 fixup_offset, const String& value);
+
     void EmitSymbolTable(FoxAstBlock* root);
+    void EmitStrings();
 
     template <typename... TTypes>
     void CompileError(const char* fmt, TTypes&&... args)
@@ -92,23 +105,20 @@ private:
 
     uint16 GetSizeOfType(Token* type);
 
-    void DoSaveInt32(uint32 stack_offset, uint32 value, bool force_absolute = false);
-
     void EmitPush32(int32 value);
     void EmitPushFloat32(float32 value);
+    void EmitPushString(uint32 value);
     void EmitPushVar(VarIndex var);
+    void EmitPushReturnAddr();
 
-    void EmitPushVarOrLiteral(FoxAstNode* node);
+    eFoxType EmitPushVarOrLiteral(FoxAstNode* node);
     eFoxType GetVarOrLiteralType(FoxAstNode* node);
 
     void EmitStackAlloc(uint16 size);
 
     void EmitPopVar(VarIndex var);
-
-
-    void EmitSave32(int16 offset, uint32 value);
-
-    void EmitSaveAbsolute32(uint32 offset, uint32 value);
+    void EmitPopDiscard();
+    void EmitPopReturnAddr();
 
     void EmitJumpRelative(uint16 offset);
     void EmitJumpConditional(uint16 offset, eFoxConditionResult cond);
@@ -118,6 +128,9 @@ private:
     void EmitJumpReturnToCaller();
     void EmitJumpReturnToCallerInt32();
     void EmitJumpReturnToCallerFloat32();
+    void EmitJumpReturnToCallerString();
+
+    void EmitJumpPause(uint16 time_ms);
 
     void EmitJumpCallExternal(Hash32 hashed_name);
 
@@ -126,22 +139,26 @@ private:
     eFoxConditionResult EmitPushConditionResult(FoxAstNode* condition_node);
 
     void EmitVariableSetInt32(uint16 var_index, int32 value);
+    void EmitVariableSetString(uint16 var_index);
     void EmitVariableSetFloat32(uint16 var_index, float32 value);
     void EmitVariableSetVar(VarIndex dst, VarIndex src);
 
     void EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global);
     void EmitVariableIndex(uint16 var_index);
 
-    void EmitVariableCastInt32(VarIndex var_index);
-    void EmitVariableCastFloat32(VarIndex var_index);
+    void EmitVariableCastInt32();
+    void EmitVariableCastFloat32();
 
     void EmitCompare();
     void EmitCompareNotZero();
 
-    void EmitParamsStart();
     void EmitType(eFoxType type);
 
-    uint32 EmitDataString(char* str, uint16 length);
+    /**
+     * @brief Emits a null-terminated string to the bytecode with the length preceding it.
+     * The length is 16-bit and is used to quickly read in the string and ensure we are not reading past boundaries.
+     */
+    uint32 EmitDataString(const char* str, uint16 length, bool emit_length_prefix);
 
     void EmitBinop(FoxAstBinop* binop);
 
@@ -156,28 +173,30 @@ private:
     void Write16(uint16 value);
     void Write32(uint32 value);
 
-    FoxBytecodeVarHandle* FindVarHandle(Hash32 hashed_name);
-    VarIndex FindVarInScope(Hash32 hashed_name);
+    FoxBytecodeVarHandle* FindVarHandle(Hash32 hashed_name) const;
+    VarIndex FindVarInScope(Hash32 hashed_name) const;
 
     FoxBytecodeFunctionHandle* FindFunctionHandle(Hash32 hashed_name);
 
-
-    bool DoesNodeBranch(FoxAstNode* node);
-
+    eFoxType GetLiteralUnderlyingType(FoxAstLiteral* literal) const;
 
 public:
     PagedArray<FoxBytecodeVarHandle> VarHandles;
     std::vector<FoxBytecodeFunctionHandle> FunctionHandles;
     PagedArray<uint8> mBytecode {};
 
+    PagedArray<FoxBytecodeString> Strings;
+
 private:
     uint16 mVariableIndex = 0;
-
     uint32 mErrorCount = 0;
+
+    int32 mScopeIndex = 0;
 
     FoxAstFunctionDecl* mpCurrentFunctionBody = nullptr;
 
     bool mEntryPointEmitted = false;
+    bool mbEmitDebugInfo = true;
 };
 
 
@@ -186,7 +205,7 @@ class FoxBytecodePrinter
 public:
     FoxBytecodePrinter(const SizedArray<uint8>& bytecode) { mpBytecode = Slice(bytecode); }
 
-    void PrintSymbolTable();
+    void LoadSymbolTable();
     void Print();
     void PrintOp();
 
@@ -199,9 +218,7 @@ private:
 
     void DoPush(char* s, uint8 op_base, uint8 op_spec);
     void DoPop(char* s, uint8 op_base, uint8 op_spec);
-    void DoLoad(char* s, uint8 op_base, uint8 op_spec);
     void DoArith(char* s, uint8 op_base, uint8 op_spec);
-    void DoSave(char* s, uint8 op_base, uint8 op_spec);
     void DoJump(char* s, uint8 op_base, uint8 op_spec);
     void DoData(char* s, uint8 op_base, uint8 op_spec);
     void DoType(char* s, uint8 op_base, uint8 op_spec);
@@ -209,11 +226,13 @@ private:
     void DoVariable(char* s, uint8 op_base, uint8 op_spec);
     void DoCompare(char* s, uint8 op_base, uint8 op_spec);
 
-    char* ReadString(char* buffer, uint32 buffer_size);
+    char* ReadString(char* buffer, uint32 buffer_size, bool has_prefixed_length);
 
 private:
     uint32 mBytecodeIndex = 0;
     Slice<uint8> mpBytecode { nullptr };
+
+    uint32 mStringTableOffset = 0;
 };
 
 } // namespace fx::script

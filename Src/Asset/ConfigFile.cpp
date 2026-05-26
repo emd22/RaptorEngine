@@ -217,12 +217,8 @@ static ConfigEntry::eValueType GetValueTokenType(const Token& token)
         }
     }
 
-    for (uint32 i = 0; i < token.Length; i++) {
-        char ch = token.Start[i];
-
-        if (ch == '"') {
-            current_type = VType::String;
-        }
+    if (token.Type == eTokenType::String) {
+        current_type = VType::String;
     }
 
     return current_type;
@@ -351,12 +347,6 @@ void ConfigFile::ParseValue(ConfigValue& value)
     case VType::None:
         break;
     case VType::String:
-        // Remove the first quote
-        value_token->Start++;
-        value_token->Length--;
-
-        // Remove the ending quote
-        value_token->Length--;
         value.Set(value_token->GetStr());
         break;
     case VType::Int:

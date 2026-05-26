@@ -19,6 +19,9 @@ public:
 
     VkDescriptorSetLayout Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl, uint32 set);
 
+    void Destroy();
+    ~DsLayoutCache() { Destroy(); }
+
 public:
     std::unordered_map<Hash64, VkDescriptorSetLayout, Hash64Stl> Cache;
 };

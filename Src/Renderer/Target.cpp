@@ -53,7 +53,7 @@ void Target::CreateImage()
         return;
     }
 
-    Image.Create(ImageType, Image.Size, Image.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect);
+    Image.Create(ImageType, Image.Size, 1, Image.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect);
 }
 
 

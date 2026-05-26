@@ -30,8 +30,10 @@ class RenderStage
 public:
     RenderStage() = default;
 
-    void Create(const Vec2u& size)
+    void Create(const char* name, const Vec2u& size)
     {
+        pcName = name;
+
         ClearValues.InitCapacity(scMaxOutputTargets);
         mSize = size;
     }
@@ -71,6 +73,8 @@ public:
     SizedArray<VkClearValue> ClearValues;
 
 private:
+    const char* pcName = "Unnamed";
+
     TargetList mOutputTargets;
     SizedArray<InputTarget> mInputTargets;
 
@@ -78,11 +82,10 @@ private:
     RenderPass mRenderPass;
     Vec2u mSize = Vec2u::sZero;
 
-    bool mbIsBuilt : 1 = false;
-
-
-    bool mbIsFinalStage = false;
     SizedArray<Framebuffer> mFinalStageFramebuffers;
+
+    bool mbIsBuilt : 1 = false;
+    bool mbIsFinalStage : 1 = false;
 };
 
 } // namespace fx::renderer

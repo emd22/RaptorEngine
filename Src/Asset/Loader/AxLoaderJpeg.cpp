@@ -7,18 +7,18 @@
 #include <Asset/AxImage.hpp>
 #include <Core/Memory.hpp>
 #include <Core/Ref.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {
 
-using namespace renderer;
 
-static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
+static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(renderer::eImageFormat format)
 {
     switch (format) {
-    case eImageFormat::BGRA8_UNorm:
+    case renderer::eImageFormat::BGRA8_UNorm:
         return JCS_EXT_BGRA;
-    case eImageFormat::RGBA8_UNorm:
-    case eImageFormat::RGBA8_SRGB:
+    case renderer::eImageFormat::RGBA8_UNorm:
+    case renderer::eImageFormat::RGBA8_SRGB:
         return JCS_EXT_RGBA;
     default:;
     }
@@ -88,19 +88,14 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
     Assert(data != nullptr);
 
     jpeg_mem_src(&mJpegInfo, data, size);
-
     jpeg_read_header(&mJpegInfo, true);
 
-
-    const uint32 num_components = ImageFormatUtil::GetSize(ImageFormat);
+    const uint32 num_components = renderer::ImageFormatUtil::GetSize(ImageFormat);
 
     J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
-
     mJpegInfo.out_color_space = color_space;
 
     jpeg_start_decompress(&mJpegInfo);
-
-    printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
     image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
@@ -124,10 +119,22 @@ void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
 {
     TSRef<AxImage> image(asset);
 
-    image->Image.CreateGpuOnly(image->ImageType, image->Size, ImageFormat, mImageData);
+    const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
-    asset->bIsUploadedToGpu = true;
-    asset->bIsUploadedToGpu.notify_all();
+    // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
+                                ImageFormat, mImageData, (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
+
+    if (should_save_data) {
+        image->Image.ImageData = std::move(mImageData);
+
+        // Set image data to null to avoid it being destroyed.
+        mImageData.pData = nullptr;
+        mImageData.Size = 0;
+    }
+
+    image->bIsUploadedToGpu = true;
+    image->bIsUploadedToGpu.notify_all();
 }
 
 void AxLoaderJpeg::Destroy(TSRef<AxBase>& asset)

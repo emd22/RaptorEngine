@@ -113,16 +113,20 @@ void RenderBackend::InitUploadContext()
 {
     UploadContext.CmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
     UploadContext.CmdBuffer.Create(&UploadContext.CmdPool);
+    UploadContext.ImmediateCmdBuffer.Create(&UploadContext.CmdPool);
 
     UploadContext.UploadFence.Create();
-    UploadContext.UploadFence.Reset();
+    UploadContext.ImmediateUploadFence.Create();
 }
 
 void RenderBackend::DestroyUploadContext()
 {
-    UploadContext.UploadFence.Destroy();
     UploadContext.CmdBuffer.Destroy();
+    UploadContext.ImmediateCmdBuffer.Destroy();
     UploadContext.CmdPool.Destroy();
+
+    UploadContext.UploadFence.Destroy();
+    UploadContext.ImmediateUploadFence.Destroy();
 }
 
 void RenderBackend::InitFrames()
@@ -137,17 +141,14 @@ void RenderBackend::InitFrames()
         FrameData& frame = Frames.pData[i];
         frame.CmdPool.Create(device, graphics_family);
         frame.CmdBuffer.Create(&frame.CmdPool);
-        /*frame.ShadowCommandBuffer.Create(&frame.CommandPool);
-        frame.CompCommandBuffer.Create(&frame.CommandPool);
-        frame.LightCommandBuffer.Create(&frame.CommandPool);*/
+
+        frame.InFlight.Create();
+        // frame.InFlight.Reset();
 
         frame.Create(device);
 
         auto synchro_label = std::format("Frame {} I.A.", i);
         Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.ImageAvailable.Get());
-
-        synchro_label = std::format("Frame {} G.P", i);
-        Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.OffscreenSem.Get());
 
         synchro_label = std::format("Frame {} R.F", i);
         Util::SetDebugLabel(synchro_label.c_str(), VK_OBJECT_TYPE_SEMAPHORE, frame.RenderFinished.Get());
@@ -158,15 +159,14 @@ void RenderBackend::DestroyFrames()
 {
     {
         SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
-
         vkQueueWaitIdle(graphics_queue.Get());
     }
 
     for (auto& frame : Frames) {
         // frame.DescriptorSet.Destroy();
-        frame.CompDescriptorSet.Destroy();
 
         frame.CmdBuffer.Destroy();
+        frame.CmdPool.Destroy();
 
         frame.Destroy();
     }
@@ -413,9 +413,9 @@ void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipel
 }
 
 
-void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
+void RenderBackend::SubmitImmediateUploadCmd(RenderBackend::SubmitFunc upload_func)
 {
-    CommandBuffer& cmd = UploadContext.CmdBuffer;
+    CommandBuffer& cmd = UploadContext.ImmediateCmdBuffer;
 
     cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     upload_func(cmd);
@@ -430,14 +430,48 @@ void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
 
     SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
 
-    VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Get()),
+    VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.ImmediateUploadFence.Get()),
           "Error submitting upload buffer");
 
-    UploadContext.UploadFence.WaitFor();
-    UploadContext.UploadFence.Reset();
+    transfer_queue.Unlock();
+
+    UploadContext.ImmediateUploadFence.WaitFor();
+    UploadContext.ImmediateUploadFence.Reset();
 
     UploadContext.CmdPool.Reset();
 }
+
+void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
+{
+    CommandBuffer& cmd = UploadContext.CmdBuffer;
+
+    // cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    upload_func(cmd);
+    // cmd.End();
+
+    // const VkSubmitInfo submit_info = {
+    //     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+
+    //     .commandBufferCount = 1,
+    //     .pCommandBuffers = &cmd.Cmd,
+    // };
+
+    // SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
+
+    // VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Get()),
+    //       "Error submitting upload buffer");
+
+    // transfer_queue.Unlock();
+
+    // UploadContext.UploadFence.WaitFor();
+    // UploadContext.UploadFence.Reset();
+
+    // UploadContext.CmdPool.Reset();
+}
+
+void RenderBackend::BeginUploads() {}
+
+void RenderBackend::SubmitUploads() {}
 
 
 void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
@@ -472,6 +506,7 @@ eFrameResult RenderBackend::BeginFrame()
 {
     FrameData* frame = GetFrame();
 
+    BeginUploads();
 
     LightBuffer.Rewind();
 
@@ -498,6 +533,8 @@ void RenderBackend::BeginGeometry()
 
 void RenderBackend::PresentFrame()
 {
+    SubmitUploads();
+
     FrameData* frame = GetFrame();
 
     const VkPipelineStageFlags wait_stages[] = {
@@ -508,6 +545,12 @@ void RenderBackend::PresentFrame()
 
     VkSemaphore wait_semaphore = frame->ImageAvailable.Get();
 
+
+    VkCommandBuffer cmds_to_submit[] = {
+        frame->CmdBuffer.Cmd,
+        // frame->TransferCmdBuffer.Cmd,
+    };
+
     const VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 
@@ -515,8 +558,8 @@ void RenderBackend::PresentFrame()
         .pWaitSemaphores = &wait_semaphore,
         .pWaitDstStageMask = wait_stages,
 
-        .commandBufferCount = 1,
-        .pCommandBuffers = &frame->CmdBuffer.Cmd,
+        .commandBufferCount = std::size(cmds_to_submit),
+        .pCommandBuffers = cmds_to_submit,
 
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = &submit_semaphore,

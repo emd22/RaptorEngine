@@ -1,7 +1,8 @@
+vpopi() int { vreti(); }
 
-proc Init() int
+
+Init() int
 {
-    local int x = 10;
 
-    return x;
+    return value;
 }

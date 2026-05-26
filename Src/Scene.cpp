@@ -140,8 +140,6 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     // gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
     renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
-
-    // renderer::Pipeline& pipeline = gRenderer->pDeferredRenderer->PlDebugLayer;
     pipeline.Bind(cmd);
 
     DebugLayerPushConstants push_constants {};
@@ -192,32 +190,31 @@ void Scene::RenderObjectShadows(const TSRef<Object>& obj)
 
     bool in_skinned_shader = false;
 
-    Pipeline* pipeline = &gShadowRenderer->GetPipeline();
+    Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
     if (in_skinned_shader && !obj->IsSkinned()) {
-        pipeline = &gShadowRenderer->GetPipeline();
         in_skinned_shader = false;
-        pipeline->Bind(cmd);
+        pipeline.Bind(cmd);
 
-        gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+        gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
                                                        gObjectManager->GetBaseOffset());
     }
-    if (obj->IsSkinned()) {
-        pipeline = &gShadowRenderer->GetSkinnedPipeline();
-        in_skinned_shader = true;
-        pipeline->Bind(cmd);
+    // if (obj->IsSkinned()) {
+    //     pipeline = &gShadowRenderer->GetSkinnedPipeline();
+    //     in_skinned_shader = true;
+    //     pipeline->Bind(cmd);
 
-        gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
-                                                       gObjectManager->GetBaseOffset());
-    }
+    //     gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+    //                                                    gObjectManager->GetBaseOffset());
+    // }
 
     obj->Update();
 
     consts.ObjectId = obj->ObjectId;
 
-    gRenderer->SubmitPushConstants(cmd, *pipeline, eShaderType::Vertex, consts);
+    gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 
     obj->RenderPrimitive(cmd);
 

@@ -10,7 +10,7 @@ uint32 Bitset::Init(uint32 max_bits)
 
     // Adjust the amount of bits to be a multiple of 64
     if (remainder != 0) {
-        max_bits += (64 - remainder);
+        max_bits += (scBitsPerInt - remainder);
     }
 
     const uint32 ints_required = (max_bits >> 6);

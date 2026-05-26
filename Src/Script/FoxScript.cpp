@@ -5,6 +5,8 @@
 #include "FoxParser.hpp"
 #include "FoxVM.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <Core/Defer.hpp>
 #include <Core/String.hpp>
 
@@ -68,8 +70,8 @@ void FoxScript::Load(const String& path)
 
     Vm.InitVM(std::move(bytecode));
 
-    RegisterProc(HashStr32("WB_InitAmmoVars"), false, 2, &WB_InitAmmoVars);
-    RegisterProc(HashStr32("WB_InitStatVars"), false, 1, &WB_InitStatVars);
+    RegisterProc(HashStr32("WB_InitAmmoVars"), eFoxProcFlags::None, { eFoxType::INT, eFoxType::INT }, &WB_InitAmmoVars);
+    RegisterProc(HashStr32("WB_InitStatVars"), eFoxProcFlags::None, { eFoxType::INT }, &WB_InitStatVars);
 
     // Since all we need is the bytecode now, we can destroy the AST.
     FoxAstDestroyer destroyer;
@@ -77,29 +79,16 @@ void FoxScript::Load(const String& path)
 
     // Call OnLoad if it exists
     CallProc(HashStr32("OnLoad"), {});
-
-    mpSymTick = GetSymbol(HashStr32("OnTick"));
-
-    // {
-    //     gEnginePool->Free(file_data.pData);
-
-    //     for (char* ptr : tokenizer.DataPtrs) {
-    //         gEnginePool->Free(ptr);
-    //     }
-    // }
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
 
-void FoxScript::RegisterProc(Hash32 name_hash, bool returns_value, uint32 parameter_count, VMExternalFunction function)
+void FoxScript::RegisterProc(Hash32 name_hash, eFoxProcFlags flags, const SizedArray<eFoxType> arg_types,
+                             VMExternalFunction function)
 {
-    VMExternalProcEntry entry {
-        .pFunc = function,
-        .ArgCount = parameter_count,
-        .bReturnsValue = returns_value,
-    };
+    VMExternalProcEntry entry { .pFunc = function, .ArgTypes = SizedArray<eFoxType>::Clone(arg_types), .Flags = flags };
 
-    Vm.ExternalProcs[name_hash] = entry;
+    Vm.ExternalProcs[name_hash] = std::move(entry);
 
     LogInfo("Registered external function {}", name_hash);
 }
@@ -110,16 +99,47 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
         return FoxValue::scNone;
     }
 
-    Vm.ScopeIndex++;
+    Vm.PushReturnAddr(0);
 
+    Vm.ScopeIndex++;
     Vm.PC = sym->Offset;
 
     for (uint32 arg_index = 0; arg_index < args.Size; arg_index++) {
         PushValue(args[arg_index]);
     }
 
+    return Resume();
+}
+
+FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
+{
+    return CallProc(GetSymbol(name_hash), args);
+}
+
+FoxValue FoxScript::Update()
+{
+    if (SDL_GetTicks() < ResumeTime) {
+        return FoxValue::scNone;
+    }
+
+    return Resume();
+}
+
+FoxValue FoxScript::Resume()
+{
+    if (Vm.ScopeIndex <= 0) {
+        return FoxValue::scNone;
+    }
+
+    Vm.bIsPaused = false;
+
     while (Vm.PC < Vm.mBytecode.Size) {
         Vm.ExecuteOp();
+
+        if (Vm.bIsPaused) {
+            ResumeTime = SDL_GetTicks() + Vm.PauseTime;
+            return FoxValue::scNone;
+        }
 
         if (Vm.ScopeIndex <= 0) {
             break;
@@ -127,15 +147,14 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     }
 
     if (Vm.bReturnValueOnStack) {
-        return FoxValue::NumberFromRaw(Vm.LastPushType, Vm.Pop32());
+        if (Vm.LastPushType == eFoxType::STRING) {
+            return FoxValue(Vm.GetString(Vm.Pop32()));
+        }
+
+        return FoxValue::ValueFromRaw(Vm.LastPushType, Vm.Pop32());
     }
 
     return FoxValue::scNone;
-}
-
-FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
-{
-    return CallProc(GetSymbol(name_hash), args);
 }
 
 

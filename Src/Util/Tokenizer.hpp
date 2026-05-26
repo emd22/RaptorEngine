@@ -38,6 +38,7 @@ enum class eTokenType
     Plus,
     Dollar,
     Minus,
+    Asterisk,
 
     Question,
 
@@ -147,6 +148,7 @@ public:
         Start = nullptr;
         End = nullptr;
         Length = 0;
+        Type = eTokenType::Identifier;
     }
 
 
@@ -169,7 +171,7 @@ class Tokenizer
 {
 private:
 public:
-    const char* SingleCharOperators = "=()[]{}<>+-$.,;?!";
+    const char* SingleCharOperators = "=()[]{}<>+-*$.,;?!";
 
     struct State
     {

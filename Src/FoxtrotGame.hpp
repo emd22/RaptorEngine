@@ -123,8 +123,6 @@ public:
     eEditorMode EditorModeType = eEditorMode::Default;
     SizedArray<BaseEditorMode*> EditorModes;
 
-    Ref<PerspectiveCamera> pEditorCamera { nullptr };
-
 private:
     uint64 mLastTick = 0;
     Scene mMainScene {};

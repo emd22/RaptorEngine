@@ -119,17 +119,18 @@ public:
         return asset;
     }
 
-    TSRef<AxImage> LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, const std::string& path)
+    TSRef<AxImage> LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, const std::string& path,
+                             eImageCreateFlags flags)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
-        LoadImage(image_type, format, asset, path);
+        LoadImage(image_type, format, asset, path, flags);
 
         return asset;
     }
 
-    inline TSRef<AxImage> LoadImage(const std::string& path, renderer::eImageFormat format)
+    inline TSRef<AxImage> LoadImage(const std::string& path, renderer::eImageFormat format, eImageCreateFlags flags)
     {
-        return LoadImage(renderer::eImageType::Flat, format, path);
+        return LoadImage(renderer::eImageType::Flat, format, path, flags);
     }
 
     /**
@@ -172,14 +173,15 @@ public:
 
 
     void LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
-                   const std::string& path);
+                   const std::string& path, eImageCreateFlags flags);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    inline void LoadImage(TSRef<AxImage>& asset, renderer::eImageFormat format, const std::string& path)
+    inline void LoadImage(TSRef<AxImage>& asset, renderer::eImageFormat format, const std::string& path,
+                          eImageCreateFlags flags)
     {
-        return LoadImage(renderer::eImageType::Flat, format, asset, path);
+        return LoadImage(renderer::eImageType::Flat, format, asset, path, flags);
     }
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
@@ -231,6 +233,8 @@ public:
     //    DataNotifier DataLoaded;
 private:
     AxQueue mLoadQueue;
+
+    SizedArray<AxWorker*> WorkersWaitingToUpload;
 
     std::atomic_flag mbActive;
 

@@ -13,8 +13,10 @@
 #include <Renderer/PrimitiveMesh.hpp>
 
 // Renderer includes
+#include <Asset/MipmapGen.hpp>
+#include <Core/FilesystemIO.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
 
 namespace fx {
 
@@ -73,6 +75,44 @@ void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<Primiti
 
     // mesh->UploadVertices();
 }
+
+// static void GenerateMipsForTexture(const String& asset_path, const Slice<uint8>& pixels)
+// {
+//     MipmapGen mg {};
+
+//     const String path = String::Fmt("");
+
+//     mg.GenerateMipmaps(path.CStr(), eImageFormat::RGBA8_UNorm, pixels, )
+// }
+
+template <eImageFormat TFormat>
+static void LoadMipmapsIfExists(const String& asset_path, const char* component_name,
+                                MaterialComponent<TFormat>& component)
+{
+    // Get the folder that the model would be stored in.
+    // This uses the normal path minus the file extension.
+    // For example,
+    //      Assets/Poo/NameOfModel.glb   becomes    Assets/Poo/NameOfModel/...
+
+    const String base_path = FilesystemIO::RemoveExtension(asset_path);
+
+    // Get the full path:
+    //      Assets/Poo/NameOfModel/Diffuse.mdp
+
+    const String full_path = String::Fmt("{}/{}.mdp", base_path, component_name);
+
+    // The pregenerated file exists, use it.
+    if (FilesystemIO::FileExists(full_path.CStr())) {
+        TSRef<AxImage> image = TSRef<AxImage>::New();
+
+        // image->Image.CreateFromData(eImageType image_type, const Vec2u &size, uint16 mips_count, eImageFormat format,
+        // const SizedArray<uint8> &image_data, eImageCreateFlags flags)
+
+        // component.pAssetImage = image;
+        // component.pDataToLoad = nullptr;
+    }
+}
+
 
 template <eImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponent<TFormat>& component,
@@ -210,8 +250,8 @@ void AxLoaderGltf::UploadMeshToGpu(TSRef<Object>& object)
         LogInfo(LC_ASSET, "Upload mesh to GPU");
 
         // Set the mesh indices
-        primitive_mesh->UploadIndices();
-        primitive_mesh->UploadVertices();
+        primitive_mesh->UploadIndices(RenderBackendFwd::GetUploadCmd());
+        primitive_mesh->UploadVertices(RenderBackendFwd::GetUploadCmd());
 
         primitive_mesh->bIsReady = true;
     }
@@ -418,6 +458,8 @@ void AxLoaderGltf::ProcessData(TSRef<Object>& output_object)
 AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const String& path)
 {
     cgltf_options options {};
+
+    mModelPath = path;
 
     cgltf_result status = cgltf_parse_file(&options, path.CStr(), &mpGltfData);
     if (status != cgltf_result_success) {

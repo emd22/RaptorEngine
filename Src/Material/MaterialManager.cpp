@@ -86,9 +86,15 @@ void MaterialManager::MakeNullMaterial()
     };
 
     TSRef<AxImage> diffuse = TSRef<AxImage>::New();
-    diffuse->Image.CreateGpuOnly(renderer::eImageType::Flat, Vec2u(4, 4), renderer::eImageFormat::RGBA8_UNorm,
-                                 diffuse_data);
-    diffuse->MarkAndSignalLoaded();
+    renderer::gRenderer->SubmitImmediateUploadCmd(
+        [&](renderer::CommandBuffer& cmd)
+        {
+            diffuse->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(4, 4), 1,
+                                          renderer::eImageFormat::RGBA8_UNorm, diffuse_data, eImageCreateFlags::None);
+
+            diffuse->MarkAndSignalLoaded();
+        });
+
 
     material->Attach(Material::eResourceType::Diffuse, diffuse);
     material->Attach(Material::eResourceType::Normal, AxImage::GetEmptyImage<renderer::eImageFormat::RGBA8_UNorm>());
@@ -158,13 +164,6 @@ void MaterialManager::DestroyMaterial(const MaterialID& id)
     }
 
     std::lock_guard guard(mInUse);
-
-    // If the material exists, destroy it
-    if (MaterialsInUse.Get(id.GetID())) {
-        Material* mat = GetMaterial(id);
-        mat->~Material();
-    }
-
     MaterialsInUse.Unset(id.GetID());
 }
 
@@ -173,6 +172,9 @@ void MaterialManager::Destroy()
     if (!mbInitialized) {
         return;
     }
+
+    MaterialsInUse.ClearAll();
+    mMaterials.Free();
 
     MaterialPropertiesBuffer.Destroy();
     mDescriptorPool.Destroy();

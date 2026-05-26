@@ -64,6 +64,7 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
     gBufferTracker.AddBuffer(BufferId, Type, Size, mBufferFlags);
 
+
     // LogInfo("[Created GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
     // GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)
     // != 0, (buffer_flags & eGpuBufferFlags::TransferReceiver) != 0);
@@ -175,7 +176,7 @@ void RawGpuBuffer::Upload(void* data, uint64 size)
 // Staged Gpu Buffer Functions
 /////////////////////////////////////
 
-void GpuBuffer::Create(eGpuBufferType buffer_type, void* data, uint64 size)
+void GpuBuffer::Create(CommandBuffer& cmd, eGpuBufferType buffer_type, void* data, uint64 size)
 {
     Size = size;
     Type = buffer_type;
@@ -187,20 +188,15 @@ void GpuBuffer::Create(eGpuBufferType buffer_type, void* data, uint64 size)
     // Create the GPU-only buffer as a transfer destination
     this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
-    // Transfer
-    Fx_Fwd_SubmitUploadCmd(
-        [&](CommandBuffer& cmd)
-        {
-            VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
-            vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
-        });
+    VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
+    vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
 
     staging_buffer.Destroy();
 }
 
-void GpuBuffer::Create(eGpuBufferType buffer_type, const AnonArray& data)
+void GpuBuffer::Create(CommandBuffer& cmd, eGpuBufferType buffer_type, const AnonArray& data)
 {
-    Create(buffer_type, data.pData, data.Size * data.ObjectSize);
+    Create(cmd, buffer_type, data.pData, data.Size * data.ObjectSize);
 }
 
 } // namespace fx::renderer

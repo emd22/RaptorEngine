@@ -7,7 +7,18 @@
 #include <Core/Types.hpp>
 #include <unordered_map>
 
-namespace fx::script {
+namespace fx {
+
+enum class eFoxProcFlags
+{
+    None = 0,
+    ReturnsValue = (1 << 0),
+    Variadic = (1 << 1),
+};
+FxEnumFlags(eFoxProcFlags);
+
+
+namespace script {
 
 ///////////////////////////////////////////
 // Bytecode VM
@@ -21,7 +32,7 @@ struct VMCallFrame
 
 struct VMVariable
 {
-    Hash32 NameHash = HashNull32;
+    Hash32 GlobalNameHash = HashNull32;
     bool bIsGlobalRef = false;
     FoxValue Value;
 };
@@ -41,13 +52,14 @@ using VMExternalFunction = void (*)(FoxVM* vm, const SizedArray<FoxValue>& args)
 struct VMExternalProcEntry
 {
     VMExternalFunction pFunc;
-    uint32 ArgCount = 0;
-    bool bReturnsValue = false;
+    SizedArray<eFoxType> ArgTypes;
+    eFoxProcFlags Flags;
 };
 
 class FoxVM
 {
     static constexpr uint32 scStackSize = 1024 * 16;
+    static constexpr uint32 scCallStackSize = 512;
 
 public:
     FoxVM() = default;
@@ -56,12 +68,17 @@ public:
 
     FX_FORCE_INLINE uint32 GetStackPointer() const { return StackPointer; }
 
+    const char* GetString(uint32 offset) const;
+
     FoxSymbol* GetSymbol(const Hash32 name_hash) const;
     uint32 GetProcAddr(const Hash32 name_hash) const;
 
     void Push16(uint16 value);
     void Push32(eFoxType type, uint32 value);
     uint32 Pop32();
+
+    void PushReturnAddr(uint32 addr);
+    uint32 PopReturnAddr();
 
     void ExecuteOp();
 
@@ -72,9 +89,7 @@ private:
 
     void DoPush(uint8 op_base, uint8 op_spec);
     void DoPop(uint8 op_base, uint8 op_spec);
-    void DoLoad(uint8 op_base, uint8 op_spec);
     void DoArith(uint8 op_base, uint8 op_spec);
-    void DoSave(uint8 op_base, uint8 op_spec);
     void DoJump(uint8 op_base, uint8 op_spec);
     void DoData(uint8 op_base, uint8 op_spec);
     void DoType(uint8 op_base, uint8 op_spec);
@@ -89,18 +104,22 @@ private:
     void StashVariables();
     void RevertVariables();
 
-
     uint16 Read16();
     uint16 Read16Rev();
     uint32 Read32();
     char* ReadString(char* buffer, uint32 buffer_size);
 
+    FoxValue& GetGlobal(const VMVariable& var);
+
     VMCallFrame* GetCurrentCallFrame();
 
 public:
-    uint8* Stack = nullptr;
+    uint8* pStack = nullptr;
     uint32 StackPointer = 0;
-    uint32 ReturnAddress = 0;
+
+    uint8* pCallStack = nullptr;
+    uint32 CallStackPointer = 0;
+
     int32 CompareResult = 0;
 
     SizedArray<uint8> mBytecode;
@@ -123,6 +142,9 @@ public:
 
     uint32 PC = 0;
     bool bReturnValueOnStack = false;
+    bool bIsPaused = false;
+
+    uint16 PauseTime = 0;
 
     eFoxType LastPushType = eFoxType::NONETYPE;
 
@@ -132,11 +154,12 @@ private:
     VMCallFrame mCallFrames[8];
     int mCallFrameIndex = 0;
 
-    bool mIsInParams = false;
-
-
     eFoxType mCurrentType = eFoxType::NONETYPE;
+
+    uint32 mStringsOffset = 0;
 };
 
 
-} // namespace fx::script
+} // namespace script
+
+} // namespace fx

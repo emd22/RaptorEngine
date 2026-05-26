@@ -39,6 +39,7 @@ void RenderStage::BuildRenderStage()
     mOutputTargets.CreateImages();
 
     mRenderPass.Create(mOutputTargets, mSize);
+    renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
 
     if (mbIsFinalStage) {
         CreateFinalStageFramebuffers();
@@ -59,9 +60,11 @@ void RenderStage::Rebuild(const Vec2u& size)
     mOutputTargets.RecreateImages();
 
     mFramebuffer.Destroy();
+    mFinalStageFramebuffers.Free();
     mRenderPass.Destroy();
 
     mRenderPass.Create(mOutputTargets, mSize);
+    renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
 
     if (mbIsFinalStage) {
         CreateFinalStageFramebuffers();

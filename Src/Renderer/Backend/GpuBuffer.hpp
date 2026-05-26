@@ -220,11 +220,11 @@ public:
     GpuBuffer() = default;
 
 
-    void Create(eGpuBufferType buffer_type, void* data, uint64 size);
-    void Create(eGpuBufferType buffer_type, const AnonArray& data);
+    void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, void* data, uint64 size);
+    void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, const AnonArray& data);
 
     template <typename TElementType>
-    void Create(eGpuBufferType buffer_type, const Slice<TElementType>& data)
+    void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, const Slice<TElementType>& data)
     {
         Size = data.Size * sizeof(TElementType);
         Type = buffer_type;
@@ -236,13 +236,8 @@ public:
         // Create the GPU-only buffer as a transfer destination
         this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
-        // Transfer
-        Fx_Fwd_SubmitUploadCmd(
-            [&](CommandBuffer& cmd)
-            {
-                VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
-                vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
-            });
+        VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
+        vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
 
         staging_buffer.Destroy();
     }

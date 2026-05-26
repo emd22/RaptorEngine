@@ -8,6 +8,7 @@
 #include <Asset/AxManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Font/Font.hpp>
+#include <Asset/MipmapGen.hpp>
 #include <Asset/SceneFile.hpp>
 #include <Controls.hpp>
 #include <Core/Defer.hpp>
@@ -90,7 +91,7 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    gAssetManager->Start(4);
+    gAssetManager->Start(3);
     gMaterialManager->Create();
 
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
@@ -200,10 +201,10 @@ void FoxtrotGame::CreateGame()
     Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
     Player.SetFlyMode(true);
 
-    pEditorCamera = MakeRef<PerspectiveCamera>();
+    // pEditorCamera = MakeRef<PerspectiveCamera>();
 
-    pEditorCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
-    pEditorCamera->SetFov(80.0f);
+    // pEditorCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
+    // pEditorCamera->SetFov(80.0f);
 
     mMainScene.SelectCamera(Player.pCamera);
 
@@ -247,6 +248,10 @@ void FoxtrotGame::CreateGame()
 
     CreateLights();
     CreateFontObject();
+
+    // MipmapGen mm;
+    // mm.GenerateMipmaps(eImageFormat::RGBA8_UNorm, test_img->Image.ImageData, test_img->Image.Size);
+    // mm.ExportMipmaps("TestMips.bin", "TestMipsExport");
 
     while (sbRunning) {
         Tick();
@@ -579,6 +584,8 @@ void FoxtrotGame::DestroyGame()
     delete gShadowRenderer;
     gShadowRenderer = nullptr;
 
+    gMaterialManager->Destroy();
+
     gAssetManager->Shutdown();
 
     gRenderer->pDeferredRenderer.DestroyRef();
@@ -588,8 +595,8 @@ void FoxtrotGame::AddEditorModes()
 {
     EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Default));
 
-    EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), pEditorCamera));
-    EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), pEditorCamera));
+    EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), nullptr));
+    EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), nullptr));
 }
 
 

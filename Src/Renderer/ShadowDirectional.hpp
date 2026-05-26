@@ -28,8 +28,8 @@ public:
 
     void End();
 
-    FX_FORCE_INLINE Pipeline& GetPipeline() { return mPipeline; }
-    FX_FORCE_INLINE Pipeline& GetSkinnedPipeline() { return mPipelineSkinned; }
+    // FX_FORCE_INLINE Pipeline& GetPipeline() { return mPipeline; }
+    // FX_FORCE_INLINE Pipeline& GetSkinnedPipeline() { return mPipelineSkinned; }
 
     ~ShadowDirectional() = default;
 
@@ -42,8 +42,8 @@ public:
     RenderStage RenderStage;
 
 private:
-    Pipeline mPipeline;
-    Pipeline mPipelineSkinned;
+    // Pipeline mPipeline;
+    // Pipeline mPipelineSkinned;
 };
 
 } // namespace fx::renderer

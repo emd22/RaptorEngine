@@ -5,6 +5,7 @@
 
 #include <Core/AnonArray.hpp>
 #include <Core/SizedArray.hpp>
+#include <Renderer/Constants.hpp>
 
 namespace fx {
 
@@ -51,7 +52,10 @@ public:
         mLocalBuffer.InitAsCopyOf(vertices);
     }
 
-    void UploadToGpu() { GpuBuffer.Create(renderer::eGpuBufferType::VertexBuffer, mLocalBuffer); }
+    void UploadToGpu(CommandBuffer& cmd)
+    {
+        GpuBuffer.Create(cmd, renderer::eGpuBufferType::VertexBuffer, mLocalBuffer);
+    }
 
     /** @brief Returns true if the vertex type supports storing normals */
     FX_FORCE_INLINE bool SupportsNormals() const { return (VertexType != renderer::eVertexType::Slim); }

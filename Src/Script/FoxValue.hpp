@@ -6,6 +6,8 @@
 
 namespace fx {
 
+class Token;
+
 enum class eFoxType : uint16
 {
     NONETYPE,
@@ -15,9 +17,9 @@ enum class eFoxType : uint16
     REF,
 };
 
+eFoxType FoxStringToType(Token* token);
 
 namespace script {
-
 struct FoxAstVarRef;
 
 struct FoxValue
@@ -30,8 +32,9 @@ public:
 
     explicit FoxValue(int value) : Type(eFoxType::INT), ValueInt(value) {}
     explicit FoxValue(float value) : Type(eFoxType::FLOAT), ValueFloat(value) {}
+    explicit FoxValue(const char* value) : Type(eFoxType::STRING), ValueString(value) {}
 
-    static FoxValue NumberFromRaw(eFoxType type, uint32 raw_value)
+    static FoxValue ValueFromRaw(eFoxType type, uint32 raw_value)
     {
         FoxValue value = FoxValue::scNone;
 
@@ -45,6 +48,11 @@ public:
             value.ValueFloat = std::bit_cast<float32>(raw_value);
             value.Type = type;
             break;
+
+        case eFoxType::STRING:
+            value.ValueInt = std::bit_cast<int32>(raw_value);
+            value.Type = type;
+
         default:
             break;
         }
@@ -130,6 +138,12 @@ public:
         return ValueFloat;
     }
 
+    template <>
+    const char* Get<const char*>() const
+    {
+        return ValueString;
+    }
+
 
     uint32 AsUInt() const { return std::bit_cast<uint32>(ValueInt); }
 
@@ -145,8 +159,7 @@ public:
     {
         int32 ValueInt = 0;
         float32 ValueFloat;
-        float32 ValueVec3[3];
-        char* ValueString;
+        const char* ValueString;
 
         FoxAstVarRef* pValueRef;
     };
@@ -180,6 +193,33 @@ struct std::formatter<fx::script::FoxValue>
         }
         else if (obj.Type == VT::REF) {
             return std::format_to(ctx.out(), "{:p}", reinterpret_cast<void*>(obj.pValueRef));
+        }
+
+        return std::format_to(ctx.out(), "Unknown");
+    }
+};
+
+
+template <>
+struct std::formatter<fx::eFoxType>
+{
+    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    auto format(const fx::eFoxType& type, std::format_context& ctx) const
+    {
+        using VT = fx::eFoxType;
+
+        switch (type) {
+        case VT::NONETYPE:
+            return std::format_to(ctx.out(), "none");
+        case VT::INT:
+            return std::format_to(ctx.out(), "int");
+        case VT::FLOAT:
+            return std::format_to(ctx.out(), "float");
+        case VT::REF:
+            return std::format_to(ctx.out(), "ref");
+        case VT::STRING:
+            return std::format_to(ctx.out(), "string");
         }
 
         return std::format_to(ctx.out(), "Unknown");

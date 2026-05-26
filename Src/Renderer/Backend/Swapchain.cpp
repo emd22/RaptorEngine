@@ -30,6 +30,7 @@ void Swapchain::Rebuild(Vec2u new_size, VkSurfaceKHR surface)
     // Wait until the GPU has stopped processing commands and all images are unbound
     mDevice->WaitForIdle();
 
+
     LogInfo(LC_RENDER, "Recreating Swapchain");
 
     CreateSwapchain(new_size, surface);
@@ -95,6 +96,10 @@ void Swapchain::CreateImageViews()
         if (status != VK_SUCCESS) {
             ModulePanicVulkan("Could not create swapchain image view", status);
         }
+
+        // if (reinterpret_cast<uint64>(OutputImages[i].View) == 0xf000000000f) {
+        //     FX_BREAKPOINT;
+        // }
     }
 }
 
@@ -144,6 +149,8 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 
     const VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
+    VkSwapchainKHR old_swapchain = mSwapchain;
+
     VkSwapchainCreateInfoKHR create_info = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = surface,
@@ -162,8 +169,9 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 
         .presentMode = present_mode,
         .clipped = VK_TRUE,
+
         // mSwapchain is null if not initialized
-        .oldSwapchain = mSwapchain,
+        .oldSwapchain = old_swapchain,
     };
 
     create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -174,6 +182,10 @@ void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Could not create swapchain", status);
+    }
+
+    if (old_swapchain != nullptr && mSwapchain != old_swapchain) {
+        vkDestroySwapchainKHR(mDevice->Device, old_swapchain, nullptr);
     }
 }
 
@@ -208,14 +220,16 @@ void Swapchain::CreateSamplers()
 void Swapchain::DestroyFramebuffersAndImageViews()
 {
     for (int i = 0; i < FramesInFlight; i++) {
-        // HACK: Clears the image so that we only destroy the image view. This should be updated!
+        // HACK: Clear the images so that we only destroy the image view.
         OutputImages[i].InternalImage = nullptr;
-        OutputImages[i].DecRef();
     }
+
+    OutputImages.Free();
 
 
     // TODO: Add sampler cache!
     ColorSampler.Destroy();
+    ColorSamplerNearest.Destroy();
     DepthSampler.Destroy();
     ShadowDepthSampler.Destroy();
     NormalsSampler.Destroy();
@@ -231,7 +245,6 @@ void Swapchain::Destroy()
     }
 
     DestroyFramebuffersAndImageViews();
-    // Images.Free();
     DestroyInternalSwapchain();
 
     bInitialized = false;

@@ -23,7 +23,7 @@ const char* Token::GetTypeName(eTokenType type)
 
         "LessThan",   "GreaterThan",
 
-        "Plus",       "Dollar",      "Minus",
+        "Plus",       "Dollar",      "Minus",     "Asterisk",
 
         "Question",
 
@@ -61,6 +61,11 @@ Token::eIsNumericResult Token::IsNumeric() const
             continue;
         }
 
+        if (ch == 'f' && (i == Length - 1) && result != Token::eIsNumericResult::NaN) {
+            result = Token::eIsNumericResult::Fractional;
+            continue;
+        }
+
         // Not a number
         return Token::eIsNumericResult::NaN;
     }
@@ -92,13 +97,9 @@ eTokenType Tokenizer::GetTokenType(Token& token)
         break;
     }
 
-    if (token.Length > 2) {
-        // Checks if the token is a string
-        if (token.Start[0] == '"' && token.Start[token.Length - 1] == '"') {
-            return eTokenType::String;
-        }
+    if (token.Type == eTokenType::String) {
+        return eTokenType::String;
     }
-
 
     if (token.Length == 1) {
         switch (token.Start[0]) {
@@ -126,6 +127,8 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Minus;
         case '$':
             return eTokenType::Dollar;
+        case '*':
+            return eTokenType::Asterisk;
         case '.':
             return eTokenType::Dot;
         case ',':
@@ -331,7 +334,6 @@ void Tokenizer::IncludeFile(const char* path)
 
     SetDataPtr(include_data.pData);
     mpDataEnd = include_data.pData + include_data.Size;
-    mbInString = false;
 
     // Tokenize all of the included file
     Tokenize();
@@ -391,23 +393,32 @@ void Tokenizer::Tokenize()
             in_comment = false;
         }
 
+        // Read in a string
         if (ch == '"') {
             // If we are not currently in a string, submit the token if there is data waiting
-            if (!mbInString) {
-                SubmitTokenIfData(current_token);
+            SubmitTokenIfData(current_token);
+
+            current_token.Type = eTokenType::String;
+            ++current_token.Start;
+
+            // Skip quote
+            ++mpData;
+
+            while (mpData < mpDataEnd && (*mpData) != '"') {
+                current_token.Increment();
+                ++mpData;
             }
 
-            mbInString = !mbInString;
-        }
+            if (mpData < mpDataEnd) {
+                ++mpData;
+            }
 
-        if (mbInString) {
-            ++mpData;
-            current_token.Increment();
             continue;
         }
 
+
         // Internal call
-        if (ch == '@') {
+        if (ch == '#') {
             ++mpData;
             TryReadInternalCall();
 
@@ -448,8 +459,6 @@ void Tokenizer::TryReadInternalCall()
         }
 
         IncludeFile(include_path);
-    }
-    else if (ExpectString("macro")) {
     }
 }
 

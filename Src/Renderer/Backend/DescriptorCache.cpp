@@ -2,7 +2,9 @@
 
 #include "Shader.hpp"
 
+#include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/ShaderNames.hpp>
 
 
@@ -60,6 +62,15 @@ VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const Size
     Cache[entries_hash] = layout;
 
     return layout;
+}
+
+void DsLayoutCache::Destroy()
+{
+    for (auto& item : Cache) {
+        vkDestroyDescriptorSetLayout(RenderBackendFwd::GetDevice()->Device, item.second, nullptr);
+    }
+
+    Cache.clear();
 }
 
 

@@ -72,6 +72,7 @@ protected:
 
 private:
     cgltf_data* mpGltfData = nullptr;
+    String mModelPath;
 
     SizedArray<Mat4f> mBones;
 };

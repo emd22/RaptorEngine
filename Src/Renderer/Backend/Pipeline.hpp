@@ -140,7 +140,7 @@ public:
 
     void DestroyObject() override;
 
-    ~PipelineLayout() = default;
+    ~PipelineLayout();
 
 public:
     VkPipelineLayout InternalLayout = nullptr;
