@@ -118,10 +118,6 @@ private:
     void EmitPopVar(VarIndex var);
     void EmitPopDiscard();
 
-    void EmitSave32(int16 offset, uint32 value);
-
-    void EmitSaveAbsolute32(uint32 offset, uint32 value);
-
     void EmitJumpRelative(uint16 offset);
     void EmitJumpConditional(uint16 offset, eFoxConditionResult cond);
     void EmitJumpAbsolute(uint32 position);
@@ -154,7 +150,6 @@ private:
     void EmitCompare();
     void EmitCompareNotZero();
 
-    void EmitParamsStart();
     void EmitType(eFoxType type);
 
     /**
@@ -176,14 +171,12 @@ private:
     void Write16(uint16 value);
     void Write32(uint32 value);
 
-    FoxBytecodeVarHandle* FindVarHandle(Hash32 hashed_name);
-    VarIndex FindVarInScope(Hash32 hashed_name);
+    FoxBytecodeVarHandle* FindVarHandle(Hash32 hashed_name) const;
+    VarIndex FindVarInScope(Hash32 hashed_name) const;
 
     FoxBytecodeFunctionHandle* FindFunctionHandle(Hash32 hashed_name);
 
-
-    bool DoesNodeBranch(FoxAstNode* node);
-
+    eFoxType GetLiteralUnderlyingType(FoxAstLiteral* literal) const;
 
 public:
     PagedArray<FoxBytecodeVarHandle> VarHandles;
@@ -225,7 +218,6 @@ private:
     void DoPop(char* s, uint8 op_base, uint8 op_spec);
     void DoLoad(char* s, uint8 op_base, uint8 op_spec);
     void DoArith(char* s, uint8 op_base, uint8 op_spec);
-    void DoSave(char* s, uint8 op_base, uint8 op_spec);
     void DoJump(char* s, uint8 op_base, uint8 op_spec);
     void DoData(char* s, uint8 op_base, uint8 op_spec);
     void DoType(char* s, uint8 op_base, uint8 op_spec);

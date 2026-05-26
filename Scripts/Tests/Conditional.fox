@@ -1,0 +1,16 @@
+Test_Conditional()
+{
+    if (5 == 5) {
+        // Pass
+    }
+    else {
+        FAIL("Conditional equals");
+    }
+
+    if (5 > 2) {
+        // Pass
+    }
+    else {
+        FAIL("Greater than");
+    }
+}

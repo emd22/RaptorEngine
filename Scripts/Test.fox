@@ -1,11 +1,7 @@
 
-
-
-Init() float
+Init() int
 {
-    local int value = 10;
+    local int x = 10 * 2 + 20;
 
-    pause(100);
-
-    return castfloat(castint(10f));
+    return x;
 }

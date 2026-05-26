@@ -31,7 +31,7 @@ struct VMCallFrame
 
 struct VMVariable
 {
-    Hash32 NameHash = HashNull32;
+    Hash32 GlobalNameHash = HashNull32;
     bool bIsGlobalRef = false;
     FoxValue Value;
 };
@@ -108,6 +108,7 @@ private:
     uint32 Read32();
     char* ReadString(char* buffer, uint32 buffer_size);
 
+    FoxValue& GetGlobal(const VMVariable& var);
 
     VMCallFrame* GetCurrentCallFrame();
 

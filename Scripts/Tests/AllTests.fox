@@ -1,0 +1,11 @@
+#include "Scripts/Util.fox"
+#include "Scripts/Tests/TestHelper.fox"
+
+#include "Scripts/Tests/Variables.fox"
+#include "Scripts/Tests/Conditional.fox"
+
+RunAllTests()
+{
+    Test_Variables();
+    Test_Conditional();
+}

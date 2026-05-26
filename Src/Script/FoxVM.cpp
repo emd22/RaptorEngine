@@ -3,7 +3,10 @@
 #include "FoxBytecode.hpp"
 #include "FoxBytecodeCompiler.hpp"
 
+
 namespace fx::script {
+
+static constexpr uint32 scMaxGlobalsInScope = 32;
 
 char* FoxVM::ReadString(char* buffer, uint32 buffer_size)
 {
@@ -198,15 +201,16 @@ void FoxVM::DoPush(uint8 op_base, uint8 op_spec)
     }
 }
 
+FoxValue& FoxVM::GetGlobal(const VMVariable& var) { return Globals[var.GlobalNameHash]; }
+
 void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPop_Variable_Int32) {
         uint16 var_index = Read16();
-
         VMVariable& var = GetVar(var_index);
 
         if (var.bIsGlobalRef) {
-            Globals[var.NameHash].Set<int32>(Pop32());
+            GetGlobal(var).Set<int32>(Pop32());
             return;
         }
 
@@ -218,7 +222,7 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
         VMVariable& var = GetVar(var_index);
 
         if (var.bIsGlobalRef) {
-            Globals[var.NameHash].Set<float32>(Pop32());
+            GetGlobal(var).Set<float32>(Pop32());
             return;
         }
 
@@ -493,7 +497,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 
         // Update global variable
         if (var.bIsGlobalRef) {
-            Globals[var.NameHash].Set<int32>(value);
+            GetGlobal(var).Set<int32>(value);
         }
     }
     else if (op_spec == BcSpecVariable_Set_Float32) {
@@ -506,7 +510,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 
         // Update global variable
         if (var.bIsGlobalRef) {
-            Globals[var.NameHash].Set<float32>(value);
+            GetGlobal(var).Set<float32>(value);
         }
     }
     else if (op_spec == BcSpecVariable_Set_String) {
@@ -518,7 +522,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 
         // Update global variable
         if (var.bIsGlobalRef) {
-            Globals[var.NameHash].Set<int32>(string_offset);
+            GetGlobal(var).Set<int32>(string_offset);
         }
     }
     else if (op_spec == BcSpecVariable_Set_Var) {
@@ -528,7 +532,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VMVariable& dst_var = GetVar(dst_index);
 
         if (dst_var.bIsGlobalRef) {
-            Globals[dst_var.NameHash] = GetVar(src_index).Value;
+            GetGlobal(dst_var) = GetVar(src_index).Value;
         }
         else {
             GetVar(dst_index).Value = GetVar(src_index).Value;
@@ -536,12 +540,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecVariable_Define) {
         uint16 var_index = Read16();
-        Hash32 name_hash = Read32();
-
         VMVariable& var = GetVar(var_index);
         ScopeVarCounts[ScopeIndex] = var_index + 1;
-
-        var.NameHash = name_hash;
         var.Value.Set<int32>(0);
     }
 
@@ -555,10 +555,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         }
 
         VMVariable& var = GetVar(var_index);
-
-        var.NameHash = name_hash;
         var.bIsGlobalRef = true;
         var.Value.Set<int32>(Globals[name_hash].Get<int32>());
+        var.GlobalNameHash = name_hash;
     }
     else if (op_spec == BcSpecVariable_Cast_Int32) {
         float32 fvalue = std::bit_cast<float32>(Pop32());

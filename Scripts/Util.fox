@@ -15,3 +15,8 @@ vpopf() float
     vpop(v);
     return v;
 }
+
+handoff()
+{
+    pause(0);
+}

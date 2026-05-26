@@ -125,6 +125,10 @@ FoxValue FoxScript::Update()
 
 FoxValue FoxScript::Resume()
 {
+    if (Vm.ScopeIndex <= 0) {
+        return FoxValue::scNone;
+    }
+
     Vm.bIsPaused = false;
 
     while (Vm.PC < Vm.mBytecode.Size) {

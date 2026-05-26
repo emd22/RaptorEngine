@@ -123,6 +123,10 @@ private:
 
     FoxAstNode* ParseGlobalDefinitions();
 
+    FoxAstNode* ParseMulExpr();
+    FoxAstNode* ParseAddExpr();
+    FoxAstNode* ParseTerm();
+
     void FixupFunctionCalls();
 
 public:
@@ -133,7 +137,6 @@ private:
     PagedArray<FoxScope> mScopes;
     FoxScope* mCurrentScope = nullptr;
 
-    std::vector<FoxAstDocComment*> CurrentDocComments;
     std::vector<FoxFunctionFixup> mFunctionFixups;
 
     FoxAstBlock* mpRootBlock = nullptr;

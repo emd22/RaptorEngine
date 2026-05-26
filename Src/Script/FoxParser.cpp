@@ -271,7 +271,7 @@ FoxValue FoxParser::ParseValue()
 
             FoxAstVarRef* var_ref = FX_SCRIPT_ALLOC_NODE(FoxAstVarRef);
             var_ref->pName = var->Name;
-            var_ref->Scope = var->Scope;
+            var_ref->pScope = var->Scope;
 
             value.pValueRef = var_ref;
 
@@ -325,15 +325,67 @@ static bool IsTokenTypeLiteral(eTokenType type)
     return (type == eTokenType::Integer || type == eTokenType::Float || type == eTokenType::String);
 }
 
+FoxAstNode* FoxParser::ParseAddExpr()
+{
+    FoxAstNode* lhs = ParseMulExpr();
+    Token& token = GetToken(0);
+
+    while (GetToken(0).Type == eTokenType::Plus || GetToken(0).Type == eTokenType::Minus) {
+        FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
+        binop->OpToken = &EatToken(GetToken(0).Type);
+        binop->pLeft = lhs;
+        binop->pRight = ParseMulExpr();
+
+        lhs = binop;
+    }
+
+    return lhs;
+}
+
+
+FoxAstNode* FoxParser::ParseMulExpr()
+{
+    FoxAstNode* lhs = ParseTerm();
+    Token& token = GetToken(0);
+
+    while (GetToken(0).Type == eTokenType::Asterisk) {
+        FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
+        binop->OpToken = &EatToken(eTokenType::Asterisk);
+        binop->pLeft = lhs;
+        binop->pRight = ParseTerm();
+
+        lhs = binop;
+    }
+
+    return lhs;
+}
+
+FoxAstNode* FoxParser::ParseTerm()
+{
+    FoxAstNode* lhs = nullptr;
+    Token& token = GetToken(0);
+
+    if (IsTokenTypeLiteral(token.Type) || token.Type == TT::Identifier) {
+        FoxAstLiteral* literal = FX_SCRIPT_ALLOC_NODE(FoxAstLiteral);
+
+        FoxValue value = ParseValue();
+        literal->Value = value;
+
+        return literal;
+    }
+
+    return ParseRhs();
+}
+
 FoxAstNode* FoxParser::ParseRhs()
 {
     RETURN_IF_NO_TOKENS(nullptr);
 
-    bool has_parameters = false;
+    bool has_paramlist = false;
 
     if (mTokenIndex + 1 < mTokens.Size()) {
         TT next_token_type = GetToken(1).Type;
-        has_parameters = next_token_type == TT::LParen;
+        has_paramlist = next_token_type == TT::LParen;
     }
 
     Token& token = GetToken();
@@ -341,7 +393,8 @@ FoxAstNode* FoxParser::ParseRhs()
     FoxAstNode* lhs = nullptr;
 
     if (token.Type == TT::Identifier) {
-        if (has_parameters) {
+        // If there is a lparen after this, we can assume that this is a function call
+        if (has_paramlist) {
             lhs = ParseFunctionCall();
         }
         else {
@@ -356,35 +409,49 @@ FoxAstNode* FoxParser::ParseRhs()
             }
         }
     }
-    if (!lhs) {
-        if (IsTokenTypeLiteral(token.Type) || token.Type == TT::Identifier) {
-            FoxAstLiteral* literal = FX_SCRIPT_ALLOC_NODE(FoxAstLiteral);
+    // if (!lhs) {
+    //     if (IsTokenTypeLiteral(token.Type) || token.Type == TT::Identifier) {
+    //         FoxAstLiteral* literal = FX_SCRIPT_ALLOC_NODE(FoxAstLiteral);
 
-            FoxValue value = ParseValue();
-            literal->Value = value;
+    //         FoxValue value = ParseValue();
+    //         literal->Value = value;
 
-            lhs = literal;
-        }
-        else {
-            lhs = ParseRhs();
-        }
+    //         lhs = literal;
+    //     }
+    //     else {
+    //         lhs = ParseRhs();
+    //     }
+    // }
+
+    if (lhs) {
+        return lhs;
     }
 
+    TT op_type = GetToken(1).Type;
 
-    // FoxAstLiteral* literal = FX_SCRIPT_ALLOC_NODE(FoxAstLiteral);
-    // literal->Value = value;
-
-    TT op_type = GetToken(0).Type;
-
-    if (op_type == TT::Plus || op_type == TT::Minus || op_type == TT::Asterisk || Token::IsTypeEqualityCheck(op_type)) {
+    if (Token::IsTypeEqualityCheck(op_type)) {
         FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
 
-        binop->pLeft = lhs;
+        binop->pLeft = ParseTerm();
         binop->OpToken = &EatToken(op_type);
         binop->pRight = ParseRhs();
 
         return binop;
     }
+
+    return ParseAddExpr();
+
+
+    // if (op_type == TT::Plus || op_type == TT::Minus || op_type == TT::Asterisk ||
+    // Token::IsTypeEqualityCheck(op_type)) {
+    //     FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
+
+    //     binop->pLeft = lhs;
+    //     binop->OpToken = &EatToken(op_type);
+    //     binop->pRight = ParseRhs();
+
+    //     return binop;
+    // }
 
     return lhs;
 }
@@ -401,12 +468,12 @@ FoxAstAssign* FoxParser::TryParseAssignment(Token* var_name)
 
     FoxAstVarRef* var_ref = FX_SCRIPT_ALLOC_NODE(FoxAstVarRef);
     var_ref->pName = var_name;
-    var_ref->Scope = mCurrentScope;
-    node->Var = var_ref;
+    var_ref->pScope = mCurrentScope;
+    node->pLhs = var_ref;
 
 
     // node->Value = ParseValue();
-    node->Rhs = ParseRhs();
+    node->pRhs = ParseRhs();
 
     return node;
 }
@@ -549,16 +616,6 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
         return ParseBlock();
     }
 
-    while (GetToken().Type == TT::DocComment) {
-        FoxAstDocComment* comment = FX_SCRIPT_ALLOC_NODE(FoxAstDocComment);
-        comment->Comment = &EatToken(TT::DocComment);
-        CurrentDocComments.push_back(comment);
-
-        if (mTokenIndex >= mTokens.Size()) {
-            return nullptr;
-        }
-    }
-
     // Eat any extraneous semicolons
     while (GetToken().Type == TT::Semicolon) {
         EatToken(TT::Semicolon);
@@ -683,11 +740,6 @@ FoxAstFunctionDecl* FoxParser::ParseProcedureDeclare()
 FoxAstFunctionDecl* FoxParser::ParseExtfnDeclare()
 {
     FoxAstFunctionDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionDecl);
-
-    if (!CurrentDocComments.empty()) {
-        node->DocComments = CurrentDocComments;
-        CurrentDocComments.clear();
-    }
 
     // Name of the function
     Token& name = EatToken(TT::Identifier);
@@ -861,7 +913,7 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
     else if (node->NodeType == FX_AST_ASSIGN) {
         FoxAstAssign* assign = static_cast<FoxAstAssign*>(node);
 
-        Do(assign->Rhs);
+        Do(assign->pRhs);
 
         FX_SCRIPT_FREE(FoxAstAssign, assign);
     }
