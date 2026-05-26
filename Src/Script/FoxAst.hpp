@@ -66,6 +66,8 @@ struct FoxAstBlock : public FoxAstNode
     FoxAstBlock() { this->NodeType = FX_AST_BLOCK; }
 
     std::vector<FoxAstNode*> Statements;
+
+    bool bHasExplicitReturn = false;
 };
 
 
@@ -116,6 +118,7 @@ struct FoxAstFunctionDecl : public FoxAstNode
     FoxAstBlock* pParams = nullptr;
     FoxAstBlock* pBlock = nullptr;
 
+    bool bIsVariadic = false;
     bool bIsExternal = false;
 
     eFoxType ReturnType = eFoxType::NONETYPE;

@@ -98,7 +98,7 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_s
     case kw_proc:
         EatToken(TT::Identifier);
         // ParseFunctionDeclare();
-        return ParseProcedureDeclare();
+        return ParseFunctionDeclare();
 
     case kw_extfn:
         EatToken(TT::Identifier);
@@ -130,6 +130,7 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_s
 
         FoxAstReturn* ret = FX_SCRIPT_ALLOC_NODE(FoxAstReturn);
         ret->pRhs = return_rhs;
+        parent_block->bHasExplicitReturn = true;
 
         return ret;
     }
@@ -366,6 +367,18 @@ FoxAstNode* FoxParser::ParseTerm()
     Token& token = GetToken(0);
 
     if (IsTokenTypeLiteral(token.Type) || token.Type == TT::Identifier) {
+        bool has_paramlist = false;
+
+        if (mTokenIndex + 1 < mTokens.Size()) {
+            TT next_token_type = GetToken(1).Type;
+            has_paramlist = next_token_type == TT::LParen;
+        }
+
+        if (token.Type == TT::Identifier && has_paramlist) {
+            // If there is a lparen after this, we can assume that this is a function call
+            return ParseFunctionCall();
+        }
+
         FoxAstLiteral* literal = FX_SCRIPT_ALLOC_NODE(FoxAstLiteral);
 
         FoxValue value = ParseValue();
@@ -488,73 +501,11 @@ void FoxParser::DefineExternalVar(const char* type, const char* name, const FoxV
     var.Type = nullptr;
 }
 
-FoxAstNode* FoxParser::ParseStatementAsCommand(FoxAstBlock* parent_block)
-{
-    if (bHasErrors) {
-        return nullptr;
-    }
-
-    RETURN_IF_NO_TOKENS(nullptr);
-
-    // Eat any extraneous semicolons
-    while (GetToken().Type == TT::Semicolon) {
-        EatToken(TT::Semicolon);
-        if (mTokenIndex >= mTokens.Size()) {
-            return nullptr;
-        }
-    }
-
-
-    bool ignore_semicolon = false;
-    // Try to parse as a keyword first
-    FoxAstNode* node = TryParseKeyword(parent_block, &ignore_semicolon);
-
-    if (node) {
-        RETURN_IF_NO_TOKENS(node);
-
-        if (!ignore_semicolon || GetToken().Type == TT::Semicolon) {
-            EatToken(TT::Semicolon);
-        }
-
-        return node;
-    }
-
-    // Check identifier
-    if (mTokenIndex < mTokens.Size() && GetToken().Type == TT::Identifier) {
-        TT next_token_type = TT::Unknown;
-
-        if (mTokenIndex + 1 < mTokens.Size()) {
-            next_token_type = GetToken(1).Type;
-        }
-
-        if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::Equals) {
-            Token& assign_name = EatToken(TT::Identifier);
-            node = TryParseAssignment(&assign_name);
-        }
-        // If there is what looks to be a function call, try it
-        else {
-            FoxFunction* function = FindFunction(GetToken().GetHash());
-            if (function != nullptr) {
-                node = ParseFunctionCall();
-            }
-        }
-        // If there is just a semicolon after an identifier, parse as an rhs to print out later
-        if (!node && next_token_type == TT::Semicolon) {
-            node = ParseRhs();
-        }
-    }
-
-    RETURN_IF_NO_TOKENS(node);
-
-    EatToken(TT::Semicolon);
-
-    return node;
-}
 
 FoxAstNode* FoxParser::ParseGlobalDefinitions()
 {
     if (GetToken().Type == TT::Identifier && GetToken(1).Type == TT::LParen) {
-        return ParseProcedureDeclare();
+        return ParseFunctionDeclare();
     }
 
     return nullptr;
@@ -567,19 +518,6 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
     }
 
     RETURN_IF_NO_TOKENS(nullptr);
-
-    if (GetToken().Type == TT::Dollar) {
-        EatToken(TT::Dollar);
-
-        mInCommandMode = true;
-
-        FoxAstCommandMode* cmd_mode = FX_SCRIPT_ALLOC_NODE(FoxAstCommandMode);
-        cmd_mode->Node = ParseStatementAsCommand(parent_block);
-
-        mInCommandMode = false;
-
-        return cmd_mode;
-    }
 
     if (GetToken().Type == TT::LBrace) {
         return ParseBlock();
@@ -637,9 +575,6 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
 
 FoxAstBlock* FoxParser::ParseBlock()
 {
-    bool in_command = mInCommandMode;
-    mInCommandMode = false;
-
     FoxAstBlock* block = FX_SCRIPT_ALLOC_NODE(FoxAstBlock);
 
     EatToken(TT::LBrace);
@@ -654,11 +589,10 @@ FoxAstBlock* FoxParser::ParseBlock()
 
     EatToken(TT::RBrace);
 
-    mInCommandMode = in_command;
     return block;
 }
 
-FoxAstFunctionDecl* FoxParser::ParseProcedureDeclare()
+FoxAstFunctionDecl* FoxParser::ParseFunctionDeclare()
 {
     FoxAstFunctionDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionDecl);
 
@@ -674,6 +608,17 @@ FoxAstFunctionDecl* FoxParser::ParseProcedureDeclare()
 
     // Parse the parameter list
     while (GetToken().Type != TT::RParen) {
+        // Parse variadic arg
+        if (GetToken().Type == TT::Dot && GetToken(1).Type == TT::Dot && GetToken(2).Type == TT::Dot) {
+            node->bIsVariadic = true;
+
+            EatToken(TT::Dot);
+            EatToken(TT::Dot);
+            EatToken(TT::Dot);
+
+            break;
+        }
+
         params->Statements.push_back(ParseVarDeclare());
 
         if (GetToken().Type == TT::Comma) {

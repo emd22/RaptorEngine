@@ -74,7 +74,7 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
             }
 
             if (builtin_call_type == eFoxType::NONETYPE) {
-                DoFunctionCall(call_node, true);
+                EmitFunctionCall(call_node, true);
             }
 
             eFoxType caller_return_type = mpCurrentFunctionBody ? mpCurrentFunctionBody->ReturnType : eFoxType::INT;
@@ -200,7 +200,7 @@ void FoxBytecodeCompiler::EmitNode(FoxAstNode* node)
             return;
         }
 
-        return DoFunctionCall(call, false);
+        return EmitFunctionCall(call, false);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
         return EmitAssign(static_cast<FoxAstAssign*>(node));
@@ -298,6 +298,8 @@ void FoxBytecodeCompiler::EmitPushVar(VarIndex var)
     Write16(var);
 }
 
+void FoxBytecodeCompiler::EmitPushReturnAddr() { WriteOp(BcBase_Push, BcSpecPush_ReturnAddr); }
+
 eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
 {
     if (node->NodeType == FX_AST_LITERAL) {
@@ -343,7 +345,7 @@ eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
             return builtin_call_rvalue;
         }
 
-        DoFunctionCall(call, true);
+        EmitFunctionCall(call, true);
         return call->GetReturnType();
     }
     else {
@@ -408,6 +410,8 @@ void FoxBytecodeCompiler::EmitPopDiscard()
     // VPOP
     WriteOp(BcBase_Pop, BcSpecPop_Discard);
 }
+
+void FoxBytecodeCompiler::EmitPopReturnAddr() { WriteOp(BcBase_Pop, BcSpecPop_ReturnAddr); }
 
 
 void FoxBytecodeCompiler::EmitJumpRelative(uint16 offset)
@@ -728,7 +732,7 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
                     CompileError("Type mismatch: assigning function return type '{}' to variable of type '{}'",
                                  call->GetReturnType(), handle->Type);
                 }
-                DoFunctionCall(call, true);
+                EmitFunctionCall(call, true);
             }
         }
 
@@ -801,14 +805,24 @@ void FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
     // Get the parameter definitions for the function declaration
     const std::vector<FoxAstNode*>& param_decl_stmts = call->pFunction->pDeclaration->pParams->Statements;
 
+    bool has_correct_param_count = call->Params.size() == param_decl_stmts.size();
+
+    if (call->pFunction->pDeclaration->bIsVariadic) {
+        has_correct_param_count = (param_decl_stmts.size() <= call->Params.size());
+    }
+
     // Check to make sure there are the correct number of arguments
-    if (call->Params.size() != param_decl_stmts.size()) {
-        CompileError("Not enough parameters for function call!");
+    if (!has_correct_param_count) {
+        CompileError("Expected {} parameters but only {} were passed in", param_decl_stmts.size(), call->Params.size());
         return;
     }
 
     // Check the argument types match
     for (int32 i = 0; i < call->Params.size(); i++) {
+        if (i >= param_decl_stmts.size()) {
+            break;
+        }
+
         eFoxType type = GetVarOrLiteralType(call->Params[i]);
         FoxAstVarDecl* decl = static_cast<FoxAstVarDecl*>(param_decl_stmts[i]);
 
@@ -831,6 +845,10 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
     static constexpr Hash32 scPause = HashStr32("pause");
     static constexpr Hash32 scVPush = HashStr32("vpush");
     static constexpr Hash32 scVPop = HashStr32("vpop");
+
+    static constexpr Hash32 scVRetI = HashStr32("vreti");
+    static constexpr Hash32 scVRetF = HashStr32("vretf");
+    static constexpr Hash32 scVRetS = HashStr32("vrets");
 
     switch (call->HashedName) {
     case scCastInt: {
@@ -895,6 +913,21 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
 
         return eFoxType::INT;
     }
+    case scVRetI: {
+        mpCurrentFunctionBody->pBlock->bHasExplicitReturn = true;
+        EmitJumpReturnToCallerInt32();
+        return eFoxType::INT;
+    }
+    case scVRetF: {
+        mpCurrentFunctionBody->pBlock->bHasExplicitReturn = true;
+        EmitJumpReturnToCallerFloat32();
+        return eFoxType::FLOAT;
+    }
+    case scVRetS: {
+        mpCurrentFunctionBody->pBlock->bHasExplicitReturn = true;
+        EmitJumpReturnToCallerString();
+        return eFoxType::STRING;
+    }
     default:;
     }
 
@@ -903,7 +936,7 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
 }
 
 
-void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value)
+void FoxBytecodeCompiler::EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value)
 {
     RETURN_IF_NO_NODE(call);
 
@@ -916,6 +949,7 @@ void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call, bool preserve
     //     return;
     // }
 
+
     int32 parameter_index = 0;
 
     // Fetch all parameters into registers
@@ -924,6 +958,10 @@ void FoxBytecodeCompiler::DoFunctionCall(FoxAstFunctionCall* call, bool preserve
         parameter_index++;
     }
 
+
+    if (call->pFunction && call->pFunction->pDeclaration->bIsVariadic) {
+        EmitPush32(call->Params.size());
+    }
 
     // If the function is externally defined, emit external jump instead
     if (handle && handle->BytecodeIndex == UINT32_MAX) {
@@ -1086,17 +1124,8 @@ void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
         // Check to see if there has been a return statement in the function
 
         if (function->pBlock) {
-            bool block_has_return = false;
-
-            for (FoxAstNode* statement : function->pBlock->Statements) {
-                if (statement->NodeType == FX_AST_RETURN) {
-                    block_has_return = true;
-                    break;
-                }
-            }
-
             // There is no return statement in the function's block, add a void return statement
-            if (!block_has_return) {
+            if (!function->pBlock->bHasExplicitReturn) {
                 EmitJumpReturnToCaller();
             }
 
@@ -1219,6 +1248,9 @@ void FoxBytecodePrinter::DoPush(char* s, uint8 op_base, uint8 op_spec)
         VarIndex var = Read16();
         BC_PRINT_OP("VPUSH ${}", var);
     }
+    else if (op_spec == BcSpecPush_ReturnAddr) {
+        BC_PRINT_OP("PUSHRA");
+    }
 }
 
 void FoxBytecodePrinter::DoPop(char* s, uint8 op_base, uint8 op_spec_raw)
@@ -1233,6 +1265,9 @@ void FoxBytecodePrinter::DoPop(char* s, uint8 op_base, uint8 op_spec_raw)
     }
     else if (op_spec_raw == BcSpecPop_Discard) {
         BC_PRINT_OP("DISCARD");
+    }
+    else if (op_spec_raw == BcSpecPop_ReturnAddr) {
+        BC_PRINT_OP("POPRA");
     }
 }
 

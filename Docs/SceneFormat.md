@@ -1,6 +1,6 @@
-# PRX script
+# Project format (.prx)
 
-PRX is a custom configuration langauge designed for this engine.
+PRX is a custom configuration language designed for this engine.
 A scene is outlined by a PRX script located at the root of the scenes' directory.
 This file specifies:
 

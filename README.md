@@ -14,6 +14,13 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 - Jolt Physics
 - Deferred rendering with light volumes
 
+## Docs
+
+| Name               | Document                              |
+| ------------------ | ------------------------------------- |
+| Scripting language | [FoxScript.md](Docs/FoxScript.md)     |
+| Project format     | [SceneFormat.md](Docs/SceneFormat.md) |
+
 ## Building
 
 To build the engine, make sure you have CMake installed.

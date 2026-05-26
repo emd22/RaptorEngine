@@ -83,7 +83,7 @@ private:
     void EmitFunctionDefinitionsInBlock(FoxAstBlock* block);
 
     eFoxType DoBuiltin(FoxAstFunctionCall* call);
-    void DoFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value);
+    void EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value);
 
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
     void EmitAssign(FoxAstAssign* assign);
@@ -109,6 +109,7 @@ private:
     void EmitPushFloat32(float32 value);
     void EmitPushString(uint32 value);
     void EmitPushVar(VarIndex var);
+    void EmitPushReturnAddr();
 
     eFoxType EmitPushVarOrLiteral(FoxAstNode* node);
     eFoxType GetVarOrLiteralType(FoxAstNode* node);
@@ -117,6 +118,7 @@ private:
 
     void EmitPopVar(VarIndex var);
     void EmitPopDiscard();
+    void EmitPopReturnAddr();
 
     void EmitJumpRelative(uint16 offset);
     void EmitJumpConditional(uint16 offset, eFoxConditionResult cond);
@@ -216,7 +218,6 @@ private:
 
     void DoPush(char* s, uint8 op_base, uint8 op_spec);
     void DoPop(char* s, uint8 op_base, uint8 op_spec);
-    void DoLoad(char* s, uint8 op_base, uint8 op_spec);
     void DoArith(char* s, uint8 op_base, uint8 op_spec);
     void DoJump(char* s, uint8 op_base, uint8 op_spec);
     void DoData(char* s, uint8 op_base, uint8 op_spec);

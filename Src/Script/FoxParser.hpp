@@ -45,7 +45,7 @@ public:
 
     FoxValue ParseValue();
 
-    FoxAstFunctionDecl* ParseProcedureDeclare();
+    FoxAstFunctionDecl* ParseFunctionDeclare();
     FoxAstFunctionDecl* ParseExtfnDeclare();
 
     FoxAstNode* ParseRhs();
@@ -66,8 +66,6 @@ public:
     FoxAstBlock* ParseBlock();
 
     FoxAstNode* ParseStatement(FoxAstBlock* parent_block);
-    FoxAstNode* ParseStatementAsCommand(FoxAstBlock* parent_block);
-
 
     FoxAstBlock* Parse();
 
@@ -140,8 +138,6 @@ private:
     std::vector<FoxFunctionFixup> mFunctionFixups;
 
     FoxAstBlock* mpRootBlock = nullptr;
-
-    bool mInCommandMode = false;
 
     PagedArray<Token> mTokens = {};
     uint32 mTokenIndex = 0;

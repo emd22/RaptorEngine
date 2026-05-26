@@ -99,6 +99,8 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
         return FoxValue::scNone;
     }
 
+    Vm.PushReturnAddr(0);
+
     Vm.ScopeIndex++;
     Vm.PC = sym->Offset;
 

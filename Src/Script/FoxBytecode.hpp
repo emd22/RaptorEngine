@@ -29,19 +29,21 @@ enum BcSpecCompare : uint8
 
 enum BcSpecPush : uint8
 {
-    BcSpecPush_Int32 = 1, // PUSH  [int32]
-    BcSpecPush_Float32,   // PUSHF [float32]
-    BcSpecPush_String,    // PUSHS [str]
-    BcSpecPush_Var,       // VPUSH [%var]
+    BcSpecPush_Int32 = 1,  // PUSH  [int32]
+    BcSpecPush_Float32,    // PUSHF [float32]
+    BcSpecPush_String,     // PUSHS [str]
+    BcSpecPush_Var,        // VPUSH [%var]
+    BcSpecPush_ReturnAddr, // PUSHRA
 
     BcSpecPush_StackAlloc,
 };
 
 enum BcSpecPop : uint8
 {
-    BcSpecPop_Variable_Int32,
-    BcSpecPop_Variable_Float32,
-    BcSpecPop_Discard,
+    BcSpecPop_Variable_Int32,   // VPOP
+    BcSpecPop_Variable_Float32, // VPOPF
+    BcSpecPop_Discard,          // POP
+    BcSpecPop_ReturnAddr,       // POPRA
 };
 
 enum BcSpecArith : uint8
