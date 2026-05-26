@@ -121,10 +121,12 @@ void RenderBackend::InitUploadContext()
 
 void RenderBackend::DestroyUploadContext()
 {
-    UploadContext.UploadFence.Destroy();
     UploadContext.CmdBuffer.Destroy();
     UploadContext.ImmediateCmdBuffer.Destroy();
     UploadContext.CmdPool.Destroy();
+
+    UploadContext.UploadFence.Destroy();
+    UploadContext.ImmediateUploadFence.Destroy();
 }
 
 void RenderBackend::InitFrames()

@@ -45,6 +45,5 @@ void RefCountedBase::ReleaseRef()
     DestroyObject();
 }
 
-RefCountedBase::~RefCountedBase() { ReleaseRef(); }
 
 } // namespace fx

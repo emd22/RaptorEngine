@@ -60,6 +60,7 @@ void RenderStage::Rebuild(const Vec2u& size)
     mOutputTargets.RecreateImages();
 
     mFramebuffer.Destroy();
+    mFinalStageFramebuffers.Free();
     mRenderPass.Destroy();
 
     mRenderPass.Create(mOutputTargets, mSize);
