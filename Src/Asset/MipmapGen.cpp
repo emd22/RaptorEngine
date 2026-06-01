@@ -6,6 +6,8 @@
 
 #include <Asset/Loader/AxLoaderStb.hpp>
 #include <Core/FilesystemIO.hpp>
+#include <Renderer/Backend/Image.hpp>
+
 
 namespace fx {
 
@@ -101,6 +103,56 @@ void MipmapGen::ExportMipmaps(const char* dp_path, const char* output_path)
     }
 
     dp.Close();
+}
+
+#define M_HEADER_PTR(ptr_) reinterpret_cast<MipHeader*>(ptr_)
+#define M_DATA_PTR(ptr_)   (ptr_ + sizeof(MipHeader))
+#define M_DATA_SIZE(arr_)  (arr_.Size - sizeof(MipHeader))
+
+renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char* path)
+{
+    renderer::Image image;
+
+    DataPack dp;
+    dp.ReadFromFile(path);
+
+    if (!dp.IsOpen()) {
+        return image;
+    }
+
+    dp.PrintInfo();
+
+    const uint32 num_mips = dp.Entries.Size();
+
+    DataPackEntry* base_mip = &dp.Entries[0];
+
+    dp.ReadEntry(base_mip);
+
+    MipHeader* base_header = M_HEADER_PTR(base_mip->Data.pData);
+    uint8* base_data = M_DATA_PTR(base_mip->Data.pData);
+    uint32 base_data_size = M_DATA_SIZE(base_mip->Data);
+
+    image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(base_header->SizeX, base_header->SizeY), num_mips,
+                         renderer::eImageFormat::RGBA8_UNorm, MakeSlice<uint8>(base_data, base_data_size),
+                         eImageCreateFlags::None);
+
+    for (uint32 i = 1; i < num_mips; i++) {
+        DataPackEntry* entry = &dp.Entries[i];
+        dp.ReadEntry(entry);
+
+        MipHeader* header = M_HEADER_PTR(base_mip->Data.pData);
+        uint8* data = M_DATA_PTR(base_mip->Data.pData);
+        uint32 data_size = M_DATA_SIZE(base_mip->Data);
+
+        LogInfo("Loading mip {} with size {}x{}", header->MipLevel, header->SizeX, header->SizeY);
+
+        image.UploadMip(cmd, header->MipLevel, Vec2u(header->SizeX, header->SizeY), MakeSlice<uint8>(data, data_size));
+    }
+
+
+    // image.UploadMip(cmd, mheader->MipLevel, const Vec2u& size, const SizedArray<uint8>& image_data)
+
+    return image;
 }
 
 

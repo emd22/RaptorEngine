@@ -160,7 +160,7 @@ void RawGpuBuffer::Destroy()
     Buffer = nullptr;
 }
 
-void RawGpuBuffer::Upload(void* data, uint64 size)
+void RawGpuBuffer::Upload(const void* data, uint64 size)
 {
     DebugAssert(size > 0);
     DebugAssert(data != nullptr);

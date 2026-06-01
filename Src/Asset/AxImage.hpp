@@ -46,7 +46,8 @@ public:
         renderer::RenderBackendFwd::SubmitImmediateUploadCmd(
             [&](renderer::CommandBuffer& cmd)
             {
-                spEmptyImage->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(1, 1), 1, TFormat, image_data,
+                spEmptyImage->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(1, 1), 1, TFormat,
+                                                   Slice<const uint8>(image_data.pData, image_data.Size),
                                                    eImageCreateFlags::None);
                 spEmptyImage->MarkAndSignalLoaded();
             });

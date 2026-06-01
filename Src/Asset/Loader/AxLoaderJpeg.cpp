@@ -123,7 +123,8 @@ void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
     image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
-                                ImageFormat, mImageData, (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
+                                ImageFormat, MakeSlice<const uint8>(mImageData.pData, mImageData.Size),
+                                (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
     if (should_save_data) {
         image->Image.ImageData = std::move(mImageData);

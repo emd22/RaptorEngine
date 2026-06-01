@@ -192,6 +192,13 @@ struct ImageCubemapOptions
     eImageAspectFlag AspectFlag = eImageAspectFlag::Color;
 };
 
+struct ImageInfo
+{
+    Vec2u Size;
+    eImageFormat Format;
+    int32 MipLevel = 0;
+};
+
 const ImageTypeProperties ImageTypeGetProperties(eImageType image_type);
 
 class Image
@@ -208,6 +215,8 @@ public:
     Image& operator=(const Image& other);
     Image& operator=(Ref<Image>&& ref);
 
+    ImageInfo GetInfo() const { return ImageInfo { .Size = Size, .Format = Format }; }
+
     void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
                 VkImageUsageFlags usage, eImageAspectFlag aspect);
 
@@ -215,7 +224,10 @@ public:
                 VkImageUsageFlags usage, eImageAspectFlag aspect);
 
     void CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2u& size, uint16 mips_count,
-                        eImageFormat format, const SizedArray<uint8>& image_data, eImageCreateFlags flags);
+                        eImageFormat format, const Slice<const uint8>& image_data, eImageCreateFlags flags);
+
+
+    void UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<uint8>& image_data);
 
     void TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
                           std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
@@ -225,7 +237,7 @@ public:
 
 
     void CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
-                        uint32 base_layer);
+                        uint32 base_layer, uint32 mip_level);
 
     void CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
                                        ImageCubemapOptions options);

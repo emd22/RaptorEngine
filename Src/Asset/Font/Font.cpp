@@ -126,7 +126,7 @@ void FontAtlas::Upload(renderer::Image& out_image)
     RawGpuBuffer rgba_staging;
     rgba_staging.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
                         eGpuBufferFlags::TransferReceiver);
-    rgba_staging.Upload(image_data);
+    rgba_staging.Upload(Slice(image_data));
 
     const VkImageUsageFlags usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;

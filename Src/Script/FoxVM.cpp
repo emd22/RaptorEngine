@@ -212,32 +212,27 @@ void FoxVM::DoPush(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPush_Int32) {
         const int32 value = Read32();
-        LogInfo(LC_SCRIPT, "Pushing int32 {} ({})", value, StackPointer);
 
         Push32(eFoxType::INT, value);
     }
     else if (op_spec == BcSpecPush_Float32) {
         const uint32 value = Read32();
-        LogInfo(LC_SCRIPT, "Pushing float32 {} ({})", std::bit_cast<float32>(value), StackPointer);
 
         Push32(eFoxType::FLOAT, value);
     }
     else if (op_spec == BcSpecType_String) {
         const int value = Read32();
-        LogInfo(LC_SCRIPT, "Pushing string {} ({})", value, StackPointer);
 
         Push32(eFoxType::STRING, value);
     }
     else if (op_spec == BcSpecPush_Var) {
         uint16 var_index = Read16();
-        LogInfo(LC_SCRIPT, "Pushing var {} ({})", var_index, StackPointer);
 
         VMVariable& var = GetVar(var_index);
         Push32(var.Value.Type, var.Value.Get<int32>());
     }
 
     else if (op_spec == BcSpecPush_ReturnAddr) {
-        LogInfo(LC_SCRIPT, "Pushing return addr ({})", StackPointer);
     }
 }
 
@@ -247,7 +242,6 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
 {
     if (op_spec == BcSpecPop_Variable_Int32) {
         uint16 var_index = Read16();
-        LogInfo(LC_SCRIPT, "Popping var at index {} ({})", var_index, StackPointer - 4);
 
         VMVariable& var = GetVar(var_index);
 
@@ -260,7 +254,6 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecPop_Variable_Float32) {
         uint16 var_index = Read16();
-        LogInfo(LC_SCRIPT, "Popping var at index {} ({})", var_index, StackPointer - 4);
 
         VMVariable& var = GetVar(var_index);
 
@@ -273,13 +266,10 @@ void FoxVM::DoPop(uint8 op_base, uint8 op_spec)
     }
 
     else if (op_spec == BcSpecPop_Discard) {
-        LogInfo(LC_SCRIPT, "Popping (discard) ({})", StackPointer - 4);
-
         Pop32();
     }
 
     else if (op_spec == BcSpecPop_ReturnAddr) {
-        LogInfo(LC_SCRIPT, "Popping return addr ({})", StackPointer - 4);
     }
 }
 
@@ -292,7 +282,6 @@ void FoxVM::DoArith(uint8 op_base, uint8 op_spec)
         int32 b = static_cast<int32>(Pop32());
 
         int32 result = a + b;
-        LogInfo(LC_SCRIPT, "Adding values {} and {} for {}", a, b, result);
 
         Push32(eFoxType::INT, static_cast<uint32>(result));
     }
@@ -475,7 +464,6 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
 
         ++ScopeIndex;
 
-        LogInfo(LC_SCRIPT, "Calling function {}", call_offset);
         PushReturnAddr(PC);
         // Jump to the function address
         PC = call_offset;

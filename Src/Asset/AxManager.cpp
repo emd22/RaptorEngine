@@ -46,7 +46,12 @@ void AxWorker::Update()
         // Retrieve the loader and asset from the item
         LockContext<AxItemData> asset_data = Item.GetDataContext();
 
-        // If there is data passed in then we load from memory
+        // if (Item.bIsRawPixelData) {
+        //     // If we are loading raw pixel data, then we just need to upload it;
+        //     // Do not modify the data, we know that the data is ready to upload.
+        //     LoadStatus = AxLoaderBase::eStatus::Success;
+        // }
+        // If there is data passed in, load it from memory
         if (Item.pcRawData != nullptr && Item.DataSize > 0) {
             LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
 
@@ -178,7 +183,7 @@ void AxManager::LoadObject(const std::string& name, TSRef<Object>& asset, const 
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetType::Object>(asset, loader, path);
+    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, path);
     asset->Name = name;
 }
 
@@ -187,7 +192,7 @@ void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& ass
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetType::Object>(asset, loader, "", data, data_size);
+    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, "", data, data_size);
     asset->Name = name;
 }
 
@@ -203,7 +208,7 @@ void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageForma
         loader->ImageFormat = format;
         loader->CreationFlags = flags;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAssetType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAssetLoadType::Image>(asset, loader, path);
     }
     else {
         TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
@@ -211,7 +216,7 @@ void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageForma
         loader->ImageFormat = format;
         loader->CreationFlags = flags;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetType::Image>(asset, loader, path);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetLoadType::Image>(asset, loader, path);
     }
 }
 
@@ -225,7 +230,7 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::e
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAssetType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderJpeg, eAssetLoadType::Image>(asset, loader, "", data, data_size);
     }
     else {
         // Load the image using stb_image
@@ -233,10 +238,33 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::e
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetType::Image>(asset, loader, "", data, data_size);
+        SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetLoadType::Image>(asset, loader, "", data, data_size);
     }
 }
 
+void AxManager::LoadImageFromPixels(renderer::eImageType image_type, renderer::eImageFormat format,
+                                    TSRef<AxImage>& asset, uint32 mip_level, const uint8* pixel_data, uint32 data_size)
+{
+    SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, mip_level, pixel_data, data_size);
+}
+
+static void UploadImagePixels(TSRef<AxBase>& asset, renderer::ImageInfo image_info, uint32 mip_level,
+                              const uint8* pixel_data, uint32 data_size)
+{
+    // using namespace renderer;
+
+    // TSRef<AxImage> image(asset);
+
+    // if (!image->Image.IsInited()) {
+    //     image->Image.CreateFromData(gRenderer->UploadContext.CmdBuffer, eImageType::Flat, image_info.Size, 1,
+    //                                 image_info.Format, MakeSlice<const uint8>(pixel_data, data_size),
+    //                                 eImageCreateFlags::None);
+    // }
+    // else {
+    //     image->Image.UploadMip(gRenderer->UploadContext, mip_level, const Vec2u &size, const Slice<uint8>
+    //     &image_data)
+    // }
+}
 
 void AxManager::CheckForUploadableData()
 {
@@ -272,8 +300,14 @@ void AxManager::CheckForUploadableData()
 
         // The asset was successfully loaded, upload to GPU
         if (worker->LoadStatus == AxLoaderBase::eStatus::Success) {
+            // if (worker->Item.bIsRawPixelData) {
+            //     AxQueueItem& item = worker->Item;
+            //     UploadImagePixels(asset_data->pAsset, item.ImgInfo, item.MipLevel, item.pcRawData, item.DataSize);
+            // }
+            // else {
             // Load the resouce into GPU memory
             asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
+            // }
         }
     }
 

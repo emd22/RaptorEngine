@@ -14,6 +14,9 @@
 namespace fx {
 
 class DataPack;
+namespace renderer {
+class Image;
+}
 
 class MipmapGen
 {
@@ -26,6 +29,7 @@ public:
 
     void GenerateMipmaps(const char* path, renderer::eImageFormat format, const Slice<uint8>& pixels,
                          const Vec2u& size);
+
     Slice<uint8> GenerateMip(DataPack& dp, renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
                              uint8 mip_level);
 
@@ -34,6 +38,8 @@ public:
      * @param dp_path The path to the datapack.
      */
     void ExportMipmaps(const char* dp_path, const char* output_path);
+
+    renderer::Image LoadMipmaps(renderer::CommandBuffer& cmd, const char* path);
 
     ~MipmapGen() = default;
 

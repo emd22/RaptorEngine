@@ -89,8 +89,9 @@ void MaterialManager::MakeNullMaterial()
     renderer::gRenderer->SubmitImmediateUploadCmd(
         [&](renderer::CommandBuffer& cmd)
         {
-            diffuse->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(4, 4), 1,
-                                          renderer::eImageFormat::RGBA8_UNorm, diffuse_data, eImageCreateFlags::None);
+            diffuse->Image.CreateFromData(
+                cmd, renderer::eImageType::Flat, Vec2u(4, 4), 1, renderer::eImageFormat::RGBA8_UNorm,
+                MakeSlice<const uint8>(diffuse_data.pData, diffuse_data.Size), eImageCreateFlags::None);
 
             diffuse->MarkAndSignalLoaded();
         });

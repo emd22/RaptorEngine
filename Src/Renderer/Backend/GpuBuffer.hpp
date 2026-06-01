@@ -143,12 +143,12 @@ public:
      * @param data The data to upload
      * @param size The size of the buffer in bytes
      */
-    void Upload(void* data, uint64 size);
+    void Upload(const void* data, uint64 size);
 
     template <typename TElementType>
-    void Upload(const SizedArray<TElementType>& data)
+    void Upload(const Slice<TElementType>& data)
     {
-        Upload(reinterpret_cast<void*>(data.pData), data.GetSizeInBytes());
+        Upload(reinterpret_cast<const void*>(data.pData), data.GetSizeInBytes());
     }
 
     void Destroy();

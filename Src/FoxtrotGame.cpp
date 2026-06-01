@@ -249,6 +249,13 @@ void FoxtrotGame::CreateGame()
     CreateLights();
     CreateFontObject();
 
+
+    MipmapGen mm;
+
+    renderer::Image mip_image;
+
+    gRenderer->SubmitImmediateUploadCmd([&](CommandBuffer& cmd) { mip_image = mm.LoadMipmaps(cmd, "TestMips.bin"); });
+
     // MipmapGen mm;
     // mm.GenerateMipmaps(eImageFormat::RGBA8_UNorm, test_img->Image.ImageData, test_img->Image.Size);
     // mm.ExportMipmaps("TestMips.bin", "TestMipsExport");

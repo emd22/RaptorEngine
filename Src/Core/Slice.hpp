@@ -21,6 +21,7 @@ public:
     Iterator end() const { return pData + Size; }
 
     Slice(const SizedArray<T>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
+    Slice(const Slice<T>& other) { (*this) = other; }
 
     template <uint32 TSize>
     Slice(StackArray<T, TSize>& stack_arr) : pData(stack_arr.pData), Size(stack_arr.Size)
@@ -28,14 +29,7 @@ public:
     }
 
     Slice(T* ptr, uint32 size) : pData(ptr), Size(size) {}
-
     Slice(nullptr_t np) : pData(nullptr), Size(0) {}
-
-    Slice(const Slice& other)
-    {
-        pData = other.pData;
-        Size = other.Size;
-    }
 
     Slice(Slice<T>&& other) { (*this) = std::move(other); }
 
@@ -60,6 +54,14 @@ public:
         return *this;
     }
 
+    Slice& operator=(const Slice<T>& other)
+    {
+        pData = other.pData;
+        Size = other.Size;
+
+        return *this;
+    }
+
     bool operator==(nullptr_t np) { return pData == nullptr; }
 
     operator T*() const { return pData; }
@@ -71,6 +73,8 @@ public:
         }
         return pData[index];
     }
+
+    FX_FORCE_INLINE uint32 GetSizeInBytes() const { return sizeof(T) * Size; }
 };
 
 /** Creates a new Slice object */

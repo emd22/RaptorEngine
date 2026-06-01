@@ -444,29 +444,7 @@ void RenderBackend::SubmitImmediateUploadCmd(RenderBackend::SubmitFunc upload_fu
 void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
 {
     CommandBuffer& cmd = UploadContext.CmdBuffer;
-
-    // cmd.Record(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     upload_func(cmd);
-    // cmd.End();
-
-    // const VkSubmitInfo submit_info = {
-    //     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-
-    //     .commandBufferCount = 1,
-    //     .pCommandBuffers = &cmd.Cmd,
-    // };
-
-    // SpinLockContext<VkQueue> transfer_queue = GetDevice()->GetTransferQueue();
-
-    // VkTry(vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, UploadContext.UploadFence.Get()),
-    //       "Error submitting upload buffer");
-
-    // transfer_queue.Unlock();
-
-    // UploadContext.UploadFence.WaitFor();
-    // UploadContext.UploadFence.Reset();
-
-    // UploadContext.CmdPool.Reset();
 }
 
 void RenderBackend::BeginUploads() {}

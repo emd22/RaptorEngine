@@ -59,13 +59,13 @@ public:
     {
         pAssetImage = other.pAssetImage;
 
-        pDataToLoad.pData = other.pDataToLoad.pData;
-        pDataToLoad.Size = other.pDataToLoad.Size;
+        pDataToLoad = other.pDataToLoad;
+        pPixelData = other.pPixelData;
 
         return *this;
     }
 
-    bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr); }
+    bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (pPixelData != nullptr); }
 
     ~MaterialComponent() = default;
 
@@ -75,10 +75,13 @@ private:
         // If there is data passed in and the image has not been loaded yet, load it using the
         // asset manager. This will be validated on the next call of this function. (when attempting to build the
         // material)
-        if (!pAssetImage && pDataToLoad) {
-            Slice<const uint8>& image_data = pDataToLoad;
-            pAssetImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, image_data.pData, image_data.Size);
-
+        if (!pAssetImage) {
+            if (pDataToLoad) {
+                Slice<const uint8>& image_data = pDataToLoad;
+                pAssetImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, image_data.pData, image_data.Size);
+            }
+            else if (pPixelData) {
+            }
             return false;
         }
 
@@ -92,7 +95,12 @@ private:
 
 public:
     TSRef<AxImage> pAssetImage { nullptr };
+
+    /// Image data (including format containers) that needs to be parsed and uploaded by a loader.
     Slice<const uint8> pDataToLoad { nullptr };
+
+    /// Pixel data to be uploaded;
+    Slice<const uint8> pPixelData { nullptr };
 };
 
 /////////////////////////////////////

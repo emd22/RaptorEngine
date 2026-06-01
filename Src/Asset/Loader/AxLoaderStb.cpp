@@ -98,7 +98,8 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
     image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
-                                ImageFormat, data_arr, (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
+                                ImageFormat, Slice<uint8>(data_arr),
+                                (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
     if (should_save_data) {
         image->Image.ImageData = std::move(data_arr);

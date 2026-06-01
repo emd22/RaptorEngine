@@ -1,8 +1,16 @@
-vpopi() int { vreti(); }
+#include "Scripts/Util.fox"
+
+/*vpopi() int { vreti(); }*/
+
+
+Hello(int x, int y) int
+{
+    LOG("Hello");
+    return x + y * 2;
+}
 
 
 Init() int
 {
-
-    return value;
+    return Hello(10, 20);
 }

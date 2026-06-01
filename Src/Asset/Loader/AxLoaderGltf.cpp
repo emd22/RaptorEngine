@@ -92,24 +92,29 @@ static void LoadMipmapsIfExists(const String& asset_path, const char* component_
     // Get the folder that the model would be stored in.
     // This uses the normal path minus the file extension.
     // For example,
-    //      Assets/Poo/NameOfModel.glb   becomes    Assets/Poo/NameOfModel/...
+    //      Assets/Folder/NameOfModel.glb   becomes    Assets/Folder/NameOfModel/...
 
     const String base_path = FilesystemIO::RemoveExtension(asset_path);
 
     // Get the full path:
-    //      Assets/Poo/NameOfModel/Diffuse.mdp
+    //      Assets/Folder/NameOfModel/Diffuse.mdp
 
     const String full_path = String::Fmt("{}/{}.mdp", base_path, component_name);
 
     // The pregenerated file exists, use it.
     if (FilesystemIO::FileExists(full_path.CStr())) {
-        TSRef<AxImage> image = TSRef<AxImage>::New();
+        // TSRef<AxImage> image = TSRef<AxImage>::New();
 
-        // image->Image.CreateFromData(eImageType image_type, const Vec2u &size, uint16 mips_count, eImageFormat format,
+        // image->Image.CreateFromData(eImageType::Flat, const Vec2u &size, uint16 mips_count, eImageFormat format,
         // const SizedArray<uint8> &image_data, eImageCreateFlags flags)
 
         // component.pAssetImage = image;
         // component.pDataToLoad = nullptr;
+    }
+    else {
+        // MipmapGen mm {};
+        // mm.GenerateMipmaps(full_path.CStr(), eImageFormat::RGBA8_UNorm, const Slice<uint8>& pixels,
+        //                    const Vec2u& size)
     }
 }
 

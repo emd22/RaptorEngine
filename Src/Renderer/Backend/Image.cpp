@@ -235,7 +235,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
 
 void Image::CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2u& size, uint16 mips_count,
-                           eImageFormat format, const SizedArray<uint8>& image_data, eImageCreateFlags flags)
+                           eImageFormat format, const Slice<const uint8>& image_data, eImageCreateFlags flags)
 {
     RawGpuBuffer staging_buffer;
     staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
@@ -243,7 +243,7 @@ void Image::CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2
     staging_buffer.Upload(image_data);
 
     if ((flags & eImageCreateFlags::KeepInMemory) != 0) {
-        ImageData.CloneFrom(image_data);
+        ImageData.CreateCopyOf(image_data.pData, image_data.Size);
     }
 
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
@@ -251,8 +251,22 @@ void Image::CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2
 
     Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, eImageAspectFlag::Color);
 
-    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0);
+    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0, 0);
 }
+
+void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<uint8>& image_data)
+{
+    RawGpuBuffer staging_buffer;
+    staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+                          eGpuBufferFlags::TransferReceiver);
+    staging_buffer.Upload(image_data);
+
+    const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0, mip_index);
+}
+
 
 void Image::MarkUploaded() { gRenderer->GetFrameNumber(); }
 
@@ -391,7 +405,7 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
 }
 
 void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
-                           uint32 base_layer)
+                           uint32 base_layer, uint32 mip_level)
 {
     TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1,
                      TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -403,7 +417,7 @@ void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkIma
         .bufferImageHeight = 0,
         .imageSubresource {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .mipLevel = 0,
+            .mipLevel = mip_level,
             .baseArrayLayer = base_layer,
             .layerCount = 1,
         },
