@@ -43,7 +43,7 @@ public:
 
 private:
     // void MakeEmptyMaterialTexture(Ref<Material>& material, MaterialComponent& component);
-    void MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive);
+    void MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive, int32 primitive_index);
 
     void UnpackMeshAttributes(const TSRef<Object>& object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive);
 

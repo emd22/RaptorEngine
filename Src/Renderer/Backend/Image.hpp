@@ -162,7 +162,6 @@ struct ImageFormatUtil
     }
 };
 
-
 struct ImageTypeProperties
 {
     VkImageViewType ViewType;

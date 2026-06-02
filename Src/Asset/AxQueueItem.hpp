@@ -97,7 +97,6 @@ struct AxQueueItem
         item.Data.pAsset = asset;
 
         item.AssetType = type;
-        item.MipLevel = 0;
         item.pcRawData = nullptr;
         item.DataSize = 0;
         item.AssetSrc = eAxQueueItemSrc::FilePath;
@@ -116,7 +115,6 @@ struct AxQueueItem
         item.Data.pAsset = asset;
 
         item.AssetType = type;
-        item.MipLevel = 0;
         item.pcRawData = data.pData;
         item.DataSize = data.Size;
         item.AssetSrc = eAxQueueItemSrc::FileData;
@@ -134,7 +132,6 @@ struct AxQueueItem
         item.Data.pAsset = asset;
 
         item.AssetType = type;
-        item.MipLevel = mip_level;
         item.pcRawData = pixel_data;
         item.DataSize = pixel_size;
 
@@ -172,8 +169,6 @@ public:
     uint32 DataSize = 0;
 
     renderer::ImageInfo ImgInfo;
-    uint32 MipLevel = 0;
-
     eAssetLoadType AssetType;
 
     eAxQueueItemSrc AssetSrc = eAxQueueItemSrc::FilePath;

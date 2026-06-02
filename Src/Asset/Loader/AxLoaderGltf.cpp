@@ -119,6 +119,8 @@ static void LoadMipmapsIfExists(const String& asset_path, const char* component_
 }
 
 
+String GetMaterialExportName(const char* path_basename, int32 material_index) {}
+
 template <eImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)
@@ -136,7 +138,7 @@ static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponen
     component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 
-void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive)
+void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive, int32 primitive_index)
 {
     // if (!object->mMaterialID.IsNull()) {
     //     return;
@@ -199,6 +201,8 @@ void AxLoaderGltf::BuildObjectsFromPrimitives(TSRef<Object>& container_object, c
     // if there are multiple primitives.
     if (has_multiple_primitives) {
         current_object = TSRef<Object>::New();
+        // Propagate the name
+        current_object->Name = container_object->Name;
     }
 
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
@@ -221,7 +225,7 @@ void AxLoaderGltf::BuildObjectsFromPrimitives(TSRef<Object>& container_object, c
         UnpackMeshAttributes(current_object, primitive_mesh, gltf_primitive);
         current_object->pMesh = primitive_mesh;
 
-        MakeMaterialForPrimitive(current_object, gltf_primitive);
+        MakeMaterialForPrimitive(current_object, gltf_primitive, i);
 
         if (has_multiple_primitives) {
             // Attach the current object to the object container (our output)
@@ -434,6 +438,8 @@ void AxLoaderGltf::ProcessData(TSRef<Object>& output_object)
         current_object = TSRef<Object>::New();
     }
 
+    int32 attach_id = 1;
+
     // Load each object in the GLTF as a new separate object.
     for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
         cgltf_node* node = &mpGltfData->nodes[node_index];
@@ -451,6 +457,8 @@ void AxLoaderGltf::ProcessData(TSRef<Object>& output_object)
         }
 
         if (has_multiple_meshes) {
+            current_object->Name.Set(String::Fmt("{}_{}", output_object->Name.Get(), attach_id++));
+
             // Attach the loaded object onto the final object. This will be a container.
             output_object->AttachObject(current_object);
 

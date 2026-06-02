@@ -470,7 +470,8 @@ void FoxtrotGame::ProcessControls()
     // }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
-        pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
+        gObjectManager->PrintActive(1000);
+        // pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
     }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {

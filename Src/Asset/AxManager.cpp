@@ -183,8 +183,8 @@ void AxManager::LoadObject(const std::string& name, TSRef<Object>& asset, const 
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, path);
     asset->Name = name;
+    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, path);
 }
 
 
@@ -192,8 +192,8 @@ void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& ass
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
 
-    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, "", data, data_size);
     asset->Name = name;
+    SubmitAssetToLoad<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, "", data, data_size);
 }
 
 

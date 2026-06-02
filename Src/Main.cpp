@@ -11,6 +11,7 @@
 #include <Asset/ShaderPreproc.hpp>
 #include <Core/Defer.hpp>
 #include <Core/FilesystemIO.hpp>
+#include <Core/FreeArray.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/String.hpp>
 #include <Engine.hpp>
@@ -50,23 +51,6 @@ int main()
 
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
-
-    // {
-    //     fx::script::FoxScript script(FX_BASE_DIR "/Scripts/Test.fox");
-
-    //     script.RegisterProc(fx::HashStr32("LOG"), fx::eFoxProcFlags::None, { fx::eFoxType::STRING }, N_ScriptLog);
-    //     fx::script::FoxValue value = script.CallProc(script.GetSymbol("Init"), {});
-    //     value.Print();
-
-    //     // while (true) {
-    //     //     value = script.Update();
-    //     //     if (!script.IsPaused()) {
-    //     //         value.Print();
-    //     //         break;
-    //     //     }
-    //     //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    //     // }
-    // }
 
 
     fx::renderer::Globals::Init();
