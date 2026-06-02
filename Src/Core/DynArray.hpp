@@ -7,7 +7,7 @@
 namespace fx {
 
 namespace GrowthFunctions {
-inline constexpr uint32 Double(uint32 v) { return v * 2; }
+inline constexpr uint32 Double(uint32 v, uint32) { return v * 2; }
 inline constexpr uint32 InPages(uint32 v, uint32 page_size) { return v + page_size; }
 } // namespace GrowthFunctions
 

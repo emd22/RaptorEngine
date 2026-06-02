@@ -59,10 +59,10 @@ public:
             ptr->~TItemType();
         }
 
-        SlotsInUse.Unset(index);
+        MarkItemFree(index);
     }
 
-    void MarkItemFree(uint32 index) { SlotsInUse.Unset(index); }
+    FX_FORCE_INLINE void MarkItemFree(uint32 index) { SlotsInUse.Unset(index); }
 
     FX_FORCE_INLINE uint32 GetIndexForItem(TItemType* ptr) const
     {

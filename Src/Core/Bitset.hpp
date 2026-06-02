@@ -34,6 +34,8 @@ public:
 
     FX_FORCE_INLINE uint64 GetBitCapacity() const;
 
+    FX_FORCE_INLINE bool IsInited() const { return mBits.IsInited(); }
+
     /**
      * @brief Sets all bits to zero.
      */
