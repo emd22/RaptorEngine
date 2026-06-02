@@ -471,6 +471,8 @@ void FoxtrotGame::ProcessControls()
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
         gObjectManager->PrintActive(1000);
+
+        mMainScene.mRenderList.GetSection(ePipelineName::Geometry).InUse.Print();
         // pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
     }
 

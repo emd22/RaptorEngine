@@ -1,6 +1,9 @@
 #include "Scene.hpp"
 
 #include <Engine.hpp>
+#include <Material/Material.hpp>
+#include <Material/MaterialManagerFwd.hpp>
+#include <Object.hpp>
 #include <ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -23,6 +26,19 @@ void Scene::Attach(const TSRef<Object>& object)
     mObjects.Insert(object);
     object->pScene = this;
     object->OnAttached(this);
+
+    object->OnLoaded(
+        [](TSRef<AxBase> asset)
+        {
+            TSRef<Object> obj { asset };
+            Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
+            obj->pScene->mRenderList.Insert(material->GetPipelineName(), obj.mpPtr);
+
+            for (const TSRef<Object>& attach : obj->AttachedNodes) {
+                material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
+                obj->pScene->mRenderList.Insert(material->GetPipelineName(), attach.mpPtr);
+            }
+        });
 }
 
 void Scene::Attach(const Ref<LightBase>& light)
@@ -82,23 +98,51 @@ PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
 }
 
 
+void Scene::RenderRLSection(const renderer::RenderListSection& section)
+{
+    PerspectiveCamera& camera = *mpCurrentCamera;
+
+    if (!section.InUse.IsInited()) {
+        return;
+    }
+
+    uint32 index = 0;
+    while (true) {
+        index = section.InUse.FindNextSetBit(index);
+        if (index == Bitset::scNoFreeBits) {
+            break;
+        }
+
+        Object* obj = section.Objects[index];
+
+        obj->RenderShallow(camera);
+
+        ++index;
+    }
+}
+
+
 void Scene::Render(Camera* shadow_camera)
 {
     PerspectiveCamera& camera = *mpCurrentCamera;
 
     gRenderer->BeginGeometry();
 
+    RenderRLSection(mRenderList.GetSection(ePipelineName::Geometry));
+    RenderRLSection(mRenderList.GetSection(ePipelineName::GeometryNormalMaps));
+    RenderRLSection(mRenderList.GetSection(ePipelineName::GeometrySkinned));
 
-    for (const TSRef<Object>& obj : mObjects) {
-        obj->Update();
+
+    // for (const TSRef<Object>& obj : mObjects) {
+    //     obj->Update();
 
 
-        if (obj->GetRenderUnlit()) {
-            continue;
-        }
+    //     if (obj->GetRenderUnlit()) {
+    //         continue;
+    //     }
 
-        obj->Render(camera);
-    }
+    //     obj->Render(camera);
+    // }
 
     // Render lights
     gRenderer->BeginLighting();

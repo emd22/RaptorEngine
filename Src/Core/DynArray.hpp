@@ -24,6 +24,7 @@ public:
     DynArray(DynArray&& other) { (*this) = std::move(other); }
 
     TElementType& operator[](uint32 index) noexcept { return pData[index]; }
+    const TElementType& operator[](uint32 index) const noexcept { return pData[index]; }
 
     void Insert(const TElementType& object)
     {

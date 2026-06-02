@@ -6,6 +6,7 @@
 #include <Object.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Light.hpp>
+#include <Renderer/RenderList.hpp>
 
 namespace fx {
 
@@ -60,10 +61,14 @@ private:
 
     void RenderObjectShadows(const TSRef<Object>& obj);
 
+    void RenderRLSection(const renderer::RenderListSection& section);
+
 public:
     Name Name = "(unnamed)";
 
     bool bRenderPhysicsObjects = false;
+
+    renderer::RenderList mRenderList;
 
 private:
     PagedArray<TSRef<Object>> mObjects;

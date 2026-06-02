@@ -26,7 +26,7 @@ class MaterialManager
 public:
     void Create();
 
-    MaterialID NewMaterial(const String& name, renderer::Pipeline* pipeline, bool supports_skinning);
+    MaterialID NewMaterial(const String& name, renderer::ePipelineName pl_name, bool supports_skinning);
     Material* GetMaterial(const MaterialID& id);
     void DestroyMaterial(const MaterialID& id);
 

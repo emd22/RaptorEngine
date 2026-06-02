@@ -148,8 +148,8 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
         return;
     }
 
-    object->mMaterialID = gMaterialManager->NewMaterial(
-        object->Name.Get(), &gPipelineCache->Request(ePipelineName::Geometry), object->IsSkinned());
+    object->mMaterialID = gMaterialManager->NewMaterial(object->Name.Get(), ePipelineName::Geometry,
+                                                        object->IsSkinned());
 
     Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
 

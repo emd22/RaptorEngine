@@ -12,6 +12,7 @@ public:
     PipelineCache();
 
     Pipeline& Request(const ePipelineName name);
+    ePipelineName GetName(const Pipeline* pipeline) const;
     void Bind(const ePipelineName name, const CommandBuffer& cmd);
 
 private:

@@ -26,6 +26,8 @@ public:
      * @return An index to the bit, or `Bitset::scNoFreeBits` if there are none remaining.
      */
     FX_FORCE_INLINE uint32 FindNextFreeBit(uint32 start_index = 0) const;
+    FX_FORCE_INLINE uint32 FindNextSetBit(uint32 start_index = 0) const;
+
     FX_FORCE_INLINE uint32 FindNextFreeBitGroup(uint32 group_size) const;
 
     FX_FORCE_INLINE void Set(uint32 index);
@@ -41,7 +43,7 @@ public:
      */
     void ClearAll();
 
-    void Print();
+    void Print() const;
 
 private:
     uint32 Init(uint32 max_bits);

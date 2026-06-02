@@ -77,7 +77,7 @@ void MaterialManager::MakeNullMaterial()
 
     material->ID = MaterialID(0);
     material->Name = "NullMaterial";
-    material->pPipeline = &renderer::gPipelineCache->Request(renderer::ePipelineName::Geometry);
+    material->SetPipeline(renderer::ePipelineName::Geometry);
     material->SetSupportsSkinning(false);
 
     SizedArray<uint8> diffuse_data = {
@@ -131,7 +131,7 @@ Material* MaterialManager::GetMaterial(const MaterialID& id)
     return mMaterialList.GetItem(id.GetID());
 }
 
-MaterialID MaterialManager::NewMaterial(const String& name, renderer::Pipeline* pipeline, bool supports_skinning)
+MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineName pl_name, bool supports_skinning)
 {
     if (!mMaterialList.IsInited()) {
         Create();
@@ -142,7 +142,7 @@ MaterialID MaterialManager::NewMaterial(const String& name, renderer::Pipeline* 
 
     Material* material = GetNewMaterial();
     material->Name = name.Str();
-    material->pPipeline = pipeline;
+    material->SetPipeline(pl_name);
     material->SetSupportsSkinning(supports_skinning);
 
     return material->ID;

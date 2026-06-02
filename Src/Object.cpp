@@ -55,7 +55,7 @@ bool Object::CheckIfReady(bool require_material)
     // TODO: Remove this
     if (require_material && pMesh->VertexList.IsSkinned()) {
         Material* material = gMaterialManager->GetMaterial(mMaterialID);
-        material->pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
+        material->SetPipeline(ePipelineName::GeometrySkinned);
     }
 
     Flags |= (eObjectFlags::ReadyToRender);
@@ -168,7 +168,7 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
                     material->SetDefaultPipeline();
                 }
                 else {
-                    material->pPipeline = pipeline;
+                    material->SetPipeline(gPipelineCache->GetName(pipeline));
                 }
             }
 
@@ -184,7 +184,7 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
                         material->SetDefaultPipeline();
                     }
                     else {
-                        material->pPipeline = pipeline;
+                        material->SetPipeline(gPipelineCache->GetName(pipeline));
                     }
                 }
             }
@@ -247,7 +247,7 @@ void Object::Render(const Camera& camera)
 {
     FrameData* frame = gRenderer->GetFrame();
 
-    MaterialID material_id = MaterialID::Null;
+    MaterialID material_id = mMaterialID;
 
     // const bool use_null_material = mMaterialID.IsNull();
     Material* material = gMaterialManager->GetMaterial(material_id);
@@ -265,8 +265,8 @@ void Object::Render(const Camera& camera)
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
     if (CheckIfReady(true)) {
-        gRenderer->SubmitPushConstants(frame->CmdBuffer, *material->pPipeline, eShaderType::Vertex | eShaderType::Pixel,
-                                       push_constants);
+        gRenderer->SubmitPushConstants(frame->CmdBuffer, material->GetPipeline(),
+                                       eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
         RenderMesh();
     }
@@ -279,6 +279,25 @@ void Object::Render(const Camera& camera)
     for (TSRef<Object>& obj : AttachedNodes) {
         obj->Render(camera);
     }
+}
+
+void Object::RenderShallow(const Camera& camera)
+{
+    FrameData* frame = gRenderer->GetFrame();
+
+    Material* material = gMaterialManager->GetMaterial(mMaterialID);
+
+    UpdateIfOutOfDate();
+
+    DrawPushConstants push_constants {};
+    push_constants.ObjectId = ObjectId;
+    push_constants.MaterialIndex = mMaterialID.GetID();
+    memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
+
+    gRenderer->SubmitPushConstants(frame->CmdBuffer, material->GetPipeline(), eShaderType::Vertex | eShaderType::Pixel,
+                                   push_constants);
+
+    RenderMesh();
 }
 
 void Object::RenderUnlit(const Camera& camera)
@@ -367,7 +386,7 @@ void Object::RenderMesh()
     }
 
     gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                   *gMaterialManager->GetMaterial(material_id)->pPipeline,
+                                                   gMaterialManager->GetMaterial(material_id)->GetPipeline(),
                                                    gObjectManager->GetBaseOffset());
 
     if (pMesh) {

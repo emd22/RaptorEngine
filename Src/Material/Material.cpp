@@ -62,7 +62,7 @@ DescriptorSet& Material::GetDescriptorSetAlbedoOnly()
 }
 
 
-bool Material::Bind(const CommandBuffer& cmd) { return BindWithPipeline(cmd, *pPipeline, false); }
+bool Material::Bind(const CommandBuffer& cmd) { return BindWithPipeline(cmd, *mpPipeline, false); }
 
 bool Material::BindWithPipeline(const CommandBuffer& cmd, Pipeline& pipeline, bool albedo_only)
 {
@@ -106,7 +106,8 @@ Material& Material::operator=(const Material& other)
 
     Name = other.Name;
 
-    pPipeline = other.pPipeline;
+    mpPipeline = other.mpPipeline;
+    mPipelineName = other.mPipelineName;
 
     bIsBuilt = false;
 
@@ -157,14 +158,14 @@ static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
 void Material::SetDefaultPipeline()
 {
     if (NormalMap.Exists()) {
-        pPipeline = &gPipelineCache->Request(ePipelineName::GeometryNormalMaps);
+        SetPipeline(ePipelineName::GeometryNormalMaps);
 
         if (bSupportsSkinning) {
-            pPipeline = &gPipelineCache->Request(ePipelineName::GeometrySkinned);
+            SetPipeline(ePipelineName::GeometrySkinned);
         }
     }
     else {
-        pPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
+        SetPipeline(ePipelineName::Geometry);
     }
 }
 
@@ -174,6 +175,12 @@ void Material::SubmitProperties(const MaterialProperties& properties)
         MaterialManagerFwd::GetMaterialPropertiesBuffer().pMappedBuffer);
 
     memcpy(&properties_buffer[ID.GetID()], &properties, sizeof(MaterialProperties));
+}
+
+void Material::SetPipeline(renderer::ePipelineName pl_name)
+{
+    mPipelineName = pl_name;
+    mpPipeline = &gPipelineCache->Request(pl_name);
 }
 
 void Material::Build()
@@ -225,7 +232,7 @@ void Material::Build()
 
     SubmitProperties(Properties);
 
-    if (!pPipeline) {
+    if (!mpPipeline) {
         SetDefaultPipeline();
     }
 

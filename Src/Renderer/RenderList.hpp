@@ -13,15 +13,13 @@
 #include <Renderer/PipelineNames.hpp>
 
 namespace fx {
-namespace renderer {
+class Object;
 
-class PrimitiveMesh;
-class Material;
+namespace renderer {
 
 struct RenderListSection
 {
-    DynArray<PrimitiveMesh*> Meshes;
-    DynArray<Material*> Materials;
+    DynArray<Object*> Objects;
     Bitset InUse;
 };
 
@@ -30,15 +28,15 @@ class RenderList
 public:
     RenderList() = default;
 
-    uint32 Insert(ePipelineName pl_name, PrimitiveMesh* mesh, Material* material);
+    uint32 Insert(ePipelineName pl_name, Object* object);
 
-    void Remove(ePipelineName pl_name, PrimitiveMesh* mesh);
-    void RemoveAllOfMesh(PrimitiveMesh* mesh);
+    void Remove(ePipelineName pl_name, Object* mesh);
+    void RemoveAllOfObject(Object* mesh);
 
     const RenderListSection& GetSection(ePipelineName pl_name) { return mSections[static_cast<uint32>(pl_name)]; }
 
 private:
-    RenderListSection mSections[scNumPipelines];
+    std::array<RenderListSection, scNumPipelines> mSections;
 };
 
 } // namespace renderer

@@ -50,7 +50,7 @@ static void PrintByte(uint8 b)
 }
 
 
-void Bitset::Print()
+void Bitset::Print() const
 {
     uint32 size = static_cast<uint32>(mBits.Size);
 

@@ -17,6 +17,7 @@
 #include <Core/PagedArray.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
+#include <Renderer/PipelineNames.hpp>
 
 
 namespace fx {
@@ -167,6 +168,11 @@ public:
     void SetDefaultPipeline();
     void SubmitProperties(const MaterialProperties& properties);
 
+    void SetPipeline(renderer::ePipelineName pl_name);
+    renderer::Pipeline& GetPipeline() { return *mpPipeline; }
+    renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
+
+
     Material& operator=(const Material& other);
 
     void Destroy();
@@ -183,7 +189,6 @@ public:
 
     Name Name;
 
-    renderer::Pipeline* pPipeline = nullptr;
 
     std::atomic_bool bIsBuilt = { false };
 
@@ -199,6 +204,10 @@ public:
 private:
     renderer::DescriptorSet mDsDefault;
     renderer::DescriptorSet mDsAlbedoOnly;
+
+
+    renderer::Pipeline* mpPipeline = nullptr;
+    renderer::ePipelineName mPipelineName = renderer::ePipelineName::Geometry;
 
 
     bool mbIsReady : 1 = false;
