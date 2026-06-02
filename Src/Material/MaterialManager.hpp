@@ -4,6 +4,7 @@
 #include "MaterialID.hpp"
 
 #include <Core/Bitset.hpp>
+#include <Core/FreeArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
@@ -48,7 +49,7 @@ public:
      */
     renderer::RawGpuBuffer MaterialPropertiesBuffer {};
 
-    Bitset MaterialsInUse;
+    // Bitset MaterialsInUse;
 
     /**
      * @brief Descriptor set for material properties. Used in the light pass.
@@ -57,8 +58,8 @@ public:
 
 
 private:
-    SizedArray<Material> mMaterials;
-    // SizedArray<int16> mMaterialUsages;
+    // SizedArray<Material> mMaterials;
+    FreeArray<Material> mMaterialList;
 
     renderer::DescriptorPool mDescriptorPool;
 

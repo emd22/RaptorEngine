@@ -154,7 +154,7 @@ public:
 
     /**
      * Binds the material to be used in the given command buffer.
-     * @returns True if the material was bound succesfully.
+     * @returns True if the material was bound successfully.
      */
     bool Bind(const renderer::CommandBuffer& cmd);
     bool BindWithPipeline(const renderer::CommandBuffer& cmd, renderer::Pipeline& pipeline, bool albedo_only = false);

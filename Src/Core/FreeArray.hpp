@@ -20,7 +20,9 @@ public:
         SlotsInUse.InitZero(capacity);
     }
 
-    TItemType* NewItem()
+    FX_FORCE_INLINE bool IsInited() const { return pPtr != nullptr; }
+
+    TItemType* NewItem(uint32* out_index = nullptr)
     {
         uint32 index = SlotsInUse.FindNextFreeBit();
         if (index == Bitset::scNoFreeBits) {
@@ -31,6 +33,10 @@ public:
         new (ptr) TItemType;
 
         SlotsInUse.Set(index);
+
+        if (out_index != nullptr) {
+            (*out_index) = index;
+        }
 
         return ptr;
     }
@@ -56,14 +62,14 @@ public:
         SlotsInUse.Unset(index);
     }
 
+    void MarkItemFree(uint32 index) { SlotsInUse.Unset(index); }
+
     FX_FORCE_INLINE uint32 GetIndexForItem(TItemType* ptr) const
     {
         return reinterpret_cast<uintptr_t>(ptr - pPtr) / sizeof(TItemType);
     }
 
-    // FX_FORCE_INLINE void FreeItem(const TItemType* ptr) { FreeItem(GetIndexForItem(ptr)); }
-
-    ~FreeArray()
+    void Free()
     {
         if (pPtr) {
             for (uint32 i = 0; i < Capacity; i++) {
@@ -75,6 +81,7 @@ public:
         }
     }
 
+    ~FreeArray() { Free(); }
 
 public:
     TItemType* pPtr = nullptr;

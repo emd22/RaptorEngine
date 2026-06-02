@@ -119,8 +119,6 @@ static void LoadMipmapsIfExists(const String& asset_path, const char* component_
 }
 
 
-String GetMaterialExportName(const char* path_basename, int32 material_index) {}
-
 template <eImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponent<TFormat>& component,
                                             cgltf_texture_view& texture_view)

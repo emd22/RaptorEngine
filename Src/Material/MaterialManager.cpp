@@ -20,11 +20,7 @@ void MaterialManager::Create()
         return;
     }
 
-    mMaterials.InitCapacity(FX_MAX_BOUND_MATERIALS);
-    // mMaterialUsages.InitSize(FX_MAX_BOUND_MATERIALS);
-    // memset(mMaterialUsages.pData, 0, mMaterialUsages.GetSizeInBytes());
-
-    MaterialsInUse.InitZero(FX_MAX_BOUND_MATERIALS);
+    mMaterialList.Init(FX_MAX_BOUND_MATERIALS);
 
     // The null material should always be set
 
@@ -62,7 +58,14 @@ void MaterialManager::Create()
 bool MaterialManager::Bind(const renderer::CommandBuffer& cmd, const MaterialID& id)
 {
     // Note that if the id is zero, this binds the null material.
-    return mMaterials[id.GetID()].Bind(cmd);
+
+    Material* material = mMaterialList.GetItem(id.GetID());
+    if (material == nullptr) {
+        LogError(LC_CORE, "Could not bind material {}", id.GetID());
+        return false;
+    }
+
+    return material->Bind(cmd);
 }
 
 #define NM_PINK  255, 80, 203, 255
@@ -70,9 +73,8 @@ bool MaterialManager::Bind(const renderer::CommandBuffer& cmd, const MaterialID&
 
 void MaterialManager::MakeNullMaterial()
 {
-    MaterialsInUse.Set(0);
+    Material* material = mMaterialList.NewItem();
 
-    Material* material = mMaterials.Insert();
     material->ID = MaterialID(0);
     material->Name = "NullMaterial";
     material->pPipeline = &renderer::gPipelineCache->Request(renderer::ePipelineName::Geometry);
@@ -111,23 +113,13 @@ void MaterialManager::MakeNullMaterial()
 
 Material* MaterialManager::GetNewMaterial()
 {
-    uint32 material_index = MaterialsInUse.FindNextFreeBit();
-    Assert(material_index != Bitset::scNoFreeBits);
+    // Do not lock mutex here, this is called by NewMaterial.
+
+    uint32 material_index = 0;
+    Material* material = mMaterialList.NewItem(&material_index);
+
+    // Ensure that the null material does not get overwritten
     Assert(material_index != 0);
-
-    Material* material;
-
-    if (material_index >= mMaterials.Size) {
-        LogInfo(LC_CORE, "Adding new material {}", material_index);
-        Assert(mMaterials.Size == material_index);
-        material = mMaterials.Insert();
-    }
-    else {
-        material = &mMaterials[material_index];
-        new (material) Material;
-    }
-
-    MaterialsInUse.Set(material_index);
     material->ID = MaterialID(material_index);
 
     return material;
@@ -136,19 +128,17 @@ Material* MaterialManager::GetNewMaterial()
 Material* MaterialManager::GetMaterial(const MaterialID& id)
 {
     std::lock_guard guard(mInUse);
-
-    Assert(MaterialsInUse.Get(id.GetID()) == true);
-
-    return &mMaterials[id.GetID()];
+    return mMaterialList.GetItem(id.GetID());
 }
 
 MaterialID MaterialManager::NewMaterial(const String& name, renderer::Pipeline* pipeline, bool supports_skinning)
 {
-    std::lock_guard guard(mInUse);
-
-    if (!mMaterials.IsInited()) {
+    if (!mMaterialList.IsInited()) {
         Create();
     }
+
+    std::lock_guard guard(mInUse);
+
 
     Material* material = GetNewMaterial();
     material->Name = name.Str();
@@ -165,7 +155,7 @@ void MaterialManager::DestroyMaterial(const MaterialID& id)
     }
 
     std::lock_guard guard(mInUse);
-    MaterialsInUse.Unset(id.GetID());
+    mMaterialList.MarkItemFree(id.GetID());
 }
 
 void MaterialManager::Destroy()
@@ -174,8 +164,7 @@ void MaterialManager::Destroy()
         return;
     }
 
-    MaterialsInUse.ClearAll();
-    mMaterials.Free();
+    mMaterialList.Free();
 
     MaterialPropertiesBuffer.Destroy();
     mDescriptorPool.Destroy();
