@@ -134,7 +134,6 @@ struct AxQueueItem
         item.AssetType = type;
         item.pcRawData = pixel_data;
         item.DataSize = pixel_size;
-
         item.AssetSrc = eAxQueueItemSrc::RawData;
 
         return std::move(item);
@@ -151,6 +150,7 @@ struct AxQueueItem
         pcRawData = other.pcRawData;
         DataSize = other.DataSize;
         AssetType = other.AssetType;
+        AssetSrc = other.AssetSrc;
 
         mMutex.unlock();
 

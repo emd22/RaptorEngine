@@ -40,12 +40,16 @@ public:
 
     void Update();
 
+
     void Kill()
     {
         bRunning.store(false);
         // The worker waits on the ItemReady notifier, so we kill the notifier
         ItemReady.Kill();
     }
+
+private:
+    void DirectUploadData(AxItemData& item_data);
 
 
 public:
@@ -210,45 +214,47 @@ private:
 
     template <typename TAssetType, typename TLoaderType, eAssetLoadType TLoadType>
         requires C_IsAsset<TAssetType>
-    static void SubmitAssetToLoad(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader, const std::string& path,
-                                  const uint8* data = nullptr, uint32 data_size = 0)
+    static void SubmitLoadAssetFromPath(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader,
+                                        const std::string& path)
     {
         AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
 
         AxManager* mgr = GetInstance();
 
-        if (data != nullptr) {
-            // AxQueueItem queue_item((loader), asset, TLoadType, data, data_size);
-            // mgr->mLoadQueue.Push(std::move(queue_item));
-            mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, asset, TLoadType, MakeSlice(data, data_size)));
-        }
-        else {
-            // AxQueueItem queue_item((loader), asset, TLoadType, path);
-            // mgr->mLoadQueue.Push(std::move(queue_item));
-            mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, asset, TLoadType));
-        }
+        mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, asset, TLoadType));
 
         mgr->ItemsEnqueued.test_and_set();
         mgr->ItemsEnqueuedNotifier.SignalDataWritten();
     }
 
-    template <typename TAssetType, eAssetLoadType TEnumValue>
-        requires C_IsAsset<TAssetType>
-    static void SubmitImageToUpload(const TSRef<TAssetType>& asset, uint32 mip_level, const uint8* pixel_data,
-                                    uint32 data_size)
+    template <typename TAssetType, typename TLoaderType, eAssetLoadType TLoadType>
+    static void SubmitLoadAssetFromData(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader,
+                                        const Slice<const uint8>& asset_data)
     {
         AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
 
-        // AxManager* mgr = GetInstance();
+        AxManager* mgr = GetInstance();
 
-        // if (pixel_data == nullptr) {
-        //     return;
-        // }
+        mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, asset, TLoadType, asset_data));
 
-        // mgr->mLoadQueue.Push(AxQueueItem::FromPixelData(asset, TEnumValue, mip_level, pixel_data, data_size));
+        mgr->ItemsEnqueued.test_and_set();
+        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+    }
 
-        // mgr->ItemsEnqueued.test_and_set();
-        // mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+    template <typename TAssetType, eAssetLoadType TLoadType>
+        requires C_IsAsset<TAssetType>
+    static void SubmitImageToUpload(const TSRef<TAssetType>& asset, uint32 mip_level,
+                                    const Slice<const uint8>& pixel_data)
+    {
+        AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
+        AssertMsg(pixel_data != nullptr, "Data cannot be null");
+
+        AxManager* mgr = GetInstance();
+
+        mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, 0, pixel_data.pData, pixel_data.Size));
+
+        mgr->ItemsEnqueued.test_and_set();
+        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
     }
 
 public:
