@@ -10,7 +10,7 @@
 #include "MaterialID.hpp"
 
 #include <Asset/AxImage.hpp>
-#include <Asset/Fwd/Ax_Fwd_Manager.hpp>
+#include <Asset/AxManagerFwd.hpp>
 #include <Color.hpp>
 #include <Core/Bitset.hpp>
 #include <Core/Name.hpp>
@@ -78,10 +78,10 @@ private:
         // material)
         if (!pAssetImage) {
             if (pDataToLoad) {
-                pAssetImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
+                pAssetImage = AssetManagerFwd::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
             }
             else if (pDataToUpload) {
-                pAssetImage = Fwd::AssetManager::LoadImageFromPixels(TFormat, pDataToUpload.pData, pDataToUpload.Size);
+                pAssetImage = AssetManagerFwd::LoadImageFromPixels(TFormat, pDataToUpload.pData, pDataToUpload.Size);
             }
 
             return false;
