@@ -48,14 +48,14 @@ void AxWorker::Update()
         LockContext<AxItemData> asset_data = Item.GetDataContext();
 
         switch (Item.AssetSrc) {
-        case fx::eAxQueueItemSrc::FilePath:
+        case fx::eAssetLoadSrc::FilePath:
             LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
             break;
-        case fx::eAxQueueItemSrc::FileData:
+        case fx::eAssetLoadSrc::FileData:
             LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
             std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
             break;
-        case fx::eAxQueueItemSrc::RawData:
+        case fx::eAssetLoadSrc::RawData:
             // No need to process anything
             break;
 
@@ -196,7 +196,7 @@ void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& ass
 }
 
 
-void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
+void AxManager::LoadImage(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
                           const std::string& path, eImageCreateFlags flags)
 {
     bool is_jpeg = IsFileJpeg(path);
@@ -222,8 +222,8 @@ void AxManager::LoadImage(renderer::eImageType image_type, renderer::eImageForma
 }
 
 
-void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::eImageFormat format,
-                                    TSRef<AxImage>& asset, const uint8* data, uint32 data_size)
+void AxManager::LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
+                                    const uint8* data, uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
         // Load the image using turbojpeg
@@ -245,14 +245,14 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, renderer::e
     }
 }
 
-void AxManager::LoadImageFromPixels(renderer::eImageType image_type, renderer::eImageFormat format,
-                                    TSRef<AxImage>& asset, uint32 mip_level, const uint8* pixel_data, uint32 data_size)
+void AxManager::LoadImageFromPixels(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
+                                    uint32 mip_level, const uint8* pixel_data, uint32 data_size)
 {
     SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, mip_level, Slice<const uint8>(pixel_data, data_size));
 }
 
-static void UploadImagePixels(TSRef<AxBase>& asset, renderer::ImageInfo image_info, uint32 mip_level,
-                              const uint8* pixel_data, uint32 data_size)
+static void UploadImagePixels(TSRef<AxBase>& asset, ImageInfo image_info, uint32 mip_level, const uint8* pixel_data,
+                              uint32 data_size)
 {
     // using namespace renderer;
 

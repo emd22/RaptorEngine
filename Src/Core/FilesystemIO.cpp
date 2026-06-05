@@ -2,40 +2,17 @@
 
 #include <filesystem>
 
-namespace fx::FilesystemIO {
+namespace fx {
 
-/////////////////////////////////////
-// File functions
-/////////////////////////////////////
+FilePath FilePath::operator/(const String& other) const { return FilePath(String::Fmt("{}/{}", Value, other)); }
 
-uint64 FileGetLastModified(const char* path)
+FilePath FilePath::RemoveExtension() const { return FilePath(Value.SubStr(0, Value.FindFirst('.'))); }
+FilePath FilePath::RemoveFilename() const { return FilePath(Value.SubStr(0, Value.FindLast('/'))); }
+
+FilePath FilePath::GetFilename(bool keep_extension) const
 {
-    return std::filesystem::last_write_time(path).time_since_epoch().count();
-}
-
-bool FileExists(const char* path) { return std::filesystem::exists(path); }
-
-String RemoveExtension(const String& path)
-{
-    const char* ptr = path.CStr();
-    const uint32 length = path.GetLength();
-
-    int32 ext_index = 0;
-
-    // Find the first occurance of a period
-    for (; ext_index < length; ext_index++) {
-        if (ptr[ext_index] == '.') {
-            break;
-        }
-    }
-
-    return path.SubStr(0, ext_index);
-}
-
-String FilenameFromPath(const String& path, bool keep_extension)
-{
-    const char* ptr = path.CStr();
-    const uint32 length = path.GetLength();
+    const char* ptr = Value.CStr();
+    const uint32 length = Value.GetLength();
 
     int32 extension_index = 0;
     int32 slash_index = 0;
@@ -61,8 +38,22 @@ String FilenameFromPath(const String& path, bool keep_extension)
         extension_index = length;
     }
 
-    return path.SubStr(slash_index, extension_index);
+    return FilePath(Value.SubStr(slash_index, extension_index));
 }
+
+
+namespace FilesystemIO {
+
+/////////////////////////////////////
+// File functions
+/////////////////////////////////////
+
+uint64 FileGetLastModified(const char* path)
+{
+    return std::filesystem::last_write_time(path).time_since_epoch().count();
+}
+
+bool FileExists(const String& path) { return std::filesystem::exists(path.CStr()); }
 
 /////////////////////////////////////
 // Directory functions
@@ -118,4 +109,6 @@ PagedArray<std::string> DirListIfHasExtension(const char* path, const std::strin
 
 void DirCreate(const char* path) { std::filesystem::create_directory(path); }
 
-}; // namespace fx::FilesystemIO
+} // namespace FilesystemIO
+
+} // namespace fx

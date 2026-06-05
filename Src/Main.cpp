@@ -19,7 +19,6 @@
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
 #include <Script/FoxScript.hpp>
-#include <thread>
 
 FX_SET_MODULE_NAME("Main")
 
@@ -68,7 +67,6 @@ int main()
             delete fx::gEnginePool;
             fx::gEnginePool = nullptr;
         });
-
 
     return 0;
 }

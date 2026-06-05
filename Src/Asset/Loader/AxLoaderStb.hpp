@@ -23,6 +23,9 @@ public:
     static eStatus SaveToFile(eImageSaveFormat format, const Slice<uint8>& data, const Vec2u& size, const String& path,
                               eImageSaveFlags flags);
 
+    Slice<uint8> GetImageData() const { return Slice(mImageData, mDataSize); }
+    Vec2u GetImageSize() const { return Vec2u(mWidth, mHeight); };
+
     void Destroy(TSRef<AxBase>& asset) override;
 
     ~AxLoaderStb() override = default;

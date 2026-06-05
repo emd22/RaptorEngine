@@ -1,5 +1,7 @@
 #include "AxLoaderGltf.hpp"
 
+#include "AxLoaderStb.hpp"
+
 #include <ThirdParty/cgltf.h>
 
 #include <Asset/Animation.hpp>
@@ -94,12 +96,12 @@ static void LoadMipmapsIfExists(const String& asset_path, const char* component_
     // For example,
     //      Assets/Folder/NameOfModel.glb   becomes    Assets/Folder/NameOfModel/...
 
-    const String base_path = FilesystemIO::RemoveExtension(asset_path);
+    const FilePath base_path = FilePath(asset_path).RemoveExtension();
 
     // Get the full path:
-    //      Assets/Folder/NameOfModel/Diffuse.mdp
+    //      Assets/Folder/NameOfModel/Diffuse.ftx
 
-    const String full_path = String::Fmt("{}/{}.mdp", base_path, component_name);
+    const String full_path = String::Fmt("{}/{}.ftx", base_path.Str(), component_name);
 
     // The pregenerated file exists, use it.
     if (FilesystemIO::FileExists(full_path.CStr())) {
@@ -119,11 +121,58 @@ static void LoadMipmapsIfExists(const String& asset_path, const char* component_
 }
 
 
+static String MakeMaterialTextureCacheName(Material* material, const char* component_name)
+{
+    return String::Fmt("{}_{}.ftx", material->Name.Get(), component_name);
+}
+
+
+static void GenerateMipmapImage(const FilePath& output_path, eImageFormat format, uint8* data, uint32 size)
+{
+    AxLoaderStb loader;
+    loader.ImageType = eImageType::Flat;
+    loader.ImageFormat = format;
+    loader.CreationFlags = eImageCreateFlags::None;
+
+    TSRef<AxImage> image = TSRef<AxImage>::New();
+    AxLoaderStb::eStatus status = loader.LoadFromMemory(image, data, size);
+
+    if (status != AxLoaderStb::eStatus::Success) {
+        LogError("Error loading material texture!");
+        return;
+    }
+
+    MipmapGen mm {};
+    mm.GenerateMipmaps(output_path.Str().CStr(), format, loader.GetImageData(), loader.GetImageSize());
+}
+
+
 template <eImageFormat TFormat>
-static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponent<TFormat>& component,
-                                            cgltf_texture_view& texture_view)
+static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* material, const char* component_name,
+                                            MaterialComponent<TFormat>& component, cgltf_texture_view& texture_view)
 {
     Assert(texture_view.texture != nullptr);
+
+    FilePath tc_path = FilePath(String::Fmt("{}_{}", FilePath(asset_path).RemoveExtension().Str(),
+                                            MakeMaterialTextureCacheName(material, component_name)));
+
+    const bool texture_cache_exists = FilesystemIO::FileExists(tc_path.Str());
+
+    // if (texture_cache_exists) {
+    //     MipmapGen mm {};
+    //     renderer::Image mipmap_image;
+    //     RenderBackendFwd::SubmitImmediateUploadCmd([&](CommandBuffer& cmd)
+    //                                                { mipmap_image = mm.LoadMipmaps(cmd, tc_path.Str().CStr()); });
+
+    //     TSRef<AxImage> asset_image = TSRef<AxImage>::New();
+    //     asset_image->Image = mipmap_image;
+    //     asset_image->MarkAndSignalLoaded();
+
+    //     component.pAssetImage = asset_image;
+    //     component.pDataToUpload = Slice<const uint8>(nullptr, 0);
+
+    //     return;
+    // }
 
     const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
@@ -131,6 +180,10 @@ static void MakeMaterialTextureForPrimitive(Material* material, MaterialComponen
     // Stage that shit so we can nuke mGltfData as soon as we can
     uint8* goober_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
     memcpy(goober_buffer, image_buffer, image_buffer_size);
+
+    if (!texture_cache_exists) {
+        GenerateMipmapImage(tc_path, TFormat, goober_buffer, image_buffer_size);
+    }
 
     // Submit as data to be loaded later by the asset manager
     component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
@@ -148,8 +201,10 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
         return;
     }
 
-    object->mMaterialID = gMaterialManager->NewMaterial(object->Name.Get(), ePipelineName::Geometry,
-                                                        object->IsSkinned());
+    String material_name = (gltf_material->name) ? gltf_material->name : object->Name.Get();
+
+
+    object->mMaterialID = gMaterialManager->NewMaterial(material_name, ePipelineName::Geometry, object->IsSkinned());
 
     Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
 
@@ -165,7 +220,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
             // Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
         }
         else {
-            MakeMaterialTextureForPrimitive(material, material->Diffuse, texture_view);
+            MakeMaterialTextureForPrimitive(mModelPath, material, "AL", material->Diffuse, texture_view);
             // material->Properties.BaseColor = Color::FromRGBA(1, 1, 1, 255);
         }
     }
@@ -176,12 +231,12 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
 
     // Load the normalmap
     if (gltf_material->normal_texture.texture != nullptr) {
-        MakeMaterialTextureForPrimitive(material, material->NormalMap, gltf_material->normal_texture);
+        MakeMaterialTextureForPrimitive(mModelPath, material, "NM", material->NormalMap, gltf_material->normal_texture);
     }
 
     // Load the metallic/roughness texture
     if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture != nullptr) {
-        MakeMaterialTextureForPrimitive(material, material->MetallicRoughness,
+        MakeMaterialTextureForPrimitive(mModelPath, material, "MR", material->MetallicRoughness,
                                         gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
     }
 

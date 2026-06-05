@@ -11,13 +11,15 @@
 
 namespace fx::script {
 
+static constexpr uint32 scBytecodePageSize = 4096;
+
 static constexpr uint16 ReverseInt16(uint16 value) { return (value >> 8) | (value << 8); }
 
 using TT = eTokenType;
 
 SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
 {
-    mBytecode.Create(4096);
+    mBytecode.Create(scBytecodePageSize);
     VarHandles.Create(64);
     Strings.Create(32);
 

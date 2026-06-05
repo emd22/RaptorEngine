@@ -19,7 +19,7 @@ public:
 
     static PagedArray<TSRef<AxImage>>& GetEmptyImagesArray();
 
-    template <renderer::eImageFormat TFormat>
+    template <eImageFormat TFormat>
     static TSRef<AxImage> GetEmptyImage()
     {
         // Stashed ptr for the image

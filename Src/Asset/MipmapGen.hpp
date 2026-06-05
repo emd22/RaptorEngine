@@ -7,13 +7,13 @@
 
 #pragma once
 
+#include <Asset/DataPack.hpp>
 #include <Core/Slice.hpp>
 #include <Math/Vec2.hpp>
 #include <Renderer/Backend/Image.hpp>
 
 namespace fx {
 
-class DataPack;
 namespace renderer {
 class Image;
 }
@@ -22,15 +22,14 @@ class MipmapGen
 {
 public:
     MipmapGen() = default;
-    MipmapGen(const char* path, renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
+    MipmapGen(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
     {
         GenerateMipmaps(path, format, pixels, size);
     }
 
-    void GenerateMipmaps(const char* path, renderer::eImageFormat format, const Slice<uint8>& pixels,
-                         const Vec2u& size);
+    void GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size);
 
-    Slice<uint8> GenerateMip(DataPack& dp, renderer::eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
+    Slice<uint8> GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
                              uint8 mip_level);
 
     /**
@@ -45,5 +44,22 @@ public:
 
 public:
 };
+
+class MipmapLoader
+{
+public:
+    MipmapLoader() = default;
+
+    void Open(const char* path);
+
+    ImageInfo GetMip(uint32 mip_level);
+
+private:
+    uint32 FindClosestMipLevel(uint32 mip_level);
+
+public:
+    DataPack Pack;
+};
+
 
 } // namespace fx

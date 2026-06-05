@@ -123,7 +123,7 @@ public:
         return asset;
     }
 
-    TSRef<AxImage> LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, const std::string& path,
+    TSRef<AxImage> LoadImage(renderer::eImageType image_type, eImageFormat format, const std::string& path,
                              eImageCreateFlags flags)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
@@ -132,7 +132,7 @@ public:
         return asset;
     }
 
-    inline TSRef<AxImage> LoadImage(const std::string& path, renderer::eImageFormat format, eImageCreateFlags flags)
+    inline TSRef<AxImage> LoadImage(const std::string& path, eImageFormat format, eImageCreateFlags flags)
     {
         return LoadImage(renderer::eImageType::Flat, format, path, flags);
     }
@@ -141,8 +141,8 @@ public:
      * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    TSRef<AxImage> LoadImageFromMemory(renderer::eImageType image_type, renderer::eImageFormat format,
-                                       const uint8* data, uint32 data_size)
+    TSRef<AxImage> LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, const uint8* data,
+                                       uint32 data_size)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
         LoadImageFromMemory(image_type, format, asset, data, data_size);
@@ -150,9 +150,23 @@ public:
         return asset;
     }
 
-    inline TSRef<AxImage> LoadImageFromMemory(renderer::eImageFormat format, const uint8* data, uint32 data_size)
+    TSRef<AxImage> LoadImageFromPixels(renderer::eImageType image_type, eImageFormat format, const uint8* data,
+                                       uint32 data_size)
+    {
+        TSRef<AxImage> asset = TSRef<AxImage>::New();
+        LoadImageFromPixels(image_type, format, asset, 0, data, data_size);
+
+        return asset;
+    }
+
+    inline TSRef<AxImage> LoadImageFromMemory(eImageFormat format, const uint8* data, uint32 data_size)
     {
         return LoadImageFromMemory(renderer::eImageType::Flat, format, data, data_size);
+    }
+
+    inline TSRef<AxImage> LoadImageFromPixels(eImageFormat format, const uint8* pixels, uint32 data_size)
+    {
+        return LoadImageFromPixels(renderer::eImageType::Flat, format, pixels, data_size);
     }
 
 
@@ -160,10 +174,10 @@ public:
     // Methods to load into existing containers
     ////////////////////////////////////////////////
 
-    void LoadImageFromMemory(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
+    void LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
                              const uint8* data, uint32 data_size);
 
-    void LoadImageFromPixels(renderer::eImageType, renderer::eImageFormat, TSRef<AxImage>& asset, uint32 mip_level,
+    void LoadImageFromPixels(renderer::eImageType, eImageFormat, TSRef<AxImage>& asset, uint32 mip_level,
                              const uint8* pixel_data, uint32 size);
 
     /**
@@ -179,21 +193,20 @@ public:
                     LoadObjectOptions options = {});
 
 
-    void LoadImage(renderer::eImageType image_type, renderer::eImageFormat format, TSRef<AxImage>& asset,
-                   const std::string& path, eImageCreateFlags flags);
+    void LoadImage(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
+                   eImageCreateFlags flags);
 
     /**
      * @brief Loads an Image2D from the path provided into `asset`.
      */
-    inline void LoadImage(TSRef<AxImage>& asset, renderer::eImageFormat format, const std::string& path,
-                          eImageCreateFlags flags)
+    inline void LoadImage(TSRef<AxImage>& asset, eImageFormat format, const std::string& path, eImageCreateFlags flags)
     {
         return LoadImage(renderer::eImageType::Flat, format, asset, path, flags);
     }
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
-    void LoadImageFromMemory(TSRef<AxImage>& asset, renderer::eImageFormat format, const uint8* data, uint32 data_size)
+    void LoadImageFromMemory(TSRef<AxImage>& asset, eImageFormat format, const uint8* data, uint32 data_size)
     {
         LoadImageFromMemory(renderer::eImageType::Flat, format, asset, data, data_size);
     }

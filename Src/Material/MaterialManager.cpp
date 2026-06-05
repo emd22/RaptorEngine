@@ -91,18 +91,17 @@ void MaterialManager::MakeNullMaterial()
     renderer::gRenderer->SubmitImmediateUploadCmd(
         [&](renderer::CommandBuffer& cmd)
         {
-            diffuse->Image.CreateFromData(
-                cmd, renderer::eImageType::Flat, Vec2u(4, 4), 1, renderer::eImageFormat::RGBA8_UNorm,
-                MakeSlice<const uint8>(diffuse_data.pData, diffuse_data.Size), eImageCreateFlags::None);
+            diffuse->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(4, 4), 1, eImageFormat::RGBA8_UNorm,
+                                          MakeSlice<const uint8>(diffuse_data.pData, diffuse_data.Size),
+                                          eImageCreateFlags::None);
 
             diffuse->MarkAndSignalLoaded();
         });
 
 
     material->Attach(Material::eResourceType::Diffuse, diffuse);
-    material->Attach(Material::eResourceType::Normal, AxImage::GetEmptyImage<renderer::eImageFormat::RGBA8_UNorm>());
-    material->Attach(Material::eResourceType::MetallicRoughness,
-                     AxImage::GetEmptyImage<renderer::eImageFormat::RGBA8_UNorm>());
+    material->Attach(Material::eResourceType::Normal, AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>());
+    material->Attach(Material::eResourceType::MetallicRoughness, AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>());
 
     material->bNearestFiltering = true;
 
@@ -138,7 +137,6 @@ MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineN
     }
 
     std::lock_guard guard(mInUse);
-
 
     Material* material = GetNewMaterial();
     material->Name = name.Str();

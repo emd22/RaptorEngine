@@ -8,6 +8,37 @@
 
 namespace fx {
 
+/////////////////////////////////////
+// Path functions
+/////////////////////////////////////
+
+class FilePath
+{
+public:
+    FilePath() = default;
+    FilePath(String value) : Value(value) {};
+
+    FilePath operator/(const String& other) const;
+
+    FilePath RemoveExtension() const;
+
+    /**
+     * @brief Removes the filename and the file extension from the path.
+     *
+     * Example: Some/Path/Filename.ext  becomes  Some/Path
+     */
+    FilePath RemoveFilename() const;
+
+    FilePath GetFilename(bool keep_extension) const;
+
+    String& Str() { return Value; }
+    const String& Str() const { return Value; }
+
+public:
+    String Value;
+};
+
+
 namespace FilesystemIO {
 
 /////////////////////////////////////
@@ -15,14 +46,7 @@ namespace FilesystemIO {
 /////////////////////////////////////
 
 uint64 FileGetLastModified(const char* path);
-bool FileExists(const char* path);
-
-/////////////////////////////////////
-// Path functions
-/////////////////////////////////////
-
-String RemoveExtension(const String& path);
-String FilenameFromPath(const String& path, bool keep_extension);
+bool FileExists(const String& path);
 
 //////////////////////////////
 // Directory functions

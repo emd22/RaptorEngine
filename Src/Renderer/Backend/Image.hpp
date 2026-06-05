@@ -42,8 +42,6 @@ enum class eImageCreateFlags
 FxEnumFlags(eImageCreateFlags);
 
 
-namespace renderer {
-
 enum class eImageFormat : uint16
 {
     None,
@@ -70,6 +68,16 @@ enum class eImageFormat : uint16
     /// DO NOT USE FORMAT: Marker for depth formats
     _eDepthFormatsEnd,
 };
+
+struct ImageInfo
+{
+    Vec2u Size;
+    eImageFormat Format;
+    int32 MipLevel = 0;
+    Slice<const uint8> ImageData { nullptr, 0 };
+};
+
+namespace renderer {
 
 
 struct ImageFormatUtil
@@ -191,12 +199,6 @@ struct ImageCubemapOptions
     eImageAspectFlag AspectFlag = eImageAspectFlag::Color;
 };
 
-struct ImageInfo
-{
-    Vec2u Size;
-    eImageFormat Format;
-    int32 MipLevel = 0;
-};
 
 const ImageTypeProperties ImageTypeGetProperties(eImageType image_type);
 

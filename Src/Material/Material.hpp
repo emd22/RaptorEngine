@@ -33,7 +33,7 @@ enum class eMaterialComponentStatus
 // Material Component
 /////////////////////////////////////
 
-template <renderer::eImageFormat TFormat>
+template <eImageFormat TFormat>
 struct MaterialComponent
 {
 public:
@@ -61,12 +61,12 @@ public:
         pAssetImage = other.pAssetImage;
 
         pDataToLoad = other.pDataToLoad;
-        pPixelData = other.pPixelData;
+        pDataToUpload = other.pDataToUpload;
 
         return *this;
     }
 
-    bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (pPixelData != nullptr); }
+    bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (pDataToUpload != nullptr); }
 
     ~MaterialComponent() = default;
 
@@ -78,11 +78,12 @@ private:
         // material)
         if (!pAssetImage) {
             if (pDataToLoad) {
-                Slice<const uint8>& image_data = pDataToLoad;
-                pAssetImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, image_data.pData, image_data.Size);
+                pAssetImage = Fwd::AssetManager::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
             }
-            else if (pPixelData) {
+            else if (pDataToUpload) {
+                pAssetImage = Fwd::AssetManager::LoadImageFromPixels(TFormat, pDataToUpload.pData, pDataToUpload.Size);
             }
+
             return false;
         }
 
@@ -101,7 +102,7 @@ public:
     Slice<const uint8> pDataToLoad { nullptr };
 
     /// Pixel data to be uploaded;
-    Slice<const uint8> pPixelData { nullptr };
+    Slice<const uint8> pDataToUpload { nullptr };
 };
 
 /////////////////////////////////////
@@ -181,9 +182,9 @@ public:
 public:
     MaterialID ID = MaterialID::Null;
 
-    MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> Diffuse {};
-    MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> NormalMap {};
-    MaterialComponent<renderer::eImageFormat::RGBA8_UNorm> MetallicRoughness {};
+    MaterialComponent<eImageFormat::RGBA8_UNorm> Diffuse {};
+    MaterialComponent<eImageFormat::RGBA8_UNorm> NormalMap {};
+    MaterialComponent<eImageFormat::RGBA8_UNorm> MetallicRoughness {};
 
     MaterialProperties Properties {};
 

@@ -250,15 +250,13 @@ void FoxtrotGame::CreateGame()
     CreateFontObject();
 
 
-    MipmapGen mm;
-
-    renderer::Image mip_image;
-
-    gRenderer->SubmitImmediateUploadCmd([&](CommandBuffer& cmd) { mip_image = mm.LoadMipmaps(cmd, "TestMips.bin"); });
-
     // MipmapGen mm;
-    // mm.GenerateMipmaps(eImageFormat::RGBA8_UNorm, test_img->Image.ImageData, test_img->Image.Size);
-    // mm.ExportMipmaps("TestMips.bin", "TestMipsExport");
+
+    // renderer::Image mip_image;
+
+    // gRenderer->SubmitImmediateUploadCmd([&](CommandBuffer& cmd) { mip_image = mm.LoadMipmaps(cmd, "TestMips.bin");
+    // });
+
 
     while (sbRunning) {
         Tick();
@@ -470,9 +468,6 @@ void FoxtrotGame::ProcessControls()
     // }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
-        gObjectManager->PrintActive(1000);
-
-        mMainScene.mRenderList.GetSection(ePipelineName::Geometry).InUse.Print();
         // pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
     }
 

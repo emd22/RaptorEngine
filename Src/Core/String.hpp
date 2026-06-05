@@ -11,6 +11,9 @@ class String
     static constexpr uint32 scStackAllocSize = 32;
 
 public:
+    static constexpr uint32 scNotFound = UINT32_MAX;
+
+public:
     static String NoCopy(char* ptr, uint32 length);
 
     template <typename... TTypes>
@@ -29,6 +32,14 @@ public:
     FX_FORCE_INLINE bool IsHeapAllocated() const { return (mpHeapStr != nullptr); }
 
     FX_FORCE_INLINE uint32 GetLength() const { return Length; }
+
+    uint32 FindFirst(char ch) const;
+    uint32 FindLast(char ch) const;
+
+    /**
+     * @brief Replace all occurances of `to_replace` with
+     */
+    String ReplaceAll(const char* to_replace, char replacement);
 
     void Clear();
 

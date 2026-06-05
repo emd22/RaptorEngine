@@ -12,13 +12,13 @@
 namespace fx {
 
 
-static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(renderer::eImageFormat format)
+static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
 {
     switch (format) {
-    case renderer::eImageFormat::BGRA8_UNorm:
+    case eImageFormat::BGRA8_UNorm:
         return JCS_EXT_BGRA;
-    case renderer::eImageFormat::RGBA8_UNorm:
-    case renderer::eImageFormat::RGBA8_SRGB:
+    case eImageFormat::RGBA8_UNorm:
+    case eImageFormat::RGBA8_SRGB:
         return JCS_EXT_RGBA;
     default:;
     }

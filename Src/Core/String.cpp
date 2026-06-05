@@ -128,6 +128,60 @@ String& String::operator=(const String& other)
     return *this;
 }
 
+uint32 String::FindFirst(char ch) const
+{
+    const char* pstr = GetInternalPtr();
+    char cur = 0;
+
+    for (uint32 i = 0; (cur = pstr[i]) != 0; i++) {
+        if (cur == ch) {
+            return i;
+        }
+    }
+
+    return scNotFound;
+}
+
+uint32 String::FindLast(char ch) const
+{
+    const char* pstr = GetInternalPtr();
+    char cur = 0;
+
+    for (uint32 i = Length - 1; (cur = pstr[i]); i--) {
+        if (cur == ch) {
+            return i;
+        }
+    }
+
+    return scNotFound;
+}
+
+String String::ReplaceAll(const char* to_replace, char replacement)
+{
+    String copy = *this;
+
+    char* original_ptr = GetInternalPtr();
+    const char* replace_ptr = to_replace;
+
+    uint32 count = 0;
+
+    for (uint32 i = 0; i < Length; i++) {
+        char ch = original_ptr[i];
+        char replace_ch = 0;
+
+        while ((replace_ch = *(replace_ptr++))) {
+            if (ch == replace_ch) {
+                copy[i] = replacement;
+                ++count;
+            }
+        }
+
+        replace_ptr = to_replace;
+    }
+
+    return copy;
+}
+
 void String::Clear()
 {
     if (mpHeapStr && Length > scStackAllocSize) {

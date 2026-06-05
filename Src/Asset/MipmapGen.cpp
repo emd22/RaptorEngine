@@ -19,13 +19,12 @@ struct MipHeader
     uint16 SizeY;
     uint8 MipLevel;
     uint8 Unused0;
-    renderer::eImageFormat Format;
+    eImageFormat Format;
 };
 
 #pragma pack(pop)
 
-void MipmapGen::GenerateMipmaps(const char* path, renderer::eImageFormat format, const Slice<uint8>& pixels,
-                                const Vec2u& size)
+void MipmapGen::GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
 {
     DataPack dp;
     GenerateMip(dp, format, pixels, size, 0);
@@ -35,8 +34,8 @@ void MipmapGen::GenerateMipmaps(const char* path, renderer::eImageFormat format,
     dp.WriteToFile(path);
 }
 
-Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, renderer::eImageFormat format, const Slice<uint8>& pixels,
-                                    const Vec2u& size, uint8 mip_level)
+Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
+                                    uint8 mip_level)
 {
     const uint32 pixel_size = renderer::ImageFormatUtil::GetSize(format);
     static constexpr uint32 scHeaderOffset = sizeof(MipHeader);
@@ -120,8 +119,6 @@ renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char*
         return image;
     }
 
-    dp.PrintInfo();
-
     const uint32 num_mips = dp.Entries.Size();
 
     DataPackEntry* base_mip = &dp.Entries[0];
@@ -133,26 +130,64 @@ renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char*
     uint32 base_data_size = M_DATA_SIZE(base_mip->Data);
 
     image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(base_header->SizeX, base_header->SizeY), num_mips,
-                         renderer::eImageFormat::RGBA8_UNorm, MakeSlice<uint8>(base_data, base_data_size),
+                         eImageFormat::RGBA8_UNorm, MakeSlice<uint8>(base_data, base_data_size),
                          eImageCreateFlags::None);
 
-    for (uint32 i = 1; i < num_mips; i++) {
-        DataPackEntry* entry = &dp.Entries[i];
-        dp.ReadEntry(entry);
+    // for (uint32 i = 1; i < num_mips; i++) {
+    //     DataPackEntry* entry = &dp.Entries[i];
+    //     dp.ReadEntry(entry);
 
-        MipHeader* header = M_HEADER_PTR(base_mip->Data.pData);
-        uint8* data = M_DATA_PTR(base_mip->Data.pData);
-        uint32 data_size = M_DATA_SIZE(base_mip->Data);
+    //     MipHeader* header = M_HEADER_PTR(base_mip->Data.pData);
+    //     uint8* data = M_DATA_PTR(base_mip->Data.pData);
+    //     uint32 data_size = M_DATA_SIZE(base_mip->Data);
 
-        LogInfo("Loading mip {} with size {}x{}", header->MipLevel, header->SizeX, header->SizeY);
+    //     LogInfo("Loading mip {} with size {}x{}", header->MipLevel, header->SizeX, header->SizeY);
 
-        image.UploadMip(cmd, header->MipLevel, Vec2u(header->SizeX, header->SizeY), MakeSlice<uint8>(data, data_size));
-    }
+    //     image.UploadMip(cmd, header->MipLevel, Vec2u(header->SizeX, header->SizeY), MakeSlice<uint8>(data,
+    //     data_size));
+    // }
 
 
     // image.UploadMip(cmd, mheader->MipLevel, const Vec2u& size, const SizedArray<uint8>& image_data)
 
     return image;
+}
+
+
+/////////////////////////////////////
+// Mipmap Loader
+/////////////////////////////////////
+
+
+void MipmapLoader::Open(const char* path)
+{
+    Pack.ReadFromFile(path);
+    if (!Pack.IsOpen()) {
+        LogError(LC_ASSET, "MipmapLoader: Could not open datapack");
+        return;
+    }
+}
+
+
+uint32 MipmapLoader::FindClosestMipLevel(uint32 mip_level)
+{
+    DataPackEntry* prev = nullptr;
+
+    for (DataPackEntry& entry : Pack.Entries) {
+        // If the (next) entry's mip level is greater than the desired mip level, return the previous one.
+        if (entry.Id > mip_level) {
+            return prev->Id;
+        }
+
+        prev = &entry;
+    }
+
+    // No mips in the pack...
+    if (!prev) {
+        return 0;
+    }
+
+    return prev->Id;
 }
 
 

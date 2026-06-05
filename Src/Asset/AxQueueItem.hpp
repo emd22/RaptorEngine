@@ -22,7 +22,7 @@ enum class eAssetLoadType
     Image,
 };
 
-enum class eAxQueueItemSrc
+enum class eAssetLoadSrc
 {
     FilePath,
     FileData,
@@ -99,7 +99,7 @@ struct AxQueueItem
         item.AssetType = type;
         item.pcRawData = nullptr;
         item.DataSize = 0;
-        item.AssetSrc = eAxQueueItemSrc::FilePath;
+        item.AssetSrc = eAssetLoadSrc::FilePath;
         item.Path = path;
 
         return std::move(item);
@@ -117,7 +117,7 @@ struct AxQueueItem
         item.AssetType = type;
         item.pcRawData = data.pData;
         item.DataSize = data.Size;
-        item.AssetSrc = eAxQueueItemSrc::FileData;
+        item.AssetSrc = eAssetLoadSrc::FileData;
 
         return std::move(item);
     }
@@ -134,7 +134,7 @@ struct AxQueueItem
         item.AssetType = type;
         item.pcRawData = pixel_data;
         item.DataSize = pixel_size;
-        item.AssetSrc = eAxQueueItemSrc::RawData;
+        item.AssetSrc = eAssetLoadSrc::RawData;
 
         return std::move(item);
     }
@@ -168,10 +168,10 @@ public:
     const uint8* pcRawData = nullptr;
     uint32 DataSize = 0;
 
-    renderer::ImageInfo ImgInfo;
+    ImageInfo ImgInfo;
     eAssetLoadType AssetType;
 
-    eAxQueueItemSrc AssetSrc = eAxQueueItemSrc::FilePath;
+    eAssetLoadSrc AssetSrc = eAssetLoadSrc::FilePath;
 
 private:
     AxItemData Data;
