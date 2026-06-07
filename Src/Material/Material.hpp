@@ -9,8 +9,8 @@
 
 #include "MaterialID.hpp"
 
+#include <Asset/AssetManagerFwd.hpp>
 #include <Asset/AxImage.hpp>
-#include <Asset/AxManagerFwd.hpp>
 #include <Color.hpp>
 #include <Core/Bitset.hpp>
 #include <Core/Name.hpp>
@@ -29,6 +29,13 @@ enum class eMaterialComponentStatus
     NotReady,
 };
 
+enum class eMaterialComponentUploadSrc
+{
+    None,
+    ProcessAndUpload,
+    DirectUpload,
+};
+
 /////////////////////////////////////
 // Material Component
 /////////////////////////////////////
@@ -43,7 +50,7 @@ public:
     MaterialComponent::Status Build()
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
-        if (!pAssetImage && !pDataToLoad) {
+        if ((!pAssetImage && !pDataToLoad)) {
             // pAssetImage = AxImage::GetEmptyImage<TFormat>();
             return Status::MissingComponent;
         }
@@ -60,13 +67,17 @@ public:
     {
         pAssetImage = other.pAssetImage;
 
+        UploadSrc = other.UploadSrc;
         pDataToLoad = other.pDataToLoad;
-        pDataToUpload = other.pDataToUpload;
+        ImageToUpload = other.ImageToUpload;
 
         return *this;
     }
 
-    bool Exists() const { return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (pDataToUpload != nullptr); }
+    bool Exists() const
+    {
+        return (pAssetImage != nullptr) || (pDataToLoad != nullptr); // || (ImageToUpload.ImageData.pData != nullptr);
+    }
 
     ~MaterialComponent() = default;
 
@@ -77,18 +88,21 @@ private:
         // asset manager. This will be validated on the next call of this function. (when attempting to build the
         // material)
         if (!pAssetImage) {
-            if (pDataToLoad) {
+            AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
+
+            if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
                 pAssetImage = AssetManagerFwd::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
             }
-            else if (pDataToUpload) {
-                pAssetImage = AssetManagerFwd::LoadImageFromPixels(TFormat, pDataToUpload.pData, pDataToUpload.Size);
+            else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
+                pAssetImage = AssetManagerFwd::LoadImageFromPixels(ImageToUpload);
             }
+
 
             return false;
         }
 
         // If there is no texture and we are not loaded, return not loaded.
-        if (!pAssetImage || !pAssetImage->IsLoaded()) {
+        if (!pAssetImage->IsLoaded()) {
             return false;
         }
 
@@ -98,11 +112,12 @@ private:
 public:
     TSRef<AxImage> pAssetImage { nullptr };
 
+    eMaterialComponentUploadSrc UploadSrc = eMaterialComponentUploadSrc::None;
+
     /// Image data (including format containers) that needs to be parsed and uploaded by a loader.
     Slice<const uint8> pDataToLoad { nullptr };
 
-    /// Pixel data to be uploaded;
-    Slice<const uint8> pDataToUpload { nullptr };
+    ImageInfo ImageToUpload {};
 };
 
 /////////////////////////////////////

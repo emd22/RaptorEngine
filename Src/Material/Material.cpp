@@ -24,7 +24,7 @@ using namespace renderer;
 
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
-    if (component_.Exists() && !component_.pAssetImage->IsLoaded()) {                                                  \
+    if (component_.Exists() && (!component_.pAssetImage || !component_.pAssetImage->IsLoaded())) {                     \
         return false;                                                                                                  \
     }
 
@@ -34,9 +34,6 @@ bool Material::IsReady()
         return true;
     }
 
-    if (!Diffuse.Exists()) {
-        return false;
-    }
 
     CHECK_COMPONENT_READY(Diffuse);
     CHECK_COMPONENT_READY(NormalMap);
@@ -130,22 +127,28 @@ void Material::Destroy()
 }
 
 
-template <eImageFormat TFormat>
-static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
-{
-    if (!component.pAssetImage && component.pDataToLoad) {
-        Slice<const uint8>& image_data = component.pDataToLoad;
+// template <eImageFormat TFormat>
+// static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
+// {
+//     if (!component.pAssetImage && component.UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
+//         Slice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pAssetImage = gAssetManager->LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
-        return false;
-    }
+//         component.pAssetImage = gAssetManager->LoadImageFromMemory(component.Format, image_data.pData,
+//         image_data.Size); return false;
+//     }
+//     else if (!component.pAssetImage && component.UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
+//         ImageInfo& image_data = component.ImageToUpload;
 
-    if (!component.pAssetImage || !component.pAssetImage.IsLoaded()) {
-        return false;
-    }
+//         component.pAssetImage = gAssetManager->LoadImageFromPixels(component.Format, image_data.pData,
+//         image_data.Size); return false;-
+//     }
 
-    return true;
-}
+//     if (!component.pAssetImage || !component.pAssetImage.IsLoaded()) {
+//         return false;
+//     }
+
+//     return true;
+// }
 
 
 #define BUILD_MATERIAL_COMPONENT(component_)                                                                           \
@@ -193,6 +196,10 @@ void Material::Build()
         }
 
         mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
+    }
+
+    if (!Diffuse.pAssetImage) {
+        return;
     }
 
     // Build components

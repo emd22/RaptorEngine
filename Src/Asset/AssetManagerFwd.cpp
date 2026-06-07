@@ -1,11 +1,10 @@
-#include "AxManagerFwd.hpp"
+#include "AssetManagerFwd.hpp"
 
 #include "AxManager.hpp"
 
 #include <Engine.hpp>
 
 namespace fx {
-
 
 namespace AssetManagerFwd {
 
@@ -14,10 +13,7 @@ TSRef<AxImage> LoadImageFromMemory(eImageFormat format, const uint8* data, uint3
     return gAssetManager->LoadImageFromMemory(format, data, data_size);
 }
 
-TSRef<AxImage> LoadImageFromPixels(eImageFormat format, const uint8* pixels, uint32 data_size)
-{
-    return gAssetManager->LoadImageFromPixels(format, pixels, data_size);
-}
+TSRef<AxImage> LoadImageFromPixels(const ImageInfo& img_info) { return gAssetManager->LoadImageFromPixels(img_info); }
 
 } // namespace AssetManagerFwd
 

@@ -157,9 +157,11 @@ public:
             return;
         }
 
-        for (size_t i = 0; i < Size; i++) {
-            TElementType& element = pData[i];
-            element.~TElementType();
+        if (std::is_destructible_v<TElementType>) {
+            for (size_t i = 0; i < Size; i++) {
+                TElementType& element = pData[i];
+                element.~TElementType();
+            }
         }
 
         FreeNoDestructor();

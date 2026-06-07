@@ -41,6 +41,10 @@ public:
     void Open(const String& path, eModType mt, eDataType dt);
     uint64 GetFileSize();
 
+    /**
+     * @brief Reads data from the current position in the file into the provided buffer `out_buffer`.
+     * The `out_buffer.Size` is expected to be the suggested amount of `TDataType` objects to be read.
+     */
     template <typename TDataType>
     Slice<TDataType> Read(const Slice<TDataType>& out_buffer)
     {

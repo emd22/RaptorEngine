@@ -150,12 +150,10 @@ public:
         return asset;
     }
 
-    TSRef<AxImage> LoadImageFromPixels(renderer::eImageType image_type, eImageFormat format, const uint8* data,
-                                       uint32 data_size)
+    TSRef<AxImage> LoadImageFromPixels(const ImageInfo& img_info)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
-        LoadImageFromPixels(image_type, format, asset, 0, data, data_size);
-
+        LoadImageFromPixels(asset, img_info);
         return asset;
     }
 
@@ -164,12 +162,6 @@ public:
         return LoadImageFromMemory(renderer::eImageType::Flat, format, data, data_size);
     }
 
-    inline TSRef<AxImage> LoadImageFromPixels(eImageFormat format, const uint8* pixels, uint32 data_size)
-    {
-        return LoadImageFromPixels(renderer::eImageType::Flat, format, pixels, data_size);
-    }
-
-
     ////////////////////////////////////////////////
     // Methods to load into existing containers
     ////////////////////////////////////////////////
@@ -177,8 +169,7 @@ public:
     void LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
                              const uint8* data, uint32 data_size);
 
-    void LoadImageFromPixels(renderer::eImageType, eImageFormat, TSRef<AxImage>& asset, uint32 mip_level,
-                             const uint8* pixel_data, uint32 size);
+    void LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info);
 
     /**
      * @brief Loads an asset into the provided asset from the provided data.
@@ -256,15 +247,14 @@ private:
 
     template <typename TAssetType, eAssetLoadType TLoadType>
         requires C_IsAsset<TAssetType>
-    static void SubmitImageToUpload(const TSRef<TAssetType>& asset, uint32 mip_level,
-                                    const Slice<const uint8>& pixel_data)
+    static void SubmitImageToUpload(const TSRef<TAssetType>& asset, const ImageInfo& img_info)
     {
         AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
-        AssertMsg(pixel_data != nullptr, "Data cannot be null");
+        AssertMsg(img_info.ImageData.pData != nullptr, "Image data cannot be null");
 
         AxManager* mgr = GetInstance();
 
-        mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, 0, pixel_data.pData, pixel_data.Size));
+        mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, img_info));
 
         mgr->ItemsEnqueued.test_and_set();
         mgr->ItemsEnqueuedNotifier.SignalDataWritten();

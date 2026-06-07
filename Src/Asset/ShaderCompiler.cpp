@@ -107,7 +107,7 @@ struct CompileState
 
 ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pack)
 {
-    DataPackEntry* entry = pack.QuerySection(program_id);
+    DataPackEntry* entry = pack.GetEntry(program_id, true);
 
     ProgramData program = { .Reflection = {}, .pProgramData = nullptr };
 

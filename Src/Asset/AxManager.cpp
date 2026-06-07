@@ -47,15 +47,17 @@ void AxWorker::Update()
         // Retrieve the loader and asset from the item
         LockContext<AxItemData> asset_data = Item.GetDataContext();
 
-        switch (Item.AssetSrc) {
-        case fx::eAssetLoadSrc::FilePath:
+        AssertMsg(Item.AssetLoadOp != eAssetLoadOp::None, "No asset load op set!");
+
+        switch (Item.AssetLoadOp) {
+        case fx::eAssetLoadOp::ReadAndUpload:
             LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
             break;
-        case fx::eAssetLoadSrc::FileData:
+        case fx::eAssetLoadOp::ProcessAndUpload:
             LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
             std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
             break;
-        case fx::eAssetLoadSrc::RawData:
+        case fx::eAssetLoadOp::DirectUpload:
             // No need to process anything
             break;
 
@@ -245,28 +247,22 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, eImageForma
     }
 }
 
-void AxManager::LoadImageFromPixels(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
-                                    uint32 mip_level, const uint8* pixel_data, uint32 data_size)
+void AxManager::LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info)
 {
-    SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, mip_level, Slice<const uint8>(pixel_data, data_size));
+    SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, img_info);
 }
 
-static void UploadImagePixels(TSRef<AxBase>& asset, ImageInfo image_info, uint32 mip_level, const uint8* pixel_data,
-                              uint32 data_size)
+static void DoDirectUpload(AxQueueItem& item, AxItemData& asset_data)
 {
-    // using namespace renderer;
+    ImageInfo img_info = item.ImgInfo;
 
-    // TSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset_data.pAsset);
 
-    // if (!image->Image.IsInited()) {
-    //     image->Image.CreateFromData(gRenderer->UploadContext.CmdBuffer, eImageType::Flat, image_info.Size, 1,
-    //                                 image_info.Format, MakeSlice<const uint8>(pixel_data, data_size),
-    //                                 eImageCreateFlags::None);
-    // }
-    // else {
-    //     image->Image.UploadMip(gRenderer->UploadContext, mip_level, const Vec2u &size, const Slice<uint8>
-    //     &image_data)
-    // }
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), renderer::eImageType::Flat, img_info.Size,
+                                1, img_info.Format, img_info.ImageData, eImageCreateFlags::None);
+
+    image->bIsUploadedToGpu = true;
+    image->bIsUploadedToGpu.notify_all();
 }
 
 void AxManager::CheckForUploadableData()
@@ -303,13 +299,18 @@ void AxManager::CheckForUploadableData()
 
         // The asset was successfully loaded, upload to GPU
         if (worker->LoadStatus == AxLoaderBase::eStatus::Success) {
+            if (worker->Item.AssetLoadOp == eAssetLoadOp::DirectUpload) {
+                DoDirectUpload(worker->Item, asset_data.Get());
+            }
+            else {
+                asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
+            }
             // if (worker->Item.bIsRawPixelData) {
             //     AxQueueItem& item = worker->Item;
             //     UploadImagePixels(asset_data->pAsset, item.ImgInfo, item.MipLevel, item.pcRawData, item.DataSize);
             // }
             // else {
             // Load the resouce into GPU memory
-            asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
             // }
         }
     }
@@ -342,7 +343,6 @@ void AxManager::CheckForUploadableData()
             while (!asset_data->pAsset->bIsUploadedToGpu) {
                 asset_data->pAsset->bIsUploadedToGpu.wait(true);
             }
-
 
             {
                 std::lock_guard guard(asset_data->pAsset->mCallbackMutex);

@@ -5,6 +5,7 @@
 #include <ThirdParty/stb_image_resize2.h>
 
 #include <Asset/Loader/AxLoaderStb.hpp>
+#include <Core/ArrayUtil.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Renderer/Backend/Image.hpp>
 
@@ -90,7 +91,7 @@ void MipmapGen::ExportMipmaps(const char* dp_path, const char* output_path)
     for (DataPackEntry& entry : dp.Entries) {
         // If there is no data in this datapack entry, load it from the file.
         if (!entry.HasData()) {
-            dp.ReadEntry(&entry);
+            dp.ReadInto(&entry);
         }
 
         MipHeader* header = reinterpret_cast<MipHeader*>(entry.Data.pData);
@@ -123,7 +124,7 @@ renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char*
 
     DataPackEntry* base_mip = &dp.Entries[0];
 
-    dp.ReadEntry(base_mip);
+    dp.ReadInto(base_mip);
 
     MipHeader* base_header = M_HEADER_PTR(base_mip->Data.pData);
     uint8* base_data = M_DATA_PTR(base_mip->Data.pData);
@@ -147,7 +148,6 @@ renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char*
     //     data_size));
     // }
 
-
     // image.UploadMip(cmd, mheader->MipLevel, const Vec2u& size, const SizedArray<uint8>& image_data)
 
     return image;
@@ -166,6 +166,28 @@ void MipmapLoader::Open(const char* path)
         LogError(LC_ASSET, "MipmapLoader: Could not open datapack");
         return;
     }
+}
+
+ImageInfo MipmapLoader::GetMip(uint32 mip_level)
+{
+    uint32 closest_mip = FindClosestMipLevel(mip_level);
+    mip_level = closest_mip;
+
+
+    DataPackEntry* mip_entry = Pack.GetEntry(mip_level, true);
+
+    MipHeader* header = M_HEADER_PTR(mip_entry->Data.pData);
+    uint8* image_data = M_DATA_PTR(mip_entry->Data.pData);
+    uint32 image_size = M_DATA_SIZE(mip_entry->Data);
+
+    ImageInfo image_info {};
+    image_info.MipLevel = mip_level;
+    image_info.Format = header->Format;
+    image_info.Size = Vec2u(header->SizeX, header->SizeY);
+
+    image_info.ImageData = ArrayUtil::SliceDupe(Slice<const uint8>(image_data, image_size));
+
+    return image_info;
 }
 
 

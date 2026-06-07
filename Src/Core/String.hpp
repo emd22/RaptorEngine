@@ -100,6 +100,13 @@ private:
     char* mpHeapStr = nullptr;
 };
 
+// class ConstString
+// {
+// public:
+//     ConstString();
+// };
+
+
 } // namespace fx
 
 

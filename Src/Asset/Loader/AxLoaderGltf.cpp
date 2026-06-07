@@ -159,18 +159,11 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     const bool texture_cache_exists = FilesystemIO::FileExists(tc_path.Str());
 
     // if (texture_cache_exists) {
-    //     MipmapGen mm {};
-    //     renderer::Image mipmap_image;
-    //     RenderBackendFwd::SubmitImmediateUploadCmd([&](CommandBuffer& cmd)
-    //                                                { mipmap_image = mm.LoadMipmaps(cmd, tc_path.Str().CStr()); });
+    //     MipmapLoader ml {};
+    //     ml.Open(tc_path.CStr());
 
-    //     TSRef<AxImage> asset_image = TSRef<AxImage>::New();
-    //     asset_image->Image = mipmap_image;
-    //     asset_image->MarkAndSignalLoaded();
-
-    //     component.pAssetImage = asset_image;
-    //     component.pDataToUpload = Slice<const uint8>(nullptr, 0);
-
+    //     component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
+    //     component.ImageToUpload = ml.GetMip(1);
     //     return;
     // }
 
@@ -181,11 +174,12 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     uint8* goober_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
-    if (!texture_cache_exists) {
-        GenerateMipmapImage(tc_path, TFormat, goober_buffer, image_buffer_size);
-    }
+    // if (!texture_cache_exists) {
+    //     GenerateMipmapImage(tc_path, TFormat, goober_buffer, image_buffer_size);
+    // }
 
     // Submit as data to be loaded later by the asset manager
+    component.UploadSrc = eMaterialComponentUploadSrc::ProcessAndUpload;
     component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 }
 
