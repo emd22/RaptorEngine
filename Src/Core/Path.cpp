@@ -108,6 +108,35 @@ const String& Path::Get(const uint32 index) const
     return Components[index];
 }
 
+String* Path::Get(const uint32 index)
+{
+    if (index >= Components.size()) {
+        return nullptr;
+    }
+
+    return &Components[index];
+}
+
+Path& Path::RemoveExtension()
+{
+    String* basename = Get(Components.size() - 1);
+
+    if (!basename) {
+        return *this;
+    }
+
+    const uint32 ext_index = basename->FindFirst('.');
+
+    // No extension here boss
+    if (ext_index == String::scNotFound) {
+        return *this;
+    }
+
+    basename->ShortenTo(ext_index);
+
+    return *this;
+}
+
 String Path::Str() const
 {
     String result;

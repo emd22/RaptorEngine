@@ -274,6 +274,31 @@ void String::Clear()
     Length = 0;
 }
 
+String& String::ShortenTo(uint32 new_length)
+{
+    if (new_length >= Length) {
+        return *this;
+    }
+
+    if (mpHeapStr) {
+        // The string is now able to fit into the stack allocated buffer, copy it to there and free the stack string.
+        if (new_length < scStackAllocSize) {
+            memcpy(mpStackStr, mpHeapStr, Length);
+            gEnginePool->Free<char>(mpHeapStr);
+            mpHeapStr = nullptr;
+        }
+        else {
+            mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_length);
+        }
+    }
+
+    Length = new_length;
+
+    GetInternalPtr()[Length] = '\0';
+
+    return *this;
+}
+
 
 const char String::operator[](size_t index) const { return CStr()[index]; }
 char& String::operator[](size_t index) { return GetInternalPtr()[index]; }

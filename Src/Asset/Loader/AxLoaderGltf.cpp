@@ -17,6 +17,7 @@
 // Renderer includes
 #include <Asset/MipmapGen.hpp>
 #include <Core/FilesystemIO.hpp>
+#include <Core/Path.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
 
@@ -97,6 +98,8 @@ static void LoadMipmapsIfExists(const String& asset_path, const char* component_
     //      Assets/Folder/NameOfModel.glb   becomes    Assets/Folder/NameOfModel/...
 
     const FilePath base_path = FilePath(asset_path).RemoveExtension();
+
+    // const Path base_path = Path(asset_path);
 
     // Get the full path:
     //      Assets/Folder/NameOfModel/Diffuse.ftx

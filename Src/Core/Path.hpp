@@ -43,11 +43,14 @@ public:
         return *this;
     }
 
+    Path& RemoveExtension();
+
     Path operator/(const String& sub) const;
     Path& operator=(Path&& other);
 
     const String& BaseName() const { return Get(Components.size() - 1); };
     const String& Get(const uint32 index) const;
+    String* Get(const uint32 index);
 
     String Str() const;
 

@@ -46,6 +46,8 @@ public:
 
     void Clear();
 
+    String& ShortenTo(uint32 new_length);
+
     const char* CStr() const
     {
         if (IsHeapAllocated()) {

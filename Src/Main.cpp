@@ -46,33 +46,28 @@ static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::
 
 int main()
 {
-    Path path("Hello\\\\Something/Hello.txt");
+    fx::gEnginePool = new fx::MemPool;
+    fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
-    LogInfo("{}", path.Str());
-
-
-    // fx::gEnginePool = new fx::MemPool;
-    // fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
-
-    // fx::gScriptMemPool = new fx::MemPool;
-    // fx::gScriptMemPool->Create(1024 * 64);
+    fx::gScriptMemPool = new fx::MemPool;
+    fx::gScriptMemPool->Create(1024 * 64);
 
 
-    // fx::renderer::Globals::Init();
+    fx::renderer::Globals::Init();
 
-    // {
-    //     fx::FoxtrotGame game {};
-    // }
+    {
+        fx::FoxtrotGame game {};
+    }
 
-    // fx::Globals::Destroy();
-    // fx::renderer::Globals::Destroy();
+    fx::Globals::Destroy();
+    fx::renderer::Globals::Destroy();
 
-    // Defer(
-    //     []()
-    //     {
-    //         delete fx::gEnginePool;
-    //         fx::gEnginePool = nullptr;
-    //     });
+    Defer(
+        []()
+        {
+            delete fx::gEnginePool;
+            fx::gEnginePool = nullptr;
+        });
 
     return 0;
 }
