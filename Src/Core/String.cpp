@@ -47,10 +47,16 @@ String::String(uint32 allocation_size)
 }
 
 
-String String::SubStr(uint32 start, uint32 end) const
+String String::SubStrAbs(uint32 start, uint32 end) const
 {
     Assert(start <= Length && end <= Length);
     return String(GetInternalPtr() + start, (end - start));
+}
+
+String String::SubStr(uint32 start, uint32 length) const
+{
+    Assert(start <= Length && start + length <= Length);
+    return String(GetInternalPtr() + start, length);
 }
 
 bool String::operator==(const String& other) const
@@ -176,12 +182,56 @@ uint32 String::FindLast(char ch) const
 
 uint32 String::FindNext(uint32 start, char ch) const
 {
+    if (start >= Length || (Length - start) == 0) {
+        return scNotFound;
+    }
+
     const char* pstr = GetInternalPtr();
     char cur = 0;
 
     for (uint32 i = start; (cur = pstr[i]) != 0; i++) {
         if (cur == ch) {
             return i;
+        }
+    }
+
+    return scNotFound;
+}
+
+uint32 String::FindNext(uint32 start, const String& match) const
+{
+    // If there is only one character, use the char specific function
+    if (match.Length == 1) {
+        return FindNext(start, match[0]);
+    }
+
+    // Checks
+    if (start >= Length || (Length - start) < match.Length) {
+        return scNotFound;
+    }
+
+
+    const char* pstr = GetInternalPtr();
+    char cur = 0;
+
+    char first = match[0];
+
+    for (uint32 i = start; (cur = pstr[i]) != 0; i++) {
+        if (cur == first) {
+            bool found = true;
+
+
+            // Check for the rest of the string
+            for (uint32 match_index = 1; match_index < match.Length; match_index++) {
+                if (pstr[i + match_index] != match[match_index]) {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found) {
+                return i;
+            }
         }
     }
 

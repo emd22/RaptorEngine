@@ -37,6 +37,8 @@ public:
     uint32 FindLast(char ch) const;
     uint32 FindNext(uint32 start, char ch) const;
 
+    uint32 FindNext(uint32 start, const String& match) const;
+
     /**
      * @brief Replace all occurances of `to_replace` with
      */
@@ -57,7 +59,8 @@ public:
      * @brief Creates a copy of this string from `start` to `end`.
      * @returns The copy of the string
      */
-    String SubStr(uint32 start, uint32 end) const;
+    String SubStrAbs(uint32 start, uint32 end) const;
+    String SubStr(uint32 start, uint32 length) const;
 
     std::string Str() const { return std::string(CStr(), Length); }
 

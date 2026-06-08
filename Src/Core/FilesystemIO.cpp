@@ -6,8 +6,8 @@ namespace fx {
 
 FilePath FilePath::operator/(const String& other) const { return FilePath(String::Fmt("{}/{}", Value, other)); }
 
-FilePath FilePath::RemoveExtension() const { return FilePath(Value.SubStr(0, Value.FindFirst('.'))); }
-FilePath FilePath::RemoveFilename() const { return FilePath(Value.SubStr(0, Value.FindLast('/'))); }
+FilePath FilePath::RemoveExtension() const { return FilePath(Value.SubStrAbs(0, Value.FindFirst('.'))); }
+FilePath FilePath::RemoveFilename() const { return FilePath(Value.SubStrAbs(0, Value.FindLast('/'))); }
 
 FilePath FilePath::GetFilename(bool keep_extension) const
 {
@@ -38,7 +38,7 @@ FilePath FilePath::GetFilename(bool keep_extension) const
         extension_index = length;
     }
 
-    return FilePath(Value.SubStr(slash_index, extension_index));
+    return FilePath(Value.SubStrAbs(slash_index, extension_index));
 }
 
 

@@ -46,12 +46,9 @@ static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::
 
 int main()
 {
-    // Path path("Base/Dir/Test/Hello.txt");
+    Path path("Hello\\\\Something/Hello.txt");
 
-    String str("Hello");
-    str += ", World!";
-
-    LogInfo("{}", str);
+    LogInfo("{}", path.Str());
 
 
     // fx::gEnginePool = new fx::MemPool;
