@@ -48,9 +48,10 @@ public:
     Path operator/(const String& sub) const;
     Path& operator=(Path&& other);
 
-    const String& BaseName() const { return Get(Components.size() - 1); };
     const String& Get(const uint32 index) const;
+
     String* Get(const uint32 index);
+    String* BaseName() { return Get(Components.size() - 1); };
 
     String Str() const;
 

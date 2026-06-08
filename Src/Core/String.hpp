@@ -28,6 +28,7 @@ public:
     String(const std::string& str);
     String(const char* str);
     String(const String& other) { (*this) = other; }
+    String(String&& other);
 
     FX_FORCE_INLINE bool IsHeapAllocated() const { return (mpHeapStr != nullptr); }
 
@@ -37,15 +38,22 @@ public:
     uint32 FindLast(char ch) const;
     uint32 FindNext(uint32 start, char ch) const;
 
+    /**
+     * @brief Finds the first occurance of the string `match` beginning at the index `start`.
+     */
     uint32 FindNext(uint32 start, const String& match) const;
 
     /**
-     * @brief Replace all occurances of `to_replace` with
+     * @brief Replace all occurances of `to_replace` with `replacement`
      */
     String ReplaceAll(const char* to_replace, char replacement);
 
     void Clear();
 
+    /**
+     * @brief Reduces the length of a string to the length `new_length`. This function resizes the string and bins down
+     * to the stack version of the string if it fits.
+     */
     String& ShortenTo(uint32 new_length);
 
     const char* CStr() const
@@ -62,12 +70,18 @@ public:
      * @returns The copy of the string
      */
     String SubStrAbs(uint32 start, uint32 end) const;
+
+    /**
+     * @brief Creates a copy of this string from `start` with the length of `length`
+     * @returns The copy of the string
+     */
     String SubStr(uint32 start, uint32 length) const;
 
     std::string Str() const { return std::string(CStr(), Length); }
 
     String& operator=(const char* str);
     String& operator=(const String& other);
+    String& operator=(String&& other);
 
     bool operator==(const String& other) const;
 

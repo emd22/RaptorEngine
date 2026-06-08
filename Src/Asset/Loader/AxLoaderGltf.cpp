@@ -88,40 +88,43 @@ void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<Primiti
 //     mg.GenerateMipmaps(path.CStr(), eImageFormat::RGBA8_UNorm, pixels, )
 // }
 
-template <eImageFormat TFormat>
-static void LoadMipmapsIfExists(const String& asset_path, const char* component_name,
-                                MaterialComponent<TFormat>& component)
-{
-    // Get the folder that the model would be stored in.
-    // This uses the normal path minus the file extension.
-    // For example,
-    //      Assets/Folder/NameOfModel.glb   becomes    Assets/Folder/NameOfModel/...
+// template <eImageFormat TFormat>
+// static void LoadMipmapsIfExists(const String& asset_path, const char* component_name,
+//                                 MaterialComponent<TFormat>& component)
+// {
+//     // Get the folder that the model would be stored in.
+//     // This uses the normal path minus the file extension.
+//     // For example,
+//     //      Assets/Folder/NameOfModel.glb   becomes    Assets/Folder/NameOfModel/...
 
-    const FilePath base_path = FilePath(asset_path).RemoveExtension();
+//     // const FilePath base_path = FilePath(asset_path).RemoveExtension();
 
-    // const Path base_path = Path(asset_path);
+//     Path base_path = Path(asset_path);
+//     base_path.RemoveExtension();
+//     base_path.Add(String(component_name) + ".ftx");
 
-    // Get the full path:
-    //      Assets/Folder/NameOfModel/Diffuse.ftx
 
-    const String full_path = String::Fmt("{}/{}.ftx", base_path.Str(), component_name);
+//     // Get the full path:
+//     //      Assets/Folder/NameOfModel/Diffuse.ftx
 
-    // The pregenerated file exists, use it.
-    if (FilesystemIO::FileExists(full_path.CStr())) {
-        // TSRef<AxImage> image = TSRef<AxImage>::New();
+//     const String full_path = String::Fmt("{}/{}.ftx", base_path.Str(), component_name);
 
-        // image->Image.CreateFromData(eImageType::Flat, const Vec2u &size, uint16 mips_count, eImageFormat format,
-        // const SizedArray<uint8> &image_data, eImageCreateFlags flags)
+//     // The pregenerated file exists, use it.
+//     if (FilesystemIO::FileExists(full_path.CStr())) {
+//         // TSRef<AxImage> image = TSRef<AxImage>::New();
 
-        // component.pAssetImage = image;
-        // component.pDataToLoad = nullptr;
-    }
-    else {
-        // MipmapGen mm {};
-        // mm.GenerateMipmaps(full_path.CStr(), eImageFormat::RGBA8_UNorm, const Slice<uint8>& pixels,
-        //                    const Vec2u& size)
-    }
-}
+//         // image->Image.CreateFromData(eImageType::Flat, const Vec2u &size, uint16 mips_count, eImageFormat format,
+//         // const SizedArray<uint8> &image_data, eImageCreateFlags flags)
+
+//         // component.pAssetImage = image;
+//         // component.pDataToLoad = nullptr;
+//     }
+//     else {
+//         // MipmapGen mm {};
+//         // mm.GenerateMipmaps(full_path.CStr(), eImageFormat::RGBA8_UNorm, const Slice<uint8>& pixels,
+//         //                    const Vec2u& size)
+//     }
+// }
 
 
 static String MakeMaterialTextureCacheName(Material* material, const char* component_name)
@@ -130,7 +133,21 @@ static String MakeMaterialTextureCacheName(Material* material, const char* compo
 }
 
 
-static void GenerateMipmapImage(const FilePath& output_path, eImageFormat format, uint8* data, uint32 size)
+static String GetTextureCachePath(const String& asset_path, Material* material, const char* component_name)
+{
+    Path path = Path(asset_path);
+    path.RemoveExtension();
+
+    String* basename = path.BaseName();
+    if (basename) {
+        (*basename) = String::Fmt("{}_{}_{}.ftx", *basename, material->Name.Get(), component_name);
+    }
+
+    return std::move(path.Str());
+}
+
+
+static void GenerateMipmapImage(const String& output_path, eImageFormat format, uint8* data, uint32 size)
 {
     AxLoaderStb loader;
     loader.ImageType = eImageType::Flat;
@@ -148,7 +165,7 @@ static void GenerateMipmapImage(const FilePath& output_path, eImageFormat format
     loader.InvalidateImageData();
 
     MipmapGen mm {};
-    mm.GenerateMipmaps(output_path.Str().CStr(), format, loader.GetImageData(), loader.GetImageSize());
+    mm.GenerateMipmaps(output_path.CStr(), format, loader.GetImageData(), loader.GetImageSize());
 }
 
 
@@ -158,18 +175,21 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
 {
     Assert(texture_view.texture != nullptr);
 
-    FilePath tc_path = FilePath(String::Fmt("{}_{}", FilePath(asset_path).RemoveExtension().Str(),
-                                            MakeMaterialTextureCacheName(material, component_name)));
+    // FilePath tex_cache_path = FilePath(String::Fmt("{}_{}", FilePath(asset_path).RemoveExtension().Str(),
+    //                                                MakeMaterialTextureCacheName(material, component_name)));
 
-    const bool texture_cache_exists = FilesystemIO::FileExists(tc_path.Str());
+    String tex_cache_path = GetTextureCachePath(asset_path, material, component_name);
+
+    const bool texture_cache_exists = FilesystemIO::FileExists(tex_cache_path.Str());
 
     if (texture_cache_exists) {
-        MipmapLoader ml {};
-        ml.Open(tc_path.CStr());
+        // MipmapLoader ml {};
 
-        component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
-        component.ImageToUpload = ml.GetMip(1);
-        return;
+        // ml.Open(tc_path_str.CStr());
+
+        // component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
+        // component.ImageToUpload = ml.GetMip(1);
+        // return;
     }
 
     const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
@@ -179,9 +199,9 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     uint8* goober_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
-    if (!texture_cache_exists) {
-        GenerateMipmapImage(tc_path, TFormat, goober_buffer, image_buffer_size);
-    }
+    // if (!texture_cache_exists) {
+    //     GenerateMipmapImage(tex_cache_path, TFormat, goober_buffer, image_buffer_size);
+    // }
 
     // Submit as data to be loaded later by the asset manager
     component.UploadSrc = eMaterialComponentUploadSrc::ProcessAndUpload;

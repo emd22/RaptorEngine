@@ -46,6 +46,8 @@ String::String(uint32 allocation_size)
     }
 }
 
+String::String(String&& other) { (*this) = other; }
+
 
 String String::SubStrAbs(uint32 start, uint32 end) const
 {
@@ -160,6 +162,33 @@ String& String::operator=(const char* str)
 String& String::operator=(const String& other)
 {
     (*this) = other.CStr();
+
+    return *this;
+}
+
+String& String::operator=(String&& other)
+{
+    // Delete the current string if it exists
+    Clear();
+
+    if (other.IsHeapAllocated()) {
+        mpHeapStr = other.mpHeapStr;
+        Length = other.Length;
+
+        // Set the other string to null to avoid freeing
+        other.mpHeapStr = nullptr;
+        other.Length = 0;
+    }
+    else {
+        Length = other.Length;
+        memcpy(mpStackStr, other.mpStackStr, Length);
+
+        // Not just transferring ptrs here, so we need to add the null terminator
+        mpStackStr[Length] = '\0';
+
+        other.Length = 0;
+    }
+
 
     return *this;
 }
