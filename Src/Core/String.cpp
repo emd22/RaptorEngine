@@ -95,6 +95,36 @@ String String::operator+(const char* other) const
     return result;
 }
 
+String& String::operator+=(const String& other)
+{
+    const uint32 existing_length = Length;
+    const uint32 final_length = existing_length + other.Length;
+
+    char* dst = GetInternalPtr();
+
+    // Allocate heap string if there is not enough space remaining
+    if (final_length >= scStackAllocSize && final_length > Length) {
+        if (mpHeapStr == nullptr) {
+            mpHeapStr = gEnginePool->Alloc<char>(final_length);
+
+            // Copy the existing stack string to the newly allocated buffer
+            memcpy(mpHeapStr, dst, existing_length);
+        }
+        else {
+            mpHeapStr = gEnginePool->Realloc(mpHeapStr, final_length);
+        }
+
+        dst = mpHeapStr;
+    }
+
+    memcpy(dst + existing_length, other.CStr(), other.Length);
+    dst[final_length] = '\0';
+
+    Length = final_length;
+
+    return *this;
+}
+
 
 String& String::operator=(const char* str)
 {
@@ -128,12 +158,14 @@ String& String::operator=(const String& other)
     return *this;
 }
 
-uint32 String::FindFirst(char ch) const
+uint32 String::FindFirst(char ch) const { return FindNext(0, ch); }
+
+uint32 String::FindLast(char ch) const
 {
     const char* pstr = GetInternalPtr();
     char cur = 0;
 
-    for (uint32 i = 0; (cur = pstr[i]) != 0; i++) {
+    for (uint32 i = Length - 1; (cur = pstr[i]); i--) {
         if (cur == ch) {
             return i;
         }
@@ -142,12 +174,12 @@ uint32 String::FindFirst(char ch) const
     return scNotFound;
 }
 
-uint32 String::FindLast(char ch) const
+uint32 String::FindNext(uint32 start, char ch) const
 {
     const char* pstr = GetInternalPtr();
     char cur = 0;
 
-    for (uint32 i = Length - 1; (cur = pstr[i]); i--) {
+    for (uint32 i = start; (cur = pstr[i]) != 0; i++) {
         if (cur == ch) {
             return i;
         }
@@ -197,5 +229,13 @@ const char String::operator[](size_t index) const { return CStr()[index]; }
 char& String::operator[](size_t index) { return GetInternalPtr()[index]; }
 
 String::~String() { Clear(); }
+
+
+/////////////////////////////////////
+// Const String functions
+/////////////////////////////////////
+
+
+ConstString::ConstString(const char* ptr, uint32 length) : pStr(ptr), Length(length) {}
 
 } // namespace fx

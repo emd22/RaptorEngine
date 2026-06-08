@@ -50,7 +50,7 @@ public:
     MaterialComponent::Status Build()
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
-        if ((!pAssetImage && !pDataToLoad)) {
+        if ((!pAssetImage && (!pDataToLoad && !ImageToUpload.ImageData.pData))) {
             // pAssetImage = AxImage::GetEmptyImage<TFormat>();
             return Status::MissingComponent;
         }

@@ -27,6 +27,7 @@ public:
     Vec2u GetImageSize() const { return Vec2u(mWidth, mHeight); };
 
     void Destroy(TSRef<AxBase>& asset) override;
+    void InvalidateImageData() { mImageData = nullptr; };
 
     ~AxLoaderStb() override = default;
 

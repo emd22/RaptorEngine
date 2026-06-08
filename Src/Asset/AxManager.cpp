@@ -58,6 +58,7 @@ void AxWorker::Update()
             std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
             break;
         case fx::eAssetLoadOp::DirectUpload:
+            LoadStatus = AxLoaderBase::eStatus::Success;
             // No need to process anything
             break;
 

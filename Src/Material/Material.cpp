@@ -198,10 +198,6 @@ void Material::Build()
         mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
     }
 
-    if (!Diffuse.pAssetImage) {
-        return;
-    }
-
     // Build components
     BUILD_MATERIAL_COMPONENT(Diffuse);
     BUILD_MATERIAL_COMPONENT(NormalMap);

@@ -185,6 +185,8 @@ ImageInfo MipmapLoader::GetMip(uint32 mip_level)
     image_info.Format = header->Format;
     image_info.Size = Vec2u(header->SizeX, header->SizeY);
 
+    LogInfo("Image info size: {}x{}", header->SizeX, header->SizeY);
+
     image_info.ImageData = ArrayUtil::SliceDupe(Slice<const uint8>(image_data, image_size));
 
     return image_info;

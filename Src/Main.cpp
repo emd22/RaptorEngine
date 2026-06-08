@@ -13,6 +13,7 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/FreeArray.hpp>
 #include <Core/MemPool/MemPool.hpp>
+#include <Core/Path.hpp>
 #include <Core/String.hpp>
 #include <Engine.hpp>
 #include <Math/MathConsts.hpp>
@@ -45,28 +46,36 @@ static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::
 
 int main()
 {
-    fx::gEnginePool = new fx::MemPool;
-    fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
+    // Path path("Base/Dir/Test/Hello.txt");
 
-    fx::gScriptMemPool = new fx::MemPool;
-    fx::gScriptMemPool->Create(1024 * 64);
+    String str("Hello");
+    str += ", World!";
+
+    LogInfo("{}", str);
 
 
-    fx::renderer::Globals::Init();
+    // fx::gEnginePool = new fx::MemPool;
+    // fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
-    {
-        fx::FoxtrotGame game {};
-    }
+    // fx::gScriptMemPool = new fx::MemPool;
+    // fx::gScriptMemPool->Create(1024 * 64);
 
-    fx::Globals::Destroy();
-    fx::renderer::Globals::Destroy();
 
-    Defer(
-        []()
-        {
-            delete fx::gEnginePool;
-            fx::gEnginePool = nullptr;
-        });
+    // fx::renderer::Globals::Init();
+
+    // {
+    //     fx::FoxtrotGame game {};
+    // }
+
+    // fx::Globals::Destroy();
+    // fx::renderer::Globals::Destroy();
+
+    // Defer(
+    //     []()
+    //     {
+    //         delete fx::gEnginePool;
+    //         fx::gEnginePool = nullptr;
+    //     });
 
     return 0;
 }

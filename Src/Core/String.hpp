@@ -8,7 +8,7 @@ namespace fx {
 
 class String
 {
-    static constexpr uint32 scStackAllocSize = 32;
+    static constexpr uint32 scStackAllocSize = 16;
 
 public:
     static constexpr uint32 scNotFound = UINT32_MAX;
@@ -23,7 +23,7 @@ public:
     }
 
     String() = default;
-    String(uint32 allocation_size);
+    explicit String(uint32 allocation_size);
     String(const char* str, uint32 length);
     String(const std::string& str);
     String(const char* str);
@@ -35,6 +35,7 @@ public:
 
     uint32 FindFirst(char ch) const;
     uint32 FindLast(char ch) const;
+    uint32 FindNext(uint32 start, char ch) const;
 
     /**
      * @brief Replace all occurances of `to_replace` with
@@ -68,6 +69,8 @@ public:
     String operator+(const String& other) const;
     String operator+(const char* other) const;
 
+    String& operator+=(const String& other);
+
     const char operator[](size_t index) const;
     char& operator[](size_t index);
 
@@ -100,11 +103,18 @@ private:
     char* mpHeapStr = nullptr;
 };
 
-// class ConstString
-// {
-// public:
-//     ConstString();
-// };
+class ConstString
+{
+public:
+    ConstString() = default;
+    ConstString(const char* ptr, uint32 length);
+
+    const char* CStr() const { return pStr; }
+
+public:
+    uint32 Length = 0;
+    const char* pStr = nullptr;
+};
 
 
 } // namespace fx
