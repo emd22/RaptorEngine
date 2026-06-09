@@ -136,12 +136,14 @@ static String MakeMaterialTextureCacheName(Material* material, const char* compo
 static String GetTextureCachePath(const String& asset_path, Material* material, const char* component_name)
 {
     Path path = Path(asset_path);
+    // Transform the basename into a directory
+    // Some/Path/Filename.txt   to   Some/Path/Filename/
     path.RemoveExtension();
+    // Ensure that the directories for the path are created
+    path.CreateDirs();
 
-    String* basename = path.BaseName();
-    if (basename) {
-        (*basename) = String::Fmt("{}_{}_{}.ftx", *basename, material->Name.Get(), component_name);
-    }
+    // Add the filename
+    path.Add(String::Fmt("{}_{}.ftx", material->Name.Get(), component_name));
 
     return std::move(path.Str());
 }
@@ -180,7 +182,8 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
 
     String tex_cache_path = GetTextureCachePath(asset_path, material, component_name);
 
-    const bool texture_cache_exists = FilesystemIO::FileExists(tex_cache_path.Str());
+
+    const bool texture_cache_exists = FilesystemIO::FileExists(tex_cache_path);
 
     if (texture_cache_exists) {
         // MipmapLoader ml {};

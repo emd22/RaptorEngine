@@ -8,8 +8,6 @@ namespace fx {
 
 class Path
 {
-    static const String scNullComponent;
-
     using ComponentList = std::vector<String>;
 
 public:
@@ -44,11 +42,10 @@ public:
     }
 
     Path& RemoveExtension();
+    void CreateDirs() const;
 
     Path operator/(const String& sub) const;
     Path& operator=(Path&& other);
-
-    const String& Get(const uint32 index) const;
 
     String* Get(const uint32 index);
     String* BaseName() { return Get(Components.size() - 1); };
@@ -58,6 +55,8 @@ public:
 
 public:
     ComponentList Components;
+
+    bool bIsAbsolutePath = false;
 };
 
 

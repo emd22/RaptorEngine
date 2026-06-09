@@ -1,9 +1,9 @@
 #include "Path.hpp"
 
+#include <filesystem>
 
 namespace fx {
 
-const String Path::scNullComponent = String(nullptr, 0);
 
 Path::Path(const String& full_path)
 {
@@ -21,6 +21,8 @@ Path::Path(const String& full_path)
     // Break into path components
 
     const char* pstr = full_path.CStr();
+
+    bIsAbsolutePath = (full_path.Length > 0 && pstr[0] == '/');
 
     while (true) {
         end = full_path.FindNext(start, '/');
@@ -85,6 +87,14 @@ Path& Path::Remove(const uint32 index)
     return *this;
 }
 
+void Path::CreateDirs() const
+{
+    String path_str = Str();
+    if (!std::filesystem::exists(path_str.CStr())) {
+        std::filesystem::create_directories(path_str.CStr());
+    }
+}
+
 Path& Path::operator=(Path&& other)
 {
     Components = std::move(other.Components);
@@ -98,15 +108,6 @@ Path Path::operator/(const String& sub) const
     return std::move(np);
 }
 
-
-const String& Path::Get(const uint32 index) const
-{
-    if (index >= Components.size()) {
-        return Path::scNullComponent;
-    }
-
-    return Components[index];
-}
 
 String* Path::Get(const uint32 index)
 {
@@ -137,11 +138,16 @@ Path& Path::RemoveExtension()
     return *this;
 }
 
+
 String Path::Str() const
 {
     String result;
 
     const uint32 num_components = Components.size();
+
+    if (bIsAbsolutePath) {
+        result = "/";
+    }
 
     for (uint32 i = 0; i < num_components; i++) {
         result += Components[i];

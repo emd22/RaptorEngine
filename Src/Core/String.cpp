@@ -21,7 +21,6 @@ String::String(const char* str, uint32 length)
 
     char* dst = mpStackStr;
 
-
     // If the size cannot fit into the stack string, allocate a buffer for it
     if (length >= scStackAllocSize) {
         mpHeapStr = gEnginePool->Alloc<char>(length + 1);
@@ -111,24 +110,24 @@ String& String::operator+=(const String& other)
     char* dst = GetInternalPtr();
 
     // Allocate heap string if there is not enough space remaining
-    if (final_length >= scStackAllocSize && final_length > Length) {
+    if (final_length >= scStackAllocSize) {
         if (mpHeapStr == nullptr) {
-            mpHeapStr = gEnginePool->Alloc<char>(final_length);
+            mpHeapStr = gEnginePool->Alloc<char>(final_length + 1);
 
             // Copy the existing stack string to the newly allocated buffer
             memcpy(mpHeapStr, dst, existing_length);
         }
         else {
-            mpHeapStr = gEnginePool->Realloc(mpHeapStr, final_length);
+            mpHeapStr = gEnginePool->Realloc(mpHeapStr, final_length + 1);
         }
 
         dst = mpHeapStr;
     }
 
     memcpy(dst + existing_length, other.CStr(), other.Length);
-    dst[final_length] = '\0';
 
     Length = final_length;
+    dst[final_length] = '\0';
 
     return *this;
 }
@@ -136,7 +135,7 @@ String& String::operator+=(const String& other)
 
 String& String::operator=(const char* str)
 {
-    const uint32 new_len = strlen(str);
+    const uint32 new_len = strlen(str) + 1;
 
     char* dst = mpStackStr;
 
@@ -150,10 +149,9 @@ String& String::operator=(const char* str)
         dst = mpHeapStr;
     }
 
-    memcpy(dst, str, new_len);
+    memcpy(dst, str, new_len - 1);
 
-
-    Length = new_len;
+    Length = new_len - 1;
     dst[Length] = 0;
 
     return *this;
@@ -161,7 +159,21 @@ String& String::operator=(const char* str)
 
 String& String::operator=(const String& other)
 {
-    (*this) = other.CStr();
+    // Delete the current string if it exists
+    Clear();
+
+    if (other.IsHeapAllocated()) {
+        mpHeapStr = gEnginePool->Alloc<char>(other.Length + 1);
+        Length = other.Length;
+        memcpy(mpHeapStr, other.mpHeapStr, Length);
+        mpHeapStr[Length] = '\0';
+    }
+    else {
+        Length = other.Length;
+        memcpy(mpStackStr, other.mpStackStr, Length);
+        mpStackStr[Length] = '\0';
+    }
+
 
     return *this;
 }
@@ -317,12 +329,11 @@ String& String::ShortenTo(uint32 new_length)
             mpHeapStr = nullptr;
         }
         else {
-            mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_length);
+            mpHeapStr = gEnginePool->Realloc(mpHeapStr, new_length + 1);
         }
     }
 
     Length = new_length;
-
     GetInternalPtr()[Length] = '\0';
 
     return *this;
