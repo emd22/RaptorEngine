@@ -9,6 +9,10 @@
 
 FX_SET_MODULE_NAME("Device")
 
+// This isn't defined on some platforms/drivers.
+#ifndef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME "VK_KHR_portability_enumeration"
+#endif
 
 namespace fx::renderer {
 
@@ -161,7 +165,7 @@ void GpuDevice::QueryQueues()
     vkGetDeviceQueue(Device, mQueueFamilies.GetTransferFamily(), 0, &mTransferQueue);
 }
 
-void GpuDevice::CreateLogicalDevice()
+void GpuDevice::CreateLogicalDevice(bool requires_portability_extension)
 {
     if (Physical == nullptr) {
         PickPhysicalDevice();
@@ -186,6 +190,11 @@ void GpuDevice::CreateLogicalDevice()
         .pQueuePriorities = graphics_priorities,
     });
 
+    // If the device has an independent transfer queue, push the new queue to be created.
+    // This is the best scenario as it means we can have fully async uploads. Drivers such as KosmicKrisp do not allow
+    // this as Metal doesnt offer something equivalent. For some reason MoltenVK emulates this through 4 "virtual"
+    // queues, but this seems to just be something that was added because people were complaining about only having one
+    // queue...
     if (mQueueFamilies.HasIndependentTransfer()) {
         queue_create_infos.push_back(VkDeviceQueueCreateInfo {
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -195,38 +204,34 @@ void GpuDevice::CreateLogicalDevice()
         });
     }
 
-    const VkPhysicalDeviceFeatures device_features {
-        // .fillModeNonSolid = true,
-    };
+    const VkPhysicalDeviceFeatures device_features {};
 
-    const char* device_extensions[] = {
-#ifdef FX_USE_PORTABILITY_EXTENSION
-        VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
-#endif
+    std::vector<const char*> device_extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
     };
 
-#ifdef FX_USE_PORTABILITY_EXTENSION
+    if (requires_portability_extension) {
+        LogInfo(LC_RENDER, "Device is using portability extension!");
+        device_extensions.emplace_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+    }
 
-    // List of features that may not be available on all devices
     VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PORTABILITY_SUBSET_FEATURES_KHR,
         .pNext = nullptr,
         .mutableComparisonSamplers = VK_TRUE, // For samplers that use compareOp's / SampleCmp in shaders
     };
-#endif
 
     VkPhysicalDeviceVulkan11Features vk11_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-#ifdef FX_USE_PORTABILITY_EXTENSION
-        .pNext = &portability_features,
-#else
         .pNext = nullptr,
-#endif
         .shaderDrawParameters = VK_TRUE,
 
     };
+
+    if (requires_portability_extension) {
+        vk11_features.pNext = &portability_features;
+    }
 
 
     const VkDeviceCreateInfo create_info {
@@ -236,13 +241,13 @@ void GpuDevice::CreateLogicalDevice()
         .queueCreateInfoCount = static_cast<uint32>(queue_create_infos.size()),
         .pQueueCreateInfos = queue_create_infos.data(),
 
-        // device specific layers (not used in modern vulkan)
+        // Device specific layers. Not used in modern Vulkan.
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = nullptr,
 
-        // device specific extensions
-        .enabledExtensionCount = std::size(device_extensions),
-        .ppEnabledExtensionNames = device_extensions,
+        // Device specific extensions
+        .enabledExtensionCount = static_cast<uint32>(device_extensions.size()),
+        .ppEnabledExtensionNames = device_extensions.data(),
 
         .pEnabledFeatures = &device_features,
 
@@ -257,7 +262,7 @@ void GpuDevice::CreateLogicalDevice()
     QueryQueues();
 }
 
-void GpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
+void GpuDevice::Create(VkInstance instance, VkSurfaceKHR surface, bool use_portability_extension)
 {
     mInstance = instance;
     mSurface = surface;
@@ -266,7 +271,7 @@ void GpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 
     mQueueFamilies.FindQueueFamilies(Physical, surface);
 
-    CreateLogicalDevice();
+    CreateLogicalDevice(use_portability_extension);
 
     LogInfo(LC_RENDER, "Device Queue Families: \n\tPresent: {:d}\n\tGraphics: {:d}\n\tTransfer: {:d}",
             mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(), mQueueFamilies.GetTransferFamily());

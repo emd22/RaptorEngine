@@ -75,8 +75,8 @@ elseif(APPLE)
     target_compile_definitions(foxtrot PRIVATE VK_ENABLE_BETA_EXTENSIONS=1)
 endif()
 
-# target_compile_options(foxtrot PRIVATE -fsanitize=address)
-# target_link_options(foxtrot PRIVATE -fsanitize=address)
+target_compile_options(foxtrot PRIVATE -fsanitize=address)
+target_link_options(foxtrot PRIVATE -fsanitize=address)
 
 target_include_directories(foxtrot PRIVATE
     "Src"

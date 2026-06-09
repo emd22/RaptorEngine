@@ -60,13 +60,16 @@ class GpuDevice
 {
 public:
     GpuDevice() = default;
-    GpuDevice(VkInstance instance, VkSurfaceKHR surface) { Create(instance, surface); }
+    GpuDevice(VkInstance instance, VkSurfaceKHR surface, bool use_portability_extension)
+    {
+        Create(instance, surface, use_portability_extension);
+    }
 
-    void Create(VkInstance instance, VkSurfaceKHR surface);
+    void Create(VkInstance instance, VkSurfaceKHR surface, bool use_portability_extension);
     void Destroy();
 
     void PickPhysicalDevice();
-    void CreateLogicalDevice();
+    void CreateLogicalDevice(bool requires_portability_extension);
 
     void WaitForIdle();
 

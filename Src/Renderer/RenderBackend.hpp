@@ -187,6 +187,8 @@ private:
 
     void RebuildRenderStages();
 
+    bool RequiresVulkanPortability();
+
     eFrameResult GetNextSwapchainImage(FrameData* frame);
 
     ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);

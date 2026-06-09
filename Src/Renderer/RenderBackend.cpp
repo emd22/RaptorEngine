@@ -28,6 +28,11 @@
 
 #define FX_VULKAN_DEBUG 1
 
+// This isn't defined on some platforms/drivers.
+#ifndef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME "VK_KHR_portability_enumeration"
+#endif
+
 namespace fx::renderer {
 
 using ExtensionNames = RenderBackend::ExtensionNames;
@@ -60,6 +65,21 @@ ExtensionNames RenderBackend::CheckExtensionsAvailable(ExtensionNames& requested
     return missing_extensions;
 }
 
+bool RenderBackend::RequiresVulkanPortability()
+{
+    if (mAvailableExtensions.IsEmpty()) {
+        QueryInstanceExtensions();
+    }
+
+    for (const VkExtensionProperties& extension : mAvailableExtensions) {
+        if (!strncmp(extension.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, 256)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 SizedArray<VkLayerProperties> RenderBackend::GetAvailableValidationLayers()
 {
     uint32 layer_count;
@@ -80,7 +100,10 @@ void RenderBackend::Init(Vec2u window_size)
     InitVulkan();
     CreateSurfaceFromWindow();
 
-    mDevice.Create(mInstance, mWindowSurface);
+
+    const bool requires_vulkan_portability = RequiresVulkanPortability();
+
+    mDevice.Create(mInstance, mWindowSurface, requires_vulkan_portability);
 
     InitGPUAllocator();
     Swapchain.Init(window_size, mWindowSurface, &mDevice);
@@ -215,23 +238,24 @@ void RenderBackend::InitVulkan()
 
     std::cout << "Requested to load " << all_extensions.size() << " extensions...\n";
 
-    for (const auto& extension : all_extensions) {
-        LogDebug(LC_RENDER, "Ext: {:s}", extension);
+    LogDebug(LC_RENDER, "== Supported Extensions ==");
+    for (const VkExtensionProperties& extension : mAvailableExtensions) {
+        LogDebug(LC_RENDER, "{}", extension.extensionName);
     }
 
     ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions);
 
-    if (!missing_extensions.empty()) {
-        std::cerr << "MISSING: ";
-        for (size_t i = 0; i < missing_extensions.size(); ++i) {
-            std::cerr << missing_extensions[i];
-            if (i < missing_extensions.size() - 1) {
-                std::cerr << ", ";
-            }
-        }
+    // if (!missing_extensions.empty()) {
+    //     std::cerr << "MISSING: ";
+    //     for (size_t i = 0; i < missing_extensions.size(); ++i) {
+    //         std::cerr << missing_extensions[i];
+    //         if (i < missing_extensions.size() - 1) {
+    //             std::cerr << ", ";
+    //         }
+    //     }
 
-        ModulePanic("Missing required instance extensions");
-    }
+    //     ModulePanic("Missing required instance extensions");
+    // }
 
     // auto validation_layers = GetAvailableValidationLayers();
     // for (auto &layer : validation_layers) {
@@ -250,9 +274,9 @@ void RenderBackend::InitVulkan()
     instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
     instance_info.ppEnabledLayerNames = requested_validation_layers.data();
     instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.size());
-#ifdef FX_USE_PORTABILITY_EXTENSION
+
+    // Allow portability devices (e.g. MoltenVK) to be shown when querying devices.
     instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-#endif
 
     VkResult result = vkCreateInstance(&instance_info, nullptr, &mInstance);
 
@@ -488,11 +512,8 @@ eFrameResult RenderBackend::BeginFrame()
 
     LightBuffer.Rewind();
 
-    // memcpy(GetUbo().MvpMatrix.RawData, MVPMatrix.RawData, sizeof(Mat4f));
-
     frame->InFlight.WaitFor();
     frame->InFlight.Reset();
-
 
     eFrameResult result = GetNextSwapchainImage(frame);
     if (result != eFrameResult::Success) {
