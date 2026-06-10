@@ -91,8 +91,8 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    gAssetManager->Start(3);
     gMaterialManager->Create();
+    gAssetManager->Start(3);
 
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 }

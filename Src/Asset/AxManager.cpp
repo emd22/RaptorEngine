@@ -79,6 +79,8 @@ void AxWorker::Update()
 
 void AxManager::Start(int32 min_threads)
 {
+    AssertMsg(mbActive.test() == false, "Asset manager is already created!");
+
     mMinThreads = min_threads;
     mbActive.test_and_set();
 
@@ -329,8 +331,10 @@ void AxManager::CheckForUploadableData()
             .pCommandBuffers = &cmd.Cmd,
         };
 
+        VkQueue vk_xfer_queue = transfer_queue.Get();
 
-        vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, gRenderer->UploadContext.UploadFence.Get());
+        AssertMsg(vk_xfer_queue != nullptr, "Queue has not been initialized");
+        vkQueueSubmit(vk_xfer_queue, 1, &submit_info, gRenderer->UploadContext.UploadFence.Get());
     }
 
     transfer_queue.Unlock();
@@ -342,7 +346,7 @@ void AxManager::CheckForUploadableData()
 
         if (worker->LoadStatus == AxLoaderBase::eStatus::Success) {
             while (!asset_data->pAsset->bIsUploadedToGpu) {
-                asset_data->pAsset->bIsUploadedToGpu.wait(true);
+                asset_data->pAsset->bIsUploadedToGpu.wait(false);
             }
 
             {

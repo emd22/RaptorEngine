@@ -68,9 +68,29 @@ public:
         mbIsLocked = true;
     }
 
-    FX_FORCE_INLINE TObjectType& Get() { return mObject; }
+    SpinLockContext(const SpinLockContext& other) = delete;
 
+    FX_FORCE_INLINE SpinLockContext(SpinLockContext&& other) noexcept : mObject(other.mObject), mbIsLocked(false)
+    {
+        if (other.mAtomicFlag.test()) {
+            other.mAtomicFlag.clear();
+            other.mAtomicFlag.notify_one();
+        }
+
+        other.mbIsLocked = false;
+
+        if (mAtomicFlag.test()) {
+            mAtomicFlag.clear();
+            mAtomicFlag.notify_one();
+        }
+
+        mbIsLocked = false;
+    }
+
+    FX_FORCE_INLINE TObjectType& Get() { return mObject; }
     FX_FORCE_INLINE TObjectType* operator->() { return &mObject; }
+
+    SpinLockContext& operator=(const SpinLockContext& other) = delete;
 
     FX_FORCE_INLINE void Unlock()
     {

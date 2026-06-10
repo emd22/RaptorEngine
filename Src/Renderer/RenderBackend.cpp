@@ -100,10 +100,7 @@ void RenderBackend::Init(Vec2u window_size)
     InitVulkan();
     CreateSurfaceFromWindow();
 
-
-    const bool requires_vulkan_portability = RequiresVulkanPortability();
-
-    mDevice.Create(mInstance, mWindowSurface, requires_vulkan_portability);
+    mDevice.Create(mInstance, mWindowSurface);
 
     InitGPUAllocator();
     Swapchain.Init(window_size, mWindowSurface, &mDevice);
@@ -274,6 +271,7 @@ void RenderBackend::InitVulkan()
     instance_info.enabledExtensionCount = static_cast<uint32_t>(all_extensions.size());
     instance_info.ppEnabledLayerNames = requested_validation_layers.data();
     instance_info.enabledLayerCount = static_cast<uint32_t>(requested_validation_layers.size());
+    instance_info.pNext = nullptr;
 
     // Allow portability devices (e.g. MoltenVK) to be shown when querying devices.
     instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;

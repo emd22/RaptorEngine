@@ -163,9 +163,32 @@ void GpuDevice::QueryQueues()
     vkGetDeviceQueue(Device, mQueueFamilies.GetGraphicsFamily(), 0, &mGraphicsQueue);
     vkGetDeviceQueue(Device, mQueueFamilies.GetPresentFamily(), 0, &mPresentQueue);
     vkGetDeviceQueue(Device, mQueueFamilies.GetTransferFamily(), 0, &mTransferQueue);
+
+
+    AssertMsg(mTransferQueue != nullptr, "Queue cannot be null!");
+    AssertMsg(mPresentQueue != nullptr, "Queue cannot be null!");
+    AssertMsg(mGraphicsQueue != nullptr, "Queue cannot be null!");
 }
 
-void GpuDevice::CreateLogicalDevice(bool requires_portability_extension)
+bool GpuDevice::SupportsPortabilityExtension() const
+{
+    uint32 extension_count = 0;
+    vkEnumerateDeviceExtensionProperties(Physical, nullptr, &extension_count, nullptr);
+    SizedArray<VkExtensionProperties> exts;
+    exts.InitSize(extension_count);
+    vkEnumerateDeviceExtensionProperties(Physical, nullptr, &extension_count, exts.pData);
+
+    for (const VkExtensionProperties& ext : exts) {
+        if (!std::strncmp(ext.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, 256)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+void GpuDevice::CreateLogicalDevice()
 {
     if (Physical == nullptr) {
         PickPhysicalDevice();
@@ -193,8 +216,7 @@ void GpuDevice::CreateLogicalDevice(bool requires_portability_extension)
     // If the device has an independent transfer queue, push the new queue to be created.
     // This is the best scenario as it means we can have fully async uploads. Drivers such as KosmicKrisp do not allow
     // this as Metal doesnt offer something equivalent. For some reason MoltenVK emulates this through 4 "virtual"
-    // queues, but this seems to just be something that was added because people were complaining about only having one
-    // queue...
+    // queues, but thats essentially an internal mutex.
     if (mQueueFamilies.HasIndependentTransfer()) {
         queue_create_infos.push_back(VkDeviceQueueCreateInfo {
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -210,6 +232,8 @@ void GpuDevice::CreateLogicalDevice(bool requires_portability_extension)
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
     };
+
+    const bool requires_portability_extension = SupportsPortabilityExtension();
 
     if (requires_portability_extension) {
         LogInfo(LC_RENDER, "Device is using portability extension!");
@@ -231,6 +255,23 @@ void GpuDevice::CreateLogicalDevice(bool requires_portability_extension)
 
     if (requires_portability_extension) {
         vk11_features.pNext = &portability_features;
+    }
+
+    {
+        VkPhysicalDeviceDriverProperties driver_properties {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES,
+        };
+
+        VkPhysicalDeviceProperties2 physical_properties {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+            .pNext = &driver_properties,
+        };
+
+        vkGetPhysicalDeviceProperties2(Physical, &physical_properties);
+
+        LogInfo(LC_RENDER, "Creating device for physical device (Id={}) {} -- driver {}",
+                physical_properties.properties.deviceID, physical_properties.properties.deviceName,
+                driver_properties.driverName);
     }
 
 
@@ -262,7 +303,7 @@ void GpuDevice::CreateLogicalDevice(bool requires_portability_extension)
     QueryQueues();
 }
 
-void GpuDevice::Create(VkInstance instance, VkSurfaceKHR surface, bool use_portability_extension)
+void GpuDevice::Create(VkInstance instance, VkSurfaceKHR surface)
 {
     mInstance = instance;
     mSurface = surface;
@@ -271,7 +312,7 @@ void GpuDevice::Create(VkInstance instance, VkSurfaceKHR surface, bool use_porta
 
     mQueueFamilies.FindQueueFamilies(Physical, surface);
 
-    CreateLogicalDevice(use_portability_extension);
+    CreateLogicalDevice();
 
     LogInfo(LC_RENDER, "Device Queue Families: \n\tPresent: {:d}\n\tGraphics: {:d}\n\tTransfer: {:d}",
             mQueueFamilies.GetPresentFamily(), mQueueFamilies.GetGraphicsFamily(), mQueueFamilies.GetTransferFamily());
@@ -344,6 +385,12 @@ void GpuDevice::WaitForIdle()
     }
 
     vkDeviceWaitIdle(Device);
+}
+
+GpuDevice::~GpuDevice()
+{
+    Device = nullptr;
+    Physical = nullptr;
 }
 
 } // namespace fx::renderer
