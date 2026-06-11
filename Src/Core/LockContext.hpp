@@ -70,21 +70,10 @@ public:
 
     SpinLockContext(const SpinLockContext& other) = delete;
 
-    FX_FORCE_INLINE SpinLockContext(SpinLockContext&& other) noexcept : mObject(other.mObject), mbIsLocked(false)
+    FX_FORCE_INLINE SpinLockContext(SpinLockContext&& other) noexcept
+        : mAtomicFlag(other.mAtomicFlag), mObject(other.mObject), mbIsLocked(other.mbIsLocked)
     {
-        if (other.mAtomicFlag.test()) {
-            other.mAtomicFlag.clear();
-            other.mAtomicFlag.notify_one();
-        }
-
         other.mbIsLocked = false;
-
-        if (mAtomicFlag.test()) {
-            mAtomicFlag.clear();
-            mAtomicFlag.notify_one();
-        }
-
-        mbIsLocked = false;
     }
 
     FX_FORCE_INLINE TObjectType& Get() { return mObject; }

@@ -74,7 +74,7 @@ public:
 
     VkSurfaceFormatKHR GetSurfaceFormat();
 
-    SpinLockContext<VkQueue> GetLockableQueue(VkQueue queue)
+    SpinLockContext<VkQueue> GetLockableQueue(VkQueue& queue)
     {
         if (mQueueFamilies.HasIndependentTransfer() && queue == mTransferQueue) {
             LogInfo("Has independent transfer queue!");
