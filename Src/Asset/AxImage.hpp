@@ -17,19 +17,19 @@ public:
     AxImage() = default;
     AxImage(const AxImage& other);
 
-    static PagedArray<TSRef<AxImage>>& GetEmptyImagesArray();
+    static PagedArray<AxImage>& GetEmptyImagesArray();
 
     template <eImageFormat TFormat>
     static TSRef<AxImage> GetEmptyImage()
     {
         // Stashed ptr for the image
-        static TSRef<AxImage> spEmptyImage { nullptr };
+        static AxImage* spEmptyImage { nullptr };
 
         if (spEmptyImage) {
             return spEmptyImage;
         }
 
-        PagedArray<TSRef<AxImage>>& empty_images = GetEmptyImagesArray();
+        PagedArray<AxImage>& empty_images = GetEmptyImagesArray();
 
         if (!empty_images.IsInited()) {
             empty_images.Create(10);
@@ -41,7 +41,7 @@ public:
         memset(image_data.pData, 1, pixel_size);
         image_data.MarkFull();
 
-        spEmptyImage = TSRef<AxImage>::New();
+        spEmptyImage = empty_images.Insert();
 
         renderer::RenderBackendFwd::SubmitImmediateUploadCmd(
             [&](renderer::CommandBuffer& cmd)
@@ -51,9 +51,6 @@ public:
                                                    eImageCreateFlags::None);
                 spEmptyImage->MarkAndSignalLoaded();
             });
-
-
-        empty_images.Insert(spEmptyImage);
 
         return spEmptyImage;
     }

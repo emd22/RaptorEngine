@@ -221,7 +221,7 @@ void Material::Build()
         // To reduce permutations -- the metallic roughness map should only be
         // enabled if there is also a normal map.
         if (!MetallicRoughness.Exists()) {
-            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_SRGB>();
+            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
         }
 
         mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);

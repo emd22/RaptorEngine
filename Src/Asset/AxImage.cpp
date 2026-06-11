@@ -6,9 +6,9 @@
 namespace fx {
 
 
-static PagedArray<TSRef<AxImage>> mEmptyImagesPerFormat;
+static PagedArray<AxImage> mEmptyImagesPerFormat;
 
-PagedArray<TSRef<AxImage>>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
+PagedArray<AxImage>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
 
 AxImage::AxImage(const AxImage& other) { (*this) = other; }
 

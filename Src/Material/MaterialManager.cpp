@@ -148,10 +148,6 @@ MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineN
 
 void MaterialManager::DestroyMaterial(const MaterialID& id)
 {
-    if (id.IsNull()) {
-        return;
-    }
-
     std::lock_guard guard(mInUse);
     mMaterialList.MarkItemFree(id.GetID());
 }
