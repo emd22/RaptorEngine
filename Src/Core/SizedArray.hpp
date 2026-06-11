@@ -1,8 +1,8 @@
 #pragma once
 
 // #include "Allocator.hpp"
+#include "Assert.hpp"
 #include "Defines.hpp"
-#include "Panic.hpp"
 
 #include <stddef.h>
 #include <stdio.h>

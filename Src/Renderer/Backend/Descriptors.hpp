@@ -7,7 +7,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Core/SizedArray.hpp>
 #include <Renderer/Constants.hpp>
 

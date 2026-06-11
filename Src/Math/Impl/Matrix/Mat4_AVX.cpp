@@ -2,7 +2,7 @@
 
 #ifdef FX_USE_AVX
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Types.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>

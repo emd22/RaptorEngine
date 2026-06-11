@@ -1,7 +1,7 @@
 #pragma once
 
+#include <Core/Assert.hpp>
 #include <Core/MemPool/MemPool.hpp>
-#include <Core/Panic.hpp>
 #include <Core/Types.hpp>
 #include <Engine.hpp>
 

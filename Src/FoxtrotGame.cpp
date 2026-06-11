@@ -11,8 +11,8 @@
 #include <Asset/MipmapGen.hpp>
 #include <Asset/SceneFile.hpp>
 #include <Controls.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
-#include <Core/Panic.hpp>
 #include <Core/Ref.hpp>
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>

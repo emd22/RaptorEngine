@@ -1,4 +1,4 @@
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Renderer/Camera.hpp>
 
 namespace fx {
@@ -32,9 +32,6 @@ void OrthoCamera::ResolveViewToTexels(float32 texture_res)
     Position.Y = snapped_y;
 }
 
-void OrthoCamera::OnWindowResize(const Vec2u& size) 
-{ 
-    
-}
+void OrthoCamera::OnWindowResize(const Vec2u& size) {}
 
 } // namespace fx

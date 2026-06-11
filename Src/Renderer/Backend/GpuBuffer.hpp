@@ -229,18 +229,21 @@ public:
         Size = data.Size * sizeof(TElementType);
         Type = buffer_type;
 
-        RawGpuBuffer staging_buffer;
-        staging_buffer.Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        staging_buffer.Upload(data, Size);
+        pStagingBuffer = gEnginePool->Alloc<RawGpuBuffer>(sizeof(RawGpuBuffer));
+        pStagingBuffer->Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        pStagingBuffer->Upload(data, Size);
 
         // Create the GPU-only buffer as a transfer destination
         this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
         VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
-        vkCmdCopyBuffer(cmd.Get(), staging_buffer.Buffer, this->Buffer, 1, &copy);
+        vkCmdCopyBuffer(cmd.Get(), pStagingBuffer->Buffer, this->Buffer, 1, &copy);
 
-        staging_buffer.Destroy();
+        // staging_buffer.Destroy();
     }
+
+public:
+    RawGpuBuffer* pStagingBuffer = nullptr;
 };
 
 } // namespace renderer

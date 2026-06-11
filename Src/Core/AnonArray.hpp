@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
 #include <Core/Types.hpp>

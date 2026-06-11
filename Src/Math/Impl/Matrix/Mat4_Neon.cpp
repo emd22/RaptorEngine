@@ -3,7 +3,7 @@
 #ifdef FX_USE_NEON
 #include <arm_neon.h>
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
 #include <cstring>

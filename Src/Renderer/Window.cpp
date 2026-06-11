@@ -2,7 +2,7 @@
 
 #include <SDL3/SDL.h>
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Ref.hpp>
 #include <Core/Types.hpp>
 

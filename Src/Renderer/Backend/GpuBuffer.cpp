@@ -64,7 +64,6 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
     gBufferTracker.AddBuffer(BufferId, Type, Size, mBufferFlags);
 
-
     // LogInfo("[Created GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
     // GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)
     // != 0, (buffer_flags & eGpuBufferFlags::TransferReceiver) != 0);
@@ -99,6 +98,10 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
         PanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
     }
 
+
+    if (reinterpret_cast<uintptr_t>(Buffer) == 0x850000000085) {
+        FX_BREAKPOINT;
+    }
 
     // LogInfo("Create Buffer  (Buffer={:p}, Allocation={:p}, Size={})", reinterpret_cast<void*>(Buffer),
     //           reinterpret_cast<void*>(Allocation), Size);

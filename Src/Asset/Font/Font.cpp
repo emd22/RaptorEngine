@@ -2,7 +2,7 @@
 
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Loader/AxLoaderStb.hpp>
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 

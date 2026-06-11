@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Panic.hpp"
+#include "Assert.hpp"
 
 #include <Core/Types.hpp>
 #include <atomic>

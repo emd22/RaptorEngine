@@ -13,8 +13,8 @@
 #include <SDL3/SDL_vulkan.h>
 
 #include <Asset/Animation.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
-#include <Core/Panic.hpp>
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>

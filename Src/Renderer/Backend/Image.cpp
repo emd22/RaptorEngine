@@ -2,10 +2,10 @@
 #include "Image.hpp"
 
 #include <Asset/Loader/AxLoaderStb.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/File.hpp>
 #include <Core/MemPool/MemPool.hpp>
-#include <Core/Panic.hpp>
 #include <Core/StackArray.hpp>
 #include <Engine.hpp>
 #include <Renderer/Backend/Fwd/Fwd_GetFrame.hpp>

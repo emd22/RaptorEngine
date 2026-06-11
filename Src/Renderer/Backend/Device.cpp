@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 
 FX_SET_MODULE_NAME("Device")
 

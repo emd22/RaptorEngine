@@ -1,7 +1,7 @@
 #include "AxManager.hpp"
 
 #include "AxImage.hpp"
-#include "Core/Panic.hpp"
+#include "Core/Assert.hpp"
 #include "Core/SizedArray.hpp"
 #include "Loader/AxLoaderGltf.hpp"
 #include "Loader/AxLoaderJpeg.hpp"

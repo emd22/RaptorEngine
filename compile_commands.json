@@ -127,6 +127,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Core/Assert.cpp.o -c /Users/emd22/Projects/a2/Src/Core/Assert.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/Assert.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/Assert.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Core/BasicDb.cpp.o -c /Users/emd22/Projects/a2/Src/Core/BasicDb.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Core/BasicDb.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/BasicDb.cpp.o"
@@ -172,12 +178,6 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Core/MemPool/MemPoolLegacy.cpp.o -c /Users/emd22/Projects/a2/Src/Core/MemPool/MemPoolLegacy.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Core/MemPool/MemPoolLegacy.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/MemPool/MemPoolLegacy.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Core/Panic.cpp.o -c /Users/emd22/Projects/a2/Src/Core/Panic.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Core/Panic.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/Panic.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

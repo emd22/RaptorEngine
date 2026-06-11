@@ -14,6 +14,7 @@
 #include <Core/FreeArray.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Path.hpp>
+#include <Core/Queue.hpp>
 #include <Core/String.hpp>
 #include <Engine.hpp>
 #include <Math/MathConsts.hpp>

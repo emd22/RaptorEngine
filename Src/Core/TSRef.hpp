@@ -1,8 +1,8 @@
 #pragma once
 
 
+#include "Assert.hpp"
 #include "Defines.hpp"
-#include "Panic.hpp"
 #include "Types.hpp"
 
 #include <Core/MemPool/MemPool.hpp>

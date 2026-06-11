@@ -1,8 +1,8 @@
 #include "String.hpp"
 
+#include <Core/Assert.hpp>
 #include <Core/Log.hpp>
 #include <Core/MemPool/MemPool.hpp>
-#include <Core/Panic.hpp>
 #include <Engine.hpp>
 
 namespace fx {

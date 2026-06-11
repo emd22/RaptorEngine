@@ -1,0 +1,143 @@
+#pragma once
+
+#include "Assert.hpp"
+#include "Log.hpp"
+#include "Types.hpp"
+
+#include <Math/MathUtil.hpp>
+
+namespace fx {
+
+template <typename T>
+class Queue
+{
+public:
+    Queue() = default;
+    Queue(uint32 num_objects) { InitCapacity(num_objects); }
+
+    void InitCapacity(uint32 num_objects)
+    {
+        Assert(num_objects > 0);
+
+        if (mpData != nullptr) {
+            // Recreate queue
+            Destroy();
+        }
+
+        mCapacity = num_objects;
+
+        const uint32 buffer_size = sizeof(T) * num_objects;
+        mpData = reinterpret_cast<T*>(std::malloc(buffer_size));
+
+        if (mpData == nullptr) {
+            LogError(LC_CORE, "Could not allocate memory for queue of size {}", buffer_size);
+            mCapacity = 0;
+        }
+    }
+
+    T& Push(const T& value)
+    {
+        if (mSize >= mCapacity) {
+            LogWarning("Queue is full");
+            Pop();
+        }
+
+        if (mPushIndex >= mCapacity) {
+            mPushIndex = 0;
+        }
+
+
+        ++mSize;
+
+        T* ptr = mpData + (mPushIndex++);
+        new (ptr) T(value);
+
+        return *ptr;
+    }
+
+    T& Push(T&& value)
+    {
+        if (mSize >= mCapacity) {
+            LogWarning("Queue is full");
+            Pop();
+        }
+
+        if (mPushIndex >= mCapacity) {
+            mPushIndex = 0;
+        }
+
+        ++mSize;
+
+        T* ptr = mpData + (mPushIndex++);
+        new (ptr) T(value);
+
+        return *ptr;
+    }
+
+    T PopValue()
+    {
+        Assert(mSize > 0);
+
+        if (mPopIndex >= mCapacity) {
+            mPopIndex = 0;
+        }
+
+        --mSize;
+
+        T* ptr = mpData + (mPopIndex++);
+
+        T value = std::move(*ptr);
+        ptr->~T();
+
+        return value;
+    }
+
+    void Pop()
+    {
+        if (mSize == 0) {
+            LogError(LC_CORE, "Cannot pop from empty queue");
+            return;
+        }
+
+        if (mPopIndex >= mCapacity) {
+            mPopIndex = 0;
+        }
+
+        --mSize;
+
+        T* ptr = mpData + (mPopIndex++);
+        if constexpr (!std::is_trivially_destructible_v<T>) {
+            ptr->~T();
+        }
+    }
+
+
+    void Destroy()
+    {
+        if (!mpData) {
+            return;
+        }
+
+        // Destroy all items remaining
+        for (uint32 index = 0; index < mSize; index++) {
+            Pop();
+        }
+
+        std::free(static_cast<void*>(mpData));
+        mpData = nullptr;
+        mCapacity = 0;
+    }
+
+    ~Queue() = default;
+
+
+private:
+    T* mpData = nullptr;
+
+    uint32 mCapacity = 0;
+    uint32 mSize = 0;
+
+    uint32 mPushIndex = 0;
+    uint32 mPopIndex = 0;
+};
+} // namespace fx

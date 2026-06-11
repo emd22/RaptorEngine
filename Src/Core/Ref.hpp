@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Assert.hpp"
 #include "Defines.hpp"
-#include "Panic.hpp"
 #include "Types.hpp"
 
 #ifdef FX_DEBUG_REF
