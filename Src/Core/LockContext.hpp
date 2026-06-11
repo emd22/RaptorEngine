@@ -102,3 +102,47 @@ private:
 
     bool mbIsLocked = false;
 };
+
+
+class SpinLockGuard
+{
+public:
+    FX_FORCE_INLINE SpinLockGuard(std::atomic_flag& af) : mAtomicFlag(af)
+    {
+        while (af.test()) {
+            af.wait(true);
+        }
+
+        af.test_and_set();
+
+        mbIsLocked = true;
+    }
+
+    SpinLockGuard(const SpinLockGuard& other) = delete;
+
+    FX_FORCE_INLINE SpinLockGuard(SpinLockGuard&& other) noexcept : mAtomicFlag(other.mAtomicFlag)
+    {
+        other.mbIsLocked = false;
+    }
+
+    SpinLockGuard& operator=(const SpinLockGuard& other) = delete;
+
+    FX_FORCE_INLINE void Unlock()
+    {
+        if (!mbIsLocked) {
+            return;
+        }
+
+        mAtomicFlag.clear();
+        mAtomicFlag.notify_one();
+
+        mbIsLocked = false;
+    }
+
+    ~SpinLockGuard() { Unlock(); }
+
+
+private:
+    std::atomic_flag& mAtomicFlag;
+    bool mbIsLocked = false;
+};

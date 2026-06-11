@@ -15,6 +15,25 @@ public:
     Queue() = default;
     Queue(uint32 num_objects) { InitCapacity(num_objects); }
 
+    Queue(const Queue& other) = delete;
+    Queue(Queue&& other) { (*this) = std::move(other); }
+
+    Queue& operator=(const Queue& other) = delete;
+    Queue& operator=(Queue&& other)
+    {
+        mpData = other.mpData;
+        mCapacity = other.mCapacity;
+        mSize = other.mSize;
+        mPushIndex = other.mPushIndex;
+        mPopIndex = other.mPopIndex;
+
+        other.mCapacity = 0;
+        other.mpData = nullptr;
+
+        return *this;
+    }
+
+
     void InitCapacity(uint32 num_objects)
     {
         Assert(num_objects > 0);
@@ -25,6 +44,9 @@ public:
         }
 
         mCapacity = num_objects;
+        mPushIndex = 0;
+        mPopIndex = 0;
+        mSize = 0;
 
         const uint32 buffer_size = sizeof(T) * num_objects;
         mpData = reinterpret_cast<T*>(std::malloc(buffer_size));
