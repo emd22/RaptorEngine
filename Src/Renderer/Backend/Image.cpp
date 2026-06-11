@@ -163,8 +163,12 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
     static uint32 alloc_number = 0;
 
+    // if (alloc_number == 6) {
+    //     FX_BREAKPOINT;
+    // }
     std::string alloc_name = std::to_string(alloc_number++);
     vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
+
 
     // LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
     //           reinterpret_cast<void*>(Allocation));

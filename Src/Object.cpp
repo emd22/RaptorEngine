@@ -526,14 +526,6 @@ void Object::Destroy()
         pMesh->Destroy();
     }
 
-    // gMaterialManager->DestroyMaterial(mMaterialID);
-
-    // if (pMaterial) {
-    //     pMaterial->Destroy();
-    // }
-
-    // gMaterialManager->DestroyMaterial(mMaterialID);
-
     PhObject* phys = nullptr;
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
         phys->DestroyPhysicsBody();

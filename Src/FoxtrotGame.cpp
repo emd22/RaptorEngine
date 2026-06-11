@@ -608,6 +608,9 @@ FoxtrotGame::~FoxtrotGame()
 {
     DestroyGame();
     mMainScene.Destroy();
+
+    PagedArray<TSRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
+    empty_images_list.Destroy();
 }
 
 

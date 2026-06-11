@@ -115,6 +115,16 @@ void AxManager::Shutdown()
         return;
     }
 
+    // Cleanup all permutations of empty images that were created.
+    PagedArray<TSRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
+
+    if (empty_images_list.IsInited()) {
+        for (TSRef<AxImage>& image_ref : empty_images_list) {
+            image_ref.DestroyRef();
+        }
+    }
+
+
     mbActive.clear();
     ItemsEnqueuedNotifier.Kill();
 
@@ -127,17 +137,6 @@ void AxManager::Shutdown()
     delete mpAssetManagerThread;
 
     mWorkerThreads.Free();
-
-    // Cleanup all permutations of empty images that were created.
-    PagedArray<TSRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
-
-    // if (empty_images_list.IsInited()) {
-    //     for (TSRef<AxImage>& image_ref : empty_images_list) {
-    //         image_ref.DestroyRef();
-    //     }
-    // }
-
-    empty_images_list.Destroy();
 }
 
 
