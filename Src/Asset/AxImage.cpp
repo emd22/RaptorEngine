@@ -26,7 +26,7 @@ AxImage& AxImage::operator=(const AxImage& other)
 {
     Image = other.Image;
     ImageType = other.ImageType;
-    Size = other.Size;
+    Image.Size = other.Image.Size;
 
     return *this;
 }

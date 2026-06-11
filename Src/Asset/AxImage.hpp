@@ -73,7 +73,6 @@ public:
     renderer::Image Image {};
 
     renderer::eImageType ImageType = renderer::eImageType::Flat;
-    Vec2u Size = Vec2u::sZero;
 };
 
 } // namespace fx

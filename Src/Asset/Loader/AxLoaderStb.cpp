@@ -19,7 +19,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
     // image->NumComponents = mChannels;
-    image->Size = { uint32(mWidth), uint32(mHeight) };
+    image->Image.Size = { uint32(mWidth), uint32(mHeight) };
 
     uint32 data_size = mWidth * mHeight * pixel_size;
     mDataSize = data_size;
@@ -50,7 +50,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
     uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
     mDataSize = data_size;
 
-    image->Size = { uint32(mWidth), uint32(mHeight) };
+    image->Image.Size = { uint32(mWidth), uint32(mHeight) };
 
     mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
@@ -97,7 +97,7 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
     const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Image.Size, 1,
                                 ImageFormat, Slice<uint8>(data_arr),
                                 (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 

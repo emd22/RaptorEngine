@@ -590,7 +590,6 @@ void FoxtrotGame::DestroyGame()
     gShadowRenderer = nullptr;
 
     gMaterialManager->Destroy();
-
     gAssetManager->Shutdown();
 
     gRenderer->pDeferredRenderer.DestroyRef();
