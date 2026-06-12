@@ -1,5 +1,6 @@
 #include "GpuBuffer.hpp"
 
+#include <Asset/AxManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 
@@ -154,7 +155,9 @@ void RawGpuBuffer::Destroy()
     // GpuBufferUtil::BufferTypeToName(Type), Size, (mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0,
     // (mBufferFlags & eGpuBufferFlags::TransferReceiver) != 0);
 
-    gRenderer->AddGpuBufferToDeletionQueue(Buffer, Allocation);
+    // gRenderer->AddGpuBufferToDeletionQueue(Buffer, Allocation);
+
+    gAssetManager->DeleteBuffer(*this);
 
     Initialized.store(false);
     Size = 0;

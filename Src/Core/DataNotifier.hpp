@@ -8,7 +8,7 @@ class DataNotifier
 public:
     DataNotifier() = default;
 
-    void SignalDataWritten()
+    void Signal()
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
@@ -23,7 +23,7 @@ public:
         mCV.notify_one();
     }
 
-    void WaitForData(bool pass_if_already_done = false)
+    void Wait(bool pass_if_already_done = false)
     {
         std::unique_lock<std::mutex> lock(mMutex);
 
@@ -32,6 +32,22 @@ public:
         }
 
         mCV.wait(lock, [this] { return mDone; });
+    }
+
+    void WaitAndReset()
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+
+        if (mDone) {
+            mKilled = false;
+            mDone = false;
+            return;
+        }
+
+        mCV.wait(lock, [this] { return mDone; });
+
+        mKilled = false;
+        mDone = false;
     }
 
     bool IsDone()

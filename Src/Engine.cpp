@@ -40,7 +40,6 @@ void Destroy()
     DESTROY_GLOBAL(gShaderCompiler);
     DESTROY_GLOBAL(gMaterialManager);
     DESTROY_GLOBAL(gObjectManager);
-    DESTROY_GLOBAL(gAssetManager);
 }
 
 } // namespace Globals

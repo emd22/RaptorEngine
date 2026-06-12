@@ -14,7 +14,7 @@ AxImage::AxImage(const AxImage& other) { (*this) = other; }
 
 void AxImage::MarkAndSignalLoaded()
 {
-    IsFinishedNotifier.SignalDataWritten();
+    IsFinishedNotifier.Signal();
 
     bIsUploadedToGpu = true;
     bIsUploadedToGpu.notify_all();

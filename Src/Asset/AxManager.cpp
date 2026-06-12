@@ -25,7 +25,7 @@ static constexpr uint32 scMaxWorkerThreads = 10;
 // Asset Deletion Ticket
 /////////////////////////////////////
 
-void AssetDeletionTicket::Execute() const
+void AssetDeletionTicket::DeleteImmediate() const
 {
     switch (Type) {
     case eType::None:
@@ -36,6 +36,19 @@ void AssetDeletionTicket::Execute() const
         vmaDestroyBuffer(renderer::gRenderer->GpuAllocator, ticket.Buffer, ticket.Allocation);
     } break;
     }
+}
+
+
+bool AssetDeletionTicket::TryDelete(uint32 current_tick) const
+{
+    const bool missed_or_overflow = ((MinDeletionTick - current_tick) > 10000);
+
+    if (current_tick >= MinDeletionTick || missed_or_overflow) {
+        DeleteImmediate();
+        return true;
+    }
+
+    return false;
 }
 
 
@@ -52,7 +65,7 @@ void AxWorker::Create()
 void AxWorker::Update()
 {
     while (bRunning.load()) {
-        ItemReady.WaitForData();
+        ItemReady.Wait();
         ItemReady.Reset();
 
         // In order to stop the worker, we need to kill the ItemReady notifier. Here we need to check if the worker
@@ -102,6 +115,7 @@ void AxManager::Start(int32 min_threads)
     mMinThreads = min_threads;
     mbActive.test_and_set();
 
+
     // Allocate the workers
     mWorkerThreads.InitCapacity(scMaxWorkerThreads);
 
@@ -144,7 +158,7 @@ void AxManager::Shutdown()
 
 
     mbActive.clear();
-    ItemsEnqueuedNotifier.Kill();
+    ManagerUpdateNotifier.Kill();
 
     for (auto& worker : mWorkerThreads) {
         worker.Kill();
@@ -383,14 +397,14 @@ void AxManager::CheckForUploadableData()
 
             // Notify the asset thread that loading is finished
 
-            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.Signal();
             asset_data->pAsset->mIsLoaded.store(true);
 
             // Destroy the loader(clearing the loading buffers)
             asset_data->pLoader->Destroy(asset_data->pAsset);
         }
         else if (worker->LoadStatus == AxLoaderBase::eStatus::Error) {
-            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.Signal();
 
             // There was an error, call the OnError callback if it was registered
             if (asset_data->pAsset->mOnErrorCallback) {
@@ -398,7 +412,7 @@ void AxManager::CheckForUploadableData()
             }
         }
         else if (worker->LoadStatus == AxLoaderBase::eStatus::None) {
-            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.Signal();
             Panic("AssetManager", "Worker status is none!");
         }
 
@@ -480,6 +494,19 @@ void AxManager::CheckForItemsToLoad()
     }
 }
 
+void AxManager::CheckForItemsToDelete()
+{
+    SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
+
+    if (queue->IsEmpty()) {
+        return;
+    }
+
+    if (queue->First().TryDelete(mTickCounter)) {
+        queue->Pop();
+    }
+}
+
 void AxManager::AssetManagerUpdate()
 {
     uint32 num_uploads = 0;
@@ -501,24 +528,15 @@ void AxManager::AssetManagerUpdate()
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
             }
         }
-        // There is no data being loaded or uploaded, we can unload the extra worker threads.
-        // else {
-        //     const uint32 amount_threads = mWorkerThreads.Size;
-        //     for (uint32 index = amount_threads; index > mMinThreads; index--) {
-        //         LogInfo(LC_ASSET, "Killing asset manager worker thread...");
-
-        //         // mWorkerThreads[index].Kill();
-        //         // mWorkerThreads[index].Thread.join();
-        //         // mWorkerThreads.RemoveLast();
-        //     }
-        // }
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
-        ItemsEnqueuedNotifier.WaitForData();
-        ItemsEnqueuedNotifier.Reset();
+        ManagerUpdateNotifier.WaitAndReset();
+
         if (!mbActive.test()) {
             break;
         }
+
+        CheckForItemsToDelete();
 
         mTickCounter.fetch_add(1);
 

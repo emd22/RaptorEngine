@@ -19,6 +19,9 @@ template <typename T>
 concept C_IsAsset = std::is_base_of_v<AxBase, T>;
 
 
+static constexpr uint32 scDeletionTickOffset = 1;
+
+
 struct AssetDeletionTicket
 {
     enum class eType
@@ -34,20 +37,23 @@ struct AssetDeletionTicket
     };
 
 public:
-    AssetDeletionTicket(const renderer::RawGpuBuffer& gpu_buffer)
-        : Type(eType::Buffer), Value { .Ticket = { .Buffer = gpu_buffer.Buffer, .Allocation = gpu_buffer.Allocation } }
+    AssetDeletionTicket(uint32 current_tick, const renderer::RawGpuBuffer& gpu_buffer)
+        : Type(eType::Buffer), Value { .Ticket = { .Buffer = gpu_buffer.Buffer, .Allocation = gpu_buffer.Allocation } },
+          MinDeletionTick(current_tick + scDeletionTickOffset)
     {
     }
 
-    void Execute() const;
+    void DeleteImmediate() const;
+    bool TryDelete(uint32 current_tick) const;
 
 public:
+    eType Type = eType::None;
+
     union
     {
         BufferTicket Ticket;
     } Value;
 
-    eType Type = eType::None;
     uint32 MinDeletionTick = 0;
 };
 
@@ -64,7 +70,7 @@ public:
     void SubmitItemToLoad(AxQueueItem&& item)
     {
         Item = std::move(item);
-        ItemReady.SignalDataWritten();
+        ItemReady.Signal();
     }
 
     void DebugPrint() const
@@ -236,6 +242,24 @@ public:
         LoadImageFromMemory(renderer::eImageType::Flat, format, asset, data, data_size);
     }
 
+
+    /////////////////////////////////////
+    // Deletion Functions
+    /////////////////////////////////////
+
+    void DeleteBuffer(const renderer::RawGpuBuffer& buffer)
+    {
+        SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
+
+        if (!queue->IsInited()) {
+            queue->InitCapacity(256);
+        }
+
+        queue->Emplace(mTickCounter, buffer);
+        ManagerUpdateNotifier.Signal();
+    }
+
+
     ~AxManager() { Shutdown(); }
 
 
@@ -244,6 +268,7 @@ private:
 
     void CheckForUploadableData();
     void CheckForItemsToLoad();
+    void CheckForItemsToDelete();
 
     bool CheckWorkersBusy();
 
@@ -262,7 +287,7 @@ private:
         mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, asset, TLoadType));
 
         mgr->ItemsEnqueued.test_and_set();
-        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+        mgr->ManagerUpdateNotifier.Signal();
     }
 
     template <typename TAssetType, typename TLoaderType, eAssetLoadType TLoadType>
@@ -276,7 +301,7 @@ private:
         mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, asset, TLoadType, asset_data));
 
         mgr->ItemsEnqueued.test_and_set();
-        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+        mgr->ManagerUpdateNotifier.Signal();
     }
 
     template <typename TAssetType, eAssetLoadType TLoadType>
@@ -291,30 +316,27 @@ private:
         mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, img_info));
 
         mgr->ItemsEnqueued.test_and_set();
-        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+        mgr->ManagerUpdateNotifier.Signal();
     }
 
 public:
     //    DataNotifier DataLoaded;
 private:
     AxQueue mLoadQueue;
+    TSQueue<AssetDeletionTicket> mDeletionTickets;
 
     SizedArray<AxWorker*> WorkersWaitingToUpload;
 
     std::atomic_flag mbActive;
 
-    DataNotifier ItemsEnqueuedNotifier;
+    DataNotifier ManagerUpdateNotifier;
     std::atomic_flag ItemsEnqueued;
 
     uint32 mMinThreads = 2;
-    // SizedArray<std::thread *> mWorkerThreads;
     SizedArray<AxWorker> mWorkerThreads;
     std::thread* mpAssetManagerThread;
 
-
-    TSQueue<AssetDeletionTicket> mDeletionTickets;
-
-    std::atomic_int mTickCounter = 0;
+    std::atomic_uint mTickCounter = 0;
 };
 
 } // namespace fx

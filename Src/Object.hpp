@@ -145,7 +145,7 @@ public:
         Flags |= eObjectFlags::ReadyToRender;
 
         bIsUploadedToGpu = true;
-        IsFinishedNotifier.SignalDataWritten();
+        IsFinishedNotifier.Signal();
     }
 
     void Destroy() override;

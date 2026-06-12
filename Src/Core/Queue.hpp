@@ -33,6 +33,7 @@ public:
         return *this;
     }
 
+    bool IsInited() const { return mpData != nullptr; }
 
     void InitCapacity(uint32 num_objects)
     {
@@ -68,7 +69,6 @@ public:
             mPushIndex = 0;
         }
 
-
         ++mSize;
 
         T* ptr = mpData + (mPushIndex++);
@@ -91,7 +91,27 @@ public:
         ++mSize;
 
         T* ptr = mpData + (mPushIndex++);
-        new (ptr) T(value);
+        new (ptr) T(std::move(value));
+
+        return *ptr;
+    }
+
+    template <typename... TArgs>
+    T& Emplace(TArgs&&... args)
+    {
+        if (mSize >= mCapacity) {
+            LogWarning("Queue is full");
+            Pop();
+        }
+
+        if (mPushIndex >= mCapacity) {
+            mPushIndex = 0;
+        }
+
+        ++mSize;
+
+        T* ptr = mpData + (mPushIndex++);
+        new (ptr) T(std::forward<TArgs>(args)...);
 
         return *ptr;
     }

@@ -35,7 +35,7 @@ public:
             return;
         }
 
-        IsFinishedNotifier.WaitForData(true);
+        IsFinishedNotifier.Wait(true);
     }
 
     /** Returns true if the asset has been loaded and is in GPU memory. */

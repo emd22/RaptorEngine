@@ -3,6 +3,7 @@
 
 #include "FoxtrotGame.hpp"
 
+#include <Asset/AxManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/DataPack.hpp>
 #include <Asset/Font/Font.hpp>
@@ -62,6 +63,11 @@ int main()
 
     fx::Globals::Destroy();
     fx::renderer::Globals::Destroy();
+
+    if (gAssetManager) {
+        delete gAssetManager;
+        gAssetManager = nullptr;
+    }
 
     Defer(
         []()
