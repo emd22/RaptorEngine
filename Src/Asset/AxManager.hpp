@@ -259,6 +259,8 @@ public:
         ManagerUpdateNotifier.Signal();
     }
 
+    void ShutdownDeletionQueue();
+
 
     ~AxManager() { Shutdown(); }
 

@@ -13,6 +13,7 @@
 #include <SDL3/SDL_vulkan.h>
 
 #include <Asset/Animation.hpp>
+#include <Asset/AxManager.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/RefUtil.hpp>
@@ -751,6 +752,9 @@ void RenderBackend::Destroy()
     }
 
     deletion_queue.Unlock();
+
+    gAssetManager->ShutdownDeletionQueue();
+
 
     GpuBufferPrintUndestroyed();
 

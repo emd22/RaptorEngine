@@ -171,6 +171,16 @@ void AxManager::Shutdown()
     mWorkerThreads.Free();
 }
 
+void AxManager::ShutdownDeletionQueue()
+{
+    SpinLockContext<Queue<AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
+
+    while (!queue->IsEmpty()) {
+        queue->First().DeleteImmediate();
+        queue->Pop();
+    }
+}
+
 
 inline bool IsMemoryJpeg(const uint8* data, uint32 data_size)
 {
