@@ -100,7 +100,7 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
 
     if (reinterpret_cast<uintptr_t>(Buffer) == 0x850000000085) {
-        FX_BREAKPOINT;
+        // FX_BREAKPOINT;
     }
 
     // LogInfo("Create Buffer  (Buffer={:p}, Allocation={:p}, Size={})", reinterpret_cast<void*>(Buffer),

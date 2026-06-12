@@ -114,6 +114,14 @@ public:
         return value;
     }
 
+    T& First() const
+    {
+        Assert(mSize > 0);
+        T* ptr = mpData + (mPopIndex);
+
+        return *ptr;
+    }
+
     void Pop()
     {
         if (mSize == 0) {
@@ -132,6 +140,8 @@ public:
             ptr->~T();
         }
     }
+
+    bool IsEmpty() const { return mSize == 0; }
 
 
     void Destroy()

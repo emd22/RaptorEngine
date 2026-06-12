@@ -26,6 +26,7 @@
 #include <thread>
 #include <vector>
 
+
 #define FX_VULKAN_DEBUG 1
 
 // This isn't defined on some platforms/drivers.
@@ -107,6 +108,9 @@ void RenderBackend::Init(Vec2u window_size)
 
     InitFrames();
     InitUploadContext();
+
+    SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+    deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
 
     // Create final submission semaphores. Note that there is one submission semaphore
     // per Swapchain image, not frame in flight.
@@ -667,7 +671,10 @@ void RenderBackend::DoComposition(Camera& render_cam)
     frame->CmdBuffer.End();
 
     PresentFrame();
-    ProcessDeletionQueue();
+
+    SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+    ProcessDeletionQueue(false, deletion_queue.Get());
+    deletion_queue.Unlock();
 
     RequirePipelineDynamicStates();
 
@@ -733,13 +740,17 @@ void RenderBackend::Destroy()
     LightBuffer.Destroy();
     BoneBuffer.Destroy();
 
-    while (!mDeletionQueue.empty()) {
-        ProcessDeletionQueue(true);
+    SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+
+    while (!deletion_queue->IsEmpty()) {
+        ProcessDeletionQueue(true, deletion_queue.Get());
 
         // insert a small delay to avoid the processor spinning out while
         // waiting for an object. this allows handing the core off to other threads.
         std::this_thread::sleep_for(std::chrono::nanoseconds(100));
     }
+
+    deletion_queue.Unlock();
 
     GpuBufferPrintUndestroyed();
 
