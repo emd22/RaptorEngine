@@ -21,6 +21,24 @@ namespace fx {
 static constexpr uint32 scMaxWorkerThreads = 10;
 
 
+/////////////////////////////////////
+// Asset Deletion Ticket
+/////////////////////////////////////
+
+void AssetDeletionTicket::Execute() const
+{
+    switch (Type) {
+    case eType::None:
+        break;
+
+    case eType::Buffer: {
+        const BufferTicket& ticket = Value.Ticket;
+        vmaDestroyBuffer(renderer::gRenderer->GpuAllocator, ticket.Buffer, ticket.Allocation);
+    } break;
+    }
+}
+
+
 ////////////////////////////////////
 // Asset Worker
 ////////////////////////////////////
@@ -501,6 +519,8 @@ void AxManager::AssetManagerUpdate()
         if (!mbActive.test()) {
             break;
         }
+
+        mTickCounter.fetch_add(1);
 
         CheckForItemsToLoad();
     }

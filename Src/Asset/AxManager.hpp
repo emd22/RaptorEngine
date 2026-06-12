@@ -7,6 +7,7 @@
 
 #include <Core/DataNotifier.hpp>
 #include <Core/Ref.hpp>
+#include <Core/TSQueue.hpp>
 #include <Core/TSRef.hpp>
 #include <Core/Types.hpp>
 #include <atomic>
@@ -16,6 +17,39 @@ namespace fx {
 
 template <typename T>
 concept C_IsAsset = std::is_base_of_v<AxBase, T>;
+
+
+struct AssetDeletionTicket
+{
+    enum class eType
+    {
+        None,
+        Buffer,
+    };
+
+    struct BufferTicket
+    {
+        VkBuffer Buffer = VK_NULL_HANDLE;
+        VmaAllocation Allocation = VK_NULL_HANDLE;
+    };
+
+public:
+    AssetDeletionTicket(const renderer::RawGpuBuffer& gpu_buffer)
+        : Type(eType::Buffer), Value { .Ticket = { .Buffer = gpu_buffer.Buffer, .Allocation = gpu_buffer.Allocation } }
+    {
+    }
+
+    void Execute() const;
+
+public:
+    union
+    {
+        BufferTicket Ticket;
+    } Value;
+
+    eType Type = eType::None;
+    uint32 MinDeletionTick = 0;
+};
 
 /**
  * Worker thread that waits and processes individual asset loading.
@@ -276,6 +310,11 @@ private:
     // SizedArray<std::thread *> mWorkerThreads;
     SizedArray<AxWorker> mWorkerThreads;
     std::thread* mpAssetManagerThread;
+
+
+    TSQueue<AssetDeletionTicket> mDeletionTickets;
+
+    std::atomic_int mTickCounter = 0;
 };
 
 } // namespace fx
