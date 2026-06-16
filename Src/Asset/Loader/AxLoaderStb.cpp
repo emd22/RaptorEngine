@@ -13,7 +13,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String
 
     const char* c_path = path.CStr();
 
-    const int pixel_size = renderer::ImageFormatUtil::GetSize(ImageFormat);
+    const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
     Assert(pixel_size > 0);
 
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
@@ -37,7 +37,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
 {
     TSRef<AxImage> image(asset);
 
-    const int pixel_size = renderer::ImageFormatUtil::GetSize(ImageFormat);
+    const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
     Assert(pixel_size > 0);
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
@@ -103,7 +103,6 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 
     if (should_save_data) {
         image->Image.ImageData = std::move(data_arr);
-
 
         // Set image data to null to avoid it being destroyed.
         mImageData = nullptr;

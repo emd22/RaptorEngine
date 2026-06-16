@@ -49,6 +49,10 @@ public:
 public:
     MaterialComponent::Status Build()
     {
+        if (!bReadyToCheck.test()) {
+            return Status::MissingComponent;
+        }
+
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if ((!pAssetImage && (!pDataToLoad && !ImageToUpload.ImageData.pData))) {
             // pAssetImage = AxImage::GetEmptyImage<TFormat>();
@@ -71,19 +75,28 @@ public:
         pDataToLoad = other.pDataToLoad;
         ImageToUpload = other.ImageToUpload;
 
+        if (other.bReadyToCheck.test()) {
+            bReadyToCheck.test_and_set();
+        }
+
         return *this;
     }
 
     bool Exists() const
     {
-        return (pAssetImage != nullptr) || (pDataToLoad != nullptr); // || (ImageToUpload.ImageData.pData != nullptr);
+        return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
     }
+
+    FX_FORCE_INLINE void MarkReadyToCheck() { bReadyToCheck.test_and_set(); }
 
     ~MaterialComponent() = default;
 
 private:
     bool CheckIfReady()
     {
+        if (!bReadyToCheck.test()) {
+            return false;
+        }
         // If there is data passed in and the image has not been loaded yet, load it using the
         // asset manager. This will be validated on the next call of this function. (when attempting to build the
         // material)
@@ -96,7 +109,6 @@ private:
             else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
                 pAssetImage = AssetManagerFwd::LoadImageFromPixels(ImageToUpload);
             }
-
 
             return false;
         }
@@ -118,6 +130,8 @@ public:
     Slice<const uint8> pDataToLoad { nullptr };
 
     ImageInfo ImageToUpload {};
+
+    std::atomic_flag bReadyToCheck = ATOMIC_FLAG_INIT;
 };
 
 /////////////////////////////////////

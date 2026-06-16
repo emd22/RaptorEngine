@@ -72,7 +72,7 @@ enum class eImageFormat : uint16
 struct ImageInfo
 {
     Vec2u Size;
-    eImageFormat Format;
+    eImageFormat Format = eImageFormat::RGBA8_UNorm;
     int32 MipLevel = 0;
     Slice<const uint8> ImageData { nullptr, 0 };
 };
@@ -94,7 +94,7 @@ struct ImageFormatUtil
     /**
      * @brief Get the size of the format in bytes. For example, RGBA8 would return 4.
      */
-    static constexpr uint32 GetSize(eImageFormat format)
+    static constexpr uint32 GetPixelStride(eImageFormat format)
     {
         switch (format) {
         case eImageFormat::None:

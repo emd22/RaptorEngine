@@ -639,7 +639,7 @@ void Image::DecRef()
 
 void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 {
-    const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetSize(Format);
+    const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetPixelStride(Format);
 
     SizedArray<uint8> image_data;
     image_data.InitSize(data_size);

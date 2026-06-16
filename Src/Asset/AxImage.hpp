@@ -35,7 +35,7 @@ public:
             empty_images.Create(10);
         }
 
-        constexpr uint32 pixel_size = renderer::ImageFormatUtil::GetSize(TFormat);
+        constexpr uint32 pixel_size = renderer::ImageFormatUtil::GetPixelStride(TFormat);
 
         SizedArray<uint8> image_data(pixel_size);
         memset(image_data.pData, 1, pixel_size);

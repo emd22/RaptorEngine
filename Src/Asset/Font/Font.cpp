@@ -96,7 +96,7 @@ void FontAtlas::RenderGlyph(FT_GlyphSlot glyph, uint32 codepoint)
 
 SizedArray<uint8> FontAtlas::GetImageData(eImageFormat format) const
 {
-    const uint32 num_components = ImageFormatUtil::GetSize(format);
+    const uint32 num_components = ImageFormatUtil::GetPixelStride(format);
 
     const uint32 data_size = AtlasSize.X * AtlasSize.Y * num_components;
 

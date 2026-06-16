@@ -149,7 +149,7 @@ static String GetTextureCachePath(const String& asset_path, Material* material, 
 }
 
 
-static void GenerateMipmapImage(const String& output_path, eImageFormat format, uint8* data, uint32 size)
+static void GenerateMipmapImage(const String& output_path, eImageFormat format, const uint8* data, uint32 size)
 {
     AxLoaderStb loader;
     loader.ImageType = eImageType::Flat;
@@ -164,10 +164,10 @@ static void GenerateMipmapImage(const String& output_path, eImageFormat format, 
         return;
     }
 
-    loader.InvalidateImageData();
-
     MipmapGen mm {};
     mm.GenerateMipmaps(output_path.CStr(), format, loader.GetImageData(), loader.GetImageSize());
+
+    // loader.InvalidateImageData();
 }
 
 
@@ -185,15 +185,15 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
 
     const bool texture_cache_exists = FilesystemIO::FileExists(tex_cache_path);
 
-    if (texture_cache_exists) {
-        // MipmapLoader ml {};
+    // if (texture_cache_exists) {
+    //     MipmapLoader ml {};
 
-        // ml.Open(tc_path_str.CStr());
+    //     ml.Open(tex_cache_path.CStr());
 
-        // component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
-        // component.ImageToUpload = ml.GetMip(1);
-        // return;
-    }
+    //     component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
+    //     component.ImageToUpload = ml.GetMip(1);
+    //     return;
+    // }
 
     const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);
@@ -202,13 +202,21 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     uint8* goober_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
-    // if (!texture_cache_exists) {
-    //     GenerateMipmapImage(tex_cache_path, TFormat, goober_buffer, image_buffer_size);
-    // }
+    uint8* mip_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
+    memcpy(mip_buffer, image_buffer, image_buffer_size);
+
+    Assert(goober_buffer != nullptr);
+    Assert(image_buffer_size > 0);
 
     // Submit as data to be loaded later by the asset manager
     component.UploadSrc = eMaterialComponentUploadSrc::ProcessAndUpload;
     component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
+
+    component.MarkReadyToCheck();
+
+    // if (!texture_cache_exists || true) {
+    //     GenerateMipmapImage(tex_cache_path, TFormat, mip_buffer, image_buffer_size);
+    // }
 }
 
 void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive, int32 primitive_index)

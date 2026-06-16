@@ -90,7 +90,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
     jpeg_mem_src(&mJpegInfo, data, size);
     jpeg_read_header(&mJpegInfo, true);
 
-    const uint32 num_components = renderer::ImageFormatUtil::GetSize(ImageFormat);
+    const uint32 num_components = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
 
     J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
     mJpegInfo.out_color_space = color_space;
