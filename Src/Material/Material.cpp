@@ -95,6 +95,12 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, Pipeline& pipeline, bo
     return true;
 }
 
+String Material::GetCachePath() const
+{
+    String base_path = "Data/Demo/Models/";
+    return base_path;
+}
+
 Material& Material::operator=(const Material& other)
 {
     ID = other.ID;

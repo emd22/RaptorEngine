@@ -23,7 +23,7 @@
 #include <Renderer/Globals.hpp>
 #include <Script/FoxScript.hpp>
 
-// #define FX_RUN_TEST
+#define FX_RUN_TEST
 
 FX_SET_MODULE_NAME("Main")
 
@@ -50,14 +50,23 @@ static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::
 
 int main()
 {
-#ifndef FX_RUN_TEST
     fx::gEnginePool = new fx::MemPool;
     fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
 
+    script::FoxScript fs("./Scripts/GlobalTest.fox");
+    script::FoxSymbol* sym = fs.GetSymbol("Default");
+    if (!sym) {
+        LogError("Cannot find symbol!");
+    }
 
+    script::FoxValue value = fs.CallProc(sym, {});
+
+    LogInfo("Value: {}", value);
+
+#ifndef FX_RUN_TEST
     fx::renderer::Globals::Init();
 
     {

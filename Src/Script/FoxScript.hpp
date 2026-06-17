@@ -35,7 +35,6 @@ public:
     void PushValue(const FoxValue& value);
 
     FoxValue CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args);
-    FoxValue CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args);
 
     FoxValue Update();
     FoxValue Resume();

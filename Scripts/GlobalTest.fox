@@ -1,0 +1,12 @@
+globals()
+{
+global int SC_HELLO = 8;
+}
+
+
+Default() int
+{
+    local int x = SC_HELLO;
+
+    return x;
+}

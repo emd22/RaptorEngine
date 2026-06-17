@@ -60,9 +60,12 @@ public:
         return value;
     }
 
-    FoxValue(const FoxValue& other)
+    FoxValue(const FoxValue& other) { (*this) = other; }
+
+    FoxValue& operator=(const FoxValue& other)
     {
         Type = other.Type;
+
         if (other.Type == eFoxType::INT) {
             ValueInt = other.ValueInt;
         }
@@ -75,6 +78,8 @@ public:
         else if (other.Type == eFoxType::REF) {
             pValueRef = other.pValueRef;
         }
+
+        return *this;
     }
 
 

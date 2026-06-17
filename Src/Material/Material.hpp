@@ -74,6 +74,8 @@ public:
         return *this;
     }
 
+    FX_FORCE_INLINE void RequireUpdate() { mbRequiresUpdate = true; }
+
     bool Exists() const
     {
         return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
@@ -87,15 +89,24 @@ private:
         // If there is data passed in and the image has not been loaded yet, load it using the
         // asset manager. This will be validated on the next call of this function. (when attempting to build the
         // material)
-        if (!pAssetImage) {
+        if (!pAssetImage || mbRequiresUpdate) {
             AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
 
             if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
                 pAssetImage = AssetManagerFwd::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
             }
             else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
-                pAssetImage = AssetManagerFwd::LoadImageFromPixels(ImageToUpload);
+                // If the image has not been created yet, create the reference.
+                if (!pAssetImage.IsValid()) {
+                    pAssetImage = TSRef<AxImage>::New();
+                }
+
+                // If the image is previously initialized, we want to update the image with the new mip.
+                /// @see DoDirectUpload() in AxManager.cpp
+                AssetManagerFwd::LoadImageFromPixels(pAssetImage, ImageToUpload);
             }
+
+            mbRequiresUpdate = false;
 
             return false;
         }
@@ -117,6 +128,9 @@ public:
     Slice<const uint8> pDataToLoad { nullptr };
 
     ImageInfo ImageToUpload {};
+
+private:
+    bool mbRequiresUpdate = false;
 };
 
 /////////////////////////////////////
@@ -187,6 +201,7 @@ public:
     renderer::Pipeline& GetPipeline() { return *mpPipeline; }
     renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
 
+    String GetCachePath() const;
 
     Material& operator=(const Material& other);
 

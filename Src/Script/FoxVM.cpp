@@ -577,9 +577,12 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecVariable_Define) {
         uint16 var_index = Read16();
+
         VMVariable& var = GetVar(var_index);
-        ScopeVarCounts[ScopeIndex] = var_index + 1;
+        var.bIsGlobalRef = false;
         var.Value.Set<int32>(0);
+
+        ScopeVarCounts[ScopeIndex] = var_index;
     }
 
     else if (op_spec == BcSpecVariable_DefineGlobal) {
@@ -593,8 +596,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = true;
-        var.Value.Set<int32>(Globals[name_hash].Get<int32>());
         var.GlobalNameHash = name_hash;
+        var.Value.Set<int32>(Globals[name_hash].Get<int32>());
+        ScopeVarCounts[ScopeIndex] = var_index;
     }
     else if (op_spec == BcSpecVariable_Cast_Int32) {
         float32 fvalue = std::bit_cast<float32>(Pop32());

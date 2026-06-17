@@ -74,6 +74,7 @@ struct ImageInfo
     Vec2u Size;
     eImageFormat Format = eImageFormat::RGBA8_UNorm;
     int32 MipLevel = 0;
+    int32 MipCount = 1;
     Slice<const uint8> ImageData { nullptr, 0 };
 };
 
@@ -216,7 +217,7 @@ public:
     Image& operator=(const Image& other);
     Image& operator=(Ref<Image>&& ref);
 
-    ImageInfo GetInfo() const { return ImageInfo { .Size = Size, .Format = Format }; }
+    ImageInfo GetInfo() const { return ImageInfo { .Size = Size, .Format = Format, .MipCount = mMipCount }; }
 
     void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
                 VkImageUsageFlags usage, eImageAspectFlag aspect);
@@ -228,7 +229,7 @@ public:
                         eImageFormat format, const Slice<const uint8>& image_data, eImageCreateFlags flags);
 
 
-    void UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<uint8>& image_data);
+    void UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<const uint8>& image_data);
 
     void TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
                           std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
@@ -273,7 +274,7 @@ public:
 
 
 private:
-    uint16 mMipsCount = 1;
+    uint16 mMipCount = 1;
     RefCount* mpRefCnt = nullptr;
     uint8 mFrameUploadedBit = 0;
 };

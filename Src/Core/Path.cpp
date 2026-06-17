@@ -87,6 +87,22 @@ Path& Path::Remove(const uint32 index)
     return *this;
 }
 
+Path& Path::DirBack()
+{
+    uint32 last_index = Components.size() - 1;
+
+    // If there are no items left, do nothing
+    if (last_index == 0) {
+        return *this;
+    }
+
+    // Remove the directory before the basename
+    Components.erase(Components.begin() + (last_index - 1));
+
+    return *this;
+}
+
+
 void Path::CreateDirs() const
 {
     String path_str = Str();

@@ -77,8 +77,9 @@ void FoxScript::Load(const String& path)
     FoxAstDestroyer destroyer;
     destroyer.Do(root_node);
 
-    // Call OnLoad if it exists
-    CallProc(HashStr32("OnLoad"), {});
+    // If there is a globals function, call it
+
+    CallProc(GetSymbol("globals"), {});
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
@@ -111,11 +112,6 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     return Resume();
 }
 
-FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
-{
-    return CallProc(GetSymbol(name_hash), args);
-}
-
 FoxValue FoxScript::Update()
 {
     if (SDL_GetTicks() < ResumeTime) {
@@ -138,7 +134,7 @@ FoxValue FoxScript::Resume()
 
         if (Vm.bIsPaused) {
             ResumeTime = SDL_GetTicks() + Vm.PauseTime;
-            return FoxValue::scNone;
+            break;
         }
 
         if (Vm.ScopeIndex <= 0) {
@@ -153,6 +149,7 @@ FoxValue FoxScript::Resume()
 
         return FoxValue::ValueFromRaw(Vm.LastPushType, Vm.Pop32());
     }
+
 
     return FoxValue::scNone;
 }

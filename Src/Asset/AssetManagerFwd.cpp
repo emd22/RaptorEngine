@@ -14,6 +14,10 @@ TSRef<AxImage> LoadImageFromMemory(eImageFormat format, const uint8* data, uint3
 }
 
 TSRef<AxImage> LoadImageFromPixels(const ImageInfo& img_info) { return gAssetManager->LoadImageFromPixels(img_info); }
+void LoadImageFromPixels(TSRef<AxImage>& image, const ImageInfo& img_info)
+{
+    gAssetManager->LoadImageFromPixels(image, img_info);
+}
 
 } // namespace AssetManagerFwd
 

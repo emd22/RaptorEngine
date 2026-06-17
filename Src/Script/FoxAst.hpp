@@ -203,6 +203,7 @@ struct FoxBytecodeVarHandle
     eFoxType Type = eFoxType::INT;
     int64 Offset = 0;
 
+    int32 ScopeIndex = 0;
     uint16 VariableIndex = 0;
 
     uint16 SizeOnStack = 4;

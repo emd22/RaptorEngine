@@ -306,8 +306,16 @@ static void DoDirectUpload(AxQueueItem& item, AxItemData& asset_data)
 
     TSRef<AxImage> image(asset_data.pAsset);
 
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), renderer::eImageType::Flat, img_info.Size,
-                                1, img_info.Format, img_info.ImageData, eImageCreateFlags::None);
+    if (image->Image.IsInited()) {
+        image->Image.UploadMip(renderer::RenderBackendFwd::GetUploadCmd(), img_info.MipLevel, img_info.Size,
+                               img_info.ImageData);
+    }
+    else {
+        image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), renderer::eImageType::Flat,
+                                    img_info.Size, img_info.MipCount, img_info.Format, img_info.ImageData,
+                                    eImageCreateFlags::None);
+    }
+
 
     image->bIsUploadedToGpu = true;
     image->bIsUploadedToGpu.notify_all();

@@ -28,6 +28,12 @@ public:
      */
     Path& Remove(const uint32 index);
 
+    /**
+     * @brief Removes the parent directory from the path, preserving the filename.
+     * Example:
+     * `A/B/File.txt` becomes `A/File.txt`.
+     */
+    Path& DirBack();
 
     Path& RemoveLast()
     {

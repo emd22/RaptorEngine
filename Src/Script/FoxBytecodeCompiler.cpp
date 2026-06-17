@@ -20,7 +20,7 @@ using TT = eTokenType;
 SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
 {
     mBytecode.Create(scBytecodePageSize);
-    VarHandles.Create(64);
+    LocalVarHandles.Create(64);
     Strings.Create(32);
 
     Assert(root->NodeType == FX_AST_BLOCK);
@@ -221,9 +221,21 @@ void FoxBytecodeCompiler::EmitNode(FoxAstNode* node)
     }
 }
 
+FoxBytecodeVarHandle* FoxBytecodeCompiler::FindGlobalHandle(Hash32 hashed_name) const
+{
+    for (FoxBytecodeVarHandle& handle : GlobalHandles) {
+        if (handle.HashedName == hashed_name) {
+            return &handle;
+        }
+    }
+
+    return nullptr;
+}
+
+
 FoxBytecodeVarHandle* FoxBytecodeCompiler::FindVarHandle(Hash32 hashed_name) const
 {
-    for (FoxBytecodeVarHandle& handle : VarHandles) {
+    for (FoxBytecodeVarHandle& handle : LocalVarHandles) {
         if (handle.HashedName == hashed_name) {
             return &handle;
         }
@@ -234,7 +246,7 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::FindVarHandle(Hash32 hashed_name) con
 VarIndex FoxBytecodeCompiler::FindVarInScope(Hash32 hashed_name) const
 {
     // TODO: add back scope checks here
-    for (const FoxBytecodeVarHandle& handle : VarHandles) {
+    for (const FoxBytecodeVarHandle& handle : LocalVarHandles) {
         if (handle.HashedName == hashed_name) {
             return handle.VariableIndex;
         }
@@ -531,6 +543,21 @@ void FoxBytecodeCompiler::EmitVariableIndex(uint16 var_index) { Write16(var_inde
 void FoxBytecodeCompiler::EmitVariableCastInt32() { WriteOp(BcBase_Variable, BcSpecVariable_Cast_Int32); }
 void FoxBytecodeCompiler::EmitVariableCastFloat32() { WriteOp(BcBase_Variable, BcSpecVariable_Cast_Float32); }
 
+void FoxBytecodeCompiler::EmitVariableGlobalHoist(FoxBytecodeVarHandle* handle, Hash32 name_hash)
+{
+    // Emit the local definition
+    EmitVariableDefine(mVariableIndex, name_hash, true);
+
+    // Create a new handle (for local)
+    FoxBytecodeVarHandle local_handle = *handle;
+    local_handle.VariableIndex = mVariableIndex;
+
+    LocalVarHandles.Insert(local_handle);
+
+    ++mVariableIndex;
+}
+
+
 void FoxBytecodeCompiler::EmitCompare() { WriteOp(BcBase_Compare, BcSpecCompare_Default); }
 void FoxBytecodeCompiler::EmitCompareNotZero() { WriteOp(BcBase_Compare, BcSpecCompare_NotZero); }
 
@@ -633,14 +660,6 @@ void FoxBytecodeCompiler::EmitAssign(FoxAstAssign* assign)
         return;
     }
 
-    // bool force_absolute_save = false;
-
-    // if (var_handle->ScopeIndex < mScopeIndex) {
-    //     force_absolute_save = true;
-    // }
-
-    // int output_offset = -(static_cast<int>(mStackOffset) - static_cast<int>(var_handle->Offset));
-
     if (!var_handle) {
         CompileError("Could not find var handle to assign to!");
         return;
@@ -692,6 +711,32 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
 {
     if (rhs->NodeType == FX_AST_LITERAL) {
         FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(rhs);
+
+        // Check if its a reference to another variable.
+        if (literal->Value.IsRef()) {
+            FoxAstVarRef* ref = literal->Value.pValueRef;
+
+            // If the variable is not defined in scope, we should check to see if its a global.
+            // Globals need to be hoisted up to the current scope.
+
+            FoxBytecodeVarHandle* local_handle = FindVarHandle(ref->GetNameHash());
+
+            // If the variable is not defined locally but there is a global entry for the variable, use that and hoist
+            // the variable up to scope.
+            if (local_handle == nullptr) {
+                FoxBytecodeVarHandle* global_handle = FindGlobalHandle(ref->GetNameHash());
+
+                // This is not a global variable and is undefined.
+                if (!global_handle) {
+                    CompileError("Cannot find variable {} (Hash={})", ref->pName->GetStr(), ref->GetNameHash());
+                    return;
+                }
+
+                // A global handle does exist, hoist it up.
+                EmitVariableGlobalHoist(global_handle, ref->GetNameHash());
+            }
+        }
+
 
         // Check to see if the rhs type matches the variable we are assigning to. We can get the underlying type, as we
         // want to make sure the type is correct when using refs as well.
@@ -770,12 +815,17 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
         .HashedName = decl_hash,
         .Type = var_type,
         .Offset = 0,
+        .ScopeIndex = mScopeIndex,
         .VariableIndex = mVariableIndex,
         .SizeOnStack = size_of_type,
     };
 
-    VarHandles.Insert(handle);
+    LocalVarHandles.Insert(handle);
     ++mVariableIndex;
+
+    if (decl->bDefineAsGlobal) {
+        GlobalHandles.Insert(handle);
+    }
 
     FoxBytecodeVarHandle* var_handle = FindVarHandle(decl_hash);
 
@@ -1157,6 +1207,7 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int num_parameters, bool
         EmitMarker(BcSpecMarker_FrameBegin);
     }
 
+
     // Emit all nodes inside of the scope
     for (FoxAstNode* node : block->Statements) {
         EmitNode(node);
@@ -1170,7 +1221,7 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int num_parameters, bool
                 mVariableIndex, num_vars_to_delete);
 
         for (int32 i = 0; i < num_vars_to_delete; i++) {
-            VarHandles.RemoveLast();
+            LocalVarHandles.RemoveLast();
         }
 
         mVariableIndex = var_index_before_scope;
@@ -1179,6 +1230,8 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int num_parameters, bool
     if (!is_function_body && mbEmitDebugInfo) {
         EmitMarker(BcSpecMarker_FrameEnd);
     }
+
+    ++mScopeIndex;
 }
 
 void FoxBytecodeCompiler::PrintBytecode()

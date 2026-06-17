@@ -191,7 +191,7 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
         ml.Open(tex_cache_path.CStr());
 
         component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
-        component.ImageToUpload = ml.GetMip(1);
+        component.ImageToUpload = ml.GetMip(4);
         return;
     }
 
@@ -202,9 +202,6 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     uint8* goober_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
     memcpy(goober_buffer, image_buffer, image_buffer_size);
 
-    uint8* mip_buffer = static_cast<uint8*>(std::malloc(image_buffer_size));
-    memcpy(mip_buffer, image_buffer, image_buffer_size);
-
     Assert(goober_buffer != nullptr);
     Assert(image_buffer_size > 0);
 
@@ -213,7 +210,7 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 
     if (!texture_cache_exists) {
-        GenerateMipmapImage(tex_cache_path, TFormat, mip_buffer, image_buffer_size);
+        GenerateMipmapImage(tex_cache_path, TFormat, goober_buffer, image_buffer_size);
     }
 }
 

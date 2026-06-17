@@ -146,6 +146,8 @@ private:
     void EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global);
     void EmitVariableIndex(uint16 var_index);
 
+    void EmitVariableGlobalHoist(FoxBytecodeVarHandle* handle, Hash32 name_hash);
+
     void EmitVariableCastInt32();
     void EmitVariableCastFloat32();
 
@@ -176,12 +178,16 @@ private:
     FoxBytecodeVarHandle* FindVarHandle(Hash32 hashed_name) const;
     VarIndex FindVarInScope(Hash32 hashed_name) const;
 
+    FoxBytecodeVarHandle* FindGlobalHandle(Hash32 hashed_name) const;
+
+
     FoxBytecodeFunctionHandle* FindFunctionHandle(Hash32 hashed_name);
 
     eFoxType GetLiteralUnderlyingType(FoxAstLiteral* literal) const;
 
 public:
-    PagedArray<FoxBytecodeVarHandle> VarHandles;
+    PagedArray<FoxBytecodeVarHandle> LocalVarHandles;
+    PagedArray<FoxBytecodeVarHandle> GlobalHandles;
     std::vector<FoxBytecodeFunctionHandle> FunctionHandles;
     PagedArray<uint8> mBytecode {};
 
