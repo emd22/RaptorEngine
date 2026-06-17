@@ -43,7 +43,7 @@ void AssetDeletionTicket::DeleteImmediate() const
 
 bool AssetDeletionTicket::TryDelete(uint32 current_tick) const
 {
-    const bool missed_or_overflow = ((MinDeletionTick - current_tick) > 10000);
+    const bool missed_or_overflow = ((MinDeletionTick - current_tick) > (UINT32_MAX - 10000));
 
     if (current_tick >= MinDeletionTick || missed_or_overflow) {
         DeleteImmediate();
@@ -461,41 +461,16 @@ bool AxManager::CheckForItemsToLoad()
 
     AxWorker* worker = FindWorkerThread();
 
+    // No workers available currently, defer the item loading.
     // Even though there is no worker available, we still return true as there is an item in the queue.
-    if (!worker) {
+    if (worker == nullptr) {
         return true;
     }
-
 
     AxQueueItem item;
     if (!mLoadQueue.PopIfAvailable(&item)) {
         // The load queue is currently in use(uploaded to), skip for now.
         return true;
-    }
-
-    // Set this to something small, but high enough that it won't cancel loading in a ton of big models at once.
-    int tries_remaining = 3;
-
-    // No workers available, poll until one becomes available
-    while (worker == nullptr) {
-        // if (tries_remaining <= 0) {
-        //     LogError(LC_ASSET, "Could not find worker thread, skipping load of object...");
-        //     // DebugPrintWorkers();
-        //     mLoadQueue.Push(std::move(item));
-        //     ManagerUpdateNotifier.Signal();
-        //     return;
-        // }
-
-        // AddWorkerThread();
-
-        LogWarning(LC_ASSET, "Currently {} items are enqueued...", mLoadQueue.Size());
-        LogError(LC_ASSET, "No workers available; Polling for worker thread...");
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-        // Check to see if any threads opened up
-        worker = FindWorkerThread();
-
-        --tries_remaining;
     }
 
     if (worker) {
@@ -524,6 +499,9 @@ bool AxManager::CheckForItemsToDelete()
     if (queue->IsEmpty()) {
         return false;
     }
+
+    // Wait for all uploads to finish. We cannot be actively loading the item we are deleting!
+    renderer::gRenderer->UploadContext.UploadFence.WaitFor();
 
     if (queue->First().TryDelete(mTickCounter)) {
         queue->Pop();
@@ -582,21 +560,26 @@ void AxManager::AssetManagerUpdate()
             continue;
         }
 
-        { // Throttle back if there is nothing to do
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
-
+        {
+            // If this is the first time that there has been no activity, set the current timestamp.
             if (!mbIsTimeSet) {
                 mbIsTimeSet = true;
                 mLastActiveTime = std::chrono::system_clock::now();
             }
         }
 
+        // If the time since last activity is greater than scTimeUntilSleep, then sleep the asset manager.
+        // To wake it back up, ManagerUpdateNotifier will need to be signalled.
         std::chrono::system_clock::duration time_since_active = std::chrono::system_clock::now() - mLastActiveTime;
 
         if (time_since_active >= scTimeUntilSleep) {
             mbShouldSleep = true;
             LogInfo("Sleeping asset manager...");
+            continue;
         }
+
+        // Throttle back if there is nothing to do
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 }
 
@@ -611,8 +594,7 @@ AxWorker* AxManager::FindWorkerThread()
         ++worker_id;
     }
 
-    LogInfo(LC_ASSET, "Did not find any open worker!");
-
+    // Did not find any open worker, return null to be handled by the caller.
     return nullptr;
 }
 

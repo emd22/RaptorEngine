@@ -20,7 +20,7 @@ template <typename T>
 concept C_IsAsset = std::is_base_of_v<AxBase, T>;
 
 
-static constexpr uint32 scDeletionTickOffset = 3;
+static constexpr uint32 scDeletionTickOffset = 10;
 
 
 struct AssetDeletionTicket
