@@ -11,6 +11,7 @@
 #include <Core/TSRef.hpp>
 #include <Core/Types.hpp>
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 namespace fx {
@@ -268,9 +269,9 @@ public:
 private:
     AxWorker* FindWorkerThread();
 
-    void CheckForUploadableData();
-    void CheckForItemsToLoad();
-    void CheckForItemsToDelete();
+    bool CheckForUploadableData();
+    bool CheckForItemsToLoad();
+    bool CheckForItemsToDelete();
 
     bool CheckWorkersBusy();
 
@@ -324,15 +325,19 @@ private:
     SizedArray<AxWorker*> WorkersWaitingToUpload;
 
     std::atomic_flag mbActive;
+    CountedNotifier ManagerUpdateNotifier;
 
-    DataNotifier ManagerUpdateNotifier;
-    // std::atomic_flag ItemsEnqueued;
+    bool mbShouldSleep = false;
 
     uint32 mMinThreads = 2;
     SizedArray<AxWorker> mWorkerThreads;
     std::thread* mpAssetManagerThread;
 
     std::atomic_uint mTickCounter = 0;
+    uint32 mLastActiveTick = 0;
+
+    bool mbIsTimeSet = false;
+    std::chrono::system_clock::time_point mLastActiveTime;
 };
 
 } // namespace fx

@@ -23,6 +23,8 @@
 #include <Renderer/Globals.hpp>
 #include <Script/FoxScript.hpp>
 
+// #define FX_RUN_TEST
+
 FX_SET_MODULE_NAME("Main")
 
 using namespace fx;
@@ -48,6 +50,7 @@ static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::
 
 int main()
 {
+#ifndef FX_RUN_TEST
     fx::gEnginePool = new fx::MemPool;
     fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
@@ -75,6 +78,6 @@ int main()
             delete fx::gEnginePool;
             fx::gEnginePool = nullptr;
         });
-
+#endif
     return 0;
 }

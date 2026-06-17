@@ -20,6 +20,8 @@ namespace fx {
 
 static constexpr uint32 scMaxWorkerThreads = 10;
 
+static constexpr std::chrono::seconds scTimeUntilSleep = std::chrono::seconds(3);
+
 
 /////////////////////////////////////
 // Asset Deletion Ticket
@@ -311,7 +313,7 @@ static void DoDirectUpload(AxQueueItem& item, AxItemData& asset_data)
     image->bIsUploadedToGpu.notify_all();
 }
 
-void AxManager::CheckForUploadableData()
+bool AxManager::CheckForUploadableData()
 {
     using namespace renderer;
 
@@ -329,7 +331,7 @@ void AxManager::CheckForUploadableData()
     const bool should_upload = WorkersWaitingToUpload.Size > 0;
 
     if (!should_upload) {
-        return;
+        return false;
     }
 
     // Begin GPU upload
@@ -425,6 +427,8 @@ void AxManager::CheckForUploadableData()
         worker->LoadStatus = AxLoaderBase::eStatus::None;
         worker->bIsBusy.clear();
     }
+
+    return true;
 }
 
 bool AxManager::CheckWorkersBusy()
@@ -449,24 +453,24 @@ void AxManager::AddWorkerThread()
     worker->Create();
 }
 
-void AxManager::CheckForItemsToLoad()
+bool AxManager::CheckForItemsToLoad()
 {
     if (mLoadQueue.Size() < 1) {
-        return;
+        return false;
     }
-
 
     AxWorker* worker = FindWorkerThread();
 
+    // Even though there is no worker available, we still return true as there is an item in the queue.
     if (!worker) {
-        return;
+        return true;
     }
 
 
     AxQueueItem item;
     if (!mLoadQueue.PopIfAvailable(&item)) {
         // The load queue is currently in use(uploaded to), skip for now.
-        return;
+        return true;
     }
 
     // Set this to something small, but high enough that it won't cancel loading in a ton of big models at once.
@@ -498,7 +502,7 @@ void AxManager::CheckForItemsToLoad()
         if (worker->bIsBusy.test()) {
             // Return to sender
             mLoadQueue.Push(std::move(item));
-            return;
+            return true;
         }
 
         // Set busy
@@ -509,19 +513,23 @@ void AxManager::CheckForItemsToLoad()
         // Submit the item we want to load
         worker->SubmitItemToLoad(std::move(item));
     }
+
+    return true;
 }
 
-void AxManager::CheckForItemsToDelete()
+bool AxManager::CheckForItemsToDelete()
 {
     SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
 
     if (queue->IsEmpty()) {
-        return;
+        return false;
     }
 
     if (queue->First().TryDelete(mTickCounter)) {
         queue->Pop();
     }
+
+    return true;
 }
 
 void AxManager::AssetManagerUpdate()
@@ -547,18 +555,48 @@ void AxManager::AssetManagerUpdate()
         // }
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
-        // ManagerUpdateNotifier.WaitAndReset();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        if (mbShouldSleep) {
+            ManagerUpdateNotifier.Wait();
+            mbShouldSleep = false;
+        }
+        else {
+            ManagerUpdateNotifier.Discard();
+        }
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         if (!mbActive.test()) {
             break;
         }
 
-        CheckForUploadableData();
-        CheckForItemsToDelete();
-        CheckForItemsToLoad();
 
-        mTickCounter.fetch_add(1);
+        const bool has_upload_data = CheckForUploadableData();
+        const bool has_delete_data = CheckForItemsToDelete();
+        const bool has_load_data = CheckForItemsToLoad();
+
+        uint32 tick = mTickCounter.fetch_add(1);
+
+        if (has_upload_data || has_delete_data || has_load_data) {
+            mbIsTimeSet = false;
+            continue;
+        }
+
+        { // Throttle back if there is nothing to do
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+            if (!mbIsTimeSet) {
+                mbIsTimeSet = true;
+                mLastActiveTime = std::chrono::system_clock::now();
+            }
+        }
+
+        std::chrono::system_clock::duration time_since_active = std::chrono::system_clock::now() - mLastActiveTime;
+
+        if (time_since_active >= scTimeUntilSleep) {
+            mbShouldSleep = true;
+            LogInfo("Sleeping asset manager...");
+        }
     }
 }
 

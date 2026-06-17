@@ -3,89 +3,68 @@
 #include <condition_variable>
 #include <mutex>
 
+namespace fx {
+
 class DataNotifier
 {
 public:
     DataNotifier() = default;
 
-    void Signal()
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
+    /**
+     * @brief Signals the waiter that it can continue.
+     */
+    void Signal();
 
-        if (mKilled) {
-            return;
-        }
+    /**
+     * @brief Waits to receive a signal.
+     * @param pass_if_already_done Does not wait if the notifier is already signalled.
+     */
+    void Wait(bool pass_if_already_done = false);
+    void WaitAndReset();
 
-        mDone = true;
+    void Reset();
+    void Kill();
 
-
-        // Notify the other thread
-        mCV.notify_one();
-    }
-
-    void Wait(bool pass_if_already_done = false)
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-
-        if (pass_if_already_done && mDone) {
-            return;
-        }
-
-        mCV.wait(lock, [this] { return mDone; });
-    }
-
-    void WaitAndReset()
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-
-        if (mDone) {
-            mKilled = false;
-            mDone = false;
-            return;
-        }
-
-        mCV.wait(lock, [this] { return mDone; });
-
-        mKilled = false;
-        mDone = false;
-    }
-
-    bool IsDone()
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-        return mDone;
-    }
-
-    void Reset()
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-
-        mKilled = false;
-        mDone = false;
-    }
-
-    bool IsKilled()
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-
-        return mKilled;
-    }
-
-    void Kill()
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-
-        mKilled = true;
-        mDone = true;
-
-        mCV.notify_one();
-    }
+    bool IsKilled() const;
+    bool IsSignalled() const;
 
 
 private:
-    bool mDone = false;
-    bool mKilled = false;
+    bool mbIsSignalled = false;
+    bool mbIsKilled = false;
 
     std::condition_variable mCV;
-    std::mutex mMutex;
+    mutable std::mutex mMutex;
 };
+
+
+class CountedNotifier
+{
+public:
+    CountedNotifier() = default;
+
+    /**
+     * @brief Signals the waiter that it can continue.
+     */
+    void Signal();
+    void Wait();
+    void Discard();
+
+    void Kill();
+    void Reset();
+
+    bool IsKilled() const;
+    int GetSignalCount() const;
+
+
+private:
+    bool mbIsKilled = false;
+
+    int mNumberOfSignals = 0;
+
+    std::condition_variable mCV;
+    mutable std::mutex mMutex;
+};
+
+
+} // namespace fx

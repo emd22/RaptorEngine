@@ -48,7 +48,7 @@ public:
     /**
      * Constructs a new Ref from a pointer and a pre-allocated ref count.
      */
-    Ref(T* ptr, RefCount* cnt, bool is_combined_allocation = false)
+    Ref(T* RESTRICT ptr, RefCount* RESTRICT cnt, bool is_combined_allocation = false)
         : mpRefCnt(cnt), mpPtr(ptr), mbIsCombinedAllocation(is_combined_allocation), mbIsExternalPtr(true)
     {
 #ifdef FX_DEBUG_REF

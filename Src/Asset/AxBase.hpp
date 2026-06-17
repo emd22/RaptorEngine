@@ -31,7 +31,7 @@ public:
 
     virtual void WaitUntilLoaded()
     {
-        if (IsFinishedNotifier.IsDone()) {
+        if (IsFinishedNotifier.IsSignalled()) {
             return;
         }
 
@@ -56,7 +56,7 @@ public:
     {
         std::lock_guard guard(mCallbackMutex);
         // If the asset has already been loaded, call the callback immediately.
-        if (IsFinishedNotifier.IsDone()) {
+        if (IsFinishedNotifier.IsSignalled()) {
             on_loaded_callback(this);
             return;
         }
@@ -66,7 +66,7 @@ public:
 
     void OnError(const OnErrorFunc& on_error_callback)
     {
-        if (IsFinishedNotifier.IsDone()) {
+        if (IsFinishedNotifier.IsSignalled()) {
             // on_error_callback(this);
             return;
         }

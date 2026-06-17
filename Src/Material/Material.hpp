@@ -94,7 +94,6 @@ private:
                 pAssetImage = AssetManagerFwd::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
             }
             else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
-                LogInfo(LC_ASSET, "LOADING IMAGE FROM PIXELS **");
                 pAssetImage = AssetManagerFwd::LoadImageFromPixels(ImageToUpload);
             }
 
