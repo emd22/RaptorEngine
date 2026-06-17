@@ -56,7 +56,9 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
 
-    script::FoxScript fs("./Scripts/GlobalTest.fox");
+    script::FoxScript fs;
+    fs.Load("./Scripts/GlobalTest.fox");
+
     script::FoxSymbol* sym = fs.GetSymbol("Default");
     if (!sym) {
         LogError("Cannot find symbol!");

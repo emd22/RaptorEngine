@@ -97,12 +97,16 @@ private:
     void DoVariable(uint8 op_base, uint8 op_spec);
     void DoCompare(uint8 op_base, uint8 op_spec);
 
-    VMVariable& GetVar(uint16 index) { return pVariables[index + VariableBaseIndex]; }
+    void PushVarCount();
+    void IncVarCount();
+    void PopVarCount();
+
+    VMVariable& GetVar(uint16 index);
 
     void CallExternalFunction(Hash32 hashed_name);
 
-    void StashVariables();
-    void RevertVariables();
+    // void StashVariables();
+    // void RevertVariables();
 
     uint16 Read16();
     uint16 Read16Rev();

@@ -1,12 +1,25 @@
 globals()
 {
-global int SC_HELLO = 8;
+global int SC_Hello = 10;
+}
+
+ModifyGlobal()
+{
+    global int SC_Hello;
+    global int x = 2;
+    SC_Hello = x;
 }
 
 
 Default() int
 {
-    local int x = SC_HELLO;
+    globals();
+
+    global int SC_Hello;
+
+    ModifyGlobal();
+
+    local int x = SC_Hello;
 
     return x;
 }

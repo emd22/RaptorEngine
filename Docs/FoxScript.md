@@ -109,6 +109,16 @@ For example:
     global int SOME_GLOBAL; // Value is 2
 }
 
+// Globals are automatically hoisted if they are not defined in the current scope.
+{
+    local int using_globals = SOME_GLOBAL;
+
+    // Is the exact same as:
+
+    global int SOME_GLOBAL;
+    local int using_globals2 = SOME_GLOBAL;
+}
+
 {
     // Strings can also be defined, but they are immutable
     local str hello = "Hello, World";
@@ -123,6 +133,37 @@ For example:
     local float z = 1f;
 }
 
+```
+
+As you can see from the above example, global variables need to be brought into a local scope to be used.
+They can either be brought in implicitly, or defined explicitly. If there is no local `global [type] [name]` definition in the current scope but the value is requested, the bytecode compiler automatically outputs a `VGLOBAL` instruction to define it in local scope.
+
+Note that `global [type] [name]` is not a _reference_ to a global variable `[name]`. It creates a variable locally that contains the same value as `[name]`.
+
+This means that the order can matter.
+For example,
+
+```
+globals()
+{
+    global int SC_Global_Value;
+}
+
+ModifyGlobal()
+{
+    // Explicit hoisting
+    global int SC_GlobalValue;
+    SC_GlobalValue = 10;
+}
+
+TheIssue()
+{
+    // If we define the hoist explicitly, then we can use the unmodified value.
+    global int SC_GlobalValue;
+
+
+
+}
 ```
 
 Currently, the only builtin types are `int`, `float` and `str`.

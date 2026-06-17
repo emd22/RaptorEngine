@@ -79,7 +79,7 @@ void FoxScript::Load(const String& path)
 
     // If there is a globals function, call it
 
-    CallProc(GetSymbol("globals"), {});
+    // CallProc(GetSymbol("globals"), {});
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
@@ -102,7 +102,7 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
 
     Vm.PushReturnAddr(0);
 
-    Vm.ScopeIndex++;
+    ++Vm.ScopeIndex;
     Vm.PC = sym->Offset;
 
     for (uint32 arg_index = 0; arg_index < args.Size; arg_index++) {
@@ -146,6 +146,7 @@ FoxValue FoxScript::Resume()
         if (Vm.LastPushType == eFoxType::STRING) {
             return FoxValue(Vm.GetString(Vm.Pop32()));
         }
+
 
         return FoxValue::ValueFromRaw(Vm.LastPushType, Vm.Pop32());
     }
