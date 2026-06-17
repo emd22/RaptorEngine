@@ -105,6 +105,8 @@ void MaterialManager::MakeNullMaterial()
 
     material->bNearestFiltering = true;
 
+    material->bReadyToCheck.test_and_set();
+
     material->Build();
 
     LogInfo("Created null material (Id={})", material->GetID());

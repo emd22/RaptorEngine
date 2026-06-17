@@ -19,7 +19,7 @@ template <typename T>
 concept C_IsAsset = std::is_base_of_v<AxBase, T>;
 
 
-static constexpr uint32 scDeletionTickOffset = 1;
+static constexpr uint32 scDeletionTickOffset = 3;
 
 
 struct AssetDeletionTicket
@@ -287,8 +287,6 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, asset, TLoadType));
-
-        mgr->ItemsEnqueued.test_and_set();
         mgr->ManagerUpdateNotifier.Signal();
     }
 
@@ -301,8 +299,6 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, asset, TLoadType, asset_data));
-
-        mgr->ItemsEnqueued.test_and_set();
         mgr->ManagerUpdateNotifier.Signal();
     }
 
@@ -316,8 +312,6 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, img_info));
-
-        mgr->ItemsEnqueued.test_and_set();
         mgr->ManagerUpdateNotifier.Signal();
     }
 
@@ -332,7 +326,7 @@ private:
     std::atomic_flag mbActive;
 
     DataNotifier ManagerUpdateNotifier;
-    std::atomic_flag ItemsEnqueued;
+    // std::atomic_flag ItemsEnqueued;
 
     uint32 mMinThreads = 2;
     SizedArray<AxWorker> mWorkerThreads;

@@ -38,9 +38,9 @@ private:
     void LoadCubemapToLayeredImage();
 
 private:
-    int mWidth;
-    int mHeight;
-    int mChannels;
+    int mWidth = 0;
+    int mHeight = 0;
+    int mChannels = 0;
 
     uint32 mDataSize = 0;
     uint8* mImageData = nullptr;

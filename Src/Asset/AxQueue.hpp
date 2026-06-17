@@ -35,7 +35,12 @@ public:
         return true;
     }
 
-    uint32 Size() { return mQueue.size(); }
+    uint32 Size()
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+
+        return mQueue.size();
+    }
 
     void Destroy()
     {

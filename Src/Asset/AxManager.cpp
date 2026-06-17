@@ -351,13 +351,6 @@ void AxManager::CheckForUploadableData()
             else {
                 asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
             }
-            // if (worker->Item.bIsRawPixelData) {
-            //     AxQueueItem& item = worker->Item;
-            //     UploadImagePixels(asset_data->pAsset, item.ImgInfo, item.MipLevel, item.pcRawData, item.DataSize);
-            // }
-            // else {
-            // Load the resouce into GPU memory
-            // }
         }
     }
 
@@ -426,11 +419,9 @@ void AxManager::CheckForUploadableData()
             Panic("AssetManager", "Worker status is none!");
         }
 
-        ItemsEnqueued.clear();
-        worker->bIsBusy.clear();
-        worker->LoadStatus = AxLoaderBase::eStatus::None;
-
         worker->bDataPendingUpload.clear();
+        worker->LoadStatus = AxLoaderBase::eStatus::None;
+        worker->bIsBusy.clear();
     }
 }
 
@@ -458,30 +449,42 @@ void AxManager::AddWorkerThread()
 
 void AxManager::CheckForItemsToLoad()
 {
+    if (mLoadQueue.Size() < 1) {
+        return;
+    }
+
+
+    AxWorker* worker = FindWorkerThread();
+
+    if (!worker) {
+        return;
+    }
+
+
     AxQueueItem item;
     if (!mLoadQueue.PopIfAvailable(&item)) {
         // The load queue is currently in use(uploaded to), skip for now.
         return;
     }
 
-    AxWorker* worker = FindWorkerThread();
-
     // Set this to something small, but high enough that it won't cancel loading in a ton of big models at once.
-    int tries_remaining = 5;
+    int tries_remaining = 3;
 
     // No workers available, poll until one becomes available
     while (worker == nullptr) {
-        if (tries_remaining <= 0) {
-            LogError(LC_ASSET, "Could not find worker thread, skipping load of object...");
-            DebugPrintWorkers();
-            break;
-        }
+        // if (tries_remaining <= 0) {
+        //     LogError(LC_ASSET, "Could not find worker thread, skipping load of object...");
+        //     // DebugPrintWorkers();
+        //     mLoadQueue.Push(std::move(item));
+        //     ManagerUpdateNotifier.Signal();
+        //     return;
+        // }
 
         // AddWorkerThread();
 
         LogWarning(LC_ASSET, "Currently {} items are enqueued...", mLoadQueue.Size());
         LogError(LC_ASSET, "No workers available; Polling for worker thread...");
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
         // Check to see if any threads opened up
         worker = FindWorkerThread();
@@ -497,7 +500,9 @@ void AxManager::CheckForItemsToLoad()
         }
 
         // Set busy
-        worker->bIsBusy.test_and_set();
+        while (worker->bIsBusy.test_and_set()) {
+            worker->bIsBusy.wait(true);
+        }
 
         // Submit the item we want to load
         worker->SubmitItemToLoad(std::move(item));
@@ -521,36 +526,37 @@ void AxManager::AssetManagerUpdate()
 {
     uint32 num_uploads = 0;
     while (mbActive.test()) {
-        bool is_busy = CheckWorkersBusy();
+        // bool is_busy = CheckWorkersBusy();
 
         // If any of the workers are still marked as busy, there is data
         // either to be uploaded or is currently being loaded.
-        if (is_busy) {
-            // Loop while we are busy to check for when we are pending upload, as well
-            // as check for new arrivals.
-            while (CheckWorkersBusy() && mbActive.test()) {
-                // Check if there is data to be uploaded to the GPU
-                CheckForUploadableData();
+        // if (is_busy) {
+        //     // Loop while we are busy to check for when we are pending upload, as well
+        //     // as check for new arrivals.
+        //     while (CheckWorkersBusy() && mbActive.test()) {
+        //         // Check if there is data to be uploaded to the GPU
+        //         CheckForUploadableData();
 
-                // Check if there are any items that can be loaded by a worker
-                CheckForItemsToLoad();
+        //         // Check if there are any items that can be loaded by a worker
+        //         CheckForItemsToLoad();
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(80));
-            }
-        }
+        //         std::this_thread::sleep_for(std::chrono::milliseconds(80));
+        //     }
+        // }
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
-        ManagerUpdateNotifier.WaitAndReset();
+        // ManagerUpdateNotifier.WaitAndReset();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         if (!mbActive.test()) {
             break;
         }
 
+        CheckForUploadableData();
         CheckForItemsToDelete();
+        CheckForItemsToLoad();
 
         mTickCounter.fetch_add(1);
-
-        CheckForItemsToLoad();
     }
 }
 
@@ -558,12 +564,13 @@ AxWorker* AxManager::FindWorkerThread()
 {
     uint32 worker_id = 0;
     for (AxWorker& worker : mWorkerThreads) {
-        ++worker_id;
         if (!worker.bIsBusy.test()) {
             LogInfo(LC_ASSET, "Found worker (id={})", worker_id);
             return &worker;
         }
+        ++worker_id;
     }
+
     LogInfo(LC_ASSET, "Did not find any open worker!");
 
     return nullptr;

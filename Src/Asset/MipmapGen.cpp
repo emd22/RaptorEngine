@@ -28,10 +28,10 @@ struct MipHeader
 void MipmapGen::GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
 {
     DataPack dp;
-    GenerateMip(dp, format, pixels, size, 0);
+    // GenerateMip(dp, format, pixels, size, 0);
     GenerateMip(dp, format, pixels, size, 1);
-    GenerateMip(dp, format, pixels, size, 2);
-    GenerateMip(dp, format, pixels, size, 4);
+    // GenerateMip(dp, format, pixels, size, 2);
+    // GenerateMip(dp, format, pixels, size, 4);
     dp.WriteToFile(path);
 }
 

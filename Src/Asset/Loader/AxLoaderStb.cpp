@@ -40,6 +40,9 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
     const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
     Assert(pixel_size > 0);
 
+    Assert(data != nullptr);
+    Assert(size > 0);
+
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         LogError(LC_ASSET, "Could not retrieve info from image in memory! (Size={})", size);
         return AxLoaderStb::eStatus::Error;

@@ -59,11 +59,9 @@ public:
             return;
         }
 
-        while (af.test()) {
+        while (af.test_and_set()) {
             af.wait(true);
         }
-
-        af.test_and_set();
 
         mbIsLocked = true;
     }

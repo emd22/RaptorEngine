@@ -30,6 +30,10 @@ using namespace renderer;
 
 bool Material::IsReady()
 {
+    if (!bReadyToCheck.test()) {
+        return false;
+    }
+
     if (mbIsReady) {
         return true;
     }

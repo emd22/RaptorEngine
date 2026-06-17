@@ -151,21 +151,21 @@ static String GetTextureCachePath(const String& asset_path, Material* material, 
 
 static void GenerateMipmapImage(const String& output_path, eImageFormat format, const uint8* data, uint32 size)
 {
-    AxLoaderStb loader;
-    loader.ImageType = eImageType::Flat;
-    loader.ImageFormat = format;
-    loader.CreationFlags = eImageCreateFlags::None;
+    // TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
+    // loader->ImageType = eImageType::Flat;
+    // loader->ImageFormat = format;
+    // loader->CreationFlags = eImageCreateFlags::None;
 
-    TSRef<AxImage> image = TSRef<AxImage>::New();
-    AxLoaderStb::eStatus status = loader.LoadFromMemory(image, data, size);
+    // TSRef<AxImage> image = TSRef<AxImage>::New();
+    // AxLoaderStb::eStatus status = loader->LoadFromMemory(image, data, size);
 
-    if (status != AxLoaderStb::eStatus::Success) {
-        LogError("Error loading material texture!");
-        return;
-    }
+    // if (status != AxLoaderStb::eStatus::Success) {
+    //     LogError("Error loading material texture!");
+    //     return;
+    // }
 
-    MipmapGen mm {};
-    mm.GenerateMipmaps(output_path.CStr(), format, loader.GetImageData(), loader.GetImageSize());
+    // MipmapGen mm {};
+    // mm.GenerateMipmaps(output_path.CStr(), format, loader.GetImageData(), loader.GetImageSize());
 
     // loader.InvalidateImageData();
 }
@@ -212,11 +212,9 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     component.UploadSrc = eMaterialComponentUploadSrc::ProcessAndUpload;
     component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 
-    component.MarkReadyToCheck();
-
-    // if (!texture_cache_exists || true) {
-    //     GenerateMipmapImage(tex_cache_path, TFormat, mip_buffer, image_buffer_size);
-    // }
+    if (!texture_cache_exists || true) {
+        GenerateMipmapImage(tex_cache_path, TFormat, mip_buffer, image_buffer_size);
+    }
 }
 
 void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive, int32 primitive_index)
@@ -271,6 +269,7 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
     }
 
     material->SetDefaultPipeline();
+    material->bReadyToCheck.test_and_set();
 }
 
 void AxLoaderGltf::BuildObjectsFromPrimitives(TSRef<Object>& container_object, cgltf_mesh* gltf_mesh)
