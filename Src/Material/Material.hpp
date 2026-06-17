@@ -50,7 +50,7 @@ public:
     MaterialComponent::Status Build()
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
-        if ((!pAssetImage && (!pDataToLoad && !ImageToUpload.ImageData.pData))) {
+        if (!pAssetImage.IsValid() && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
             // pAssetImage = AxImage::GetEmptyImage<TFormat>();
             return Status::MissingComponent;
         }
@@ -94,6 +94,7 @@ private:
                 pAssetImage = AssetManagerFwd::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
             }
             else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
+                LogInfo(LC_ASSET, "LOADING IMAGE FROM PIXELS **");
                 pAssetImage = AssetManagerFwd::LoadImageFromPixels(ImageToUpload);
             }
 

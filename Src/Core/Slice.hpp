@@ -87,6 +87,12 @@ public:
         return pData[index];
     }
 
+    FX_FORCE_INLINE void SetNull()
+    {
+        pData = nullptr;
+        Size = 0;
+    }
+
     FX_FORCE_INLINE uint32 GetSizeInBytes() const { return sizeof(T) * Size; }
 };
 

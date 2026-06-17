@@ -154,6 +154,13 @@ void Material::Destroy()
 //     return true;
 // }
 
+#define BUILD_REQUIRED_MATERIAL_COMPONENT(component_)                                                                  \
+    {                                                                                                                  \
+        if (component_.Build() != eMaterialComponentStatus::Ready) {                                                   \
+            return;                                                                                                    \
+        }                                                                                                              \
+    }
+
 
 #define BUILD_MATERIAL_COMPONENT(component_)                                                                           \
     {                                                                                                                  \
@@ -192,6 +199,11 @@ void Material::SetPipeline(renderer::ePipelineName pl_name)
 
 void Material::Build()
 {
+    // Build components
+    BUILD_REQUIRED_MATERIAL_COMPONENT(Diffuse);
+    BUILD_MATERIAL_COMPONENT(NormalMap);
+    BUILD_MATERIAL_COMPONENT(MetallicRoughness);
+
     if (!mDsDefault.IsInited()) {
         VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
 
@@ -202,10 +214,6 @@ void Material::Build()
         mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
     }
 
-    // Build components
-    BUILD_MATERIAL_COMPONENT(Diffuse);
-    BUILD_MATERIAL_COMPONENT(NormalMap);
-    BUILD_MATERIAL_COMPONENT(MetallicRoughness);
 
     // Fill material descriptor
 
@@ -213,6 +221,8 @@ void Material::Build()
     if (bNearestFiltering) {
         diffuse_sampler = &gRenderer->Swapchain.ColorSamplerNearest;
     }
+
+    AssertMsg(Diffuse.pAssetImage.IsValid(), "Diffuse texture must be valid");
 
     mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, diffuse_sampler);
 

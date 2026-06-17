@@ -137,8 +137,8 @@ struct AxQueueItem
         item.Data.pLoader = nullptr;
         item.Data.pAsset = asset;
 
-        item.pcRawData = nullptr;
         item.AssetType = type;
+        item.pcRawData = nullptr;
         item.ImgInfo = img_info;
         item.AssetLoadOp = eAssetLoadOp::DirectUpload;
 
@@ -161,6 +161,7 @@ struct AxQueueItem
 
         other.pcRawData = nullptr;
         other.DataSize = 0;
+        other.ImgInfo.ImageData.SetNull();
 
         mMutex.unlock();
 

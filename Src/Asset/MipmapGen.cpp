@@ -187,6 +187,8 @@ ImageInfo MipmapLoader::GetMip(uint32 mip_level)
 
     DataPackEntry* mip_entry = Pack.GetEntry(mip_level, true);
 
+    LogInfo("Mip (DataOffset={}, DataSize={})", mip_entry->DataOffset, mip_entry->DataSize);
+
     MipHeader* header = M_HEADER_PTR(mip_entry->Data.pData);
     uint8* image_data = M_DATA_PTR(mip_entry->Data.pData);
     uint32 image_size = M_DATA_SIZE(mip_entry->Data);

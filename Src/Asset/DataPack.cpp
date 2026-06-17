@@ -99,11 +99,7 @@ bool DataPack::BinaryReadHeader()
         uint32 size;
         File.Read<uint32>(MakeSlice(&size, 1));
 
-
-        SizedArray<uint8> data;
-        data.InitSize(size);
-
-        DataPackEntry entry { id, std::move(data), offset, size };
+        DataPackEntry entry { id, SizedArray<uint8>::CreateEmpty(), offset, size };
         Entries.Insert(std::move(entry));
     }
 

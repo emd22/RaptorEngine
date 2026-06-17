@@ -348,7 +348,7 @@ void AxManager::CheckForUploadableData()
             if (worker->Item.AssetLoadOp == eAssetLoadOp::DirectUpload) {
                 DoDirectUpload(worker->Item, asset_data.Get());
             }
-            else {
+            else if (asset_data->pLoader.IsValid()) {
                 asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
             }
         }
@@ -403,8 +403,10 @@ void AxManager::CheckForUploadableData()
             asset_data->pAsset->IsFinishedNotifier.Signal();
             asset_data->pAsset->mIsLoaded.store(true);
 
-            // Destroy the loader(clearing the loading buffers)
-            asset_data->pLoader->Destroy(asset_data->pAsset);
+            if (asset_data->pLoader.IsValid()) {
+                // Destroy the loader(clearing the loading buffers)
+                asset_data->pLoader->Destroy(asset_data->pAsset);
+            }
         }
         else if (worker->LoadStatus == AxLoaderBase::eStatus::Error) {
             asset_data->pAsset->IsFinishedNotifier.Signal();
