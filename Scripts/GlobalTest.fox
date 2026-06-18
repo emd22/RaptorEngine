@@ -1,14 +1,19 @@
 #include "Scripts/time"
 
-globals()
+init()
 {
-    global int SC_TurnRadius = 10;
 }
 
 
-Default() int
+addvalues(str x) str
+{
+    return x;
+}
+
+
+
+Default() str
 {
 
-
-    return SC_TurnRadius;
+    return addvalues("Hello");
 }

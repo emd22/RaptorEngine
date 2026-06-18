@@ -79,8 +79,8 @@ void FoxScript::Load(const String& path)
     FoxAstDestroyer destroyer;
     destroyer.Do(root_node);
 
-    // If there is a globals function, call it
-    CallProc(GetSymbol("globals"), {});
+    // If there is an init function, call it
+    CallProc(GetSymbol("init"), {});
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }

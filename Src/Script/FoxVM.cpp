@@ -552,7 +552,8 @@ void FoxVM::DoMove(uint8 op_base, uint8 op_spec_raw) {}
 
 void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
 {
-    if (op_spec == BcSpecVariable_Set_Int32) {
+    switch (op_spec) {
+    case BcSpecVariable_Set_Int32: {
         uint16 var_index = Read16();
         uint32 value = Read32();
         LogInfo("VSET [int32] ${}, {}", var_index, value);
@@ -565,8 +566,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         if (var.bIsGlobalRef) {
             GetGlobal(var).Set<int32>(value);
         }
-    }
-    else if (op_spec == BcSpecVariable_Set_Float32) {
+    } break;
+
+    case BcSpecVariable_Set_Float32: {
         uint16 var_index = Read16();
         float32 value = std::bit_cast<float32>(Read32());
         LogInfo("VSET [float32] ${}, {}", var_index, value);
@@ -578,8 +580,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         if (var.bIsGlobalRef) {
             GetGlobal(var).Set<float32>(value);
         }
-    }
-    else if (op_spec == BcSpecVariable_Set_String) {
+    } break;
+
+    case BcSpecVariable_Set_String: {
         uint16 var_index = Read16();
         uint32 string_offset = Read32();
 
@@ -590,8 +593,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         if (var.bIsGlobalRef) {
             GetGlobal(var).Set<int32>(string_offset);
         }
-    }
-    else if (op_spec == BcSpecVariable_Set_Var) {
+    } break;
+
+    case BcSpecVariable_Set_Var: {
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
@@ -603,16 +607,17 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         else {
             GetVar(dst_index).Value = GetVar(src_index).Value;
         }
-    }
-    else if (op_spec == BcSpecVariable_Define) {
+    } break;
+
+    case BcSpecVariable_Define: {
         uint16 var_index = Read16();
 
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = false;
         var.Value.Set<int32>(0);
-    }
+    } break;
 
-    else if (op_spec == BcSpecVariable_DefineGlobal) {
+    case BcSpecVariable_DefineGlobal: {
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
 
@@ -625,14 +630,33 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         var.bIsGlobalRef = true;
         var.GlobalNameHash = name_hash;
         var.Value.Set<int32>(Globals[name_hash].Get<int32>());
-    }
-    else if (op_spec == BcSpecVariable_Cast_Int32) {
+    } break;
+
+    case BcSpecVariable_Cast_Int32: {
         float32 fvalue = std::bit_cast<float32>(Pop32());
         Push32(eFoxType::INT, std::bit_cast<uint32>(static_cast<int32>(fvalue)));
-    }
-    else if (op_spec == BcSpecVariable_Cast_Float32) {
+    } break;
+
+    case BcSpecVariable_Cast_Float32: {
         int32 ivalue = std::bit_cast<int32>(Pop32());
         Push32(eFoxType::FLOAT, std::bit_cast<uint32>(static_cast<float>(ivalue)));
+    } break;
+
+
+    case BcSpecVariable_DefineFetchParam_String:
+        [[fallthrough]];
+    case BcSpecVariable_DefineFetchParam_Int32: {
+        uint16 var_index = Read16();
+        VMVariable& var = GetVar(var_index);
+        var.bIsGlobalRef = false;
+        var.Value.Set<int32>(Pop32());
+    } break;
+    case BcSpecVariable_DefineFetchParam_Float32: {
+        uint16 var_index = Read16();
+        VMVariable& var = GetVar(var_index);
+        var.bIsGlobalRef = false;
+        var.Value.Set<float32>(Pop32());
+    } break;
     }
 }
 

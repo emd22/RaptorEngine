@@ -1,1 +1,4 @@
-seconds(int _v)int{return _v*10;}
+seconds(float x) int
+{
+    return castint(x * 10f);
+}

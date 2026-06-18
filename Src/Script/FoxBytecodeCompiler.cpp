@@ -562,6 +562,28 @@ void FoxBytecodeCompiler::EmitVariableDefine(uint16 var_index, Hash32 name_hash,
     }
 }
 
+void FoxBytecodeCompiler::EmitVariableDefineFetchParam(eFoxType type, uint16 var_index)
+{
+    BcSpecVariable spec;
+
+    switch (type) {
+    case eFoxType::INT:
+        spec = BcSpecVariable_DefineFetchParam_Int32;
+        break;
+    case eFoxType::FLOAT:
+        spec = BcSpecVariable_DefineFetchParam_Float32;
+        break;
+    case eFoxType::STRING:
+        spec = BcSpecVariable_DefineFetchParam_String;
+        break;
+    default:
+        spec = BcSpecVariable_DefineFetchParam_Int32;
+    }
+
+    WriteOp(BcBase_Variable, spec);
+    Write16(var_index);
+}
+
 
 void FoxBytecodeCompiler::EmitVariableIndex(uint16 var_index) { Write16(var_index); }
 
@@ -834,7 +856,12 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
     eFoxType var_type = FoxStringToType(decl->pTypeToken);
     const uint16 size_of_type = GetSizeOfType(decl->pTypeToken);
 
-    EmitVariableDefine(mVariableIndex, decl->pNameToken->GetHash(), decl->bDefineAsGlobal);
+    if (mode == VarDeclareMode::DECLARE_PARAMETER) {
+        EmitVariableDefineFetchParam(var_type, mVariableIndex);
+    }
+    else {
+        EmitVariableDefine(mVariableIndex, decl->pNameToken->GetHash(), decl->bDefineAsGlobal);
+    }
 
     FoxBytecodeVarHandle handle {
         .HashedName = decl_hash,
@@ -859,7 +886,7 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
         return nullptr;
     }
 
-    if (mode == DO_NOT_ALLOW_ASSIGNMENT) {
+    if (mode == VarDeclareMode::DO_NOT_ALLOW_ASSIGNMENT || mode == VarDeclareMode::DECLARE_PARAMETER) {
         return var_handle;
     }
 
@@ -1065,7 +1092,7 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DefineParam(FoxAstNode* param_decl_no
     FoxAstVarDecl* var_decl_node = static_cast<FoxAstVarDecl*>(param_decl_node);
 
     // Emit variable without emitting pushes or pops
-    FoxBytecodeVarHandle* handle = DoVarDeclare(var_decl_node, DO_NOT_ALLOW_ASSIGNMENT);
+    FoxBytecodeVarHandle* handle = DoVarDeclare(var_decl_node, VarDeclareMode::DECLARE_PARAMETER);
 
     if (!handle) {
         CompileError("DefineParam: Could not define and fetch param!");
@@ -1192,9 +1219,9 @@ void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
             DefineParam(param_decl_node);
         }
         // Pop values into parameter variables in reverse order
-        for (parameter_index = 0; parameter_index < num_parameters; parameter_index++) {
-            EmitPopVar(parameter_index);
-        }
+        // for (parameter_index = 0; parameter_index < num_parameters; parameter_index++) {
+        //     EmitPopVar(parameter_index);
+        // }
 
         EmitBlock(function->pBlock, num_parameters, true);
 
@@ -1542,17 +1569,21 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
 {
     char string_buffer[256];
 
-    if (op_spec == BcSpecVariable_Set_Int32) {
+    switch (op_spec) {
+    case BcSpecVariable_Set_Int32: {
         uint16 var_index = Read16();
         uint32 value = Read32();
         BC_PRINT_OP("VSET [int32] ${}, {}", var_index, value);
-    }
-    else if (op_spec == BcSpecVariable_Set_Float32) {
+    } break;
+
+    case BcSpecVariable_Set_Float32: {
         uint16 var_index = Read16();
         float32 value = std::bit_cast<float32>(Read32());
         BC_PRINT_OP("VSET [float32] ${}, {:f}", var_index, value);
-    }
-    else if (op_spec == BcSpecVariable_Set_String) {
+
+    } break;
+
+    case BcSpecVariable_Set_String: {
         uint16 var_index = Read16();
         uint32 value = Read32();
 
@@ -1560,39 +1591,60 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
         mBytecodeIndex = mStringTableOffset;
         BC_PRINT_OP("VSET [str] ${}, \"{}\"", var_index, ReadString(string_buffer, 256, false));
         mBytecodeIndex = old_index;
-    }
-    else if (op_spec == BcSpecVariable_Set_Var) {
+    } break;
+
+    case BcSpecVariable_Set_Var: {
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
         BC_PRINT_OP("VSET ${}, ${}", dst_index, src_index);
-    }
-    else if (op_spec == BcSpecVariable_Define) {
+    } break;
+
+    case BcSpecVariable_Define: {
         uint16 var_index = Read16();
         BC_PRINT_OP("VDEFINE ${}", var_index);
-    }
-    else if (op_spec == BcSpecVariable_Define_Float32) {
+    } break;
+
+    case BcSpecVariable_Define_Float32: {
         uint16 var_index = Read16();
         BC_PRINT_OP("VDEFINEF [float32] ${}", var_index);
-    }
+    } break;
 
-    else if (op_spec == BcSpecVariable_DefineGlobal) {
+    case BcSpecVariable_DefineGlobal: {
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
         BC_PRINT_OP("VGLOBAL ${} AS {}", var_index, name_hash);
-    }
-    else if (op_spec == BcSpecVariable_DefineGlobal_Float32) {
+    } break;
+
+    case BcSpecVariable_DefineGlobal_Float32: {
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
         BC_PRINT_OP("VGLOBALF [float32] ${} AS {}", var_index, name_hash);
-    }
+    } break;
 
-    else if (op_spec == BcSpecVariable_Cast_Int32) {
+
+    case BcSpecVariable_DefineFetchParam_Int32: {
+        uint16 var_index = Read16();
+        BC_PRINT_OP("VPARAM [int32] ${}", var_index);
+    } break;
+
+    case BcSpecVariable_DefineFetchParam_Float32: {
+        uint16 var_index = Read16();
+        BC_PRINT_OP("VPARAMF [float32] ${}", var_index);
+    } break;
+
+    case BcSpecVariable_DefineFetchParam_String: {
+        uint16 var_index = Read16();
+        BC_PRINT_OP("VPARAMS [str] ${}", var_index);
+    } break;
+
+    case BcSpecVariable_Cast_Int32:
         BC_PRINT_OP("VCAST [int32]");
-    }
+        break;
 
-    else if (op_spec == BcSpecVariable_Cast_Float32) {
+    case BcSpecVariable_Cast_Float32:
         BC_PRINT_OP("VCASTF [float32]");
+        break;
     }
 }
 

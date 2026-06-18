@@ -64,6 +64,7 @@ public:
     {
         DECLARE_DEFAULT,
         DO_NOT_ALLOW_ASSIGNMENT,
+        DECLARE_PARAMETER,
     };
 
 public:
@@ -145,6 +146,8 @@ private:
 
     void EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global);
     void EmitVariableIndex(uint16 var_index);
+
+    void EmitVariableDefineFetchParam(eFoxType type, uint16 var_index);
 
     void EmitVariableGlobalHoist(FoxBytecodeVarHandle* handle, Hash32 name_hash);
 
