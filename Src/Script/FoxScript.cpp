@@ -39,6 +39,7 @@ void FoxScript::Load(const String& path)
     Slice<char> file_data = fp.Read<char>();
 
     Tokenizer tokenizer(file_data.pData, file_data.Size);
+    tokenizer.SetFileExtension(".fox");
     tokenizer.Tokenize();
 
     for (const Token& token : tokenizer.TokenBuffer) {

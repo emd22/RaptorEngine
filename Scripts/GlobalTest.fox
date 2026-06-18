@@ -1,4 +1,4 @@
-
+#include "Scripts/time"
 
 Add(int x, int y) int
 {

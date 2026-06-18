@@ -1,1 +1,1 @@
-
+seconds(int __v){return __v*10;}

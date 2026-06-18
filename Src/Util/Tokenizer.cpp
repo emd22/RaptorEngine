@@ -318,10 +318,10 @@ void Tokenizer::IncludeFile(const char* path)
 {
     Path vpath(path);
 
-    // If there is no extension on the file, add .fox
+    // If there is no extension on the file, add an expected extension
     if (!vpath.HasExtension()) {
         String* basename = vpath.BaseName();
-        (*basename) += ".fox";
+        (*basename) += mpExpectedFileExtension;
     }
 
     File file(path, File::eModType::Read, File::eDataType::Binary);

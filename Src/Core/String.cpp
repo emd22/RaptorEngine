@@ -220,7 +220,7 @@ uint32 String::FindPrev(uint32 skip, char ch) const
     char cur = 0;
 
 
-    for (uint32 i = real_length - skip; (cur = pstr[i]); i--) {
+    for (uint32 i = real_length - skip; i > 0 && (cur = pstr[i]); i--) {
         if (cur == ch) {
             return i;
         }

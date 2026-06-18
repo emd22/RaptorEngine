@@ -193,6 +193,7 @@ void ConfigFile::Load(const std::string& path)
     Slice<char> file_buffer = file.Read<char>();
 
     Tokenizer tokenizer(file_buffer.pData, file_buffer.Size);
+    tokenizer.SetFileExtension(".conf");
     tokenizer.IncludeFile(FX_BASE_DIR "/Config/Internal/Constants.conf");
     tokenizer.Tokenize();
 

@@ -207,6 +207,8 @@ public:
 
     void Tokenize();
 
+    void SetFileExtension(const char* ext) { mpExpectedFileExtension = ext; }
+
     void SetDataPtr(char* ptr)
     {
         mpDataStart = ptr;
@@ -267,6 +269,8 @@ public:
     PagedArray<char*> DataPtrs;
 
 private:
+    const char* mpExpectedFileExtension = "";
+
     State mSavedState;
 
     char* mpDataStart = nullptr;
