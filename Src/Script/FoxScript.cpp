@@ -80,7 +80,7 @@ void FoxScript::Load(const String& path)
     destroyer.Do(root_node);
 
     // If there is an init function, call it
-    // CallProc(GetSymbol("init"), {});
+    CallProc(GetSymbol("init"), {});
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }

@@ -353,11 +353,12 @@ eFoxType FoxBytecodeCompiler::EmitPushUnderlyingValue(FoxAstNode* node, eFoxPush
             // If the variable is not defined in scope, we should check to see if its a global.
             // Globals need to be hoisted up to the current scope.
 
-            FoxBytecodeVarHandle* local_handle = FindVarHandle(ref->GetNameHash());
+            // This is the "local" handle.
+            FoxBytecodeVarHandle* handle = FindVarHandle(ref->GetNameHash());
 
             // If the variable is not defined locally but there is a global entry for the variable, use that and hoist
             // the variable up to scope.
-            if (local_handle == nullptr) {
+            if (handle == nullptr) {
                 FoxBytecodeVarHandle* global_handle = FindGlobalHandle(ref->GetNameHash());
 
                 // This is not a global variable and is undefined.
@@ -368,28 +369,27 @@ eFoxType FoxBytecodeCompiler::EmitPushUnderlyingValue(FoxAstNode* node, eFoxPush
 
                 // A global handle does exist, hoist it up.
                 EmitVariableGlobalHoist(global_handle, ref->GetNameHash());
+
+                // We can get the information from the global handle now
+                handle = global_handle;
             }
+
+            // Get the reference variable index and push it to the stack.
+            if (mode == eFoxPushMode::PushPointer) {
+                EmitPushVarPtr(handle->VariableIndex);
+            }
+
+            // If the value is a pointer and we are not in the PushPointer mode, then we need to dereference it.
+            else if (handle->bIsPointer) {
+                EmitPushReadPtr(handle->VariableIndex);
+            }
+
+            // Push the normal variable index to the stack.
             else {
-                // Get the type of the variable
-                FoxBytecodeVarHandle* vhandle = FindVarHandle(literal->Value.pValueRef->pName->GetHash());
-
-                // Get the reference variable index and push it to the stack.
-                if (mode == eFoxPushMode::PushPointer) {
-                    EmitPushVarPtr(vhandle->VariableIndex);
-                }
-
-                // If the value is a pointer and we are not in the PushPointer mode, then we need to dereference it.
-                else if (vhandle->bIsPointer) {
-                    EmitPushReadPtr(vhandle->VariableIndex);
-                }
-
-                // Push the normal variable index to the stack.
-                else {
-                    EmitPushVar(vhandle->VariableIndex);
-                }
-
-                return vhandle->Type;
+                EmitPushVar(handle->VariableIndex);
             }
+
+            return handle->Type;
         }
         else if (literal->Value.Type == eFoxType::INT) {
             EmitPush32(literal->Value.ValueInt);
@@ -494,10 +494,6 @@ bool FoxBytecodeCompiler::IsUnderlyingVariableRef(FoxAstNode* node)
         }
 
         FoxAstVarRef* ref = literal->Value.pValueRef;
-
-        // If the variable is not defined in scope, we should check to see if its a global.
-        // Globals need to be hoisted up to the current scope.
-
         FoxBytecodeVarHandle* local_handle = FindVarHandle(ref->GetNameHash());
 
         // If the variable is not defined locally but there is a global entry for the variable, use that and hoist
@@ -942,19 +938,24 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
                          handle->Type);
         }
 
-        bool is_pointer = handle->bIsPointer;
+        bool modify_pointer_dst = handle->bIsPointer && handle->bIsPointerAssigned;
+
+        if (handle->bIsPointer && !handle->bIsPointerAssigned && literal->Value.Type != eFoxType::REF) {
+            CompileError("Attempting to assign '{}' to uninitialized pointer", literal->Value.Type);
+            return;
+        }
 
         switch (literal->Value.Type) {
         case eFoxType::NONETYPE:
             break;
         case eFoxType::INT:
-            EmitVariableSetInt32(handle->VariableIndex, literal->Value.ValueInt, is_pointer);
+            EmitVariableSetInt32(handle->VariableIndex, literal->Value.ValueInt, modify_pointer_dst);
             break;
         case eFoxType::FLOAT:
-            EmitVariableSetFloat32(handle->VariableIndex, literal->Value.ValueFloat, is_pointer);
+            EmitVariableSetFloat32(handle->VariableIndex, literal->Value.ValueFloat, modify_pointer_dst);
             break;
         case eFoxType::STRING:
-            EmitVariableSetString(handle->VariableIndex, is_pointer);
+            EmitVariableSetString(handle->VariableIndex, modify_pointer_dst);
             AddString(mBytecode.Size() - sizeof(uint32), literal->Value.ValueString);
             break;
         case eFoxType::REF: {
@@ -966,13 +967,15 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
             }
 
             // If the RHS is a pointer, we need to dereference it with VREADPTR.
-            if (rhs_handle->bIsPointer) {
+            if (rhs_handle->bIsPointer && rhs_handle->bIsPointerAssigned) {
                 EmitPushReadPtr(rhs_handle->VariableIndex);
                 EmitPopVar(handle->VariableIndex);
             }
             else {
-                EmitVariableSetVar(handle->VariableIndex, rhs_handle->VariableIndex, is_pointer);
+                EmitVariableSetVar(handle->VariableIndex, rhs_handle->VariableIndex, modify_pointer_dst);
             }
+
+            handle->bIsPointerAssigned = true;
 
         } break;
         }
@@ -1039,11 +1042,17 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
         .HashedName = decl_hash,
         .Type = var_type,
         .bIsPointer = decl->bIsPointer,
+        .bIsPointerAssigned = false,
         .Offset = 0,
         .ScopeIndex = mScopeIndex,
         .VariableIndex = mVariableIndex,
         .SizeOnStack = size_of_type,
     };
+
+    // Parameters will have an assigned pointer value.
+    if (mode == VarDeclareMode::DECLARE_PARAMETER) {
+        handle.bIsPointerAssigned = true;
+    }
 
     LocalVarHandles.Insert(handle);
     ++mVariableIndex;

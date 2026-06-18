@@ -14,7 +14,9 @@ struct FoxBytecodeVarHandle
 {
     Hash32 HashedName = HashNull32;
     eFoxType Type = eFoxType::INT;
+
     bool bIsPointer = false;
+    bool bIsPointerAssigned = false;
 
     int64 Offset = 0;
 

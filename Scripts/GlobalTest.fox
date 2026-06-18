@@ -4,24 +4,19 @@ init()
 {
 }
 
-
-fun() int
+some(&int x)
 {
-    local int z  = 10;
-
-    other();
-
-    return z;
+    x = 20;
 }
-
-
 
 
 Default() int
 {
-    local int test = 5;
+    local int z = 20;
+    local int x = 10;
 
-    local int z = fun();
+    local &int ref = x;
+    ref = 30;
 
-    return test + z;
+    return x;
 }
