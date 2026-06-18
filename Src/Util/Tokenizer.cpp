@@ -25,7 +25,7 @@ const char* Token::GetTypeName(eTokenType type)
 
         "Plus",       "Dollar",      "Minus",     "Asterisk",
 
-        "Question",
+        "Question",   "Ampersand",
 
         "Dot",        "Comma",       "Semicolon",
 
@@ -129,6 +129,8 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Dollar;
         case '*':
             return eTokenType::Asterisk;
+        case '&':
+            return eTokenType::Ampersand;
         case '.':
             return eTokenType::Dot;
         case ',':

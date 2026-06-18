@@ -99,6 +99,12 @@ VMVariable& FoxVM::GetVar(uint16 index)
     return pVariables[index + VariableBaseIndex];
 }
 
+VMVariable& FoxVM::GetVarAbsolute(uint16 index)
+{
+    Assert(index < 32);
+    return pVariables[index];
+}
+
 
 uint16 FoxVM::Read16()
 {
@@ -150,6 +156,7 @@ void FoxVM::Push32(eFoxType type, uint32 value)
     if (type != eFoxType::NONETYPE) {
         LastPushType = type;
     }
+
     StackPointer += sizeof(uint32);
 }
 
@@ -240,6 +247,11 @@ void FoxVM::DoPush(uint8 op_base, uint8 op_spec)
 
         VMVariable& var = GetVar(var_index);
         Push32(var.Value.Type, var.Value.Get<int32>());
+    }
+
+    else if (op_spec == BcSpecPush_VarPtr) {
+        uint16 var_index = Read16();
+        Push32(eFoxType::INT, static_cast<uint32>(var_index));
     }
 
     else if (op_spec == BcSpecPush_ReturnAddr) {
@@ -609,7 +621,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         }
     } break;
 
-    case BcSpecVariable_Define: {
+    case BcSpecVariable_Define_Int32: {
         uint16 var_index = Read16();
 
         VMVariable& var = GetVar(var_index);
@@ -617,7 +629,24 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         var.Value.Set<int32>(0);
     } break;
 
-    case BcSpecVariable_DefineGlobal: {
+    case BcSpecVariable_Define_Float32: {
+        uint16 var_index = Read16();
+
+        VMVariable& var = GetVar(var_index);
+        var.bIsGlobalRef = false;
+        var.Value.Set<int32>(0);
+    } break;
+
+    case BcSpecVariable_Define_String: {
+        uint16 var_index = Read16();
+
+        VMVariable& var = GetVar(var_index);
+        var.bIsGlobalRef = false;
+        var.Value.Set<int32>(0);
+    } break;
+
+
+    case BcSpecVariable_DefineGlobal_Int32: {
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
 
@@ -629,8 +658,44 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = true;
         var.GlobalNameHash = name_hash;
+        var.Type = eFoxType::INT;
         var.Value.Set<int32>(Globals[name_hash].Get<int32>());
     } break;
+
+
+    case BcSpecVariable_DefineGlobal_Float32: {
+        uint16 var_index = Read16();
+        Hash32 name_hash = Read32();
+
+        auto it = Globals.find(name_hash);
+        if (it == Globals.end()) {
+            Globals[name_hash].Set<int32>(0);
+        }
+
+        VMVariable& var = GetVar(var_index);
+        var.bIsGlobalRef = true;
+        var.GlobalNameHash = name_hash;
+        var.Type = eFoxType::FLOAT;
+        var.Value.Set<float32>(Globals[name_hash].Get<float32>());
+    } break;
+
+
+    case BcSpecVariable_DefineGlobal_String: {
+        uint16 var_index = Read16();
+        Hash32 name_hash = Read32();
+
+        auto it = Globals.find(name_hash);
+        if (it == Globals.end()) {
+            Globals[name_hash].Set<int32>(0);
+        }
+
+        VMVariable& var = GetVar(var_index);
+        var.bIsGlobalRef = true;
+        var.GlobalNameHash = name_hash;
+        var.Type = eFoxType::STRING;
+        var.Value.Set<int32>(Globals[name_hash].Get<int32>());
+    } break;
+
 
     case BcSpecVariable_Cast_Int32: {
         float32 fvalue = std::bit_cast<float32>(Pop32());
@@ -656,6 +721,65 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = false;
         var.Value.Set<float32>(Pop32());
+    } break;
+
+        /////////////////////////////////////
+        // Pointer instructions
+        /////////////////////////////////////
+
+    case BcSpecVariable_SetPtr_Int32: {
+        uint16 var_index = Read16();
+        uint32 value = Read32();
+        LogInfo("VSET [int32] ${}, {}", var_index, value);
+
+        VMVariable& var = GetVarAbsolute(var_index);
+        var.Value.Set<int32>(value);
+
+        // Update global variable
+        if (var.bIsGlobalRef) {
+            GetGlobal(var).Set<int32>(value);
+        }
+    } break;
+
+    case BcSpecVariable_SetPtr_Float32: {
+        uint16 var_index = Read16();
+        float32 value = std::bit_cast<float32>(Read32());
+        LogInfo("VSET [float32] ${}, {}", var_index, value);
+
+        VMVariable& var = GetVarAbsolute(var_index);
+        var.Value.Set<float32>(value);
+
+        // Update global variable
+        if (var.bIsGlobalRef) {
+            GetGlobal(var).Set<float32>(value);
+        }
+    } break;
+
+    case BcSpecVariable_SetPtr_String: {
+        uint16 var_index = Read16();
+        uint32 string_offset = Read32();
+
+        VMVariable& var = GetVarAbsolute(var_index);
+        var.Value.Set<int32>(string_offset);
+
+        // Update global variable
+        if (var.bIsGlobalRef) {
+            GetGlobal(var).Set<int32>(string_offset);
+        }
+    } break;
+
+    case BcSpecVariable_SetPtr_Var: {
+        VarIndex dst_index = Read16();
+        VarIndex src_index = Read16();
+
+        VMVariable& dst_var = GetVarAbsolute(dst_index);
+
+        if (dst_var.bIsGlobalRef) {
+            GetGlobal(dst_var) = GetVar(src_index).Value;
+        }
+        else {
+            dst_var.Value = GetVar(src_index).Value;
+        }
     } break;
     }
 }

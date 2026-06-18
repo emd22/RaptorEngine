@@ -4,16 +4,20 @@ init()
 {
 }
 
-
-addvalues(str x) str
+getvalue(&int x)
 {
-    return x;
+    local int z = 25;
+    x = 10;
 }
 
 
 
-Default() str
-{
 
-    return addvalues("Hello");
+Default() int
+{
+    local int test = 2;
+
+    getvalue(test);
+
+    return test;
 }

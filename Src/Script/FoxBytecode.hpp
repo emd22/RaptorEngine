@@ -34,6 +34,7 @@ enum BcSpecPush : uint8
     BcSpecPush_String,     // PUSHS [str]
     BcSpecPush_Var,        // VPUSH [%var]
     BcSpecPush_ReturnAddr, // PUSHRA
+    BcSpecPush_VarPtr,     // VPUSHPTR [%var]
 
     BcSpecPush_StackAlloc,
 };
@@ -124,17 +125,18 @@ enum BcSpecVariable : uint8
     BcSpecVariable_Set_Int32 = 1,
     BcSpecVariable_Set_Float32,
     BcSpecVariable_Set_String,
-
     BcSpecVariable_Set_Var,
 
     BcSpecVariable_Get_Int32,
     BcSpecVariable_Get_Float32,
 
-    BcSpecVariable_Define,
+    BcSpecVariable_Define_Int32,
     BcSpecVariable_Define_Float32,
+    BcSpecVariable_Define_String,
 
-    BcSpecVariable_DefineGlobal,
+    BcSpecVariable_DefineGlobal_Int32,
     BcSpecVariable_DefineGlobal_Float32,
+    BcSpecVariable_DefineGlobal_String,
 
     BcSpecVariable_DefineFetchParam_Int32,
     BcSpecVariable_DefineFetchParam_Float32,
@@ -142,6 +144,11 @@ enum BcSpecVariable : uint8
 
     BcSpecVariable_Cast_Int32,
     BcSpecVariable_Cast_Float32,
+
+    BcSpecVariable_SetPtr_Int32,
+    BcSpecVariable_SetPtr_Float32,
+    BcSpecVariable_SetPtr_String,
+    BcSpecVariable_SetPtr_Var,
 };
 
 } // namespace fx::script

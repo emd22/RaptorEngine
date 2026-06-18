@@ -188,11 +188,15 @@ FoxAstVarDecl* FoxParser::ParseVarDeclare(FoxScope* scope)
     if (scope == nullptr) {
         scope = mCurrentScope;
     }
+    FoxAstVarDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstVarDecl);
+
+    if (GetToken().Type == TT::Ampersand) {
+        node->bIsPointer = true;
+        EatToken(TT::Ampersand);
+    }
 
     Token& type = EatToken(TT::Identifier);
     Token& name = EatToken(TT::Identifier);
-
-    FoxAstVarDecl* node = FX_SCRIPT_ALLOC_NODE(FoxAstVarDecl);
 
     node->pNameToken = &name;
     node->pTypeToken = &type;
@@ -458,47 +462,6 @@ FoxAstAssign* FoxParser::TryParseAssignment(Token* var_name)
     node->pRhs = ParseRhs();
 
     return node;
-}
-
-void FoxParser::DefineExternalVar(const char* type, const char* name, const FoxValue& value)
-{
-    Token* name_token = FX_SCRIPT_ALLOC_MEMORY(Token, sizeof(Token));
-    Token* type_token = FX_SCRIPT_ALLOC_MEMORY(Token, sizeof(Token));
-
-    {
-        const uint32 type_len = strlen(type);
-
-        char* type_buffer = FX_SCRIPT_ALLOC_MEMORY(char, (type_len + 1));
-        std::strcpy(type_buffer, type);
-
-        type_token->Start = type_buffer;
-        type_token->Type = TT::Identifier;
-        type_token->Start[type_len] = 0;
-        type_token->Length = type_len + 1;
-    }
-
-    {
-        const uint32 name_len = strlen(name);
-
-        char* name_buffer = FX_SCRIPT_ALLOC_MEMORY(char, (name_len + 1));
-        std::strcpy(name_buffer, name);
-
-        name_token->Start = name_buffer;
-        name_token->Type = TT::Identifier;
-        name_token->Start[name_len] = 0;
-        name_token->Length = name_len + 1;
-    }
-
-    FoxScope* definition_scope = &mScopes[0];
-
-    FoxVar var(type_token, name_token, definition_scope, true);
-    var.Value = value;
-
-    definition_scope->Vars.Insert(var);
-
-    // To prevent the variable data from being deleted here.
-    var.Name = nullptr;
-    var.Type = nullptr;
 }
 
 

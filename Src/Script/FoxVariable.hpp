@@ -49,7 +49,8 @@ struct FoxVar : public FoxLabelledData
     Token* Type = nullptr;
     FoxValue Value;
 
-    bool IsExternal = false;
+    bool bIsPointer = false;
+
 
     void Print() const
     {
@@ -60,12 +61,11 @@ struct FoxVar : public FoxLabelledData
 
     FoxVar() {}
 
-    FoxVar(Token* type, Token* name, FoxScope* scope, bool is_external = false) : Type(type)
+    FoxVar(Token* type, Token* name, FoxScope* scope) : Type(type)
     {
         this->HashedName = name->GetHash();
         this->Name = name;
         this->Scope = scope;
-        IsExternal = is_external;
     }
 
     FoxVar(const FoxVar& other)
@@ -74,7 +74,6 @@ struct FoxVar : public FoxLabelledData
         Type = other.Type;
         Name = other.Name;
         Value = other.Value;
-        IsExternal = other.IsExternal;
     }
 
     FoxVar& operator=(FoxVar&& other) noexcept
@@ -83,7 +82,6 @@ struct FoxVar : public FoxLabelledData
         Type = other.Type;
         Name = other.Name;
         Value = other.Value;
-        IsExternal = other.IsExternal;
 
         Name = nullptr;
         Type = nullptr;
@@ -94,18 +92,14 @@ struct FoxVar : public FoxLabelledData
 
     ~FoxVar()
     {
-        if (!IsExternal) {
-            return;
-        }
-
         // Free tokens allocated by external variables
-        if (Type && Type->Start) {
-            free(Type->Start);
-        }
+        // if (Type && Type->Start) {
+        //     free(Type->Start);
+        // }
 
-        if (this->Name && this->Name->Start) {
-            free(this->Name->Start);
-        }
+        // if (this->Name && this->Name->Start) {
+        //     free(this->Name->Start);
+        // }
     }
 };
 

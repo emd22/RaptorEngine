@@ -10,10 +10,25 @@
 namespace fx::script {
 
 
-////////////////////////////////////////////
-// IR Emitter
-////////////////////////////////////////////
+struct FoxBytecodeVarHandle
+{
+    Hash32 HashedName = HashNull32;
+    eFoxType Type = eFoxType::INT;
+    bool bIsPointer = false;
 
+    int64 Offset = 0;
+
+    int32 ScopeIndex = 0;
+    uint16 VariableIndex = 0;
+
+    uint16 SizeOnStack = 4;
+};
+
+struct FoxBytecodeFunctionHandle
+{
+    Hash32 HashedName = HashNull32;
+    uint32 BytecodeIndex = 0;
+};
 
 enum class eFoxConditionResult
 {
@@ -25,16 +40,14 @@ enum class eFoxConditionResult
     Greater,
 };
 
-using VarIndex = uint16;
-constexpr VarIndex VarIndexNull = UINT16_MAX;
-
-struct FoxIRFunctionRef
+enum class eFoxPushMode
 {
-    char* Name = nullptr;
-    uint32 HashedName = HashNull32;
-    uint32 Position = 0;
+    Default,
+    PushPointer,
 };
 
+using VarIndex = uint16;
+constexpr VarIndex VarIndexNull = UINT16_MAX;
 
 struct FoxBytecodeString
 {
@@ -91,7 +104,7 @@ private:
     FoxBytecodeVarHandle* DefineParam(FoxAstNode* param_decl_node);
     FoxBytecodeVarHandle* DefineReturnVar(FoxAstVarDecl* decl);
 
-    void ValidateParameters(FoxAstFunctionCall* call);
+    bool ValidateParameters(FoxAstFunctionCall* call);
     void AddString(uint32 fixup_offset, const String& value);
 
     void EmitSymbolTable(FoxAstBlock* root);
@@ -110,10 +123,12 @@ private:
     void EmitPushFloat32(float32 value);
     void EmitPushString(uint32 value);
     void EmitPushVar(VarIndex var);
+    void EmitPushVarPtr(VarIndex var);
     void EmitPushReturnAddr();
 
-    eFoxType EmitPushVarOrLiteral(FoxAstNode* node);
-    eFoxType GetVarOrLiteralType(FoxAstNode* node);
+    eFoxType EmitPushUnderlyingValue(FoxAstNode* node, eFoxPushMode mode = eFoxPushMode::Default);
+    eFoxType GetUnderlyingType(FoxAstNode* node);
+    bool IsUnderlyingVariableRef(FoxAstNode* node);
 
     void EmitStackAlloc(uint16 size);
 
@@ -139,12 +154,14 @@ private:
     void EmitIfStatement(FoxAstIf* if_node);
     eFoxConditionResult EmitPushConditionResult(FoxAstNode* condition_node);
 
-    void EmitVariableSetInt32(uint16 var_index, int32 value);
-    void EmitVariableSetString(uint16 var_index);
-    void EmitVariableSetFloat32(uint16 var_index, float32 value);
-    void EmitVariableSetVar(VarIndex dst, VarIndex src);
+    void EmitVariableSetInt32(uint16 var_index, int32 value, bool is_pointer);
+    void EmitVariableSetString(uint16 var_index, bool is_pointer);
+    void EmitVariableSetFloat32(uint16 var_index, float32 value, bool is_pointer);
+    void EmitVariableSetVar(VarIndex dst, VarIndex src, bool is_dst_pointer);
 
-    void EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global);
+
+    void EmitVariableDefine(eFoxType type, uint16 var_index);
+    void EmitVariableGlobalDefine(eFoxType type, uint16 var_index, Hash32 name_hash);
     void EmitVariableIndex(uint16 var_index);
 
     void EmitVariableDefineFetchParam(eFoxType type, uint16 var_index);

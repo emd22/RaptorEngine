@@ -41,6 +41,7 @@ enum class eTokenType
     Asterisk,
 
     Question,
+    Ampersand,
 
     Dot,
     Comma,
@@ -90,9 +91,9 @@ public:
 
     void Increment() { ++Length; }
 
-    inline std::string GetStr() const { return std::string(Start, Length); }
+    FX_FORCE_INLINE std::string GetStr() const { return std::string(Start, Length); }
 
-    inline char* GetHeapStr() const
+    FX_FORCE_INLINE char* GetHeapStr() const
     {
         char* str = gEnginePool->Alloc<char>(Length + 1);
 
@@ -171,7 +172,7 @@ class Tokenizer
 {
 private:
 public:
-    const char* SingleCharOperators = "=()[]{}<>+-*$.,;?!";
+    const char* SingleCharOperators = "=()[]{}<>+-*$.,;?!&";
 
     struct State
     {

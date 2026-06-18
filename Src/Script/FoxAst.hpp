@@ -108,6 +108,7 @@ struct FoxAstVarDecl : public FoxAstNode
 
     /// Ignore the scope that the variable is declared in, force it to be global.
     bool bDefineAsGlobal = false;
+    bool bIsPointer = false;
 };
 
 struct FoxAstFunctionDecl : public FoxAstNode
@@ -195,24 +196,6 @@ public:
 
 public:
     // FoxAstBlock* mRootBlock = nullptr;
-};
-
-struct FoxBytecodeVarHandle
-{
-    Hash32 HashedName = HashNull32;
-    eFoxType Type = eFoxType::INT;
-    int64 Offset = 0;
-
-    int32 ScopeIndex = 0;
-    uint16 VariableIndex = 0;
-
-    uint16 SizeOnStack = 4;
-};
-
-struct FoxBytecodeFunctionHandle
-{
-    Hash32 HashedName = HashNull32;
-    uint32 BytecodeIndex = 0;
 };
 
 } // namespace script

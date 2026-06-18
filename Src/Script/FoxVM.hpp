@@ -35,6 +35,7 @@ struct VMVariable
     Hash32 GlobalNameHash = HashNull32;
     bool bIsGlobalRef = false;
     FoxValue Value;
+    eFoxType Type = eFoxType::NONETYPE;
 };
 
 
@@ -101,6 +102,7 @@ private:
     void PopVarBaseIndex();
 
     VMVariable& GetVar(uint16 index);
+    VMVariable& GetVarAbsolute(uint16 index);
 
     void CallExternalFunction(Hash32 hashed_name);
 

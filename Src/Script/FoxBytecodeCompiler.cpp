@@ -56,6 +56,18 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
     if (return_node->pRhs) {
         FoxAstNode* return_rhs = return_node->pRhs;
 
+        if (mpCurrentFunctionBody) {
+            const eFoxType expected_return_type = mpCurrentFunctionBody->ReturnType;
+            const eFoxType return_type = GetUnderlyingType(return_rhs);
+
+            if (return_type != expected_return_type) {
+                CompileError("Return: Cannot return type '{}' when definition expects '{}'", return_type,
+                             expected_return_type);
+                return;
+            }
+        }
+
+
         // Check to see if its a literal
 
         if (return_rhs->NodeType == FX_AST_PROCCALL) {
@@ -105,7 +117,7 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
         else {
             eFoxType return_type = mpCurrentFunctionBody ? mpCurrentFunctionBody->ReturnType : eFoxType::INT;
 
-            EmitPushVarOrLiteral(return_rhs);
+            EmitPushUnderlyingValue(return_rhs);
 
             if (return_type == eFoxType::INT) {
                 EmitJumpReturnToCallerInt32();
@@ -128,8 +140,8 @@ eFoxConditionResult FoxBytecodeCompiler::EmitPushConditionResult(FoxAstNode* con
 {
     if (cond->NodeType == FoxAstType::FX_AST_BINOP) {
         FoxAstBinop* binop = static_cast<FoxAstBinop*>(cond);
-        EmitPushVarOrLiteral(binop->pLeft);
-        EmitPushVarOrLiteral(binop->pRight);
+        EmitPushUnderlyingValue(binop->pLeft);
+        EmitPushUnderlyingValue(binop->pRight);
         // Compare the values, push to stack
         EmitCompare();
 
@@ -153,7 +165,7 @@ eFoxConditionResult FoxBytecodeCompiler::EmitPushConditionResult(FoxAstNode* con
         return eFoxConditionResult::Equal;
     }
     else if (cond->NodeType == FoxAstType::FX_AST_LITERAL) {
-        EmitPushVarOrLiteral(static_cast<FoxAstLiteral*>(cond));
+        EmitPushUnderlyingValue(static_cast<FoxAstLiteral*>(cond));
         EmitCompareNotZero();
 
         return eFoxConditionResult::Equal;
@@ -312,9 +324,16 @@ void FoxBytecodeCompiler::EmitPushVar(VarIndex var)
     Write16(var);
 }
 
+void FoxBytecodeCompiler::EmitPushVarPtr(VarIndex var)
+{
+    // VPUSHPTR [%var]
+    WriteOp(BcBase_Push, BcSpecPush_VarPtr);
+    Write16(var);
+}
+
 void FoxBytecodeCompiler::EmitPushReturnAddr() { WriteOp(BcBase_Push, BcSpecPush_ReturnAddr); }
 
-eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
+eFoxType FoxBytecodeCompiler::EmitPushUnderlyingValue(FoxAstNode* node, eFoxPushMode mode)
 {
     if (node->NodeType == FX_AST_LITERAL) {
         FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
@@ -348,17 +367,21 @@ eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
             EmitPush32(literal->Value.ValueInt);
         }
         else if (literal->Value.Type == eFoxType::REF) {
-            EmitPushVar(FindVarInScope(literal->Value.pValueRef->pName->GetHash()));
-
             // Get the type of the variable
             FoxBytecodeVarHandle* vhandle = FindVarHandle(literal->Value.pValueRef->pName->GetHash());
 
-            if (vhandle) {
-                LogInfo("Handle type: {}", static_cast<int32>(vhandle->Type));
-                return vhandle->Type;
+            if (!vhandle) {
+                return eFoxType::NONETYPE;
             }
 
-            return eFoxType::NONETYPE;
+            if (mode == eFoxPushMode::PushPointer) {
+                EmitPushVarPtr(vhandle->VariableIndex);
+            }
+            else {
+                EmitPushVar(vhandle->VariableIndex);
+            }
+
+            return vhandle->Type;
         }
         else if (literal->Value.Type == eFoxType::FLOAT) {
             EmitPushFloat32(literal->Value.ValueFloat);
@@ -374,7 +397,7 @@ eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
     else if (node->NodeType == FX_AST_BINOP) {
         FoxAstBinop* binop = static_cast<FoxAstBinop*>(node);
         EmitBinop(binop);
-        return GetVarOrLiteralType(binop->pLeft);
+        return GetUnderlyingType(binop->pLeft);
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
         FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(node);
@@ -388,23 +411,38 @@ eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
         return call->GetReturnType();
     }
     else {
-        CompileError("EmitPushVarOrLiteral: Unknown node type");
+        CompileError("EmitPushUnderlyingValue: Unknown node type");
     }
 
     return eFoxType::NONETYPE;
 }
 
-eFoxType FoxBytecodeCompiler::GetVarOrLiteralType(FoxAstNode* node)
+eFoxType FoxBytecodeCompiler::GetUnderlyingType(FoxAstNode* node)
 {
     if (node->NodeType == FX_AST_LITERAL) {
         FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
 
-        if (literal->Value.Type == eFoxType::REF) {
-            FoxBytecodeVarHandle* vhandle = FindVarHandle(literal->Value.pValueRef->pName->GetHash());
+        if (literal->Value.IsRef()) {
+            FoxAstVarRef* ref = literal->Value.pValueRef;
 
-            if (vhandle) {
-                LogInfo("Handle type: {}", static_cast<int32>(vhandle->Type));
-                return vhandle->Type;
+            // If the variable is not defined in scope, we should check to see if its a global.
+            // Globals need to be hoisted up to the current scope.
+
+            FoxBytecodeVarHandle* local_handle = FindVarHandle(ref->GetNameHash());
+
+            // If the variable is not defined locally but there is a global entry for the variable, use that and hoist
+            // the variable up to scope.
+            if (local_handle == nullptr) {
+                FoxBytecodeVarHandle* global_handle = FindGlobalHandle(ref->GetNameHash());
+                // The variable is undefined
+                if (!global_handle) {
+                    return eFoxType::NONETYPE;
+                }
+
+                return global_handle->Type;
+            }
+            else {
+                return local_handle->Type;
             }
 
             return eFoxType::NONETYPE;
@@ -414,17 +452,60 @@ eFoxType FoxBytecodeCompiler::GetVarOrLiteralType(FoxAstNode* node)
     }
     else if (node->NodeType == FX_AST_BINOP) {
         FoxAstBinop* binop = static_cast<FoxAstBinop*>(node);
-        return GetVarOrLiteralType(binop->pLeft);
+        return GetUnderlyingType(binop->pLeft);
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
-        FoxAstFunctionCall* fcall = static_cast<FoxAstFunctionCall*>(node);
-        return fcall->GetReturnType();
+        FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(node);
+
+        eFoxType builtin_call_rvalue = DoBuiltin(call);
+        if (builtin_call_rvalue != eFoxType::NONETYPE) {
+            return builtin_call_rvalue;
+        }
+
+        return call->GetReturnType();
     }
     else {
-        CompileError("EmitPushVarOrLiteral: Unknown node type");
+        CompileError("GetUnderlyingType: Unknown node type");
     }
 
     return eFoxType::NONETYPE;
+}
+
+
+bool FoxBytecodeCompiler::IsUnderlyingVariableRef(FoxAstNode* node)
+{
+    if (node->NodeType == FX_AST_LITERAL) {
+        FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
+
+        // If the type is not a reference, return false.
+        if (!literal->Value.IsRef()) {
+            return false;
+        }
+
+        FoxAstVarRef* ref = literal->Value.pValueRef;
+
+        // If the variable is not defined in scope, we should check to see if its a global.
+        // Globals need to be hoisted up to the current scope.
+
+        FoxBytecodeVarHandle* local_handle = FindVarHandle(ref->GetNameHash());
+
+        // If the variable is not defined locally but there is a global entry for the variable, use that and hoist
+        // the variable up to scope.
+        if (local_handle == nullptr) {
+            FoxBytecodeVarHandle* global_handle = FindGlobalHandle(ref->GetNameHash());
+            // The variable is undefined
+            if (!global_handle) {
+                return false;
+            }
+
+            // The global variable is defined, so it is a reference.
+            return true;
+        }
+
+        return (local_handle != nullptr);
+    }
+
+    return false;
 }
 
 
@@ -521,45 +602,103 @@ void FoxBytecodeCompiler::EmitJumpPause(uint16 time)
     Write16(time);
 }
 
+/////////////////////////////////////
+// Value set functions
+/////////////////////////////////////
 
-void FoxBytecodeCompiler::EmitVariableSetInt32(uint16 var_index, int32 value)
+void FoxBytecodeCompiler::EmitVariableSetInt32(uint16 var_index, int32 value, bool is_pointer)
 {
-    WriteOp(BcBase_Variable, BcSpecVariable_Set_Int32);
+    BcSpecVariable spec = BcSpecVariable_Set_Int32;
+    if (is_pointer) {
+        spec = BcSpecVariable_SetPtr_Int32;
+    }
+
+    WriteOp(BcBase_Variable, spec);
     Write16(var_index);
     Write32(value);
 }
 
-void FoxBytecodeCompiler::EmitVariableSetString(uint16 var_index)
+void FoxBytecodeCompiler::EmitVariableSetString(uint16 var_index, bool is_pointer)
 {
-    WriteOp(BcBase_Variable, BcSpecVariable_Set_String);
+    BcSpecVariable spec = BcSpecVariable_Set_String;
+    if (is_pointer) {
+        spec = BcSpecVariable_SetPtr_String;
+    }
+
+    WriteOp(BcBase_Variable, spec);
     Write16(var_index);
     Write32(0);
 }
 
-void FoxBytecodeCompiler::EmitVariableSetFloat32(uint16 var_index, float32 value)
+void FoxBytecodeCompiler::EmitVariableSetFloat32(uint16 var_index, float32 value, bool is_pointer)
 {
-    WriteOp(BcBase_Variable, BcSpecVariable_Set_Float32);
+    BcSpecVariable spec = BcSpecVariable_Set_Float32;
+    if (is_pointer) {
+        spec = BcSpecVariable_SetPtr_Float32;
+    }
+
+    WriteOp(BcBase_Variable, spec);
     Write16(var_index);
     Write32(std::bit_cast<uint32>(value));
 }
 
 
-void FoxBytecodeCompiler::EmitVariableSetVar(VarIndex dst, VarIndex src)
+void FoxBytecodeCompiler::EmitVariableSetVar(VarIndex dst, VarIndex src, bool is_dst_pointer)
 {
-    WriteOp(BcBase_Variable, BcSpecVariable_Set_Var);
+    BcSpecVariable spec = BcSpecVariable_Set_Var;
+    if (is_dst_pointer) {
+        spec = BcSpecVariable_SetPtr_Var;
+    }
+
+    WriteOp(BcBase_Variable, spec);
     Write16(dst);
     Write16(src);
 }
 
 
-void FoxBytecodeCompiler::EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global)
+void FoxBytecodeCompiler::EmitVariableDefine(eFoxType type, uint16 var_index)
 {
-    WriteOp(BcBase_Variable, is_global ? BcSpecVariable_DefineGlobal : BcSpecVariable_Define);
-    Write16(var_index);
+    BcSpecVariable spec;
 
-    if (is_global) {
-        Write32(name_hash);
+    switch (type) {
+    case eFoxType::INT:
+        spec = BcSpecVariable_Define_Int32;
+        break;
+    case eFoxType::FLOAT:
+        spec = BcSpecVariable_Define_Float32;
+        break;
+    case eFoxType::STRING:
+        spec = BcSpecVariable_Define_String;
+        break;
+    default:
+        spec = BcSpecVariable_Define_Int32;
     }
+
+    WriteOp(BcBase_Variable, spec);
+    Write16(var_index);
+}
+
+void FoxBytecodeCompiler::EmitVariableGlobalDefine(eFoxType type, uint16 var_index, Hash32 name_hash)
+{
+    BcSpecVariable spec;
+
+    switch (type) {
+    case eFoxType::INT:
+        spec = BcSpecVariable_DefineGlobal_Int32;
+        break;
+    case eFoxType::FLOAT:
+        spec = BcSpecVariable_DefineGlobal_Float32;
+        break;
+    case eFoxType::STRING:
+        spec = BcSpecVariable_DefineGlobal_String;
+        break;
+    default:
+        spec = BcSpecVariable_DefineGlobal_Int32;
+    }
+
+    WriteOp(BcBase_Variable, spec);
+    Write16(var_index);
+    Write32(name_hash);
 }
 
 void FoxBytecodeCompiler::EmitVariableDefineFetchParam(eFoxType type, uint16 var_index)
@@ -593,7 +732,7 @@ void FoxBytecodeCompiler::EmitVariableCastFloat32() { WriteOp(BcBase_Variable, B
 void FoxBytecodeCompiler::EmitVariableGlobalHoist(FoxBytecodeVarHandle* handle, Hash32 name_hash)
 {
     // Emit the local definition
-    EmitVariableDefine(mVariableIndex, name_hash, true);
+    EmitVariableGlobalDefine(handle->Type, mVariableIndex, name_hash);
 
     // Create a new handle (for local)
     FoxBytecodeVarHandle local_handle = *handle;
@@ -655,8 +794,8 @@ uint32 FoxBytecodeCompiler::EmitDataString(const char* str, uint16 length, bool 
 void FoxBytecodeCompiler::EmitBinop(FoxAstBinop* binop)
 {
     // Push LHS and RHS to the stack
-    eFoxType left_type = EmitPushVarOrLiteral(binop->pLeft);
-    eFoxType right_type = EmitPushVarOrLiteral(binop->pRight);
+    eFoxType left_type = EmitPushUnderlyingValue(binop->pLeft);
+    eFoxType right_type = EmitPushUnderlyingValue(binop->pRight);
 
     if (left_type != right_type) {
         CompileError("Mismatched type: Cannot perform operation on '{}' and '{}'", left_type, right_type);
@@ -792,21 +931,24 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
                          handle->Type);
         }
 
+        bool is_pointer = handle->bIsPointer;
+
         switch (literal->Value.Type) {
         case eFoxType::NONETYPE:
             break;
         case eFoxType::INT:
-            EmitVariableSetInt32(handle->VariableIndex, literal->Value.ValueInt);
+            EmitVariableSetInt32(handle->VariableIndex, literal->Value.ValueInt, is_pointer);
             break;
         case eFoxType::FLOAT:
-            EmitVariableSetFloat32(handle->VariableIndex, literal->Value.ValueFloat);
+            EmitVariableSetFloat32(handle->VariableIndex, literal->Value.ValueFloat, is_pointer);
             break;
         case eFoxType::STRING:
-            EmitVariableSetString(handle->VariableIndex);
+            EmitVariableSetString(handle->VariableIndex, is_pointer);
             AddString(mBytecode.Size() - sizeof(uint32), literal->Value.ValueString);
             break;
         case eFoxType::REF:
-            EmitVariableSetVar(handle->VariableIndex, FindVarInScope(literal->Value.pValueRef->pName->GetHash()));
+            EmitVariableSetVar(handle->VariableIndex, FindVarInScope(literal->Value.pValueRef->pName->GetHash()),
+                               is_pointer);
             break;
         }
     }
@@ -860,12 +1002,18 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
         EmitVariableDefineFetchParam(var_type, mVariableIndex);
     }
     else {
-        EmitVariableDefine(mVariableIndex, decl->pNameToken->GetHash(), decl->bDefineAsGlobal);
+        if (decl->bDefineAsGlobal) {
+            EmitVariableGlobalDefine(var_type, mVariableIndex, decl->pNameToken->GetHash());
+        }
+        else {
+            EmitVariableDefine(var_type, mVariableIndex);
+        }
     }
 
     FoxBytecodeVarHandle handle {
         .HashedName = decl_hash,
         .Type = var_type,
+        .bIsPointer = decl->bIsPointer,
         .Offset = 0,
         .ScopeIndex = mScopeIndex,
         .VariableIndex = mVariableIndex,
@@ -899,11 +1047,11 @@ FoxBytecodeVarHandle* FoxBytecodeCompiler::DoVarDeclare(FoxAstVarDecl* decl, Var
     return var_handle;
 }
 
-void FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
+bool FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
 {
     if (call->pFunction == nullptr || call->pFunction->pDeclaration == nullptr) {
         CompileError("Attempting to call undefined function");
-        return;
+        return false;
     }
 
     // Get the parameter definitions for the function declaration
@@ -918,7 +1066,7 @@ void FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
     // Check to make sure there are the correct number of arguments
     if (!has_correct_param_count) {
         CompileError("Expected {} parameters but only {} were passed in", param_decl_stmts.size(), call->Params.size());
-        return;
+        return false;
     }
 
     // Check the argument types match
@@ -927,13 +1075,21 @@ void FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
             break;
         }
 
-        eFoxType type = GetVarOrLiteralType(call->Params[i]);
+        FoxAstNode* passed_parameter = call->Params[i];
+
+        eFoxType type = GetUnderlyingType(passed_parameter);
         FoxAstVarDecl* decl = static_cast<FoxAstVarDecl*>(param_decl_stmts[i]);
 
         if (type != decl->Type) {
-            CompileError("Paremeter type {} does not match {}", type, decl->Type);
+            CompileError("Passing value of type '{}' but parameter expects '{}'", type, decl->Type);
+        }
+
+        if (decl->bIsPointer && !IsUnderlyingVariableRef(passed_parameter)) {
+            CompileError("Function expects a pointer type but recieved '{}'", type);
         }
     }
+
+    return true;
 }
 
 #define BUILTIN_REQUIRE_PARAM_N(num_)                                                                                  \
@@ -958,7 +1114,7 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
     case scCastInt: {
         BUILTIN_REQUIRE_PARAM_N(1);
 
-        eFoxType vtype = EmitPushVarOrLiteral(call->Params[0]);
+        eFoxType vtype = EmitPushUnderlyingValue(call->Params[0]);
 
         if (vtype != eFoxType::INT) {
             EmitVariableCastInt32();
@@ -973,7 +1129,7 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
     case scCastFloat: {
         BUILTIN_REQUIRE_PARAM_N(1);
 
-        eFoxType vtype = EmitPushVarOrLiteral(call->Params[0]);
+        eFoxType vtype = EmitPushUnderlyingValue(call->Params[0]);
 
         if (vtype != eFoxType::FLOAT) {
             EmitVariableCastFloat32();
@@ -984,7 +1140,7 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
 
     case scVPush: {
         BUILTIN_REQUIRE_PARAM_N(1);
-        return EmitPushVarOrLiteral(call->Params[0]);
+        return EmitPushUnderlyingValue(call->Params[0]);
     }
 
     case scVPop: {
@@ -1046,20 +1202,40 @@ void FoxBytecodeCompiler::EmitFunctionCall(FoxAstFunctionCall* call, bool preser
 
     FoxBytecodeFunctionHandle* handle = FindFunctionHandle(call->HashedName);
 
-    ValidateParameters(call);
+    bool parameters_correct = ValidateParameters(call);
 
-    // if (handle == nullptr) {
-    //     CompileError("DoFunctionCall: Undefined reference to function (Hash={})", call->HashedName);
-    //     return;
-    // }
+    if (!parameters_correct) {
+        return;
+    }
 
-
-    int32 parameter_index = 0;
+    uint32 provided_parameter_count = call->Params.size();
 
     // Fetch all parameters into registers
-    for (FoxAstNode* param : call->Params) {
-        EmitPushVarOrLiteral(param);
-        parameter_index++;
+    for (uint32 parameter_index = 0; parameter_index < provided_parameter_count; parameter_index++) {
+        FoxAstNode* param = call->Params[parameter_index];
+
+        eFoxPushMode push_mode = eFoxPushMode::Default;
+
+        // If there is a defined function declaration node, check to see if the function expects a pointer to a
+        // variable.
+        // If true, change the push mode when submitting a variable.
+
+        if (call->pFunction && call->pFunction->pDeclaration) {
+            const FoxAstBlock* param_declaration_block = call->pFunction->pDeclaration->pParams;
+
+            FoxAstNode* param_declaration_node = param_declaration_block->Statements[parameter_index];
+
+            if (param_declaration_node->NodeType == FX_AST_VARDECL) {
+                FoxAstVarDecl* var_decl = static_cast<FoxAstVarDecl*>(param_declaration_node);
+
+                if (var_decl->bIsPointer) {
+                    push_mode = eFoxPushMode::PushPointer;
+                }
+            }
+        }
+
+
+        EmitPushUnderlyingValue(param, push_mode);
     }
 
 
@@ -1358,6 +1534,10 @@ void FoxBytecodePrinter::DoPush(char* s, uint8 op_base, uint8 op_spec)
     else if (op_spec == BcSpecPush_ReturnAddr) {
         BC_PRINT_OP("PUSHRA");
     }
+    else if (op_spec == BcSpecPush_VarPtr) {
+        VarIndex var = Read16();
+        BC_PRINT_OP("VPUSHPTR {}", var);
+    }
 }
 
 void FoxBytecodePrinter::DoPop(char* s, uint8 op_base, uint8 op_spec_raw)
@@ -1579,7 +1759,7 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
     case BcSpecVariable_Set_Float32: {
         uint16 var_index = Read16();
         float32 value = std::bit_cast<float32>(Read32());
-        BC_PRINT_OP("VSET [float32] ${}, {:f}", var_index, value);
+        BC_PRINT_OP("VSETF [float32] ${}, {:f}", var_index, value);
 
     } break;
 
@@ -1589,7 +1769,7 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
 
         uint32 old_index = mBytecodeIndex;
         mBytecodeIndex = mStringTableOffset;
-        BC_PRINT_OP("VSET [str] ${}, \"{}\"", var_index, ReadString(string_buffer, 256, false));
+        BC_PRINT_OP("VSETS [str] ${}, \"{}\"", var_index, ReadString(string_buffer, 256, false));
         mBytecodeIndex = old_index;
     } break;
 
@@ -1597,10 +1777,10 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
-        BC_PRINT_OP("VSET ${}, ${}", dst_index, src_index);
+        BC_PRINT_OP("VSETV ${}, ${}", dst_index, src_index);
     } break;
 
-    case BcSpecVariable_Define: {
+    case BcSpecVariable_Define_Int32: {
         uint16 var_index = Read16();
         BC_PRINT_OP("VDEFINE ${}", var_index);
     } break;
@@ -1610,7 +1790,12 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
         BC_PRINT_OP("VDEFINEF [float32] ${}", var_index);
     } break;
 
-    case BcSpecVariable_DefineGlobal: {
+    case BcSpecVariable_Define_String: {
+        uint16 var_index = Read16();
+        BC_PRINT_OP("VDEFINES [str] ${}", var_index);
+    } break;
+
+    case BcSpecVariable_DefineGlobal_Int32: {
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
         BC_PRINT_OP("VGLOBAL ${} AS {}", var_index, name_hash);
@@ -1620,6 +1805,12 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
         uint16 var_index = Read16();
         Hash32 name_hash = Read32();
         BC_PRINT_OP("VGLOBALF [float32] ${} AS {}", var_index, name_hash);
+    } break;
+
+    case BcSpecVariable_DefineGlobal_String: {
+        uint16 var_index = Read16();
+        Hash32 name_hash = Read32();
+        BC_PRINT_OP("VGLOBALS [str] ${} AS {}", var_index, name_hash);
     } break;
 
 
@@ -1645,6 +1836,38 @@ void FoxBytecodePrinter::DoVariable(char* s, uint8 op_base, uint8 op_spec)
     case BcSpecVariable_Cast_Float32:
         BC_PRINT_OP("VCASTF [float32]");
         break;
+    /////////////////////////////////////
+    // Pointer instructions
+    /////////////////////////////////////
+    case BcSpecVariable_SetPtr_Int32: {
+        uint16 var_index = Read16();
+        uint32 value = Read32();
+        BC_PRINT_OP("VSETPTR [int32] ${}, {}", var_index, value);
+    } break;
+
+    case BcSpecVariable_SetPtr_Float32: {
+        uint16 var_index = Read16();
+        float32 value = std::bit_cast<float32>(Read32());
+        BC_PRINT_OP("VSETPTRF [float32] ${}, {:f}", var_index, value);
+
+    } break;
+
+    case BcSpecVariable_SetPtr_String: {
+        uint16 var_index = Read16();
+        uint32 value = Read32();
+
+        uint32 old_index = mBytecodeIndex;
+        mBytecodeIndex = mStringTableOffset;
+        BC_PRINT_OP("VSETPTRS [str] ${}, \"{}\"", var_index, ReadString(string_buffer, 256, false));
+        mBytecodeIndex = old_index;
+    } break;
+
+    case BcSpecVariable_SetPtr_Var: {
+        VarIndex dst_index = Read16();
+        VarIndex src_index = Read16();
+
+        BC_PRINT_OP("VSETPTRV ${}, ${}", dst_index, src_index);
+    } break;
     }
 }
 
