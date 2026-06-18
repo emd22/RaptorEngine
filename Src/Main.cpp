@@ -24,6 +24,7 @@
 #include <Script/FoxScript.hpp>
 
 #define FX_RUN_TEST
+#define FX_TEST_SCRIPT
 
 FX_SET_MODULE_NAME("Main")
 
@@ -56,6 +57,8 @@ int main()
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
 
+
+#ifdef FX_TEST_SCRIPT
     script::FoxScript fs;
     fs.Load("./Scripts/GlobalTest.fox");
 
@@ -67,6 +70,7 @@ int main()
     script::FoxValue value = fs.CallProc(sym, {});
 
     LogInfo("Value: {}", value);
+#endif
 
 #ifndef FX_RUN_TEST
     fx::renderer::Globals::Init();

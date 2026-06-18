@@ -48,12 +48,15 @@ public:
     }
 
     Path& RemoveExtension();
+    bool HasExtension() const;
+
     void CreateDirs() const;
 
     Path operator/(const String& sub) const;
     Path& operator=(Path&& other);
 
     String* Get(const uint32 index);
+    const String* Get(const uint32 index) const;
     String* BaseName() { return Get(Components.size() - 1); };
 
     String Str() const;

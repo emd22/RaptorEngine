@@ -206,13 +206,21 @@ String& String::operator=(String&& other)
 }
 
 uint32 String::FindFirst(char ch) const { return FindNext(0, ch); }
+uint32 String::FindLast(char ch) const { return FindPrev(0, ch); }
 
-uint32 String::FindLast(char ch) const
+uint32 String::FindPrev(uint32 skip, char ch) const
 {
+    const uint32 real_length = Length - 1;
+
+    if (skip > real_length || (real_length - skip) == 0) {
+        return scNotFound;
+    }
+
     const char* pstr = GetInternalPtr();
     char cur = 0;
 
-    for (uint32 i = Length - 1; (cur = pstr[i]); i--) {
+
+    for (uint32 i = real_length - skip; (cur = pstr[i]); i--) {
         if (cur == ch) {
             return i;
         }

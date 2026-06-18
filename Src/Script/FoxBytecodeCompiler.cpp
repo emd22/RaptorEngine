@@ -1217,14 +1217,14 @@ void FoxBytecodeCompiler::EmitBlock(FoxAstBlock* block, int num_parameters, bool
     {
         const uint32 num_vars_to_delete = num_parameters + (mVariableIndex - var_index_before_scope);
 
-        LogInfo(LC_SCRIPT, "{} Vars on entry, {} Vars on exit. {} Vars to delete", var_index_before_scope,
-                mVariableIndex, num_vars_to_delete);
+        LogInfo(LC_SCRIPT, "{} Vars on entry, {} Vars on exit, {} parameters -> {} Vars to delete",
+                var_index_before_scope, mVariableIndex, num_parameters, num_vars_to_delete);
 
         for (int32 i = 0; i < num_vars_to_delete; i++) {
             LocalVarHandles.RemoveLast();
         }
 
-        mVariableIndex = var_index_before_scope;
+        mVariableIndex -= num_vars_to_delete;
     }
 
     if (!is_function_body && mbEmitDebugInfo) {

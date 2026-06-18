@@ -134,15 +134,25 @@ String* Path::Get(const uint32 index)
     return &Components[index];
 }
 
+const String* Path::Get(const uint32 index) const
+{
+    if (index >= Components.size()) {
+        return nullptr;
+    }
+
+    return &Components[index];
+}
+
 Path& Path::RemoveExtension()
 {
     String* basename = Get(Components.size() - 1);
 
-    if (!basename) {
+    if (!basename || basename->Length < 3) {
         return *this;
     }
 
-    const uint32 ext_index = basename->FindFirst('.');
+    // Start at 1, to avoid catching hidden files
+    const uint32 ext_index = basename->FindNext(1, '.');
 
     // No extension here boss
     if (ext_index == String::scNotFound) {
@@ -152,6 +162,15 @@ Path& Path::RemoveExtension()
     basename->ShortenTo(ext_index);
 
     return *this;
+}
+
+bool Path::HasExtension() const
+{
+    const String* basename = Get(Components.size() - 1);
+    const uint32 ext_index = basename->FindLast('.');
+
+    // Return false if the only extension index is the first dot in the basename, as that is likely just a hidden file.
+    return (ext_index != String::scNotFound && ext_index != 0);
 }
 
 

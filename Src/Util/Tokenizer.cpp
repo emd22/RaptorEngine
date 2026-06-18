@@ -1,8 +1,8 @@
 #include "Tokenizer.hpp"
 
 #include <Core/MemPool/MemPool.hpp>
+#include <Core/Path.hpp>
 #include <Engine.hpp>
-
 
 namespace fx {
 
@@ -316,6 +316,14 @@ bool Tokenizer::ExpectString(const char* expected_value, bool skip_on_success)
 
 void Tokenizer::IncludeFile(const char* path)
 {
+    Path vpath(path);
+
+    // If there is no extension on the file, add .fox
+    if (!vpath.HasExtension()) {
+        String* basename = vpath.BaseName();
+        (*basename) += ".fox";
+    }
+
     File file(path, File::eModType::Read, File::eDataType::Binary);
 
 

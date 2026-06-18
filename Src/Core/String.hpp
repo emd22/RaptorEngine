@@ -37,6 +37,7 @@ public:
     uint32 FindFirst(char ch) const;
     uint32 FindLast(char ch) const;
     uint32 FindNext(uint32 start, char ch) const;
+    uint32 FindPrev(uint32 skip, char ch) const;
 
     /**
      * @brief Finds the first occurance of the string `match` beginning at the index `start`.
