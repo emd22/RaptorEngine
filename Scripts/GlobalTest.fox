@@ -4,9 +4,14 @@ init()
 {
 }
 
-getvalue(&int x) int
+
+fun() int
 {
- return x;
+    local int z  = 10;
+
+    other();
+
+    return z;
 }
 
 
@@ -14,10 +19,9 @@ getvalue(&int x) int
 
 Default() int
 {
-    local int test = 2;
+    local int test = 5;
 
-    local &int v = test;
-    v = 3;
+    local int z = fun();
 
-    return test;
+    return test + z;
 }

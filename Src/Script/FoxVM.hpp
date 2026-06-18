@@ -137,6 +137,7 @@ public:
 
     /// The base index for variables. When calling another function, the variable indexes will start from 0, but will be
     /// offset by this value. This avoids clobbering variables when calling other functions.
+    int32 VariableIndex = 0;
     int32 VariableBaseIndex = 0;
     uint16 ScopeVarCounts[32];
 

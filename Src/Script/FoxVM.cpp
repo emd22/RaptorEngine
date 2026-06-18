@@ -422,12 +422,15 @@ void FoxVM::PushVarBaseIndex()
     }
 
     Assert(ScopeIndex < 32);
+    LogInfo("Pushing {} to scope {}", VariableIndex, ScopeIndex);
 
     // Store the current base index.
     ScopeVarCounts[ScopeIndex] = VariableBaseIndex;
+    VariableBaseIndex = VariableIndex;
+
     ++ScopeIndex;
 
-    ScopeVarCounts[ScopeIndex] = 0;
+    ScopeVarCounts[ScopeIndex] = VariableBaseIndex;
 }
 
 
@@ -444,6 +447,10 @@ void FoxVM::PopVarBaseIndex()
     // Restore the base index
     --ScopeIndex;
     VariableBaseIndex = ScopeVarCounts[ScopeIndex];
+    VariableIndex = VariableBaseIndex;
+
+
+    LogInfo("Popping {} from scope {}", VariableIndex, ScopeIndex);
 }
 
 
@@ -636,6 +643,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = false;
         var.Value.Set<int32>(0);
+
+        ++VariableIndex;
     } break;
 
     case BcSpecVariable_Define_Float32: {
@@ -644,6 +653,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = false;
         var.Value.Set<int32>(0);
+
+        ++VariableIndex;
     } break;
 
     case BcSpecVariable_Define_String: {
@@ -652,6 +663,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = false;
         var.Value.Set<int32>(0);
+
+        ++VariableIndex;
     } break;
 
 
@@ -669,6 +682,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         var.GlobalNameHash = name_hash;
         var.Type = eFoxType::INT;
         var.Value.Set<int32>(Globals[name_hash].Get<int32>());
+
+        ++VariableIndex;
+
     } break;
 
 
@@ -686,6 +702,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         var.GlobalNameHash = name_hash;
         var.Type = eFoxType::FLOAT;
         var.Value.Set<float32>(Globals[name_hash].Get<float32>());
+
+        ++VariableIndex;
+
     } break;
 
 
@@ -703,6 +722,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         var.GlobalNameHash = name_hash;
         var.Type = eFoxType::STRING;
         var.Value.Set<int32>(Globals[name_hash].Get<int32>());
+
+        ++VariableIndex;
+
     } break;
 
 
