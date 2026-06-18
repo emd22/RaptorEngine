@@ -319,6 +319,31 @@ eFoxType FoxBytecodeCompiler::EmitPushVarOrLiteral(FoxAstNode* node)
     if (node->NodeType == FX_AST_LITERAL) {
         FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
 
+        // Check if its a reference to another variable.
+        if (literal->Value.IsRef()) {
+            FoxAstVarRef* ref = literal->Value.pValueRef;
+
+            // If the variable is not defined in scope, we should check to see if its a global.
+            // Globals need to be hoisted up to the current scope.
+
+            FoxBytecodeVarHandle* local_handle = FindVarHandle(ref->GetNameHash());
+
+            // If the variable is not defined locally but there is a global entry for the variable, use that and hoist
+            // the variable up to scope.
+            if (local_handle == nullptr) {
+                FoxBytecodeVarHandle* global_handle = FindGlobalHandle(ref->GetNameHash());
+
+                // This is not a global variable and is undefined.
+                if (!global_handle) {
+                    CompileError("Cannot find variable {} (Hash={})", ref->pName->GetStr(), ref->GetNameHash());
+                    return eFoxType::NONETYPE;
+                }
+
+                // A global handle does exist, hoist it up.
+                EmitVariableGlobalHoist(global_handle, ref->GetNameHash());
+            }
+        }
+
         if (literal->Value.Type == eFoxType::INT) {
             EmitPush32(literal->Value.ValueInt);
         }

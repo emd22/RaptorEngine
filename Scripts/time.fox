@@ -1,1 +1,1 @@
-seconds(int v) int {return v*10;}
+seconds(int _v)int{return _v*10;}

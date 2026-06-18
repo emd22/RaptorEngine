@@ -1,14 +1,14 @@
 #include "Scripts/time"
 
-Add(int x, int y) int
+globals()
 {
-    return x + y;
+    global int SC_TurnRadius = 10;
 }
 
 
 Default() int
 {
-    local int v =  Add(2, 5);
-    local int z = 10;
-    return seconds(v);
+
+
+    return SC_TurnRadius;
 }
