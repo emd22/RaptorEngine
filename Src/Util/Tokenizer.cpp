@@ -322,9 +322,10 @@ void Tokenizer::IncludeFile(const char* path)
     if (!vpath.HasExtension()) {
         String* basename = vpath.BaseName();
         (*basename) += mpExpectedFileExtension;
+        LogInfo("basename : {}", *basename);
     }
 
-    File file(path, File::eModType::Read, File::eDataType::Binary);
+    File file(vpath.Str(), File::eModType::Read, File::eDataType::Binary);
 
 
     if (!file.IsFileOpen()) {

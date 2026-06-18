@@ -1,1 +1,1 @@
-seconds(int __v){return __v*10;}
+seconds(int v) int {return v*10;}

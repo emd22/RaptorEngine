@@ -10,5 +10,5 @@ Default() int
 {
     local int v =  Add(2, 5);
     local int z = 10;
-    return v;
+    return seconds(v);
 }
