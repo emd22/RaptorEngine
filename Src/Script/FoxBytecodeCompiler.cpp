@@ -67,29 +67,28 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
             }
         }
 
-
         // Check to see if its a literal
 
         if (return_rhs->NodeType == FX_AST_PROCCALL) {
             FoxAstFunctionCall* call_node = static_cast<FoxAstFunctionCall*>(return_rhs);
 
             eFoxType return_type = call_node->GetReturnType();
-            eFoxType builtin_call_type = DoBuiltin(call_node);
 
             if (return_type == eFoxType::NONETYPE) {
+                eFoxType builtin_call_type = DoBuiltin(call_node, false);
                 return_type = builtin_call_type;
-            }
 
-            if (return_type == eFoxType::NONETYPE) {
-                CompileError("EmitReturn: Cannot return a result that is void. The function called in this return "
-                             "statement does not return a value.");
-                EmitJumpReturnToCaller();
-                return;
+                if (builtin_call_type == eFoxType::NONETYPE) {
+                    CompileError("EmitReturn: Cannot return a result that is void. The function called in this return "
+                                 "statement does not return a value.");
+                    EmitJumpReturnToCaller();
+                    return;
+                }
             }
-
-            if (builtin_call_type == eFoxType::NONETYPE) {
+            else {
                 EmitFunctionCall(call_node, true);
             }
+
 
             eFoxType caller_return_type = mpCurrentFunctionBody ? mpCurrentFunctionBody->ReturnType : eFoxType::INT;
             if (caller_return_type != return_type) {
@@ -210,7 +209,9 @@ void FoxBytecodeCompiler::EmitNode(FoxAstNode* node)
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
         FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(node);
-        if (DoBuiltin(call) != eFoxType::NONETYPE) {
+        if (DoBuiltin(call, false) != eFoxType::NONETYPE) {
+            // Since this is a freestanding function call, we will want to discard the return value.
+            EmitPopDiscard();
             return;
         }
 
@@ -413,7 +414,7 @@ eFoxType FoxBytecodeCompiler::EmitPushUnderlyingValue(FoxAstNode* node, eFoxPush
     else if (node->NodeType == FX_AST_PROCCALL) {
         FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(node);
 
-        eFoxType builtin_call_rvalue = DoBuiltin(call);
+        eFoxType builtin_call_rvalue = DoBuiltin(call, false);
         if (builtin_call_rvalue != eFoxType::NONETYPE) {
             return builtin_call_rvalue;
         }
@@ -468,7 +469,7 @@ eFoxType FoxBytecodeCompiler::GetUnderlyingType(FoxAstNode* node)
     else if (node->NodeType == FX_AST_PROCCALL) {
         FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(node);
 
-        eFoxType builtin_call_rvalue = DoBuiltin(call);
+        eFoxType builtin_call_rvalue = DoBuiltin(call, true);
         if (builtin_call_rvalue != eFoxType::NONETYPE) {
             return builtin_call_rvalue;
         }
@@ -989,7 +990,7 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
         else if (rhs->NodeType == FX_AST_PROCCALL) {
             FoxAstFunctionCall* call = static_cast<FoxAstFunctionCall*>(rhs);
 
-            bool is_builtin_call = DoBuiltin(call) != eFoxType::NONETYPE;
+            bool is_builtin_call = DoBuiltin(call, false) != eFoxType::NONETYPE;
 
             if (!is_builtin_call) {
                 if (call->GetReturnType() != handle->Type) {
@@ -1132,7 +1133,7 @@ bool FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
         return eFoxType::NONETYPE;                                                                                     \
     }
 
-eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
+eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call, bool do_not_call)
 {
     static constexpr Hash32 scCastInt = HashStr32("castint");
     static constexpr Hash32 scCastFloat = HashStr32("castfloat");
@@ -1144,9 +1145,14 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
     static constexpr Hash32 scVRetF = HashStr32("vretf");
     static constexpr Hash32 scVRetS = HashStr32("vrets");
 
+
     switch (call->HashedName) {
     case scCastInt: {
         BUILTIN_REQUIRE_PARAM_N(1);
+
+        if (do_not_call) {
+            return eFoxType::INT;
+        }
 
         eFoxType vtype = EmitPushUnderlyingValue(call->Params[0]);
 
@@ -1154,14 +1160,19 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
             EmitVariableCastInt32();
         }
 
+
         // The cast builtins are transformation operations, so they pop the value off of the stack and push the
-        // converted value back onto it. If the type is already an int, preserve the original value by doing nothing to
-        // avoid mangling the value with casts.
+        // converted value back onto it. If the type is already an int, preserve the original value by doing nothing
+        // to avoid mangling the value with casts.
 
         return eFoxType::INT;
     }
     case scCastFloat: {
         BUILTIN_REQUIRE_PARAM_N(1);
+
+        if (do_not_call) {
+            return eFoxType::FLOAT;
+        }
 
         eFoxType vtype = EmitPushUnderlyingValue(call->Params[0]);
 
@@ -1174,6 +1185,11 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
 
     case scVPush: {
         BUILTIN_REQUIRE_PARAM_N(1);
+
+        if (do_not_call) {
+            return GetUnderlyingType(call->Params[0]);
+        }
+
         return EmitPushUnderlyingValue(call->Params[0]);
     }
 
@@ -1191,6 +1207,11 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
             return eFoxType::NONETYPE;
         }
 
+
+        if (do_not_call) {
+            return vh->Type;
+        }
+
         EmitPopVar(vh->VariableIndex);
 
         return vh->Type;
@@ -1203,21 +1224,37 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call)
             return eFoxType::NONETYPE;
         }
 
+        if (do_not_call) {
+            return eFoxType::INT;
+        }
+
         EmitJumpPause(lit->Value.ValueInt);
 
         return eFoxType::INT;
     }
     case scVRetI: {
+        if (do_not_call) {
+            return eFoxType::INT;
+        }
+
         mpCurrentFunctionBody->pBlock->bHasExplicitReturn = true;
         EmitJumpReturnToCallerInt32();
         return eFoxType::INT;
     }
     case scVRetF: {
+        if (do_not_call) {
+            return eFoxType::FLOAT;
+        }
+
         mpCurrentFunctionBody->pBlock->bHasExplicitReturn = true;
         EmitJumpReturnToCallerFloat32();
         return eFoxType::FLOAT;
     }
     case scVRetS: {
+        if (do_not_call) {
+            return eFoxType::STRING;
+        }
+
         mpCurrentFunctionBody->pBlock->bHasExplicitReturn = true;
         EmitJumpReturnToCallerString();
         return eFoxType::STRING;

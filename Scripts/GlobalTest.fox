@@ -1,22 +1,9 @@
-#include "Scripts/time"
 
 init()
 {
 }
 
-some(&int x)
-{
-    x = 20;
-}
-
-
 Default() int
 {
-    local int z = 20;
-    local int x = 10;
-
-    local &int ref = x;
-    ref = 30;
-
-    return x;
+    return castint(10.5f);
 }

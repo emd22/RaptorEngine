@@ -1,4 +1,1 @@
-seconds(float x) int
-{
-    return castint(x * 10f);
-}
+

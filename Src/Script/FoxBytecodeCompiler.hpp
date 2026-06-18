@@ -98,7 +98,7 @@ private:
     void EmitFunctionDeclaration(FoxAstFunctionDecl* function);
     void EmitFunctionDefinitionsInBlock(FoxAstBlock* block);
 
-    eFoxType DoBuiltin(FoxAstFunctionCall* call);
+    eFoxType DoBuiltin(FoxAstFunctionCall* call, bool do_not_call);
     void EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value);
 
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
