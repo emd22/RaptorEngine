@@ -97,9 +97,8 @@ private:
     void DoVariable(uint8 op_base, uint8 op_spec);
     void DoCompare(uint8 op_base, uint8 op_spec);
 
-    void PushVarCount();
-    void IncVarCount();
-    void PopVarCount();
+    void PushVarBaseIndex();
+    void PopVarBaseIndex();
 
     VMVariable& GetVar(uint16 index);
 

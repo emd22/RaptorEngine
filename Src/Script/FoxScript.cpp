@@ -9,6 +9,7 @@
 
 #include <Core/Defer.hpp>
 #include <Core/String.hpp>
+#include <chrono>
 
 namespace fx::script {
 
@@ -78,8 +79,7 @@ void FoxScript::Load(const String& path)
     destroyer.Do(root_node);
 
     // If there is a globals function, call it
-
-    // CallProc(GetSymbol("globals"), {});
+    CallProc(GetSymbol("globals"), {});
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
@@ -114,7 +114,7 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
 
 FoxValue FoxScript::Update()
 {
-    if (SDL_GetTicks() < ResumeTime) {
+    if (std::chrono::system_clock::now() < ResumeTime) {
         return FoxValue::scNone;
     }
 
@@ -133,7 +133,7 @@ FoxValue FoxScript::Resume()
         Vm.ExecuteOp();
 
         if (Vm.bIsPaused) {
-            ResumeTime = SDL_GetTicks() + Vm.PauseTime;
+            ResumeTime = std::chrono::system_clock::now() + std::chrono::milliseconds(uint64(Vm.PauseTime) * 100);
             break;
         }
 

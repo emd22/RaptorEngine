@@ -138,31 +138,30 @@ For example:
 As you can see from the above example, global variables need to be brought into a local scope to be used.
 They can either be brought in implicitly, or defined explicitly. If there is no local `global [type] [name]` definition in the current scope but the value is requested, the bytecode compiler automatically outputs a `VGLOBAL` instruction to define it in local scope.
 
-Note that `global [type] [name]` is not a _reference_ to a global variable `[name]`. It creates a variable locally that contains the same value as `[name]`.
+Note that `global [type] [name]` is a _reference_ to a global variable `[name]`. This means that `global [type] [name]` is just a proxy to the actual variable.
 
-This means that the order can matter.
 For example,
 
 ```
 globals()
 {
-    global int SC_Global_Value;
+    global int SC_GlobalValue = 10;
 }
 
 ModifyGlobal()
 {
     // Explicit hoisting
     global int SC_GlobalValue;
-    SC_GlobalValue = 10;
+    SC_GlobalValue = 5;
 }
 
-TheIssue()
+A() int
 {
-    // If we define the hoist explicitly, then we can use the unmodified value.
     global int SC_GlobalValue;
+    ModifyGlobal();
 
-
-
+    // Returns 5, not 10.
+    return SC_GlobalValue;
 }
 ```
 
@@ -207,6 +206,26 @@ To return values from procedures, follow the definition with a type:
 ProcThatReturns(int x, int y) int
 {
     return x + y;
+}
+```
+
+## Waiting / Execution Handoff
+
+A key feature to game scripting languages is the ability to time events based on wall-time. This could be for timing enemies spawning, opening doors, or for animating objects.
+
+To do this in Fox, you can use the `pause(time_in_100ms)` function. The time is by a 10th of a second.
+
+Example:
+
+```
+DoSomething()
+{
+    Object_DoSomething(OBJECT_ID);
+
+    // Handoff control back to the engine for 1 second.
+    pause(10);
+
+    Object_Remove(OBJECT_ID);
 }
 ```
 
@@ -313,7 +332,4 @@ caller()
 
     saveobject("ploober");
 }
-
-
-
 ```

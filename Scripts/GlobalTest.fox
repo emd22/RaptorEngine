@@ -1,4 +1,4 @@
-globals()
+/*globals()
 {
 global int SC_Hello = 10;
 }
@@ -15,11 +15,43 @@ Default() int
 {
     globals();
 
-    global int SC_Hello;
+
+    local int temp = 0;
+
+    {
+        temp = SC_Hello;
+    }
 
     ModifyGlobal();
 
-    local int x = SC_Hello;
 
+    return SC_Hello;
+}*/
+
+
+globals()
+{
+    global int A = 2;
+}
+
+funcall()
+{
+    global int A = 3;
+
+}
+
+Default() int
+{
+    {
+        global int A;
+        A = A + 2;
+    }
+
+    global int A;
+    local int t = A;
+
+    funcall();
+
+    local int x = t;
     return x;
 }

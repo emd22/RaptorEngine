@@ -55,7 +55,7 @@ public:
 public:
     FoxVM Vm;
 
-    uint64 ResumeTime = 0;
+    std::chrono::system_clock::time_point ResumeTime;
 };
 
 } // namespace script

@@ -393,7 +393,7 @@ uint32 FoxVM::GetProcAddr(const Hash32 name_hash) const
     return sym->Offset;
 }
 
-void FoxVM::PushVarCount()
+void FoxVM::PushVarBaseIndex()
 {
     if (ScopeIndex < 0) {
         LogWarning(LC_SCRIPT, "Scope index < 0");
@@ -402,14 +402,15 @@ void FoxVM::PushVarCount()
 
     Assert(ScopeIndex < 32);
 
+    // Store the current base index.
     ScopeVarCounts[ScopeIndex] = VariableBaseIndex;
-
     ++ScopeIndex;
+
     ScopeVarCounts[ScopeIndex] = 0;
 }
 
 
-void FoxVM::PopVarCount()
+void FoxVM::PopVarBaseIndex()
 {
     if (ScopeIndex < 0) {
         LogWarning(LC_SCRIPT, "Scope index < 0");
@@ -418,40 +419,12 @@ void FoxVM::PopVarCount()
 
     Assert(ScopeIndex < 32);
     Assert(ScopeIndex > 0);
+
+    // Restore the base index
     --ScopeIndex;
     VariableBaseIndex = ScopeVarCounts[ScopeIndex];
 }
 
-void FoxVM::IncVarCount()
-{
-    Assert(ScopeIndex < 32);
-    Assert(ScopeIndex > 0);
-
-    ++ScopeVarCounts[ScopeIndex];
-}
-
-
-// void FoxVM::StashVariables()
-// {
-//     if (ScopeIndex < 0) {
-//         LogWarning(LC_SCRIPT, "Scope index < 0");
-//         return;
-//     }
-
-//     Assert(ScopeIndex < 32);
-//     VariableBaseIndex += ScopeVarCounts[ScopeIndex];
-// }
-
-// void FoxVM::RevertVariables()
-// {
-//     if (ScopeIndex < 0) {
-//         LogWarning(LC_SCRIPT, "Scope index < 0");
-//         return;
-//     }
-
-//     Assert(ScopeIndex < 32);
-//     VariableBaseIndex -= ScopeVarCounts[ScopeIndex];
-// }
 
 void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
 {
@@ -509,7 +482,7 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_CallAbsolute) {
         // StashVariables();
-        PushVarCount();
+        PushVarBaseIndex();
 
         uint32 name_hash = Read32();
         uint32 call_offset = GetProcAddr(name_hash);
@@ -526,14 +499,14 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_ReturnToCaller) {
         // RevertVariables();
-        PopVarCount();
+        PopVarBaseIndex();
 
         // --ScopeIndex;
         PC = PopReturnAddr();
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Int32) {
         // RevertVariables();
-        PopVarCount();
+        PopVarBaseIndex();
 
         LastPushType = eFoxType::INT;
         // --ScopeIndex;
@@ -542,7 +515,7 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_Float32) {
         // RevertVariables();
-        PopVarCount();
+        PopVarBaseIndex();
 
         LastPushType = eFoxType::FLOAT;
         // --ScopeIndex;
@@ -551,7 +524,7 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecJump_ReturnToCaller_String) {
         // RevertVariables();
-        PopVarCount();
+        PopVarBaseIndex();
 
         LastPushType = eFoxType::STRING;
         // --ScopeIndex;
@@ -637,10 +610,6 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = false;
         var.Value.Set<int32>(0);
-
-        IncVarCount();
-        // Assert(ScopeIndex < 32);
-        // ScopeVarCounts[ScopeIndex]++;
     }
 
     else if (op_spec == BcSpecVariable_DefineGlobal) {
@@ -656,10 +625,6 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         var.bIsGlobalRef = true;
         var.GlobalNameHash = name_hash;
         var.Value.Set<int32>(Globals[name_hash].Get<int32>());
-
-        IncVarCount();
-        // Assert(ScopeIndex < 32);
-        // ScopeVarCounts[ScopeIndex]++;
     }
     else if (op_spec == BcSpecVariable_Cast_Int32) {
         float32 fvalue = std::bit_cast<float32>(Pop32());

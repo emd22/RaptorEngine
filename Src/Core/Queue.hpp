@@ -12,6 +12,34 @@ template <typename T>
 class Queue
 {
 public:
+    struct Iterator
+    {
+        Iterator(T* ptr, size_t index) : mpPtr(ptr), mIndex(index) {}
+
+        Iterator& operator++()
+        {
+            mIndex++;
+            return *this;
+        }
+
+        Iterator& operator++(int value)
+        {
+            Iterator before = *this;
+            mIndex++;
+            return before;
+        }
+
+        T& operator*() const { return mpPtr[mIndex]; }
+
+        bool operator==(const Iterator& b) const { return mpPtr == b.mpPtr && mIndex == b.mIndex; }
+
+
+    private:
+        T* mpPtr;
+        size_t mIndex;
+    };
+
+public:
     Queue() = default;
     Queue(uint32 num_objects) { InitCapacity(num_objects); }
 
@@ -32,6 +60,10 @@ public:
 
         return *this;
     }
+
+
+    Iterator begin() const { return Iterator(mpData, 0); }
+    Iterator end() const { return Iterator(mpData, mSize); }
 
     bool IsInited() const { return mpData != nullptr; }
 
@@ -192,4 +224,6 @@ private:
     uint32 mPushIndex = 0;
     uint32 mPopIndex = 0;
 };
+
+
 } // namespace fx

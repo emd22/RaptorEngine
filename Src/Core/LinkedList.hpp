@@ -5,6 +5,8 @@
 
 #include <cstdlib>
 
+namespace fx {
+
 // #define FX_LINKED_LIST_NO_REUSE_NODES 1
 
 template <typename ElementType>
@@ -220,3 +222,5 @@ private:
     PagedArray<Node> mNodePool;
     PagedArray<Node*> mFreedNodes;
 };
+
+} // namespace fx

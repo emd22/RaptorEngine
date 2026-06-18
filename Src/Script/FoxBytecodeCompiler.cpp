@@ -20,7 +20,7 @@ using TT = eTokenType;
 SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
 {
     mBytecode.Create(scBytecodePageSize);
-    LocalVarHandles.Create(64);
+    LocalVarHandles.InitCapacity(64);
     Strings.Create(32);
 
     Assert(root->NodeType == FX_AST_BLOCK);

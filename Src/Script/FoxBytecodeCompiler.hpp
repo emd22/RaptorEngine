@@ -186,8 +186,9 @@ private:
     eFoxType GetLiteralUnderlyingType(FoxAstLiteral* literal) const;
 
 public:
-    PagedArray<FoxBytecodeVarHandle> LocalVarHandles;
+    SizedArray<FoxBytecodeVarHandle> LocalVarHandles;
     PagedArray<FoxBytecodeVarHandle> GlobalHandles;
+
     std::vector<FoxBytecodeFunctionHandle> FunctionHandles;
     PagedArray<uint8> mBytecode {};
 
