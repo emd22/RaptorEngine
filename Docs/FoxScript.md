@@ -229,6 +229,18 @@ DoSomething()
 }
 ```
 
+The C++ code for this would look like:
+
+```cpp
+FoxScript script("Script.fox");
+
+// Call the entrypoint
+FoxValue return_value = script.CallProc(script.GetSymbol("start"), {});
+
+// Resume from the paused state. This might be in the game loop or the object update function.
+return_value = script.Resume();
+```
+
 ## Conditionals
 
 If statements in Fox work in the same way as C.
