@@ -124,6 +124,7 @@ private:
     void EmitPushString(uint32 value);
     void EmitPushVar(VarIndex var);
     void EmitPushVarPtr(VarIndex var);
+    void EmitPushReadPtr(VarIndex var);
     void EmitPushReturnAddr();
 
     eFoxType EmitPushUnderlyingValue(FoxAstNode* node, eFoxPushMode mode = eFoxPushMode::Default);

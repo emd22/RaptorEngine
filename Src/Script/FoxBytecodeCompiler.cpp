@@ -331,6 +331,14 @@ void FoxBytecodeCompiler::EmitPushVarPtr(VarIndex var)
     Write16(var);
 }
 
+void FoxBytecodeCompiler::EmitPushReadPtr(VarIndex var)
+{
+    // VREADPTR [&ptr]
+    WriteOp(BcBase_Push, BcSpecPush_ReadPtr);
+    Write16(var);
+}
+
+
 void FoxBytecodeCompiler::EmitPushReturnAddr() { WriteOp(BcBase_Push, BcSpecPush_ReturnAddr); }
 
 eFoxType FoxBytecodeCompiler::EmitPushUnderlyingValue(FoxAstNode* node, eFoxPushMode mode)
@@ -361,27 +369,30 @@ eFoxType FoxBytecodeCompiler::EmitPushUnderlyingValue(FoxAstNode* node, eFoxPush
                 // A global handle does exist, hoist it up.
                 EmitVariableGlobalHoist(global_handle, ref->GetNameHash());
             }
-        }
-
-        if (literal->Value.Type == eFoxType::INT) {
-            EmitPush32(literal->Value.ValueInt);
-        }
-        else if (literal->Value.Type == eFoxType::REF) {
-            // Get the type of the variable
-            FoxBytecodeVarHandle* vhandle = FindVarHandle(literal->Value.pValueRef->pName->GetHash());
-
-            if (!vhandle) {
-                return eFoxType::NONETYPE;
-            }
-
-            if (mode == eFoxPushMode::PushPointer) {
-                EmitPushVarPtr(vhandle->VariableIndex);
-            }
             else {
-                EmitPushVar(vhandle->VariableIndex);
-            }
+                // Get the type of the variable
+                FoxBytecodeVarHandle* vhandle = FindVarHandle(literal->Value.pValueRef->pName->GetHash());
 
-            return vhandle->Type;
+                // Get the reference variable index and push it to the stack.
+                if (mode == eFoxPushMode::PushPointer) {
+                    EmitPushVarPtr(vhandle->VariableIndex);
+                }
+
+                // If the value is a pointer and we are not in the PushPointer mode, then we need to dereference it.
+                else if (vhandle->bIsPointer) {
+                    EmitPushReadPtr(vhandle->VariableIndex);
+                }
+
+                // Push the normal variable index to the stack.
+                else {
+                    EmitPushVar(vhandle->VariableIndex);
+                }
+
+                return vhandle->Type;
+            }
+        }
+        else if (literal->Value.Type == eFoxType::INT) {
+            EmitPush32(literal->Value.ValueInt);
         }
         else if (literal->Value.Type == eFoxType::FLOAT) {
             EmitPushFloat32(literal->Value.ValueFloat);
@@ -842,7 +853,7 @@ void FoxBytecodeCompiler::EmitAssign(FoxAstAssign* assign)
 {
     FoxBytecodeVarHandle* var_handle = FindVarHandle(assign->pLhs->pName->GetHash());
     if (var_handle == nullptr) {
-        CompileError("Var '{:.{}}' does not exist!", assign->pLhs->pName->Start, assign->pLhs->pName->Length);
+        CompileError("Var '{}' does not exist!", assign->pLhs->pName->GetStr());
         return;
     }
 
@@ -946,10 +957,24 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
             EmitVariableSetString(handle->VariableIndex, is_pointer);
             AddString(mBytecode.Size() - sizeof(uint32), literal->Value.ValueString);
             break;
-        case eFoxType::REF:
-            EmitVariableSetVar(handle->VariableIndex, FindVarInScope(literal->Value.pValueRef->pName->GetHash()),
-                               is_pointer);
-            break;
+        case eFoxType::REF: {
+            FoxBytecodeVarHandle* rhs_handle = FindVarHandle(literal->Value.pValueRef->pName->GetHash());
+
+            if (rhs_handle == nullptr) {
+                CompileError("Assignment: Could not find variable {}", literal->Value.pValueRef->pName->GetStr());
+                return;
+            }
+
+            // If the RHS is a pointer, we need to dereference it with VREADPTR.
+            if (rhs_handle->bIsPointer) {
+                EmitPushReadPtr(rhs_handle->VariableIndex);
+                EmitPopVar(handle->VariableIndex);
+            }
+            else {
+                EmitVariableSetVar(handle->VariableIndex, rhs_handle->VariableIndex, is_pointer);
+            }
+
+        } break;
         }
     }
     else if (rhs->NodeType == FX_AST_PROCCALL || rhs->NodeType == FX_AST_BINOP) {
@@ -1536,7 +1561,11 @@ void FoxBytecodePrinter::DoPush(char* s, uint8 op_base, uint8 op_spec)
     }
     else if (op_spec == BcSpecPush_VarPtr) {
         VarIndex var = Read16();
-        BC_PRINT_OP("VPUSHPTR {}", var);
+        BC_PRINT_OP("VPUSHPTR ({})", var);
+    }
+    else if (op_spec == BcSpecPush_ReadPtr) {
+        VarIndex var = Read16();
+        BC_PRINT_OP("VREADPTR ${}", var);
     }
 }
 

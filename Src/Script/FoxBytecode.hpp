@@ -35,6 +35,7 @@ enum BcSpecPush : uint8
     BcSpecPush_Var,        // VPUSH [%var]
     BcSpecPush_ReturnAddr, // PUSHRA
     BcSpecPush_VarPtr,     // VPUSHPTR [%var]
+    BcSpecPush_ReadPtr,    // VREADPTR [&ptr]
 
     BcSpecPush_StackAlloc,
 };

@@ -251,7 +251,16 @@ void FoxVM::DoPush(uint8 op_base, uint8 op_spec)
 
     else if (op_spec == BcSpecPush_VarPtr) {
         uint16 var_index = Read16();
-        Push32(eFoxType::INT, static_cast<uint32>(var_index));
+        VMVariable& var = GetVar(var_index);
+
+        Push32(var.Type, static_cast<uint32>(var_index));
+    }
+
+    else if (op_spec == BcSpecPush_ReadPtr) {
+        VMVariable& ptr_var = GetVar(Read16());
+        VMVariable& underlying_var = GetVarAbsolute(ptr_var.Value.ValueInt);
+
+        Push32(underlying_var.Type, underlying_var.Value.AsUInt());
     }
 
     else if (op_spec == BcSpecPush_ReturnAddr) {
@@ -732,7 +741,9 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         uint32 value = Read32();
         LogInfo("VSET [int32] ${}, {}", var_index, value);
 
-        VMVariable& var = GetVarAbsolute(var_index);
+        VMVariable& ptr_var = GetVar(var_index);
+        VMVariable& var = GetVarAbsolute(ptr_var.Value.ValueInt);
+
         var.Value.Set<int32>(value);
 
         // Update global variable
@@ -746,7 +757,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         float32 value = std::bit_cast<float32>(Read32());
         LogInfo("VSET [float32] ${}, {}", var_index, value);
 
-        VMVariable& var = GetVarAbsolute(var_index);
+        VMVariable& ptr_var = GetVar(var_index);
+        VMVariable& var = GetVarAbsolute(ptr_var.Value.ValueInt);
         var.Value.Set<float32>(value);
 
         // Update global variable
@@ -759,7 +771,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         uint16 var_index = Read16();
         uint32 string_offset = Read32();
 
-        VMVariable& var = GetVarAbsolute(var_index);
+        VMVariable& ptr_var = GetVar(var_index);
+        VMVariable& var = GetVarAbsolute(ptr_var.Value.ValueInt);
         var.Value.Set<int32>(string_offset);
 
         // Update global variable
@@ -772,7 +785,8 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         VarIndex dst_index = Read16();
         VarIndex src_index = Read16();
 
-        VMVariable& dst_var = GetVarAbsolute(dst_index);
+        VMVariable& ptr_var = GetVar(dst_index);
+        VMVariable& dst_var = GetVarAbsolute(ptr_var.Value.ValueInt);
 
         if (dst_var.bIsGlobalRef) {
             GetGlobal(dst_var) = GetVar(src_index).Value;
