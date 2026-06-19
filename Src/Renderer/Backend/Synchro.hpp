@@ -2,8 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Core/Assert.hpp>
 #include <Core/Bitset.hpp>
-#include <Core/Panic.hpp>
 #include <Core/Types.hpp>
 
 namespace fx::renderer {

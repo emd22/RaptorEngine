@@ -7,15 +7,56 @@
 
 #include <Core/DataNotifier.hpp>
 #include <Core/Ref.hpp>
+#include <Core/TSQueue.hpp>
 #include <Core/TSRef.hpp>
 #include <Core/Types.hpp>
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 namespace fx {
 
 template <typename T>
 concept C_IsAsset = std::is_base_of_v<AxBase, T>;
+
+
+static constexpr uint32 scDeletionTickOffset = 10;
+
+
+struct AssetDeletionTicket
+{
+    enum class eType
+    {
+        None,
+        Buffer,
+    };
+
+    struct BufferTicket
+    {
+        VkBuffer Buffer = VK_NULL_HANDLE;
+        VmaAllocation Allocation = VK_NULL_HANDLE;
+    };
+
+public:
+    AssetDeletionTicket(uint32 current_tick, const renderer::RawGpuBuffer& gpu_buffer)
+        : Type(eType::Buffer), Value { .Ticket = { .Buffer = gpu_buffer.Buffer, .Allocation = gpu_buffer.Allocation } },
+          MinDeletionTick(current_tick + scDeletionTickOffset)
+    {
+    }
+
+    void DeleteImmediate() const;
+    bool TryDelete(uint32 current_tick) const;
+
+public:
+    eType Type = eType::None;
+
+    union
+    {
+        BufferTicket Ticket;
+    } Value;
+
+    uint32 MinDeletionTick = 0;
+};
 
 /**
  * Worker thread that waits and processes individual asset loading.
@@ -30,7 +71,7 @@ public:
     void SubmitItemToLoad(AxQueueItem&& item)
     {
         Item = std::move(item);
-        ItemReady.SignalDataWritten();
+        ItemReady.Signal();
     }
 
     void DebugPrint() const
@@ -150,12 +191,10 @@ public:
         return asset;
     }
 
-    TSRef<AxImage> LoadImageFromPixels(renderer::eImageType image_type, eImageFormat format, const uint8* data,
-                                       uint32 data_size)
+    TSRef<AxImage> LoadImageFromPixels(const ImageInfo& img_info)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
-        LoadImageFromPixels(image_type, format, asset, 0, data, data_size);
-
+        LoadImageFromPixels(asset, img_info);
         return asset;
     }
 
@@ -164,12 +203,6 @@ public:
         return LoadImageFromMemory(renderer::eImageType::Flat, format, data, data_size);
     }
 
-    inline TSRef<AxImage> LoadImageFromPixels(eImageFormat format, const uint8* pixels, uint32 data_size)
-    {
-        return LoadImageFromPixels(renderer::eImageType::Flat, format, pixels, data_size);
-    }
-
-
     ////////////////////////////////////////////////
     // Methods to load into existing containers
     ////////////////////////////////////////////////
@@ -177,8 +210,7 @@ public:
     void LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
                              const uint8* data, uint32 data_size);
 
-    void LoadImageFromPixels(renderer::eImageType, eImageFormat, TSRef<AxImage>& asset, uint32 mip_level,
-                             const uint8* pixel_data, uint32 size);
+    void LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info);
 
     /**
      * @brief Loads an asset into the provided asset from the provided data.
@@ -211,14 +243,35 @@ public:
         LoadImageFromMemory(renderer::eImageType::Flat, format, asset, data, data_size);
     }
 
+
+    /////////////////////////////////////
+    // Deletion Functions
+    /////////////////////////////////////
+
+    void DeleteBuffer(const renderer::RawGpuBuffer& buffer)
+    {
+        SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
+
+        if (!queue->IsInited()) {
+            queue->InitCapacity(256);
+        }
+
+        queue->Emplace(mTickCounter, buffer);
+        ManagerUpdateNotifier.Signal();
+    }
+
+    void ShutdownDeletionQueue();
+
+
     ~AxManager() { Shutdown(); }
 
 
 private:
     AxWorker* FindWorkerThread();
 
-    void CheckForUploadableData();
-    void CheckForItemsToLoad();
+    bool CheckForUploadableData();
+    bool CheckForItemsToLoad();
+    bool CheckForItemsToDelete();
 
     bool CheckWorkersBusy();
 
@@ -235,9 +288,7 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, asset, TLoadType));
-
-        mgr->ItemsEnqueued.test_and_set();
-        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+        mgr->ManagerUpdateNotifier.Signal();
     }
 
     template <typename TAssetType, typename TLoaderType, eAssetLoadType TLoadType>
@@ -249,43 +300,44 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, asset, TLoadType, asset_data));
-
-        mgr->ItemsEnqueued.test_and_set();
-        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+        mgr->ManagerUpdateNotifier.Signal();
     }
 
     template <typename TAssetType, eAssetLoadType TLoadType>
         requires C_IsAsset<TAssetType>
-    static void SubmitImageToUpload(const TSRef<TAssetType>& asset, uint32 mip_level,
-                                    const Slice<const uint8>& pixel_data)
+    static void SubmitImageToUpload(const TSRef<TAssetType>& asset, const ImageInfo& img_info)
     {
         AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
-        AssertMsg(pixel_data != nullptr, "Data cannot be null");
+        AssertMsg(img_info.ImageData.pData != nullptr, "Image data cannot be null");
 
         AxManager* mgr = GetInstance();
 
-        mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, 0, pixel_data.pData, pixel_data.Size));
-
-        mgr->ItemsEnqueued.test_and_set();
-        mgr->ItemsEnqueuedNotifier.SignalDataWritten();
+        mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, img_info));
+        mgr->ManagerUpdateNotifier.Signal();
     }
 
 public:
     //    DataNotifier DataLoaded;
 private:
     AxQueue mLoadQueue;
+    TSQueue<AssetDeletionTicket> mDeletionTickets;
 
     SizedArray<AxWorker*> WorkersWaitingToUpload;
 
     std::atomic_flag mbActive;
+    CountedNotifier ManagerUpdateNotifier;
 
-    DataNotifier ItemsEnqueuedNotifier;
-    std::atomic_flag ItemsEnqueued;
+    bool mbShouldSleep = false;
 
     uint32 mMinThreads = 2;
-    // SizedArray<std::thread *> mWorkerThreads;
     SizedArray<AxWorker> mWorkerThreads;
     std::thread* mpAssetManagerThread;
+
+    std::atomic_uint mTickCounter = 0;
+    uint32 mLastActiveTick = 0;
+
+    bool mbIsTimeSet = false;
+    std::chrono::system_clock::time_point mLastActiveTime;
 };
 
 } // namespace fx

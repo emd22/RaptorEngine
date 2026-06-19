@@ -139,3 +139,9 @@
     using EnumType_##Bits = std::underlying_type_t<EnumType_>;
 
 #define FX_UNUSED [[maybe_unused]]
+
+#ifndef FX_NO_RESTRICT
+#define RESTRICT __restrict
+#else
+#define RESTRICT
+#endif

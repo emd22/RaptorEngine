@@ -5,8 +5,8 @@
 #include "Shader.hpp"
 #include "VertexDescription.hpp"
 
+#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
-#include <Core/Panic.hpp>
 #include <Core/StackArray.hpp>
 #include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>

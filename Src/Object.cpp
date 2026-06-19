@@ -417,7 +417,6 @@ void Object::SetScriptVars()
     }
 
     pScript->SetGlobal(HashStr32("OBJECTID"), script::FoxValue(static_cast<int32>(ObjectId)));
-    pScript->CallProc(HashStr32("ObjectInit"), {});
 }
 
 void Object::AttachScript(const Ref<script::FoxScript>& script)
@@ -525,14 +524,6 @@ void Object::Destroy()
     if (pMesh) {
         pMesh->Destroy();
     }
-
-    // gMaterialManager->DestroyMaterial(mMaterialID);
-
-    // if (pMaterial) {
-    //     pMaterial->Destroy();
-    // }
-
-    // gMaterialManager->DestroyMaterial(mMaterialID);
 
     PhObject* phys = nullptr;
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {

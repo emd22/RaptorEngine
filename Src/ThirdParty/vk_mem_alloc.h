@@ -6578,7 +6578,7 @@ VmaDedicatedAllocationList::~VmaDedicatedAllocationList()
         auto* node = m_AllocationList.Front();
 
         while (node != nullptr) {
-            printf("[UNFREED ALLOCATION] %s of size %llu of type %d (sub %d)\n", node->GetName(), node->GetSize(), node->GetType(), node->GetSuballocationType());
+            printf("[UNFREED ALLOCATION] %s of size %llu of type %d (sub %s)\n", node->GetName(), node->GetSize(), node->GetType(), VMA_SUBALLOCATION_TYPE_NAMES[node->GetSuballocationType()]);
             node = m_AllocationList.GetNext(node);
         }
 

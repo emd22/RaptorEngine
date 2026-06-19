@@ -2,10 +2,10 @@
 #include "Image.hpp"
 
 #include <Asset/Loader/AxLoaderStb.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/File.hpp>
 #include <Core/MemPool/MemPool.hpp>
-#include <Core/Panic.hpp>
 #include <Core/StackArray.hpp>
 #include <Engine.hpp>
 #include <Renderer/Backend/Fwd/Fwd_GetFrame.hpp>
@@ -74,7 +74,7 @@ Image& Image::operator=(const Image& other)
     ImageLayout = other.ImageLayout;
     Allocation = other.Allocation;
 
-    mMipsCount = other.mMipsCount;
+    mMipCount = other.mMipCount;
 
     // Set the new ref count
     mpRefCnt = other.mpRefCnt;
@@ -111,7 +111,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
     Size = size;
     Format = format;
     ViewType = image_type;
-    mMipsCount = mips_count;
+    mMipCount = mips_count;
 
     if (!mpRefCnt) {
         mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
@@ -163,8 +163,12 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
     static uint32 alloc_number = 0;
 
+    // if (alloc_number == 6) {
+    //     FX_BREAKPOINT;
+    // }
     std::string alloc_name = std::to_string(alloc_number++);
     vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
+
 
     // LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
     //           reinterpret_cast<void*>(Allocation));
@@ -254,7 +258,7 @@ void Image::CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2
     CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0, 0);
 }
 
-void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<uint8>& image_data)
+void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<const uint8>& image_data)
 {
     RawGpuBuffer staging_buffer;
     staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
@@ -360,7 +364,7 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
             {
                 .aspectMask = aspect_flags,
                 .baseMipLevel = 0,
-                .levelCount = mMipsCount,
+                .levelCount = mMipCount,
                 .baseArrayLayer = 0,
                 .layerCount = layer_count,
             },
@@ -635,7 +639,7 @@ void Image::DecRef()
 
 void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 {
-    const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetSize(Format);
+    const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetPixelStride(Format);
 
     SizedArray<uint8> image_data;
     image_data.InitSize(data_size);

@@ -1,7 +1,7 @@
 #include "AxManager.hpp"
 
 #include "AxImage.hpp"
-#include "Core/Panic.hpp"
+#include "Core/Assert.hpp"
 #include "Core/SizedArray.hpp"
 #include "Loader/AxLoaderGltf.hpp"
 #include "Loader/AxLoaderJpeg.hpp"
@@ -20,6 +20,39 @@ namespace fx {
 
 static constexpr uint32 scMaxWorkerThreads = 10;
 
+static constexpr std::chrono::seconds scTimeUntilSleep = std::chrono::seconds(3);
+
+
+/////////////////////////////////////
+// Asset Deletion Ticket
+/////////////////////////////////////
+
+void AssetDeletionTicket::DeleteImmediate() const
+{
+    switch (Type) {
+    case eType::None:
+        break;
+
+    case eType::Buffer: {
+        const BufferTicket& ticket = Value.Ticket;
+        vmaDestroyBuffer(renderer::gRenderer->GpuAllocator, ticket.Buffer, ticket.Allocation);
+    } break;
+    }
+}
+
+
+bool AssetDeletionTicket::TryDelete(uint32 current_tick) const
+{
+    const bool missed_or_overflow = ((MinDeletionTick - current_tick) > (UINT32_MAX - 10000));
+
+    if (current_tick >= MinDeletionTick || missed_or_overflow) {
+        DeleteImmediate();
+        return true;
+    }
+
+    return false;
+}
+
 
 ////////////////////////////////////
 // Asset Worker
@@ -34,7 +67,7 @@ void AxWorker::Create()
 void AxWorker::Update()
 {
     while (bRunning.load()) {
-        ItemReady.WaitForData();
+        ItemReady.Wait();
         ItemReady.Reset();
 
         // In order to stop the worker, we need to kill the ItemReady notifier. Here we need to check if the worker
@@ -47,15 +80,18 @@ void AxWorker::Update()
         // Retrieve the loader and asset from the item
         LockContext<AxItemData> asset_data = Item.GetDataContext();
 
-        switch (Item.AssetSrc) {
-        case fx::eAssetLoadSrc::FilePath:
+        AssertMsg(Item.AssetLoadOp != eAssetLoadOp::None, "No asset load op set!");
+
+        switch (Item.AssetLoadOp) {
+        case fx::eAssetLoadOp::ReadAndUpload:
             LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
             break;
-        case fx::eAssetLoadSrc::FileData:
+        case fx::eAssetLoadOp::ProcessAndUpload:
             LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
             std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
             break;
-        case fx::eAssetLoadSrc::RawData:
+        case fx::eAssetLoadOp::DirectUpload:
+            LoadStatus = AxLoaderBase::eStatus::Success;
             // No need to process anything
             break;
 
@@ -76,8 +112,11 @@ void AxWorker::Update()
 
 void AxManager::Start(int32 min_threads)
 {
+    AssertMsg(mbActive.test() == false, "Asset manager is already created!");
+
     mMinThreads = min_threads;
     mbActive.test_and_set();
+
 
     // Allocate the workers
     mWorkerThreads.InitCapacity(scMaxWorkerThreads);
@@ -110,8 +149,18 @@ void AxManager::Shutdown()
         return;
     }
 
+    // Cleanup all permutations of empty images that were created.
+    PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
+
+    // if (empty_images_list.IsInited()) {
+    //     for (TSRef<AxImage>& image_ref : empty_images_list) {
+    //         image_ref.DestroyRef();
+    //     }
+    // }
+
+
     mbActive.clear();
-    ItemsEnqueuedNotifier.Kill();
+    ManagerUpdateNotifier.Kill();
 
     for (auto& worker : mWorkerThreads) {
         worker.Kill();
@@ -122,14 +171,15 @@ void AxManager::Shutdown()
     delete mpAssetManagerThread;
 
     mWorkerThreads.Free();
+}
 
-    // Cleanup all permutations of empty images that were created.
-    PagedArray<TSRef<AxImage>>& empty_images_list = AxImage::GetEmptyImagesArray();
+void AxManager::ShutdownDeletionQueue()
+{
+    SpinLockContext<Queue<AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
 
-    if (empty_images_list.IsInited()) {
-        for (TSRef<AxImage>& image_ref : empty_images_list) {
-            image_ref.DestroyRef();
-        }
+    while (!queue->IsEmpty()) {
+        queue->First().DeleteImmediate();
+        queue->Pop();
     }
 }
 
@@ -245,31 +295,33 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, eImageForma
     }
 }
 
-void AxManager::LoadImageFromPixels(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
-                                    uint32 mip_level, const uint8* pixel_data, uint32 data_size)
+void AxManager::LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info)
 {
-    SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, mip_level, Slice<const uint8>(pixel_data, data_size));
+    SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, img_info);
 }
 
-static void UploadImagePixels(TSRef<AxBase>& asset, ImageInfo image_info, uint32 mip_level, const uint8* pixel_data,
-                              uint32 data_size)
+static void DoDirectUpload(AxQueueItem& item, AxItemData& asset_data)
 {
-    // using namespace renderer;
+    ImageInfo img_info = item.ImgInfo;
 
-    // TSRef<AxImage> image(asset);
+    TSRef<AxImage> image(asset_data.pAsset);
 
-    // if (!image->Image.IsInited()) {
-    //     image->Image.CreateFromData(gRenderer->UploadContext.CmdBuffer, eImageType::Flat, image_info.Size, 1,
-    //                                 image_info.Format, MakeSlice<const uint8>(pixel_data, data_size),
-    //                                 eImageCreateFlags::None);
-    // }
-    // else {
-    //     image->Image.UploadMip(gRenderer->UploadContext, mip_level, const Vec2u &size, const Slice<uint8>
-    //     &image_data)
-    // }
+    if (image->Image.IsInited()) {
+        image->Image.UploadMip(renderer::RenderBackendFwd::GetUploadCmd(), img_info.MipLevel, img_info.Size,
+                               img_info.ImageData);
+    }
+    else {
+        image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), renderer::eImageType::Flat,
+                                    img_info.Size, img_info.MipCount, img_info.Format, img_info.ImageData,
+                                    eImageCreateFlags::None);
+    }
+
+
+    image->bIsUploadedToGpu = true;
+    image->bIsUploadedToGpu.notify_all();
 }
 
-void AxManager::CheckForUploadableData()
+bool AxManager::CheckForUploadableData()
 {
     using namespace renderer;
 
@@ -287,7 +339,7 @@ void AxManager::CheckForUploadableData()
     const bool should_upload = WorkersWaitingToUpload.Size > 0;
 
     if (!should_upload) {
-        return;
+        return false;
     }
 
     // Begin GPU upload
@@ -303,14 +355,12 @@ void AxManager::CheckForUploadableData()
 
         // The asset was successfully loaded, upload to GPU
         if (worker->LoadStatus == AxLoaderBase::eStatus::Success) {
-            // if (worker->Item.bIsRawPixelData) {
-            //     AxQueueItem& item = worker->Item;
-            //     UploadImagePixels(asset_data->pAsset, item.ImgInfo, item.MipLevel, item.pcRawData, item.DataSize);
-            // }
-            // else {
-            // Load the resouce into GPU memory
-            asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
-            // }
+            if (worker->Item.AssetLoadOp == eAssetLoadOp::DirectUpload) {
+                DoDirectUpload(worker->Item, asset_data.Get());
+            }
+            else if (asset_data->pLoader.IsValid()) {
+                asset_data->pLoader->CreateGpuResource(asset_data->pAsset);
+            }
         }
     }
 
@@ -327,8 +377,10 @@ void AxManager::CheckForUploadableData()
             .pCommandBuffers = &cmd.Cmd,
         };
 
+        VkQueue vk_xfer_queue = transfer_queue.Get();
 
-        vkQueueSubmit(transfer_queue.Get(), 1, &submit_info, gRenderer->UploadContext.UploadFence.Get());
+        AssertMsg(vk_xfer_queue != nullptr, "Queue has not been initialized");
+        vkQueueSubmit(vk_xfer_queue, 1, &submit_info, gRenderer->UploadContext.UploadFence.Get());
     }
 
     transfer_queue.Unlock();
@@ -340,9 +392,8 @@ void AxManager::CheckForUploadableData()
 
         if (worker->LoadStatus == AxLoaderBase::eStatus::Success) {
             while (!asset_data->pAsset->bIsUploadedToGpu) {
-                asset_data->pAsset->bIsUploadedToGpu.wait(true);
+                asset_data->pAsset->bIsUploadedToGpu.wait(false);
             }
-
 
             {
                 std::lock_guard guard(asset_data->pAsset->mCallbackMutex);
@@ -359,14 +410,16 @@ void AxManager::CheckForUploadableData()
 
             // Notify the asset thread that loading is finished
 
-            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.Signal();
             asset_data->pAsset->mIsLoaded.store(true);
 
-            // Destroy the loader(clearing the loading buffers)
-            asset_data->pLoader->Destroy(asset_data->pAsset);
+            if (asset_data->pLoader.IsValid()) {
+                // Destroy the loader(clearing the loading buffers)
+                asset_data->pLoader->Destroy(asset_data->pAsset);
+            }
         }
         else if (worker->LoadStatus == AxLoaderBase::eStatus::Error) {
-            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.Signal();
 
             // There was an error, call the OnError callback if it was registered
             if (asset_data->pAsset->mOnErrorCallback) {
@@ -374,16 +427,16 @@ void AxManager::CheckForUploadableData()
             }
         }
         else if (worker->LoadStatus == AxLoaderBase::eStatus::None) {
-            asset_data->pAsset->IsFinishedNotifier.SignalDataWritten();
+            asset_data->pAsset->IsFinishedNotifier.Signal();
             Panic("AssetManager", "Worker status is none!");
         }
 
-        ItemsEnqueued.clear();
-        worker->bIsBusy.clear();
-        worker->LoadStatus = AxLoaderBase::eStatus::None;
-
         worker->bDataPendingUpload.clear();
+        worker->LoadStatus = AxLoaderBase::eStatus::None;
+        worker->bIsBusy.clear();
     }
+
+    return true;
 }
 
 bool AxManager::CheckWorkersBusy()
@@ -408,95 +461,133 @@ void AxManager::AddWorkerThread()
     worker->Create();
 }
 
-void AxManager::CheckForItemsToLoad()
+bool AxManager::CheckForItemsToLoad()
 {
-    AxQueueItem item;
-    if (!mLoadQueue.PopIfAvailable(&item)) {
-        // The load queue is currently in use(uploaded to), skip for now.
-        return;
+    if (mLoadQueue.Size() < 1) {
+        return false;
     }
 
     AxWorker* worker = FindWorkerThread();
 
-    // Set this to something small, but high enough that it won't cancel loading in a ton of big models at once.
-    int tries_remaining = 5;
+    // No workers available currently, defer the item loading.
+    // Even though there is no worker available, we still return true as there is an item in the queue.
+    if (worker == nullptr) {
+        return true;
+    }
 
-    // No workers available, poll until one becomes available
-    while (worker == nullptr) {
-        if (tries_remaining <= 0) {
-            LogError(LC_ASSET, "Could not find worker thread, skipping load of object...");
-            DebugPrintWorkers();
-            break;
-        }
-
-        // AddWorkerThread();
-
-        LogWarning(LC_ASSET, "Currently {} items are enqueued...", mLoadQueue.Size());
-        LogError(LC_ASSET, "No workers available; Polling for worker thread...");
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-        // Check to see if any threads opened up
-        worker = FindWorkerThread();
-
-        --tries_remaining;
+    AxQueueItem item;
+    if (!mLoadQueue.PopIfAvailable(&item)) {
+        // The load queue is currently in use(uploaded to), skip for now.
+        return true;
     }
 
     if (worker) {
         if (worker->bIsBusy.test()) {
             // Return to sender
             mLoadQueue.Push(std::move(item));
-            return;
+            return true;
         }
 
         // Set busy
-        worker->bIsBusy.test_and_set();
+        while (worker->bIsBusy.test_and_set()) {
+            worker->bIsBusy.wait(true);
+        }
 
         // Submit the item we want to load
         worker->SubmitItemToLoad(std::move(item));
     }
+
+    return true;
+}
+
+bool AxManager::CheckForItemsToDelete()
+{
+    SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
+
+    if (queue->IsEmpty()) {
+        return false;
+    }
+
+    // Wait for all uploads to finish. We cannot be actively loading the item we are deleting!
+    renderer::gRenderer->UploadContext.UploadFence.WaitFor();
+
+    if (queue->First().TryDelete(mTickCounter)) {
+        queue->Pop();
+    }
+
+    return true;
 }
 
 void AxManager::AssetManagerUpdate()
 {
     uint32 num_uploads = 0;
     while (mbActive.test()) {
-        bool is_busy = CheckWorkersBusy();
+        // bool is_busy = CheckWorkersBusy();
 
         // If any of the workers are still marked as busy, there is data
         // either to be uploaded or is currently being loaded.
-        if (is_busy) {
-            // Loop while we are busy to check for when we are pending upload, as well
-            // as check for new arrivals.
-            while (CheckWorkersBusy() && mbActive.test()) {
-                // Check if there is data to be uploaded to the GPU
-                CheckForUploadableData();
+        // if (is_busy) {
+        //     // Loop while we are busy to check for when we are pending upload, as well
+        //     // as check for new arrivals.
+        //     while (CheckWorkersBusy() && mbActive.test()) {
+        //         // Check if there is data to be uploaded to the GPU
+        //         CheckForUploadableData();
 
-                // Check if there are any items that can be loaded by a worker
-                CheckForItemsToLoad();
+        //         // Check if there are any items that can be loaded by a worker
+        //         CheckForItemsToLoad();
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(80));
-            }
-        }
-        // There is no data being loaded or uploaded, we can unload the extra worker threads.
-        // else {
-        //     const uint32 amount_threads = mWorkerThreads.Size;
-        //     for (uint32 index = amount_threads; index > mMinThreads; index--) {
-        //         LogInfo(LC_ASSET, "Killing asset manager worker thread...");
-
-        //         // mWorkerThreads[index].Kill();
-        //         // mWorkerThreads[index].Thread.join();
-        //         // mWorkerThreads.RemoveLast();
+        //         std::this_thread::sleep_for(std::chrono::milliseconds(80));
         //     }
         // }
 
         // There are no busy workers remaining, wait for the next item to be enqueued.
-        ItemsEnqueuedNotifier.WaitForData();
-        ItemsEnqueuedNotifier.Reset();
+
+        if (mbShouldSleep) {
+            ManagerUpdateNotifier.Wait();
+            mbShouldSleep = false;
+        }
+        else {
+            ManagerUpdateNotifier.Discard();
+        }
+
+        // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
         if (!mbActive.test()) {
             break;
         }
 
-        CheckForItemsToLoad();
+
+        const bool has_upload_data = CheckForUploadableData();
+        const bool has_delete_data = CheckForItemsToDelete();
+        const bool has_load_data = CheckForItemsToLoad();
+
+        uint32 tick = mTickCounter.fetch_add(1);
+
+        if (has_upload_data || has_delete_data || has_load_data) {
+            mbIsTimeSet = false;
+            continue;
+        }
+
+        {
+            // If this is the first time that there has been no activity, set the current timestamp.
+            if (!mbIsTimeSet) {
+                mbIsTimeSet = true;
+                mLastActiveTime = std::chrono::system_clock::now();
+            }
+        }
+
+        // If the time since last activity is greater than scTimeUntilSleep, then sleep the asset manager.
+        // To wake it back up, ManagerUpdateNotifier will need to be signalled.
+        std::chrono::system_clock::duration time_since_active = std::chrono::system_clock::now() - mLastActiveTime;
+
+        if (time_since_active >= scTimeUntilSleep) {
+            mbShouldSleep = true;
+            LogInfo("Sleeping asset manager...");
+            continue;
+        }
+
+        // Throttle back if there is nothing to do
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 }
 
@@ -504,14 +595,14 @@ AxWorker* AxManager::FindWorkerThread()
 {
     uint32 worker_id = 0;
     for (AxWorker& worker : mWorkerThreads) {
-        ++worker_id;
         if (!worker.bIsBusy.test()) {
             LogInfo(LC_ASSET, "Found worker (id={})", worker_id);
             return &worker;
         }
+        ++worker_id;
     }
-    LogInfo(LC_ASSET, "Did not find any open worker!");
 
+    // Did not find any open worker, return null to be handled by the caller.
     return nullptr;
 }
 

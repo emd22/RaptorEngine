@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Panic.hpp"
+#include "Assert.hpp"
 
 #include <Core/Types.hpp>
 #include <atomic>
@@ -59,18 +59,25 @@ public:
             return;
         }
 
-        while (af.test()) {
+        while (af.test_and_set()) {
             af.wait(true);
         }
-
-        af.test_and_set();
 
         mbIsLocked = true;
     }
 
-    FX_FORCE_INLINE TObjectType& Get() { return mObject; }
+    SpinLockContext(const SpinLockContext& other) = delete;
 
+    FX_FORCE_INLINE SpinLockContext(SpinLockContext&& other) noexcept
+        : mAtomicFlag(other.mAtomicFlag), mObject(other.mObject), mbIsLocked(other.mbIsLocked)
+    {
+        other.mbIsLocked = false;
+    }
+
+    FX_FORCE_INLINE TObjectType& Get() { return mObject; }
     FX_FORCE_INLINE TObjectType* operator->() { return &mObject; }
+
+    SpinLockContext& operator=(const SpinLockContext& other) = delete;
 
     FX_FORCE_INLINE void Unlock()
     {
@@ -91,5 +98,49 @@ private:
     std::atomic_flag& mAtomicFlag;
     TObjectType& mObject;
 
+    bool mbIsLocked = false;
+};
+
+
+class SpinLockGuard
+{
+public:
+    FX_FORCE_INLINE SpinLockGuard(std::atomic_flag& af) : mAtomicFlag(af)
+    {
+        while (af.test()) {
+            af.wait(true);
+        }
+
+        af.test_and_set();
+
+        mbIsLocked = true;
+    }
+
+    SpinLockGuard(const SpinLockGuard& other) = delete;
+
+    FX_FORCE_INLINE SpinLockGuard(SpinLockGuard&& other) noexcept : mAtomicFlag(other.mAtomicFlag)
+    {
+        other.mbIsLocked = false;
+    }
+
+    SpinLockGuard& operator=(const SpinLockGuard& other) = delete;
+
+    FX_FORCE_INLINE void Unlock()
+    {
+        if (!mbIsLocked) {
+            return;
+        }
+
+        mAtomicFlag.clear();
+        mAtomicFlag.notify_one();
+
+        mbIsLocked = false;
+    }
+
+    ~SpinLockGuard() { Unlock(); }
+
+
+private:
+    std::atomic_flag& mAtomicFlag;
     bool mbIsLocked = false;
 };

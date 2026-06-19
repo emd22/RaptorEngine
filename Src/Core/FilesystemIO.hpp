@@ -31,8 +31,10 @@ public:
 
     FilePath GetFilename(bool keep_extension) const;
 
-    String& Str() { return Value; }
-    const String& Str() const { return Value; }
+    FX_FORCE_INLINE String& Str() { return Value; }
+    FX_FORCE_INLINE const String& Str() const { return Value; }
+
+    FX_FORCE_INLINE const char* CStr() const { return Value.CStr(); }
 
 public:
     String Value;

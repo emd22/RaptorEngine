@@ -1,7 +1,8 @@
 #include "Commands.hpp"
+
 #include "Device.hpp"
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 

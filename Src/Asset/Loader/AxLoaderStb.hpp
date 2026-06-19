@@ -27,6 +27,7 @@ public:
     Vec2u GetImageSize() const { return Vec2u(mWidth, mHeight); };
 
     void Destroy(TSRef<AxBase>& asset) override;
+    void InvalidateImageData() { mImageData = nullptr; };
 
     ~AxLoaderStb() override = default;
 
@@ -37,9 +38,9 @@ private:
     void LoadCubemapToLayeredImage();
 
 private:
-    int mWidth;
-    int mHeight;
-    int mChannels;
+    int mWidth = 0;
+    int mHeight = 0;
+    int mChannels = 0;
 
     uint32 mDataSize = 0;
     uint8* mImageData = nullptr;

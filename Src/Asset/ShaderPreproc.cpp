@@ -70,7 +70,7 @@ public:
     char Get(uint32 offset) const
     {
         uint32 idx = Index + offset;
-        if (idx > FileData.Size) {
+        if (idx >= FileData.Size) {
             return 0;
         }
 

@@ -35,7 +35,6 @@ public:
     void PushValue(const FoxValue& value);
 
     FoxValue CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args);
-    FoxValue CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args);
 
     FoxValue Update();
     FoxValue Resume();
@@ -56,7 +55,7 @@ public:
 public:
     FoxVM Vm;
 
-    uint64 ResumeTime = 0;
+    std::chrono::system_clock::time_point ResumeTime;
 };
 
 } // namespace script

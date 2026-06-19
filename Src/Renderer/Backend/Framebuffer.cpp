@@ -3,8 +3,8 @@
 #include "Device.hpp"
 #include "RenderPass.hpp"
 
+#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
-#include <Core/Panic.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -32,7 +32,8 @@ void Framebuffer::Create(const SizedArray<VkImageView>& image_views, const Rende
         .layers = 1,
     };
 
-    const VkResult status = vkCreateFramebuffer(gRenderer->GetDevice()->Device, &create_info, nullptr, &InternalFramebuffer);
+    const VkResult status = vkCreateFramebuffer(gRenderer->GetDevice()->Device, &create_info, nullptr,
+                                                &InternalFramebuffer);
 
     if (status != VK_SUCCESS) {
         ModulePanicVulkan("Failed to create framebuffer", status);

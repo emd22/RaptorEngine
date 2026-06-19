@@ -41,7 +41,7 @@ extproc NativeAddition(int x, int y) int;
 
 Which can then be defined in C++ by
 
-```
+```cpp
 script::FoxScript script("Some/File/Path.fox");
 
 // ...
@@ -109,6 +109,16 @@ For example:
     global int SOME_GLOBAL; // Value is 2
 }
 
+// Globals are automatically hoisted if they are not defined in the current scope.
+{
+    local int using_globals = SOME_GLOBAL;
+
+    // Is the exact same as:
+
+    global int SOME_GLOBAL;
+    local int using_globals2 = SOME_GLOBAL;
+}
+
 {
     // Strings can also be defined, but they are immutable
     local str hello = "Hello, World";
@@ -125,7 +135,85 @@ For example:
 
 ```
 
+As you can see from the above example, global variables need to be brought into a local scope to be used.
+They can either be brought in implicitly, or defined explicitly. If there is no local `global [type] [name]` definition in the current scope but the value is requested, the bytecode compiler automatically outputs a `VGLOBAL` instruction to define it in local scope.
+
+Note that `global [type] [name]` acts as a _reference_ to a global variable `[name]`, and not a copy of the value.
+
+For example,
+
+```
+init()
+{
+    global int SC_GlobalValue = 10;
+}
+
+ModifyGlobal()
+{
+    // Explicit hoisting
+    global int SC_GlobalValue;
+    SC_GlobalValue = 5;
+}
+
+A() int
+{
+    global int SC_GlobalValue;
+    ModifyGlobal();
+
+    // Returns 5, not 10.
+    return SC_GlobalValue;
+}
+```
+
 Currently, the only builtin types are `int`, `float` and `str`.
+
+## Variable References
+
+Previously, the only way to modify variables across functions was to use globals. This has been recently updated with the addition of references.
+
+```
+reftest() int
+{
+    local int some_value = 10;
+
+    // Take the address of `some_value`
+    local &int some_ref = some_value;
+    some_ref = 5;
+
+    // Returns 5.
+    return some_value;
+}
+```
+
+This is super helpful when you want to return a value in a deeply nested call stack, or want a function to result in more than one value.
+
+```
+// Without references, the value would need to be passed up 3 layers of functions, and returned by each one.
+// This also limits these functions to only return one result.
+
+A(int v) int { return v + 10; }
+B(int v) int { return A(v); }
+C(int v) int { return B(v); }
+
+EntryPoint() int
+{
+    local int value = 10;
+
+    value = C(value);
+}
+
+// With references, only the index to the original variable is passed up, and therefore can modify the source.
+
+A(&int v) { v = v + 10; }
+B(&int v) { A(v); }
+C(&int v) { B(v); }
+
+EntryPoint() int
+{
+    local int value = 10;
+    C(value);
+}
+```
 
 ### Casting Variables
 
@@ -158,6 +246,12 @@ FireWeapon(int gusto)
     N_SetDirection(DIRX, DIRY, DIRZ);
     N_FireWeaponInternalCall(damage);
 }
+
+// Optionally, procedures can be defined using the `proc` prefix, similarly to `extproc`.
+proc DoSomething()
+{
+    // ...
+}
 ```
 
 To return values from procedures, follow the definition with a type:
@@ -167,6 +261,49 @@ ProcThatReturns(int x, int y) int
 {
     return x + y;
 }
+```
+
+## Waiting / Execution Handoff
+
+A key feature to game scripting languages is the ability to time events based on wall-time. This could be for timing enemies spawning, opening doors, or for animating objects.
+
+To do this in Fox, you can use the `pause(time_in_100ms)` function. The time is by a 10th of a second.
+
+Example:
+
+```
+DoSomething()
+{
+    Object_DoSomething(OBJECT_ID);
+
+    // Handoff control back to the engine for 1 second.
+    pause(10);
+
+    Object_Remove(OBJECT_ID);
+}
+
+// You can also use the simple time helpers in `Scripts/time`.
+DoPause()
+{
+    Object_DoSomething(OBJECT_ID);
+
+    // Handoff control back to the engine for 0.5 seconds.
+    pause(seconds(0.5));
+
+    Object_Remove(OBJECT_ID);
+}
+```
+
+The C++ code for this would look like:
+
+```cpp
+FoxScript script("Script.fox");
+
+// Call the entrypoint
+FoxValue return_value = script.CallProc(script.GetSymbol("start"), {});
+
+// Resume from the paused state. This might be in the game loop or the object update function.
+return_value = script.Resume();
 ```
 
 ## Conditionals
@@ -190,8 +327,6 @@ if (x == 5)
     return 2;
 else
     return 1;
-
-
 ```
 
 ## Scoping and Blocks
@@ -272,7 +407,4 @@ caller()
 
     saveobject("ploober");
 }
-
-
-
 ```

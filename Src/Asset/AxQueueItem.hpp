@@ -22,11 +22,18 @@ enum class eAssetLoadType
     Image,
 };
 
-enum class eAssetLoadSrc
+enum class eAssetLoadOp
 {
-    FilePath,
-    FileData,
-    RawData,
+    None,
+
+    /// Reads a file source into an asset given a path.
+    ReadAndUpload,
+
+    /// Reads unprocessed file data using a loader and uploads to an asset.
+    ProcessAndUpload,
+
+    /// Directly uploads the data into an asset.
+    DirectUpload,
 };
 
 
@@ -99,7 +106,7 @@ struct AxQueueItem
         item.AssetType = type;
         item.pcRawData = nullptr;
         item.DataSize = 0;
-        item.AssetSrc = eAssetLoadSrc::FilePath;
+        item.AssetLoadOp = eAssetLoadOp::ReadAndUpload;
         item.Path = path;
 
         return std::move(item);
@@ -117,24 +124,23 @@ struct AxQueueItem
         item.AssetType = type;
         item.pcRawData = data.pData;
         item.DataSize = data.Size;
-        item.AssetSrc = eAssetLoadSrc::FileData;
+        item.AssetLoadOp = eAssetLoadOp::ProcessAndUpload;
 
         return std::move(item);
     }
 
 
     template <typename TAssetType>
-    static AxQueueItem DirectUpload(const TSRef<TAssetType>& asset, eAssetLoadType type, uint32 mip_level,
-                                    const uint8* pixel_data, uint32 pixel_size)
+    static AxQueueItem DirectUpload(const TSRef<TAssetType>& asset, eAssetLoadType type, const ImageInfo& img_info)
     {
         AxQueueItem item;
         item.Data.pLoader = nullptr;
         item.Data.pAsset = asset;
 
         item.AssetType = type;
-        item.pcRawData = pixel_data;
-        item.DataSize = pixel_size;
-        item.AssetSrc = eAssetLoadSrc::RawData;
+        item.pcRawData = nullptr;
+        item.ImgInfo = img_info;
+        item.AssetLoadOp = eAssetLoadOp::DirectUpload;
 
         return std::move(item);
     }
@@ -150,7 +156,12 @@ struct AxQueueItem
         pcRawData = other.pcRawData;
         DataSize = other.DataSize;
         AssetType = other.AssetType;
-        AssetSrc = other.AssetSrc;
+        AssetLoadOp = other.AssetLoadOp;
+        ImgInfo = other.ImgInfo;
+
+        other.pcRawData = nullptr;
+        other.DataSize = 0;
+        other.ImgInfo.ImageData.SetNull();
 
         mMutex.unlock();
 
@@ -171,7 +182,7 @@ public:
     ImageInfo ImgInfo;
     eAssetLoadType AssetType;
 
-    eAssetLoadSrc AssetSrc = eAssetLoadSrc::FilePath;
+    eAssetLoadOp AssetLoadOp = eAssetLoadOp::None;
 
 private:
     AxItemData Data;

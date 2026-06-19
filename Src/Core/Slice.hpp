@@ -23,6 +23,19 @@ public:
     Slice(const SizedArray<T>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
     Slice(const Slice<T>& other) { (*this) = other; }
 
+    template <typename TOther>
+    static Slice<T> FromArray(const SizedArray<TOther>& arr)
+    {
+        Slice<T> slice { .pData = static_cast<T*>(arr.pData), .Size = arr.Size };
+        return slice;
+    }
+
+    static Slice<T> FromArray(const SizedArray<T>& arr)
+    {
+        Slice<T> slice { .pData = arr.pData, .Size = arr.Size };
+        return slice;
+    }
+
     template <uint32 TSize>
     Slice(StackArray<T, TSize>& stack_arr) : pData(stack_arr.pData), Size(stack_arr.Size)
     {
@@ -72,6 +85,12 @@ public:
             Panic("Slice", "Index out of range! ({:d} > {:d})\n", index, Size);
         }
         return pData[index];
+    }
+
+    FX_FORCE_INLINE void SetNull()
+    {
+        pData = nullptr;
+        Size = 0;
     }
 
     FX_FORCE_INLINE uint32 GetSizeInBytes() const { return sizeof(T) * Size; }

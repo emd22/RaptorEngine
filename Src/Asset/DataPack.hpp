@@ -42,7 +42,7 @@ struct DataPackEntry
         return *this;
     }
 
-    FX_FORCE_INLINE bool HasData() const { return bIsRead && Data.pData != nullptr; }
+    FX_FORCE_INLINE bool HasData() const { return Data.pData != nullptr; }
 
     DataPackEntry(const DataPackEntry& other) = delete;
     DataPackEntry& operator=(const DataPackEntry& other) = delete;
@@ -52,9 +52,7 @@ public:
     uint32 DataOffset = 0;
     uint32 DataSize = 0;
 
-    SizedArray<uint8> Data;
-
-    bool bIsRead = false;
+    SizedArray<uint8> Data { nullptr, 0 };
 };
 
 class DataPack
@@ -76,63 +74,48 @@ public:
     bool ReadFromFile(const char* path);
 
     /**
-     * @brief Finds the entry for a given ID
+     * @brief Finds the entry for a given ID. Does not load data from the pack into the entry.
      */
-    DataPackEntry* QuerySection(Hash64 id) const;
+    DataPackEntry* GetEntryFast(Hash64 id) const;
 
     /**
-     * @brief Reads data from the datapack using the offset and size from `entry`.
+     * @brief Finds the entry for a given ID.
+     * @param require_data If true, the entry would be populated with data from the datapack. If false, this is
+     * equivalent to `GetEntryFast()`.
+     */
+    DataPackEntry* GetEntry(Hash64 id, bool require_data);
+
+    void ReadInto(DataPackEntry* entry);
+
+    /**
+     * @brief Reads data into the provided entry from the datapack using the offset and size from `entry`.
      * @param entry The entry with the data offset and size
-     * @returns The buffer with the loaded data.
+     * @returns A slice pointing to the entry's data.
      */
     template <typename TDataType>
-    SizedArray<TDataType> ReadSection(DataPackEntry* entry)
+    Slice<TDataType> ReadSection(DataPackEntry* entry)
     {
         if (!entry) {
             LogWarning(LC_ASSET, "Cannot read section of null entry!");
 
-            return SizedArray<TDataType>::CreateEmpty();
+            return Slice<TDataType>(nullptr, 0);
         }
 
+        if (entry->Data.IsNotEmpty()) {
+            // Data is already loaded, return the `TDataType` repr
+            return Slice<TDataType>(static_cast<TDataType*>(entry->Data.pData), entry->Data.Size);
+        }
 
-        SizedArray<TDataType> arr;
-        arr.InitSize(entry->DataSize);
+        // The data is not already loaded into the entry, load it.
+        entry->Data.InitSize(entry->DataSize);
 
         File.SeekTo(entry->DataOffset);
-        File.Read(Slice<TDataType>(arr));
-        entry->bIsRead = true;
+        File.Read(Slice<uint8>(entry->Data));
 
-        return std::move(arr);
+        return Slice<TDataType>(static_cast<TDataType*>(entry->Data.pData), entry->Data.Size);
     }
 
     void PrintInfo() const;
-
-    /**
-     * @brief Reads data from the datapack using the offset and size from `entry`.
-     * @param entry The entry with the data offset and size
-     * @param buffer The buffer to read into
-     */
-    template <typename TDataType>
-    void ReadSection(DataPackEntry* entry, const Slice<TDataType>& buffer)
-    {
-        if (!entry) {
-            LogWarning(LC_ASSET, "Cannot read section of null entry!");
-
-            return;
-        }
-
-        uint32 read_size = std::min(entry->DataSize, buffer.Size);
-
-        File.SeekTo(entry->DataOffset);
-        File.Read(Slice<TDataType>(buffer.pData, read_size));
-        entry->bIsRead = true;
-    }
-
-    /**
-     * @brief Populates an entry with data from its offset in the datapack
-     * @param entry The entry to read
-     */
-    void ReadEntry(DataPackEntry* entry);
 
     /**
      * @brief Reads data from the datapack into all entries.

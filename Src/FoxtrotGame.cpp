@@ -11,8 +11,8 @@
 #include <Asset/MipmapGen.hpp>
 #include <Asset/SceneFile.hpp>
 #include <Controls.hpp>
+#include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
-#include <Core/Panic.hpp>
 #include <Core/Ref.hpp>
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
@@ -91,8 +91,8 @@ void FoxtrotGame::InitEngine()
 
     gPhysics->Create();
 
-    gAssetManager->Start(3);
     gMaterialManager->Create();
+    gAssetManager->Start(3);
 
     sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 }
@@ -590,7 +590,6 @@ void FoxtrotGame::DestroyGame()
     gShadowRenderer = nullptr;
 
     gMaterialManager->Destroy();
-
     gAssetManager->Shutdown();
 
     gRenderer->pDeferredRenderer.DestroyRef();
@@ -609,6 +608,12 @@ FoxtrotGame::~FoxtrotGame()
 {
     DestroyGame();
     mMainScene.Destroy();
+
+    PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
+    // for (AxImage& img : empty_images_list) {
+    //     img.Destroy();
+    // }
+    empty_images_list.Destroy();
 }
 
 

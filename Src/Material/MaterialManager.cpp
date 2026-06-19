@@ -105,6 +105,8 @@ void MaterialManager::MakeNullMaterial()
 
     material->bNearestFiltering = true;
 
+    material->bReadyToCheck.test_and_set();
+
     material->Build();
 
     LogInfo("Created null material (Id={})", material->GetID());
@@ -148,10 +150,6 @@ MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineN
 
 void MaterialManager::DestroyMaterial(const MaterialID& id)
 {
-    if (id.IsNull()) {
-        return;
-    }
-
     std::lock_guard guard(mInUse);
     mMaterialList.MarkItemFree(id.GetID());
 }

@@ -24,19 +24,20 @@ using namespace renderer;
 
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
-    if (component_.Exists() && !component_.pAssetImage->IsLoaded()) {                                                  \
+    if (component_.Exists() && (!component_.pAssetImage || !component_.pAssetImage->IsLoaded())) {                     \
         return false;                                                                                                  \
     }
 
 bool Material::IsReady()
 {
+    if (!bReadyToCheck.test()) {
+        return false;
+    }
+
     if (mbIsReady) {
         return true;
     }
 
-    if (!Diffuse.Exists()) {
-        return false;
-    }
 
     CHECK_COMPONENT_READY(Diffuse);
     CHECK_COMPONENT_READY(NormalMap);
@@ -94,6 +95,12 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, Pipeline& pipeline, bo
     return true;
 }
 
+String Material::GetCachePath() const
+{
+    String base_path = "Data/Demo/Models/";
+    return base_path;
+}
+
 Material& Material::operator=(const Material& other)
 {
     ID = other.ID;
@@ -130,22 +137,35 @@ void Material::Destroy()
 }
 
 
-template <eImageFormat TFormat>
-static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
-{
-    if (!component.pAssetImage && component.pDataToLoad) {
-        Slice<const uint8>& image_data = component.pDataToLoad;
+// template <eImageFormat TFormat>
+// static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
+// {
+//     if (!component.pAssetImage && component.UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
+//         Slice<const uint8>& image_data = component.pDataToLoad;
 
-        component.pAssetImage = gAssetManager->LoadImageFromMemory(component.Format, image_data.pData, image_data.Size);
-        return false;
+//         component.pAssetImage = gAssetManager->LoadImageFromMemory(component.Format, image_data.pData,
+//         image_data.Size); return false;
+//     }
+//     else if (!component.pAssetImage && component.UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
+//         ImageInfo& image_data = component.ImageToUpload;
+
+//         component.pAssetImage = gAssetManager->LoadImageFromPixels(component.Format, image_data.pData,
+//         image_data.Size); return false;-
+//     }
+
+//     if (!component.pAssetImage || !component.pAssetImage.IsLoaded()) {
+//         return false;
+//     }
+
+//     return true;
+// }
+
+#define BUILD_REQUIRED_MATERIAL_COMPONENT(component_)                                                                  \
+    {                                                                                                                  \
+        if (component_.Build() != eMaterialComponentStatus::Ready) {                                                   \
+            return;                                                                                                    \
+        }                                                                                                              \
     }
-
-    if (!component.pAssetImage || !component.pAssetImage.IsLoaded()) {
-        return false;
-    }
-
-    return true;
-}
 
 
 #define BUILD_MATERIAL_COMPONENT(component_)                                                                           \
@@ -185,6 +205,11 @@ void Material::SetPipeline(renderer::ePipelineName pl_name)
 
 void Material::Build()
 {
+    // Build components
+    BUILD_REQUIRED_MATERIAL_COMPONENT(Diffuse);
+    BUILD_MATERIAL_COMPONENT(NormalMap);
+    BUILD_MATERIAL_COMPONENT(MetallicRoughness);
+
     if (!mDsDefault.IsInited()) {
         VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
 
@@ -195,10 +220,6 @@ void Material::Build()
         mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
     }
 
-    // Build components
-    BUILD_MATERIAL_COMPONENT(Diffuse);
-    BUILD_MATERIAL_COMPONENT(NormalMap);
-    BUILD_MATERIAL_COMPONENT(MetallicRoughness);
 
     // Fill material descriptor
 
@@ -206,6 +227,8 @@ void Material::Build()
     if (bNearestFiltering) {
         diffuse_sampler = &gRenderer->Swapchain.ColorSamplerNearest;
     }
+
+    AssertMsg(Diffuse.pAssetImage.IsValid(), "Diffuse texture must be valid");
 
     mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, diffuse_sampler);
 
@@ -218,7 +241,7 @@ void Material::Build()
         // To reduce permutations -- the metallic roughness map should only be
         // enabled if there is also a normal map.
         if (!MetallicRoughness.Exists()) {
-            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_SRGB>();
+            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
         }
 
         mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);

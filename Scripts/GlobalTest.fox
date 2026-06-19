@@ -1,0 +1,10 @@
+#include "Scripts/time"
+
+init()
+{
+}
+
+Default() int
+{
+    return seconds(1f);
+}

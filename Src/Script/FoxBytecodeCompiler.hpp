@@ -10,10 +10,27 @@
 namespace fx::script {
 
 
-////////////////////////////////////////////
-// IR Emitter
-////////////////////////////////////////////
+struct FoxBytecodeVarHandle
+{
+    Hash32 HashedName = HashNull32;
+    eFoxType Type = eFoxType::INT;
 
+    bool bIsPointer = false;
+    bool bIsPointerAssigned = false;
+
+    int64 Offset = 0;
+
+    int32 ScopeIndex = 0;
+    uint16 VariableIndex = 0;
+
+    uint16 SizeOnStack = 4;
+};
+
+struct FoxBytecodeFunctionHandle
+{
+    Hash32 HashedName = HashNull32;
+    uint32 BytecodeIndex = 0;
+};
 
 enum class eFoxConditionResult
 {
@@ -25,16 +42,14 @@ enum class eFoxConditionResult
     Greater,
 };
 
-using VarIndex = uint16;
-constexpr VarIndex VarIndexNull = UINT16_MAX;
-
-struct FoxIRFunctionRef
+enum class eFoxPushMode
 {
-    char* Name = nullptr;
-    uint32 HashedName = HashNull32;
-    uint32 Position = 0;
+    Default,
+    PushPointer,
 };
 
+using VarIndex = uint16;
+constexpr VarIndex VarIndexNull = UINT16_MAX;
 
 struct FoxBytecodeString
 {
@@ -64,6 +79,7 @@ public:
     {
         DECLARE_DEFAULT,
         DO_NOT_ALLOW_ASSIGNMENT,
+        DECLARE_PARAMETER,
     };
 
 public:
@@ -82,7 +98,7 @@ private:
     void EmitFunctionDeclaration(FoxAstFunctionDecl* function);
     void EmitFunctionDefinitionsInBlock(FoxAstBlock* block);
 
-    eFoxType DoBuiltin(FoxAstFunctionCall* call);
+    eFoxType DoBuiltin(FoxAstFunctionCall* call, bool do_not_call);
     void EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value);
 
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
@@ -90,7 +106,7 @@ private:
     FoxBytecodeVarHandle* DefineParam(FoxAstNode* param_decl_node);
     FoxBytecodeVarHandle* DefineReturnVar(FoxAstVarDecl* decl);
 
-    void ValidateParameters(FoxAstFunctionCall* call);
+    bool ValidateParameters(FoxAstFunctionCall* call);
     void AddString(uint32 fixup_offset, const String& value);
 
     void EmitSymbolTable(FoxAstBlock* root);
@@ -109,10 +125,13 @@ private:
     void EmitPushFloat32(float32 value);
     void EmitPushString(uint32 value);
     void EmitPushVar(VarIndex var);
+    void EmitPushVarPtr(VarIndex var);
+    void EmitPushReadPtr(VarIndex var);
     void EmitPushReturnAddr();
 
-    eFoxType EmitPushVarOrLiteral(FoxAstNode* node);
-    eFoxType GetVarOrLiteralType(FoxAstNode* node);
+    eFoxType EmitPushUnderlyingValue(FoxAstNode* node, eFoxPushMode mode = eFoxPushMode::Default);
+    eFoxType GetUnderlyingType(FoxAstNode* node);
+    bool IsUnderlyingVariableRef(FoxAstNode* node);
 
     void EmitStackAlloc(uint16 size);
 
@@ -138,13 +157,19 @@ private:
     void EmitIfStatement(FoxAstIf* if_node);
     eFoxConditionResult EmitPushConditionResult(FoxAstNode* condition_node);
 
-    void EmitVariableSetInt32(uint16 var_index, int32 value);
-    void EmitVariableSetString(uint16 var_index);
-    void EmitVariableSetFloat32(uint16 var_index, float32 value);
-    void EmitVariableSetVar(VarIndex dst, VarIndex src);
+    void EmitVariableSetInt32(uint16 var_index, int32 value, bool is_pointer);
+    void EmitVariableSetString(uint16 var_index, bool is_pointer);
+    void EmitVariableSetFloat32(uint16 var_index, float32 value, bool is_pointer);
+    void EmitVariableSetVar(VarIndex dst, VarIndex src, bool is_dst_pointer);
 
-    void EmitVariableDefine(uint16 var_index, Hash32 name_hash, bool is_global);
+
+    void EmitVariableDefine(eFoxType type, uint16 var_index);
+    void EmitVariableGlobalDefine(eFoxType type, uint16 var_index, Hash32 name_hash);
     void EmitVariableIndex(uint16 var_index);
+
+    void EmitVariableDefineFetchParam(eFoxType type, uint16 var_index);
+
+    void EmitVariableGlobalHoist(FoxBytecodeVarHandle* handle, Hash32 name_hash);
 
     void EmitVariableCastInt32();
     void EmitVariableCastFloat32();
@@ -176,12 +201,17 @@ private:
     FoxBytecodeVarHandle* FindVarHandle(Hash32 hashed_name) const;
     VarIndex FindVarInScope(Hash32 hashed_name) const;
 
+    FoxBytecodeVarHandle* FindGlobalHandle(Hash32 hashed_name) const;
+
+
     FoxBytecodeFunctionHandle* FindFunctionHandle(Hash32 hashed_name);
 
     eFoxType GetLiteralUnderlyingType(FoxAstLiteral* literal) const;
 
 public:
-    PagedArray<FoxBytecodeVarHandle> VarHandles;
+    SizedArray<FoxBytecodeVarHandle> LocalVarHandles;
+    PagedArray<FoxBytecodeVarHandle> GlobalHandles;
+
     std::vector<FoxBytecodeFunctionHandle> FunctionHandles;
     PagedArray<uint8> mBytecode {};
 

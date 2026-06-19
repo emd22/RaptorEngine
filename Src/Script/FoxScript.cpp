@@ -9,6 +9,7 @@
 
 #include <Core/Defer.hpp>
 #include <Core/String.hpp>
+#include <chrono>
 
 namespace fx::script {
 
@@ -38,6 +39,7 @@ void FoxScript::Load(const String& path)
     Slice<char> file_data = fp.Read<char>();
 
     Tokenizer tokenizer(file_data.pData, file_data.Size);
+    tokenizer.SetFileExtension(".fox");
     tokenizer.Tokenize();
 
     for (const Token& token : tokenizer.TokenBuffer) {
@@ -77,8 +79,8 @@ void FoxScript::Load(const String& path)
     FoxAstDestroyer destroyer;
     destroyer.Do(root_node);
 
-    // Call OnLoad if it exists
-    CallProc(HashStr32("OnLoad"), {});
+    // If there is an init function, call it
+    CallProc(GetSymbol("init"), {});
 }
 
 void FoxScript::PushValue(const FoxValue& value) { Vm.Push32(value.Type, value.AsUInt()); }
@@ -101,7 +103,7 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
 
     Vm.PushReturnAddr(0);
 
-    Vm.ScopeIndex++;
+    ++Vm.ScopeIndex;
     Vm.PC = sym->Offset;
 
     for (uint32 arg_index = 0; arg_index < args.Size; arg_index++) {
@@ -111,14 +113,9 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     return Resume();
 }
 
-FoxValue FoxScript::CallProc(const Hash32 name_hash, const SizedArray<FoxValue>& args)
-{
-    return CallProc(GetSymbol(name_hash), args);
-}
-
 FoxValue FoxScript::Update()
 {
-    if (SDL_GetTicks() < ResumeTime) {
+    if (std::chrono::system_clock::now() < ResumeTime) {
         return FoxValue::scNone;
     }
 
@@ -137,8 +134,8 @@ FoxValue FoxScript::Resume()
         Vm.ExecuteOp();
 
         if (Vm.bIsPaused) {
-            ResumeTime = SDL_GetTicks() + Vm.PauseTime;
-            return FoxValue::scNone;
+            ResumeTime = std::chrono::system_clock::now() + std::chrono::milliseconds(uint64(Vm.PauseTime) * 100);
+            break;
         }
 
         if (Vm.ScopeIndex <= 0) {
@@ -151,8 +148,10 @@ FoxValue FoxScript::Resume()
             return FoxValue(Vm.GetString(Vm.Pop32()));
         }
 
+
         return FoxValue::ValueFromRaw(Vm.LastPushType, Vm.Pop32());
     }
+
 
     return FoxValue::scNone;
 }

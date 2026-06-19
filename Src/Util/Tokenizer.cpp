@@ -1,8 +1,8 @@
 #include "Tokenizer.hpp"
 
 #include <Core/MemPool/MemPool.hpp>
+#include <Core/Path.hpp>
 #include <Engine.hpp>
-
 
 namespace fx {
 
@@ -25,7 +25,7 @@ const char* Token::GetTypeName(eTokenType type)
 
         "Plus",       "Dollar",      "Minus",     "Asterisk",
 
-        "Question",
+        "Question",   "Ampersand",
 
         "Dot",        "Comma",       "Semicolon",
 
@@ -129,6 +129,8 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Dollar;
         case '*':
             return eTokenType::Asterisk;
+        case '&':
+            return eTokenType::Ampersand;
         case '.':
             return eTokenType::Dot;
         case ',':
@@ -316,7 +318,16 @@ bool Tokenizer::ExpectString(const char* expected_value, bool skip_on_success)
 
 void Tokenizer::IncludeFile(const char* path)
 {
-    File file(path, File::eModType::Read, File::eDataType::Binary);
+    Path vpath(path);
+
+    // If there is no extension on the file, add an expected extension
+    if (!vpath.HasExtension()) {
+        String* basename = vpath.BaseName();
+        (*basename) += mpExpectedFileExtension;
+        LogInfo("basename : {}", *basename);
+    }
+
+    File file(vpath.Str(), File::eModType::Read, File::eDataType::Binary);
 
 
     if (!file.IsFileOpen()) {

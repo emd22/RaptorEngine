@@ -13,13 +13,13 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String
 
     const char* c_path = path.CStr();
 
-    const int pixel_size = renderer::ImageFormatUtil::GetSize(ImageFormat);
+    const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
     Assert(pixel_size > 0);
 
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
     // image->NumComponents = mChannels;
-    image->Size = { uint32(mWidth), uint32(mHeight) };
+    image->Image.Size = { uint32(mWidth), uint32(mHeight) };
 
     uint32 data_size = mWidth * mHeight * pixel_size;
     mDataSize = data_size;
@@ -37,8 +37,11 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
 {
     TSRef<AxImage> image(asset);
 
-    const int pixel_size = renderer::ImageFormatUtil::GetSize(ImageFormat);
+    const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
     Assert(pixel_size > 0);
+
+    Assert(data != nullptr);
+    Assert(size > 0);
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         LogError(LC_ASSET, "Could not retrieve info from image in memory! (Size={})", size);
@@ -50,7 +53,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
     uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
     mDataSize = data_size;
 
-    image->Size = { uint32(mWidth), uint32(mHeight) };
+    image->Image.Size = { uint32(mWidth), uint32(mHeight) };
 
     mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
@@ -97,13 +100,12 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
     const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Image.Size, 1,
                                 ImageFormat, Slice<uint8>(data_arr),
                                 (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
     if (should_save_data) {
         image->Image.ImageData = std::move(data_arr);
-
 
         // Set image data to null to avoid it being destroyed.
         mImageData = nullptr;

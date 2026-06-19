@@ -6,15 +6,15 @@
 namespace fx {
 
 
-static PagedArray<TSRef<AxImage>> mEmptyImagesPerFormat;
+static PagedArray<AxImage> mEmptyImagesPerFormat;
 
-PagedArray<TSRef<AxImage>>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
+PagedArray<AxImage>& AxImage::GetEmptyImagesArray() { return mEmptyImagesPerFormat; }
 
 AxImage::AxImage(const AxImage& other) { (*this) = other; }
 
 void AxImage::MarkAndSignalLoaded()
 {
-    IsFinishedNotifier.SignalDataWritten();
+    IsFinishedNotifier.Signal();
 
     bIsUploadedToGpu = true;
     bIsUploadedToGpu.notify_all();
@@ -26,7 +26,7 @@ AxImage& AxImage::operator=(const AxImage& other)
 {
     Image = other.Image;
     ImageType = other.ImageType;
-    Size = other.Size;
+    Image.Size = other.Image.Size;
 
     return *this;
 }

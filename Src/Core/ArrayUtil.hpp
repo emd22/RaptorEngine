@@ -2,6 +2,8 @@
 
 #include <Core/PagedArray.hpp>
 #include <Core/SizedArray.hpp>
+#include <Core/Slice.hpp>
+#include <cstdlib>
 
 namespace fx::ArrayUtil {
 
@@ -25,6 +27,18 @@ SizedArray<T> LinearizePagedArray(PagedArray<T>& src)
     }
 
     return dst;
+}
+
+template <typename T>
+Slice<T> SliceDupe(const Slice<T>& value)
+{
+    const uint32 total_size = value.GetSizeInBytes();
+    Slice<T> copy { reinterpret_cast<T*>(malloc(total_size)), value.Size };
+
+    memcpy(const_cast<void*>(reinterpret_cast<const void*>(copy.pData)), reinterpret_cast<const void*>(value.pData),
+           total_size);
+
+    return copy;
 }
 
 } // namespace fx::ArrayUtil

@@ -55,7 +55,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const Strin
     int32 num_jpeg_components = mJpegInfo.output_components;
 
     printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+    image->Image.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_jpeg_components;
     mImageData.InitSize(data_size);
@@ -90,13 +90,13 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
     jpeg_mem_src(&mJpegInfo, data, size);
     jpeg_read_header(&mJpegInfo, true);
 
-    const uint32 num_components = renderer::ImageFormatUtil::GetSize(ImageFormat);
+    const uint32 num_components = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
 
     J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
     mJpegInfo.out_color_space = color_space;
 
     jpeg_start_decompress(&mJpegInfo);
-    image->Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+    image->Image.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
     mImageData.InitSize(data_size);
@@ -122,7 +122,7 @@ void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
     const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Size, 1,
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Image.Size, 1,
                                 ImageFormat, MakeSlice<const uint8>(mImageData.pData, mImageData.Size),
                                 (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 

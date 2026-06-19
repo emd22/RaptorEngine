@@ -4,8 +4,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
-#include <Core/Panic.hpp>
 #include <Renderer/DeferredRenderer.hpp>
 
 namespace fx::renderer {

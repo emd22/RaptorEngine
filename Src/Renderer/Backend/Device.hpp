@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <vector>
 
+// #define FX_DEBUG_DEVICE_ASSERT_INITIALIZED 1
+
 namespace fx::renderer {
 
 class QueueFamilies
@@ -72,25 +74,48 @@ public:
 
     VkSurfaceFormatKHR GetSurfaceFormat();
 
-    SpinLockContext<VkQueue> GetLockableQueue(VkQueue queue)
+    SpinLockContext<VkQueue> GetLockableQueue(VkQueue& queue)
     {
-        if (mQueueFamilies.HasIndependentTransfer()) {
+        if (mQueueFamilies.HasIndependentTransfer() && queue == mTransferQueue) {
             return SpinLockContext<VkQueue>(mTransferMutex, queue, true);
         }
 
         return SpinLockContext<VkQueue>(mTransferMutex, queue);
     }
 
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetGraphicsQueue() { return GetLockableQueue(mGraphicsQueue); }
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetTransferQueue() { return GetLockableQueue(mTransferQueue); }
-    FX_FORCE_INLINE SpinLockContext<VkQueue> GetPresentQueue() { return GetLockableQueue(mPresentQueue); }
+    FX_FORCE_INLINE SpinLockContext<VkQueue> GetGraphicsQueue()
+    {
+#ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
+        DebugAssert(Device != nullptr);
+#endif
+        return GetLockableQueue(mGraphicsQueue);
+    }
+
+    FX_FORCE_INLINE SpinLockContext<VkQueue> GetTransferQueue()
+    {
+#ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
+        DebugAssert(Device != nullptr);
+#endif
+        return GetLockableQueue(mTransferQueue);
+    }
+
+    FX_FORCE_INLINE SpinLockContext<VkQueue> GetPresentQueue()
+    {
+#ifdef FX_DEBUG_DEVICE_ASSERT_INITIALIZED
+        DebugAssert(Device != nullptr);
+#endif
+        return GetLockableQueue(mPresentQueue);
+    }
 
     operator VkDevice() const { return Device; }
     operator VkPhysicalDevice() const { return Physical; }
 
+    ~GpuDevice();
+
 private:
     bool IsPhysicalDeviceSuitable(VkPhysicalDevice& device);
     void QueryQueues();
+    bool SupportsPortabilityExtension() const;
 
 public:
     VkPhysicalDevice Physical = nullptr;

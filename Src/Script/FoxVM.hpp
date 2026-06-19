@@ -35,6 +35,7 @@ struct VMVariable
     Hash32 GlobalNameHash = HashNull32;
     bool bIsGlobalRef = false;
     FoxValue Value;
+    eFoxType Type = eFoxType::NONETYPE;
 };
 
 
@@ -97,12 +98,16 @@ private:
     void DoVariable(uint8 op_base, uint8 op_spec);
     void DoCompare(uint8 op_base, uint8 op_spec);
 
-    VMVariable& GetVar(uint16 index) { return pVariables[index + VariableBaseIndex]; }
+    void PushVarBaseIndex();
+    void PopVarBaseIndex();
+
+    VMVariable& GetVar(uint16 index);
+    VMVariable& GetVarAbsolute(uint16 index);
 
     void CallExternalFunction(Hash32 hashed_name);
 
-    void StashVariables();
-    void RevertVariables();
+    // void StashVariables();
+    // void RevertVariables();
 
     uint16 Read16();
     uint16 Read16Rev();
@@ -132,6 +137,7 @@ public:
 
     /// The base index for variables. When calling another function, the variable indexes will start from 0, but will be
     /// offset by this value. This avoids clobbering variables when calling other functions.
+    int32 VariableIndex = 0;
     int32 VariableBaseIndex = 0;
     uint16 ScopeVarCounts[32];
 

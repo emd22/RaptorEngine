@@ -1,7 +1,7 @@
 #pragma once
 
+#include <Core/Assert.hpp>
 #include <Core/MemPool/MemPool.hpp>
-#include <Core/Panic.hpp>
 #include <Core/Types.hpp>
 #include <Engine.hpp>
 
@@ -314,16 +314,14 @@ public:
 
     TElementType& GetLast() { return pCurrentPage->pData[pCurrentPage->Size - 1]; }
 
-    TElementType* RemoveLast()
+    void RemoveLast()
     {
         // If there are no pages remaining, return null
         if (pCurrentPage == nullptr) {
-            return nullptr;
+            return;
         }
 
         SizeCheck(pCurrentPage->Size);
-
-        TElementType* element = &GetLast();
 
         // If there are no items left in the page and there is another page before this one, switch
         // to that page.
@@ -341,18 +339,18 @@ public:
 
             --CurrentPageIndex;
 
-            return element;
+            return;
         }
 
         if (pCurrentPage->Size == 0 && pCurrentPage->pPrev == nullptr) {
-            return nullptr;
+            return;
         }
 
         --pCurrentPage->Size;
 
         --TrackedSize;
 
-        return element;
+        return;
     }
 
     void Clear()

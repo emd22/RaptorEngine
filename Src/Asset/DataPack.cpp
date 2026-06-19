@@ -99,11 +99,7 @@ bool DataPack::BinaryReadHeader()
         uint32 size;
         File.Read<uint32>(MakeSlice(&size, 1));
 
-
-        SizedArray<uint8> data;
-        data.InitSize(size);
-
-        DataPackEntry entry { id, std::move(data), offset, size };
+        DataPackEntry entry { id, SizedArray<uint8>::CreateEmpty(), offset, size };
         Entries.Insert(std::move(entry));
     }
 
@@ -158,11 +154,10 @@ void DataPack::BinaryReadAllData()
     }
 
     for (DataPackEntry& entry : Entries) {
-        entry.Data = ReadSection<uint8>(&entry);
+        ReadInto(&entry);
     }
 }
 
-void DataPack::ReadEntry(DataPackEntry* entry) { entry->Data = ReadSection<uint8>(entry); }
 
 void DataPack::PrintInfo() const
 {
@@ -193,7 +188,7 @@ void DataPack::JumpToEntry(Hash64 id)
     }
 }
 
-DataPackEntry* DataPack::QuerySection(Hash64 id) const
+DataPackEntry* DataPack::GetEntryFast(Hash64 id) const
 {
     // TODO: replace with ordered map query
 
@@ -260,6 +255,40 @@ bool DataPack::ReadFromFile(const char* name)
 
     return true;
 }
+
+DataPackEntry* DataPack::GetEntry(Hash64 id, bool require_data)
+{
+    DataPackEntry* entry = GetEntryFast(id);
+
+    if (require_data && entry->Data.IsEmpty()) {
+        ReadInto(entry);
+    }
+
+    return entry;
+}
+
+void DataPack::ReadInto(DataPackEntry* entry)
+{
+    if (!entry) {
+        LogWarning(LC_ASSET, "Cannot read section of null entry!");
+
+        return;
+    }
+
+    // The data is not already loaded into the entry, load it.
+    entry->Data.InitSize(entry->DataSize);
+
+    File.SeekTo(entry->DataOffset);
+    File.Read(Slice<uint8>(entry->Data));
+}
+
+// DataPackEntry* DataPack::GetEntry(Hash64 id)
+// {
+//     DataPackEntry* entry = QuerySection(id);
+//     ReadSection(entry);
+
+//     return entry;
+// }
 
 void DataPack::Close()
 {

@@ -15,8 +15,9 @@
 
 #include <Core/Defer.hpp>
 #include <Core/Ref.hpp>
-#include <deque>
-#include <mutex>
+#include <Core/TSQueue.hpp>
+// #include <deque>
+// #include <mutex>
 
 namespace fx {
 class Camera;
@@ -81,14 +82,16 @@ public:
 
     void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
     {
-        std::lock_guard<std::mutex> guard(mInDeletionQueue);
+        SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 
-        mDeletionQueue.push_back(DeletionObject {
+        DeletionObject obj = {
             .Buffer = buffer,
             .Allocation = allocation,
             .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
             .bIsGpuBuffer = true,
-        });
+        };
+
+        deletion_queue->Push(std::move(obj));
     }
 
     VkInstance GetVulkanInstance() { return mInstance; }
@@ -115,21 +118,20 @@ public:
 
     ~RenderBackend() { Destroy(); }
 
-    bool ProcessDeletionQueue(bool immediate = false)
+    bool ProcessDeletionQueue(bool immediate, Queue<DeletionObject>& deletion_queue)
     {
-        if (immediate) {
-            mInDeletionQueue.lock();
-        }
-        else if (!mInDeletionQueue.try_lock()) {
+        // if (immediate) {
+        //     mInDeletionQueue.lock();
+        // }
+        // else if (!mInDeletionQueue.try_lock()) {
+        //     return false;
+        // }
+
+        if (deletion_queue.IsEmpty()) {
             return false;
         }
 
-        if (mDeletionQueue.empty()) {
-            mInDeletionQueue.unlock();
-            return false;
-        }
-
-        DeletionObject& object = mDeletionQueue.front();
+        DeletionObject& object = deletion_queue.First();
 
         const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
 
@@ -138,31 +140,28 @@ public:
         if (immediate || is_frame_spaced) {
             if (object.bIsGpuBuffer) {
                 vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
-                did_delete = true;
             }
             else {
                 object.Func(&object);
-                did_delete = true;
             }
 
-            mDeletionQueue.pop_front();
+            did_delete = true;
+            deletion_queue.Pop();
         }
-
-        mInDeletionQueue.unlock();
 
         return did_delete;
     }
 
     void AddToDeletionQueue(DeletionObject::FuncType func)
     {
-        // LogInfo("Adding object to deletion queue at frame {}", mInternalFrameCounter);
+        SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 
-        std::lock_guard<std::mutex> guard(mInDeletionQueue);
-
-        mDeletionQueue.push_back(DeletionObject {
+        DeletionObject obj = {
             .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
             .Func = func,
-        });
+        };
+
+        deletion_queue->Push(std::move(obj));
     }
 
     uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
@@ -186,6 +185,8 @@ private:
     void DestroyFrames();
 
     void RebuildRenderStages();
+
+    bool RequiresVulkanPortability();
 
     eFrameResult GetNextSwapchainImage(FrameData* frame);
 
@@ -238,8 +239,9 @@ protected:
     uint32 mFrameNumber = 0;
     std::atomic_uint32_t mInternalFrameCounter = 0;
 
-    std::mutex mInDeletionQueue;
-    std::deque<DeletionObject> mDeletionQueue;
+    TSQueue<DeletionObject> mDeletionQueue;
+    // std::mutex mInDeletionQueue;
+    // std::deque<DeletionObject> mDeletionQueue;
 };
 
 } // namespace fx::renderer

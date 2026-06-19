@@ -1,8 +1,8 @@
 #pragma once
 
 
+#include "Assert.hpp"
 #include "Defines.hpp"
-#include "Panic.hpp"
 #include "Types.hpp"
 
 #include <Core/MemPool/MemPool.hpp>
@@ -21,8 +21,8 @@ namespace fx {
 /** The internal reference count for `TSRef`. */
 struct TSRefCount
 {
-    using IntType = std::atomic<int32>;
-    using RefCountType = IntType;
+    using IntType = int32;
+    using RefCountType = std::atomic<IntType>;
 
     /** Increments the reference count */
     void Inc() { ++Count; }
@@ -51,7 +51,7 @@ public:
     /**
      * Constructs a new TSRef from a pointer and a pre-allocated ref count.
      */
-    TSRef(T* ptr, TSRefCount* cnt, bool is_combined_allocation = false)
+    TSRef(T* RESTRICT ptr, TSRefCount* RESTRICT cnt, bool is_combined_allocation = false)
         : mpRefCnt(cnt), mpPtr(ptr), mbIsCombinedAllocation(is_combined_allocation), mbIsExternalPtr(true)
     {
 #ifdef FX_DEBUG_REF
@@ -161,7 +161,7 @@ public:
     }
 
     /** Retrieves the internal usage count for the reference. */
-    uint32 GetRefCount()
+    TSRefCount::IntType GetRefCount()
     {
         if (mpRefCnt) {
             return mpRefCnt->Count;

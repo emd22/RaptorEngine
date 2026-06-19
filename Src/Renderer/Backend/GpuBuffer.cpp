@@ -1,5 +1,6 @@
 #include "GpuBuffer.hpp"
 
+#include <Asset/AxManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 
@@ -64,7 +65,6 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 
     gBufferTracker.AddBuffer(BufferId, Type, Size, mBufferFlags);
 
-
     // LogInfo("[Created GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
     // GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)
     // != 0, (buffer_flags & eGpuBufferFlags::TransferReceiver) != 0);
@@ -99,6 +99,10 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
         PanicVulkan("GPUBuffer", "Error allocating GPU buffer!", status);
     }
 
+
+    if (reinterpret_cast<uintptr_t>(Buffer) == 0x850000000085) {
+        // FX_BREAKPOINT;
+    }
 
     // LogInfo("Create Buffer  (Buffer={:p}, Allocation={:p}, Size={})", reinterpret_cast<void*>(Buffer),
     //           reinterpret_cast<void*>(Allocation), Size);
@@ -151,7 +155,9 @@ void RawGpuBuffer::Destroy()
     // GpuBufferUtil::BufferTypeToName(Type), Size, (mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0,
     // (mBufferFlags & eGpuBufferFlags::TransferReceiver) != 0);
 
-    gRenderer->AddGpuBufferToDeletionQueue(Buffer, Allocation);
+    // gRenderer->AddGpuBufferToDeletionQueue(Buffer, Allocation);
+
+    gAssetManager->DeleteBuffer(*this);
 
     Initialized.store(false);
     Size = 0;

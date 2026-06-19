@@ -47,8 +47,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <Core/Assert.hpp>
 #include <Core/BitUtil.hpp>
-#include <Core/Panic.hpp>
 #include <Math/MathUtil.hpp>
 
 namespace fx {

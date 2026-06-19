@@ -5,10 +5,14 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Core/Panic.hpp>
+#include <Core/Assert.hpp>
 
 FX_SET_MODULE_NAME("Device")
 
+// This isn't defined on some platforms/drivers.
+#ifndef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME "VK_KHR_portability_enumeration"
+#endif
 
 namespace fx::renderer {
 
@@ -159,7 +163,30 @@ void GpuDevice::QueryQueues()
     vkGetDeviceQueue(Device, mQueueFamilies.GetGraphicsFamily(), 0, &mGraphicsQueue);
     vkGetDeviceQueue(Device, mQueueFamilies.GetPresentFamily(), 0, &mPresentQueue);
     vkGetDeviceQueue(Device, mQueueFamilies.GetTransferFamily(), 0, &mTransferQueue);
+
+
+    AssertMsg(mTransferQueue != nullptr, "Queue cannot be null!");
+    AssertMsg(mPresentQueue != nullptr, "Queue cannot be null!");
+    AssertMsg(mGraphicsQueue != nullptr, "Queue cannot be null!");
 }
+
+bool GpuDevice::SupportsPortabilityExtension() const
+{
+    uint32 extension_count = 0;
+    vkEnumerateDeviceExtensionProperties(Physical, nullptr, &extension_count, nullptr);
+    SizedArray<VkExtensionProperties> exts;
+    exts.InitSize(extension_count);
+    vkEnumerateDeviceExtensionProperties(Physical, nullptr, &extension_count, exts.pData);
+
+    for (const VkExtensionProperties& ext : exts) {
+        if (!std::strncmp(ext.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, 256)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 
 void GpuDevice::CreateLogicalDevice()
 {
@@ -186,6 +213,10 @@ void GpuDevice::CreateLogicalDevice()
         .pQueuePriorities = graphics_priorities,
     });
 
+    // If the device has an independent transfer queue, push the new queue to be created.
+    // This is the best scenario as it means we can have fully async uploads. Drivers such as KosmicKrisp do not allow
+    // this as Metal doesnt offer something equivalent. For some reason MoltenVK emulates this through 4 "virtual"
+    // queues, but thats essentially an internal mutex.
     if (mQueueFamilies.HasIndependentTransfer()) {
         queue_create_infos.push_back(VkDeviceQueueCreateInfo {
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -195,38 +226,53 @@ void GpuDevice::CreateLogicalDevice()
         });
     }
 
-    const VkPhysicalDeviceFeatures device_features {
-        // .fillModeNonSolid = true,
-    };
+    const VkPhysicalDeviceFeatures device_features {};
 
-    const char* device_extensions[] = {
-#ifdef FX_USE_PORTABILITY_EXTENSION
-        VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
-#endif
+    std::vector<const char*> device_extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
     };
 
-#ifdef FX_USE_PORTABILITY_EXTENSION
+    const bool requires_portability_extension = SupportsPortabilityExtension();
 
-    // List of features that may not be available on all devices
+    if (requires_portability_extension) {
+        LogInfo(LC_RENDER, "Device is using portability extension!");
+        device_extensions.emplace_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+    }
+
     VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PORTABILITY_SUBSET_FEATURES_KHR,
         .pNext = nullptr,
         .mutableComparisonSamplers = VK_TRUE, // For samplers that use compareOp's / SampleCmp in shaders
     };
-#endif
 
     VkPhysicalDeviceVulkan11Features vk11_features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-#ifdef FX_USE_PORTABILITY_EXTENSION
-        .pNext = &portability_features,
-#else
         .pNext = nullptr,
-#endif
         .shaderDrawParameters = VK_TRUE,
 
     };
+
+    if (requires_portability_extension) {
+        vk11_features.pNext = &portability_features;
+    }
+
+    {
+        VkPhysicalDeviceDriverProperties driver_properties {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES,
+        };
+
+        VkPhysicalDeviceProperties2 physical_properties {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+            .pNext = &driver_properties,
+        };
+
+        vkGetPhysicalDeviceProperties2(Physical, &physical_properties);
+
+        LogInfo(LC_RENDER, "Creating device for physical device (Id={}) {} -- driver {}",
+                physical_properties.properties.deviceID, physical_properties.properties.deviceName,
+                driver_properties.driverName);
+    }
 
 
     const VkDeviceCreateInfo create_info {
@@ -236,13 +282,13 @@ void GpuDevice::CreateLogicalDevice()
         .queueCreateInfoCount = static_cast<uint32>(queue_create_infos.size()),
         .pQueueCreateInfos = queue_create_infos.data(),
 
-        // device specific layers (not used in modern vulkan)
+        // Device specific layers. Not used in modern Vulkan.
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = nullptr,
 
-        // device specific extensions
-        .enabledExtensionCount = std::size(device_extensions),
-        .ppEnabledExtensionNames = device_extensions,
+        // Device specific extensions
+        .enabledExtensionCount = static_cast<uint32>(device_extensions.size()),
+        .ppEnabledExtensionNames = device_extensions.data(),
 
         .pEnabledFeatures = &device_features,
 
@@ -339,6 +385,12 @@ void GpuDevice::WaitForIdle()
     }
 
     vkDeviceWaitIdle(Device);
+}
+
+GpuDevice::~GpuDevice()
+{
+    Device = nullptr;
+    Physical = nullptr;
 }
 
 } // namespace fx::renderer
