@@ -1,3 +1,4 @@
+#include "Scripts/time"
 
 init()
 {
@@ -5,5 +6,5 @@ init()
 
 Default() int
 {
-    return castint(10.5f);
+    return seconds(1f);
 }

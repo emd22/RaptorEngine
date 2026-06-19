@@ -751,7 +751,7 @@ void FoxVM::DoVariable(uint8 op_base, uint8 op_spec)
         uint16 var_index = Read16();
         VMVariable& var = GetVar(var_index);
         var.bIsGlobalRef = false;
-        var.Value.Set<float32>(Pop32());
+        var.Value.Set<float32>(std::bit_cast<float32>(Pop32()));
     } break;
 
         /////////////////////////////////////
