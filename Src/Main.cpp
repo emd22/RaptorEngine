@@ -23,8 +23,8 @@
 #include <Renderer/Globals.hpp>
 #include <Script/FoxScript.hpp>
 
-#define FX_RUN_TEST
-#define FX_TEST_SCRIPT
+// #define FX_RUN_TEST
+// #define FX_TEST_SCRIPT
 
 FX_SET_MODULE_NAME("Main")
 
