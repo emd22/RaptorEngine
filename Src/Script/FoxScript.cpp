@@ -135,48 +135,9 @@ FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
     return Resume();
 }
 
-FoxValue FoxScript::Update()
-{
-    if (std::chrono::system_clock::now() < ResumeTime) {
-        return FoxValue::scNone;
-    }
+FoxValue FoxScript::Update() { return Vm.Update(); }
 
-    return Resume();
-}
-
-FoxValue FoxScript::Resume()
-{
-    if (Vm.ScopeIndex <= 0) {
-        return FoxValue::scNone;
-    }
-
-    Vm.bIsPaused = false;
-
-    while (Vm.PC < Vm.mBytecode.Size) {
-        Vm.ExecuteOp();
-
-        if (Vm.bIsPaused) {
-            ResumeTime = std::chrono::system_clock::now() + std::chrono::milliseconds(uint64(Vm.PauseTime) * 100);
-            break;
-        }
-
-        if (Vm.ScopeIndex <= 0) {
-            break;
-        }
-    }
-
-    if (Vm.bReturnValueOnStack) {
-        if (Vm.LastPushType == eFoxType::STRING) {
-            return FoxValue(Vm.GetString(Vm.Pop32()));
-        }
-
-
-        return FoxValue::ValueFromRaw(Vm.LastPushType, Vm.Pop32());
-    }
-
-
-    return FoxValue::scNone;
-}
+FoxValue FoxScript::Resume() { return Vm.Resume(); }
 
 
 void FoxScript::SetGlobal(const Hash32 name_hash, const FoxValue& value) { Vm.Globals[name_hash] = value; }

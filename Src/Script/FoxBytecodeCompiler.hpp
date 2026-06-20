@@ -7,6 +7,25 @@
 #include <Core/Ref.hpp>
 #include <Core/Types.hpp>
 
+namespace fx {
+
+enum class eFoxFunctionCallFlags
+{
+    None = 0,
+
+    /// If the return value is not used but the function returns a value, discard the value from the stack after the
+    /// function call.
+    IgnoreReturnValue = (1 << 0),
+
+    /// Do not emit any jump instructions. This is for functions that which to emit different functionality while using
+    /// the rest of the logic in `EmitFunctionCall`.
+    NoJump = (1 << 1),
+};
+
+FxEnumFlags(eFoxFunctionCallFlags);
+
+}; // namespace fx
+
 namespace fx::script {
 
 
@@ -82,6 +101,7 @@ public:
         DECLARE_PARAMETER,
     };
 
+
 public:
     FoxBytecodeCompiler() = default;
 
@@ -101,8 +121,8 @@ private:
     void EmitFunctionDefinitionsInBlock(FoxAstBlock* block);
 
     eFoxType DoBuiltin(FoxAstFunctionCall* call, bool do_not_call);
-    void EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value);
-    void EmitModuleCall(FoxAstModuleCall* call, bool preserve_return_value);
+    void EmitFunctionCall(FoxAstFunctionCall* call, eFoxFunctionCallFlags flags);
+    void EmitModuleCall(FoxAstModuleCall* call, eFoxFunctionCallFlags flags);
 
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
     void EmitAssign(FoxAstAssign* assign);
@@ -147,6 +167,7 @@ private:
     void EmitJumpConditional(uint16 offset, eFoxConditionResult cond);
     void EmitJumpAbsolute(uint32 position);
     void EmitJumpCallAbsolute(uint32 position);
+    void EmitJumpCallModuleFunction(uint16 link_table_offset, uint32 name_hash);
 
     void EmitJumpReturnToCaller();
     void EmitJumpReturnToCallerInt32();

@@ -161,7 +161,7 @@ struct FoxAstModuleLoad : public FoxAstNode
     Token* pAlias = nullptr;
     Token* pModulePath = nullptr;
 
-    uint32 LinkTableOffset = 0;
+    uint32 ModuleIndex = 0;
 };
 
 

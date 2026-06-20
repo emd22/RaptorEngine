@@ -60,6 +60,7 @@ struct VMExternalProcEntry
 struct VMModule
 {
     Slice<uint8> Bytecode { nullptr, 0 };
+    FoxVM* pVM = nullptr;
 };
 
 class FoxVM
@@ -81,6 +82,7 @@ public:
 
     FoxSymbol* GetSymbol(const Hash32 name_hash) const;
     uint32 GetProcAddr(const Hash32 name_hash) const;
+    uint32 GetModuleProcAddr(const uint32 module_index, const Hash32 name_hash) const;
 
     void Push16(uint16 value);
     void Push32(eFoxType type, uint32 value);
@@ -89,12 +91,15 @@ public:
     void PushReturnAddr(uint32 addr);
     uint32 PopReturnAddr();
 
+    FoxValue Resume();
+    FoxValue Update();
+
     void ExecuteOp();
 
     ~FoxVM();
 
 private:
-    void LoadSymTable();
+    void LoadSymTable(SizedArray<FoxSymbol>& sym_table);
     void LoadLinkTable();
 
     void DoPush(uint8 op_base, uint8 op_spec);
@@ -161,8 +166,10 @@ public:
     bool bIsPaused = false;
 
     uint16 PauseTime = 0;
+    std::chrono::system_clock::time_point ResumeTime;
 
     eFoxType LastPushType = eFoxType::NONETYPE;
+
 
 private:
     bool mIsInCallFrame = false;

@@ -426,42 +426,41 @@ FoxAstNode* FoxParser::ParseRhs()
 
     Token& token = GetToken();
 
-    FoxAstNode* lhs = nullptr;
 
-    if (token.Type == TT::String) {
-        lhs = ParseModuleCall();
-    }
-    else if (token.Type == TT::Identifier) {
+    if (token.Type == TT::Identifier) {
+        // Module function call
+
+        if (GetToken(1).Type == TT::Colon) {
+            return ParseModuleCall();
+        }
+
+        // Default function call
+
         // If there is a lparen after this, we can assume that this is a function call
         if (has_paramlist) {
-            lhs = ParseFunctionCall();
+            return ParseFunctionCall();
         }
         else {
             FoxFunction* function = FindFunction(token.GetHash());
             if (function != nullptr) {
-                lhs = ParseFunctionCall();
+                return ParseFunctionCall();
             }
         }
     }
 
-    if (!lhs) {
-        TT op_type = GetToken(1).Type;
+    TT op_type = GetToken(1).Type;
 
-        if (Token::IsTypeEqualityCheck(op_type)) {
-            FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
+    if (Token::IsTypeEqualityCheck(op_type)) {
+        FoxAstBinop* binop = FX_SCRIPT_ALLOC_NODE(FoxAstBinop);
 
-            binop->pLeft = ParseTerm();
-            binop->OpToken = &EatToken(op_type);
-            binop->pRight = ParseRhs();
+        binop->pLeft = ParseTerm();
+        binop->OpToken = &EatToken(op_type);
+        binop->pRight = ParseRhs();
 
-            return binop;
-        }
-
-        return ParseAddExpr();
+        return binop;
     }
 
-
-    return lhs;
+    return ParseAddExpr();
 }
 
 FoxAstAssign* FoxParser::TryParseAssignment(Token* var_name)

@@ -97,7 +97,7 @@ public:
     }
 
 public:
-    SizedArray(TElementType* ptr, size_t size) : pData(ptr), Size(size), Capacity(size) {}
+    SizedArray(TElementType* ptr, size_t size) : pData(ptr), Size(size), Capacity(size), bDoNotDestroy(true) {}
 
     SizedArray(size_t element_count) : Capacity(element_count)
     {

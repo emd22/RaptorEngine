@@ -91,7 +91,7 @@ void FoxBytecodeCompiler::EmitReturn(FoxAstReturn* return_node)
                 }
             }
             else {
-                EmitFunctionCall(call_node, true);
+                EmitFunctionCall(call_node, eFoxFunctionCallFlags::None);
             }
 
 
@@ -220,12 +220,12 @@ void FoxBytecodeCompiler::EmitNode(FoxAstNode* node)
             return;
         }
 
-        return EmitFunctionCall(call, false);
+        // Since this is a freestanding function and not an assignment, we should ignore the value returned.
+        return EmitFunctionCall(call, eFoxFunctionCallFlags::IgnoreReturnValue);
     }
     else if (node->NodeType == FX_AST_MODULECALL) {
         FoxAstModuleCall* call = static_cast<FoxAstModuleCall*>(node);
-
-        return EmitModuleCall(call, false);
+        return EmitModuleCall(call, eFoxFunctionCallFlags::None);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
         return EmitAssign(static_cast<FoxAstAssign*>(node));
@@ -429,8 +429,13 @@ eFoxType FoxBytecodeCompiler::EmitPushUnderlyingValue(FoxAstNode* node, eFoxPush
             return builtin_call_rvalue;
         }
 
-        EmitFunctionCall(call, true);
+        EmitFunctionCall(call, eFoxFunctionCallFlags::None);
         return call->GetReturnType();
+    }
+    else if (node->NodeType == FX_AST_MODULECALL) {
+        FoxAstModuleCall* call = static_cast<FoxAstModuleCall*>(node);
+        EmitModuleCall(call, eFoxFunctionCallFlags::None);
+        return call->pFunctionCall->GetReturnType();
     }
     else {
         CompileError("EmitPushUnderlyingValue: Unknown node type");
@@ -485,6 +490,10 @@ eFoxType FoxBytecodeCompiler::GetUnderlyingType(FoxAstNode* node)
         }
 
         return call->GetReturnType();
+    }
+    else if (node->NodeType == FX_AST_MODULECALL) {
+        FoxAstModuleCall* call = static_cast<FoxAstModuleCall*>(node);
+        return call->pFunctionCall->GetReturnType();
     }
     else {
         CompileError("GetUnderlyingType: Unknown node type");
@@ -599,6 +608,13 @@ void FoxBytecodeCompiler::EmitJumpCallAbsolute(uint32 position)
 {
     WriteOp(BcBase_Jump, BcSpecJump_CallAbsolute);
     Write32(position);
+}
+
+void FoxBytecodeCompiler::EmitJumpCallModuleFunction(uint16 link_table_offset, uint32 name_hash)
+{
+    WriteOp(BcBase_Jump, BcSpecJump_CallModuleFunction);
+    Write16(link_table_offset);
+    Write32(name_hash);
 }
 
 
@@ -991,7 +1007,7 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
         } break;
         }
     }
-    else if (rhs->NodeType == FX_AST_PROCCALL || rhs->NodeType == FX_AST_BINOP) {
+    else if (rhs->NodeType == FX_AST_PROCCALL || rhs->NodeType == FX_AST_MODULECALL || rhs->NodeType == FX_AST_BINOP) {
         if (rhs->NodeType == FX_AST_BINOP) {
             FoxAstBinop* binop = static_cast<FoxAstBinop*>(rhs);
             EmitBinop(binop);
@@ -1007,8 +1023,19 @@ void FoxBytecodeCompiler::EmitRhs(FoxAstNode* rhs, FoxBytecodeCompiler::RhsMode 
                     CompileError("Type mismatch: assigning function return type '{}' to variable of type '{}'",
                                  call->GetReturnType(), handle->Type);
                 }
-                EmitFunctionCall(call, true);
+                EmitFunctionCall(call, eFoxFunctionCallFlags::None);
             }
+        }
+
+        else if (rhs->NodeType == FX_AST_MODULECALL) {
+            FoxAstModuleCall* call = static_cast<FoxAstModuleCall*>(rhs);
+
+            if (call->pFunctionCall->GetReturnType() != handle->Type) {
+                CompileError("Type mismatch: assigning function return type '{}' to variable of type '{}'",
+                             call->pFunctionCall->GetReturnType(), handle->Type);
+            }
+
+            EmitModuleCall(call, eFoxFunctionCallFlags::None);
         }
 
         // Pop the newly pushed value to the variable
@@ -1277,7 +1304,7 @@ eFoxType FoxBytecodeCompiler::DoBuiltin(FoxAstFunctionCall* call, bool do_not_ca
 }
 
 
-void FoxBytecodeCompiler::EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value)
+void FoxBytecodeCompiler::EmitFunctionCall(FoxAstFunctionCall* call, eFoxFunctionCallFlags flags)
 {
     RETURN_IF_NO_NODE(call);
 
@@ -1324,63 +1351,41 @@ void FoxBytecodeCompiler::EmitFunctionCall(FoxAstFunctionCall* call, bool preser
         EmitPush32(call->Params.size());
     }
 
-    // If the function is externally defined, emit external jump instead
-    if (handle && handle->BytecodeIndex == UINT32_MAX) {
-        EmitJumpCallExternal(call->HashedName);
-        return;
+    if ((flags & eFoxFunctionCallFlags::NoJump) == 0) {
+        // If the function is externally defined, emit external jump instead
+        if (handle && handle->BytecodeIndex == UINT32_MAX) {
+            EmitJumpCallExternal(call->HashedName);
+        }
+        else {
+            EmitJumpCallAbsolute(call->HashedName);
+        }
     }
 
-    EmitJumpCallAbsolute(call->HashedName);
-
     // If there is no consumer for the return value, emit a discard instruction
-    if (!preserve_return_value && call->HasReturnType()) {
+    if ((flags & eFoxFunctionCallFlags::IgnoreReturnValue) != 0 && call->HasReturnType()) {
         EmitPopDiscard();
     }
 }
 
-void FoxBytecodeCompiler::EmitModuleCall(FoxAstModuleCall* call, bool preserve_return_value)
+void FoxBytecodeCompiler::EmitModuleCall(FoxAstModuleCall* call, eFoxFunctionCallFlags flags)
 {
     RETURN_IF_NO_NODE(call);
 
-    // Read the file definitions
-    // {
-    //     Path module_declarations_path(call->ModulePath);
-    //     module_declarations_path.DirDown("Header");
-    //     module_declarations_path.SetExtension("fsh");
+    Assert(call->pFunctionCall != nullptr);
+    if (call->pModuleLoad == nullptr) {
+        CompileError("No module load statement found in script, but module is requested for a function call.");
+        return;
+    }
 
+    EmitFunctionCall(call->pFunctionCall, eFoxFunctionCallFlags::NoJump);
 
-    //     File fp(, File::eModType::Read, File::eDataType::Binary);
+    if ((flags & eFoxFunctionCallFlags::NoJump) == 0) {
+        EmitJumpCallModuleFunction(call->pModuleLoad->ModuleIndex, call->pFunctionCall->HashedName);
+    }
 
-    //     if (!fp.IsFileOpen()) {
-    //         LogError(LC_SCRIPT, "Could not open script file at '{}'", path);
-    //         return;
-    //     }
-
-    //     Path bytecode_path(path);
-    //     bytecode_path.DirDown("Out");
-    //     bytecode_path.SetExtension(".fsb");
-    //     bytecode_path.CreateDirs();
-
-    //     Slice<char> file_data = fp.Read<char>();
-
-    //     Tokenizer tokenizer(file_data.pData, file_data.Size);
-    //     tokenizer.SetFileExtension(".fox");
-    //     tokenizer.Tokenize();
-
-    //     for (const Token& token : tokenizer.TokenBuffer) {
-    //         LogInfo("{}", token);
-    //     }
-
-    //     FoxParser parser {};
-
-    //     parser.Init(std::move(tokenizer.TokenBuffer));
-
-    //     FoxAstNode* root_node = parser.Parse();
-    //     if (parser.bHasErrors || root_node == nullptr) {
-    //         LogError(LC_SCRIPT, "Errors found while parsing script, exitting...");
-    //         return;
-    //     }
-    // }
+    if ((flags & eFoxFunctionCallFlags::IgnoreReturnValue) != 0 && call->pFunctionCall->HasReturnType()) {
+        EmitPopDiscard();
+    }
 }
 
 
@@ -1543,6 +1548,8 @@ void FoxBytecodeCompiler::EmitLinkTable(FoxAstBlock* root)
 
     Write32(num_links);
 
+    uint32 module_index = 0;
+
     for (FoxAstNode* stmt : root->Statements) {
         if (stmt->NodeType == FX_AST_MODULELOAD) {
             FoxAstModuleLoad* decl = static_cast<FoxAstModuleLoad*>(stmt);
@@ -1573,8 +1580,10 @@ void FoxBytecodeCompiler::EmitLinkTable(FoxAstBlock* root)
                 script.Compile(script_path.Str());
             }
 
-            decl->LinkTableOffset = mBytecode.Size();
+            decl->ModuleIndex = module_index;
             EmitDataString(bin_str.CStr(), bin_str.Length, true);
+
+            ++module_index;
         }
     }
 }
@@ -1860,8 +1869,13 @@ void FoxBytecodePrinter::DoJump(char* s, uint8 op_base, uint8 op_spec)
         BC_PRINT_OP("jmpa {}", position);
     }
     else if (op_spec == BcSpecJump_CallAbsolute) {
-        uint32 position = Read32();
-        BC_PRINT_OP("CALLA {}", position);
+        uint32 hash = Read32();
+        BC_PRINT_OP("CALLA {}", hash);
+    }
+    else if (op_spec == BcSpecJump_CallModuleFunction) {
+        uint16 link_table_offset = Read16();
+        uint32 hash = Read32();
+        BC_PRINT_OP("MODCALL {} {}", link_table_offset, hash);
     }
     else if (op_spec == BcSpecJump_ReturnToCaller) {
         BC_PRINT_OP("RET");
@@ -2167,10 +2181,10 @@ void FoxBytecodePrinter::LoadLinkTable()
 
     LogInfo("--- Links ---");
 
-
     for (uint32 index = 0; index < num_links; index++) {
+        uint32 load_index = mBytecodeIndex;
         ReadString(buffer, cTempBufferSize, true);
-        LogInfo("{}", buffer);
+        LogInfo("{} -> {}", buffer, load_index);
     }
 
     LogInfo("----------------");

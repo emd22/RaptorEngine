@@ -78,6 +78,7 @@ enum BcSpecJump : uint8
     BcSpecJump_AbsoluteReg32,
 
     BcSpecJump_CallAbsolute,
+    BcSpecJump_CallModuleFunction,
 
     BcSpecJump_ReturnToCaller,
     BcSpecJump_ReturnToCaller_Int32,
