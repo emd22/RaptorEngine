@@ -4,6 +4,17 @@
 
 namespace fx {
 
+static String FixExtension(const String& ext)
+{
+    if (!ext.StartsWith('.')) {
+        String fixed(".");
+        fixed += ext;
+        return fixed;
+    }
+
+    return ext;
+}
+
 
 Path::Path(const String& full_path)
 {
@@ -87,7 +98,7 @@ Path& Path::Remove(const uint32 index)
     return *this;
 }
 
-Path& Path::DirBack()
+Path& Path::DirUp()
 {
     uint32 last_index = Components.size() - 1;
 
@@ -102,10 +113,33 @@ Path& Path::DirBack()
     return *this;
 }
 
+Path& Path::DirDown(const String& dir_name)
+{
+    bool has_extension = (Components.size() > 0) && HasExtension();
+    String basename;
+
+    // Save basename and remove from path
+    if (has_extension) {
+        basename = *BaseName();
+        RemoveLast();
+    }
+
+    // Add the subdir
+    Add(dir_name);
+
+    // Add the basename back in
+    if (has_extension) {
+        Add(basename);
+    }
+
+    return *this;
+}
+
 
 void Path::CreateDirs() const
 {
-    String path_str = Str();
+    String path_str = Str(eStrMode::NoBaseName);
+
     if (!std::filesystem::exists(path_str.CStr())) {
         std::filesystem::create_directories(path_str.CStr());
     }
@@ -164,6 +198,49 @@ Path& Path::RemoveExtension()
     return *this;
 }
 
+Path& Path::AddExtension(const String& ext)
+{
+    String* basename = Get(Components.size() - 1);
+
+    if (!basename || Components.size() == 0) {
+        return *this;
+    }
+
+
+    (*basename) += FixExtension(ext);
+
+    return *this;
+}
+
+Path& Path::SetExtension(const String& ext)
+{
+    String* basename = Get(Components.size() - 1);
+
+    if (!basename || Components.size() == 0) {
+        return *this;
+    }
+
+    uint32 ext_index = basename->FindNext(1, '.');
+
+    String updated_ext = FixExtension(ext);
+
+
+    // If there is no extension found, add it
+    if (ext_index == String::scNotFound) {
+        (*basename) += updated_ext;
+
+        return *this;
+    }
+
+    // There is an extension that exists, trim it
+    basename->ShortenTo(ext_index);
+
+    // Add the new extension
+    (*basename) += updated_ext;
+
+    return *this;
+}
+
 bool Path::HasExtension() const
 {
     const String* basename = Get(Components.size() - 1);
@@ -174,11 +251,21 @@ bool Path::HasExtension() const
 }
 
 
-String Path::Str() const
+String Path::Str(eStrMode mode) const
 {
     String result;
+    int32 num_components = Components.size();
 
-    const uint32 num_components = Components.size();
+    if (num_components <= 0) {
+        return result;
+    }
+
+    if (mode == eStrMode::NoBaseName) {
+        // Omit the basename if it exists
+        if (HasExtension()) {
+            --num_components;
+        }
+    }
 
     if (bIsAbsolutePath) {
         result = "/";

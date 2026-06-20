@@ -1,20 +1,13 @@
 #include "Scripts/time"
 
-fwddeclare() int;
-
 init()
 {
 }
 
 Default() int
 {
+
     local int x = fwddeclare();
 
     return x;
-}
-
-
-fwddeclare() int
-{
-    return 5;
 }

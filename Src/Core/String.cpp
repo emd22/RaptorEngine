@@ -287,6 +287,25 @@ uint32 String::FindNext(uint32 start, const String& match) const
     return scNotFound;
 }
 
+bool String::StartsWith(const char ch) const
+{
+    if (Length < 1) {
+        return false;
+    }
+
+    return (GetInternalPtr()[0] == ch);
+}
+
+bool String::EndsWith(const char ch) const
+{
+    if (Length < 1) {
+        return false;
+    }
+
+    return (GetInternalPtr()[Length - 1] == ch);
+}
+
+
 String String::ReplaceAll(const char* to_replace, char replacement)
 {
     String copy = *this;

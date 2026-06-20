@@ -35,6 +35,10 @@ void FoxScript::Load(const String& path)
         return;
     }
 
+    Path bytecode_path(path);
+    bytecode_path.DirDown("Out");
+    bytecode_path.SetExtension(".fsb");
+    bytecode_path.CreateDirs();
 
     Slice<char> file_data = fp.Read<char>();
 
@@ -57,10 +61,19 @@ void FoxScript::Load(const String& path)
     }
 
     FoxBytecodeCompiler compiler {};
+    compiler.WriteHeaderFile(path, static_cast<FoxAstBlock*>(root_node));
+
     SizedArray<uint8> bytecode = compiler.Compile(root_node);
     if (compiler.HasErrors()) {
         LogError(LC_SCRIPT, "Errors found during script compilation, cannot continue");
         return;
+    }
+
+    {
+        LogInfo("output to {}", bytecode_path.Str());
+        File bytecode_file(bytecode_path.Str(), File::eModType::Write, File::eDataType::Binary);
+        bytecode_file.Write(bytecode.pData, bytecode.Size);
+        bytecode_file.Close();
     }
 
     LogInfo("Compiled script {}", path);

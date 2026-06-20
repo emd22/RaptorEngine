@@ -90,8 +90,10 @@ public:
 
     void PrintBytecode();
     bool HasErrors() const { return mErrorCount > 0; }
+    void WriteHeaderFile(const String& script_path, FoxAstBlock* root);
 
     ~FoxBytecodeCompiler() = default;
+
 
 private:
     void EmitBlock(FoxAstBlock* block, int params_to_save, bool is_function_body);
@@ -109,7 +111,6 @@ private:
     bool ValidateParameters(FoxAstFunctionCall* call);
     void AddString(uint32 fixup_offset, const String& value);
 
-    void EmitFunctionDefinitionFile(FoxAstBlock* root);
     void EmitSymbolTable(FoxAstBlock* root);
     void EmitStrings();
 

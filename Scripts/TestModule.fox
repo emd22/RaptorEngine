@@ -1,0 +1,9 @@
+
+init()
+{
+}
+
+getvalue() int
+{
+    return 16;
+}

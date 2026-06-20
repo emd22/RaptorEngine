@@ -26,7 +26,6 @@ SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
     Assert(root->NodeType == FX_AST_BLOCK);
 
     EmitSymbolTable(static_cast<FoxAstBlock*>(root));
-    EmitFunctionDefinitionFile(static_cast<FoxAstBlock*>(root));
 
     EmitNode(root);
     EmitStrings();
@@ -1371,9 +1370,18 @@ void FoxBytecodeCompiler::EmitFunctionDefinitionsInBlock(FoxAstBlock* block)
     }
 }
 
-void FoxBytecodeCompiler::EmitFunctionDefinitionFile(FoxAstBlock* root)
+void FoxBytecodeCompiler::WriteHeaderFile(const String& script_path, FoxAstBlock* root)
 {
+    Path header_path(script_path);
+    header_path.DirDown("Header");
+    header_path.SetExtension("fsh");
+
+    // Ensure the enclosing directory exists
+    header_path.CreateDirs();
+
     std::unordered_map<std::string, FoxAstFunctionDecl*> discovered_symbols;
+
+    File file(header_path.Str(), File::eModType::Write, File::eDataType::Text);
 
     for (FoxAstNode* stmt : root->Statements) {
         if (stmt->NodeType != FX_AST_PROCDECL) {
@@ -1402,12 +1410,14 @@ void FoxBytecodeCompiler::EmitFunctionDefinitionFile(FoxAstBlock* root)
                                      (i < num_params - 1) ? ", " : "");
         }
 
-        String decl = String::Fmt("{0}({1}) {2};", proc_decl->pNameToken->GetStr(), param_str,
+        String decl = String::Fmt("{0}({1}) {2};\n", proc_decl->pNameToken->GetStr(), param_str,
                                   (proc_decl->pReturnTypeToken != nullptr) ? proc_decl->pReturnTypeToken->GetStr()
                                                                            : "");
 
-        LogInfo("DECLARATION: {}", decl);
+        file.Write(decl);
     }
+
+    file.Close();
 }
 
 

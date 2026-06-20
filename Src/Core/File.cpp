@@ -62,6 +62,9 @@ void File::Open(const String& path, eModType mt, eDataType dt)
 
 #else
     pFileHandle = fopen(path.CStr(), mode);
+    if (pFileHandle == nullptr) {
+        LogError(LC_CORE, "Error opening file {}", path);
+    }
 #endif
 }
 

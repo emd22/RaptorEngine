@@ -39,6 +39,9 @@ public:
     uint32 FindNext(uint32 start, char ch) const;
     uint32 FindPrev(uint32 skip, char ch) const;
 
+    bool StartsWith(const char ch) const;
+    bool EndsWith(const char ch) const;
+
     /**
      * @brief Finds the first occurance of the string `match` beginning at the index `start`.
      */

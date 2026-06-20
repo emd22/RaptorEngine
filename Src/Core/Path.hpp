@@ -11,6 +11,13 @@ class Path
     using ComponentList = std::vector<String>;
 
 public:
+    enum class eStrMode
+    {
+        FullPath,
+        NoBaseName,
+    };
+
+public:
     Path() = default;
     /**
      * @brief Separates components to create a Path object given the file path `path`.
@@ -34,7 +41,14 @@ public:
      * Example:
      * `A/B/File.txt` becomes `A/File.txt`.
      */
-    Path& DirBack();
+    Path& DirUp();
+
+    /**
+     * @brief Adds a directory component at the end of the path, preserving the filename.
+     * Example:
+     * `A/File.txt` becomes `A/B/File.txt`.`
+     */
+    Path& DirDown(const String& dir_name);
 
     Path& RemoveLast()
     {
@@ -49,6 +63,8 @@ public:
     }
 
     Path& RemoveExtension();
+    Path& AddExtension(const String& ext);
+    Path& SetExtension(const String& ext);
     bool HasExtension() const;
 
     void CreateDirs() const;
@@ -60,7 +76,7 @@ public:
     const String* Get(const uint32 index) const;
     String* BaseName() { return Get(Components.size() - 1); };
 
-    String Str() const;
+    String Str(eStrMode mode = eStrMode::FullPath) const;
 
 
 public:
