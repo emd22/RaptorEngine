@@ -24,6 +24,14 @@ struct FoxFunctionFixup
     Hash32 FunctionName;
 };
 
+class FoxParser;
+
+struct FoxCachedModule
+{
+    FoxParser* pParser = nullptr;
+    FoxAstNode* pAstTree = nullptr;
+};
+
 class FoxParser
 {
     using TT = eTokenType;
@@ -39,6 +47,7 @@ public:
     FoxVar* FindVar(Hash32 hashed_name);
 
     FoxFunction* FindFunction(Hash32 hashed_name);
+    FoxFunction* FindModuleFunction(const String& module_alias, Hash32 hashed_name);
 
     FoxAstNode* TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_semicolon);
     FoxAstAssign* TryParseAssignment(Token* var_name);
@@ -53,6 +62,7 @@ public:
     FoxAstNode* ParseRhs();
 
     FoxAstFunctionCall* ParseFunctionCall();
+    FoxAstFunctionCall* ParseModuleFunctionCall(const std::string& module_name);
     FoxAstModuleCall* ParseModuleCall();
 
     FoxAstIf* ParseIfStatement(FoxAstBlock* parent_block);
@@ -91,6 +101,8 @@ public:
     Token& EatToken(TT token_type);
 
     void PrintFunctionTable(const FoxScope& scope) const;
+
+    ~FoxParser();
 
     // void RegisterExternalFunc(FoxHash func_name, std::vector<FoxValue::ValueType> param_types,
     // FoxExternalFunc::FuncType func, bool is_variadic);
@@ -132,6 +144,8 @@ private:
 public:
     // char* pFileData = nullptr;
     bool bHasErrors = false;
+
+    std::unordered_map<std::string, FoxCachedModule> CachedModules;
 
 private:
     PagedArray<FoxScope> mScopes;

@@ -64,7 +64,7 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         printf("[MODULECALL] ");
 
         if (module_call->pModuleLoad) {
-            module_call->pModuleLoad->pAlias->Print(true);
+            module_call->pModuleLoad->pAlias->Print();
         }
 
         PRINT_NESTED(module_call->pFunctionCall);

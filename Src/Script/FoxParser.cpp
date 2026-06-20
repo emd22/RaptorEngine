@@ -254,6 +254,19 @@ FoxFunction* FoxParser::FindFunction(Hash32 hashed_name)
     return nullptr;
 }
 
+FoxFunction* FoxParser::FindModuleFunction(const String& module_alias, Hash32 hashed_name)
+{
+    // Find the cached module
+    auto it = CachedModules.find(module_alias.Str());
+    if (it == CachedModules.end()) {
+        return nullptr;
+    }
+
+    FoxCachedModule& cached_mod = it->second;
+
+    return cached_mod.pParser->FindFunction(hashed_name);
+}
+
 void FoxParser::PrintFunctionTable(const FoxScope& scope) const
 {
     LogInfo("||-------------------------------------||");
@@ -572,8 +585,35 @@ FoxAstModuleLoad* FoxParser::ParseModuleLoad()
 
     std::string path_str = node->pAlias->GetStr();
 
-    if (mModuleLoads.find(path_str) != mModuleLoads.end()) {
+    if (mModuleLoads.find(path_str) == mModuleLoads.end()) {
         mModuleLoads[path_str] = node;
+    }
+
+    Path mod_header_path(node->pModulePath->GetStr());
+    mod_header_path.SetExtension(".fsh");
+    mod_header_path.DirDown("Header");
+
+    File mod_header_file(mod_header_path.Str(), File::eModType::Read, File::eDataType::Binary);
+
+    if (mod_header_file.IsFileOpen()) {
+        Slice<char> file_data = mod_header_file.Read<char>();
+
+        Tokenizer tokenizer(file_data.pData, file_data.Size);
+        tokenizer.SetFileExtension(".fox");
+        tokenizer.Tokenize();
+
+        FoxParser* parser = new FoxParser();
+
+        parser->Init(std::move(tokenizer.TokenBuffer));
+
+        FoxAstNode* module_ast = parser->Parse();
+        if (parser->bHasErrors || module_ast == nullptr) {
+            LogError(LC_SCRIPT, "Errors found while parsing module header, exitting...");
+            return node;
+        }
+
+
+        CachedModules[node->pAlias->GetStr()] = FoxCachedModule { .pParser = parser, .pAstTree = module_ast };
     }
 
     return node;
@@ -754,12 +794,58 @@ FoxAstFunctionCall* FoxParser::ParseFunctionCall()
     return node;
 }
 
+FoxAstFunctionCall* FoxParser::ParseModuleFunctionCall(const std::string& module_name)
+{
+    // Find the cached module
+    auto it = CachedModules.find(module_name);
+    if (it == CachedModules.end()) {
+        return nullptr;
+    }
+    FoxCachedModule& cached_mod = it->second;
+
+
+    FoxAstFunctionCall* node = FX_SCRIPT_ALLOC_NODE(FoxAstFunctionCall);
+
+    Token& name = EatToken(TT::Identifier);
+
+    node->HashedName = name.GetHash();
+    node->pFunction = cached_mod.pParser->FindFunction(node->HashedName);
+
+    if (node->pFunction == nullptr) {
+        ParseError("Module '{}' function '{}' not found!", module_name, name.GetStr());
+    }
+
+    EatToken(TT::LParen);
+
+    while (GetToken().Type != TT::RParen) {
+        FoxAstNode* param = ParseRhs();
+
+        if (param == nullptr) {
+            break;
+        }
+
+        node->Params.push_back(param);
+
+        TT next_tt = GetToken().Type;
+
+        if (GetToken().Type == TT::Comma) {
+            EatToken(TT::Comma);
+            continue;
+        }
+
+        break;
+    }
+
+    EatToken(TT::RParen);
+
+    return node;
+}
+
 FoxAstModuleCall* FoxParser::ParseModuleCall()
 {
     FoxAstModuleCall* node = FX_SCRIPT_ALLOC_NODE(FoxAstModuleCall);
 
     Token& mod_name = EatToken(TT::Identifier);
-
     std::string mod_str = mod_name.GetStr();
 
     auto load_it = mModuleLoads.find(mod_str);
@@ -771,7 +857,7 @@ FoxAstModuleCall* FoxParser::ParseModuleCall()
     }
 
     EatToken(TT::Colon);
-    node->pFunctionCall = ParseFunctionCall();
+    node->pFunctionCall = ParseModuleFunctionCall(mod_str);
 
     return node;
 }
@@ -819,9 +905,6 @@ FoxAstBlock* FoxParser::Parse()
     if (bHasErrors) {
         return nullptr;
     }
-
-    FoxAstPrinter printer(root_block);
-    printer.Print(root_block);
 
     return root_block;
 }
@@ -913,9 +996,29 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
         FoxAstModuleLoad* mod_node = static_cast<FoxAstModuleLoad*>(node);
         FX_SCRIPT_FREE(FoxAstModuleLoad, mod_node);
     }
+    else if (node->NodeType == FX_AST_MODULECALL) {
+        FoxAstModuleCall* mod_call = static_cast<FoxAstModuleCall*>(node);
+
+        // Do not free pModuleLoad as that is not controlled by this node.
+        Do(mod_call->pFunctionCall);
+
+        FX_SCRIPT_FREE(FoxAstModuleCall, mod_call);
+    }
     else {
         LogError(LC_SCRIPT, "Cannot free unknown node!");
     }
+}
+
+FoxParser::~FoxParser()
+{
+    FoxAstDestroyer destroyer;
+
+    for (auto it : CachedModules) {
+        destroyer.Do(it.second.pAstTree);
+        delete it.second.pParser;
+    }
+
+    CachedModules.clear();
 }
 
 } // namespace fx::script

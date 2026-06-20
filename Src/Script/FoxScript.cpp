@@ -55,6 +55,9 @@ SizedArray<uint8> FoxScript::Compile(const String& path)
         return SizedArray<uint8>();
     }
 
+    FoxAstPrinter printer(static_cast<FoxAstBlock*>(root_node));
+    printer.Print(root_node);
+
     FoxBytecodeCompiler compiler {};
     compiler.WriteHeaderFile(path, static_cast<FoxAstBlock*>(root_node));
 
