@@ -27,7 +27,7 @@ const char* Token::GetTypeName(eTokenType type)
 
         "Question",   "Ampersand",
 
-        "Dot",        "Comma",       "Semicolon",
+        "Dot",        "Comma",       "Semicolon", "Colon",
 
         "Equality",   "NotEqual",    "LessEqual", "GreaterEqual",
 
@@ -137,6 +137,8 @@ eTokenType Tokenizer::GetTokenType(Token& token)
             return eTokenType::Comma;
         case ';':
             return eTokenType::Semicolon;
+        case ':':
+            return eTokenType::Colon;
         }
     }
 

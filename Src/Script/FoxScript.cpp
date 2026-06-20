@@ -26,19 +26,14 @@ static void WB_InitStatVars(FoxVM* vm, const SizedArray<FoxValue>& args)
 
 FoxScript::FoxScript(const String& path) { Load(path); }
 
-void FoxScript::Load(const String& path)
+SizedArray<uint8> FoxScript::Compile(const String& path)
 {
     File fp(path, File::eModType::Read, File::eDataType::Binary);
 
     if (!fp.IsFileOpen()) {
         LogError(LC_SCRIPT, "Could not open script file at '{}'", path);
-        return;
+        return SizedArray<uint8>();
     }
-
-    Path bytecode_path(path);
-    bytecode_path.DirDown("Out");
-    bytecode_path.SetExtension(".fsb");
-    bytecode_path.CreateDirs();
 
     Slice<char> file_data = fp.Read<char>();
 
@@ -46,9 +41,9 @@ void FoxScript::Load(const String& path)
     tokenizer.SetFileExtension(".fox");
     tokenizer.Tokenize();
 
-    for (const Token& token : tokenizer.TokenBuffer) {
-        LogInfo("{}", token);
-    }
+    // for (const Token& token : tokenizer.TokenBuffer) {
+    //     LogInfo("{}", token);
+    // }
 
     FoxParser parser {};
 
@@ -57,7 +52,7 @@ void FoxScript::Load(const String& path)
     FoxAstNode* root_node = parser.Parse();
     if (parser.bHasErrors || root_node == nullptr) {
         LogError(LC_SCRIPT, "Errors found while parsing script, exitting...");
-        return;
+        return SizedArray<uint8>();
     }
 
     FoxBytecodeCompiler compiler {};
@@ -66,19 +61,33 @@ void FoxScript::Load(const String& path)
     SizedArray<uint8> bytecode = compiler.Compile(root_node);
     if (compiler.HasErrors()) {
         LogError(LC_SCRIPT, "Errors found during script compilation, cannot continue");
-        return;
+        return SizedArray<uint8>();
     }
 
+    Path bytecode_path(path);
+    bytecode_path.DirDown("Out");
+    bytecode_path.SetExtension(".fsb");
+    bytecode_path.CreateDirs();
+
     {
-        LogInfo("output to {}", bytecode_path.Str());
+        LogInfo(LC_SCRIPT, "Write bytecode to {}", bytecode_path.Str());
         File bytecode_file(bytecode_path.Str(), File::eModType::Write, File::eDataType::Binary);
         bytecode_file.Write(bytecode.pData, bytecode.Size);
         bytecode_file.Close();
     }
 
-    LogInfo("Compiled script {}", path);
-    // Script is compiled, we can now start freeing loaded file data.
+    LogInfo(LC_SCRIPT, "Compiled script {}", path);
 
+    // Since all we need is the bytecode now, we can destroy the AST.
+    FoxAstDestroyer destroyer;
+    destroyer.Do(root_node);
+
+    return std::move(bytecode);
+}
+
+void FoxScript::Load(const String& path)
+{
+    SizedArray<uint8> bytecode = Compile(path);
 
     FoxBytecodePrinter bc_printer(bytecode);
     bc_printer.Print();
@@ -88,9 +97,6 @@ void FoxScript::Load(const String& path)
     RegisterProc(HashStr32("WB_InitAmmoVars"), eFoxProcFlags::None, { eFoxType::INT, eFoxType::INT }, &WB_InitAmmoVars);
     RegisterProc(HashStr32("WB_InitStatVars"), eFoxProcFlags::None, { eFoxType::INT }, &WB_InitStatVars);
 
-    // Since all we need is the bytecode now, we can destroy the AST.
-    FoxAstDestroyer destroyer;
-    destroyer.Do(root_node);
 
     // If there is an init function, call it
     CallProc(GetSymbol("init"), {});

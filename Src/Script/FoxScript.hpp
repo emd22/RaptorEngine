@@ -15,6 +15,7 @@ public:
     FoxScript(const String& path);
 
     void Load(const String& path);
+    SizedArray<uint8> Compile(const String& path);
 
     template <typename T>
         requires C_IsAnyOf<T, uint32, int32, float32>

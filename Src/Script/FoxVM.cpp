@@ -50,6 +50,34 @@ void FoxVM::LoadSymTable()
     }
 }
 
+void FoxVM::LoadLinkTable()
+{
+    uint32 num_links = Read32();
+
+    LogInfo("Loaded {} links", num_links);
+
+    LoadedModules.InitSize(num_links);
+
+    constexpr uint32 scBufferSize = 1024;
+    char name_buffer[scBufferSize];
+
+    for (uint32 index = 0; index < num_links; index++) {
+        ReadString(name_buffer, scBufferSize);
+
+        VMModule& mod = LoadedModules[index];
+
+        File bytecode_file(name_buffer, File::eModType::Read, File::eDataType::Binary);
+        if (!bytecode_file.IsFileOpen()) {
+            LogError(LC_SCRIPT, "Error loading linked module '{}'", name_buffer);
+            continue;
+        }
+
+        LogInfo(LC_SCRIPT, "Loaded link '{}'", name_buffer);
+
+        mod.Bytecode = bytecode_file.Read<uint8>();
+    }
+}
+
 void FoxVM::PushReturnAddr(uint32 addr)
 {
     if (CallStackPointer + 4 > scStackSize) {
@@ -81,6 +109,7 @@ void FoxVM::InitVM(SizedArray<uint8>&& bytecode)
     mBytecode = std::move(bytecode);
 
     LoadSymTable();
+    LoadLinkTable();
 
     Assert(scStackSize >= 1024);
 

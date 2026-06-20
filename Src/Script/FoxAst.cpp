@@ -25,6 +25,8 @@ bool FoxAstFunctionCall::HasReturnType() const
     return pFunction->pDeclaration->ReturnType != eFoxType::NONETYPE;
 }
 
+#define PRINT_NESTED(node_) Print(static_cast<FoxAstNode*>(node_), depth + 1);
+
 void FoxAstPrinter::Print(FoxAstNode* node, int depth)
 {
     if (node == nullptr) {
@@ -41,40 +43,47 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
 
         FoxAstBlock* block = static_cast<FoxAstBlock*>(node);
         for (FoxAstNode* child : block->Statements) {
-            Print(child, depth + 1);
+            PRINT_NESTED(child);
         }
         return;
     }
     else if (node->NodeType == FX_AST_PROCDECL) {
         FoxAstFunctionDecl* functiondecl = static_cast<FoxAstFunctionDecl*>(node);
+
         printf("[PROCDECL] ");
-        functiondecl->pNameToken->Print();
+        functiondecl->pNameToken->PrintBasic();
 
         for (FoxAstNode* param : functiondecl->pParams->Statements) {
-            Print(param, depth + 1);
+            PRINT_NESTED(param);
         }
 
-        Print(functiondecl->pBlock, depth + 1);
+        PRINT_NESTED(functiondecl->pBlock);
     }
     else if (node->NodeType == FX_AST_MODULECALL) {
         FoxAstModuleCall* module_call = static_cast<FoxAstModuleCall*>(node);
         printf("[MODULECALL] ");
+
+        if (module_call->pModuleLoad) {
+            module_call->pModuleLoad->pAlias->Print(true);
+        }
+
+        PRINT_NESTED(module_call->pFunctionCall);
     }
     else if (node->NodeType == FX_AST_VARDECL) {
         FoxAstVarDecl* vardecl = static_cast<FoxAstVarDecl*>(node);
 
         printf("[VARDECL] ");
-        vardecl->pNameToken->Print();
+        vardecl->pNameToken->PrintBasic();
 
-        Print(vardecl->pAssignment, depth + 1);
+        PRINT_NESTED(vardecl->pAssignment);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
         FoxAstAssign* assign = static_cast<FoxAstAssign*>(node);
 
         printf("[ASSIGN] ");
 
-        assign->pLhs->pName->Print();
-        Print(assign->pRhs, depth + 1);
+        assign->pLhs->pName->PrintBasic();
+        PRINT_NESTED(assign->pRhs);
     }
     else if (node->NodeType == FX_AST_PROCCALL) {
         FoxAstFunctionCall* functioncall = static_cast<FoxAstFunctionCall*>(node);
@@ -84,7 +93,7 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
             printf("{defined externally}");
         }
         else {
-            functioncall->pFunction->Name->Print(true);
+            functioncall->pFunction->Name->PrintBasic(true);
         }
 
         printf(" (%zu params)\n", functioncall->Params.size());
@@ -99,16 +108,10 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         FoxAstBinop* binop = static_cast<FoxAstBinop*>(node);
 
         printf("[BINOP] ");
-        binop->OpToken->Print();
+        binop->OpToken->PrintBasic();
 
-        Print(binop->pLeft, depth + 1);
-        Print(binop->pRight, depth + 1);
-    }
-    else if (node->NodeType == FX_AST_COMMANDMODE) {
-        FoxAstCommandMode* command_mode = static_cast<FoxAstCommandMode*>(node);
-        printf("[COMMANDMODE]\n");
-
-        Print(command_mode->Node, depth + 1);
+        PRINT_NESTED(binop->pLeft);
+        PRINT_NESTED(binop->pRight);
     }
     else if (node->NodeType == FX_AST_RETURN) {
         FoxAstReturn* return_node = static_cast<FoxAstReturn*>(node);
@@ -116,7 +119,7 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
         puts("[RETURN]");
 
         if (return_node->pRhs) {
-            Print(return_node->pRhs, depth + 1);
+            PRINT_NESTED(return_node->pRhs);
         }
     }
     else if (node->NodeType == FX_AST_IF) {
@@ -124,11 +127,32 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
 
         puts("[IF]");
 
-        Print(if_block->pCondition, depth + 1);
-        Print(if_block->pBlock, depth + 1);
+        PRINT_NESTED(if_block->pCondition);
+        PRINT_NESTED(if_block->pBlock);
 
         if (if_block->pElseBlock) {
-            Print(if_block->pElseBlock, depth + 1);
+            PRINT_NESTED(if_block->pElseBlock);
+        }
+    }
+
+    else if (node->NodeType == FX_AST_MODULELOAD) {
+        FoxAstModuleLoad* module_load = static_cast<FoxAstModuleLoad*>(node);
+
+        printf("[MODLOAD] ");
+
+        if (module_load->pAlias) {
+            module_load->pAlias->PrintBasic(true);
+        }
+        else {
+            printf("[none]");
+        }
+        printf(" at ");
+
+        if (module_load->pModulePath) {
+            module_load->pModulePath->PrintBasic();
+        }
+        else {
+            printf("[none]\n");
         }
     }
     else {

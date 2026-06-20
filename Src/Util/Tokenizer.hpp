@@ -46,6 +46,7 @@ enum class eTokenType
     Dot,
     Comma,
     Semicolon,
+    Colon,
 
     Equality,
     NotEqual,
@@ -88,6 +89,8 @@ public:
     {
         printf("Token[%d]: (T:%-10s) {%.*s} %c", Length, GetTypeName(Type), Length, Start, (no_newline) ? ' ' : '\n');
     }
+
+    void PrintBasic(bool no_newline = false) const { printf("'%.*s'%c", Length, Start, (no_newline) ? ' ' : '\n'); }
 
     void Increment() { ++Length; }
 
@@ -172,7 +175,7 @@ class Tokenizer
 {
 private:
 public:
-    const char* SingleCharOperators = "=()[]{}<>+-*$.,;?!&";
+    const char* SingleCharOperators = "=()[]{}<>+-*/$.,;:?!&";
 
     struct State
     {

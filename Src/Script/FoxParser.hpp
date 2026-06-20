@@ -43,6 +43,8 @@ public:
     FoxAstNode* TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_semicolon);
     FoxAstAssign* TryParseAssignment(Token* var_name);
 
+    FoxAstModuleLoad* ParseModuleLoad();
+
     FoxValue ParseValue();
 
     FoxAstFunctionDecl* ParseFunctionDeclare();
@@ -135,6 +137,7 @@ private:
     PagedArray<FoxScope> mScopes;
     FoxScope* mCurrentScope = nullptr;
 
+    std::unordered_map<std::string, FoxAstModuleLoad*> mModuleLoads;
     std::vector<FoxFunctionFixup> mFunctionFixups;
 
     FoxAstBlock* mpRootBlock = nullptr;

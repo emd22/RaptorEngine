@@ -102,6 +102,7 @@ private:
 
     eFoxType DoBuiltin(FoxAstFunctionCall* call, bool do_not_call);
     void EmitFunctionCall(FoxAstFunctionCall* call, bool preserve_return_value);
+    void EmitModuleCall(FoxAstModuleCall* call, bool preserve_return_value);
 
     FoxBytecodeVarHandle* DoVarDeclare(FoxAstVarDecl* decl, VarDeclareMode mode = DECLARE_DEFAULT);
     void EmitAssign(FoxAstAssign* assign);
@@ -112,6 +113,7 @@ private:
     void AddString(uint32 fixup_offset, const String& value);
 
     void EmitSymbolTable(FoxAstBlock* root);
+    void EmitLinkTable(FoxAstBlock* root);
     void EmitStrings();
 
     template <typename... TTypes>
@@ -238,6 +240,8 @@ public:
     FoxBytecodePrinter(const SizedArray<uint8>& bytecode) { mpBytecode = Slice(bytecode); }
 
     void LoadSymbolTable();
+    void LoadLinkTable();
+
     void Print();
     void PrintOp();
 

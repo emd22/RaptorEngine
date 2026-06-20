@@ -57,6 +57,11 @@ struct VMExternalProcEntry
     eFoxProcFlags Flags;
 };
 
+struct VMModule
+{
+    Slice<uint8> Bytecode { nullptr, 0 };
+};
+
 class FoxVM
 {
     static constexpr uint32 scStackSize = 1024 * 16;
@@ -90,6 +95,7 @@ public:
 
 private:
     void LoadSymTable();
+    void LoadLinkTable();
 
     void DoPush(uint8 op_base, uint8 op_spec);
     void DoPop(uint8 op_base, uint8 op_spec);
@@ -133,6 +139,7 @@ public:
     SizedArray<uint8> mBytecode;
 
     SizedArray<FoxSymbol> SymTable;
+    SizedArray<VMModule> LoadedModules;
 
     std::unordered_map<Hash32, FoxValue, Hash32Stl> Globals;
 

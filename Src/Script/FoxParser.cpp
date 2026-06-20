@@ -94,6 +94,8 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_s
 
     constexpr Hash32 kw_if = HashStr32("if");
 
+    constexpr Hash32 kw_modload = HashStr32("modload");
+
     switch (hash) {
     case kw_proc:
         EatToken(TT::Identifier);
@@ -134,6 +136,10 @@ FoxAstNode* FoxParser::TryParseKeyword(FoxAstBlock* parent_block, bool* ignore_s
 
         return ret;
     }
+
+    case kw_modload:
+        EatToken(TT::Identifier);
+        return ParseModuleLoad();
     }
 
     return nullptr;
@@ -409,7 +415,10 @@ FoxAstNode* FoxParser::ParseRhs()
 
     FoxAstNode* lhs = nullptr;
 
-    if (token.Type == TT::Identifier) {
+    if (token.Type == TT::String) {
+        lhs = ParseModuleCall();
+    }
+    else if (token.Type == TT::Identifier) {
         // If there is a lparen after this, we can assume that this is a function call
         if (has_paramlist) {
             lhs = ParseFunctionCall();
@@ -467,8 +476,10 @@ FoxAstAssign* FoxParser::TryParseAssignment(Token* var_name)
 
 FoxAstNode* FoxParser::ParseGlobalDefinitions()
 {
-    if (GetToken().Type == TT::Identifier && GetToken(1).Type == TT::LParen) {
-        return ParseFunctionDeclare();
+    if (GetToken().Type == TT::Identifier) {
+        if (GetToken(1).Type == TT::LParen) {
+            return ParseFunctionDeclare();
+        }
     }
 
     return nullptr;
@@ -509,6 +520,9 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
         if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::LParen) {
             node = ParseFunctionCall();
         }
+        else if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::Colon) {
+            node = ParseModuleCall();
+        }
         else if (mTokenIndex + 1 < mTokens.Size() && GetToken(1).Type == TT::Equals) {
             Token& assign_name = EatToken(TT::Identifier);
             node = TryParseAssignment(&assign_name);
@@ -516,6 +530,9 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
         else {
             GetToken().Print();
         }
+    }
+    else if (!node && (mTokenIndex < mTokens.Size() && GetToken().Type == TT::String)) {
+        node = ParseModuleCall();
     }
 
 
@@ -531,6 +548,32 @@ FoxAstNode* FoxParser::ParseStatement(FoxAstBlock* parent_block)
 
     if (!ignore_semicolon || GetToken().Type == TT::Semicolon) {
         EatToken(TT::Semicolon);
+    }
+
+    return node;
+}
+
+FoxAstModuleLoad* FoxParser::ParseModuleLoad()
+{
+    // modload [name] = > "[path]" ;
+    Token* alias_token = &EatToken(TT::Identifier);
+
+    // Eat arrow "=>"
+    EatToken(TT::Equals);
+    EatToken(TT::GreaterThan);
+
+    Token* path_token = &EatToken(TT::String);
+
+    FoxAstModuleLoad* node = FX_SCRIPT_ALLOC_NODE(FoxAstModuleLoad);
+
+    // modload [name] = > "[path]" ;
+    node->pAlias = alias_token;
+    node->pModulePath = path_token;
+
+    std::string path_str = node->pAlias->GetStr();
+
+    if (mModuleLoads.find(path_str) != mModuleLoads.end()) {
+        mModuleLoads[path_str] = node;
     }
 
     return node;
@@ -715,9 +758,21 @@ FoxAstModuleCall* FoxParser::ParseModuleCall()
 {
     FoxAstModuleCall* node = FX_SCRIPT_ALLOC_NODE(FoxAstModuleCall);
 
-    // Token& path = EatToken(TT::String);
+    Token& mod_name = EatToken(TT::Identifier);
 
-    // node->ModulePath = Path(path.GetStr());
+    std::string mod_str = mod_name.GetStr();
+
+    auto load_it = mModuleLoads.find(mod_str);
+    if (load_it == mModuleLoads.end()) {
+        ParseError("No module load found for '{}'", mod_str);
+    }
+    else {
+        node->pModuleLoad = load_it->second;
+    }
+
+    EatToken(TT::Colon);
+    node->pFunctionCall = ParseFunctionCall();
+
     return node;
 }
 
@@ -815,6 +870,13 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
 
         FX_SCRIPT_FREE(FoxAstFunctionCall, functioncall);
     }
+    else if (node->NodeType == FX_AST_PROCCALL) {
+        FoxAstModuleCall* module_call = static_cast<FoxAstModuleCall*>(node);
+
+        Do(module_call->pFunctionCall);
+
+        FX_SCRIPT_FREE(FoxAstModuleCall, module_call);
+    }
     else if (node->NodeType == FX_AST_LITERAL) {
         FoxAstLiteral* literal = static_cast<FoxAstLiteral*>(node);
 
@@ -846,6 +908,10 @@ void FoxAstDestroyer::Do(FoxAstNode* node)
         Do(if_node->pElseBlock);
 
         FX_SCRIPT_FREE(FoxAstIf, if_node);
+    }
+    else if (node->NodeType == FX_AST_MODULELOAD) {
+        FoxAstModuleLoad* mod_node = static_cast<FoxAstModuleLoad*>(node);
+        FX_SCRIPT_FREE(FoxAstModuleLoad, mod_node);
     }
     else {
         LogError(LC_SCRIPT, "Cannot free unknown node!");

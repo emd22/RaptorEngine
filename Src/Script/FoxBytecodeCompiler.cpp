@@ -1,10 +1,13 @@
 #include "FoxBytecodeCompiler.hpp"
 
+#include "FoxParser.hpp"
 #include "FoxVariable.hpp"
 
 #include <Core/ArrayUtil.hpp>
+#include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Core/PagedArray.hpp>
+#include <Script/FoxScript.hpp>
 #include <Util/Tokenizer.hpp>
 
 #define BC_PRINT_OP(fmt_, ...) fx::Log<fx::eLogSeverity::None>(fmt_, ##__VA_ARGS__)
@@ -26,6 +29,7 @@ SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
     Assert(root->NodeType == FX_AST_BLOCK);
 
     EmitSymbolTable(static_cast<FoxAstBlock*>(root));
+    EmitLinkTable(static_cast<FoxAstBlock*>(root));
 
     EmitNode(root);
     EmitStrings();
@@ -217,6 +221,11 @@ void FoxBytecodeCompiler::EmitNode(FoxAstNode* node)
         }
 
         return EmitFunctionCall(call, false);
+    }
+    else if (node->NodeType == FX_AST_MODULECALL) {
+        FoxAstModuleCall* call = static_cast<FoxAstModuleCall*>(node);
+
+        return EmitModuleCall(call, false);
     }
     else if (node->NodeType == FX_AST_ASSIGN) {
         return EmitAssign(static_cast<FoxAstAssign*>(node));
@@ -1329,6 +1338,51 @@ void FoxBytecodeCompiler::EmitFunctionCall(FoxAstFunctionCall* call, bool preser
     }
 }
 
+void FoxBytecodeCompiler::EmitModuleCall(FoxAstModuleCall* call, bool preserve_return_value)
+{
+    RETURN_IF_NO_NODE(call);
+
+    // Read the file definitions
+    // {
+    //     Path module_declarations_path(call->ModulePath);
+    //     module_declarations_path.DirDown("Header");
+    //     module_declarations_path.SetExtension("fsh");
+
+
+    //     File fp(, File::eModType::Read, File::eDataType::Binary);
+
+    //     if (!fp.IsFileOpen()) {
+    //         LogError(LC_SCRIPT, "Could not open script file at '{}'", path);
+    //         return;
+    //     }
+
+    //     Path bytecode_path(path);
+    //     bytecode_path.DirDown("Out");
+    //     bytecode_path.SetExtension(".fsb");
+    //     bytecode_path.CreateDirs();
+
+    //     Slice<char> file_data = fp.Read<char>();
+
+    //     Tokenizer tokenizer(file_data.pData, file_data.Size);
+    //     tokenizer.SetFileExtension(".fox");
+    //     tokenizer.Tokenize();
+
+    //     for (const Token& token : tokenizer.TokenBuffer) {
+    //         LogInfo("{}", token);
+    //     }
+
+    //     FoxParser parser {};
+
+    //     parser.Init(std::move(tokenizer.TokenBuffer));
+
+    //     FoxAstNode* root_node = parser.Parse();
+    //     if (parser.bHasErrors || root_node == nullptr) {
+    //         LogError(LC_SCRIPT, "Errors found while parsing script, exitting...");
+    //         return;
+    //     }
+    // }
+}
+
 
 FoxBytecodeVarHandle* FoxBytecodeCompiler::DefineParam(FoxAstNode* param_decl_node)
 {
@@ -1473,6 +1527,54 @@ void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
                 // Write a temporary address (will be updated after bytecode is written)
                 Write32(0);
             }
+        }
+    }
+}
+
+void FoxBytecodeCompiler::EmitLinkTable(FoxAstBlock* root)
+{
+    uint32 num_links = 0;
+
+    for (FoxAstNode* stmt : root->Statements) {
+        if (stmt->NodeType == FX_AST_MODULELOAD) {
+            ++num_links;
+        }
+    }
+
+    Write32(num_links);
+
+    for (FoxAstNode* stmt : root->Statements) {
+        if (stmt->NodeType == FX_AST_MODULELOAD) {
+            FoxAstModuleLoad* decl = static_cast<FoxAstModuleLoad*>(stmt);
+
+            std::string alias = decl->pAlias->GetStr();
+            std::string mod_path = decl->pModulePath->GetStr();
+
+            Path bin_path(mod_path);
+            {
+                String basename = *bin_path.BaseName();
+                bin_path.RemoveLast();
+
+                bin_path.Add("Out");
+                bin_path.Add(basename);
+
+                bin_path.SetExtension(".fsb");
+            }
+
+            String bin_str = bin_path.Str();
+
+            if (!FilesystemIO::FileExists(bin_str)) {
+                // Compile script
+                FoxScript script;
+
+                Path script_path(mod_path);
+                script_path.SetExtension(".fox");
+
+                script.Compile(script_path.Str());
+            }
+
+            decl->LinkTableOffset = mBytecode.Size();
+            EmitDataString(bin_str.CStr(), bin_str.Length, true);
         }
     }
 }
@@ -2056,9 +2158,29 @@ void FoxBytecodePrinter::LoadSymbolTable()
     LogInfo("----------------");
 }
 
+void FoxBytecodePrinter::LoadLinkTable()
+{
+    uint32 num_links = Read32();
+
+    constexpr uint32 cTempBufferSize = 1024;
+    char buffer[cTempBufferSize];
+
+    LogInfo("--- Links ---");
+
+
+    for (uint32 index = 0; index < num_links; index++) {
+        ReadString(buffer, cTempBufferSize, true);
+        LogInfo("{}", buffer);
+    }
+
+    LogInfo("----------------");
+}
+
 void FoxBytecodePrinter::Print()
 {
     LoadSymbolTable();
+    LogInfo("");
+    LoadLinkTable();
 
     while (mBytecodeIndex < mpBytecode.Size) {
         PrintOp();

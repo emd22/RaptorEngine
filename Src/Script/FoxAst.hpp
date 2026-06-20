@@ -34,6 +34,8 @@ enum FoxAstType
     FX_AST_MODULECALL,
     FX_AST_RETURN,
 
+    FX_AST_MODULELOAD,
+
     FX_AST_DOCCOMMENT,
 
     FX_AST_COMMANDMODE,
@@ -152,14 +154,25 @@ struct FoxAstFunctionCall : public FoxAstNode
     std::vector<FoxAstNode*> Params {}; // FoxAstLiteral or FoxAstVarRef
 };
 
+struct FoxAstModuleLoad : public FoxAstNode
+{
+    FoxAstModuleLoad() { this->NodeType = FX_AST_MODULELOAD; }
+
+    Token* pAlias = nullptr;
+    Token* pModulePath = nullptr;
+
+    uint32 LinkTableOffset = 0;
+};
+
+
 struct FoxAstModuleCall : public FoxAstNode
 {
     FoxAstModuleCall() { this->NodeType = FX_AST_MODULECALL; }
 
-    Path ModulePath;
-    FoxFunction* pFunction = nullptr;
-    Hash32 HashedName = HashNull32;
+    FoxAstModuleLoad* pModuleLoad = nullptr;
+    FoxAstFunctionCall* pFunctionCall = nullptr;
 };
+
 
 struct FoxAstReturn : public FoxAstNode
 {
