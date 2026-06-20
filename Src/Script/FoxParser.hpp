@@ -49,7 +49,9 @@ public:
     FoxAstFunctionDecl* ParseExtfnDeclare();
 
     FoxAstNode* ParseRhs();
+
     FoxAstFunctionCall* ParseFunctionCall();
+    FoxAstModuleCall* ParseModuleCall();
 
     FoxAstIf* ParseIfStatement(FoxAstBlock* parent_block);
 

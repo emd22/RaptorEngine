@@ -56,6 +56,10 @@ void FoxAstPrinter::Print(FoxAstNode* node, int depth)
 
         Print(functiondecl->pBlock, depth + 1);
     }
+    else if (node->NodeType == FX_AST_MODULECALL) {
+        FoxAstModuleCall* module_call = static_cast<FoxAstModuleCall*>(node);
+        printf("[MODULECALL] ");
+    }
     else if (node->NodeType == FX_AST_VARDECL) {
         FoxAstVarDecl* vardecl = static_cast<FoxAstVarDecl*>(node);
 

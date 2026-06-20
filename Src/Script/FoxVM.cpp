@@ -86,22 +86,22 @@ void FoxVM::InitVM(SizedArray<uint8>&& bytecode)
 
     pStack = gScriptMemPool->Alloc<uint8>(scStackSize);
     pCallStack = pStack + (scStackSize - scCallStackSize);
-    pVariables = gScriptMemPool->Alloc<VMVariable>(sizeof(VMVariable) * 32);
+    pVariables = gScriptMemPool->Alloc<VMVariable>(sizeof(VMVariable) * scMaxActiveVariables);
 
     memset(ScopeVarCounts, 0, sizeof(ScopeVarCounts));
 }
 
 VMVariable& FoxVM::GetVar(uint16 index)
 {
-    Assert(VariableBaseIndex < 32 && VariableBaseIndex >= 0);
-    Assert(index + VariableBaseIndex < 32);
+    Assert(VariableBaseIndex < scMaxActiveVariables && VariableBaseIndex >= 0);
+    Assert(index + VariableBaseIndex < scMaxActiveVariables);
 
     return pVariables[index + VariableBaseIndex];
 }
 
 VMVariable& FoxVM::GetVarAbsolute(uint16 index)
 {
-    Assert(index < 32);
+    Assert(index < scMaxActiveVariables);
     return pVariables[index];
 }
 
@@ -421,7 +421,7 @@ void FoxVM::PushVarBaseIndex()
         return;
     }
 
-    Assert(ScopeIndex < 32);
+    Assert(ScopeIndex < scMaxRecurseDepth);
     LogInfo("Pushing {} to scope {}", VariableIndex, ScopeIndex);
 
     // Store the current base index.
@@ -441,7 +441,7 @@ void FoxVM::PopVarBaseIndex()
         return;
     }
 
-    Assert(ScopeIndex < 32);
+    Assert(ScopeIndex < scMaxRecurseDepth);
     Assert(ScopeIndex > 0);
 
     // Restore the base index

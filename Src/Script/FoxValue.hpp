@@ -224,7 +224,7 @@ struct std::formatter<fx::eFoxType>
         case VT::REF:
             return std::format_to(ctx.out(), "ref");
         case VT::STRING:
-            return std::format_to(ctx.out(), "string");
+            return std::format_to(ctx.out(), "str");
         }
 
         return std::format_to(ctx.out(), "Unknown");

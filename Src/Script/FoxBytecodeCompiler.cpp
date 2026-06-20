@@ -26,6 +26,8 @@ SizedArray<uint8> FoxBytecodeCompiler::Compile(FoxAstNode* root)
     Assert(root->NodeType == FX_AST_BLOCK);
 
     EmitSymbolTable(static_cast<FoxAstBlock*>(root));
+    EmitFunctionDefinitionFile(static_cast<FoxAstBlock*>(root));
+
     EmitNode(root);
     EmitStrings();
 
@@ -1369,31 +1371,92 @@ void FoxBytecodeCompiler::EmitFunctionDefinitionsInBlock(FoxAstBlock* block)
     }
 }
 
+void FoxBytecodeCompiler::EmitFunctionDefinitionFile(FoxAstBlock* root)
+{
+    std::unordered_map<std::string, FoxAstFunctionDecl*> discovered_symbols;
+
+    for (FoxAstNode* stmt : root->Statements) {
+        if (stmt->NodeType != FX_AST_PROCDECL) {
+            continue;
+        }
+
+        FoxAstFunctionDecl* proc_decl = static_cast<FoxAstFunctionDecl*>(stmt);
+
+        std::string name = proc_decl->pNameToken->GetStr();
+
+        if (discovered_symbols.find(name) != discovered_symbols.end()) {
+            continue;
+        }
+
+        discovered_symbols[name] = proc_decl;
+
+        String param_str = "";
+
+        uint32 num_params = proc_decl->pParams->Statements.size();
+
+        for (uint32 i = 0; i < num_params; i++) {
+            FoxAstNode* param_node = proc_decl->pParams->Statements[i];
+            FoxAstVarDecl* param = static_cast<FoxAstVarDecl*>(param_node);
+
+            param_str += String::Fmt("{0} {1}{2}", param->pTypeToken->GetStr(), param->pNameToken->GetStr(),
+                                     (i < num_params - 1) ? ", " : "");
+        }
+
+        String decl = String::Fmt("{0}({1}) {2};", proc_decl->pNameToken->GetStr(), param_str,
+                                  (proc_decl->pReturnTypeToken != nullptr) ? proc_decl->pReturnTypeToken->GetStr()
+                                                                           : "");
+
+        LogInfo("DECLARATION: {}", decl);
+    }
+}
+
+
 void FoxBytecodeCompiler::EmitSymbolTable(FoxAstBlock* root)
 {
-    uint32 num_symbols = 0;
-    for (FoxAstNode* stmt : root->Statements) {
-        if (stmt->NodeType == FX_AST_PROCDECL) {
-            ++num_symbols;
-        }
-    }
-
-    // Number of symbols
-    Write32(num_symbols);
-
-    // String table offset
-    Write32(0);
+    std::unordered_map<std::string, FoxAstFunctionDecl*> discovered_symbols;
 
     for (FoxAstNode* stmt : root->Statements) {
         if (stmt->NodeType == FX_AST_PROCDECL) {
             FoxAstFunctionDecl* proc_decl = static_cast<FoxAstFunctionDecl*>(stmt);
 
-            EmitDataString(proc_decl->pNameToken->Start, proc_decl->pNameToken->Length, true);
+            std::string name = proc_decl->pNameToken->GetStr();
 
-            proc_decl->SymbolTableOffset = mBytecode.Size();
+            if (discovered_symbols.find(name) == discovered_symbols.end()) {
+                discovered_symbols[name] = proc_decl;
+            }
+        }
+    }
+
+    // Number of symbols
+    Write32(discovered_symbols.size());
+
+    LogInfo("Emitting {} symbols", discovered_symbols.size());
+
+    // String table offset
+    Write32(0);
+
+    discovered_symbols.clear();
+
+    for (FoxAstNode* stmt : root->Statements) {
+        if (stmt->NodeType == FX_AST_PROCDECL) {
+            FoxAstFunctionDecl* decl = static_cast<FoxAstFunctionDecl*>(stmt);
+
+            std::string name = decl->pNameToken->GetStr();
+
+            // If the declaration has already been output before, skip output but make sure the data is up to date.
+            auto discovered_it = discovered_symbols.find(name);
+            if (discovered_it != discovered_symbols.end()) {
+                decl->SymbolTableOffset = discovered_it->second->SymbolTableOffset;
+                continue;
+            }
+
+            discovered_symbols[name] = decl;
+
+            EmitDataString(decl->pNameToken->Start, decl->pNameToken->Length, true);
+            decl->SymbolTableOffset = mBytecode.Size();
 
             // Externally defined
-            if (proc_decl->bIsExternal) {
+            if (decl->bIsExternal) {
                 Write32(UINT32_MAX);
             }
             else {
@@ -1439,24 +1502,26 @@ void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
         return;
     }
 
+    FoxBytecodeFunctionHandle* existing_handle = FindFunctionHandle(function->pNameToken->GetHash());
+
     // Store the bytecode offset before the function is emitted
     const uint32 start_of_function = mBytecode.Size();
 
     mpCurrentFunctionBody = function;
 
+    if (function->pBlock) {
+        EmitMarker(BcSpecMarker_Proc);
+    }
+
+    if (function->pNameToken) {
+        uint32 sym_offset = function->SymbolTableOffset;
+        uint32 bc_offset = mBytecode.Size();
+
+        Fixup32(sym_offset, bc_offset);
+    }
+
     // Emit the body of the function
-    {
-        if (function->pNameToken) {
-            if (function->pBlock) {
-                EmitMarker(BcSpecMarker_Proc);
-            }
-
-            uint32 sym_offset = function->SymbolTableOffset;
-            uint32 bc_offset = mBytecode.Size();
-
-            Fixup32(sym_offset, bc_offset);
-        }
-
+    if (function->IsDefinition()) {
         int32 parameter_index = 0;
 
         uint32 num_parameters = function->pParams->Statements.size();
@@ -1465,24 +1530,21 @@ void FoxBytecodeCompiler::EmitFunctionDeclaration(FoxAstFunctionDecl* function)
             FoxAstNode* param_decl_node = function->pParams->Statements[(num_parameters - parameter_index - 1)];
             DefineParam(param_decl_node);
         }
-        // Pop values into parameter variables in reverse order
-        // for (parameter_index = 0; parameter_index < num_parameters; parameter_index++) {
-        //     EmitPopVar(parameter_index);
-        // }
 
         EmitBlock(function->pBlock, num_parameters, true);
 
         // Check to see if there has been a return statement in the function
 
-        if (function->pBlock) {
-            // There is no return statement in the function's block, add a void return statement
-            if (!function->pBlock->bHasExplicitReturn) {
-                EmitJumpReturnToCaller();
-            }
-
-            // End of procedure, end of scope
-            EmitMarker(BcSpecMarker_ProcEnd);
+        // There is no return statement in the function's block, add a void return statement
+        if (!function->pBlock->bHasExplicitReturn) {
+            EmitJumpReturnToCaller();
         }
+
+        // End of procedure, end of scope
+    }
+
+    if (function->pBlock) {
+        EmitMarker(BcSpecMarker_ProcEnd);
     }
 
     FoxBytecodeFunctionHandle function_handle { .HashedName = function->pNameToken->GetHash(),

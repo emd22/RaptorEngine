@@ -109,6 +109,7 @@ private:
     bool ValidateParameters(FoxAstFunctionCall* call);
     void AddString(uint32 fixup_offset, const String& value);
 
+    void EmitFunctionDefinitionFile(FoxAstBlock* root);
     void EmitSymbolTable(FoxAstBlock* root);
     void EmitStrings();
 

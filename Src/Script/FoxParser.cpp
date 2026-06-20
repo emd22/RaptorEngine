@@ -594,16 +594,22 @@ FoxAstFunctionDecl* FoxParser::ParseFunctionDeclare()
 
     EatToken(TT::RParen);
 
-    // Check to see if there is a return type provided
-    if (GetToken().Type != TT::LBrace) {
-        node->ReturnType = FoxStringToType(&EatToken(TT::Identifier));
+    eTokenType end_token_type = GetToken().Type;
 
-        // FoxAstVarDecl* return_decl = InternalVarDeclare(mTokenReturnVar, &type_token);
-        // node->pReturnVar = return_decl;
+    // Check to see if there is a return type provided
+    if (end_token_type != TT::LBrace && end_token_type != TT::Semicolon) {
+        node->pReturnTypeToken = &EatToken(TT::Identifier);
+        node->ReturnType = FoxStringToType(node->pReturnTypeToken);
     }
 
+    if (GetToken().Type == TT::Semicolon) {
+        // This is a declaration, not a definition
+        node->pBlock = nullptr;
+    }
+    else {
+        node->pBlock = ParseBlock();
+    }
 
-    node->pBlock = ParseBlock();
     PopScope();
 
     node->pParams = params;
@@ -702,6 +708,16 @@ FoxAstFunctionCall* FoxParser::ParseFunctionCall()
 
     EatToken(TT::RParen);
 
+    return node;
+}
+
+FoxAstModuleCall* FoxParser::ParseModuleCall()
+{
+    FoxAstModuleCall* node = FX_SCRIPT_ALLOC_NODE(FoxAstModuleCall);
+
+    // Token& path = EatToken(TT::String);
+
+    // node->ModulePath = Path(path.GetStr());
     return node;
 }
 

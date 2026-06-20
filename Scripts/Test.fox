@@ -5,6 +5,8 @@
 
 Hello(int x, int y) int
 {
+    /*$"Scripts/Local" Hello();*/
+
     LOG("Hello");
     return x + y * 2;
 }

@@ -2,6 +2,7 @@
 
 #include "FoxValue.hpp"
 
+#include <Core/Path.hpp>
 #include <Core/Types.hpp>
 #include <Util/Tokenizer.hpp>
 
@@ -30,6 +31,7 @@ enum FoxAstType
     // Functions
     FX_AST_PROCDECL,
     FX_AST_PROCCALL,
+    FX_AST_MODULECALL,
     FX_AST_RETURN,
 
     FX_AST_DOCCOMMENT,
@@ -115,7 +117,11 @@ struct FoxAstFunctionDecl : public FoxAstNode
 {
     FoxAstFunctionDecl() { this->NodeType = FX_AST_PROCDECL; }
 
+    bool IsForwardDeclaration() const { return pBlock == nullptr && pNameToken != nullptr; }
+    bool IsDefinition() const { return pBlock != nullptr; }
+
     Token* pNameToken = nullptr;
+    Token* pReturnTypeToken = nullptr;
     FoxAstBlock* pParams = nullptr;
     FoxAstBlock* pBlock = nullptr;
 
@@ -144,6 +150,15 @@ struct FoxAstFunctionCall : public FoxAstNode
     FoxFunction* pFunction = nullptr;
     Hash32 HashedName = HashNull32;
     std::vector<FoxAstNode*> Params {}; // FoxAstLiteral or FoxAstVarRef
+};
+
+struct FoxAstModuleCall : public FoxAstNode
+{
+    FoxAstModuleCall() { this->NodeType = FX_AST_MODULECALL; }
+
+    Path ModulePath;
+    FoxFunction* pFunction = nullptr;
+    Hash32 HashedName = HashNull32;
 };
 
 struct FoxAstReturn : public FoxAstNode

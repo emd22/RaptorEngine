@@ -62,6 +62,9 @@ class FoxVM
     static constexpr uint32 scStackSize = 1024 * 16;
     static constexpr uint32 scCallStackSize = 512;
 
+    static constexpr uint32 scMaxRecurseDepth = 32;
+    static constexpr uint32 scMaxActiveVariables = 128;
+
 public:
     FoxVM() = default;
 
@@ -139,7 +142,7 @@ public:
     /// offset by this value. This avoids clobbering variables when calling other functions.
     int32 VariableIndex = 0;
     int32 VariableBaseIndex = 0;
-    uint16 ScopeVarCounts[32];
+    uint16 ScopeVarCounts[scMaxRecurseDepth];
 
     int32 ScopeIndex = 0;
 

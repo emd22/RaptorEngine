@@ -11,6 +11,7 @@ class Path
     using ComponentList = std::vector<String>;
 
 public:
+    Path() = default;
     /**
      * @brief Separates components to create a Path object given the file path `path`.
      */
