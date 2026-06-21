@@ -3,7 +3,9 @@ init()
 {
 }
 
-getvalue() int
+
+getvalue(int x, int y) int
 {
-    return 16;
+    return x + y;
+
 }

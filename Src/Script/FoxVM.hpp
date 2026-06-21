@@ -63,6 +63,20 @@ struct VMModule
     FoxVM* pVM = nullptr;
 };
 
+struct VMInitState
+{
+    VMInitState() = delete;
+    VMInitState(uint8* stack, uint8* call_stack, uint32 stack_ptr, uint32 call_stack_ptr)
+        : pStack(stack), pCallStack(call_stack), StackPointer(stack_ptr), CallStackPointer(call_stack_ptr)
+    {
+    }
+
+    uint8* pStack = nullptr;
+    uint8* pCallStack = nullptr;
+    uint32 StackPointer = 0;
+    uint32 CallStackPointer = 0;
+};
+
 class FoxVM
 {
     static constexpr uint32 scStackSize = 1024 * 16;
@@ -74,7 +88,7 @@ class FoxVM
 public:
     FoxVM() = default;
 
-    void InitVM(SizedArray<uint8>&& bytecode);
+    void InitVM(SizedArray<uint8>&& bytecode, VMInitState* init_state);
 
     FX_FORCE_INLINE uint32 GetStackPointer() const { return StackPointer; }
 
@@ -91,7 +105,7 @@ public:
     void PushReturnAddr(uint32 addr);
     uint32 PopReturnAddr();
 
-    FoxValue Resume();
+    FoxValue Resume(bool no_return = false);
     FoxValue Update();
 
     void ExecuteOp();

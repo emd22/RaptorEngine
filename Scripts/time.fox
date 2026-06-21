@@ -1,3 +1,9 @@
+init()
+{
+
+}
+
 
 /// Converts `T` seconds to tenths of seconds.
 seconds(float T) int { return castint(T * 10f); }
+seconds2(int T) int { return castint(T * 10); }

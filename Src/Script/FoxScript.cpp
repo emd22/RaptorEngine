@@ -85,6 +85,9 @@ SizedArray<uint8> FoxScript::Compile(const String& path)
     FoxAstDestroyer destroyer;
     destroyer.Do(root_node);
 
+    FoxBytecodePrinter bc_printer(bytecode);
+    bc_printer.Print();
+
     return std::move(bytecode);
 }
 
@@ -92,10 +95,8 @@ void FoxScript::Load(const String& path)
 {
     SizedArray<uint8> bytecode = Compile(path);
 
-    FoxBytecodePrinter bc_printer(bytecode);
-    bc_printer.Print();
 
-    Vm.InitVM(std::move(bytecode));
+    Vm.InitVM(std::move(bytecode), nullptr);
 
     RegisterProc(HashStr32("WB_InitAmmoVars"), eFoxProcFlags::None, { eFoxType::INT, eFoxType::INT }, &WB_InitAmmoVars);
     RegisterProc(HashStr32("WB_InitStatVars"), eFoxProcFlags::None, { eFoxType::INT }, &WB_InitStatVars);

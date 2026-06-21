@@ -77,7 +77,8 @@ void FoxVM::LoadLinkTable()
         mod.Bytecode = bytecode_file.Read<uint8>();
         mod.pVM = new FoxVM;
 
-        mod.pVM->InitVM(SizedArray<uint8>(mod.Bytecode, mod.Bytecode.Size));
+        VMInitState init_state { pStack, pCallStack, StackPointer, CallStackPointer };
+        mod.pVM->InitVM(SizedArray<uint8>(mod.Bytecode, mod.Bytecode.Size), &init_state);
     }
 }
 
@@ -107,7 +108,7 @@ uint32 FoxVM::PopReturnAddr()
     return value;
 }
 
-void FoxVM::InitVM(SizedArray<uint8>&& bytecode)
+void FoxVM::InitVM(SizedArray<uint8>&& bytecode, VMInitState* init_state)
 {
     mBytecode = std::move(bytecode);
 
@@ -116,8 +117,27 @@ void FoxVM::InitVM(SizedArray<uint8>&& bytecode)
 
     Assert(scStackSize >= 1024);
 
-    pStack = gScriptMemPool->Alloc<uint8>(scStackSize);
-    pCallStack = pStack + (scStackSize - scCallStackSize);
+    if (init_state && init_state->pStack) {
+        pStack = init_state->pStack;
+        StackPointer = init_state->StackPointer;
+    }
+    else {
+        pStack = gScriptMemPool->Alloc<uint8>(scStackSize);
+    }
+
+    if (init_state && init_state->pCallStack) {
+        pCallStack = init_state->pCallStack;
+        CallStackPointer = init_state->CallStackPointer;
+    }
+    else {
+        pCallStack = pStack + (scStackSize - scCallStackSize);
+    }
+
+    if (init_state && init_state->pStack && !init_state->pCallStack) {
+        pCallStack = gScriptMemPool->Alloc<uint8>(scCallStackSize);
+        CallStackPointer = 0;
+    }
+
     pVariables = gScriptMemPool->Alloc<VMVariable>(sizeof(VMVariable) * scMaxActiveVariables);
 
     memset(ScopeVarCounts, 0, sizeof(ScopeVarCounts));
@@ -464,7 +484,7 @@ void FoxVM::PushVarBaseIndex()
     }
 
     Assert(ScopeIndex < scMaxRecurseDepth);
-    LogInfo("Pushing {} to scope {}", VariableIndex, ScopeIndex);
+    // LogInfo("Pushing {} to scope {}", VariableIndex, ScopeIndex);
 
     // Store the current base index.
     ScopeVarCounts[ScopeIndex] = VariableBaseIndex;
@@ -492,7 +512,7 @@ void FoxVM::PopVarBaseIndex()
     VariableIndex = VariableBaseIndex;
 
 
-    LogInfo("Popping {} from scope {}", VariableIndex, ScopeIndex);
+    // LogInfo("Popping {} from scope {}", VariableIndex, ScopeIndex);
 }
 
 void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
@@ -583,15 +603,24 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         FoxVM* mod_vm = LoadedModules[module_index].pVM;
         uint32 call_offset = mod_vm->GetProcAddr(name_hash);
 
-        ++mod_vm->ScopeIndex;
-        mod_vm->PushReturnAddr(0);
+        LogInfo("Loading module with SP={}, CSP={}", StackPointer, CallStackPointer);
+        mod_vm->pStack = pStack;
+        mod_vm->pCallStack = pCallStack;
+        mod_vm->StackPointer = StackPointer;
+        mod_vm->CallStackPointer = CallStackPointer;
+
+        mod_vm->ScopeIndex = 1;
         mod_vm->PC = call_offset;
 
-        FoxValue return_value = mod_vm->Resume();
+        mod_vm->PushReturnAddr(0);
 
-        if (return_value.Type != eFoxType::NONETYPE) {
-            Push32(return_value.Type, return_value.AsUInt());
-        }
+        mod_vm->Resume(true);
+
+        StackPointer = mod_vm->StackPointer;
+        CallStackPointer = mod_vm->CallStackPointer;
+        // if (return_value.Type != eFoxType::NONETYPE) {
+        //     Push32(return_value.Type, return_value.AsUInt());
+        // }
 
         break;
     }
@@ -616,6 +645,7 @@ void FoxVM::DoJump(uint8 op_base, uint8 op_spec)
         // --ScopeIndex;
         bReturnValueOnStack = true;
         PC = PopReturnAddr();
+
         break;
     }
     case BcSpecJump_ReturnToCaller_Float32: {
@@ -659,7 +689,7 @@ void FoxVM::DoType(uint8 op_base, uint8 op_spec) {}
 
 void FoxVM::DoMove(uint8 op_base, uint8 op_spec_raw) {}
 
-FoxValue FoxVM::Resume()
+FoxValue FoxVM::Resume(bool no_return)
 {
     if (ScopeIndex <= 0) {
         return FoxValue::scNone;
@@ -680,7 +710,7 @@ FoxValue FoxVM::Resume()
         }
     }
 
-    if (bReturnValueOnStack) {
+    if (bReturnValueOnStack && !no_return) {
         if (LastPushType == eFoxType::STRING) {
             return FoxValue(GetString(Pop32()));
         }

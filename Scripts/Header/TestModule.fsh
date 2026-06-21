@@ -1,2 +1,2 @@
 init() ;
-getvalue() int;
+getvalue(int x, int y) int;

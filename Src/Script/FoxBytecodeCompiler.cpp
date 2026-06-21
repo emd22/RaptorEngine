@@ -1137,7 +1137,7 @@ bool FoxBytecodeCompiler::ValidateParameters(FoxAstFunctionCall* call)
 
     // Check to make sure there are the correct number of arguments
     if (!has_correct_param_count) {
-        CompileError("Expected {} parameters but only {} were passed in", param_decl_stmts.size(), call->Params.size());
+        CompileError("Expected {} parameters but {} were passed in", param_decl_stmts.size(), call->Params.size());
         return false;
     }
 
@@ -1570,7 +1570,7 @@ void FoxBytecodeCompiler::EmitLinkTable(FoxAstBlock* root)
 
             String bin_str = bin_path.Str();
 
-            if (!FilesystemIO::FileExists(bin_str)) {
+            if (!FilesystemIO::FileExists(bin_str) || true) {
                 // Compile script
                 FoxScript script;
 

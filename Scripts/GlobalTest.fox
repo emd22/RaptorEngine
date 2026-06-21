@@ -7,6 +7,6 @@ init()
 
 Default() int
 {
-    local int x = TestModule:getvalue();
+    local int x = TestModule:getvalue(10, 20);
     return x;
 }
