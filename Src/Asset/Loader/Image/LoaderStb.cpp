@@ -1,4 +1,4 @@
-#include "AxLoaderStb.hpp"
+#include "LoaderStb.hpp"
 
 #include <Asset/AxBase.hpp>
 #include <Asset/AxImage.hpp>
@@ -6,8 +6,9 @@
 
 namespace fx {
 
+namespace loader {
 
-AxLoaderStb::eStatus AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String& path)
+LoaderStb::eStatus LoaderStb::LoadFromFile(TSRef<AxBase> asset, const String& path)
 {
     TSRef<AxImage> image(asset);
 
@@ -27,13 +28,13 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromFile(TSRef<AxBase> asset, const String
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
     if (mImageData == nullptr) {
         LogError(LC_ASSET, "Could not load image file at '{}'", c_path);
-        return AxLoaderStb::eStatus::Error;
+        return LoaderStb::eStatus::Error;
     }
 
-    return AxLoaderStb::eStatus::Success;
+    return LoaderStb::eStatus::Success;
 }
 
-AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
+LoaderStb::eStatus LoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
 {
     TSRef<AxImage> image(asset);
 
@@ -45,7 +46,7 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         LogError(LC_ASSET, "Could not retrieve info from image in memory! (Size={})", size);
-        return AxLoaderStb::eStatus::Error;
+        return LoaderStb::eStatus::Error;
     }
 
     mChannels = pixel_size;
@@ -59,15 +60,15 @@ AxLoaderStb::eStatus AxLoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint
 
     if (mImageData == nullptr) {
         LogError(LC_ASSET, "Could not load image file from memory!");
-        return AxLoaderStb::eStatus::Error;
+        return LoaderStb::eStatus::Error;
     }
 
-    return AxLoaderStb::eStatus::Success;
+    return LoaderStb::eStatus::Success;
 }
 
 
-AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
-                                             const String& path, eImageSaveFlags flags)
+LoaderStb::eStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
+                                         const String& path, eImageSaveFlags flags)
 {
     if ((flags & eImageSaveFlags::FlipY) != 0) {
         stbi_flip_vertically_on_write(1);
@@ -81,10 +82,10 @@ AxLoaderStb::eStatus AxLoaderStb::SaveToFile(eImageSaveFormat file_format, const
         stbi_write_png(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, size.GetX() * 4);
     }
 
-    return AxLoaderStb::eStatus::Success;
+    return LoaderStb::eStatus::Success;
 }
 
-void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
+void LoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 {
     TSRef<AxImage> image(asset);
 
@@ -147,7 +148,7 @@ void AxLoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 //     StackArray<VkImageCopy, 6> image_copy_infos;
 // }
 
-void AxLoaderStb::Destroy(TSRef<AxBase>& asset)
+void LoaderStb::Destroy(TSRef<AxBase>& asset)
 {
     // while (!asset->bIsUploadedToGpu) {
     //     asset->bIsUploadedToGpu.wait(true);
@@ -157,5 +158,7 @@ void AxLoaderStb::Destroy(TSRef<AxBase>& asset)
         stbi_image_free(mImageData);
     }
 }
+
+} // namespace loader
 
 } // namespace fx

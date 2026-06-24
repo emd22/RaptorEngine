@@ -13,10 +13,14 @@
 #include <Core/TSRef.hpp>
 #include <Entity.hpp>
 #include <Material/MaterialID.hpp>
-#include <ObjectManager.hpp>
 #include <Script/FoxScript.hpp>
 
+
 namespace fx {
+
+namespace renderer {
+class Pipeline;
+};
 
 enum class eObjectFlags : uint16
 {
@@ -39,14 +43,13 @@ class Object : public AxBase, public Entity
     friend class AxManager;
 
 public:
-    static const ::fx::ObjectId sNone = UINT32_MAX;
-
     static constexpr eEntityType scEntityType = eEntityType::Object;
 
 public:
-    Object();
+    Object() = default;
+    Object(const ObjectID& id);
 
-    void MakeInstanceOf(const TSRef<Object>& source_ref);
+    void MakeInstanceOf(const ObjectID& source);
 
     void Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material);
 
@@ -61,7 +64,7 @@ public:
     bool CheckIfReady(bool require_material);
 
 
-    void AttachObject(const TSRef<Object>& object);
+    void AttachObject(const ObjectID& object);
 
     void Update();
 
@@ -168,21 +171,18 @@ public:
 
     Scene* pScene = nullptr;
 
-    PagedArray<TSRef<Object>> AttachedNodes;
+    PagedArray<ObjectID> AttachedNodes;
 
     Vec3f Dimensions = Vec3f::sZero;
 
     Ref<script::FoxScript> pScript { nullptr };
 
-private:
     MaterialID mMaterialID = MaterialID::Null;
 
+private:
     /// Object slots allocated following this object. Used by other instances of this object.
     uint16 mInstanceSlots = 0;
     uint16 mInstanceSlotsInUse = 0;
-
-    TSRef<Object> mpInstanceSource { nullptr };
-
     eObjectFlags Flags = eObjectFlags::None;
 
     eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;

@@ -10,7 +10,7 @@
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
@@ -23,7 +23,7 @@ namespace fx {
 
 using namespace renderer;
 
-Object::Object() { ObjectId = gObjectManager->GenerateObjectId(); }
+Object::Object(const ObjectID& id) { ID = id; }
 
 void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 {
@@ -173,12 +173,14 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
             }
 
             if (update_children) {
-                for (TSRef<Object>& node : asset->AttachedNodes) {
-                    if (!node->GetMaterialID().IsNull()) {
+                for (const ObjectID& attached_id : asset->AttachedNodes) {
+                    Object* attached = gObjectManager->GetObject(attached_id);
+
+                    if (!attached->GetMaterialID().IsNull()) {
                         continue;
                     }
 
-                    Material* material = gMaterialManager->GetMaterial(node->GetMaterialID());
+                    Material* material = gMaterialManager->GetMaterial(attached->GetMaterialID());
 
                     if (should_set_default) {
                         material->SetDefaultPipeline();
@@ -217,27 +219,25 @@ void Object::UpdateAnimation()
     gRenderer->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData, pSkeleton->SkinningMatrices.Size * sizeof(Mat4f));
 }
 
-void Object::MakeInstanceOf(const TSRef<Object>& source_ref)
+void Object::MakeInstanceOf(const ObjectID& source_id)
 {
-    RefContext<TSRef<Object>> source_ctx(source_ref);
-    Object& source = source_ctx.Get();
+    Object* source_obj = gObjectManager->GetObject(source_id);
 
-    AssertMsg((source.mInstanceSlots - source.mInstanceSlotsInUse) > 0,
+    AssertMsg((source_obj->mInstanceSlots - source_obj->mInstanceSlotsInUse) > 0,
               "Object has no instance slots remaining! Did you reserve any instances on the source object?");
 
-    gObjectManager->ReleaseObject(ObjectId);
 
-    mpInstanceSource = source_ref;
+    gObjectManager->DestroyObject(ID);
     Flags |= eObjectFlags::IsInstance;
 
-    ++source.mInstanceSlotsInUse;
+    ++source_obj->mInstanceSlotsInUse;
 
-    ObjectId = source.ObjectId + source.mInstanceSlotsInUse;
+    ID = ObjectID(source_obj->ID.GetID() + source_obj->mInstanceSlotsInUse);
 }
 
 void Object::ReserveInstances(uint32 num)
 {
-    ObjectId = gObjectManager->ReserveInstances(ObjectId, num);
+    ID = gObjectManager->ReserveInstances(ID, num);
     mInstanceSlots = num;
     mInstanceSlotsInUse = 0;
 }
@@ -260,7 +260,7 @@ void Object::Render(const Camera& camera)
     UpdateIfOutOfDate();
 
     DrawPushConstants push_constants {};
-    push_constants.ObjectId = ObjectId;
+    push_constants.ObjectId = ID.GetID();
     push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
@@ -276,7 +276,8 @@ void Object::Render(const Camera& camera)
         return;
     }
 
-    for (TSRef<Object>& obj : AttachedNodes) {
+    for (const ObjectID& obj_id : AttachedNodes) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         obj->Render(camera);
     }
 }
@@ -290,7 +291,7 @@ void Object::RenderShallow(const Camera& camera)
     UpdateIfOutOfDate();
 
     DrawPushConstants push_constants {};
-    push_constants.ObjectId = ObjectId;
+    push_constants.ObjectId = ID.GetID();
     push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
@@ -321,7 +322,7 @@ void Object::RenderUnlit(const Camera& camera)
     UpdateIfOutOfDate();
 
     DrawPushConstants push_constants {};
-    push_constants.ObjectId = ObjectId;
+    push_constants.ObjectId = ID.GetID();
     push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
@@ -346,7 +347,8 @@ void Object::RenderUnlit(const Camera& camera)
         return;
     }
 
-    for (TSRef<Object>& obj : AttachedNodes) {
+    for (const ObjectID& obj_id : AttachedNodes) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         obj->RenderUnlit(camera);
     }
 }
@@ -416,7 +418,7 @@ void Object::SetScriptVars()
         return;
     }
 
-    pScript->SetGlobal(HashStr32("OBJECTID"), script::FoxValue(static_cast<int32>(ObjectId)));
+    pScript->SetGlobal(HashStr32("OBJECTID"), script::FoxValue(static_cast<int32>(ID.GetID())));
 }
 
 void Object::AttachScript(const Ref<script::FoxScript>& script)
@@ -431,9 +433,9 @@ void Object::LoadScript(const String& path)
     SetScriptVars();
 }
 
-void Object::AttachObject(const TSRef<Object>& object)
+void Object::AttachObject(const ObjectID& object)
 {
-    if (AttachedNodes.IsEmpty()) {
+    if (!AttachedNodes.IsInited()) {
         AttachedNodes.Create(8);
     }
 
@@ -492,7 +494,7 @@ void Object::SetPhysicsEnabled(bool enabled)
 
 void Object::PrintDebug() const
 {
-    LogInfo(LC_CORE, "Object '{}' (Id={}, Material={}) {{", Name.Get(), ObjectId, mMaterialID);
+    LogInfo(LC_CORE, "Object '{}' (Id={}, Material={}) {{", Name.Get(), ID, mMaterialID);
     LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
 
     PhObject* phys = nullptr;
@@ -513,7 +515,8 @@ void Object::PrintDebug() const
     LogInfo(LC_CORE, "}}");
 
     LogInfo(LC_CORE, "Attached({}): ", AttachedNodes.Size());
-    for (const TSRef<Object>& obj : AttachedNodes) {
+    for (const ObjectID& obj_id : AttachedNodes) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         obj->PrintDebug();
     }
 }
@@ -531,7 +534,8 @@ void Object::Destroy()
     }
 
     if (!AttachedNodes.IsEmpty()) {
-        for (TSRef<Object>& obj : AttachedNodes) {
+        for (ObjectID& obj_id : AttachedNodes) {
+            Object* obj = gObjectManager->GetObject(obj_id);
             obj->Destroy();
         }
     }

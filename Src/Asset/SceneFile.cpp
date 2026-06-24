@@ -152,8 +152,6 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
     object->SetPosition(object_entry.GetMemberValue(HashStr32("Pos"), object->mPosition));
     object->SetRotation(object_entry.GetMemberValue(HashStr32("Rot"), object->mRotation));
     object->SetScale(object_entry.GetMemberValue(HashStr32("Scale"), object->mScale));
-
-    object->Update();
     object->MarkTransformOutOfDate();
 
     // Render options

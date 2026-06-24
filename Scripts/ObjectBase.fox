@@ -1,5 +1,0 @@
-/*
-    Base object functions
-*/
-
-extproc OB_MoveTo(float x, float y, float z);

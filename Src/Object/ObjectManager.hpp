@@ -1,6 +1,9 @@
 #pragma once
 
+#include "ObjectID.hpp"
+
 #include <Core/Bitset.hpp>
+#include <Core/FreeArray.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
 
@@ -14,7 +17,9 @@ struct alignas(16) ObjectGpuEntry
 
 class Mat4f;
 
-using ObjectId = uint32;
+// using ObjectId = uint32;
+
+class Object;
 
 class ObjectManager
 {
@@ -25,10 +30,12 @@ public:
 public:
     void Create();
 
-    ObjectId GenerateObjectId();
-    void Submit(ObjectId id, ObjectGpuEntry& entry);
-    void Submit(ObjectId id, const Mat4f& model_matrix);
-    void ReleaseObject(ObjectId id);
+    ObjectID NewObject(const std::string& name);
+    Object* GetObject(const ObjectID& id);
+    void DestroyObject(ObjectID& id);
+
+    void Submit(const ObjectID& id, ObjectGpuEntry& entry);
+    void Submit(const ObjectID& id, const Mat4f& model_matrix);
     void ReleaseAllObjects();
 
     void PrintActive(int limit = 20);
@@ -45,7 +52,7 @@ public:
      * @param object_id An object id of the current object if it needs to be moved.
      * @returns The object id for the first slot of the block.
      */
-    ObjectId ReserveInstances(ObjectId object_id, uint32 num_instances);
+    ObjectID ReserveInstances(const ObjectID& object_id, uint32 num_instances);
 
     void Destroy();
 
@@ -59,12 +66,15 @@ public:
 
 public:
     renderer::RawGpuBuffer mObjectGpuBuffer {};
-    Bitset mObjectSlotsInUse;
+    // Bitset mObjectSlotsInUse;
 
     renderer::DescriptorSet mObjectBufferDS {};
     VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
 
     std::mutex mInUse;
+
+private:
+    FreeArray<Object> mObjectList;
 };
 
 } // namespace fx

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "ObjectManager.hpp"
+#include "Object/ObjectManager.hpp"
 
 #include <Entity.hpp>
-#include <Object.hpp>
+#include <Object/Object.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/RenderList.hpp>

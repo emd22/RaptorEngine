@@ -3,8 +3,8 @@
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManagerFwd.hpp>
-#include <Object.hpp>
-#include <ObjectManager.hpp>
+#include <Object/Object.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -115,6 +115,7 @@ void Scene::RenderRLSection(const renderer::RenderListSection& section)
 
         Object* obj = section.Objects[index];
 
+        obj->Update();
         obj->RenderShallow(camera);
 
         ++index;
@@ -256,7 +257,7 @@ void Scene::RenderObjectShadows(const TSRef<Object>& obj)
 
     obj->Update();
 
-    consts.ObjectId = obj->ObjectId;
+    consts.ObjectId = obj->ID.GetID();
 
     gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 

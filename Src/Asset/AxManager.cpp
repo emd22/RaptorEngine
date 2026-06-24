@@ -3,13 +3,13 @@
 #include "AxImage.hpp"
 #include "Core/Assert.hpp"
 #include "Core/SizedArray.hpp"
-#include "Loader/AxLoaderGltf.hpp"
-#include "Loader/AxLoaderJpeg.hpp"
-#include "Loader/AxLoaderStb.hpp"
+#include "Loader/Image/LoaderJpeg.hpp"
+#include "Loader/Image/LoaderStb.hpp"
+#include "Loader/Object/LoaderGltf.hpp"
 
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
-#include <Object.hpp>
+#include <Object/Object.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <atomic>
@@ -63,6 +63,47 @@ void AxWorker::Create()
     Thread = std::thread([this]() { this->Update(); });
 }
 
+void AxWorker::LoadObject(const LockContext<AxItemData>& asset_data)
+{
+    switch (Item.AssetLoadOp) {
+    case fx::eAssetLoadOp::ReadAndUpload:
+        LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
+
+        break;
+    case fx::eAssetLoadOp::ProcessAndUpload:
+        LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
+        std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
+        break;
+    case fx::eAssetLoadOp::DirectUpload:
+        LoadStatus = AxLoaderBase::eStatus::Success;
+        // No need to process anything
+        break;
+
+    default:
+        LogError(LC_ASSET, "Unknown asset source!");
+    }
+}
+
+void AxWorker::LoadAsset(const LockContext<AxItemData>& asset_data)
+{
+    switch (Item.AssetLoadOp) {
+    case fx::eAssetLoadOp::ReadAndUpload:
+        LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
+        break;
+    case fx::eAssetLoadOp::ProcessAndUpload:
+        LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
+        std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
+        break;
+    case fx::eAssetLoadOp::DirectUpload:
+        LoadStatus = AxLoaderBase::eStatus::Success;
+        // No need to process anything
+        break;
+
+    default:
+        LogError(LC_ASSET, "Unknown asset source!");
+    }
+}
+
 
 void AxWorker::Update()
 {
@@ -82,22 +123,13 @@ void AxWorker::Update()
 
         AssertMsg(Item.AssetLoadOp != eAssetLoadOp::None, "No asset load op set!");
 
-        switch (Item.AssetLoadOp) {
-        case fx::eAssetLoadOp::ReadAndUpload:
-            LoadStatus = asset_data->pLoader->LoadFromFile(asset_data->pAsset, Item.Path);
-            break;
-        case fx::eAssetLoadOp::ProcessAndUpload:
-            LoadStatus = asset_data->pLoader->LoadFromMemory(asset_data->pAsset, Item.pcRawData, Item.DataSize);
-            std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
-            break;
-        case fx::eAssetLoadOp::DirectUpload:
-            LoadStatus = AxLoaderBase::eStatus::Success;
-            // No need to process anything
-            break;
-
-        default:
-            LogError(LC_ASSET, "Unknown asset source!");
+        if (Item.IsObject()) {
+            LoadObject(asset_data);
         }
+        else {
+            LoadAsset(asset_data);
+        }
+
 
         // Mark that we are waiting for the data to be uploaded to the GPU
         bDataPendingUpload.test_and_set();
@@ -224,25 +256,20 @@ inline bool IsFileJpeg(const std::string& path)
     return false;
 }
 
-void AxManager::LoadObject(const std::string& name, TSRef<Object>& asset, const std::string& path,
-                           LoadObjectOptions options)
+void AxManager::LoadObject(const ObjectID& object_id, const std::string& path, LoadObjectOptions options)
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
-    asset->Name = name;
-    // SubmitAssetToLoad<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, path);
-    SubmitLoadAssetFromPath<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader, path);
+    SubmitLoadObject<AxLoaderGltf>(object_id, loader, path);
 }
 
 
-void AxManager::LoadObjectFromMemory(const std::string& name, TSRef<Object>& asset, const uint8* data, uint32 data_size)
+void AxManager::LoadObjectFromMemory(const ObjectID& object_id, const uint8* data, uint32 data_size)
 {
     TSRef<AxLoaderGltf> loader = TSRef<AxLoaderGltf>::New();
 
-    asset->Name = name;
-    SubmitLoadAssetFromData<Object, AxLoaderGltf, eAssetLoadType::Object>(asset, loader,
-                                                                          Slice<const uint8>(data, data_size));
+    SubmitLoadObject<AxLoaderGltf>(object_id, loader, Slice<const uint8>(data, data_size));
 }
 
 
@@ -261,13 +288,13 @@ void AxManager::LoadImage(renderer::eImageType image_type, eImageFormat format, 
         SubmitLoadAssetFromPath<AxImage, AxLoaderJpeg, eAssetLoadType::Image>(asset, loader, path);
     }
     else {
-        TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
+        TSRef<LoaderStb> loader = TSRef<LoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
         loader->CreationFlags = flags;
 
         // SubmitAssetToLoad<AxImage, AxLoaderStb, eAssetLoadType::Image>(asset, loader, path);
-        SubmitLoadAssetFromPath<AxImage, AxLoaderStb, eAssetLoadType::Image>(asset, loader, path);
+        SubmitLoadAssetFromPath<AxImage, LoaderStb, eAssetLoadType::Image>(asset, loader, path);
     }
 }
 
@@ -286,12 +313,12 @@ void AxManager::LoadImageFromMemory(renderer::eImageType image_type, eImageForma
     }
     else {
         // Load the image using stb_image
-        TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
+        TSRef<LoaderStb> loader = TSRef<LoaderStb>::New();
         loader->ImageType = image_type;
         loader->ImageFormat = format;
 
-        SubmitLoadAssetFromData<AxImage, AxLoaderStb, eAssetLoadType::Image>(asset, loader,
-                                                                             Slice<const uint8>(data, data_size));
+        SubmitLoadAssetFromData<AxImage, LoaderStb, eAssetLoadType::Image>(asset, loader,
+                                                                           Slice<const uint8>(data, data_size));
     }
 }
 

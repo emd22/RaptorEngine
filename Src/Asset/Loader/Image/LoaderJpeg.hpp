@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AxLoaderImageBase.hpp"
+#include "../AxLoaderImageBase.hpp"
 
 #include <TurboJPEG/jpeglib.h>
 
@@ -9,6 +9,8 @@
 #include <string>
 
 namespace fx {
+
+namespace loader {
 
 class AxLoaderJpeg : public AxLoaderImageBase
 {
@@ -31,5 +33,7 @@ private:
     struct jpeg_decompress_struct mJpegInfo;
     SizedArray<uint8> mImageData;
 };
+
+} // namespace loader
 
 } // namespace fx

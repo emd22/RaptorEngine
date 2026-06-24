@@ -3,7 +3,7 @@
 #include "Camera.hpp"
 #include "Engine.hpp"
 
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -110,7 +110,6 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
                                    eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
     mpDebugMesh->Render(frame->CmdBuffer, 1);
-
 }
 
 

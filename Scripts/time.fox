@@ -1,9 +1,3 @@
-init()
-{
-
-}
-
-
-/// Converts `T` seconds to tenths of seconds.
+/// Converts `T` seconds to the timescale used by `pause`
 seconds(float T) int { return castint(T * 10f); }
-seconds2(int T) int { return castint(T * 10); }
+minutes(float T) int { return castint(T * 600f); }

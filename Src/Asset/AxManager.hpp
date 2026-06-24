@@ -3,7 +3,8 @@
 #include "Asset/AxQueue.hpp"
 #include "Asset/AxQueueItem.hpp"
 #include "AxImage.hpp"
-#include "Object.hpp"
+#include "Object/Object.hpp"
+#include "Object/ObjectManager.hpp"
 
 #include <Core/DataNotifier.hpp>
 #include <Core/Ref.hpp>
@@ -81,7 +82,6 @@ public:
 
     void Update();
 
-
     void Kill()
     {
         bRunning.store(false);
@@ -91,6 +91,9 @@ public:
 
 private:
     void DirectUploadData(AxItemData& item_data);
+
+    void LoadObject(const LockContext<AxItemData>& asset_data);
+    void LoadAsset(const LockContext<AxItemData>& asset_data);
 
 
 public:
@@ -144,24 +147,24 @@ public:
      * @brief Creates a new `Object` and loads the provided asset into it from
      * the path provided.
      */
-    TSRef<Object> LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
+    ObjectID LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
     {
-        TSRef<Object> asset = TSRef<Object>::New();
-        LoadObject(name, asset, path, options);
+        ObjectID id = gObjectManager->NewObject(name);
+        LoadObject(id, path, options);
 
-        return asset;
+        return id;
     }
 
     /**
      * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    TSRef<Object> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
+    ObjectID LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
     {
-        TSRef<Object> asset = TSRef<Object>::New();
-        LoadObjectFromMemory(name, asset, data, data_size);
+        ObjectID id = gObjectManager->NewObject(name);
+        LoadObjectFromMemory(id, data, data_size);
 
-        return asset;
+        return id;
     }
 
     TSRef<AxImage> LoadImage(renderer::eImageType image_type, eImageFormat format, const std::string& path,
@@ -215,14 +218,13 @@ public:
     /**
      * @brief Loads an asset into the provided asset from the provided data.
      */
-    void LoadObjectFromMemory(const std::string& name, TSRef<Object>& asset, const uint8* data, uint32 data_size);
+    void LoadObjectFromMemory(const ObjectID& object_id, const uint8* data, uint32 data_size);
 
 
     /**
      * @brief Loads an object into the provided asset from a path.
      */
-    void LoadObject(const std::string& name, TSRef<Object>& asset, const std::string& path,
-                    LoadObjectOptions options = {});
+    void LoadObject(const ObjectID& object_id, const std::string& path, LoadObjectOptions options = {});
 
 
     void LoadImage(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
@@ -291,6 +293,16 @@ private:
         mgr->ManagerUpdateNotifier.Signal();
     }
 
+
+    template <typename TLoaderType>
+    static void SubmitLoadObject(const ObjectID& object_id, TSRef<TLoaderType>& loader, const std::string& path)
+    {
+        AxManager* mgr = GetInstance();
+
+        mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, object_id, eAssetLoadType::Object));
+        mgr->ManagerUpdateNotifier.Signal();
+    }
+
     template <typename TAssetType, typename TLoaderType, eAssetLoadType TLoadType>
     static void SubmitLoadAssetFromData(const TSRef<TAssetType>& asset, TSRef<TLoaderType>& loader,
                                         const Slice<const uint8>& asset_data)
@@ -300,6 +312,16 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, asset, TLoadType, asset_data));
+        mgr->ManagerUpdateNotifier.Signal();
+    }
+
+    template <typename TLoaderType>
+    static void SubmitLoadObject(const ObjectID& object_id, TSRef<TLoaderType>& loader,
+                                 const Slice<const uint8>& asset_data)
+    {
+        AxManager* mgr = GetInstance();
+
+        mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, object_id, eAssetLoadType::Object, asset_data));
         mgr->ManagerUpdateNotifier.Signal();
     }
 

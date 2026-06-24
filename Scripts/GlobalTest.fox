@@ -1,5 +1,6 @@
 
-modload TestModule => "Scripts/TestModule";
+modload TM => "Scripts/TestModule";
+
 
 init()
 {
@@ -7,6 +8,6 @@ init()
 
 Default() int
 {
-    local int x = TestModule:getvalue(10, 20);
+    local int x = 10;
     return x;
 }

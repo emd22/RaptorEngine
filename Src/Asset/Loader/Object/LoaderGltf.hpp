@@ -1,10 +1,11 @@
 #pragma once
 
-#include "AxLoaderBase.hpp"
+#include "LoaderCommon.hpp"
+#include "ObjectLoaderBase.hpp"
 
 #include <Asset/Animation.hpp>
 #include <Material/Material.hpp>
-#include <Object.hpp>
+#include <Object/Object.hpp>
 #include <string>
 
 struct cgltf_data;
@@ -18,6 +19,8 @@ struct cgltf_node;
 
 namespace fx {
 
+namespace loader {
+
 struct AxGltfMaterialToLoad
 {
     TSRef<Object> pObject { nullptr };
@@ -25,25 +28,24 @@ struct AxGltfMaterialToLoad
     int MeshIndex = 0;
 };
 
-class AxLoaderGltf : public AxLoaderBase
+
+class LoaderGltf : public ObjectLoaderBase
 {
 public:
-    using Status = AxLoaderBase::eStatus;
+    LoaderGltf() = default;
 
-    AxLoaderGltf() = default;
-
-    Status LoadFromFile(TSRef<AxBase> asset, const String& path) override;
-    Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
+    eLoaderStatus Load(const ObjectID& id, const String& path) override;
+    eLoaderStatus Load(const ObjectID& id, const uint8* data, uint32 size) override;
 
     void UploadMeshToGpu(TSRef<Object>& object);
 
-    void Destroy(TSRef<AxBase>& asset) override;
+    void Destroy() override;
 
-    ~AxLoaderGltf() override = default;
+    ~LoaderGltf() override = default;
 
 private:
     // void MakeEmptyMaterialTexture(Ref<Material>& material, MaterialComponent& component);
-    void MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive, int32 primitive_index);
+    void MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index);
 
     void UnpackMeshAttributes(const TSRef<Object>& object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive);
 
@@ -60,15 +62,13 @@ private:
      */
     void ProcessData(TSRef<Object>& output_object);
 
+protected:
+    void CreateGpuResource(const ObjectID& object_id) override;
+
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;
-
     bool bKeepInMemory : 1 = false;
-
     SizedArray<uint32> IndexBuffer;
-
-protected:
-    void CreateGpuResource(TSRef<AxBase>& asset) override;
 
 private:
     cgltf_data* mpGltfData = nullptr;
@@ -76,5 +76,7 @@ private:
 
     SizedArray<Mat4f> mBones;
 };
+
+} // namespace loader
 
 } // namespace fx

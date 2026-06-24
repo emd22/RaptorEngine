@@ -6,6 +6,7 @@
 #include <Math/Mat4.hpp>
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
+#include <Object/ObjectID.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Constants.hpp>
 
@@ -100,7 +101,7 @@ protected:
     void SubmitMatrixIfNeeded();
 
 public:
-    uint32 ObjectId = UINT32_MAX;
+    ObjectID ID { ObjectID::Null };
 
     Name Name;
 

@@ -1,7 +1,7 @@
 #include "Entity.hpp"
 
 #include <Engine.hpp>
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/DeferredRenderer.hpp>
 
 namespace fx {
@@ -86,11 +86,11 @@ Mat4f& Entity::GetModelMatrix()
 void Entity::SubmitMatrixIfNeeded()
 {
     // There is no object id assigned to the object yet, break
-    if (ObjectId == UINT32_MAX || mMatrixUpdateFramesRemaining <= 0) {
+    if (ID.IsInvalid() || mMatrixUpdateFramesRemaining <= 0) {
         return;
     }
 
-    gObjectManager->Submit(ObjectId, mModelMatrix);
+    gObjectManager->Submit(ID.GetID(), mModelMatrix);
 
     --mMatrixUpdateFramesRemaining;
 }
@@ -112,6 +112,6 @@ void Entity::RecalculateModelMatrix()
     mbMatrixOutOfDate = false;
 }
 
-Entity::~Entity() { gObjectManager->ReleaseObject(ObjectId); }
+Entity::~Entity() { gObjectManager->ReleaseObject(ID); }
 
 } // namespace fx

@@ -7,7 +7,7 @@
 #include "Constants.hpp"
 #include "DeferredRenderer.hpp"
 #include "Engine.hpp"
-#include "ObjectManager.hpp"
+#include "Object/ObjectManager.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>

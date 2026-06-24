@@ -13,7 +13,7 @@
 #include "ShadowDirectional.hpp"
 #include "State.hpp"
 
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 
 namespace fx::renderer {
 

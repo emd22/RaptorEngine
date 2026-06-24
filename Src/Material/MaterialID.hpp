@@ -40,6 +40,6 @@ struct std::formatter<fx::MaterialID>
 
     auto format(const fx::MaterialID& id, std::format_context& ctx) const
     {
-        return std::format_to(ctx.out(), "{}", id.GetID());
+        return std::format_to(ctx.out(), "MaterialID({})", id.GetID());
     }
 };

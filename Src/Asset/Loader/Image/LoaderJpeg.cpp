@@ -1,6 +1,5 @@
-#include "AxLoaderJpeg.hpp"
-
 #include "Asset/AxBase.hpp"
+#include "AxLoaderJpeg.hpp"
 
 #include <TurboJPEG/jpeglib.h>
 
@@ -11,6 +10,7 @@
 
 namespace fx {
 
+namespace loader {
 
 static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
 {
@@ -146,5 +146,7 @@ void AxLoaderJpeg::Destroy(TSRef<AxBase>& asset)
 
     jpeg_destroy_decompress(&mJpegInfo);
 }
+
+} // namespace loader
 
 } // namespace fx

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AxLoaderImageBase.hpp"
+#include "../AxLoaderImageBase.hpp"
 
 #include <ThirdParty/stb_image.h>
 
@@ -9,13 +9,14 @@
 
 namespace fx {
 
+namespace loader {
 
-class AxLoaderStb : public AxLoaderImageBase
+class LoaderStb : public AxLoaderImageBase
 {
 public:
     using eStatus = AxLoaderBase::eStatus;
 
-    AxLoaderStb() = default;
+    LoaderStb() = default;
 
     eStatus LoadFromFile(TSRef<AxBase> asset, const String& path) override;
     eStatus LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
@@ -29,7 +30,7 @@ public:
     void Destroy(TSRef<AxBase>& asset) override;
     void InvalidateImageData() { mImageData = nullptr; };
 
-    ~AxLoaderStb() override = default;
+    ~LoaderStb() override = default;
 
 protected:
     void CreateGpuResource(TSRef<AxBase>& asset) override;
@@ -45,5 +46,7 @@ private:
     uint32 mDataSize = 0;
     uint8* mImageData = nullptr;
 };
+
+} // namespace loader
 
 } // namespace fx

@@ -7,7 +7,7 @@
 #include <Asset/AxManager.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/Pipeline.hpp>

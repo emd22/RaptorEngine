@@ -26,7 +26,10 @@ public:
     }
 
     FX_FORCE_INLINE TObjectType& Get() { return mObject; }
+    FX_FORCE_INLINE const TObjectType& Get() const { return mObject; }
+
     FX_FORCE_INLINE TObjectType* operator->() { return &mObject; }
+    FX_FORCE_INLINE const TObjectType* operator->() const { return &mObject; }
 
     FX_FORCE_INLINE void Unlock()
     {
