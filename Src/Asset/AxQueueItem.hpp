@@ -1,7 +1,8 @@
 #pragma once
 
-#include "AxBase.hpp"
-#include "Loader/AxLoaderBase.hpp"
+#include "AssetBase.hpp"
+#include "Loader/ImageLoaderBase.hpp"
+#include "Loader/ObjectLoaderBase.hpp"
 
 #include <Core/LockContext.hpp>
 #include <Core/Slice.hpp>
@@ -55,25 +56,38 @@ constexpr const char* AssetTypeToString(eAssetLoadType type)
 }
 
 
-struct AxItemData
+struct AssetItemData
 {
-    AxItemData() = default;
+    AssetItemData() = default;
 
     template <typename TLoaderType, typename TAssetType>
-    AxItemData(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset, eAssetLoadType load_type)
-        : pLoader(loader), pAsset(asset), LoadType(load_type)
+    static AssetItemData Make(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset,
+                              eAssetLoadType load_type)
     {
+        AssetItemData data;
+
+        data.pLoader = loader;
+        data.pAsset = asset;
+        data.LoadType = load_type;
+
+        return std::move(data);
     }
 
     template <typename TLoaderType>
-    AxItemData(const TSRef<TLoaderType>& loader, const ObjectID& id)
-        : pLoader(loader), ObjID(id), LoadType(eAssetLoadType::Object)
+    static AssetItemData Make(const TSRef<TLoaderType>& loader, const ObjectID& id)
     {
+        AssetItemData data;
+
+        data.pLoader = loader;
+        data.ObjID = id;
+        data.LoadType = eAssetLoadType::Object;
+
+        return std::move(data);
     }
 
-    AxItemData(AxItemData&& other) { (*this) = std::move(other); }
+    AssetItemData(AssetItemData&& other) { (*this) = std::move(other); }
 
-    AxItemData& operator=(AxItemData&& other)
+    AssetItemData& operator=(AssetItemData&& other)
     {
         pLoader = std::move(other.pLoader);
         pAsset = std::move(other.pAsset);
@@ -83,10 +97,50 @@ struct AxItemData
         return *this;
     }
 
+    void CreateGpuResource()
+    {
+        switch (pLoader->scLoaderType) {
+        case loader::eLoaderType::ImageLoader: {
+            TSRef<loader::ImageLoaderBase> image_loader(pLoader);
+            image_loader->CreateGpuResource(pAsset);
+            break;
+        }
+        case loader::eLoaderType::ObjectLoader: {
+            TSRef<loader::ObjectLoaderBase> object_loader(pLoader);
+            object_loader->CreateGpuResource(ObjID);
+            break;
+        }
+
+        default:
+            LogError("Cannot create GPU resource for unknown type");
+            break;
+        }
+    }
+
+    void DestroyLoader()
+    {
+        switch (pLoader->scLoaderType) {
+        case loader::eLoaderType::ImageLoader: {
+            TSRef<loader::ImageLoaderBase> image_loader(pLoader);
+            image_loader->Destroy(pAsset);
+            break;
+        }
+        case loader::eLoaderType::ObjectLoader: {
+            TSRef<loader::ObjectLoaderBase> object_loader(pLoader);
+            object_loader->Destroy();
+            break;
+        }
+
+        default:
+            LogError("Cannot create GPU resource for unknown type");
+            break;
+        }
+    }
+
     eAssetLoadType LoadType = eAssetLoadType::None;
 
-    TSRef<AxLoaderBase> pLoader { nullptr };
-    TSRef<AxBase> pAsset { nullptr };
+    TSRef<loader::LoaderBase> pLoader { nullptr };
+    TSRef<AssetBase> pAsset { nullptr };
 
     ObjectID ObjID { ObjectID::Null };
 };
@@ -96,6 +150,7 @@ struct AxQueueItem
 {
     AxQueueItem() = default;
 
+
     FX_FORCE_INLINE bool IsObject() const { return Data.LoadType == eAssetLoadType::Object; }
     FX_FORCE_INLINE bool IsImage() const { return Data.LoadType == eAssetLoadType::Image; }
     FX_FORCE_INLINE bool IsBinary() const { return Data.LoadType == eAssetLoadType::Binary; }
@@ -104,7 +159,9 @@ struct AxQueueItem
     static AxQueueItem UploadFileToProcess(const std::string& path, const TSRef<TLoaderType>& loader,
                                            const TSRef<TAssetType>& asset, eAssetLoadType type)
     {
-        AxQueueItem item { loader, asset, type };
+        AxQueueItem item;
+
+        item.Data = AssetItemData::Make<TLoaderType, TAssetType>(loader, asset, type);
 
         item.pcRawData = nullptr;
         item.DataSize = 0;
@@ -114,12 +171,13 @@ struct AxQueueItem
         return std::move(item);
     }
 
-    template <typename TLoaderType, typename TAssetType>
+    template <typename TLoaderType>
     static AxQueueItem UploadFileToProcess(const std::string& path, const TSRef<TLoaderType>& loader,
-                                           const ObjectID& object_id, eAssetLoadType type)
+                                           const ObjectID& object_id)
     {
-        AxQueueItem item { loader, object_id };
+        AxQueueItem item;
 
+        item.Data = AssetItemData::Make<TLoaderType>(loader, object_id);
         item.pcRawData = nullptr;
         item.DataSize = 0;
         item.AssetLoadOp = eAssetLoadOp::ReadAndUpload;
@@ -133,7 +191,9 @@ struct AxQueueItem
     static AxQueueItem UploadAndProcess(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset,
                                         eAssetLoadType type, const Slice<const uint8>& data)
     {
-        AxQueueItem item { loader, asset, type };
+        AxQueueItem item;
+
+        item.Data = AssetItemData::Make<TLoaderType, TAssetType>(loader, asset, type);
 
         item.pcRawData = data.pData;
         item.DataSize = data.Size;
@@ -142,11 +202,13 @@ struct AxQueueItem
         return std::move(item);
     }
 
-    template <typename TLoaderType, typename TAssetType>
+    template <typename TLoaderType>
     static AxQueueItem UploadAndProcess(const TSRef<TLoaderType>& loader, const ObjectID& object_id,
-                                        eAssetLoadType type, const Slice<const uint8>& data)
+                                        const Slice<const uint8>& data)
     {
-        AxQueueItem item { loader, object_id };
+        AxQueueItem item;
+
+        item.Data = AssetItemData::Make<TLoaderType>(loader, object_id);
 
         item.pcRawData = data.pData;
         item.DataSize = data.Size;
@@ -159,7 +221,9 @@ struct AxQueueItem
     template <typename TAssetType>
     static AxQueueItem DirectUpload(const TSRef<TAssetType>& asset, eAssetLoadType type, const ImageInfo& img_info)
     {
-        AxQueueItem item { nullptr, asset, type };
+        AxQueueItem item;
+
+        item.Data = AssetItemData::Make<loader::LoaderBase, TAssetType>(nullptr, asset, type);
 
         item.pcRawData = nullptr;
         item.ImgInfo = img_info;
@@ -190,7 +254,7 @@ struct AxQueueItem
         return *this;
     }
 
-    LockContext<AxItemData> GetDataContext() { return LockContext<AxItemData>(mMutex, Data); }
+    LockContext<AssetItemData> GetDataContext() { return LockContext<AssetItemData>(mMutex, Data); }
 
 public:
     std::string Path;
@@ -205,7 +269,7 @@ public:
 
     eAssetLoadOp AssetLoadOp = eAssetLoadOp::None;
 
-    AxItemData Data;
+    AssetItemData Data;
 };
 
 } // namespace fx

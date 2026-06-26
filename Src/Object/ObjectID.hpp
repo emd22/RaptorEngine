@@ -37,6 +37,8 @@ public:
         return *this;
     }
 
+    bool operator==(const ObjectID& other) const { return ID == other.ID; }
+
     FX_FORCE_INLINE IDType GetID() const { return (ID & scIDMask); }
     FX_FORCE_INLINE bool IsNull() const { return ID == UINT32_MAX; }
 

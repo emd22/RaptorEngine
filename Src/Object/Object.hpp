@@ -7,6 +7,7 @@
 // #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Asset/Animation.hpp>
+#include <Asset/AssetObject.hpp>
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Ref.hpp>
@@ -37,9 +38,9 @@ FxEnumFlags(eObjectFlags);
 
 class PrimitiveMesh;
 
-class Object : public AxBase, public Entity
+class Object : public AssetObject, public Entity
 {
-    friend class AxLoaderGltf;
+    friend class LoaderGltf;
     friend class AxManager;
 
 public:

@@ -1,7 +1,7 @@
 
 #include "Image.hpp"
 
-#include <Asset/Loader/AxLoaderStb.hpp>
+#include <Asset/Loader/Image/LoaderStb.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/File.hpp>
@@ -718,7 +718,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
         });
 
 
-    AxLoaderStb::SaveToFile(file_format, image_data, Size, path, eImageSaveFlags::None);
+    loader::LoaderStb::SaveToFile(file_format, image_data, Size, path, eImageSaveFlags::None);
 }
 
 

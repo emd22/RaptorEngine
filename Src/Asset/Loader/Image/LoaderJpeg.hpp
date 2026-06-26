@@ -1,33 +1,30 @@
 #pragma once
 
-#include "../AxLoaderImageBase.hpp"
+#include "../ImageLoaderBase.hpp"
 
 #include <TurboJPEG/jpeglib.h>
 
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
-#include <string>
 
 namespace fx {
 
 namespace loader {
 
-class AxLoaderJpeg : public AxLoaderImageBase
+class LoaderJpeg : public ImageLoaderBase
 {
 public:
-    using Status = AxLoaderBase::eStatus;
+    LoaderJpeg() = default;
 
-    AxLoaderJpeg() = default;
+    eLoaderStatus Load(TSRef<AssetBase> asset, const String& path) override;
+    eLoaderStatus Load(TSRef<AssetBase> asset, const uint8* data, uint32 size) override;
 
-    Status LoadFromFile(TSRef<AxBase> asset, const String& path) override;
-    Status LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size) override;
+    void Destroy(TSRef<AssetBase>& asset) override;
 
-    void Destroy(TSRef<AxBase>& asset) override;
-
-    ~AxLoaderJpeg() override = default;
+    ~LoaderJpeg() override = default;
 
 protected:
-    void CreateGpuResource(TSRef<AxBase>& asset) override;
+    void CreateGpuResource(TSRef<AssetBase>& asset) override;
 
 private:
     struct jpeg_decompress_struct mJpegInfo;

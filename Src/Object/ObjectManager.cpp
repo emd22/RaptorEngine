@@ -30,8 +30,6 @@ void ObjectManager::Create()
                             eGpuBufferFlags::PersistentMapped);
 
 
-    mObjectSlotsInUse.InitZero(scMaxObjects);
-
     if (!mObjectBufferDS.IsInited()) {
         Assert(DsLayoutObjectBuffer != nullptr);
         mObjectBufferDS.Create(mDescriptorPool, DsLayoutObjectBuffer, true);
@@ -42,7 +40,7 @@ void ObjectManager::Create()
     mObjectBufferDS.Build();
 }
 
-ObjectID ObjectManager::NewObject(const std::string& name)
+ObjectID ObjectManager::NewObjectID(const std::string& name)
 {
     std::lock_guard<std::mutex> guard(mInUse);
 
@@ -52,6 +50,17 @@ ObjectID ObjectManager::NewObject(const std::string& name)
     obj->ID = ObjectID(index);
 
     return obj->ID;
+}
+
+Object* ObjectManager::NewObject()
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+
+    uint32 index;
+    Object* obj = mObjectList.NewItem(&index);
+    obj->ID = ObjectID(index);
+
+    return obj;
 }
 
 Object* ObjectManager::GetObject(const ObjectID& id)
@@ -123,25 +132,23 @@ void ObjectManager::ReleaseAllObjects()
 {
     std::lock_guard<std::mutex> guard(mInUse);
 
-    if (id.IsInvalid()) {
-        return;
+    uint32 capacity = mObjectList.Capacity;
+
+    for (uint32 i = 0; i < capacity; i++) {
+        if (!mObjectList.SlotsInUse.Get(i)) {
+            continue;
+        }
+
+        mObjectList.FreeItem(i);
     }
-
-    // Delete the object id at the definition
-    mObjectList.GetItem(id.GetID())->ID.Invalidate();
-    // Free the object from the list
-    mObjectList.FreeItem(id.GetID());
-
-    // Invalidate the passed ID
-    id.Invalidate();
 }
 
-void ObjectManager::PrintActive(int limit)
+void ObjectManager::PrintActive(uint32 limit)
 {
     ObjectGpuEntry* buffer = reinterpret_cast<ObjectGpuEntry*>(mObjectGpuBuffer.pMappedBuffer);
 
-    for (int i = 0; i < limit; i++) {
-        if (mObjectSlotsInUse.Get(i)) {
+    for (int i = 0; i < std::min(limit, mObjectList.Capacity); i++) {
+        if (mObjectList.SlotsInUse.Get(i)) {
             LogInfo(LC_CORE, "Object [{}]", i);
 
             float* model1 = buffer[i].ModelMatrix;
@@ -157,10 +164,10 @@ void ObjectManager::PrintActive(int limit)
 ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_instances)
 {
     // Unset the current object to determine if the current span of slots can contain the instances
-    mObjectSlotsInUse.Unset(object_id.GetID());
+    mObjectList.SlotsInUse.Unset(object_id.GetID());
 
     // Find the new bit group (+1 for the current object)
-    uint32 start_index = mObjectSlotsInUse.FindNextFreeBitGroup(num_instances + 1);
+    uint32 start_index = mObjectList.SlotsInUse.FindNextFreeBitGroup(num_instances + 1);
     Assert(start_index != Bit::scBitNotFound);
 
     // There is not enough room after our current object, move it
@@ -172,7 +179,7 @@ ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_i
 
     // Mark the following bits as 'in use' to prevent other future objects from snatching them.
     for (uint32 i = start_index; i < start_index + num_instances; i++) {
-        mObjectSlotsInUse.Set(i);
+        mObjectList.SlotsInUse.Set(i);
     }
 
     // Return the new slot block

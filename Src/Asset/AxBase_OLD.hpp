@@ -82,7 +82,7 @@ public:
     std::atomic_bool bIsUploadedToGpu = { false };
 
 protected:
-    friend class AxLoaderGltf;
+    friend class LoaderGltf;
 
 
     std::mutex mCallbackMutex;

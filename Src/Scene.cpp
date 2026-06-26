@@ -21,22 +21,25 @@ void Scene::Create()
     mPhysicsObjects.Create(32);
 }
 
-void Scene::Attach(const TSRef<Object>& object)
+void Scene::Attach(const ObjectID& object_id)
 {
-    mObjects.Insert(object);
+    mObjects.Insert(object_id);
+
+    Object* object = gObjectManager->GetObject(object_id);
     object->pScene = this;
     object->OnAttached(this);
 
-    object->OnLoaded(
-        [](TSRef<AxBase> asset)
-        {
-            TSRef<Object> obj { asset };
-            Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
-            obj->pScene->mRenderList.Insert(material->GetPipelineName(), obj.mpPtr);
 
-            for (const TSRef<Object>& attach : obj->AttachedNodes) {
+    object->OnLoaded(
+        [object]()
+        {
+            Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+            object->pScene->mRenderList.Insert(material->GetPipelineName(), object->ID);
+
+            for (const ObjectID& attach_id : object->AttachedNodes) {
+                Object* attach = gObjectManager->GetObject(attach_id);
                 material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
-                obj->pScene->mRenderList.Insert(material->GetPipelineName(), attach.mpPtr);
+                object->pScene->mRenderList.Insert(material->GetPipelineName(), attach_id);
             }
         });
 }
@@ -75,15 +78,16 @@ void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
     }
 }
 
-TSRef<Object> Scene::FindObject(const Hash32 name_hash)
+Object* Scene::FindObject(const Hash32 name_hash)
 {
-    for (TSRef<Object>& obj : mObjects) {
+    for (ObjectID& obj_id : mObjects) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         if (obj->Name == name_hash) {
             return obj;
         }
     }
 
-    return TSRef<Object>(nullptr);
+    return nullptr;
 }
 
 PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
@@ -113,10 +117,11 @@ void Scene::RenderRLSection(const renderer::RenderListSection& section)
             break;
         }
 
-        Object* obj = section.Objects[index];
+        ObjectID object_id = section.Objects[index];
+        Object* object = gObjectManager->GetObject(object_id);
 
-        obj->Update();
-        obj->RenderShallow(camera);
+        object->Update();
+        object->RenderShallow(camera);
 
         ++index;
     }
@@ -167,11 +172,14 @@ void Scene::RenderUnlitObjects(const Camera& camera) const
     // gRenderer->pDeferredRenderer->PlUnlit.Bind(gRenderer->GetFrame()->CommandBuffer);
     gRenderer->BeginUnlit();
 
-    for (const TSRef<Object>& obj : mObjects) {
-        if (!obj->GetRenderUnlit()) {
+    for (const ObjectID& object_id : mObjects) {
+        Object* object = gObjectManager->GetObject(object_id);
+
+        if (!object->GetRenderUnlit()) {
             continue;
         }
-        obj->RenderUnlit(camera);
+
+        object->RenderUnlit(camera);
     }
 }
 
@@ -226,7 +234,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     // }
 }
 
-void Scene::RenderObjectShadows(const TSRef<Object>& obj)
+void Scene::RenderObjectShadows(Object* object)
 {
     ShadowPushConstants consts;
 
@@ -239,7 +247,7 @@ void Scene::RenderObjectShadows(const TSRef<Object>& obj)
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
-    if (in_skinned_shader && !obj->IsSkinned()) {
+    if (in_skinned_shader && !object->IsSkinned()) {
         in_skinned_shader = false;
         pipeline.Bind(cmd);
 
@@ -255,16 +263,16 @@ void Scene::RenderObjectShadows(const TSRef<Object>& obj)
     //                                                    gObjectManager->GetBaseOffset());
     // }
 
-    obj->Update();
+    object->Update();
 
-    consts.ObjectId = obj->ID.GetID();
+    consts.ObjectId = object->ID.GetID();
 
     gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 
-    obj->RenderPrimitive(cmd);
+    object->RenderPrimitive(cmd);
 
-    for (const TSRef<Object>& attached : obj->AttachedNodes) {
-        RenderObjectShadows(attached);
+    for (const ObjectID& attached : object->AttachedNodes) {
+        RenderObjectShadows(gObjectManager->GetObject(attached));
     }
 }
 
@@ -273,12 +281,14 @@ void Scene::RenderShadows(Camera* shadow_camera)
 {
     gShadowRenderer->Begin();
 
-    for (const TSRef<Object>& obj : mObjects) {
-        if (!obj->IsShadowCaster()) {
+    for (const ObjectID& object_id : mObjects) {
+        Object* object = gObjectManager->GetObject(object_id);
+
+        if (!object->IsShadowCaster()) {
             continue;
         }
 
-        RenderObjectShadows(obj);
+        RenderObjectShadows(object);
     }
 
 

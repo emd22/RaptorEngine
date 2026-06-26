@@ -17,7 +17,7 @@ public:
 
     void Create();
 
-    void Attach(const TSRef<Object>& object);
+    void Attach(const ObjectID& object_id);
     void Attach(const Ref<LightBase>& light);
 
     PhObjectId NewPhysicsObject();
@@ -28,7 +28,7 @@ public:
     void Render(Camera* shadow_camera);
     void RenderShadows(Camera* shadow_camera);
 
-    const PagedArray<TSRef<Object>>& GetAllObjects() { return mObjects; }
+    const PagedArray<ObjectID>& GetAllObjects() { return mObjects; }
     const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
 
     Ref<LightDirectional> GetDirectionalLight()
@@ -41,7 +41,7 @@ public:
         return Ref<LightDirectional>(nullptr);
     }
 
-    TSRef<Object> FindObject(const Hash32 name_hash);
+    Object* FindObject(const Hash32 name_hash);
     PhObject* FindPhysicsObject(const Hash32 name_hash);
 
     void SelectPhysicsObject(const JPH::BodyID& body_id);
@@ -59,7 +59,7 @@ private:
     void RenderUnlitObjects(const Camera& camera) const;
     void RenderPhysicsObjects(const Camera& camera);
 
-    void RenderObjectShadows(const TSRef<Object>& obj);
+    void RenderObjectShadows(Object* object_id);
 
     void RenderRLSection(const renderer::RenderListSection& section);
 
@@ -71,7 +71,7 @@ public:
     renderer::RenderList mRenderList;
 
 private:
-    PagedArray<TSRef<Object>> mObjects;
+    PagedArray<ObjectID> mObjects;
     PagedArray<Ref<LightBase>> mLights;
     PagedArray<PhObject> mPhysicsObjects;
 

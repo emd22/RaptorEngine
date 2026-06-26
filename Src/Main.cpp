@@ -31,23 +31,6 @@ FX_SET_MODULE_NAME("Main")
 using namespace fx;
 using namespace fx::renderer;
 
-static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::FoxValue>& args)
-{
-    for (fx::script::FoxValue& arg : args) {
-        switch (arg.Type) {
-        case fx::eFoxType::INT:
-            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<fx::int32>());
-            break;
-        case fx::eFoxType::FLOAT:
-            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<fx::float32>());
-            break;
-        case fx::eFoxType::STRING:
-            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<const char*>());
-            break;
-        default:;
-        }
-    }
-}
 
 int main()
 {

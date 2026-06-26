@@ -6,6 +6,7 @@
 #include "Object/Object.hpp"
 #include "Object/ObjectManager.hpp"
 
+#include <Asset/Loader/Object/LoaderGltf.hpp>
 #include <Core/DataNotifier.hpp>
 #include <Core/Ref.hpp>
 #include <Core/TSQueue.hpp>
@@ -18,7 +19,7 @@
 namespace fx {
 
 template <typename T>
-concept C_IsAsset = std::is_base_of_v<AxBase, T>;
+concept C_IsAsset = std::is_base_of_v<AssetBase, T>;
 
 
 static constexpr uint32 scDeletionTickOffset = 10;
@@ -77,7 +78,7 @@ public:
 
     void DebugPrint() const
     {
-        LogInfo(LC_ASSET, "Worker: Loading {}, {}", Item.Path, AssetTypeToString(Item.AssetType));
+        LogInfo(LC_ASSET, "Worker: Loading {}, {}", Item.Path, AssetTypeToString(Item.Data.LoadType));
     }
 
     void Update();
@@ -90,15 +91,15 @@ public:
     }
 
 private:
-    void DirectUploadData(AxItemData& item_data);
+    void DirectUploadData(AssetItemData& item_data);
 
-    void LoadObject(const LockContext<AxItemData>& asset_data);
-    void LoadAsset(const LockContext<AxItemData>& asset_data);
+    void LoadObject(const LockContext<AssetItemData>& asset_data);
+    void LoadImage(const LockContext<AssetItemData>& asset_data);
 
 
 public:
     AxQueueItem Item;
-    AxLoaderBase::eStatus LoadStatus = AxLoaderBase::eStatus::None;
+    loader::eLoaderStatus LoadStatus = loader::eLoaderStatus::None;
 
     DataNotifier ItemReady;
 
@@ -149,7 +150,7 @@ public:
      */
     ObjectID LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
     {
-        ObjectID id = gObjectManager->NewObject(name);
+        ObjectID id = gObjectManager->NewObjectID(name);
         LoadObject(id, path, options);
 
         return id;
@@ -161,7 +162,7 @@ public:
      */
     ObjectID LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
     {
-        ObjectID id = gObjectManager->NewObject(name);
+        ObjectID id = gObjectManager->NewObjectID(name);
         LoadObjectFromMemory(id, data, data_size);
 
         return id;
@@ -299,7 +300,7 @@ private:
     {
         AxManager* mgr = GetInstance();
 
-        mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, object_id, eAssetLoadType::Object));
+        mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess<loader::LoaderGltf>(path, loader, object_id));
         mgr->ManagerUpdateNotifier.Signal();
     }
 
@@ -321,7 +322,7 @@ private:
     {
         AxManager* mgr = GetInstance();
 
-        mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, object_id, eAssetLoadType::Object, asset_data));
+        mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess<loader::LoaderGltf>(loader, object_id, asset_data));
         mgr->ManagerUpdateNotifier.Signal();
     }
 

@@ -1,6 +1,6 @@
 #include "LoaderStb.hpp"
 
-#include <Asset/AxBase.hpp>
+#include <Asset/AssetBase.hpp>
 #include <Asset/AxImage.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
 
@@ -8,7 +8,7 @@ namespace fx {
 
 namespace loader {
 
-LoaderStb::eStatus LoaderStb::LoadFromFile(TSRef<AxBase> asset, const String& path)
+eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const String& path)
 {
     TSRef<AxImage> image(asset);
 
@@ -28,13 +28,13 @@ LoaderStb::eStatus LoaderStb::LoadFromFile(TSRef<AxBase> asset, const String& pa
     mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
     if (mImageData == nullptr) {
         LogError(LC_ASSET, "Could not load image file at '{}'", c_path);
-        return LoaderStb::eStatus::Error;
+        return eLoaderStatus::Error;
     }
 
-    return LoaderStb::eStatus::Success;
+    return eLoaderStatus::Success;
 }
 
-LoaderStb::eStatus LoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
+eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const uint8* data, uint32 size)
 {
     TSRef<AxImage> image(asset);
 
@@ -46,7 +46,7 @@ LoaderStb::eStatus LoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* d
 
     if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
         LogError(LC_ASSET, "Could not retrieve info from image in memory! (Size={})", size);
-        return LoaderStb::eStatus::Error;
+        return eLoaderStatus::Error;
     }
 
     mChannels = pixel_size;
@@ -60,15 +60,15 @@ LoaderStb::eStatus LoaderStb::LoadFromMemory(TSRef<AxBase> asset, const uint8* d
 
     if (mImageData == nullptr) {
         LogError(LC_ASSET, "Could not load image file from memory!");
-        return LoaderStb::eStatus::Error;
+        return eLoaderStatus::Error;
     }
 
-    return LoaderStb::eStatus::Success;
+    return eLoaderStatus::Success;
 }
 
 
-LoaderStb::eStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
-                                         const String& path, eImageSaveFlags flags)
+eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
+                                    const String& path, eImageSaveFlags flags)
 {
     if ((flags & eImageSaveFlags::FlipY) != 0) {
         stbi_flip_vertically_on_write(1);
@@ -82,10 +82,10 @@ LoaderStb::eStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Sli
         stbi_write_png(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, size.GetX() * 4);
     }
 
-    return LoaderStb::eStatus::Success;
+    return eLoaderStatus::Success;
 }
 
-void LoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
+void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
 {
     TSRef<AxImage> image(asset);
 
@@ -148,7 +148,7 @@ void LoaderStb::CreateGpuResource(TSRef<AxBase>& asset)
 //     StackArray<VkImageCopy, 6> image_copy_infos;
 // }
 
-void LoaderStb::Destroy(TSRef<AxBase>& asset)
+void LoaderStb::Destroy(TSRef<AssetBase>& asset)
 {
     // while (!asset->bIsUploadedToGpu) {
     //     asset->bIsUploadedToGpu.wait(true);

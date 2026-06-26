@@ -1,7 +1,6 @@
 #pragma once
 
 #include "LoaderBase.hpp"
-#include "LoaderCommon.hpp"
 
 #include <Core/String.hpp>
 
@@ -23,7 +22,7 @@ public:
         Error,
     };
 
-    ObjectLoaderBase() {}
+    ObjectLoaderBase() = default;
 
     virtual eLoaderStatus Load(const ObjectID& id, const String& path) = 0;
     virtual eLoaderStatus Load(const ObjectID& id, const uint8* data, uint32 size) = 0;
@@ -31,7 +30,7 @@ public:
     virtual void CreateGpuResource(const ObjectID& id) = 0;
 
     virtual void Destroy() = 0;
-    virtual ~ObjectLoaderBase() {}
+    virtual ~ObjectLoaderBase() = default;
 
 protected:
     friend class AxManager;

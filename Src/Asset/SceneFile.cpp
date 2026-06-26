@@ -82,7 +82,7 @@ void SceneFile::Load(const std::string& path, Scene& scene)
             AddObjectFromEntry(path, object_entry, scene);
         }
         else {
-            TSRef<Object> object = scene.FindObject(object_entry.Name.GetHash());
+            Object* object = scene.FindObject(object_entry.Name.GetHash());
             ApplyPropertiesToObject(object, object_entry);
         }
     }
@@ -127,15 +127,17 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 
 
     String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
-    TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
+    ObjectID object_id = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
+    Object* object = gObjectManager->GetObject(object_id);
+
     object->pScene = &scene;
     ApplyPropertiesToObject(object, object_entry);
 
-    scene.Attach(object);
+    scene.Attach(object_id);
 }
 
 
-void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry& object_entry)
+void SceneFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry)
 {
     ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("Shadows"));
     if (shadow_caster != nullptr) {
@@ -185,13 +187,6 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
     if (script != nullptr) {
         object->LoadScript(String::Fmt("./Scripts{}", script->GetValue<const char*>()));
     }
-
-    object->OnLoaded(
-        [](TSRef<AxBase> base_asset)
-        {
-            TSRef<Object> obj = base_asset;
-            obj->PrintDebug();
-        });
 }
 
 } // namespace fx

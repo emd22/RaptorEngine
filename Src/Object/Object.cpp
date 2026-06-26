@@ -67,20 +67,18 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
                                     const PhProperties& physics_properties)
 {
     OnLoaded(
-        [primitive_type, dimensions, motion_type, physics_properties](TSRef<AxBase> base_asset)
+        [&]()
         {
-            TSRef<Object> object = base_asset;
-
-            Scene* scene = object->pScene;
+            Scene* scene = this->pScene;
             if (!scene) {
                 return;
             }
 
-            if (object->PhysicsId == PhObjectIdNull) {
-                object->PhysicsId = scene->NewPhysicsObject();
+            if (this->PhysicsId == PhObjectIdNull) {
+                this->PhysicsId = scene->NewPhysicsObject();
             }
 
-            PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
+            PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
 
             if (!phys) {
                 LogError(LC_PHYSICS, "Error creating physics object");
@@ -88,10 +86,10 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
             }
 
             phys->CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
-            object->mbPhysicsTransformOutOfDate = true;
-            object->SetPhysicsEnabled(true);
+            this->mbPhysicsTransformOutOfDate = true;
+            this->SetPhysicsEnabled(true);
 
-            object->PrintDebug();
+            this->PrintDebug();
         });
 }
 
@@ -100,17 +98,15 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
                                const PhProperties& physics_properties)
 {
     OnLoaded(
-        [custom_physics_mesh, motion_type, physics_properties](TSRef<AxBase> base_asset)
+        [&]()
         {
-            TSRef<Object> object = base_asset;
-
-            Scene* scene = object->pScene;
+            Scene* scene = this->pScene;
             if (!scene) {
                 return;
             }
 
-            object->PhysicsId = scene->NewPhysicsObject();
-            PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
+            this->PhysicsId = scene->NewPhysicsObject();
+            PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
 
             if (!phys) {
                 LogError(LC_PHYSICS, "Error creating physics object");
@@ -118,15 +114,15 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
             }
 
             Ref<PrimitiveMesh> physics_mesh { nullptr };
-            physics_mesh = custom_physics_mesh ? custom_physics_mesh : object->pMesh;
+            physics_mesh = custom_physics_mesh ? custom_physics_mesh : this->pMesh;
 
             Assert(physics_mesh.IsValid());
 
             phys->CreateMeshBody(*physics_mesh, motion_type, physics_properties);
-            object->mbPhysicsTransformOutOfDate = true;
-            object->SetPhysicsEnabled(true);
+            this->mbPhysicsTransformOutOfDate = true;
+            this->SetPhysicsEnabled(true);
 
-            object->PrintDebug();
+            this->PrintDebug();
         });
 }
 
@@ -154,15 +150,13 @@ void Object::OnAttached(Scene* scene)
 void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 {
     OnLoaded(
-        [pipeline, update_children](TSRef<AxBase> base_asset)
+        [&]()
         {
-            TSRef<Object> asset = base_asset;
-
             const bool should_set_default = (pipeline == nullptr);
 
 
-            if (!asset->GetMaterialID().IsNull()) {
-                Material* material = gMaterialManager->GetMaterial(asset->mMaterialID);
+            if (!this->GetMaterialID().IsNull()) {
+                Material* material = gMaterialManager->GetMaterial(this->mMaterialID);
 
                 if (should_set_default) {
                     material->SetDefaultPipeline();
@@ -173,7 +167,7 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
             }
 
             if (update_children) {
-                for (const ObjectID& attached_id : asset->AttachedNodes) {
+                for (const ObjectID& attached_id : this->AttachedNodes) {
                     Object* attached = gObjectManager->GetObject(attached_id);
 
                     if (!attached->GetMaterialID().IsNull()) {

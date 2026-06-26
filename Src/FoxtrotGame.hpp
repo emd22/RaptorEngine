@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ObjectManager.hpp"
+#include "Object/ObjectManager.hpp"
 
 #include <Asset/ConfigFile.hpp>
 #include <Object/Object.hpp>

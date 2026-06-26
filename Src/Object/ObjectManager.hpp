@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Object.hpp"
 #include "ObjectID.hpp"
 
 #include <Core/Bitset.hpp>
@@ -19,7 +20,6 @@ class Mat4f;
 
 // using ObjectId = uint32;
 
-class Object;
 
 class ObjectManager
 {
@@ -30,7 +30,8 @@ public:
 public:
     void Create();
 
-    ObjectID NewObject(const std::string& name);
+    ObjectID NewObjectID(const std::string& name);
+    Object* NewObject();
     Object* GetObject(const ObjectID& id);
     void DestroyObject(ObjectID& id);
 
@@ -38,7 +39,7 @@ public:
     void Submit(const ObjectID& id, const Mat4f& model_matrix);
     void ReleaseAllObjects();
 
-    void PrintActive(int limit = 20);
+    void PrintActive(uint32 limit = 20);
 
     uint32 GetOffsetObjectIndex(uint32 object_id) const;
     uint32 GetBaseOffset() const;

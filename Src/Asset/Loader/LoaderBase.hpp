@@ -6,6 +6,13 @@ namespace fx {
 
 namespace loader {
 
+enum class eLoaderStatus
+{
+    None,
+    Success,
+    Error,
+};
+
 #define FX_DEFINE_LOADER_TYPE(loader_type_) static const eLoaderType scLoaderType = loader_type_
 
 enum class eLoaderType
@@ -19,6 +26,9 @@ class LoaderBase
 {
 public:
     FX_DEFINE_LOADER_TYPE(eLoaderType::BaseLoader);
+
+    LoaderBase() = default;
+    virtual ~LoaderBase() = default;
 };
 
 

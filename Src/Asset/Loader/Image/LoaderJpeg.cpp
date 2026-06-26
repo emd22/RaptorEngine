@@ -1,5 +1,6 @@
-#include "Asset/AxBase.hpp"
-#include "AxLoaderJpeg.hpp"
+#include "LoaderJpeg.hpp"
+
+#include "Asset/AssetBase.hpp"
 
 #include <TurboJPEG/jpeglib.h>
 
@@ -27,7 +28,7 @@ static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
 }
 
 
-AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const String& path)
+eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const String& path)
 {
     TSRef<AxImage> image(asset);
 
@@ -37,7 +38,7 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const Strin
 
     if (!fp) {
         LogError(LC_ASSET, "Could not find JPEG file at '{:s}'", c_path);
-        return AxLoaderJpeg::Status::Error;
+        return eLoaderStatus::Error;
     }
 
     struct jpeg_error_mgr error_mgr;
@@ -73,10 +74,10 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromFile(TSRef<AxBase> asset, const Strin
 
     fclose(fp);
 
-    return Status::Success;
+    return eLoaderStatus::Success;
 }
 
-AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
+eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const uint8* data, uint32 size)
 {
     TSRef<AxImage> image(asset);
 
@@ -112,10 +113,10 @@ AxLoaderJpeg::Status AxLoaderJpeg::LoadFromMemory(TSRef<AxBase> asset, const uin
 
     jpeg_finish_decompress(&mJpegInfo);
 
-    return Status::Success;
+    return eLoaderStatus::Success;
 }
 
-void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
+void LoaderJpeg::CreateGpuResource(TSRef<AssetBase>& asset)
 {
     TSRef<AxImage> image(asset);
 
@@ -138,14 +139,7 @@ void AxLoaderJpeg::CreateGpuResource(TSRef<AxBase>& asset)
     image->bIsUploadedToGpu.notify_all();
 }
 
-void AxLoaderJpeg::Destroy(TSRef<AxBase>& asset)
-{
-    //    while (!asset->bIsUploadedToGpu) {
-    //        asset->bIsUploadedToGpu.wait(true);
-    //    }
-
-    jpeg_destroy_decompress(&mJpegInfo);
-}
+void LoaderJpeg::Destroy(TSRef<AssetBase>& asset) { jpeg_destroy_decompress(&mJpegInfo); }
 
 } // namespace loader
 

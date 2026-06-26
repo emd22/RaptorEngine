@@ -55,21 +55,21 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Asset/Loader/AxLoaderGltf.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Loader/AxLoaderGltf.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/Loader/AxLoaderGltf.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Loader/AxLoaderGltf.cpp.o"
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Asset/Loader/Image/LoaderJpeg.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Loader/Image/LoaderJpeg.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/Loader/Image/LoaderJpeg.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Loader/Image/LoaderJpeg.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Asset/Loader/AxLoaderJpeg.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Loader/AxLoaderJpeg.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/Loader/AxLoaderJpeg.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Loader/AxLoaderJpeg.cpp.o"
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Asset/Loader/Image/LoaderStb.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Loader/Image/LoaderStb.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/Loader/Image/LoaderStb.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Loader/Image/LoaderStb.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Asset/Loader/AxLoaderStb.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Loader/AxLoaderStb.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/Loader/AxLoaderStb.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Loader/AxLoaderStb.cpp.o"
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Asset/Loader/Object/LoaderGltf.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/Loader/Object/LoaderGltf.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/Loader/Object/LoaderGltf.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/Loader/Object/LoaderGltf.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -349,15 +349,15 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Object.cpp.o -c /Users/emd22/Projects/a2/Src/Object.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Object.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Object.cpp.o"
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Object/Object.cpp.o -c /Users/emd22/Projects/a2/Src/Object/Object.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Object/Object.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Object/Object.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/ObjectManager.cpp.o -c /Users/emd22/Projects/a2/Src/ObjectManager.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/ObjectManager.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/ObjectManager.cpp.o"
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\"/Users/emd22/Projects/a2\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.350.0/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -fsanitize=address -o CMakeFiles/foxtrot.dir/Src/Object/ObjectManager.cpp.o -c /Users/emd22/Projects/a2/Src/Object/ObjectManager.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Object/ObjectManager.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Object/ObjectManager.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

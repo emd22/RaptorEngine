@@ -1,12 +1,11 @@
 #pragma once
 
-#include "LoaderCommon.hpp"
-#include "ObjectLoaderBase.hpp"
+#include "../ObjectLoaderBase.hpp"
 
 #include <Asset/Animation.hpp>
 #include <Material/Material.hpp>
 #include <Object/Object.hpp>
-#include <string>
+#include <vector>
 
 struct cgltf_data;
 struct cgltf_material;
@@ -37,7 +36,7 @@ public:
     eLoaderStatus Load(const ObjectID& id, const String& path) override;
     eLoaderStatus Load(const ObjectID& id, const uint8* data, uint32 size) override;
 
-    void UploadMeshToGpu(TSRef<Object>& object);
+    void UploadMeshToGpu(Object* object);
 
     void Destroy() override;
 
@@ -47,20 +46,20 @@ private:
     // void MakeEmptyMaterialTexture(Ref<Material>& material, MaterialComponent& component);
     void MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index);
 
-    void UnpackMeshAttributes(const TSRef<Object>& object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive);
+    void UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive);
 
     int32 FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const;
 
     void LoadSkeleton(Skeleton& skel, cgltf_skin* skin); // now takes skel by ref
     void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
-    void LoadAnimations(TSRef<Object>& output_object, Skeleton& skel);
+    void LoadAnimations(Object* object, Skeleton& skel);
 
-    void BuildObjectsFromPrimitives(TSRef<Object>& object, cgltf_mesh* gltf_mesh);
+    void BuildObjectsFromPrimitives(const ObjectID& container_id, cgltf_mesh* gltf_mesh);
 
     /**
      * @brief Process the GLTF data and build out the object tree.
      */
-    void ProcessData(TSRef<Object>& output_object);
+    void ProcessData(const ObjectID& output_id);
 
 protected:
     void CreateGpuResource(const ObjectID& object_id) override;
