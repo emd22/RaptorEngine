@@ -29,7 +29,7 @@ class RenderList
 public:
     RenderList() = default;
 
-    uint32 Insert(ePipelineName pl_name, const ObjectID& id);
+    uint32 Add(ePipelineName pl_name, const ObjectID& id);
 
     void Remove(ePipelineName pl_name, const ObjectID& id);
     void RemoveAllOfObject(const ObjectID& id);

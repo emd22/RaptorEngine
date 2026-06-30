@@ -146,7 +146,7 @@ static String GetTextureCachePath(const String& asset_path, Material* material, 
     // Add the filename
     path.Add(String::Fmt("{}_{}.ftx", material->Name.Get(), component_name));
 
-    return std::move(path.Str());
+    return path.Str();
 }
 
 
@@ -270,22 +270,29 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
     material->bReadyToCheck.test_and_set();
 }
 
-void LoaderGltf::BuildObjectsFromPrimitives(const ObjectID& container_id, cgltf_mesh* gltf_mesh)
+void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh)
 {
     const bool has_multiple_primitives = gltf_mesh->primitives_count > 1;
 
     // Assume at first that there is only one primitive;
-    ObjectID current_id = container_id;
-
-    Object* container_object = gObjectManager->GetObject(container_id);
+    Object* current_object = container_object;
 
     // Similarly to `CreateGpuResource`, we are going to make the `object` into a container
     // if there are multiple primitives.
     if (has_multiple_primitives) {
-        current_id = gObjectManager->NewObjectID(gObjectManager->GetObject(container_id)->Name.Get());
+        current_object = gObjectManager->NewObject(container_object->Name.Get());
     }
 
+    bool needs_new_object = false;
+
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
+        if (needs_new_object) {
+            // Create a new object to load into next
+            current_object = gObjectManager->NewObject(container_object->Name.Get());
+            needs_new_object = false;
+        }
+
+
         cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[i];
         Ref<PrimitiveMesh> primitive_mesh = Ref<PrimitiveMesh>::New();
 
@@ -302,8 +309,6 @@ void LoaderGltf::BuildObjectsFromPrimitives(const ObjectID& container_id, cgltf_
             primitive_mesh->SetIndices(std::move(indices));
         }
 
-        Object* current_object = gObjectManager->GetObject(current_id);
-
         UnpackMeshAttributes(current_object, primitive_mesh, gltf_primitive);
         current_object->pMesh = primitive_mesh;
 
@@ -311,10 +316,8 @@ void LoaderGltf::BuildObjectsFromPrimitives(const ObjectID& container_id, cgltf_
 
         if (has_multiple_primitives) {
             // Attach the current object to the object container (our output)
-            container_object->AttachObject(current_id);
-
-            // Create a new object to load into next
-            current_id = gObjectManager->NewObjectID(container_object->Name.Get());
+            container_object->AttachObject(current_object->ID);
+            needs_new_object = true;
         }
     }
 }
@@ -506,12 +509,11 @@ void LoaderGltf::LoadAnimations(Object* object, Skeleton& skel)
     LogInfo(LC_ASSET, "Loaded {} animations", mpGltfData->animations_count);
 }
 
-void LoaderGltf::ProcessData(const ObjectID& output_id)
+void LoaderGltf::ProcessData(AssetTicket<Object>& ticket)
 {
     // If there is only one mesh to load, store the mesh directly in the output object
-    ObjectID current_id = output_id;
-
-    Object* output_object = gObjectManager->GetObject(output_id);
+    Object* output_object = ticket.Get();
+    Object* current_object = output_object;
 
     // If there are multiple gltf meshes, we will need to use the output object as a
     // container for multiple other meshes
@@ -521,19 +523,25 @@ void LoaderGltf::ProcessData(const ObjectID& output_id)
 
     // If there are multiple objects, each object found will be attached to the output object.
     if (has_multiple_meshes) {
-        current_id = gObjectManager->NewObjectID(std::format("{}_{}", output_object->Name.Get(), attach_id++));
+        current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++));
     }
 
 
+    bool needs_new_object = false;
+
     // Load each object in the GLTF as a new separate object.
     for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
-        cgltf_node* node = &mpGltfData->nodes[node_index];
+        if (needs_new_object) {
+            // Create a new object to load into next
+            current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++));
+            needs_new_object = false;
+        }
 
-        Object* current_object = gObjectManager->GetObject(current_id);
+        cgltf_node* node = &mpGltfData->nodes[node_index];
 
         if (node->mesh) {
             // Load all meshes from the node we are currently on.
-            BuildObjectsFromPrimitives(current_id, node->mesh);
+            BuildObjectsFromPrimitives(current_object, node->mesh);
 
             // If the node has a skeleton, load it in.
             if (node->skin) {
@@ -545,15 +553,13 @@ void LoaderGltf::ProcessData(const ObjectID& output_id)
 
         if (has_multiple_meshes) {
             // Attach the loaded object onto the final object. This will be a container.
-            output_object->AttachObject(current_id);
-
-            // Create a new object to load into next
-            current_id = gObjectManager->NewObjectID(std::format("{}_{}", output_object->Name.Get(), attach_id++));
+            output_object->AttachObject(current_object->ID);
+            needs_new_object = true;
         }
     }
 }
 
-eLoaderStatus LoaderGltf::Load(const ObjectID& object_id, const String& path)
+eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const String& path)
 {
     cgltf_options options {};
 
@@ -571,13 +577,13 @@ eLoaderStatus LoaderGltf::Load(const ObjectID& object_id, const String& path)
         return eLoaderStatus::Error;
     }
 
-    ProcessData(object_id);
+    ProcessData(ticket);
 
     return eLoaderStatus::Success;
 }
 
 
-eLoaderStatus LoaderGltf::Load(const ObjectID& object_id, const uint8* data, uint32 size)
+eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const uint8* data, uint32 size)
 {
     cgltf_options options {};
 
@@ -587,15 +593,13 @@ eLoaderStatus LoaderGltf::Load(const ObjectID& object_id, const uint8* data, uin
         return eLoaderStatus::Error;
     }
 
-    ProcessData(object_id);
+    ProcessData(ticket);
 
     return eLoaderStatus::Success;
 }
 
-void LoaderGltf::CreateGpuResource(const ObjectID& object_id)
+void LoaderGltf::CreateGpuResource(AssetTicket<Object>& ticket)
 {
-    Object* container_object = gObjectManager->GetObject(object_id);
-
     // If there is only one mesh to load, store the mesh directly in the output object
     // TSRef<Object> current_object = container_object;
 
@@ -605,19 +609,18 @@ void LoaderGltf::CreateGpuResource(const ObjectID& object_id)
 
     // UploadMeshToGpu(container_object);
 
-    uint32 attached_count = container_object->AttachedNodes.Size();
+    Object* object = ticket.Get();
+
+    uint32 attached_count = object->AttachedNodes.Size();
 
     // container_object->PrintDebug();
 
     for (uint32 i = 0; i < attached_count; i++) {
-        UploadMeshToGpu(gObjectManager->GetObject(container_object->AttachedNodes[i]));
+        UploadMeshToGpu(gObjectManager->GetObject(object->AttachedNodes[i]));
     }
 
-    UploadMeshToGpu(container_object);
-
-
-    // asset->bIsUploadedToGpu = true;
-    // asset->bIsUploadedToGpu.notify_all();
+    UploadMeshToGpu(object);
+    ticket.SignalUploadedToGpu();
 }
 
 void LoaderGltf::Destroy()

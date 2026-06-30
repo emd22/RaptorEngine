@@ -58,8 +58,8 @@ FX_FORCE_INLINE Color Color::FromRGBA(uint8 r, uint8 g, uint8 b, uint8 a)
 FX_FORCE_INLINE Color Color::FromFloats(float32 rgba[4])
 {
     Color colour;
-    colour.Value = ((static_cast<uint32>(rgba[3] * 255.0) << 24) | (static_cast<uint32>(rgba[2] * 255.0) << 16) |
-                    (static_cast<uint32>(rgba[1] * 255.0) << 8) | (static_cast<uint32>(rgba[0] * 255.0)));
+    colour.Value = ((static_cast<uint32>(rgba[3] * 255.0f) << 24) | (static_cast<uint32>(rgba[2] * 255.0f) << 16) |
+                    (static_cast<uint32>(rgba[1] * 255.0f) << 8) | (static_cast<uint32>(rgba[0] * 255.0f)));
     return colour;
 }
 

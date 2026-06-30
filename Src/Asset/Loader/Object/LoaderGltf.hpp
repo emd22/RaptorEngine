@@ -28,14 +28,15 @@ struct AxGltfMaterialToLoad
 };
 
 
-class LoaderGltf : public ObjectLoaderBase
+class LoaderGltf final : public ObjectLoaderBase
 {
 public:
     LoaderGltf() = default;
 
-    eLoaderStatus Load(const ObjectID& id, const String& path) override;
-    eLoaderStatus Load(const ObjectID& id, const uint8* data, uint32 size) override;
+    eLoaderStatus Load(AssetTicket<Object>& ticket, const String& path) override;
+    eLoaderStatus Load(AssetTicket<Object>& ticket, const uint8* data, uint32 size) override;
 
+    void CreateGpuResource(AssetTicket<Object>& object_id) override;
     void UploadMeshToGpu(Object* object);
 
     void Destroy() override;
@@ -54,15 +55,13 @@ private:
     void LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin);
     void LoadAnimations(Object* object, Skeleton& skel);
 
-    void BuildObjectsFromPrimitives(const ObjectID& container_id, cgltf_mesh* gltf_mesh);
+    void BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh);
 
     /**
      * @brief Process the GLTF data and build out the object tree.
      */
-    void ProcessData(const ObjectID& output_id);
+    void ProcessData(AssetTicket<Object>& ticket);
 
-protected:
-    void CreateGpuResource(const ObjectID& object_id) override;
 
 public:
     std::vector<AxGltfMaterialToLoad> MaterialsToLoad;

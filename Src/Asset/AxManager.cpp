@@ -63,16 +63,16 @@ void AxWorker::Create()
     Thread = std::thread([this]() { this->Update(); });
 }
 
-void AxWorker::LoadObject(const LockContext<AssetItemData>& asset_data)
+void AxWorker::LoadObject(LockContext<AssetItemData>& asset_data)
 {
     TSRef<loader::ObjectLoaderBase> object_loader(asset_data->pLoader);
 
     switch (Item.AssetLoadOp) {
     case fx::eAssetLoadOp::ReadAndUpload:
-        LoadStatus = object_loader->Load(asset_data->ObjID, Item.Path);
+        LoadStatus = object_loader->Load(asset_data->ObjectTicket, String(Item.Path));
         break;
     case fx::eAssetLoadOp::ProcessAndUpload:
-        LoadStatus = object_loader->Load(asset_data->ObjID, Item.pcRawData, Item.DataSize);
+        LoadStatus = object_loader->Load(asset_data->ObjectTicket, Item.pcRawData, Item.DataSize);
         std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
         break;
     default:
@@ -254,20 +254,20 @@ inline bool IsFileJpeg(const std::string& path)
     return false;
 }
 
-void AxManager::LoadObject(const ObjectID& object_id, const std::string& path, LoadObjectOptions options)
+void AxManager::LoadObject(const AssetTicket<Object>& ticket, const std::string& path, LoadObjectOptions options)
 {
     TSRef<loader::LoaderGltf> loader = TSRef<loader::LoaderGltf>::New();
     loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
 
-    SubmitLoadObject<loader::LoaderGltf>(object_id, loader, path);
+    SubmitLoadObject<loader::LoaderGltf>(ticket, loader, path);
 }
 
 
-void AxManager::LoadObjectFromMemory(const ObjectID& object_id, const uint8* data, uint32 data_size)
+void AxManager::LoadObjectFromMemory(const AssetTicket<Object>& ticket, const uint8* data, uint32 data_size)
 {
     TSRef<loader::LoaderGltf> loader = TSRef<loader::LoaderGltf>::New();
 
-    SubmitLoadObject<loader::LoaderGltf>(object_id, loader, Slice<const uint8>(data, data_size));
+    SubmitLoadObject<loader::LoaderGltf>(ticket, loader, Slice<const uint8>(data, data_size));
 }
 
 
@@ -416,46 +416,78 @@ bool AxManager::CheckForUploadableData()
         LockContext<AssetItemData> asset_data = worker->Item.GetDataContext();
 
         if (worker->LoadStatus == loader::eLoaderStatus::Success) {
-            while (!asset_data->pAsset->bIsUploadedToGpu) {
-                asset_data->pAsset->bIsUploadedToGpu.wait(false);
-            }
+            if (asset_data->LoadType == eAssetLoadType::Object) {
+                AssetTicketData* ticket_data = asset_data->ObjectTicket.pTicketData;
 
-            {
-                if (asset_data->LoadType == eAssetLoadType::Object) {
-                    TSRef<AssetObject> obj_asset(asset_data->pAsset);
+                while (!ticket_data->bIsUploadedToGpu) {
+                    ticket_data->bIsUploadedToGpu.wait(false);
+                }
 
-                    std::lock_guard guard(obj_asset->mCallbackMutex);
+                if (asset_data->LoadType == eAssetLoadType::Object && asset_data->ObjectTicket.pTicketData) {
+                    std::lock_guard guard(ticket_data->mCallbackMutex);
 
                     // Call OnLoaded callbacks if they are attached
-                    if (!obj_asset->mOnLoadedCallbacks.empty()) {
-                        for (auto& callback : obj_asset->mOnLoadedCallbacks) {
+                    if (!ticket_data->mOnLoadedCallbacks.empty()) {
+                        for (auto& callback : ticket_data->mOnLoadedCallbacks) {
                             callback();
                         }
                     }
 
-                    obj_asset->mOnLoadedCallbacks.clear();
+                    ticket_data->mOnLoadedCallbacks.clear();
+                }
+
+                // Notify the asset thread that loading is finished
+
+                ticket_data->IsFinishedNotifier.Signal();
+                ticket_data->bIsLoaded.store(true);
+
+                if (asset_data->pLoader.IsValid()) {
+                    // Destroy the loader(clearing the loading buffers)
+                    asset_data->DestroyLoader();
                 }
             }
+            else {
+                while (!asset_data->pAsset->bIsUploadedToGpu) {
+                    asset_data->pAsset->bIsUploadedToGpu.wait(false);
+                }
 
-            // Notify the asset thread that loading is finished
+                {
+                    if (asset_data->LoadType == eAssetLoadType::Object && asset_data->ObjectTicket.pTicketData) {
+                        AssetTicketData* ticket_data = asset_data->ObjectTicket.pTicketData;
 
-            asset_data->pAsset->IsFinishedNotifier.Signal();
-            asset_data->pAsset->mIsLoaded.store(true);
+                        std::lock_guard guard(ticket_data->mCallbackMutex);
 
-            if (asset_data->pLoader.IsValid()) {
-                // Destroy the loader(clearing the loading buffers)
-                asset_data->DestroyLoader();
+                        // Call OnLoaded callbacks if they are attached
+                        if (!ticket_data->mOnLoadedCallbacks.empty()) {
+                            for (auto& callback : ticket_data->mOnLoadedCallbacks) {
+                                callback();
+                            }
+                        }
+
+                        ticket_data->mOnLoadedCallbacks.clear();
+                    }
+                }
+
+                // Notify the asset thread that loading is finished
+
+                asset_data->pAsset->IsFinishedNotifier.Signal();
+                asset_data->pAsset->mIsLoaded.store(true);
+
+                if (asset_data->pLoader.IsValid()) {
+                    // Destroy the loader(clearing the loading buffers)
+                    asset_data->DestroyLoader();
+                }
             }
         }
         else if (worker->LoadStatus == loader::eLoaderStatus::Error) {
             asset_data->pAsset->IsFinishedNotifier.Signal();
 
-            if (asset_data->LoadType == eAssetLoadType::Object) {
-                TSRef<AssetObject> obj_asset(asset_data->pAsset);
+            if (asset_data->LoadType == eAssetLoadType::Object && asset_data->ObjectTicket.pTicketData) {
+                AssetTicketData* ticket_data = asset_data->ObjectTicket.pTicketData;
 
                 // There was an error, call the OnError callback if it was registered
-                if (obj_asset->mOnErrorCallback) {
-                    obj_asset->mOnErrorCallback();
+                if (ticket_data->mOnErrorCallback) {
+                    ticket_data->mOnErrorCallback();
                 }
             }
         }

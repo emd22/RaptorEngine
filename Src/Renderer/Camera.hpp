@@ -166,10 +166,10 @@ public:
     void UpdateCameraMatrix() override;
     void OnWindowResize(const Vec2u& size) override;
 
-    float32 GetFov() const { return RadToDeg(mFovRad); }
+    float32 GetFov() const { return MathUtil::RadiansToDegrees(mFovRad); }
     float32 GetFovRad() const { return mFovRad; }
 
-    void SetFov(float32 fov) { SetFovRad(DegToRad(fov)); }
+    void SetFov(float32 fov) { SetFovRad(MathUtil::DegreesToRadians(fov)); }
 
     void SetFovRad(float32 fov_rad)
     {
@@ -185,8 +185,8 @@ public:
 
         constexpr float cOffset = 0.01f;
 
-        constexpr float cMinY = -FX_HALF_PI + cOffset;
-        constexpr float cMaxY = FX_HALF_PI - cOffset;
+        constexpr float cMinY = static_cast<float32>(-FX_HALF_PI) + cOffset;
+        constexpr float cMaxY = static_cast<float32>(FX_HALF_PI) - cOffset;
 
         mAngleY = MathUtil::Clamp(mAngleY, cMinY, cMaxY);
 
@@ -223,16 +223,16 @@ private:
         constexpr float32 cf2Pi = FX_2PI;
 
         if (v < -cf2Pi) {
-            return cf2Pi - 1e-5;
+            return cf2Pi - static_cast<float32>(1e-5);
         }
         else if (v > cf2Pi) {
-            return -cf2Pi + 1e-5;
+            return -cf2Pi + static_cast<float32>(1e-5);
         }
         return v;
     }
 
 private:
-    float32 mFovRad = DegToRad(80.0f);
+    float32 mFovRad = MathUtil::DegreesToRadians(80.0f);
 
     float32 mAspectRatio = 1.0f;
 
@@ -243,7 +243,7 @@ private:
     Mat4f mWeaponCameraMatrix = Mat4f::sIdentity;
     Mat4f mWeaponProjectionMatrix = Mat4f::sIdentity;
 
-    float32 mWeaponFov = DegToRad(75.0f);
+    float32 mWeaponFov = MathUtil::DegreesToRadians(75.0f);
 };
 
 } // namespace fx

@@ -127,13 +127,14 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 
 
     String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
-    ObjectID object_id = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
-    Object* object = gObjectManager->GetObject(object_id);
+    AssetTicket<Object> ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
+
+    Object* object = ticket.Get();
 
     object->pScene = &scene;
     ApplyPropertiesToObject(object, object_entry);
 
-    scene.Attach(object_id);
+    scene.Attach(object);
 }
 
 

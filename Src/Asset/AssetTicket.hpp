@@ -3,11 +3,16 @@
 #include <Core/DataNotifier.hpp>
 #include <Core/Defines.hpp>
 #include <atomic>
+#include <functional>
 
 namespace fx {
 
 class AssetTicketData
 {
+public:
+    using OnLoadFunc = std::function<void()>;
+    using OnErrorFunc = std::function<void()>;
+
 public:
     AssetTicketData() = default;
     AssetTicketData(const AssetTicketData&) = delete;
@@ -28,6 +33,40 @@ public:
         bIsLoaded.store(true);
     }
 
+    void SignalUploadedToGpu()
+    {
+        bIsUploadedToGpu = true;
+        bIsUploadedToGpu.notify_all();
+    }
+
+    void OnLoaded(const OnLoadFunc& on_loaded_callback)
+    {
+        std::lock_guard guard(mCallbackMutex);
+
+        // If the asset has already been loaded, call the callback immediately.
+        if (IsFinishedNotifier.IsSignalled()) {
+            on_loaded_callback();
+            return;
+        }
+
+        mOnLoadedCallbacks.push_back(on_loaded_callback);
+    }
+
+
+    void OnError(const OnErrorFunc& on_error_callback)
+    {
+        std::lock_guard guard(mCallbackMutex);
+
+        // If the asset has already been loaded, call the callback immediately.
+        if (IsFinishedNotifier.IsSignalled()) {
+            on_error_callback();
+            return;
+        }
+
+        mOnErrorCallback = on_error_callback;
+    }
+
+
     ~AssetTicketData() = default;
 
 public:
@@ -38,6 +77,12 @@ public:
 
     std::atomic_int UsageCount = 1;
 
+
+    // Callback members
+    std::mutex mCallbackMutex;
+    std::vector<OnLoadFunc> mOnLoadedCallbacks;
+    OnErrorFunc mOnErrorCallback = nullptr;
+
 protected:
     friend class LoaderGltf;
     friend class AxManager;
@@ -47,18 +92,23 @@ template <typename T>
 class AssetTicket
 {
 public:
-    AssetTicket() = default;
-    AssetTicket(const AssetTicket& other) { (*this) = other; }
+    AssetTicket() = delete;
+    AssetTicket(T* data)
+    {
+        mpData = data;
+        pTicketData = new AssetTicketData;
+    }
 
-    AssetTicket(AssetTicket&& other) { (*this) = std::move(this); }
+    AssetTicket(const AssetTicket& other) { (*this) = other; }
+    AssetTicket(AssetTicket&& other) { (*this) = std::move(other); }
 
     AssetTicket& operator=(const AssetTicket& other)
     {
-        mpTicketData = other.mpTicketData;
+        pTicketData = other.pTicketData;
         mpData = other.mpData;
 
-        if (mpTicketData) {
-            mpTicketData->UsageCount.fetch_add(1);
+        if (pTicketData) {
+            pTicketData->UsageCount.fetch_add(1);
         }
 
         return *this;
@@ -66,12 +116,12 @@ public:
 
     AssetTicket& operator=(AssetTicket&& other)
     {
-        mpTicketData = other.mpTicketData;
+        pTicketData = other.pTicketData;
         mpData = other.mpData;
 
         other.DecRef();
 
-        other.mpTicketData = nullptr;
+        other.pTicketData = nullptr;
         other.mpData = nullptr;
 
         return *this;
@@ -82,48 +132,72 @@ public:
      */
     FX_FORCE_INLINE bool IsLoaded() const
     {
-        if (mpTicketData == nullptr) {
+        if (pTicketData == nullptr) {
             return false;
         }
 
-        return mpTicketData->bIsLoaded.load();
+        return pTicketData->bIsLoaded.load();
     }
 
+    FX_FORCE_INLINE T& operator*() { return *mpData; }
+    FX_FORCE_INLINE T* operator->() { return mpData; }
+
+    FX_FORCE_INLINE T* Get() { return mpData; }
 
     void WaitUntilLoaded()
     {
-        if (mpTicketData == nullptr || mpTicketData->IsFinishedNotifier.IsSignalled()) {
+        if (pTicketData == nullptr || pTicketData->IsFinishedNotifier.IsSignalled()) {
             return;
         }
 
-        mpTicketData->IsFinishedNotifier.Wait(true);
+        pTicketData->IsFinishedNotifier.Wait(true);
     }
 
     void MarkAndSignalLoaded() const
     {
-        if (mpTicketData == nullptr) {
+        if (pTicketData == nullptr) {
             return;
         }
 
-        mpTicketData->MarkAndSignalLoaded();
+        pTicketData->MarkAndSignalLoaded();
+    }
+
+    void SignalUploadedToGpu() const
+    {
+        if (pTicketData == nullptr) {
+            return;
+        }
+
+        pTicketData->SignalUploadedToGpu();
+    }
+
+
+    void OnLoaded(const AssetTicketData::OnLoadFunc& on_loaded_callback)
+    {
+        if (pTicketData == nullptr) {
+            return;
+        }
+
+        pTicketData->OnLoaded(on_loaded_callback);
     }
 
     void DecRef()
     {
-        if (!mpTicketData) {
+        if (!pTicketData) {
             return;
         }
 
-        if (mpTicketData->UsageCount.fetch_sub(1) <= 1) {
-            delete mpTicketData;
-            mpTicketData = nullptr;
+        if (pTicketData->UsageCount.fetch_sub(1) <= 1) {
+            pTicketData = nullptr;
         }
     }
 
     ~AssetTicket() { DecRef(); }
 
+public:
+    AssetTicketData* pTicketData = nullptr;
+
 protected:
-    AssetTicketData* mpTicketData = nullptr;
     T* mpData = nullptr;
 };
 

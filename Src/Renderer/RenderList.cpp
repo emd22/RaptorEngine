@@ -6,7 +6,7 @@ namespace fx::renderer {
 
 static constexpr uint32 scMaxRenderable = 1024;
 
-uint32 RenderList::Insert(ePipelineName pl_name, const ObjectID& id)
+uint32 RenderList::Add(ePipelineName pl_name, const ObjectID& id)
 {
     RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
     if (!section.InUse.IsInited()) {

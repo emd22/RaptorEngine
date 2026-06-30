@@ -21,25 +21,44 @@ void Scene::Create()
     mPhysicsObjects.Create(32);
 }
 
-void Scene::Attach(const ObjectID& object_id)
+void Scene::Attach(Object* object)
 {
-    mObjects.Insert(object_id);
+    mObjects.Insert(object->ID);
 
-    Object* object = gObjectManager->GetObject(object_id);
+    object->pScene = this;
+    object->OnAttached(this);
+
+    Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+    object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
+
+    for (const ObjectID& attach_id : object->AttachedNodes) {
+        Object* attach = gObjectManager->GetObject(attach_id);
+        material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
+        object->pScene->mRenderList.Add(material->GetPipelineName(), attach_id);
+    }
+}
+
+
+void Scene::Attach(AssetTicket<Object>& object_ticket)
+{
+    Object* object = object_ticket.Get();
+
+    mObjects.Insert(object->ID);
+
     object->pScene = this;
     object->OnAttached(this);
 
 
-    object->OnLoaded(
+    object_ticket.OnLoaded(
         [object]()
         {
             Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
-            object->pScene->mRenderList.Insert(material->GetPipelineName(), object->ID);
+            object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
 
             for (const ObjectID& attach_id : object->AttachedNodes) {
                 Object* attach = gObjectManager->GetObject(attach_id);
                 material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
-                object->pScene->mRenderList.Insert(material->GetPipelineName(), attach_id);
+                object->pScene->mRenderList.Add(material->GetPipelineName(), attach_id);
             }
         });
 }

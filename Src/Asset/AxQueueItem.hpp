@@ -4,11 +4,12 @@
 #include "Loader/ImageLoaderBase.hpp"
 #include "Loader/ObjectLoaderBase.hpp"
 
+#include <Asset/AssetTicket.hpp>
 #include <Core/LockContext.hpp>
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
 #include <Core/TSRef.hpp>
-#include <Object/ObjectID.hpp>
+// #include <Object/ObjectID.hpp>
 #include <Renderer/Backend/Image.hpp>
 #include <mutex>
 #include <string>
@@ -55,6 +56,8 @@ constexpr const char* AssetTypeToString(eAssetLoadType type)
     return "None";
 }
 
+class Object;
+
 
 struct AssetItemData
 {
@@ -70,19 +73,19 @@ struct AssetItemData
         data.pAsset = asset;
         data.LoadType = load_type;
 
-        return std::move(data);
+        return data;
     }
 
     template <typename TLoaderType>
-    static AssetItemData Make(const TSRef<TLoaderType>& loader, const ObjectID& id)
+    static AssetItemData Make(const TSRef<TLoaderType>& loader, const AssetTicket<Object>& ticket)
     {
         AssetItemData data;
 
         data.pLoader = loader;
-        data.ObjID = id;
+        data.ObjectTicket = ticket;
         data.LoadType = eAssetLoadType::Object;
 
-        return std::move(data);
+        return data;
     }
 
     AssetItemData(AssetItemData&& other) { (*this) = std::move(other); }
@@ -91,7 +94,7 @@ struct AssetItemData
     {
         pLoader = std::move(other.pLoader);
         pAsset = std::move(other.pAsset);
-        ObjID = std::move(other.ObjID);
+        ObjectTicket = std::move(other.ObjectTicket);
         LoadType = other.LoadType;
 
         return *this;
@@ -107,7 +110,7 @@ struct AssetItemData
         }
         case loader::eLoaderType::ObjectLoader: {
             TSRef<loader::ObjectLoaderBase> object_loader(pLoader);
-            object_loader->CreateGpuResource(ObjID);
+            object_loader->CreateGpuResource(ObjectTicket);
             break;
         }
 
@@ -142,7 +145,7 @@ struct AssetItemData
     TSRef<loader::LoaderBase> pLoader { nullptr };
     TSRef<AssetBase> pAsset { nullptr };
 
-    ObjectID ObjID { ObjectID::Null };
+    AssetTicket<Object> ObjectTicket { nullptr };
 };
 
 
@@ -168,22 +171,22 @@ struct AxQueueItem
         item.AssetLoadOp = eAssetLoadOp::ReadAndUpload;
         item.Path = path;
 
-        return std::move(item);
+        return item;
     }
 
     template <typename TLoaderType>
     static AxQueueItem UploadFileToProcess(const std::string& path, const TSRef<TLoaderType>& loader,
-                                           const ObjectID& object_id)
+                                           const AssetTicket<Object>& ticket)
     {
         AxQueueItem item;
 
-        item.Data = AssetItemData::Make<TLoaderType>(loader, object_id);
+        item.Data = AssetItemData::Make<TLoaderType>(loader, ticket);
         item.pcRawData = nullptr;
         item.DataSize = 0;
         item.AssetLoadOp = eAssetLoadOp::ReadAndUpload;
         item.Path = path;
 
-        return std::move(item);
+        return item;
     }
 
 
@@ -199,22 +202,22 @@ struct AxQueueItem
         item.DataSize = data.Size;
         item.AssetLoadOp = eAssetLoadOp::ProcessAndUpload;
 
-        return std::move(item);
+        return item;
     }
 
     template <typename TLoaderType>
-    static AxQueueItem UploadAndProcess(const TSRef<TLoaderType>& loader, const ObjectID& object_id,
+    static AxQueueItem UploadAndProcess(const TSRef<TLoaderType>& loader, const AssetTicket<Object>& ticket,
                                         const Slice<const uint8>& data)
     {
         AxQueueItem item;
 
-        item.Data = AssetItemData::Make<TLoaderType>(loader, object_id);
+        item.Data = AssetItemData::Make<TLoaderType>(loader, ticket);
 
         item.pcRawData = data.pData;
         item.DataSize = data.Size;
         item.AssetLoadOp = eAssetLoadOp::ProcessAndUpload;
 
-        return std::move(item);
+        return item;
     }
 
 
@@ -229,7 +232,7 @@ struct AxQueueItem
         item.ImgInfo = img_info;
         item.AssetLoadOp = eAssetLoadOp::DirectUpload;
 
-        return std::move(item);
+        return item;
     }
 
     AxQueueItem(AxQueueItem&& other) { (*this) = std::move(other); }

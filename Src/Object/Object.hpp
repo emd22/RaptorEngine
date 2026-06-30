@@ -33,6 +33,7 @@ enum class eObjectFlags : uint16
     Unlit = (1 << 4),
 };
 
+
 FxEnumFlags(eObjectFlags);
 
 
@@ -40,9 +41,6 @@ class PrimitiveMesh;
 
 class Object : public Entity
 {
-    friend class LoaderGltf;
-    friend class AxManager;
-
 public:
     static constexpr eEntityType scEntityType = eEntityType::Object;
 
@@ -144,16 +142,8 @@ public:
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
-    void MarkReadyToRender()
-    {
-        Flags |= eObjectFlags::ReadyToRender;
-
-        bIsUploadedToGpu = true;
-        IsFinishedNotifier.Signal();
-    }
-
-    void Destroy() override;
-    ~Object();
+    void Destroy();
+    ~Object() { Destroy(); }
 
 private:
     void RenderMesh();
@@ -184,7 +174,9 @@ private:
     /// Object slots allocated following this object. Used by other instances of this object.
     uint16 mInstanceSlots = 0;
     uint16 mInstanceSlotsInUse = 0;
+
     eObjectFlags Flags = eObjectFlags::None;
+    eObjectFlags PendingFlags = eObjectFlags::None;
 
     eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 };

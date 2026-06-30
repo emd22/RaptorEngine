@@ -2,6 +2,7 @@
 
 #include "Object/ObjectManager.hpp"
 
+#include <Asset/AssetTicket.hpp>
 #include <Entity.hpp>
 #include <Object/Object.hpp>
 #include <Renderer/Camera.hpp>
@@ -17,7 +18,9 @@ public:
 
     void Create();
 
-    void Attach(const ObjectID& object_id);
+    void Attach(AssetTicket<Object>& object_ticket);
+    void Attach(Object* object);
+
     void Attach(const Ref<LightBase>& light);
 
     PhObjectId NewPhysicsObject();

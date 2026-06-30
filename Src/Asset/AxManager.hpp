@@ -94,7 +94,7 @@ public:
 private:
     void DirectUploadData(AssetItemData& item_data);
 
-    void LoadObject(const LockContext<AssetItemData>& asset_data);
+    void LoadObject(LockContext<AssetItemData>& asset_data);
     void LoadImage(const LockContext<AssetItemData>& asset_data);
 
 
@@ -152,21 +152,25 @@ public:
     AssetTicket<Object> LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
     {
         Object* object = gObjectManager->NewObject(name);
-        LoadObject(object->ID, path, options);
 
-        return id;
+        AssetTicket<Object> ticket { object };
+        LoadObject(object, path, options);
+
+        return ticket;
     }
 
     /**
      * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    ObjectID LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
+    AssetTicket<Object> LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
     {
-        ObjectID id = gObjectManager->NewObjectID(name);
-        LoadObjectFromMemory(id, data, data_size);
+        Object* object = gObjectManager->NewObject(name);
 
-        return id;
+        AssetTicket<Object> ticket { object };
+        LoadObjectFromMemory(ticket, data, data_size);
+
+        return ticket;
     }
 
     TSRef<AxImage> LoadImage(renderer::eImageType image_type, eImageFormat format, const std::string& path,
@@ -220,13 +224,13 @@ public:
     /**
      * @brief Loads an asset into the provided asset from the provided data.
      */
-    void LoadObjectFromMemory(const ObjectID& object_id, const uint8* data, uint32 data_size);
+    void LoadObjectFromMemory(const AssetTicket<Object>& ticket, const uint8* data, uint32 data_size);
 
 
     /**
      * @brief Loads an object into the provided asset from a path.
      */
-    void LoadObject(const ObjectID& object_id, const std::string& path, LoadObjectOptions options = {});
+    void LoadObject(const AssetTicket<Object>& ticket, const std::string& path, LoadObjectOptions options = {});
 
 
     void LoadImage(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
@@ -297,11 +301,11 @@ private:
 
 
     template <typename TLoaderType>
-    static void SubmitLoadObject(const ObjectID& object_id, TSRef<TLoaderType>& loader, const std::string& path)
+    static void SubmitLoadObject(const AssetTicket<Object>& ticket, TSRef<TLoaderType>& loader, const std::string& path)
     {
         AxManager* mgr = GetInstance();
 
-        mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess<loader::LoaderGltf>(path, loader, object_id));
+        mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess<loader::LoaderGltf>(path, loader, ticket));
         mgr->ManagerUpdateNotifier.Signal();
     }
 
@@ -318,12 +322,12 @@ private:
     }
 
     template <typename TLoaderType>
-    static void SubmitLoadObject(const ObjectID& object_id, TSRef<TLoaderType>& loader,
+    static void SubmitLoadObject(const AssetTicket<Object>& ticket, TSRef<TLoaderType>& loader,
                                  const Slice<const uint8>& asset_data)
     {
         AxManager* mgr = GetInstance();
 
-        mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess<loader::LoaderGltf>(loader, object_id, asset_data));
+        mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess<loader::LoaderGltf>(loader, ticket, asset_data));
         mgr->ManagerUpdateNotifier.Signal();
     }
 

@@ -66,64 +66,64 @@ bool Object::CheckIfReady(bool require_material)
 void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                                     const PhProperties& physics_properties)
 {
-    OnLoaded(
-        [&]()
-        {
-            Scene* scene = this->pScene;
-            if (!scene) {
-                return;
-            }
+    // OnLoaded(
+    //     [&]()
+    //     {
+    //         Scene* scene = this->pScene;
+    //         if (!scene) {
+    //             return;
+    //         }
 
-            if (this->PhysicsId == PhObjectIdNull) {
-                this->PhysicsId = scene->NewPhysicsObject();
-            }
+    //         if (this->PhysicsId == PhObjectIdNull) {
+    //             this->PhysicsId = scene->NewPhysicsObject();
+    //         }
 
-            PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
+    //         PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
 
-            if (!phys) {
-                LogError(LC_PHYSICS, "Error creating physics object");
-                return;
-            }
+    //         if (!phys) {
+    //             LogError(LC_PHYSICS, "Error creating physics object");
+    //             return;
+    //         }
 
-            phys->CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
-            this->mbPhysicsTransformOutOfDate = true;
-            this->SetPhysicsEnabled(true);
+    //         phys->CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
+    //         this->mbPhysicsTransformOutOfDate = true;
+    //         this->SetPhysicsEnabled(true);
 
-            this->PrintDebug();
-        });
+    //         this->PrintDebug();
+    //     });
 }
 
 
 void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotionType motion_type,
                                const PhProperties& physics_properties)
 {
-    OnLoaded(
-        [&]()
-        {
-            Scene* scene = this->pScene;
-            if (!scene) {
-                return;
-            }
+    // OnLoaded(
+    //     [&]()
+    //     {
+    //         Scene* scene = this->pScene;
+    //         if (!scene) {
+    //             return;
+    //         }
 
-            this->PhysicsId = scene->NewPhysicsObject();
-            PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
+    //         this->PhysicsId = scene->NewPhysicsObject();
+    //         PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
 
-            if (!phys) {
-                LogError(LC_PHYSICS, "Error creating physics object");
-                return;
-            }
+    //         if (!phys) {
+    //             LogError(LC_PHYSICS, "Error creating physics object");
+    //             return;
+    //         }
 
-            Ref<PrimitiveMesh> physics_mesh { nullptr };
-            physics_mesh = custom_physics_mesh ? custom_physics_mesh : this->pMesh;
+    //         Ref<PrimitiveMesh> physics_mesh { nullptr };
+    //         physics_mesh = custom_physics_mesh ? custom_physics_mesh : this->pMesh;
 
-            Assert(physics_mesh.IsValid());
+    //         Assert(physics_mesh.IsValid());
 
-            phys->CreateMeshBody(*physics_mesh, motion_type, physics_properties);
-            this->mbPhysicsTransformOutOfDate = true;
-            this->SetPhysicsEnabled(true);
+    //         phys->CreateMeshBody(*physics_mesh, motion_type, physics_properties);
+    //         this->mbPhysicsTransformOutOfDate = true;
+    //         this->SetPhysicsEnabled(true);
 
-            this->PrintDebug();
-        });
+    //         this->PrintDebug();
+    //     });
 }
 
 void Object::OnAttached(Scene* scene)
@@ -149,42 +149,38 @@ void Object::OnAttached(Scene* scene)
 
 void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 {
-    OnLoaded(
-        [&]()
-        {
-            const bool should_set_default = (pipeline == nullptr);
+    const bool should_set_default = (pipeline == nullptr);
 
 
-            if (!this->GetMaterialID().IsNull()) {
-                Material* material = gMaterialManager->GetMaterial(this->mMaterialID);
+    if (!this->GetMaterialID().IsNull()) {
+        Material* material = gMaterialManager->GetMaterial(this->mMaterialID);
 
-                if (should_set_default) {
-                    material->SetDefaultPipeline();
-                }
-                else {
-                    material->SetPipeline(gPipelineCache->GetName(pipeline));
-                }
+        if (should_set_default) {
+            material->SetDefaultPipeline();
+        }
+        else {
+            material->SetPipeline(gPipelineCache->GetName(pipeline));
+        }
+    }
+
+    if (update_children) {
+        for (const ObjectID& attached_id : this->AttachedNodes) {
+            Object* attached = gObjectManager->GetObject(attached_id);
+
+            if (!attached->GetMaterialID().IsNull()) {
+                continue;
             }
 
-            if (update_children) {
-                for (const ObjectID& attached_id : this->AttachedNodes) {
-                    Object* attached = gObjectManager->GetObject(attached_id);
+            Material* material = gMaterialManager->GetMaterial(attached->GetMaterialID());
 
-                    if (!attached->GetMaterialID().IsNull()) {
-                        continue;
-                    }
-
-                    Material* material = gMaterialManager->GetMaterial(attached->GetMaterialID());
-
-                    if (should_set_default) {
-                        material->SetDefaultPipeline();
-                    }
-                    else {
-                        material->SetPipeline(gPipelineCache->GetName(pipeline));
-                    }
-                }
+            if (should_set_default) {
+                material->SetDefaultPipeline();
             }
-        });
+            else {
+                material->SetPipeline(gPipelineCache->GetName(pipeline));
+            }
+        }
+    }
 }
 
 void Object::UpdateAnimation()
@@ -201,7 +197,7 @@ void Object::UpdateAnimation()
     if (AnimationTime >= pCurrentAnimation->Duration) {
         AnimationTime = 0.0f;
     }
-    else if (AnimationTime < 0.0001) {
+    else if (AnimationTime < 0.0001f) {
         AnimationTime = pCurrentAnimation->Duration;
     }
 
@@ -392,7 +388,7 @@ void Object::RenderMesh()
 
 void Object::Update()
 {
-    if ((Flags & eObjectFlags::PhysicsEnabled) != 0 && pScene) {
+    if (IsFlagSet(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
         PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
 
         if (mbPhysicsTransformOutOfDate) {
@@ -401,6 +397,18 @@ void Object::Update()
         }
 
         SyncObjectWithPhysics(phys);
+    }
+
+
+    if (IsFlagSet(PendingFlags, eObjectFlags::Unlit) && !mMaterialID.IsNull()) {
+        ClearFlag(PendingFlags, eObjectFlags::Unlit);
+
+        if (!IsFlagSet(Flags, eObjectFlags::Unlit)) {
+            SetGraphicsPipeline(nullptr);
+        }
+        else {
+            SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
+        }
     }
 
     UpdateAnimation();
@@ -449,13 +457,12 @@ void Object::SyncObjectWithPhysics(PhObject* phys)
 void Object::SetRenderUnlit(const bool value)
 {
     if (value) {
-        SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
-        Flags |= eObjectFlags::Unlit;
+        SetFlag(Flags, eObjectFlags::Unlit);
+        SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
     else {
-        // Set to default graphics pipeline
-        SetGraphicsPipeline(nullptr);
-        Flags &= (~eObjectFlags::Unlit);
+        ClearFlag(Flags, eObjectFlags::Unlit);
+        SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
 }
 
@@ -535,10 +542,7 @@ void Object::Destroy()
     }
 
     Flags &= ~(eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled);
-
-    bIsUploadedToGpu = false;
 }
 
-Object::~Object() { Destroy(); }
 
 } // namespace fx
