@@ -2,6 +2,7 @@
 
 #include "AssetBase.hpp"
 
+#include <Core/PagedArray.hpp>
 #include <Core/Ref.hpp>
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>

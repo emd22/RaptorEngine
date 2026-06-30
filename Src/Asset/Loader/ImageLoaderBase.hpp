@@ -12,8 +12,9 @@ namespace loader {
 class ImageLoaderBase : public LoaderBase
 {
 public:
-    FX_DEFINE_LOADER_TYPE(eLoaderType::ImageLoader);
+    eLoaderType GetLoaderType() const override { return eLoaderType::ImageLoader; };
 
+public:
     ImageLoaderBase() = default;
 
     virtual eLoaderStatus Load(TSRef<AssetBase> asset, const String& path) = 0;

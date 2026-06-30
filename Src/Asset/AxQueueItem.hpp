@@ -99,7 +99,7 @@ struct AssetItemData
 
     void CreateGpuResource()
     {
-        switch (pLoader->scLoaderType) {
+        switch (pLoader->GetLoaderType()) {
         case loader::eLoaderType::ImageLoader: {
             TSRef<loader::ImageLoaderBase> image_loader(pLoader);
             image_loader->CreateGpuResource(pAsset);
@@ -119,7 +119,7 @@ struct AssetItemData
 
     void DestroyLoader()
     {
-        switch (pLoader->scLoaderType) {
+        switch (pLoader->GetLoaderType()) {
         case loader::eLoaderType::ImageLoader: {
             TSRef<loader::ImageLoaderBase> image_loader(pLoader);
             image_loader->Destroy(pAsset);

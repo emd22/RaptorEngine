@@ -63,6 +63,18 @@ Object* ObjectManager::NewObject()
     return obj;
 }
 
+Object* ObjectManager::NewObject(const std::string& name)
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+
+    uint32 index;
+    Object* obj = mObjectList.NewItem(&index);
+    obj->ID = ObjectID(index);
+    obj->Name = name;
+
+    return obj;
+}
+
 Object* ObjectManager::GetObject(const ObjectID& id)
 {
     if (id.IsInvalid()) {

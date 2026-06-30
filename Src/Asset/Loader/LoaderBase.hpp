@@ -13,8 +13,6 @@ enum class eLoaderStatus
     Error,
 };
 
-#define FX_DEFINE_LOADER_TYPE(loader_type_) static const eLoaderType scLoaderType = loader_type_
-
 enum class eLoaderType
 {
     BaseLoader,
@@ -25,9 +23,11 @@ enum class eLoaderType
 class LoaderBase
 {
 public:
-    FX_DEFINE_LOADER_TYPE(eLoaderType::BaseLoader);
+    virtual eLoaderType GetLoaderType() const { return eLoaderType::BaseLoader; };
 
+public:
     LoaderBase() = default;
+
     virtual ~LoaderBase() = default;
 };
 

@@ -38,7 +38,7 @@ FxEnumFlags(eObjectFlags);
 
 class PrimitiveMesh;
 
-class Object : public AssetObject, public Entity
+class Object : public Entity
 {
     friend class LoaderGltf;
     friend class AxManager;

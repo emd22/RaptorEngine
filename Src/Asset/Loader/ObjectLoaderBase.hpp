@@ -12,7 +12,7 @@ namespace loader {
 class ObjectLoaderBase : public LoaderBase
 {
 public:
-    FX_DEFINE_LOADER_TYPE(eLoaderType::ObjectLoader);
+    eLoaderType GetLoaderType() const override { return eLoaderType::ObjectLoader; };
 
 public:
     enum class eStatus

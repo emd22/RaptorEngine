@@ -2,6 +2,7 @@
 
 #include "Asset/AxQueue.hpp"
 #include "Asset/AxQueueItem.hpp"
+#include "AssetTicket.hpp"
 #include "AxImage.hpp"
 #include "Object/Object.hpp"
 #include "Object/ObjectManager.hpp"
@@ -148,10 +149,10 @@ public:
      * @brief Creates a new `Object` and loads the provided asset into it from
      * the path provided.
      */
-    ObjectID LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
+    AssetTicket<Object> LoadObject(const std::string& name, const std::string& path, LoadObjectOptions options = {})
     {
-        ObjectID id = gObjectManager->NewObjectID(name);
-        LoadObject(id, path, options);
+        Object* object = gObjectManager->NewObject(name);
+        LoadObject(object->ID, path, options);
 
         return id;
     }
