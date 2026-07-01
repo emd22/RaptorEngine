@@ -32,6 +32,18 @@ using namespace fx;
 using namespace fx::renderer;
 
 
+enum class eTestFlags
+{
+    None = 0,
+    A = (1 << 0),
+    B = (1 << 1),
+    C = (1 << 2),
+    D = (1 << 3),
+};
+
+FxEnumFlags(eTestFlags);
+
+
 int main()
 {
     fx::gEnginePool = new fx::MemPool;
@@ -39,7 +51,6 @@ int main()
 
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
-
 
 #ifdef FX_TEST_SCRIPT
     script::FoxScript fs;
@@ -66,6 +77,9 @@ int main()
     fx::renderer::Globals::Destroy();
 
     if (gAssetManager) {
+        delete fx::gObjectManager;
+        fx::gObjectManager = nullptr;
+
         delete gAssetManager;
         gAssetManager = nullptr;
     }

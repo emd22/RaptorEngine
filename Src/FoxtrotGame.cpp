@@ -37,7 +37,7 @@ static constexpr float scMouseSensitivity = 0.25;
 static constexpr uint32 scFramesForAvg = 10;
 
 
-static double sClockFreq = 1.0f;
+static double sClockFreq = 1.0;
 
 static bool sbRunning = true;
 
@@ -423,8 +423,10 @@ void FoxtrotGame::ProcessControls()
 
     if (ControlManager::IsMouseLocked()) {
         Vec2f mouse_delta = ControlManager::GetMouseDelta();
-        mouse_delta.X = (DeltaTime * mouse_delta.X * scMouseSensitivity);
-        mouse_delta.Y = (DeltaTime * mouse_delta.Y * -scMouseSensitivity);
+        mouse_delta.X = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.X) *
+                                             static_cast<double>(scMouseSensitivity));
+        mouse_delta.Y = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.Y) *
+                                             -static_cast<double>(scMouseSensitivity));
 
         // camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
         Player.RotateHead(mouse_delta);
@@ -645,14 +647,14 @@ void EditorModeScaleCollider::Update(const Scene& scene, const Vec3f& movement_v
     if (phys_id != PhObjectIdNull) {
         PhObject* phys = scene.GetPhysicsObject(phys_id);
         phys->Dimensions = phys->Dimensions + (movement_vector * Vec3f(0.05));
-        if (phys->Dimensions.X < 0.01) {
-            phys->Dimensions.X = 0.01;
+        if (phys->Dimensions.X < 0.01f) {
+            phys->Dimensions.X = 0.01f;
         }
-        if (phys->Dimensions.Y < 0.01) {
-            phys->Dimensions.Y = 0.01;
+        if (phys->Dimensions.Y < 0.01f) {
+            phys->Dimensions.Y = 0.01f;
         }
-        if (phys->Dimensions.Z < 0.01) {
-            phys->Dimensions.Z = 0.01;
+        if (phys->Dimensions.Z < 0.01f) {
+            phys->Dimensions.Z = 0.01f;
         }
 
         Vec3f target = phys->GetPosition();

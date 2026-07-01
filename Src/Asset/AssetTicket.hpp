@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/Assert.hpp>
 #include <Core/DataNotifier.hpp>
 #include <Core/Defines.hpp>
 #include <atomic>
@@ -7,10 +8,15 @@
 
 namespace fx {
 
+
+/**
+ * @brief The internal representation of an asset ticket. This is shared between all instances of an `AssetTicket`, much
+ * like a shared ptr.
+ */
 class AssetTicketData
 {
 public:
-    using OnLoadFunc = std::function<void()>;
+    using OnLoadFunc = std::function<void(void*)>;
     using OnErrorFunc = std::function<void()>;
 
 public:
@@ -39,13 +45,13 @@ public:
         bIsUploadedToGpu.notify_all();
     }
 
-    void OnLoaded(const OnLoadFunc& on_loaded_callback)
+    void OnLoaded(void* item, const OnLoadFunc& on_loaded_callback)
     {
         std::lock_guard guard(mCallbackMutex);
 
         // If the asset has already been loaded, call the callback immediately.
         if (IsFinishedNotifier.IsSignalled()) {
-            on_loaded_callback();
+            on_loaded_callback(item);
             return;
         }
 
@@ -72,11 +78,8 @@ public:
 public:
     DataNotifier IsFinishedNotifier;
     std::atomic_bool bIsUploadedToGpu = { false };
-
     std::atomic_bool bIsLoaded = { false };
-
     std::atomic_int UsageCount = 1;
-
 
     // Callback members
     std::mutex mCallbackMutex;
@@ -88,12 +91,17 @@ protected:
     friend class AxManager;
 };
 
+
+/**
+ * @brief Functions as a "carrier" for an asset that holds all of the signalling logic to communicate between the asset
+ * manager and the code requesting the asset.
+ */
 template <typename T>
 class AssetTicket
 {
 public:
     AssetTicket() = delete;
-    AssetTicket(T* data)
+    explicit AssetTicket(T* data)
     {
         mpData = data;
         pTicketData = new AssetTicketData;
@@ -118,8 +126,6 @@ public:
     {
         pTicketData = other.pTicketData;
         mpData = other.mpData;
-
-        other.DecRef();
 
         other.pTicketData = nullptr;
         other.mpData = nullptr;
@@ -146,27 +152,21 @@ public:
 
     void WaitUntilLoaded()
     {
-        if (pTicketData == nullptr || pTicketData->IsFinishedNotifier.IsSignalled()) {
-            return;
-        }
+        Assert(pTicketData != nullptr);
 
         pTicketData->IsFinishedNotifier.Wait(true);
     }
 
     void MarkAndSignalLoaded() const
     {
-        if (pTicketData == nullptr) {
-            return;
-        }
+        Assert(pTicketData != nullptr);
 
         pTicketData->MarkAndSignalLoaded();
     }
 
     void SignalUploadedToGpu() const
     {
-        if (pTicketData == nullptr) {
-            return;
-        }
+        Assert(pTicketData != nullptr);
 
         pTicketData->SignalUploadedToGpu();
     }
@@ -174,11 +174,9 @@ public:
 
     void OnLoaded(const AssetTicketData::OnLoadFunc& on_loaded_callback)
     {
-        if (pTicketData == nullptr) {
-            return;
-        }
+        Assert(pTicketData != nullptr);
 
-        pTicketData->OnLoaded(on_loaded_callback);
+        pTicketData->OnLoaded(reinterpret_cast<void*>(mpData), on_loaded_callback);
     }
 
     void DecRef()
@@ -188,7 +186,7 @@ public:
         }
 
         if (pTicketData->UsageCount.fetch_sub(1) <= 1) {
-            pTicketData = nullptr;
+            // pTicketData = nullptr;
         }
     }
 

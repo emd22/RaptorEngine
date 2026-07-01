@@ -93,7 +93,7 @@ public:
             printf("Int, %d]\n", ValueInt);
         }
         else if (Type == eFoxType::FLOAT) {
-            printf("Float, %f]\n", ValueFloat);
+            printf("Float, %f]\n", static_cast<double>(ValueFloat));
         }
         else if (Type == eFoxType::STRING) {
             printf("String, %s]\n", ValueString);

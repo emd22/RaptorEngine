@@ -45,7 +45,7 @@ FX_FORCE_INLINE void Quat::NLerpIP(const Quat& dest, float32 time)
         dest_v = Neon::SetSigns<-1>(dest_v);
     }
 
-    const float32x4_t inv_time_v = vdupq_n_f32(1.0 - time);
+    const float32x4_t inv_time_v = vdupq_n_f32(1.0f - time);
     const float32x4_t time_v = vdupq_n_f32(time);
 
     // (1 - time) * A
@@ -70,7 +70,7 @@ FX_FORCE_INLINE Quat Quat::SLerp(const Quat& dest, const float32 step) const
     // Calculate angle between them.
     float32 cos_half_theta = Neon::Dot(a_v, b_v);
     // if qa=qb or qa=-qb then theta = 0 and we can return qa
-    if (abs(cos_half_theta) >= 1.0) {
+    if (abs(cos_half_theta) >= 1.0f) {
         return Quat(mIntrin);
     }
 
@@ -80,7 +80,7 @@ FX_FORCE_INLINE Quat Quat::SLerp(const Quat& dest, const float32 step) const
 
     // if theta = 180 degrees then result is not fully defined
     // we could rotate around any axis normal to qa or qb
-    if (sin_half_theta < 0.001) {
+    if (sin_half_theta < 0.001f) {
         float32x4_t half = vdupq_n_f32(0.5f);
 
         result = vmulq_f32(a_v, half);

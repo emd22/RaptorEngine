@@ -59,6 +59,7 @@ bool Object::CheckIfReady(bool require_material)
     }
 
     Flags |= (eObjectFlags::ReadyToRender);
+    LogInfo(LC_RENDER, "Object {} is now ready to render.", Name.Get());
     return true;
 }
 
@@ -150,7 +151,6 @@ void Object::OnAttached(Scene* scene)
 void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 {
     const bool should_set_default = (pipeline == nullptr);
-
 
     if (!this->GetMaterialID().IsNull()) {
         Material* material = gMaterialManager->GetMaterial(this->mMaterialID);
@@ -401,13 +401,15 @@ void Object::Update()
 
 
     if (IsFlagSet(PendingFlags, eObjectFlags::Unlit) && !mMaterialID.IsNull()) {
-        ClearFlag(PendingFlags, eObjectFlags::Unlit);
+        if (gMaterialManager->GetMaterial(mMaterialID)->IsReady()) {
+            ClearFlag(PendingFlags, eObjectFlags::Unlit);
 
-        if (!IsFlagSet(Flags, eObjectFlags::Unlit)) {
-            SetGraphicsPipeline(nullptr);
-        }
-        else {
-            SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
+            if (!IsFlagSet(Flags, eObjectFlags::Unlit)) {
+                SetGraphicsPipeline(nullptr);
+            }
+            else {
+                SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
+            }
         }
     }
 
@@ -460,10 +462,10 @@ void Object::SetRenderUnlit(const bool value)
         SetFlag(Flags, eObjectFlags::Unlit);
         SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
-    else {
-        ClearFlag(Flags, eObjectFlags::Unlit);
-        SetFlag(PendingFlags, eObjectFlags::Unlit);
-    }
+    // else {
+    //     ClearFlag(Flags, eObjectFlags::Unlit);
+    //     SetFlag(PendingFlags, eObjectFlags::Unlit);
+    // }
 }
 
 

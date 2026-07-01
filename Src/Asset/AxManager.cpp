@@ -423,23 +423,24 @@ bool AxManager::CheckForUploadableData()
                     ticket_data->bIsUploadedToGpu.wait(false);
                 }
 
-                if (asset_data->LoadType == eAssetLoadType::Object && asset_data->ObjectTicket.pTicketData) {
+
+                {
                     std::lock_guard guard(ticket_data->mCallbackMutex);
 
                     // Call OnLoaded callbacks if they are attached
                     if (!ticket_data->mOnLoadedCallbacks.empty()) {
                         for (auto& callback : ticket_data->mOnLoadedCallbacks) {
-                            callback();
+                            callback(reinterpret_cast<void*>(asset_data->ObjectTicket.Get()));
                         }
                     }
 
                     ticket_data->mOnLoadedCallbacks.clear();
+                    ticket_data->IsFinishedNotifier.Signal();
+
+                    // Notify the asset thread that loading is finished
+                    ticket_data->bIsLoaded.store(true);
                 }
 
-                // Notify the asset thread that loading is finished
-
-                ticket_data->IsFinishedNotifier.Signal();
-                ticket_data->bIsLoaded.store(true);
 
                 if (asset_data->pLoader.IsValid()) {
                     // Destroy the loader(clearing the loading buffers)
@@ -449,23 +450,6 @@ bool AxManager::CheckForUploadableData()
             else {
                 while (!asset_data->pAsset->bIsUploadedToGpu) {
                     asset_data->pAsset->bIsUploadedToGpu.wait(false);
-                }
-
-                {
-                    if (asset_data->LoadType == eAssetLoadType::Object && asset_data->ObjectTicket.pTicketData) {
-                        AssetTicketData* ticket_data = asset_data->ObjectTicket.pTicketData;
-
-                        std::lock_guard guard(ticket_data->mCallbackMutex);
-
-                        // Call OnLoaded callbacks if they are attached
-                        if (!ticket_data->mOnLoadedCallbacks.empty()) {
-                            for (auto& callback : ticket_data->mOnLoadedCallbacks) {
-                                callback();
-                            }
-                        }
-
-                        ticket_data->mOnLoadedCallbacks.clear();
-                    }
                 }
 
                 // Notify the asset thread that loading is finished

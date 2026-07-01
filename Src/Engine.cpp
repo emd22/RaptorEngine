@@ -39,7 +39,6 @@ void Destroy()
     DESTROY_GLOBAL(gPhysics);
     DESTROY_GLOBAL(gShaderCompiler);
     DESTROY_GLOBAL(gMaterialManager);
-    DESTROY_GLOBAL(gObjectManager);
 }
 
 } // namespace Globals

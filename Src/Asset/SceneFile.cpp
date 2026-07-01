@@ -134,7 +134,7 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
     object->pScene = &scene;
     ApplyPropertiesToObject(object, object_entry);
 
-    scene.Attach(object);
+    scene.Attach(ticket);
 }
 
 
@@ -168,10 +168,12 @@ void SceneFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& objec
         }
     }
 
-    ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
-    if (unlit != nullptr) {
-        object->SetRenderUnlit(static_cast<bool>(unlit->Get<int64>()));
-    }
+    object->SetRenderUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("Unlit"), 0)));
+
+    // ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
+    // if (unlit != nullptr) {
+    //     object->SetRenderUnlit(static_cast<bool>(unlit->Get<int64>()));
+    // }
 
     PhProperties physics_properties {};
 

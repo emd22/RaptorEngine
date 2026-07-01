@@ -33,7 +33,6 @@ enum class eObjectFlags : uint16
     Unlit = (1 << 4),
 };
 
-
 FxEnumFlags(eObjectFlags);
 
 
@@ -143,7 +142,7 @@ public:
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
     void Destroy();
-    ~Object() { Destroy(); }
+    ~Object() override { Destroy(); }
 
 private:
     void RenderMesh();

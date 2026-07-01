@@ -154,7 +154,7 @@ public:
         Object* object = gObjectManager->NewObject(name);
 
         AssetTicket<Object> ticket { object };
-        LoadObject(object, path, options);
+        LoadObject(ticket, path, options);
 
         return ticket;
     }

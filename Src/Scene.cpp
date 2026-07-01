@@ -39,7 +39,7 @@ void Scene::Attach(Object* object)
 }
 
 
-void Scene::Attach(AssetTicket<Object>& object_ticket)
+void Scene::Attach(AssetTicket<Object> object_ticket)
 {
     Object* object = object_ticket.Get();
 
@@ -48,10 +48,18 @@ void Scene::Attach(AssetTicket<Object>& object_ticket)
     object->pScene = this;
     object->OnAttached(this);
 
-
     object_ticket.OnLoaded(
-        [object]()
+        [](void* item_ptr)
         {
+            Object* object = static_cast<Object*>(item_ptr);
+
+            // TEMP
+            if (object->GetRenderUnlit()) {
+                return;
+            }
+
+
+            LogInfo("CALL ONLOADED");
             Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
             object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
 
