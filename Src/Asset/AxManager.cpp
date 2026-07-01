@@ -419,10 +419,11 @@ bool AxManager::CheckForUploadableData()
             if (asset_data->LoadType == eAssetLoadType::Object) {
                 AssetTicketData* ticket_data = asset_data->ObjectTicket.pTicketData;
 
+                fx::Object* object_data = asset_data->ObjectTicket.Get();
+
                 while (!ticket_data->bIsUploadedToGpu) {
                     ticket_data->bIsUploadedToGpu.wait(false);
                 }
-
 
                 {
                     std::lock_guard guard(ticket_data->mCallbackMutex);
@@ -430,7 +431,7 @@ bool AxManager::CheckForUploadableData()
                     // Call OnLoaded callbacks if they are attached
                     if (!ticket_data->mOnLoadedCallbacks.empty()) {
                         for (auto& callback : ticket_data->mOnLoadedCallbacks) {
-                            callback(reinterpret_cast<void*>(asset_data->ObjectTicket.Get()));
+                            callback(reinterpret_cast<void*>(object_data));
                         }
                     }
 

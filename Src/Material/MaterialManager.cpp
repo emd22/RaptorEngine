@@ -68,6 +68,18 @@ bool MaterialManager::Bind(const renderer::CommandBuffer& cmd, const MaterialID&
     return material->Bind(cmd);
 }
 
+bool MaterialManager::BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline,
+                                       const MaterialID& id)
+{
+    Material* material = mMaterialList.GetItem(id.GetID());
+    if (material == nullptr) {
+        LogError(LC_CORE, "Could not bind material {}", id.GetID());
+        return false;
+    }
+
+    return material->BindWithPipeline(cmd, pipeline);
+}
+
 #define NM_PINK  255, 80, 203, 255
 #define NM_BLACK 0, 0, 0, 255
 

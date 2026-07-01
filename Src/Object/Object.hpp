@@ -40,6 +40,8 @@ class PrimitiveMesh;
 
 class Object : public Entity
 {
+    friend class AxManager;
+
 public:
     static constexpr eEntityType scEntityType = eEntityType::Object;
 
@@ -56,7 +58,7 @@ public:
      */
     void RenderPrimitive(const renderer::CommandBuffer& cmd);
     void Render(const Camera& camera);
-    void RenderShallow(const Camera& camera);
+    void RenderShallow(const Camera& camera, renderer::Pipeline* alt_pipeline = nullptr);
     void RenderUnlit(const Camera& camera);
 
     bool CheckIfReady(bool require_material);
@@ -136,7 +138,7 @@ public:
 
     FX_FORCE_INLINE bool IsShadowCaster() const { return (Flags & eObjectFlags::ShadowCaster) != 0; }
 
-    void SetRenderUnlit(const bool value);
+    void SetUnlit(const bool value);
     FX_FORCE_INLINE bool IsUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
@@ -144,8 +146,18 @@ public:
     void Destroy();
     ~Object() override { Destroy(); }
 
+protected:
+    /**
+     * @brief Finalizes any changes that have been made to the object before it was finished loading.
+     */
+    void FinalizeWhenReady();
+
 private:
-    void RenderMesh();
+    /**
+     * @brief Render the bare model for the object. Note that there are no `CheckIfReady` checks in here as they are
+     * done by RenderShallow et. al!
+     */
+    void RenderMesh(renderer::Pipeline* pipeline);
     void SetScriptVars();
 
     void SyncObjectWithPhysics(PhObject* phys);

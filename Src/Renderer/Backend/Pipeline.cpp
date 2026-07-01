@@ -305,12 +305,11 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
             reinterpret_cast<void*>(Layout.Get()));
 }
 
-void Pipeline::Bind(const CommandBuffer& cmd)
+void Pipeline::Bind(const CommandBuffer& cmd) const
 {
     if (InternalPipeline == spBoundPipeline) {
         return;
     }
-
 
     if (bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
         if (bIsViewportFullscreen) {

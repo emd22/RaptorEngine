@@ -49,6 +49,7 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 
         Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
         if (is_unlit) {
+            LogInfo("Setting material {} pipeline to be unlit", material->ID);
             material->SetPipeline(ePipelineName::Unlit);
         }
 
@@ -143,13 +144,20 @@ PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
 }
 
 
-void Scene::RenderRLSection(const renderer::RenderListSection& section)
+void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
     PerspectiveCamera& camera = *mpCurrentCamera;
+
+    const RenderListSection& section = mRenderList.GetSection(pl_name);
 
     if (!section.InUse.IsInited()) {
         return;
     }
+
+    // If the pipeline passed in is unlit, force the unlit pipeline to be used over the materials pipeline.
+    const bool force_unlit_pipeline = (pl_name == ePipelineName::Unlit);
+    renderer::Pipeline* alt_pipeline = (force_unlit_pipeline ? &gPipelineCache->Request(ePipelineName::Unlit)
+                                                             : nullptr);
 
     uint32 index = 0;
     while (true) {
@@ -162,7 +170,7 @@ void Scene::RenderRLSection(const renderer::RenderListSection& section)
         Object* object = gObjectManager->GetObject(object_id);
 
         object->Update();
-        object->RenderShallow(camera);
+        object->RenderShallow(camera, alt_pipeline);
 
         ++index;
     }
@@ -175,59 +183,28 @@ void Scene::Render(Camera* shadow_camera)
 
     gRenderer->BeginGeometry();
 
-    RenderRLSection(mRenderList.GetSection(ePipelineName::Geometry));
-    RenderRLSection(mRenderList.GetSection(ePipelineName::GeometryNormalMaps));
-    RenderRLSection(mRenderList.GetSection(ePipelineName::GeometrySkinned));
-
-
-    // for (const TSRef<Object>& obj : mObjects) {
-    //     obj->Update();
-
-
-    //     if (obj->GetRenderUnlit()) {
-    //         continue;
-    //     }
-
-    //     obj->Render(camera);
-    // }
+    ExecuteRenderList(ePipelineName::Geometry);
+    ExecuteRenderList(ePipelineName::GeometryNormalMaps);
+    ExecuteRenderList(ePipelineName::GeometrySkinned);
 
     // Render lights
     gRenderer->BeginLighting();
-
     gRenderer->LightBuffer.Rewind();
 
     for (const Ref<LightBase>& light : mLights) {
         light->Render(camera, shadow_camera);
     }
 
+    // Render the unlit objects
     gRenderer->BeginUnlit();
 
-    RenderRLSection(mRenderList.GetSection(ePipelineName::Unlit));
-
-    // RenderUnlitObjects(camera);
-
+    ExecuteRenderList(ePipelineName::Unlit);
 
     if (bRenderPhysicsObjects) {
         RenderPhysicsObjects(camera);
     }
 }
 
-
-void Scene::RenderUnlitObjects(const Camera& camera) const
-{
-    // gRenderer->pDeferredRenderer->PlUnlit.Bind(gRenderer->GetFrame()->CommandBuffer);
-    gRenderer->BeginUnlit();
-
-    for (const ObjectID& object_id : mObjects) {
-        Object* object = gObjectManager->GetObject(object_id);
-
-        if (!object->IsUnlit()) {
-            continue;
-        }
-
-        object->RenderUnlit(camera);
-    }
-}
 
 void Scene::RenderPhysicsObjects(const Camera& camera)
 {

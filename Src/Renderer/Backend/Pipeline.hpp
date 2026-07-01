@@ -170,7 +170,7 @@ public:
 
     FX_FORCE_INLINE bool HasLayout() const { return Layout.IsValid(); }
 
-    void Bind(const CommandBuffer& command_buffer);
+    void Bind(const CommandBuffer& command_buffer) const;
 
     void SetViewport(const Vec2u& size);
 
@@ -183,7 +183,7 @@ public:
     PipelineLayout Layout;
     VkPipeline InternalPipeline = nullptr;
 
-    Vec2u ViewportSize = Vec2u::sZero;
+    mutable Vec2u ViewportSize = Vec2u::sZero;
 
     String Name;
 

@@ -59,12 +59,10 @@ public:
     ~Scene() { Destroy(); }
 
 private:
-    void RenderUnlitObjects(const Camera& camera) const;
     void RenderPhysicsObjects(const Camera& camera);
-
     void RenderObjectShadows(Object* object_id);
 
-    void RenderRLSection(const renderer::RenderListSection& section);
+    void ExecuteRenderList(renderer::ePipelineName pl_name);
 
 public:
     Name Name = "(unnamed)";

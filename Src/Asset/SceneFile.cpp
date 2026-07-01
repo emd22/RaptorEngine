@@ -168,12 +168,12 @@ void SceneFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& objec
         }
     }
 
-    object->SetRenderUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("Unlit"), 0)));
+    // object->SetUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("Unlit"), 0)));
 
-    // ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
-    // if (unlit != nullptr) {
-    //     object->SetRenderUnlit(static_cast<bool>(unlit->Get<int64>()));
-    // }
+    ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
+    if (unlit != nullptr) {
+        object->SetUnlit(static_cast<bool>(unlit->Get<int64>()));
+    }
 
     PhProperties physics_properties {};
 

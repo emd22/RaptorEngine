@@ -60,7 +60,22 @@ bool Object::CheckIfReady(bool require_material)
 
     Flags |= (eObjectFlags::ReadyToRender);
     LogInfo(LC_RENDER, "Object {} is now ready to render.", Name.Get());
+
+    // The object is now ready to render and is "full". Finalize any changes that have been made when loading.
+    FinalizeWhenReady();
+
     return true;
+}
+
+
+void Object::FinalizeWhenReady()
+{
+    if (IsFlagSet(Flags, eObjectFlags::Unlit)) {
+        Material* material = gMaterialManager->GetMaterial(mMaterialID);
+        if (material != nullptr) {
+            material->SetPipeline(ePipelineName::Unlit);
+        }
+    }
 }
 
 
@@ -242,6 +257,7 @@ void Object::Render(const Camera& camera)
     // const bool use_null_material = mMaterialID.IsNull();
     Material* material = gMaterialManager->GetMaterial(material_id);
 
+
     // if (!use_null_material && !material->bIsBuilt) {
     //     material->Build();
     //     return;
@@ -258,7 +274,7 @@ void Object::Render(const Camera& camera)
         gRenderer->SubmitPushConstants(frame->CmdBuffer, material->GetPipeline(),
                                        eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
-        RenderMesh();
+        RenderMesh(&material->GetPipeline());
     }
 
     // If there are no attached nodes, break early
@@ -272,23 +288,30 @@ void Object::Render(const Camera& camera)
     }
 }
 
-void Object::RenderShallow(const Camera& camera)
+void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 {
-    FrameData* frame = gRenderer->GetFrame();
-
-    Material* material = gMaterialManager->GetMaterial(mMaterialID);
-
     UpdateIfOutOfDate();
+
+    if (!CheckIfReady(true)) {
+        return;
+    }
+
+    FrameData* frame = gRenderer->GetFrame();
+    Material* material = gMaterialManager->GetMaterial(mMaterialID);
 
     DrawPushConstants push_constants {};
     push_constants.ObjectId = ID.GetID();
     push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
-    gRenderer->SubmitPushConstants(frame->CmdBuffer, material->GetPipeline(), eShaderType::Vertex | eShaderType::Pixel,
+    if (!pipeline) {
+        pipeline = &material->GetPipeline();
+    }
+
+    gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
                                    push_constants);
 
-    RenderMesh();
+    RenderMesh(pipeline);
 }
 
 void Object::RenderUnlit(const Camera& camera)
@@ -361,24 +384,17 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
     // }
 }
 
-void Object::RenderMesh()
+void Object::RenderMesh(renderer::Pipeline* pipeline)
 {
-    if (!CheckIfReady(true)) {
-        return;
-    }
-
     FrameData* frame = gRenderer->GetFrame();
     CommandBuffer& cmd = frame->CmdBuffer;
 
-    MaterialID material_id = mMaterialID;
-
-
-    if (!gMaterialManager->Bind(cmd, material_id)) {
-        gMaterialManager->Bind(cmd, MaterialID::Null);
+    // If there was an error binding the object material, bind the null material.
+    if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
+        gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
     }
 
-    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                   gMaterialManager->GetMaterial(material_id)->GetPipeline(),
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
                                                    gObjectManager->GetBaseOffset());
 
     if (pMesh) {
@@ -400,18 +416,18 @@ void Object::Update()
     }
 
 
-    if (IsFlagSet(PendingFlags, eObjectFlags::Unlit) && !mMaterialID.IsNull()) {
-        if (gMaterialManager->GetMaterial(mMaterialID)->IsReady()) {
-            ClearFlag(PendingFlags, eObjectFlags::Unlit);
+    // if (IsFlagSet(PendingFlags, eObjectFlags::Unlit) && !mMaterialID.IsNull()) {
+    //     if (gMaterialManager->GetMaterial(mMaterialID)->IsReady()) {
+    //         ClearFlag(PendingFlags, eObjectFlags::Unlit);
 
-            if (!IsFlagSet(Flags, eObjectFlags::Unlit)) {
-                SetGraphicsPipeline(nullptr);
-            }
-            else {
-                SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
-            }
-        }
-    }
+    //         if (!IsFlagSet(Flags, eObjectFlags::Unlit)) {
+    //             SetGraphicsPipeline(nullptr);
+    //         }
+    //         else {
+    //             SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
+    //         }
+    //     }
+    // }
 
     UpdateAnimation();
 }
@@ -456,15 +472,15 @@ void Object::SyncObjectWithPhysics(PhObject* phys)
     }
 }
 
-void Object::SetRenderUnlit(const bool value)
+void Object::SetUnlit(const bool value)
 {
     if (value) {
         SetFlag(Flags, eObjectFlags::Unlit);
-        SetFlag(PendingFlags, eObjectFlags::Unlit);
+        // SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
     else {
         ClearFlag(Flags, eObjectFlags::Unlit);
-        SetFlag(PendingFlags, eObjectFlags::Unlit);
+        // SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
 }
 
