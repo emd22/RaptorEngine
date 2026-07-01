@@ -7,7 +7,7 @@
 #include <Asset/AxManager.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
@@ -63,9 +63,9 @@ DescriptorSet& Material::GetDescriptorSetAlbedoOnly()
 }
 
 
-bool Material::Bind(const CommandBuffer& cmd) { return BindWithPipeline(cmd, *mpPipeline, false); }
+bool Material::Bind(const CommandBuffer& cmd) { return BindWithPipeline(cmd, *mpPipeline); }
 
-bool Material::BindWithPipeline(const CommandBuffer& cmd, Pipeline& pipeline, bool albedo_only)
+bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline)
 {
     if (!bIsBuilt.load()) {
         Build();
@@ -87,7 +87,6 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, Pipeline& pipeline, bo
     if (bSupportsSkinning) {
         offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
     }
-
 
     DescriptorSet::BindMultipleOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
                                       MakeSlice(sets_to_bind, std::size(sets_to_bind)), Slice<uint32>(offsets));

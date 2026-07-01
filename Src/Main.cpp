@@ -23,31 +23,26 @@
 #include <Renderer/Globals.hpp>
 #include <Script/FoxScript.hpp>
 
-#define FX_RUN_TEST
-#define FX_TEST_SCRIPT
+// #define FX_RUN_TEST
+// #define FX_TEST_SCRIPT
 
 FX_SET_MODULE_NAME("Main")
 
 using namespace fx;
 using namespace fx::renderer;
 
-static void N_ScriptLog(fx::script::FoxVM* vm, const fx::SizedArray<fx::script::FoxValue>& args)
+
+enum class eTestFlags
 {
-    for (fx::script::FoxValue& arg : args) {
-        switch (arg.Type) {
-        case fx::eFoxType::INT:
-            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<fx::int32>());
-            break;
-        case fx::eFoxType::FLOAT:
-            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<fx::float32>());
-            break;
-        case fx::eFoxType::STRING:
-            fx::LogInfo(fx::LC_SCRIPT, "{}", arg.Get<const char*>());
-            break;
-        default:;
-        }
-    }
-}
+    None = 0,
+    A = (1 << 0),
+    B = (1 << 1),
+    C = (1 << 2),
+    D = (1 << 3),
+};
+
+FxEnumFlags(eTestFlags);
+
 
 int main()
 {
@@ -56,7 +51,6 @@ int main()
 
     fx::gScriptMemPool = new fx::MemPool;
     fx::gScriptMemPool->Create(1024 * 64);
-
 
 #ifdef FX_TEST_SCRIPT
     script::FoxScript fs;

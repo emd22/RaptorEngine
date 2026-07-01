@@ -2,12 +2,14 @@
 
 #include <Engine.hpp>
 #include <Math/Mat4.hpp>
-#include <Object.hpp>
+#include <Object/Object.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 
 namespace fx {
+
+const ObjectID ObjectID::Null = ObjectID(UINT32_MAX);
 
 void ObjectManager::Create()
 {
@@ -15,6 +17,8 @@ void ObjectManager::Create()
         mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4);
         mDescriptorPool.Create(renderer::gRenderer->GetDevice(), 2);
     }
+
+    mObjectList.Init(scMaxObjects);
 
     renderer::DsLayoutBuilder builder {};
     builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Vertex);
@@ -26,8 +30,6 @@ void ObjectManager::Create()
                             eGpuBufferFlags::PersistentMapped);
 
 
-    mObjectSlotsInUse.InitZero(scMaxObjects);
-
     if (!mObjectBufferDS.IsInited()) {
         Assert(DsLayoutObjectBuffer != nullptr);
         mObjectBufferDS.Create(mDescriptorPool, DsLayoutObjectBuffer, true);
@@ -36,6 +38,72 @@ void ObjectManager::Create()
     static constexpr uint32 bound_size = scMaxObjects * sizeof(ObjectGpuEntry);
     mObjectBufferDS.AddBuffer(0, &mObjectGpuBuffer, 0, bound_size);
     mObjectBufferDS.Build();
+}
+
+ObjectID ObjectManager::NewObjectID(const std::string& name)
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+
+    uint32 index;
+    Object* obj = mObjectList.NewItem(&index);
+    obj->Name = Name(name);
+    obj->ID = ObjectID(index);
+
+    return obj->ID;
+}
+
+Object* ObjectManager::NewObject()
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+
+    uint32 index;
+    Object* obj = mObjectList.NewItem(&index);
+    obj->ID = ObjectID(index);
+
+    return obj;
+}
+
+Object* ObjectManager::NewObject(const std::string& name)
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+
+    uint32 index;
+    Object* obj = mObjectList.NewItem(&index);
+    obj->ID = ObjectID(index);
+    obj->Name = name;
+
+    return obj;
+}
+
+Object* ObjectManager::GetObject(const ObjectID& id)
+{
+    if (id.IsInvalid()) {
+        return nullptr;
+    }
+
+    return mObjectList.GetItem(id.GetID());
+}
+
+void ObjectManager::DestroyObject(ObjectID& id)
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+
+    if (id.IsInvalid()) {
+        return;
+    }
+
+    // If the ID is passed in directly from an object (as it probably will be in some places), then we want to make sure
+    // we dont invalidate our ID before freeing it.
+    ObjectID id_copy = id;
+
+    // Delete the object id at the definition
+    mObjectList.GetItem(id.GetID())->ID.Invalidate();
+
+    // Free the object from the list
+    mObjectList.FreeItem(id_copy.GetID());
+
+    // Invalidate the passed ID
+    id.Invalidate();
 }
 
 
@@ -56,63 +124,48 @@ ObjectGpuEntry* ObjectManager::GetBufferAtFrame(uint32 object_id)
     return reinterpret_cast<ObjectGpuEntry*>(entry_buffer + GetOffsetObjectIndex(object_id));
 }
 
-
-ObjectId ObjectManager::GenerateObjectId()
+void ObjectManager::Submit(const ObjectID& object_id, ObjectGpuEntry& entry)
 {
-    std::lock_guard<std::mutex> guard(mInUse);
+    Assert(object_id.GetID() < scMaxObjects);
 
-    ObjectId free_object_id = mObjectSlotsInUse.FindNextFreeBit();
-    mObjectSlotsInUse.Set(free_object_id);
-
-    return free_object_id;
-}
-
-void ObjectManager::Submit(ObjectId object_id, ObjectGpuEntry& entry)
-{
-    Assert(object_id < scMaxObjects);
-
-    memcpy(GetBufferAtFrame(object_id), &entry, sizeof(ObjectGpuEntry));
+    memcpy(GetBufferAtFrame(object_id.GetID()), &entry, sizeof(ObjectGpuEntry));
 
     // mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(ObjectGpuEntry));
 }
 
-void ObjectManager::Submit(ObjectId object_id, const Mat4f& model_matrix)
+void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
 {
     static_assert(offsetof(ObjectGpuEntry, ModelMatrix) == 0);
 
-    Assert(object_id < scMaxObjects);
+    Assert(object_id.GetID() < scMaxObjects);
 
-    memcpy(GetBufferAtFrame(object_id), model_matrix.RawData, sizeof(Mat4f));
+    memcpy(GetBufferAtFrame(object_id.GetID()), model_matrix.RawData, sizeof(Mat4f));
 
     // mObjectGpuBuffer.FlushToGpu(GetOffsetObjectIndex(object_id), sizeof(ObjectGpuEntry));
 }
 
-
-void ObjectManager::ReleaseObject(ObjectId id)
-{
-    if (id == UINT32_MAX) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> guard(mInUse);
-
-    LogInfo(LC_CORE, "Freeing object {} from object manager", id);
-
-    mObjectSlotsInUse.Unset(id);
-}
 
 void ObjectManager::ReleaseAllObjects()
 {
     std::lock_guard<std::mutex> guard(mInUse);
-    mObjectSlotsInUse.ClearAll();
+
+    uint32 capacity = mObjectList.Capacity;
+
+    for (uint32 i = 0; i < capacity; i++) {
+        if (!mObjectList.SlotsInUse.Get(i)) {
+            continue;
+        }
+
+        mObjectList.FreeItem(i);
+    }
 }
 
-void ObjectManager::PrintActive(int limit)
+void ObjectManager::PrintActive(uint32 limit)
 {
     ObjectGpuEntry* buffer = reinterpret_cast<ObjectGpuEntry*>(mObjectGpuBuffer.pMappedBuffer);
 
-    for (int i = 0; i < limit; i++) {
-        if (mObjectSlotsInUse.Get(i)) {
+    for (int i = 0; i < std::min(limit, mObjectList.Capacity); i++) {
+        if (mObjectList.SlotsInUse.Get(i)) {
             LogInfo(LC_CORE, "Object [{}]", i);
 
             float* model1 = buffer[i].ModelMatrix;
@@ -125,29 +178,29 @@ void ObjectManager::PrintActive(int limit)
     }
 }
 
-ObjectId ObjectManager::ReserveInstances(ObjectId object_id, uint32 num_instances)
+ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_instances)
 {
     // Unset the current object to determine if the current span of slots can contain the instances
-    mObjectSlotsInUse.Unset(object_id);
+    mObjectList.SlotsInUse.Unset(object_id.GetID());
 
     // Find the new bit group (+1 for the current object)
-    uint32 start_index = mObjectSlotsInUse.FindNextFreeBitGroup(num_instances + 1);
+    uint32 start_index = mObjectList.SlotsInUse.FindNextFreeBitGroup(num_instances + 1);
     Assert(start_index != Bit::scBitNotFound);
 
     // There is not enough room after our current object, move it
-    if (start_index != object_id) {
-        Submit(start_index, *GetBufferAtFrame(object_id));
+    if (start_index != object_id.GetID()) {
+        Submit(start_index, *GetBufferAtFrame(object_id.GetID()));
 
         // The object id is already 'freed', so we do not need to call FreeObjectId.
     }
 
     // Mark the following bits as 'in use' to prevent other future objects from snatching them.
     for (uint32 i = start_index; i < start_index + num_instances; i++) {
-        mObjectSlotsInUse.Set(i);
+        mObjectList.SlotsInUse.Set(i);
     }
 
     // Return the new slot block
-    return start_index;
+    return ObjectID(start_index);
 }
 
 

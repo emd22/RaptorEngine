@@ -4,7 +4,7 @@
 
 #include <ThirdParty/stb_image_resize2.h>
 
-#include <Asset/Loader/AxLoaderStb.hpp>
+#include <Asset/Loader/Image/LoaderStb.hpp>
 #include <Core/ArrayUtil.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Renderer/Backend/Image.hpp>
@@ -80,8 +80,8 @@ Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Sli
     }
 
 #ifdef FX_DEBUG_MIPS_SAVE_AS_IMAGES
-    AxLoaderStb::SaveToFile(eImageSaveFormat::Jpeg, output_data, output_dimensions,
-                            String::Fmt("Mip_{}.jpeg", mip_level), eImageSaveFlags::None);
+    loader::LoaderStb::SaveToFile(eImageSaveFormat::Jpeg, output_data, output_dimensions,
+                                  String::Fmt("Mip_{}.jpeg", mip_level), eImageSaveFlags::None);
 #endif
 
     dp.AddEntry(mip_level, output_data);
@@ -110,8 +110,9 @@ void MipmapGen::ExportMipmaps(const char* dp_path, const char* output_path)
 
         Slice<uint8> image_data = Slice(entry.Data.pData + sizeof(MipHeader), entry.Data.Size - sizeof(MipHeader));
 
-        AxLoaderStb::SaveToFile(eImageSaveFormat::Jpeg, image_data, Vec2u(header->SizeX, header->SizeY),
-                                String::Fmt("{}/Mip{}.jpeg", output_path, header->MipLevel), eImageSaveFlags::None);
+        loader::LoaderStb::SaveToFile(eImageSaveFormat::Jpeg, image_data, Vec2u(header->SizeX, header->SizeY),
+                                      String::Fmt("{}/Mip{}.jpeg", output_path, header->MipLevel),
+                                      eImageSaveFlags::None);
     }
 
     dp.Close();

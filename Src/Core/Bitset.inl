@@ -57,11 +57,13 @@ FX_FORCE_INLINE uint32 Bitset::FindNextFreeBit(uint32 start_index) const
 
     uint64 byte_mask = 0;
 
-    uint64 bit_index = (start_index & scBitIndexMask);
+    {
+        uint64 bit_index = (start_index & scBitIndexMask);
 
-    // if the start index is not at a byte boundary, we need to mask off the start of the byte.
-    if (bit_index != 0) {
-        byte_mask = (1ULL << bit_index) - 1;
+        // if the start index is not at a byte boundary, we need to mask off the start of the byte.
+        if (bit_index != 0) {
+            byte_mask = (1ULL << bit_index) - 1;
+        }
     }
 
     constexpr uint64 cFullChunk = (~0ULL);
@@ -93,11 +95,13 @@ FX_FORCE_INLINE uint32 Bitset::FindNextSetBit(uint32 start_index) const
 
     uint64 byte_mask = 0;
 
-    uint64 bit_index = (start_index & scBitIndexMask);
+    {
+        uint64 bit_index = (start_index & scBitIndexMask);
 
-    // if the start index is not at a byte boundary, we need to mask off the start of the byte.
-    if (bit_index != 0) {
-        byte_mask |= (1ULL << bit_index) - 1;
+        // if the start index is not at a byte boundary, we need to mask off the start of the byte.
+        if (bit_index != 0) {
+            byte_mask |= (1ULL << bit_index) - 1;
+        }
     }
 
     constexpr uint64 cEmptyChunk = (0ULL);

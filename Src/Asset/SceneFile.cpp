@@ -82,7 +82,7 @@ void SceneFile::Load(const std::string& path, Scene& scene)
             AddObjectFromEntry(path, object_entry, scene);
         }
         else {
-            TSRef<Object> object = scene.FindObject(object_entry.Name.GetHash());
+            Object* object = scene.FindObject(object_entry.Name.GetHash());
             ApplyPropertiesToObject(object, object_entry);
         }
     }
@@ -127,15 +127,18 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 
 
     String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
-    TSRef<Object> object = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
+    AssetTicket<Object> ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
+
+    Object* object = ticket.Get();
+
     object->pScene = &scene;
     ApplyPropertiesToObject(object, object_entry);
 
-    scene.Attach(object);
+    scene.Attach(ticket);
 }
 
 
-void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry& object_entry)
+void SceneFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry)
 {
     ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("Shadows"));
     if (shadow_caster != nullptr) {
@@ -152,8 +155,6 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
     object->SetPosition(object_entry.GetMemberValue(HashStr32("Pos"), object->mPosition));
     object->SetRotation(object_entry.GetMemberValue(HashStr32("Rot"), object->mRotation));
     object->SetScale(object_entry.GetMemberValue(HashStr32("Scale"), object->mScale));
-
-    object->Update();
     object->MarkTransformOutOfDate();
 
     // Render options
@@ -167,9 +168,11 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
         }
     }
 
+    // object->SetUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("Unlit"), 0)));
+
     ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
     if (unlit != nullptr) {
-        object->SetRenderUnlit(static_cast<bool>(unlit->Get<int64>()));
+        object->SetUnlit(static_cast<bool>(unlit->Get<int64>()));
     }
 
     PhProperties physics_properties {};
@@ -187,13 +190,6 @@ void SceneFile::ApplyPropertiesToObject(TSRef<Object>& object, const ConfigEntry
     if (script != nullptr) {
         object->LoadScript(String::Fmt("./Scripts{}", script->GetValue<const char*>()));
     }
-
-    object->OnLoaded(
-        [](TSRef<AxBase> base_asset)
-        {
-            TSRef<Object> obj = base_asset;
-            obj->PrintDebug();
-        });
 }
 
 } // namespace fx

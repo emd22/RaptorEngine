@@ -187,7 +187,7 @@ public:
      * @returns True if the material was bound successfully.
      */
     bool Bind(const renderer::CommandBuffer& cmd);
-    bool BindWithPipeline(const renderer::CommandBuffer& cmd, renderer::Pipeline& pipeline, bool albedo_only = false);
+    bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
 
     void Build();
 

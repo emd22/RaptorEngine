@@ -3,8 +3,8 @@
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManagerFwd.hpp>
-#include <Object.hpp>
-#include <ObjectManager.hpp>
+#include <Object/Object.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -21,23 +21,68 @@ void Scene::Create()
     mPhysicsObjects.Create(32);
 }
 
-void Scene::Attach(const TSRef<Object>& object)
+void Scene::Attach(Object* object)
 {
-    mObjects.Insert(object);
+    mObjects.Insert(object->ID);
+
     object->pScene = this;
     object->OnAttached(this);
 
-    object->OnLoaded(
-        [](TSRef<AxBase> asset)
-        {
-            TSRef<Object> obj { asset };
-            Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
-            obj->pScene->mRenderList.Insert(material->GetPipelineName(), obj.mpPtr);
+    Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+    object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
 
-            for (const TSRef<Object>& attach : obj->AttachedNodes) {
-                material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
-                obj->pScene->mRenderList.Insert(material->GetPipelineName(), attach.mpPtr);
-            }
+    for (const ObjectID& attach_id : object->AttachedNodes) {
+        Object* attach = gObjectManager->GetObject(attach_id);
+        material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
+        object->pScene->mRenderList.Add(material->GetPipelineName(), attach_id);
+    }
+}
+
+static void AddObjectToRenderList(Object* object, Scene* scene)
+{
+    if (object->pScene == nullptr) {
+        object->pScene = scene;
+    }
+
+    if (object->pMesh.IsValid()) {
+        const bool is_unlit = object->IsUnlit();
+
+        Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+        if (is_unlit) {
+            LogInfo("Setting material {} pipeline to be unlit", material->ID);
+            material->SetPipeline(ePipelineName::Unlit);
+        }
+
+        ePipelineName pipeline_name = material->GetPipelineName();
+
+        AssertMsg(object->pScene, "Scene has not been initialized on object!");
+        object->pScene->mRenderList.Add(pipeline_name, object->ID);
+    }
+
+    if (!object->AttachedNodes.IsEmpty()) {
+        LogInfo("Listing attached nodes for {}:", object->ID.GetID());
+
+        for (const ObjectID& attach_id : object->AttachedNodes) {
+            LogInfo("   Object {}", attach_id.GetID());
+            AddObjectToRenderList(gObjectManager->GetObject(attach_id), scene);
+        }
+    }
+}
+
+
+void Scene::Attach(AssetTicket<Object> object_ticket)
+{
+    Object* object = object_ticket.Get();
+
+    mObjects.Insert(object->ID);
+
+    object->OnAttached(this);
+
+    object_ticket.OnLoaded(
+        [this](void* item_ptr)
+        {
+            Object* object = static_cast<Object*>(item_ptr);
+            AddObjectToRenderList(object, this);
         });
 }
 
@@ -75,15 +120,16 @@ void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
     }
 }
 
-TSRef<Object> Scene::FindObject(const Hash32 name_hash)
+Object* Scene::FindObject(const Hash32 name_hash)
 {
-    for (TSRef<Object>& obj : mObjects) {
+    for (ObjectID& obj_id : mObjects) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         if (obj->Name == name_hash) {
             return obj;
         }
     }
 
-    return TSRef<Object>(nullptr);
+    return nullptr;
 }
 
 PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
@@ -98,13 +144,20 @@ PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
 }
 
 
-void Scene::RenderRLSection(const renderer::RenderListSection& section)
+void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
     PerspectiveCamera& camera = *mpCurrentCamera;
+
+    const RenderListSection& section = mRenderList.GetSection(pl_name);
 
     if (!section.InUse.IsInited()) {
         return;
     }
+
+    // If the pipeline passed in is unlit, force the unlit pipeline to be used over the materials pipeline.
+    const bool force_unlit_pipeline = (pl_name == ePipelineName::Unlit);
+    renderer::Pipeline* alt_pipeline = (force_unlit_pipeline ? &gPipelineCache->Request(ePipelineName::Unlit)
+                                                             : nullptr);
 
     uint32 index = 0;
     while (true) {
@@ -113,9 +166,11 @@ void Scene::RenderRLSection(const renderer::RenderListSection& section)
             break;
         }
 
-        Object* obj = section.Objects[index];
+        ObjectID object_id = section.Objects[index];
+        Object* object = gObjectManager->GetObject(object_id);
 
-        obj->RenderShallow(camera);
+        object->Update();
+        object->RenderShallow(camera, alt_pipeline);
 
         ++index;
     }
@@ -128,51 +183,28 @@ void Scene::Render(Camera* shadow_camera)
 
     gRenderer->BeginGeometry();
 
-    RenderRLSection(mRenderList.GetSection(ePipelineName::Geometry));
-    RenderRLSection(mRenderList.GetSection(ePipelineName::GeometryNormalMaps));
-    RenderRLSection(mRenderList.GetSection(ePipelineName::GeometrySkinned));
-
-
-    // for (const TSRef<Object>& obj : mObjects) {
-    //     obj->Update();
-
-
-    //     if (obj->GetRenderUnlit()) {
-    //         continue;
-    //     }
-
-    //     obj->Render(camera);
-    // }
+    ExecuteRenderList(ePipelineName::Geometry);
+    ExecuteRenderList(ePipelineName::GeometryNormalMaps);
+    ExecuteRenderList(ePipelineName::GeometrySkinned);
 
     // Render lights
     gRenderer->BeginLighting();
-
     gRenderer->LightBuffer.Rewind();
 
     for (const Ref<LightBase>& light : mLights) {
         light->Render(camera, shadow_camera);
     }
 
-    RenderUnlitObjects(camera);
+    // Render the unlit objects
+    gRenderer->BeginUnlit();
+
+    ExecuteRenderList(ePipelineName::Unlit);
 
     if (bRenderPhysicsObjects) {
         RenderPhysicsObjects(camera);
     }
 }
 
-
-void Scene::RenderUnlitObjects(const Camera& camera) const
-{
-    // gRenderer->pDeferredRenderer->PlUnlit.Bind(gRenderer->GetFrame()->CommandBuffer);
-    gRenderer->BeginUnlit();
-
-    for (const TSRef<Object>& obj : mObjects) {
-        if (!obj->GetRenderUnlit()) {
-            continue;
-        }
-        obj->RenderUnlit(camera);
-    }
-}
 
 void Scene::RenderPhysicsObjects(const Camera& camera)
 {
@@ -225,7 +257,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
     // }
 }
 
-void Scene::RenderObjectShadows(const TSRef<Object>& obj)
+void Scene::RenderObjectShadows(Object* object)
 {
     ShadowPushConstants consts;
 
@@ -238,7 +270,7 @@ void Scene::RenderObjectShadows(const TSRef<Object>& obj)
 
     CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
-    if (in_skinned_shader && !obj->IsSkinned()) {
+    if (in_skinned_shader && !object->IsSkinned()) {
         in_skinned_shader = false;
         pipeline.Bind(cmd);
 
@@ -254,16 +286,16 @@ void Scene::RenderObjectShadows(const TSRef<Object>& obj)
     //                                                    gObjectManager->GetBaseOffset());
     // }
 
-    obj->Update();
+    object->Update();
 
-    consts.ObjectId = obj->ObjectId;
+    consts.ObjectId = object->ID.GetID();
 
     gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 
-    obj->RenderPrimitive(cmd);
+    object->RenderPrimitive(cmd);
 
-    for (const TSRef<Object>& attached : obj->AttachedNodes) {
-        RenderObjectShadows(attached);
+    for (const ObjectID& attached : object->AttachedNodes) {
+        RenderObjectShadows(gObjectManager->GetObject(attached));
     }
 }
 
@@ -272,12 +304,14 @@ void Scene::RenderShadows(Camera* shadow_camera)
 {
     gShadowRenderer->Begin();
 
-    for (const TSRef<Object>& obj : mObjects) {
-        if (!obj->IsShadowCaster()) {
+    for (const ObjectID& object_id : mObjects) {
+        Object* object = gObjectManager->GetObject(object_id);
+
+        if (!object->IsShadowCaster()) {
             continue;
         }
 
-        RenderObjectShadows(obj);
+        RenderObjectShadows(object);
     }
 
 
@@ -288,6 +322,8 @@ void Scene::Destroy()
 {
     mObjects.Destroy();
     mLights.Destroy();
+
+    mPhysicsObjects.Destroy();
 }
 
 } // namespace fx

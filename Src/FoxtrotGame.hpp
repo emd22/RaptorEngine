@@ -1,9 +1,9 @@
 #pragma once
 
-#include "ObjectManager.hpp"
+#include "Object/ObjectManager.hpp"
 
 #include <Asset/ConfigFile.hpp>
-#include <Object.hpp>
+#include <Object/Object.hpp>
 #include <Player.hpp>
 #include <Scene.hpp>
 

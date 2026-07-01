@@ -10,7 +10,7 @@
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
@@ -23,7 +23,7 @@ namespace fx {
 
 using namespace renderer;
 
-Object::Object() { ObjectId = gObjectManager->GenerateObjectId(); }
+Object::Object(const ObjectID& id) { ID = id; }
 
 void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 {
@@ -59,75 +59,87 @@ bool Object::CheckIfReady(bool require_material)
     }
 
     Flags |= (eObjectFlags::ReadyToRender);
+    LogInfo(LC_RENDER, "Object {} is now ready to render.", Name.Get());
+
+    // The object is now ready to render and is "full". Finalize any changes that have been made when loading.
+    FinalizeWhenReady();
+
     return true;
+}
+
+
+void Object::FinalizeWhenReady()
+{
+    if (IsFlagSet(Flags, eObjectFlags::Unlit)) {
+        Material* material = gMaterialManager->GetMaterial(mMaterialID);
+        if (material != nullptr) {
+            material->SetPipeline(ePipelineName::Unlit);
+        }
+    }
 }
 
 
 void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
                                     const PhProperties& physics_properties)
 {
-    OnLoaded(
-        [primitive_type, dimensions, motion_type, physics_properties](TSRef<AxBase> base_asset)
-        {
-            TSRef<Object> object = base_asset;
+    // OnLoaded(
+    //     [&]()
+    //     {
+    //         Scene* scene = this->pScene;
+    //         if (!scene) {
+    //             return;
+    //         }
 
-            Scene* scene = object->pScene;
-            if (!scene) {
-                return;
-            }
+    //         if (this->PhysicsId == PhObjectIdNull) {
+    //             this->PhysicsId = scene->NewPhysicsObject();
+    //         }
 
-            if (object->PhysicsId == PhObjectIdNull) {
-                object->PhysicsId = scene->NewPhysicsObject();
-            }
+    //         PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
 
-            PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
+    //         if (!phys) {
+    //             LogError(LC_PHYSICS, "Error creating physics object");
+    //             return;
+    //         }
 
-            if (!phys) {
-                LogError(LC_PHYSICS, "Error creating physics object");
-                return;
-            }
+    //         phys->CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
+    //         this->mbPhysicsTransformOutOfDate = true;
+    //         this->SetPhysicsEnabled(true);
 
-            phys->CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
-            object->mbPhysicsTransformOutOfDate = true;
-            object->SetPhysicsEnabled(true);
-
-            object->PrintDebug();
-        });
+    //         this->PrintDebug();
+    //     });
 }
 
 
 void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotionType motion_type,
                                const PhProperties& physics_properties)
 {
-    OnLoaded(
-        [custom_physics_mesh, motion_type, physics_properties](TSRef<AxBase> base_asset)
-        {
-            TSRef<Object> object = base_asset;
+    // OnLoaded(
+    //     [&]()
+    //     {
+    //         Scene* scene = this->pScene;
+    //         if (!scene) {
+    //             return;
+    //         }
 
-            Scene* scene = object->pScene;
-            if (!scene) {
-                return;
-            }
+    //         this->PhysicsId = scene->NewPhysicsObject();
+    //         PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
 
-            object->PhysicsId = scene->NewPhysicsObject();
-            PhObject* phys = scene->GetPhysicsObject(object->PhysicsId);
+    //         if (!phys) {
+    //             LogError(LC_PHYSICS, "Error creating physics object");
+    //             return;
+    //         }
 
-            if (!phys) {
-                LogError(LC_PHYSICS, "Error creating physics object");
-                return;
-            }
+    //         Ref<PrimitiveMesh> physics_mesh { nullptr };
+    //         physics_mesh = custom_physics_mesh ? custom_physics_mesh : this->pMesh;
 
-            Ref<PrimitiveMesh> physics_mesh { nullptr };
-            physics_mesh = custom_physics_mesh ? custom_physics_mesh : object->pMesh;
+    //         Assert(physics_mesh.IsValid());
 
-            Assert(physics_mesh.IsValid());
+    //         phys->CreateMeshBody(*physics_mesh, motion_type, physics_properties);
+    //         this->mbPhysicsTransformOutOfDate = true;
+    //         this->SetPhysicsEnabled(true);
 
-            phys->CreateMeshBody(*physics_mesh, motion_type, physics_properties);
-            object->mbPhysicsTransformOutOfDate = true;
-            object->SetPhysicsEnabled(true);
-
-            object->PrintDebug();
-        });
+    //         this->PrintDebug();
+    //     });
 }
 
 void Object::OnAttached(Scene* scene)
@@ -153,42 +165,37 @@ void Object::OnAttached(Scene* scene)
 
 void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 {
-    OnLoaded(
-        [pipeline, update_children](TSRef<AxBase> base_asset)
-        {
-            TSRef<Object> asset = base_asset;
+    const bool should_set_default = (pipeline == nullptr);
 
-            const bool should_set_default = (pipeline == nullptr);
+    if (!this->GetMaterialID().IsNull()) {
+        Material* material = gMaterialManager->GetMaterial(this->mMaterialID);
 
+        if (should_set_default) {
+            material->SetDefaultPipeline();
+        }
+        else {
+            material->SetPipeline(gPipelineCache->GetName(pipeline));
+        }
+    }
 
-            if (!asset->GetMaterialID().IsNull()) {
-                Material* material = gMaterialManager->GetMaterial(asset->mMaterialID);
+    if (update_children) {
+        for (const ObjectID& attached_id : this->AttachedNodes) {
+            Object* attached = gObjectManager->GetObject(attached_id);
 
-                if (should_set_default) {
-                    material->SetDefaultPipeline();
-                }
-                else {
-                    material->SetPipeline(gPipelineCache->GetName(pipeline));
-                }
+            if (!attached->GetMaterialID().IsNull()) {
+                continue;
             }
 
-            if (update_children) {
-                for (TSRef<Object>& node : asset->AttachedNodes) {
-                    if (!node->GetMaterialID().IsNull()) {
-                        continue;
-                    }
+            Material* material = gMaterialManager->GetMaterial(attached->GetMaterialID());
 
-                    Material* material = gMaterialManager->GetMaterial(node->GetMaterialID());
-
-                    if (should_set_default) {
-                        material->SetDefaultPipeline();
-                    }
-                    else {
-                        material->SetPipeline(gPipelineCache->GetName(pipeline));
-                    }
-                }
+            if (should_set_default) {
+                material->SetDefaultPipeline();
             }
-        });
+            else {
+                material->SetPipeline(gPipelineCache->GetName(pipeline));
+            }
+        }
+    }
 }
 
 void Object::UpdateAnimation()
@@ -205,7 +212,7 @@ void Object::UpdateAnimation()
     if (AnimationTime >= pCurrentAnimation->Duration) {
         AnimationTime = 0.0f;
     }
-    else if (AnimationTime < 0.0001) {
+    else if (AnimationTime < 0.0001f) {
         AnimationTime = pCurrentAnimation->Duration;
     }
 
@@ -217,27 +224,25 @@ void Object::UpdateAnimation()
     gRenderer->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData, pSkeleton->SkinningMatrices.Size * sizeof(Mat4f));
 }
 
-void Object::MakeInstanceOf(const TSRef<Object>& source_ref)
+void Object::MakeInstanceOf(const ObjectID& source_id)
 {
-    RefContext<TSRef<Object>> source_ctx(source_ref);
-    Object& source = source_ctx.Get();
+    Object* source_obj = gObjectManager->GetObject(source_id);
 
-    AssertMsg((source.mInstanceSlots - source.mInstanceSlotsInUse) > 0,
+    AssertMsg((source_obj->mInstanceSlots - source_obj->mInstanceSlotsInUse) > 0,
               "Object has no instance slots remaining! Did you reserve any instances on the source object?");
 
-    gObjectManager->ReleaseObject(ObjectId);
 
-    mpInstanceSource = source_ref;
+    gObjectManager->DestroyObject(ID);
     Flags |= eObjectFlags::IsInstance;
 
-    ++source.mInstanceSlotsInUse;
+    ++source_obj->mInstanceSlotsInUse;
 
-    ObjectId = source.ObjectId + source.mInstanceSlotsInUse;
+    ID = ObjectID(source_obj->ID.GetID() + source_obj->mInstanceSlotsInUse);
 }
 
 void Object::ReserveInstances(uint32 num)
 {
-    ObjectId = gObjectManager->ReserveInstances(ObjectId, num);
+    ID = gObjectManager->ReserveInstances(ID, num);
     mInstanceSlots = num;
     mInstanceSlotsInUse = 0;
 }
@@ -252,6 +257,7 @@ void Object::Render(const Camera& camera)
     // const bool use_null_material = mMaterialID.IsNull();
     Material* material = gMaterialManager->GetMaterial(material_id);
 
+
     // if (!use_null_material && !material->bIsBuilt) {
     //     material->Build();
     //     return;
@@ -260,7 +266,7 @@ void Object::Render(const Camera& camera)
     UpdateIfOutOfDate();
 
     DrawPushConstants push_constants {};
-    push_constants.ObjectId = ObjectId;
+    push_constants.ObjectId = ID.GetID();
     push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
@@ -268,7 +274,7 @@ void Object::Render(const Camera& camera)
         gRenderer->SubmitPushConstants(frame->CmdBuffer, material->GetPipeline(),
                                        eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
-        RenderMesh();
+        RenderMesh(&material->GetPipeline());
     }
 
     // If there are no attached nodes, break early
@@ -276,33 +282,41 @@ void Object::Render(const Camera& camera)
         return;
     }
 
-    for (TSRef<Object>& obj : AttachedNodes) {
+    for (const ObjectID& obj_id : AttachedNodes) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         obj->Render(camera);
     }
 }
 
-void Object::RenderShallow(const Camera& camera)
+void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 {
-    FrameData* frame = gRenderer->GetFrame();
-
-    Material* material = gMaterialManager->GetMaterial(mMaterialID);
-
     UpdateIfOutOfDate();
 
+    if (!CheckIfReady(true)) {
+        return;
+    }
+
+    FrameData* frame = gRenderer->GetFrame();
+    Material* material = gMaterialManager->GetMaterial(mMaterialID);
+
     DrawPushConstants push_constants {};
-    push_constants.ObjectId = ObjectId;
+    push_constants.ObjectId = ID.GetID();
     push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
-    gRenderer->SubmitPushConstants(frame->CmdBuffer, material->GetPipeline(), eShaderType::Vertex | eShaderType::Pixel,
+    if (!pipeline) {
+        pipeline = &material->GetPipeline();
+    }
+
+    gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
                                    push_constants);
 
-    RenderMesh();
+    RenderMesh(pipeline);
 }
 
 void Object::RenderUnlit(const Camera& camera)
 {
-    if (!GetRenderUnlit()) {
+    if (!IsUnlit()) {
         return;
     }
 
@@ -321,7 +335,7 @@ void Object::RenderUnlit(const Camera& camera)
     UpdateIfOutOfDate();
 
     DrawPushConstants push_constants {};
-    push_constants.ObjectId = ObjectId;
+    push_constants.ObjectId = ID.GetID();
     push_constants.MaterialIndex = mMaterialID.GetID();
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
@@ -346,7 +360,8 @@ void Object::RenderUnlit(const Camera& camera)
         return;
     }
 
-    for (TSRef<Object>& obj : AttachedNodes) {
+    for (const ObjectID& obj_id : AttachedNodes) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         obj->RenderUnlit(camera);
     }
 }
@@ -369,24 +384,17 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
     // }
 }
 
-void Object::RenderMesh()
+void Object::RenderMesh(renderer::Pipeline* pipeline)
 {
-    if (!CheckIfReady(true)) {
-        return;
-    }
-
     FrameData* frame = gRenderer->GetFrame();
     CommandBuffer& cmd = frame->CmdBuffer;
 
-    MaterialID material_id = mMaterialID;
-
-
-    if (!gMaterialManager->Bind(cmd, material_id)) {
-        gMaterialManager->Bind(cmd, MaterialID::Null);
+    // If there was an error binding the object material, bind the null material.
+    if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
+        gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
     }
 
-    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                   gMaterialManager->GetMaterial(material_id)->GetPipeline(),
+    gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
                                                    gObjectManager->GetBaseOffset());
 
     if (pMesh) {
@@ -396,7 +404,7 @@ void Object::RenderMesh()
 
 void Object::Update()
 {
-    if ((Flags & eObjectFlags::PhysicsEnabled) != 0 && pScene) {
+    if (IsFlagSet(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
         PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
 
         if (mbPhysicsTransformOutOfDate) {
@@ -407,6 +415,20 @@ void Object::Update()
         SyncObjectWithPhysics(phys);
     }
 
+
+    // if (IsFlagSet(PendingFlags, eObjectFlags::Unlit) && !mMaterialID.IsNull()) {
+    //     if (gMaterialManager->GetMaterial(mMaterialID)->IsReady()) {
+    //         ClearFlag(PendingFlags, eObjectFlags::Unlit);
+
+    //         if (!IsFlagSet(Flags, eObjectFlags::Unlit)) {
+    //             SetGraphicsPipeline(nullptr);
+    //         }
+    //         else {
+    //             SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
+    //         }
+    //     }
+    // }
+
     UpdateAnimation();
 }
 
@@ -416,7 +438,7 @@ void Object::SetScriptVars()
         return;
     }
 
-    pScript->SetGlobal(HashStr32("OBJECTID"), script::FoxValue(static_cast<int32>(ObjectId)));
+    pScript->SetGlobal(HashStr32("OBJECTID"), script::FoxValue(static_cast<int32>(ID.GetID())));
 }
 
 void Object::AttachScript(const Ref<script::FoxScript>& script)
@@ -431,9 +453,9 @@ void Object::LoadScript(const String& path)
     SetScriptVars();
 }
 
-void Object::AttachObject(const TSRef<Object>& object)
+void Object::AttachObject(const ObjectID& object)
 {
-    if (AttachedNodes.IsEmpty()) {
+    if (!AttachedNodes.IsInited()) {
         AttachedNodes.Create(8);
     }
 
@@ -450,16 +472,15 @@ void Object::SyncObjectWithPhysics(PhObject* phys)
     }
 }
 
-void Object::SetRenderUnlit(const bool value)
+void Object::SetUnlit(const bool value)
 {
     if (value) {
-        SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
-        Flags |= eObjectFlags::Unlit;
+        SetFlag(Flags, eObjectFlags::Unlit);
+        // SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
     else {
-        // Set to default graphics pipeline
-        SetGraphicsPipeline(nullptr);
-        Flags &= (~eObjectFlags::Unlit);
+        ClearFlag(Flags, eObjectFlags::Unlit);
+        // SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
 }
 
@@ -480,19 +501,18 @@ void Object::SetPhysicsEnabled(bool enabled)
     if (enabled) {
         LogInfo("Activate physics body");
         gPhysics->GetBodyInterface().ActivateBody(phys->GetBodyId());
-        Flags |= eObjectFlags::PhysicsEnabled;
+        SetFlag(Flags, eObjectFlags::PhysicsEnabled);
     }
     else {
         LogInfo("Deactivate physics body");
         gPhysics->GetBodyInterface().DeactivateBody(phys->GetBodyId());
-
-        Flags &= (~eObjectFlags::PhysicsEnabled);
+        ClearFlag(Flags, eObjectFlags::PhysicsEnabled);
     }
 }
 
 void Object::PrintDebug() const
 {
-    LogInfo(LC_CORE, "Object '{}' (Id={}, Material={}) {{", Name.Get(), ObjectId, mMaterialID);
+    LogInfo(LC_CORE, "Object '{}' (Id={}, Material={}) {{", Name.Get(), ID, mMaterialID);
     LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
 
     PhObject* phys = nullptr;
@@ -500,20 +520,21 @@ void Object::PrintDebug() const
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
         bool has_body = phys->mbHasPhysicsBody;
         LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
-                static_cast<bool>((Flags & eObjectFlags::PhysicsEnabled) != 0), phys->GetBodyId().GetIndex(),
-                phys->GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
+                IsFlagSet(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
+                (phys->GetMotionType() == ePhMotionType::Static) ? "Static" : "Dynamic");
     }
 
     LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
-            static_cast<bool>((Flags & eObjectFlags::IsInstance) != 0),    /* */
-            static_cast<bool>((Flags & eObjectFlags::ReadyToRender) != 0), /* */
-            static_cast<bool>((Flags & eObjectFlags::ShadowCaster) != 0),  /* */
+            IsFlagSet(Flags, eObjectFlags::IsInstance),    /* */
+            IsFlagSet(Flags, eObjectFlags::ReadyToRender), /* */
+            IsFlagSet(Flags, eObjectFlags::ShadowCaster),  /* */
             (pMesh && pMesh->VertexList.IsSkinned()));
 
     LogInfo(LC_CORE, "}}");
 
     LogInfo(LC_CORE, "Attached({}): ", AttachedNodes.Size());
-    for (const TSRef<Object>& obj : AttachedNodes) {
+    for (const ObjectID& obj_id : AttachedNodes) {
+        Object* obj = gObjectManager->GetObject(obj_id);
         obj->PrintDebug();
     }
 }
@@ -526,21 +547,21 @@ void Object::Destroy()
     }
 
     PhObject* phys = nullptr;
-    if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
+    if (pScene != nullptr && (phys = pScene->GetPhysicsObject(PhysicsId)) != nullptr) {
         phys->DestroyPhysicsBody();
     }
 
+    pScene = nullptr;
+
     if (!AttachedNodes.IsEmpty()) {
-        for (TSRef<Object>& obj : AttachedNodes) {
+        for (ObjectID& obj_id : AttachedNodes) {
+            Object* obj = gObjectManager->GetObject(obj_id);
             obj->Destroy();
         }
     }
 
-    Flags &= ~(eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled);
-
-    bIsUploadedToGpu = false;
+    ClearFlag(Flags, (eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled));
 }
 
-Object::~Object() { Destroy(); }
 
 } // namespace fx

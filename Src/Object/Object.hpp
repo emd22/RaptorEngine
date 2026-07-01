@@ -7,16 +7,21 @@
 // #include <ThirdParty/Jolt/Physics/Body/BodyID.h>
 
 #include <Asset/Animation.hpp>
+#include <Asset/AssetObject.hpp>
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Core/Ref.hpp>
 #include <Core/TSRef.hpp>
 #include <Entity.hpp>
 #include <Material/MaterialID.hpp>
-#include <ObjectManager.hpp>
 #include <Script/FoxScript.hpp>
 
+
 namespace fx {
+
+namespace renderer {
+class Pipeline;
+};
 
 enum class eObjectFlags : uint16
 {
@@ -33,20 +38,18 @@ FxEnumFlags(eObjectFlags);
 
 class PrimitiveMesh;
 
-class Object : public AxBase, public Entity
+class Object : public Entity
 {
-    friend class AxLoaderGltf;
     friend class AxManager;
 
 public:
-    static const ::fx::ObjectId sNone = UINT32_MAX;
-
     static constexpr eEntityType scEntityType = eEntityType::Object;
 
 public:
-    Object();
+    Object() = default;
+    Object(const ObjectID& id);
 
-    void MakeInstanceOf(const TSRef<Object>& source_ref);
+    void MakeInstanceOf(const ObjectID& source);
 
     void Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material);
 
@@ -55,13 +58,13 @@ public:
      */
     void RenderPrimitive(const renderer::CommandBuffer& cmd);
     void Render(const Camera& camera);
-    void RenderShallow(const Camera& camera);
+    void RenderShallow(const Camera& camera, renderer::Pipeline* alt_pipeline = nullptr);
     void RenderUnlit(const Camera& camera);
 
     bool CheckIfReady(bool require_material);
 
 
-    void AttachObject(const TSRef<Object>& object);
+    void AttachObject(const ObjectID& object);
 
     void Update();
 
@@ -135,24 +138,26 @@ public:
 
     FX_FORCE_INLINE bool IsShadowCaster() const { return (Flags & eObjectFlags::ShadowCaster) != 0; }
 
-    void SetRenderUnlit(const bool value);
-    FX_FORCE_INLINE bool GetRenderUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
+    void SetUnlit(const bool value);
+    FX_FORCE_INLINE bool IsUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
-    void MarkReadyToRender()
-    {
-        Flags |= eObjectFlags::ReadyToRender;
+    void Destroy();
+    ~Object() override { Destroy(); }
 
-        bIsUploadedToGpu = true;
-        IsFinishedNotifier.Signal();
-    }
-
-    void Destroy() override;
-    ~Object();
+protected:
+    /**
+     * @brief Finalizes any changes that have been made to the object before it was finished loading.
+     */
+    void FinalizeWhenReady();
 
 private:
-    void RenderMesh();
+    /**
+     * @brief Render the bare model for the object. Note that there are no `CheckIfReady` checks in here as they are
+     * done by RenderShallow et. al!
+     */
+    void RenderMesh(renderer::Pipeline* pipeline);
     void SetScriptVars();
 
     void SyncObjectWithPhysics(PhObject* phys);
@@ -168,22 +173,21 @@ public:
 
     Scene* pScene = nullptr;
 
-    PagedArray<TSRef<Object>> AttachedNodes;
+    PagedArray<ObjectID> AttachedNodes;
 
     Vec3f Dimensions = Vec3f::sZero;
 
     Ref<script::FoxScript> pScript { nullptr };
 
-private:
     MaterialID mMaterialID = MaterialID::Null;
 
+private:
     /// Object slots allocated following this object. Used by other instances of this object.
     uint16 mInstanceSlots = 0;
     uint16 mInstanceSlotsInUse = 0;
 
-    TSRef<Object> mpInstanceSource { nullptr };
-
     eObjectFlags Flags = eObjectFlags::None;
+    eObjectFlags PendingFlags = eObjectFlags::None;
 
     eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 };

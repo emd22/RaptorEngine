@@ -4,7 +4,7 @@
 #include <Asset/ShaderCompiler.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Material/MaterialManager.hpp>
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
 
 namespace fx {
@@ -39,7 +39,6 @@ void Destroy()
     DESTROY_GLOBAL(gPhysics);
     DESTROY_GLOBAL(gShaderCompiler);
     DESTROY_GLOBAL(gMaterialManager);
-    DESTROY_GLOBAL(gObjectManager);
 }
 
 } // namespace Globals

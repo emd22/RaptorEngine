@@ -1,14 +1,15 @@
 #pragma once
 
-#include "AxBase.hpp"
+#include "AssetBase.hpp"
 
+#include <Core/PagedArray.hpp>
 #include <Core/Ref.hpp>
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {
 
-class AxImage : public AxBase
+class AxImage : public AssetBase
 {
 protected:
 public:

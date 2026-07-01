@@ -1,9 +1,10 @@
 #pragma once
 
-#include "ObjectManager.hpp"
+#include "Object/ObjectManager.hpp"
 
+#include <Asset/AssetTicket.hpp>
 #include <Entity.hpp>
-#include <Object.hpp>
+#include <Object/Object.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/RenderList.hpp>
@@ -17,7 +18,9 @@ public:
 
     void Create();
 
-    void Attach(const TSRef<Object>& object);
+    void Attach(AssetTicket<Object> object_ticket);
+    void Attach(Object* object);
+
     void Attach(const Ref<LightBase>& light);
 
     PhObjectId NewPhysicsObject();
@@ -28,7 +31,7 @@ public:
     void Render(Camera* shadow_camera);
     void RenderShadows(Camera* shadow_camera);
 
-    const PagedArray<TSRef<Object>>& GetAllObjects() { return mObjects; }
+    const PagedArray<ObjectID>& GetAllObjects() { return mObjects; }
     const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
 
     Ref<LightDirectional> GetDirectionalLight()
@@ -41,7 +44,7 @@ public:
         return Ref<LightDirectional>(nullptr);
     }
 
-    TSRef<Object> FindObject(const Hash32 name_hash);
+    Object* FindObject(const Hash32 name_hash);
     PhObject* FindPhysicsObject(const Hash32 name_hash);
 
     void SelectPhysicsObject(const JPH::BodyID& body_id);
@@ -56,12 +59,10 @@ public:
     ~Scene() { Destroy(); }
 
 private:
-    void RenderUnlitObjects(const Camera& camera) const;
     void RenderPhysicsObjects(const Camera& camera);
+    void RenderObjectShadows(Object* object_id);
 
-    void RenderObjectShadows(const TSRef<Object>& obj);
-
-    void RenderRLSection(const renderer::RenderListSection& section);
+    void ExecuteRenderList(renderer::ePipelineName pl_name);
 
 public:
     Name Name = "(unnamed)";
@@ -71,7 +72,7 @@ public:
     renderer::RenderList mRenderList;
 
 private:
-    PagedArray<TSRef<Object>> mObjects;
+    PagedArray<ObjectID> mObjects;
     PagedArray<Ref<LightBase>> mLights;
     PagedArray<PhObject> mPhysicsObjects;
 

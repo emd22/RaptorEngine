@@ -1,16 +1,16 @@
-#include "AxLoaderGltf.hpp"
+#include "LoaderGltf.hpp"
 
-#include "AxLoaderStb.hpp"
+#include "../Image/LoaderStb.hpp"
 
 #include <ThirdParty/cgltf.h>
 
 #include <Asset/Animation.hpp>
-#include <Asset/AxBase.hpp>
+#include <Asset/AssetBase.hpp>
 #include <Asset/AxManager.hpp>
 #include <Core/Ref.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
-#include <Object.hpp>
+#include <Object/Object.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 
@@ -25,8 +25,9 @@ namespace fx {
 
 using namespace renderer;
 
-void AxLoaderGltf::UnpackMeshAttributes(const TSRef<Object>& object, Ref<PrimitiveMesh>& mesh,
-                                        cgltf_primitive* primitive)
+namespace loader {
+
+void LoaderGltf::UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, cgltf_primitive* primitive)
 {
     SizedArray<float32> positions;
     SizedArray<float32> normals;
@@ -145,21 +146,21 @@ static String GetTextureCachePath(const String& asset_path, Material* material, 
     // Add the filename
     path.Add(String::Fmt("{}_{}.ftx", material->Name.Get(), component_name));
 
-    return std::move(path.Str());
+    return path.Str();
 }
 
 
 static void GenerateMipmapImage(const String& output_path, eImageFormat format, const uint8* data, uint32 size)
 {
-    TSRef<AxLoaderStb> loader = TSRef<AxLoaderStb>::New();
+    TSRef<loader::LoaderStb> loader = TSRef<loader::LoaderStb>::New();
     loader->ImageType = eImageType::Flat;
     loader->ImageFormat = format;
     loader->CreationFlags = eImageCreateFlags::None;
 
     TSRef<AxImage> image = TSRef<AxImage>::New();
-    AxLoaderStb::eStatus status = loader->LoadFromMemory(image, data, size);
+    loader::eLoaderStatus status = loader->Load(image, data, size);
 
-    if (status != AxLoaderStb::eStatus::Success) {
+    if (status != loader::eLoaderStatus::Success) {
         LogError("Error loading material texture!");
         return;
     }
@@ -214,7 +215,7 @@ static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* 
     }
 }
 
-void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primitive* primitive, int32 primitive_index)
+void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primitive, int32 primitive_index)
 {
     // if (!object->mMaterialID.IsNull()) {
     //     return;
@@ -269,22 +270,29 @@ void AxLoaderGltf::MakeMaterialForPrimitive(TSRef<Object>& object, cgltf_primiti
     material->bReadyToCheck.test_and_set();
 }
 
-void AxLoaderGltf::BuildObjectsFromPrimitives(TSRef<Object>& container_object, cgltf_mesh* gltf_mesh)
+void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh)
 {
     const bool has_multiple_primitives = gltf_mesh->primitives_count > 1;
 
     // Assume at first that there is only one primitive;
-    TSRef<Object> current_object = container_object;
+    Object* current_object = container_object;
 
     // Similarly to `CreateGpuResource`, we are going to make the `object` into a container
     // if there are multiple primitives.
     if (has_multiple_primitives) {
-        current_object = TSRef<Object>::New();
-        // Propagate the name
-        current_object->Name = container_object->Name;
+        current_object = gObjectManager->NewObject(container_object->Name.Get());
     }
 
+    bool needs_new_object = false;
+
     for (int i = 0; i < gltf_mesh->primitives_count; i++) {
+        if (needs_new_object) {
+            // Create a new object to load into next
+            current_object = gObjectManager->NewObject(container_object->Name.Get());
+            needs_new_object = false;
+        }
+
+
         cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[i];
         Ref<PrimitiveMesh> primitive_mesh = Ref<PrimitiveMesh>::New();
 
@@ -308,16 +316,14 @@ void AxLoaderGltf::BuildObjectsFromPrimitives(TSRef<Object>& container_object, c
 
         if (has_multiple_primitives) {
             // Attach the current object to the object container (our output)
-            container_object->AttachObject(current_object);
-
-            // Create a new object to load into next
-            current_object = TSRef<Object>::New();
+            container_object->AttachObject(current_object->ID);
+            needs_new_object = true;
         }
     }
 }
 
 
-void AxLoaderGltf::UploadMeshToGpu(TSRef<Object>& object)
+void LoaderGltf::UploadMeshToGpu(Object* object)
 {
     // uint32 attached_count = object->AttachedNodes.Size();
 
@@ -346,7 +352,7 @@ void AxLoaderGltf::UploadMeshToGpu(TSRef<Object>& object)
 }
 
 
-int32 AxLoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const
+int32 LoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) const
 {
     for (cgltf_size i = 0; i < skin->joints_count; i++) {
         if (skin->joints[i] == node) {
@@ -358,7 +364,7 @@ int32 AxLoaderGltf::FindJointIndex(cgltf_skin* skin, const cgltf_node* node) con
 }
 
 
-void AxLoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
+void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 {
     if (!skin) {
         return;
@@ -403,7 +409,7 @@ void AxLoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
     }
 }
 
-void AxLoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin)
+void LoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& anim, cgltf_skin* skin)
 {
     const uint32 joint_count = skin ? static_cast<uint32>(skin->joints_count) : 0;
 
@@ -482,7 +488,7 @@ void AxLoaderGltf::LoadAnimation(Animation& out_anim, const cgltf_animation& ani
     LogInfo(LC_ASSET, "Loaded animation '{}': {:.3f}s, {} joints", out_anim.Name, out_anim.Duration, joint_count);
 }
 
-void AxLoaderGltf::LoadAnimations(TSRef<Object>& output_object, Skeleton& skel)
+void LoaderGltf::LoadAnimations(Object* object, Skeleton& skel)
 {
     if (!mpGltfData->animations_count || mpGltfData->skins_count == 0) {
         return;
@@ -491,36 +497,46 @@ void AxLoaderGltf::LoadAnimations(TSRef<Object>& output_object, Skeleton& skel)
     // Most models only have one skin/skeleton, so we just assume one for now.
     cgltf_skin* skin = &mpGltfData->skins[0];
 
-    output_object->Animations.InitCapacity(8);
+    object->Animations.InitCapacity(8);
 
 
     for (uint32 i = 0; i < mpGltfData->animations_count; i++) {
         Animation anim;
         LoadAnimation(anim, mpGltfData->animations[i], skin);
-        output_object->Animations.Insert(std::move(anim));
+        object->Animations.Insert(std::move(anim));
     }
 
     LogInfo(LC_ASSET, "Loaded {} animations", mpGltfData->animations_count);
 }
 
-void AxLoaderGltf::ProcessData(TSRef<Object>& output_object)
+void LoaderGltf::ProcessData(AssetTicket<Object>& ticket)
 {
     // If there is only one mesh to load, store the mesh directly in the output object
-    TSRef<Object> current_object = output_object;
+    Object* output_object = ticket.Get();
+    Object* current_object = output_object;
 
     // If there are multiple gltf meshes, we will need to use the output object as a
     // container for multiple other meshes
     const bool has_multiple_meshes = mpGltfData->meshes_count > 1;
 
+    int32 attach_id = 1;
+
     // If there are multiple objects, each object found will be attached to the output object.
     if (has_multiple_meshes) {
-        current_object = TSRef<Object>::New();
+        current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++));
     }
 
-    int32 attach_id = 1;
+
+    bool needs_new_object = false;
 
     // Load each object in the GLTF as a new separate object.
     for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
+        if (needs_new_object) {
+            // Create a new object to load into next
+            current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++));
+            needs_new_object = false;
+        }
+
         cgltf_node* node = &mpGltfData->nodes[node_index];
 
         if (node->mesh) {
@@ -536,18 +552,14 @@ void AxLoaderGltf::ProcessData(TSRef<Object>& output_object)
         }
 
         if (has_multiple_meshes) {
-            current_object->Name.Set(String::Fmt("{}_{}", output_object->Name.Get(), attach_id++));
-
             // Attach the loaded object onto the final object. This will be a container.
-            output_object->AttachObject(current_object);
-
-            // Create a new object to load into next
-            current_object = TSRef<Object>::New();
+            output_object->AttachObject(current_object->ID);
+            needs_new_object = true;
         }
     }
 }
 
-AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const String& path)
+eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const String& path)
 {
     cgltf_options options {};
 
@@ -556,42 +568,38 @@ AxLoaderGltf::Status AxLoaderGltf::LoadFromFile(TSRef<AxBase> asset, const Strin
     cgltf_result status = cgltf_parse_file(&options, path.CStr(), &mpGltfData);
     if (status != cgltf_result_success) {
         LogError(LC_ASSET, "Error parsing GLTF file! (path: {})", path);
-        return AxLoaderGltf::Status::Error;
+        return eLoaderStatus::Error;
     }
 
     status = cgltf_load_buffers(&options, mpGltfData, path.CStr());
     if (status != cgltf_result_success) {
         LogError(LC_ASSET, "Error loading buffers from GLTF file! (path: {:s})", path);
-        return AxLoaderGltf::Status::Error;
+        return eLoaderStatus::Error;
     }
 
-    TSRef<Object> object(asset);
-    ProcessData(object);
+    ProcessData(ticket);
 
-    return AxLoaderGltf::Status::Success;
+    return eLoaderStatus::Success;
 }
 
 
-AxLoaderGltf::Status AxLoaderGltf::LoadFromMemory(TSRef<AxBase> asset, const uint8* data, uint32 size)
+eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const uint8* data, uint32 size)
 {
     cgltf_options options {};
 
     cgltf_result status = cgltf_parse(&options, data, size, &mpGltfData);
     if (status != cgltf_result_success) {
         LogError(LC_ASSET, "Error parsing GLTF file from data");
-        return AxLoaderGltf::Status::Error;
+        return eLoaderStatus::Error;
     }
 
-    TSRef<Object> object(asset);
-    ProcessData(object);
+    ProcessData(ticket);
 
-    return AxLoaderGltf::Status::Success;
+    return eLoaderStatus::Success;
 }
 
-void AxLoaderGltf::CreateGpuResource(TSRef<AxBase>& asset)
+void LoaderGltf::CreateGpuResource(AssetTicket<Object>& ticket)
 {
-    TSRef<Object> container_object(asset);
-
     // If there is only one mesh to load, store the mesh directly in the output object
     // TSRef<Object> current_object = container_object;
 
@@ -601,39 +609,28 @@ void AxLoaderGltf::CreateGpuResource(TSRef<AxBase>& asset)
 
     // UploadMeshToGpu(container_object);
 
-    uint32 attached_count = container_object->AttachedNodes.Size();
+    Object* object = ticket.Get();
+
+    uint32 attached_count = object->AttachedNodes.Size();
 
     // container_object->PrintDebug();
 
     for (uint32 i = 0; i < attached_count; i++) {
-        UploadMeshToGpu(container_object->AttachedNodes[i]);
+        UploadMeshToGpu(gObjectManager->GetObject(object->AttachedNodes[i]));
     }
 
-    UploadMeshToGpu(container_object);
-
-    // LogInfo(LC_ASSET, "UPLOADING GLTF object with {} meshes", mpGltfData->meshes_count);
-
-    // for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
-    //     cgltf_node* node = &mpGltfData->nodes[node_index];
-
-    //     if (current_object->pMesh.IsValid()) {
-    //     }
-
-    //     if (has_multiple_meshes) {
-    //         current_object = container_object->AttachedNodes[node_index];
-    //     }
-    // }
-
-    asset->bIsUploadedToGpu = true;
-    asset->bIsUploadedToGpu.notify_all();
+    UploadMeshToGpu(object);
+    ticket.SignalUploadedToGpu();
 }
 
-void AxLoaderGltf::Destroy(TSRef<AxBase>& asset)
+void LoaderGltf::Destroy()
 {
     if (mpGltfData) {
         cgltf_free(mpGltfData);
         mpGltfData = nullptr;
     }
 }
+
+} // namespace loader
 
 } // namespace fx

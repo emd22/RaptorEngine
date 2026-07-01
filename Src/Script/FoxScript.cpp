@@ -95,6 +95,10 @@ void FoxScript::Load(const String& path)
 {
     SizedArray<uint8> bytecode = Compile(path);
 
+    if (!bytecode.IsInited()) {
+        return;
+    }
+
 
     Vm.InitVM(std::move(bytecode), nullptr);
 

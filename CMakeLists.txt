@@ -63,7 +63,18 @@ if(WIN32)
 
 elseif(APPLE)
     set_target_properties(foxtrot PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "aarch64")
-    target_compile_options(foxtrot PRIVATE -Wno-nullability-completeness)
+
+
+
+    target_compile_options(foxtrot PRIVATE
+        -Wno-nullability-completeness
+        -Wcast-align
+        -Wold-style-cast
+        -Wpessimizing-move
+        -Wredundant-move
+        -Wshadow
+        -Wdouble-promotion
+    )
     target_link_directories(foxtrot PRIVATE "./Lib/macOS")
 
     set(VK_SDK $ENV{VULKAN_SDK})

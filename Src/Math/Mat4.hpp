@@ -151,8 +151,9 @@ public:
     {
         printf("\t=== Matrix ===\n");
         for (int i = 0; i < 4; i++) {
-            printf("{ %.06f\t%.06f\t%.06f\t%.06f }", Columns[0].mData[i], Columns[1].mData[i], Columns[2].mData[i],
-                   Columns[3].mData[i]);
+            printf("{ %.06f\t%.06f\t%.06f\t%.06f }", static_cast<double>(Columns[0].mData[i]),
+                   static_cast<double>(Columns[1].mData[i]), static_cast<double>(Columns[2].mData[i]),
+                   static_cast<double>(Columns[3].mData[i]));
             putchar('\n');
         }
     }

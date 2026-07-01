@@ -3,7 +3,7 @@
 #include "Camera.hpp"
 #include "Engine.hpp"
 
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -16,9 +16,8 @@ using VertexType = LightBase::VertexType;
 
 LightBase::LightBase(eLightFlags flags) : Flags(flags)
 {
-    ObjectId = gObjectManager->GenerateObjectId();
-
-    LogDebug("Creating light (id={})", ObjectId);
+    this->ID = gObjectManager->NewObjectID("Light");
+    LogDebug("Creating light (id={})", this->ID);
 }
 
 void LightBase::SetLightVolume(const Ref<PrimitiveMesh>& volume) { pLightVolume = volume; }
@@ -64,7 +63,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
         memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
 
-        push_constants.ObjectId = ObjectId;
+        push_constants.ObjectId = ID.GetID();
         push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
 
         gRenderer->SubmitPushConstants(frame->CmdBuffer, *pPipeline, eShaderType::Vertex, push_constants);
@@ -104,13 +103,12 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
 
     DrawPushConstants push_constants {};
     memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
-    push_constants.ObjectId = ObjectId;
+    push_constants.ObjectId = ID.GetID();
 
     gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
                                    eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
     mpDebugMesh->Render(frame->CmdBuffer, 1);
-
 }
 
 
@@ -151,7 +149,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
         LightVertPushConstants push_constants {};
         memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
-        push_constants.ObjectId = ObjectId;
+        push_constants.ObjectId = ID.GetID();
         push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
 
         gRenderer->SubmitPushConstants(frame->CmdBuffer, *pPipeline, eShaderType::Vertex, push_constants);

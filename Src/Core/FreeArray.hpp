@@ -78,7 +78,11 @@ public:
 
             free(pPtr);
             pPtr = nullptr;
+
+            SlotsInUse.ClearAll();
         }
+
+        Capacity = 0;
     }
 
     ~FreeArray() { Free(); }

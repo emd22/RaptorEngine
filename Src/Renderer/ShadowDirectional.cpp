@@ -1,7 +1,7 @@
 #include "ShadowDirectional.hpp"
 
 #include <Engine.hpp>
-#include <ObjectManager.hpp>
+#include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Backend/VertexDescription.hpp>

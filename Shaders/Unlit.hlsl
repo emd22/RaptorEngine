@@ -7,6 +7,20 @@
 
 F_PROGRAM(FPT_VERTEX)
 
+
+struct VSInput
+{
+    float3 vPosition : POSITION;
+#ifdef IS_DEBUG_LAYER
+    // Skip
+#else
+    float3 vNormal : NORMAL;
+    float2 vUV : TEXCOORD0;
+    float3 vTangent : TANGENT;
+    uint uiInstanceId : SV_InstanceID;
+#endif
+};
+
 struct VSOutput
 {
     float4 vPosition : SV_POSITION;
@@ -22,18 +36,6 @@ struct VSOutput
 #endif // IS_DEBUG_LAYER
 };
 
-struct VSInput
-{
-    float3 vPosition : POSITION;
-#ifdef IS_DEBUG_LAYER
-    // Skip
-#else
-    float3 vNormal : NORMAL;
-    float2 vUV : TEXCOORD0;
-    float3 vTangent : TANGENT;
-    uint uiInstanceId : SV_InstanceID;
-#endif
-};
 
 struct VSPushConsts
 {
