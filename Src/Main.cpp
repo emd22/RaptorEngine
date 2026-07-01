@@ -77,9 +77,6 @@ int main()
     fx::renderer::Globals::Destroy();
 
     if (gAssetManager) {
-        delete fx::gObjectManager;
-        fx::gObjectManager = nullptr;
-
         delete gAssetManager;
         gAssetManager = nullptr;
     }

@@ -462,10 +462,10 @@ void Object::SetRenderUnlit(const bool value)
         SetFlag(Flags, eObjectFlags::Unlit);
         SetFlag(PendingFlags, eObjectFlags::Unlit);
     }
-    // else {
-    //     ClearFlag(Flags, eObjectFlags::Unlit);
-    //     SetFlag(PendingFlags, eObjectFlags::Unlit);
-    // }
+    else {
+        ClearFlag(Flags, eObjectFlags::Unlit);
+        SetFlag(PendingFlags, eObjectFlags::Unlit);
+    }
 }
 
 
@@ -485,13 +485,12 @@ void Object::SetPhysicsEnabled(bool enabled)
     if (enabled) {
         LogInfo("Activate physics body");
         gPhysics->GetBodyInterface().ActivateBody(phys->GetBodyId());
-        Flags |= eObjectFlags::PhysicsEnabled;
+        SetFlag(Flags, eObjectFlags::PhysicsEnabled);
     }
     else {
         LogInfo("Deactivate physics body");
         gPhysics->GetBodyInterface().DeactivateBody(phys->GetBodyId());
-
-        Flags &= (~eObjectFlags::PhysicsEnabled);
+        ClearFlag(Flags, eObjectFlags::PhysicsEnabled);
     }
 }
 
@@ -505,14 +504,14 @@ void Object::PrintDebug() const
     if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
         bool has_body = phys->mbHasPhysicsBody;
         LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
-                static_cast<bool>((Flags & eObjectFlags::PhysicsEnabled) != 0), phys->GetBodyId().GetIndex(),
-                phys->GetMotionType() == ePhMotionType::Static ? "Static" : "Dynamic");
+                IsFlagSet(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
+                (phys->GetMotionType() == ePhMotionType::Static) ? "Static" : "Dynamic");
     }
 
     LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
-            static_cast<bool>((Flags & eObjectFlags::IsInstance) != 0),    /* */
-            static_cast<bool>((Flags & eObjectFlags::ReadyToRender) != 0), /* */
-            static_cast<bool>((Flags & eObjectFlags::ShadowCaster) != 0),  /* */
+            IsFlagSet(Flags, eObjectFlags::IsInstance),    /* */
+            IsFlagSet(Flags, eObjectFlags::ReadyToRender), /* */
+            IsFlagSet(Flags, eObjectFlags::ShadowCaster),  /* */
             (pMesh && pMesh->VertexList.IsSkinned()));
 
     LogInfo(LC_CORE, "}}");
@@ -532,9 +531,11 @@ void Object::Destroy()
     }
 
     PhObject* phys = nullptr;
-    if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
+    if (pScene != nullptr && (phys = pScene->GetPhysicsObject(PhysicsId)) != nullptr) {
         phys->DestroyPhysicsBody();
     }
+
+    pScene = nullptr;
 
     if (!AttachedNodes.IsEmpty()) {
         for (ObjectID& obj_id : AttachedNodes) {
@@ -543,7 +544,7 @@ void Object::Destroy()
         }
     }
 
-    Flags &= ~(eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled);
+    ClearFlag(Flags, (eObjectFlags::ReadyToRender | eObjectFlags::IsInstance | eObjectFlags::PhysicsEnabled));
 }
 
 

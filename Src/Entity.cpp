@@ -112,9 +112,4 @@ void Entity::RecalculateModelMatrix()
     mbMatrixOutOfDate = false;
 }
 
-Entity::~Entity()
-{
-    // gObjectManager->DestroyObject(ID);
-}
-
 } // namespace fx

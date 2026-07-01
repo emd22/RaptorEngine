@@ -92,10 +92,15 @@ void ObjectManager::DestroyObject(ObjectID& id)
         return;
     }
 
+    // If the ID is passed in directly from an object (as it probably will be in some places), then we want to make sure
+    // we dont invalidate our ID before freeing it.
+    ObjectID id_copy = id;
+
     // Delete the object id at the definition
     mObjectList.GetItem(id.GetID())->ID.Invalidate();
+
     // Free the object from the list
-    mObjectList.FreeItem(id.GetID());
+    mObjectList.FreeItem(id_copy.GetID());
 
     // Invalidate the passed ID
     id.Invalidate();

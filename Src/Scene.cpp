@@ -56,8 +56,6 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 
         AssertMsg(object->pScene, "Scene has not been initialized on object!");
         object->pScene->mRenderList.Add(pipeline_name, object->ID);
-
-        LogInfo("Object {} has been added to render list", object->ID.GetID());
     }
 
     if (!object->AttachedNodes.IsEmpty()) {
@@ -347,6 +345,8 @@ void Scene::Destroy()
 {
     mObjects.Destroy();
     mLights.Destroy();
+
+    mPhysicsObjects.Destroy();
 }
 
 } // namespace fx

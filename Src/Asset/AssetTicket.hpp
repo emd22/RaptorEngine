@@ -186,7 +186,8 @@ public:
         }
 
         if (pTicketData->UsageCount.fetch_sub(1) <= 1) {
-            // pTicketData = nullptr;
+            free(pTicketData);
+            pTicketData = nullptr;
         }
     }
 

@@ -609,6 +609,10 @@ void FoxtrotGame::AddEditorModes()
 FoxtrotGame::~FoxtrotGame()
 {
     DestroyGame();
+
+    delete gObjectManager;
+    gObjectManager = nullptr;
+
     mMainScene.Destroy();
 
     PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();

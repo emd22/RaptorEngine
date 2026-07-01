@@ -50,7 +50,7 @@ public:
     FX_FORCE_INLINE Quat& SmoothInterpolate(const Quat& dest, const float speed, const float delta_time)
     {
         // Lerp with exp decay
-        NLerpIP(dest, 1.0 - expf(-speed * delta_time));
+        NLerpIP(dest, 1.0f - expf(-speed * delta_time));
 
         return *this;
     }

@@ -143,20 +143,20 @@ constexpr T operator~(T v)
 
 template <typename T>
     requires C_IsEnumFlags<T>
-constexpr T& ClearFlag(T& lhs, T flag)
+FX_FORCE_INLINE constexpr T& ClearFlag(T& lhs, T flag)
 {
     return (lhs &= static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(flag))));
 }
 
 template <typename T>
     requires C_IsEnumFlags<T>
-constexpr T& SetFlag(T& lhs, T flag)
+FX_FORCE_INLINE constexpr T& SetFlag(T& lhs, T flag)
 {
     return (lhs |= flag);
 }
 
 template <typename T>
-constexpr bool IsFlagSet(T lhs, T flag)
+FX_FORCE_INLINE constexpr bool IsFlagSet(T lhs, T flag)
 {
     using InternalType = EnumFlagsIntType<T>;
     return (static_cast<InternalType>(lhs) & static_cast<InternalType>(flag)) != 0;

@@ -89,7 +89,7 @@ public:
 
     FX_FORCE_INLINE void MarkMatrixOutOfDate() { mbMatrixOutOfDate = true; }
 
-    virtual ~Entity();
+    virtual ~Entity() = default;
 
 protected:
     void RecalculateModelMatrix();
