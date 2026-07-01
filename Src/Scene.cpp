@@ -38,6 +38,38 @@ void Scene::Attach(Object* object)
     }
 }
 
+static void AddObjectToRenderList(Object* object, Scene* scene)
+{
+    if (object->pScene == nullptr) {
+        object->pScene = scene;
+    }
+
+    if (object->pMesh.IsValid()) {
+        const bool is_unlit = object->IsUnlit();
+
+        Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+        if (is_unlit) {
+            material->SetPipeline(ePipelineName::Unlit);
+        }
+
+        ePipelineName pipeline_name = material->GetPipelineName();
+
+        AssertMsg(object->pScene, "Scene has not been initialized on object!");
+        object->pScene->mRenderList.Add(pipeline_name, object->ID);
+
+        LogInfo("Object {} has been added to render list", object->ID.GetID());
+    }
+
+    if (!object->AttachedNodes.IsEmpty()) {
+        LogInfo("Listing attached nodes for {}:", object->ID.GetID());
+
+        for (const ObjectID& attach_id : object->AttachedNodes) {
+            LogInfo("   Object {}", attach_id.GetID());
+            AddObjectToRenderList(gObjectManager->GetObject(attach_id), scene);
+        }
+    }
+}
+
 
 void Scene::Attach(AssetTicket<Object> object_ticket)
 {
@@ -45,29 +77,13 @@ void Scene::Attach(AssetTicket<Object> object_ticket)
 
     mObjects.Insert(object->ID);
 
-    object->pScene = this;
     object->OnAttached(this);
 
     object_ticket.OnLoaded(
-        [](void* item_ptr)
+        [this](void* item_ptr)
         {
             Object* object = static_cast<Object*>(item_ptr);
-
-            // TEMP
-            if (object->GetRenderUnlit()) {
-                return;
-            }
-
-
-            LogInfo("CALL ONLOADED");
-            Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
-            object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
-
-            for (const ObjectID& attach_id : object->AttachedNodes) {
-                Object* attach = gObjectManager->GetObject(attach_id);
-                material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
-                object->pScene->mRenderList.Add(material->GetPipelineName(), attach_id);
-            }
+            AddObjectToRenderList(object, this);
         });
 }
 
@@ -186,7 +202,12 @@ void Scene::Render(Camera* shadow_camera)
         light->Render(camera, shadow_camera);
     }
 
-    RenderUnlitObjects(camera);
+    gRenderer->BeginUnlit();
+
+    RenderRLSection(mRenderList.GetSection(ePipelineName::Unlit));
+
+    // RenderUnlitObjects(camera);
+
 
     if (bRenderPhysicsObjects) {
         RenderPhysicsObjects(camera);
@@ -202,7 +223,7 @@ void Scene::RenderUnlitObjects(const Camera& camera) const
     for (const ObjectID& object_id : mObjects) {
         Object* object = gObjectManager->GetObject(object_id);
 
-        if (!object->GetRenderUnlit()) {
+        if (!object->IsUnlit()) {
             continue;
         }
 

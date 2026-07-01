@@ -4,11 +4,18 @@
 
 namespace fx::renderer {
 
-static constexpr uint32 scMaxRenderable = 1024;
+static constexpr uint32 scMaxRenderable = 512;
 
 uint32 RenderList::Add(ePipelineName pl_name, const ObjectID& id)
 {
+    if (!mSections.IsInited()) {
+        mSections.InitSize(scNumPipelines);
+    }
+
+    AssertLess(static_cast<uint32>(pl_name), mSections.Capacity);
+
     RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
+
     if (!section.InUse.IsInited()) {
         section.InUse.InitZero(scMaxRenderable);
     }
@@ -29,6 +36,7 @@ uint32 RenderList::Add(ePipelineName pl_name, const ObjectID& id)
 
 void RenderList::Remove(ePipelineName pl_name, const ObjectID& id)
 {
+    Assert(static_cast<uint32>(pl_name) < mSections.Capacity);
     RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
 
     for (uint32 object_index = 0; object_index < section.Objects.Size; object_index++) {

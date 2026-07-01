@@ -17,13 +17,13 @@ void Terminate();
 template <typename... TTypes>
 void Panic(const char* module, const char* fmt, TTypes&&... items)
 {
-    LogFatal(LC_CORE, "An irrecoverable error has occurred");
+    LogFatal("An irrecoverable error has occurred");
 
     if (module != nullptr) {
-        LogFatal(LC_CORE, "{:s}: ", module);
+        LogFatal("{:s}: ", module);
     }
 
-    LogFatal(LC_CORE, fmt, std::forward<TTypes>(items)...);
+    LogFatal(fmt, std::forward<TTypes>(items)...);
 
     Terminate();
 }
@@ -51,6 +51,21 @@ void PanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&.
         LogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond, __FILE__, __LINE__);                        \
         Panic(__func__, "Assertion failed!", 0);                                                                       \
     }
+
+#define AssertLess(a_, b_)                                                                                             \
+    if (a_ >= b_) {                                                                                                    \
+        LogFatal("An assertion failed ({} < {}) at ({:s}:{:d})", a_, b_, __FILE__, __LINE__);                          \
+        LogFatal("Condition: {:s} < {:s}", #a_, #b_);                                                                  \
+        Panic(__func__, "Assertion failed!", 0);                                                                       \
+    }
+
+#define AssertGreater(a_, b_)                                                                                          \
+    if (a_ <= b_) {                                                                                                    \
+        LogFatal("An assertion failed ({} > {}) at ({:s}:{:d})", a_, b_, __FILE__, __LINE__);                          \
+        LogFatal("Condition: {:s} > {:s}", #a_, #b_);                                                                  \
+        Panic(__func__, "Assertion failed!", 0);                                                                       \
+    }
+
 
 #define AssertMsg(cond_, msg_)                                                                                         \
     if (!(cond_)) {                                                                                                    \

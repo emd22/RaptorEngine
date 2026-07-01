@@ -293,7 +293,7 @@ void Object::RenderShallow(const Camera& camera)
 
 void Object::RenderUnlit(const Camera& camera)
 {
-    if (!GetRenderUnlit()) {
+    if (!IsUnlit()) {
         return;
     }
 

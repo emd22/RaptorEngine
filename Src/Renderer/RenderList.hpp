@@ -9,6 +9,7 @@
 
 #include <Core/Bitset.hpp>
 #include <Core/DynArray.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Renderer/PipelineNames.hpp>
 
@@ -37,7 +38,7 @@ public:
     const RenderListSection& GetSection(ePipelineName pl_name) { return mSections[static_cast<uint32>(pl_name)]; }
 
 private:
-    std::array<RenderListSection, scNumPipelines> mSections;
+    SizedArray<RenderListSection> mSections;
 };
 
 } // namespace renderer

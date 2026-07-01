@@ -137,7 +137,7 @@ public:
     FX_FORCE_INLINE bool IsShadowCaster() const { return (Flags & eObjectFlags::ShadowCaster) != 0; }
 
     void SetRenderUnlit(const bool value);
-    FX_FORCE_INLINE bool GetRenderUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
+    FX_FORCE_INLINE bool IsUnlit() const { return (Flags & eObjectFlags::Unlit) != 0; }
 
     FX_FORCE_INLINE bool IsSkinned() const { return (pMesh != nullptr) && pMesh->VertexList.IsSkinned(); }
 
