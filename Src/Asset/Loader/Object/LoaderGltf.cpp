@@ -133,20 +133,17 @@ static String MakeMaterialTextureCacheName(Material* material, const char* compo
     return String::Fmt("{}_{}.ftx", material->Name.Get(), component_name);
 }
 
-
-static String GetTextureCachePath(const String& asset_path, Material* material, const char* component_name)
+static String GetTextureCachePath(const String& model_name, const String& base_path, Material* material,
+                                  const char* component_name)
 {
-    Path path = Path(asset_path);
-    // Transform the basename into a directory
-    // Some/Path/Filename.txt   to   Some/Path/Filename/
-    path.RemoveExtension();
-    // Ensure that the directories for the path are created
-    path.CreateDirs();
+    // Build a unique name (e.g. FireExtinguisher_BodyMaterial_Albedo)
+    String text = (String::Fmt("{}_{}_{}", model_name, material->Name.Get(), component_name));
+    const Hash32 id = HashStr32(text.CStr());
 
-    // Add the filename
-    path.Add(String::Fmt("{}_{}.ftx", material->Name.Get(), component_name));
+    // Some/Base/Path + abcd1234 + .ftx    ->      Some/Base/Path/abcd1234.ftx
+    String output_path = Path(base_path).Add(String(std::to_string(id))).AddExtension(".ftx").Str();
 
-    return path.Str();
+    return output_path;
 }
 
 
@@ -173,16 +170,16 @@ static void GenerateMipmapImage(const String& output_path, eImageFormat format, 
 
 
 template <eImageFormat TFormat>
-static void MakeMaterialTextureForPrimitive(const String& asset_path, Material* material, const char* component_name,
-                                            MaterialComponent<TFormat>& component, cgltf_texture_view& texture_view)
+static void MakeMaterialTextureForPrimitive(const String& model_name, const String& base_path, Material* material,
+                                            const char* component_name, MaterialComponent<TFormat>& component,
+                                            cgltf_texture_view& texture_view)
 {
     Assert(texture_view.texture != nullptr);
 
     // FilePath tex_cache_path = FilePath(String::Fmt("{}_{}", FilePath(asset_path).RemoveExtension().Str(),
     //                                                MakeMaterialTextureCacheName(material, component_name)));
 
-    String tex_cache_path = GetTextureCachePath(asset_path, material, component_name);
-
+    String tex_cache_path = GetTextureCachePath(model_name, base_path, material, component_name);
 
     const bool texture_cache_exists = FilesystemIO::FileExists(tex_cache_path);
 
@@ -230,6 +227,22 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
     String material_name = (gltf_material->name) ? gltf_material->name : object->Name.Get();
 
 
+    Path model_path(mModelPath);
+
+    // Get the filename (without extension) from the model path.
+    // Hello/Test/ModelName.xyz -> ModelName
+    model_path.RemoveExtension();
+    const String model_name = *model_path.BaseName();
+
+    // Remove the basename
+    // Hello/Test/ModelName -> Hello/Test
+    model_path.RemoveLast();
+    model_path.DirDown("TGen");
+    // Create the base dir if it doesn't exist
+    model_path.CreateDirs();
+
+    const String tcache_base_path = model_path.Str();
+
     object->mMaterialID = gMaterialManager->NewMaterial(material_name, ePipelineName::Geometry, object->IsSkinned());
 
     Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
@@ -246,7 +259,8 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
             // Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
         }
         else {
-            MakeMaterialTextureForPrimitive(mModelPath, material, "AL", material->Diffuse, texture_view);
+            MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "AL", material->Diffuse,
+                                            texture_view);
             // material->Properties.BaseColor = Color::FromRGBA(1, 1, 1, 255);
         }
     }
@@ -257,12 +271,13 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 
     // Load the normalmap
     if (gltf_material->normal_texture.texture != nullptr) {
-        MakeMaterialTextureForPrimitive(mModelPath, material, "NM", material->NormalMap, gltf_material->normal_texture);
+        MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "NM", material->NormalMap,
+                                        gltf_material->normal_texture);
     }
 
     // Load the metallic/roughness texture
     if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture != nullptr) {
-        MakeMaterialTextureForPrimitive(mModelPath, material, "MR", material->MetallicRoughness,
+        MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "MR", material->MetallicRoughness,
                                         gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
     }
 

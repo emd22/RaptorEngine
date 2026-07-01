@@ -74,6 +74,10 @@ public:
 
     String* Get(const uint32 index);
     const String* Get(const uint32 index) const;
+
+    /**
+     * @brief Returns the component for the basename. The basename is the filename and the file extension.
+     */
     String* BaseName() { return Get(Components.size() - 1); };
 
     String Str(eStrMode mode = eStrMode::FullPath) const;

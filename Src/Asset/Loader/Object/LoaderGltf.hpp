@@ -3,6 +3,7 @@
 #include "../ObjectLoaderBase.hpp"
 
 #include <Asset/Animation.hpp>
+#include <Core/Path.hpp>
 #include <Material/Material.hpp>
 #include <Object/Object.hpp>
 #include <vector>

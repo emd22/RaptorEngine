@@ -53,5 +53,14 @@ void RenderList::RemoveAllOfObject(const ObjectID& id)
     }
 }
 
+const RenderListSection& RenderList::GetSection(ePipelineName pl_name)
+{
+    if (!mSections.IsInited()) {
+        mSections.InitSize(scNumPipelines);
+    }
+
+    return mSections[static_cast<uint32>(pl_name)];
+}
+
 
 } // namespace fx::renderer

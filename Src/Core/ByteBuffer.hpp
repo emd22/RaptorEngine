@@ -19,7 +19,7 @@ public:
         bb.Capacity = size;
         bb.Offset = 0;
         bb.bIsExternalPtr = true;
-        return std::move(bb);
+        return bb;
     }
 
 public:

@@ -69,11 +69,11 @@ elseif(APPLE)
     target_compile_options(foxtrot PRIVATE
         -Wno-nullability-completeness
         -Wcast-align
-        -Wold-style-cast
+        #-Wold-style-cast
         -Wpessimizing-move
         -Wredundant-move
         -Wshadow
-        -Wdouble-promotion
+        #-Wdouble-promotion
     )
     target_link_directories(foxtrot PRIVATE "./Lib/macOS")
 

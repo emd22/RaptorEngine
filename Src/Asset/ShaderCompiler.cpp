@@ -114,7 +114,7 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
     // Entry was not found, return null data
     if (entry == nullptr) {
         LogWarning(LC_SHADER, "Could not find shader entry");
-        return std::move(program);
+        return program;
     }
 
     const SizedArray<uint8>& entry_data = entry->Data;
@@ -126,8 +126,8 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
     program.Reflection.InitCapacity(num_reflected_entries);
 
     for (uint32 i = 0; i < num_reflected_entries; i++) {
-        uint32 entry_data = bb.Get<uint32>();
-        program.Reflection.Insert(ShaderReflectionEntry::FromUInt(entry_data));
+        uint32 entry_data_int = bb.Get<uint32>();
+        program.Reflection.Insert(ShaderReflectionEntry::FromUInt(entry_data_int));
     }
 
 #endif
@@ -135,7 +135,7 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
     // Get the SPIRV data
     program.pProgramData = Slice<uint8>(bb.GetPtr<uint8>(), bb.GetRemainingSize());
 
-    return std::move(program);
+    return program;
 }
 
 
@@ -165,7 +165,7 @@ static ByteBuffer BuildReflectionHeader(const CompileState& state, eShaderType s
         bb.Insert<uint32>(entry.AsUInt());
     }
 
-    return std::move(bb);
+    return bb;
 }
 
 

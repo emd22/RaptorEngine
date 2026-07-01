@@ -58,7 +58,7 @@ bool Object::CheckIfReady(bool require_material)
         material->SetPipeline(ePipelineName::GeometrySkinned);
     }
 
-    Flags |= (eObjectFlags::ReadyToRender);
+    SetFlag(Flags, eObjectFlags::ReadyToRender);
     LogInfo(LC_RENDER, "Object {} is now ready to render.", Name.Get());
 
     // The object is now ready to render and is "full". Finalize any changes that have been made when loading.

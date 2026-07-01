@@ -16,6 +16,23 @@ public:
 public:
     static String NoCopy(char* ptr, uint32 length);
 
+    template <typename T>
+    static String From(T value)
+    {
+        // Using a temp buffer here is faster than trying to predict the length of the value before converting.
+        static constexpr uint32 scTmpBufferSize = 128;
+        char buffer[scTmpBufferSize];
+
+        // Convert using to_chars. This doesn't have heap allocs like std::to_string would.
+        std::to_chars_result result = std::to_chars(buffer, buffer + scTmpBufferSize, value);
+
+        if (result.ec != std::errc()) {
+            return String(buffer, result.ptr - buffer);
+        }
+
+        return String();
+    }
+
     template <typename... TTypes>
     static String Fmt(const char* fmt, TTypes&&... args)
     {

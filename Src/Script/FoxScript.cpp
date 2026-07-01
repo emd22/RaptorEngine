@@ -9,7 +9,6 @@
 
 #include <Core/Defer.hpp>
 #include <Core/String.hpp>
-#include <chrono>
 
 namespace fx::script {
 
@@ -88,7 +87,7 @@ SizedArray<uint8> FoxScript::Compile(const String& path)
     FoxBytecodePrinter bc_printer(bytecode);
     bc_printer.Print();
 
-    return std::move(bytecode);
+    return bytecode;
 }
 
 void FoxScript::Load(const String& path)

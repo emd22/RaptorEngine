@@ -155,7 +155,7 @@ Path Path::operator/(const String& sub) const
 {
     Path np(Components);
     np.Add(sub);
-    return std::move(np);
+    return np;
 }
 
 

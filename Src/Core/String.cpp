@@ -47,15 +47,27 @@ String::String(uint32 allocation_size)
 
 String::String(String&& other) { (*this) = other; }
 
-
 String String::SubStrAbs(uint32 start, uint32 end) const
 {
+    // Since its common to use to use Find* functions for start and end points, we should handle conditions where the
+    // values are not found.
+    if (start == String::scNotFound) {
+        start = 0;
+    }
+    if (end == String::scNotFound) {
+        end = Length - 1;
+    }
+
     Assert(start <= Length && end <= Length);
     return String(GetInternalPtr() + start, (end - start));
 }
 
 String String::SubStr(uint32 start, uint32 length) const
 {
+    if (start == String::scNotFound) {
+        start = 0;
+    }
+
     Assert(start <= Length && start + length <= Length);
     return String(GetInternalPtr() + start, length);
 }
