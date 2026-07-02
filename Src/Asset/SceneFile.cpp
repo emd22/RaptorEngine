@@ -44,7 +44,6 @@ void SceneFile::Load(const std::string& path, Scene& scene)
     }
 
     // Load sun
-
     Ref<LightDirectional> sun = scene.GetDirectionalLight();
     if (!sun.IsValid()) {
         sun = Ref<LightDirectional>::New();

@@ -27,10 +27,10 @@ public:
         std::to_chars_result result = std::to_chars(buffer, buffer + scTmpBufferSize, value);
 
         if (result.ec != std::errc()) {
-            return String(buffer, result.ptr - buffer);
+            return String();
         }
 
-        return String();
+        return String(buffer, result.ptr - buffer);
     }
 
     template <typename... TTypes>

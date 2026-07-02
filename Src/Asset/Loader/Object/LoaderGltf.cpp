@@ -133,15 +133,19 @@ static String MakeMaterialTextureCacheName(Material* material, const char* compo
     return String::Fmt("{}_{}.ftx", material->Name.Get(), component_name);
 }
 
-static String GetTextureCachePath(const String& model_name, const String& base_path, Material* material,
-                                  const char* component_name)
+static Hash32 GetTextureCacheID(const String& model_name, Material* material, const char* component_name)
 {
     // Build a unique name (e.g. FireExtinguisher_BodyMaterial_Albedo)
-    String text = (String::Fmt("{}_{}_{}", model_name, material->Name.Get(), component_name));
+    const String text = (String::Fmt("{}_{}_{}", model_name, material->Name.Get(), component_name));
     const Hash32 id = HashStr32(text.CStr());
 
+    return id;
+}
+
+static String GetTextureCachePath(const Hash32 texture_cache_id, const String& base_path)
+{
     // Some/Base/Path + abcd1234 + .ftx    ->      Some/Base/Path/abcd1234.ftx
-    String output_path = Path(base_path).Add(String(std::to_string(id))).AddExtension(".ftx").Str();
+    String output_path = Path(base_path).Add(String::From(texture_cache_id)).AddExtension(".ftx").Str();
 
     return output_path;
 }
@@ -149,13 +153,13 @@ static String GetTextureCachePath(const String& model_name, const String& base_p
 
 static void GenerateMipmapImage(const String& output_path, eImageFormat format, const uint8* data, uint32 size)
 {
-    TSRef<loader::LoaderStb> loader = TSRef<loader::LoaderStb>::New();
-    loader->ImageType = eImageType::Flat;
-    loader->ImageFormat = format;
-    loader->CreationFlags = eImageCreateFlags::None;
+    loader::LoaderStb loader {};
+    loader.ImageType = eImageType::Flat;
+    loader.ImageFormat = format;
+    loader.CreationFlags = eImageCreateFlags::None;
 
     TSRef<AxImage> image = TSRef<AxImage>::New();
-    loader::eLoaderStatus status = loader->Load(image, data, size);
+    loader::eLoaderStatus status = loader.Load(image, data, size);
 
     if (status != loader::eLoaderStatus::Success) {
         LogError("Error loading material texture!");
@@ -163,30 +167,27 @@ static void GenerateMipmapImage(const String& output_path, eImageFormat format, 
     }
 
     MipmapGen mm {};
-    mm.GenerateMipmaps(output_path.CStr(), format, loader->GetImageData(), loader->GetImageSize());
+    mm.GenerateMipmaps(output_path.CStr(), format, loader.GetImageData(), loader.GetImageSize());
 
-    // loader.InvalidateImageData();
+    loader.InvalidateImageData();
 }
 
 
-template <eImageFormat TFormat>
 static void MakeMaterialTextureForPrimitive(const String& model_name, const String& base_path, Material* material,
-                                            const char* component_name, MaterialComponent<TFormat>& component,
+                                            const char* component_name, MaterialComponent& component,
                                             cgltf_texture_view& texture_view)
 {
     Assert(texture_view.texture != nullptr);
 
-    // FilePath tex_cache_path = FilePath(String::Fmt("{}_{}", FilePath(asset_path).RemoveExtension().Str(),
-    //                                                MakeMaterialTextureCacheName(material, component_name)));
+    Hash32 texture_cache_id = GetTextureCacheID(model_name, material, component_name);
+    String texture_cache_path = GetTextureCachePath(texture_cache_id, base_path);
 
-    String tex_cache_path = GetTextureCachePath(model_name, base_path, material, component_name);
-
-    const bool texture_cache_exists = FilesystemIO::FileExists(tex_cache_path);
+    const bool texture_cache_exists = FilesystemIO::FileExists(texture_cache_path);
 
     if (texture_cache_exists) {
         MipmapLoader ml {};
 
-        ml.Open(tex_cache_path.CStr());
+        ml.Open(texture_cache_path.CStr());
 
         component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
         component.ImageToUpload = ml.GetMip(4);
@@ -207,8 +208,11 @@ static void MakeMaterialTextureForPrimitive(const String& model_name, const Stri
     component.UploadSrc = eMaterialComponentUploadSrc::ProcessAndUpload;
     component.pDataToLoad = MakeSlice(const_cast<const uint8*>(goober_buffer), image_buffer_size);
 
+    // Set the ID to be able to load higher resolution textures later
+    component.TextureCacheID = texture_cache_id;
+
     if (!texture_cache_exists) {
-        GenerateMipmapImage(tex_cache_path, TFormat, goober_buffer, image_buffer_size);
+        GenerateMipmapImage(texture_cache_path, component.ImageFormat, goober_buffer, image_buffer_size);
     }
 }
 

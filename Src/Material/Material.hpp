@@ -40,18 +40,18 @@ enum class eMaterialComponentUploadSrc
 // Material Component
 /////////////////////////////////////
 
-template <eImageFormat TFormat>
 struct MaterialComponent
 {
 public:
     using Status = eMaterialComponentStatus;
 
 public:
+    MaterialComponent(eImageFormat format) : ImageFormat(format) {}
+
     MaterialComponent::Status Build()
     {
         // There is no texture provided, we will use the base colours passed in and a dummy texture
         if (!pAssetImage.IsValid() && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
-            // pAssetImage = AxImage::GetEmptyImage<TFormat>();
             return Status::MissingComponent;
         }
 
@@ -70,6 +70,8 @@ public:
         UploadSrc = other.UploadSrc;
         pDataToLoad = other.pDataToLoad;
         ImageToUpload = other.ImageToUpload;
+
+        TextureCacheID = other.TextureCacheID;
 
         return *this;
     }
@@ -93,7 +95,7 @@ private:
             AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
 
             if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
-                pAssetImage = AssetManagerFwd::LoadImageFromMemory(TFormat, pDataToLoad.pData, pDataToLoad.Size);
+                pAssetImage = AssetManagerFwd::LoadImageFromMemory(ImageFormat, pDataToLoad.pData, pDataToLoad.Size);
             }
             else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
                 // If the image has not been created yet, create the reference.
@@ -122,12 +124,16 @@ private:
 public:
     TSRef<AxImage> pAssetImage { nullptr };
 
+    Hash32 TextureCacheID = HashNull32;
+
     eMaterialComponentUploadSrc UploadSrc = eMaterialComponentUploadSrc::None;
 
     /// Image data (including format containers) that needs to be parsed and uploaded by a loader.
     Slice<const uint8> pDataToLoad { nullptr };
 
     ImageInfo ImageToUpload {};
+
+    eImageFormat ImageFormat = eImageFormat::RGBA8_UNorm;
 
 private:
     bool mbRequiresUpdate = false;
@@ -189,6 +195,8 @@ public:
     bool Bind(const renderer::CommandBuffer& cmd);
     bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
 
+    void RequestQuality(uint32 quality);
+
     void Build();
 
     renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
@@ -201,7 +209,6 @@ public:
     renderer::Pipeline& GetPipeline() { return *mpPipeline; }
     renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
 
-    String GetCachePath() const;
 
     Material& operator=(const Material& other);
 
@@ -211,9 +218,9 @@ public:
 public:
     MaterialID ID = MaterialID::Null;
 
-    MaterialComponent<eImageFormat::RGBA8_UNorm> Diffuse {};
-    MaterialComponent<eImageFormat::RGBA8_UNorm> NormalMap {};
-    MaterialComponent<eImageFormat::RGBA8_UNorm> MetallicRoughness {};
+    MaterialComponent Diffuse { eImageFormat::RGBA8_UNorm };
+    MaterialComponent NormalMap { eImageFormat::RGBA8_UNorm };
+    MaterialComponent MetallicRoughness { eImageFormat::RGBA8_UNorm };
 
     MaterialProperties Properties {};
 

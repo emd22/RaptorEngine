@@ -183,8 +183,7 @@ void MipmapLoader::Open(const char* path)
 
 ImageInfo MipmapLoader::GetMip(uint32 mip_level)
 {
-    // uint32 closest_mip = FindClosestMipLevel(mip_level);
-    // mip_level = closest_mip;
+    mip_level = FindClosestMipLevel(mip_level);
 
     DataPackEntry* mip_entry = Pack.GetEntry(mip_level, true);
 

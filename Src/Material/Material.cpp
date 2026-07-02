@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 
 #include <Asset/AxManager.hpp>
+#include <Asset/MipmapGen.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
 #include <Object/ObjectManager.hpp>
@@ -44,6 +45,21 @@ bool Material::IsReady()
     CHECK_COMPONENT_READY(MetallicRoughness);
 
     return (mbIsReady = true);
+}
+
+
+void Material::RequestQuality(uint32 quality)
+{
+    // Require new IsReady checks
+    mbIsReady = false;
+
+    if (Diffuse.Exists()) {
+        MipmapLoader loader {};
+        loader.Open("");
+
+
+        // Diffuse.ImageToUpload.MipLevel =
+    }
 }
 
 DescriptorSet& Material::GetDescriptorSetAlbedoOnly()
@@ -92,12 +108,6 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
                                       MakeSlice(sets_to_bind, std::size(sets_to_bind)), Slice<uint32>(offsets));
 
     return true;
-}
-
-String Material::GetCachePath() const
-{
-    String base_path = "Data/Demo/Models/";
-    return base_path;
 }
 
 Material& Material::operator=(const Material& other)
