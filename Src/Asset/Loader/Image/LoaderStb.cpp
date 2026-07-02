@@ -101,8 +101,8 @@ void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
     const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Image.Size, 1,
-                                ImageFormat, Slice<uint8>(data_arr),
+    ImageInfo image_info { image->Image.Size, ImageFormat, 0, 1, Slice<const uint8>(data_arr.pData, data_arr.Size) };
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info,
                                 (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
     if (should_save_data) {

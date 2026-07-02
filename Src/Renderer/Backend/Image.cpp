@@ -238,24 +238,25 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 }
 
 
-void Image::CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2u& size, uint16 mips_count,
-                           eImageFormat format, const Slice<const uint8>& image_data, eImageCreateFlags flags)
+void Image::CreateFromData(CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags)
 {
+    // Upload image to staging buffer
     RawGpuBuffer staging_buffer;
-    staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+    staging_buffer.Create(eGpuBufferType::Transfer, info.ImageData.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
                           eGpuBufferFlags::TransferReceiver);
-    staging_buffer.Upload(image_data);
+    staging_buffer.Upload(info.ImageData);
 
     if ((flags & eImageCreateFlags::KeepInMemory) != 0) {
-        ImageData.CreateCopyOf(image_data.pData, image_data.Size);
+        ImageData.CreateCopyOf(info.ImageData.pData, info.ImageData.Size);
     }
 
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    Create(image_type, size, mips_count, format, VK_IMAGE_TILING_OPTIMAL, usage_flags, eImageAspectFlag::Color);
+    Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags,
+           eImageAspectFlag::Color);
 
-    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0, 0);
+    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, info.Size, 0, 0);
 }
 
 void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<const uint8>& image_data)

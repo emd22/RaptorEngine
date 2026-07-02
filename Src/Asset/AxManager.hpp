@@ -139,6 +139,9 @@ public:
         return TSRef<T>::New();
     }
 
+    FX_FORCE_INLINE void SetScenePath(const String& path) { ScenePath = path; }
+    FX_FORCE_INLINE const String& GetScenePath() const { return ScenePath; }
+
 
     ////////////////////////////////////////////////
     // Methods to create and load objects
@@ -173,7 +176,7 @@ public:
         return ticket;
     }
 
-    TSRef<AxImage> LoadImage(renderer::eImageType image_type, eImageFormat format, const std::string& path,
+    TSRef<AxImage> LoadImage(eImageType image_type, eImageFormat format, const std::string& path,
                              eImageCreateFlags flags)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
@@ -184,15 +187,14 @@ public:
 
     inline TSRef<AxImage> LoadImage(const std::string& path, eImageFormat format, eImageCreateFlags flags)
     {
-        return LoadImage(renderer::eImageType::Flat, format, path, flags);
+        return LoadImage(eImageType::Flat, format, path, flags);
     }
 
     /**
      * @brief Creates a new `Object` and loads the asset into it from
      * the data provided.
      */
-    TSRef<AxImage> LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, const uint8* data,
-                                       uint32 data_size)
+    TSRef<AxImage> LoadImageFromMemory(eImageType image_type, eImageFormat format, const uint8* data, uint32 data_size)
     {
         TSRef<AxImage> asset = TSRef<AxImage>::New();
         LoadImageFromMemory(image_type, format, asset, data, data_size);
@@ -209,15 +211,15 @@ public:
 
     inline TSRef<AxImage> LoadImageFromMemory(eImageFormat format, const uint8* data, uint32 data_size)
     {
-        return LoadImageFromMemory(renderer::eImageType::Flat, format, data, data_size);
+        return LoadImageFromMemory(eImageType::Flat, format, data, data_size);
     }
 
     ////////////////////////////////////////////////
     // Methods to load into existing containers
     ////////////////////////////////////////////////
 
-    void LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
-                             const uint8* data, uint32 data_size);
+    void LoadImageFromMemory(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const uint8* data,
+                             uint32 data_size);
 
     void LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info);
 
@@ -233,7 +235,7 @@ public:
     void LoadObject(const AssetTicket<Object>& ticket, const std::string& path, LoadObjectOptions options = {});
 
 
-    void LoadImage(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
+    void LoadImage(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
                    eImageCreateFlags flags);
 
     /**
@@ -241,14 +243,14 @@ public:
      */
     inline void LoadImage(TSRef<AxImage>& asset, eImageFormat format, const std::string& path, eImageCreateFlags flags)
     {
-        return LoadImage(renderer::eImageType::Flat, format, asset, path, flags);
+        return LoadImage(eImageType::Flat, format, asset, path, flags);
     }
     /**
      * @brief Loads an Image2D from the data provided into `asset`.
      */
     void LoadImageFromMemory(TSRef<AxImage>& asset, eImageFormat format, const uint8* data, uint32 data_size)
     {
-        LoadImageFromMemory(renderer::eImageType::Flat, format, asset, data, data_size);
+        LoadImageFromMemory(eImageType::Flat, format, asset, data, data_size);
     }
 
 
@@ -345,6 +347,9 @@ private:
     }
 
 public:
+    String ScenePath = "";
+
+
     //    DataNotifier DataLoaded;
 private:
     AxQueue mLoadQueue;

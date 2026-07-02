@@ -47,9 +47,10 @@ public:
         renderer::RenderBackendFwd::SubmitImmediateUploadCmd(
             [&](renderer::CommandBuffer& cmd)
             {
-                spEmptyImage->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(1, 1), 1, TFormat,
-                                                   Slice<const uint8>(image_data.pData, image_data.Size),
-                                                   eImageCreateFlags::None);
+                ImageInfo image_info { Vec2u(1, 1), TFormat, 0, 1,
+                                       Slice<const uint8>(image_data.pData, image_data.Size) };
+
+                spEmptyImage->Image.CreateFromData(cmd, image_info, eImageCreateFlags::None);
                 spEmptyImage->MarkAndSignalLoaded();
             });
 
@@ -70,7 +71,7 @@ public:
 public:
     renderer::Image Image {};
 
-    renderer::eImageType ImageType = renderer::eImageType::Flat;
+    eImageType ImageType = eImageType::Flat;
 };
 
 } // namespace fx

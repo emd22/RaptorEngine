@@ -69,8 +69,24 @@ enum class eImageFormat : uint16
     _eDepthFormatsEnd,
 };
 
+enum class eImageType
+{
+    Flat,
+    Cubemap,
+};
+
 struct ImageInfo
 {
+    ImageInfo() = default;
+
+    ImageInfo(Vec2u size, eImageFormat format, int32 mip_level, int32 mip_count, const Slice<const uint8>& data)
+        : ImageType(eImageType::Flat), Size(size), Format(format), MipLevel(mip_level), MipCount(mip_count),
+          ImageData(data)
+    {
+    }
+
+public:
+    eImageType ImageType = eImageType::Flat;
     Vec2u Size;
     eImageFormat Format = eImageFormat::RGBA8_UNorm;
     int32 MipLevel = 0;
@@ -177,12 +193,6 @@ struct ImageTypeProperties
     uint32 LayerCount;
 };
 
-enum class eImageType
-{
-    Flat,
-    Cubemap,
-};
-
 enum class eImageAspectFlag
 {
     Color = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -217,7 +227,10 @@ public:
     Image& operator=(const Image& other);
     Image& operator=(Ref<Image>&& ref);
 
-    ImageInfo GetInfo() const { return ImageInfo { .Size = Size, .Format = Format, .MipCount = mMipCount }; }
+    ImageInfo GetInfo() const
+    {
+        return ImageInfo { Size, Format, 0, mMipCount, Slice(ImageData.pData, ImageData.Size) };
+    }
 
     void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
                 VkImageUsageFlags usage, eImageAspectFlag aspect);
@@ -225,8 +238,7 @@ public:
     void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
                 VkImageUsageFlags usage, eImageAspectFlag aspect);
 
-    void CreateFromData(CommandBuffer& cmd, eImageType image_type, const Vec2u& size, uint16 mips_count,
-                        eImageFormat format, const Slice<const uint8>& image_data, eImageCreateFlags flags);
+    void CreateFromData(CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 
 
     void UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<const uint8>& image_data);

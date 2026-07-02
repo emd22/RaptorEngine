@@ -100,13 +100,14 @@ void MaterialManager::MakeNullMaterial()
     };
 
     TSRef<AxImage> diffuse = TSRef<AxImage>::New();
+
+    // Upload the null material diffuse texture to GPU
     renderer::gRenderer->SubmitImmediateUploadCmd(
         [&](renderer::CommandBuffer& cmd)
         {
-            diffuse->Image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(4, 4), 1, eImageFormat::RGBA8_UNorm,
-                                          MakeSlice<const uint8>(diffuse_data.pData, diffuse_data.Size),
-                                          eImageCreateFlags::None);
-
+            ImageInfo image_info { Vec2u(4, 4), eImageFormat::RGBA8_UNorm, 0, 1,
+                                   Slice<const uint8>(diffuse_data.pData, diffuse_data.Size) };
+            diffuse->Image.CreateFromData(cmd, image_info, eImageCreateFlags::None);
             diffuse->MarkAndSignalLoaded();
         });
 

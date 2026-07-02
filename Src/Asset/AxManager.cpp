@@ -271,8 +271,8 @@ void AxManager::LoadObjectFromMemory(const AssetTicket<Object>& ticket, const ui
 }
 
 
-void AxManager::LoadImage(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
-                          const std::string& path, eImageCreateFlags flags)
+void AxManager::LoadImage(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
+                          eImageCreateFlags flags)
 {
     bool is_jpeg = IsFileJpeg(path);
 
@@ -297,7 +297,7 @@ void AxManager::LoadImage(renderer::eImageType image_type, eImageFormat format, 
 }
 
 
-void AxManager::LoadImageFromMemory(renderer::eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
+void AxManager::LoadImageFromMemory(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
                                     const uint8* data, uint32 data_size)
 {
     if (IsMemoryJpeg(data, data_size)) {
@@ -332,15 +332,14 @@ static void DoDirectUpload(AxQueueItem& item, AssetItemData& asset_data)
     TSRef<AxImage> image(asset_data.pAsset);
 
     if (image->Image.IsInited()) {
+        // The image already exists, upload to a new mip in the same image.
         image->Image.UploadMip(renderer::RenderBackendFwd::GetUploadCmd(), img_info.MipLevel, img_info.Size,
                                img_info.ImageData);
     }
     else {
-        image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), renderer::eImageType::Flat,
-                                    img_info.Size, img_info.MipCount, img_info.Format, img_info.ImageData,
-                                    eImageCreateFlags::None);
+        // The image does not exist yet, upload directly as the base mip.
+        image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), img_info, eImageCreateFlags::None);
     }
-
 
     image->bIsUploadedToGpu = true;
     image->bIsUploadedToGpu.notify_all();

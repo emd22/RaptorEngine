@@ -122,9 +122,11 @@ void LoaderJpeg::CreateGpuResource(TSRef<AssetBase>& asset)
 
     const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
+    ImageInfo image_info { image->Image.Size, ImageFormat, 0, 1,
+                           MakeSlice<const uint8>(mImageData.pData, mImageData.Size) };
+
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image->ImageType, image->Image.Size, 1,
-                                ImageFormat, MakeSlice<const uint8>(mImageData.pData, mImageData.Size),
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info,
                                 (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
 
     if (should_save_data) {

@@ -28,6 +28,8 @@ void SceneFile::Load(const std::string& path, Scene& scene)
 {
     ConfigFile info;
 
+    gAssetManager->SetScenePath(path);
+
     info.Load(path + "/info.prx");
 
     bool first_time = (scene.GetAllObjects().Size() == 0);

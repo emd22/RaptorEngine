@@ -133,7 +133,7 @@ renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char*
         return image;
     }
 
-    const uint32 num_mips = dp.Entries.Size();
+    const int32 num_mips = static_cast<int32>(dp.Entries.Size());
 
     DataPackEntry* base_mip = &dp.Entries[0];
 
@@ -143,9 +143,19 @@ renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char*
     uint8* base_data = M_DATA_PTR(base_mip->Data.pData);
     uint32 base_data_size = M_DATA_SIZE(base_mip->Data);
 
-    image.CreateFromData(cmd, renderer::eImageType::Flat, Vec2u(base_header->SizeX, base_header->SizeY), num_mips,
-                         eImageFormat::RGBA8_UNorm, MakeSlice<uint8>(base_data, base_data_size),
-                         eImageCreateFlags::None);
+
+    const Vec2u image_size(base_header->SizeX, base_header->SizeY);
+    Slice<uint8> image_data(base_data, base_data_size);
+
+    ImageInfo image_info {
+        image_size,                       // Dimensions
+        eImageFormat::RGBA8_UNorm,        // Format
+        static_cast<int32>(base_mip->Id), // Mip level
+        num_mips,                         // Mips count
+        image_data,                       // Data
+    };
+
+    image.CreateFromData(cmd, image_info, eImageCreateFlags::None);
 
     // for (uint32 i = 1; i < num_mips; i++) {
     //     DataPackEntry* entry = &dp.Entries[i];

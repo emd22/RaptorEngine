@@ -22,6 +22,11 @@
 
 namespace fx {
 
+
+/////////////////////////////////////
+// Material Component
+/////////////////////////////////////
+
 enum class eMaterialComponentStatus
 {
     Ready,
@@ -36,10 +41,6 @@ enum class eMaterialComponentUploadSrc
     DirectUpload,
 };
 
-/////////////////////////////////////
-// Material Component
-/////////////////////////////////////
-
 struct MaterialComponent
 {
 public:
@@ -48,37 +49,12 @@ public:
 public:
     MaterialComponent(eImageFormat format) : ImageFormat(format) {}
 
-    MaterialComponent::Status Build()
-    {
-        // There is no texture provided, we will use the base colours passed in and a dummy texture
-        if (!pAssetImage.IsValid() && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
-            return Status::MissingComponent;
-        }
+    MaterialComponent& operator=(const MaterialComponent& other);
 
-        if (!CheckIfReady()) {
-            // The texture is not ready, return the status to the material build function
-            return Status::NotReady;
-        }
-
-        return Status::Ready;
-    }
-
-    MaterialComponent& operator=(const MaterialComponent& other)
-    {
-        pAssetImage = other.pAssetImage;
-
-        UploadSrc = other.UploadSrc;
-        pDataToLoad = other.pDataToLoad;
-        ImageToUpload = other.ImageToUpload;
-
-        TextureCacheID = other.TextureCacheID;
-
-        return *this;
-    }
-
+    MaterialComponent::Status Build();
     FX_FORCE_INLINE void RequireUpdate() { mbRequiresUpdate = true; }
 
-    bool Exists() const
+    FX_FORCE_INLINE bool Exists() const
     {
         return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
     }
@@ -86,44 +62,12 @@ public:
     ~MaterialComponent() = default;
 
 private:
-    bool CheckIfReady()
-    {
-        // If there is data passed in and the image has not been loaded yet, load it using the
-        // asset manager. This will be validated on the next call of this function. (when attempting to build the
-        // material)
-        if (!pAssetImage || mbRequiresUpdate) {
-            AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
-
-            if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
-                pAssetImage = AssetManagerFwd::LoadImageFromMemory(ImageFormat, pDataToLoad.pData, pDataToLoad.Size);
-            }
-            else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
-                // If the image has not been created yet, create the reference.
-                if (!pAssetImage.IsValid()) {
-                    pAssetImage = TSRef<AxImage>::New();
-                }
-
-                // If the image is previously initialized, we want to update the image with the new mip.
-                /// @see DoDirectUpload() in AxManager.cpp
-                AssetManagerFwd::LoadImageFromPixels(pAssetImage, ImageToUpload);
-            }
-
-            mbRequiresUpdate = false;
-
-            return false;
-        }
-
-        // If there is no texture and we are not loaded, return not loaded.
-        if (!pAssetImage->IsLoaded()) {
-            return false;
-        }
-
-        return true;
-    }
+    bool CheckIfReady();
 
 public:
     TSRef<AxImage> pAssetImage { nullptr };
 
+    /// The texture cache ID used to load this image from.
     Hash32 TextureCacheID = HashNull32;
 
     eMaterialComponentUploadSrc UploadSrc = eMaterialComponentUploadSrc::None;
@@ -131,6 +75,8 @@ public:
     /// Image data (including format containers) that needs to be parsed and uploaded by a loader.
     Slice<const uint8> pDataToLoad { nullptr };
 
+    /// The image info used to _directly_ upload pixel data to an image. This would be used when uploading from
+    /// pregenerated texture cache files.
     ImageInfo ImageToUpload {};
 
     eImageFormat ImageFormat = eImageFormat::RGBA8_UNorm;

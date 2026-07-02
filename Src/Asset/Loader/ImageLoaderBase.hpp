@@ -27,7 +27,7 @@ public:
     ~ImageLoaderBase() override = default;
 
 public:
-    renderer::eImageType ImageType = renderer::eImageType::Flat;
+    eImageType ImageType = eImageType::Flat;
     eImageFormat ImageFormat = eImageFormat::None;
     eImageCreateFlags CreationFlags = eImageCreateFlags::None;
 };

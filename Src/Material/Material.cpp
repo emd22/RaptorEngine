@@ -23,6 +23,77 @@ namespace fx {
 
 using namespace renderer;
 
+/////////////////////////////////////
+// Material Component
+/////////////////////////////////////
+
+MaterialComponent& MaterialComponent::operator=(const MaterialComponent& other)
+{
+    pAssetImage = other.pAssetImage;
+
+    UploadSrc = other.UploadSrc;
+    pDataToLoad = other.pDataToLoad;
+    ImageToUpload = other.ImageToUpload;
+
+    TextureCacheID = other.TextureCacheID;
+
+    return *this;
+}
+
+MaterialComponent::Status MaterialComponent::Build()
+{
+    // There is no texture provided, we will use the base colours passed in and a dummy texture
+    if (!pAssetImage.IsValid() && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
+        return Status::MissingComponent;
+    }
+
+    if (!CheckIfReady()) {
+        // The texture is not ready, return the status to the material build function
+        return Status::NotReady;
+    }
+
+    return Status::Ready;
+}
+
+
+bool MaterialComponent::CheckIfReady()
+{
+    // If there is data passed in and the image has not been loaded yet, load it using the
+    // asset manager. This will be validated on the next call of this function. (when attempting to build the
+    // material)
+    if (!pAssetImage || mbRequiresUpdate) {
+        AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
+
+        if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
+            pAssetImage = AssetManagerFwd::LoadImageFromMemory(ImageFormat, pDataToLoad.pData, pDataToLoad.Size);
+        }
+        else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
+            // If the image has not been created yet, create the reference.
+            if (!pAssetImage.IsValid()) {
+                pAssetImage = TSRef<AxImage>::New();
+            }
+
+            // If the image is previously initialized, we want to update the image with the new mip.
+            /// @see DoDirectUpload() in AxManager.cpp
+            AssetManagerFwd::LoadImageFromPixels(pAssetImage, ImageToUpload);
+        }
+
+        mbRequiresUpdate = false;
+
+        return false;
+    }
+
+    // If there is no texture and we are not loaded, return not loaded.
+    if (!pAssetImage->IsLoaded()) {
+        return false;
+    }
+
+    return true;
+}
+
+/////////////////////////////////////
+// Material
+/////////////////////////////////////
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
     if (component_.Exists() && (!component_.pAssetImage || !component_.pAssetImage->IsLoaded())) {                     \
@@ -55,10 +126,11 @@ void Material::RequestQuality(uint32 quality)
 
     if (Diffuse.Exists()) {
         MipmapLoader loader {};
-        loader.Open("");
 
+        String texture_cache_path = String::Fmt("{}/{}.ftx", gAssetManager->GetScenePath(), Diffuse.TextureCacheID);
+        loader.Open(texture_cache_path.CStr());
 
-        // Diffuse.ImageToUpload.MipLevel =
+        Diffuse.ImageToUpload = loader.GetMip(quality);
     }
 }
 
