@@ -84,6 +84,28 @@ Object* ObjectManager::GetObject(const ObjectID& id)
     return mObjectList.GetItem(id.GetID());
 }
 
+Object* ObjectManager::FindObject(const Hash32 name_hash)
+{
+    std::lock_guard<std::mutex> guard(mInUse);
+
+    const uint32 capacity = mObjectList.Capacity;
+
+    for (uint32 i = 0; i < capacity; i++) {
+        if (!mObjectList.SlotsInUse.Get(i)) {
+            continue;
+        }
+
+        Object* object = mObjectList.GetItem(i);
+
+        if (object->Name.GetHash() == name_hash) {
+            return object;
+        }
+    }
+
+    return nullptr;
+}
+
+
 void ObjectManager::DestroyObject(ObjectID& id)
 {
     std::lock_guard<std::mutex> guard(mInUse);

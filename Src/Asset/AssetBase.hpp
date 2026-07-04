@@ -28,7 +28,8 @@ public:
     }
 
     /** Returns true if the asset has been loaded and is in GPU memory. */
-    inline bool IsLoaded() const { return mIsLoaded.load(); }
+    FX_FORCE_INLINE bool IsLoaded() const { return mIsLoaded.load(); }
+    FX_FORCE_INLINE void InvalidateLoaded() { mIsLoaded.store(false); }
 
     virtual void Destroy() = 0;
 

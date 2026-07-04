@@ -64,6 +64,8 @@ bool MaterialComponent::CheckIfReady()
     if (!pAssetImage || mbRequiresUpdate) {
         AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
 
+        LogInfo("CHECKING IF READY");
+
         if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
             pAssetImage = AssetManagerFwd::LoadImageFromMemory(ImageFormat, pDataToLoad.pData, pDataToLoad.Size);
         }
@@ -118,20 +120,28 @@ bool Material::IsReady()
     return (mbIsReady = true);
 }
 
+#define REQUEST_COMPONENT_HIGHER_DETAIL(component_)                                                                    \
+    if (component_.Exists()) {                                                                                         \
+        MipmapLoader loader {};                                                                                        \
+        String texture_cache_path = String::Fmt("{}/Models/TGen/{}.ftx", gAssetManager->GetScenePath(),                \
+                                                component_.TextureCacheID);                                            \
+        loader.Open(texture_cache_path.CStr());                                                                        \
+        component_.ImageToUpload = loader.GetMip(quality);                                                             \
+        component_.pAssetImage->InvalidateLoaded();                                                                    \
+        component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                              \
+        component_.RequireUpdate();                                                                                    \
+    }
+
 
 void Material::RequestQuality(uint32 quality)
 {
-    // Require new IsReady checks
+    REQUEST_COMPONENT_HIGHER_DETAIL(Diffuse);
+
+    bReadyToCheck.test_and_set();
+    bIsBuilt.store(false);
     mbIsReady = false;
 
-    if (Diffuse.Exists()) {
-        MipmapLoader loader {};
-
-        String texture_cache_path = String::Fmt("{}/{}.ftx", gAssetManager->GetScenePath(), Diffuse.TextureCacheID);
-        loader.Open(texture_cache_path.CStr());
-
-        Diffuse.ImageToUpload = loader.GetMip(quality);
-    }
+    // REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
 }
 
 DescriptorSet& Material::GetDescriptorSetAlbedoOnly()

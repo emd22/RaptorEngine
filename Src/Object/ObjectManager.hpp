@@ -36,6 +36,8 @@ public:
     Object* GetObject(const ObjectID& id);
     void DestroyObject(ObjectID& id);
 
+    Object* FindObject(const Hash32 name_hash);
+
     void Submit(const ObjectID& id, ObjectGpuEntry& entry);
     void Submit(const ObjectID& id, const Mat4f& model_matrix);
     void ReleaseAllObjects();

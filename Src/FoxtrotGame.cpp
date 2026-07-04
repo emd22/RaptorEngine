@@ -473,6 +473,17 @@ void FoxtrotGame::ProcessControls()
         // pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
     }
 
+    if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
+        Object* object = gObjectManager->FindObject(HashStr32("BrickTest"));
+        if (!object) {
+            LogError("Cannot find object!");
+        }
+        else {
+            gMaterialManager->GetMaterial(object->mMaterialID)->RequestQuality(3);
+        }
+    }
+
+
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
         Player.SetFlyMode(true);
         Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
@@ -506,7 +517,6 @@ void FoxtrotGame::Tick()
 
     ControlManager::Update();
     ProcessControls();
-
 
     Player.Move(DeltaTime, GetMovementVector());
     Player.Update(DeltaTime);

@@ -43,7 +43,7 @@ Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Sli
     const uint32 pixel_size = renderer::ImageFormatUtil::GetPixelStride(format);
 
     const int32 input_stride = size.X * pixel_size;
-    const float32 divisor = 1.0f / float32(mip_level + 1);
+    const float32 divisor = 1.0f / (1U << static_cast<uint32>(mip_level));
 
     Vec2u output_dimensions(std::max(1U, uint32(float32(size.X) * divisor)),
                             std::max(1U, uint32(float32(size.Y) * divisor)));
@@ -205,6 +205,7 @@ ImageInfo MipmapLoader::GetMip(uint32 mip_level)
 
     ImageInfo image_info {};
     image_info.MipLevel = mip_level;
+    image_info.MipCount = Pack.Entries.Size();
     image_info.Format = header->Format;
     image_info.Size = Vec2u(header->SizeX, header->SizeY);
 

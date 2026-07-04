@@ -337,7 +337,6 @@ private:
         requires C_IsAsset<TAssetType>
     static void SubmitImageToUpload(const TSRef<TAssetType>& asset, const ImageInfo& img_info)
     {
-        AssertMsg(asset->bIsUploadedToGpu == false, "Asset is already uploaded!");
         AssertMsg(img_info.ImageData.pData != nullptr, "Image data cannot be null");
 
         AxManager* mgr = GetInstance();
