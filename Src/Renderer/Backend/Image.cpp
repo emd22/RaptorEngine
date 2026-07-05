@@ -146,7 +146,6 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 
         .initialLayout = ImageLayout,
-
     };
 
     VmaAllocationCreateInfo create_info {
@@ -163,12 +162,8 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 
     static uint32 alloc_number = 0;
 
-    // if (alloc_number == 6) {
-    //     FX_BREAKPOINT;
-    // }
     std::string alloc_name = std::to_string(alloc_number++);
     vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
-
 
     // LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
     //           reinterpret_cast<void*>(Allocation));
@@ -269,9 +264,7 @@ void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, c
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    LogInfo("Uploading mip {}", mip_index);
-
-    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, 0, mip_index);
+    CopyToMip(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, mip_index);
 }
 
 
@@ -339,6 +332,76 @@ void Image::TransitionDepthToAttachment(CommandBuffer& cmd)
                          nullptr, 1, &barrier);
 
     ImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+}
+
+void Image::TransitionMip(VkImageLayout new_layout, CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
+                          std::optional<TransitionLayoutOverrides> overrides)
+{
+    bool is_depth_texture = ImageFormatUtil::IsDepth(Format);
+
+    VkImageAspectFlags aspect_flags = static_cast<VkImageAspectFlags>((is_depth_texture) ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                                                                         : VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkImageMemoryBarrier barrier {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+
+        .srcAccessMask = static_cast<VkAccessFlags>((is_depth_texture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
+        .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
+
+        .oldLayout = ImageLayout,
+        .newLayout = new_layout,
+
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+        .image = InternalImage,
+
+        .subresourceRange =
+            {
+                .aspectMask = aspect_flags,
+                .baseMipLevel = mip_level,
+                .levelCount = num_levels,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+    };
+
+    VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+    if (ImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        dest_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (ImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+
+    if (is_depth_texture) {
+        src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+
+    if (overrides.has_value()) {
+        if (overrides->DstStage.has_value()) {
+            dest_stage = overrides->DstStage.value();
+        }
+        if (overrides->DstAccessMask.has_value()) {
+            barrier.dstAccessMask = overrides->DstAccessMask.value();
+        }
+    }
+
+    vkCmdPipelineBarrier(cmd, src_stage, dest_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    ImageLayout = new_layout;
 }
 
 void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
@@ -425,7 +488,7 @@ void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkIma
         .imageSubresource {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
             .mipLevel = mip_level,
-            .baseArrayLayer = base_layer,
+            .baseArrayLayer = 0,
             .layerCount = 1,
         },
         .imageExtent =
@@ -443,10 +506,40 @@ void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkIma
                                                  .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 }
 
+void Image::CopyToMip(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
+                      uint32 mip_level)
+{
+    TransitionMip(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1,
+                  TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                              .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+
+    VkBufferImageCopy copy {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = mip_level,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        },
+        .imageExtent =
+            VkExtent3D {
+                .width = size.X,
+                .height = size.Y,
+                .depth = 1,
+            },
+    };
+
+    vkCmdCopyBufferToImage(cmd, buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+    TransitionMip(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, mip_level, 1,
+                  TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                              .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+}
+
 enum eCubemapLayer
 {
-    // Forward,
-
     Right,
     Left,
     Top,

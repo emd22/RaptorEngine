@@ -35,6 +35,11 @@ void MipmapGen::GenerateMipmaps(const char* path, eImageFormat format, const Sli
     dp.WriteToFile(path);
 }
 
+FX_FORCE_INLINE constexpr float32 GetMipDivisor(uint32 mip_level)
+{
+    return 1.0f / (1U << static_cast<uint32>(mip_level));
+}
+
 Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
                                     uint8 mip_level)
 {
@@ -43,7 +48,7 @@ Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Sli
     const uint32 pixel_size = renderer::ImageFormatUtil::GetPixelStride(format);
 
     const int32 input_stride = size.X * pixel_size;
-    const float32 divisor = 1.0f / (1U << static_cast<uint32>(mip_level));
+    const float32 divisor = GetMipDivisor(static_cast<uint32>(mip_level));
 
     Vec2u output_dimensions(std::max(1U, uint32(float32(size.X) * divisor)),
                             std::max(1U, uint32(float32(size.Y) * divisor)));
@@ -88,6 +93,60 @@ Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Sli
 
     return Slice(dp.GetEntry(mip_level, false)->Data);
 }
+
+void MipmapGen::GenerateTestMipmap(const char* output_path, const Vec2u& size)
+{
+    DataPack dp;
+
+    static constexpr uint32 scHeaderOffset = sizeof(MipHeader);
+    static constexpr uint32 scNumMips = 4;
+    static constexpr uint32 scPixelStride = 4;
+
+    // The buffer is the size of mip level 0, where each mip will get progressively smaller.
+    const uint32 buffer_size = (size.X * size.Y * scPixelStride) + scHeaderOffset;
+    uint8* buffer = static_cast<uint8*>(std::malloc(buffer_size));
+
+    const uint8 mip_level_colors[][4] = {
+        { 0xFF, 0x11, 0x11, 0xFF }, // Mip Level 0 : Red
+        { 0xFF, 0xFF, 0x11, 0xFF }, // Mip Level 1 : Yellow
+        { 0x11, 0xFF, 0x11, 0xFF }, // Mip Level 2 : Green
+        { 0x11, 0xFF, 0xFF, 0xFF }, // Mip Level 3 : Teal
+    };
+
+    for (uint32 mip_level = 0; mip_level < scNumMips; mip_level++) {
+        const uint8* level_color = mip_level_colors[(mip_level % std::size(mip_level_colors))];
+        const float32 mip_divisor = GetMipDivisor(mip_level);
+
+        const uint32 mip_buffer_size = (size.X * mip_divisor) * (size.Y * mip_divisor);
+
+        // Write the image data
+        for (uint32 b_index = 0; b_index < mip_buffer_size; b_index++) {
+            memcpy(buffer + scHeaderOffset + (b_index * scPixelStride), level_color, scPixelStride);
+        }
+
+        // Write the mip header
+        {
+            MipHeader header {
+                .SizeX = static_cast<uint16>(size.X * mip_divisor),
+                .SizeY = static_cast<uint16>(size.Y * mip_divisor),
+                .MipLevel = static_cast<uint8>(mip_level),
+                .Unused0 = 0,
+                .Format = eImageFormat::RGBA8_UNorm,
+            };
+
+            LogInfo("Mippy Width: {}, Height: {}", header.SizeX, header.SizeY);
+
+            memcpy(buffer, &header, sizeof(header));
+        }
+
+        dp.AddEntry(mip_level, Slice<uint8>(buffer, mip_buffer_size * scPixelStride + scHeaderOffset));
+    }
+
+    dp.WriteToFile(output_path);
+
+    std::free(buffer);
+}
+
 
 void MipmapGen::ExportMipmaps(const char* dp_path, const char* output_path)
 {

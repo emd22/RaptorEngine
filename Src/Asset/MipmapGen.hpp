@@ -32,7 +32,7 @@ public:
     Slice<uint8> GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
                              uint8 mip_level);
 
-    void GenerateTestMipmap(eImageFormat format, const Vec2u& size);
+    void GenerateTestMipmap(const char* output_path, const Vec2u& size);
 
     /**
      * @brief Loads a mipmap datapack and exports each image to its own JPEG.

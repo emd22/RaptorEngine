@@ -246,8 +246,15 @@ public:
     void TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
                           std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
 
+    void TransitionMip(VkImageLayout new_layout, CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
+                       std::optional<TransitionLayoutOverrides> overrides);
+
+
     void TransitionDepthToShaderRO(CommandBuffer& cmd);
     void TransitionDepthToAttachment(CommandBuffer& cmd);
+
+    void CopyToMip(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
+                   uint32 mip_level);
 
 
     void CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,

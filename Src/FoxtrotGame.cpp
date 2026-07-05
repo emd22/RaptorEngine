@@ -250,7 +250,8 @@ void FoxtrotGame::CreateGame()
     CreateFontObject();
 
 
-    // MipmapGen mm;
+    MipmapGen mm;
+    mm.GenerateTestMipmap("Data/Demo/Models/TGen/2990995153.ftx", Vec2u(512, 512));
 
     // renderer::Image mip_image;
 
@@ -480,6 +481,8 @@ void FoxtrotGame::ProcessControls()
         }
         else {
             gMaterialManager->GetMaterial(object->mMaterialID)->RequestQuality(3);
+
+            LogInfo("Component ID : {}", gMaterialManager->GetMaterial(object->mMaterialID)->Diffuse.TextureCacheID);
         }
     }
 

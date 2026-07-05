@@ -64,8 +64,6 @@ if(WIN32)
 elseif(APPLE)
     set_target_properties(foxtrot PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "aarch64")
 
-
-
     target_compile_options(foxtrot PRIVATE
         -Wno-nullability-completeness
         -Wcast-align
@@ -96,7 +94,7 @@ target_include_directories(foxtrot PRIVATE
 )
 
 target_compile_definitions(foxtrot PRIVATE
-    FX_BASE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    FX_BASE_DIR="."
 )
 
 target_compile_definitions(foxtrot PRIVATE
