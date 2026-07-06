@@ -36,7 +36,6 @@ FxEnumFlags(eImageSaveFlags);
 enum class eImageCreateFlags
 {
     None = 0,
-    KeepInMemory = (1 << 0),
 };
 
 FxEnumFlags(eImageCreateFlags);
@@ -80,17 +79,18 @@ struct ImageInfo
     ImageInfo() = default;
 
     ImageInfo(Vec2u size, eImageFormat format, int32 mip_level, int32 mip_count, const Slice<const uint8>& data)
-        : ImageType(eImageType::Flat), Size(size), Format(format), MipLevel(mip_level), MipCount(mip_count),
+        : Size(size), ImageType(eImageType::Flat), Format(format), MipLevel(mip_level), MipCount(mip_count),
           ImageData(data)
     {
     }
 
 public:
+    Vec2u Size = Vec2u::sZero;
+
     eImageType ImageType = eImageType::Flat;
-    Vec2u Size;
     eImageFormat Format = eImageFormat::RGBA8_UNorm;
-    int32 MipLevel = 0;
-    int32 MipCount = 1;
+    uint32 MipLevel = 0;
+    uint32 MipCount = 1;
     Slice<const uint8> ImageData { nullptr, 0 };
 };
 
@@ -227,10 +227,7 @@ public:
     Image& operator=(const Image& other);
     Image& operator=(Ref<Image>&& ref);
 
-    ImageInfo GetInfo() const
-    {
-        return ImageInfo { Size, Format, 0, mMipCount, Slice(ImageData.pData, ImageData.Size) };
-    }
+    FX_FORCE_INLINE const ImageInfo& GetInfo() const { return Info; }
 
     void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
                 VkImageUsageFlags usage, eImageAspectFlag aspect);
@@ -277,25 +274,18 @@ public:
     ~Image();
 
 public:
-    Vec2u Size = Vec2u::sZero;
-
     eImageAspectFlag Aspect = eImageAspectFlag::Color;
 
     VkImage InternalImage = nullptr;
     VkImageView View = nullptr;
-    SizedArray<uint8> ImageData { nullptr, 0 };
 
-    eImageType ViewType = eImageType::Flat;
-    eImageFormat Format = eImageFormat::None;
     VkImageLayout ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
     VmaAllocation Allocation = nullptr;
 
+    ImageInfo Info {};
 
 private:
-    uint16 mMipCount = 1;
     RefCount* mpRefCnt = nullptr;
-    uint8 mFrameUploadedBit = 0;
 };
 
 } // namespace renderer

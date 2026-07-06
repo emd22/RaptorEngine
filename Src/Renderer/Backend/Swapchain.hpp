@@ -2,7 +2,7 @@
 
 #include "Framebuffer.hpp"
 #include "Image.hpp"
-#include "Sampler.hpp"
+#include "Sampler/Sampler.hpp"
 
 #include <vulkan/vulkan.h>
 

@@ -1,4 +1,3 @@
-
 #include "Image.hpp"
 
 #include <Asset/Loader/Image/LoaderStb.hpp>
@@ -36,6 +35,14 @@ const ImageTypeProperties ImageTypeGetProperties(eImageType image_type)
     return props;
 }
 
+static Vec2u GetMipDimensions(const Vec2u& ml_zero_size, uint32 mip_level)
+{
+    float32 mip_divisor = (1.0f / static_cast<float32>(1U << mip_level));
+
+    return Vec2u(static_cast<uint32>(static_cast<float32>(ml_zero_size.X) * mip_divisor),
+                 static_cast<uint32>(static_cast<float32>(ml_zero_size.Y) * mip_divisor));
+}
+
 Image::Image() { mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount)); }
 
 Image::Image(const Image& other) { (*this) = other; }
@@ -63,18 +70,15 @@ Image& Image::operator=(const Image& other)
         DecRef();
     }
 
-    Size = other.Size;
     Aspect = other.Aspect;
 
     InternalImage = other.InternalImage;
     View = other.View;
 
-    ViewType = other.ViewType;
-    Format = other.Format;
     ImageLayout = other.ImageLayout;
     Allocation = other.Allocation;
 
-    mMipCount = other.mMipCount;
+    Info = other.Info;
 
     // Set the new ref count
     mpRefCnt = other.mpRefCnt;
@@ -108,10 +112,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
     }
 
     Aspect = aspect;
-    Size = size;
-    Format = format;
-    ViewType = image_type;
-    mMipCount = mips_count;
+    Info = ImageInfo { size, format, 0, mips_count, Slice<const uint8>(nullptr, 0) };
 
     if (!mpRefCnt) {
         mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount));
@@ -241,17 +242,16 @@ void Image::CreateFromData(CommandBuffer& cmd, const ImageInfo& info, eImageCrea
                           eGpuBufferFlags::TransferReceiver);
     staging_buffer.Upload(info.ImageData);
 
-    if ((flags & eImageCreateFlags::KeepInMemory) != 0) {
-        ImageData.CreateCopyOf(info.ImageData.pData, info.ImageData.Size);
-    }
-
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
     Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags,
            eImageAspectFlag::Color);
 
-    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, info.Size, 0, 0);
+    CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                   GetMipDimensions(info.Size, info.MipLevel), 0, info.MipLevel);
+
+    Info.MipLevel = info.MipLevel;
 }
 
 void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<const uint8>& image_data)
@@ -264,7 +264,10 @@ void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, c
     const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
-    CopyToMip(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, size, mip_index);
+    Info.MipLevel = std::min(Info.MipLevel, mip_index);
+
+    CopyToMip(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, GetMipDimensions(size, mip_index),
+              mip_index);
 }
 
 
@@ -337,7 +340,7 @@ void Image::TransitionDepthToAttachment(CommandBuffer& cmd)
 void Image::TransitionMip(VkImageLayout new_layout, CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
                           std::optional<TransitionLayoutOverrides> overrides)
 {
-    bool is_depth_texture = ImageFormatUtil::IsDepth(Format);
+    bool is_depth_texture = ImageFormatUtil::IsDepth(Info.Format);
 
     VkImageAspectFlags aspect_flags = static_cast<VkImageAspectFlags>((is_depth_texture) ? VK_IMAGE_ASPECT_DEPTH_BIT
                                                                                          : VK_IMAGE_ASPECT_COLOR_BIT);
@@ -407,7 +410,7 @@ void Image::TransitionMip(VkImageLayout new_layout, CommandBuffer& cmd, uint32 m
 void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
                              std::optional<TransitionLayoutOverrides> overrides)
 {
-    bool is_depth_texture = ImageFormatUtil::IsDepth(Format);
+    bool is_depth_texture = ImageFormatUtil::IsDepth(Info.Format);
 
     VkImageAspectFlags aspect_flags = static_cast<VkImageAspectFlags>((is_depth_texture) ? VK_IMAGE_ASPECT_DEPTH_BIT
                                                                                          : VK_IMAGE_ASPECT_COLOR_BIT);
@@ -430,7 +433,7 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
             {
                 .aspectMask = aspect_flags,
                 .baseMipLevel = 0,
-                .levelCount = mMipCount,
+                .levelCount = Info.MipCount,
                 .baseArrayLayer = 0,
                 .layerCount = layer_count,
             },
@@ -477,9 +480,17 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
 void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
                            uint32 base_layer, uint32 mip_level)
 {
-    TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1,
-                     TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                                 .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+    if (mip_level < 0) {
+        return;
+    }
+
+    if (mip_level < Info.MipLevel) {
+        Info.MipLevel = mip_level;
+    }
+
+    TransitionMip(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1,
+                  TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                              .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 
     VkBufferImageCopy copy {
         .bufferOffset = 0,
@@ -501,9 +512,9 @@ void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkIma
 
     vkCmdCopyBufferToImage(cmd, buffer.Buffer, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
-    TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
-                     TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                                 .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+    TransitionMip(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, mip_level, 1,
+                  TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                              .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 }
 
 void Image::CopyToMip(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
@@ -567,8 +578,8 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_for
     // Note that it is 4 tiles wide and 3 tiles tall.
 
 
-    const uint32 tile_width = cubemap.Size.X / 4;
-    const uint32 tile_height = cubemap.Size.Y / 3;
+    const uint32 tile_width = cubemap.Info.Size.X / 4;
+    const uint32 tile_height = cubemap.Info.Size.Y / 3;
 
     Assert(tile_width == tile_height);
 
@@ -735,7 +746,7 @@ void Image::DecRef()
 
 void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 {
-    const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetPixelStride(Format);
+    const uint32 data_size = Info.Size.X * Info.Size.Y * ImageFormatUtil::GetPixelStride(Info.Format);
 
     SizedArray<uint8> image_data;
     image_data.InitSize(data_size);
@@ -778,7 +789,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
                     .baseArrayLayer = 0,
                     .layerCount = 1,
                 },
-                .imageExtent = VkExtent3D { .width = Size.X, .height = Size.Y, .depth = 1 },
+                .imageExtent = VkExtent3D { .width = Info.Size.X, .height = Info.Size.Y, .depth = 1 },
             };
 
             vkCmdCopyImageToBuffer(cmd, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_buffer.Buffer, 1,
@@ -814,7 +825,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
         });
 
 
-    loader::LoaderStb::SaveToFile(file_format, image_data, Size, path, eImageSaveFlags::None);
+    loader::LoaderStb::SaveToFile(file_format, image_data, Info.Size, path, eImageSaveFlags::None);
 }
 
 

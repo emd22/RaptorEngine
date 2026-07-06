@@ -1,6 +1,7 @@
 #include "Swapchain.hpp"
 
 #include "Device.hpp"
+#include "Sampler/SamplerProps.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -59,7 +60,7 @@ void Swapchain::CreateSwapchainImages()
         image->View = nullptr;
         image->Allocation = nullptr;
         image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        image->Format = Surface.Format;
+        image->Info.Format = Surface.Format;
     }
 }
 

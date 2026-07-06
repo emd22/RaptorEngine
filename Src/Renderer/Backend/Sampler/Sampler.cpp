@@ -1,5 +1,7 @@
 #include "Sampler.hpp"
 
+#include "SamplerProps.hpp"
+
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 
@@ -119,7 +121,7 @@ void Sampler::Create(const SamplerProps& props)
         .compareEnable = static_cast<VkBool32>(props.CompareOp != eSamplerCompareOp::None),
         .compareOp = GetVkCompareOp(props.CompareOp),
 
-        .minLod = 0.0f,
+        .minLod = props.MinLOD,
         .maxLod = props.MaxLOD,
 
         .borderColor = GetVkBorderColor(props.BorderColor),

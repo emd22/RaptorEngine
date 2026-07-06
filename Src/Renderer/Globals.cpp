@@ -1,6 +1,7 @@
 #include "Globals.hpp"
 
 #include "Backend/DescriptorCache.hpp"
+#include "Backend/Sampler/SamplerCache.hpp"
 #include "PipelineCache.hpp"
 #include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
@@ -11,11 +12,10 @@ namespace fx::renderer {
 
 RenderBackend* gRenderer = nullptr;
 ShadowDirectional* gShadowRenderer = nullptr;
-
 ShaderCache* gShaderCache = nullptr;
 DsLayoutCache* gDsLayoutCache = nullptr;
 PipelineCache* gPipelineCache = nullptr;
-
+SamplerCache* gSamplerCache = nullptr;
 State* gState = nullptr;
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
@@ -27,6 +27,7 @@ namespace Globals {
 
 void Init()
 {
+    gSamplerCache = new SamplerCache;
     gPipelineCache = new PipelineCache;
     gState = new State;
 
@@ -40,6 +41,8 @@ void Destroy()
     if (gShadowRenderer) {
         DESTROY_GLOBAL(gShadowRenderer);
     }
+
+    DESTROY_GLOBAL(gSamplerCache);
 
     // DESTROY_GLOBAL(gState);
     DESTROY_GLOBAL(gDsLayoutCache);

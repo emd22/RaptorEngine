@@ -3,7 +3,7 @@
 #include "Device.hpp"
 #include "GpuBuffer.hpp"
 #include "Pipeline.hpp"
-#include "Sampler.hpp"
+#include "Sampler/Sampler.hpp"
 
 #include <vulkan/vulkan.h>
 

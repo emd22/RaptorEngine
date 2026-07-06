@@ -4,7 +4,7 @@
 #include "Backend/Framebuffer.hpp"
 #include "Backend/Image.hpp"
 #include "Backend/RenderPass.hpp"
-#include "Backend/Sampler.hpp"
+#include "Backend/Sampler/Sampler.hpp"
 
 #include <Core/SizedArray.hpp>
 

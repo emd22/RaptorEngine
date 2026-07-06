@@ -8,7 +8,7 @@ namespace fx::renderer {
 Target* RenderStage::GetTarget(eImageFormat format, int sub_index)
 {
     for (Target& attachment : mOutputTargets.Targets) {
-        if (attachment.Image.Format == format) {
+        if (attachment.Image.Info.Format == format) {
             if ((sub_index--) > 0) {
                 continue;
             }

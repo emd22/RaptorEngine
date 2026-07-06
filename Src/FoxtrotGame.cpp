@@ -250,9 +250,6 @@ void FoxtrotGame::CreateGame()
     CreateFontObject();
 
 
-    MipmapGen mm;
-    mm.GenerateTestMipmap("Data/Demo/Models/TGen/2990995153.ftx", Vec2u(512, 512));
-
     // renderer::Image mip_image;
 
     // gRenderer->SubmitImmediateUploadCmd([&](CommandBuffer& cmd) { mip_image = mm.LoadMipmaps(cmd, "TestMips.bin");
@@ -475,14 +472,28 @@ void FoxtrotGame::ProcessControls()
     }
 
     if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
-        Object* object = gObjectManager->FindObject(HashStr32("BrickTest"));
-        if (!object) {
-            LogError("Cannot find object!");
-        }
-        else {
-            gMaterialManager->GetMaterial(object->mMaterialID)->RequestQuality(3);
+        for (const ObjectID& obj_id : mMainScene.GetAllObjects()) {
+            Object* object = gObjectManager->GetObject(obj_id);
 
-            LogInfo("Component ID : {}", gMaterialManager->GetMaterial(object->mMaterialID)->Diffuse.TextureCacheID);
+            if (!object) {
+                LogError("Cannot find object!");
+            }
+            else {
+                Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
+                if (!material) {
+                    continue;
+                }
+
+                const ImageInfo& diffuse_info = material->Diffuse.pAssetImage->Image.GetInfo();
+
+                LogInfo("Requesting higher quality {} for {}", diffuse_info.MipLevel, object->Name.Get());
+
+                if (diffuse_info.MipLevel == 0) {
+                    continue;
+                }
+
+                material->RequestQuality(diffuse_info.MipLevel - 1);
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 #include "DeferredRenderer.hpp"
 
 #include "Backend/DsLayoutBuilder.hpp"
+#include "Backend/Sampler/SamplerCache.hpp"
 #include "Backend/Shader.hpp"
 #include "Backend/VertexDescription.hpp"
 #include "Camera.hpp"
@@ -428,12 +429,18 @@ void DeferredRenderer::CreateDescriptorSets()
 {
     DsComposition.Destroy();
     DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
-    DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-    DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+    DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::eD32_Float),
+                                     gSamplerCache->Request(SamplerProps {
+                                         eSamplerFilter::Nearest,
+                                         eSamplerFilter::Nearest,
+                                         eSamplerFilter::Nearest,
+                                     }));
+    DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
+                                     gSamplerCache->Request(SamplerProps {}));
     DsComposition.AddImageFromTarget(3, GPass.GetTarget(eImageFormat::RGBA16_Float),
-                                     &gRenderer->Swapchain.NormalsSampler);
+                                     gSamplerCache->Request(SamplerProps {}));
     DsComposition.AddImageFromTarget(4, LightPass.GetTarget(eImageFormat::RGBA16_Float),
-                                     &gRenderer->Swapchain.LightsSampler);
+                                     gSamplerCache->Request(SamplerProps {}));
     DsComposition.Build();
 
 

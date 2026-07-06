@@ -190,7 +190,7 @@ static void MakeMaterialTextureForPrimitive(const String& model_name, const Stri
         ml.Open(texture_cache_path.CStr());
 
         component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
-        component.ImageToUpload = ml.GetMip(0);
+        component.ImageToUpload = ml.GetMip(3);
         component.TextureCacheID = texture_cache_id;
         return;
     }

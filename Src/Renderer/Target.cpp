@@ -7,11 +7,10 @@ namespace fx::renderer {
 
 Target::Target(eImageFormat format, const Vec2u& size)
 {
-    Image.Format = format;
-    Image.Size = size;
+    Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
     if (size == Target::scFullScreen) {
-        Image.Size = gRenderer->Swapchain.Extent;
+        Image.Info.Size = gRenderer->Swapchain.Extent;
         bIsFullscreen = true;
     }
 }
@@ -20,11 +19,10 @@ Target::Target(eImageFormat format, const Vec2u& size, eLoadOp load_op, eStoreOp
                VkImageLayout final_layout)
     : LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
-    Image.Format = format;
-    Image.Size = size;
+    Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
     if (size == Target::scFullScreen) {
-        Image.Size = gRenderer->Swapchain.Extent;
+        Image.Info.Size = gRenderer->Swapchain.Extent;
         bIsFullscreen = true;
     }
 }
@@ -32,11 +30,10 @@ Target::Target(eImageFormat format, const Vec2u& size, eLoadOp load_op, eStoreOp
 Target::Target(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)
     : Usage(usage), Aspect(aspect)
 {
-    Image.Format = format;
-    Image.Size = size;
+    Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
     if (size == Target::scFullScreen) {
-        Image.Size = gRenderer->Swapchain.Extent;
+        Image.Info.Size = gRenderer->Swapchain.Extent;
         bIsFullscreen = true;
     }
 }
@@ -53,16 +50,16 @@ void Target::CreateImage()
         return;
     }
 
-    Image.Create(ImageType, Image.Size, 1, Image.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect);
+    Image.Create(ImageType, Image.Info.Size, 1, Image.Info.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect);
 }
 
 
 VkAttachmentDescription Target::BuildDescription() const
 {
-    Assert(Image.Format != eImageFormat::None);
+    Assert(Image.Info.Format != eImageFormat::None);
 
     return VkAttachmentDescription {
-        .format = ImageFormatUtil::ToUnderlying(Image.Format),
+        .format = ImageFormatUtil::ToUnderlying(Image.Info.Format),
         .samples = Samples,
 
         .loadOp = static_cast<VkAttachmentLoadOp>(LoadOp),
@@ -132,7 +129,7 @@ void TargetList::CreateImages()
     for (Target& target : Targets) {
         if (target.bIsFullscreen) {
             // This size will be the size of the newly created image after running `CreateImage`.
-            target.Image.Size = swapchain_size;
+            target.Image.Info.Size = swapchain_size;
         }
 
         target.CreateImage();
@@ -179,7 +176,7 @@ bool TargetList::IsCompatible(const TargetList& other) const
         const Target& t = Targets[index];
         const Target& other_t = other.Targets[index];
 
-        const bool format_matches = t.Image.Format == other_t.Image.Format;
+        const bool format_matches = t.Image.Info.Format == other_t.Image.Info.Format;
 
         if (!format_matches) {
             return false;

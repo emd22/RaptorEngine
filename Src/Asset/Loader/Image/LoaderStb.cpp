@@ -19,8 +19,7 @@ eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const String& path)
 
     stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
-    // image->NumComponents = mChannels;
-    image->Image.Size = { uint32(mWidth), uint32(mHeight) };
+    image->Image.Info.Size = { uint32(mWidth), uint32(mHeight) };
 
     uint32 data_size = mWidth * mHeight * pixel_size;
     mDataSize = data_size;
@@ -54,7 +53,7 @@ eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const uint8* data, uint32 
     uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
     mDataSize = data_size;
 
-    image->Image.Size = { uint32(mWidth), uint32(mHeight) };
+    image->Image.Info.Size = { uint32(mWidth), uint32(mHeight) };
 
     mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
@@ -98,19 +97,12 @@ void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
     data_arr.Size = mDataSize;
     data_arr.Capacity = mDataSize;
 
-    const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
+    // const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    ImageInfo image_info { image->Image.Size, ImageFormat, 0, 1, Slice<const uint8>(data_arr.pData, data_arr.Size) };
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info,
-                                (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
-
-    if (should_save_data) {
-        image->Image.ImageData = std::move(data_arr);
-
-        // Set image data to null to avoid it being destroyed.
-        mImageData = nullptr;
-    }
+    ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
+                           Slice<const uint8>(data_arr.pData, data_arr.Size) };
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
     // Set to nullptr so that the data is not freed by the SizedArray
     data_arr.pData = nullptr;

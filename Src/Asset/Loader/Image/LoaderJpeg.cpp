@@ -56,7 +56,7 @@ eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const String& path)
     int32 num_jpeg_components = mJpegInfo.output_components;
 
     printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-    image->Image.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+    image->Image.Info.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_jpeg_components;
     mImageData.InitSize(data_size);
@@ -97,7 +97,7 @@ eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const uint8* data, uint32
     mJpegInfo.out_color_space = color_space;
 
     jpeg_start_decompress(&mJpegInfo);
-    image->Image.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+    image->Image.Info.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
 
     uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
     mImageData.InitSize(data_size);
@@ -120,22 +120,12 @@ void LoaderJpeg::CreateGpuResource(TSRef<AssetBase>& asset)
 {
     TSRef<AxImage> image(asset);
 
-    const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
-    ImageInfo image_info { image->Image.Size, ImageFormat, 0, 1,
+    ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
                            MakeSlice<const uint8>(mImageData.pData, mImageData.Size) };
 
     // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info,
-                                (CreationFlags & (~eImageCreateFlags::KeepInMemory)));
-
-    if (should_save_data) {
-        image->Image.ImageData = std::move(mImageData);
-
-        // Set image data to null to avoid it being destroyed.
-        mImageData.pData = nullptr;
-        mImageData.Size = 0;
-    }
+    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
     image->bIsUploadedToGpu = true;
     image->bIsUploadedToGpu.notify_all();

@@ -31,13 +31,18 @@ void MipmapGen::GenerateMipmaps(const char* path, eImageFormat format, const Sli
     GenerateMip(dp, format, pixels, size, 0);
     GenerateMip(dp, format, pixels, size, 1);
     GenerateMip(dp, format, pixels, size, 2);
-    GenerateMip(dp, format, pixels, size, 4);
+    GenerateMip(dp, format, pixels, size, 3);
     dp.WriteToFile(path);
 }
 
 FX_FORCE_INLINE constexpr float32 GetMipDivisor(uint32 mip_level)
 {
     return 1.0f / (1U << static_cast<uint32>(mip_level));
+}
+
+FX_FORCE_INLINE constexpr float32 GetBaseMipMultiplier(uint32 mip_level)
+{
+    return (1U << static_cast<uint32>(mip_level));
 }
 
 Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
@@ -262,11 +267,15 @@ ImageInfo MipmapLoader::GetMip(uint32 mip_level)
     uint8* image_data = M_DATA_PTR(mip_entry->Data.pData);
     uint32 image_size = M_DATA_SIZE(mip_entry->Data);
 
+    // When we upload the image, we want the image to be created to be the size of Mip 0.
+    float32 bmm = GetBaseMipMultiplier(mip_level);
+
     ImageInfo image_info {};
     image_info.MipLevel = mip_level;
     image_info.MipCount = Pack.Entries.Size();
     image_info.Format = header->Format;
-    image_info.Size = Vec2u(header->SizeX, header->SizeY);
+    image_info.Size = Vec2u(static_cast<uint32>(static_cast<float32>(header->SizeX) * bmm),
+                            static_cast<uint32>(static_cast<float32>(header->SizeY) * bmm));
 
     LogInfo("Image info size: {}x{}", header->SizeX, header->SizeY);
 
@@ -283,6 +292,8 @@ uint32 MipmapLoader::FindClosestMipLevel(uint32 mip_level)
     for (DataPackEntry& entry : Pack.Entries) {
         // If the (next) entry's mip level is greater than the desired mip level, return the previous one.
         if (entry.Id > mip_level) {
+            LogInfo("Closest mip level is {} (for {})", entry.Id, mip_level);
+
             return prev->Id;
         }
 

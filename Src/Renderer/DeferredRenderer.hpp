@@ -4,7 +4,7 @@
 #include "Backend/FrameData.hpp"
 #include "Backend/Framebuffer.hpp"
 #include "Backend/Image.hpp"
-#include "Backend/Sampler.hpp"
+#include "Backend/Sampler/Sampler.hpp"
 #include "RenderStage.hpp"
 
 namespace fx {

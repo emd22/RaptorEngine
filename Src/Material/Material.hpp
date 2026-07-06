@@ -146,7 +146,6 @@ public:
     void Build();
 
     renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
-    renderer::DescriptorSet& GetDescriptorSetAlbedoOnly();
 
     void SetDefaultPipeline();
     void SubmitProperties(const MaterialProperties& properties);
@@ -175,23 +174,14 @@ public:
     std::atomic_bool bIsBuilt = { false };
     std::atomic_flag bReadyToCheck = ATOMIC_FLAG_INIT;
 
-    bool bSupportsSkinning = false;
-
-    /**
-     * @brief Offset into `MaterialPropertiesBuffer` for this material.
-     */
-    // uint32 mMaterialPropertiesIndex = UINT32_MAX;
-
+    bool bSupportsSkinning : 1 = false;
     bool bNearestFiltering : 1 = false;
 
 private:
     renderer::DescriptorSet mDsDefault;
-    renderer::DescriptorSet mDsAlbedoOnly;
-
 
     renderer::Pipeline* mpPipeline = nullptr;
     renderer::ePipelineName mPipelineName = renderer::ePipelineName::Geometry;
-
 
     bool mbIsReady : 1 = false;
     bool mbIsBeingBuilt : 1 = false;

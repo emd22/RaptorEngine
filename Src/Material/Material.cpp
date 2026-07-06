@@ -1,3 +1,10 @@
+/*
+ * File:        Material.cpp
+ * Author:      emd22
+ * Created:     23/06/2025
+ * Description: Material modification and loading functions
+ */
+
 #include "Material.hpp"
 
 #include "MaterialManagerFwd.hpp"
@@ -12,6 +19,7 @@
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
+#include <Renderer/Backend/Sampler/SamplerCache.hpp>
 #include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -126,38 +134,24 @@ bool Material::IsReady()
         String texture_cache_path = String::Fmt("{}/Models/TGen/{}.ftx", gAssetManager->GetScenePath(),                \
                                                 component_.TextureCacheID);                                            \
         loader.Open(texture_cache_path.CStr());                                                                        \
-        component_.ImageToUpload = loader.GetMip(quality);                                                             \
-        component_.pAssetImage->InvalidateLoaded();                                                                    \
-        component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                              \
-        component_.RequireUpdate();                                                                                    \
+        if (loader.Pack.IsOpen()) {                                                                                    \
+            component_.ImageToUpload = loader.GetMip(quality);                                                         \
+            component_.pAssetImage->InvalidateLoaded();                                                                \
+            component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                          \
+            component_.RequireUpdate();                                                                                \
+        }                                                                                                              \
     }
 
 
 void Material::RequestQuality(uint32 quality)
 {
     REQUEST_COMPONENT_HIGHER_DETAIL(Diffuse);
+    REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
+    REQUEST_COMPONENT_HIGHER_DETAIL(MetallicRoughness);
 
     bReadyToCheck.test_and_set();
     bIsBuilt.store(false);
     mbIsReady = false;
-
-    // REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
-}
-
-DescriptorSet& Material::GetDescriptorSetAlbedoOnly()
-{
-    if (mDsAlbedoOnly.IsInited()) {
-        return mDsAlbedoOnly;
-    }
-
-    mDsAlbedoOnly.Create(MaterialManagerFwd::GetDescriptorPool(),
-                         gRenderer->pDeferredRenderer->DsLayoutGPassMaterialAlbedoOnly, false, 1);
-
-
-    mDsAlbedoOnly.AddImage(0, &Diffuse.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
-    mDsAlbedoOnly.Build();
-
-    return mDsAlbedoOnly;
 }
 
 
@@ -228,29 +222,6 @@ void Material::Destroy()
 }
 
 
-// template <eImageFormat TFormat>
-// static bool CheckComponentTextureLoaded(MaterialComponent<TFormat>& component)
-// {
-//     if (!component.pAssetImage && component.UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
-//         Slice<const uint8>& image_data = component.pDataToLoad;
-
-//         component.pAssetImage = gAssetManager->LoadImageFromMemory(component.Format, image_data.pData,
-//         image_data.Size); return false;
-//     }
-//     else if (!component.pAssetImage && component.UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
-//         ImageInfo& image_data = component.ImageToUpload;
-
-//         component.pAssetImage = gAssetManager->LoadImageFromPixels(component.Format, image_data.pData,
-//         image_data.Size); return false;-
-//     }
-
-//     if (!component.pAssetImage || !component.pAssetImage.IsLoaded()) {
-//         return false;
-//     }
-
-//     return true;
-// }
-
 #define BUILD_REQUIRED_MATERIAL_COMPONENT(component_)                                                                  \
     {                                                                                                                  \
         if (component_.Build() != eMaterialComponentStatus::Ready) {                                                   \
@@ -294,6 +265,29 @@ void Material::SetPipeline(renderer::ePipelineName pl_name)
     mpPipeline = &gPipelineCache->Request(pl_name);
 }
 
+static float32 GetComponentMaxLOD(const MaterialComponent& component)
+{
+    if (!component.pAssetImage) {
+        return 0.0f;
+    }
+
+    const ImageInfo& info = component.pAssetImage->Image.GetInfo();
+
+    return static_cast<float32>(info.MipCount);
+}
+
+static float32 GetComponentMinLOD(const MaterialComponent& component)
+{
+    if (!component.pAssetImage) {
+        return 0.0f;
+    }
+
+    const ImageInfo& info = component.pAssetImage->Image.GetInfo();
+
+    return static_cast<float32>(info.MipLevel);
+}
+
+
 void Material::Build()
 {
     // Build components
@@ -311,23 +305,22 @@ void Material::Build()
         mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
     }
 
-
-    // Fill material descriptor
-
-    Sampler* diffuse_sampler = &gRenderer->Swapchain.ColorSampler;
-    if (bNearestFiltering) {
-        diffuse_sampler = &gRenderer->Swapchain.ColorSamplerNearest;
-    }
-
     AssertMsg(Diffuse.pAssetImage.IsValid(), "Diffuse texture must be valid");
 
-    mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, diffuse_sampler);
+    SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
+
+    if (bNearestFiltering) {
+        diffuse_sampler_props.SetNearest();
+    }
+
+    mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, gSamplerCache->Request(diffuse_sampler_props));
 
     // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
     // not need to.
 
     if (NormalMap.Exists()) {
-        mDsDefault.AddImage(1, &NormalMap.pAssetImage->Image, &gRenderer->Swapchain.NormalsSampler);
+        mDsDefault.AddImage(1, &NormalMap.pAssetImage->Image,
+                            gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(NormalMap) }));
 
         // To reduce permutations -- the metallic roughness map should only be
         // enabled if there is also a normal map.
@@ -335,7 +328,8 @@ void Material::Build()
             MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
         }
 
-        mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image, &gRenderer->Swapchain.ColorSampler);
+        mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image,
+                            gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(MetallicRoughness) }));
     }
 
     if (bSupportsSkinning) {

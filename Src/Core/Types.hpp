@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <type_traits>
 
-
 #ifndef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
 #include <atomic>
 using AtomicFlag = std::atomic_flag;
@@ -40,10 +39,8 @@ using Handle = uint32;
 
 static constexpr Handle NullHandle = UINT32_MAX;
 
-
 template <typename T, typename... TTypes>
 concept C_IsAnyOf = (std::is_same_v<T, TTypes> || ...);
-
 
 template <typename T, typename... TTypes>
 concept C_IsAnyBaseOf = (std::is_base_of_v<TTypes, T> || ...);
@@ -161,44 +158,6 @@ FX_FORCE_INLINE constexpr bool IsFlagSet(T lhs, T flag)
     using InternalType = EnumFlagsIntType<T>;
     return (static_cast<InternalType>(lhs) & static_cast<InternalType>(flag)) != 0;
 }
-
-// template <typename ValueType>
-// class Optional {
-// public:
-//     Optional(ValueType &value)
-//         : mHasValue(true),
-//           mData()
-//     {
-//     }
-
-//     Optional(std::nullptr_t)
-//         : mHasValue(false),
-//           mData()
-//     {
-//     }
-
-//     bool HasValue() const { return mHasValue; }
-
-//     void Clear()
-//     {
-//         mHasValue = false;
-//     }
-
-//     ValueType &operator *() const
-//     {
-//         if (!HasValue()) {
-//             Panic("Optional", "Could not retrieve undefined value", 0);
-//         }
-
-//         return *reinterpret_cast<ValueType *>(&mData);
-//     }
-
-//     ValueType &Get() const { return *this; }
-
-// private:
-//     bool mHasValue = false;
-//     std::aligned_storage<sizeof(ValueType), std::alignment_of<ValueType>::value> mData;
-// };
 
 
 // #define FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX 1

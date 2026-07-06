@@ -14,6 +14,9 @@ extern ShaderCache* gShaderCache;
 class PipelineCache;
 extern PipelineCache* gPipelineCache;
 
+class SamplerCache;
+extern SamplerCache* gSamplerCache;
+
 class DsLayoutCache;
 extern DsLayoutCache* gDsLayoutCache;
 
