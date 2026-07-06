@@ -49,6 +49,8 @@ struct SamplerProps
     eSamplerAddressMode AddressMode = eSamplerAddressMode::Repeat;
     eSamplerBorderColor BorderColor = eSamplerBorderColor::IntBlack;
     eSamplerCompareOp CompareOp = eSamplerCompareOp::None;
+
+    float32 MaxLOD = 4.0f;
 };
 
 

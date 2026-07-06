@@ -120,7 +120,7 @@ void Sampler::Create(const SamplerProps& props)
         .compareOp = GetVkCompareOp(props.CompareOp),
 
         .minLod = 0.0f,
-        .maxLod = 0.0f,
+        .maxLod = props.MaxLOD,
 
         .borderColor = GetVkBorderColor(props.BorderColor),
         .unnormalizedCoordinates = VK_FALSE,
