@@ -21,24 +21,24 @@ namespace renderer {
 
 struct RenderListSection
 {
-    DynArray<ObjectID> Objects;
-    Bitset InUse;
+	DynArray<ObjectID> Objects;
+	Bitset InUse;
 };
 
 class RenderList
 {
 public:
-    RenderList() = default;
+	RenderList() = default;
 
-    uint32 Add(ePipelineName pl_name, const ObjectID& id);
+	uint32 Add(ePipelineName pl_name, const ObjectID& id);
 
-    void Remove(ePipelineName pl_name, const ObjectID& id);
-    void RemoveAllOfObject(const ObjectID& id);
+	void Remove(ePipelineName pl_name, const ObjectID& id);
+	void RemoveAllOfObject(const ObjectID& id);
 
-    const RenderListSection& GetSection(ePipelineName pl_name);
+	const RenderListSection& GetSection(ePipelineName pl_name);
 
 private:
-    SizedArray<RenderListSection> mSections;
+	SizedArray<RenderListSection> mSections;
 };
 
 } // namespace renderer

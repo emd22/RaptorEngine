@@ -5,7 +5,7 @@ BasedOnStyle: GNU
 # Indentation
 IndentWidth: 4
 TabWidth: 4
-UseTab: Never
+UseTab: Always
 ContinuationIndentWidth: 4
 ConstructorInitializerIndentWidth: 4
 AccessModifierOffset: -4

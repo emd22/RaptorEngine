@@ -274,7 +274,6 @@ public:
 
     void SignalUpdate() { ManagerUpdateNotifier.Signal(); }
 
-
     ~AxManager() { Shutdown(); }
 
 
@@ -301,7 +300,7 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(path, loader, asset, TLoadType));
-        mgr->ManagerUpdateNotifier.Signal();
+        mgr->SignalUpdate();
     }
 
 
@@ -311,7 +310,7 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess<loader::LoaderGltf>(path, loader, ticket));
-        mgr->ManagerUpdateNotifier.Signal();
+        mgr->SignalUpdate();
     }
 
     template <typename TAssetType, typename TLoaderType, eAssetLoadType TLoadType>
@@ -323,7 +322,7 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(loader, asset, TLoadType, asset_data));
-        mgr->ManagerUpdateNotifier.Signal();
+        mgr->SignalUpdate();
     }
 
     template <typename TLoaderType>
@@ -333,7 +332,7 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess<loader::LoaderGltf>(loader, ticket, asset_data));
-        mgr->ManagerUpdateNotifier.Signal();
+        mgr->SignalUpdate();
     }
 
     template <typename TAssetType, eAssetLoadType TLoadType>
@@ -345,7 +344,7 @@ private:
         AxManager* mgr = GetInstance();
 
         mgr->mLoadQueue.Push(AxQueueItem::DirectUpload(asset, TLoadType, img_info));
-        mgr->ManagerUpdateNotifier.Signal();
+        mgr->SignalUpdate();
     }
 
 public:

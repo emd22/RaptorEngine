@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Object/ObjectManager.hpp"
 
 #include <Asset/AssetTicket.hpp>
 #include <Entity.hpp>
@@ -10,6 +9,12 @@
 #include <Renderer/RenderList.hpp>
 
 namespace fx {
+
+struct SceneDistanceBand
+{
+    float32 Distance = 0.0f;
+    PagedArray<ObjectID> Objects;
+};
 
 class Scene
 {
