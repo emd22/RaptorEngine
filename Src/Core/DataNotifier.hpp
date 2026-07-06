@@ -49,6 +49,7 @@ public:
     void Signal();
     void Wait();
     void Discard();
+    void Discard(int n);
 
     void Kill();
     void Reset();

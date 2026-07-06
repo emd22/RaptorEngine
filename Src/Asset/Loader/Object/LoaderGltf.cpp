@@ -182,18 +182,19 @@ static void MakeMaterialTextureForPrimitive(const String& model_name, const Stri
     Hash32 texture_cache_id = GetTextureCacheID(model_name, material, component_name);
     String texture_cache_path = GetTextureCachePath(texture_cache_id, base_path);
 
-    const bool texture_cache_exists = FilesystemIO::FileExists(texture_cache_path);
+    // const bool texture_cache_exists = FilesystemIO::FileExists(texture_cache_path);
+    const bool texture_cache_exists = false;
 
-    if (texture_cache_exists) {
-        MipmapLoader ml {};
+    // if (texture_cache_exists) {
+    //     MipmapLoader ml {};
 
-        ml.Open(texture_cache_path.CStr());
+    //     ml.Open(texture_cache_path.CStr());
 
-        component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
-        component.ImageToUpload = ml.GetMip(3);
-        component.TextureCacheID = texture_cache_id;
-        return;
-    }
+    //     component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
+    //     component.ImageToUpload = ml.GetMip(3);
+    //     component.TextureCacheID = texture_cache_id;
+    //     return;
+    // }
 
     const uint8* image_buffer = cgltf_buffer_view_data(texture_view.texture->image->buffer_view);
     uint32 image_buffer_size = static_cast<uint32>(texture_view.texture->image->buffer_view->size);

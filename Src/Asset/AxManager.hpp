@@ -272,6 +272,8 @@ public:
 
     void ShutdownDeletionQueue();
 
+    void SignalUpdate() { ManagerUpdateNotifier.Signal(); }
+
 
     ~AxManager() { Shutdown(); }
 
@@ -279,14 +281,15 @@ public:
 private:
     AxWorker* FindWorkerThread();
 
-    bool CheckForUploadableData();
-    bool CheckForItemsToLoad();
-    bool CheckForItemsToDelete();
+    int32 CheckForUploadableData();
+    int32 CheckForItemsToLoad();
+    int32 CheckForItemsToDelete();
 
     bool CheckWorkersBusy();
 
     void AddWorkerThread();
     void AssetManagerUpdate();
+
 
     template <typename TAssetType, typename TLoaderType, eAssetLoadType TLoadType>
         requires C_IsAsset<TAssetType>

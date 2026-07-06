@@ -131,6 +131,7 @@ void AxWorker::Update()
 
         // Mark that we are waiting for the data to be uploaded to the GPU
         bDataPendingUpload.test_and_set();
+        gAssetManager->SignalUpdate();
     }
 }
 
@@ -345,9 +346,11 @@ static void DoDirectUpload(AxQueueItem& item, AssetItemData& asset_data)
     image->bIsUploadedToGpu.notify_all();
 }
 
-bool AxManager::CheckForUploadableData()
+int32 AxManager::CheckForUploadableData()
 {
     using namespace renderer;
+
+    int32 num_uploads = 0;
 
     WorkersWaitingToUpload.Clear();
 
@@ -381,9 +384,11 @@ bool AxManager::CheckForUploadableData()
         if (worker->LoadStatus == loader::eLoaderStatus::Success) {
             if (worker->Item.AssetLoadOp == eAssetLoadOp::DirectUpload) {
                 DoDirectUpload(worker->Item, asset_data.Get());
+                ++num_uploads;
             }
             else if (asset_data->pLoader.IsValid()) {
                 asset_data->CreateGpuResource();
+                ++num_uploads;
             }
         }
     }
@@ -485,7 +490,7 @@ bool AxManager::CheckForUploadableData()
         worker->bIsBusy.clear();
     }
 
-    return true;
+    return num_uploads;
 }
 
 bool AxManager::CheckWorkersBusy()
@@ -510,10 +515,12 @@ void AxManager::AddWorkerThread()
     worker->Create();
 }
 
-bool AxManager::CheckForItemsToLoad()
+int32 AxManager::CheckForItemsToLoad()
 {
-    if (mLoadQueue.Size() < 1) {
-        return false;
+    uint32 num_loads = mLoadQueue.Size();
+
+    if (num_loads < 1) {
+        return num_loads;
     }
 
     AxWorker* worker = FindWorkerThread();
@@ -521,13 +528,13 @@ bool AxManager::CheckForItemsToLoad()
     // No workers available currently, defer the item loading.
     // Even though there is no worker available, we still return true as there is an item in the queue.
     if (worker == nullptr) {
-        return true;
+        return num_loads;
     }
 
     AxQueueItem item;
     if (!mLoadQueue.PopIfAvailable(&item)) {
         // The load queue is currently in use(uploaded to), skip for now.
-        return true;
+        return num_loads;
     }
 
     if (worker) {
@@ -546,30 +553,32 @@ bool AxManager::CheckForItemsToLoad()
         worker->SubmitItemToLoad(std::move(item));
     }
 
-    return true;
+    return num_loads;
 }
 
-bool AxManager::CheckForItemsToDelete()
+int32 AxManager::CheckForItemsToDelete()
 {
+    int32 num_deletes = 0;
+
     SpinLockContext<Queue<fx::AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
 
     if (queue->IsEmpty()) {
-        return false;
+        return 0;
     }
 
     // Wait for all uploads to finish. We cannot be actively loading the item we are deleting!
     renderer::gRenderer->UploadContext.UploadFence.WaitFor();
 
     if (queue->First().TryDelete(mTickCounter)) {
+        ++num_deletes;
         queue->Pop();
     }
 
-    return true;
+    return num_deletes;
 }
 
 void AxManager::AssetManagerUpdate()
 {
-    uint32 num_uploads = 0;
     while (mbActive.test()) {
         // bool is_busy = CheckWorkersBusy();
 
@@ -595,9 +604,6 @@ void AxManager::AssetManagerUpdate()
             ManagerUpdateNotifier.Wait();
             mbShouldSleep = false;
         }
-        else {
-            ManagerUpdateNotifier.Discard();
-        }
 
         // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
@@ -605,17 +611,22 @@ void AxManager::AssetManagerUpdate()
             break;
         }
 
+        const int32 num_uploads = CheckForUploadableData();
+        const int32 num_deletes = CheckForItemsToDelete();
+        const int32 num_loads = CheckForItemsToLoad();
 
-        const bool has_upload_data = CheckForUploadableData();
-        const bool has_delete_data = CheckForItemsToDelete();
-        const bool has_load_data = CheckForItemsToLoad();
 
-        uint32 tick = mTickCounter.fetch_add(1);
+        const int32 num_operations = num_uploads + num_deletes + num_loads;
+        for (uint32 i = 0; i < num_operations; i++) {
+            ManagerUpdateNotifier.Discard();
+        }
 
-        if (has_upload_data || has_delete_data || has_load_data) {
+        if (num_operations > 0) {
             mbIsTimeSet = false;
             continue;
         }
+
+        uint32 tick = mTickCounter.fetch_add(1);
 
         {
             // If this is the first time that there has been no activity, set the current timestamp.
