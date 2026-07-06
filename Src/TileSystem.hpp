@@ -3,6 +3,7 @@
 #include <Core/FreeArray.hpp>
 #include <Core/SizedArray.hpp>
 #include <Math/Vec2.hpp>
+#include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 
 namespace fx {
@@ -39,35 +40,50 @@ public:
 	 * @brief Inserts an object into its respective tile.
 	 * @returns The tile index that it was added to.
 	 */
-	uint32 Insert(ObjectID id);
+	TileIndex Insert(ObjectID id);
 
+	TileIndex GetTileIndex(const Vec3f& position) const;
 
 	/**
 	 * @brief Updates an object to a new tile if the object has moved into another tile boundary.
 	 */
 	void Update(ObjectID id, bool update_attached = true);
 
+	/**
+	 * @brief Remove an object from its assigned tile.
+	 */
 	void Remove(ObjectID id);
 
+	Vec2u GetTileXY(TileIndex tile_index)
+	{
+		const uint32 tile_x = tile_index % mGridSize.X;
+		const uint32 tile_y = (tile_index - tile_x) / mGridSize.X;
+		return Vec2u(tile_x, tile_y);
+	}
+
+	Tile* GetTile(TileIndex index)
+	{
+		if (index > mTileBuffer.Capacity) {
+			return nullptr;
+		}
+
+		return &mTileBuffer[index];
+	}
+
+	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
 
 	~TileSystem() = default;
 
 private:
-	Tile* GetObjectTile(const Object* object, uint32* out_tile_index);
-	uint32 InsertInto(uint32 tile_index, ObjectID id);
-
-	/**
-	 * @brief A shallower position update that avoids extraneous checks and retrieves.
-	 */
-	void UpdateAttached(Object* base_object, ObjectID attached_id);
+	Tile* GetObjectTile(const Object* object, TileIndex* out_tile_index);
+	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
 
 public:
-	Vec2f TileSize = Vec2f(5.0f, 5.0f);
-
-
 private:
 	SizedArray<Tile> mTileBuffer;
 	Vec2u mGridSize;
+	Vec2f mTileSize = Vec2f(5.0f, 5.0f);
+	Vec3f mPositionOffset = Vec3f::sZero;
 };
 
 } // namespace fx

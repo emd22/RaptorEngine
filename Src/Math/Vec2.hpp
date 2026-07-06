@@ -10,104 +10,90 @@ template <typename Type>
 class Vec2Base
 {
 public:
-    constexpr Vec2Base() = default;
-
-    constexpr Vec2Base(Type x, Type y) : X(x), Y(y) {}
-
-    constexpr explicit Vec2Base(Type scalar) : X(scalar), Y(scalar) {}
-
-    Vec2Base operator+(const Vec2Base& other) const
-    {
-        Vec2Base result = *this;
-        result += other;
-        return result;
-    }
-
-    Vec2Base operator-(const Vec2Base& other) const
-    {
-        Vec2Base result = *this;
-        result -= other;
-        return result;
-    }
-
-    Vec2Base operator*(const Vec2Base& other) const
-    {
-        Vec2Base result = *this;
-        result *= other;
-        return result;
-    }
-
-    Vec2Base& operator+=(const Vec2Base& other)
-    {
-        X += other.X;
-        Y += other.Y;
-
-        return *this;
-    }
-
-    Vec2Base& operator-=(const Vec2Base& other)
-    {
-        X -= other.X;
-        Y -= other.Y;
-
-        return *this;
-    }
-
-    Vec2Base& operator*=(const Vec2Base& other)
-    {
-        X *= other.X;
-        Y *= other.Y;
-
-        return *this;
-    }
-
-    Vec2Base operator*(float scalar) const
-    {
-        Vec2Base result = *this;
-        result.X *= scalar;
-        result.Y *= scalar;
-        return result;
-    }
-
-    /**
-     * @brief Checks if a vector is **exactly** equal to another vector. This does not account for floating point error.
-     */
-    bool operator==(const Vec2Base<Type>& other) const { return (X == other.X && Y == other.Y); }
-
-    Vec2Base<Type>& operator=(const Vec2Base<Type>& other)
-    {
-        X = other.X;
-        Y = other.Y;
-        return *this;
-    }
-
-    void Set(Type x, Type y)
-    {
-        X = x;
-        Y = y;
-    }
-
-    Type GetX() const { return X; }
-    Type GetY() const { return Y; }
-
-    void SetX(Type x) { X = x; }
-    void SetY(Type y) { Y = y; }
-
-    Type Width() const { return GetX(); }
-    Type Height() const { return GetY(); }
-
-    static const Vec2Base<Type> sZero;
+	static const Vec2Base<Type> sZero;
 
 public:
-    union alignas(16)
-    {
-        float32 mData[2];
+	constexpr Vec2Base() = default;
 
-        struct
-        {
-            Type X, Y;
-        };
-    };
+	constexpr explicit Vec2Base(Type x, Type y) : X(x), Y(y) {}
+	constexpr explicit Vec2Base(Type scalar) : X(scalar), Y(scalar) {}
+
+
+	Vec2Base operator-() const { return Vec2Base(-X, -Y); }
+
+
+	Vec2Base operator+(const Vec2Base& other) const { return Vec2Base(X + other.X, Y + other.Y); }
+	Vec2Base operator-(const Vec2Base& other) const { return Vec2Base(X - other.X, Y - other.Y); }
+	Vec2Base operator*(const Vec2Base& other) const { return Vec2Base(X * other.X, Y * other.Y); }
+	Vec2Base operator/(const Vec2Base& other) const { return Vec2Base(X / other.X, Y / other.Y); }
+
+	Vec2Base operator+(float scalar) const { return Vec2Base(X + scalar, Y + scalar); }
+	Vec2Base operator-(float scalar) const { return Vec2Base(X - scalar, Y - scalar); }
+	Vec2Base operator*(float scalar) const { return Vec2Base(X * scalar, Y * scalar); }
+	Vec2Base operator/(float scalar) const { return Vec2Base(X / scalar, Y / scalar); }
+
+	Vec2Base& operator+=(const Vec2Base& other)
+	{
+		X += other.X;
+		Y += other.Y;
+
+		return *this;
+	}
+
+	Vec2Base& operator-=(const Vec2Base& other)
+	{
+		X -= other.X;
+		Y -= other.Y;
+
+		return *this;
+	}
+
+	Vec2Base& operator*=(const Vec2Base& other)
+	{
+		X *= other.X;
+		Y *= other.Y;
+
+		return *this;
+	}
+
+
+	/**
+	 * @brief Checks if a vector is **exactly** equal to another vector. This does not account for floating point error.
+	 */
+	bool operator==(const Vec2Base<Type>& other) const { return (X == other.X && Y == other.Y); }
+
+	Vec2Base<Type>& operator=(const Vec2Base<Type>& other)
+	{
+		X = other.X;
+		Y = other.Y;
+		return *this;
+	}
+
+	void Set(Type x, Type y)
+	{
+		X = x;
+		Y = y;
+	}
+
+	FX_FORCE_INLINE Type GetX() const { return X; }
+	FX_FORCE_INLINE Type GetY() const { return Y; }
+
+	FX_FORCE_INLINE void SetX(Type x) { X = x; }
+	FX_FORCE_INLINE void SetY(Type y) { Y = y; }
+
+	Type Width() const { return GetX(); }
+	Type Height() const { return GetY(); }
+
+public:
+	union alignas(16)
+	{
+		float32 mData[2];
+
+		struct
+		{
+			Type X, Y;
+		};
+	};
 };
 
 // Declaration of Vec2::sZero
@@ -125,44 +111,44 @@ using Vec2u = Vec2Base<uint32>;
 template <>
 struct std::formatter<fx::Vec2i>
 {
-    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    auto format(const fx::Vec2i& obj, std::format_context& ctx) const
-    {
-        return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
-    }
+	auto format(const fx::Vec2i& obj, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
+	}
 };
 
 template <>
 struct std::formatter<fx::Vec2u>
 {
-    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    auto format(const fx::Vec2u& obj, std::format_context& ctx) const
-    {
-        return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
-    }
+	auto format(const fx::Vec2u& obj, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "({}, {})", obj.X, obj.Y);
+	}
 };
 
 template <>
 struct std::formatter<fx::Vec2f>
 {
-    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    auto format(const fx::Vec2f& obj, std::format_context& ctx) const
-    {
-        return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
-    }
+	auto format(const fx::Vec2f& obj, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
+	}
 };
 
 
 template <>
 struct std::formatter<fx::Vec2d>
 {
-    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    auto format(const fx::Vec2d& obj, std::format_context& ctx) const
-    {
-        return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
-    }
+	auto format(const fx::Vec2d& obj, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "({:.04}, {:.04})", obj.X, obj.Y);
+	}
 };

@@ -37,68 +37,66 @@ using namespace renderer;
 
 MaterialComponent& MaterialComponent::operator=(const MaterialComponent& other)
 {
-    pAssetImage = other.pAssetImage;
+	pAssetImage = other.pAssetImage;
 
-    UploadSrc = other.UploadSrc;
-    pDataToLoad = other.pDataToLoad;
-    ImageToUpload = other.ImageToUpload;
+	UploadSrc = other.UploadSrc;
+	pDataToLoad = other.pDataToLoad;
+	ImageToUpload = other.ImageToUpload;
 
-    TextureCacheID = other.TextureCacheID;
+	TextureCacheID = other.TextureCacheID;
 
-    return *this;
+	return *this;
 }
 
 MaterialComponent::Status MaterialComponent::Build()
 {
-    // There is no texture provided, we will use the base colours passed in and a dummy texture
-    if (!pAssetImage.IsValid() && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
-        return Status::MissingComponent;
-    }
+	// There is no texture provided, we will use the base colours passed in and a dummy texture
+	if (!pAssetImage.IsValid() && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
+		return Status::MissingComponent;
+	}
 
-    if (!CheckIfReady()) {
-        // The texture is not ready, return the status to the material build function
-        return Status::NotReady;
-    }
+	if (!CheckIfReady()) {
+		// The texture is not ready, return the status to the material build function
+		return Status::NotReady;
+	}
 
-    return Status::Ready;
+	return Status::Ready;
 }
 
 
 bool MaterialComponent::CheckIfReady()
 {
-    // If there is data passed in and the image has not been loaded yet, load it using the
-    // asset manager. This will be validated on the next call of this function. (when attempting to build the
-    // material)
-    if (!pAssetImage || mbRequiresUpdate) {
-        AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
+	// If there is data passed in and the image has not been loaded yet, load it using the
+	// asset manager. This will be validated on the next call of this function. (when attempting to build the
+	// material)
+	if (!pAssetImage || mbRequiresUpdate) {
+		AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
 
-        LogInfo("CHECKING IF READY");
+		if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
+			pAssetImage = AssetManagerFwd::LoadImageFromMemory(ImageFormat, pDataToLoad.pData, pDataToLoad.Size);
+		}
+		else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
+			// If the image has not been created yet, create the reference.
+			if (!pAssetImage.IsValid()) {
+				pAssetImage = TSRef<AxImage>::New();
+			}
 
-        if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
-            pAssetImage = AssetManagerFwd::LoadImageFromMemory(ImageFormat, pDataToLoad.pData, pDataToLoad.Size);
-        }
-        else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
-            // If the image has not been created yet, create the reference.
-            if (!pAssetImage.IsValid()) {
-                pAssetImage = TSRef<AxImage>::New();
-            }
+			// If the image is previously initialized, we want to update the image with the new mip.
+			/// @see DoDirectUpload() in AxManager.cpp
+			AssetManagerFwd::LoadImageFromPixels(pAssetImage, ImageToUpload);
+		}
 
-            // If the image is previously initialized, we want to update the image with the new mip.
-            /// @see DoDirectUpload() in AxManager.cpp
-            AssetManagerFwd::LoadImageFromPixels(pAssetImage, ImageToUpload);
-        }
+		mbRequiresUpdate = false;
 
-        mbRequiresUpdate = false;
+		return false;
+	}
 
-        return false;
-    }
+	// If there is no texture and we are not loaded, return not loaded.
+	if (!pAssetImage->IsLoaded()) {
+		return false;
+	}
 
-    // If there is no texture and we are not loaded, return not loaded.
-    if (!pAssetImage->IsLoaded()) {
-        return false;
-    }
-
-    return true;
+	return true;
 }
 
 /////////////////////////////////////
@@ -106,52 +104,52 @@ bool MaterialComponent::CheckIfReady()
 /////////////////////////////////////
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
-    if (component_.Exists() && (!component_.pAssetImage || !component_.pAssetImage->IsLoaded())) {                     \
-        return false;                                                                                                  \
-    }
+	if (component_.Exists() && (!component_.pAssetImage || !component_.pAssetImage->IsLoaded())) {                     \
+		return false;                                                                                                  \
+	}
 
 bool Material::IsReady()
 {
-    if (!bReadyToCheck.test()) {
-        return false;
-    }
+	if (!bReadyToCheck.test()) {
+		return false;
+	}
 
-    if (mbIsReady) {
-        return true;
-    }
+	if (mbIsReady) {
+		return true;
+	}
 
 
-    CHECK_COMPONENT_READY(Diffuse);
-    CHECK_COMPONENT_READY(NormalMap);
-    CHECK_COMPONENT_READY(MetallicRoughness);
+	CHECK_COMPONENT_READY(Diffuse);
+	CHECK_COMPONENT_READY(NormalMap);
+	CHECK_COMPONENT_READY(MetallicRoughness);
 
-    return (mbIsReady = true);
+	return (mbIsReady = true);
 }
 
 #define REQUEST_COMPONENT_HIGHER_DETAIL(component_)                                                                    \
-    if (component_.Exists()) {                                                                                         \
-        MipmapLoader loader {};                                                                                        \
-        String texture_cache_path = String::Fmt("{}/Models/TGen/{}.ftx", gAssetManager->GetScenePath(),                \
-                                                component_.TextureCacheID);                                            \
-        loader.Open(texture_cache_path.CStr());                                                                        \
-        if (loader.Pack.IsOpen()) {                                                                                    \
-            component_.ImageToUpload = loader.GetMip(quality);                                                         \
-            component_.pAssetImage->InvalidateLoaded();                                                                \
-            component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                          \
-            component_.RequireUpdate();                                                                                \
-        }                                                                                                              \
-    }
+	if (component_.Exists()) {                                                                                         \
+		MipmapLoader loader {};                                                                                        \
+		String texture_cache_path = String::Fmt("{}/Models/TGen/{}.ftx", gAssetManager->GetScenePath(),                \
+												component_.TextureCacheID);                                            \
+		loader.Open(texture_cache_path.CStr());                                                                        \
+		if (loader.Pack.IsOpen()) {                                                                                    \
+			component_.ImageToUpload = loader.GetMip(quality);                                                         \
+			component_.pAssetImage->InvalidateLoaded();                                                                \
+			component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                          \
+			component_.RequireUpdate();                                                                                \
+		}                                                                                                              \
+	}
 
 
 void Material::RequestQuality(uint32 quality)
 {
-    REQUEST_COMPONENT_HIGHER_DETAIL(Diffuse);
-    REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
-    REQUEST_COMPONENT_HIGHER_DETAIL(MetallicRoughness);
+	REQUEST_COMPONENT_HIGHER_DETAIL(Diffuse);
+	REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
+	REQUEST_COMPONENT_HIGHER_DETAIL(MetallicRoughness);
 
-    bReadyToCheck.test_and_set();
-    bIsBuilt.store(false);
-    mbIsReady = false;
+	bReadyToCheck.test_and_set();
+	bIsBuilt.store(false);
+	mbIsReady = false;
 }
 
 
@@ -159,193 +157,193 @@ bool Material::Bind(const CommandBuffer& cmd) { return BindWithPipeline(cmd, *mp
 
 bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline)
 {
-    if (!bIsBuilt.load()) {
-        Build();
-    }
+	if (!bIsBuilt.load()) {
+		Build();
+	}
 
-    if (!IsReady() || !mDsDefault) {
-        // gMaterialManager->GetNullMaterial()->BindWithPipeline(cmd, pipeline);
-        return false;
-    }
+	if (!IsReady() || !mDsDefault) {
+		// gMaterialManager->GetNullMaterial()->BindWithPipeline(cmd, pipeline);
+		return false;
+	}
 
-    pipeline.Bind(cmd);
+	pipeline.Bind(cmd);
 
-    VkDescriptorSet sets_to_bind[] = {
-        mDsDefault.Get(),                             // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
-        MaterialManagerFwd::GetDescriptorSet().Get(), // Set 1: Material Properties Buffer
-    };
+	VkDescriptorSet sets_to_bind[] = {
+		mDsDefault.Get(),							  // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
+		MaterialManagerFwd::GetDescriptorSet().Get(), // Set 1: Material Properties Buffer
+	};
 
-    StackArray<uint32, 2> offsets = { 0 };
-    if (bSupportsSkinning) {
-        offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
-    }
+	StackArray<uint32, 2> offsets = { 0 };
+	if (bSupportsSkinning) {
+		offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
+	}
 
-    DescriptorSet::BindMultipleOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-                                      MakeSlice(sets_to_bind, std::size(sets_to_bind)), Slice<uint32>(offsets));
+	DescriptorSet::BindMultipleOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+									  MakeSlice(sets_to_bind, std::size(sets_to_bind)), Slice<uint32>(offsets));
 
-    return true;
+	return true;
 }
 
 Material& Material::operator=(const Material& other)
 {
-    ID = other.ID;
+	ID = other.ID;
 
-    Diffuse = other.Diffuse;
-    NormalMap = other.NormalMap;
-    MetallicRoughness = other.MetallicRoughness;
+	Diffuse = other.Diffuse;
+	NormalMap = other.NormalMap;
+	MetallicRoughness = other.MetallicRoughness;
 
-    Properties = other.Properties;
+	Properties = other.Properties;
 
-    Name = other.Name;
+	Name = other.Name;
 
-    mpPipeline = other.mpPipeline;
-    mPipelineName = other.mPipelineName;
+	mpPipeline = other.mpPipeline;
+	mPipelineName = other.mPipelineName;
 
-    bIsBuilt = false;
+	bIsBuilt = false;
 
-    bSupportsSkinning = other.bSupportsSkinning;
-    bNearestFiltering = other.bNearestFiltering;
+	bSupportsSkinning = other.bSupportsSkinning;
+	bNearestFiltering = other.bNearestFiltering;
 
-    mbIsReady = false;
-    mbIsBeingBuilt = false;
+	mbIsReady = false;
+	mbIsBeingBuilt = false;
 
-    return *this;
+	return *this;
 }
 
 void Material::Destroy()
 {
-    if (bIsBuilt) {
-        bIsBuilt.store(false);
-    }
+	if (bIsBuilt) {
+		bIsBuilt.store(false);
+	}
 
-    MaterialManagerFwd::DestroyMaterial(ID);
+	MaterialManagerFwd::DestroyMaterial(ID);
 }
 
 
 #define BUILD_REQUIRED_MATERIAL_COMPONENT(component_)                                                                  \
-    {                                                                                                                  \
-        if (component_.Build() != eMaterialComponentStatus::Ready) {                                                   \
-            return;                                                                                                    \
-        }                                                                                                              \
-    }
+	{                                                                                                                  \
+		if (component_.Build() != eMaterialComponentStatus::Ready) {                                                   \
+			return;                                                                                                    \
+		}                                                                                                              \
+	}
 
 
 #define BUILD_MATERIAL_COMPONENT(component_)                                                                           \
-    {                                                                                                                  \
-        if (component_.Build() == eMaterialComponentStatus::NotReady) {                                                \
-            return;                                                                                                    \
-        }                                                                                                              \
-    }
+	{                                                                                                                  \
+		if (component_.Build() == eMaterialComponentStatus::NotReady) {                                                \
+			return;                                                                                                    \
+		}                                                                                                              \
+	}
 
 void Material::SetDefaultPipeline()
 {
-    if (NormalMap.Exists()) {
-        SetPipeline(ePipelineName::GeometryNormalMaps);
+	if (NormalMap.Exists()) {
+		SetPipeline(ePipelineName::GeometryNormalMaps);
 
-        if (bSupportsSkinning) {
-            SetPipeline(ePipelineName::GeometrySkinned);
-        }
-    }
-    else {
-        SetPipeline(ePipelineName::Geometry);
-    }
+		if (bSupportsSkinning) {
+			SetPipeline(ePipelineName::GeometrySkinned);
+		}
+	}
+	else {
+		SetPipeline(ePipelineName::Geometry);
+	}
 }
 
 void Material::SubmitProperties(const MaterialProperties& properties)
 {
-    MaterialProperties* properties_buffer = static_cast<MaterialProperties*>(
-        MaterialManagerFwd::GetMaterialPropertiesBuffer().pMappedBuffer);
+	MaterialProperties* properties_buffer = static_cast<MaterialProperties*>(
+		MaterialManagerFwd::GetMaterialPropertiesBuffer().pMappedBuffer);
 
-    memcpy(&properties_buffer[ID.GetID()], &properties, sizeof(MaterialProperties));
+	memcpy(&properties_buffer[ID.GetID()], &properties, sizeof(MaterialProperties));
 }
 
 void Material::SetPipeline(renderer::ePipelineName pl_name)
 {
-    mPipelineName = pl_name;
-    mpPipeline = &gPipelineCache->Request(pl_name);
+	mPipelineName = pl_name;
+	mpPipeline = &gPipelineCache->Request(pl_name);
 }
 
 static float32 GetComponentMaxLOD(const MaterialComponent& component)
 {
-    if (!component.pAssetImage) {
-        return 0.0f;
-    }
+	if (!component.pAssetImage) {
+		return 0.0f;
+	}
 
-    const ImageInfo& info = component.pAssetImage->Image.GetInfo();
+	const ImageInfo& info = component.pAssetImage->Image.GetInfo();
 
-    return static_cast<float32>(info.MipCount);
+	return static_cast<float32>(info.MipCount);
 }
 
 static float32 GetComponentMinLOD(const MaterialComponent& component)
 {
-    if (!component.pAssetImage) {
-        return 0.0f;
-    }
+	if (!component.pAssetImage) {
+		return 0.0f;
+	}
 
-    const ImageInfo& info = component.pAssetImage->Image.GetInfo();
+	const ImageInfo& info = component.pAssetImage->Image.GetInfo();
 
-    return static_cast<float32>(info.MipLevel);
+	return static_cast<float32>(info.MipLevel);
 }
 
 
 void Material::Build()
 {
-    // Build components
-    BUILD_REQUIRED_MATERIAL_COMPONENT(Diffuse);
-    BUILD_MATERIAL_COMPONENT(NormalMap);
-    BUILD_MATERIAL_COMPONENT(MetallicRoughness);
+	// Build components
+	BUILD_REQUIRED_MATERIAL_COMPONENT(Diffuse);
+	BUILD_MATERIAL_COMPONENT(NormalMap);
+	BUILD_MATERIAL_COMPONENT(MetallicRoughness);
 
-    if (!mDsDefault.IsInited()) {
-        VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
+	if (!mDsDefault.IsInited()) {
+		VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
 
-        if (bSupportsSkinning) {
-            layout = gRenderer->pDeferredRenderer->DsLayoutGPassSkinned;
-        }
+		if (bSupportsSkinning) {
+			layout = gRenderer->pDeferredRenderer->DsLayoutGPassSkinned;
+		}
 
-        mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
-    }
+		mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
+	}
 
-    AssertMsg(Diffuse.pAssetImage.IsValid(), "Diffuse texture must be valid");
+	AssertMsg(Diffuse.pAssetImage.IsValid(), "Diffuse texture must be valid");
 
-    SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
+	SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
 
-    if (bNearestFiltering) {
-        diffuse_sampler_props.SetNearest();
-    }
+	if (bNearestFiltering) {
+		diffuse_sampler_props.SetNearest();
+	}
 
-    mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, gSamplerCache->Request(diffuse_sampler_props));
+	mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, gSamplerCache->Request(diffuse_sampler_props));
 
-    // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
-    // not need to.
+	// When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
+	// not need to.
 
-    if (NormalMap.Exists()) {
-        mDsDefault.AddImage(1, &NormalMap.pAssetImage->Image,
-                            gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(NormalMap) }));
+	if (NormalMap.Exists()) {
+		mDsDefault.AddImage(1, &NormalMap.pAssetImage->Image,
+							gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(NormalMap) }));
 
-        // To reduce permutations -- the metallic roughness map should only be
-        // enabled if there is also a normal map.
-        if (!MetallicRoughness.Exists()) {
-            MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
-        }
+		// To reduce permutations -- the metallic roughness map should only be
+		// enabled if there is also a normal map.
+		if (!MetallicRoughness.Exists()) {
+			MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
+		}
 
-        mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image,
-                            gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(MetallicRoughness) }));
-    }
+		mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image,
+							gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(MetallicRoughness) }));
+	}
 
-    if (bSupportsSkinning) {
-        mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.PageSize);
-    }
+	if (bSupportsSkinning) {
+		mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.PageSize);
+	}
 
-    mDsDefault.Build();
+	mDsDefault.Build();
 
-    SubmitProperties(Properties);
+	SubmitProperties(Properties);
 
-    if (!mpPipeline) {
-        SetDefaultPipeline();
-    }
+	if (!mpPipeline) {
+		SetDefaultPipeline();
+	}
 
 
-    bIsBuilt.store(true);
+	bIsBuilt.store(true);
 }
 
 } // namespace fx

@@ -35,7 +35,7 @@ public:
 	void Remove(ePipelineName pl_name, const ObjectID& id);
 	void RemoveAllOfObject(const ObjectID& id);
 
-	const RenderListSection& GetSection(ePipelineName pl_name);
+	RenderListSection& GetSection(ePipelineName pl_name);
 
 private:
 	SizedArray<RenderListSection> mSections;

@@ -10,105 +10,105 @@ namespace loader {
 
 eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const String& path)
 {
-    TSRef<AxImage> image(asset);
+	TSRef<AxImage> image(asset);
 
-    const char* c_path = path.CStr();
+	const char* c_path = path.CStr();
 
-    const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
-    Assert(pixel_size > 0);
+	const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
+	Assert(pixel_size > 0);
 
-    stbi_info(c_path, &mWidth, &mHeight, &mChannels);
+	stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
-    image->Image.Info.Size = { uint32(mWidth), uint32(mHeight) };
+	image->Image.Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
 
-    uint32 data_size = mWidth * mHeight * pixel_size;
-    mDataSize = data_size;
+	uint32 data_size = mWidth * mHeight * pixel_size;
+	mDataSize = data_size;
 
-    mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
-    if (mImageData == nullptr) {
-        LogError(LC_ASSET, "Could not load image file at '{}'", c_path);
-        return eLoaderStatus::Error;
-    }
+	mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
+	if (mImageData == nullptr) {
+		LogError(LC_ASSET, "Could not load image file at '{}'", c_path);
+		return eLoaderStatus::Error;
+	}
 
-    return eLoaderStatus::Success;
+	return eLoaderStatus::Success;
 }
 
 eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const uint8* data, uint32 size)
 {
-    TSRef<AxImage> image(asset);
+	TSRef<AxImage> image(asset);
 
-    const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
-    Assert(pixel_size > 0);
+	const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
+	Assert(pixel_size > 0);
 
-    Assert(data != nullptr);
-    Assert(size > 0);
+	Assert(data != nullptr);
+	Assert(size > 0);
 
-    if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
-        LogError(LC_ASSET, "Could not retrieve info from image in memory! (Size={})", size);
-        return eLoaderStatus::Error;
-    }
+	if (!stbi_info_from_memory(data, size, &mWidth, &mHeight, &mChannels)) {
+		LogError(LC_ASSET, "Could not retrieve info from image in memory! (Size={})", size);
+		return eLoaderStatus::Error;
+	}
 
-    mChannels = pixel_size;
+	mChannels = pixel_size;
 
-    uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
-    mDataSize = data_size;
+	uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
+	mDataSize = data_size;
 
-    image->Image.Info.Size = { uint32(mWidth), uint32(mHeight) };
+	image->Image.Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
 
-    mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
+	mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
-    if (mImageData == nullptr) {
-        LogError(LC_ASSET, "Could not load image file from memory!");
-        return eLoaderStatus::Error;
-    }
+	if (mImageData == nullptr) {
+		LogError(LC_ASSET, "Could not load image file from memory!");
+		return eLoaderStatus::Error;
+	}
 
-    return eLoaderStatus::Success;
+	return eLoaderStatus::Success;
 }
 
 
 eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
-                                    const String& path, eImageSaveFlags flags)
+									const String& path, eImageSaveFlags flags)
 {
-    if ((flags & eImageSaveFlags::FlipY) != 0) {
-        stbi_flip_vertically_on_write(1);
-    }
+	if ((flags & eImageSaveFlags::FlipY) != 0) {
+		stbi_flip_vertically_on_write(1);
+	}
 
-    switch (file_format) {
-    case eImageSaveFormat::Jpeg:
-        stbi_write_jpg(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, 90);
-        break;
-    case eImageSaveFormat::Png:
-        stbi_write_png(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, size.GetX() * 4);
-    }
+	switch (file_format) {
+	case eImageSaveFormat::Jpeg:
+		stbi_write_jpg(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, 90);
+		break;
+	case eImageSaveFormat::Png:
+		stbi_write_png(path.CStr(), size.GetX(), size.GetY(), 4, data.pData, size.GetX() * 4);
+	}
 
-    return eLoaderStatus::Success;
+	return eLoaderStatus::Success;
 }
 
 void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
 {
-    TSRef<AxImage> image(asset);
+	TSRef<AxImage> image(asset);
 
-    SizedArray<uint8> data_arr;
+	SizedArray<uint8> data_arr;
 
-    // Since the image data in mImageData is not ours(it is stb's),
-    // we need to set this flag to prevent it from attemping to be freed.
+	// Since the image data in mImageData is not ours(it is stb's),
+	// we need to set this flag to prevent it from attemping to be freed.
 
-    data_arr.pData = mImageData;
-    data_arr.Size = mDataSize;
-    data_arr.Capacity = mDataSize;
+	data_arr.pData = mImageData;
+	data_arr.Size = mDataSize;
+	data_arr.Capacity = mDataSize;
 
-    // const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
+	// const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
-    // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
-                           Slice<const uint8>(data_arr.pData, data_arr.Size) };
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
+	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
+	ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
+						   Slice<const uint8>(data_arr.pData, data_arr.Size) };
+	image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
-    // Set to nullptr so that the data is not freed by the SizedArray
-    data_arr.pData = nullptr;
+	// Set to nullptr so that the data is not freed by the SizedArray
+	data_arr.pData = nullptr;
 
-    image->bIsUploadedToGpu = true;
-    image->bIsUploadedToGpu.notify_all();
+	image->bIsUploadedToGpu = true;
+	image->bIsUploadedToGpu.notify_all();
 }
 
 // void LoaderStb::LoadCubemapToLayeredImage(const Image&)
@@ -142,13 +142,13 @@ void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
 
 void LoaderStb::Destroy(TSRef<AssetBase>& asset)
 {
-    // while (!asset->bIsUploadedToGpu) {
-    //     asset->bIsUploadedToGpu.wait(true);
-    // }
+	// while (!asset->bIsUploadedToGpu) {
+	//     asset->bIsUploadedToGpu.wait(true);
+	// }
 
-    if (mImageData != nullptr) {
-        stbi_image_free(mImageData);
-    }
+	if (mImageData != nullptr) {
+		stbi_image_free(mImageData);
+	}
 }
 
 } // namespace loader

@@ -15,120 +15,120 @@ namespace loader {
 
 static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
 {
-    switch (format) {
-    case eImageFormat::BGRA8_UNorm:
-        return JCS_EXT_BGRA;
-    case eImageFormat::RGBA8_UNorm:
-    case eImageFormat::RGBA8_SRGB:
-        return JCS_EXT_RGBA;
-    default:;
-    }
+	switch (format) {
+	case eImageFormat::BGRA8_UNorm:
+		return JCS_EXT_BGRA;
+	case eImageFormat::RGBA8_UNorm:
+	case eImageFormat::RGBA8_SRGB:
+		return JCS_EXT_RGBA;
+	default:;
+	}
 
-    return JCS_EXT_RGBA;
+	return JCS_EXT_RGBA;
 }
 
 
 eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const String& path)
 {
-    TSRef<AxImage> image(asset);
+	TSRef<AxImage> image(asset);
 
-    const char* c_path = path.CStr();
+	const char* c_path = path.CStr();
 
-    FILE* fp = fopen(c_path, "rb");
+	FILE* fp = fopen(c_path, "rb");
 
-    if (!fp) {
-        LogError(LC_ASSET, "Could not find JPEG file at '{:s}'", c_path);
-        return eLoaderStatus::Error;
-    }
+	if (!fp) {
+		LogError(LC_ASSET, "Could not find JPEG file at '{:s}'", c_path);
+		return eLoaderStatus::Error;
+	}
 
-    struct jpeg_error_mgr error_mgr;
+	struct jpeg_error_mgr error_mgr;
 
-    mJpegInfo.err = jpeg_std_error(&error_mgr);
-    jpeg_create_decompress(&mJpegInfo);
+	mJpegInfo.err = jpeg_std_error(&error_mgr);
+	jpeg_create_decompress(&mJpegInfo);
 
-    jpeg_stdio_src(&mJpegInfo, fp);
-    jpeg_read_header(&mJpegInfo, true);
+	jpeg_stdio_src(&mJpegInfo, fp);
+	jpeg_read_header(&mJpegInfo, true);
 
-    mJpegInfo.out_color_space = GetJpegColorspaceForFormat(ImageFormat);
+	mJpegInfo.out_color_space = GetJpegColorspaceForFormat(ImageFormat);
 
-    jpeg_start_decompress(&mJpegInfo);
+	jpeg_start_decompress(&mJpegInfo);
 
-    int32 num_jpeg_components = mJpegInfo.output_components;
+	int32 num_jpeg_components = mJpegInfo.output_components;
 
-    printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-    image->Image.Info.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+	printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
+	image->Image.Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
 
-    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_jpeg_components;
-    mImageData.InitSize(data_size);
+	uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_jpeg_components;
+	mImageData.InitSize(data_size);
 
-    const uint32 row_stride = num_jpeg_components * mJpegInfo.output_width;
+	const uint32 row_stride = num_jpeg_components * mJpegInfo.output_width;
 
-    uint8* ptr_list[1] = { nullptr };
+	uint8* ptr_list[1] = { nullptr };
 
-    while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
-        ptr_list[0] = (mImageData.pData + (row_stride * mJpegInfo.output_scanline));
-        jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
-    }
+	while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
+		ptr_list[0] = (mImageData.pData + (row_stride * mJpegInfo.output_scanline));
+		jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
+	}
 
-    jpeg_finish_decompress(&mJpegInfo);
+	jpeg_finish_decompress(&mJpegInfo);
 
-    fclose(fp);
+	fclose(fp);
 
-    return eLoaderStatus::Success;
+	return eLoaderStatus::Success;
 }
 
 eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const uint8* data, uint32 size)
 {
-    TSRef<AxImage> image(asset);
+	TSRef<AxImage> image(asset);
 
-    struct jpeg_error_mgr error_mgr;
+	struct jpeg_error_mgr error_mgr;
 
-    mJpegInfo.err = jpeg_std_error(&error_mgr);
-    jpeg_create_decompress(&mJpegInfo);
+	mJpegInfo.err = jpeg_std_error(&error_mgr);
+	jpeg_create_decompress(&mJpegInfo);
 
-    Assert(data != nullptr);
+	Assert(data != nullptr);
 
-    jpeg_mem_src(&mJpegInfo, data, size);
-    jpeg_read_header(&mJpegInfo, true);
+	jpeg_mem_src(&mJpegInfo, data, size);
+	jpeg_read_header(&mJpegInfo, true);
 
-    const uint32 num_components = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
+	const uint32 num_components = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
 
-    J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
-    mJpegInfo.out_color_space = color_space;
+	J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
+	mJpegInfo.out_color_space = color_space;
 
-    jpeg_start_decompress(&mJpegInfo);
-    image->Image.Info.Size = { mJpegInfo.output_width, mJpegInfo.output_height };
+	jpeg_start_decompress(&mJpegInfo);
+	image->Image.Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
 
-    uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
-    mImageData.InitSize(data_size);
+	uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
+	mImageData.InitSize(data_size);
 
-    const uint32 row_stride = num_components * mJpegInfo.output_width;
+	const uint32 row_stride = num_components * mJpegInfo.output_width;
 
-    uint8* ptr_list[1] = { nullptr };
+	uint8* ptr_list[1] = { nullptr };
 
-    while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
-        ptr_list[0] = (mImageData.pData + (row_stride * mJpegInfo.output_scanline));
-        jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
-    }
+	while (mJpegInfo.output_scanline < mJpegInfo.output_height) {
+		ptr_list[0] = (mImageData.pData + (row_stride * mJpegInfo.output_scanline));
+		jpeg_read_scanlines(&mJpegInfo, ptr_list, 1);
+	}
 
-    jpeg_finish_decompress(&mJpegInfo);
+	jpeg_finish_decompress(&mJpegInfo);
 
-    return eLoaderStatus::Success;
+	return eLoaderStatus::Success;
 }
 
 void LoaderJpeg::CreateGpuResource(TSRef<AssetBase>& asset)
 {
-    TSRef<AxImage> image(asset);
+	TSRef<AxImage> image(asset);
 
 
-    ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
-                           MakeSlice<const uint8>(mImageData.pData, mImageData.Size) };
+	ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
+						   MakeSlice<const uint8>(mImageData.pData, mImageData.Size) };
 
-    // Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-    image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
+	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
+	image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
-    image->bIsUploadedToGpu = true;
-    image->bIsUploadedToGpu.notify_all();
+	image->bIsUploadedToGpu = true;
+	image->bIsUploadedToGpu.notify_all();
 }
 
 void LoaderJpeg::Destroy(TSRef<AssetBase>& asset) { jpeg_destroy_decompress(&mJpegInfo); }
