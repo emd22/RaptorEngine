@@ -174,6 +174,23 @@ void TileSystem::Update(ObjectID id, bool update_attached)
 	}
 }
 
+Vec2u TileSystem::GetTileXY(TileIndex tile_index)
+{
+	const uint32 tile_x = tile_index % mGridSize.X;
+	const uint32 tile_y = (tile_index - tile_x) / mGridSize.X;
+	return Vec2u(tile_x, tile_y);
+}
+
+
+Tile* TileSystem::GetTile(TileIndex index)
+{
+	if (index > mTileBuffer.Capacity) {
+		return nullptr;
+	}
+
+	return &mTileBuffer[index];
+}
+
 TileIndex TileSystem::GetTileIndex(const Vec3f& position) const
 {
 	const Vec3f adjusted = position + mPositionOffset;

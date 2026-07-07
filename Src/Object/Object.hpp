@@ -13,6 +13,7 @@
 #include <Core/TSRef.hpp>
 #include <Entity.hpp>
 #include <Material/MaterialID.hpp>
+#include <Math/BoundingBox.hpp>
 #include <Script/FoxScript.hpp>
 #include <TileSystem.hpp>
 
@@ -62,8 +63,6 @@ public:
 	void RenderUnlit(const Camera& camera);
 
 	bool CheckIfReady(bool require_material);
-
-
 	void AttachObject(const ObjectID& object);
 
 	void Update();
@@ -172,9 +171,10 @@ public:
 	float32 AnimationTime = 0.0f;
 
 	Scene* pScene = nullptr;
+	ObjectID ParentID = ObjectID::Null;
 	PagedArray<ObjectID> AttachedNodes;
 
-	Vec3f Dimensions = Vec3f::sZero;
+	BoundingBox Bounds { Vec3f::sZero, Vec3f::sZero };
 
 	Ref<script::FoxScript> pScript { nullptr };
 

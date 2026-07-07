@@ -50,7 +50,7 @@ bool Object::CheckIfReady(bool require_material)
 	}
 
 	// Dimensions = pMesh->GetDimensions();
-	Dimensions = MeshUtil::CalculateDimensions(pMesh->GetVertices());
+	Bounds = MeshUtil::CalculateBounds(pMesh->GetVertices());
 
 	// TODO: Remove this
 	if (require_material && pMesh->VertexList.IsSkinned()) {
@@ -75,6 +75,12 @@ void Object::FinalizeWhenReady()
 		if (material != nullptr) {
 			material->SetPipeline(ePipelineName::Unlit);
 		}
+	}
+
+
+	if (!ParentID.IsNull()) {
+		Object* parent_object = gObjectManager->GetObject(ParentID);
+		parent_object->Bounds.Add(Bounds);
 	}
 }
 
@@ -256,12 +262,6 @@ void Object::Render(const Camera& camera)
 
 	// const bool use_null_material = mMaterialID.IsNull();
 	Material* material = gMaterialManager->GetMaterial(material_id);
-
-
-	// if (!use_null_material && !material->bIsBuilt) {
-	//     material->Build();
-	//     return;
-	// }
 
 	UpdateIfOutOfDate();
 
@@ -453,13 +453,18 @@ void Object::LoadScript(const String& path)
 	SetScriptVars();
 }
 
-void Object::AttachObject(const ObjectID& object)
+void Object::AttachObject(const ObjectID& attach_id)
 {
 	if (!AttachedNodes.IsInited()) {
 		AttachedNodes.Create(8);
 	}
 
-	AttachedNodes.Insert(object);
+	Object* attached_object = gObjectManager->GetObject(attach_id);
+	attached_object->ParentID = ID;
+	attached_object->MoveBy(mPosition);
+	attached_object->ScaleBy(mScale);
+
+	AttachedNodes.Insert(attach_id);
 }
 
 void Object::SyncObjectWithPhysics(PhObject* phys)
@@ -511,7 +516,8 @@ void Object::SetPhysicsEnabled(bool enabled)
 void Object::PrintDebug() const
 {
 	LogInfo(LC_CORE, "Object '{}' (Id={}, Material={}) {{", Name.Get(), ID, mMaterialID);
-	LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, Dim={}", mPosition, mRotation, mScale, Dimensions);
+	LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, DimMin={}, DimMax={}", mPosition, mRotation, mScale, Bounds.Min,
+			Bounds.Max);
 
 	PhObject* phys = nullptr;
 

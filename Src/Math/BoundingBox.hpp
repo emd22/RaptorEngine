@@ -7,17 +7,21 @@ namespace fx {
 class BoundingBox
 {
 public:
-    BoundingBox() = default;
-    BoundingBox(Vec3f min, Vec3f max);
+	BoundingBox() = default;
+	BoundingBox(Vec3f min, Vec3f max);
 
-    BoundingBox operator+(const BoundingBox& other) const;
-    BoundingBox& operator+=(const BoundingBox& other);
+	FX_FORCE_INLINE Vec3f GetSize() { return Max - Min; }
 
-    BoundingBox& operator=(const BoundingBox& other);
+	void Add(const BoundingBox& other);
+
+	BoundingBox operator+(const BoundingBox& other) const;
+	BoundingBox& operator+=(const BoundingBox& other);
+
+	BoundingBox& operator=(const BoundingBox& other);
 
 public:
-    Vec3f Min = Vec3f::sZero;
-    Vec3f Max = Vec3f::sZero;
+	Vec3f Min = Vec3f::sZero;
+	Vec3f Max = Vec3f::sZero;
 };
 
 } // namespace fx

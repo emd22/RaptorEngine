@@ -34,11 +34,11 @@ using namespace fx::renderer;
 
 enum class eTestFlags
 {
-    None = 0,
-    A = (1 << 0),
-    B = (1 << 1),
-    C = (1 << 2),
-    D = (1 << 3),
+	None = 0,
+	A = (1 << 0),
+	B = (1 << 1),
+	C = (1 << 2),
+	D = (1 << 3),
 };
 
 FxEnumFlags(eTestFlags);
@@ -46,47 +46,47 @@ FxEnumFlags(eTestFlags);
 
 int main()
 {
-    fx::gEnginePool = new fx::MemPool;
-    fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
+	fx::gEnginePool = new fx::MemPool;
+	fx::gEnginePool->Create(FX_MEMORY_ENGINE_POOL_SIZE);
 
-    fx::gScriptMemPool = new fx::MemPool;
-    fx::gScriptMemPool->Create(1024 * 64);
+	fx::gScriptMemPool = new fx::MemPool;
+	fx::gScriptMemPool->Create(1024 * 64);
 
 #ifdef FX_TEST_SCRIPT
-    script::FoxScript fs;
-    fs.Load("./Scripts/GlobalTest.fox");
+	script::FoxScript fs;
+	fs.Load("./Scripts/GlobalTest.fox");
 
-    script::FoxSymbol* sym = fs.GetSymbol("Default");
-    if (!sym) {
-        LogError("Cannot find symbol!");
-    }
+	script::FoxSymbol* sym = fs.GetSymbol("Default");
+	if (!sym) {
+		LogError("Cannot find symbol!");
+	}
 
-    script::FoxValue value = fs.CallProc(sym, {});
+	script::FoxValue value = fs.CallProc(sym, {});
 
-    LogInfo("Value: {}", value);
+	LogInfo("Value: {}", value);
 #endif
 
 #ifndef FX_RUN_TEST
-    fx::renderer::Globals::Init();
+	fx::renderer::Globals::Init();
 
-    {
-        fx::FoxtrotGame game {};
-    }
+	{
+		fx::FoxtrotGame game {};
+	}
 
-    fx::Globals::Destroy();
-    fx::renderer::Globals::Destroy();
+	fx::Globals::Destroy();
+	fx::renderer::Globals::Destroy();
 
-    if (gAssetManager) {
-        delete gAssetManager;
-        gAssetManager = nullptr;
-    }
+	if (gAssetManager) {
+		delete gAssetManager;
+		gAssetManager = nullptr;
+	}
 
-    Defer(
-        []()
-        {
-            delete fx::gEnginePool;
-            fx::gEnginePool = nullptr;
-        });
+	Defer(
+		[]()
+		{
+			delete fx::gEnginePool;
+			fx::gEnginePool = nullptr;
+		});
 #endif
-    return 0;
+	return 0;
 }

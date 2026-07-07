@@ -198,13 +198,15 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 		rl.Objects.Clear();                                                                                            \
 	}
 
-void Scene::RebuildRenderList(TileIndex new_tile_index)
+void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 {
 	Tile* tile = mTileSystem.GetTile(new_tile_index);
 
-	CLEAR_RL_SECTION(ePipelineName::Geometry);
-	CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
-	CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
+	if (clear) {
+		CLEAR_RL_SECTION(ePipelineName::Geometry);
+		CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
+		CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
+	}
 
 	if (tile == nullptr) {
 		return;
@@ -237,12 +239,13 @@ void Scene::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	TileIndex tile_index = mTileSystem.GetTileIndex(mpCurrentCamera->Position);
-	if (tile_index != mCameraTileIndex) {
-		LogInfo("REBUILD");
-		RebuildRenderList(tile_index);
-		mCameraTileIndex = tile_index;
-	}
+	// TileIndex tile_index = mTileSystem.GetTileIndex(mpCurrentCamera->Position);
+
+	// if (tile_index != mCameraTileIndex) {
+	// 	LogInfo("REBUILD");
+	// 	RebuildRenderList(true, tile_index);
+	// 	mCameraTileIndex = tile_index;
+	// }
 
 
 	gRenderer->BeginGeometry();
@@ -264,8 +267,43 @@ void Scene::Render(Camera* shadow_camera)
 
 	ExecuteRenderList(ePipelineName::Unlit);
 
+	RenderBoundingBoxes(camera);
+
 	if (bRenderPhysicsObjects) {
 		RenderPhysicsObjects(camera);
+	}
+}
+
+
+void Scene::RenderBoundingBoxes(const Camera& camera)
+{
+	if (!mpDebugCube.IsValid()) {
+		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
+	}
+
+	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
+	pipeline.Bind(cmd);
+
+	DebugLayerPushConstants push_constants {};
+
+	const Color debug_color = Color::FromRGBA(150, 255, 80, 255);
+
+	for (ObjectID object_id : mObjects) {
+		Object* object = gObjectManager->GetObject(object_id);
+
+		Mat4f model_matrix = Mat4f::AsScale(object->Bounds.GetSize()) * Mat4f::AsRotation(object->mRotation) *
+							 Mat4f::AsTranslation(object->GetPosition() + (object->Bounds.GetSize() / Vec3f(2.0f)) +
+												  object->Bounds.Min);
+
+		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+
+		push_constants.DebugColor = debug_color.AsUInt();
+
+		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		mpDebugCube->Render(cmd, 1);
 	}
 }
 
@@ -304,21 +342,6 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
 		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);
 	}
-
-	// push_constants.ObjectId = ObjectId;
-
-	// memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
-
-	// push_constants.MaterialIndex = 0;
-
-	// vkCmdPushConstants(frame->CommandBuffer.CommandBuffer, pMaterial->pPipeline->Layout,
-	//                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants),
-	//                    &push_constants);
-
-
-	// for (const PhObject& obj : mPhysicsObjects) {
-	//     mpDebugCube->Render(cmd, 1);
-	// }
 }
 
 void Scene::RenderObjectShadows(Object* object)
@@ -341,14 +364,6 @@ void Scene::RenderObjectShadows(Object* object)
 		gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
 													   gObjectManager->GetBaseOffset());
 	}
-	// if (obj->IsSkinned()) {
-	//     pipeline = &gShadowRenderer->GetSkinnedPipeline();
-	//     in_skinned_shader = true;
-	//     pipeline->Bind(cmd);
-
-	//     gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
-	//                                                    gObjectManager->GetBaseOffset());
-	// }
 
 	object->Update();
 

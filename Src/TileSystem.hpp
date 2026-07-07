@@ -54,21 +54,8 @@ public:
 	 */
 	void Remove(ObjectID id);
 
-	Vec2u GetTileXY(TileIndex tile_index)
-	{
-		const uint32 tile_x = tile_index % mGridSize.X;
-		const uint32 tile_y = (tile_index - tile_x) / mGridSize.X;
-		return Vec2u(tile_x, tile_y);
-	}
-
-	Tile* GetTile(TileIndex index)
-	{
-		if (index > mTileBuffer.Capacity) {
-			return nullptr;
-		}
-
-		return &mTileBuffer[index];
-	}
+	Vec2u GetTileXY(TileIndex tile_index);
+	Tile* GetTile(TileIndex index);
 
 	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
 
@@ -82,7 +69,7 @@ public:
 private:
 	SizedArray<Tile> mTileBuffer;
 	Vec2u mGridSize;
-	Vec2f mTileSize = Vec2f(5.0f, 5.0f);
+	Vec2f mTileSize = Vec2f(10.0f, 10.0f);
 	Vec3f mPositionOffset = Vec3f::sZero;
 };
 

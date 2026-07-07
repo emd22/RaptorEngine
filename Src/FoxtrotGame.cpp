@@ -504,6 +504,9 @@ void FoxtrotGame::ProcessControls()
 
 		LogInfo("Tile index: {}, {}", tile_xy.X, tile_xy.Y);
 
+		Object* object = gObjectManager->FindObject(HashStr32("FireExtinguisher"));
+		LogInfo("object bounds:  {} -> {}  = {}", object->Bounds.Min, object->Bounds.Max, object->Bounds.GetSize());
+
 		// Player.SetFlyMode(true);
 		// Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
 	}

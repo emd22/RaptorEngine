@@ -48,6 +48,7 @@ public:
 				return Ref<LightDirectional>(light);
 			}
 		}
+
 		return Ref<LightDirectional>(nullptr);
 	}
 
@@ -67,10 +68,11 @@ public:
 
 private:
 	void RenderPhysicsObjects(const Camera& camera);
+	void RenderBoundingBoxes(const Camera& camera);
 	void RenderObjectShadows(Object* object_id);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
-	void RebuildRenderList(TileIndex new_tile);
+	void RebuildRenderList(bool clear, TileIndex new_tile);
 	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
 
 public:
@@ -85,6 +87,7 @@ private:
 	PagedArray<PhObject> mPhysicsObjects;
 
 	TileIndex mCameraTileIndex = TileIndexNull;
+	TileIndex mCameraTileIndex2 = TileIndexNull;
 
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 

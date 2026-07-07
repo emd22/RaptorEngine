@@ -26,171 +26,169 @@ namespace fx {
 
 void SceneFile::Load(const std::string& path, Scene& scene)
 {
-    ConfigFile info;
+	ConfigFile info;
 
-    gAssetManager->SetScenePath(path);
+	gAssetManager->SetScenePath(path);
 
-    info.Load(path + "/info.prx");
+	info.Load(path + "/info.prx");
 
-    bool first_time = (scene.GetAllObjects().Size() == 0);
+	bool first_time = (scene.GetAllObjects().Size() == 0);
 
-    if (first_time) {
-        ConfigEntry* meta = info.GetEntry(HashStr32("Meta"));
+	if (first_time) {
+		ConfigEntry* meta = info.GetEntry(HashStr32("Meta"));
 
-        if (!meta) {
-            LogError(LC_ASSET, "Project missing metadata!");
-            return;
-        }
+		if (!meta) {
+			LogError(LC_ASSET, "Project missing metadata!");
+			return;
+		}
 
-        scene.Name = meta->GetMember(HashStr32("Name"))->Get<const char*>();
-    }
+		scene.Name = meta->GetMember(HashStr32("Name"))->Get<const char*>();
+	}
 
-    // Load sun
-    Ref<LightDirectional> sun = scene.GetDirectionalLight();
-    if (!sun.IsValid()) {
-        sun = Ref<LightDirectional>::New();
-        scene.Attach(sun);
-    }
+	// Load sun
+	Ref<LightDirectional> sun = scene.GetDirectionalLight();
+	if (!sun.IsValid()) {
+		sun = Ref<LightDirectional>::New();
+		scene.Attach(sun);
+	}
 
-    ConfigEntry* sun_entry = info.GetEntry(HashStr32("Sun"));
+	ConfigEntry* sun_entry = info.GetEntry(HashStr32("Sun"));
 
-    if (sun_entry) {
-        sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("Pos"), Vec3f::sZero));
+	if (sun_entry) {
+		sun->SetPosition(sun_entry->GetMemberValue<Vec3f>(HashStr32("Pos"), Vec3f::sZero));
 
-        sun->Color = sun_entry->GetMemberValue<Color>(HashStr32("Color"), Color::FromRGBA(100, 100, 100, 4));
-        sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("AmbientColor"),
-                                                             Color::FromRGBA(100, 100, 100, 1));
-    }
+		sun->Color = sun_entry->GetMemberValue<Color>(HashStr32("Color"), Color::FromRGBA(100, 100, 100, 4));
+		sun->AmbientColor = sun_entry->GetMemberValue<Color>(HashStr32("AmbientColor"),
+															 Color::FromRGBA(100, 100, 100, 1));
+	}
 
-    ConfigEntry* collider_list = info.GetEntry(HashStr32("Colliders"));
-    if (collider_list) {
-        for (const ConfigEntry& collider_entry : collider_list->Members) {
-            if (first_time) {
-                AddColliderFromEntry(path, collider_entry, scene);
-            }
-            else {
-            }
-        }
-    }
+	ConfigEntry* collider_list = info.GetEntry(HashStr32("Colliders"));
+	if (collider_list) {
+		for (const ConfigEntry& collider_entry : collider_list->Members) {
+			if (first_time) {
+				AddColliderFromEntry(path, collider_entry, scene);
+			}
+		}
+	}
 
 
-    // Load objects
+	// Load objects
 
-    ConfigEntry* object_list = info.GetEntry(HashStr32("Objects"));
+	ConfigEntry* object_list = info.GetEntry(HashStr32("Objects"));
 
-    for (const ConfigEntry& object_entry : object_list->Members) {
-        if (first_time) {
-            AddObjectFromEntry(path, object_entry, scene);
-        }
-        else {
-            Object* object = scene.FindObject(object_entry.Name.GetHash());
-            ApplyPropertiesToObject(object, object_entry);
-        }
-    }
+	for (const ConfigEntry& object_entry : object_list->Members) {
+		if (first_time) {
+			AddObjectFromEntry(path, object_entry, scene);
+		}
+		else {
+			Object* object = scene.FindObject(object_entry.Name.GetHash());
+			ApplyPropertiesToObject(object, object_entry);
+		}
+	}
 }
 
 
 void SceneFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry, Scene& scene)
 {
-    const std::string& collider_name = collider_entry.Name.Get();
+	const std::string& collider_name = collider_entry.Name.Get();
 
-    ePhMotionType motion_type = ePhMotionType::Static;
+	ePhMotionType motion_type = ePhMotionType::Static;
 
-    // Create physics object
-    PhObjectId physics_id = scene.NewPhysicsObject();
-    PhObject* phys = scene.GetPhysicsObject(physics_id);
-    phys->SetName(collider_name);
+	// Create physics object
+	PhObjectId physics_id = scene.NewPhysicsObject();
+	PhObject* phys = scene.GetPhysicsObject(physics_id);
+	phys->SetName(collider_name);
 
-    Vec3f position = collider_entry.GetMemberValue(HashStr32("Pos"), Vec3f::sZero);
-    Quat rotation = collider_entry.GetMemberValue(HashStr32("Rot"), Quat::sIdentity);
+	Vec3f position = collider_entry.GetMemberValue(HashStr32("Pos"), Vec3f::sZero);
+	Quat rotation = collider_entry.GetMemberValue(HashStr32("Rot"), Quat::sIdentity);
 
-    ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("Type"));
-    if (physics_type && physics_type->Get<uint32>() == static_cast<uint32>(ePhMotionType::Dynamic)) {
-        motion_type = ePhMotionType::Dynamic;
-    }
+	ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("Type"));
+	if (physics_type && physics_type->Get<uint32>() == static_cast<uint32>(ePhMotionType::Dynamic)) {
+		motion_type = ePhMotionType::Dynamic;
+	}
 
-    ConfigEntry* box = collider_entry.GetMember(HashStr32("Box"));
-    if (box != nullptr) {
-        Vec3f size = box->GetMemberValue(HashStr32("Size"), Vec3f::sOne);
+	ConfigEntry* box = collider_entry.GetMember(HashStr32("Box"));
+	if (box != nullptr) {
+		Vec3f size = box->GetMemberValue(HashStr32("Size"), Vec3f::sOne);
 
-        phys->CreatePrimitiveBody(ePhPrimitiveType::Box, size, motion_type, PhProperties {});
-    }
+		phys->CreatePrimitiveBody(ePhPrimitiveType::Box, size, motion_type, PhProperties {});
+	}
 
 
-    phys->Teleport(position, rotation);
+	phys->Teleport(position, rotation);
 }
 
 void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry, Scene& scene)
 {
-    const char* mesh_path = object_entry.GetMember(HashStr32("Mesh"))->Get<const char*>();
+	const char* mesh_path = object_entry.GetMember(HashStr32("Mesh"))->Get<const char*>();
 
-    LoadObjectOptions load_options {};
+	LoadObjectOptions load_options {};
 
 
-    String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
-    AssetTicket<Object> ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
+	String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
+	AssetTicket<Object> ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
 
-    Object* object = ticket.Get();
+	Object* object = ticket.Get();
 
-    object->pScene = &scene;
-    ApplyPropertiesToObject(object, object_entry);
+	object->pScene = &scene;
+	ApplyPropertiesToObject(object, object_entry);
 
-    scene.Attach(ticket);
+	scene.Attach(ticket);
 }
 
 
 void SceneFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry)
 {
-    ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("Shadows"));
-    if (shadow_caster != nullptr) {
-        object->SetShadowCaster(static_cast<bool>(shadow_caster->Get<int64>()));
-    }
+	ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("Shadows"));
+	if (shadow_caster != nullptr) {
+		object->SetShadowCaster(static_cast<bool>(shadow_caster->Get<int64>()));
+	}
 
-    ConfigEntry* scale = object_entry.GetMember(HashStr32("Scale"));
-    if (scale != nullptr) {
-        object->SetScale(scale->Get<float32>());
-    }
+	ConfigEntry* scale = object_entry.GetMember(HashStr32("Scale"));
+	if (scale != nullptr) {
+		object->SetScale(scale->Get<float32>());
+	}
 
-    // Transforms
+	// Transforms
 
-    object->SetPosition(object_entry.GetMemberValue(HashStr32("Pos"), object->mPosition));
-    object->SetRotation(object_entry.GetMemberValue(HashStr32("Rot"), object->mRotation));
-    object->SetScale(object_entry.GetMemberValue(HashStr32("Scale"), object->mScale));
-    object->MarkTransformOutOfDate();
+	object->SetPosition(object_entry.GetMemberValue(HashStr32("Pos"), object->mPosition));
+	object->SetRotation(object_entry.GetMemberValue(HashStr32("Rot"), object->mRotation));
+	object->SetScale(object_entry.GetMemberValue(HashStr32("Scale"), object->mScale));
+	object->MarkTransformOutOfDate();
 
-    // Render options
+	// Render options
 
-    ConfigEntry* layer = object_entry.GetMember(HashStr32("Layer"));
-    if (layer != nullptr) {
-        int64 layer_value = layer->Get<int64>();
+	ConfigEntry* layer = object_entry.GetMember(HashStr32("Layer"));
+	if (layer != nullptr) {
+		int64 layer_value = layer->Get<int64>();
 
-        if (layer_value == static_cast<int64>(eObjectLayer::PlayerLayer)) {
-            object->SetObjectLayer(eObjectLayer::PlayerLayer);
-        }
-    }
+		if (layer_value == static_cast<int64>(eObjectLayer::PlayerLayer)) {
+			object->SetObjectLayer(eObjectLayer::PlayerLayer);
+		}
+	}
 
-    // object->SetUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("Unlit"), 0)));
+	// object->SetUnlit(static_cast<bool>(object_entry.GetMemberValue(HashStr32("Unlit"), 0)));
 
-    ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
-    if (unlit != nullptr) {
-        object->SetUnlit(static_cast<bool>(unlit->Get<int64>()));
-    }
+	ConfigEntry* unlit = object_entry.GetMember(HashStr32("Unlit"));
+	if (unlit != nullptr) {
+		object->SetUnlit(static_cast<bool>(unlit->Get<int64>()));
+	}
 
-    PhProperties physics_properties {};
+	PhProperties physics_properties {};
 
-    // Physics
+	// Physics
 
-    ConfigEntry* collider_ref = object_entry.GetMember(HashStr32("ColliderRef"));
-    if (collider_ref != nullptr) {
-        PhObject* phys_object = object->pScene->FindPhysicsObject(HashStr32(collider_ref->Get<const char*>()));
-        object->SetPhysicsId(phys_object->GetId());
-        object->SetPhysicsEnabled(true);
-    }
+	ConfigEntry* collider_ref = object_entry.GetMember(HashStr32("ColliderRef"));
+	if (collider_ref != nullptr) {
+		PhObject* phys_object = object->pScene->FindPhysicsObject(HashStr32(collider_ref->Get<const char*>()));
+		object->SetPhysicsId(phys_object->GetId());
+		object->SetPhysicsEnabled(true);
+	}
 
-    ConfigEntry* script = object_entry.GetMember(HashStr32("Script"));
-    if (script != nullptr) {
-        object->LoadScript(String::Fmt("./Scripts{}", script->GetValue<const char*>()));
-    }
+	ConfigEntry* script = object_entry.GetMember(HashStr32("Script"));
+	if (script != nullptr) {
+		object->LoadScript(String::Fmt("./Scripts{}", script->GetValue<const char*>()));
+	}
 }
 
 } // namespace fx

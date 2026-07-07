@@ -54,17 +54,17 @@ concept C_IsSameOrConst = std::is_same_v<typename std::remove_const<TPossiblyCon
 /////////////////////////////////////
 
 #define FxEnumFlags(type_)                                                                                             \
-    template <>                                                                                                        \
-    struct EnumFlagsOptIn<type_>                                                                                       \
-    {                                                                                                                  \
-        static constexpr bool bValue = true;                                                                           \
-    }
+	template <>                                                                                                        \
+	struct EnumFlagsOptIn<type_>                                                                                       \
+	{                                                                                                                  \
+		static constexpr bool bValue = true;                                                                           \
+	}
 
 
 template <typename T>
 struct EnumFlagsOptIn
 {
-    static constexpr bool bValue = false;
+	static constexpr bool bValue = false;
 };
 
 template <typename T>
@@ -75,88 +75,88 @@ using EnumFlagsIntType = typename std::underlying_type<T>::type;
 
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 constexpr T operator&(T lhs, T rhs)
 {
-    using InternalType = EnumFlagsIntType<T>;
-    return static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
+	using InternalType = EnumFlagsIntType<T>;
+	return static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 constexpr T& operator&=(T& lhs, T rhs)
 {
-    using InternalType = EnumFlagsIntType<T>;
-    lhs = static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
+	using InternalType = EnumFlagsIntType<T>;
+	lhs = static_cast<T>(static_cast<InternalType>(lhs) & static_cast<InternalType>(rhs));
 
-    return lhs;
+	return lhs;
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 constexpr T operator|(T lhs, T rhs)
 {
-    using InternalType = EnumFlagsIntType<T>;
-    return static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
+	using InternalType = EnumFlagsIntType<T>;
+	return static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 constexpr T& operator|=(T& lhs, T rhs)
 {
-    using InternalType = EnumFlagsIntType<T>;
-    lhs = static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
-    return lhs;
+	using InternalType = EnumFlagsIntType<T>;
+	lhs = static_cast<T>(static_cast<InternalType>(lhs) | static_cast<InternalType>(rhs));
+	return lhs;
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 constexpr T& operator^=(T& lhs, T rhs)
 {
-    using InternalType = EnumFlagsIntType<T>;
-    lhs = static_cast<T>(static_cast<InternalType>(lhs) ^ static_cast<InternalType>(rhs));
-    return lhs;
+	using InternalType = EnumFlagsIntType<T>;
+	lhs = static_cast<T>(static_cast<InternalType>(lhs) ^ static_cast<InternalType>(rhs));
+	return lhs;
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 constexpr bool operator!=(T lhs, int rhs)
 {
-    return (static_cast<EnumFlagsIntType<T>>(lhs)) != rhs;
+	return (static_cast<EnumFlagsIntType<T>>(lhs)) != rhs;
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 constexpr bool operator==(T lhs, int rhs)
 {
-    return (static_cast<EnumFlagsIntType<T>>(lhs)) == rhs;
+	return (static_cast<EnumFlagsIntType<T>>(lhs)) == rhs;
 }
 
 template <typename T>
 constexpr T operator~(T v)
 {
-    return static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(v)));
+	return static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(v)));
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 FX_FORCE_INLINE constexpr T& ClearFlag(T& lhs, T flag)
 {
-    return (lhs &= static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(flag))));
+	return (lhs &= static_cast<T>(~(static_cast<EnumFlagsIntType<T>>(flag))));
 }
 
 template <typename T>
-    requires C_IsEnumFlags<T>
+	requires C_IsEnumFlags<T>
 FX_FORCE_INLINE constexpr T& SetFlag(T& lhs, T flag)
 {
-    return (lhs |= flag);
+	return (lhs |= flag);
 }
 
 template <typename T>
 FX_FORCE_INLINE constexpr bool IsFlagSet(T lhs, T flag)
 {
-    using InternalType = EnumFlagsIntType<T>;
-    return (static_cast<InternalType>(lhs) & static_cast<InternalType>(flag)) != 0;
+	using InternalType = EnumFlagsIntType<T>;
+	return (static_cast<InternalType>(lhs) & static_cast<InternalType>(flag)) != 0;
 }
 
 
@@ -164,49 +164,49 @@ FX_FORCE_INLINE constexpr bool IsFlagSet(T lhs, T flag)
 
 
 #define FX_ENUM_CASE_NAME(member_)                                                                                     \
-    case ENUM_TYPE::member_:                                                                                           \
-        return #member_
+	case ENUM_TYPE::member_:                                                                                           \
+		return #member_
 
 struct SpinThreadGuard
 {
 public:
-    SpinThreadGuard(AtomicFlag* busy_flag) noexcept
-    {
+	SpinThreadGuard(AtomicFlag* busy_flag) noexcept
+	{
 #ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
-        mMutex = busy_flag;
+		mMutex = busy_flag;
 
-        mMutex->lock();
+		mMutex->lock();
 #else
-        mFlag = busy_flag;
+		mFlag = busy_flag;
 
-        // If the busy flag is set currently, wait until it is cleared
-        while (mFlag->test()) {
-            mFlag->wait(true);
-        }
+		// If the busy flag is set currently, wait until it is cleared
+		while (mFlag->test()) {
+			mFlag->wait(true);
+		}
 
-        // Mark as busy
-        mFlag->test_and_set();
-        mFlag->notify_one();
+		// Mark as busy
+		mFlag->test_and_set();
+		mFlag->notify_one();
 #endif
-    }
+	}
 
-    void Unlock() noexcept {}
+	void Unlock() noexcept {}
 
-    ~SpinThreadGuard() noexcept
-    {
+	~SpinThreadGuard() noexcept
+	{
 #ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
-        mMutex->unlock();
+		mMutex->unlock();
 #else
-        mFlag->clear(std::memory_order_release);
-        mFlag->notify_one();
+		mFlag->clear(std::memory_order_release);
+		mFlag->notify_one();
 #endif
-    }
+	}
 
 private:
 #ifdef FX_SPIN_THREAD_GUARD_DEBUG_USE_MUTEX
-    std::mutex* mMutex;
+	std::mutex* mMutex;
 #else
-    AtomicFlag* mFlag = nullptr;
+	AtomicFlag* mFlag = nullptr;
 #endif
 };
 
