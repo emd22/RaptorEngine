@@ -181,13 +181,30 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 	}
 }
 
+void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id)
+{
+	mRenderList.Add(pl_name, *id);
+
+	Object* obj = gObjectManager->GetObject(*id);
+	for (ObjectID& attached_id : obj->AttachedNodes) {
+		AddToRenderListRecursive(pl_name, &attached_id);
+	}
+}
+
+#define CLEAR_RL_SECTION(pl_name_)                                                                                     \
+	{                                                                                                                  \
+		RenderListSection& rl = mRenderList.GetSection(pl_name_);                                                      \
+		rl.InUse.ClearAll();                                                                                           \
+		rl.Objects.Clear();                                                                                            \
+	}
+
 void Scene::RebuildRenderList(TileIndex new_tile_index)
 {
 	Tile* tile = mTileSystem.GetTile(new_tile_index);
 
-	RenderListSection& rl = mRenderList.GetSection(ePipelineName::Geometry);
-	rl.InUse.ClearAll();
-	rl.Objects.Clear();
+	CLEAR_RL_SECTION(ePipelineName::Geometry);
+	CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
+	CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
 
 	if (tile == nullptr) {
 		return;
@@ -206,14 +223,15 @@ void Scene::RebuildRenderList(TileIndex new_tile_index)
 			continue;
 		}
 
+		Object* object = gObjectManager->GetObject(*object_id);
+		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+
 		LogInfo("Adding object ID {}", *object_id);
 
-		mRenderList.Add(ePipelineName::Geometry, *object_id);
-
+		AddToRenderListRecursive(material->GetPipelineName(), object_id);
 		++index;
 	}
 }
-
 
 void Scene::Render(Camera* shadow_camera)
 {
@@ -221,6 +239,7 @@ void Scene::Render(Camera* shadow_camera)
 
 	TileIndex tile_index = mTileSystem.GetTileIndex(mpCurrentCamera->Position);
 	if (tile_index != mCameraTileIndex) {
+		LogInfo("REBUILD");
 		RebuildRenderList(tile_index);
 		mCameraTileIndex = tile_index;
 	}

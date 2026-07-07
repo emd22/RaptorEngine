@@ -480,7 +480,7 @@ void FoxtrotGame::ProcessControls()
 			}
 			else {
 				Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
-				if (!material) {
+				if (!material || !material->Diffuse.Exists()) {
 					continue;
 				}
 
@@ -496,7 +496,6 @@ void FoxtrotGame::ProcessControls()
 			}
 		}
 	}
-
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
 		TileIndex tile_index = mMainScene.mTileSystem.GetTileIndex(Player.Position);

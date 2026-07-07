@@ -70,8 +70,8 @@ private:
 	void RenderObjectShadows(Object* object_id);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
-
 	void RebuildRenderList(TileIndex new_tile);
+	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
 
 public:
 	Name Name = "(unnamed)";
