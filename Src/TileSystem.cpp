@@ -87,6 +87,8 @@ void TileSystem::Insert(ObjectID id)
 
 	const Vec3f object_size = object->Bounds.GetSize();
 
+	LogInfo("OBJECT SIZE: ({}, {}) {}", object->ID, object->Name.Get(), object_size);
+
 	Vec2u tile_index_start = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.Min));
 	Vec2u tile_index_end = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.GetSize()));
 
@@ -230,8 +232,8 @@ TileIndex TileSystem::GetTileIndexXY(const Vec2u& xy) const
 TileIndex TileSystem::GetTileIndex(const Vec3f& position) const
 {
 	const Vec3f adjusted = position + mPositionOffset;
-	return static_cast<uint32>(std::floor(adjusted.Z / mTileSize.Y)) * mGridSize.X +
-		   static_cast<uint32>(std::floor(adjusted.X / mTileSize.X));
+	return std::min(static_cast<uint32>(std::floor(adjusted.Z / mTileSize.Y)), mGridSize.Y - 1) * mGridSize.X +
+		   std::min(static_cast<uint32>(std::floor(adjusted.X / mTileSize.X)), mGridSize.X - 1);
 }
 
 void TileSystem::Remove(ObjectID id)

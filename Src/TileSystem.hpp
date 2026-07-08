@@ -28,7 +28,6 @@ class Object;
 
 class TileSystem
 {
-	// About half KiB in total per tile. This should be raised when needed.
 	static constexpr uint32 scMaxObjectsPerTile = 64;
 
 public:

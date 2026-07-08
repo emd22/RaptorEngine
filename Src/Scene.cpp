@@ -393,10 +393,11 @@ void Scene::RenderTileSystem(const Camera& camera)
 
 	const Vec3f tile_size = Vec3f(mTileSystem.mTileSize.X, 1.0f, mTileSystem.mTileSize.Y);
 
+	Vec2u camera_tile_index = mTileSystem.GetTileXY(mCameraTileIndex);
+
 	for (uint32 y = 0; y < mTileSystem.mGridSize.Y; y++) {
 		for (uint32 x = 0; x < mTileSystem.mGridSize.X; x++) {
 			const Vec3f tile_offset = Vec3f(x, -1.0f, y) * tile_size;
-
 
 			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::sIdentity) *
 								 Mat4f::AsTranslation((tile_offset)-mTileSystem.mPositionOffset + (tile_size * 0.5f));
@@ -406,7 +407,8 @@ void Scene::RenderTileSystem(const Camera& camera)
 
 			push_constants.DebugColor = debug_color.AsUInt();
 
-			if (mTileSystem.GetTileIndexXY(Vec2u(x, y)) == mCameraTileIndex) {
+			if ((x >= camera_tile_index.X - 1 && x <= camera_tile_index.X + 1) &&
+				(y >= camera_tile_index.Y - 1 && y <= camera_tile_index.Y + 1)) {
 				push_constants.DebugColor = player_debug_color.AsUInt();
 			}
 
