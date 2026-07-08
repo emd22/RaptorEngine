@@ -27,7 +27,6 @@ void Scene::Attach(Object* object)
 {
 	mObjects.Insert(object->ID);
 	mTileSystem.Insert(object->ID);
-
 	object->pScene = this;
 	object->OnAttached(this);
 
@@ -78,7 +77,6 @@ void Scene::Attach(AssetTicket<Object> object_ticket)
 	Object* object = object_ticket.Get();
 
 	mObjects.Insert(object->ID);
-	mTileSystem.Insert(object->ID);
 
 	object->pScene = this;
 	object->OnAttached(this);
@@ -88,6 +86,7 @@ void Scene::Attach(AssetTicket<Object> object_ticket)
 		{
 			Object* object = static_cast<Object*>(item_ptr);
 			AddObjectToRenderList(object, this);
+			mTileSystem.Insert(object->ID);
 		});
 }
 
@@ -181,11 +180,41 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 	}
 }
 
-void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id)
+void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
 {
-	mRenderList.Add(pl_name, *id);
+	if (id_ptr == nullptr) {
+		return;
+	}
 
-	Object* obj = gObjectManager->GetObject(*id);
+	ObjectID id = *id_ptr;
+
+	RenderListSection& section = mRenderList.GetSection(pl_name);
+
+	uint32 index = 0;
+	while (true) {
+		index = section.InUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+		const ObjectID* object_id = section.Objects.Get(index);
+		if (!object_id) {
+			break;
+		}
+
+		if ((*object_id) == id) {
+			LogInfo("Avoiding ID {}, {}", *object_id, id);
+			return;
+		}
+
+		++index;
+	}
+
+
+	LogInfo("Adding object to render list index {}", section.Objects.Size);
+	mRenderList.Add(pl_name, id);
+
+	Object* obj = gObjectManager->GetObject(id);
 	for (ObjectID& attached_id : obj->AttachedNodes) {
 		AddToRenderListRecursive(pl_name, &attached_id);
 	}
@@ -202,14 +231,15 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 {
 	Tile* tile = mTileSystem.GetTile(new_tile_index);
 
+	if (tile == nullptr) {
+		return;
+	}
+
 	if (clear) {
 		CLEAR_RL_SECTION(ePipelineName::Geometry);
 		CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
 		CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
-	}
-
-	if (tile == nullptr) {
-		return;
+		CLEAR_RL_SECTION(ePipelineName::Unlit);
 	}
 
 	uint32 index = 0;
@@ -228,25 +258,61 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		Object* object = gObjectManager->GetObject(*object_id);
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
 
-		LogInfo("Adding object ID {}", *object_id);
+		LogInfo("Adding object ID {} -> {}", *object_id, PipelineNameUtil::GetName(material->GetPipelineName()));
 
 		AddToRenderListRecursive(material->GetPipelineName(), object_id);
+
 		++index;
 	}
+}
+
+void Scene::RebuildFromTiles(TileIndex tile_index)
+{
+	LogInfo("REBUILD");
+
+	/*
+		+--------+--------+--------+-----
+		|		 |        |        |
+		| -1,  1 |  0,  1 |  1,  1 |  ...
+		|		 |        |        |
+		+--------+--------+--------+-----
+		|		 |        |        |
+		| -1,  0 | PLAYER |  1,  0 |  ...
+		|		 |        |        |
+		+--------+--------+--------+-----
+		|		 |        |        |
+		| -1, -1 |  0, -1 |  1, -1 |  ...
+		|		 |        |        |
+		+--------+--------+--------+-----
+		| ...    |  ...   |  ...   |
+	*/
+
+	RebuildRenderList(true, tile_index);
+	Vec2u xy = mTileSystem.GetTileXY(tile_index);
+
+	// Rebuild the immediate surrounding tiles (up, left, down, right)
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(1, 0)));
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(-1, 0)));
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(0, -1)));
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(0, 1)));
+
+	// Build the diagonals
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(1, 1)));
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(1, -1)));
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(-1, -1)));
+	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(-1, 1)));
 }
 
 void Scene::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	// TileIndex tile_index = mTileSystem.GetTileIndex(mpCurrentCamera->Position);
+	TileIndex tile_index = mTileSystem.GetTileIndex(mpCurrentCamera->Position);
 
-	// if (tile_index != mCameraTileIndex) {
-	// 	LogInfo("REBUILD");
-	// 	RebuildRenderList(true, tile_index);
-	// 	mCameraTileIndex = tile_index;
-	// }
-
+	if (tile_index != mCameraTileIndex) {
+		RebuildFromTiles(tile_index);
+		mCameraTileIndex = tile_index;
+	}
 
 	gRenderer->BeginGeometry();
 
@@ -267,7 +333,8 @@ void Scene::Render(Camera* shadow_camera)
 
 	ExecuteRenderList(ePipelineName::Unlit);
 
-	RenderBoundingBoxes(camera);
+	// RenderBoundingBoxes(camera);
+	RenderTileSystem(camera);
 
 	if (bRenderPhysicsObjects) {
 		RenderPhysicsObjects(camera);
@@ -304,6 +371,48 @@ void Scene::RenderBoundingBoxes(const Camera& camera)
 
 		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);
+	}
+}
+
+void Scene::RenderTileSystem(const Camera& camera)
+{
+	if (!mpDebugCube.IsValid()) {
+		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
+	}
+
+	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
+	pipeline.Bind(cmd);
+
+
+	DebugLayerPushConstants push_constants {};
+
+	const Color debug_color = Color::FromRGBA(255, 255, 30, 255);
+	const Color player_debug_color = Color::FromRGBA(0, 255, 255, 255);
+
+	const Vec3f tile_size = Vec3f(mTileSystem.mTileSize.X, 1.0f, mTileSystem.mTileSize.Y);
+
+	for (uint32 y = 0; y < mTileSystem.mGridSize.Y; y++) {
+		for (uint32 x = 0; x < mTileSystem.mGridSize.X; x++) {
+			const Vec3f tile_offset = Vec3f(x, -1.0f, y) * tile_size;
+
+
+			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::sIdentity) *
+								 Mat4f::AsTranslation((tile_offset)-mTileSystem.mPositionOffset + (tile_size * 0.5f));
+
+			Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+
+			push_constants.DebugColor = debug_color.AsUInt();
+
+			if (mTileSystem.GetTileIndexXY(Vec2u(x, y)) == mCameraTileIndex) {
+				push_constants.DebugColor = player_debug_color.AsUInt();
+			}
+
+			gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+			mpDebugCube->Render(cmd, 1);
+		}
 	}
 }
 

@@ -53,9 +53,7 @@ void TileSystem::Create(const Vec2u grid_size)
 	Vec2u half_grid = grid_size / Vec2u(2U);
 
 	// Center the grid about zero.
-	mPositionOffset = (Vec3f(half_grid.X, 0.0f, half_grid.Y) * Vec3f(mTileSize.X, 0.0f, mTileSize.Y));
-
-	LogInfo("Center grid at {}", mPositionOffset);
+	mPositionOffset = ((Vec3f(half_grid.X, 0.0f, half_grid.Y) * Vec3f(mTileSize.X, 0.0f, mTileSize.Y)));
 }
 
 Tile* TileSystem::GetObjectTile(const Object* object, TileIndex* out_tile_index)
@@ -63,7 +61,7 @@ Tile* TileSystem::GetObjectTile(const Object* object, TileIndex* out_tile_index)
 	// TODO: Check based on AABB or radius.
 
 	const Vec3f tile_size_v(mTileSize.X, 0.0f, mTileSize.Y);
-	const Vec3f position_tile_local = object->mPosition / tile_size_v;
+	const Vec3f position_tile_local = (object->mPosition) / tile_size_v;
 
 	if (position_tile_local.X >= mGridSize.X || position_tile_local.Z >= mGridSize.Y) {
 #ifdef FX_TILE_SYSTEM_LOG_ERRORS
@@ -81,8 +79,41 @@ Tile* TileSystem::GetObjectTile(const Object* object, TileIndex* out_tile_index)
 	return &mTileBuffer[tile_index];
 }
 
+void TileSystem::Insert(ObjectID id)
+{
+	Object* object = gObjectManager->GetObject(id);
 
-TileIndex TileSystem::Insert(ObjectID id)
+	// Tile* base_tile = GetObjectTile(object, &tile_index);
+
+	const Vec3f object_size = object->Bounds.GetSize();
+
+	Vec2u tile_index_start = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.Min));
+	Vec2u tile_index_end = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.GetSize()));
+
+	// uint32 width_in_tiles = std::max(std::min(static_cast<uint32>(std::ceil(f_width)), mGridSize.X), 1U);
+	// uint32 height_in_tiles = std::max(std::min(static_cast<uint32>(std::ceil(f_height)), mGridSize.Y), 1U);
+
+	LogInfo("Object ({}) -> Start={}, End={}", object->Name.Get(), tile_index_start, tile_index_end);
+
+	uint32 width_in_tiles = std::clamp(tile_index_end.X - tile_index_start.X + 1, 1U, mGridSize.X);
+	uint32 height_in_tiles = std::clamp(tile_index_end.Y - tile_index_start.Y + 1, 1U, mGridSize.Y);
+
+	Vec2u n_offset = Vec2u(width_in_tiles / 2, height_in_tiles / 2);
+
+	LogInfo("Tiles start at {} and end at {}", tile_index_start, tile_index_end);
+
+	for (uint32 y = 0; y < height_in_tiles; y++) {
+		for (uint32 x = 0; x < width_in_tiles; x++) {
+			LogInfo("Adding object {} to Tile ({}, {})", id, x + tile_index_start.X, y + tile_index_start.Y);
+
+			TileIndex tile_index = GetTileIndexXY(Vec2u(x + tile_index_start.X, y + tile_index_start.Y));
+			InsertInto(tile_index, id);
+		}
+	}
+}
+
+
+TileIndex TileSystem::InsertDirect(ObjectID id)
 {
 	Object* object = gObjectManager->GetObject(id);
 
@@ -191,10 +222,16 @@ Tile* TileSystem::GetTile(TileIndex index)
 	return &mTileBuffer[index];
 }
 
+TileIndex TileSystem::GetTileIndexXY(const Vec2u& xy) const
+{
+	return std::min(xy.Y, mGridSize.Y - 1) * mGridSize.X + std::min(xy.X, mGridSize.X - 1);
+}
+
 TileIndex TileSystem::GetTileIndex(const Vec3f& position) const
 {
 	const Vec3f adjusted = position + mPositionOffset;
-	return static_cast<uint32>(adjusted.Z / mTileSize.Y) * mGridSize.X + static_cast<uint32>(adjusted.X / mTileSize.X);
+	return static_cast<uint32>(std::floor(adjusted.Z / mTileSize.Y)) * mGridSize.X +
+		   static_cast<uint32>(std::floor(adjusted.X / mTileSize.X));
 }
 
 void TileSystem::Remove(ObjectID id)

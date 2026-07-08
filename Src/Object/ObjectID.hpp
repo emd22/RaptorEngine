@@ -18,37 +18,37 @@ namespace fx {
 
 struct ObjectID
 {
-    using IDType = uint32;
+	using IDType = uint32;
 
-    static const ObjectID Null;
+	static const ObjectID Null;
 
-    static const IDType scInvalidBit = (1U << 31);
-    static const IDType scIDMask = 0x0000FFFF;
-
-public:
-    ObjectID() = default;
-    ObjectID(IDType id) : ID(id) {}
-    ObjectID(const ObjectID& other) : ID(other.ID) {}
-
-    ObjectID& operator=(uint32 value) = delete;
-    ObjectID& operator=(const ObjectID& other)
-    {
-        ID = other.ID;
-        return *this;
-    }
-
-    bool operator==(const ObjectID& other) const { return ID == other.ID; }
-
-    FX_FORCE_INLINE IDType GetID() const { return (ID & scIDMask); }
-    FX_FORCE_INLINE bool IsNull() const { return ID == UINT32_MAX; }
-
-    FX_FORCE_INLINE bool IsInvalid() const { return (ID & scInvalidBit) != 0; }
-    FX_FORCE_INLINE void Invalidate() { ID |= scInvalidBit; };
-
-    FX_FORCE_INLINE IDType GetPageNumber() const { return ((ID & ~(scInvalidBit)) >> 24); }
+	static const IDType scInvalidBit = (1U << 31);
+	static const IDType scIDMask = 0x0000FFFF;
 
 public:
-    IDType ID = UINT32_MAX;
+	ObjectID() = default;
+	ObjectID(IDType id) : ID(id) {}
+	ObjectID(const ObjectID& other) : ID(other.ID) {}
+
+	ObjectID& operator=(uint32 value) = delete;
+	ObjectID& operator=(const ObjectID& other)
+	{
+		ID = other.ID;
+		return *this;
+	}
+
+	bool operator==(const ObjectID& other) const { return ID == (other.ID & scIDMask); }
+
+	FX_FORCE_INLINE IDType GetID() const { return (ID & scIDMask); }
+	FX_FORCE_INLINE bool IsNull() const { return ID == UINT32_MAX; }
+
+	FX_FORCE_INLINE bool IsInvalid() const { return (ID & scInvalidBit) != 0; }
+	FX_FORCE_INLINE void Invalidate() { ID |= scInvalidBit; };
+
+	FX_FORCE_INLINE IDType GetPageNumber() const { return ((ID & ~(scInvalidBit)) >> 24); }
+
+public:
+	IDType ID = UINT32_MAX;
 };
 
 } // namespace fx
@@ -56,10 +56,10 @@ public:
 template <>
 struct std::formatter<fx::ObjectID>
 {
-    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    auto format(const fx::ObjectID& id, std::format_context& ctx) const
-    {
-        return std::format_to(ctx.out(), "ObjectID({})", id.GetID());
-    }
+	auto format(const fx::ObjectID& id, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "ObjectID({})", id.GetID());
+	}
 };

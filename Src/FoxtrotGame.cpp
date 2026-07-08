@@ -84,7 +84,11 @@ void FoxtrotGame::InitEngine()
 	Ref<Window> window = Window::New(window_entry->GetMember(HashStr32("Title"))->Get<const char*>(),
 									 Vec2u(window_width, window_height));
 
-	Player.bEnableHeadBob = static_cast<bool>(Config.GetEntryValue<int32>(HashStr32("EnableHeadBob"), 1));
+	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
+
+	Player.bEnableHeadBob = static_cast<bool>(bob_entry->GetMemberValue(HashStr32("Enabled"), 1));
+	Player.HeadBobStrength.X = bob_entry->GetMemberValue(HashStr32("ScaleX"), 0.011);
+	Player.HeadBobStrength.Y = bob_entry->GetMemberValue(HashStr32("ScaleY"), 0.018);
 
 	gRenderer->SelectWindow(window);
 	gRenderer->Init(Vec2u(window_width, window_height));

@@ -26,6 +26,25 @@ public:
 	TElementType& operator[](uint32 index) noexcept { return pData[index]; }
 	const TElementType& operator[](uint32 index) const noexcept { return pData[index]; }
 
+	TElementType* Get(uint32 index)
+	{
+		if (index > Size) {
+			return nullptr;
+		}
+
+		return &pData[index];
+	}
+
+
+	const TElementType* Get(uint32 index) const
+	{
+		if (index > Size) {
+			return nullptr;
+		}
+
+		return &pData[index];
+	}
+
 	void Insert(const TElementType& object)
 	{
 		ResizeIfNeeded();

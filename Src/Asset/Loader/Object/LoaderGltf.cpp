@@ -20,6 +20,7 @@
 #include <Core/Path.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/MeshUtil.hpp>
 
 namespace fx {
 
@@ -76,6 +77,7 @@ void LoaderGltf::UnpackMeshAttributes(Object* object, Ref<PrimitiveMesh>& mesh, 
 	// buffers.
 	constexpr eVertexCreateFlags create_flags = eVertexCreateFlags::NegativeX;
 	mesh->VertexList.CreateFrom(positions, normals, uvs, tangents, weights, boneids, create_flags);
+
 
 	// mesh->UploadVertices();
 }
@@ -331,6 +333,7 @@ void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh
 
 		UnpackMeshAttributes(current_object, primitive_mesh, gltf_primitive);
 		current_object->pMesh = primitive_mesh;
+		current_object->Bounds = MeshUtil::CalculateBounds(primitive_mesh->GetVertices());
 
 		MakeMaterialForPrimitive(current_object, gltf_primitive, i);
 

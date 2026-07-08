@@ -40,9 +40,10 @@ public:
 	 * @brief Inserts an object into its respective tile.
 	 * @returns The tile index that it was added to.
 	 */
-	TileIndex Insert(ObjectID id);
+	void Insert(ObjectID id);
 
 	TileIndex GetTileIndex(const Vec3f& position) const;
+	TileIndex GetTileIndexXY(const Vec2u& xy) const;
 
 	/**
 	 * @brief Updates an object to a new tile if the object has moved into another tile boundary.
@@ -65,12 +66,15 @@ private:
 	Tile* GetObjectTile(const Object* object, TileIndex* out_tile_index);
 	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
 
+	TileIndex InsertDirect(ObjectID id);
+
 public:
-private:
-	SizedArray<Tile> mTileBuffer;
 	Vec2u mGridSize;
 	Vec2f mTileSize = Vec2f(10.0f, 10.0f);
 	Vec3f mPositionOffset = Vec3f::sZero;
+
+private:
+	SizedArray<Tile> mTileBuffer;
 };
 
 } // namespace fx

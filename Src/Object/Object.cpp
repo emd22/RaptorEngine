@@ -50,7 +50,6 @@ bool Object::CheckIfReady(bool require_material)
 	}
 
 	// Dimensions = pMesh->GetDimensions();
-	Bounds = MeshUtil::CalculateBounds(pMesh->GetVertices());
 
 	// TODO: Remove this
 	if (require_material && pMesh->VertexList.IsSkinned()) {
