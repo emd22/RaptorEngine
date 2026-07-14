@@ -328,19 +328,21 @@ void AxManager::LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_
 
 static void DoDirectUpload(AxQueueItem& item, AssetItemData& asset_data)
 {
-	ImageInfo img_info = item.ImgInfo;
+	ImageInfo& img_info = item.ImgInfo;
 
 	TSRef<AxImage> image(asset_data.pAsset);
 
-	if (image->Image.IsInited()) {
-		// The image already exists, upload to a new mip in the same image.
-		image->Image.UploadMip(renderer::RenderBackendFwd::GetUploadCmd(), img_info.MipLevel, img_info.Size,
-							   img_info.ImageData);
-	}
-	else {
-		// The image does not exist yet, upload directly as the base mip.
-		image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), img_info, eImageCreateFlags::None);
-	}
+	image->Image.Upload(renderer::RenderBackendFwd::GetUploadCmd(), img_info);
+
+	// if (image->Image.IsInited()) {
+	// 	// The image already exists, upload to a new mip in the same image.
+	// 	image->Image.UploadMip(renderer::RenderBackendFwd::GetUploadCmd(), img_info.MipLevel, img_info.Size,
+	// 						   img_info.ImageData);
+	// }
+	// else {
+	// 	// The image does not exist yet, upload directly as the base mip.
+	// 	image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), img_info, eImageCreateFlags::None);
+	// }
 
 	image->bIsUploadedToGpu = true;
 	image->bIsUploadedToGpu.notify_all();

@@ -27,7 +27,7 @@ public:
 		GenerateMipmaps(path, format, pixels, size);
 	}
 
-	uint32 CalculateExpectedMipCount(Vec2u base_size);
+	uint32 GetExpectedMipCount(Vec2u base_size);
 
 	void GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size);
 
@@ -57,6 +57,8 @@ public:
 	void Open(const char* path);
 
 	ImageInfo GetMip(uint32 mip_level);
+
+	ImageInfo GetLowQuality();
 
 private:
 	uint32 FindClosestMipLevel(uint32 mip_level);

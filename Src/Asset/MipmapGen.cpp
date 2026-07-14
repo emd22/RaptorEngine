@@ -27,11 +27,14 @@ struct MipHeader
 
 void MipmapGen::GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
 {
+	uint32 expected_mip_count = GetExpectedMipCount(size);
+
 	DataPack dp;
-	GenerateMip(dp, format, pixels, size, 0);
-	GenerateMip(dp, format, pixels, size, 1);
-	GenerateMip(dp, format, pixels, size, 2);
-	GenerateMip(dp, format, pixels, size, 3);
+
+	for (uint32 i = 0; i < expected_mip_count; i++) {
+		GenerateMip(dp, format, pixels, size, i);
+	}
+
 	dp.WriteToFile(path);
 }
 
@@ -45,7 +48,10 @@ FX_FORCE_INLINE constexpr float32 GetBaseMipMultiplier(uint32 mip_level)
 	return (1U << static_cast<uint32>(mip_level));
 }
 
-uint32 MipmapGen::CalculateExpectedMipCount(Vec2u base_size) { return 0; }
+uint32 MipmapGen::GetExpectedMipCount(Vec2u base_size)
+{
+	return static_cast<uint32_t>(std::floor(std::log2(std::max(base_size.X, base_size.Y)))) + 1U;
+}
 
 
 Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
@@ -279,6 +285,58 @@ ImageInfo MipmapLoader::GetMip(uint32 mip_level)
 	LogInfo("Image info size: {}x{}", header->SizeX, header->SizeY);
 
 	image_info.ImageData = ArrayUtil::SliceDupe(Slice<const uint8>(image_data, image_size));
+
+	return image_info;
+}
+
+ImageInfo MipmapLoader::GetLowQuality()
+{
+	ImageInfo image_info {};
+
+	uint32 zero_level = Pack.Entries.Size() / 2;
+
+	uint64 total_buffer_size = 0;
+
+	for (uint32 i = zero_level; i < Pack.Entries.Size(); i++) {
+		DataPackEntry* mip_entry = Pack.GetEntry(i, true);
+		uint32 image_size = M_DATA_SIZE(mip_entry->Data);
+		total_buffer_size += image_size;
+	}
+
+	uint8* data_to_load = static_cast<uint8*>(std::malloc(total_buffer_size));
+
+
+	uint64 offset = 0;
+
+	Vec2u zero_level_dimensions;
+
+	for (uint32 i = zero_level; i < Pack.Entries.Size(); i++) {
+		DataPackEntry* mip_entry = Pack.GetEntry(i, true);
+
+		MipHeader* header = M_HEADER_PTR(mip_entry->Data.pData);
+		if (i == zero_level) {
+			image_info.Size = Vec2u(header->SizeX, header->SizeY);
+			image_info.Format = header->Format;
+		}
+
+		uint8* image_data = M_DATA_PTR(mip_entry->Data.pData);
+		uint32 image_size = M_DATA_SIZE(mip_entry->Data);
+
+		memcpy(data_to_load + offset, image_data, image_size);
+
+		offset += image_size;
+	}
+
+
+	// When we upload the image, we want the image to be created to be the size of Mip 0.
+	// float32 bmm = GetBaseMipMultiplier(mip_level);
+
+	float32 bmm = 1.0f;
+
+	image_info.MipLevel = 0;
+	image_info.MipCount = Pack.Entries.Size() - zero_level;
+
+	image_info.ImageData = Slice<const uint8>(data_to_load, total_buffer_size);
 
 	return image_info;
 }
