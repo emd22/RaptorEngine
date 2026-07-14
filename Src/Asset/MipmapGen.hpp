@@ -18,6 +18,12 @@ namespace renderer {
 class Image;
 }
 
+enum class eQualityLevel
+{
+	LowQuality,
+	HighQuality,
+};
+
 class MipmapGen
 {
 public:
@@ -58,7 +64,7 @@ public:
 
 	ImageInfo GetMip(uint32 mip_level);
 
-	ImageInfo GetLowQuality();
+	ImageInfo GetQuality(eQualityLevel quality);
 
 private:
 	uint32 FindClosestMipLevel(uint32 mip_level);

@@ -193,7 +193,7 @@ static void MakeMaterialTextureForPrimitive(const String& model_name, const Stri
 
 		component.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;
 		// component.ImageToUpload = ml.GetMip(3);
-		component.ImageToUpload = ml.GetLowQuality();
+		component.ImageToUpload = ml.GetQuality(eQualityLevel::HighQuality);
 		component.TextureCacheID = texture_cache_id;
 		return;
 	}

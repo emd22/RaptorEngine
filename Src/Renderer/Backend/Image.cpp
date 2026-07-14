@@ -288,12 +288,15 @@ void Image::Upload(CommandBuffer& cmd, const ImageInfo& info)
 
 	SizedArray<VkBufferImageCopy> buffer_copy_infos(info.MipCount);
 
+	uint32 pixel_stride = ImageFormatUtil::GetPixelStride(info.Format);
+
+	uint64 offset = 0;
 
 	for (uint32 info_index = 0; info_index < info.MipCount; info_index++) {
 		Vec2u mip_dimensions = GetMipDimensions(info.Size, info_index);
 
 		buffer_copy_infos.Insert(VkBufferImageCopy {
-			.bufferOffset = 0,
+			.bufferOffset = offset,
 			.bufferRowLength = 0,
 			.bufferImageHeight = 0,
 			.imageSubresource {
@@ -309,6 +312,8 @@ void Image::Upload(CommandBuffer& cmd, const ImageInfo& info)
 					.depth = 1,
 				},
 		});
+
+		offset += mip_dimensions.X * mip_dimensions.Y * pixel_stride;
 	}
 
 

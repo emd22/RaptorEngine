@@ -289,11 +289,14 @@ ImageInfo MipmapLoader::GetMip(uint32 mip_level)
 	return image_info;
 }
 
-ImageInfo MipmapLoader::GetLowQuality()
+ImageInfo MipmapLoader::GetQuality(eQualityLevel quality)
 {
 	ImageInfo image_info {};
 
-	uint32 zero_level = Pack.Entries.Size() / 2;
+	uint32 zero_level = 0;
+	if (quality == eQualityLevel::LowQuality) {
+		zero_level = Pack.Entries.Size() / 2;
+	}
 
 	uint64 total_buffer_size = 0;
 
