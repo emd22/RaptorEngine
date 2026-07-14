@@ -11,7 +11,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <Asset/AxManager.hpp>
+#include <Asset/AssetManager.hpp>
 #include <Asset/MipmapGen.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>

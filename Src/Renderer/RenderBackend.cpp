@@ -13,7 +13,7 @@
 #include <SDL3/SDL_vulkan.h>
 
 #include <Asset/Animation.hpp>
-#include <Asset/AxManager.hpp>
+#include <Asset/AssetManager.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/RefUtil.hpp>

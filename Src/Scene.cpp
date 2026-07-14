@@ -19,14 +19,13 @@ void Scene::Create()
 	mObjects.Create(32);
 	mLights.Create(32);
 	mPhysicsObjects.Create(32);
-
-	mTileSystem.Create(Vec2u(10, 10));
 }
 
 void Scene::Attach(Object* object)
 {
 	mObjects.Insert(object->ID);
-	mTileSystem.Insert(object->ID);
+	gWorldGrid->Insert(object->ID);
+
 	object->pScene = this;
 	object->OnAttached(this);
 
@@ -86,7 +85,7 @@ void Scene::Attach(AssetTicket<Object> object_ticket)
 		{
 			Object* object = static_cast<Object*>(item_ptr);
 			AddObjectToRenderList(object, this);
-			mTileSystem.Insert(object->ID);
+			gWorldGrid->Insert(object->ID);
 		});
 }
 
@@ -236,7 +235,7 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 
 void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 {
-	Tile* tile = mTileSystem.GetTile(new_tile_index);
+	Tile* tile = gWorldGrid->GetTile(new_tile_index);
 
 	if (tile == nullptr) {
 		return;
@@ -293,19 +292,19 @@ void Scene::RebuildFromTiles(TileIndex tile_index)
 	*/
 
 	RebuildRenderList(true, tile_index);
-	Vec2u xy = mTileSystem.GetTileXY(tile_index);
+	Vec2u xy = gWorldGrid->GetTileXY(tile_index);
 
 	// Rebuild the immediate surrounding tiles (up, left, down, right)
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(1, 0)));
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(-1, 0)));
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(0, -1)));
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(0, 1)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 0)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 0)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, -1)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(0, 1)));
 
 	// Build the diagonals
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(1, 1)));
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(1, -1)));
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(-1, -1)));
-	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(-1, 1)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, 1)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(1, -1)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, -1)));
+	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 1)));
 }
 
 
@@ -317,10 +316,10 @@ void Scene::Render(Camera* shadow_camera)
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
 	}
 
-	TileIndex tile_index = mTileSystem.GetTileIndex(mpCurrentCamera->Position);
+	TileIndex tile_index = gWorldGrid->GetTileIndex(mpCurrentCamera->Position);
 
 	if (tile_index != mCameraTileIndex) {
-		RebuildFromTiles(tile_index);
+		// RebuildFromTiles(tile_index);
 		mCameraTileIndex = tile_index;
 	}
 
@@ -344,7 +343,7 @@ void Scene::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::Unlit);
 
 	// RenderBoundingBoxes(camera);
-	RenderTileSystem(camera);
+	RenderWorldGrid(camera);
 
 	if (bRenderPhysicsObjects) {
 		RenderPhysicsObjects(camera);
@@ -385,7 +384,7 @@ void Scene::RenderBoundingBoxes(const Camera& camera)
 }
 
 
-void Scene::RenderTileSystem(const Camera& camera)
+void Scene::RenderWorldGrid(const Camera& camera)
 {
 	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
@@ -398,16 +397,16 @@ void Scene::RenderTileSystem(const Camera& camera)
 	const Color debug_color = Color::FromRGBA(255, 255, 30, 255);
 	const Color player_debug_color = Color::FromRGBA(0, 255, 255, 255);
 
-	const Vec3f tile_size = Vec3f(mTileSystem.mTileSize.X, 1.0f, mTileSystem.mTileSize.Y);
+	const Vec3f tile_size = Vec3f(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
 
-	Vec2u camera_tile_index = mTileSystem.GetTileXY(mCameraTileIndex);
+	Vec2u camera_tile_index = gWorldGrid->GetTileXY(mCameraTileIndex);
 
-	for (uint32 y = 0; y < mTileSystem.mGridSize.Y; y++) {
-		for (uint32 x = 0; x < mTileSystem.mGridSize.X; x++) {
+	for (uint32 y = 0; y < gWorldGrid->mGridSize.Y; y++) {
+		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
 			const Vec3f tile_offset = Vec3f(x, -1.5f, y) * tile_size;
 
 			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::sIdentity) *
-								 Mat4f::AsTranslation((tile_offset)-mTileSystem.mPositionOffset + (tile_size * 0.5f));
+								 Mat4f::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
 
 			Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 			memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));

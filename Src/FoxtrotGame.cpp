@@ -5,7 +5,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_revision.h>
 
-#include <Asset/AxManager.hpp>
+#include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Font/Font.hpp>
 #include <Asset/MipmapGen.hpp>
@@ -97,6 +97,8 @@ void FoxtrotGame::InitEngine()
 
 	gMaterialManager->Create();
 	gAssetManager->Start(3);
+
+	gWorldGrid->Create(Vec2u(10, 10));
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 }
@@ -502,9 +504,9 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
-		TileIndex tile_index = mMainScene.mTileSystem.GetTileIndex(Player.Position);
+		TileIndex tile_index = gWorldGrid->GetTileIndex(Player.Position);
 
-		Vec2u tile_xy = mMainScene.mTileSystem.GetTileXY(tile_index);
+		Vec2u tile_xy = gWorldGrid->GetTileXY(tile_index);
 
 		LogInfo("Tile index: {}, {}", tile_xy.X, tile_xy.Y);
 

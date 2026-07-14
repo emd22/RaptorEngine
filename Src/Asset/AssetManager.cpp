@@ -1,4 +1,4 @@
-#include "AxManager.hpp"
+#include "AssetManager.hpp"
 
 #include "AxImage.hpp"
 #include "Core/Assert.hpp"
@@ -58,12 +58,12 @@ bool AssetDeletionTicket::TryDelete(uint32 current_tick) const
 // Asset Worker
 ////////////////////////////////////
 
-void AxWorker::Create()
+void AssetWorker::Create()
 {
 	Thread = std::thread([this]() { this->Update(); });
 }
 
-void AxWorker::LoadObject(LockContext<AssetItemData>& asset_data)
+void AssetWorker::LoadObject(LockContext<AssetItemData>& asset_data)
 {
 	TSRef<loader::ObjectLoaderBase> object_loader(asset_data->pLoader);
 
@@ -80,7 +80,7 @@ void AxWorker::LoadObject(LockContext<AssetItemData>& asset_data)
 	}
 }
 
-void AxWorker::LoadImage(const LockContext<AssetItemData>& asset_data)
+void AssetWorker::LoadImage(const LockContext<AssetItemData>& asset_data)
 {
 	TSRef<loader::ImageLoaderBase> image_loader(asset_data->pLoader);
 
@@ -98,7 +98,7 @@ void AxWorker::LoadImage(const LockContext<AssetItemData>& asset_data)
 }
 
 
-void AxWorker::Update()
+void AssetWorker::Update()
 {
 	while (bRunning.load()) {
 		ItemReady.Wait();
@@ -141,7 +141,7 @@ void AxWorker::Update()
 ////////////////////////////////////
 
 
-void AxManager::Start(int32 min_threads)
+void AssetManager::Start(int32 min_threads)
 {
 	AssertMsg(mbActive.test() == false, "Asset manager is already created!");
 
@@ -154,7 +154,7 @@ void AxManager::Start(int32 min_threads)
 
 	for (int32 i = 0; i < mMinThreads; i++) {
 		// 'Insert' a new worker and get its pointer
-		AxWorker* worker = mWorkerThreads.Insert();
+		AssetWorker* worker = mWorkerThreads.Insert();
 
 		// Create the worker from the newly inserted pointer
 		worker->Create();
@@ -162,17 +162,17 @@ void AxManager::Start(int32 min_threads)
 
 	WorkersWaitingToUpload.InitSize(scMaxWorkerThreads);
 
-	mpAssetManagerThread = new std::thread([this]() { AxManager::AssetManagerUpdate(); });
+	mpAssetManagerThread = new std::thread([this]() { AssetManager::AssetManagerUpdate(); });
 }
 
-void AxManager::DebugPrintWorkers() const
+void AssetManager::DebugPrintWorkers() const
 {
-	for (const AxWorker& worker : mWorkerThreads) {
+	for (const AssetWorker& worker : mWorkerThreads) {
 		worker.DebugPrint();
 	}
 }
 
-void AxManager::Shutdown()
+void AssetManager::Shutdown()
 {
 	LogInfo(LC_ASSET, "Shutting down asset manager...");
 
@@ -204,7 +204,9 @@ void AxManager::Shutdown()
 	mWorkerThreads.Free();
 }
 
-void AxManager::ShutdownDeletionQueue()
+void AssetManager::RequestHigherDetail() {}
+
+void AssetManager::ShutdownDeletionQueue()
 {
 	SpinLockContext<Queue<AssetDeletionTicket>> queue = mDeletionTickets.GetQueue();
 
@@ -255,7 +257,7 @@ inline bool IsFileJpeg(const std::string& path)
 	return false;
 }
 
-void AxManager::LoadObject(const AssetTicket<Object>& ticket, const std::string& path, LoadObjectOptions options)
+void AssetManager::LoadObject(const AssetTicket<Object>& ticket, const std::string& path, LoadObjectOptions options)
 {
 	TSRef<loader::LoaderGltf> loader = TSRef<loader::LoaderGltf>::New();
 	loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
@@ -264,7 +266,7 @@ void AxManager::LoadObject(const AssetTicket<Object>& ticket, const std::string&
 }
 
 
-void AxManager::LoadObjectFromMemory(const AssetTicket<Object>& ticket, const uint8* data, uint32 data_size)
+void AssetManager::LoadObjectFromMemory(const AssetTicket<Object>& ticket, const uint8* data, uint32 data_size)
 {
 	TSRef<loader::LoaderGltf> loader = TSRef<loader::LoaderGltf>::New();
 
@@ -272,8 +274,8 @@ void AxManager::LoadObjectFromMemory(const AssetTicket<Object>& ticket, const ui
 }
 
 
-void AxManager::LoadImage(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
-						  eImageCreateFlags flags)
+void AssetManager::LoadImage(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
+							 eImageCreateFlags flags)
 {
 	bool is_jpeg = IsFileJpeg(path);
 
@@ -298,8 +300,8 @@ void AxManager::LoadImage(eImageType image_type, eImageFormat format, TSRef<AxIm
 }
 
 
-void AxManager::LoadImageFromMemory(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
-									const uint8* data, uint32 data_size)
+void AssetManager::LoadImageFromMemory(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
+									   const uint8* data, uint32 data_size)
 {
 	if (IsMemoryJpeg(data, data_size)) {
 		// Load the image using turbojpeg
@@ -321,7 +323,7 @@ void AxManager::LoadImageFromMemory(eImageType image_type, eImageFormat format, 
 	}
 }
 
-void AxManager::LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info)
+void AssetManager::LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info)
 {
 	SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, img_info);
 }
@@ -348,7 +350,7 @@ static void DoDirectUpload(AxQueueItem& item, AssetItemData& asset_data)
 	image->bIsUploadedToGpu.notify_all();
 }
 
-int32 AxManager::CheckForUploadableData()
+int32 AssetManager::CheckForUploadableData()
 {
 	using namespace renderer;
 
@@ -357,7 +359,7 @@ int32 AxManager::CheckForUploadableData()
 	WorkersWaitingToUpload.Clear();
 
 	// Check with the workers to see if there is anything to load onto the GPU
-	for (AxWorker& worker : mWorkerThreads) {
+	for (AssetWorker& worker : mWorkerThreads) {
 		if (!worker.bDataPendingUpload.test()) {
 			continue;
 		}
@@ -379,7 +381,7 @@ int32 AxManager::CheckForUploadableData()
 		gRenderer->UploadContext.CmdBuffer.Record();
 	}
 
-	for (AxWorker* worker : WorkersWaitingToUpload) {
+	for (AssetWorker* worker : WorkersWaitingToUpload) {
 		LockContext<AssetItemData> asset_data = worker->Item.GetDataContext();
 
 		// The asset was successfully loaded, upload to GPU
@@ -418,7 +420,7 @@ int32 AxManager::CheckForUploadableData()
 
 	// Finally, notify the asset that it is loaded and tell the workers they are free
 
-	for (AxWorker* worker : WorkersWaitingToUpload) {
+	for (AssetWorker* worker : WorkersWaitingToUpload) {
 		LockContext<AssetItemData> asset_data = worker->Item.GetDataContext();
 
 		if (worker->LoadStatus == loader::eLoaderStatus::Success) {
@@ -489,7 +491,7 @@ int32 AxManager::CheckForUploadableData()
 	return num_uploads;
 }
 
-bool AxManager::CheckWorkersBusy()
+bool AssetManager::CheckWorkersBusy()
 {
 	for (auto& worker : mWorkerThreads) {
 		if (worker.bIsBusy.test()) {
@@ -499,7 +501,7 @@ bool AxManager::CheckWorkersBusy()
 	return false;
 }
 
-void AxManager::AddWorkerThread()
+void AssetManager::AddWorkerThread()
 {
 	// At the maximum number of workers, break
 	if (mWorkerThreads.Size >= mWorkerThreads.Capacity) {
@@ -507,11 +509,11 @@ void AxManager::AddWorkerThread()
 		return;
 	}
 
-	AxWorker* worker = mWorkerThreads.Insert();
+	AssetWorker* worker = mWorkerThreads.Insert();
 	worker->Create();
 }
 
-int32 AxManager::CheckForItemsToLoad()
+int32 AssetManager::CheckForItemsToLoad()
 {
 	uint32 num_loads = mLoadQueue.Size();
 
@@ -519,7 +521,7 @@ int32 AxManager::CheckForItemsToLoad()
 		return num_loads;
 	}
 
-	AxWorker* worker = FindWorkerThread();
+	AssetWorker* worker = FindWorkerThread();
 
 	// No workers available currently, defer the item loading.
 	// Even though there is no worker available, we still return true as there is an item in the queue.
@@ -552,7 +554,7 @@ int32 AxManager::CheckForItemsToLoad()
 	return num_loads;
 }
 
-int32 AxManager::CheckForItemsToDelete()
+int32 AssetManager::CheckForItemsToDelete()
 {
 	int32 num_deletes = 0;
 
@@ -573,7 +575,7 @@ int32 AxManager::CheckForItemsToDelete()
 	return num_deletes;
 }
 
-void AxManager::AssetManagerUpdate()
+void AssetManager::AssetManagerUpdate()
 {
 	while (mbActive.test()) {
 		// bool is_busy = CheckWorkersBusy();
@@ -645,10 +647,10 @@ void AxManager::AssetManagerUpdate()
 	}
 }
 
-AxWorker* AxManager::FindWorkerThread()
+AssetWorker* AssetManager::FindWorkerThread()
 {
 	uint32 worker_id = 0;
-	for (AxWorker& worker : mWorkerThreads) {
+	for (AssetWorker& worker : mWorkerThreads) {
 		if (!worker.bIsBusy.test()) {
 			LogInfo(LC_ASSET, "Found worker (id={})", worker_id);
 			return &worker;
@@ -660,6 +662,6 @@ AxWorker* AxManager::FindWorkerThread()
 	return nullptr;
 }
 
-AxManager* AxManager::GetInstance() { return gAssetManager; }
+AssetManager* AssetManager::GetInstance() { return gAssetManager; }
 
 } // namespace fx

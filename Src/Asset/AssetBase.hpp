@@ -15,35 +15,35 @@ namespace fx {
 class AssetBase
 {
 protected:
-    AssetBase() {}
+	AssetBase() {}
 
 public:
-    virtual void WaitUntilLoaded()
-    {
-        if (IsFinishedNotifier.IsSignalled()) {
-            return;
-        }
+	virtual void WaitUntilLoaded()
+	{
+		if (IsFinishedNotifier.IsSignalled()) {
+			return;
+		}
 
-        IsFinishedNotifier.Wait(true);
-    }
+		IsFinishedNotifier.Wait(true);
+	}
 
-    /** Returns true if the asset has been loaded and is in GPU memory. */
-    FX_FORCE_INLINE bool IsLoaded() const { return mIsLoaded.load(); }
-    FX_FORCE_INLINE void InvalidateLoaded() { mIsLoaded.store(false); }
+	/** Returns true if the asset has been loaded and is in GPU memory. */
+	FX_FORCE_INLINE bool IsLoaded() const { return mIsLoaded.load(); }
+	FX_FORCE_INLINE void InvalidateLoaded() { mIsLoaded.store(false); }
 
-    virtual void Destroy() = 0;
+	virtual void Destroy() = 0;
 
-    virtual ~AssetBase() {}
+	virtual ~AssetBase() {}
 
 public:
-    DataNotifier IsFinishedNotifier;
-    std::atomic_bool bIsUploadedToGpu = { false };
+	DataNotifier IsFinishedNotifier;
+	std::atomic_bool bIsUploadedToGpu = { false };
 
 protected:
-    std::atomic_bool mIsLoaded = { false };
+	std::atomic_bool mIsLoaded = { false };
 
-    friend class LoaderGltf;
-    friend class AxManager;
+	friend class LoaderGltf;
+	friend class AssetManager;
 };
 
 } // namespace fx

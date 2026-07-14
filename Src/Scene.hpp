@@ -2,7 +2,7 @@
 
 
 #include "Entity.hpp"
-#include "TileSystem.hpp"
+#include "WorldGrid.hpp"
 
 #include <Asset/AssetTicket.hpp>
 #include <Object/Object.hpp>
@@ -69,7 +69,7 @@ public:
 private:
 	void RenderPhysicsObjects(const Camera& camera);
 	void RenderBoundingBoxes(const Camera& camera);
-	void RenderTileSystem(const Camera& camera);
+	void RenderWorldGrid(const Camera& camera);
 	void RenderObjectShadows(Object* object_id);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
@@ -82,7 +82,6 @@ public:
 	Name Name = "(unnamed)";
 	bool bRenderPhysicsObjects = false;
 	renderer::RenderList mRenderList;
-	TileSystem mTileSystem;
 
 private:
 	PagedArray<ObjectID> mObjects;

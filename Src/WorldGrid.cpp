@@ -1,11 +1,11 @@
 /*
- * File:        TileSystem.cpp
+ * File:        WorldGrid.cpp
  * Author:      emd22
  * Created:     06/07/2026
  * Description: Breaks scenes into 2D tiles to optimize object collect operations and visibility checks.
  */
 
-#include "TileSystem.hpp"
+#include "WorldGrid.hpp"
 
 #include <Engine.hpp>
 #include <Object/Object.hpp>
@@ -43,7 +43,7 @@ uint32 Tile::FindObject(ObjectID id)
 // Tile System
 /////////////////////////////////////
 
-void TileSystem::Create(const Vec2u grid_size)
+void WorldGrid::Create(const Vec2u grid_size)
 {
 	mGridSize = grid_size;
 
@@ -56,7 +56,7 @@ void TileSystem::Create(const Vec2u grid_size)
 	mPositionOffset = ((Vec3f(half_grid.X, 0.0f, half_grid.Y) * Vec3f(mTileSize.X, 0.0f, mTileSize.Y)));
 }
 
-Tile* TileSystem::GetObjectTile(const Object* object, TileIndex* out_tile_index)
+Tile* WorldGrid::GetObjectTile(const Object* object, TileIndex* out_tile_index)
 {
 	// TODO: Check based on AABB or radius.
 
@@ -79,7 +79,7 @@ Tile* TileSystem::GetObjectTile(const Object* object, TileIndex* out_tile_index)
 	return &mTileBuffer[tile_index];
 }
 
-void TileSystem::Insert(ObjectID id)
+void WorldGrid::Insert(ObjectID id)
 {
 	Object* object = gObjectManager->GetObject(id);
 
@@ -114,8 +114,21 @@ void TileSystem::Insert(ObjectID id)
 	}
 }
 
+void WorldGrid::AddObjectsFromTile(PagedArray<ObjectID>& object_buffer, const Tile* tile) const {}
 
-TileIndex TileSystem::InsertDirect(ObjectID id)
+
+SizedArray<ObjectID> WorldGrid::GetNearbyObjects(TileIndex view_tile) const
+{
+	PagedArray<ObjectID> all_objects;
+	all_objects.Create(32);
+
+	Vec2u view_xy = GetTileXY(view_tile);
+
+	// GetTile(GetTileIndexXY(view_xy))->Objects;
+}
+
+
+TileIndex WorldGrid::InsertDirect(ObjectID id)
 {
 	Object* object = gObjectManager->GetObject(id);
 
@@ -138,7 +151,7 @@ TileIndex TileSystem::InsertDirect(ObjectID id)
 	return tile_index;
 }
 
-TileIndex TileSystem::InsertInto(TileIndex tile_index, ObjectID id)
+TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
 {
 	Object* object = gObjectManager->GetObject(id);
 
@@ -156,7 +169,7 @@ TileIndex TileSystem::InsertInto(TileIndex tile_index, ObjectID id)
 }
 
 
-void TileSystem::Update(ObjectID id, bool update_attached)
+void WorldGrid::Update(ObjectID id, bool update_attached)
 {
 	Object* object = gObjectManager->GetObject(id);
 
@@ -207,7 +220,7 @@ void TileSystem::Update(ObjectID id, bool update_attached)
 	}
 }
 
-Vec2u TileSystem::GetTileXY(TileIndex tile_index)
+Vec2u WorldGrid::GetTileXY(TileIndex tile_index) const
 {
 	const uint32 tile_x = tile_index % mGridSize.X;
 	const uint32 tile_y = (tile_index - tile_x) / mGridSize.X;
@@ -215,7 +228,7 @@ Vec2u TileSystem::GetTileXY(TileIndex tile_index)
 }
 
 
-Tile* TileSystem::GetTile(TileIndex index)
+Tile* WorldGrid::GetTile(TileIndex index)
 {
 	if (index > mTileBuffer.Capacity) {
 		return nullptr;
@@ -224,19 +237,28 @@ Tile* TileSystem::GetTile(TileIndex index)
 	return &mTileBuffer[index];
 }
 
-TileIndex TileSystem::GetTileIndexXY(const Vec2u& xy) const
+const Tile* WorldGrid::GetTile(TileIndex index) const
+{
+	if (index > mTileBuffer.Capacity) {
+		return nullptr;
+	}
+
+	return &mTileBuffer[index];
+}
+
+TileIndex WorldGrid::GetTileIndexXY(const Vec2u& xy) const
 {
 	return std::min(xy.Y, mGridSize.Y - 1) * mGridSize.X + std::min(xy.X, mGridSize.X - 1);
 }
 
-TileIndex TileSystem::GetTileIndex(const Vec3f& position) const
+TileIndex WorldGrid::GetTileIndex(const Vec3f& position) const
 {
 	const Vec3f adjusted = position + mPositionOffset;
 	return std::min(static_cast<uint32>(std::floor(adjusted.Z / mTileSize.Y)), mGridSize.Y - 1) * mGridSize.X +
 		   std::min(static_cast<uint32>(std::floor(adjusted.X / mTileSize.X)), mGridSize.X - 1);
 }
 
-void TileSystem::Remove(ObjectID id)
+void WorldGrid::Remove(ObjectID id)
 {
 	Object* object = gObjectManager->GetObject(id);
 	TileIndex tile_index = object->mTileIndex;

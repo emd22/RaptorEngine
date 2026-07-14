@@ -15,7 +15,7 @@
 #include <Material/MaterialID.hpp>
 #include <Math/BoundingBox.hpp>
 #include <Script/FoxScript.hpp>
-#include <TileSystem.hpp>
+#include <WorldGrid.hpp>
 
 
 namespace fx {
@@ -41,7 +41,7 @@ class PrimitiveMesh;
 
 class Object : public Entity
 {
-	friend class AxManager;
+	friend class AssetManager;
 
 public:
 	static constexpr eEntityType scEntityType = eEntityType::Object;
@@ -190,7 +190,7 @@ private:
 	eObjectFlags Flags = eObjectFlags::None;
 	eObjectLayer mObjectLayer = eObjectLayer::WorldLayer;
 
-	friend class TileSystem;
+	friend class WorldGrid;
 };
 
 

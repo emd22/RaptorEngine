@@ -6,7 +6,7 @@
 
 #include <Asset/Animation.hpp>
 #include <Asset/AssetBase.hpp>
-#include <Asset/AxManager.hpp>
+#include <Asset/AssetManager.hpp>
 #include <Core/Ref.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>

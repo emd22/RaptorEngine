@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/FreeArray.hpp>
+#include <Core/PagedArray.hpp>
 #include <Core/SizedArray.hpp>
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
@@ -26,12 +27,12 @@ public:
 
 class Object;
 
-class TileSystem
+class WorldGrid
 {
 	static constexpr uint32 scMaxObjectsPerTile = 64;
 
 public:
-	TileSystem() = default;
+	WorldGrid() = default;
 
 	void Create(const Vec2u grid_size);
 
@@ -44,6 +45,8 @@ public:
 	TileIndex GetTileIndex(const Vec3f& position) const;
 	TileIndex GetTileIndexXY(const Vec2u& xy) const;
 
+	SizedArray<ObjectID> GetNearbyObjects(TileIndex view_tile) const;
+
 	/**
 	 * @brief Updates an object to a new tile if the object has moved into another tile boundary.
 	 */
@@ -54,18 +57,21 @@ public:
 	 */
 	void Remove(ObjectID id);
 
-	Vec2u GetTileXY(TileIndex tile_index);
+	Vec2u GetTileXY(TileIndex tile_index) const;
 	Tile* GetTile(TileIndex index);
+	const Tile* GetTile(TileIndex index) const;
 
 	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
 
-	~TileSystem() = default;
+	~WorldGrid() = default;
 
 private:
 	Tile* GetObjectTile(const Object* object, TileIndex* out_tile_index);
 	TileIndex InsertInto(TileIndex tile_index, ObjectID id);
 
 	TileIndex InsertDirect(ObjectID id);
+
+	void AddObjectsFromTile(PagedArray<ObjectID>& object_buffer, const Tile* tile) const;
 
 public:
 	Vec2u mGridSize;

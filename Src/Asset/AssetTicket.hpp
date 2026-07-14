@@ -88,7 +88,7 @@ public:
 
 protected:
     friend class LoaderGltf;
-    friend class AxManager;
+    friend class AssetManager;
 };
 
 

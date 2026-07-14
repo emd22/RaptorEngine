@@ -13,7 +13,7 @@ class AxImage : public AssetBase
 {
 protected:
 public:
-    friend class AxManager;
+    friend class AssetManager;
 
     AxImage() = default;
     AxImage(const AxImage& other);

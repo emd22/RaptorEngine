@@ -89,6 +89,7 @@ public:
 
 public:
 	TItemType* pPtr = nullptr;
+	uint32 Size = 0;
 	uint32 Capacity = 0;
 	Bitset SlotsInUse;
 };
