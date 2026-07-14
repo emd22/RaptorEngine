@@ -445,12 +445,6 @@ int32 AxManager::CheckForUploadableData()
 					// Notify the asset thread that loading is finished
 					ticket_data->bIsLoaded.store(true);
 				}
-
-
-				if (asset_data->pLoader.IsValid()) {
-					// Destroy the loader(clearing the loading buffers)
-					asset_data->DestroyLoader();
-				}
 			}
 			else {
 				while (!asset_data->pAsset->bIsUploadedToGpu) {
@@ -461,11 +455,11 @@ int32 AxManager::CheckForUploadableData()
 
 				asset_data->pAsset->IsFinishedNotifier.Signal();
 				asset_data->pAsset->mIsLoaded.store(true);
+			}
 
-				if (asset_data->pLoader.IsValid()) {
-					// Destroy the loader(clearing the loading buffers)
-					asset_data->DestroyLoader();
-				}
+			if (asset_data->pLoader.IsValid()) {
+				// Destroy the loader(clearing the loading buffers)
+				asset_data->DestroyLoader();
 			}
 		}
 		else if (worker->LoadStatus == loader::eLoaderStatus::Error) {

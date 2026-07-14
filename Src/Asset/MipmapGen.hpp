@@ -21,28 +21,30 @@ class Image;
 class MipmapGen
 {
 public:
-    MipmapGen() = default;
-    MipmapGen(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
-    {
-        GenerateMipmaps(path, format, pixels, size);
-    }
+	MipmapGen() = default;
+	MipmapGen(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size)
+	{
+		GenerateMipmaps(path, format, pixels, size);
+	}
 
-    void GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size);
+	uint32 CalculateExpectedMipCount(Vec2u base_size);
 
-    Slice<uint8> GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
-                             uint8 mip_level);
+	void GenerateMipmaps(const char* path, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size);
 
-    void GenerateTestMipmap(const char* output_path, const Vec2u& size);
+	Slice<uint8> GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
+							 uint8 mip_level);
 
-    /**
-     * @brief Loads a mipmap datapack and exports each image to its own JPEG.
-     * @param dp_path The path to the datapack.
-     */
-    void ExportMipmaps(const char* dp_path, const char* output_path);
+	void GenerateTestMipmap(const char* output_path, const Vec2u& size);
 
-    renderer::Image LoadMipmaps(renderer::CommandBuffer& cmd, const char* path);
+	/**
+	 * @brief Loads a mipmap datapack and exports each image to its own JPEG.
+	 * @param dp_path The path to the datapack.
+	 */
+	void ExportMipmaps(const char* dp_path, const char* output_path);
 
-    ~MipmapGen() = default;
+	renderer::Image LoadMipmaps(renderer::CommandBuffer& cmd, const char* path);
+
+	~MipmapGen() = default;
 
 public:
 };
@@ -50,17 +52,17 @@ public:
 class MipmapLoader
 {
 public:
-    MipmapLoader() = default;
+	MipmapLoader() = default;
 
-    void Open(const char* path);
+	void Open(const char* path);
 
-    ImageInfo GetMip(uint32 mip_level);
+	ImageInfo GetMip(uint32 mip_level);
 
 private:
-    uint32 FindClosestMipLevel(uint32 mip_level);
+	uint32 FindClosestMipLevel(uint32 mip_level);
 
 public:
-    DataPack Pack;
+	DataPack Pack;
 };
 
 

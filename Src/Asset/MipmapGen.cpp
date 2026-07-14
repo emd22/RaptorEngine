@@ -45,6 +45,9 @@ FX_FORCE_INLINE constexpr float32 GetBaseMipMultiplier(uint32 mip_level)
 	return (1U << static_cast<uint32>(mip_level));
 }
 
+uint32 MipmapGen::CalculateExpectedMipCount(Vec2u base_size) { return 0; }
+
+
 Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Slice<uint8>& pixels, const Vec2u& size,
 									uint8 mip_level)
 {
@@ -262,11 +265,13 @@ ImageInfo MipmapLoader::GetMip(uint32 mip_level)
 	uint32 image_size = M_DATA_SIZE(mip_entry->Data);
 
 	// When we upload the image, we want the image to be created to be the size of Mip 0.
-	float32 bmm = GetBaseMipMultiplier(mip_level);
+	// float32 bmm = GetBaseMipMultiplier(mip_level);
+
+	float32 bmm = 1.0f;
 
 	ImageInfo image_info {};
-	image_info.MipLevel = mip_level;
-	image_info.MipCount = Pack.Entries.Size();
+	image_info.MipLevel = 0;
+	image_info.MipCount = 1;
 	image_info.Format = header->Format;
 	image_info.Size = Vec2u(static_cast<uint32>(static_cast<float32>(header->SizeX) * bmm),
 							static_cast<uint32>(static_cast<float32>(header->SizeY) * bmm));

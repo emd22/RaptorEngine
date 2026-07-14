@@ -275,8 +275,6 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 
 void Scene::RebuildFromTiles(TileIndex tile_index)
 {
-	LogInfo("REBUILD");
-
 	/*
 		+--------+--------+--------+-----
 		|		 |        |        |
@@ -314,6 +312,10 @@ void Scene::RebuildFromTiles(TileIndex tile_index)
 void Scene::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
+
+	if (!mpDebugCube.IsValid()) {
+		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
+	}
 
 	TileIndex tile_index = mTileSystem.GetTileIndex(mpCurrentCamera->Position);
 
@@ -385,10 +387,6 @@ void Scene::RenderBoundingBoxes(const Camera& camera)
 
 void Scene::RenderTileSystem(const Camera& camera)
 {
-	if (!mpDebugCube.IsValid()) {
-		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
-	}
-
 	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
