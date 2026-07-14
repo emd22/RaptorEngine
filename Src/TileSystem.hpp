@@ -69,7 +69,7 @@ private:
 
 public:
 	Vec2u mGridSize;
-	Vec2f mTileSize = Vec2f(10.0f, 10.0f);
+	Vec2f mTileSize = Vec2f(5.0f, 5.0f);
 	Vec3f mPositionOffset = Vec3f::sZero;
 
 private:

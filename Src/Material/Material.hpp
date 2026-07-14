@@ -29,60 +29,62 @@ namespace fx {
 
 enum class eMaterialComponentStatus
 {
-    Ready,
-    MissingComponent,
-    NotReady,
+	Ready,
+	MissingComponent,
+	NotReady,
 };
 
 enum class eMaterialComponentUploadSrc
 {
-    None,
-    ProcessAndUpload,
-    DirectUpload,
+	None,
+	ProcessAndUpload,
+	DirectUpload,
 };
 
 struct MaterialComponent
 {
 public:
-    using Status = eMaterialComponentStatus;
+	using Status = eMaterialComponentStatus;
 
 public:
-    MaterialComponent(eImageFormat format) : ImageFormat(format) {}
+	MaterialComponent(eImageFormat format) : ImageFormat(format) {}
 
-    MaterialComponent& operator=(const MaterialComponent& other);
+	MaterialComponent& operator=(const MaterialComponent& other);
 
-    MaterialComponent::Status Build();
-    FX_FORCE_INLINE void RequireUpdate() { mbRequiresUpdate = true; }
+	MaterialComponent::Status Build();
+	FX_FORCE_INLINE void RequireUpdate() { mbRequiresUpdate = true; }
 
-    FX_FORCE_INLINE bool Exists() const
-    {
-        return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
-    }
+	FX_FORCE_INLINE bool Exists() const
+	{
+		return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
+	}
 
-    ~MaterialComponent() = default;
+	~MaterialComponent() = default;
 
 private:
-    bool CheckIfReady();
+	bool CheckIfReady();
 
 public:
-    TSRef<AxImage> pAssetImage { nullptr };
+	TSRef<AxImage> pAssetImage { nullptr };
 
-    /// The texture cache ID used to load this image from.
-    Hash32 TextureCacheID = HashNull32;
+	/// The texture cache ID used to load this image from.
+	Hash32 TextureCacheID = HashNull32;
 
-    eMaterialComponentUploadSrc UploadSrc = eMaterialComponentUploadSrc::None;
+	eMaterialComponentUploadSrc UploadSrc = eMaterialComponentUploadSrc::None;
 
-    /// Image data (including format containers) that needs to be parsed and uploaded by a loader.
-    Slice<const uint8> pDataToLoad { nullptr };
+	/// Image data (including format containers) that needs to be parsed and uploaded by a loader.
+	Slice<const uint8> pDataToLoad { nullptr };
 
-    /// The image info used to _directly_ upload pixel data to an image. This would be used when uploading from
-    /// pregenerated texture cache files.
-    ImageInfo ImageToUpload {};
+	/// The image info used to _directly_ upload pixel data to an image. This would be used when uploading from
+	/// pregenerated texture cache files.
+	ImageInfo ImageToUpload {};
 
-    eImageFormat ImageFormat = eImageFormat::RGBA8_UNorm;
+	eImageFormat ImageFormat = eImageFormat::RGBA8_UNorm;
+
+	bool bUpdateAndReupload = false;
 
 private:
-    bool mbRequiresUpdate = false;
+	bool mbRequiresUpdate = false;
 };
 
 /////////////////////////////////////
@@ -91,100 +93,107 @@ private:
 
 struct MaterialProperties
 {
-    alignas(16) Color BaseColor = 0xFF010101u;
+	alignas(16) Color BaseColor = 0xFF010101u;
 };
 
 class Material
 {
 public:
-    enum class eResourceType : uint32
-    {
-        Diffuse,
-        Normal,
-        MetallicRoughness,
+	enum class eResourceType : uint32
+	{
+		Diffuse,
+		Normal,
+		MetallicRoughness,
 
-        MaxImages,
-    };
-
-public:
-    Material() { Properties.BaseColor = 0xFF010101u; }
-
-    void Attach(eResourceType type, const TSRef<AxImage>& image)
-    {
-        switch (type) {
-        case eResourceType::Diffuse:
-            Diffuse.pAssetImage = image;
-            break;
-        case eResourceType::Normal:
-            NormalMap.pAssetImage = image;
-            break;
-        case eResourceType::MetallicRoughness:
-            MetallicRoughness.pAssetImage = image;
-            break;
-
-        default:
-            LogError(LC_CORE, "Unsupported resource type to attach to material!");
-            break;
-        }
-    }
-
-    bool IsReady();
-
-    void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
-
-    FX_FORCE_INLINE MaterialID GetID() const { return ID; }
-
-    /**
-     * Binds the material to be used in the given command buffer.
-     * @returns True if the material was bound successfully.
-     */
-    bool Bind(const renderer::CommandBuffer& cmd);
-    bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
-
-    void RequestQuality(uint32 quality);
-
-    void Build();
-
-    renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
-
-    void SetDefaultPipeline();
-    void SubmitProperties(const MaterialProperties& properties);
-
-    void SetPipeline(renderer::ePipelineName pl_name);
-    renderer::Pipeline& GetPipeline() { return *mpPipeline; }
-    renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
-
-
-    Material& operator=(const Material& other);
-
-    void Destroy();
-    ~Material() { Destroy(); }
+		MaxImages,
+	};
 
 public:
-    MaterialID ID = MaterialID::Null;
+	Material() { Properties.BaseColor = 0xFF010101u; }
 
-    MaterialComponent Diffuse { eImageFormat::RGBA8_UNorm };
-    MaterialComponent NormalMap { eImageFormat::RGBA8_UNorm };
-    MaterialComponent MetallicRoughness { eImageFormat::RGBA8_UNorm };
+	void Attach(eResourceType type, const TSRef<AxImage>& image)
+	{
+		int32 mip_level = image->Image.GetInfo().MipLevel;
+		if (mip_level < QualityLevel) {
+			QualityLevel = mip_level;
+		}
 
-    MaterialProperties Properties {};
+		switch (type) {
+		case eResourceType::Diffuse:
+			Diffuse.pAssetImage = image;
+			break;
+		case eResourceType::Normal:
+			NormalMap.pAssetImage = image;
+			break;
+		case eResourceType::MetallicRoughness:
+			MetallicRoughness.pAssetImage = image;
+			break;
 
-    Name Name;
+		default:
+			LogError(LC_CORE, "Unsupported resource type to attach to material!");
+			break;
+		}
+	}
 
-    std::atomic_bool bIsBuilt = { false };
-    std::atomic_flag bReadyToCheck = ATOMIC_FLAG_INIT;
+	bool IsReady();
 
-    bool bSupportsSkinning : 1 = false;
-    bool bNearestFiltering : 1 = false;
+	void SetSupportsSkinning(bool value) { bSupportsSkinning = value; }
+
+	FX_FORCE_INLINE MaterialID GetID() const { return ID; }
+
+	/**
+	 * Binds the material to be used in the given command buffer.
+	 * @returns True if the material was bound successfully.
+	 */
+	bool Bind(const renderer::CommandBuffer& cmd);
+	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
+
+	void RequestQuality(uint32 quality);
+
+	void Build();
+
+	renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
+
+	void SetDefaultPipeline();
+	void SubmitProperties(const MaterialProperties& properties);
+
+	void SetPipeline(renderer::ePipelineName pl_name);
+	renderer::Pipeline& GetPipeline() { return *mpPipeline; }
+	renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
+
+
+	Material& operator=(const Material& other);
+
+	void Destroy();
+	~Material() { Destroy(); }
+
+public:
+	MaterialID ID = MaterialID::Null;
+
+	MaterialComponent Diffuse { eImageFormat::RGBA8_UNorm };
+	MaterialComponent NormalMap { eImageFormat::RGBA8_UNorm };
+	MaterialComponent MetallicRoughness { eImageFormat::RGBA8_UNorm };
+
+	MaterialProperties Properties {};
+
+	Name Name;
+
+	std::atomic_bool bIsBuilt = { false };
+	std::atomic_flag bReadyToCheck = ATOMIC_FLAG_INIT;
+
+	bool bSupportsSkinning : 1 = false;
+	bool bNearestFiltering : 1 = false;
+
+	int32 QualityLevel = 3;
 
 private:
-    renderer::DescriptorSet mDsDefault;
+	renderer::DescriptorSet mDsDefault;
 
-    renderer::Pipeline* mpPipeline = nullptr;
-    renderer::ePipelineName mPipelineName = renderer::ePipelineName::Geometry;
+	renderer::Pipeline* mpPipeline = nullptr;
+	renderer::ePipelineName mPipelineName = renderer::ePipelineName::Geometry;
 
-    bool mbIsReady : 1 = false;
-    bool mbIsBeingBuilt : 1 = false;
+	bool mbIsReady : 1 = false;
+	bool mbIsBeingBuilt : 1 = false;
 };
 
 

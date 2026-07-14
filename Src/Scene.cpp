@@ -215,6 +215,13 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 	mRenderList.Add(pl_name, id);
 
 	Object* obj = gObjectManager->GetObject(id);
+
+	Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
+
+	// if (material->QualityLevel > 0) {
+	// 	material->RequestQuality(material->QualityLevel - 1);
+	// }
+
 	for (ObjectID& attached_id : obj->AttachedNodes) {
 		AddToRenderListRecursive(pl_name, &attached_id);
 	}
@@ -303,6 +310,7 @@ void Scene::RebuildFromTiles(TileIndex tile_index)
 	RebuildRenderList(false, mTileSystem.GetTileIndexXY(xy + Vec2u(-1, 1)));
 }
 
+
 void Scene::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
@@ -374,6 +382,7 @@ void Scene::RenderBoundingBoxes(const Camera& camera)
 	}
 }
 
+
 void Scene::RenderTileSystem(const Camera& camera)
 {
 	if (!mpDebugCube.IsValid()) {
@@ -397,7 +406,7 @@ void Scene::RenderTileSystem(const Camera& camera)
 
 	for (uint32 y = 0; y < mTileSystem.mGridSize.Y; y++) {
 		for (uint32 x = 0; x < mTileSystem.mGridSize.X; x++) {
-			const Vec3f tile_offset = Vec3f(x, -1.0f, y) * tile_size;
+			const Vec3f tile_offset = Vec3f(x, -1.5f, y) * tile_size;
 
 			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::sIdentity) *
 								 Mat4f::AsTranslation((tile_offset)-mTileSystem.mPositionOffset + (tile_size * 0.5f));

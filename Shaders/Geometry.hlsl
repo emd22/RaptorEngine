@@ -150,7 +150,6 @@ FSOutput main(FSInput input)
 #endif
 
 
-    // output.vAlbedo = float4(input.vDebugColor.rgb, 1.0);
 
     return output;
 }
