@@ -18,6 +18,7 @@
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/Device.hpp>
+#include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Backend/Sampler/SamplerCache.hpp>
 #include <Renderer/DeferredRenderer.hpp>

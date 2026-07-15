@@ -14,9 +14,7 @@
 
 namespace fx {
 
-namespace renderer {
 class Image;
-}
 
 enum class eQualityLevel
 {

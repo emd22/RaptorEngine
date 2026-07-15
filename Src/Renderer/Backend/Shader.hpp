@@ -1,10 +1,13 @@
 #pragma once
 
+#include "ShaderReflection.hpp"
+
 #include <Asset/ShaderCompiler.hpp>
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Renderer/Backend/Descriptors.hpp>
 #include <unordered_map>
 
 
@@ -19,43 +22,6 @@ enum class eShaderType : uint16
 };
 
 FxEnumFlags(eShaderType);
-
-
-enum eShaderReflectionType : uint16
-{
-	StructuredBuffer,
-	CBuffer,
-	Texture,
-};
-
-struct ShaderReflectionEntry
-{
-	ShaderReflectionEntry() = delete;
-	ShaderReflectionEntry(eShaderReflectionType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding)
-	{
-	}
-
-	uint32 AsUInt() const
-	{
-		const uint32 value = (static_cast<uint32>(Type) << 16) | (static_cast<uint32>(Set) << 8) |
-							 static_cast<uint32>(Binding);
-		return value;
-	}
-
-	static ShaderReflectionEntry FromUInt(uint32 value)
-	{
-		ShaderReflectionEntry entry(static_cast<eShaderReflectionType>(static_cast<uint16>(value >> 16)),
-									static_cast<uint8>(value >> 8), static_cast<uint8>(value));
-
-		return entry;
-	}
-
-public:
-	eShaderReflectionType Type;
-	uint8 Set;
-	uint8 Binding;
-};
-
 
 struct ProgramData
 {
@@ -151,7 +117,7 @@ public:
 		other.pShader = nullptr;
 	}
 
-	void BuildDescriptors();
+	void BuildDescriptor();
 
 	void Bind(const CommandBuffer& cmd, const Pipeline& pipeline, const ShaderBindOptions& bind_options);
 
@@ -171,6 +137,8 @@ public:
 public:
 	VkShaderModule InternalShader = nullptr;
 	Shader* pShader = nullptr;
+
+	DescriptorSet Descriptor;
 
 	SizedArray<ShaderReflectionEntry> Reflection;
 	eShaderType ShaderType = eShaderType::Vertex;

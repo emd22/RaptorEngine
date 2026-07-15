@@ -12,6 +12,8 @@
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/MathUtil.hpp>
+#include <Renderer/Backend/Descriptors.hpp>
+#include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 
@@ -144,6 +146,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
 		// Now that the shader is officially loaded, move over the reflection data.
 		program->Reflection = std::move(program_data.Reflection);
+		program->PrintReflection();
 
 		return program;
 	}
@@ -186,8 +189,31 @@ void Shader::RecompileShader(const String& source_path, const String& compiled_p
 }
 
 
-void ShaderProgram::BuildDescriptors()
+void ShaderProgram::BuildDescriptor()
 {
+	DsLayoutBuilder layout_builder {};
+
+	uint32 binding_index = 0;
+
+	bool has_dynamic_offsets = false;
+
+	for (const ShaderReflectionEntry& refl_entry : Reflection) {
+		if (ShaderReflectionUtil::RequiresOffset(refl_entry.Type)) {
+			has_dynamic_offsets = true;
+		}
+
+		layout_builder.AddBinding(binding_index++, ShaderReflectionUtil::TypeToVkDescriptorType(refl_entry.Type),
+								  ShaderType);
+	}
+
+	if (!layout_builder.HasBindings()) {
+		return;
+	}
+
+	layout_builder.Build();
+
+	Descriptor.Create(gRenderer->pDeferredRenderer->DescriptorPool, layout_builder.Build(), has_dynamic_offsets);
+
 	// Assert(ShaderOutline.IsValid());
 
 	// Descriptors.InitCapacity(ShaderOutline::scNumSets);
@@ -224,10 +250,13 @@ void ShaderProgram::Bind(const CommandBuffer& cmd, const Pipeline& pipeline, con
 
 void ShaderProgram::PrintReflection()
 {
-	LogInfo(LC_SHADER, "Shader reflection:");
+	LogInfo(LC_SHADER, "Shader '{}' ({}) reflection:", pShader->GetName(), ShaderUtil::TypeToName(ShaderType));
+
 	for (const ShaderReflectionEntry& entry : Reflection) {
-		LogInfo(LC_SHADER, "Type: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
+		LogInfo(LC_SHADER, "\tType: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
 	}
+
+	LogInfo(LC_SHADER, "");
 }
 
 void ShaderProgram::Destroy()

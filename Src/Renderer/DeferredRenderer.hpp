@@ -1,10 +1,6 @@
 #pragma once
 
 #include "Backend/Descriptors.hpp"
-#include "Backend/FrameData.hpp"
-#include "Backend/Framebuffer.hpp"
-#include "Backend/Image.hpp"
-#include "Backend/Sampler/Sampler.hpp"
 #include "RenderStage.hpp"
 
 namespace fx {
@@ -26,108 +22,108 @@ class DeferredLightingPass;
 class DeferredRenderer
 {
 public:
-    void Create(const Vec2u& extent);
+	void Create(const Vec2u& extent);
 
-    void DoCompPass(Camera& camera);
+	void DoCompPass(Camera& camera);
 
-    void CreateDescriptorSets();
+	void CreateDescriptorSets();
 
-    void Destroy();
-    ~DeferredRenderer() { Destroy(); }
+	void Destroy();
+	~DeferredRenderer() { Destroy(); }
 
 private:
-    // Geometry
-    void CreateGPassPipeline();
-    void DestroyGPassPipeline();
+	// Geometry
+	void CreateGPassPipeline();
+	void DestroyGPassPipeline();
 
-    void CreateForwardPass();
-    void CreateGPass();
-
-
-    VkPipelineLayout CreateGPassPipelineLayout();
-    VkPipelineLayout CreateGPassSkinnedPipelineLayout();
+	void CreateForwardPass();
+	void CreateGPass();
 
 
-    // Lighting
-    // void CreateLightVolumePipeline();
-    void CreateLightingPipeline();
+	VkPipelineLayout CreateGPassPipelineLayout();
+	VkPipelineLayout CreateGPassSkinnedPipelineLayout();
 
-    void CreateLightingDSLayout();
 
-    // void DestroyLightVolumePipeline();
-    void DestroyLightingPipeline();
+	// Lighting
+	// void CreateLightVolumePipeline();
+	void CreateLightingPipeline();
 
-    // PipelineLayout CreateLightingPipelineLayout();
+	void CreateLightingDSLayout();
 
-    // Composition
-    void CreateCompPipeline();
-    void DestroyCompPipeline();
+	// void DestroyLightVolumePipeline();
+	void DestroyLightingPipeline();
 
-    void CreateUnlitPipeline();
+	// PipelineLayout CreateLightingPipelineLayout();
 
-    void CreateCompPass();
+	// Composition
+	void CreateCompPipeline();
+	void DestroyCompPipeline();
+
+	void CreateUnlitPipeline();
+
+	void CreateCompPass();
 
 public:
-    DescriptorPool DescriptorPool;
+	DescriptorPool DescriptorPool;
 
-    /////////////////////
-    // Geometry Pass
-    /////////////////////
+	/////////////////////
+	// Geometry Pass
+	/////////////////////
 
-    VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
-    VkDescriptorSetLayout DsLayoutGPassSkinned = nullptr;
+	VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
+	VkDescriptorSetLayout DsLayoutGPassSkinned = nullptr;
 
-    VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
+	VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
 
-    RenderStage ForwardPass;
-    RenderStage GPass;
+	RenderStage ForwardPass;
+	RenderStage GPass;
 
-    // Pipeline PlGeometry;
-    // Pipeline PlGeometryNoDepthTest;
-    // Pipeline PlGeometryWithNormalMaps;
+	// Pipeline PlGeometry;
+	// Pipeline PlGeometryNoDepthTest;
+	// Pipeline PlGeometryWithNormalMaps;
 
-    // Pipeline PlGeometrySkinned;
+	// Pipeline PlGeometrySkinned;
 
-    Pipeline* pGeometryPipeline = nullptr;
+	Pipeline* pGeometryPipeline = nullptr;
 
-    //////////////////////
-    // Lighting Pass
-    //////////////////////
+	//////////////////////
+	// Lighting Pass
+	//////////////////////
 
-    VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
-    VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
+	VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
+	VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
 
-    DescriptorSet DsLighting;
+	DescriptorSet DsLighting;
 
-    RenderStage LightPass;
+	RenderStage LightPass;
 
-    // Pipeline PlLightingOutsideVolume;
-    // Pipeline PlLightingInsideVolume;
-    // Pipeline PlLightingDirectional;
+	// Pipeline PlLightingOutsideVolume;
+	// Pipeline PlLightingInsideVolume;
+	// Pipeline PlLightingDirectional;
 
-    /////////////////////////////////////////////////
-    // Forward pass / Unlit
-    /////////////////////////////////////////////////
-    // VkDescriptorSetLayout DsLayoutUnlit = nullptr;
-    Pipeline PlText;
-    // Pipeline PlDebugLayer;
-    // DescriptorSet DsUnlit;
+	/////////////////////////////////////////////////
+	// Forward pass / Unlit
+	/////////////////////////////////////////////////
+	// VkDescriptorSetLayout DsLayoutUnlit = nullptr;
+	// Pipeline PlText;
+	// Pipeline PlDebugLayer;
+	// DescriptorSet DsUnlit;
 
-    /*    RenderPass RpForward;
-        Framebuffer FbForward;*/
+	/*    RenderPass RpForward;
+		Framebuffer FbForward;*/
 
-    //////////////////////
-    // Composition Pass
-    //////////////////////
+	//////////////////////
+	// Composition Pass
+	//////////////////////
 
-    VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
+	VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
-    DescriptorSet DsComposition;
+	DescriptorSet DsComposition;
 
-    RenderStage CompPass;
+	RenderStage CompPass;
 
-    // Pipeline PlComposition;
-    // Pipeline PlCompositionUnlit;
+	// Pipeline PlComposition;
+	// Pipeline PlCompositionUnlit;
 };
 
 } // namespace fx::renderer
