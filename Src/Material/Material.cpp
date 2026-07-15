@@ -98,7 +98,7 @@ bool MaterialComponent::CheckIfReady()
 			// }
 
 			AssetTicket ticket = gAssetManager->UploadImage(ImageToUpload);
-
+			SetTicket(ticket);
 
 			// If the image is previously initialized, we want to update the image with the new mip.
 			/// @see DoDirectUpload() in AxManager.cpp

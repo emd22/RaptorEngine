@@ -30,7 +30,11 @@ Image* TextureManager::NewTexture()
 
 	uint32 index;
 	Image* image = mTextureList.NewItem(&index);
-	image->ID = TextureID(index);
+
+	// Temporary, this should remove the least used textures.
+	Assert(image != nullptr);
+
+	image->ID = TextureID { index };
 
 	return image;
 }

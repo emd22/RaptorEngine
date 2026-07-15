@@ -23,14 +23,14 @@ struct TextureID
 	static const TextureID Null;
 
 	static const IDType scInvalidBit = (1U << 31);
-	static const IDType scIDMask = 0x00FFFFFF;
+	static const IDType scIDMask = 0x00FFFFFFU;
 
 public:
 	TextureID() = default;
 	TextureID(IDType id) : ID(id) {}
 	TextureID(const TextureID& other) : ID(other.ID) {}
 
-	TextureID& operator=(uint32 value) = delete;
+	TextureID& operator=(IDType value) = delete;
 	TextureID& operator=(const TextureID& other)
 	{
 		ID = other.ID;

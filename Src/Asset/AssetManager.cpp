@@ -390,6 +390,7 @@ fx::Image* AssetManager::GetNullImage(eImageFormat format)
 	// Create a new null image
 	fx::Image* image = mNullImageList[format];
 	image = gTextureManager->NewTexture();
+	mNullImageList[format] = image;
 
 	const uint32 pixel_stride = ImageFormatUtil::GetPixelStride(format);
 

@@ -17,6 +17,8 @@ public:
 
 
 public:
+	TextureManager() { Create(); }
+
 	void Create();
 
 	TextureID NewTextureID();
