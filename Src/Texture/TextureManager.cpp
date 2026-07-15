@@ -86,6 +86,6 @@ void TextureManager::ReleaseAllTextures()
 	}
 }
 
-void TextureManager::Destroy() {}
+void TextureManager::Destroy() { mTextureList.Free(); }
 
 } // namespace fx

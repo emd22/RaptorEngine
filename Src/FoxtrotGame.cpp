@@ -24,6 +24,7 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <Texture/TextureManager.hpp>
 #include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
@@ -631,6 +632,9 @@ void FoxtrotGame::AddEditorModes()
 FoxtrotGame::~FoxtrotGame()
 {
 	DestroyGame();
+
+	delete gTextureManager;
+	gTextureManager = nullptr;
 
 	delete gObjectManager;
 	gObjectManager = nullptr;
