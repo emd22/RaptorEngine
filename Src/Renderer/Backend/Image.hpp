@@ -14,6 +14,7 @@
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Math/Vec2.hpp>
+#include <Texture/TextureID.hpp>
 #include <optional>
 
 namespace fx {
@@ -288,6 +289,8 @@ public:
 	VmaAllocation Allocation = nullptr;
 
 	ImageInfo Info {};
+
+	TextureID ID = TextureID::Null;
 
 private:
 	RefCount* mpRefCnt = nullptr;

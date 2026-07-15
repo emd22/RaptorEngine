@@ -10,8 +10,8 @@ namespace fx {
  * --------------------------------------
  * [I][   P   ][          LI            ]
  *
- * I  ( 1 bit )   ->  Is the ID invalid
- * P  ( 7 bits)  ->  Page number
+ * I  ( 1 bit ) ->  Is the ID invalid
+ * P  ( 7 bits) ->  Page number
  * LI (24 bits) ->  Local index
  */
 
@@ -23,7 +23,7 @@ struct ObjectID
 	static const ObjectID Null;
 
 	static const IDType scInvalidBit = (1U << 31);
-	static const IDType scIDMask = 0x0000FFFF;
+	static const IDType scIDMask = 0x00FFFFFF;
 
 public:
 	ObjectID() = default;

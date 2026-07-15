@@ -187,8 +187,6 @@ const SizedArray<ObjectID>& WorldGrid::GetNearbyObjects()
 		mNearbyObjectCache.Insert(id);
 	}
 
-	std::sort(mNearbyObjectCache.begin(), mNearbyObjectCache.end());
-
 	return mNearbyObjectCache;
 }
 

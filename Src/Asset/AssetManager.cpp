@@ -9,6 +9,7 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Object/Object.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -207,6 +208,11 @@ void AssetManager::Shutdown()
 void AssetManager::RequestHigherDetail()
 {
 	const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
+
+	for (ObjectID object_id : nearby_objects) {
+		Object* object = gObjectManager->GetObject(object_id);
+		Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
+	}
 }
 
 void AssetManager::ShutdownDeletionQueue()

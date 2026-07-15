@@ -6,15 +6,20 @@
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
+#include <Texture/TextureManager.hpp>
 #include <WorldGrid.hpp>
 
 namespace fx {
 
 PhJolt* gPhysics = nullptr;
 ShaderCompiler* gShaderCompiler = nullptr;
+
+// Managers
 AssetManager* gAssetManager = nullptr;
 ObjectManager* gObjectManager = nullptr;
+TextureManager* gTextureManager = nullptr;
 MaterialManager* gMaterialManager = nullptr;
+
 MemPool* gEnginePool = nullptr;
 MemPool* gScriptMemPool = nullptr;
 WorldGrid* gWorldGrid = nullptr;
@@ -34,6 +39,7 @@ void Init()
 	gObjectManager = new ObjectManager;
 	gMaterialManager = new MaterialManager;
 	gWorldGrid = new WorldGrid;
+	gTextureManager = new TextureManager;
 }
 
 
