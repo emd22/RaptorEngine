@@ -17,11 +17,13 @@ public:
 
 
 public:
+	TextureManager() { Create(); }
+
 	void Create();
 
 	TextureID NewTextureID();
-	renderer::Image* NewTexture();
-	renderer::Image* GetTexture(TextureID id);
+	Image* NewTexture();
+	Image* GetTexture(TextureID id);
 
 	void DestroyTexture(TextureID id);
 	void ReleaseAllTextures();
@@ -34,7 +36,7 @@ public:
 	std::mutex mInUse;
 
 private:
-	FreeArray<renderer::Image> mTextureList;
+	FreeArray<Image> mTextureList;
 };
 
 } // namespace fx

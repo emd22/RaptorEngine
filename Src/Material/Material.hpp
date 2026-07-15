@@ -10,7 +10,6 @@
 #include "MaterialID.hpp"
 
 #include <Asset/AssetManagerFwd.hpp>
-#include <Asset/AxImage.hpp>
 #include <Color.hpp>
 #include <Core/Bitset.hpp>
 #include <Core/Name.hpp>
@@ -56,8 +55,11 @@ public:
 
 	FX_FORCE_INLINE bool Exists() const
 	{
-		return (pAssetImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
+		return (pImage != nullptr) || (pDataToLoad != nullptr) || (ImageToUpload.ImageData.pData != nullptr);
 	}
+
+	void SetTicket(AssetTicket& ticket);
+	void SetTicket(AssetTicket&& ticket);
 
 	~MaterialComponent() = default;
 
@@ -65,7 +67,9 @@ private:
 	bool CheckIfReady();
 
 public:
-	TSRef<AxImage> pAssetImage { nullptr };
+	AssetTicket Ticket { nullptr };
+	Image* pImage = nullptr;
+
 
 	/// The texture cache ID used to load this image from.
 	Hash32 TextureCacheID = HashNull32;
@@ -111,27 +115,36 @@ public:
 public:
 	Material() { Properties.BaseColor = 0xFF010101u; }
 
-	void Attach(eResourceType type, const TSRef<AxImage>& image)
+	void Attach(eResourceType type, AssetTicket& ticket)
 	{
-		int32 mip_level = image->Image.GetInfo().MipLevel;
+		Image* image = static_cast<Image*>(ticket.Get());
+
+		int32 mip_level = image->GetInfo().MipLevel;
 		if (mip_level < QualityLevel) {
 			QualityLevel = mip_level;
 		}
 
+		MaterialComponent* component = nullptr;
+
 		switch (type) {
 		case eResourceType::Diffuse:
-			Diffuse.pAssetImage = image;
+			component = &Diffuse;
 			break;
 		case eResourceType::Normal:
-			NormalMap.pAssetImage = image;
+			component = &NormalMap;
 			break;
 		case eResourceType::MetallicRoughness:
-			MetallicRoughness.pAssetImage = image;
+			component = &MetallicRoughness;
 			break;
 
 		default:
 			LogError(LC_CORE, "Unsupported resource type to attach to material!");
 			break;
+		}
+
+		if (component) {
+			component->Ticket = ticket;
+			component->pImage = image;
 		}
 	}
 

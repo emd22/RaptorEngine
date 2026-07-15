@@ -1,6 +1,8 @@
 #pragma once
 
-#include <Asset/AxImage.hpp>
+#include "AssetTicket.hpp"
+
+#include <Renderer/Backend/Image.hpp>
 
 namespace fx {
 
@@ -8,9 +10,8 @@ struct ImageInfo;
 
 namespace AssetManagerFwd {
 
-TSRef<AxImage> LoadImageFromMemory(eImageFormat format, const uint8* data, uint32 data_size);
-TSRef<AxImage> LoadImageFromPixels(const ImageInfo& img_info);
-void LoadImageFromPixels(TSRef<AxImage>& image, const ImageInfo& img_info);
+AssetTicket LoadImageFromMemory(eImageType image_type, eImageFormat format, const Slice<const uint8> data,
+								eImageCreateFlags flags);
 
 }; // namespace AssetManagerFwd
 } // namespace fx

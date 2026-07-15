@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AssetBase.hpp"
+#include "AssetDef.hpp"
 #include "Loader/ImageLoaderBase.hpp"
 #include "Loader/ObjectLoaderBase.hpp"
 
@@ -17,45 +17,6 @@
 namespace fx {
 
 
-enum class eAssetLoadType
-{
-	None,
-	Binary,
-	Object,
-	Image,
-};
-
-enum class eAssetLoadOp
-{
-	None,
-
-	/// Reads a file source into an asset given a path.
-	ReadAndUpload,
-
-	/// Reads unprocessed file data using a loader and uploads to an asset.
-	ProcessAndUpload,
-
-	/// Directly uploads the data into an asset.
-	DirectUpload,
-};
-
-
-constexpr const char* AssetTypeToString(eAssetLoadType type)
-{
-	switch (type) {
-	case eAssetLoadType::None:
-		return "None";
-	case eAssetLoadType::Binary:
-		return "Binary";
-	case eAssetLoadType::Object:
-		return "Object";
-	case eAssetLoadType::Image:
-		return "Image";
-	default:;
-	}
-	return "None";
-}
-
 class Object;
 
 
@@ -63,27 +24,14 @@ struct AssetItemData
 {
 	AssetItemData() = default;
 
-	template <typename TLoaderType, typename TAssetType>
-	static AssetItemData Make(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset,
-							  eAssetLoadType load_type)
-	{
-		AssetItemData data;
-
-		data.pLoader = loader;
-		data.pAsset = asset;
-		data.LoadType = load_type;
-
-		return data;
-	}
-
 	template <typename TLoaderType>
-	static AssetItemData Make(const TSRef<TLoaderType>& loader, const AssetTicket<Object>& ticket)
+	static AssetItemData Make(const TSRef<TLoaderType>& loader, const AssetTicket& ticket, eAssetType asset_type)
 	{
 		AssetItemData data;
 
 		data.pLoader = loader;
-		data.ObjectTicket = ticket;
-		data.LoadType = eAssetLoadType::Object;
+		data.Ticket = ticket;
+		data.LoadType = asset_type;
 
 		return data;
 	}
@@ -93,8 +41,7 @@ struct AssetItemData
 	AssetItemData& operator=(AssetItemData&& other)
 	{
 		pLoader = std::move(other.pLoader);
-		pAsset = std::move(other.pAsset);
-		ObjectTicket = std::move(other.ObjectTicket);
+		Ticket = std::move(other.Ticket);
 		LoadType = other.LoadType;
 
 		return *this;
@@ -105,12 +52,12 @@ struct AssetItemData
 		switch (pLoader->GetLoaderType()) {
 		case loader::eLoaderType::ImageLoader: {
 			TSRef<loader::ImageLoaderBase> image_loader(pLoader);
-			image_loader->CreateGpuResource(pAsset);
+			image_loader->CreateGpuResource(Ticket);
 			break;
 		}
 		case loader::eLoaderType::ObjectLoader: {
 			TSRef<loader::ObjectLoaderBase> object_loader(pLoader);
-			object_loader->CreateGpuResource(ObjectTicket);
+			object_loader->CreateGpuResource(Ticket);
 			break;
 		}
 
@@ -125,7 +72,7 @@ struct AssetItemData
 		switch (pLoader->GetLoaderType()) {
 		case loader::eLoaderType::ImageLoader: {
 			TSRef<loader::ImageLoaderBase> image_loader(pLoader);
-			image_loader->Destroy(pAsset);
+			image_loader->Destroy();
 			break;
 		}
 		case loader::eLoaderType::ObjectLoader: {
@@ -140,12 +87,12 @@ struct AssetItemData
 		}
 	}
 
-	eAssetLoadType LoadType = eAssetLoadType::None;
+	eAssetType LoadType = eAssetType::None;
 
 	TSRef<loader::LoaderBase> pLoader { nullptr };
-	TSRef<AssetBase> pAsset { nullptr };
+	// TSRef<AssetBase> pAsset { nullptr };
 
-	AssetTicket<Object> ObjectTicket { nullptr };
+	AssetTicket Ticket { nullptr };
 };
 
 
@@ -154,18 +101,18 @@ struct AxQueueItem
 	AxQueueItem() = default;
 
 
-	FX_FORCE_INLINE bool IsObject() const { return Data.LoadType == eAssetLoadType::Object; }
-	FX_FORCE_INLINE bool IsImage() const { return Data.LoadType == eAssetLoadType::Image; }
-	FX_FORCE_INLINE bool IsBinary() const { return Data.LoadType == eAssetLoadType::Binary; }
+	FX_FORCE_INLINE bool IsObject() const { return Data.LoadType == eAssetType::Object; }
+	FX_FORCE_INLINE bool IsImage() const { return Data.LoadType == eAssetType::Image; }
+	FX_FORCE_INLINE bool IsBinary() const { return Data.LoadType == eAssetType::Binary; }
 
-	template <typename TLoaderType, typename TAssetType>
-	static AxQueueItem UploadFileToProcess(const std::string& path, const TSRef<TLoaderType>& loader,
-										   const TSRef<TAssetType>& asset, eAssetLoadType type)
+
+	template <typename TLoaderType>
+	static AxQueueItem UploadFileToProcess(const AssetTicket& ticket, const TSRef<TLoaderType>& loader,
+										   const std::string& path, eAssetType asset_type)
 	{
 		AxQueueItem item;
 
-		item.Data = AssetItemData::Make<TLoaderType, TAssetType>(loader, asset, type);
-
+		item.Data = AssetItemData::Make<TLoaderType>(loader, ticket, asset_type);
 		item.pcRawData = nullptr;
 		item.DataSize = 0;
 		item.AssetLoadOp = eAssetLoadOp::ReadAndUpload;
@@ -175,43 +122,12 @@ struct AxQueueItem
 	}
 
 	template <typename TLoaderType>
-	static AxQueueItem UploadFileToProcess(const std::string& path, const TSRef<TLoaderType>& loader,
-										   const AssetTicket<Object>& ticket)
+	static AxQueueItem UploadAndProcess(const AssetTicket& ticket, const TSRef<TLoaderType>& loader,
+										eAssetType asset_type, const Slice<const uint8>& data)
 	{
 		AxQueueItem item;
 
-		item.Data = AssetItemData::Make<TLoaderType>(loader, ticket);
-		item.pcRawData = nullptr;
-		item.DataSize = 0;
-		item.AssetLoadOp = eAssetLoadOp::ReadAndUpload;
-		item.Path = path;
-
-		return item;
-	}
-
-
-	template <typename TLoaderType, typename TAssetType>
-	static AxQueueItem UploadAndProcess(const TSRef<TLoaderType>& loader, const TSRef<TAssetType>& asset,
-										eAssetLoadType type, const Slice<const uint8>& data)
-	{
-		AxQueueItem item;
-
-		item.Data = AssetItemData::Make<TLoaderType, TAssetType>(loader, asset, type);
-
-		item.pcRawData = data.pData;
-		item.DataSize = data.Size;
-		item.AssetLoadOp = eAssetLoadOp::ProcessAndUpload;
-
-		return item;
-	}
-
-	template <typename TLoaderType>
-	static AxQueueItem UploadAndProcess(const TSRef<TLoaderType>& loader, const AssetTicket<Object>& ticket,
-										const Slice<const uint8>& data)
-	{
-		AxQueueItem item;
-
-		item.Data = AssetItemData::Make<TLoaderType>(loader, ticket);
+		item.Data = AssetItemData::Make<TLoaderType>(loader, ticket, asset_type);
 
 		item.pcRawData = data.pData;
 		item.DataSize = data.Size;
@@ -221,12 +137,11 @@ struct AxQueueItem
 	}
 
 
-	template <typename TAssetType>
-	static AxQueueItem DirectUpload(const TSRef<TAssetType>& asset, eAssetLoadType type, const ImageInfo& img_info)
+	static AxQueueItem DirectUploadImage(AssetTicket& asset, const ImageInfo& img_info)
 	{
 		AxQueueItem item;
 
-		item.Data = AssetItemData::Make<loader::LoaderBase, TAssetType>(nullptr, asset, type);
+		item.Data = AssetItemData::Make<loader::LoaderBase>(nullptr, asset, eAssetType::Image);
 
 		item.pcRawData = nullptr;
 		item.ImgInfo = img_info;

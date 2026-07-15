@@ -24,6 +24,7 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <Texture/TextureManager.hpp>
 #include <csignal>
 
 FX_SET_MODULE_NAME("FoxtrotGame");
@@ -256,7 +257,7 @@ void FoxtrotGame::CreateGame()
 	CreateFontObject();
 
 
-	// renderer::Image mip_image;
+	// Image mip_image;
 
 	// gRenderer->SubmitImmediateUploadCmd([&](CommandBuffer& cmd) { mip_image = mm.LoadMipmaps(cmd, "TestMips.bin");
 	// });
@@ -632,16 +633,15 @@ FoxtrotGame::~FoxtrotGame()
 {
 	DestroyGame();
 
+	delete gTextureManager;
+	gTextureManager = nullptr;
+
 	delete gObjectManager;
 	gObjectManager = nullptr;
 
 	mMainScene.Destroy();
 
-	PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
-	// for (AxImage& img : empty_images_list) {
-	//     img.Destroy();
-	// }
-	empty_images_list.Destroy();
+	// empty_images_list.Destroy();
 }
 
 

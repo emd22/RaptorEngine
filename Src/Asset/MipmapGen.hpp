@@ -48,7 +48,7 @@ public:
 	 */
 	void ExportMipmaps(const char* dp_path, const char* output_path);
 
-	renderer::Image LoadMipmaps(renderer::CommandBuffer& cmd, const char* path);
+	Image LoadMipmaps(renderer::CommandBuffer& cmd, const char* path);
 
 	~MipmapGen() = default;
 

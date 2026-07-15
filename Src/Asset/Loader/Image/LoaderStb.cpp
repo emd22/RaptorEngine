@@ -1,43 +1,42 @@
 #include "LoaderStb.hpp"
 
 #include <Asset/AssetBase.hpp>
-#include <Asset/AxImage.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {
 
 namespace loader {
 
-eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const String& path)
+eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const std::string& path)
 {
-	TSRef<AxImage> image(asset);
+	Image* image = static_cast<Image*>(ticket.Get());
 
-	const char* c_path = path.CStr();
+	const char* c_path = path.c_str();
 
-	const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
+	const int pixel_size = ImageFormatUtil::GetPixelStride(ImageFormat);
 	Assert(pixel_size > 0);
 
 	stbi_info(c_path, &mWidth, &mHeight, &mChannels);
 
-	image->Image.Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
+	image->Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
 
 	uint32 data_size = mWidth * mHeight * pixel_size;
 	mDataSize = data_size;
 
 	mImageData = stbi_load(c_path, &mWidth, &mHeight, &mChannels, pixel_size);
 	if (mImageData == nullptr) {
-		LogError(LC_ASSET, "Could not load image file at '{}'", c_path);
+		LogError(LC_ASSET, "Could not load image file at '{}'", path);
 		return eLoaderStatus::Error;
 	}
 
 	return eLoaderStatus::Success;
 }
 
-eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const uint8* data, uint32 size)
+eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const uint8* data, uint32 size)
 {
-	TSRef<AxImage> image(asset);
+	Image* image = static_cast<Image*>(ticket.Get());
 
-	const int pixel_size = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
+	const int pixel_size = ImageFormatUtil::GetPixelStride(ImageFormat);
 	Assert(pixel_size > 0);
 
 	Assert(data != nullptr);
@@ -53,7 +52,7 @@ eLoaderStatus LoaderStb::Load(TSRef<AssetBase> asset, const uint8* data, uint32 
 	uint32 data_size = mWidth * mHeight * (pixel_size * sizeof(uint8));
 	mDataSize = data_size;
 
-	image->Image.Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
+	image->Info.Size = Vec2u { uint32(mWidth), uint32(mHeight) };
 
 	mImageData = stbi_load_from_memory(data, size, &mWidth, &mHeight, &mChannels, pixel_size);
 
@@ -84,9 +83,9 @@ eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<ui
 	return eLoaderStatus::Success;
 }
 
-void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
+void LoaderStb::CreateGpuResource(AssetTicket& ticket)
 {
-	TSRef<AxImage> image(asset);
+	Image* image = static_cast<Image*>(ticket.Get());
 
 	SizedArray<uint8> data_arr;
 
@@ -100,15 +99,13 @@ void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
 	// const bool should_save_data = (CreationFlags & eImageCreateFlags::KeepInMemory) != 0;
 
 	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-	ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
-						   Slice<const uint8>(data_arr.pData, data_arr.Size) };
-	image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
+	ImageInfo image_info { image->Info.Size, ImageFormat, 0, 1, Slice<const uint8>(data_arr.pData, data_arr.Size) };
+	image->CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
 	// Set to nullptr so that the data is not freed by the SizedArray
 	data_arr.pData = nullptr;
 
-	image->bIsUploadedToGpu = true;
-	image->bIsUploadedToGpu.notify_all();
+	ticket.SignalUploadedToGpu();
 }
 
 // void LoaderStb::LoadCubemapToLayeredImage(const Image&)
@@ -140,7 +137,7 @@ void LoaderStb::CreateGpuResource(TSRef<AssetBase>& asset)
 //     StackArray<VkImageCopy, 6> image_copy_infos;
 // }
 
-void LoaderStb::Destroy(TSRef<AssetBase>& asset)
+void LoaderStb::Destroy()
 {
 	// while (!asset->bIsUploadedToGpu) {
 	//     asset->bIsUploadedToGpu.wait(true);

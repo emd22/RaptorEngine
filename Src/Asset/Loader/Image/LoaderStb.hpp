@@ -14,35 +14,34 @@ namespace loader {
 class LoaderStb final : public ImageLoaderBase
 {
 public:
-    LoaderStb() = default;
+	LoaderStb() = default;
 
-    eLoaderStatus Load(TSRef<AssetBase> asset, const String& path) override;
-    eLoaderStatus Load(TSRef<AssetBase> asset, const uint8* data, uint32 size) override;
+	eLoaderStatus Load(AssetTicket& asset, const std::string& path) override;
+	eLoaderStatus Load(AssetTicket& asset, const uint8* data, uint32 size) override;
 
-    static eLoaderStatus SaveToFile(eImageSaveFormat format, const Slice<uint8>& data, const Vec2u& size,
-                                    const String& path, eImageSaveFlags flags);
+	void CreateGpuResource(AssetTicket& asset) override;
 
-    Slice<uint8> GetImageData() const { return Slice(mImageData, mDataSize); }
-    Vec2u GetImageSize() const { return Vec2u(mWidth, mHeight); };
+	static eLoaderStatus SaveToFile(eImageSaveFormat format, const Slice<uint8>& data, const Vec2u& size,
+									const String& path, eImageSaveFlags flags);
 
-    void Destroy(TSRef<AssetBase>& asset) override;
-    void InvalidateImageData() { mImageData = nullptr; };
+	Slice<uint8> GetImageData() const { return Slice(mImageData, mDataSize); }
+	Vec2u GetImageSize() const { return Vec2u(mWidth, mHeight); };
 
-    ~LoaderStb() override = default;
+	void Destroy() override;
+	void InvalidateImageData() { mImageData = nullptr; };
 
-protected:
-    void CreateGpuResource(TSRef<AssetBase>& asset) override;
-
-private:
-    void LoadCubemapToLayeredImage();
+	~LoaderStb() override = default;
 
 private:
-    int mWidth = 0;
-    int mHeight = 0;
-    int mChannels = 0;
+	void LoadCubemapToLayeredImage();
 
-    uint32 mDataSize = 0;
-    uint8* mImageData = nullptr;
+private:
+	int mWidth = 0;
+	int mHeight = 0;
+	int mChannels = 0;
+
+	uint32 mDataSize = 0;
+	uint8* mImageData = nullptr;
 };
 
 } // namespace loader

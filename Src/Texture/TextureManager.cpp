@@ -18,24 +18,28 @@ TextureID TextureManager::NewTextureID()
 	std::lock_guard<std::mutex> guard(mInUse);
 
 	uint32 index;
-	renderer::Image* texture = mTextureList.NewItem(&index);
+	Image* texture = mTextureList.NewItem(&index);
 	texture->ID = TextureID(index);
 
 	return texture->ID;
 }
 
-renderer::Image* TextureManager::NewTexture()
+Image* TextureManager::NewTexture()
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
 	uint32 index;
-	renderer::Image* image = mTextureList.NewItem(&index);
-	image->ID = TextureID(index);
+	Image* image = mTextureList.NewItem(&index);
+
+	// Temporary, this should remove the least used textures.
+	Assert(image != nullptr);
+
+	image->ID = TextureID { index };
 
 	return image;
 }
 
-renderer::Image* TextureManager::GetTexture(TextureID id)
+Image* TextureManager::GetTexture(TextureID id)
 {
 	if (id.IsInvalid()) {
 		return nullptr;
@@ -82,6 +86,6 @@ void TextureManager::ReleaseAllTextures()
 	}
 }
 
-void TextureManager::Destroy() {}
+void TextureManager::Destroy() { mTextureList.Free(); }
 
 } // namespace fx

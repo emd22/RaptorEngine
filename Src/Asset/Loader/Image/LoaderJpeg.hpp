@@ -14,21 +14,20 @@ namespace loader {
 class LoaderJpeg : public ImageLoaderBase
 {
 public:
-    LoaderJpeg() = default;
+	LoaderJpeg() = default;
 
-    eLoaderStatus Load(TSRef<AssetBase> asset, const String& path) override;
-    eLoaderStatus Load(TSRef<AssetBase> asset, const uint8* data, uint32 size) override;
+	eLoaderStatus Load(AssetTicket& ticket, const std::string& path) override;
+	eLoaderStatus Load(AssetTicket& ticket, const uint8* data, uint32 size) override;
 
-    void Destroy(TSRef<AssetBase>& asset) override;
+	void CreateGpuResource(AssetTicket& ticket) override;
 
-    ~LoaderJpeg() override = default;
+	void Destroy() override;
 
-protected:
-    void CreateGpuResource(TSRef<AssetBase>& asset) override;
+	~LoaderJpeg() override = default;
 
 private:
-    struct jpeg_decompress_struct mJpegInfo;
-    SizedArray<uint8> mImageData;
+	struct jpeg_decompress_struct mJpegInfo;
+	SizedArray<uint8> mImageData;
 };
 
 } // namespace loader
