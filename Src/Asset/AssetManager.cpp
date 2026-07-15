@@ -1,6 +1,5 @@
 #include "AssetManager.hpp"
 
-#include "AxImage.hpp"
 #include "Core/Assert.hpp"
 #include "Core/SizedArray.hpp"
 #include "Loader/Image/LoaderJpeg.hpp"
@@ -12,6 +11,7 @@
 #include <Engine.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/Object.hpp>
+#include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 #include <Texture/TextureManager.hpp>

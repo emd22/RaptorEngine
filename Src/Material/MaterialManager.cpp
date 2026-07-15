@@ -101,7 +101,6 @@ void MaterialManager::MakeNullMaterial()
 		NM_BLACK, NM_BLACK, NM_PINK,  NM_PINK,	/* 3 */
 	};
 
-	// TSRef<AxImage> diffuse = TSRef<AxImage>::New();
 
 	fx::Image* diffuse_image = gTextureManager->NewTexture();
 	AssetTicket diffuse_ticket(diffuse_image);

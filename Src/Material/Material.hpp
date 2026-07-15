@@ -10,7 +10,6 @@
 #include "MaterialID.hpp"
 
 #include <Asset/AssetManagerFwd.hpp>
-#include <Asset/AxImage.hpp>
 #include <Color.hpp>
 #include <Core/Bitset.hpp>
 #include <Core/Name.hpp>
@@ -68,8 +67,6 @@ private:
 	bool CheckIfReady();
 
 public:
-	// TSRef<AxImage> pAssetImage { nullptr };
-
 	AssetTicket Ticket { nullptr };
 	Image* pImage = nullptr;
 

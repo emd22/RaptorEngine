@@ -1,7 +1,6 @@
 #include "LoaderStb.hpp"
 
 #include <Asset/AssetBase.hpp>
-#include <Asset/AxImage.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
 
 namespace fx {

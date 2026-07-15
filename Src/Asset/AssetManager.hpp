@@ -2,9 +2,9 @@
 
 #include "Asset/AxQueue.hpp"
 #include "Asset/AxQueueItem.hpp"
+#include "AssetBase.hpp"
 #include "AssetDef.hpp"
 #include "AssetTicket.hpp"
-#include "AxImage.hpp"
 #include "Object/Object.hpp"
 #include "Object/ObjectManager.hpp"
 

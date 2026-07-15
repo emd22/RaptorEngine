@@ -4,7 +4,6 @@
 
 #include <TurboJPEG/jpeglib.h>
 
-#include <Asset/AxImage.hpp>
 #include <Core/Memory.hpp>
 #include <Core/Ref.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
