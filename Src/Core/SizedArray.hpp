@@ -23,417 +23,397 @@ namespace fx {
 
 static inline void NoMemError()
 {
-    puts("SizedArray: out of memory");
-    Terminate();
+	puts("SizedArray: out of memory");
+	Terminate();
 }
 
 template <typename TElementType, typename TAllocator = StdAllocator>
-    requires C_IsAllocator<TAllocator>
+	requires C_IsAllocator<TAllocator>
 class SizedArray
 {
 public:
-    static constexpr int64 scItemNotFound = -1;
+	static constexpr int64 scItemNotFound = -1;
 
-    using SizeType = size_t;
+	using SizeType = size_t;
 
-public:
-    struct Iterator
-    {
-        Iterator(TElementType* ptr, size_t index) : mPtr(ptr), mIndex(index) {}
-
-        Iterator& operator++()
-        {
-            mIndex++;
-            return *this;
-        }
-
-        Iterator& operator++(int value)
-        {
-            Iterator before = *this;
-            mIndex++;
-            return before;
-        }
-
-        TElementType& operator*() const { return mPtr[mIndex]; }
-
-        bool operator==(const Iterator& b) const { return mPtr == b.mPtr && mIndex == b.mIndex; }
-
-
-    private:
-        TElementType* mPtr;
-        size_t mIndex;
-    };
+	using Iterator = TElementType*;
+	using ConstIterator = const TElementType*;
 
 
 public:
-    static SizedArray<TElementType> CreateCopyOf(const TElementType* ptr, SizeType size)
-    {
-        SizedArray<TElementType> arr(size);
-        arr.MarkFull();
+	static SizedArray<TElementType> CreateCopyOf(const TElementType* ptr, SizeType size)
+	{
+		SizedArray<TElementType> arr(size);
+		arr.MarkFull();
 
-        memcpy(arr.pData, ptr, arr.GetSizeInBytes());
+		memcpy(arr.pData, ptr, arr.GetSizeInBytes());
 
-        return std::move(arr);
-    }
+		return std::move(arr);
+	}
 
-    static SizedArray<TElementType> CreateAsSize(SizeType size)
-    {
-        SizedArray<TElementType> arr;
-        arr.InitSize(size);
+	static SizedArray<TElementType> CreateAsSize(SizeType size)
+	{
+		SizedArray<TElementType> arr;
+		arr.InitSize(size);
 
-        return std::move(arr);
-    }
+		return std::move(arr);
+	}
 
-    static SizedArray<TElementType> CreateEmpty() { return SizedArray<TElementType>(nullptr, 0); }
+	static SizedArray<TElementType> CreateEmpty() { return SizedArray<TElementType>(nullptr, 0); }
 
-    static SizedArray<TElementType> Clone(const SizedArray<TElementType>& other)
-    {
-        SizedArray<TElementType> clone;
-        clone.InitCapacity(other.Capacity);
-        for (uint32 i = 0; i < other.Size; i++) {
-            clone.Insert(other[i]);
-        }
-        return std::move(clone);
-    }
+	static SizedArray<TElementType> Clone(const SizedArray<TElementType>& other)
+	{
+		SizedArray<TElementType> clone;
+		clone.InitCapacity(other.Capacity);
+		for (uint32 i = 0; i < other.Size; i++) {
+			clone.Insert(other[i]);
+		}
+		return std::move(clone);
+	}
 
 public:
-    SizedArray(TElementType* ptr, size_t size) : pData(ptr), Size(size), Capacity(size), bDoNotDestroy(true) {}
+	SizedArray(TElementType* ptr, size_t size) : pData(ptr), Size(size), Capacity(size), bDoNotDestroy(true) {}
 
-    SizedArray(size_t element_count) : Capacity(element_count)
-    {
+	SizedArray(size_t element_count) : Capacity(element_count)
+	{
 #ifdef FX_SIZED_ARRAY_DEBUG
-        LogDebug("Allocating SizedArray of capacity {:d} (type: {:s})", Capacity, typeid(TElementType).name());
+		LogDebug("Allocating SizedArray of capacity {:d} (type: {:s})", Capacity, typeid(TElementType).name());
 #endif
-        InternalAllocateArray(element_count);
-        Size = 0;
-    }
+		InternalAllocateArray(element_count);
+		Size = 0;
+	}
 
-    SizedArray(std::initializer_list<TElementType> list)
-    {
-        if (list.size() == 0) {
-            return;
-        }
+	SizedArray(std::initializer_list<TElementType> list)
+	{
+		if (list.size() == 0) {
+			return;
+		}
 
-        InitCapacity(list.size());
+		InitCapacity(list.size());
 
-        for (const TElementType& obj : list) {
-            Insert(obj);
-        }
-    };
+		for (const TElementType& obj : list) {
+			Insert(obj);
+		}
+	};
 
-    SizedArray(SizedArray<TElementType>&& other) { (*this) = std::move(other); }
+	SizedArray(SizedArray<TElementType>&& other) { (*this) = std::move(other); }
 
-    SizedArray() = default;
+	SizedArray() = default;
 
-    ~SizedArray() { Free(); }
+	~SizedArray() { Free(); }
 
 
-    void FreeNoDestructor()
-    {
-        if (pData == nullptr || bDoNotDestroy) {
-            return;
-        }
+	void FreeNoDestructor()
+	{
+		if (pData == nullptr || bDoNotDestroy) {
+			return;
+		}
 
 #ifndef FX_SIZED_ARRAY_NO_MEMPOOL
-        if (gEnginePool) {
-            gEnginePool->FreeRaw(static_cast<void*>(pData));
-        }
+		if (gEnginePool) {
+			gEnginePool->FreeRaw(static_cast<void*>(pData));
+		}
 #else
-        std::free(reinterpret_cast<void*>(pData));
+		std::free(reinterpret_cast<void*>(pData));
 #endif
 
 #ifdef FX_SIZED_ARRAY_DEBUG
-        LogDebug("Freeing SizedArray of size {:d} (type: {:s})", Size, typeid(TElementType).name());
+		LogDebug("Freeing SizedArray of size {:d} (type: {:s})", Size, typeid(TElementType).name());
 #endif
 
-        pData = nullptr;
-        Capacity = 0;
-        Size = 0;
-    }
+		pData = nullptr;
+		Capacity = 0;
+		Size = 0;
+	}
 
-    void Free()
-    {
-        if (pData == nullptr || bDoNotDestroy) {
-            return;
-        }
+	void Free()
+	{
+		if (pData == nullptr || bDoNotDestroy) {
+			return;
+		}
 
-        if (std::is_destructible_v<TElementType>) {
-            for (size_t i = 0; i < Size; i++) {
-                TElementType& element = pData[i];
-                element.~TElementType();
-            }
-        }
+		if (std::is_destructible_v<TElementType>) {
+			for (size_t i = 0; i < Size; i++) {
+				TElementType& element = pData[i];
+				element.~TElementType();
+			}
+		}
 
-        FreeNoDestructor();
-    }
+		FreeNoDestructor();
+	}
 
-    Iterator begin() const { return Iterator(pData, 0); }
-
-    Iterator end() const { return Iterator(pData, Size); }
-
-    operator TElementType*() const { return pData; }
-
-    operator TElementType&() const { return *pData; }
-
-    const TElementType& operator[](size_t index) const
-    {
-        AssertMsg(index < Capacity, "Access out of range");
-        return pData[index];
-    }
-
-    TElementType& operator[](size_t index)
-    {
-        AssertMsg(index < Capacity, "Access out of range");
-        return pData[index];
-    }
-
-    SizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
-    {
-        const size_t list_size = list.size();
-        if (list_size > Capacity) {
-            Free();
-            InitCapacity(list.size());
-        }
-
-        Clear();
-
-        for (const TElementType& obj : list) {
-            Insert(obj);
-        }
-
-        return *this;
-    }
-
-    SizedArray<TElementType>& operator=(SizedArray<TElementType>&& other)
-    {
-        if (pData) {
-            Free();
-        }
+	Iterator begin() { return pData; }
+	Iterator end() { return pData + Size; }
 
 
-        pData = other.pData;
-        other.pData = nullptr;
+	ConstIterator begin() const { return pData; }
+	ConstIterator end() const { return pData + Size; }
 
-        Size = other.Size;
-        Capacity = other.Capacity;
+	operator TElementType*() const { return pData; }
 
-        other.Size = 0;
-        other.Capacity = 0;
+	operator TElementType&() const { return *pData; }
 
-        bDoNotDestroy = other.bDoNotDestroy;
-        other.bDoNotDestroy = false;
+	const TElementType& operator[](size_t index) const
+	{
+		AssertMsg(index < Capacity, "Access out of range");
+		return pData[index];
+	}
 
-        return *this;
-    }
+	TElementType& operator[](size_t index)
+	{
+		AssertMsg(index < Capacity, "Access out of range");
+		return pData[index];
+	}
 
-    template <typename T>
-        requires C_IsSameOrConst<T, TElementType>
-    void InitAsCopyOf(const SizedArray<T>& other)
-    {
-        InitCapacity(other.Capacity);
-        Size = other.Size;
+	SizedArray<TElementType>& operator=(std::initializer_list<TElementType>& list)
+	{
+		const size_t list_size = list.size();
+		if (list_size > Capacity) {
+			Free();
+			InitCapacity(list.size());
+		}
 
-        if (std::is_copy_constructible_v<TElementType>) {
-            for (SizeType i = 0; i < Size; i++) {
-                new (other.pData + i) TElementType(other.pData[i]);
-            }
-        }
-        else {
-            std::memcpy(reinterpret_cast<void*>(pData), reinterpret_cast<const void*>(other.pData),
-                        other.GetSizeInBytes());
-        }
-    }
+		Clear();
 
-    template <typename T>
-        requires std::is_same_v<typename std::remove_const<T>::type, TElementType>
-    void InitAsCopyOf(const SizedArray<T>& other, SizeType copy_capacity)
-    {
-        InitCapacity(max(other.Capacity, copy_capacity));
-        Size = other.Size;
+		for (const TElementType& obj : list) {
+			Insert(obj);
+		}
 
-        memcpy(pData, other.pData, other.GetSizeInBytes());
-    }
+		return *this;
+	}
 
-    void InitAsCopyOf(const TElementType* ptr, SizeType size)
-    {
-        InitSize(size);
-        memcpy(pData, ptr, GetSizeInBytes());
-    }
+	SizedArray<TElementType>& operator=(SizedArray<TElementType>&& other)
+	{
+		if (pData) {
+			Free();
+		}
 
-    void CloneFrom(const SizedArray<TElementType>& other)
-    {
-        InitCapacity(other.Capacity);
-        Size = other.Size;
-        memcpy(pData, other.pData, other.GetSizeInBytes());
-    }
 
-    void Clear()
-    {
-        for (size_t i = 0; i < Size; i++) {
-            TElementType& element = pData[i];
-            element.~TElementType();
-        }
+		pData = other.pData;
+		other.pData = nullptr;
 
-        Size = 0;
-    }
+		Size = other.Size;
+		Capacity = other.Capacity;
 
-    FX_FORCE_INLINE bool IsEmpty() const { return Size == 0; }
-    FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
+		other.Size = 0;
+		other.Capacity = 0;
 
-    TElementType& Insert(const TElementType& object)
-    {
-        AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+		bDoNotDestroy = other.bDoNotDestroy;
+		other.bDoNotDestroy = false;
 
-        TElementType* element = &pData[Size++];
-        new (element) TElementType(object);
+		return *this;
+	}
 
-        return *element;
-    }
+	template <typename T>
+		requires C_IsSameOrConst<T, TElementType>
+	void InitAsCopyOf(const SizedArray<T>& other)
+	{
+		InitCapacity(other.Capacity);
+		Size = other.Size;
 
-    void Insert(TElementType&& object)
-    {
-        AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+		if (std::is_copy_constructible_v<TElementType>) {
+			for (SizeType i = 0; i < Size; i++) {
+				new (other.pData + i) TElementType(other.pData[i]);
+			}
+		}
+		else {
+			std::memcpy(reinterpret_cast<void*>(pData), reinterpret_cast<const void*>(other.pData),
+						other.GetSizeInBytes());
+		}
+	}
 
-        TElementType* element = &pData[Size++];
+	template <typename T>
+		requires std::is_same_v<typename std::remove_const<T>::type, TElementType>
+	void InitAsCopyOf(const SizedArray<T>& other, SizeType copy_capacity)
+	{
+		InitCapacity(max(other.Capacity, copy_capacity));
+		Size = other.Size;
 
-        new (element) TElementType(std::move(object));
-    }
+		memcpy(pData, other.pData, other.GetSizeInBytes());
+	}
 
-    /** Inserts a new empty element into the array and returns a pointer to the element */
-    TElementType* Insert()
-    {
-        AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+	void InitAsCopyOf(const TElementType* ptr, SizeType size)
+	{
+		InitSize(size);
+		memcpy(pData, ptr, GetSizeInBytes());
+	}
 
-        TElementType* element = &pData[Size++];
+	void CloneFrom(const SizedArray<TElementType>& other)
+	{
+		InitCapacity(other.Capacity);
+		Size = other.Size;
+		memcpy(pData, other.pData, other.GetSizeInBytes());
+	}
 
-        new (element) TElementType;
+	void Clear()
+	{
+		for (size_t i = 0; i < Size; i++) {
+			TElementType& element = pData[i];
+			element.~TElementType();
+		}
 
-        return element;
-    }
+		Size = 0;
+	}
 
-    void RemoveLast()
-    {
-        AssertMsg(Size > 0, "No elements remaining!");
-        TElementType* element = &pData[Size--];
+	FX_FORCE_INLINE bool IsEmpty() const { return Size == 0; }
+	FX_FORCE_INLINE bool IsNotEmpty() const { return !IsEmpty(); }
 
-        if (std::is_destructible_v<TElementType>) {
-            element->~TElementType();
-        }
-    }
+	TElementType& Insert(const TElementType& object)
+	{
+		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
 
-    void InitCapacity(size_t element_count)
-    {
-        AssertMsg(pData == nullptr, "SizedArray has already been initialized!");
+		TElementType* element = &pData[Size++];
+		new (element) TElementType(object);
 
-        InternalAllocateArray(element_count);
+		return *element;
+	}
 
-        Capacity = element_count;
-    }
+	void Insert(TElementType&& object)
+	{
+		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
 
-    void MarkFull() { Size = Capacity; }
+		TElementType* element = &pData[Size++];
 
-    bool ContainsItem(TElementType* ptr) const
-    {
-        const TElementType* end_ptr = (pData + Size);
+		new (element) TElementType(std::move(object));
+	}
 
-        if (ptr >= pData && ptr <= end_ptr) {
-            return true;
-        }
+	/** Inserts a new empty element into the array and returns a pointer to the element */
+	TElementType* Insert()
+	{
+		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
 
-        return false;
-    }
+		TElementType* element = &pData[Size++];
 
-    int64 GetItemIndex(TElementType* ptr) const
-    {
-        const TElementType* end_ptr = (pData + Size);
+		new (element) TElementType;
 
-        if (ptr < pData || ptr > end_ptr) {
-            return scItemNotFound;
-        }
+		return element;
+	}
 
-        Assert(ptr >= pData);
+	void RemoveLast()
+	{
+		AssertMsg(Size > 0, "No elements remaining!");
+		TElementType* element = &pData[Size--];
 
-        return ptr - pData;
-    }
+		if (std::is_destructible_v<TElementType>) {
+			element->~TElementType();
+		}
+	}
 
-    /**
-     *   Initializes an array to contain `element_count` elements, which can be modified externally.
-     *
-     *   Example:
-     *   ```cpp
-     *      SizedArray<int32> int_array(10);
-     *      int_array.InitSize();
-     *
-     *      SizedArray<int32> other_array;
-     *      other_array.InitSize(15);
-     *   ```
-     */
-    void InitSize(size_t element_count)
-    {
-        if (Capacity == 0) {
-            InitCapacity(element_count);
-        }
+	void InitCapacity(size_t element_count)
+	{
+		if (pData != nullptr) {
+			Free();
+		}
 
-        Size = Capacity;
+		InternalAllocateArray(element_count);
 
-        for (uint64 i = 0; i < Size; i++) {
-            new (&pData[i]) TElementType;
-        }
-    }
+		Capacity = element_count;
+	}
 
-    size_t GetSizeInBytes() const { return Size * sizeof(TElementType); }
+	void MarkFull() { Size = Capacity; }
 
-    size_t GetCapacityInBytes() const { return Capacity * sizeof(TElementType); }
+	bool ContainsItem(TElementType* ptr) const
+	{
+		const TElementType* end_ptr = (pData + Size);
 
-    void Print()
-    {
-        LogSeverityText<eLogSeverity::Info>();
+		if (ptr >= pData && ptr <= end_ptr) {
+			return true;
+		}
 
-        LogDirect("Array: {{ ");
+		return false;
+	}
 
-        for (size_t i = 0; i < Size; i++) {
-            LogDirect("{}", (*this)[i]);
+	int64 GetItemIndex(TElementType* ptr) const
+	{
+		const TElementType* end_ptr = (pData + Size);
 
-            if (i < Size - 1) {
-                LogDirect(", ");
-            }
-        }
+		if (ptr < pData || ptr > end_ptr) {
+			return scItemNotFound;
+		}
 
-        LogDirect(" }}\n");
-    }
+		Assert(ptr >= pData);
 
-    FX_FORCE_INLINE bool IsInited() const { return (pData != nullptr && Capacity > 0); }
+		return ptr - pData;
+	}
+
+	/**
+	 *   Initializes an array to contain `element_count` elements, which can be modified externally.
+	 *
+	 *   Example:
+	 *   ```cpp
+	 *      SizedArray<int32> int_array(10);
+	 *      int_array.InitSize();
+	 *
+	 *      SizedArray<int32> other_array;
+	 *      other_array.InitSize(15);
+	 *   ```
+	 */
+	void InitSize(size_t element_count)
+	{
+		if (Capacity == 0) {
+			InitCapacity(element_count);
+		}
+
+		Size = Capacity;
+
+		for (uint64 i = 0; i < Size; i++) {
+			new (&pData[i]) TElementType;
+		}
+	}
+
+	size_t GetSizeInBytes() const { return Size * sizeof(TElementType); }
+
+	size_t GetCapacityInBytes() const { return Capacity * sizeof(TElementType); }
+
+	void Print()
+	{
+		LogSeverityText<eLogSeverity::Info>();
+
+		LogDirect("Array: {{ ");
+
+		for (size_t i = 0; i < Size; i++) {
+			LogDirect("{}", (*this)[i]);
+
+			if (i < Size - 1) {
+				LogDirect(", ");
+			}
+		}
+
+		LogDirect(" }}\n");
+	}
+
+	FX_FORCE_INLINE bool IsInited() const { return (pData != nullptr && Capacity > 0); }
 
 
 protected:
-    void InternalAllocateArray(size_t element_count)
-    {
+	void InternalAllocateArray(size_t element_count)
+	{
 #ifdef FX_SIZED_ARRAY_DEBUG
-        LogDebug("Allocating SizedArray of capacity {:d} (type: {:s})", element_count, typeid(TElementType).name());
+		LogDebug("Allocating SizedArray of capacity {:d} (type: {:s})", element_count, typeid(TElementType).name());
 #endif
-        if (element_count == 0) {
-            return;
-        }
+		if (element_count == 0) {
+			return;
+		}
 
 #if !defined(FX_SIZED_ARRAY_NO_MEMPOOL)
-        pData = static_cast<TElementType*>(gEnginePool->AllocRaw(sizeof(TElementType) * element_count));
+		pData = static_cast<TElementType*>(gEnginePool->AllocRaw(sizeof(TElementType) * element_count));
 #else
-        pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * element_count));
+		pData = reinterpret_cast<TElementType*>(std::malloc(sizeof(TElementType) * element_count));
 #endif
 
-        if (pData == nullptr) {
-            NoMemError();
-        }
+		if (pData == nullptr) {
+			NoMemError();
+		}
 
-        Capacity = element_count;
-    }
+		Capacity = element_count;
+	}
 
 public:
-    TElementType* pData = nullptr;
-    SizeType Size = 0;
-    SizeType Capacity = 0;
+	TElementType* pData = nullptr;
+	SizeType Size = 0;
+	SizeType Capacity = 0;
 
-    bool bDoNotDestroy = false;
+	bool bDoNotDestroy = false;
 };
 
 } // namespace fx

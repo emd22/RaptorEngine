@@ -204,7 +204,10 @@ void AssetManager::Shutdown()
 	mWorkerThreads.Free();
 }
 
-void AssetManager::RequestHigherDetail() {}
+void AssetManager::RequestHigherDetail()
+{
+	const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
+}
 
 void AssetManager::ShutdownDeletionQueue()
 {

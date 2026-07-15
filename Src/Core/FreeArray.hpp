@@ -34,6 +34,8 @@ public:
 
 		SlotsInUse.Set(index);
 
+		++Size;
+
 		if (out_index != nullptr) {
 			(*out_index) = index;
 		}
@@ -50,6 +52,16 @@ public:
 		return &pPtr[index];
 	}
 
+
+	const TItemType* GetItem(uint32 index) const
+	{
+		if (!SlotsInUse.Get(index)) {
+			return nullptr;
+		}
+
+		return &pPtr[index];
+	}
+
 	void FreeItem(uint32 index)
 	{
 		Assert(index < Capacity);
@@ -58,6 +70,8 @@ public:
 		if (ptr) {
 			ptr->~TItemType();
 		}
+
+		--Size;
 
 		MarkItemFree(index);
 	}
@@ -82,6 +96,7 @@ public:
 			SlotsInUse.ClearAll();
 		}
 
+		Size = 0;
 		Capacity = 0;
 	}
 

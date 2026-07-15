@@ -478,29 +478,13 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
-		for (const ObjectID& obj_id : mMainScene.GetAllObjects()) {
-			Object* object = gObjectManager->GetObject(obj_id);
+		const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
 
-			if (!object) {
-				LogError("Cannot find object!");
-			}
-			else {
-				Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
-				if (!material || !material->Diffuse.Exists()) {
-					continue;
-				}
-
-				const ImageInfo& diffuse_info = material->Diffuse.pAssetImage->Image.GetInfo();
-
-				LogInfo("Requesting higher quality {} for {}", diffuse_info.MipLevel, object->Name.Get());
-
-				if (diffuse_info.MipLevel == 0) {
-					continue;
-				}
-
-				material->RequestQuality(diffuse_info.MipLevel - 1);
-			}
+		LogInfo("=== Nearby Objects ===");
+		for (ObjectID id : nearby_objects) {
+			LogInfo("{}", id);
 		}
+		LogInfo("");
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {

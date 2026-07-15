@@ -88,7 +88,6 @@ private:
 	PagedArray<Ref<LightBase>> mLights;
 	PagedArray<PhObject> mPhysicsObjects;
 
-	TileIndex mCameraTileIndex = TileIndexNull;
 
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 

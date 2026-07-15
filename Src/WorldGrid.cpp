@@ -8,6 +8,7 @@
 #include "WorldGrid.hpp"
 
 #include <Engine.hpp>
+#include <Material/MaterialManagerFwd.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 
@@ -79,57 +80,131 @@ Tile* WorldGrid::GetObjectTile(const Object* object, TileIndex* out_tile_index)
 	return &mTileBuffer[tile_index];
 }
 
-void WorldGrid::Insert(ObjectID id)
+void WorldGrid::AddObject(ObjectID id)
 {
 	Object* object = gObjectManager->GetObject(id);
 
-	// Tile* base_tile = GetObjectTile(object, &tile_index);
-
 	const Vec3f object_size = object->Bounds.GetSize();
-
-	LogInfo("OBJECT SIZE: ({}, {}) {}", object->ID, object->Name.Get(), object_size);
 
 	Vec2u tile_index_start = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.Min));
 	Vec2u tile_index_end = GetTileXY(GetTileIndex(object->mPosition + object->Bounds.GetSize()));
-
-	// uint32 width_in_tiles = std::max(std::min(static_cast<uint32>(std::ceil(f_width)), mGridSize.X), 1U);
-	// uint32 height_in_tiles = std::max(std::min(static_cast<uint32>(std::ceil(f_height)), mGridSize.Y), 1U);
-
-	LogInfo("Object ({}) -> Start={}, End={}", object->Name.Get(), tile_index_start, tile_index_end);
 
 	uint32 width_in_tiles = std::clamp(tile_index_end.X - tile_index_start.X + 1, 1U, mGridSize.X);
 	uint32 height_in_tiles = std::clamp(tile_index_end.Y - tile_index_start.Y + 1, 1U, mGridSize.Y);
 
 	Vec2u n_offset = Vec2u(width_in_tiles / 2, height_in_tiles / 2);
 
-	LogInfo("Tiles start at {} and end at {}", tile_index_start, tile_index_end);
-
 	for (uint32 y = 0; y < height_in_tiles; y++) {
 		for (uint32 x = 0; x < width_in_tiles; x++) {
-			LogInfo("Adding object {} to Tile ({}, {})", id, x + tile_index_start.X, y + tile_index_start.Y);
-
 			TileIndex tile_index = GetTileIndexXY(Vec2u(x + tile_index_start.X, y + tile_index_start.Y));
 			InsertInto(tile_index, id);
 		}
 	}
 }
 
-void WorldGrid::AddObjectsFromTile(PagedArray<ObjectID>& object_buffer, const Tile* tile) const {}
-
-
-SizedArray<ObjectID> WorldGrid::GetNearbyObjects(TileIndex view_tile) const
+void WorldGrid::AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const
 {
-	PagedArray<ObjectID> all_objects;
-	all_objects.Create(32);
+	uint32 index = 0;
 
-	Vec2u view_xy = GetTileXY(view_tile);
+	while (true) {
+		index = tile->Objects.SlotsInUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
 
-	// GetTile(GetTileIndexXY(view_xy))->Objects;
+		const ObjectID* object_id = tile->Objects.GetItem(index);
+		if (!object_id || object_buffer.contains(*object_id)) {
+			++index;
+			continue;
+		}
+
+		object_buffer.emplace(*object_id);
+		++index;
+	}
 }
 
 
+const SizedArray<ObjectID>& WorldGrid::GetNearbyObjects()
+{
+	/*
+		+--------+--------+--------+-----
+		|		 |        |        |
+		| -1,  1 |  0,  1 |  1,  1 |  ...
+		|		 |        |        |
+		+--------+--------+--------+-----
+		|		 |        |        |
+		| -1,  0 |  VIEW  |  1,  0 |  ...
+		|		 |        |        |
+		+--------+--------+--------+-----
+		|		 |        |        |
+		| -1, -1 |  0, -1 |  1, -1 |  ...
+		|		 |        |        |
+		+--------+--------+--------+-----
+		| ...    |  ...   |  ...   |
+	*/
+
+	if (mbNearbyObjectCacheValid) {
+		return mNearbyObjectCache;
+	}
+
+	Vec2u view_xy = GetTileXY(ViewTileIndex);
+	const Tile* view_tile = GetTile(GetTileIndexXY(view_xy));
+
+	const Tile* surrounding_tiles[] = {
+		// Get the immediate surrounding tiles (up, left, down, right)
+		GetTile(GetTileIndexXY(view_xy + Vec2u(1, 0))),
+		GetTile(GetTileIndexXY(view_xy + Vec2u(-1, 0))),
+		GetTile(GetTileIndexXY(view_xy + Vec2u(0, -1))),
+		GetTile(GetTileIndexXY(view_xy + Vec2u(0, 1))),
+
+		// Get the diagonal surrounding tiles
+		GetTile(GetTileIndexXY(view_xy + Vec2u(1, 1))),
+		GetTile(GetTileIndexXY(view_xy + Vec2u(1, -1))),
+		GetTile(GetTileIndexXY(view_xy + Vec2u(-1, -1))),
+		GetTile(GetTileIndexXY(view_xy + Vec2u(-1, 1))),
+	};
+
+	std::unordered_set<ObjectID> objects_list;
+
+	AddObjectsFromTile(objects_list, view_tile);
+
+	for (uint32 index = 0; index < std::size(surrounding_tiles); index++) {
+		AddObjectsFromTile(objects_list, surrounding_tiles[index]);
+	}
+
+	mbNearbyObjectCacheValid = true;
+
+	uint32 objects_found_count = objects_list.size();
+	if (objects_found_count < mNearbyObjectCache.Capacity) {
+		mNearbyObjectCache.Size = 0;
+	}
+	else {
+		mNearbyObjectCache.Free();
+		mNearbyObjectCache.InitCapacity(objects_found_count);
+	}
+
+	for (ObjectID id : objects_list) {
+		mNearbyObjectCache.Insert(id);
+	}
+
+	std::sort(mNearbyObjectCache.begin(), mNearbyObjectCache.end());
+
+	return mNearbyObjectCache;
+}
+
+void WorldGrid::SetViewTileIndex(TileIndex view_tile_index)
+{
+	if (ViewTileIndex != view_tile_index) {
+		mbNearbyObjectCacheValid = false;
+	}
+
+	ViewTileIndex = view_tile_index;
+}
+
 TileIndex WorldGrid::InsertDirect(ObjectID id)
 {
+	mbNearbyObjectCacheValid = false;
+
 	Object* object = gObjectManager->GetObject(id);
 
 	TileIndex tile_index = 0;
@@ -153,6 +228,8 @@ TileIndex WorldGrid::InsertDirect(ObjectID id)
 
 TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
 {
+	mbNearbyObjectCacheValid = false;
+
 	Object* object = gObjectManager->GetObject(id);
 
 	Tile& tile = mTileBuffer[tile_index];
@@ -169,8 +246,10 @@ TileIndex WorldGrid::InsertInto(TileIndex tile_index, ObjectID id)
 }
 
 
-void WorldGrid::Update(ObjectID id, bool update_attached)
+void WorldGrid::UpdateObject(ObjectID id, bool update_attached)
 {
+	mbNearbyObjectCacheValid = false;
+
 	Object* object = gObjectManager->GetObject(id);
 
 	TileIndex new_tile_index = 0;
@@ -215,7 +294,7 @@ void WorldGrid::Update(ObjectID id, bool update_attached)
 				continue;
 			}
 
-			Update(attached_id, true);
+			UpdateObject(attached_id, true);
 		}
 	}
 }
@@ -258,8 +337,10 @@ TileIndex WorldGrid::GetTileIndex(const Vec3f& position) const
 		   std::min(static_cast<uint32>(std::floor(adjusted.X / mTileSize.X)), mGridSize.X - 1);
 }
 
-void WorldGrid::Remove(ObjectID id)
+void WorldGrid::RemoveObject(ObjectID id)
 {
+	mbNearbyObjectCacheValid = false;
+
 	Object* object = gObjectManager->GetObject(id);
 	TileIndex tile_index = object->mTileIndex;
 

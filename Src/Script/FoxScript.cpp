@@ -135,7 +135,7 @@ void FoxScript::RegisterProc(Hash32 name_hash, eFoxProcFlags flags, const SizedA
 	LogInfo("Registered external function {}", name_hash);
 }
 
-FoxValue FoxScript::CallProc(FoxSymbol* sym, const SizedArray<FoxValue>& args)
+FoxValue FoxScript::CallProc(const FoxSymbol* sym, const SizedArray<FoxValue>& args)
 {
 	if (!sym) {
 		return FoxValue::scNone;

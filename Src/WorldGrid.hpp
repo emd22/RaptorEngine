@@ -6,6 +6,7 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
+#include <unordered_set>
 
 namespace fx {
 
@@ -40,26 +41,28 @@ public:
 	 * @brief Inserts an object into its respective tile.
 	 * @returns The tile index that it was added to.
 	 */
-	void Insert(ObjectID id);
+	void AddObject(ObjectID id);
 
 	TileIndex GetTileIndex(const Vec3f& position) const;
 	TileIndex GetTileIndexXY(const Vec2u& xy) const;
 
-	SizedArray<ObjectID> GetNearbyObjects(TileIndex view_tile) const;
+	const SizedArray<ObjectID>& GetNearbyObjects();
 
 	/**
 	 * @brief Updates an object to a new tile if the object has moved into another tile boundary.
 	 */
-	void Update(ObjectID id, bool update_attached = true);
+	void UpdateObject(ObjectID id, bool update_attached = true);
 
 	/**
 	 * @brief Remove an object from its assigned tile.
 	 */
-	void Remove(ObjectID id);
+	void RemoveObject(ObjectID id);
 
 	Vec2u GetTileXY(TileIndex tile_index) const;
 	Tile* GetTile(TileIndex index);
 	const Tile* GetTile(TileIndex index) const;
+
+	void SetViewTileIndex(TileIndex view_tile_index);
 
 	FX_FORCE_INLINE Vec2u GetGridSize() const { return mGridSize; }
 
@@ -71,15 +74,20 @@ private:
 
 	TileIndex InsertDirect(ObjectID id);
 
-	void AddObjectsFromTile(PagedArray<ObjectID>& object_buffer, const Tile* tile) const;
+	void AddObjectsFromTile(std::unordered_set<ObjectID>& object_buffer, const Tile* tile) const;
 
 public:
 	Vec2u mGridSize;
 	Vec2f mTileSize = Vec2f(5.0f, 5.0f);
 	Vec3f mPositionOffset = Vec3f::sZero;
 
+	TileIndex ViewTileIndex = TileIndexNull;
+
 private:
 	SizedArray<Tile> mTileBuffer;
+
+	SizedArray<ObjectID> mNearbyObjectCache;
+	bool mbNearbyObjectCacheValid = false;
 };
 
 } // namespace fx

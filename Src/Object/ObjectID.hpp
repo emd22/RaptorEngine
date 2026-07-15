@@ -37,7 +37,10 @@ public:
 		return *this;
 	}
 
+	IDType operator()() const { return ID; }
+
 	bool operator==(const ObjectID& other) const { return ID == (other.ID & scIDMask); }
+	bool operator<(const ObjectID& other) const { return ID < other.ID; }
 
 	FX_FORCE_INLINE IDType GetID() const { return (ID & scIDMask); }
 	FX_FORCE_INLINE bool IsNull() const { return ID == UINT32_MAX; }
@@ -52,6 +55,15 @@ public:
 };
 
 } // namespace fx
+
+namespace std {
+template <>
+struct hash<fx::ObjectID>
+{
+	std::size_t operator()(const fx::ObjectID& id) const noexcept { return id.ID; }
+};
+} // namespace std
+
 
 template <>
 struct std::formatter<fx::ObjectID>

@@ -24,7 +24,7 @@ void Scene::Create()
 void Scene::Attach(Object* object)
 {
 	mObjects.Insert(object->ID);
-	gWorldGrid->Insert(object->ID);
+	gWorldGrid->AddObject(object->ID);
 
 	object->pScene = this;
 	object->OnAttached(this);
@@ -85,7 +85,7 @@ void Scene::Attach(AssetTicket<Object> object_ticket)
 		{
 			Object* object = static_cast<Object*>(item_ptr);
 			AddObjectToRenderList(object, this);
-			gWorldGrid->Insert(object->ID);
+			gWorldGrid->AddObject(object->ID);
 		});
 }
 
@@ -274,23 +274,6 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 
 void Scene::RebuildFromTiles(TileIndex tile_index)
 {
-	/*
-		+--------+--------+--------+-----
-		|		 |        |        |
-		| -1,  1 |  0,  1 |  1,  1 |  ...
-		|		 |        |        |
-		+--------+--------+--------+-----
-		|		 |        |        |
-		| -1,  0 | PLAYER |  1,  0 |  ...
-		|		 |        |        |
-		+--------+--------+--------+-----
-		|		 |        |        |
-		| -1, -1 |  0, -1 |  1, -1 |  ...
-		|		 |        |        |
-		+--------+--------+--------+-----
-		| ...    |  ...   |  ...   |
-	*/
-
 	RebuildRenderList(true, tile_index);
 	Vec2u xy = gWorldGrid->GetTileXY(tile_index);
 
@@ -318,9 +301,9 @@ void Scene::Render(Camera* shadow_camera)
 
 	TileIndex tile_index = gWorldGrid->GetTileIndex(mpCurrentCamera->Position);
 
-	if (tile_index != mCameraTileIndex) {
+	if (tile_index != gWorldGrid->ViewTileIndex) {
 		// RebuildFromTiles(tile_index);
-		mCameraTileIndex = tile_index;
+		gWorldGrid->SetViewTileIndex(tile_index);
 	}
 
 	gRenderer->BeginGeometry();
@@ -399,7 +382,7 @@ void Scene::RenderWorldGrid(const Camera& camera)
 
 	const Vec3f tile_size = Vec3f(gWorldGrid->mTileSize.X, 1.0f, gWorldGrid->mTileSize.Y);
 
-	Vec2u camera_tile_index = gWorldGrid->GetTileXY(mCameraTileIndex);
+	Vec2u camera_tile_index = gWorldGrid->GetTileXY(gWorldGrid->ViewTileIndex);
 
 	for (uint32 y = 0; y < gWorldGrid->mGridSize.Y; y++) {
 		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
