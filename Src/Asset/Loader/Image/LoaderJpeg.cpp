@@ -28,11 +28,11 @@ static constexpr J_COLOR_SPACE GetJpegColorspaceForFormat(eImageFormat format)
 }
 
 
-eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const String& path)
+eLoaderStatus LoaderJpeg::Load(AssetTicket& ticket, const std::string& path)
 {
-	TSRef<AxImage> image(asset);
+	Image* image = static_cast<Image*>(ticket.Get());
 
-	const char* c_path = path.CStr();
+	const char* c_path = path.c_str();
 
 	FILE* fp = fopen(c_path, "rb");
 
@@ -56,7 +56,7 @@ eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const String& path)
 	int32 num_jpeg_components = mJpegInfo.output_components;
 
 	printf("Read jpeg, [width=%u, height=%u]\n", mJpegInfo.output_width, mJpegInfo.output_height);
-	image->Image.Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
+	image->Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
 
 	uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_jpeg_components;
 	mImageData.InitSize(data_size);
@@ -77,9 +77,9 @@ eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const String& path)
 	return eLoaderStatus::Success;
 }
 
-eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const uint8* data, uint32 size)
+eLoaderStatus LoaderJpeg::Load(AssetTicket& ticket, const uint8* data, uint32 size)
 {
-	TSRef<AxImage> image(asset);
+	Image* image = static_cast<Image*>(ticket.Get());
 
 	struct jpeg_error_mgr error_mgr;
 
@@ -91,13 +91,13 @@ eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const uint8* data, uint32
 	jpeg_mem_src(&mJpegInfo, data, size);
 	jpeg_read_header(&mJpegInfo, true);
 
-	const uint32 num_components = renderer::ImageFormatUtil::GetPixelStride(ImageFormat);
+	const uint32 num_components = ImageFormatUtil::GetPixelStride(ImageFormat);
 
 	J_COLOR_SPACE color_space = GetJpegColorspaceForFormat(ImageFormat);
 	mJpegInfo.out_color_space = color_space;
 
 	jpeg_start_decompress(&mJpegInfo);
-	image->Image.Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
+	image->Info.Size = Vec2u { mJpegInfo.output_width, mJpegInfo.output_height };
 
 	uint32 data_size = mJpegInfo.output_width * mJpegInfo.output_height * num_components;
 	mImageData.InitSize(data_size);
@@ -116,22 +116,20 @@ eLoaderStatus LoaderJpeg::Load(TSRef<AssetBase> asset, const uint8* data, uint32
 	return eLoaderStatus::Success;
 }
 
-void LoaderJpeg::CreateGpuResource(TSRef<AssetBase>& asset)
+void LoaderJpeg::CreateGpuResource(AssetTicket& ticket)
 {
-	TSRef<AxImage> image(asset);
+	Image* image = static_cast<Image*>(ticket.Get());
 
-
-	ImageInfo image_info { image->Image.Info.Size, ImageFormat, 0, 1,
+	ImageInfo image_info { image->Info.Size, ImageFormat, 0, 1,
 						   MakeSlice<const uint8>(mImageData.pData, mImageData.Size) };
 
 	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-	image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
+	image->CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
-	image->bIsUploadedToGpu = true;
-	image->bIsUploadedToGpu.notify_all();
+	ticket.SignalUploadedToGpu();
 }
 
-void LoaderJpeg::Destroy(TSRef<AssetBase>& asset) { jpeg_destroy_decompress(&mJpegInfo); }
+void LoaderJpeg::Destroy() { jpeg_destroy_decompress(&mJpegInfo); }
 
 } // namespace loader
 

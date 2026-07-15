@@ -12,7 +12,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 
-namespace fx::renderer {
+namespace fx {
 
 FX_SET_MODULE_NAME("Image")
 
@@ -101,10 +101,10 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	// Destroy image if it already has been created
 	if (InternalImage != nullptr && Allocation != nullptr) {
 		if (View != nullptr) {
-			vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
+			vkDestroyImageView(renderer::gRenderer->GetDevice()->Device, View, nullptr);
 		}
 
-		vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
+		vmaDestroyImage(renderer::gRenderer->GpuAllocator, InternalImage, this->Allocation);
 
 		InternalImage = nullptr;
 		Allocation = nullptr;
@@ -155,8 +155,8 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.priority = 1.0f,
 	};
 
-	VkResult status = vmaCreateImage(gRenderer->GpuAllocator, &image_info, &create_info, &InternalImage, &Allocation,
-									 nullptr);
+	VkResult status = vmaCreateImage(renderer::gRenderer->GpuAllocator, &image_info, &create_info, &InternalImage,
+									 &Allocation, nullptr);
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create vulkan image", status);
 	}
@@ -164,7 +164,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	static uint32 alloc_number = 0;
 
 	std::string alloc_name = std::to_string(alloc_number++);
-	vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
+	vmaSetAllocationName(renderer::gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
 
 	// LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
 	//           reinterpret_cast<void*>(Allocation));
@@ -207,7 +207,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
             },
     };
 
-	status = vkCreateImageView(gRenderer->GetDevice()->Device, &view_create_info, nullptr, &View);
+	status = vkCreateImageView(renderer::gRenderer->GetDevice()->Device, &view_create_info, nullptr, &View);
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create swapchain image view", status);
 	}
@@ -234,11 +234,11 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 }
 
 
-void Image::CreateFromData(CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags)
+void Image::CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags)
 {
 	// Upload image to staging buffer
-	RawGpuBuffer staging_buffer;
-	staging_buffer.Create(eGpuBufferType::Transfer, info.ImageData.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+	renderer::RawGpuBuffer staging_buffer;
+	staging_buffer.Create(renderer::eGpuBufferType::Transfer, info.ImageData.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
 						  eGpuBufferFlags::TransferReceiver);
 	staging_buffer.Upload(info.ImageData);
 
@@ -254,10 +254,11 @@ void Image::CreateFromData(CommandBuffer& cmd, const ImageInfo& info, eImageCrea
 	Info.MipLevel = info.MipLevel;
 }
 
-void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<const uint8>& image_data)
+void Image::UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2u& size,
+					  const Slice<const uint8>& image_data)
 {
-	RawGpuBuffer staging_buffer;
-	staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+	renderer::RawGpuBuffer staging_buffer;
+	staging_buffer.Create(renderer::eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
 						  eGpuBufferFlags::TransferReceiver);
 	staging_buffer.Upload(image_data);
 
@@ -271,12 +272,12 @@ void Image::UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, c
 }
 
 
-void Image::Upload(CommandBuffer& cmd, const ImageInfo& info)
+void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 {
 	const Slice<const uint8>& image_data = info.ImageData;
 
-	RawGpuBuffer staging_buffer;
-	staging_buffer.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
+	renderer::RawGpuBuffer staging_buffer;
+	staging_buffer.Create(renderer::eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
 						  eGpuBufferFlags::TransferReceiver);
 	staging_buffer.Upload(image_data);
 
@@ -332,9 +333,9 @@ void Image::Upload(CommandBuffer& cmd, const ImageInfo& info)
 }
 
 
-void Image::MarkUploaded() { gRenderer->GetFrameNumber(); }
+void Image::MarkUploaded() { renderer::gRenderer->GetFrameNumber(); }
 
-void Image::TransitionDepthToShaderRO(CommandBuffer& cmd)
+void Image::TransitionDepthToShaderRO(renderer::CommandBuffer& cmd)
 {
 	VkImageMemoryBarrier barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -366,7 +367,7 @@ void Image::TransitionDepthToShaderRO(CommandBuffer& cmd)
 	ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
-void Image::TransitionDepthToAttachment(CommandBuffer& cmd)
+void Image::TransitionDepthToAttachment(renderer::CommandBuffer& cmd)
 {
 	VkImageMemoryBarrier barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -398,7 +399,7 @@ void Image::TransitionDepthToAttachment(CommandBuffer& cmd)
 	ImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
-void Image::TransitionMip(VkImageLayout new_layout, CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
+void Image::TransitionMip(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
 						  std::optional<TransitionLayoutOverrides> overrides)
 {
 	bool is_depth_texture = ImageFormatUtil::IsDepth(Info.Format);
@@ -468,7 +469,7 @@ void Image::TransitionMip(VkImageLayout new_layout, CommandBuffer& cmd, uint32 m
 	ImageLayout = new_layout;
 }
 
-void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
+void Image::TransitionLayout(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 layer_count,
 							 std::optional<TransitionLayoutOverrides> overrides)
 {
 	bool is_depth_texture = ImageFormatUtil::IsDepth(Info.Format);
@@ -538,8 +539,8 @@ void Image::TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint3
 	ImageLayout = new_layout;
 }
 
-void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
-						   uint32 base_layer, uint32 mip_level)
+void Image::CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer,
+						   VkImageLayout final_layout, Vec2u size, uint32 base_layer, uint32 mip_level)
 {
 	if (mip_level < 0) {
 		return;
@@ -578,8 +579,8 @@ void Image::CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkIma
 											  .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 }
 
-void Image::CopyToMip(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
-					  uint32 mip_level)
+void Image::CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
+					  Vec2u size, uint32 mip_level)
 {
 	TransitionMip(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, mip_level, 1,
 				  TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -710,8 +711,8 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_for
 	}
 
 
-	gRenderer->SubmitOneTimeCmd(
-		[&](CommandBuffer& cmd)
+	renderer::gRenderer->SubmitOneTimeCmd(
+		[&](renderer::CommandBuffer& cmd)
 		{
 			cubemap.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd, 1);
 			TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 6);
@@ -737,11 +738,11 @@ void Image::DecRef()
 	mpRefCnt = nullptr;
 
 	if (View != nullptr) {
-		vkDestroyImageView(gRenderer->GetDevice()->Device, View, nullptr);
+		vkDestroyImageView(renderer::gRenderer->GetDevice()->Device, View, nullptr);
 	}
 
 	if (InternalImage != nullptr && Allocation != nullptr) {
-		vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
+		vmaDestroyImage(renderer::gRenderer->GpuAllocator, InternalImage, this->Allocation);
 	}
 
 	InternalImage = nullptr;
@@ -750,7 +751,7 @@ void Image::DecRef()
 }
 
 
-// bool Image::Readback(CommandBuffer& cmd)
+// bool Image::Readback(renderer::CommandBuffer& cmd)
 // {
 //     const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetSize(Format);
 
@@ -812,11 +813,11 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 	SizedArray<uint8> image_data;
 	image_data.InitSize(data_size);
 
-	gRenderer->SubmitOneTimeCmd(
-		[&](CommandBuffer& cmd)
+	renderer::gRenderer->SubmitOneTimeCmd(
+		[&](renderer::CommandBuffer& cmd)
 		{
-			RawGpuBuffer staging_buffer;
-			staging_buffer.Create(eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU,
+			renderer::RawGpuBuffer staging_buffer;
+			staging_buffer.Create(renderer::eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU,
 								  eGpuBufferFlags::TransferReceiver);
 
 			VkImageMemoryBarrier pre_barrier {
@@ -892,4 +893,4 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 
 Image::~Image() { DecRef(); }
 
-} // namespace fx::renderer
+} // namespace fx

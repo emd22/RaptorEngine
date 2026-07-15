@@ -256,7 +256,7 @@ void FoxtrotGame::CreateGame()
 	CreateFontObject();
 
 
-	// renderer::Image mip_image;
+	// Image mip_image;
 
 	// gRenderer->SubmitImmediateUploadCmd([&](CommandBuffer& cmd) { mip_image = mm.LoadMipmaps(cmd, "TestMips.bin");
 	// });
@@ -637,11 +637,11 @@ FoxtrotGame::~FoxtrotGame()
 
 	mMainScene.Destroy();
 
-	PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
+	// PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
 	// for (AxImage& img : empty_images_list) {
 	//     img.Destroy();
 	// }
-	empty_images_list.Destroy();
+	// empty_images_list.Destroy();
 }
 
 

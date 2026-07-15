@@ -160,8 +160,8 @@ static void GenerateMipmapImage(const String& output_path, eImageFormat format, 
 	loader.ImageFormat = format;
 	loader.CreationFlags = eImageCreateFlags::None;
 
-	TSRef<AxImage> image = TSRef<AxImage>::New();
-	loader::eLoaderStatus status = loader.Load(image, data, size);
+	AssetTicket ticket(new fx::Image);
+	loader::eLoaderStatus status = loader.Load(ticket, data, size);
 
 	if (status != loader::eLoaderStatus::Success) {
 		LogError("Error loading material texture!");
@@ -261,7 +261,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 
 		if (!texture_view.texture) {
 			// MakeEmptyMaterialTexture(material, material->Diffuse);
-			material->Diffuse.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
+			material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 
 			// material->Properties.BaseColor =
 			// Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
@@ -533,10 +533,10 @@ void LoaderGltf::LoadAnimations(Object* object, Skeleton& skel)
 	LogInfo(LC_ASSET, "Loaded {} animations", mpGltfData->animations_count);
 }
 
-void LoaderGltf::ProcessData(AssetTicket<Object>& ticket)
+void LoaderGltf::ProcessData(AssetTicket& ticket)
 {
 	// If there is only one mesh to load, store the mesh directly in the output object
-	Object* output_object = ticket.Get();
+	Object* output_object = static_cast<Object*>(ticket.Get());
 	Object* current_object = output_object;
 
 	// If there are multiple gltf meshes, we will need to use the output object as a
@@ -583,7 +583,7 @@ void LoaderGltf::ProcessData(AssetTicket<Object>& ticket)
 	}
 }
 
-eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const String& path)
+eLoaderStatus LoaderGltf::Load(AssetTicket& ticket, const String& path)
 {
 	cgltf_options options {};
 
@@ -607,7 +607,7 @@ eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const String& path)
 }
 
 
-eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const uint8* data, uint32 size)
+eLoaderStatus LoaderGltf::Load(AssetTicket& ticket, const uint8* data, uint32 size)
 {
 	cgltf_options options {};
 
@@ -622,7 +622,7 @@ eLoaderStatus LoaderGltf::Load(AssetTicket<Object>& ticket, const uint8* data, u
 	return eLoaderStatus::Success;
 }
 
-void LoaderGltf::CreateGpuResource(AssetTicket<Object>& ticket)
+void LoaderGltf::CreateGpuResource(AssetTicket& ticket)
 {
 	// If there is only one mesh to load, store the mesh directly in the output object
 	// TSRef<Object> current_object = container_object;
@@ -633,7 +633,7 @@ void LoaderGltf::CreateGpuResource(AssetTicket<Object>& ticket)
 
 	// UploadMeshToGpu(container_object);
 
-	Object* object = ticket.Get();
+	Object* object = static_cast<Object*>(ticket.Get());
 
 	uint32 attached_count = object->AttachedNodes.Size();
 

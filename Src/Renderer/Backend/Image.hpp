@@ -95,8 +95,6 @@ public:
 	Slice<const uint8> ImageData { nullptr, 0 };
 };
 
-namespace renderer {
-
 
 struct ImageFormatUtil
 {
@@ -236,32 +234,33 @@ public:
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
 				VkImageUsageFlags usage, eImageAspectFlag aspect);
 
-	void CreateFromData(CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
+	void CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 
 
-	void UploadMip(CommandBuffer& cmd, uint32 mip_index, const Vec2u& size, const Slice<const uint8>& image_data);
+	void UploadMip(renderer::CommandBuffer& cmd, uint32 mip_index, const Vec2u& size,
+				   const Slice<const uint8>& image_data);
 
 	/**
 	 * @brief Uploads multiple mip levels to an image
 	 */
-	void Upload(CommandBuffer& cmd, const ImageInfo& info);
+	void Upload(renderer::CommandBuffer& cmd, const ImageInfo& info);
 
-	void TransitionLayout(VkImageLayout new_layout, CommandBuffer& cmd, uint32 layer_count,
+	void TransitionLayout(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 layer_count,
 						  std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
 
-	void TransitionMip(VkImageLayout new_layout, CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
+	void TransitionMip(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
 					   std::optional<TransitionLayoutOverrides> overrides);
 
 
-	void TransitionDepthToShaderRO(CommandBuffer& cmd);
-	void TransitionDepthToAttachment(CommandBuffer& cmd);
+	void TransitionDepthToShaderRO(renderer::CommandBuffer& cmd);
+	void TransitionDepthToAttachment(renderer::CommandBuffer& cmd);
 
-	void CopyToMip(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
-				   uint32 mip_level);
+	void CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
+				   Vec2u size, uint32 mip_level);
 
 
-	void CopyFromBuffer(CommandBuffer& cmd, const RawGpuBuffer& buffer, VkImageLayout final_layout, Vec2u size,
-						uint32 base_layer, uint32 mip_level);
+	void CopyFromBuffer(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
+						Vec2u size, uint32 base_layer, uint32 mip_level);
 
 	void CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_format, VkImageAspectFlags aspect_flags,
 									   ImageCubemapOptions options);
@@ -296,6 +295,5 @@ private:
 	RefCount* mpRefCnt = nullptr;
 };
 
-} // namespace renderer
 
 } // namespace fx

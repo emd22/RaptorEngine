@@ -124,11 +124,10 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 
 	LoadObjectOptions load_options {};
 
-
 	String path = String::Fmt("{}/Models{}", (scene_path), mesh_path);
-	AssetTicket<Object> ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr(), load_options);
+	AssetTicket ticket = gAssetManager->LoadObject(object_entry.Name.Get(), path.CStr());
 
-	Object* object = ticket.Get();
+	Object* object = static_cast<Object*>(ticket.Get());
 
 	object->pScene = &scene;
 	ApplyPropertiesToObject(object, object_entry);

@@ -9,10 +9,12 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
+#include <Engine.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/Object.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Texture/TextureManager.hpp>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -70,10 +72,10 @@ void AssetWorker::LoadObject(LockContext<AssetItemData>& asset_data)
 
 	switch (Item.AssetLoadOp) {
 	case fx::eAssetLoadOp::ReadAndUpload:
-		LoadStatus = object_loader->Load(asset_data->ObjectTicket, String(Item.Path));
+		LoadStatus = object_loader->Load(asset_data->Ticket, String(Item.Path));
 		break;
 	case fx::eAssetLoadOp::ProcessAndUpload:
-		LoadStatus = object_loader->Load(asset_data->ObjectTicket, Item.pcRawData, Item.DataSize);
+		LoadStatus = object_loader->Load(asset_data->Ticket, Item.pcRawData, Item.DataSize);
 		std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
 		break;
 	default:
@@ -81,16 +83,16 @@ void AssetWorker::LoadObject(LockContext<AssetItemData>& asset_data)
 	}
 }
 
-void AssetWorker::LoadImage(const LockContext<AssetItemData>& asset_data)
+void AssetWorker::LoadImage(LockContext<AssetItemData>& asset_data)
 {
 	TSRef<loader::ImageLoaderBase> image_loader(asset_data->pLoader);
 
 	switch (Item.AssetLoadOp) {
 	case fx::eAssetLoadOp::ReadAndUpload:
-		LoadStatus = image_loader->Load(asset_data->pAsset, Item.Path);
+		LoadStatus = image_loader->Load(asset_data->Ticket, Item.Path);
 		break;
 	case fx::eAssetLoadOp::ProcessAndUpload:
-		LoadStatus = image_loader->Load(asset_data->pAsset, Item.pcRawData, Item.DataSize);
+		LoadStatus = image_loader->Load(asset_data->Ticket, Item.pcRawData, Item.DataSize);
 		std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
 		break;
 	default:
@@ -182,7 +184,7 @@ void AssetManager::Shutdown()
 	}
 
 	// Cleanup all permutations of empty images that were created.
-	PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
+	// PagedArray<AxImage>& empty_images_list = AxImage::GetEmptyImagesArray();
 
 	// if (empty_images_list.IsInited()) {
 	//     for (TSRef<AxImage>& image_ref : empty_images_list) {
@@ -190,6 +192,7 @@ void AssetManager::Shutdown()
 	//     }
 	// }
 
+	mNullImageList.clear();
 
 	mbActive.clear();
 	ManagerUpdateNotifier.Kill();
@@ -266,97 +269,217 @@ inline bool IsFileJpeg(const std::string& path)
 	return false;
 }
 
-void AssetManager::LoadObject(const AssetTicket<Object>& ticket, const std::string& path, LoadObjectOptions options)
-{
-	TSRef<loader::LoaderGltf> loader = TSRef<loader::LoaderGltf>::New();
-	loader->bKeepInMemory = options.bKeepInMemory || options.bGeneratePhysicsMesh;
+/////////////////////////////////////
+// Object loading functions
+/////////////////////////////////////
 
-	SubmitLoadObject<loader::LoaderGltf>(ticket, loader, path);
+AssetTicket AssetManager::LoadObject(const std::string& name, const std::string& path)
+{
+	Object* object = gObjectManager->NewObject(name);
+	AssetTicket ticket { object };
+
+	LoadFromPath<loader::LoaderGltf>(ticket, eAssetType::Object, path);
+
+	return ticket;
+}
+
+AssetTicket AssetManager::LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
+{
+	Object* object = gObjectManager->NewObject(name);
+	AssetTicket ticket { object };
+
+	LoadFromMemory<loader::LoaderGltf>(ticket, eAssetType::Object, Slice<const uint8>(data, data_size));
+
+	return ticket;
 }
 
 
-void AssetManager::LoadObjectFromMemory(const AssetTicket<Object>& ticket, const uint8* data, uint32 data_size)
+/////////////////////////////////////
+// Image loading functions
+/////////////////////////////////////
+
+AssetTicket AssetManager::LoadImage(eImageType image_type, eImageFormat format, const std::string& path,
+									eImageCreateFlags flags)
 {
-	TSRef<loader::LoaderGltf> loader = TSRef<loader::LoaderGltf>::New();
+	AssetTicket ticket { gTextureManager->NewTexture() };
 
-	SubmitLoadObject<loader::LoaderGltf>(ticket, loader, Slice<const uint8>(data, data_size));
-}
+	const bool is_jpeg = IsFileJpeg(path);
 
-
-void AssetManager::LoadImage(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset, const std::string& path,
-							 eImageCreateFlags flags)
-{
-	bool is_jpeg = IsFileJpeg(path);
-
-	// Use TurboJPEG if this is a JPEG file.
+	// Use TurboJPEG if this is a JPEG file
 	if (is_jpeg) {
 		TSRef<loader::LoaderJpeg> loader = TSRef<loader::LoaderJpeg>::New();
+
 		loader->ImageType = image_type;
 		loader->ImageFormat = format;
 		loader->CreationFlags = flags;
 
-		SubmitLoadAssetFromPath<AxImage, loader::LoaderJpeg, eAssetLoadType::Image>(asset, loader, path);
+		SubmitLoadAssetFromPath<loader::LoaderJpeg>(ticket, loader, eAssetType::Image, path);
 	}
-	// Use STB image otherwise.
+	// Use STB image otherwise
 	else {
 		TSRef<loader::LoaderStb> loader = TSRef<loader::LoaderStb>::New();
+
 		loader->ImageType = image_type;
 		loader->ImageFormat = format;
 		loader->CreationFlags = flags;
 
-		SubmitLoadAssetFromPath<AxImage, loader::LoaderStb, eAssetLoadType::Image>(asset, loader, path);
+		SubmitLoadAssetFromPath<loader::LoaderStb>(ticket, loader, eAssetType::Image, path);
 	}
+
+	return ticket;
 }
 
 
-void AssetManager::LoadImageFromMemory(eImageType image_type, eImageFormat format, TSRef<AxImage>& asset,
-									   const uint8* data, uint32 data_size)
+AssetTicket AssetManager::LoadImageFromMemory(eImageType image_type, eImageFormat format,
+											  const Slice<const uint8>& data, eImageCreateFlags flags)
 {
-	if (IsMemoryJpeg(data, data_size)) {
+	AssetTicket ticket { gTextureManager->NewTexture() };
+
+	const bool is_jpeg = IsMemoryJpeg(data.pData, data.Size);
+
+	if (is_jpeg) {
 		// Load the image using turbojpeg
 		TSRef<loader::LoaderJpeg> loader = TSRef<loader::LoaderJpeg>::New();
 		loader->ImageType = image_type;
 		loader->ImageFormat = format;
+		loader->CreationFlags = flags;
 
-		SubmitLoadAssetFromData<AxImage, loader::LoaderJpeg, eAssetLoadType::Image>(
-			asset, loader, Slice<const uint8>(data, data_size));
+
+		SubmitLoadAssetFromData<loader::LoaderJpeg>(ticket, loader, eAssetType::Image, data);
 	}
 	else {
 		// Load the image using stb_image
 		TSRef<loader::LoaderStb> loader = TSRef<loader::LoaderStb>::New();
 		loader->ImageType = image_type;
 		loader->ImageFormat = format;
+		loader->CreationFlags = flags;
 
-		SubmitLoadAssetFromData<AxImage, loader::LoaderStb, eAssetLoadType::Image>(asset, loader,
-																				   Slice<const uint8>(data, data_size));
+		SubmitLoadAssetFromData<loader::LoaderStb>(ticket, loader, eAssetType::Image, data);
 	}
+
+	return ticket;
 }
 
-void AssetManager::LoadImageFromPixels(TSRef<AxImage>& asset, const ImageInfo& img_info)
+AssetTicket AssetManager::UploadImage(const ImageInfo& img_info)
 {
-	SubmitImageToUpload<AxImage, eAssetLoadType::Image>(asset, img_info);
+	AssetTicket ticket = NewTextureTicket();
+
+	AssertMsg(img_info.ImageData.pData != nullptr, "Image data cannot be null");
+
+	mLoadQueue.Push(AxQueueItem::DirectUploadImage(ticket, img_info));
+	SignalUpdate();
+
+	return ticket;
 }
+
+AssetTicket AssetManager::NewTextureTicket()
+{
+	AssetTicket ticket { gTextureManager->NewTexture() };
+	return ticket;
+}
+
+
+fx::Image* AssetManager::GetNullImage(eImageFormat format)
+{
+	// If the image is already created/cached, return the cached version
+	auto it = mNullImageList.find(format);
+	if (it != mNullImageList.end() && it->second != nullptr) {
+		return it->second;
+	}
+
+	// Create a new null image
+	fx::Image* image = mNullImageList[format];
+	image = gTextureManager->NewTexture();
+
+	const uint32 pixel_stride = ImageFormatUtil::GetPixelStride(format);
+
+	// Set the pixel data to be 1's. This is so that any multiplications with pixel colours in shaders are not trashed.
+	SizedArray<uint8> pixel_data;
+	pixel_data.InitSize(pixel_stride);
+
+	memset(pixel_data.pData, 1, pixel_stride);
+
+	// Upload the texture directly without buffering
+	renderer::RenderBackendFwd::SubmitImmediateUploadCmd(
+		[&](renderer::CommandBuffer& cmd)
+		{
+			ImageInfo image_info {
+				Vec2u(1, 1), format, 0, 1, Slice<const uint8>(pixel_data.pData, pixel_data.Size),
+			};
+
+			image->Upload(cmd, image_info);
+		});
+
+	return image;
+}
+
+AssetTicket AssetManager::GetNullImageTicket(eImageFormat format)
+{
+	fx::Image* image = GetNullImage(format);
+
+	AssetTicket ticket { image };
+	ticket.MarkAndSignalLoaded();
+
+	return ticket;
+}
+
+
+/////////////////////////////////////
+// Asset manager functions
+/////////////////////////////////////
+
 
 static void DoDirectUpload(AxQueueItem& item, AssetItemData& asset_data)
 {
 	ImageInfo& img_info = item.ImgInfo;
 
-	TSRef<AxImage> image(asset_data.pAsset);
+	AssetTicket& ticket = asset_data.Ticket;
+	Image* image = static_cast<Image*>(ticket.Get());
 
-	image->Image.Upload(renderer::RenderBackendFwd::GetUploadCmd(), img_info);
+	image->Upload(renderer::RenderBackendFwd::GetUploadCmd(), img_info);
 
-	// if (image->Image.IsInited()) {
-	// 	// The image already exists, upload to a new mip in the same image.
-	// 	image->Image.UploadMip(renderer::RenderBackendFwd::GetUploadCmd(), img_info.MipLevel, img_info.Size,
-	// 						   img_info.ImageData);
-	// }
-	// else {
-	// 	// The image does not exist yet, upload directly as the base mip.
-	// 	image->Image.CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), img_info, eImageCreateFlags::None);
-	// }
+	ticket.SignalUploadedToGpu();
+}
 
-	image->bIsUploadedToGpu = true;
-	image->bIsUploadedToGpu.notify_all();
+static void ProcessLoadSuccess(LockContext<AssetItemData>& asset_data)
+{
+	AssetTicketData* ticket_data = asset_data->Ticket.pTicketData;
+
+	while (!ticket_data->bIsUploadedToGpu) {
+		ticket_data->bIsUploadedToGpu.wait(false);
+	}
+
+	switch (asset_data->LoadType) {
+	case eAssetType::Object: {
+		Object* object_data = reinterpret_cast<Object*>(asset_data->Ticket.Get());
+
+		std::lock_guard guard(ticket_data->mCallbackMutex);
+
+		// Call OnLoaded callbacks if they are attached
+		if (!ticket_data->mOnLoadedCallbacks.empty()) {
+			for (auto& callback : ticket_data->mOnLoadedCallbacks) {
+				callback(reinterpret_cast<void*>(object_data));
+			}
+		}
+
+		ticket_data->mOnLoadedCallbacks.clear();
+		ticket_data->IsFinishedNotifier.Signal();
+
+		// Notify the asset thread that loading is finished
+		ticket_data->bIsLoaded.store(true);
+	} break;
+	case eAssetType::Image: {
+		// Notify the asset thread that loading is finished
+		asset_data->Ticket.SignalUploadedToGpu();
+		ticket_data->bIsLoaded.store(true);
+	} break;
+	default:;
+	}
+
+	if (asset_data->pLoader.IsValid()) {
+		// Destroy the loader(clearing the loading buffers)
+		asset_data->DestroyLoader();
+	}
 }
 
 int32 AssetManager::CheckForUploadableData()
@@ -433,53 +556,13 @@ int32 AssetManager::CheckForUploadableData()
 		LockContext<AssetItemData> asset_data = worker->Item.GetDataContext();
 
 		if (worker->LoadStatus == loader::eLoaderStatus::Success) {
-			if (asset_data->LoadType == eAssetLoadType::Object) {
-				AssetTicketData* ticket_data = asset_data->ObjectTicket.pTicketData;
-
-				fx::Object* object_data = asset_data->ObjectTicket.Get();
-
-				while (!ticket_data->bIsUploadedToGpu) {
-					ticket_data->bIsUploadedToGpu.wait(false);
-				}
-
-				{
-					std::lock_guard guard(ticket_data->mCallbackMutex);
-
-					// Call OnLoaded callbacks if they are attached
-					if (!ticket_data->mOnLoadedCallbacks.empty()) {
-						for (auto& callback : ticket_data->mOnLoadedCallbacks) {
-							callback(reinterpret_cast<void*>(object_data));
-						}
-					}
-
-					ticket_data->mOnLoadedCallbacks.clear();
-					ticket_data->IsFinishedNotifier.Signal();
-
-					// Notify the asset thread that loading is finished
-					ticket_data->bIsLoaded.store(true);
-				}
-			}
-			else {
-				while (!asset_data->pAsset->bIsUploadedToGpu) {
-					asset_data->pAsset->bIsUploadedToGpu.wait(false);
-				}
-
-				// Notify the asset thread that loading is finished
-
-				asset_data->pAsset->IsFinishedNotifier.Signal();
-				asset_data->pAsset->mIsLoaded.store(true);
-			}
-
-			if (asset_data->pLoader.IsValid()) {
-				// Destroy the loader(clearing the loading buffers)
-				asset_data->DestroyLoader();
-			}
+			ProcessLoadSuccess(asset_data);
 		}
 		else if (worker->LoadStatus == loader::eLoaderStatus::Error) {
-			asset_data->pAsset->IsFinishedNotifier.Signal();
+			asset_data->Ticket.SignalFinished();
 
-			if (asset_data->LoadType == eAssetLoadType::Object && asset_data->ObjectTicket.pTicketData) {
-				AssetTicketData* ticket_data = asset_data->ObjectTicket.pTicketData;
+			if (asset_data->LoadType == eAssetType::Object && asset_data->Ticket.pTicketData) {
+				AssetTicketData* ticket_data = asset_data->Ticket.pTicketData;
 
 				// There was an error, call the OnError callback if it was registered
 				if (ticket_data->mOnErrorCallback) {
@@ -488,7 +571,7 @@ int32 AssetManager::CheckForUploadableData()
 			}
 		}
 		else if (worker->LoadStatus == loader::eLoaderStatus::None) {
-			asset_data->pAsset->IsFinishedNotifier.Signal();
+			asset_data->Ticket.SignalFinished();
 			Panic("AssetManager", "Worker status is none!");
 		}
 

@@ -59,7 +59,7 @@ Slice<uint8> MipmapGen::GenerateMip(DataPack& dp, eImageFormat format, const Sli
 {
 	static constexpr uint32 scHeaderOffset = sizeof(MipHeader);
 
-	const uint32 pixel_size = renderer::ImageFormatUtil::GetPixelStride(format);
+	const uint32 pixel_size = ImageFormatUtil::GetPixelStride(format);
 
 	const int32 input_stride = size.X * pixel_size;
 	const float32 divisor = GetMipDivisor(static_cast<uint32>(mip_level));
@@ -195,9 +195,9 @@ void MipmapGen::ExportMipmaps(const char* dp_path, const char* output_path)
 #define M_DATA_PTR(ptr_)   (ptr_ + sizeof(MipHeader))
 #define M_DATA_SIZE(arr_)  (arr_.Size - sizeof(MipHeader))
 
-renderer::Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char* path)
+Image MipmapGen::LoadMipmaps(renderer::CommandBuffer& cmd, const char* path)
 {
-	renderer::Image image;
+	Image image;
 
 	DataPack dp;
 	dp.ReadFromFile(path);

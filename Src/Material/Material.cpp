@@ -24,6 +24,7 @@
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Texture/TextureManager.hpp>
 
 FX_SET_MODULE_NAME("Material")
 
@@ -37,7 +38,8 @@ using namespace renderer;
 
 MaterialComponent& MaterialComponent::operator=(const MaterialComponent& other)
 {
-	pAssetImage = other.pAssetImage;
+	Ticket = other.Ticket;
+	pImage = other.pImage;
 
 	UploadSrc = other.UploadSrc;
 	pDataToLoad = other.pDataToLoad;
@@ -51,7 +53,7 @@ MaterialComponent& MaterialComponent::operator=(const MaterialComponent& other)
 MaterialComponent::Status MaterialComponent::Build()
 {
 	// There is no texture provided, we will use the base colours passed in and a dummy texture
-	if (!pAssetImage.IsValid() && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
+	if (!pImage && !pDataToLoad.pData && !ImageToUpload.ImageData.pData) {
 		return Status::MissingComponent;
 	}
 
@@ -63,27 +65,44 @@ MaterialComponent::Status MaterialComponent::Build()
 	return Status::Ready;
 }
 
+void MaterialComponent::SetTicket(AssetTicket& ticket)
+{
+	Ticket = ticket;
+	pImage = static_cast<fx::Image*>(ticket.Get());
+}
+
+void MaterialComponent::SetTicket(AssetTicket&& ticket)
+{
+	Ticket = std::move(ticket);
+	pImage = static_cast<fx::Image*>(Ticket.Get());
+}
+
 
 bool MaterialComponent::CheckIfReady()
 {
 	// If there is data passed in and the image has not been loaded yet, load it using the
 	// asset manager. This will be validated on the next call of this function. (when attempting to build the
 	// material)
-	if (!pAssetImage || mbRequiresUpdate) {
+	if (!pImage || mbRequiresUpdate) {
 		AssertMsg(UploadSrc != eMaterialComponentUploadSrc::None, "UploadSrc has not been set!");
 
 		if (UploadSrc == eMaterialComponentUploadSrc::ProcessAndUpload) {
-			pAssetImage = AssetManagerFwd::LoadImageFromMemory(ImageFormat, pDataToLoad.pData, pDataToLoad.Size);
+			AssetTicket ticket = gAssetManager->LoadImageFromMemory(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+																	pDataToLoad, eImageCreateFlags::None);
+			SetTicket(ticket);
 		}
 		else if (UploadSrc == eMaterialComponentUploadSrc::DirectUpload) {
 			// If the image has not been created yet, create the reference.
-			if (!pAssetImage.IsValid()) {
-				pAssetImage = TSRef<AxImage>::New();
-			}
+			// if (!pImage && !Ticket.IsInvalid()) {
+			// 	Ticket = AssetTicket(gTextureManager->NewTexture());
+			// }
+
+			AssetTicket ticket = gAssetManager->UploadImage(ImageToUpload);
+
 
 			// If the image is previously initialized, we want to update the image with the new mip.
 			/// @see DoDirectUpload() in AxManager.cpp
-			AssetManagerFwd::LoadImageFromPixels(pAssetImage, ImageToUpload);
+			// AssetManagerFwd::LoadImageFromPixels(pAssetImage, ImageToUpload);
 		}
 
 		mbRequiresUpdate = false;
@@ -92,7 +111,7 @@ bool MaterialComponent::CheckIfReady()
 	}
 
 	// If there is no texture and we are not loaded, return not loaded.
-	if (!pAssetImage->IsLoaded()) {
+	if (!Ticket.IsLoaded()) {
 		return false;
 	}
 
@@ -104,7 +123,7 @@ bool MaterialComponent::CheckIfReady()
 /////////////////////////////////////
 
 #define CHECK_COMPONENT_READY(component_)                                                                              \
-	if (component_.Exists() && (!component_.pAssetImage || !component_.pAssetImage->IsLoaded())) {                     \
+	if (component_.Exists() && (!component_.pImage || !component_.Ticket.IsLoaded())) {                                \
 		return false;                                                                                                  \
 	}
 
@@ -133,7 +152,7 @@ bool Material::IsReady()
 												component_.TextureCacheID);                                            \
 		loader.Open(texture_cache_path.CStr());                                                                        \
 		if (loader.Pack.IsOpen()) {                                                                                    \
-			component_.ImageToUpload = loader.GetMip(quality);                                                         \
+			component_.ImageToUpload = loader.GetQuality(quality);                                                     \
 			component_.pAssetImage->InvalidateLoaded();                                                                \
 			component_.UploadSrc = eMaterialComponentUploadSrc::DirectUpload;                                          \
 			component_.RequireUpdate();                                                                                \
@@ -143,9 +162,9 @@ bool Material::IsReady()
 
 void Material::RequestQuality(uint32 quality)
 {
-	REQUEST_COMPONENT_HIGHER_DETAIL(Diffuse);
-	REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
-	REQUEST_COMPONENT_HIGHER_DETAIL(MetallicRoughness);
+	// REQUEST_COMPONENT_HIGHER_DETAIL(Diffuse);
+	// REQUEST_COMPONENT_HIGHER_DETAIL(NormalMap);
+	// REQUEST_COMPONENT_HIGHER_DETAIL(MetallicRoughness);
 
 	bReadyToCheck.test_and_set();
 	bIsBuilt.store(false);
@@ -265,22 +284,22 @@ void Material::SetPipeline(renderer::ePipelineName pl_name)
 
 static float32 GetComponentMaxLOD(const MaterialComponent& component)
 {
-	if (!component.pAssetImage) {
+	if (!component.pImage) {
 		return 0.0f;
 	}
 
-	const ImageInfo& info = component.pAssetImage->Image.GetInfo();
+	const ImageInfo& info = component.pImage->GetInfo();
 
 	return static_cast<float32>(info.MipCount);
 }
 
 static float32 GetComponentMinLOD(const MaterialComponent& component)
 {
-	if (!component.pAssetImage) {
+	if (!component.pImage) {
 		return 0.0f;
 	}
 
-	const ImageInfo& info = component.pAssetImage->Image.GetInfo();
+	const ImageInfo& info = component.pImage->GetInfo();
 
 	return static_cast<float32>(info.MipLevel);
 }
@@ -303,7 +322,7 @@ void Material::Build()
 		mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
 	}
 
-	AssertMsg(Diffuse.pAssetImage.IsValid(), "Diffuse texture must be valid");
+	AssertMsg(Diffuse.Ticket.IsValid(), "Diffuse texture must be valid");
 
 	SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
 
@@ -311,22 +330,22 @@ void Material::Build()
 		diffuse_sampler_props.SetNearest();
 	}
 
-	mDsDefault.AddImage(0, &Diffuse.pAssetImage->Image, gSamplerCache->Request(diffuse_sampler_props));
+	mDsDefault.AddImage(0, Diffuse.pImage, gSamplerCache->Request(diffuse_sampler_props));
 
 	// When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
 	// not need to.
 
 	if (NormalMap.Exists()) {
-		mDsDefault.AddImage(1, &NormalMap.pAssetImage->Image,
+		mDsDefault.AddImage(1, NormalMap.pImage,
 							gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(NormalMap) }));
 
 		// To reduce permutations -- the metallic roughness map should only be
 		// enabled if there is also a normal map.
 		if (!MetallicRoughness.Exists()) {
-			MetallicRoughness.pAssetImage = AxImage::GetEmptyImage<eImageFormat::RGBA8_UNorm>();
+			MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 		}
 
-		mDsDefault.AddImage(2, &MetallicRoughness.pAssetImage->Image,
+		mDsDefault.AddImage(2, MetallicRoughness.pImage,
 							gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(MetallicRoughness) }));
 	}
 

@@ -71,9 +71,9 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 }
 
 
-void Scene::Attach(AssetTicket<Object> object_ticket)
+void Scene::Attach(AssetTicket object_ticket)
 {
-	Object* object = object_ticket.Get();
+	Object* object = static_cast<Object*>(object_ticket.Get());
 
 	mObjects.Insert(object->ID);
 
