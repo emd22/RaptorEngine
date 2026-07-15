@@ -17,6 +17,7 @@ enum eStringId
 	F_PROGRAM,
 	FPT_VERTEX,
 	FPT_PIXEL,
+	FPT_COMPUTE,
 	FPT_ALL,
 
 	// Reflection definitions
@@ -40,6 +41,7 @@ static constexpr const char* scStrings[] = {
 	"F_PROGRAM",
 	"FPT_VERTEX",
 	"FPT_PIXEL",
+	"FPT_COMPUTE",
 	"FPT_ALL",
 
 	// Reflection definitions
@@ -198,6 +200,9 @@ static void ParseProgramDefinition(const std::vector<Slice<char>>& params, State
 	case FHash(FPT_PIXEL):
 		result.SetCurrentShader(eShaderType::Pixel);
 		break;
+	case FHash(FPT_COMPUTE):
+		result.SetCurrentShader(eShaderType::Compute);
+		break;
 	case FHash(FPT_ALL):
 		result.bBroadcastToAllPrograms = true;
 		return;
@@ -316,6 +321,7 @@ static void WriteCurrentCharToProgram(State& state, Result& result)
 	char ch = state.Get();
 
 	if (result.bBroadcastToAllPrograms) {
+		// Only broadcast to vertex and pixel shaders
 		result.GetBuffer(eShaderType::Vertex).Insert(ch);
 		result.GetBuffer(eShaderType::Pixel).Insert(ch);
 
@@ -676,6 +682,7 @@ void DebugSaveToDisk(const char* name, const Result& result)
 {
 	SaveProgramToDisk(name, eShaderType::Vertex, result);
 	SaveProgramToDisk(name, eShaderType::Pixel, result);
+	SaveProgramToDisk(name, eShaderType::Compute, result);
 }
 
 }; // namespace ShaderPreproc

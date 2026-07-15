@@ -11,8 +11,8 @@
 namespace fx {
 enum class eStateFlags
 {
-    None = 0,
-    NoVertices = (1 << 0),
+	None = 0,
+	NoVertices = (1 << 0),
 };
 
 FxEnumFlags(eStateFlags);
@@ -26,74 +26,75 @@ class RenderStage;
 class State
 {
 public:
-    /**
-     * @brief Selects a pipeline to create.
-     */
-    void BeginPipeline(ePipelineName pipeline);
-    void EndPipeline();
+	/**
+	 * @brief Selects a pipeline to create.
+	 */
+	void BeginPipeline(ePipelineName pipeline);
+	void EndPipeline();
 
-    /**
-     * @brief Sets the pipeline layout from a preexisting layout.
-     */
-    void SetLayout(const PipelineLayout& layout);
-    /**
-     * @brief Sets the pipeline layout to the layout used by pipeline `other_pl`
-     */
-    void SetLayout(ePipelineName other_pl);
+	/**
+	 * @brief Sets the pipeline layout from a preexisting layout.
+	 */
+	void SetLayout(const PipelineLayout& layout);
+	/**
+	 * @brief Sets the pipeline layout to the layout used by pipeline `other_pl`
+	 */
+	void SetLayout(ePipelineName other_pl);
 
-    void SetPushConstants(eShaderType shader_type, uint32 pc_size);
-    PipelineLayout BuildLayout();
+	void SetPushConstants(eShaderType shader_type, uint32 pc_size);
+	PipelineLayout BuildLayout();
 
-    void SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment);
-    void SetOutputTargets(TargetList* targets);
-    void UseRenderStage(RenderStage& stage);
+	void SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment);
+	void SetOutputTargets(TargetList* targets);
+	void UseRenderStage(RenderStage& stage);
 
-    void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
+	void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
 
-    FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
+	FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
 
-    FX_FORCE_INLINE void SetFlags(eStateFlags flags) { mFlags = flags; }
-    FX_FORCE_INLINE eStateFlags GetFlags() const { return mFlags; }
+	FX_FORCE_INLINE void SetFlags(eStateFlags flags) { mFlags = flags; }
+	FX_FORCE_INLINE eStateFlags GetFlags() const { return mFlags; }
 
-    FX_FORCE_INLINE void SetDepthTest(bool value) { mProperties.bDisableDepthTest = !value; }
-    FX_FORCE_INLINE void SetDepthWrite(bool value) { mProperties.bDisableDepthWrite = !value; }
+	FX_FORCE_INLINE void SetDepthTest(bool value) { mProperties.bDisableDepthTest = !value; }
+	FX_FORCE_INLINE void SetDepthWrite(bool value) { mProperties.bDisableDepthWrite = !value; }
 
-    void SetRenderPass(RenderPass* rp);
+	void SetRenderPass(RenderPass* rp);
 
-    void SetRenderLines(bool value) { mProperties.bRenderLines = value; }
-    void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }
-    void SetCullMode(eCullMode mode) { mProperties.CullMode = CullModeToVk(mode); }
+	void SetRenderLines(bool value) { mProperties.bRenderLines = value; }
+	void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }
+	void SetCullMode(eCullMode mode) { mProperties.CullMode = CullModeToVk(mode); }
 
-    FX_FORCE_INLINE void SetViewportSize(const Vec2u& size) { mProperties.ViewportSize = size; }
-    FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
+	FX_FORCE_INLINE void SetViewportSize(const Vec2u& size) { mProperties.ViewportSize = size; }
+	FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
 
 private:
-    void BuildPipeline();
-    void Reset();
+	void BuildPipeline();
+	void Reset();
 
-    void AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program);
+	void AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program);
 
 public:
-    TargetList* pOutputTargets;
-    BlendAttachmentList BlendAttachments;
+	TargetList* pOutputTargets;
+	BlendAttachmentList BlendAttachments;
 
 private:
-    Pipeline* mpPipeline = nullptr;
-    ePipelineName mPipelineName = ePipelineName::Geometry;
+	Pipeline* mpPipeline = nullptr;
+	ePipelineName mPipelineName = ePipelineName::Geometry;
 
-    RenderPass* mpRenderPass = nullptr;
+	RenderPass* mpRenderPass = nullptr;
 
-    eVertexType mVertexType = eVertexType::Default;
+	eVertexType mVertexType = eVertexType::Default;
 
-    Ref<ShaderProgram> mpVertexShader { nullptr };
-    Ref<ShaderProgram> mpPixelShader { nullptr };
+	Ref<ShaderProgram> mpVertexShader { nullptr };
+	Ref<ShaderProgram> mpPixelShader { nullptr };
+	Ref<ShaderProgram> mpComputeShader { nullptr };
 
-    StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
-    SizedArray<VkDescriptorSetLayout> mDescriptors;
+	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
+	SizedArray<VkDescriptorSetLayout> mDescriptors;
 
-    PipelineProperties mProperties;
+	PipelineProperties mProperties;
 
-    eStateFlags mFlags = eStateFlags::None;
+	eStateFlags mFlags = eStateFlags::None;
 };
 
 } // namespace fx::renderer

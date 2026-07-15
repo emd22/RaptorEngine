@@ -27,259 +27,261 @@ static const uint16 scBinHeaderEnd = 0x2B1A;
 
 DataPack::DataPack(eDataPackMode mode, const char* path)
 {
-    switch (mode) {
-    case eDataPackMode::Read:
-        ReadFromFile(path);
-        break;
-    case eDataPackMode::Write:
-        WriteToFile(path);
-        break;
-    }
+	switch (mode) {
+	case eDataPackMode::Read:
+		ReadFromFile(path);
+		break;
+	case eDataPackMode::Write:
+		WriteToFile(path);
+		break;
+	}
 }
 
 void DataPack::AddEntry(Hash64 id, const Slice<uint8>& data)
 {
-    if (!Entries.IsInited()) {
-        Entries.Create(16);
-    }
+	if (!Entries.IsInited()) {
+		Entries.Create(16);
+	}
 
-    // LogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<const char*>(data.pData),
-    //           static_cast<uint32>(data.Size));
+	// LogInfo("SAVE ({}), {:.{}}", static_cast<uint32>(data.Size), reinterpret_cast<const char*>(data.pData),
+	//           static_cast<uint32>(data.Size));
 
-    // Check to see if the entry exists and update it if it does
-    if (!Entries.IsEmpty()) {
-        DataPackEntry* found_entry = nullptr;
-        for (DataPackEntry& entry : Entries) {
-            if (entry.Id == id) {
-                found_entry = &entry;
-            }
-        }
+	// Check to see if the entry exists and update it if it does
+	if (!Entries.IsEmpty()) {
+		DataPackEntry* found_entry = nullptr;
+		for (DataPackEntry& entry : Entries) {
+			if (entry.Id == id) {
+				found_entry = &entry;
+			}
+		}
 
-        if (found_entry) {
-            found_entry->Data.Free();
-            found_entry->Data.InitAsCopyOf(data.pData, data.Size);
-            found_entry->DataSize = data.Size;
+		if (found_entry) {
+			found_entry->Data.Free();
+			found_entry->Data.InitAsCopyOf(data.pData, data.Size);
+			found_entry->DataSize = data.Size;
 
-            LogInfo("Updating data pack entry {}", id);
-            return;
-        }
-    }
+			LogInfo("Updating data pack entry {}", id);
+			return;
+		}
+	}
 
-    SizedArray<uint8> data_arr;
-    data_arr.InitAsCopyOf(data.pData, data.Size);
+	SizedArray<uint8> data_arr;
+	data_arr.InitAsCopyOf(data.pData, data.Size);
 
-    DataPackEntry pack { id, std::move(data_arr) };
-    Entries.Insert(std::move(pack));
+	DataPackEntry pack { id, std::move(data_arr) };
+	Entries.Insert(std::move(pack));
 }
 
 
 bool DataPack::BinaryReadHeader()
 {
-    uint16 header_start = 0;
-    File.Read<uint16>(MakeSlice(&header_start, 1));
+	uint16 header_start = 0;
+	File.Read<uint16>(MakeSlice(&header_start, 1));
 
-    uint16 number_of_entries;
-    File.Read<uint16>(MakeSlice(&number_of_entries, 1));
+	uint16 number_of_entries;
+	File.Read<uint16>(MakeSlice(&number_of_entries, 1));
 
-    if (!Entries.IsInited()) {
-        Entries.Create(number_of_entries);
-    }
+	if (!Entries.IsInited()) {
+		Entries.Create(number_of_entries);
+	}
 
-    if (header_start != scBinHeaderStart) {
-        return false;
-    }
+	if (header_start != scBinHeaderStart) {
+		return false;
+	}
 
-    for (int index = 0; index < number_of_entries; index++) {
-        Hash64 id;
-        File.Read<uint64>(MakeSlice(&id, 1));
+	for (int index = 0; index < number_of_entries; index++) {
+		Hash64 id;
+		File.Read<uint64>(MakeSlice(&id, 1));
 
-        uint32 offset;
-        File.Read<uint32>(MakeSlice(&offset, 1));
+		uint32 offset;
+		File.Read<uint32>(MakeSlice(&offset, 1));
 
-        uint32 size;
-        File.Read<uint32>(MakeSlice(&size, 1));
+		uint32 size;
+		File.Read<uint32>(MakeSlice(&size, 1));
 
-        DataPackEntry entry { id, SizedArray<uint8>::CreateEmpty(), offset, size };
-        Entries.Insert(std::move(entry));
-    }
+		DataPackEntry entry { id, SizedArray<uint8>::CreateEmpty(), offset, size };
+		Entries.Insert(std::move(entry));
+	}
 
-    uint16 header_end;
-    File.Read<uint16>(MakeSlice(&header_end, 1));
+	uint16 header_end;
+	File.Read<uint16>(MakeSlice(&header_end, 1));
 
-    if (header_end != scBinHeaderEnd) {
-        return false;
-    }
+	if (header_end != scBinHeaderEnd) {
+		return false;
+	}
 
-    return true;
+	return true;
 }
 
 void DataPack::BinaryWriteHeader()
 {
-    uint32 header_size = 0;
+	uint32 header_size = 0;
 
-    // identifier_hash, offset, data_size
-    constexpr int cSizeOfEntry = sizeof(uint64) + sizeof(uint32) + sizeof(uint32);
-    header_size += cSizeOfEntry * Entries.Size();
+	// identifier_hash, offset, data_size
+	constexpr int cSizeOfEntry = sizeof(uint64) + sizeof(uint32) + sizeof(uint32);
+	header_size += cSizeOfEntry * Entries.Size();
 
-    // Header start(uint16), entry count (uint16), header end(uint16)
-    header_size += (sizeof(uint16) * 3);
+	// Header start(uint16), entry count (uint16), header end(uint16)
+	header_size += (sizeof(uint16) * 3);
 
-    uint32 offset = header_size;
+	uint32 offset = header_size;
 
-    File.Write(scBinHeaderStart);
-    File.Write<uint16>(static_cast<uint16>(Entries.Size()));
+	File.Write(scBinHeaderStart);
+	File.Write<uint16>(static_cast<uint16>(Entries.Size()));
 
-    for (DataPackEntry& entry : Entries) {
-        File.Write<uint64>(entry.Id);
-        File.Write<uint32>(offset);
-        File.Write<uint32>(entry.Data.Size);
+	for (DataPackEntry& entry : Entries) {
+		File.Write<uint64>(entry.Id);
+		File.Write<uint32>(offset);
+		File.Write<uint32>(entry.Data.Size);
 
-        offset += entry.Data.Size;
-    }
+		offset += entry.Data.Size;
+	}
 
-    File.Write(scBinHeaderEnd);
+	File.Write(scBinHeaderEnd);
 }
 
 void DataPack::BinaryWriteData()
 {
-    for (const DataPackEntry& entry : Entries) {
-        File.Write(entry.Data.pData, entry.Data.Size);
-    }
+	for (const DataPackEntry& entry : Entries) {
+		File.Write(entry.Data.pData, entry.Data.Size);
+	}
 }
 
 void DataPack::BinaryReadAllData()
 {
-    if (Entries.IsEmpty()) {
-        BinaryReadHeader();
-    }
+	if (Entries.IsEmpty()) {
+		BinaryReadHeader();
+	}
 
-    for (DataPackEntry& entry : Entries) {
-        ReadInto(&entry);
-    }
+	for (DataPackEntry& entry : Entries) {
+		ReadInto(&entry);
+	}
 }
 
 
 void DataPack::PrintInfo() const
 {
-    LogInfo("");
-    LogInfo("=== DataPack ===");
+	LogInfo("");
+	LogInfo("=== DataPack ===");
 
 
-    for (const DataPackEntry& entry : Entries) {
-        LogInfo("Entry 0x{:x} => Offset={}, Size={}", entry.Id, entry.DataOffset, entry.DataSize);
-    }
+	for (const DataPackEntry& entry : Entries) {
+		LogInfo("Entry 0x{:x} => Offset={}, Size={}", entry.Id, entry.DataOffset, entry.DataSize);
+	}
 
-    LogInfo("================");
-    LogInfo("");
+	LogInfo("================");
+	LogInfo("");
 }
 
 void DataPack::JumpToEntry(Hash64 id)
 {
-    DataPackEntry* found_entry = nullptr;
-    for (DataPackEntry& entry : Entries) {
-        if (entry.Id == id) {
-            found_entry = &entry;
-        }
-    }
+	DataPackEntry* found_entry = nullptr;
+	for (DataPackEntry& entry : Entries) {
+		if (entry.Id == id) {
+			found_entry = &entry;
+		}
+	}
 
-    if (!found_entry) {
-        LogError(LC_ASSET, "Could not find entry {} in DataPack", id);
-        return;
-    }
+	if (!found_entry) {
+		LogError(LC_ASSET, "Could not find entry {} in DataPack", id);
+		return;
+	}
 }
 
 DataPackEntry* DataPack::GetEntryFast(Hash64 id) const
 {
-    // TODO: replace with ordered map query
+	// TODO: replace with ordered map query
 
-    DataPackEntry* found_entry = nullptr;
-    for (DataPackEntry& entry : Entries) {
-        if (entry.Id == id) {
-            found_entry = &entry;
-            break;
-        }
-    }
+	for (DataPackEntry& entry : Entries) {
+		if (entry.Id == id) {
+			return &entry;
+		}
+	}
 
-    return found_entry;
+	return nullptr;
 }
 
 void DataPack::WriteToFile(const char* name)
 {
-    if (File.IsFileOpen()) {
-        File.Flush();
-        File.Close();
-    }
+	if (File.IsFileOpen()) {
+		File.Flush();
+		File.Close();
+	}
 
-    File.Open(name, File::eModType::Write, File::eDataType::Binary);
+	File.Open(name, File::eModType::Write, File::eDataType::Binary);
 
-    if (!File.IsFileOpen()) {
-        LogWarning(LC_ASSET, "Data pack '{}' could not be written to", name);
-        return;
-    }
+	if (!File.IsFileOpen()) {
+		LogWarning(LC_ASSET, "Data pack '{}' could not be written to", name);
+		return;
+	}
 
-    BinaryWriteHeader();
-    BinaryWriteData();
+	BinaryWriteHeader();
+	BinaryWriteData();
 }
 
 
 bool DataPack::ReadFromFile(const char* name)
 {
-    if (File.IsFileOpen()) {
-        File.Flush();
-        File.Close();
-    }
-    if (!Entries.IsInited()) {
-        Entries.Create(16);
-    }
-    if (!Entries.IsEmpty()) {
-        Entries.Clear();
-    }
+	if (File.IsFileOpen()) {
+		File.Flush();
+		File.Close();
+	}
+	if (!Entries.IsInited()) {
+		Entries.Create(16);
+	}
+	if (!Entries.IsEmpty()) {
+		Entries.Clear();
+	}
 
-    File.Open(name, File::eModType::Read, File::eDataType::Binary);
+	File.Open(name, File::eModType::Read, File::eDataType::Binary);
 
-    if (!File.IsFileOpen()) {
-        LogWarning(LC_ASSET, "Could not open data pack '{}'", name);
-        return false;
-    }
+	if (!File.IsFileOpen()) {
+		LogWarning(LC_ASSET, "Could not open data pack '{}'", name);
+		return false;
+	}
 
-    bool successful = BinaryReadHeader();
-    if (!successful) {
-        File.Close();
-        // Open the file in write mode to clear it
-        File.Open(name, File::eModType::Write, File::eDataType::Binary);
-        File.Close();
+	bool successful = BinaryReadHeader();
+	if (!successful) {
+		File.Close();
+		// Open the file in write mode to clear it
+		File.Open(name, File::eModType::Write, File::eDataType::Binary);
+		File.Close();
 
-        // Return unsuccessful
-        return false;
-    }
+		// Return unsuccessful
+		return false;
+	}
 
-    return true;
+	return true;
 }
 
 DataPackEntry* DataPack::GetEntry(Hash64 id, bool require_data)
 {
-    DataPackEntry* entry = GetEntryFast(id);
+	DataPackEntry* entry = GetEntryFast(id);
 
-    if (require_data && entry->Data.IsEmpty()) {
-        ReadInto(entry);
-    }
+	if (entry == nullptr) {
+		return nullptr;
+	}
 
-    return entry;
+	if (require_data && entry->Data.IsEmpty()) {
+		ReadInto(entry);
+	}
+
+	return entry;
 }
 
 void DataPack::ReadInto(DataPackEntry* entry)
 {
-    if (!entry) {
-        LogWarning(LC_ASSET, "Cannot read section of null entry!");
+	if (!entry) {
+		LogWarning(LC_ASSET, "Cannot read section of null entry!");
 
-        return;
-    }
+		return;
+	}
 
-    // The data is not already loaded into the entry, load it.
-    entry->Data.InitSize(entry->DataSize);
+	// The data is not already loaded into the entry, load it.
+	entry->Data.InitSize(entry->DataSize);
 
-    File.SeekTo(entry->DataOffset);
-    File.Read(Slice<uint8>(entry->Data));
+	File.SeekTo(entry->DataOffset);
+	File.Read(Slice<uint8>(entry->Data));
 }
 
 // DataPackEntry* DataPack::GetEntry(Hash64 id)
@@ -292,9 +294,9 @@ void DataPack::ReadInto(DataPackEntry* entry)
 
 void DataPack::Close()
 {
-    if (File.IsFileOpen()) {
-        File.Close();
-    }
+	if (File.IsFileOpen()) {
+		File.Close();
+	}
 }
 
 
