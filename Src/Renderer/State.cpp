@@ -25,9 +25,10 @@ void State::BeginPipeline(ePipelineName name)
 void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
 {
 	Ref<Shader> shader = gShaderCache->Request(shader_name);
-	mpVertexShader = shader->GetProgram(eShaderType::Vertex, macros);
-	mpPixelShader = shader->GetProgram(eShaderType::Pixel, macros);
-	mpComputeShader = shader->GetProgram(eShaderType::Compute, macros);
+
+	SetShaderProgram(eShaderType::Vertex, shader->GetProgram(eShaderType::Vertex, macros));
+	SetShaderProgram(eShaderType::Pixel, shader->GetProgram(eShaderType::Pixel, macros));
+	SetShaderProgram(eShaderType::Compute, shader->GetProgram(eShaderType::Compute, macros));
 }
 
 void State::UseRenderStage(RenderStage& stage)
@@ -45,7 +46,11 @@ void State::BuildPipeline()
 		BuildLayout();
 	}
 
-	if (!mpVertexShader.IsValid() || !mpPixelShader.IsValid()) {
+	Ref<ShaderProgram> vertex_shader = GetShaderProgram(eShaderType::Vertex);
+	Ref<ShaderProgram> pixel_shader = GetShaderProgram(eShaderType::Pixel);
+
+
+	if (!vertex_shader.IsValid() || !pixel_shader.IsValid()) {
 		LogError(LC_RENDER, "Invalid shaders provided");
 		return;
 	}
@@ -55,7 +60,7 @@ void State::BuildPipeline()
 		return;
 	}
 
-	SizedArray<Ref<ShaderProgram>> shader_list = { mpVertexShader, mpPixelShader };
+	SizedArray<Ref<ShaderProgram>> shader_list = { vertex_shader, pixel_shader };
 
 	VertexDescription* vertex_ptr = nullptr;
 	VertexDescription vertex_desc = VertexUtil::BuildDescription(mVertexType);
@@ -89,7 +94,7 @@ void State::SetPushConstants(eShaderType type, uint32 pc_size)
 }
 
 
-static Vec2u GetDescriptorIndexRangeForShader(Ref<ShaderProgram>& program)
+static Vec2u GetDescriptorIndexRangeForShader(const Ref<ShaderProgram>& program)
 {
 	SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
 
@@ -109,8 +114,8 @@ PipelineLayout State::BuildLayout()
 	// Create the descriptor set layout
 	{
 		// Get the minimum and maximum descriptor sets used by each shader
-		Vec2u vertex_ds_range = GetDescriptorIndexRangeForShader(mpVertexShader);
-		Vec2u pixel_ds_range = GetDescriptorIndexRangeForShader(mpPixelShader);
+		Vec2u vertex_ds_range = GetDescriptorIndexRangeForShader(GetShaderProgram(eShaderType::Vertex));
+		Vec2u pixel_ds_range = GetDescriptorIndexRangeForShader(GetShaderProgram(eShaderType::Pixel));
 
 		Vec2u ds_range_combined = Vec2u(std::min(vertex_ds_range.X, pixel_ds_range.X),
 										std::max(vertex_ds_range.Y, pixel_ds_range.Y));
@@ -121,8 +126,9 @@ PipelineLayout State::BuildLayout()
 		if (max_ds_index >= min_ds_index) {
 			mDescriptors.Size = (max_ds_index - min_ds_index) + 1;
 
-			AddDescriptorsForShaderProgram(mpVertexShader);
-			AddDescriptorsForShaderProgram(mpPixelShader);
+			for (Ref<ShaderProgram>& program : mShaderPrograms) {
+				AddDescriptorsForShaderProgram(program);
+			}
 		}
 	}
 
@@ -140,8 +146,18 @@ void State::EndPipeline()
 }
 
 
+void State::AddBuffer(eShaderType shader_type, uint32 bind_index, RawGpuBuffer* buffer, uint64 offset, uint64 range) {}
+
+void State::AddImage(eShaderType shader_type, uint32 bind_index, Image* image, Sampler* sampler) {}
+void State::AddImageFromTarget(eShaderType shader_type, uint32 bind_index, Target* target, Sampler* sampler) {}
+
+
 void State::AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program)
 {
+	if (!program.IsValid()) {
+		return;
+	}
+
 	Vec2u ds_index_range = GetDescriptorIndexRangeForShader(program);
 
 	const SizedArray<ShaderReflectionEntry>& refl = program->Reflection;

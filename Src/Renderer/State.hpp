@@ -48,7 +48,15 @@ public:
 	void SetOutputTargets(TargetList* targets);
 	void UseRenderStage(RenderStage& stage);
 
+	/////////////////////////////////////
+	// Shader/Descriptor functions
+	/////////////////////////////////////
 	void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
+
+	void AddBuffer(eShaderType shader_type, uint32 bind_index, RawGpuBuffer* buffer, uint64 offset, uint64 range);
+	void AddImage(eShaderType shader_type, uint32 bind_index, Image* image, Sampler* sampler);
+	void AddImageFromTarget(eShaderType shader_type, uint32 bind_index, Target* target, Sampler* sampler);
+
 
 	FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
 
@@ -66,6 +74,16 @@ public:
 
 	FX_FORCE_INLINE void SetViewportSize(const Vec2u& size) { mProperties.ViewportSize = size; }
 	FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
+
+	FX_FORCE_INLINE Ref<ShaderProgram> GetShaderProgram(eShaderType shader_type)
+	{
+		return mShaderPrograms[static_cast<uint32>(shader_type) - 1];
+	}
+
+	FX_FORCE_INLINE void SetShaderProgram(eShaderType shader_type, const Ref<ShaderProgram>& program)
+	{
+		mShaderPrograms[static_cast<uint32>(shader_type) - 1] = program;
+	}
 
 private:
 	void BuildPipeline();
@@ -85,9 +103,7 @@ private:
 
 	eVertexType mVertexType = eVertexType::Default;
 
-	Ref<ShaderProgram> mpVertexShader { nullptr };
-	Ref<ShaderProgram> mpPixelShader { nullptr };
-	Ref<ShaderProgram> mpComputeShader { nullptr };
+	StackArray<Ref<ShaderProgram>, (ShaderUtil::scNumShaderTypes - 1)> mShaderPrograms;
 
 	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
 	SizedArray<VkDescriptorSetLayout> mDescriptors;

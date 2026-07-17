@@ -213,25 +213,6 @@ void ShaderProgram::BuildDescriptor()
 	layout_builder.Build();
 
 	Descriptor.Create(gRenderer->pDeferredRenderer->DescriptorPool, layout_builder.Build(), has_dynamic_offsets);
-
-	// Assert(ShaderOutline.IsValid());
-
-	// Descriptors.InitCapacity(ShaderOutline::scNumSets);
-
-	// LogWarning("Build Descriptors for shader {}", ShaderUtil::TypeToName(ShaderType));
-
-	// for (uint32 set_index = 0; set_index < ShaderOutline::scNumSets; set_index++) {
-	//     ShaderOutline::EntryList& entry_list = ShaderOutline->SetBuckets[set_index];
-
-	//     if (entry_list.IsEmpty()) {
-	//         LogWarning("Skipping descriptors for {} (no entries found)", ShaderUtil::TypeToName(ShaderType));
-	//         continue;
-	//     }
-
-	//     Descriptors.Insert(gDescriptorCache->Register(set_index, ShaderType, entry_list));
-	// }
-
-	// LogInfo("Added {} descriptors to shader program", Descriptors.Size);
 }
 
 
