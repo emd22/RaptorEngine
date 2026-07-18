@@ -23,7 +23,7 @@ namespace fx::renderer {
 class RenderPass;
 class RenderStage;
 
-class RenderState
+class PSOBuild
 {
 public:
 	/**
@@ -87,9 +87,11 @@ public:
 
 private:
 	void BuildPipeline();
+	void BuildDescriptorLayouts();
 	void Reset();
 
-	DescriptorSet* GetDescriptorSet(eShaderType shader_type, uint32 set_index);
+
+	DescriptorSet* StartDescriptorUpdate(uint32 set_index);
 
 	void AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& program);
 
@@ -111,6 +113,8 @@ private:
 	SizedArray<VkDescriptorSetLayout> mDescriptorLayouts;
 
 	PipelineProperties mProperties;
+
+	bool bBuiltDescriptorLayouts = false;
 
 	eStateFlags mFlags = eStateFlags::None;
 };

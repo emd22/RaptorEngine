@@ -23,8 +23,8 @@ extern DsLayoutCache* gDsLayoutCache;
 class DescriptorCache;
 extern DescriptorCache* gDescriptorCache;
 
-class RenderState;
-extern RenderState* gRenderState;
+class PSOBuild;
+extern PSOBuild* gPSOBuild;
 
 namespace Globals {
 

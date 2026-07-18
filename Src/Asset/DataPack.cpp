@@ -211,7 +211,6 @@ void DataPack::WriteToFile(const char* name)
 	File.Open(name, File::eModType::Write, File::eDataType::Binary);
 
 	if (!File.IsFileOpen()) {
-		LogWarning(LC_ASSET, "Data pack '{}' could not be written to", name);
 		return;
 	}
 
@@ -236,7 +235,6 @@ bool DataPack::ReadFromFile(const char* name)
 	File.Open(name, File::eModType::Read, File::eDataType::Binary);
 
 	if (!File.IsFileOpen()) {
-		LogWarning(LC_ASSET, "Could not open data pack '{}'", name);
 		return false;
 	}
 

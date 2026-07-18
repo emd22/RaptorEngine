@@ -22,8 +22,8 @@
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/Limits.hpp>
+#include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/State.hpp>
 #include <thread>
 #include <vector>
 

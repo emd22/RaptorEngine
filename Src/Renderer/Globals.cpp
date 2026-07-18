@@ -2,11 +2,11 @@
 
 #include "Backend/DescriptorCache.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
+#include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
 #include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
-#include "State.hpp"
 
 namespace fx::renderer {
 
@@ -16,7 +16,7 @@ ShaderCache* gShaderCache = nullptr;
 DsLayoutCache* gDsLayoutCache = nullptr;
 PipelineCache* gPipelineCache = nullptr;
 SamplerCache* gSamplerCache = nullptr;
-RenderState* gRenderState = nullptr;
+PSOBuild* gPSOBuild = nullptr;
 DescriptorCache* gDescriptorCache = nullptr;
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
@@ -30,7 +30,7 @@ void Init()
 {
 	gSamplerCache = new SamplerCache;
 	gPipelineCache = new PipelineCache;
-	gRenderState = new RenderState;
+	gPSOBuild = new PSOBuild;
 
 	gRenderer = new RenderBackend;
 	gShaderCache = new ShaderCache;
@@ -51,7 +51,7 @@ void Destroy()
 	DESTROY_GLOBAL(gPipelineCache);
 	DESTROY_GLOBAL(gShaderCache);
 
-	DESTROY_GLOBAL(gRenderState);
+	DESTROY_GLOBAL(gPSOBuild);
 	DESTROY_GLOBAL(gRenderer);
 }
 

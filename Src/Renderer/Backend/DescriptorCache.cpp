@@ -50,10 +50,9 @@ VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const Size
 		builder.AddBinding(entry.Binding, ReflectionTypeToDescriptorType(entry.Type), shader_type);
 	}
 
-	VkDescriptorSetLayout layout = builder.Build();
-	Cache[entries_hash] = layout;
+	Cache[entries_hash] = builder.Build();
 
-	return layout;
+	return Cache[entries_hash];
 }
 
 VkDescriptorSetLayout* DsLayoutCache::RequestExisting(Hash32 descriptor_id)

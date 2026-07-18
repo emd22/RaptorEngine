@@ -7,12 +7,11 @@
 #include "Camera.hpp"
 #include "Engine.hpp"
 #include "Globals.hpp"
-#include "PipelineBuilder.hpp"
+#include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
 #include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
-#include "State.hpp"
 
 #include <Object/ObjectManager.hpp>
 
@@ -151,39 +150,36 @@ void DeferredRenderer::CreateUnlitPipeline()
 	CreateForwardPass();
 
 	// Unlit pipeline
-	gRenderState->BeginPipeline(ePipelineName::Unlit);
-	gRenderState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-	gRenderState->SetShader(eShaderName::Unlit, {});
+	gPSOBuild->BeginPipeline(ePipelineName::Unlit);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+	gPSOBuild->SetShader(eShaderName::Unlit, {});
 
-	gRenderState->UseRenderStage(ForwardPass);
-	gRenderState->SetVertexType(eVertexType::Default);
-	gRenderState->SetCullMode(eCullMode::Back);
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->SetVertexType(eVertexType::Default);
+	gPSOBuild->SetCullMode(eCullMode::Back);
 
-	gRenderState->EndPipeline();
-
-	gRenderState->AddBuffer(0, 2, &gObjectManager->mObjectGpuBuffer, 0, 100);
-
+	gPSOBuild->EndPipeline();
 
 	// Text rendering pipeline
-	gRenderState->BeginPipeline(ePipelineName::TextRendering);
-	gRenderState->SetLayout(ePipelineName::Unlit);
+	gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
+	gPSOBuild->SetLayout(ePipelineName::Unlit);
 
-	gRenderState->UseRenderStage(ForwardPass);
-	gRenderState->SetShader(eShaderName::Text, {});
-	gRenderState->SetCullMode(eCullMode::None);
-	gRenderState->EndPipeline();
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->SetShader(eShaderName::Text, {});
+	gPSOBuild->SetCullMode(eCullMode::None);
+	gPSOBuild->EndPipeline();
 
 
 	// Debug Layer pipeline
-	gRenderState->BeginPipeline(ePipelineName::DebugLayer);
-	gRenderState->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
-	gRenderState->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
-	gRenderState->SetVertexType(eVertexType::Slim);
-	gRenderState->SetRenderLines(true);
-	gRenderState->SetCullMode(eCullMode::Back);
+	gPSOBuild->BeginPipeline(ePipelineName::DebugLayer);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
+	gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
+	gPSOBuild->SetVertexType(eVertexType::Slim);
+	gPSOBuild->SetRenderLines(true);
+	gPSOBuild->SetCullMode(eCullMode::Back);
 
-	gRenderState->UseRenderStage(ForwardPass);
-	gRenderState->EndPipeline();
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->EndPipeline();
 }
 
 
@@ -193,15 +189,15 @@ void DeferredRenderer::CreateGPassPipeline()
 
 	CreateGPass();
 	{
-		gRenderState->BeginPipeline(ePipelineName::Geometry);
-		gRenderState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->BeginPipeline(ePipelineName::Geometry);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
-		gRenderState->UseRenderStage(GPass);
-		gRenderState->SetShader(eShaderName::Geometry, {});
-		gRenderState->SetVertexType(eVertexType::Default);
-		gRenderState->SetCullMode(eCullMode::Back);
+		gPSOBuild->UseRenderStage(GPass);
+		gPSOBuild->SetShader(eShaderName::Geometry, {});
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gRenderState->EndPipeline();
+		gPSOBuild->EndPipeline();
 
 		Ref<Shader> geometry_shader = gShaderCache->Request(eShaderName::Geometry);
 	}
@@ -212,29 +208,29 @@ void DeferredRenderer::CreateGPassPipeline()
 
 
 	// Normal mapped pipeline
-	gRenderState->BeginPipeline(ePipelineName::GeometryNormalMaps);
+	gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
 	// Use previous layout
-	gRenderState->SetLayout(ePipelineName::Geometry);
+	gPSOBuild->SetLayout(ePipelineName::Geometry);
 
-	gRenderState->UseRenderStage(GPass);
-	gRenderState->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
-	gRenderState->SetVertexType(eVertexType::Default);
-	gRenderState->SetCullMode(eCullMode::Back);
+	gPSOBuild->UseRenderStage(GPass);
+	gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+	gPSOBuild->SetVertexType(eVertexType::Default);
+	gPSOBuild->SetCullMode(eCullMode::Back);
 
-	gRenderState->EndPipeline();
+	gPSOBuild->EndPipeline();
 
 	CreateGPassSkinnedPipelineLayout();
 
 	// Skinned + Normal mapped pipeline
-	gRenderState->BeginPipeline(ePipelineName::GeometrySkinned);
-	gRenderState->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+	gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
-	gRenderState->UseRenderStage(GPass);
-	gRenderState->SetVertexType(eVertexType::Skinned);
-	gRenderState->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
-													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
-	gRenderState->SetCullMode(eCullMode::Back);
-	gRenderState->EndPipeline();
+	gPSOBuild->UseRenderStage(GPass);
+	gPSOBuild->SetVertexType(eVertexType::Skinned);
+	gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
+												  ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
+	gPSOBuild->SetCullMode(eCullMode::Back);
+	gPSOBuild->EndPipeline();
 
 
 	pGeometryPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
@@ -317,61 +313,71 @@ void DeferredRenderer::CreateLightingPipeline()
 	};
 
 	// Point light pipeline (inside)
-	gRenderState->BeginPipeline(ePipelineName::LightingInsideVolume);
-	gRenderState->SetPushConstants(eShaderType::Vertex, sizeof(LightVertPushConstants));
+	gPSOBuild->BeginPipeline(ePipelineName::LightingInsideVolume);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(LightVertPushConstants));
 
-	gRenderState->UseRenderStage(LightPass);
-	gRenderState->SetTargetBlend(0, lighting_blend);
-	gRenderState->SetShader(eShaderName::Lighting, {});
-	gRenderState->SetVertexType(eVertexType::Slim);
+	gPSOBuild->UseRenderStage(LightPass);
+	gPSOBuild->SetTargetBlend(0, lighting_blend);
+	gPSOBuild->SetShader(eShaderName::Lighting, {});
+	gPSOBuild->SetVertexType(eVertexType::Slim);
 
-	gRenderState->SetDepthTest(false);
-	gRenderState->SetDepthWrite(false);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
 
-	gRenderState->SetFaceOrder(eFaceOrder::Reverse);
-	gRenderState->SetCullMode(eCullMode::Back);
+	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+	gPSOBuild->SetCullMode(eCullMode::Back);
 
-	gRenderState->EndPipeline();
+	gPSOBuild->EndPipeline();
 
 	// Point light pipeline (outside)
 
-	gRenderState->BeginPipeline(ePipelineName::LightingOutsideVolume);
-	gRenderState->SetLayout(ePipelineName::LightingInsideVolume);
+	gPSOBuild->BeginPipeline(ePipelineName::LightingOutsideVolume);
+	gPSOBuild->SetLayout(ePipelineName::LightingInsideVolume);
 
-	gRenderState->UseRenderStage(LightPass);
-	gRenderState->SetTargetBlend(0, lighting_blend);
-	gRenderState->SetShader(eShaderName::Lighting, {});
-	gRenderState->SetVertexType(eVertexType::Slim);
+	gPSOBuild->UseRenderStage(LightPass);
+	gPSOBuild->SetTargetBlend(0, lighting_blend);
+	gPSOBuild->SetShader(eShaderName::Lighting, {});
+	gPSOBuild->SetVertexType(eVertexType::Slim);
 
-	gRenderState->SetDepthTest(false);
-	gRenderState->SetDepthWrite(false);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
 
-	gRenderState->SetFaceOrder(eFaceOrder::Reverse);
-	gRenderState->SetCullMode(eCullMode::Back);
+	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+	gPSOBuild->SetCullMode(eCullMode::Back);
 
-	gRenderState->EndPipeline();
+	gPSOBuild->EndPipeline();
 
 
 	// Directional lighting pipeline
-	gRenderState->BeginPipeline(ePipelineName::LightingDirectional);
-	gRenderState->SetLayout(ePipelineName::LightingInsideVolume);
+	gPSOBuild->BeginPipeline(ePipelineName::LightingDirectional);
+	gPSOBuild->SetLayout(ePipelineName::LightingInsideVolume);
 
-	gRenderState->UseRenderStage(LightPass);
-	gRenderState->SetTargetBlend(0, lighting_blend);
-	gRenderState->SetShader(eShaderName::Lighting,
-							{ ShaderMacro { .pcName = "FX_LIGHT_DIRECTIONAL", .pcValue = "1" } });
-	gRenderState->SetVertexType(eVertexType::Slim);
+	gPSOBuild->UseRenderStage(LightPass);
+	gPSOBuild->SetTargetBlend(0, lighting_blend);
+	gPSOBuild->SetShader(eShaderName::Lighting, { ShaderMacro { .pcName = "FX_LIGHT_DIRECTIONAL", .pcValue = "1" } });
+	gPSOBuild->SetVertexType(eVertexType::Slim);
 
-	gRenderState->SetDepthTest(false);
-	gRenderState->SetDepthWrite(false);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
 
-	gRenderState->SetFaceOrder(eFaceOrder::Reverse);
-	gRenderState->SetCullMode(eCullMode::None);
+	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+	gPSOBuild->SetCullMode(eCullMode::None);
 
 	// Since the directional light is a triangle built from the screen coordinates, we won't be passing in vertices.
-	gRenderState->SetFlags(eStateFlags::NoVertices);
+	gPSOBuild->SetFlags(eStateFlags::NoVertices);
 
-	gRenderState->EndPipeline();
+	gPSOBuild->AddImageFromTarget(0, 0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
+	gPSOBuild->AddImageFromTarget(1, 0, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+	gPSOBuild->AddImageFromTarget(2, 0, GPass.GetTarget(eImageFormat::RGBA16_Float),
+								  &gRenderer->Swapchain.NormalsSampler);
+	if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
+		gPSOBuild->AddImageFromTarget(3, 0, gShadowRenderer->RenderStage.GetTarget(eImageFormat::eD32_Float),
+									  &gRenderer->Swapchain.ShadowDepthSampler);
+	}
+
+	gPSOBuild->AddBuffer(4, 0, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
+
+	gPSOBuild->EndPipeline();
 }
 
 void DeferredRenderer::DestroyLightingPipeline()
@@ -409,17 +415,17 @@ void DeferredRenderer::CreateCompPipeline()
 
 	CreateCompPass();
 
-	gRenderState->BeginPipeline(ePipelineName::Composition);
-	gRenderState->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
+	gPSOBuild->BeginPipeline(ePipelineName::Composition);
+	gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
 
-	gRenderState->UseRenderStage(CompPass);
-	gRenderState->SetShader(eShaderName::Composition, {});
-	gRenderState->SetFlags(eStateFlags::NoVertices);
-	gRenderState->SetCullMode(eCullMode::None);
-	gRenderState->SetFaceOrder(eFaceOrder::Default);
-	gRenderState->SetDepthTest(false);
-	gRenderState->SetDepthWrite(false);
-	gRenderState->EndPipeline();
+	gPSOBuild->UseRenderStage(CompPass);
+	gPSOBuild->SetShader(eShaderName::Composition, {});
+	gPSOBuild->SetFlags(eStateFlags::NoVertices);
+	gPSOBuild->SetCullMode(eCullMode::None);
+	gPSOBuild->SetFaceOrder(eFaceOrder::Default);
+	gPSOBuild->SetDepthTest(false);
+	gPSOBuild->SetDepthWrite(false);
+	gPSOBuild->EndPipeline();
 }
 
 void DeferredRenderer::DestroyCompPipeline()

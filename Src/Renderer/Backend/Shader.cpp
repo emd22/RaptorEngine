@@ -183,7 +183,7 @@ void Shader::RecompileShader(const String& source_path, const String& compiled_p
 	// Compile to the shader pack
 	ShaderCompiler::eResult compile_result = ShaderCompiler::Compile(source_path.CStr(), mDataPack, macros);
 
-	if (compile_result != ShaderCompiler::eResult::Failed) {
+	if (compile_result == ShaderCompiler::eResult::Success) {
 		mDataPack.WriteToFile(compiled_path.CStr());
 	}
 }

@@ -9,14 +9,14 @@ namespace fx::renderer {
 class PipelineCache
 {
 public:
-    PipelineCache();
+	PipelineCache();
 
-    Pipeline& Request(const ePipelineName name);
-    ePipelineName GetName(const Pipeline* pipeline) const;
-    void Bind(const ePipelineName name, const CommandBuffer& cmd);
+	Pipeline& Request(const ePipelineName name);
+	ePipelineName GetName(const Pipeline* pipeline) const;
+	void Bind(const ePipelineName name, const CommandBuffer& cmd);
 
 private:
-    SizedArray<Pipeline> mCache;
+	SizedArray<Pipeline> mCache;
 };
 
 

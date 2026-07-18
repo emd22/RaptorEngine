@@ -203,8 +203,6 @@ private:
 	GpuDevice* mDevice = nullptr;
 
 protected:
-	friend class PipelineBuilder;
-
 	bool mbDoNotDestroyLayout = false;
 };
 

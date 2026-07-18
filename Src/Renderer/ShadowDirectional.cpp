@@ -7,10 +7,9 @@
 #include <Renderer/Backend/VertexDescription.hpp>
 #include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/PipelineBuilder.hpp>
+#include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
-#include <Renderer/State.hpp>
 
 namespace fx::renderer {
 
@@ -50,18 +49,18 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 	// Ref<ShaderProgram> vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, {});
 	// Ref<ShaderProgram> fragment_shader = shader_shadow.GetProgram(eShaderType::Pixel, {});
 
-	gRenderState->BeginPipeline(ePipelineName::ShadowDirectional);
-	gRenderState->SetPushConstants(eShaderType::Vertex, sizeof(ShadowPushConstants));
-	gRenderState->UseRenderStage(RenderStage);
+	gPSOBuild->BeginPipeline(ePipelineName::ShadowDirectional);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(ShadowPushConstants));
+	gPSOBuild->UseRenderStage(RenderStage);
 
-	gRenderState->SetVertexType(eVertexType::Default);
-	gRenderState->SetShader(eShaderName::Shadows, {});
-	gRenderState->SetViewportSize(size);
-	gRenderState->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
-	gRenderState->SetCullMode(eCullMode::Back);
-	gRenderState->SetFaceOrder(eFaceOrder::Reverse);
+	gPSOBuild->SetVertexType(eVertexType::Default);
+	gPSOBuild->SetShader(eShaderName::Shadows, {});
+	gPSOBuild->SetViewportSize(size);
+	gPSOBuild->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
+	gPSOBuild->SetCullMode(eCullMode::Back);
+	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
 
-	gRenderState->EndPipeline();
+	gPSOBuild->EndPipeline();
 
 
 	// PipelineBuilder builder {};

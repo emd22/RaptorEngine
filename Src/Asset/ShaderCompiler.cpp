@@ -43,7 +43,6 @@ static bool IsShaderUpToDate(renderer::ShaderId entry_id, const char* path)
 {
 	BasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
 	if (!entry) {
-		LogWarning(LC_SHADER, "Cannot find entry for shader!");
 		return false;
 	}
 
@@ -115,7 +114,6 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
 
 	// Entry was not found, return null data
 	if (entry == nullptr) {
-		LogWarning(LC_SHADER, "Could not find shader entry");
 		return program;
 	}
 

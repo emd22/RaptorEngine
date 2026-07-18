@@ -172,8 +172,11 @@ void DescriptorSet::AddImage(uint32 bind_index, Image* image, Sampler* sampler)
 
 void DescriptorSet::Build()
 {
+	if (mDescriptorEntries.IsEmpty()) {
+		return;
+	}
+
 	Assert(mbIsBuilt == false);
-	AssertMsg(mDescriptorEntries.IsNotEmpty(), "Descriptor set is missing entries!");
 
 	StackArray<VkDescriptorImageInfo, scMaxImages> image_infos;
 	StackArray<VkDescriptorBufferInfo, scMaxBuffers> buffer_infos;
