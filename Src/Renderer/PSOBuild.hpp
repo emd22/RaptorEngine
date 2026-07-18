@@ -61,7 +61,7 @@ public:
 
 	FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
 
-	FX_FORCE_INLINE void SetFlags(ePSOBuildFlags flags) { mFlags = flags; }
+	FX_FORCE_INLINE void SetFlags(ePSOBuildFlags flags) { mFlags = flags | ePSOBuildFlags::NoAutoDescriptors; }
 	FX_FORCE_INLINE ePSOBuildFlags GetFlags() const { return mFlags; }
 
 	FX_FORCE_INLINE void SetDepthTest(bool value) { mProperties.bDisableDepthTest = !value; }

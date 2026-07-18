@@ -44,8 +44,6 @@ ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro
 		hash = cPrefixHashCS;
 	}
 
-	LogInfo(LC_SHADER, "Building entry ID with {} macros", macros.Size);
-
 	return HashData64(Slice<ShaderMacro>(macros), hash);
 }
 
@@ -54,7 +52,6 @@ bool Shader::PreloadCompiledPrograms(const char* pack_path)
 	bool did_read = mDataPack.ReadFromFile(pack_path);
 
 	if (!did_read) {
-		LogInfo(LC_SHADER, "Could not read compiled shader from {}. Recompiling...", pack_path);
 		return false;
 	}
 
@@ -136,8 +133,6 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
 	// If there is data available, create the program.
 	if (program_data.HasData()) {
-		LogInfo(LC_SHADER, "Data is available, creating shader...");
-
 		Assert(program_data.pProgramData.Size == MathUtil::AlignValue<4>(program_data.pProgramData.Size));
 		Assert(program_data.pProgramData.Size > 0);
 

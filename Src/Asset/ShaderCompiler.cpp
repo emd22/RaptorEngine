@@ -237,7 +237,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 #endif
 		ByteBuffer final_buffer(reflection_header.GetSize() + spirv_bin->GetBufferSize());
 
-		LogWarning(LC_SHADER, "Reflection header: {:p}, {}", reflection_header.pData, reflection_header.GetSize());
 		// Write the reflection header
 		final_buffer.InsertRaw(reflection_header.pData, reflection_header.GetSize());
 		// Write the SPIRV data
@@ -264,8 +263,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
 												bool do_db_flush)
 {
-	LogInfo(LC_SHADER, "Compiling shader {} with {} macros", path, macros.Size);
-
 	File file(path, File::eModType::Read, File::eDataType::Binary);
 	Slice<char> file_data = file.Read<char>();
 

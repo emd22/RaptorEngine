@@ -88,11 +88,22 @@ void PSOBuild::BuildPipeline()
 					   blend_attachments, vertex_ptr, *mpRenderPass, mProperties);
 
 	if (IsFlagSet(mFlags, ePSOBuildFlags::NoAutoDescriptors)) {
-		mpPipeline->DescriptorIDs.Clear();
+		mpPipeline->DescriptorIDs.Free();
+
+		return;
 	}
 
+	mpPipeline->bBindAttachedDescriptors = true;
+
+	LogInfo(LC_RENDER, "Pipeline auto descriptors:");
 	// Build any descriptors that were created
-	for (Hash32 descriptor_id : mpPipeline->DescriptorIDs) {
+	for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Capacity; i++) {
+		Hash32 descriptor_id = mpPipeline->DescriptorIDs[i];
+		if (descriptor_id == HashNull32) {
+			LogWarning("Skipping DS(index {}) as it is null.", i);
+			continue;
+		}
+
 		DescriptorSet* ds = gDescriptorCache->Request(descriptor_id);
 		if (ds == nullptr) {
 			LogError(LC_RENDER, "RenderState: Descriptor set could not be built (not found)");
@@ -141,8 +152,6 @@ void PSOBuild::BuildDescriptorLayouts()
 	}
 
 	// Create the descriptor set layout
-	Pipeline& pl = gPipelineCache->Request(mPipelineName);
-
 
 	// Get the minimum and maximum descriptor sets used by each shader
 	Vec2u vertex_ds_range = GetDescriptorIndexRangeForShader(GetShaderProgram(eShaderType::Vertex));
@@ -158,7 +167,7 @@ void PSOBuild::BuildDescriptorLayouts()
 		mDescriptorLayouts.Size = (max_ds_index - min_ds_index) + 1;
 
 		for (Ref<ShaderProgram>& program : mShaderPrograms) {
-			AddDescriptorsForShaderProgram(pl, program);
+			AddDescriptorsForShaderProgram(*mpPipeline, program);
 		}
 	}
 
@@ -239,6 +248,7 @@ void PSOBuild::AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& 
 
 		VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
 		mDescriptorLayouts[ds_index] = ds_layout;
+
 		pl.DescriptorIDs[ds_index] = descriptor_id;
 		LogInfo("Adding Descriptor {} at set index {}", descriptor_id, ds_index);
 
