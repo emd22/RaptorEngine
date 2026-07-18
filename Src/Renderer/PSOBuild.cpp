@@ -75,7 +75,7 @@ void PSOBuild::BuildPipeline()
 	VertexDescription vertex_desc = VertexUtil::BuildDescription(mVertexType);
 
 	// If there is no `NoVertices` flag set, use the built vertex description.
-	if ((mFlags & eStateFlags::NoVertices) == 0) {
+	if ((mFlags & ePSOBuildFlags::NoVertices) == 0) {
 		vertex_ptr = &vertex_desc;
 	}
 
@@ -86,6 +86,10 @@ void PSOBuild::BuildPipeline()
 
 	mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, pOutputTargets->GetDescriptions(),
 					   blend_attachments, vertex_ptr, *mpRenderPass, mProperties);
+
+	if (IsFlagSet(mFlags, ePSOBuildFlags::NoAutoDescriptors)) {
+		mpPipeline->DescriptorIDs.Clear();
+	}
 
 	// Build any descriptors that were created
 	for (Hash32 descriptor_id : mpPipeline->DescriptorIDs) {
@@ -259,7 +263,7 @@ void PSOBuild::Reset()
 	memset(mPushConstants.pData, 0, mPushConstants.GetSizeInBytes());
 
 	mProperties = PipelineProperties {};
-	mFlags = eStateFlags::None;
+	mFlags = ePSOBuildFlags::NoAutoDescriptors;
 }
 
 } // namespace fx::renderer

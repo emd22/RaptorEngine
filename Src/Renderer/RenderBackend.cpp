@@ -535,7 +535,8 @@ void RenderBackend::BeginGeometry()
 {
 	FrameData* frame = GetFrame();
 
-	pDeferredRenderer->GPass.Begin(frame->CmdBuffer, *pDeferredRenderer->pGeometryPipeline);
+	pDeferredRenderer->GPass.Begin(frame->CmdBuffer);
+	gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 }
 
 void RenderBackend::PresentFrame()
@@ -628,13 +629,16 @@ void RenderBackend::BeginLighting()
 	depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
-	pDeferredRenderer->LightPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::LightingDirectional));
+	pDeferredRenderer->LightPass.Begin(frame->CmdBuffer);
 
 	// gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
 	// gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
 	// gState->Apply(frame->CommandBuffer);
 	// gState->Reset();
 
+
+	gPipelineCache->SetBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 
 	pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 												 gPipelineCache->Request(ePipelineName::LightingDirectional),
@@ -653,9 +657,9 @@ void RenderBackend::BeginUnlit()
 	// Assert(depth_target != nullptr);
 	// depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
-	Pipeline& pl = gPipelineCache->Request(ePipelineName::Unlit);
+	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
+	gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
 
-	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer, pl);
 	/*    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
 									   Slice<VkClearValue>({}, 0));*/
 
@@ -670,7 +674,9 @@ void RenderBackend::DoComposition(Camera& render_cam)
 
 	// pDeferredRenderer->RpForward.End();
 
-	pDeferredRenderer->CompPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Composition));
+	pDeferredRenderer->CompPass.Begin(frame->CmdBuffer);
+	gPipelineCache->Bind(ePipelineName::Composition, frame->CmdBuffer);
+
 	pDeferredRenderer->DoCompPass(render_cam);
 
 	pDeferredRenderer->CompPass.End();

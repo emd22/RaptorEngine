@@ -9,13 +9,14 @@
 #include <Core/SizedArray.hpp>
 
 namespace fx {
-enum class eStateFlags
+enum class ePSOBuildFlags
 {
 	None = 0,
 	NoVertices = (1 << 0),
+	NoAutoDescriptors = (1 << 1),
 };
 
-FxEnumFlags(eStateFlags);
+FxEnumFlags(ePSOBuildFlags);
 } // namespace fx
 
 namespace fx::renderer {
@@ -60,8 +61,8 @@ public:
 
 	FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
 
-	FX_FORCE_INLINE void SetFlags(eStateFlags flags) { mFlags = flags; }
-	FX_FORCE_INLINE eStateFlags GetFlags() const { return mFlags; }
+	FX_FORCE_INLINE void SetFlags(ePSOBuildFlags flags) { mFlags = flags; }
+	FX_FORCE_INLINE ePSOBuildFlags GetFlags() const { return mFlags; }
 
 	FX_FORCE_INLINE void SetDepthTest(bool value) { mProperties.bDisableDepthTest = !value; }
 	FX_FORCE_INLINE void SetDepthWrite(bool value) { mProperties.bDisableDepthWrite = !value; }
@@ -84,6 +85,8 @@ public:
 	{
 		mShaderPrograms[static_cast<uint32>(shader_type) - 1] = program;
 	}
+
+	FX_FORCE_INLINE void EnableAutoDescriptors() { ClearFlag(mFlags, ePSOBuildFlags::NoAutoDescriptors); }
 
 private:
 	void BuildPipeline();
@@ -116,7 +119,7 @@ private:
 
 	bool bBuiltDescriptorLayouts = false;
 
-	eStateFlags mFlags = eStateFlags::None;
+	ePSOBuildFlags mFlags = ePSOBuildFlags::NoAutoDescriptors;
 };
 
 } // namespace fx::renderer

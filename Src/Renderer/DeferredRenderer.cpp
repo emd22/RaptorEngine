@@ -233,7 +233,7 @@ void DeferredRenderer::CreateGPassPipeline()
 	gPSOBuild->EndPipeline();
 
 
-	pGeometryPipeline = &gPipelineCache->Request(ePipelineName::Geometry);
+	pGeometryPipelineName = ePipelineName::Geometry;
 }
 
 void DeferredRenderer::DestroyGPassPipeline()
@@ -364,7 +364,7 @@ void DeferredRenderer::CreateLightingPipeline()
 	gPSOBuild->SetCullMode(eCullMode::None);
 
 	// Since the directional light is a triangle built from the screen coordinates, we won't be passing in vertices.
-	gPSOBuild->SetFlags(eStateFlags::NoVertices);
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 
 	gPSOBuild->AddImageFromTarget(0, 0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
 	gPSOBuild->AddImageFromTarget(1, 0, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
@@ -376,6 +376,8 @@ void DeferredRenderer::CreateLightingPipeline()
 	}
 
 	gPSOBuild->AddBuffer(4, 0, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
+
+	// gPSOBuild->EnableAutoDescriptors();
 
 	gPSOBuild->EndPipeline();
 }
@@ -420,7 +422,7 @@ void DeferredRenderer::CreateCompPipeline()
 
 	gPSOBuild->UseRenderStage(CompPass);
 	gPSOBuild->SetShader(eShaderName::Composition, {});
-	gPSOBuild->SetFlags(eStateFlags::NoVertices);
+	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 	gPSOBuild->SetCullMode(eCullMode::None);
 	gPSOBuild->SetFaceOrder(eFaceOrder::Default);
 	gPSOBuild->SetDepthTest(false);

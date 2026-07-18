@@ -19,6 +19,7 @@ PipelineCache::PipelineCache()
 		mOffsets[i].pData = nullptr;
 		mOffsets[i].Size = 0;
 		mOffsets[i].Capacity = 0;
+		mOffsets[i].bDoNotDestroy = false;
 		mOffsets[i].InitCapacity(scMaxBuffersPerDS);
 	}
 }
@@ -54,14 +55,11 @@ void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd)
 	Reset();
 }
 
-void PipelineCache::SetBufferOffset(uint32 bind_index, uint32 set_index, uint32 offset)
-{
-	mOffsets[set_index][bind_index] = offset;
-}
+void PipelineCache::SetBufferOffset(uint32 set_index, uint32 offset) { mOffsets[set_index].Insert(offset); }
 
 void PipelineCache::Reset()
 {
-	for (uint32 i = 0; i < mOffsets.Size; i++) {
+	for (uint32 i = 0; i < mOffsets.Capacity; i++) {
 		mOffsets[i].Size = 0;
 	}
 

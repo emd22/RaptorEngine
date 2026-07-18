@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Backend/Descriptors.hpp"
+#include "PipelineNames.hpp"
 #include "RenderStage.hpp"
 
 namespace fx {
@@ -84,7 +85,7 @@ public:
 
 	// Pipeline PlGeometrySkinned;
 
-	Pipeline* pGeometryPipeline = nullptr;
+	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;
 
 	//////////////////////
 	// Lighting Pass

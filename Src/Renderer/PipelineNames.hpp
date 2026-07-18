@@ -6,22 +6,22 @@ namespace fx::renderer {
 
 enum class ePipelineName : uint16
 {
-    Geometry,
-    GeometryNormalMaps,
-    GeometrySkinned,
+	Geometry,
+	GeometryNormalMaps,
+	GeometrySkinned,
 
-    LightingOutsideVolume,
-    LightingInsideVolume,
-    LightingDirectional,
-    Unlit,
-    DebugLayer,
+	LightingOutsideVolume,
+	LightingInsideVolume,
+	LightingDirectional,
+	Unlit,
+	DebugLayer,
 
-    TextRendering,
-    Composition,
+	TextRendering,
+	Composition,
 
-    ShadowDirectional,
+	ShadowDirectional,
 
-    NumPipelines
+	NumPipelines
 };
 
 constexpr uint32 scNumPipelines = static_cast<uint32>(ePipelineName::NumPipelines);
@@ -34,25 +34,26 @@ namespace PipelineNameUtil {
 
 constexpr const char* GetName(const ePipelineName id)
 {
-    switch (id) {
-        FX_ENUM_CASE_NAME(Geometry);
-        FX_ENUM_CASE_NAME(GeometryNormalMaps);
-        FX_ENUM_CASE_NAME(GeometrySkinned);
-        // Lighting
-        FX_ENUM_CASE_NAME(LightingOutsideVolume);
-        FX_ENUM_CASE_NAME(LightingInsideVolume);
-        FX_ENUM_CASE_NAME(LightingDirectional);
-        FX_ENUM_CASE_NAME(Unlit);
-        FX_ENUM_CASE_NAME(DebugLayer);
+	switch (id) {
+		FX_ENUM_CASE_NAME(Geometry);
+		FX_ENUM_CASE_NAME(GeometryNormalMaps);
+		FX_ENUM_CASE_NAME(GeometrySkinned);
+		// Lighting
+		FX_ENUM_CASE_NAME(LightingOutsideVolume);
+		FX_ENUM_CASE_NAME(LightingInsideVolume);
+		FX_ENUM_CASE_NAME(LightingDirectional);
 
-        FX_ENUM_CASE_NAME(TextRendering);
-        FX_ENUM_CASE_NAME(Composition);
+		FX_ENUM_CASE_NAME(Unlit);
+		FX_ENUM_CASE_NAME(DebugLayer);
 
-        FX_ENUM_CASE_NAME(ShadowDirectional);
-    default:;
-    }
+		FX_ENUM_CASE_NAME(TextRendering);
+		FX_ENUM_CASE_NAME(Composition);
 
-    return "Unknown";
+		FX_ENUM_CASE_NAME(ShadowDirectional);
+	default:;
+	}
+
+	return "Unknown";
 }
 
 #undef ENUM_TYPE
