@@ -161,6 +161,9 @@ void DeferredRenderer::CreateUnlitPipeline()
 
 	gRenderState->EndPipeline();
 
+	gRenderState->AddBuffer(0, 2, &gObjectManager->mObjectGpuBuffer, 0, 100);
+
+
 	// Text rendering pipeline
 	gRenderState->BeginPipeline(ePipelineName::TextRendering);
 	gRenderState->SetLayout(ePipelineName::Unlit);

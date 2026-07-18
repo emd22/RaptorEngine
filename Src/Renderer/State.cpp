@@ -211,6 +211,8 @@ void RenderState::AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram
 		VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
 		mDescriptorLayouts[ds_index] = ds_layout;
 		pl.DescriptorIDs[ds_index] = descriptor_id;
+
+		gDescriptorCache->Request(program->ShaderType, refl, ds_index);
 	}
 
 	// Set the size to be the max descriptor set index
