@@ -671,7 +671,7 @@ static void SaveProgramToDisk(const char* name, eShaderType shader_type, const R
 	const DataBuffer& buffer = result.ProgramData[static_cast<uint32>(shader_type)];
 
 	if (buffer.Size > 0) {
-		std::string sname = std::string(name) + "_" + renderer::ShaderUtil::TypeToName(shader_type) + ".hlsl";
+		std::string sname = std::string(name) + "_" + ShaderUtil::TypeToName(shader_type) + ".hlsl";
 		File file(sname.c_str(), File::eModType::Write, File::eDataType::Binary);
 		file.Write(Slice<char>(buffer.pData, buffer.Size));
 		file.Close();

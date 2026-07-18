@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ShaderReflection.hpp"
+#include "ShaderType.hpp"
 
 #include <Asset/ShaderCompiler.hpp>
 #include <Core/Ref.hpp>
@@ -13,15 +14,6 @@
 
 namespace fx {
 
-enum class eShaderType : uint16
-{
-	None = 0,
-	Vertex = (1 << 0),
-	Pixel = (1 << 1),
-	Compute = (1 << 2),
-};
-
-FxEnumFlags(eShaderType);
 
 struct ProgramData
 {
@@ -38,50 +30,6 @@ namespace renderer {
 class Shader;
 class CommandBuffer;
 class Pipeline;
-
-using ShaderId = Hash64;
-
-namespace ShaderUtil {
-static constexpr uint32 scNumShaderTypes = static_cast<uint32>(eShaderType::Compute) + 1;
-
-/**
- * @brief Get the underlying Vulkan shader stage bit for an ShaderType.
- */
-static constexpr VkShaderStageFlags ToUnderlyingType(eShaderType type)
-{
-	VkShaderStageFlags flags = 0;
-
-	if ((type & eShaderType::Vertex) != 0) {
-		flags |= VK_SHADER_STAGE_VERTEX_BIT;
-	}
-
-	if ((type & eShaderType::Pixel) != 0) {
-		flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
-	}
-
-	if ((type & eShaderType::Compute) != 0) {
-		flags |= VK_SHADER_STAGE_COMPUTE_BIT;
-	}
-
-	return flags;
-}
-
-static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
-{
-	switch (type) {
-	case eShaderType::Vertex:
-		return "Vertex";
-	case eShaderType::Pixel:
-		return "Pixel";
-	case eShaderType::Compute:
-		return "Compute";
-	default:;
-	}
-
-	return "Unknown";
-}
-}; // namespace ShaderUtil
-
 
 struct ShaderDescriptorId
 {

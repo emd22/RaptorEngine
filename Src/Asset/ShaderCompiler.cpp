@@ -39,7 +39,7 @@ static BasicDb sShaderCompileDb;
 
 using CompileResult = ShaderCompiler::eResult;
 
-static bool IsShaderUpToDate(renderer::ShaderId entry_id, const char* path)
+static bool IsShaderUpToDate(ShaderId entry_id, const char* path)
 {
 	BasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
 	if (!entry) {
@@ -62,7 +62,7 @@ bool ShaderCompiler::IsOutOfDate(const char* path)
 		sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
 	}
 
-	renderer::ShaderId compile_entry_id = HashStr64(path);
+	ShaderId compile_entry_id = HashStr64(path);
 
 	return !IsShaderUpToDate(compile_entry_id, path);
 }
@@ -224,7 +224,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 	CComPtr<IDxcBlob> spirv_bin;
 	result->GetResult(&spirv_bin);
 
-	const renderer::ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
+	const ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
 
 	LogInfo(LC_SHADER, "Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
 

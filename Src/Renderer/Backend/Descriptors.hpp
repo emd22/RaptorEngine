@@ -3,6 +3,7 @@
 #include "Device.hpp"
 #include "GpuBuffer.hpp"
 #include "Sampler/Sampler.hpp"
+#include "ShaderType.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -87,6 +88,8 @@ public:
 	static void BindMultipleOffset(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
 								   const Pipeline& pipeline, const Slice<VkDescriptorSet>& sets,
 								   const Slice<uint32>& offsets);
+
+	void Bind(const CommandBuffer& cmd, const Pipeline& pipeline, const Slice<uint32> buffer_offsets);
 
 	void BindWithOffset(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
 						const Pipeline& pipeline, uint32 offset) const;
