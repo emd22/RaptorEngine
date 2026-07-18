@@ -12,7 +12,7 @@
 
 namespace fx::renderer {
 
-void State::BeginPipeline(ePipelineName name)
+void RenderState::BeginPipeline(ePipelineName name)
 {
 	mPipelineName = name;
 	mpPipeline = &gPipelineCache->Request(name);
@@ -22,7 +22,7 @@ void State::BeginPipeline(ePipelineName name)
 	}
 }
 
-void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
+void RenderState::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& macros)
 {
 	Ref<Shader> shader = gShaderCache->Request(shader_name);
 
@@ -31,16 +31,16 @@ void State::SetShader(eShaderName shader_name, const SizedArray<ShaderMacro>& ma
 	SetShaderProgram(eShaderType::Compute, shader->GetProgram(eShaderType::Compute, macros));
 }
 
-void State::UseRenderStage(RenderStage& stage)
+void RenderState::UseRenderStage(RenderStage& stage)
 {
 	SetOutputTargets(&stage.GetTargets());
 	SetRenderPass(&stage.GetRenderPass());
 }
 
-void State::SetLayout(const PipelineLayout& layout) { mpPipeline->SetLayout(layout); }
-void State::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout); }
+void RenderState::SetLayout(const PipelineLayout& layout) { mpPipeline->SetLayout(layout); }
+void RenderState::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout); }
 
-void State::BuildPipeline()
+void RenderState::BuildPipeline()
 {
 	if (!mpPipeline->HasLayout()) {
 		BuildLayout();
@@ -79,13 +79,13 @@ void State::BuildPipeline()
 					   blend_attachments, vertex_ptr, *mpRenderPass, mProperties);
 }
 
-void State::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
+void RenderState::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
 {
 	BlendAttachments.AddAttachment(target_index, blend_attachment);
 }
 
 
-void State::SetPushConstants(eShaderType type, uint32 pc_size)
+void RenderState::SetPushConstants(eShaderType type, uint32 pc_size)
 {
 	PushConstants* pc = mPushConstants.Insert();
 
@@ -109,10 +109,13 @@ static Vec2u GetDescriptorIndexRangeForShader(const Ref<ShaderProgram>& program)
 	return Vec2u(static_cast<uint32>(min_set), static_cast<uint32>(max_set));
 }
 
-PipelineLayout State::BuildLayout()
+PipelineLayout RenderState::BuildLayout()
 {
 	// Create the descriptor set layout
 	{
+		Pipeline& pl = gPipelineCache->Request(mPipelineName);
+		pl.DescriptorIDs.InitCapacity(8);
+
 		// Get the minimum and maximum descriptor sets used by each shader
 		Vec2u vertex_ds_range = GetDescriptorIndexRangeForShader(GetShaderProgram(eShaderType::Vertex));
 		Vec2u pixel_ds_range = GetDescriptorIndexRangeForShader(GetShaderProgram(eShaderType::Pixel));
@@ -127,7 +130,7 @@ PipelineLayout State::BuildLayout()
 			mDescriptorLayouts.Size = (max_ds_index - min_ds_index) + 1;
 
 			for (Ref<ShaderProgram>& program : mShaderPrograms) {
-				AddDescriptorsForShaderProgram(program);
+				AddDescriptorsForShaderProgram(pl, program);
 			}
 		}
 	}
@@ -136,23 +139,55 @@ PipelineLayout State::BuildLayout()
 	return mpPipeline->Layout;
 }
 
-void State::SetRenderPass(RenderPass* rp) { mpRenderPass = rp; }
-void State::SetOutputTargets(TargetList* targets) { pOutputTargets = targets; }
+void RenderState::SetRenderPass(RenderPass* rp) { mpRenderPass = rp; }
+void RenderState::SetOutputTargets(TargetList* targets) { pOutputTargets = targets; }
 
-void State::EndPipeline()
+void RenderState::EndPipeline()
 {
 	BuildPipeline();
 	Reset();
 }
 
+DescriptorSet* RenderState::GetDescriptorSet(eShaderType shader_type, uint32 set_index)
+{
+	Pipeline& pl = gPipelineCache->Request(mPipelineName);
+	if (!pl.DescriptorIDs.IsInited()) {
+		return nullptr;
+	}
 
-void State::AddBuffer(eShaderType shader_type, uint32 bind_index, RawGpuBuffer* buffer, uint64 offset, uint64 range) {}
-
-void State::AddImage(eShaderType shader_type, uint32 bind_index, Image* image, Sampler* sampler) {}
-void State::AddImageFromTarget(eShaderType shader_type, uint32 bind_index, Target* target, Sampler* sampler) {}
+	return nullptr;
+}
 
 
-void State::AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program)
+void RenderState::AddBuffer(uint32 bind_index, uint32 set_index, RawGpuBuffer* buffer, uint64 offset, uint64 range)
+{
+	Pipeline& pl = gPipelineCache->Request(mPipelineName);
+	DescriptorSet* set = gDescriptorCache->Request(pl.DescriptorIDs[set_index]);
+
+	Assert(set != nullptr);
+	set->AddBuffer(bind_index, buffer, offset, range);
+}
+
+void RenderState::AddImage(uint32 bind_index, uint32 set_index, Image* image, Sampler* sampler)
+{
+	Pipeline& pl = gPipelineCache->Request(mPipelineName);
+	DescriptorSet* set = gDescriptorCache->Request(pl.DescriptorIDs[set_index]);
+
+	Assert(set != nullptr);
+	set->AddImage(bind_index, image, sampler);
+}
+
+void RenderState::AddImageFromTarget(uint32 bind_index, uint32 set_index, Target* target, Sampler* sampler)
+{
+	Pipeline& pl = gPipelineCache->Request(mPipelineName);
+	DescriptorSet* set = gDescriptorCache->Request(pl.DescriptorIDs[set_index]);
+
+	Assert(set != nullptr);
+	set->AddImageFromTarget(bind_index, target, sampler);
+}
+
+
+void RenderState::AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& program)
 {
 	if (!program.IsValid()) {
 		return;
@@ -162,13 +197,27 @@ void State::AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program)
 
 	const SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
 
+	int32 max_index = 0;
+
 	for (int32 ds_index = ds_index_range.X; ds_index <= ds_index_range.Y; ds_index++) {
+		if (ds_index > max_index) {
+			max_index = ds_index;
+		}
+
+		Hash32 descriptor_id = gDsLayoutCache->GetID(program->ShaderType,
+													 gDsLayoutCache->GetEntriesForSet(refl, ds_index));
+
+
 		VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
-		mDescriptorLayouts[ds_index] = (ds_layout);
+		mDescriptorLayouts[ds_index] = ds_layout;
+		pl.DescriptorIDs[ds_index] = descriptor_id;
 	}
+
+	// Set the size to be the max descriptor set index
+	pl.DescriptorIDs.Size = std::max(static_cast<int32>(pl.DescriptorIDs.Size), max_index);
 }
 
-void State::Reset()
+void RenderState::Reset()
 {
 	mpPipeline = nullptr;
 	mpRenderPass = nullptr;

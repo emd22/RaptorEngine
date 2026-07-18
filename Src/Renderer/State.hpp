@@ -23,7 +23,7 @@ namespace fx::renderer {
 class RenderPass;
 class RenderStage;
 
-class State
+class RenderState
 {
 public:
 	/**
@@ -53,9 +53,9 @@ public:
 	/////////////////////////////////////
 	void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
 
-	void AddBuffer(eShaderType shader_type, uint32 bind_index, RawGpuBuffer* buffer, uint64 offset, uint64 range);
-	void AddImage(eShaderType shader_type, uint32 bind_index, Image* image, Sampler* sampler);
-	void AddImageFromTarget(eShaderType shader_type, uint32 bind_index, Target* target, Sampler* sampler);
+	void AddBuffer(uint32 bind_index, uint32 set_index, RawGpuBuffer* buffer, uint64 offset, uint64 range);
+	void AddImage(uint32 bind_index, uint32 set_index, Image* image, Sampler* sampler);
+	void AddImageFromTarget(uint32 bind_index, uint32 set_index, Target* target, Sampler* sampler);
 
 
 	FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
@@ -89,7 +89,9 @@ private:
 	void BuildPipeline();
 	void Reset();
 
-	void AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program);
+	DescriptorSet* GetDescriptorSet(eShaderType shader_type, uint32 set_index);
+
+	void AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& program);
 
 public:
 	TargetList* pOutputTargets;

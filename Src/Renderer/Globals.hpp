@@ -20,8 +20,11 @@ extern SamplerCache* gSamplerCache;
 class DsLayoutCache;
 extern DsLayoutCache* gDsLayoutCache;
 
-class State;
-extern State* gState;
+class DescriptorCache;
+extern DescriptorCache* gDescriptorCache;
+
+class RenderState;
+extern RenderState* gRenderState;
 
 namespace Globals {
 

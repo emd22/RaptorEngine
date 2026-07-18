@@ -50,6 +50,8 @@ struct ShaderReflectionEntry
 	{
 	}
 
+	bool RequiresOffset() const { return ShaderReflectionUtil::RequiresOffset(Type); }
+
 	uint32 AsUInt() const
 	{
 		const uint32 value = (static_cast<uint32>(Type) << 16) | (static_cast<uint32>(Set) << 8) |

@@ -3,22 +3,28 @@
 namespace fx {
 
 class PhJolt;
-class AssetManager;
-class ShaderCompiler;
-class ObjectManager;
-class MaterialManager;
-class MemPool;
-class WorldGrid;
-class TextureManager;
-
 extern PhJolt* gPhysics;
+
+class AssetManager;
 extern AssetManager* gAssetManager;
-extern ObjectManager* gObjectManager;
+
+class ShaderCompiler;
 extern ShaderCompiler* gShaderCompiler;
+
+class ObjectManager;
+extern ObjectManager* gObjectManager;
+
+class MaterialManager;
 extern MaterialManager* gMaterialManager;
+
+class MemPool;
 extern MemPool* gEnginePool;
 extern MemPool* gScriptMemPool;
+
+class WorldGrid;
 extern WorldGrid* gWorldGrid;
+
+class TextureManager;
 extern TextureManager* gTextureManager;
 
 
