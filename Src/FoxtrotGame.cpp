@@ -617,7 +617,8 @@ void FoxtrotGame::DestroyGame()
 	gMaterialManager->Destroy();
 	gAssetManager->Shutdown();
 
-	gRenderer->pDeferredRenderer.DestroyRef();
+	delete gRenderer->pDeferredRenderer;
+	gRenderer->pDeferredRenderer = nullptr;
 }
 
 void FoxtrotGame::AddEditorModes()

@@ -183,6 +183,8 @@ public:
 	PipelineLayout Layout;
 	VkPipeline InternalPipeline = nullptr;
 
+	SizedArray<Hash32> DescriptorIDs;
+
 	mutable Vec2u ViewportSize = Vec2u::sZero;
 
 	String Name;

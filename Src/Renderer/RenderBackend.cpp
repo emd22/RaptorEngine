@@ -128,7 +128,7 @@ void RenderBackend::Init(Vec2u window_size)
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
-	pDeferredRenderer = MakeRef<DeferredRenderer>();
+	pDeferredRenderer = new DeferredRenderer;
 	pDeferredRenderer->Create(Swapchain.Extent);
 
 	bInitialized = true;
@@ -206,7 +206,7 @@ void RenderBackend::DestroyFrames()
 
 void RenderBackend::RebuildRenderStages()
 {
-	DeferredRenderer* rd = pDeferredRenderer.mpPtr;
+	DeferredRenderer* rd = pDeferredRenderer;
 
 	Vec2u size = GetWindow()->GetSize();
 

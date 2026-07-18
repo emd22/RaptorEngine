@@ -138,8 +138,6 @@ public:
 	VkShaderModule InternalShader = nullptr;
 	Shader* pShader = nullptr;
 
-	DescriptorSet Descriptor;
-
 	SizedArray<ShaderReflectionEntry> Reflection;
 	eShaderType ShaderType = eShaderType::Vertex;
 };

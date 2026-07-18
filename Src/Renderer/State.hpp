@@ -106,7 +106,7 @@ private:
 	StackArray<Ref<ShaderProgram>, (ShaderUtil::scNumShaderTypes - 1)> mShaderPrograms;
 
 	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
-	SizedArray<VkDescriptorSetLayout> mDescriptors;
+	SizedArray<VkDescriptorSetLayout> mDescriptorLayouts;
 
 	PipelineProperties mProperties;
 

@@ -27,9 +27,9 @@ namespace fx::renderer {
 
 enum class eFrameResult
 {
-    Success,
-    GraphicsOutOfDate,
-    RenderError,
+	Success,
+	GraphicsOutOfDate,
+	RenderError,
 };
 
 class DeferredRenderer;
@@ -38,210 +38,210 @@ class DeferredCompPass;
 
 struct GpuUploadContext
 {
-    CommandPool CmdPool;
-    CommandBuffer CmdBuffer;
-    CommandBuffer ImmediateCmdBuffer;
+	CommandPool CmdPool;
+	CommandBuffer CmdBuffer;
+	CommandBuffer ImmediateCmdBuffer;
 
-    Fence UploadFence;
-    Fence ImmediateUploadFence;
+	Fence UploadFence;
+	Fence ImmediateUploadFence;
 
-    ~GpuUploadContext() = default;
+	~GpuUploadContext() = default;
 };
 
 
 class RenderBackend
 {
-    const uint32 scDeletionFrameSpacing = 3;
+	const uint32 scDeletionFrameSpacing = 3;
 
-    static constexpr uint32 scLightUniformSize = 240;
-
-public:
-    using SubmitFunc = std::function<void(CommandBuffer& cmd)>;
+	static constexpr uint32 scLightUniformSize = 240;
 
 public:
-    RenderBackend() = default;
+	using SubmitFunc = std::function<void(CommandBuffer& cmd)>;
 
-    using ExtensionList = SizedArray<VkExtensionProperties>;
-    using ExtensionNames = std::vector<const char*>;
+public:
+	RenderBackend() = default;
 
-    void Init(Vec2u window_size);
-    void Destroy();
+	using ExtensionList = SizedArray<VkExtensionProperties>;
+	using ExtensionNames = std::vector<const char*>;
 
-    eFrameResult BeginFrame();
-    void BeginGeometry();
-    void BeginLighting();
-    void BeginUnlit();
-    void DoComposition(Camera& render_cam);
+	void Init(Vec2u window_size);
+	void Destroy();
 
-    void RebuildToResizedWindow();
+	eFrameResult BeginFrame();
+	void BeginGeometry();
+	void BeginLighting();
+	void BeginUnlit();
+	void DoComposition(Camera& render_cam);
 
-    void SelectWindow(const Ref<Window>& window) { mpWindow = window; }
+	void RebuildToResizedWindow();
 
-    FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
-    FX_FORCE_INLINE GpuDevice* GetDevice() { return &mDevice; }
+	void SelectWindow(const Ref<Window>& window) { mpWindow = window; }
 
-    void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
-    {
-        SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
+	FX_FORCE_INLINE GpuDevice* GetDevice() { return &mDevice; }
 
-        DeletionObject obj = {
-            .Buffer = buffer,
-            .Allocation = allocation,
-            .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
-            .bIsGpuBuffer = true,
-        };
+	void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
+	{
+		SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 
-        deletion_queue->Push(std::move(obj));
-    }
+		DeletionObject obj = {
+			.Buffer = buffer,
+			.Allocation = allocation,
+			.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
+			.bIsGpuBuffer = true,
+		};
 
-    VkInstance GetVulkanInstance() { return mInstance; }
+		deletion_queue->Push(std::move(obj));
+	}
 
-    FrameData* GetFrame();
+	VkInstance GetVulkanInstance() { return mInstance; }
 
-    uint32 GetImageIndex() const { return mImageIndex; }
-    VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
+	FrameData* GetFrame();
 
-    template <typename T>
-    void SubmitPushConstants(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
-                             const T& value) const
-    {
-        SubmitPushConstantsRaw(cmd, pipeline, shader_types, &value, sizeof(T));
-    }
+	uint32 GetImageIndex() const { return mImageIndex; }
+	VmaAllocator* GetGPUAllocator() { return &GpuAllocator; }
+
+	template <typename T>
+	void SubmitPushConstants(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+							 const T& value) const
+	{
+		SubmitPushConstantsRaw(cmd, pipeline, shader_types, &value, sizeof(T));
+	}
 
 
-    void BeginUploads();
-    void SubmitUploads();
+	void BeginUploads();
+	void SubmitUploads();
 
-    void SubmitUploadCmd(SubmitFunc func);
-    void SubmitImmediateUploadCmd(SubmitFunc func);
-    void SubmitOneTimeCmd(SubmitFunc func);
+	void SubmitUploadCmd(SubmitFunc func);
+	void SubmitImmediateUploadCmd(SubmitFunc func);
+	void SubmitOneTimeCmd(SubmitFunc func);
 
-    ~RenderBackend() { Destroy(); }
+	~RenderBackend() { Destroy(); }
 
-    bool ProcessDeletionQueue(bool immediate, Queue<DeletionObject>& deletion_queue)
-    {
-        // if (immediate) {
-        //     mInDeletionQueue.lock();
-        // }
-        // else if (!mInDeletionQueue.try_lock()) {
-        //     return false;
-        // }
+	bool ProcessDeletionQueue(bool immediate, Queue<DeletionObject>& deletion_queue)
+	{
+		// if (immediate) {
+		//     mInDeletionQueue.lock();
+		// }
+		// else if (!mInDeletionQueue.try_lock()) {
+		//     return false;
+		// }
 
-        if (deletion_queue.IsEmpty()) {
-            return false;
-        }
+		if (deletion_queue.IsEmpty()) {
+			return false;
+		}
 
-        DeletionObject& object = deletion_queue.First();
+		DeletionObject& object = deletion_queue.First();
 
-        const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
+		const bool is_frame_spaced = (mInternalFrameCounter >= object.DeletionFrameNumber);
 
-        bool did_delete = false;
+		bool did_delete = false;
 
-        if (immediate || is_frame_spaced) {
-            if (object.bIsGpuBuffer) {
-                vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
-            }
-            else {
-                object.Func(&object);
-            }
+		if (immediate || is_frame_spaced) {
+			if (object.bIsGpuBuffer) {
+				vmaDestroyBuffer(GpuAllocator, object.Buffer, object.Allocation);
+			}
+			else {
+				object.Func(&object);
+			}
 
-            did_delete = true;
-            deletion_queue.Pop();
-        }
+			did_delete = true;
+			deletion_queue.Pop();
+		}
 
-        return did_delete;
-    }
+		return did_delete;
+	}
 
-    void AddToDeletionQueue(DeletionObject::FuncType func)
-    {
-        SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	void AddToDeletionQueue(DeletionObject::FuncType func)
+	{
+		SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 
-        DeletionObject obj = {
-            .DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
-            .Func = func,
-        };
+		DeletionObject obj = {
+			.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
+			.Func = func,
+		};
 
-        deletion_queue->Push(std::move(obj));
-    }
+		deletion_queue->Push(std::move(obj));
+	}
 
-    uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
-    uint32 GetFrameNumber() const { return mFrameNumber; }
+	uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
+	uint32 GetFrameNumber() const { return mFrameNumber; }
 
-    FX_FORCE_INLINE bool DidResize() const { return bDidFrameResize; }
+	FX_FORCE_INLINE bool DidResize() const { return bDidFrameResize; }
 
 private:
-    void InitVulkan();
-    void CreateSurfaceFromWindow();
+	void InitVulkan();
+	void CreateSurfaceFromWindow();
 
-    void InitGPUAllocator();
-    void DestroyGPUAllocator();
+	void InitGPUAllocator();
+	void DestroyGPUAllocator();
 
-    void InitUploadContext();
-    void DestroyUploadContext();
+	void InitUploadContext();
+	void DestroyUploadContext();
 
-    void PresentFrame();
+	void PresentFrame();
 
-    void InitFrames();
-    void DestroyFrames();
+	void InitFrames();
+	void DestroyFrames();
 
-    void RebuildRenderStages();
+	void RebuildRenderStages();
 
-    bool RequiresVulkanPortability();
+	bool RequiresVulkanPortability();
 
-    eFrameResult GetNextSwapchainImage(FrameData* frame);
+	eFrameResult GetNextSwapchainImage(FrameData* frame);
 
-    ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
-    ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
-    ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
+	ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
+	ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
+	ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
 
-    void SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
-                                const void* data, uint32 data_size) const;
+	void SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
+								const void* data, uint32 data_size) const;
 
-    SizedArray<VkLayerProperties> GetAvailableValidationLayers();
+	SizedArray<VkLayerProperties> GetAvailableValidationLayers();
 
 
 public:
-    Swapchain Swapchain;
-    SizedArray<FrameData> Frames;
+	Swapchain Swapchain;
+	SizedArray<FrameData> Frames;
 
-    VmaAllocator GpuAllocator = nullptr;
+	VmaAllocator GpuAllocator = nullptr;
 
-    GpuUploadContext UploadContext;
+	GpuUploadContext UploadContext;
 
-    bool bInitialized = false;
-    bool bDidFrameResize = false;
+	bool bInitialized = false;
+	bool bDidFrameResize = false;
 
-    DeferredCompPass* pCurrentCompPass = nullptr;
-    DeferredLightingPass* pCurrentLightingPass = nullptr;
+	DeferredCompPass* pCurrentCompPass = nullptr;
+	DeferredLightingPass* pCurrentLightingPass = nullptr;
 
-    Ref<DeferredRenderer> pDeferredRenderer { nullptr };
+	DeferredRenderer* pDeferredRenderer { nullptr };
 
-    Uniforms LightBuffer;
-    Uniforms BoneBuffer;
+	Uniforms LightBuffer;
+	Uniforms BoneBuffer;
 
 private:
-    VkInstance mInstance = nullptr;
-    VkSurfaceKHR mWindowSurface = nullptr;
+	VkInstance mInstance = nullptr;
+	VkSurfaceKHR mWindowSurface = nullptr;
 
-    Ref<Window> mpWindow = nullptr;
-    GpuDevice mDevice;
+	Ref<Window> mpWindow = nullptr;
+	GpuDevice mDevice;
 
-    VkDebugUtilsMessengerEXT mDebugMessenger;
+	VkDebugUtilsMessengerEXT mDebugMessenger;
 
-    ExtensionList mAvailableExtensions;
+	ExtensionList mAvailableExtensions;
 
-    SizedArray<Semaphore> mSubmitSemaphores;
+	SizedArray<Semaphore> mSubmitSemaphores;
 
-    uint32 mImageIndex = 0;
+	uint32 mImageIndex = 0;
 
 
 protected:
-    uint32 mFrameNumber = 0;
-    std::atomic_uint32_t mInternalFrameCounter = 0;
+	uint32 mFrameNumber = 0;
+	std::atomic_uint32_t mInternalFrameCounter = 0;
 
-    TSQueue<DeletionObject> mDeletionQueue;
-    // std::mutex mInDeletionQueue;
-    // std::deque<DeletionObject> mDeletionQueue;
+	TSQueue<DeletionObject> mDeletionQueue;
+	// std::mutex mInDeletionQueue;
+	// std::deque<DeletionObject> mDeletionQueue;
 };
 
 } // namespace fx::renderer

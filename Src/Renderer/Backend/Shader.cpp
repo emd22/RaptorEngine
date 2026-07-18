@@ -212,7 +212,7 @@ void ShaderProgram::BuildDescriptor()
 
 	layout_builder.Build();
 
-	Descriptor.Create(gRenderer->pDeferredRenderer->DescriptorPool, layout_builder.Build(), has_dynamic_offsets);
+	// Descriptor.Create(gRenderer->pDeferredRenderer->DescriptorPool, layout_builder.Build(), has_dynamic_offsets);
 }
 
 

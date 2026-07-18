@@ -17,8 +17,8 @@ void State::BeginPipeline(ePipelineName name)
 	mPipelineName = name;
 	mpPipeline = &gPipelineCache->Request(name);
 
-	if (!mDescriptors.IsInited()) {
-		mDescriptors.InitCapacity(10);
+	if (!mDescriptorLayouts.IsInited()) {
+		mDescriptorLayouts.InitCapacity(10);
 	}
 }
 
@@ -124,7 +124,7 @@ PipelineLayout State::BuildLayout()
 		const uint32 min_ds_index = ds_range_combined.X;
 
 		if (max_ds_index >= min_ds_index) {
-			mDescriptors.Size = (max_ds_index - min_ds_index) + 1;
+			mDescriptorLayouts.Size = (max_ds_index - min_ds_index) + 1;
 
 			for (Ref<ShaderProgram>& program : mShaderPrograms) {
 				AddDescriptorsForShaderProgram(program);
@@ -132,7 +132,7 @@ PipelineLayout State::BuildLayout()
 		}
 	}
 
-	mpPipeline->Layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptors));
+	mpPipeline->Layout = PipelineLayout(Slice(mPushConstants), Slice(mDescriptorLayouts));
 	return mpPipeline->Layout;
 }
 
@@ -164,7 +164,7 @@ void State::AddDescriptorsForShaderProgram(Ref<ShaderProgram>& program)
 
 	for (int32 ds_index = ds_index_range.X; ds_index <= ds_index_range.Y; ds_index++) {
 		VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
-		mDescriptors[ds_index] = (ds_layout);
+		mDescriptorLayouts[ds_index] = (ds_layout);
 	}
 }
 
@@ -174,7 +174,7 @@ void State::Reset()
 	mpRenderPass = nullptr;
 
 	mPushConstants.Clear();
-	mDescriptors.Clear();
+	mDescriptorLayouts.Clear();
 
 	BlendAttachments.Clear();
 
