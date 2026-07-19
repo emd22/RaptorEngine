@@ -23,9 +23,6 @@ void PSOBuild::BeginPipeline(ePipelineName name)
 
 	if (!mpPipeline->DescriptorIDs.IsInited()) {
 		mpPipeline->DescriptorIDs.InitCapacity(8);
-		for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Capacity; i++) {
-			mpPipeline->DescriptorIDs[i] = HashNull32;
-		}
 	}
 }
 
@@ -84,10 +81,10 @@ void PSOBuild::BuildPipeline()
 	SizedArray<VkPipelineColorBlendAttachmentState> blend_attachments = BlendAttachments.GetVkAttachments(
 		color_only_targets.Size);
 
-	mpPipeline->Create(PipelineNameUtil::GetName(mPipelineName), shader_list, pOutputTargets->GetDescriptions(),
-					   blend_attachments, vertex_ptr, *mpRenderPass, mProperties);
+	mpPipeline->Create(mPipelineName, shader_list, pOutputTargets->GetDescriptions(), blend_attachments, vertex_ptr,
+					   *mpRenderPass, mProperties);
 
-	if (IsFlagSet(mFlags, ePSOBuildFlags::NoAutoDescriptors)) {
+	if (!IsFlagSet(mFlags, ePSOBuildFlags::UseAutoDescriptors)) {
 		mpPipeline->DescriptorIDs.Free();
 
 		return;
@@ -98,16 +95,17 @@ void PSOBuild::BuildPipeline()
 	LogInfo(LC_RENDER, "Pipeline auto descriptors:");
 	// Build any descriptors that were created
 	for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Capacity; i++) {
-		Hash32 descriptor_id = mpPipeline->DescriptorIDs[i];
-		if (descriptor_id == HashNull32) {
+		Pipeline::DescriptorRef& desc_ref = mpPipeline->DescriptorIDs[i];
+
+		if (desc_ref.ID == HashNull32) {
 			LogWarning("Skipping DS(index {}) as it is null.", i);
 			continue;
 		}
 
-		DescriptorSet* ds = gDescriptorCache->Request(descriptor_id);
+		DescriptorSet* ds = gDescriptorCache->Request(desc_ref.ID);
 		if (ds == nullptr) {
 			LogError(LC_RENDER, "RenderState: Descriptor set could not be built (not found)");
-			LogError(LC_RENDER, "RenderState: Descriptor set ID is {} ({} logged descriptors)", descriptor_id,
+			LogError(LC_RENDER, "RenderState: Descriptor set ID is {} ({} logged descriptors)", desc_ref.ID,
 					 mpPipeline->DescriptorIDs.Size);
 			continue;
 		}
@@ -195,10 +193,10 @@ DescriptorSet* PSOBuild::StartDescriptorUpdate(uint32 set_index)
 
 	BuildDescriptorLayouts();
 
-	const Hash32 id = mpPipeline->DescriptorIDs[set_index];
-	AssertMsg(id != HashNull32, "Descriptor ID does not exist");
+	Pipeline::DescriptorRef& desc_ref = mpPipeline->DescriptorIDs[set_index];
+	AssertMsg(desc_ref.ID != HashNull32, "Descriptor ID does not exist");
 
-	DescriptorSet* set = gDescriptorCache->Request(id);
+	DescriptorSet* set = gDescriptorCache->Request(desc_ref.ID);
 	AssertMsg(set != nullptr, "StartDescriptorUpdate: Cannot retrieve descriptor set");
 
 	return set;
@@ -234,12 +232,9 @@ void PSOBuild::AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& 
 
 	const SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
 
-	int32 max_index = 0;
-
 	for (int32 ds_index = ds_index_range.X; ds_index <= ds_index_range.Y; ds_index++) {
-		if (ds_index > max_index) {
-			max_index = ds_index;
-		}
+		LogInfo("Building Descriptor Set {}:", ds_index);
+
 
 		Hash32 descriptor_id = gDsLayoutCache->GetID(program->ShaderType,
 													 gDsLayoutCache->GetEntriesForSet(refl, ds_index));
@@ -249,14 +244,15 @@ void PSOBuild::AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& 
 		VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
 		mDescriptorLayouts[ds_index] = ds_layout;
 
-		pl.DescriptorIDs[ds_index] = descriptor_id;
+		pl.DescriptorIDs.Insert(Pipeline::DescriptorRef { static_cast<uint32>(ds_index), descriptor_id });
 		LogInfo("Adding Descriptor {} at set index {}", descriptor_id, ds_index);
 
 		gDescriptorCache->Request(program->ShaderType, refl, ds_index);
 	}
 
+
 	// Set the size to be the max descriptor set index
-	pl.DescriptorIDs.Size = std::max(static_cast<int32>(pl.DescriptorIDs.Size), max_index);
+	// pl.DescriptorIDs.Size = std::max(static_cast<int32>(pl.DescriptorIDs.Size), max_index);
 }
 
 void PSOBuild::Reset()
@@ -273,7 +269,7 @@ void PSOBuild::Reset()
 	memset(mPushConstants.pData, 0, mPushConstants.GetSizeInBytes());
 
 	mProperties = PipelineProperties {};
-	mFlags = ePSOBuildFlags::NoAutoDescriptors;
+	mFlags = ePSOBuildFlags::None;
 }
 
 } // namespace fx::renderer

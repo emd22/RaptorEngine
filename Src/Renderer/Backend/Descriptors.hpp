@@ -89,7 +89,8 @@ public:
 								   const Pipeline& pipeline, const Slice<VkDescriptorSet>& sets,
 								   const Slice<uint32>& offsets);
 
-	void Bind(const CommandBuffer& cmd, const Pipeline& pipeline, const Slice<uint32> buffer_offsets);
+	void Bind(uint32 ds_set_index, const CommandBuffer& cmd, const Pipeline& pipeline,
+			  const Slice<uint32> buffer_offsets);
 
 	void BindWithOffset(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
 						const Pipeline& pipeline, uint32 offset) const;

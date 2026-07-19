@@ -370,6 +370,7 @@ void DeferredRenderer::CreateLightingPipeline()
 	gPSOBuild->AddImageFromTarget(1, 0, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
 	gPSOBuild->AddImageFromTarget(2, 0, GPass.GetTarget(eImageFormat::RGBA16_Float),
 								  &gRenderer->Swapchain.NormalsSampler);
+
 	if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
 		gPSOBuild->AddImageFromTarget(3, 0, gShadowRenderer->RenderStage.GetTarget(eImageFormat::eD32_Float),
 									  &gRenderer->Swapchain.ShadowDepthSampler);
@@ -377,7 +378,7 @@ void DeferredRenderer::CreateLightingPipeline()
 
 	gPSOBuild->AddBuffer(4, 0, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
 
-	// gPSOBuild->EnableAutoDescriptors();
+	gPSOBuild->EnableAutoDescriptors();
 
 	gPSOBuild->EndPipeline();
 }

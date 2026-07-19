@@ -41,6 +41,22 @@ FX_FORCE_INLINE bool RequiresOffset(eShaderReflectionType refl_type)
 
 	return false;
 }
+
+FX_FORCE_INLINE const char* GetName(eShaderReflectionType refl_type)
+{
+	switch (refl_type) {
+	case eShaderReflectionType::StructuredBuffer:
+		return "StructuredBuffer";
+	case eShaderReflectionType::CBuffer:
+		return "CBuffer";
+	case eShaderReflectionType::Texture:
+		return "Texture";
+	default:;
+	}
+
+	return "Unknown";
+}
+
 } // namespace ShaderReflectionUtil
 
 struct ShaderReflectionEntry

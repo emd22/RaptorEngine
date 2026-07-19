@@ -9,6 +9,7 @@
 #include <Core/RefCountedBase.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/Slice.hpp>
+#include <Renderer/PipelineNames.hpp>
 #include <Renderer/Vertex.hpp>
 
 namespace fx {
@@ -152,9 +153,16 @@ public:
 class Pipeline
 {
 public:
+	struct DescriptorRef
+	{
+		uint32 SetIndex = 0;
+		Hash32 ID = HashNull32;
+	};
+
+public:
 	Pipeline() = default;
 
-	void Create(const std::string& name, const Slice<Ref<ShaderProgram>>& shaders,
+	void Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shaders,
 				const Slice<VkAttachmentDescription>& attachments,
 				const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
 				VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
@@ -184,11 +192,11 @@ public:
 	VkPipeline InternalPipeline = nullptr;
 
 	bool bBindAttachedDescriptors = false;
-	SizedArray<Hash32> DescriptorIDs;
+	SizedArray<DescriptorRef> DescriptorIDs;
 
 	mutable Vec2u ViewportSize = Vec2u::sZero;
 
-	String Name;
+	ePipelineName Name;
 
 	Ref<ShaderProgram> VertexShader { nullptr };
 	Ref<ShaderProgram> PixelShader { nullptr };

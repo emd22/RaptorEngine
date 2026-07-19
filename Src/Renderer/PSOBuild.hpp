@@ -13,7 +13,7 @@ enum class ePSOBuildFlags
 {
 	None = 0,
 	NoVertices = (1 << 0),
-	NoAutoDescriptors = (1 << 1),
+	UseAutoDescriptors = (1 << 1),
 };
 
 FxEnumFlags(ePSOBuildFlags);
@@ -61,7 +61,7 @@ public:
 
 	FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
 
-	FX_FORCE_INLINE void SetFlags(ePSOBuildFlags flags) { mFlags = flags | ePSOBuildFlags::NoAutoDescriptors; }
+	FX_FORCE_INLINE void SetFlags(ePSOBuildFlags flags) { mFlags = flags; }
 	FX_FORCE_INLINE ePSOBuildFlags GetFlags() const { return mFlags; }
 
 	FX_FORCE_INLINE void SetDepthTest(bool value) { mProperties.bDisableDepthTest = !value; }
@@ -86,7 +86,7 @@ public:
 		mShaderPrograms[static_cast<uint32>(shader_type) - 1] = program;
 	}
 
-	FX_FORCE_INLINE void EnableAutoDescriptors() { ClearFlag(mFlags, ePSOBuildFlags::NoAutoDescriptors); }
+	FX_FORCE_INLINE void EnableAutoDescriptors() { SetFlag(mFlags, ePSOBuildFlags::UseAutoDescriptors); }
 
 private:
 	void BuildPipeline();
@@ -119,7 +119,7 @@ private:
 
 	bool bBuiltDescriptorLayouts = false;
 
-	ePSOBuildFlags mFlags = ePSOBuildFlags::NoAutoDescriptors;
+	ePSOBuildFlags mFlags = ePSOBuildFlags::None;
 };
 
 } // namespace fx::renderer

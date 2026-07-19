@@ -45,12 +45,12 @@ void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd)
 
 	if (pl.bBindAttachedDescriptors) {
 		for (uint32 i = 0; i < pl.DescriptorIDs.Capacity; i++) {
-			Hash32 ds_id = pl.DescriptorIDs[i];
-			if (ds_id == HashNull32) {
+			Pipeline::DescriptorRef& desc_ref = pl.DescriptorIDs[i];
+			if (desc_ref.ID == HashNull32) {
 				continue;
 			}
 
-			gDescriptorCache->Request(ds_id)->Bind(cmd, pl, Slice<uint32>(mOffsets[i]));
+			gDescriptorCache->Request(desc_ref.ID)->Bind(desc_ref.SetIndex, cmd, pl, Slice<uint32>(mOffsets[i]));
 		}
 	}
 

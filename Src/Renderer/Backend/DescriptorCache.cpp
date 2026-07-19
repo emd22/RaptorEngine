@@ -46,9 +46,14 @@ VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const Size
 
 	DsLayoutBuilder builder {};
 
+	LogInfo(LC_CORE, "Building new DS Layout:");
 	for (const ShaderReflectionEntry& entry : entries_for_set) {
+		LogInfo(LC_CORE, "\tBinding={}, Type={}, Shader={}", entry.Binding, ShaderReflectionUtil::GetName(entry.Type),
+				ShaderUtil::TypeToName(shader_type));
 		builder.AddBinding(entry.Binding, ReflectionTypeToDescriptorType(entry.Type), shader_type);
 	}
+
+	LogInfo(LC_CORE, "");
 
 	Cache[entries_hash] = builder.Build();
 
