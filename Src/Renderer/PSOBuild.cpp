@@ -86,15 +86,15 @@ void PSOBuild::BuildPipeline()
 
 	if (!IsFlagSet(mFlags, ePSOBuildFlags::UseAutoDescriptors)) {
 		mpPipeline->DescriptorIDs.Free();
-
+		mpPipeline->bBindAttachedDescriptors = false;
 		return;
 	}
 
+
 	mpPipeline->bBindAttachedDescriptors = true;
 
-	LogInfo(LC_RENDER, "Pipeline auto descriptors:");
 	// Build any descriptors that were created
-	for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Capacity; i++) {
+	for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Size; i++) {
 		Pipeline::DescriptorRef& desc_ref = mpPipeline->DescriptorIDs[i];
 
 		if (desc_ref.ID == HashNull32) {
@@ -109,6 +109,7 @@ void PSOBuild::BuildPipeline()
 					 mpPipeline->DescriptorIDs.Size);
 			continue;
 		}
+
 		ds->Build();
 	}
 }
@@ -193,13 +194,17 @@ DescriptorSet* PSOBuild::StartDescriptorUpdate(uint32 set_index)
 
 	BuildDescriptorLayouts();
 
-	Pipeline::DescriptorRef& desc_ref = mpPipeline->DescriptorIDs[set_index];
-	AssertMsg(desc_ref.ID != HashNull32, "Descriptor ID does not exist");
+	DescriptorSet* set = nullptr;
+	for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Size; i++) {
+		Pipeline::DescriptorRef& ref = mpPipeline->DescriptorIDs[i];
+		if (ref.SetIndex == set_index) {
+			set = gDescriptorCache->Request(ref.ID);
+			AssertMsg(set != nullptr, "StartDescriptorUpdate: Cannot retrieve descriptor set");
+			return set;
+		}
+	}
 
-	DescriptorSet* set = gDescriptorCache->Request(desc_ref.ID);
-	AssertMsg(set != nullptr, "StartDescriptorUpdate: Cannot retrieve descriptor set");
-
-	return set;
+	return nullptr;
 }
 
 
@@ -244,7 +249,8 @@ void PSOBuild::AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& 
 		VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
 		mDescriptorLayouts[ds_index] = ds_layout;
 
-		pl.DescriptorIDs.Insert(Pipeline::DescriptorRef { static_cast<uint32>(ds_index), descriptor_id });
+		pl.DescriptorIDs.Insert(
+			Pipeline::DescriptorRef { .SetIndex = static_cast<uint32>(ds_index), .ID = descriptor_id });
 		LogInfo("Adding Descriptor {} at set index {}", descriptor_id, ds_index);
 
 		gDescriptorCache->Request(program->ShaderType, refl, ds_index);

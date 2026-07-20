@@ -238,8 +238,8 @@ static void ParseReflectionDefinition(const std::vector<Slice<char>>& params, St
 
 	const char* shader_refl_type[] = { "Structured Buffer", "Uniform Buffer", "Texture2D" };
 
-	LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", shader_refl_type[static_cast<uint32>(type)],
-			binding, set);
+	// LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", shader_refl_type[static_cast<uint32>(type)],
+	// 		binding, set);
 
 	result.GetReflection().emplace_back(type, set, binding);
 }
@@ -265,7 +265,7 @@ static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, Sta
 	const Slice<char>& texture_name = params[0];
 	const int32 slot_n = ParamGetInt(params[1]);
 
-	LogInfo(LC_SHADER, "Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
+	// LogInfo(LC_SHADER, "Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
 
 	result.GetReflection().emplace_back(eShaderReflectionType::Texture, 0, slot_n);
 }
@@ -280,8 +280,8 @@ static void ParseStructBufferDefinition(const std::vector<Slice<char>>& params, 
 	const int32 binding = ParamGetInt(params[2]);
 	const int32 set = ParamGetInt(params[3]);
 
-	LogInfo(LC_SHADER, "Reflected shader: {} (type={}) at Binding={}, Set={}",
-			String(buffer_name.pData, buffer_name.Size), String(objtype.pData, objtype.Size), binding, set);
+	// LogInfo(LC_SHADER, "Reflected shader: {} (type={}) at Binding={}, Set={}",
+	// 		String(buffer_name.pData, buffer_name.Size), String(objtype.pData, objtype.Size), binding, set);
 
 	result.GetReflection().emplace_back(eShaderReflectionType::StructuredBuffer, set, binding);
 }
@@ -295,8 +295,8 @@ static void ParseCBufferDefinition(const std::vector<Slice<char>>& params, State
 	const int32 binding = ParamGetInt(params[1]);
 	const int32 set = ParamGetInt(params[2]);
 
-	LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", String(buffer_name.pData, buffer_name.Size),
-			binding, set);
+	// LogInfo(LC_SHADER, "Reflected shader: {} at Binding={}, Set={}", String(buffer_name.pData, buffer_name.Size),
+	// 		binding, set);
 
 	result.GetReflection().emplace_back(eShaderReflectionType::CBuffer, set, binding);
 }

@@ -154,8 +154,6 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 			.pSpecializationInfo = &specialization_info,
 		};
 
-		LogDebug("Added shader (Vertex?: {})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
-
 		shader_create_info.Insert(create_info);
 	}
 

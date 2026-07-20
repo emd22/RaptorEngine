@@ -637,12 +637,13 @@ void RenderBackend::BeginLighting()
 	// gState->Reset();
 
 
-	// gPipelineCache->SetBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->SetBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->SetBufferOffset(2, gObjectManager->GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 
-	pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-												 gPipelineCache->Request(ePipelineName::LightingDirectional),
-												 gRenderer->LightBuffer.GetBaseOffset());
+	// pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+	// 											 gPipelineCache->Request(ePipelineName::LightingDirectional),
+	// 											 gRenderer->LightBuffer.GetBaseOffset());
 }
 
 

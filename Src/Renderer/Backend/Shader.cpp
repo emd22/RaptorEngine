@@ -229,7 +229,8 @@ void ShaderProgram::PrintReflection()
 	LogInfo(LC_SHADER, "Shader '{}' ({}) reflection:", pShader->GetName(), ShaderUtil::TypeToName(ShaderType));
 
 	for (const ShaderReflectionEntry& entry : Reflection) {
-		LogInfo(LC_SHADER, "\tType: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
+		LogInfo(LC_SHADER, "\tType: {}, Set={}, Binding={}", ShaderReflectionUtil::GetName(entry.Type), entry.Set,
+				entry.Binding);
 	}
 
 	LogInfo(LC_SHADER, "");
