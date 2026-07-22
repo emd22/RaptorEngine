@@ -4,6 +4,7 @@
 
 #include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/ShaderNames.hpp>
@@ -31,33 +32,26 @@ static VkDescriptorType ReflectionTypeToDescriptorType(eShaderReflectionType typ
 }
 
 
-VkDescriptorSetLayout DsLayoutCache::Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl,
-											 uint32 set_index)
+std::pair<Hash32, VkDescriptorSetLayout> DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 {
-	SizedArray<ShaderReflectionEntry> entries_for_set = GetEntriesForSet(refl, set_index);
-	Hash32 entries_hash = GetID(shader_type, entries_for_set);
+	Hash32 entries_hash = GetID(requested_entries);
 
 	auto it = Cache.find(entries_hash);
 
 	// If the descriptor layout was not found in the cache, create it
 	if (it != Cache.end()) {
-		return it->second;
+		return std::make_pair(entries_hash, it->second);
 	}
 
 	DsLayoutBuilder builder {};
 
-	LogInfo(LC_CORE, "Building new DS Layout:");
-	for (const ShaderReflectionEntry& entry : entries_for_set) {
-		LogInfo(LC_CORE, "\tBinding={}, Type={}, Shader={}", entry.Binding, ShaderReflectionUtil::GetName(entry.Type),
-				ShaderUtil::TypeToName(shader_type));
-		builder.AddBinding(entry.Binding, ReflectionTypeToDescriptorType(entry.Type), shader_type);
+	for (const DescriptorEntry& entry : requested_entries) {
+		builder.AddBinding(entry.BindIndex, entry.GetDescriptorType(), entry.ShaderStages);
 	}
-
-	LogInfo(LC_CORE, "");
 
 	Cache[entries_hash] = builder.Build();
 
-	return Cache[entries_hash];
+	return std::make_pair(entries_hash, Cache[entries_hash]);
 }
 
 VkDescriptorSetLayout* DsLayoutCache::RequestExisting(Hash32 descriptor_id)
@@ -70,25 +64,38 @@ VkDescriptorSetLayout* DsLayoutCache::RequestExisting(Hash32 descriptor_id)
 	return &it->second;
 }
 
-SizedArray<ShaderReflectionEntry> DsLayoutCache::GetEntriesForSet(const SizedArray<ShaderReflectionEntry>& refl,
-																  uint32 set_index)
-{
-	// Get only the entries that apply to the provided descriptor set index
-	SizedArray<ShaderReflectionEntry> entries_for_set(refl.Size);
 
-	// Get the entries for the requested set index
-	for (const ShaderReflectionEntry& entry : refl) {
-		if (entry.Set == set_index) {
-			entries_for_set.Insert(entry);
+Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
+{
+	// This function is diabolical
+
+	// Hash the handles instead of just the possibly local ptrs.
+
+	uint8* buffer = new uint8[512];
+	uint32 offset = 0;
+
+
+	auto SaveHandleToBuffer = [&](const void* handle, uint32 size)
+	{
+		memcpy(static_cast<void*>(buffer + offset), handle, size);
+		offset += size;
+	};
+
+	for (const DescriptorEntry& entry : entries) {
+		// SKETCHY_COPY_VKHANDLE_TO_BUFFER(entry.BindIndex, sizeof(uint32));
+		SaveHandleToBuffer(reinterpret_cast<const void*>(&entry.BindIndex), sizeof(uint32));
+
+		if (entry.IsImage()) {
+			SaveHandleToBuffer(reinterpret_cast<void*>(entry.pImage->InternalImage), sizeof(uint64));
+		}
+		else if (entry.IsBuffer()) {
+			SaveHandleToBuffer(reinterpret_cast<void*>(entry.pBuffer->Buffer), sizeof(uint64));
 		}
 	}
 
-	return entries_for_set;
-}
+	Hash32 entries_hash = HashData32(Slice(buffer, offset));
 
-Hash32 DsLayoutCache::GetID(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& entries_for_set)
-{
-	Hash32 entries_hash = HashData32(Slice(entries_for_set), HashStr32(ShaderUtil::TypeToName(shader_type)));
+	delete[] buffer;
 
 	return entries_hash;
 }
@@ -124,35 +131,32 @@ DescriptorPool& DescriptorCache::FindPool()
 	return Pools[0];
 }
 
-DescriptorSet* DescriptorCache::Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl,
-										uint32 set_index)
+DescriptorSet* DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
 {
-	SizedArray<ShaderReflectionEntry> entries_for_set = gDsLayoutCache->GetEntriesForSet(refl, set_index);
-	Hash32 entries_hash = gDsLayoutCache->GetID(shader_type, entries_for_set);
+	std::pair<Hash32, VkDescriptorSetLayout> layout_result = gDsLayoutCache->Request(entries);
 
 	bool has_dynamic_offsets = false;
 
-	for (const ShaderReflectionEntry& entry : entries_for_set) {
-		if (entry.RequiresOffset()) {
+	for (const DescriptorEntry& entry : entries) {
+		if (entry.IsBuffer()) {
 			has_dynamic_offsets = true;
 			break;
 		}
 	}
 
-	auto it = Cache.find(entries_hash);
+	auto it = Cache.find(layout_result.first);
 	if (it != Cache.end()) {
 		return &it->second;
 	}
 
-	DescriptorSet& descriptor = Cache[entries_hash];
+	DescriptorSet& descriptor = Cache[layout_result.first];
 
-	VkDescriptorSetLayout* layout = gDsLayoutCache->RequestExisting(entries_hash);
-	if (!layout) {
-		LogError("Could not find DS layout for ID ({})", entries_hash);
+	if (!layout_result.second) {
+		LogError("Could not find DS layout for ID ({})", layout_result.first);
 		return nullptr;
 	}
 
-	descriptor.Create(FindPool(), *layout, has_dynamic_offsets);
+	descriptor.Create(FindPool(), layout_result.second, has_dynamic_offsets);
 
 	return &descriptor;
 }

@@ -26,6 +26,7 @@ class RenderStage;
 
 class PSOBuild
 {
+private:
 public:
 	/**
 	 * @brief Selects a pipeline to create.
@@ -52,12 +53,18 @@ public:
 	/////////////////////////////////////
 	// Shader/Descriptor functions
 	/////////////////////////////////////
+
 	void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
 
-	void AddBuffer(uint32 bind_index, uint32 set_index, RawGpuBuffer* buffer, uint64 offset, uint64 range);
-	void AddImage(uint32 bind_index, uint32 set_index, Image* image, Sampler* sampler);
-	void AddImageFromTarget(uint32 bind_index, uint32 set_index, Target* target, Sampler* sampler);
+	void AddBuffer(uint32 bind_index, uint32 set_index, eShaderType shader_stages, RawGpuBuffer* buffer, uint64 offset,
+				   uint64 range);
+	void AddImage(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Image* image, Sampler* sampler);
+	void AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Target* target,
+							Sampler* sampler);
 
+	/////////////////////////////////////
+	// Modifiers
+	/////////////////////////////////////
 
 	FX_FORCE_INLINE void SetVertexType(eVertexType vertex_type) { mVertexType = vertex_type; }
 
@@ -90,13 +97,14 @@ public:
 
 private:
 	void BuildPipeline();
-	void BuildDescriptorLayouts();
 	void Reset();
+
+	std::vector<VkDescriptorSetLayout> BuildDescriptorSets();
 
 
 	DescriptorSet* StartDescriptorUpdate(uint32 set_index);
 
-	void AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& program);
+	// void AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& program);
 
 public:
 	TargetList* pOutputTargets;
@@ -113,11 +121,12 @@ private:
 	StackArray<Ref<ShaderProgram>, (ShaderUtil::scNumShaderTypes - 1)> mShaderPrograms;
 
 	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
-	SizedArray<VkDescriptorSetLayout> mDescriptorLayouts;
+	// SizedArray<VkDescriptorSetLayout> mDescriptorLayouts;
+
+	/// Contains the list of descriptor entries indexed based on the descriptor set's index.
+	SizedArray<SizedArray<DescriptorEntry>> mDescriptorEntries;
 
 	PipelineProperties mProperties;
-
-	bool bBuiltDescriptorLayouts = false;
 
 	ePSOBuildFlags mFlags = ePSOBuildFlags::None;
 };

@@ -134,6 +134,8 @@ uint32 ObjectManager::GetBaseOffset() const
 	return (renderer::gRenderer->GetFrameNumber() * scMaxObjects * sizeof(ObjectGpuEntry));
 }
 
+uint32 ObjectManager::GetPageSize() const { return scMaxObjects * sizeof(ObjectGpuEntry); }
+
 uint32 ObjectManager::GetOffsetObjectIndex(uint32 object_id) const
 {
 	return GetBaseOffset() + (object_id * sizeof(ObjectGpuEntry));

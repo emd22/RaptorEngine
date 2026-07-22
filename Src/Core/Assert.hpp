@@ -17,72 +17,72 @@ void Terminate();
 template <typename... TTypes>
 void Panic(const char* module, const char* fmt, TTypes&&... items)
 {
-    LogFatal("An irrecoverable error has occurred");
+	LogFatal("An irrecoverable error has occurred");
 
-    if (module != nullptr) {
-        LogFatal("{:s}: ", module);
-    }
+	if (module != nullptr) {
+		LogFatal("{:s}: ", module);
+	}
 
-    LogFatal(fmt, std::forward<TTypes>(items)...);
+	LogFatal(fmt, std::forward<TTypes>(items)...);
 
-    Terminate();
+	Terminate();
 }
 
 template <typename... TTypes>
 void PanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&... items)
 {
-    LogFatal(LC_RENDER, "An irrecoverable error has occurred");
+	LogFatal(LC_RENDER, "An irrecoverable error has occurred");
 
-    if (module != nullptr) {
-        LogFatal(LC_RENDER, "{:s}: ", module);
-    }
+	if (module != nullptr) {
+		LogFatal(LC_RENDER, "{:s}: ", module);
+	}
 
-    LogFatal(LC_RENDER, fmt, std::forward<TTypes>(items)...);
-    LogFatal(LC_RENDER, "=> Vulkan Err: {:s}", renderer::Util::ResultToStr(result));
+	LogFatal(LC_RENDER, fmt, std::forward<TTypes>(items)...);
+	LogFatal(LC_RENDER, "=> Vulkan Err: {:s}", renderer::Util::ResultToStr(result));
 
-    Terminate();
+	Terminate();
 }
 
-#define ModulePanic(...)       Panic(ModuleName__, __VA_ARGS__)
+#define ModulePanic(...)	   Panic(ModuleName__, __VA_ARGS__)
 #define ModulePanicVulkan(...) PanicVulkan(ModuleName__, __VA_ARGS__)
 
 #define Assert(cond)                                                                                                   \
-    if (!(cond)) {                                                                                                     \
-        LogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond, __FILE__, __LINE__);                        \
-        Panic(__func__, "Assertion failed!", 0);                                                                       \
-    }
+	if (!(cond)) {                                                                                                     \
+		LogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond, __FILE__, __LINE__);                        \
+		Panic(__func__, "Assertion failed!", 0);                                                                       \
+	}
 
 #define AssertLess(a_, b_)                                                                                             \
-    if (a_ >= b_) {                                                                                                    \
-        LogFatal("An assertion failed ({} < {}) at ({:s}:{:d})", a_, b_, __FILE__, __LINE__);                          \
-        LogFatal("Condition: {:s} < {:s}", #a_, #b_);                                                                  \
-        Panic(__func__, "Assertion failed!", 0);                                                                       \
-    }
+	if (a_ >= b_) {                                                                                                    \
+		LogFatal("An assertion failed ({} < {}) at ({:s}:{:d})", a_, b_, __FILE__, __LINE__);                          \
+		LogFatal("Condition: {:s} < {:s}", #a_, #b_);                                                                  \
+		Panic(__func__, "Assertion failed!", 0);                                                                       \
+	}
 
 #define AssertGreater(a_, b_)                                                                                          \
-    if (a_ <= b_) {                                                                                                    \
-        LogFatal("An assertion failed ({} > {}) at ({:s}:{:d})", a_, b_, __FILE__, __LINE__);                          \
-        LogFatal("Condition: {:s} > {:s}", #a_, #b_);                                                                  \
-        Panic(__func__, "Assertion failed!", 0);                                                                       \
-    }
+	if (a_ <= b_) {                                                                                                    \
+		LogFatal("An assertion failed ({} > {}) at ({:s}:{:d})", a_, b_, __FILE__, __LINE__);                          \
+		LogFatal("Condition: {:s} > {:s}", #a_, #b_);                                                                  \
+		Panic(__func__, "Assertion failed!", 0);                                                                       \
+	}
 
 
 #define AssertMsg(cond_, msg_)                                                                                         \
-    if (!(cond_)) {                                                                                                    \
-        LogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond_, __FILE__, __LINE__);                       \
-        LogFatal("Assertion Msg: {:s}", msg_);                                                                         \
-        Panic(__func__, "Assertion failed!", 0);                                                                       \
-    }
+	if (!(cond_)) {                                                                                                    \
+		LogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond_, __FILE__, __LINE__);                       \
+		LogFatal("Assertion Msg: {:s}", msg_);                                                                         \
+		Panic(__func__, "Assertion failed!", 0);                                                                       \
+	}
 
 #if defined(FX_BUILD_DEBUG) && !defined(FX_NO_DEBUG_ASSERTS)
 #define DebugAssert(cond)                                                                                              \
-    {                                                                                                                  \
-        if (!(cond)) {                                                                                                 \
-            LogFatal("=== DEBUG ASSERTION FAILED ===");                                                                \
-            LogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond, __FILE__, __LINE__);                    \
-            Panic(__func__, "Debug assertion failed!");                                                                \
-        }                                                                                                              \
-    }
+	{                                                                                                                  \
+		if (!(cond)) {                                                                                                 \
+			LogFatal("=== DEBUG ASSERTION FAILED ===");                                                                \
+			LogFatal("An assertion failed (Cond: {:s}) at ({:s}:{:d})", #cond, __FILE__, __LINE__);                    \
+			Panic(__func__, "Debug assertion failed!");                                                                \
+		}                                                                                                              \
+	}
 #else
 #define DebugAssert(cond)
 #endif

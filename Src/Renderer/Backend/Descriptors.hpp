@@ -54,22 +54,44 @@ enum class eDescriptorBufferType
 	Uniform,
 };
 
+struct DescriptorEntry
+{
+	/**
+	 * @brief Builds a descriptor entry for a GPU buffer
+	 */
+	static DescriptorEntry AsBuffer(uint32 bind_index, eShaderType shader_stages, RawGpuBuffer* buffer, uint64 offset,
+									uint64 range);
+
+	/**
+	 * @brief Builds a descriptor entry for an image
+	 */
+	static DescriptorEntry AsImage(uint32 bind_index, eShaderType shader_stages, Image* image, Sampler* sampler);
+
+	VkDescriptorType GetDescriptorType() const;
+
+
+public:
+	uint32 BindIndex = 0;
+	eShaderType ShaderStages = eShaderType::None;
+
+	Image* pImage = nullptr;
+	Sampler* pSampler = nullptr;
+	RawGpuBuffer* pBuffer = nullptr;
+
+	uint64 BufferOffset = 0;
+	uint64 BufferRange = 0;
+
+
+public:
+	FX_FORCE_INLINE bool IsImage() const { return pImage != nullptr; }
+	FX_FORCE_INLINE bool IsBuffer() const { return pBuffer != nullptr; }
+	FX_FORCE_INLINE bool IsInvalid() const { return (!IsImage() && !IsBuffer()); }
+};
+
 
 class DescriptorSet
 {
 private:
-	struct DescriptorEntry
-	{
-		uint32 BindIndex = 0;
-		Image* pImage = nullptr;
-		Sampler* pSampler = nullptr;
-		RawGpuBuffer* pBuffer = nullptr;
-
-		uint64 BufferOffset = 0;
-		uint64 BufferRange = 0;
-	};
-
-
 	static constexpr uint32 scMaxBuffers = 2;
 	static constexpr uint32 scMaxImages = 6;
 

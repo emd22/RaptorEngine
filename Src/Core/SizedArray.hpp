@@ -132,7 +132,7 @@ public:
 			return;
 		}
 
-		if (std::is_destructible_v<TElementType>) {
+		if constexpr (std::is_trivially_destructible<TElementType>::value) {
 			for (size_t i = 0; i < Size; i++) {
 				TElementType& element = pData[i];
 				element.~TElementType();
@@ -247,9 +247,11 @@ public:
 
 	void Clear()
 	{
-		for (size_t i = 0; i < Size; i++) {
-			TElementType& element = pData[i];
-			element.~TElementType();
+		if constexpr (!std::is_trivially_destructible<TElementType>::value) {
+			for (size_t i = 0; i < Size; i++) {
+				TElementType& element = pData[i];
+				element.~TElementType();
+			}
 		}
 
 		Size = 0;
@@ -287,6 +289,17 @@ public:
 		new (element) TElementType;
 
 		return element;
+	}
+
+	template <typename... Args>
+	TElementType& Emplace(Args&&... args)
+	{
+		AssertMsg(Size < Capacity, "Insert will exceed capacity!");
+
+		TElementType* element = &pData[Size++];
+		new (element) TElementType(std::forward<Args>(args)...);
+
+		return *element;
 	}
 
 	void RemoveLast()

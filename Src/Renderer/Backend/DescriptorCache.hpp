@@ -20,12 +20,10 @@ class DsLayoutCache
 public:
 	DsLayoutCache() = default;
 
-	VkDescriptorSetLayout Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl,
-								  uint32 set_index);
+	std::pair<Hash32, VkDescriptorSetLayout> Request(const SizedArray<DescriptorEntry>& entries);
 	VkDescriptorSetLayout* RequestExisting(Hash32 descriptor_id);
 
-	Hash32 GetID(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& entries_for_set);
-	SizedArray<ShaderReflectionEntry> GetEntriesForSet(const SizedArray<ShaderReflectionEntry>& refl, uint32 set_index);
+	Hash32 GetID(const SizedArray<DescriptorEntry>& entries);
 
 	void Destroy();
 	~DsLayoutCache() { Destroy(); }
@@ -34,13 +32,12 @@ public:
 	std::unordered_map<Hash32, VkDescriptorSetLayout, Hash32Stl> Cache;
 };
 
-
 class DescriptorCache
 {
 public:
 	DescriptorCache();
 
-	DescriptorSet* Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl, uint32 set_index);
+	DescriptorSet* Request(const SizedArray<DescriptorEntry>& entries);
 	DescriptorSet* Request(Hash32 descriptor_id);
 
 	DescriptorPool& FindPool();

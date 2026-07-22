@@ -13,10 +13,10 @@ namespace fx {
 
 enum class eGpuBufferFlags : uint16
 {
-    None = 0,
-    /** The buffer is mapped for the lifetime of the buffer. */
-    PersistentMapped = (1 << 0),
-    TransferReceiver = (1 << 1),
+	None = 0,
+	/** The buffer is mapped for the lifetime of the buffer. */
+	PersistentMapped = (1 << 0),
+	TransferReceiver = (1 << 1),
 };
 FxEnumFlags(eGpuBufferFlags);
 
@@ -29,8 +29,8 @@ class GpuBuffer;
 
 enum class eBufferUsageType
 {
-    Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-    Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+	Vertices = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	Indices = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 };
 
 
@@ -38,54 +38,54 @@ enum class eBufferUsageType
 
 enum class eGpuBufferType
 {
-    Storage,
-    StorageWithOffset,
-    Uniform,
-    UniformWithOffset,
-    Transfer,
-    VertexBuffer,
-    IndexBuffer,
+	Storage,
+	StorageWithOffset,
+	Uniform,
+	UniformWithOffset,
+	Transfer,
+	VertexBuffer,
+	IndexBuffer,
 };
 
 
 namespace GpuBufferUtil {
 static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
 {
-    switch (type) {
-    case eGpuBufferType::Storage:
-    case eGpuBufferType::StorageWithOffset:
-        return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	switch (type) {
+	case eGpuBufferType::Storage:
+	case eGpuBufferType::StorageWithOffset:
+		return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-    case eGpuBufferType::Uniform:
-    case eGpuBufferType::UniformWithOffset:
-        return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	case eGpuBufferType::Uniform:
+	case eGpuBufferType::UniformWithOffset:
+		return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 
-    case eGpuBufferType::Transfer:
-        return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    case eGpuBufferType::VertexBuffer:
-        return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    case eGpuBufferType::IndexBuffer:
-        return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    }
+	case eGpuBufferType::Transfer:
+		return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	case eGpuBufferType::VertexBuffer:
+		return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	case eGpuBufferType::IndexBuffer:
+		return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	}
 
-    return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+	return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 }
 
 #define ENUM_TYPE eGpuBufferType
 
 static constexpr const char* BufferTypeToName(const eGpuBufferType type)
 {
-    switch (type) {
-        FX_ENUM_CASE_NAME(Storage);
-        FX_ENUM_CASE_NAME(StorageWithOffset);
-        FX_ENUM_CASE_NAME(Uniform);
-        FX_ENUM_CASE_NAME(UniformWithOffset);
-        FX_ENUM_CASE_NAME(Transfer);
-        FX_ENUM_CASE_NAME(VertexBuffer);
-        FX_ENUM_CASE_NAME(IndexBuffer);
-    }
+	switch (type) {
+		FX_ENUM_CASE_NAME(Storage);
+		FX_ENUM_CASE_NAME(StorageWithOffset);
+		FX_ENUM_CASE_NAME(Uniform);
+		FX_ENUM_CASE_NAME(UniformWithOffset);
+		FX_ENUM_CASE_NAME(Transfer);
+		FX_ENUM_CASE_NAME(VertexBuffer);
+		FX_ENUM_CASE_NAME(IndexBuffer);
+	}
 
-    return "";
+	return "";
 }
 
 #undef ENUM_TYPE
@@ -93,21 +93,21 @@ static constexpr const char* BufferTypeToName(const eGpuBufferType type)
 
 static constexpr VkDescriptorType BufferTypeToDescriptorType(eGpuBufferType type)
 {
-    switch (type) {
-    case eGpuBufferType::Storage:
-        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-    case eGpuBufferType::StorageWithOffset:
-        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	switch (type) {
+	case eGpuBufferType::Storage:
+		[[fallthrough]];
+	case eGpuBufferType::StorageWithOffset:
+		return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 
-    case eGpuBufferType::Uniform:
-        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    case eGpuBufferType::UniformWithOffset:
-        return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	case eGpuBufferType::Uniform:
+		[[fallthrough]];
+	case eGpuBufferType::UniformWithOffset:
+		return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 
-    default:;
-    }
+	default:;
+	}
 
-    return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+	return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 }
 }; // namespace GpuBufferUtil
 
@@ -119,91 +119,91 @@ void GpuBufferPrintUndestroyed();
 class RawGpuBuffer
 {
 public:
-    RawGpuBuffer() = default;
+	RawGpuBuffer() = default;
 
-    RawGpuBuffer(RawGpuBuffer& other) = delete;
+	RawGpuBuffer(RawGpuBuffer& other) = delete;
 
-    RawGpuBuffer operator=(RawGpuBuffer& other) = delete;
+	RawGpuBuffer operator=(RawGpuBuffer& other) = delete;
 
-    void Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
-                eGpuBufferFlags buffer_flags = eGpuBufferFlags::None);
+	void Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaMemoryUsage memory_usage,
+				eGpuBufferFlags buffer_flags = eGpuBufferFlags::None);
 
-    void FlushToGpu(uint32 offset, uint32 size)
-    {
-        vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
-    }
+	void FlushToGpu(uint32 offset, uint32 size)
+	{
+		vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
+	}
 
-    void Map();
-    void UnMap();
+	void Map();
+	void UnMap();
 
-    bool IsMapped() const { return pMappedBuffer != nullptr; }
+	bool IsMapped() const { return pMappedBuffer != nullptr; }
 
-    /**
-     * @brief Uploads raw data buffer to the GPU buffer.
-     * @param data The data to upload
-     * @param size The size of the buffer in bytes
-     */
-    void Upload(const void* data, uint64 size);
+	/**
+	 * @brief Uploads raw data buffer to the GPU buffer.
+	 * @param data The data to upload
+	 * @param size The size of the buffer in bytes
+	 */
+	void Upload(const void* data, uint64 size);
 
-    template <typename TElementType>
-    void Upload(const Slice<TElementType>& data)
-    {
-        Upload(reinterpret_cast<const void*>(data.pData), data.GetSizeInBytes());
-    }
+	template <typename TElementType>
+	void Upload(const Slice<TElementType>& data)
+	{
+		Upload(reinterpret_cast<const void*>(data.pData), data.GetSizeInBytes());
+	}
 
-    void Destroy();
+	void Destroy();
 
-    ~RawGpuBuffer() { Destroy(); }
+	~RawGpuBuffer() { Destroy(); }
 
 public:
-    eGpuBufferType Type = eGpuBufferType::Storage;
-    uint32 BufferId = 0;
+	eGpuBufferType Type = eGpuBufferType::Storage;
+	uint32 BufferId = 0;
 
-    VkBuffer Buffer = nullptr;
-    VmaAllocation Allocation = nullptr;
+	VkBuffer Buffer = nullptr;
+	VmaAllocation Allocation = nullptr;
 
-    void* pMappedBuffer = nullptr;
+	void* pMappedBuffer = nullptr;
 
-    std::atomic_bool Initialized = { false };
-    uint64 Size = 0;
+	std::atomic_bool Initialized = { false };
+	uint64 Size = 0;
 
 private:
-    eGpuBufferFlags mBufferFlags = eGpuBufferFlags::None;
+	eGpuBufferFlags mBufferFlags = eGpuBufferFlags::None;
 };
 
 
 class GpuBufferMapContext
 {
 public:
-    GpuBufferMapContext(RawGpuBuffer* buffer) : mpGpuBuffer(buffer) { mpGpuBuffer->Map(); }
+	GpuBufferMapContext(RawGpuBuffer* buffer) : mpGpuBuffer(buffer) { mpGpuBuffer->Map(); }
 
-    /** Returns the raw pointer representation of the mapped data. */
-    operator void*()
-    {
-        if (!mpGpuBuffer->pMappedBuffer) {
-            return nullptr;
-        }
+	/** Returns the raw pointer representation of the mapped data. */
+	operator void*()
+	{
+		if (!mpGpuBuffer->pMappedBuffer) {
+			return nullptr;
+		}
 
-        return mpGpuBuffer->pMappedBuffer;
-    }
+		return mpGpuBuffer->pMappedBuffer;
+	}
 
-    /** Returns the pointer representation of the mapped data. */
-    template <typename TElementType>
-    TElementType* GetPtr()
-    {
-        DebugAssert(mpGpuBuffer->pMappedBuffer != nullptr);
-        return static_cast<TElementType*>(mpGpuBuffer->pMappedBuffer);
-    }
+	/** Returns the pointer representation of the mapped data. */
+	template <typename TElementType>
+	TElementType* GetPtr()
+	{
+		DebugAssert(mpGpuBuffer->pMappedBuffer != nullptr);
+		return static_cast<TElementType*>(mpGpuBuffer->pMappedBuffer);
+	}
 
-    ~GpuBufferMapContext() { mpGpuBuffer->UnMap(); }
+	~GpuBufferMapContext() { mpGpuBuffer->UnMap(); }
 
-    /**
-     * Manually unmaps the buffer.
-     */
-    void UnMap() const { mpGpuBuffer->UnMap(); }
+	/**
+	 * Manually unmaps the buffer.
+	 */
+	void UnMap() const { mpGpuBuffer->UnMap(); }
 
 private:
-    RawGpuBuffer* mpGpuBuffer = nullptr;
+	RawGpuBuffer* mpGpuBuffer = nullptr;
 };
 
 
@@ -214,37 +214,37 @@ private:
 class GpuBuffer : public RawGpuBuffer
 {
 private:
-    using RawGpuBuffer::Create;
+	using RawGpuBuffer::Create;
 
 public:
-    GpuBuffer() = default;
+	GpuBuffer() = default;
 
 
-    void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, void* data, uint64 size);
-    void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, const AnonArray& data);
+	void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, void* data, uint64 size);
+	void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, const AnonArray& data);
 
-    template <typename TElementType>
-    void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, const Slice<TElementType>& data)
-    {
-        Create(cmd, buffer_type, data.pData, data.Size * sizeof(TElementType));
-        // Size = data.Size * sizeof(TElementType);
-        // Type = buffer_type;
+	template <typename TElementType>
+	void Create(CommandBuffer& cmd, eGpuBufferType buffer_type, const Slice<TElementType>& data)
+	{
+		Create(cmd, buffer_type, data.pData, data.Size * sizeof(TElementType));
+		// Size = data.Size * sizeof(TElementType);
+		// Type = buffer_type;
 
-        // pStagingBuffer = gEnginePool->Alloc<RawGpuBuffer>(sizeof(RawGpuBuffer));
-        // pStagingBuffer->Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        // pStagingBuffer->Upload(data, Size);
+		// pStagingBuffer = gEnginePool->Alloc<RawGpuBuffer>(sizeof(RawGpuBuffer));
+		// pStagingBuffer->Create(eGpuBufferType::Transfer, Size, VMA_MEMORY_USAGE_CPU_TO_GPU);
+		// pStagingBuffer->Upload(data, Size);
 
-        // // Create the GPU-only buffer as a transfer destination
-        // this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
+		// // Create the GPU-only buffer as a transfer destination
+		// this->Create(buffer_type, this->Size, VMA_MEMORY_USAGE_GPU_ONLY, eGpuBufferFlags::TransferReceiver);
 
-        // VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
-        // vkCmdCopyBuffer(cmd.Get(), pStagingBuffer->Buffer, this->Buffer, 1, &copy);
+		// VkBufferCopy copy = { .srcOffset = 0, .dstOffset = 0, .size = Size };
+		// vkCmdCopyBuffer(cmd.Get(), pStagingBuffer->Buffer, this->Buffer, 1, &copy);
 
-        // // staging_buffer.Destroy();
-    }
+		// // staging_buffer.Destroy();
+	}
 
 public:
-    RawGpuBuffer* pStagingBuffer = nullptr;
+	RawGpuBuffer* pStagingBuffer = nullptr;
 };
 
 } // namespace renderer

@@ -9,6 +9,54 @@
 namespace fx::renderer {
 
 /////////////////////////////////////
+// DescriptorEntry
+/////////////////////////////////////
+
+DescriptorEntry DescriptorEntry::AsBuffer(uint32 bind_index, eShaderType shader_stages, RawGpuBuffer* buffer,
+										  uint64 offset, uint64 range)
+{
+	DescriptorEntry entry {
+		.BindIndex = bind_index,
+		.ShaderStages = shader_stages,
+		.pBuffer = buffer,
+		.BufferOffset = offset,
+		.BufferRange = range,
+	};
+
+	return entry;
+}
+
+
+DescriptorEntry DescriptorEntry::AsImage(uint32 bind_index, eShaderType shader_stages, Image* image, Sampler* sampler)
+{
+	DescriptorEntry entry {
+		.BindIndex = bind_index,
+		.ShaderStages = shader_stages,
+		.pImage = image,
+		.pSampler = sampler,
+	};
+
+	return entry;
+}
+
+VkDescriptorType DescriptorEntry::GetDescriptorType() const
+{
+	if (IsBuffer()) {
+		// Get the buffer type
+
+		return GpuBufferUtil::BufferTypeToDescriptorType(pBuffer->Type);
+	}
+	else if (IsImage()) {
+		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	}
+
+	Panic("DescriptorEntry", "Unknwon descriptor entry type");
+
+	return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+}
+
+
+/////////////////////////////////////
 // Descriptor Pool Functions
 /////////////////////////////////////
 
@@ -180,6 +228,7 @@ void DescriptorSet::AddImage(uint32 bind_index, Image* image, Sampler* sampler)
 void DescriptorSet::Build()
 {
 	if (mDescriptorEntries.IsEmpty()) {
+		LogWarning("Building empty descriptor set {:x}", reinterpret_cast<uintptr_t>(Set));
 		return;
 	}
 
@@ -188,6 +237,8 @@ void DescriptorSet::Build()
 	StackArray<VkDescriptorImageInfo, scMaxImages> image_infos;
 	StackArray<VkDescriptorBufferInfo, scMaxBuffers> buffer_infos;
 	StackArray<VkWriteDescriptorSet, scMaxDescriptorEntries> write_infos;
+
+	LogInfo("Building DESCRIPTOR: ");
 
 	for (const DescriptorEntry& entry : mDescriptorEntries) {
 		if (entry.pImage) {
@@ -230,6 +281,7 @@ void DescriptorSet::Build()
 			write_infos.Insert(buffer_write);
 		}
 	}
+
 
 	vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
 

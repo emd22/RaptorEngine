@@ -46,6 +46,7 @@ public:
 
 	uint32 GetOffsetObjectIndex(uint32 object_id) const;
 	uint32 GetBaseOffset() const;
+	uint32 GetPageSize() const;
 
 	/**
 	 * @brief Finds an object slot with `num_instances` free slots following.

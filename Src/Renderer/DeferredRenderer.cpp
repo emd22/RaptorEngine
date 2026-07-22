@@ -366,17 +366,25 @@ void DeferredRenderer::CreateLightingPipeline()
 	// Since the directional light is a triangle built from the screen coordinates, we won't be passing in vertices.
 	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 
-	gPSOBuild->AddImageFromTarget(0, 0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-	gPSOBuild->AddImageFromTarget(1, 0, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
-	gPSOBuild->AddImageFromTarget(2, 0, GPass.GetTarget(eImageFormat::RGBA16_Float),
+	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::eD32_Float),
+								  &gRenderer->Swapchain.DepthSampler);
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
+								  &gRenderer->Swapchain.ColorSampler);
+	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::RGBA16_Float),
 								  &gRenderer->Swapchain.NormalsSampler);
 
 	if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
-		gPSOBuild->AddImageFromTarget(3, 0, gShadowRenderer->RenderStage.GetTarget(eImageFormat::eD32_Float),
+		gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel,
+									  gShadowRenderer->RenderStage.GetTarget(eImageFormat::eD32_Float),
 									  &gRenderer->Swapchain.ShadowDepthSampler);
 	}
 
-	gPSOBuild->AddBuffer(4, 0, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
+	gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+						 gRenderer->LightBuffer.PageSize);
+
+	gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+						 gObjectManager->GetPageSize());
+
 
 	gPSOBuild->EnableAutoDescriptors();
 
