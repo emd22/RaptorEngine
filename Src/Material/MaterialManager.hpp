@@ -24,49 +24,53 @@ class Material;
 class MaterialManager
 {
 public:
-    void Create();
+	void Create();
 
-    MaterialID NewMaterial(const String& name, renderer::ePipelineName pl_name, bool supports_skinning);
-    Material* GetMaterial(const MaterialID& id);
-    void DestroyMaterial(const MaterialID& id);
+	MaterialID NewMaterial(const String& name, renderer::ePipelineName pl_name, bool supports_skinning);
+	Material* GetMaterial(const MaterialID& id);
+	void DestroyMaterial(const MaterialID& id);
 
-    bool Bind(const renderer::CommandBuffer& cmd, const MaterialID& id);
-    bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline, const MaterialID& id);
+	bool Bind(const renderer::CommandBuffer& cmd, const MaterialID& id);
+	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline, const MaterialID& id);
 
-    renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
+	renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }
 
-    void Destroy();
+	void Destroy();
 
-    ~MaterialManager();
+	~MaterialManager();
 
 private:
-    Material* GetNewMaterial();
+	Material* GetNewMaterial();
 
-    void MakeNullMaterial();
+	void MakeNullMaterial();
 
 public:
-    /**
-     * @brief A large GPU buffer containing all loaded in material properties.
-     */
-    renderer::RawGpuBuffer MaterialPropertiesBuffer {};
+	/**
+	 * @brief A large GPU buffer containing all loaded in material properties.
+	 */
+	renderer::RawGpuBuffer MaterialPropertiesBuffer {};
 
-    // Bitset MaterialsInUse;
+	// Bitset MaterialsInUse;
 
-    /**
-     * @brief Descriptor set for material properties. Used in the light pass.
-     */
-    renderer::DescriptorSet mMaterialPropertiesDS {};
+	/**
+	 * @brief Descriptor set for material properties. Used in the light pass.
+	 */
+	renderer::DescriptorSet mMaterialPropertiesDS {};
 
 
 private:
-    // SizedArray<Material> mMaterials;
-    FreeArray<Material> mMaterialList;
+	// SizedArray<Material> mMaterials;
+	FreeArray<Material> mMaterialList;
 
-    renderer::DescriptorPool mDescriptorPool;
+	renderer::DescriptorPool mDescriptorPool;
 
-    bool mbInitialized : 1 = false;
+	VkDescriptorSetLayout DsLayoutMaterialBasic;
+	VkDescriptorSetLayout DsLayoutMaterialPBR;
+	VkDescriptorSetLayout DsLayoutMaterialPBRSkinned;
 
-    std::mutex mInUse;
+	bool mbInitialized : 1 = false;
+
+	std::mutex mInUse;
 };
 
 } // namespace fx

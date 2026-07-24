@@ -48,10 +48,11 @@ private:
 	friend class DescriptorSet;
 };
 
-enum class eDescriptorBufferType
+enum class eDescriptorEntryType
 {
-	Storage,
-	Uniform,
+	None,
+	Image,
+	Buffer,
 };
 
 struct DescriptorEntry
@@ -68,9 +69,15 @@ struct DescriptorEntry
 	static DescriptorEntry AsImage(uint32 bind_index, eShaderType shader_stages, Image* image, Sampler* sampler);
 
 	VkDescriptorType GetDescriptorType() const;
+	FX_FORCE_INLINE eDescriptorEntryType GetType() const { return Type; }
 
+	FX_FORCE_INLINE bool IsImage() const { return (Type == eDescriptorEntryType::Image); }
+	FX_FORCE_INLINE bool IsBuffer() const { return (Type == eDescriptorEntryType::Buffer); }
+	FX_FORCE_INLINE bool IsInvalid() const { return (Type == eDescriptorEntryType::None); }
 
 public:
+	eDescriptorEntryType Type = eDescriptorEntryType::None;
+
 	uint32 BindIndex = 0;
 	eShaderType ShaderStages = eShaderType::None;
 
@@ -80,12 +87,6 @@ public:
 
 	uint64 BufferOffset = 0;
 	uint64 BufferRange = 0;
-
-
-public:
-	FX_FORCE_INLINE bool IsImage() const { return pImage != nullptr; }
-	FX_FORCE_INLINE bool IsBuffer() const { return pBuffer != nullptr; }
-	FX_FORCE_INLINE bool IsInvalid() const { return (!IsImage() && !IsBuffer()); }
 };
 
 

@@ -19,7 +19,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 {
 	RenderStage.Create("Shadows", size);
 
-	RenderStage.AddTarget(eImageFormat::eD32_Float, size,
+	RenderStage.AddTarget(eImageFormat::D32_Float, size,
 						  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 						  eImageAspectFlag::Depth);
 
@@ -48,19 +48,23 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 
 	// Ref<ShaderProgram> vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, {});
 	// Ref<ShaderProgram> fragment_shader = shader_shadow.GetProgram(eShaderType::Pixel, {});
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::ShadowDirectional);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(ShadowPushConstants));
+		gPSOBuild->UseRenderStage(RenderStage);
 
-	gPSOBuild->BeginPipeline(ePipelineName::ShadowDirectional);
-	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(ShadowPushConstants));
-	gPSOBuild->UseRenderStage(RenderStage);
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetShader(eShaderName::Shadows, {});
+		gPSOBuild->SetViewportSize(size);
+		gPSOBuild->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
 
-	gPSOBuild->SetVertexType(eVertexType::Default);
-	gPSOBuild->SetShader(eShaderName::Shadows, {});
-	gPSOBuild->SetViewportSize(size);
-	gPSOBuild->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
-	gPSOBuild->SetCullMode(eCullMode::Back);
-	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
 
-	gPSOBuild->EndPipeline();
+		gPSOBuild->EndPipeline();
+	}
 
 
 	// PipelineBuilder builder {};
@@ -102,19 +106,20 @@ void ShadowDirectional::Begin()
 	Pipeline& pl = gPipelineCache->Request(ePipelineName::ShadowDirectional);
 
 	RenderStage.Begin(cmd);
+	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::ShadowDirectional, cmd);
 
-	gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl,
-												   gObjectManager->GetBaseOffset());
+	// gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl,
+	// 											   gObjectManager->GetBaseOffset());
 }
 
 void ShadowDirectional::End() { RenderStage.End(); }
 
 void ShadowDirectional::UpdateLightDescriptors()
 {
-	DescriptorSet& ds = gRenderer->pDeferredRenderer->DsLighting;
-	ds.AddImageFromTarget(3, RenderStage.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.ShadowDepthSampler);
-	ds.Build();
+	// DescriptorSet& ds = gRenderer->pDeferredRenderer->DsLighting;
+	// ds.AddImageFromTarget(3, RenderStage.GetTarget(eImageFormat::D32_Float),
+	// &gRenderer->Swapchain.ShadowDepthSampler); ds.Build();
 }
 
 } // namespace fx::renderer

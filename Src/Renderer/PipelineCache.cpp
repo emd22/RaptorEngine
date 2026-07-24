@@ -58,7 +58,7 @@ void PipelineCache::Bind(const ePipelineName name, const CommandBuffer& cmd)
 	Reset();
 }
 
-void PipelineCache::SetBufferOffset(uint32 set_index, uint32 offset) { mOffsets[set_index].Insert(offset); }
+void PipelineCache::AddBufferOffset(uint32 set_index, uint32 offset) { mOffsets[set_index].Insert(offset); }
 
 void PipelineCache::Reset()
 {

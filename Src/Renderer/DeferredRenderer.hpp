@@ -71,13 +71,15 @@ public:
 	// Geometry Pass
 	/////////////////////
 
-	VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
-	VkDescriptorSetLayout DsLayoutGPassSkinned = nullptr;
+	// VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
+	// VkDescriptorSetLayout DsLayoutGPassSkinned = nullptr;
 
-	VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
+	// VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
 
 	RenderStage ForwardPass;
+	RenderStage LightPass;
 	RenderStage GPass;
+	RenderStage CompPass;
 
 	// Pipeline PlGeometry;
 	// Pipeline PlGeometryNoDepthTest;
@@ -91,12 +93,11 @@ public:
 	// Lighting Pass
 	//////////////////////
 
-	VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
-	VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
+	// VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
+	// VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
 
-	DescriptorSet DsLighting;
+	// DescriptorSet DsLighting;
 
-	RenderStage LightPass;
 
 	// Pipeline PlLightingOutsideVolume;
 	// Pipeline PlLightingInsideVolume;
@@ -117,11 +118,9 @@ public:
 	// Composition Pass
 	//////////////////////
 
-	VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
+	// VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
 
-	DescriptorSet DsComposition;
-
-	RenderStage CompPass;
+	// DescriptorSet DsComposition;
 
 	// Pipeline PlComposition;
 	// Pipeline PlCompositionUnlit;

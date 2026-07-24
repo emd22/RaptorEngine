@@ -165,7 +165,7 @@ public:
 
 	void Build();
 
-	renderer::DescriptorSet& GetDescriptorSet() { return mDsDefault; }
+	renderer::DescriptorSet* GetDescriptorSet() { return mDescriptorSet; }
 
 	void SetDefaultPipeline();
 	void SubmitProperties(const MaterialProperties& properties);
@@ -200,7 +200,7 @@ public:
 	int32 QualityLevel = 3;
 
 private:
-	renderer::DescriptorSet mDsDefault;
+	renderer::DescriptorSet* mDescriptorSet = nullptr;
 
 	renderer::Pipeline* mpPipeline = nullptr;
 	renderer::ePipelineName mPipelineName = renderer::ePipelineName::Geometry;

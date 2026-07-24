@@ -69,7 +69,7 @@ bool Object::CheckIfReady(bool require_material)
 
 void Object::FinalizeWhenReady()
 {
-	if (IsFlagSet(Flags, eObjectFlags::Unlit)) {
+	if (HasFlag(Flags, eObjectFlags::Unlit)) {
 		Material* material = gMaterialManager->GetMaterial(mMaterialID);
 		if (material != nullptr) {
 			material->SetPipeline(ePipelineName::Unlit);
@@ -403,7 +403,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 
 void Object::Update()
 {
-	if (IsFlagSet(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
+	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
 		PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
 
 		if (mbPhysicsTransformOutOfDate) {
@@ -523,14 +523,14 @@ void Object::PrintDebug() const
 	if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
 		bool has_body = phys->mbHasPhysicsBody;
 		LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
-				IsFlagSet(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
+				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
 				(phys->GetMotionType() == ePhMotionType::Static) ? "Static" : "Dynamic");
 	}
 
 	LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
-			IsFlagSet(Flags, eObjectFlags::IsInstance),	   /* */
-			IsFlagSet(Flags, eObjectFlags::ReadyToRender), /* */
-			IsFlagSet(Flags, eObjectFlags::ShadowCaster),  /* */
+			HasFlag(Flags, eObjectFlags::IsInstance),	 /* */
+			HasFlag(Flags, eObjectFlags::ReadyToRender), /* */
+			HasFlag(Flags, eObjectFlags::ShadowCaster),	 /* */
 			(pMesh && pMesh->VertexList.IsSkinned()));
 
 	LogInfo(LC_CORE, "}}");

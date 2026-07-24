@@ -16,6 +16,7 @@ DescriptorEntry DescriptorEntry::AsBuffer(uint32 bind_index, eShaderType shader_
 										  uint64 offset, uint64 range)
 {
 	DescriptorEntry entry {
+		.Type = eDescriptorEntryType::Buffer,
 		.BindIndex = bind_index,
 		.ShaderStages = shader_stages,
 		.pBuffer = buffer,
@@ -30,6 +31,7 @@ DescriptorEntry DescriptorEntry::AsBuffer(uint32 bind_index, eShaderType shader_
 DescriptorEntry DescriptorEntry::AsImage(uint32 bind_index, eShaderType shader_stages, Image* image, Sampler* sampler)
 {
 	DescriptorEntry entry {
+		.Type = eDescriptorEntryType::Image,
 		.BindIndex = bind_index,
 		.ShaderStages = shader_stages,
 		.pImage = image,
@@ -50,7 +52,7 @@ VkDescriptorType DescriptorEntry::GetDescriptorType() const
 		return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	}
 
-	Panic("DescriptorEntry", "Unknwon descriptor entry type");
+	Panic("DescriptorEntry", "Unknown descriptor entry type");
 
 	return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 }

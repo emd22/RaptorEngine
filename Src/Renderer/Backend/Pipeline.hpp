@@ -155,6 +155,8 @@ class Pipeline
 public:
 	struct DescriptorRef
 	{
+		DescriptorRef(uint32 set_index, Hash32 id) : SetIndex(set_index), ID(id) {}
+
 		uint32 SetIndex = 0;
 		Hash32 ID = HashNull32;
 	};
@@ -205,8 +207,6 @@ public:
 
 	/// True if the pipeline uses dynamic states for viewport and scissor
 	bool bHasDynamicViewport = true;
-
-	SizedArray<VkDescriptorSetLayout> DescriptorSetLayouts;
 
 private:
 	GpuDevice* mDevice = nullptr;

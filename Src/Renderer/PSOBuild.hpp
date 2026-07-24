@@ -12,8 +12,15 @@ namespace fx {
 enum class ePSOBuildFlags
 {
 	None = 0,
+
+	/// The pipeline does not process any vertices.
 	NoVertices = (1 << 0),
+
+	/// TEMP: Generated the descriptors automatically based on `AddImage` and `AddBuffer` calls.
 	UseAutoDescriptors = (1 << 1),
+
+	/// Reuse the descriptors from another PSO. Finds the layouts via the copied descriptor ids.
+	ReuseDescriptors = (1 << 2),
 };
 
 FxEnumFlags(ePSOBuildFlags);
@@ -55,6 +62,9 @@ public:
 	/////////////////////////////////////
 
 	void SetShader(eShaderName shader, const SizedArray<ShaderMacro>& macros);
+
+	void ReuseDS(ePipelineName other_pso);
+	void AddExistingDS(uint32 set_index, Hash32 layout_id);
 
 	void AddBuffer(uint32 bind_index, uint32 set_index, eShaderType shader_stages, RawGpuBuffer* buffer, uint64 offset,
 				   uint64 range);

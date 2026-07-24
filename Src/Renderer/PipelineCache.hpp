@@ -15,7 +15,7 @@ public:
 	ePipelineName GetName(const Pipeline* pipeline) const;
 	void Bind(const ePipelineName name, const CommandBuffer& cmd);
 
-	void SetBufferOffset(uint32 set_index, uint32 offset);
+	void AddBufferOffset(uint32 set_index, uint32 offset);
 
 private:
 	void Reset();

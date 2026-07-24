@@ -17,6 +17,7 @@
 #include <Core/StackArray.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/Commands.hpp>
+#include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
@@ -181,16 +182,14 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 		Build();
 	}
 
-	if (!IsReady() || !mDsDefault) {
-		// gMaterialManager->GetNullMaterial()->BindWithPipeline(cmd, pipeline);
+	if (!IsReady() || !mDescriptorSet) {
 		return false;
 	}
 
 	pipeline.Bind(cmd);
 
 	VkDescriptorSet sets_to_bind[] = {
-		mDsDefault.Get(),							  // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
-		MaterialManagerFwd::GetDescriptorSet().Get(), // Set 1: Material Properties Buffer
+		mDescriptorSet->Get(), // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
 	};
 
 	StackArray<uint32, 2> offsets = { 0 };
@@ -313,16 +312,6 @@ void Material::Build()
 	BUILD_MATERIAL_COMPONENT(NormalMap);
 	BUILD_MATERIAL_COMPONENT(MetallicRoughness);
 
-	if (!mDsDefault.IsInited()) {
-		VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
-
-		if (bSupportsSkinning) {
-			layout = gRenderer->pDeferredRenderer->DsLayoutGPassSkinned;
-		}
-
-		mDsDefault.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
-	}
-
 	AssertMsg(Diffuse.Ticket.IsValid(), "Diffuse texture must be valid");
 
 	SamplerProps diffuse_sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
@@ -331,30 +320,60 @@ void Material::Build()
 		diffuse_sampler_props.SetNearest();
 	}
 
-	mDsDefault.AddImage(0, Diffuse.pImage, gSamplerCache->Request(diffuse_sampler_props));
+	if (mDescriptorSet == nullptr) {
+		SizedArray<DescriptorEntry> ds_entries(6);
+		ds_entries.Emplace(DescriptorEntry::AsImage(0, eShaderType::Pixel, Diffuse.pImage,
+													gSamplerCache->Request(diffuse_sampler_props)));
 
-	// When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we do
-	// not need to.
-
-	if (NormalMap.Exists()) {
-		mDsDefault.AddImage(1, NormalMap.pImage,
-							gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(NormalMap) }));
-
-		// To reduce permutations -- the metallic roughness map should only be
-		// enabled if there is also a normal map.
-		if (!MetallicRoughness.Exists()) {
-			MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
+		if (NormalMap.Exists()) {
+			ds_entries.Emplace(DescriptorEntry::AsImage(1, eShaderType::Pixel, NormalMap.pImage,
+														gSamplerCache->Request(diffuse_sampler_props)));
+			ds_entries.Emplace(DescriptorEntry::AsImage(2, eShaderType::Pixel, MetallicRoughness.pImage,
+														gSamplerCache->Request(diffuse_sampler_props)));
 		}
 
-		mDsDefault.AddImage(2, MetallicRoughness.pImage,
-							gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(MetallicRoughness) }));
+		if (bSupportsSkinning) {
+			ds_entries.Emplace(DescriptorEntry::AsBuffer(0, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(),
+														 0, gRenderer->BoneBuffer.PageSize));
+		}
+
+
+		mDescriptorSet = gDescriptorCache->Request(ds_entries);
+		// VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
+
+		// if (bSupportsSkinning) {
+		// 	layout = gRenderer->pDeferredRenderer->DsLayoutGPassSkinned;
+		// }
+
+		// mDescriptorSet.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
 	}
 
-	if (bSupportsSkinning) {
-		mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.PageSize);
-	}
 
-	mDsDefault.Build();
+	// mDsDefault.AddImage(0, Diffuse.pImage, gSamplerCache->Request(diffuse_sampler_props));
+
+	// // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we
+	// do
+	// // not need to.
+
+	// if (NormalMap.Exists()) {
+	// 	mDsDefault.AddImage(1, NormalMap.pImage,
+	// 						gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(NormalMap) }));
+
+	// 	// To reduce permutations -- the metallic roughness map should only be
+	// 	// enabled if there is also a normal map.
+	// 	if (!MetallicRoughness.Exists()) {
+	// 		MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
+	// 	}
+
+	// 	mDsDefault.AddImage(2, MetallicRoughness.pImage,
+	// 						gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(MetallicRoughness) }));
+	// }
+
+	// if (bSupportsSkinning) {
+	// 	mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.PageSize);
+	// }
+
+	// mDsDefault.Build();
 
 	SubmitProperties(Properties);
 

@@ -99,11 +99,11 @@ void PSOBuild::BuildPipeline()
 	mpPipeline->Create(mPipelineName, shader_list, pOutputTargets->GetDescriptions(), blend_attachments, vertex_ptr,
 					   *mpRenderPass, mProperties);
 
-	if (!IsFlagSet(mFlags, ePSOBuildFlags::UseAutoDescriptors)) {
-		mpPipeline->DescriptorIDs.Free();
-		mpPipeline->bBindAttachedDescriptors = false;
-		return;
-	}
+	// if (!HasFlag(mFlags, ePSOBuildFlags::UseAutoDescriptors)) {
+	mpPipeline->DescriptorIDs.Free();
+	mpPipeline->bBindAttachedDescriptors = false;
+	return;
+	// }
 
 
 	mpPipeline->bBindAttachedDescriptors = true;
@@ -184,7 +184,28 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 
 PipelineLayout PSOBuild::BuildLayout()
 {
-	std::vector<VkDescriptorSetLayout> descriptor_layouts = BuildDescriptorSets();
+	std::vector<VkDescriptorSetLayout> descriptor_layouts;
+
+	if (HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors)) {
+		// Retrieve the descriptor layouts from the actively created descriptors. The list on the pipeline should
+		// already be filled out on call of `ReuseDS`.
+		descriptor_layouts.reserve(mpPipeline->DescriptorIDs.Size);
+
+		for (Pipeline::DescriptorRef& ds_ref : mpPipeline->DescriptorIDs) {
+			// Finally, we can get the layout from the previously created DS.
+			std::pair<Hash32, VkDescriptorSetLayout> ds_result = gDsLayoutCache->Request(ds_ref.ID);
+			if (ds_result.second == nullptr) {
+				LogWarning(LC_CORE, "PSOBuild::BuildLayout: Reused descriptor set does not exist!");
+				continue;
+			}
+
+			descriptor_layouts.emplace_back(ds_result.second);
+		}
+	}
+	else {
+		// Build the descriptors from `DescriptorEntry` buffer
+		descriptor_layouts = BuildDescriptorSets();
+	}
 
 	mpPipeline->Layout = PipelineLayout(Slice(mPushConstants),
 										Slice(descriptor_layouts.data(), descriptor_layouts.size()));
@@ -199,6 +220,7 @@ void PSOBuild::EndPipeline()
 	BuildPipeline();
 	Reset();
 }
+
 
 DescriptorSet* PSOBuild::StartDescriptorUpdate(uint32 set_index)
 {
@@ -219,6 +241,18 @@ DescriptorSet* PSOBuild::StartDescriptorUpdate(uint32 set_index)
 	return nullptr;
 }
 
+
+void PSOBuild::ReuseDS(ePipelineName other_pso)
+{
+	// Copy the descriptor ref's from the other pso
+	SetFlag(mFlags, ePSOBuildFlags::ReuseDescriptors);
+	mpPipeline->DescriptorIDs.CloneFrom(gPipelineCache->Request(other_pso).DescriptorIDs);
+}
+
+void PSOBuild::AddExistingDS(uint32 set_index, Hash32 layout_id)
+{
+	mpPipeline->DescriptorIDs.Emplace(set_index, layout_id);
+}
 
 void PSOBuild::AddBuffer(uint32 bind_index, uint32 set_index, eShaderType shader_stages, RawGpuBuffer* buffer,
 						 uint64 offset, uint64 range)
@@ -282,6 +316,7 @@ void PSOBuild::Reset()
 {
 	mpPipeline = nullptr;
 	mpRenderPass = nullptr;
+	mVertexType = eVertexType::Default;
 	// bBuiltDescriptorLayouts = false;
 
 	mPushConstants.Clear();

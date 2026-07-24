@@ -20,7 +20,7 @@ class Material;
 
 namespace MaterialManagerFwd {
 renderer::DescriptorPool& GetDescriptorPool();
-renderer::DescriptorSet& GetDescriptorSet();
+// renderer::DescriptorSet& GetDescriptorSet();
 renderer::RawGpuBuffer& GetMaterialPropertiesBuffer();
 void DestroyMaterial(const MaterialID& id);
 Material* GetMaterial(const MaterialID& id);

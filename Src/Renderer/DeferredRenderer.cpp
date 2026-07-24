@@ -1,5 +1,6 @@
 #include "DeferredRenderer.hpp"
 
+#include "Backend/DescriptorCache.hpp"
 #include "Backend/DsLayoutBuilder.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
 #include "Backend/Shader.hpp"
@@ -13,6 +14,8 @@
 #include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
 
+#include <Asset/AssetManager.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 
 namespace fx::renderer {
@@ -46,17 +49,17 @@ void DeferredRenderer::CreateForwardPass()
 	TargetList targets {};
 
 	Target* lp_light_attachment = LightPass.GetTarget(eImageFormat::RGBA16_Float);
-	Target* lp_depth_attachment = GPass.GetTarget(eImageFormat::eD32_Float);
+	Target* lp_depth_attachment = GPass.GetTarget(eImageFormat::D32_Float);
 
 	Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
 
 	ForwardPass.Create("Forward", gRenderer->Swapchain.Extent);
 
-	ForwardPass.AddTarget(eImageFormat::eD32_Float, Target::scFullScreen,
+	ForwardPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
 						  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						  eImageAspectFlag::Depth);
 	{
-		Target* depth_target = ForwardPass.GetTarget(eImageFormat::eD32_Float);
+		Target* depth_target = ForwardPass.GetTarget(eImageFormat::D32_Float);
 		depth_target->LoadOp = eLoadOp::Load;
 		depth_target->StoreOp = eStoreOp::DontCare;
 		depth_target->InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -90,7 +93,7 @@ void DeferredRenderer::CreateGPass()
 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
 	// Depth target
-	GPass.AddTarget(eImageFormat::eD32_Float, Target::scFullScreen,
+	GPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
 					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
 
 	GPass.BuildRenderStage();
@@ -103,28 +106,28 @@ void DeferredRenderer::CreateGPass()
 VkPipelineLayout DeferredRenderer::CreateGPassPipelineLayout()
 {
 	// Material descriptor set
-	{
-		// Create material properties DS layout
-		DsLayoutBuilder builder {};
-		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Pixel);
-		DsLayoutLightingMaterialProperties = builder.Build();
-	}
+	// {
+	// 	// Create material properties DS layout
+	// 	DsLayoutBuilder builder {};
+	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Pixel);
+	// 	DsLayoutLightingMaterialProperties = builder.Build();
+	// }
 
 
-	{
-		DsLayoutBuilder builder {};
-		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-		builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-		// builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, ShaderType::Vertex);
-		DsLayoutGPassMaterial = builder.Build();
-	}
+	// {
+	// 	DsLayoutBuilder builder {};
+	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	// builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, ShaderType::Vertex);
+	// 	DsLayoutGPassMaterial = builder.Build();
+	// }
 
-	{
-		DsLayoutBuilder builder {};
-		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-		DsLayoutGPassMaterialAlbedoOnly = builder.Build();
-	}
+	// {
+	// 	DsLayoutBuilder builder {};
+	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	DsLayoutGPassMaterialAlbedoOnly = builder.Build();
+	// }
 
 	return nullptr;
 }
@@ -132,14 +135,14 @@ VkPipelineLayout DeferredRenderer::CreateGPassPipelineLayout()
 
 VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
 {
-	{
-		DsLayoutBuilder builder {};
-		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-		builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-		builder.AddBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Vertex);
-		DsLayoutGPassSkinned = builder.Build();
-	}
+	// {
+	// 	DsLayoutBuilder builder {};
+	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	builder.AddBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Vertex);
+	// 	DsLayoutGPassSkinned = builder.Build();
+	// }
 
 	return nullptr;
 }
@@ -148,47 +151,56 @@ VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
 void DeferredRenderer::CreateUnlitPipeline()
 {
 	CreateForwardPass();
+	{
+		// Unlit pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::Unlit);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->SetShader(eShaderName::Unlit, {});
 
-	// Unlit pipeline
-	gPSOBuild->BeginPipeline(ePipelineName::Unlit);
-	gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-	gPSOBuild->SetShader(eShaderName::Unlit, {});
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
 
-	gPSOBuild->UseRenderStage(ForwardPass);
-	gPSOBuild->SetVertexType(eVertexType::Default);
-	gPSOBuild->SetCullMode(eCullMode::Back);
+		gPSOBuild->EndPipeline();
+	}
 
-	gPSOBuild->EndPipeline();
+	{
+		// Text rendering pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
+		gPSOBuild->SetLayout(ePipelineName::Unlit);
 
-	// Text rendering pipeline
-	gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
-	gPSOBuild->SetLayout(ePipelineName::Unlit);
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetShader(eShaderName::Text, {});
+		gPSOBuild->SetCullMode(eCullMode::None);
+		gPSOBuild->EndPipeline();
+	}
 
-	gPSOBuild->UseRenderStage(ForwardPass);
-	gPSOBuild->SetShader(eShaderName::Text, {});
-	gPSOBuild->SetCullMode(eCullMode::None);
-	gPSOBuild->EndPipeline();
+	{
+		// Debug Layer pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::DebugLayer);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
+		gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
+		gPSOBuild->SetVertexType(eVertexType::Slim);
+		gPSOBuild->SetRenderLines(true);
+		gPSOBuild->SetCullMode(eCullMode::Back);
 
-
-	// Debug Layer pipeline
-	gPSOBuild->BeginPipeline(ePipelineName::DebugLayer);
-	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
-	gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
-	gPSOBuild->SetVertexType(eVertexType::Slim);
-	gPSOBuild->SetRenderLines(true);
-	gPSOBuild->SetCullMode(eCullMode::Back);
-
-	gPSOBuild->UseRenderStage(ForwardPass);
-	gPSOBuild->EndPipeline();
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->EndPipeline();
+	}
 }
 
 
 void DeferredRenderer::CreateGPassPipeline()
 {
-	CreateGPassPipelineLayout();
-
 	CreateGPass();
+
 	{
+		// Build the pipeline with some descriptor set templates that are replaced by the material's descriptor set
+		SizedArray<DescriptorEntry> ds_entries(5);
+		ds_entries.Emplace(DescriptorEntry::AsImage(
+			0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
+
 		gPSOBuild->BeginPipeline(ePipelineName::Geometry);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
@@ -197,43 +209,85 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gPSOBuild->EndPipeline();
+		// bObjectBuffer
+		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
 
-		Ref<Shader> geometry_shader = gShaderCache->Request(eShaderName::Geometry);
+		// Set descriptor set 0 to be our template
+		gPSOBuild->AddExistingDS(0, ds_layout.first);
+
+
+		gPSOBuild->EndPipeline();
 	}
 
 
-	Pipeline& geometry_pl = gPipelineCache->Request(ePipelineName::Geometry);
-	geometry_pl.VertexShader->PrintReflection();
+	{
+		SizedArray<DescriptorEntry> ds_entries(5);
+		ds_entries.Emplace(DescriptorEntry::AsImage(
+			0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		ds_entries.Emplace(DescriptorEntry::AsImage(
+			1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		ds_entries.Emplace(DescriptorEntry::AsImage(
+			2, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
+
+		// Normal mapped pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
+		// Use previous layout
+		gPSOBuild->SetLayout(ePipelineName::Geometry);
+
+		gPSOBuild->UseRenderStage(GPass);
+		gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+
+		// bObjectBuffer
+		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+
+		// Set descriptor set 0 to be our template
+		gPSOBuild->AddExistingDS(0, ds_layout.first);
+
+		gPSOBuild->EndPipeline();
+	}
+
+	{
+		// As there is going to be a descriptor set per material, create an equivalent DS layout here to build the
+		// pipeline layotu.
+		SizedArray<DescriptorEntry> ds_entries(5);
+		ds_entries.Emplace(DescriptorEntry::AsImage(
+			0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		ds_entries.Emplace(DescriptorEntry::AsImage(
+			1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		ds_entries.Emplace(DescriptorEntry::AsImage(
+			2, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
+													 gRenderer->BoneBuffer.PageSize));
+		std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
+
+		// Skinned + Normal mapped pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+
+		gPSOBuild->UseRenderStage(GPass);
+		gPSOBuild->SetVertexType(eVertexType::Skinned);
+		gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
+													  ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
+		gPSOBuild->SetCullMode(eCullMode::Back);
+
+		// bObjectBuffer
+		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+
+		// Set descriptor set 0 to be our template
+		gPSOBuild->AddExistingDS(0, ds_layout.first);
 
 
-	// Normal mapped pipeline
-	gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
-	// Use previous layout
-	gPSOBuild->SetLayout(ePipelineName::Geometry);
-
-	gPSOBuild->UseRenderStage(GPass);
-	gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
-	gPSOBuild->SetVertexType(eVertexType::Default);
-	gPSOBuild->SetCullMode(eCullMode::Back);
-
-	gPSOBuild->EndPipeline();
-
-	CreateGPassSkinnedPipelineLayout();
-
-	// Skinned + Normal mapped pipeline
-	gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
-	gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
-
-	gPSOBuild->UseRenderStage(GPass);
-	gPSOBuild->SetVertexType(eVertexType::Skinned);
-	gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
-												  ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
-	gPSOBuild->SetCullMode(eCullMode::Back);
-	gPSOBuild->EndPipeline();
+		gPSOBuild->EndPipeline();
 
 
-	pGeometryPipelineName = ePipelineName::Geometry;
+		pGeometryPipelineName = ePipelineName::Geometry;
+	}
 }
 
 void DeferredRenderer::DestroyGPassPipeline()
@@ -242,18 +296,18 @@ void DeferredRenderer::DestroyGPassPipeline()
 
 	// Destroy descriptor set layouts
 
-	if (DsLayoutGPassMaterial) {
-		vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterial, nullptr);
-		DsLayoutGPassMaterial = nullptr;
-	}
-	if (DsLayoutGPassSkinned) {
-		vkDestroyDescriptorSetLayout(device, DsLayoutGPassSkinned, nullptr);
-		DsLayoutGPassSkinned = nullptr;
-	}
-	if (DsLayoutGPassMaterialAlbedoOnly) {
-		vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterialAlbedoOnly, nullptr);
-		DsLayoutGPassMaterialAlbedoOnly = nullptr;
-	}
+	// if (DsLayoutGPassMaterial) {
+	// 	vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterial, nullptr);
+	// 	DsLayoutGPassMaterial = nullptr;
+	// }
+	// if (DsLayoutGPassSkinned) {
+	// 	vkDestroyDescriptorSetLayout(device, DsLayoutGPassSkinned, nullptr);
+	// 	DsLayoutGPassSkinned = nullptr;
+	// }
+	// if (DsLayoutGPassMaterialAlbedoOnly) {
+	// 	vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterialAlbedoOnly, nullptr);
+	// 	DsLayoutGPassMaterialAlbedoOnly = nullptr;
+	// }
 
 	gPipelineCache->Request(ePipelineName::Geometry).Destroy();
 	gPipelineCache->Request(ePipelineName::GeometryNormalMaps).Destroy();
@@ -264,27 +318,27 @@ void DeferredRenderer::CreateLightingDSLayout()
 {
 	// Fragment DS
 
-	DsLayoutBuilder builder {};
+	// DsLayoutBuilder builder {};
 
 	// sDepth
-	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// sAlbedo
-	builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// sNormal
-	builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// sShadowDepth
-	builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// // sAlbedo
+	// builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// // sNormal
+	// builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// // sShadowDepth
+	// builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
 
-	builder.AddBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Pixel);
+	// builder.AddBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Pixel);
 
-	DsLayoutLightingFrag = builder.Build();
+	// DsLayoutLightingFrag = builder.Build();
 }
 
 void DeferredRenderer::CreateLightingPipeline()
 {
-	if (DsLayoutLightingFrag == nullptr) {
-		CreateLightingDSLayout();
-	}
+	// if (DsLayoutLightingFrag == nullptr) {
+	// 	CreateLightingDSLayout();
+	// }
 
 	{
 		LightPass.Create("Lighting", gRenderer->Swapchain.Extent);
@@ -312,99 +366,108 @@ void DeferredRenderer::CreateLightingPipeline()
 		.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE } },
 	};
 
-	// Point light pipeline (inside)
-	gPSOBuild->BeginPipeline(ePipelineName::LightingInsideVolume);
-	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(LightVertPushConstants));
 
-	gPSOBuild->UseRenderStage(LightPass);
-	gPSOBuild->SetTargetBlend(0, lighting_blend);
-	gPSOBuild->SetShader(eShaderName::Lighting, {});
-	gPSOBuild->SetVertexType(eVertexType::Slim);
+	{
+		// Point light pipeline (inside)
+		gPSOBuild->BeginPipeline(ePipelineName::LightingInsideVolume);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(LightVertPushConstants));
 
-	gPSOBuild->SetDepthTest(false);
-	gPSOBuild->SetDepthWrite(false);
+		gPSOBuild->UseRenderStage(LightPass);
+		gPSOBuild->SetTargetBlend(0, lighting_blend);
+		gPSOBuild->SetShader(eShaderName::Lighting, {});
+		gPSOBuild->SetVertexType(eVertexType::Slim);
 
-	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
-	gPSOBuild->SetCullMode(eCullMode::Back);
+		gPSOBuild->SetDepthTest(false);
+		gPSOBuild->SetDepthWrite(false);
 
-	gPSOBuild->EndPipeline();
-
-	// Point light pipeline (outside)
-
-	gPSOBuild->BeginPipeline(ePipelineName::LightingOutsideVolume);
-	gPSOBuild->SetLayout(ePipelineName::LightingInsideVolume);
-
-	gPSOBuild->UseRenderStage(LightPass);
-	gPSOBuild->SetTargetBlend(0, lighting_blend);
-	gPSOBuild->SetShader(eShaderName::Lighting, {});
-	gPSOBuild->SetVertexType(eVertexType::Slim);
-
-	gPSOBuild->SetDepthTest(false);
-	gPSOBuild->SetDepthWrite(false);
-
-	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
-	gPSOBuild->SetCullMode(eCullMode::Back);
-
-	gPSOBuild->EndPipeline();
+		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+		gPSOBuild->SetCullMode(eCullMode::Back);
 
 
-	// Directional lighting pipeline
-	gPSOBuild->BeginPipeline(ePipelineName::LightingDirectional);
-	gPSOBuild->SetLayout(ePipelineName::LightingInsideVolume);
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::D32_Float),
+									  &gRenderer->Swapchain.DepthSampler);
+		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
+									  &gRenderer->Swapchain.ColorSampler);
+		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::RGBA16_Float),
+									  &gRenderer->Swapchain.NormalsSampler);
 
-	gPSOBuild->UseRenderStage(LightPass);
-	gPSOBuild->SetTargetBlend(0, lighting_blend);
-	gPSOBuild->SetShader(eShaderName::Lighting, { ShaderMacro { .pcName = "FX_LIGHT_DIRECTIONAL", .pcValue = "1" } });
-	gPSOBuild->SetVertexType(eVertexType::Slim);
-
-	gPSOBuild->SetDepthTest(false);
-	gPSOBuild->SetDepthWrite(false);
-
-	gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
-	gPSOBuild->SetCullMode(eCullMode::None);
-
-	// Since the directional light is a triangle built from the screen coordinates, we won't be passing in vertices.
-	gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-
-	gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::eD32_Float),
-								  &gRenderer->Swapchain.DepthSampler);
-	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
-								  &gRenderer->Swapchain.ColorSampler);
-	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::RGBA16_Float),
-								  &gRenderer->Swapchain.NormalsSampler);
-
-	if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
 		gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel,
-									  gShadowRenderer->RenderStage.GetTarget(eImageFormat::eD32_Float),
+									  gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float),
 									  &gRenderer->Swapchain.ShadowDepthSampler);
+
+		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+							 gRenderer->LightBuffer.PageSize);
+
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+
+
+		gPSOBuild->EndPipeline();
 	}
 
-	gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-						 gRenderer->LightBuffer.PageSize);
+	{
+		// Point light pipeline (outside)
+		gPSOBuild->BeginPipeline(ePipelineName::LightingOutsideVolume);
+		gPSOBuild->SetLayout(ePipelineName::LightingInsideVolume);
 
-	gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-						 gObjectManager->GetPageSize());
+		gPSOBuild->UseRenderStage(LightPass);
+		gPSOBuild->SetTargetBlend(0, lighting_blend);
+		gPSOBuild->SetShader(eShaderName::Lighting, {});
+		gPSOBuild->SetVertexType(eVertexType::Slim);
 
+		gPSOBuild->SetDepthTest(false);
+		gPSOBuild->SetDepthWrite(false);
 
-	gPSOBuild->EnableAutoDescriptors();
+		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+		gPSOBuild->SetCullMode(eCullMode::Back);
 
-	gPSOBuild->EndPipeline();
+		// Reuse the descriptor sets defined in LightingInsideVolume
+		gPSOBuild->ReuseDS(ePipelineName::LightingInsideVolume);
+
+		gPSOBuild->EndPipeline();
+	}
+
+	{
+		// Directional lighting pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::LightingDirectional);
+		gPSOBuild->SetLayout(ePipelineName::LightingInsideVolume);
+
+		gPSOBuild->UseRenderStage(LightPass);
+		gPSOBuild->SetTargetBlend(0, lighting_blend);
+		gPSOBuild->SetShader(eShaderName::Lighting,
+							 { ShaderMacro { .pcName = "FX_LIGHT_DIRECTIONAL", .pcValue = "1" } });
+		gPSOBuild->SetVertexType(eVertexType::Slim);
+
+		gPSOBuild->SetDepthTest(false);
+		gPSOBuild->SetDepthWrite(false);
+
+		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
+		gPSOBuild->SetCullMode(eCullMode::None);
+
+		// Since the directional light is a triangle built from the screen coordinates, we won't be passing in vertices.
+		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+
+		// Reuse the descriptor sets defined in LightingInsideVolume
+		gPSOBuild->ReuseDS(ePipelineName::LightingInsideVolume);
+
+		gPSOBuild->EndPipeline();
+	}
 }
 
 void DeferredRenderer::DestroyLightingPipeline()
 {
-	VkDevice device = gRenderer->GetDevice()->Device;
+	// VkDevice device = gRenderer->GetDevice()->Device;
 
 	// Destroy descriptor set layouts
-	if (DsLayoutLightingFrag != nullptr) {
-		vkDestroyDescriptorSetLayout(device, DsLayoutLightingFrag, nullptr);
-		DsLayoutLightingFrag = nullptr;
-	}
+	// if (DsLayoutLightingFrag != nullptr) {
+	// 	vkDestroyDescriptorSetLayout(device, DsLayoutLightingFrag, nullptr);
+	// 	DsLayoutLightingFrag = nullptr;
+	// }
 
-	if (DsLayoutLightingMaterialProperties != nullptr) {
-		vkDestroyDescriptorSetLayout(device, DsLayoutLightingMaterialProperties, nullptr);
-		DsLayoutLightingMaterialProperties = nullptr;
-	}
+	// if (DsLayoutLightingMaterialProperties != nullptr) {
+	// 	vkDestroyDescriptorSetLayout(device, DsLayoutLightingMaterialProperties, nullptr);
+	// 	DsLayoutLightingMaterialProperties = nullptr;
+	// }
 }
 
 //////////////////////////////////////////
@@ -413,18 +476,26 @@ void DeferredRenderer::DestroyLightingPipeline()
 
 void DeferredRenderer::CreateCompPipeline()
 {
-	{
-		DsLayoutBuilder builder {};
+	// {
+	// 	DsLayoutBuilder builder {};
 
-		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
-			.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
-			.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
-			.AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
+	// 	builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
+	// 		.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
+	// 		.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
+	// 		.AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
 
-		DsLayoutCompFrag = builder.Build();
-	}
+	// 	DsLayoutCompFrag = builder.Build();
+	// }
 
-	CreateCompPass();
+
+	// Create composition render stage
+
+	CompPass.Create("Compose", gRenderer->Swapchain.Extent);
+
+	CompPass.MarkFinalStage();
+	CompPass.BuildRenderStage();
+
+	// Create composition pipeline
 
 	gPSOBuild->BeginPipeline(ePipelineName::Composition);
 	gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
@@ -436,6 +507,20 @@ void DeferredRenderer::CreateCompPipeline()
 	gPSOBuild->SetFaceOrder(eFaceOrder::Default);
 	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
+
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::D32_Float),
+								  gSamplerCache->Request(SamplerProps {
+									  eSamplerFilter::Nearest,
+									  eSamplerFilter::Nearest,
+									  eSamplerFilter::Nearest,
+								  }));
+	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
+								  gSamplerCache->Request(SamplerProps {}));
+	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::RGBA16_Float),
+								  gSamplerCache->Request(SamplerProps {}));
+	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, LightPass.GetTarget(eImageFormat::RGBA16_Float),
+								  gSamplerCache->Request(SamplerProps {}));
+
 	gPSOBuild->EndPipeline();
 }
 
@@ -444,59 +529,54 @@ void DeferredRenderer::DestroyCompPipeline()
 	VkDevice device = gRenderer->GetDevice()->Device;
 
 	// Destroy descriptor set layouts
-	if (DsLayoutCompFrag) {
-		vkDestroyDescriptorSetLayout(device, DsLayoutCompFrag, nullptr);
-		DsLayoutCompFrag = nullptr;
-	}
+	// if (DsLayoutCompFrag) {
+	// 	vkDestroyDescriptorSetLayout(device, DsLayoutCompFrag, nullptr);
+	// 	DsLayoutCompFrag = nullptr;
+	// }
 }
 
 void DeferredRenderer::CreateDescriptorSets()
 {
-	DsComposition.Destroy();
-	DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
-	DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::eD32_Float),
-									 gSamplerCache->Request(SamplerProps {
-										 eSamplerFilter::Nearest,
-										 eSamplerFilter::Nearest,
-										 eSamplerFilter::Nearest,
-									 }));
-	DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
-									 gSamplerCache->Request(SamplerProps {}));
-	DsComposition.AddImageFromTarget(3, GPass.GetTarget(eImageFormat::RGBA16_Float),
-									 gSamplerCache->Request(SamplerProps {}));
-	DsComposition.AddImageFromTarget(4, LightPass.GetTarget(eImageFormat::RGBA16_Float),
-									 gSamplerCache->Request(SamplerProps {}));
-	DsComposition.Build();
+	// DsComposition.Destroy();
+	// DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
+	// DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::D32_Float),
+	// 								 gSamplerCache->Request(SamplerProps {
+	// 									 eSamplerFilter::Nearest,
+	// 									 eSamplerFilter::Nearest,
+	// 									 eSamplerFilter::Nearest,
+	// 								 }));
+	// DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
+	// 								 gSamplerCache->Request(SamplerProps {}));
+	// DsComposition.AddImageFromTarget(3, GPass.GetTarget(eImageFormat::RGBA16_Float),
+	// 								 gSamplerCache->Request(SamplerProps {}));
+	// DsComposition.AddImageFromTarget(4, LightPass.GetTarget(eImageFormat::RGBA16_Float),
+	// 								 gSamplerCache->Request(SamplerProps {}));
+	// DsComposition.Build();
 
 
-	DsLighting.Destroy();
-	DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
-	// sDepth
-	DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::eD32_Float), &gRenderer->Swapchain.DepthSampler);
-	// sAlbedo
-	DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
+	// DsLighting.Destroy();
+	// DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
+	// // sDepth
+	// DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::D32_Float), &gRenderer->Swapchain.DepthSampler);
+	// // sAlbedo
+	// DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
 
-	// sNormals
-	DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float), &gRenderer->Swapchain.NormalsSampler);
+	// // sNormals
+	// DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float),
+	// &gRenderer->Swapchain.NormalsSampler);
 
-	if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
-		DsLighting.AddImageFromTarget(3, gShadowRenderer->RenderStage.GetTarget(eImageFormat::eD32_Float),
-									  &gRenderer->Swapchain.ShadowDepthSampler);
-	}
+	// if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
+	// 	DsLighting.AddImageFromTarget(3, gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float),
+	// 								  &gRenderer->Swapchain.ShadowDepthSampler);
+	// }
 
-	// Skip 3 for the shadow target, added by DirectionalShadows
-	DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
+	// // Skip 3 for the shadow target, added by DirectionalShadows
+	// DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
 
-	DsLighting.Build();
+	// DsLighting.Build();
 }
 
-void DeferredRenderer::CreateCompPass()
-{
-	CompPass.Create("Compose", gRenderer->Swapchain.Extent);
-
-	CompPass.MarkFinalStage();
-	CompPass.BuildRenderStage();
-}
+void DeferredRenderer::CreateCompPass() {}
 
 void DeferredRenderer::DoCompPass(Camera& camera)
 {
@@ -510,7 +590,9 @@ void DeferredRenderer::DoCompPass(Camera& camera)
 
 	gRenderer->SubmitPushConstants(cmd, composition_pipeline, eShaderType::Pixel, push_constants);
 
-	DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, composition_pipeline);
+	gPipelineCache->Bind(ePipelineName::Composition, cmd);
+
+	// DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, composition_pipeline);
 
 	// Use single triangle instead of two triangles as it removes the overlapping quads the gpu
 	// renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html

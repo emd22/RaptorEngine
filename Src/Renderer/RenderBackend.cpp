@@ -624,7 +624,7 @@ void RenderBackend::BeginLighting()
 
 	pDeferredRenderer->GPass.End();
 
-	Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::eD32_Float, 0);
+	Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::D32_Float, 0);
 	Assert(depth_target != nullptr);
 	depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
@@ -637,8 +637,8 @@ void RenderBackend::BeginLighting()
 	// gState->Reset();
 
 
-	gPipelineCache->SetBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
-	gPipelineCache->SetBufferOffset(2, gObjectManager->GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(2, gObjectManager->GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 
 	// pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,

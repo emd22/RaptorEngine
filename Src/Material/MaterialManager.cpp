@@ -43,19 +43,20 @@ void MaterialManager::Create()
 									VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
 
-	if (!mMaterialPropertiesDS.IsInited()) {
-		Assert(renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
-		mMaterialPropertiesDS.Create(dp, renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties,
-									 false);
-	}
+	// if (!mMaterialPropertiesDS.IsInited()) {
+	// 	Assert(renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
+	// 	mMaterialPropertiesDS.Create(dp, renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties,
+	// 								 false);
+	// }
 
-	mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);
-	mMaterialPropertiesDS.Build();
+	// mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);
+	// mMaterialPropertiesDS.Build();
 
 	MakeNullMaterial();
 
 	mbInitialized = true;
 }
+
 
 bool MaterialManager::Bind(const renderer::CommandBuffer& cmd, const MaterialID& id)
 {

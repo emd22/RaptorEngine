@@ -153,7 +153,7 @@ FX_FORCE_INLINE constexpr T& SetFlag(T& lhs, T flag)
 }
 
 template <typename T>
-FX_FORCE_INLINE constexpr bool IsFlagSet(T lhs, T flag)
+FX_FORCE_INLINE constexpr bool HasFlag(T lhs, T flag)
 {
 	using InternalType = EnumFlagsIntType<T>;
 	return (static_cast<InternalType>(lhs) & static_cast<InternalType>(flag)) != 0;

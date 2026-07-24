@@ -86,10 +86,10 @@ Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 		SaveHandleToBuffer(reinterpret_cast<const void*>(&entry.BindIndex), sizeof(uint32));
 
 		if (entry.IsImage()) {
-			SaveHandleToBuffer(reinterpret_cast<void*>(entry.pImage->InternalImage), sizeof(uint64));
+			SaveHandleToBuffer(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
 		}
 		else if (entry.IsBuffer()) {
-			SaveHandleToBuffer(reinterpret_cast<void*>(entry.pBuffer->Buffer), sizeof(uint64));
+			SaveHandleToBuffer(reinterpret_cast<void*>(&entry.pBuffer->Buffer), sizeof(uint64));
 		}
 	}
 
@@ -120,7 +120,7 @@ DescriptorPool& DescriptorCache::FindPool()
 	// TODO: This should check to see if there is an open entry in a pool, move to the next if not.
 	if (Pools.Size() < 1) {
 		DescriptorPool* pool = Pools.Insert();
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 40);
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 20);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 20);
 		pool->Create(RenderBackendFwd::GetDevice());
@@ -157,6 +157,17 @@ DescriptorSet* DescriptorCache::Request(const SizedArray<DescriptorEntry>& entri
 	}
 
 	descriptor.Create(FindPool(), layout_result.second, has_dynamic_offsets);
+
+	for (const DescriptorEntry& entry : entries) {
+		if (entry.IsBuffer()) {
+			descriptor.AddBuffer(entry.BindIndex, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
+		}
+		else if (entry.IsImage()) {
+			descriptor.AddImage(entry.BindIndex, entry.pImage, entry.pSampler);
+		}
+	}
+
+	descriptor.Build();
 
 	return &descriptor;
 }
