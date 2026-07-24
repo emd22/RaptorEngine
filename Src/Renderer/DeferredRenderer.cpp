@@ -119,6 +119,24 @@ void DeferredRenderer::CreateUnlitPipeline()
 
 		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
+
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+
+		gPSOBuild->EndPipeline();
+
+
+		// Unlit pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::UnlitNormalMaps);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
+		gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+
+		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
 		gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
@@ -360,9 +378,6 @@ void DeferredRenderer::CreateLightingPipeline()
 		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		// Reuse the descriptor sets defined in LightingInsideVolume
-		gPSOBuild->ReuseDS(ePipelineName::LightingInsideVolume);
-
 		gPSOBuild->EndPipeline();
 	}
 
@@ -385,9 +400,6 @@ void DeferredRenderer::CreateLightingPipeline()
 
 		// Since the directional light is a triangle built from the screen coordinates, we won't be passing in vertices.
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
-
-		// Reuse the descriptor sets defined in LightingInsideVolume
-		gPSOBuild->ReuseDS(ePipelineName::LightingInsideVolume);
 
 		gPSOBuild->EndPipeline();
 	}

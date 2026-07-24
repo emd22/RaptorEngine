@@ -24,7 +24,12 @@ PipelineCache::PipelineCache()
 	}
 }
 
-Pipeline& PipelineCache::Request(const ePipelineName id) { return mCache[static_cast<uint32>(id)]; }
+Pipeline& PipelineCache::Request(const ePipelineName id)
+{
+	Pipeline& pl = mCache[static_cast<uint32>(id)];
+	pl.Name = id;
+	return pl;
+}
 
 ePipelineName PipelineCache::GetName(const Pipeline* pipeline) const
 {

@@ -51,7 +51,7 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
 		if (is_unlit) {
 			LogInfo("Setting material {} pipeline to be unlit", material->ID);
-			material->SetPipeline(ePipelineName::Unlit);
+			material->SetPipeline(material->NormalMap.Exists() ? ePipelineName::UnlitNormalMaps : ePipelineName::Unlit);
 		}
 
 		ePipelineName pipeline_name = material->GetPipelineName();
@@ -157,10 +157,14 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 		return;
 	}
 
+	renderer::Pipeline* alt_pipeline = nullptr;
+
 	// If the pipeline passed in is unlit, force the unlit pipeline to be used over the materials pipeline.
-	const bool force_unlit_pipeline = (pl_name == ePipelineName::Unlit);
-	renderer::Pipeline* alt_pipeline = (force_unlit_pipeline ? &gPipelineCache->Request(ePipelineName::Unlit)
-															 : nullptr);
+	const bool is_unlit_pipeline = (pl_name == ePipelineName::Unlit || pl_name == ePipelineName::UnlitNormalMaps);
+
+	if (is_unlit_pipeline) {
+		alt_pipeline = &gPipelineCache->Request(pl_name);
+	}
 
 	uint32 index = 0;
 	while (true) {
@@ -246,6 +250,7 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
 		CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
 		CLEAR_RL_SECTION(ePipelineName::Unlit);
+		CLEAR_RL_SECTION(ePipelineName::UnlitNormalMaps);
 	}
 
 	uint32 index = 0;
@@ -324,6 +329,7 @@ void Scene::Render(Camera* shadow_camera)
 	gRenderer->BeginUnlit();
 
 	ExecuteRenderList(ePipelineName::Unlit);
+	ExecuteRenderList(ePipelineName::UnlitNormalMaps);
 
 	// RenderBoundingBoxes(camera);
 	RenderWorldGrid(camera);

@@ -174,6 +174,8 @@ public:
 	renderer::Pipeline& GetPipeline() { return *mpPipeline; }
 	renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
 
+	bool IsAlbedoOnly() const { return (!NormalMap.Exists() && !MetallicRoughness.Exists()); }
+
 
 	Material& operator=(const Material& other);
 

@@ -35,7 +35,7 @@ public:
 	/**
 	 * @brief Selects a pipeline to create.
 	 */
-	void BeginPipeline(ePipelineName pipeline);
+	void BeginPipeline(const ePipelineName pipeline);
 	void EndPipeline();
 
 	/**
@@ -105,13 +105,10 @@ private:
 	void Reset();
 
 	std::vector<VkDescriptorSetLayout> BuildDescriptorSets();
+	bool HasDescriptorsToBuild() const;
 
 	bool CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const;
 	void CheckDescriptorsAgainstShader() const;
-
-	DescriptorSet* StartDescriptorUpdate(uint32 set_index);
-
-	// void AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& program);
 
 public:
 	TargetList* pOutputTargets;
@@ -128,7 +125,6 @@ private:
 	StackArray<Ref<ShaderProgram>, (ShaderUtil::scNumShaderTypes - 1)> mShaderPrograms;
 
 	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
-	// SizedArray<VkDescriptorSetLayout> mDescriptorLayouts;
 
 	/// Contains the list of descriptor entries indexed based on the descriptor set's index.
 	SizedArray<SizedArray<DescriptorEntry>> mDescriptorEntries;

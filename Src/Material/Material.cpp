@@ -192,7 +192,7 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 		mDescriptorSet->Get(), // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
 	};
 
-	StackArray<uint32, 2> offsets = { 0 };
+	StackArray<uint32, 2> offsets;
 	if (bSupportsSkinning) {
 		offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
 	}
@@ -320,7 +320,7 @@ void Material::Build()
 		diffuse_sampler_props.SetNearest();
 	}
 
-	if (!MetallicRoughness.Exists()) {
+	if (NormalMap.Exists() && !MetallicRoughness.Exists()) {
 		MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 	}
 

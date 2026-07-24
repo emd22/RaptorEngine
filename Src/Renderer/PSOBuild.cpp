@@ -10,6 +10,8 @@
 
 #include <algorithm>
 
+#define FX_DEBUG_SET_DESCRIPTOR_NAMES 1
+
 namespace fx::renderer {
 
 
@@ -17,14 +19,10 @@ static constexpr uint32 scMaxNumDescriptorSets = 6;
 static constexpr uint32 scMaxNumDescriptorBindings = 10;
 
 
-void PSOBuild::BeginPipeline(ePipelineName name)
+void PSOBuild::BeginPipeline(const ePipelineName name)
 {
 	mPipelineName = name;
 	mpPipeline = &gPipelineCache->Request(name);
-
-	// if (!mDescriptorLayouts.IsInited()) {
-	// 	mDescriptorLayouts.InitCapacity(10);
-	// }
 
 	if (!mpPipeline->DescriptorIDs.IsInited()) {
 		mpPipeline->DescriptorIDs.InitCapacity(8);
@@ -36,8 +34,6 @@ void PSOBuild::BeginPipeline(ePipelineName name)
 		for (SizedArray<DescriptorEntry>& entry_list : mDescriptorEntries) {
 			entry_list.InitCapacity(scMaxNumDescriptorBindings);
 		}
-
-		// mDescriptorEntries.Size = 0;
 	}
 }
 
@@ -56,16 +52,38 @@ void PSOBuild::UseRenderStage(RenderStage& stage)
 	SetRenderPass(&stage.GetRenderPass());
 }
 
-void PSOBuild::SetLayout(const PipelineLayout& layout) { mpPipeline->SetLayout(layout); }
-void PSOBuild::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCache->Request(name).Layout); }
+void PSOBuild::SetLayout(ePipelineName name)
+{
+	mpPipeline->SetLayout(gPipelineCache->Request(name).Layout);
+	ReuseDS(name);
+}
+
+bool PSOBuild::HasDescriptorsToBuild() const
+{
+	for (uint32 i = 0; i < mDescriptorEntries.Size; i++) {
+		const SizedArray<DescriptorEntry>& desc_list = mDescriptorEntries[i];
+
+		if (desc_list.Size > 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 
 void PSOBuild::BuildPipeline()
 {
 	if (!mpPipeline->HasLayout()) {
-		// BuildDescriptorLayouts();
 		CheckDescriptorsAgainstShader();
-
 		BuildLayout();
+	}
+	// If there are descriptors waiting to be built but there is already a built pipeline layout, then they will never
+	// be created or used. Notify incase that is a mistake.
+	else if (HasDescriptorsToBuild() && !HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors)) {
+		LogWarning(LC_RENDER, "PSOBuild: Descriptors will never be built for pipeline '{}'",
+				   PipelineNameUtil::GetName(mPipelineName));
+		Panic("PSOBuild", "Oops!");
 	}
 
 	Ref<ShaderProgram> vertex_shader = GetShaderProgram(eShaderType::Vertex);
@@ -99,35 +117,6 @@ void PSOBuild::BuildPipeline()
 
 	mpPipeline->Create(mPipelineName, shader_list, pOutputTargets->GetDescriptions(), blend_attachments, vertex_ptr,
 					   *mpRenderPass, mProperties);
-
-	// if (!HasFlag(mFlags, ePSOBuildFlags::UseAutoDescriptors)) {
-	// mpPipeline->DescriptorIDs.Free();
-	// mpPipeline->bBindAttachedDescriptors = false;
-	// return;
-	// }
-
-
-	mpPipeline->bBindAttachedDescriptors = true;
-
-	// Build any descriptors that were created
-	// for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Size; i++) {
-	// 	Pipeline::DescriptorRef& desc_ref = mpPipeline->DescriptorIDs[i];
-
-	// 	if (desc_ref.ID == HashNull32) {
-	// 		LogWarning("Skipping DS(index {}) as it is null.", i);
-	// 		continue;
-	// 	}
-
-	// 	DescriptorSet* ds = gDescriptorCache->Request(desc_ref.ID);
-	// 	if (ds == nullptr) {
-	// 		LogError(LC_RENDER, "RenderState: Descriptor set could not be built (not found)");
-	// 		LogError(LC_RENDER, "RenderState: Descriptor set ID is {} ({} logged descriptors)", desc_ref.ID,
-	// 				 mpPipeline->DescriptorIDs.Size);
-	// 		continue;
-	// 	}
-
-	// 	ds->Build();
-	// }
 }
 
 void PSOBuild::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
@@ -177,6 +166,14 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 
 		// Request (likely create) the descriptor set + descriptor set layout
 		std::pair<Hash32, DescriptorSet*> ds_result = gDescriptorCache->Request(desc_list);
+
+#ifdef FX_DEBUG_SET_DESCRIPTOR_NAMES
+		String debug_str = String::Fmt("{}_{}_{}", PipelineNameUtil::GetName(mPipelineName), i, desc_list.Size);
+		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET, ds_result.second->Get());
+		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+									  ds_result.second->GetLayout());
+#endif
+
 		layouts.emplace_back(ds_result.second->GetLayout());
 
 		mpPipeline->DescriptorIDs.Emplace(i, ds_result.first);
@@ -224,40 +221,20 @@ void PSOBuild::SetOutputTargets(TargetList* targets) { pOutputTargets = targets;
 
 void PSOBuild::EndPipeline()
 {
-	LogInfo(LC_RENDER, "** Building Pipeline **");
+	LogInfo(LC_RENDER, "** Building Pipeline {} **", PipelineNameUtil::GetName(mPipelineName));
 	BuildPipeline();
 
-	LogInfo("");
-	LogInfo("Pipeline '{}' is assigned dsets: ", PipelineNameUtil::GetName(mPipelineName));
+	LogInfo(LC_RENDER, "");
+	LogInfo(LC_RENDER, "Pipeline '{}' is assigned descriptor sets: ", PipelineNameUtil::GetName(mPipelineName));
 
 	for (Pipeline::DescriptorRef& ref : mpPipeline->DescriptorIDs) {
-		LogInfo("\tSet={}\tID={}", ref.SetIndex, ref.ID);
+		LogInfo(LC_RENDER, "\tSet={}\tID={}", ref.SetIndex, ref.ID);
 	}
 
-	LogInfo("");
+	LogInfo(LC_RENDER, "");
 
 	Reset();
 }
-
-DescriptorSet* PSOBuild::StartDescriptorUpdate(uint32 set_index)
-{
-	// AssertMsg(mpPipeline != nullptr, "Cannot call descriptor update function outside of active RenderState");
-
-	// BuildDescriptorLayouts();
-
-	// DescriptorSet* set = nullptr;
-	// for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Size; i++) {
-	// 	Pipeline::DescriptorRef& ref = mpPipeline->DescriptorIDs[i];
-	// 	if (ref.SetIndex == set_index) {
-	// 		set = gDescriptorCache->Request(ref.ID);
-	// 		AssertMsg(set != nullptr, "StartDescriptorUpdate: Cannot retrieve descriptor set");
-	// 		return set;
-	// 	}
-	// }
-
-	return nullptr;
-}
-
 
 void PSOBuild::ReuseDS(ePipelineName other_pso)
 {
@@ -280,20 +257,17 @@ void PSOBuild::AddBuffer(uint32 bind_index, uint32 set_index, eShaderType shader
 void PSOBuild::AddImage(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Image* image, Sampler* sampler)
 {
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, image, sampler));
-
-	// DescriptorSet* set = StartDescriptorUpdate(set_index);
-	// set->AddImage(bind_index, image, sampler);
 }
 
 void PSOBuild::AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Target* target,
 								  Sampler* sampler)
 {
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, &target->Image, sampler));
-
-	// DescriptorSet* set = StartDescriptorUpdate(set_index);
-	// set->AddImageFromTarget(bind_index, target, sampler);
 }
 
+/**
+ * @brief Translate shader reflection type to descriptor entry type.
+ */
 static eDescriptorEntryType SRTToDET(eShaderReflectionType srt)
 {
 	switch (srt) {
@@ -365,41 +339,6 @@ void PSOBuild::CheckDescriptorsAgainstShader() const
 	}
 }
 
-
-// void PSOBuild::AddDescriptorsForShaderProgram(Pipeline& pl, Ref<ShaderProgram>& program)
-// {
-// 	if (!program.IsValid()) {
-// 		return;
-// 	}
-
-// 	Vec2u ds_index_range = GetDescriptorIndexRangeForShader(program);
-
-// 	const SizedArray<ShaderReflectionEntry>& refl = program->Reflection;
-
-// 	for (int32 ds_index = ds_index_range.X; ds_index <= ds_index_range.Y; ds_index++) {
-// 		LogInfo("Building Descriptor Set {}:", ds_index);
-
-
-// 		Hash32 descriptor_id = gDsLayoutCache->GetID(program->ShaderType,
-// 													 gDsLayoutCache->GetEntriesForSet(refl, ds_index));
-
-// 		Assert(descriptor_id != HashNull32);
-
-// 		VkDescriptorSetLayout ds_layout = gDsLayoutCache->Request(program->ShaderType, refl, ds_index);
-// 		mDescriptorLayouts[ds_index] = ds_layout;
-
-// 		pl.DescriptorIDs.Insert(
-// 			Pipeline::DescriptorRef { .SetIndex = static_cast<uint32>(ds_index), .ID = descriptor_id });
-// 		LogInfo("Adding Descriptor {} at set index {}", descriptor_id, ds_index);
-
-// 		gDescriptorCache->Request(program->ShaderType, refl, ds_index);
-// 	}
-
-
-// 	// Set the size to be the max descriptor set index
-// 	// pl.DescriptorIDs.Size = std::max(static_cast<int32>(pl.DescriptorIDs.Size), max_index);
-// }
-
 void PSOBuild::Reset()
 {
 	mpPipeline = nullptr;
@@ -421,10 +360,6 @@ void PSOBuild::Reset()
 	for (SizedArray<DescriptorEntry>& entry_list : mDescriptorEntries) {
 		entry_list.Clear();
 	}
-
-	// Do not call clear here as we don't want each entry list to be freed.
-	// We'll just do the cheap of clearing the size.
-	// mDescriptorEntries.Size = 0;
 }
 
 } // namespace fx::renderer

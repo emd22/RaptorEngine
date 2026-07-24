@@ -32,7 +32,6 @@ struct VSOutput
     float3 vTangentWS : TANGENT;
     float3 vBitangentWS : BITANGENT;
 #endif
-    uint uiMaterialIndex : ATTR0;
     // float4 vDebugColor : ATTR0;
 };
 
@@ -84,7 +83,6 @@ VSOutput main(VSInput input)
     output.vBitangentWS = cross(output.vNormalWS, output.vTangentWS);
 #endif
 
-    output.uiMaterialIndex = VSConst.uiMaterialIndex;
     output.vUV = input.vUV;
 
     return output;
@@ -111,7 +109,6 @@ struct FSInput
     float3 vBitangentWS : BITANGENT;
 #endif
 
-    uint uiMaterialIndex : ATTR0;
     // float4 vDebugColor : ATTR0;
 };
 

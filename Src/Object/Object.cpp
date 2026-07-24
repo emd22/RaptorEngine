@@ -72,7 +72,12 @@ void Object::FinalizeWhenReady()
 	if (HasFlag(Flags, eObjectFlags::Unlit)) {
 		Material* material = gMaterialManager->GetMaterial(mMaterialID);
 		if (material != nullptr) {
-			material->SetPipeline(ePipelineName::Unlit);
+			if (material->IsAlbedoOnly()) {
+				material->SetPipeline(ePipelineName::Unlit);
+			}
+			else {
+				material->SetPipeline(ePipelineName::UnlitNormalMaps);
+			}
 		}
 	}
 
@@ -310,58 +315,6 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex, push_constants);
 
 	RenderMesh(pipeline);
-}
-
-void Object::RenderUnlit(const Camera& camera)
-{
-	if (!IsUnlit()) {
-		return;
-	}
-
-	FrameData* frame = gRenderer->GetFrame();
-
-	MaterialID material_id = MaterialID::Null;
-
-	// bool use_null_material = mMaterialID.IsNull();
-	Material* material = gMaterialManager->GetMaterial(material_id);
-
-	// if (!use_null_material && !material->bIsBuilt) {
-	//     material->Build();
-	//     use_null_material = true;
-	// }
-
-	UpdateIfOutOfDate();
-
-	DrawPushConstants push_constants {};
-	push_constants.ObjectId = ID.GetID();
-	push_constants.MaterialIndex = mMaterialID.GetID();
-	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
-
-
-	if (!gMaterialManager->Bind(frame->CmdBuffer, mMaterialID)) {
-		gMaterialManager->Bind(frame->CmdBuffer, MaterialID::Null);
-	}
-
-	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Unlit);
-	pipeline.Bind(frame->CmdBuffer);
-
-	gObjectManager->mObjectBufferDS.BindWithOffset(2, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-												   gObjectManager->GetBaseOffset());
-
-	if (CheckIfReady(true)) {
-		gRenderer->SubmitPushConstants(frame->CmdBuffer, pipeline, eShaderType::Vertex | eShaderType::Pixel,
-									   push_constants);
-		RenderPrimitive(frame->CmdBuffer);
-	}
-
-	if (AttachedNodes.IsEmpty()) {
-		return;
-	}
-
-	for (const ObjectID& obj_id : AttachedNodes) {
-		Object* obj = gObjectManager->GetObject(obj_id);
-		obj->RenderUnlit(camera);
-	}
 }
 
 
