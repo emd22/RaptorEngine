@@ -131,7 +131,7 @@ DescriptorPool& DescriptorCache::FindPool()
 	return Pools[0];
 }
 
-DescriptorSet* DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
+std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
 {
 	std::pair<Hash32, VkDescriptorSetLayout> layout_result = gDsLayoutCache->Request(entries);
 
@@ -146,14 +146,14 @@ DescriptorSet* DescriptorCache::Request(const SizedArray<DescriptorEntry>& entri
 
 	auto it = Cache.find(layout_result.first);
 	if (it != Cache.end()) {
-		return &it->second;
+		return std::make_pair(layout_result.first, &it->second);
 	}
 
 	DescriptorSet& descriptor = Cache[layout_result.first];
 
 	if (!layout_result.second) {
 		LogError("Could not find DS layout for ID ({})", layout_result.first);
-		return nullptr;
+		return std::make_pair(HashNull32, nullptr);
 	}
 
 	descriptor.Create(FindPool(), layout_result.second, has_dynamic_offsets);
@@ -169,7 +169,7 @@ DescriptorSet* DescriptorCache::Request(const SizedArray<DescriptorEntry>& entri
 
 	descriptor.Build();
 
-	return &descriptor;
+	return std::make_pair(layout_result.first, &descriptor);
 }
 
 DescriptorSet* DescriptorCache::Request(Hash32 descriptor_id)

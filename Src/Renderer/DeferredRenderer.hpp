@@ -41,10 +41,6 @@ private:
 	void CreateGPass();
 
 
-	VkPipelineLayout CreateGPassPipelineLayout();
-	VkPipelineLayout CreateGPassSkinnedPipelineLayout();
-
-
 	// Lighting
 	// void CreateLightVolumePipeline();
 	void CreateLightingPipeline();

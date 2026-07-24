@@ -176,8 +176,10 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 		}
 
 		// Request (likely create) the descriptor set + descriptor set layout
-		DescriptorSet* ds = gDescriptorCache->Request(desc_list);
-		layouts.emplace_back(ds->GetLayout());
+		std::pair<Hash32, DescriptorSet*> ds_result = gDescriptorCache->Request(desc_list);
+		layouts.emplace_back(ds_result.second->GetLayout());
+
+		mpPipeline->DescriptorIDs.Emplace(i, ds_result.first);
 	}
 
 	return layouts;
@@ -224,6 +226,16 @@ void PSOBuild::EndPipeline()
 {
 	LogInfo(LC_RENDER, "** Building Pipeline **");
 	BuildPipeline();
+
+	LogInfo("");
+	LogInfo("Pipeline '{}' is assigned dsets: ", PipelineNameUtil::GetName(mPipelineName));
+
+	for (Pipeline::DescriptorRef& ref : mpPipeline->DescriptorIDs) {
+		LogInfo("\tSet={}\tID={}", ref.SetIndex, ref.ID);
+	}
+
+	LogInfo("");
+
 	Reset();
 }
 

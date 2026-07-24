@@ -226,8 +226,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 
 	const ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
 
-	LogInfo(LC_SHADER, "Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
-
 	// Build the final buffer and write to the data pack
 	{
 #ifndef FX_SHADER_NO_REFLECTION

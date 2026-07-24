@@ -37,7 +37,7 @@ class DescriptorCache
 public:
 	DescriptorCache();
 
-	DescriptorSet* Request(const SizedArray<DescriptorEntry>& entries);
+	std::pair<Hash32, DescriptorSet*> Request(const SizedArray<DescriptorEntry>& entries);
 	DescriptorSet* Request(Hash32 descriptor_id);
 
 	DescriptorPool& FindPool();

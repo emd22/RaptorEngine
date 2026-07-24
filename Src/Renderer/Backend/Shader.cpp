@@ -96,7 +96,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 #endif
 
 	if (is_out_of_date) {
-		LogWarning(LC_SHADER, "Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
+		// LogWarning(LC_SHADER, "Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
 
 		RecompileShader(source_path, program_path, macros);
 

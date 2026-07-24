@@ -307,8 +307,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 		pipeline = &material->GetPipeline();
 	}
 
-	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
-								   push_constants);
+	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex, push_constants);
 
 	RenderMesh(pipeline);
 }
@@ -393,7 +392,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
 	}
 
-	gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+	gObjectManager->mObjectBufferDS.BindWithOffset(1, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
 												   gObjectManager->GetBaseOffset());
 
 	if (pMesh) {

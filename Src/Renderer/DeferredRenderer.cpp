@@ -103,50 +103,6 @@ void DeferredRenderer::CreateGPass()
 // Renderer GPass Functions
 /////////////////////////////////////
 
-VkPipelineLayout DeferredRenderer::CreateGPassPipelineLayout()
-{
-	// Material descriptor set
-	// {
-	// 	// Create material properties DS layout
-	// 	DsLayoutBuilder builder {};
-	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Pixel);
-	// 	DsLayoutLightingMaterialProperties = builder.Build();
-	// }
-
-
-	// {
-	// 	DsLayoutBuilder builder {};
-	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// 	builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// 	builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// 	// builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, ShaderType::Vertex);
-	// 	DsLayoutGPassMaterial = builder.Build();
-	// }
-
-	// {
-	// 	DsLayoutBuilder builder {};
-	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// 	DsLayoutGPassMaterialAlbedoOnly = builder.Build();
-	// }
-
-	return nullptr;
-}
-
-
-VkPipelineLayout DeferredRenderer::CreateGPassSkinnedPipelineLayout()
-{
-	// {
-	// 	DsLayoutBuilder builder {};
-	// 	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// 	builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// 	builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// 	builder.AddBinding(3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Vertex);
-	// 	DsLayoutGPassSkinned = builder.Build();
-	// }
-
-	return nullptr;
-}
-
 
 void DeferredRenderer::CreateUnlitPipeline()
 {
@@ -154,7 +110,7 @@ void DeferredRenderer::CreateUnlitPipeline()
 	{
 		// Unlit pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::Unlit);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 		gPSOBuild->SetShader(eShaderName::Unlit, {});
 
 		gPSOBuild->UseRenderStage(ForwardPass);
@@ -210,7 +166,7 @@ void DeferredRenderer::CreateGPassPipeline()
 
 	{
 		gPSOBuild->BeginPipeline(ePipelineName::Geometry);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 
 		gPSOBuild->UseRenderStage(GPass);
 		gPSOBuild->SetShader(eShaderName::Geometry, {});
@@ -232,8 +188,7 @@ void DeferredRenderer::CreateGPassPipeline()
 	{
 		// Normal mapped pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
-		// Use previous layout
-		// gPSOBuild->SetLayout(ePipelineName::Geometry);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 
 		gPSOBuild->UseRenderStage(GPass);
 		gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
@@ -255,22 +210,9 @@ void DeferredRenderer::CreateGPassPipeline()
 	}
 
 	{
-		// As there is going to be a descriptor set per material, create an equivalent DS layout here to build the
-		// pipeline layotu.
-		// SizedArray<DescriptorEntry> ds_entries(5);
-		// ds_entries.Emplace(DescriptorEntry::AsImage(
-		// 	0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		// ds_entries.Emplace(DescriptorEntry::AsImage(
-		// 	1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		// ds_entries.Emplace(DescriptorEntry::AsImage(
-		// 	2, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		// ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
-		// 											 gRenderer->BoneBuffer.PageSize));
-		// std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
-
 		// Skinned + Normal mapped pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 
 		gPSOBuild->UseRenderStage(GPass);
 		gPSOBuild->SetVertexType(eVertexType::Skinned);
@@ -305,23 +247,8 @@ void DeferredRenderer::DestroyGPassPipeline()
 {
 	VkDevice device = gRenderer->GetDevice()->Device;
 
-	// Destroy descriptor set layouts
-
-	// if (DsLayoutGPassMaterial) {
-	// 	vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterial, nullptr);
-	// 	DsLayoutGPassMaterial = nullptr;
-	// }
-	// if (DsLayoutGPassSkinned) {
-	// 	vkDestroyDescriptorSetLayout(device, DsLayoutGPassSkinned, nullptr);
-	// 	DsLayoutGPassSkinned = nullptr;
-	// }
-	// if (DsLayoutGPassMaterialAlbedoOnly) {
-	// 	vkDestroyDescriptorSetLayout(device, DsLayoutGPassMaterialAlbedoOnly, nullptr);
-	// 	DsLayoutGPassMaterialAlbedoOnly = nullptr;
-	// }
-
-	gPipelineCache->Request(ePipelineName::Geometry).Destroy();
-	gPipelineCache->Request(ePipelineName::GeometryNormalMaps).Destroy();
+	// gPipelineCache->Request(ePipelineName::Geometry).Destroy();
+	// gPipelineCache->Request(ePipelineName::GeometryNormalMaps).Destroy();
 }
 
 
@@ -419,6 +346,7 @@ void DeferredRenderer::CreateLightingPipeline()
 	{
 		// Point light pipeline (outside)
 		gPSOBuild->BeginPipeline(ePipelineName::LightingOutsideVolume);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(LightVertPushConstants));
 		gPSOBuild->SetLayout(ePipelineName::LightingInsideVolume);
 
 		gPSOBuild->UseRenderStage(LightPass);

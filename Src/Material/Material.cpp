@@ -338,7 +338,10 @@ void Material::Build()
 		}
 
 
-		mDescriptorSet = gDescriptorCache->Request(ds_entries);
+		std::pair<Hash32, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
+		mDescriptorSet = result.second;
+
+
 		// VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
 
 		// if (bSupportsSkinning) {
