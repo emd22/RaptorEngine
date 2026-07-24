@@ -71,7 +71,6 @@ F_Texture2D(tAlbedo, 0)
 F_Texture2D(tNormalMap, 1)
 F_Texture2D(tMetallicRoughness, 2)
 
-F_StructBuffer(bMaterialBuffer, Material, 0, 1);
 
 
 FSOutput main(FSInput input)

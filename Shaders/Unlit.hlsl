@@ -60,7 +60,7 @@ struct VSPushConsts
 #ifdef IS_TEXT
 // Pass
 #else
-F_StructBuffer(bObjectBuffer, Object, 0, 2);
+F_StructBuffer(bObjectBuffer, Object, 0, 1);
 #endif // IS_TEXT
 #endif // IS_DEBUG_LAYER
 
@@ -132,8 +132,6 @@ F_Texture2D(tFontAtlas, 0)
 F_Texture2D(tAlbedo, 0)
 F_Texture2D(tNormalMap, 1)
 F_Texture2D(tMetallicRoughness, 2)
-
-F_StructBuffer(bMaterialBuffer, Material, 0, 1);
 
 #endif // IS_TEXT
 #endif // IS_DEBUG_LAYER

@@ -161,19 +161,29 @@ void DeferredRenderer::CreateUnlitPipeline()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
+		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+
 		gPSOBuild->EndPipeline();
 	}
 
-	{
-		// Text rendering pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
-		gPSOBuild->SetLayout(ePipelineName::Unlit);
+	// {
+	// 	// Text rendering pipeline
+	// 	gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
+	// 	// gPSOBuild->SetLayout(ePipelineName::Unlit);
 
-		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetShader(eShaderName::Text, {});
-		gPSOBuild->SetCullMode(eCullMode::None);
-		gPSOBuild->EndPipeline();
-	}
+	// 	gPSOBuild->UseRenderStage(ForwardPass);
+	// 	gPSOBuild->SetShader(eShaderName::Text, {});
+	// 	gPSOBuild->SetCullMode(eCullMode::None);
+	// 	gPSOBuild->EndPipeline();
+	// }
 
 	{
 		// Debug Layer pipeline
@@ -185,6 +195,10 @@ void DeferredRenderer::CreateUnlitPipeline()
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
 		gPSOBuild->UseRenderStage(ForwardPass);
+
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+
 		gPSOBuild->EndPipeline();
 	}
 }
@@ -207,7 +221,7 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 
 
@@ -219,7 +233,7 @@ void DeferredRenderer::CreateGPassPipeline()
 		// Normal mapped pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
 		// Use previous layout
-		gPSOBuild->SetLayout(ePipelineName::Geometry);
+		// gPSOBuild->SetLayout(ePipelineName::Geometry);
 
 		gPSOBuild->UseRenderStage(GPass);
 		gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
@@ -234,7 +248,7 @@ void DeferredRenderer::CreateGPassPipeline()
 							gSamplerCache->Request({}));
 
 		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 
 		gPSOBuild->EndPipeline();
@@ -243,16 +257,16 @@ void DeferredRenderer::CreateGPassPipeline()
 	{
 		// As there is going to be a descriptor set per material, create an equivalent DS layout here to build the
 		// pipeline layotu.
-		SizedArray<DescriptorEntry> ds_entries(5);
-		ds_entries.Emplace(DescriptorEntry::AsImage(
-			0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		ds_entries.Emplace(DescriptorEntry::AsImage(
-			1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		ds_entries.Emplace(DescriptorEntry::AsImage(
-			2, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
-													 gRenderer->BoneBuffer.PageSize));
-		std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
+		// SizedArray<DescriptorEntry> ds_entries(5);
+		// ds_entries.Emplace(DescriptorEntry::AsImage(
+		// 	0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		// ds_entries.Emplace(DescriptorEntry::AsImage(
+		// 	1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		// ds_entries.Emplace(DescriptorEntry::AsImage(
+		// 	2, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
+		// ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
+		// 											 gRenderer->BoneBuffer.PageSize));
+		// std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
 
 		// Skinned + Normal mapped pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
@@ -276,7 +290,7 @@ void DeferredRenderer::CreateGPassPipeline()
 							 gRenderer->BoneBuffer.PageSize);
 
 		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 
 
@@ -495,7 +509,7 @@ void DeferredRenderer::CreateCompPipeline()
 	// Create composition pipeline
 
 	gPSOBuild->BeginPipeline(ePipelineName::Composition);
-	gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
+	// gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
 
 	gPSOBuild->UseRenderStage(CompPass);
 	gPSOBuild->SetShader(eShaderName::Composition, {});
@@ -579,13 +593,13 @@ void DeferredRenderer::DoCompPass(Camera& camera)
 {
 	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
-	CompositionPushConstants push_constants {};
-	memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(Mat4f));
-	memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
+	// CompositionPushConstants push_constants {};
+	// memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(Mat4f));
+	// memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
-	Pipeline& composition_pipeline = gPipelineCache->Request(ePipelineName::Composition);
+	// Pipeline& composition_pipeline = gPipelineCache->Request(ePipelineName::Composition);
 
-	gRenderer->SubmitPushConstants(cmd, composition_pipeline, eShaderType::Pixel, push_constants);
+	// gRenderer->SubmitPushConstants(cmd, composition_pipeline, eShaderType::Pixel, push_constants);
 
 	gPipelineCache->Bind(ePipelineName::Composition, cmd);
 

@@ -103,7 +103,7 @@ void ShadowDirectional::Begin()
 {
 	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
-	Pipeline& pl = gPipelineCache->Request(ePipelineName::ShadowDirectional);
+	// Pipeline& pl = gPipelineCache->Request(ePipelineName::ShadowDirectional);
 
 	RenderStage.Begin(cmd);
 	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());

@@ -16,9 +16,6 @@ enum class ePSOBuildFlags
 	/// The pipeline does not process any vertices.
 	NoVertices = (1 << 0),
 
-	/// TEMP: Generated the descriptors automatically based on `AddImage` and `AddBuffer` calls.
-	UseAutoDescriptors = (1 << 1),
-
 	/// Reuse the descriptors from another PSO. Finds the layouts via the copied descriptor ids.
 	ReuseDescriptors = (1 << 2),
 };
@@ -103,15 +100,13 @@ public:
 		mShaderPrograms[static_cast<uint32>(shader_type) - 1] = program;
 	}
 
-	FX_FORCE_INLINE void EnableAutoDescriptors() { SetFlag(mFlags, ePSOBuildFlags::UseAutoDescriptors); }
-
 private:
 	void BuildPipeline();
 	void Reset();
 
 	std::vector<VkDescriptorSetLayout> BuildDescriptorSets();
 
-	void CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const;
+	bool CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const;
 	void CheckDescriptorsAgainstShader() const;
 
 	DescriptorSet* StartDescriptorUpdate(uint32 set_index);

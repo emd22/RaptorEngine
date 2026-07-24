@@ -37,7 +37,7 @@ void PSOBuild::BeginPipeline(ePipelineName name)
 			entry_list.InitCapacity(scMaxNumDescriptorBindings);
 		}
 
-		mDescriptorEntries.Size = 0;
+		// mDescriptorEntries.Size = 0;
 	}
 }
 
@@ -61,10 +61,10 @@ void PSOBuild::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCa
 
 void PSOBuild::BuildPipeline()
 {
-	// BuildDescriptorLayouts();
-	CheckDescriptorsAgainstShader();
-
 	if (!mpPipeline->HasLayout()) {
+		// BuildDescriptorLayouts();
+		CheckDescriptorsAgainstShader();
+
 		BuildLayout();
 	}
 
@@ -101,33 +101,33 @@ void PSOBuild::BuildPipeline()
 					   *mpRenderPass, mProperties);
 
 	// if (!HasFlag(mFlags, ePSOBuildFlags::UseAutoDescriptors)) {
-	mpPipeline->DescriptorIDs.Free();
-	mpPipeline->bBindAttachedDescriptors = false;
-	return;
+	// mpPipeline->DescriptorIDs.Free();
+	// mpPipeline->bBindAttachedDescriptors = false;
+	// return;
 	// }
 
 
 	mpPipeline->bBindAttachedDescriptors = true;
 
 	// Build any descriptors that were created
-	for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Size; i++) {
-		Pipeline::DescriptorRef& desc_ref = mpPipeline->DescriptorIDs[i];
+	// for (uint32 i = 0; i < mpPipeline->DescriptorIDs.Size; i++) {
+	// 	Pipeline::DescriptorRef& desc_ref = mpPipeline->DescriptorIDs[i];
 
-		if (desc_ref.ID == HashNull32) {
-			LogWarning("Skipping DS(index {}) as it is null.", i);
-			continue;
-		}
+	// 	if (desc_ref.ID == HashNull32) {
+	// 		LogWarning("Skipping DS(index {}) as it is null.", i);
+	// 		continue;
+	// 	}
 
-		DescriptorSet* ds = gDescriptorCache->Request(desc_ref.ID);
-		if (ds == nullptr) {
-			LogError(LC_RENDER, "RenderState: Descriptor set could not be built (not found)");
-			LogError(LC_RENDER, "RenderState: Descriptor set ID is {} ({} logged descriptors)", desc_ref.ID,
-					 mpPipeline->DescriptorIDs.Size);
-			continue;
-		}
+	// 	DescriptorSet* ds = gDescriptorCache->Request(desc_ref.ID);
+	// 	if (ds == nullptr) {
+	// 		LogError(LC_RENDER, "RenderState: Descriptor set could not be built (not found)");
+	// 		LogError(LC_RENDER, "RenderState: Descriptor set ID is {} ({} logged descriptors)", desc_ref.ID,
+	// 				 mpPipeline->DescriptorIDs.Size);
+	// 		continue;
+	// 	}
 
-		ds->Build();
-	}
+	// 	ds->Build();
+	// }
 }
 
 void PSOBuild::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
@@ -165,8 +165,10 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 	std::vector<VkDescriptorSetLayout> layouts;
 	layouts.reserve(8);
 
-	for (uint32 i = 0; i < mDescriptorEntries.Capacity; i++) {
+	for (uint32 i = 0; i < mDescriptorEntries.Size; i++) {
 		SizedArray<DescriptorEntry>& desc_list = mDescriptorEntries[i];
+
+		LogInfo("Descriptor '{}' Size is {}", i, desc_list.Size);
 
 		// If there are no entries added, skip creating the DS
 		if (desc_list.Size == 0) {
@@ -208,6 +210,8 @@ PipelineLayout PSOBuild::BuildLayout()
 		descriptor_layouts = BuildDescriptorSets();
 	}
 
+	LogInfo(LC_RENDER, "Creating pipeline layout with {} descriptors", descriptor_layouts.size());
+
 	mpPipeline->Layout = PipelineLayout(Slice(mPushConstants),
 										Slice(descriptor_layouts.data(), descriptor_layouts.size()));
 	return mpPipeline->Layout;
@@ -218,6 +222,7 @@ void PSOBuild::SetOutputTargets(TargetList* targets) { pOutputTargets = targets;
 
 void PSOBuild::EndPipeline()
 {
+	LogInfo(LC_RENDER, "** Building Pipeline **");
 	BuildPipeline();
 	Reset();
 }
@@ -293,7 +298,7 @@ static eDescriptorEntryType SRTToDET(eShaderReflectionType srt)
 }
 
 
-void PSOBuild::CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const
+bool PSOBuild::CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const
 {
 	int32 num_errors = 0;
 
@@ -320,15 +325,31 @@ void PSOBuild::CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program)
 	if (num_errors > 0) {
 		LogError(LC_RENDER, "PSOBuild: Failed when builing '{}' ({})", program->pShader->GetName(),
 				 ShaderUtil::TypeToName(program->ShaderType));
+		return true;
 	}
+
+	return false;
 }
 
 void PSOBuild::CheckDescriptorsAgainstShader() const
 {
 	eShaderType shader_type = eShaderType::Vertex;
 
-	for (uint32 shader_index = 0; shader_index < ShaderNameUtil::scNumShaders - 1; shader_index++) {
-		CheckDescriptorsAgainstProgram(mShaderPrograms[shader_index]);
+	int32 fails = 0;
+
+	for (uint32 shader_index = 0; shader_index < ShaderNameUtil::scNumShaders - 2; shader_index++) {
+		const Ref<ShaderProgram>& sp = mShaderPrograms[shader_index];
+		if (!sp.IsValid()) {
+			continue;
+		}
+
+		if (CheckDescriptorsAgainstProgram(sp)) {
+			++fails;
+		}
+	}
+
+	if (fails > 0) {
+		Panic("PSOBuild", "Descriptor mismatch");
 	}
 }
 
@@ -391,7 +412,7 @@ void PSOBuild::Reset()
 
 	// Do not call clear here as we don't want each entry list to be freed.
 	// We'll just do the cheap of clearing the size.
-	mDescriptorEntries.Size = 0;
+	// mDescriptorEntries.Size = 0;
 }
 
 } // namespace fx::renderer

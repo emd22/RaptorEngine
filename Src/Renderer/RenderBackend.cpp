@@ -24,6 +24,7 @@
 #include <Renderer/Limits.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
+#include <Renderer/ShadowDirectional.hpp>
 #include <thread>
 #include <vector>
 
@@ -127,6 +128,8 @@ void RenderBackend::Init(Vec2u window_size)
 
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
+
+	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 
 	pDeferredRenderer = new DeferredRenderer;
 	pDeferredRenderer->Create(Swapchain.Extent);
@@ -638,7 +641,7 @@ void RenderBackend::BeginLighting()
 
 
 	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
-	gPipelineCache->AddBufferOffset(2, gObjectManager->GetBaseOffset());
+	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 
 	// pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -673,10 +676,8 @@ void RenderBackend::DoComposition(Camera& render_cam)
 
 	pDeferredRenderer->ForwardPass.End();
 
-	// pDeferredRenderer->RpForward.End();
-
 	pDeferredRenderer->CompPass.Begin(frame->CmdBuffer);
-	gPipelineCache->Bind(ePipelineName::Composition, frame->CmdBuffer);
+	// gPipelineCache->Bind(ePipelineName::Composition, frame->CmdBuffer);
 
 	pDeferredRenderer->DoCompPass(render_cam);
 
