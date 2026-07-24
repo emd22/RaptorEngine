@@ -196,15 +196,15 @@ PipelineLayout PSOBuild::BuildLayout()
 
 		for (Pipeline::DescriptorRef& ds_ref : mpPipeline->DescriptorIDs) {
 			// Finally, we can get the layout from the previously created DS.
-			std::pair<Hash32, VkDescriptorSetLayout> ds_result = gDsLayoutCache->Request(ds_ref.ID);
-			if (ds_result.second == nullptr) {
+			VkDescriptorSetLayout* ds_result = gDsLayoutCache->RequestExisting(ds_ref.ID);
+			if (ds_result == nullptr) {
 				LogWarning(LC_CORE, "PSOBuild::BuildLayout: Reused descriptor set does not exist!");
 				continue;
 			}
 
 			LogInfo("Reusing DSLayout {}", ds_ref.ID);
 
-			descriptor_layouts.emplace_back(ds_result.second);
+			descriptor_layouts.emplace_back(*ds_result);
 		}
 	}
 	else {

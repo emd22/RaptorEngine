@@ -32,7 +32,8 @@ static VkDescriptorType ReflectionTypeToDescriptorType(eShaderReflectionType typ
 }
 
 
-std::pair<Hash32, VkDescriptorSetLayout> DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
+std::pair<Hash32, VkDescriptorSetLayout>
+DsLayoutCache::RequestExisting(const SizedArray<DescriptorEntry>& requested_entries)
 {
 	Hash32 entries_hash = GetID(requested_entries);
 
@@ -71,12 +72,16 @@ Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 
 	// Hash the handles instead of just the possibly local ptrs.
 
-	uint8* buffer = new uint8[512];
+	constexpr uint32 scMaxTempBufferSize = 512;
+
+	uint8* buffer = new uint8[scMaxTempBufferSize];
 	uint32 offset = 0;
 
 
 	auto SaveHandleToBuffer = [&](const void* handle, uint32 size)
 	{
+		AssertLess(offset + size, scMaxTempBufferSize);
+
 		memcpy(static_cast<void*>(buffer + offset), handle, size);
 		offset += size;
 	};
@@ -86,9 +91,11 @@ Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 		SaveHandleToBuffer(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
 
 		if (entry.IsImage()) {
+			Assert(entry.pImage != nullptr);
 			SaveHandleToBuffer(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
 		}
 		else if (entry.IsBuffer()) {
+			Assert(entry.pBuffer != nullptr);
 			SaveHandleToBuffer(reinterpret_cast<void*>(&entry.pBuffer->Buffer), sizeof(uint64));
 		}
 	}
@@ -121,9 +128,9 @@ DescriptorPool& DescriptorCache::FindPool()
 	if (Pools.Size() < 1) {
 		DescriptorPool* pool = Pools.Insert();
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 20);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 20);
-		pool->Create(RenderBackendFwd::GetDevice());
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100);
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100);
+		pool->Create(RenderBackendFwd::GetDevice(), 100);
 
 		return *pool;
 	}
@@ -133,7 +140,7 @@ DescriptorPool& DescriptorCache::FindPool()
 
 std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
 {
-	std::pair<Hash32, VkDescriptorSetLayout> layout_result = gDsLayoutCache->Request(entries);
+	std::pair<Hash32, VkDescriptorSetLayout> layout_result = gDsLayoutCache->RequestExisting(entries);
 
 	bool has_dynamic_offsets = false;
 

@@ -20,7 +20,7 @@ class DsLayoutCache
 public:
 	DsLayoutCache() = default;
 
-	std::pair<Hash32, VkDescriptorSetLayout> Request(const SizedArray<DescriptorEntry>& entries);
+	std::pair<Hash32, VkDescriptorSetLayout> RequestExisting(const SizedArray<DescriptorEntry>& entries);
 	VkDescriptorSetLayout* RequestExisting(Hash32 descriptor_id);
 
 	Hash32 GetID(const SizedArray<DescriptorEntry>& entries);

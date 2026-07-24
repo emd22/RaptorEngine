@@ -320,6 +320,10 @@ void Material::Build()
 		diffuse_sampler_props.SetNearest();
 	}
 
+	if (!MetallicRoughness.Exists()) {
+		MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
+	}
+
 	if (mDescriptorSet == nullptr) {
 		SizedArray<DescriptorEntry> ds_entries(6);
 		ds_entries.Emplace(DescriptorEntry::AsImage(0, eShaderType::Pixel, Diffuse.pImage,
@@ -333,7 +337,7 @@ void Material::Build()
 		}
 
 		if (bSupportsSkinning) {
-			ds_entries.Emplace(DescriptorEntry::AsBuffer(0, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(),
+			ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(),
 														 0, gRenderer->BoneBuffer.PageSize));
 		}
 
