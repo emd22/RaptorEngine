@@ -142,6 +142,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 	FrameData* frame = gRenderer->GetFrame();
 	UpdateIfOutOfDate();
 
+	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 	// pPipeline->Bind(frame->CmdBuffer);

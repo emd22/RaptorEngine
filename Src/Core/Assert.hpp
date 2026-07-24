@@ -66,6 +66,13 @@ void PanicVulkan(const char* module, const char* fmt, VkResult result, TTypes&&.
 		Panic(__func__, "Assertion failed!", 0);                                                                       \
 	}
 
+#define AssertEqual(a_, b_)                                                                                            \
+	if (a_ != b_) {                                                                                                    \
+		LogFatal("An assertion failed ({} == {}) at ({:s}:{:d})", a_, b_, __FILE__, __LINE__);                         \
+		LogFatal("Condition: {:s} == {:s}", #a_, #b_);                                                                 \
+		Panic(__func__, "Assertion failed!", 0);                                                                       \
+	}
+
 
 #define AssertMsg(cond_, msg_)                                                                                         \
 	if (!(cond_)) {                                                                                                    \

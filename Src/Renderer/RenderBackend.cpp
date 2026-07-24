@@ -539,7 +539,7 @@ void RenderBackend::BeginGeometry()
 	FrameData* frame = GetFrame();
 
 	pDeferredRenderer->GPass.Begin(frame->CmdBuffer);
-	gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
+	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 }
 
 void RenderBackend::PresentFrame()
@@ -640,7 +640,7 @@ void RenderBackend::BeginLighting()
 	// gState->Reset();
 
 
-	// gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 
@@ -662,6 +662,8 @@ void RenderBackend::BeginUnlit()
 	// depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
 	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
+
+	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
 
 	/*    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
