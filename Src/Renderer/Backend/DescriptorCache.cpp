@@ -46,7 +46,7 @@ std::pair<Hash32, VkDescriptorSetLayout> DsLayoutCache::Request(const SizedArray
 	DsLayoutBuilder builder {};
 
 	for (const DescriptorEntry& entry : requested_entries) {
-		builder.AddBinding(entry.BindIndex, entry.GetDescriptorType(), entry.ShaderStages);
+		builder.AddBinding(entry.Binding, entry.GetDescriptorType(), entry.ShaderStages);
 	}
 
 	Cache[entries_hash] = builder.Build();
@@ -83,7 +83,7 @@ Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 
 	for (const DescriptorEntry& entry : entries) {
 		// SKETCHY_COPY_VKHANDLE_TO_BUFFER(entry.BindIndex, sizeof(uint32));
-		SaveHandleToBuffer(reinterpret_cast<const void*>(&entry.BindIndex), sizeof(uint32));
+		SaveHandleToBuffer(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
 
 		if (entry.IsImage()) {
 			SaveHandleToBuffer(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
@@ -160,10 +160,10 @@ DescriptorSet* DescriptorCache::Request(const SizedArray<DescriptorEntry>& entri
 
 	for (const DescriptorEntry& entry : entries) {
 		if (entry.IsBuffer()) {
-			descriptor.AddBuffer(entry.BindIndex, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
+			descriptor.AddBuffer(entry.Binding, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
 		}
 		else if (entry.IsImage()) {
-			descriptor.AddImage(entry.BindIndex, entry.pImage, entry.pSampler);
+			descriptor.AddImage(entry.Binding, entry.pImage, entry.pSampler);
 		}
 	}
 

@@ -12,12 +12,31 @@ namespace fx::renderer {
 // DescriptorEntry
 /////////////////////////////////////
 
+namespace DescriptorEntryUtil {
+#define ENUM_TYPE eDescriptorEntryType
+
+const char* GetTypeName(eDescriptorEntryType type)
+{
+	switch (type) {
+		FX_ENUM_CASE_NAME(None);
+		FX_ENUM_CASE_NAME(Image);
+		FX_ENUM_CASE_NAME(Buffer);
+	default:;
+	}
+
+	return "Unknown";
+}
+
+#undef ENUM_TYPE
+} // namespace DescriptorEntryUtil
+
+
 DescriptorEntry DescriptorEntry::AsBuffer(uint32 bind_index, eShaderType shader_stages, RawGpuBuffer* buffer,
 										  uint64 offset, uint64 range)
 {
 	DescriptorEntry entry {
 		.Type = eDescriptorEntryType::Buffer,
-		.BindIndex = bind_index,
+		.Binding = bind_index,
 		.ShaderStages = shader_stages,
 		.pBuffer = buffer,
 		.BufferOffset = offset,
@@ -32,7 +51,7 @@ DescriptorEntry DescriptorEntry::AsImage(uint32 bind_index, eShaderType shader_s
 {
 	DescriptorEntry entry {
 		.Type = eDescriptorEntryType::Image,
-		.BindIndex = bind_index,
+		.Binding = bind_index,
 		.ShaderStages = shader_stages,
 		.pImage = image,
 		.pSampler = sampler,
@@ -186,7 +205,7 @@ void DescriptorSet::AddBuffer(uint32 bind_index, RawGpuBuffer* buffer, uint64 of
 	AssertMsg(buffer != nullptr, "Input buffer cannot be null!");
 
 	DescriptorEntry input_buffer {
-		.BindIndex = bind_index,
+		.Binding = bind_index,
 		.pImage = nullptr,
 		.pSampler = nullptr,
 		.pBuffer = buffer,
@@ -216,7 +235,7 @@ void DescriptorSet::AddImage(uint32 bind_index, Image* image, Sampler* sampler)
 	AssertMsg(image != nullptr, "Input image cannot be null!");
 
 	DescriptorEntry input_target {
-		.BindIndex = bind_index,
+		.Binding = bind_index,
 		.pImage = image,
 		.pSampler = sampler,
 		.pBuffer = nullptr,
@@ -253,7 +272,7 @@ void DescriptorSet::Build()
 			const VkWriteDescriptorSet image_write {
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstSet = Set,
-				.dstBinding = entry.BindIndex,
+				.dstBinding = entry.Binding,
 				.dstArrayElement = 0,
 				.descriptorCount = 1,
 				.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -272,7 +291,7 @@ void DescriptorSet::Build()
 			const VkWriteDescriptorSet buffer_write {
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstSet = Set,
-				.dstBinding = entry.BindIndex,
+				.dstBinding = entry.Binding,
 				.dstArrayElement = 0,
 				.descriptorCount = 1,
 				.descriptorType = GpuBufferUtil::BufferTypeToDescriptorType(entry.pBuffer->Type),

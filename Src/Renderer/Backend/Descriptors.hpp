@@ -55,6 +55,10 @@ enum class eDescriptorEntryType
 	Buffer,
 };
 
+namespace DescriptorEntryUtil {
+const char* GetTypeName(eDescriptorEntryType type);
+}
+
 struct DescriptorEntry
 {
 	/**
@@ -78,7 +82,7 @@ struct DescriptorEntry
 public:
 	eDescriptorEntryType Type = eDescriptorEntryType::None;
 
-	uint32 BindIndex = 0;
+	uint32 Binding = 0;
 	eShaderType ShaderStages = eShaderType::None;
 
 	Image* pImage = nullptr;

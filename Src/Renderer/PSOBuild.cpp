@@ -62,6 +62,7 @@ void PSOBuild::SetLayout(ePipelineName name) { mpPipeline->SetLayout(gPipelineCa
 void PSOBuild::BuildPipeline()
 {
 	// BuildDescriptorLayouts();
+	CheckDescriptorsAgainstShader();
 
 	if (!mpPipeline->HasLayout()) {
 		BuildLayout();
@@ -177,8 +178,6 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 		layouts.emplace_back(ds->GetLayout());
 	}
 
-	layouts.shrink_to_fit();
-
 	return layouts;
 }
 
@@ -198,6 +197,8 @@ PipelineLayout PSOBuild::BuildLayout()
 				LogWarning(LC_CORE, "PSOBuild::BuildLayout: Reused descriptor set does not exist!");
 				continue;
 			}
+
+			LogInfo("Reusing DSLayout {}", ds_ref.ID);
 
 			descriptor_layouts.emplace_back(ds_result.second);
 		}
@@ -220,7 +221,6 @@ void PSOBuild::EndPipeline()
 	BuildPipeline();
 	Reset();
 }
-
 
 DescriptorSet* PSOBuild::StartDescriptorUpdate(uint32 set_index)
 {
@@ -275,6 +275,61 @@ void PSOBuild::AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderTy
 
 	// DescriptorSet* set = StartDescriptorUpdate(set_index);
 	// set->AddImageFromTarget(bind_index, target, sampler);
+}
+
+static eDescriptorEntryType SRTToDET(eShaderReflectionType srt)
+{
+	switch (srt) {
+	case eShaderReflectionType::StructuredBuffer:
+		[[fallthrough]];
+	case eShaderReflectionType::CBuffer:
+		return eDescriptorEntryType::Buffer;
+	case eShaderReflectionType::Texture:
+		return eDescriptorEntryType::Image;
+	default:;
+	}
+
+	return eDescriptorEntryType::None;
+}
+
+
+void PSOBuild::CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const
+{
+	int32 num_errors = 0;
+
+	for (const ShaderReflectionEntry& refl_entry : program->Reflection) {
+		eDescriptorEntryType det = SRTToDET(refl_entry.Type);
+
+		bool is_valid = false;
+
+		for (const DescriptorEntry& ds_entry : mDescriptorEntries[refl_entry.Set]) {
+			if (ds_entry.Binding == refl_entry.Binding && det == ds_entry.Type) {
+				is_valid = true;
+				break;
+			}
+		}
+
+		if (!is_valid) {
+			LogError(LC_RENDER, "PSOBuild: Missing descriptor (Binding={}, Set={}) of type '{}'", refl_entry.Binding,
+					 refl_entry.Set, DescriptorEntryUtil::GetTypeName(det));
+			++num_errors;
+			break;
+		}
+	}
+
+	if (num_errors > 0) {
+		LogError(LC_RENDER, "PSOBuild: Failed when builing '{}' ({})", program->pShader->GetName(),
+				 ShaderUtil::TypeToName(program->ShaderType));
+	}
+}
+
+void PSOBuild::CheckDescriptorsAgainstShader() const
+{
+	eShaderType shader_type = eShaderType::Vertex;
+
+	for (uint32 shader_index = 0; shader_index < ShaderNameUtil::scNumShaders - 1; shader_index++) {
+		CheckDescriptorsAgainstProgram(mShaderPrograms[shader_index]);
+	}
 }
 
 

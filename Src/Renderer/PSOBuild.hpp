@@ -111,6 +111,8 @@ private:
 
 	std::vector<VkDescriptorSetLayout> BuildDescriptorSets();
 
+	void CheckDescriptorsAgainstProgram(const Ref<ShaderProgram>& program) const;
+	void CheckDescriptorsAgainstShader() const;
 
 	DescriptorSet* StartDescriptorUpdate(uint32 set_index);
 

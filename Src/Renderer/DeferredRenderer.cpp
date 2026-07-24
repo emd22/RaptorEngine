@@ -195,12 +195,6 @@ void DeferredRenderer::CreateGPassPipeline()
 	CreateGPass();
 
 	{
-		// Build the pipeline with some descriptor set templates that are replaced by the material's descriptor set
-		SizedArray<DescriptorEntry> ds_entries(5);
-		ds_entries.Emplace(DescriptorEntry::AsImage(
-			0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
-
 		gPSOBuild->BeginPipeline(ePipelineName::Geometry);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
@@ -209,12 +203,12 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
+		// Use a null image for now, custom DS's created by the materials will be bound at render time
+		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
 		// bObjectBuffer
 		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
-
-		// Set descriptor set 0 to be our template
-		gPSOBuild->AddExistingDS(0, ds_layout.first);
 
 
 		gPSOBuild->EndPipeline();
@@ -222,15 +216,6 @@ void DeferredRenderer::CreateGPassPipeline()
 
 
 	{
-		SizedArray<DescriptorEntry> ds_entries(5);
-		ds_entries.Emplace(DescriptorEntry::AsImage(
-			0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		ds_entries.Emplace(DescriptorEntry::AsImage(
-			1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		ds_entries.Emplace(DescriptorEntry::AsImage(
-			2, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm), gSamplerCache->Request({})));
-		std::pair<Hash32, VkDescriptorSetLayout> ds_layout = gDsLayoutCache->Request(ds_entries);
-
 		// Normal mapped pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
 		// Use previous layout
@@ -241,12 +226,16 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
+		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+
 		// bObjectBuffer
 		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
-
-		// Set descriptor set 0 to be our template
-		gPSOBuild->AddExistingDS(0, ds_layout.first);
 
 		gPSOBuild->EndPipeline();
 	}
@@ -275,12 +264,20 @@ void DeferredRenderer::CreateGPassPipeline()
 													  ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
+		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+
+		// bBoneBuffer
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
+							 gRenderer->BoneBuffer.PageSize);
+
 		// bObjectBuffer
 		gPSOBuild->AddBuffer(0, 2, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
-
-		// Set descriptor set 0 to be our template
-		gPSOBuild->AddExistingDS(0, ds_layout.first);
 
 
 		gPSOBuild->EndPipeline();
