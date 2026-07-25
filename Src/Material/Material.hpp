@@ -12,6 +12,7 @@
 #include <Asset/AssetManagerFwd.hpp>
 #include <Color.hpp>
 #include <Core/Bitset.hpp>
+#include <Core/FreeArray.hpp>
 #include <Core/Name.hpp>
 #include <Core/PagedArray.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
@@ -100,6 +101,9 @@ struct MaterialProperties
 	alignas(16) Color BaseColor = 0xFF010101u;
 };
 
+/**
+ * @brief Renderer material class.
+ */
 class Material
 {
 public:
@@ -112,9 +116,12 @@ public:
 		MaxImages,
 	};
 
-public:
-	Material() { Properties.BaseColor = 0xFF010101u; }
+private:
+	friend class MaterialManager;
+	friend class FreeArray<Material>; // Use internally by MaterialManager
+	Material() = default;
 
+public:
 	void Attach(eResourceType type, AssetTicket& ticket)
 	{
 		Image* image = static_cast<Image*>(ticket.Get());
@@ -165,7 +172,7 @@ public:
 
 	void Build();
 
-	renderer::DescriptorSet* GetDescriptorSet() { return mDescriptorSet; }
+	FX_FORCE_INLINE renderer::DescriptorSet* GetDescriptorSet() { return mDescriptorSet; }
 
 	void SetDefaultPipeline();
 	void SubmitProperties(const MaterialProperties& properties);
@@ -174,7 +181,7 @@ public:
 	renderer::Pipeline& GetPipeline() { return *mpPipeline; }
 	renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
 
-	bool IsAlbedoOnly() const { return (!NormalMap.Exists() && !MetallicRoughness.Exists()); }
+	bool IsAlbedoOnly() const { return (!NormalMap.Exists()); }
 
 
 	Material& operator=(const Material& other);

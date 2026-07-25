@@ -25,7 +25,7 @@ struct Target;
 class DescriptorPool
 {
 public:
-	void Create(GpuDevice* device, uint32 max_sets = 10);
+	void Create(GpuDevice* device, uint32 max_sets = 10, bool enable_descriptor_free = false);
 
 	bool IsInited() const { return (Pool != nullptr); }
 	FX_FORCE_INLINE VkDescriptorPool Get() const { return Pool; }
@@ -103,8 +103,11 @@ private:
 	static constexpr uint32 scMaxDescriptorEntries = scMaxBuffers + scMaxImages;
 
 public:
-	void Create(DescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets, uint32 count = 1);
-	bool IsInited() const { return Set != nullptr; }
+	DescriptorSet() = default;
+
+	void Create(DescriptorPool& pool, Hash32 id, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
+				uint32 count = 1);
+	bool IsInited() const { return mInternalSet != nullptr; }
 
 	static void BindMultiple(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
 							 const Pipeline& pipeline, VkDescriptorSet* sets, uint32 sets_count);
@@ -137,25 +140,23 @@ public:
 			Build();
 		}
 
-		return Set;
+		return mInternalSet;
 	}
 
 	bool HasDynamicOffsets() const { return mbHasDynamicOffsets; }
 
-	VkDescriptorSetLayout GetLayout() { return Layout; }
-	void DestroyLayout();
+	VkDescriptorSetLayout GetLayout() { return mInternalLayout; }
 
-	bool operator!() const { return Set == nullptr; }
+	~DescriptorSet() = default;
 
-	void Destroy();
-
-	~DescriptorSet() { Destroy(); }
+public:
+	Hash32 ID = HashNull32;
 
 private:
-	VkDescriptorSet Set = nullptr;
-	VkDescriptorSetLayout Layout = nullptr;
+	VkDescriptorSet mInternalSet = nullptr;
+	VkDescriptorSetLayout mInternalLayout = nullptr;
 
-	uint32 NumBuffers = 0;
+	uint32 mBufferCount = 0;
 
 	bool mbHasDynamicOffsets : 1 = false;
 	bool mbIsBuilt : 1 = false;

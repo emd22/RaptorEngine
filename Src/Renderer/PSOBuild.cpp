@@ -55,6 +55,8 @@ void PSOBuild::UseRenderStage(RenderStage& stage)
 void PSOBuild::SetLayout(ePipelineName name)
 {
 	mpPipeline->SetLayout(gPipelineCache->Request(name).Layout);
+
+	// Reuse the descriptors from the other pipeline
 	ReuseDS(name);
 }
 
@@ -243,25 +245,28 @@ void PSOBuild::ReuseDS(ePipelineName other_pso)
 	mpPipeline->DescriptorIDs.CloneFrom(gPipelineCache->Request(other_pso).DescriptorIDs);
 }
 
-void PSOBuild::AddExistingDS(uint32 set_index, Hash32 layout_id)
-{
-	mpPipeline->DescriptorIDs.Emplace(set_index, layout_id);
-}
-
 void PSOBuild::AddBuffer(uint32 bind_index, uint32 set_index, eShaderType shader_stages, RawGpuBuffer* buffer,
 						 uint64 offset, uint64 range)
 {
+	// Make sure there were no `ReuseDS` calls (including `UseLayout`) prior to this.
+	AssertMsg(HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors) == false,
+			  "Cannot build descriptors when already inheriting them from another pipeline");
+
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsBuffer(bind_index, shader_stages, buffer, offset, range));
 }
 
 void PSOBuild::AddImage(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Image* image, Sampler* sampler)
 {
+	AssertMsg(HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors) == false,
+			  "Cannot build descriptors when already inheriting them from another pipeline");
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, image, sampler));
 }
 
 void PSOBuild::AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderType shader_stages, Target* target,
 								  Sampler* sampler)
 {
+	AssertMsg(HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors) == false,
+			  "Cannot build descriptors when already inheriting them from another pipeline");
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, &target->Image, sampler));
 }
 

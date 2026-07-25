@@ -23,20 +23,19 @@ void Scene::Create()
 
 void Scene::Attach(Object* object)
 {
-	mObjects.Insert(object->ID);
-	gWorldGrid->AddObject(object->ID);
+	// mObjects.Insert(object->ID);
+	// gWorldGrid->AddObject(object->ID);
 
-	object->pScene = this;
-	object->OnAttached(this);
+	// object->pScene = this;
+	// object->OnAttached(this);
 
-	Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
-	object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
+	// Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+	// object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
 
-	for (const ObjectID& attach_id : object->AttachedNodes) {
-		Object* attach = gObjectManager->GetObject(attach_id);
-		material = MaterialManagerFwd::GetMaterial(attach->GetMaterialID());
-		object->pScene->mRenderList.Add(material->GetPipelineName(), attach_id);
-	}
+	// for (const ObjectID& attach_id : object->AttachedNodes) {
+	// 	Object* attach = gObjectManager->GetObject(attach_id);
+	// 	Attach(attach);
+	// }
 }
 
 static void AddObjectToRenderList(Object* object, Scene* scene)
@@ -49,12 +48,13 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 		const bool is_unlit = object->IsUnlit();
 
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+		ePipelineName pipeline_name = material->GetPipelineName();
+
 		if (is_unlit) {
 			LogInfo("Setting material {} pipeline to be unlit", material->ID);
-			material->SetPipeline(material->NormalMap.Exists() ? ePipelineName::UnlitNormalMaps : ePipelineName::Unlit);
+			pipeline_name = material->IsAlbedoOnly() ? ePipelineName::Unlit : ePipelineName::UnlitNormalMaps;
+			material->SetPipeline(pipeline_name);
 		}
-
-		ePipelineName pipeline_name = material->GetPipelineName();
 
 		AssertMsg(object->pScene, "Scene has not been initialized on object!");
 		object->pScene->mRenderList.Add(pipeline_name, object->ID);

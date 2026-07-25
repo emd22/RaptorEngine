@@ -303,14 +303,23 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	FrameData* frame = gRenderer->GetFrame();
 	Material* material = gMaterialManager->GetMaterial(mMaterialID);
 
+	if (!pipeline) {
+		pipeline = &material->GetPipeline();
+	}
+
+
+	if (pipeline->Name == ePipelineName::Unlit) {
+		Assert(material->IsAlbedoOnly());
+	}
+	else if (pipeline->Name == ePipelineName::UnlitNormalMaps) {
+		Assert(!material->IsAlbedoOnly());
+	}
+
 	DrawPushConstants push_constants {};
 	push_constants.ObjectId = ID.GetID();
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
-	if (!pipeline) {
-		pipeline = &material->GetPipeline();
-	}
 
 	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex, push_constants);
 

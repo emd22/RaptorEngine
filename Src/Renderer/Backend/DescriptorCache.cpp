@@ -74,7 +74,7 @@ Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 
 	constexpr uint32 scMaxTempBufferSize = 512;
 
-	uint8* buffer = new uint8[scMaxTempBufferSize];
+	uint8 buffer[scMaxTempBufferSize];
 	uint32 offset = 0;
 
 
@@ -102,9 +102,21 @@ Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 
 	Hash32 entries_hash = HashData32(Slice(buffer, offset));
 
-	delete[] buffer;
-
 	return entries_hash;
+}
+
+void DsLayoutCache::Free(Hash32 descriptor_id)
+{
+	auto it = Cache.find(descriptor_id);
+
+	// Descriptor layout not found, skip
+	if (it == Cache.end()) {
+		return;
+	}
+
+	vkDestroyDescriptorSetLayout(RenderBackendFwd::GetDevice()->Device, it->second, nullptr);
+
+	Cache.erase(it);
 }
 
 void DsLayoutCache::Destroy()
@@ -128,19 +140,38 @@ DescriptorPool& DescriptorCache::FindPool()
 	if (Pools.Size() < 1) {
 		DescriptorPool* pool = Pools.Insert();
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 100);
-		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 100);
-		pool->Create(RenderBackendFwd::GetDevice(), 100);
-
-		return *pool;
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 64);
+		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 64);
+		pool->Create(RenderBackendFwd::GetDevice(), 128);
+		Pools.Insert(*pool);
 	}
 
 	return Pools[0];
 }
 
+void DescriptorCache::Free(Hash32 descriptor_id)
+{
+	gDsLayoutCache->Free(descriptor_id);
+
+	auto it = Cache.find(descriptor_id);
+
+	// Descriptor set not found, skip
+	if (it == Cache.end()) {
+		return;
+	}
+
+	// Free the set from the descriptor pool
+	VkDescriptorSet ds = it->second.Get();
+	vkFreeDescriptorSets(RenderBackendFwd::GetDevice()->Device, FindPool().Get(), 1, &ds);
+
+	// Remove it from the cache.
+	Cache.erase(it);
+}
+
 std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
 {
 	std::pair<Hash32, VkDescriptorSetLayout> layout_result = gDsLayoutCache->RequestExisting(entries);
+	const Hash32 descriptor_id = layout_result.first;
 
 	bool has_dynamic_offsets = false;
 
@@ -151,19 +182,20 @@ std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<Desc
 		}
 	}
 
-	auto it = Cache.find(layout_result.first);
+	auto it = Cache.find(descriptor_id);
 	if (it != Cache.end()) {
-		return std::make_pair(layout_result.first, &it->second);
+		return std::make_pair(descriptor_id, &it->second);
 	}
 
-	DescriptorSet& descriptor = Cache[layout_result.first];
+
+	DescriptorSet& descriptor = Cache[descriptor_id];
 
 	if (!layout_result.second) {
-		LogError("Could not find DS layout for ID ({})", layout_result.first);
+		LogError("Could not find DS layout for ID ({})", descriptor_id);
 		return std::make_pair(HashNull32, nullptr);
 	}
 
-	descriptor.Create(FindPool(), layout_result.second, has_dynamic_offsets);
+	descriptor.Create(FindPool(), descriptor_id, layout_result.second, has_dynamic_offsets);
 
 	for (const DescriptorEntry& entry : entries) {
 		if (entry.IsBuffer()) {
@@ -176,10 +208,10 @@ std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<Desc
 
 	descriptor.Build();
 
-	return std::make_pair(layout_result.first, &descriptor);
+	return std::make_pair(descriptor_id, &descriptor);
 }
 
-DescriptorSet* DescriptorCache::Request(Hash32 descriptor_id)
+DescriptorSet* DescriptorCache::RequestExisting(Hash32 descriptor_id)
 {
 	auto it = Cache.find(descriptor_id);
 	if (it == Cache.end()) {

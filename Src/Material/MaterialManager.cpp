@@ -3,6 +3,7 @@
 #include "Material.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Globals.hpp>
@@ -172,6 +173,10 @@ MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineN
 void MaterialManager::DestroyMaterial(const MaterialID& id)
 {
 	std::lock_guard guard(mInUse);
+
+	Material* mat = mMaterialList.GetItem(id.GetID());
+	renderer::gDescriptorCache->Free(mat->GetDescriptorSet()->ID);
+
 	mMaterialList.MarkItemFree(id.GetID());
 }
 

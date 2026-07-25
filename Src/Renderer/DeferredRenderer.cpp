@@ -39,7 +39,6 @@ void DeferredRenderer::Create(const Vec2u& extent)
 
 void DeferredRenderer::Destroy()
 {
-	DestroyCompPipeline();
 	DestroyGPassPipeline();
 	DestroyLightingPipeline();
 }
@@ -119,6 +118,10 @@ void DeferredRenderer::CreateUnlitPipeline()
 
 		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
+		// gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+		// 					gSamplerCache->Request({}));
+		// gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+		// 					gSamplerCache->Request({}));
 
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
@@ -147,17 +150,6 @@ void DeferredRenderer::CreateUnlitPipeline()
 
 		gPSOBuild->EndPipeline();
 	}
-
-	// {
-	// 	// Text rendering pipeline
-	// 	gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
-	// 	// gPSOBuild->SetLayout(ePipelineName::Unlit);
-
-	// 	gPSOBuild->UseRenderStage(ForwardPass);
-	// 	gPSOBuild->SetShader(eShaderName::Text, {});
-	// 	gPSOBuild->SetCullMode(eCullMode::None);
-	// 	gPSOBuild->EndPipeline();
-	// }
 
 	{
 		// Debug Layer pipeline
@@ -261,41 +253,9 @@ void DeferredRenderer::CreateGPassPipeline()
 	}
 }
 
-void DeferredRenderer::DestroyGPassPipeline()
-{
-	VkDevice device = gRenderer->GetDevice()->Device;
-
-	// gPipelineCache->Request(ePipelineName::Geometry).Destroy();
-	// gPipelineCache->Request(ePipelineName::GeometryNormalMaps).Destroy();
-}
-
-
-void DeferredRenderer::CreateLightingDSLayout()
-{
-	// Fragment DS
-
-	// DsLayoutBuilder builder {};
-
-	// sDepth
-	// builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// // sAlbedo
-	// builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// // sNormal
-	// builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-	// // sShadowDepth
-	// builder.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-
-	// builder.AddBinding(4, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, eShaderType::Pixel);
-
-	// DsLayoutLightingFrag = builder.Build();
-}
 
 void DeferredRenderer::CreateLightingPipeline()
 {
-	// if (DsLayoutLightingFrag == nullptr) {
-	// 	CreateLightingDSLayout();
-	// }
-
 	{
 		LightPass.Create("Lighting", gRenderer->Swapchain.Extent);
 
@@ -405,40 +365,12 @@ void DeferredRenderer::CreateLightingPipeline()
 	}
 }
 
-void DeferredRenderer::DestroyLightingPipeline()
-{
-	// VkDevice device = gRenderer->GetDevice()->Device;
-
-	// Destroy descriptor set layouts
-	// if (DsLayoutLightingFrag != nullptr) {
-	// 	vkDestroyDescriptorSetLayout(device, DsLayoutLightingFrag, nullptr);
-	// 	DsLayoutLightingFrag = nullptr;
-	// }
-
-	// if (DsLayoutLightingMaterialProperties != nullptr) {
-	// 	vkDestroyDescriptorSetLayout(device, DsLayoutLightingMaterialProperties, nullptr);
-	// 	DsLayoutLightingMaterialProperties = nullptr;
-	// }
-}
-
 //////////////////////////////////////////
 // DeferredRenderer CompPass Functions
 //////////////////////////////////////////
 
 void DeferredRenderer::CreateCompPipeline()
 {
-	// {
-	// 	DsLayoutBuilder builder {};
-
-	// 	builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
-	// 		.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
-	// 		.AddBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel)
-	// 		.AddBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, eShaderType::Pixel);
-
-	// 	DsLayoutCompFrag = builder.Build();
-	// }
-
-
 	// Create composition render stage
 
 	CompPass.Create("Compose", gRenderer->Swapchain.Extent);
@@ -449,7 +381,6 @@ void DeferredRenderer::CreateCompPipeline()
 	// Create composition pipeline
 
 	gPSOBuild->BeginPipeline(ePipelineName::Composition);
-	// gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConstants));
 
 	gPSOBuild->UseRenderStage(CompPass);
 	gPSOBuild->SetShader(eShaderName::Composition, {});
@@ -475,75 +406,11 @@ void DeferredRenderer::CreateCompPipeline()
 	gPSOBuild->EndPipeline();
 }
 
-void DeferredRenderer::DestroyCompPipeline()
-{
-	VkDevice device = gRenderer->GetDevice()->Device;
-
-	// Destroy descriptor set layouts
-	// if (DsLayoutCompFrag) {
-	// 	vkDestroyDescriptorSetLayout(device, DsLayoutCompFrag, nullptr);
-	// 	DsLayoutCompFrag = nullptr;
-	// }
-}
-
-void DeferredRenderer::CreateDescriptorSets()
-{
-	// DsComposition.Destroy();
-	// DsComposition.Create(DescriptorPool, DsLayoutCompFrag, false);
-	// DsComposition.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::D32_Float),
-	// 								 gSamplerCache->Request(SamplerProps {
-	// 									 eSamplerFilter::Nearest,
-	// 									 eSamplerFilter::Nearest,
-	// 									 eSamplerFilter::Nearest,
-	// 								 }));
-	// DsComposition.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
-	// 								 gSamplerCache->Request(SamplerProps {}));
-	// DsComposition.AddImageFromTarget(3, GPass.GetTarget(eImageFormat::RGBA16_Float),
-	// 								 gSamplerCache->Request(SamplerProps {}));
-	// DsComposition.AddImageFromTarget(4, LightPass.GetTarget(eImageFormat::RGBA16_Float),
-	// 								 gSamplerCache->Request(SamplerProps {}));
-	// DsComposition.Build();
-
-
-	// DsLighting.Destroy();
-	// DsLighting.Create(DescriptorPool, DsLayoutLightingFrag, true);
-	// // sDepth
-	// DsLighting.AddImageFromTarget(0, GPass.GetTarget(eImageFormat::D32_Float), &gRenderer->Swapchain.DepthSampler);
-	// // sAlbedo
-	// DsLighting.AddImageFromTarget(1, GPass.GetTarget(eImageFormat::BGRA8_UNorm), &gRenderer->Swapchain.ColorSampler);
-
-	// // sNormals
-	// DsLighting.AddImageFromTarget(2, GPass.GetTarget(eImageFormat::RGBA16_Float),
-	// &gRenderer->Swapchain.NormalsSampler);
-
-	// if (gShadowRenderer != nullptr && gShadowRenderer->RenderStage.IsBuilt()) {
-	// 	DsLighting.AddImageFromTarget(3, gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float),
-	// 								  &gRenderer->Swapchain.ShadowDepthSampler);
-	// }
-
-	// // Skip 3 for the shadow target, added by DirectionalShadows
-	// DsLighting.AddBuffer(4, &gRenderer->LightBuffer.GetGpuBuffer(), 0, gRenderer->LightBuffer.PageSize);
-
-	// DsLighting.Build();
-}
-
-void DeferredRenderer::CreateCompPass() {}
-
 void DeferredRenderer::DoCompPass(Camera& camera)
 {
 	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
-	// CompositionPushConstants push_constants {};
-	// memcpy(push_constants.ViewInverse, camera.InvViewMatrix.RawData, sizeof(Mat4f));
-	// memcpy(push_constants.ProjInverse, camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
-
-	// Pipeline& composition_pipeline = gPipelineCache->Request(ePipelineName::Composition);
-
-	// gRenderer->SubmitPushConstants(cmd, composition_pipeline, eShaderType::Pixel, push_constants);
-
 	gPipelineCache->Bind(ePipelineName::Composition, cmd);
-
-	// DsComposition.Bind(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, composition_pipeline);
 
 	// Use single triangle instead of two triangles as it removes the overlapping quads the gpu
 	// renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html

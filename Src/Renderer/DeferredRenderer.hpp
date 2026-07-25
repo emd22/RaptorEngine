@@ -54,11 +54,8 @@ private:
 
 	// Composition
 	void CreateCompPipeline();
-	void DestroyCompPipeline();
 
 	void CreateUnlitPipeline();
-
-	void CreateCompPass();
 
 public:
 	DescriptorPool DescriptorPool;

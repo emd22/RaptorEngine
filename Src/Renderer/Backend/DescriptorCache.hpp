@@ -23,6 +23,11 @@ public:
 	std::pair<Hash32, VkDescriptorSetLayout> RequestExisting(const SizedArray<DescriptorEntry>& entries);
 	VkDescriptorSetLayout* RequestExisting(Hash32 descriptor_id);
 
+	/**
+	 * @brief Frees a descriptor set layout from the cache.
+	 */
+	void Free(Hash32 descriptor_id);
+
 	Hash32 GetID(const SizedArray<DescriptorEntry>& entries);
 
 	void Destroy();
@@ -38,7 +43,12 @@ public:
 	DescriptorCache();
 
 	std::pair<Hash32, DescriptorSet*> Request(const SizedArray<DescriptorEntry>& entries);
-	DescriptorSet* Request(Hash32 descriptor_id);
+	DescriptorSet* RequestExisting(Hash32 descriptor_id);
+
+	/**
+	 * @brief Frees a descriptor set and its linked layout from the cache.
+	 */
+	void Free(Hash32 descriptor_id);
 
 	DescriptorPool& FindPool();
 

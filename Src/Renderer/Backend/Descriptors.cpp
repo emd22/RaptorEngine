@@ -1,5 +1,6 @@
 #include "Descriptors.hpp"
 
+#include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Globals.hpp>
@@ -81,7 +82,7 @@ VkDescriptorType DescriptorEntry::GetDescriptorType() const
 // Descriptor Pool Functions
 /////////////////////////////////////
 
-void DescriptorPool::Create(GpuDevice* device, uint32 max_sets)
+void DescriptorPool::Create(GpuDevice* device, uint32 max_sets, bool enable_descriptor_free)
 {
 	const uint32 pool_sizes_count = RemainingDescriptorCounts.size();
 	SizedArray<VkDescriptorPoolSize> pool_sizes(pool_sizes_count);
@@ -96,6 +97,10 @@ void DescriptorPool::Create(GpuDevice* device, uint32 max_sets)
 	pool_info.maxSets = max_sets;
 	pool_info.poolSizeCount = pool_sizes.Size;
 	pool_info.pPoolSizes = pool_sizes.pData;
+
+	if (enable_descriptor_free) {
+		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	}
 
 	SetCapacity = max_sets;
 
@@ -126,11 +131,14 @@ void DescriptorPool::Destroy()
 // Descriptor Sets
 /////////////////////////////////////
 
-void DescriptorSet::Create(DescriptorPool& pool, VkDescriptorSetLayout layout, bool has_dynamic_offsets, uint32 count)
+void DescriptorSet::Create(DescriptorPool& pool, Hash32 id, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
+						   uint32 count)
 {
 	AssertMsg(pool.IsInited(), "Descriptor pool is not initialized!");
 
-	Layout = layout;
+	ID = id;
+
+	mInternalLayout = layout;
 	mbHasDynamicOffsets = has_dynamic_offsets;
 
 	VkDescriptorSetAllocateInfo alloc_info {};
@@ -141,7 +149,7 @@ void DescriptorSet::Create(DescriptorPool& pool, VkDescriptorSetLayout layout, b
 
 	pool.SetsUsed++;
 
-	VkResult status = vkAllocateDescriptorSets(gRenderer->GetDevice()->Device, &alloc_info, &Set);
+	VkResult status = vkAllocateDescriptorSets(gRenderer->GetDevice()->Device, &alloc_info, &mInternalSet);
 
 	if (status != VK_SUCCESS) {
 		LogError("Pool has {} allocated sets, with {} currently in use.", pool.SetCapacity, pool.SetsUsed);
@@ -177,14 +185,14 @@ void DescriptorSet::BindMultipleOffset(uint32 first_set_index, const CommandBuff
 void DescriptorSet::BindWithOffset(uint32 first_set_index, const CommandBuffer& cmd, VkPipelineBindPoint bind_point,
 								   const Pipeline& pipeline, uint32 offset) const
 {
-	vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, 1, &Set, 1, &offset);
+	vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, 1, &mInternalSet, 1, &offset);
 }
 
 void DescriptorSet::Bind(uint32 ds_set_index, const CommandBuffer& cmd, const Pipeline& pipeline,
 						 const Slice<uint32> buffer_offsets)
 {
-	AssertEqual(buffer_offsets.Size, NumBuffers);
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Layout.Get(), ds_set_index, 1, &Set,
+	AssertEqual(buffer_offsets.Size, mBufferCount);
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Layout.Get(), ds_set_index, 1, &mInternalSet,
 							buffer_offsets.Size, buffer_offsets.pData);
 }
 
@@ -192,8 +200,8 @@ void DescriptorSet::Bind(uint32 first_set_index, const CommandBuffer& cmd, VkPip
 						 const Pipeline& pipeline) const
 {
 	uint32 offset = 0;
-	vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, 1, &Set, (NumBuffers > 0) ? 1 : 0,
-							&offset);
+	vkCmdBindDescriptorSets(cmd, bind_point, pipeline.Layout.Get(), first_set_index, 1, &mInternalSet,
+							(mBufferCount > 0) ? 1 : 0, &offset);
 }
 
 
@@ -216,7 +224,7 @@ void DescriptorSet::AddBuffer(uint32 bind_index, RawGpuBuffer* buffer, uint64 of
 
 	mDescriptorEntries.Insert(input_buffer);
 
-	++NumBuffers;
+	++mBufferCount;
 
 	mbIsBuilt = false;
 }
@@ -250,7 +258,7 @@ void DescriptorSet::AddImage(uint32 bind_index, Image* image, Sampler* sampler)
 void DescriptorSet::Build()
 {
 	if (mDescriptorEntries.IsEmpty()) {
-		LogWarning("Building empty descriptor set {:x}", reinterpret_cast<uintptr_t>(Set));
+		LogWarning("Building empty descriptor set {:x}", reinterpret_cast<uintptr_t>(mInternalSet));
 		return;
 	}
 
@@ -272,7 +280,7 @@ void DescriptorSet::Build()
 
 			const VkWriteDescriptorSet image_write {
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = Set,
+				.dstSet = mInternalSet,
 				.dstBinding = entry.Binding,
 				.dstArrayElement = 0,
 				.descriptorCount = 1,
@@ -291,7 +299,7 @@ void DescriptorSet::Build()
 
 			const VkWriteDescriptorSet buffer_write {
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = Set,
+				.dstSet = mInternalSet,
 				.dstBinding = entry.Binding,
 				.dstArrayElement = 0,
 				.descriptorCount = 1,
@@ -312,23 +320,5 @@ void DescriptorSet::Build()
 	mDescriptorEntries.Free();
 }
 
-void DescriptorSet::DestroyLayout()
-{
-	if (Layout == nullptr) {
-		return;
-	}
-	vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, Layout, nullptr);
-	Layout = nullptr;
-}
-
-void DescriptorSet::Destroy()
-{
-	// if (Layout != nullptr) {
-	//     vkDestroyDescriptorSetLayout(gRenderer->GetDevice()->Device, Layout, nullptr);
-	//     Layout = nullptr;
-	// }
-
-	mDescriptorEntries.Clear();
-}
 
 } // namespace fx::renderer
