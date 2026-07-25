@@ -27,7 +27,6 @@ public:
 
 	void DoCompPass(Camera& camera);
 
-	void CreateDescriptorSets();
 
 	void Destroy();
 	~DeferredRenderer() { Destroy(); }
@@ -35,7 +34,6 @@ public:
 private:
 	// Geometry
 	void CreateGPassPipeline();
-	void DestroyGPassPipeline();
 
 	void CreateForwardPass();
 	void CreateGPass();
@@ -44,13 +42,7 @@ private:
 	// Lighting
 	// void CreateLightVolumePipeline();
 	void CreateLightingPipeline();
-
 	void CreateLightingDSLayout();
-
-	// void DestroyLightVolumePipeline();
-	void DestroyLightingPipeline();
-
-	// PipelineLayout CreateLightingPipelineLayout();
 
 	// Composition
 	void CreateCompPipeline();

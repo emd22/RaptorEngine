@@ -25,40 +25,40 @@ static constexpr Hash32 HashNull32 = UINT32_MAX;
 template <typename TObj>
 inline constexpr Hash32 HashData32(const Slice<TObj>& slice, Hash32 thash = FX_HASH32_FNV1A_INIT)
 {
-    uint8* buffer_start = reinterpret_cast<uint8*>(slice.pData);
-    uint8* buffer_end = buffer_start + slice.Size;
+	const uint8* buffer_start = reinterpret_cast<const uint8*>(slice.pData);
+	const uint8* buffer_end = buffer_start + slice.Size;
 
-    while (buffer_start < buffer_end) {
-        /* xor the bottom with the current octet */
-        thash ^= static_cast<Hash32>(*buffer_start);
+	while (buffer_start < buffer_end) {
+		/* xor the bottom with the current octet */
+		thash ^= static_cast<Hash32>(*buffer_start);
 
-        /* multiply by the 32 bit FNV magic prime mod 2^32 */
-        thash += (thash << 1) + (thash << 4) + (thash << 7) + (thash << 8) + (thash << 24);
+		/* multiply by the 32 bit FNV magic prime mod 2^32 */
+		thash += (thash << 1) + (thash << 4) + (thash << 7) + (thash << 8) + (thash << 24);
 
-        ++buffer_start;
-    }
+		++buffer_start;
+	}
 
-    /* return our new hash value */
-    return thash;
+	/* return our new hash value */
+	return thash;
 }
 
 template <typename TObj>
 inline Hash32 HashObj32(const TObj& obj, Hash32 thash = FX_HASH32_FNV1A_INIT)
 {
-    const uint8* start = reinterpret_cast<const uint8*>(&obj);
-    const uint8* end = start + sizeof(TObj);
+	const uint8* start = reinterpret_cast<const uint8*>(&obj);
+	const uint8* end = start + sizeof(TObj);
 
-    while (start < end) {
-        /* xor the bottom with the current octet */
-        thash ^= static_cast<Hash32>(*start);
+	while (start < end) {
+		/* xor the bottom with the current octet */
+		thash ^= static_cast<Hash32>(*start);
 
-        /* multiply by the 64 bit FNV magic prime mod 2^64 */
-        thash += (thash << 1) + (thash << 4) + (thash << 7) + (thash << 8) + (thash << 24);
+		/* multiply by the 64 bit FNV magic prime mod 2^64 */
+		thash += (thash << 1) + (thash << 4) + (thash << 7) + (thash << 8) + (thash << 24);
 
-        ++start;
-    }
+		++start;
+	}
 
-    return thash;
+	return thash;
 }
 
 /**
@@ -68,18 +68,18 @@ inline Hash32 HashObj32(const TObj& obj, Hash32 thash = FX_HASH32_FNV1A_INIT)
  */
 inline constexpr Hash32 HashStr32(const char* str, Hash32 thash = FX_HASH32_FNV1A_INIT)
 {
-    uint8 ch = 0;
-    while ((ch = *str)) {
-        /* xor the bottom with the current octet */
-        thash ^= static_cast<Hash32>(ch);
+	uint8 ch = 0;
+	while ((ch = *str)) {
+		/* xor the bottom with the current octet */
+		thash ^= static_cast<Hash32>(ch);
 
-        /* multiply by the 32 bit FNV magic prime mod 2^32 */
-        thash += (thash << 1) + (thash << 4) + (thash << 7) + (thash << 8) + (thash << 24);
+		/* multiply by the 32 bit FNV magic prime mod 2^32 */
+		thash += (thash << 1) + (thash << 4) + (thash << 7) + (thash << 8) + (thash << 24);
 
-        ++str;
-    }
+		++str;
+	}
 
-    return thash;
+	return thash;
 }
 
 
@@ -91,72 +91,72 @@ inline constexpr Hash32 HashStr32(const char* str, Hash32 thash = FX_HASH32_FNV1
 template <typename TObj>
 inline constexpr Hash64 HashData64(const Slice<TObj>& slice, Hash64 thash = FX_HASH64_FNV1A_INIT)
 {
-    uint8* buffer_start = reinterpret_cast<uint8*>(slice.pData);
-    uint8* buffer_end = buffer_start + slice.Size;
+	uint8* buffer_start = reinterpret_cast<uint8*>(slice.pData);
+	uint8* buffer_end = buffer_start + slice.Size;
 
-    /*
-     * FNV-1a hash each octet of the buffer
-     */
-    while (buffer_start < buffer_end) {
-        /* xor the bottom with the current octet */
-        thash ^= static_cast<Hash64>(*buffer_start);
+	/*
+	 * FNV-1a hash each octet of the buffer
+	 */
+	while (buffer_start < buffer_end) {
+		/* xor the bottom with the current octet */
+		thash ^= static_cast<Hash64>(*buffer_start);
 
-        /* multiply by the 64 bit FNV magic prime mod 2^64 */
-        thash += (thash << 1) + (thash << 4) + (thash << 5) + (thash << 7) + (thash << 8) + (thash << 40);
+		/* multiply by the 64 bit FNV magic prime mod 2^64 */
+		thash += (thash << 1) + (thash << 4) + (thash << 5) + (thash << 7) + (thash << 8) + (thash << 40);
 
-        ++buffer_start;
-    }
+		++buffer_start;
+	}
 
-    return thash;
+	return thash;
 }
 
 
 template <typename TObj>
 inline Hash64 HashObj64(const TObj& obj, Hash64 thash = FX_HASH64_FNV1A_INIT)
 {
-    const uint8* start = reinterpret_cast<const uint8*>(&obj);
-    const uint8* end = start + sizeof(TObj);
+	const uint8* start = reinterpret_cast<const uint8*>(&obj);
+	const uint8* end = start + sizeof(TObj);
 
 
-    while (start < end) {
-        /* xor the bottom with the current octet */
-        thash ^= static_cast<Hash64>(*start);
+	while (start < end) {
+		/* xor the bottom with the current octet */
+		thash ^= static_cast<Hash64>(*start);
 
-        /* multiply by the 64 bit FNV magic prime mod 2^64 */
-        thash += (thash << 1) + (thash << 4) + (thash << 5) + (thash << 7) + (thash << 8) + (thash << 40);
+		/* multiply by the 64 bit FNV magic prime mod 2^64 */
+		thash += (thash << 1) + (thash << 4) + (thash << 5) + (thash << 7) + (thash << 8) + (thash << 40);
 
-        ++start;
-    }
+		++start;
+	}
 
-    return thash;
+	return thash;
 }
 
 inline constexpr Hash64 HashStr64(const char* str, Hash64 thash = FX_HASH64_FNV1A_INIT)
 {
-    uint8 ch = 0;
-    while ((ch = *str)) {
-        /* xor the bottom with the current octet */
-        thash ^= static_cast<Hash64>(ch);
+	uint8 ch = 0;
+	while ((ch = *str)) {
+		/* xor the bottom with the current octet */
+		thash ^= static_cast<Hash64>(ch);
 
-        /* multiply by the 64 bit FNV magic prime mod 2^64 */
-        thash += (thash << 1) + (thash << 4) + (thash << 5) + (thash << 7) + (thash << 8) + (thash << 40);
+		/* multiply by the 64 bit FNV magic prime mod 2^64 */
+		thash += (thash << 1) + (thash << 4) + (thash << 5) + (thash << 7) + (thash << 8) + (thash << 40);
 
-        ++str;
-    }
+		++str;
+	}
 
-    return thash;
+	return thash;
 }
 
 
 struct Hash64Stl
 {
-    std::size_t operator()(Hash64 key) const { return key; }
+	std::size_t operator()(Hash64 key) const { return key; }
 };
 
 
 struct Hash32Stl
 {
-    std::size_t operator()(Hash32 key) const { return key; }
+	std::size_t operator()(Hash32 key) const { return key; }
 };
 
 } // namespace fx

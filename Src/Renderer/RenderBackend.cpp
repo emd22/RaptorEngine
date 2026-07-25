@@ -219,7 +219,6 @@ void RenderBackend::RebuildRenderStages()
 	rd->ForwardPass.Rebuild(size);
 
 	rd->DescriptorPool.Recreate();
-	rd->CreateDescriptorSets();
 
 	/*for (FrameData& frame : Frames) {
 		frame.InFlight.Reset();

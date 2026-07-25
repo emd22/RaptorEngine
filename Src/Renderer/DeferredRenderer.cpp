@@ -33,15 +33,9 @@ void DeferredRenderer::Create(const Vec2u& extent)
 	CreateLightingPipeline();
 	CreateCompPipeline();
 	CreateUnlitPipeline();
-
-	CreateDescriptorSets();
 }
 
-void DeferredRenderer::Destroy()
-{
-	DestroyGPassPipeline();
-	DestroyLightingPipeline();
-}
+void DeferredRenderer::Destroy() {}
 
 void DeferredRenderer::CreateForwardPass()
 {

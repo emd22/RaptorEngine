@@ -65,44 +65,31 @@ VkDescriptorSetLayout* DsLayoutCache::RequestExisting(Hash32 descriptor_id)
 	return &it->second;
 }
 
+#define ID_HASH_HANDLE(handle_, size_)                                                                                 \
+	HashData32(Slice<const uint8>(reinterpret_cast<const uint8*>(handle_), size_), id_result);
 
 Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 {
-	// This function is diabolical
-
-	// Hash the handles instead of just the possibly local ptrs.
-
 	constexpr uint32 scMaxTempBufferSize = 512;
 
-	uint8 buffer[scMaxTempBufferSize];
-	uint32 offset = 0;
-
-
-	auto SaveHandleToBuffer = [&](const void* handle, uint32 size)
-	{
-		AssertLess(offset + size, scMaxTempBufferSize);
-
-		memcpy(static_cast<void*>(buffer + offset), handle, size);
-		offset += size;
-	};
+	Hash32 id_result = FX_HASH32_FNV1A_INIT;
 
 	for (const DescriptorEntry& entry : entries) {
-		// SKETCHY_COPY_VKHANDLE_TO_BUFFER(entry.BindIndex, sizeof(uint32));
-		SaveHandleToBuffer(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
+		if (entry.Binding != 0) {
+			id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
+		}
 
 		if (entry.IsImage()) {
 			Assert(entry.pImage != nullptr);
-			SaveHandleToBuffer(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
+			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
 		}
 		else if (entry.IsBuffer()) {
 			Assert(entry.pBuffer != nullptr);
-			SaveHandleToBuffer(reinterpret_cast<void*>(&entry.pBuffer->Buffer), sizeof(uint64));
+			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pBuffer->Buffer), sizeof(uint64));
 		}
 	}
 
-	Hash32 entries_hash = HashData32(Slice(buffer, offset));
-
-	return entries_hash;
+	return id_result;
 }
 
 void DsLayoutCache::Free(Hash32 descriptor_id)
@@ -142,7 +129,7 @@ DescriptorPool& DescriptorCache::FindPool()
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 64);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 64);
-		pool->Create(RenderBackendFwd::GetDevice(), 128);
+		pool->Create(RenderBackendFwd::GetDevice(), 128, true);
 		Pools.Insert(*pool);
 	}
 
