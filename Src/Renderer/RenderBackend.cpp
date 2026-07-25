@@ -662,8 +662,8 @@ void RenderBackend::BeginUnlit()
 
 	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
 
-	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
-	gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
+	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
+	// gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
 
 	/*    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
 									   Slice<VkClearValue>({}, 0));*/

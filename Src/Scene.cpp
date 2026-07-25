@@ -219,7 +219,7 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 
 	Object* obj = gObjectManager->GetObject(id);
 
-	Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
+	// Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
 
 	// if (material->QualityLevel > 0) {
 	// 	material->RequestQuality(material->QualityLevel - 1);

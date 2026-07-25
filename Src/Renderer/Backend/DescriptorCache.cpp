@@ -70,8 +70,6 @@ VkDescriptorSetLayout* DsLayoutCache::RequestExisting(Hash32 descriptor_id)
 
 Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 {
-	constexpr uint32 scMaxTempBufferSize = 512;
-
 	Hash32 id_result = FX_HASH32_FNV1A_INIT;
 
 	for (const DescriptorEntry& entry : entries) {

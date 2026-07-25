@@ -290,7 +290,7 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	}
 
 	material->SetDefaultPipeline();
-	material->bReadyToCheck.test_and_set();
+	material->Finalize();
 }
 
 void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh* gltf_mesh)

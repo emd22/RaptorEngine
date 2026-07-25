@@ -33,28 +33,39 @@ void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 
 bool Object::CheckIfReady(bool require_material)
 {
-	if ((Flags & eObjectFlags::ReadyToRender) != 0) {
+	if (HasFlag(Flags, eObjectFlags::ReadyToRender)) {
 		return true;
 	}
 
-	// Not a container, ensure there is a material
-	// if (require_material && (!pMaterial || !pMaterial->IsReady())) {
-	//     Flags &= ~(eObjectFlags::ReadyToRender);
-	//     return false;
-	// }
-
 	// This is not a container object, just check that the mesh is loaded
 	if (!pMesh || !pMesh->bIsReady) {
-		Flags &= ~(eObjectFlags::ReadyToRender);
+		ClearFlag(Flags, eObjectFlags::ReadyToRender);
 		return false;
 	}
 
-	// Dimensions = pMesh->GetDimensions();
+	Material* material = gMaterialManager->GetMaterial(mMaterialID);
+	if (material == nullptr) {
+		return false;
+	}
 
-	// TODO: Remove this
-	if (require_material && pMesh->VertexList.IsSkinned()) {
-		Material* material = gMaterialManager->GetMaterial(mMaterialID);
-		material->SetPipeline(ePipelineName::GeometrySkinned);
+	// Check material is ready
+	{
+		if (!material->bReadyToCheck.test()) {
+			return false;
+		}
+
+		if (pMesh->VertexList.IsSkinned()) {
+			material->SetPipeline(ePipelineName::GeometrySkinned);
+		}
+
+		if (HasFlag(Flags, eObjectFlags::Unlit)) {
+			if (material->IsAlbedoOnly()) {
+				material->SetPipeline(ePipelineName::Unlit);
+			}
+			else {
+				material->SetPipeline(ePipelineName::UnlitNormalMaps);
+			}
+		}
 	}
 
 	SetFlag(Flags, eObjectFlags::ReadyToRender);
@@ -69,19 +80,6 @@ bool Object::CheckIfReady(bool require_material)
 
 void Object::FinalizeWhenReady()
 {
-	if (HasFlag(Flags, eObjectFlags::Unlit)) {
-		Material* material = gMaterialManager->GetMaterial(mMaterialID);
-		if (material != nullptr) {
-			if (material->IsAlbedoOnly()) {
-				material->SetPipeline(ePipelineName::Unlit);
-			}
-			else {
-				material->SetPipeline(ePipelineName::UnlitNormalMaps);
-			}
-		}
-	}
-
-
 	if (!ParentID.IsNull()) {
 		Object* parent_object = gObjectManager->GetObject(ParentID);
 		parent_object->Bounds.Add(Bounds);

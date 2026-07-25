@@ -181,8 +181,9 @@ public:
 	renderer::Pipeline& GetPipeline() { return *mpPipeline; }
 	renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
 
-	bool IsAlbedoOnly() const { return (!NormalMap.Exists()); }
+	bool IsAlbedoOnly() const { return (NormalMap.Exists() == false); }
 
+	void Finalize() { bReadyToCheck.test_and_set(); }
 
 	Material& operator=(const Material& other);
 

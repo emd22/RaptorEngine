@@ -127,8 +127,7 @@ void MaterialManager::MakeNullMaterial()
 
 	material->bNearestFiltering = true;
 
-	material->bReadyToCheck.test_and_set();
-
+	material->Finalize();
 	material->Build();
 
 	LogInfo("Created null material (Id={})", material->GetID());
@@ -175,7 +174,11 @@ void MaterialManager::DestroyMaterial(const MaterialID& id)
 	std::lock_guard guard(mInUse);
 
 	Material* mat = mMaterialList.GetItem(id.GetID());
-	renderer::gDescriptorCache->Free(mat->GetDescriptorSet()->ID);
+
+	renderer::DescriptorSet* ds = mat->GetDescriptorSet();
+	if (ds != nullptr) {
+		renderer::gDescriptorCache->Free(ds->ID);
+	}
 
 	mMaterialList.MarkItemFree(id.GetID());
 }
