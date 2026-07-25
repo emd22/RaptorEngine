@@ -63,7 +63,7 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 	Type = buffer_type;
 	mBufferFlags = buffer_flags;
 
-	gBufferTracker.AddBuffer(BufferId, Type, Size, mBufferFlags);
+	// gBufferTracker.AddBuffer(BufferId, Type, Size, mBufferFlags);
 
 	// LogInfo("[Created GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
 	// GpuBufferUtil::BufferTypeToName(buffer_type), size_in_bytes, (buffer_flags & eGpuBufferFlags::PersistentMapped)
@@ -149,7 +149,7 @@ void RawGpuBuffer::Destroy()
 		return;
 	}
 
-	gBufferTracker.RemoveBuffer(BufferId);
+	// gBufferTracker.RemoveBuffer(BufferId);
 
 	// LogInfo("[Destroyed GPU Buffer]: Type={}, Size={}, Persistent?={}, TransferReciever?={}",
 	// GpuBufferUtil::BufferTypeToName(Type), Size, (mBufferFlags & eGpuBufferFlags::PersistentMapped) != 0,

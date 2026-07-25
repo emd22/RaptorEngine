@@ -82,10 +82,11 @@ elseif(APPLE)
 
     target_link_libraries(foxtrot PRIVATE vulkan.1 dxcompiler)
     target_compile_definitions(foxtrot PRIVATE VK_ENABLE_BETA_EXTENSIONS=1)
+
+	target_compile_options(foxtrot PRIVATE -fsanitize=address -fcolor-diagnostics)
+	target_link_options(foxtrot PRIVATE -fsanitize=address)
 endif()
 
-target_compile_options(foxtrot PRIVATE -fsanitize=address)
-target_link_options(foxtrot PRIVATE -fsanitize=address)
 
 target_include_directories(foxtrot PRIVATE
     "Src"

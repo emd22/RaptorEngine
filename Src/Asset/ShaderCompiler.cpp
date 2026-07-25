@@ -39,11 +39,10 @@ static BasicDb sShaderCompileDb;
 
 using CompileResult = ShaderCompiler::eResult;
 
-static bool IsShaderUpToDate(renderer::ShaderId entry_id, const char* path)
+static bool IsShaderUpToDate(ShaderId entry_id, const char* path)
 {
 	BasicDbEntry* entry = sShaderCompileDb.FindEntry(entry_id);
 	if (!entry) {
-		LogWarning(LC_SHADER, "Cannot find entry for shader!");
 		return false;
 	}
 
@@ -63,7 +62,7 @@ bool ShaderCompiler::IsOutOfDate(const char* path)
 		sShaderCompileDb.Open(FX_BASE_DIR "/Shaders/LastUpdated.fxd");
 	}
 
-	renderer::ShaderId compile_entry_id = HashStr64(path);
+	ShaderId compile_entry_id = HashStr64(path);
 
 	return !IsShaderUpToDate(compile_entry_id, path);
 }
@@ -115,7 +114,6 @@ ProgramData ShaderCompiler::GetProgramData(const Hash64 program_id, DataPack& pa
 
 	// Entry was not found, return null data
 	if (entry == nullptr) {
-		LogWarning(LC_SHADER, "Could not find shader entry");
 		return program;
 	}
 
@@ -226,9 +224,7 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 	CComPtr<IDxcBlob> spirv_bin;
 	result->GetResult(&spirv_bin);
 
-	const renderer::ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
-
-	LogInfo(LC_SHADER, "Writing shader '{}' (Id={:x}) to data pack!", state.pcPath, shader_id);
+	const ShaderId shader_id = renderer::Shader::GenerateShaderId(shader_type, state.pcMacros);
 
 	// Build the final buffer and write to the data pack
 	{
@@ -239,7 +235,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 #endif
 		ByteBuffer final_buffer(reflection_header.GetSize() + spirv_bin->GetBufferSize());
 
-		LogWarning(LC_SHADER, "Reflection header: {:p}, {}", reflection_header.pData, reflection_header.GetSize());
 		// Write the reflection header
 		final_buffer.InsertRaw(reflection_header.pData, reflection_header.GetSize());
 		// Write the SPIRV data
@@ -266,8 +261,6 @@ static CompileResult CompileProgram(const CompileState& state, eShaderType shade
 ShaderCompiler::eResult ShaderCompiler::Compile(const char* path, DataPack& pack, const SizedArray<ShaderMacro>& macros,
 												bool do_db_flush)
 {
-	LogInfo(LC_SHADER, "Compiling shader {} with {} macros", path, macros.Size);
-
 	File file(path, File::eModType::Read, File::eDataType::Binary);
 	Slice<char> file_data = file.Read<char>();
 

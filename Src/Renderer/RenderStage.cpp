@@ -76,7 +76,7 @@ void RenderStage::Rebuild(const Vec2u& size)
 	mbIsBuilt = true;
 }
 
-void RenderStage::Begin(CommandBuffer& cmd, Pipeline& pipeline)
+void RenderStage::Begin(CommandBuffer& cmd)
 {
 	Assert(mbIsBuilt);
 
@@ -90,7 +90,6 @@ void RenderStage::Begin(CommandBuffer& cmd, Pipeline& pipeline)
 	}
 
 	mRenderPass.Begin(&cmd, framebuffer, ClearValues);
-	pipeline.Bind(cmd);
 }
 
 void RenderStage::AddTarget(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)

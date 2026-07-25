@@ -12,6 +12,8 @@
 #include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/MathUtil.hpp>
+#include <Renderer/Backend/Descriptors.hpp>
+#include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
 
@@ -42,8 +44,6 @@ ShaderId Shader::GenerateShaderId(eShaderType type, const SizedArray<ShaderMacro
 		hash = cPrefixHashCS;
 	}
 
-	LogInfo(LC_SHADER, "Building entry ID with {} macros", macros.Size);
-
 	return HashData64(Slice<ShaderMacro>(macros), hash);
 }
 
@@ -52,7 +52,6 @@ bool Shader::PreloadCompiledPrograms(const char* pack_path)
 	bool did_read = mDataPack.ReadFromFile(pack_path);
 
 	if (!did_read) {
-		LogInfo(LC_SHADER, "Could not read compiled shader from {}. Recompiling...", pack_path);
 		return false;
 	}
 
@@ -97,7 +96,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 #endif
 
 	if (is_out_of_date) {
-		LogWarning(LC_SHADER, "Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
+		// LogWarning(LC_SHADER, "Shader {} is out of date! ({} macros)", c_source_path, macros.Size);
 
 		RecompileShader(source_path, program_path, macros);
 
@@ -134,8 +133,6 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
 	// If there is data available, create the program.
 	if (program_data.HasData()) {
-		LogInfo(LC_SHADER, "Data is available, creating shader...");
-
 		Assert(program_data.pProgramData.Size == MathUtil::AlignValue<4>(program_data.pProgramData.Size));
 		Assert(program_data.pProgramData.Size > 0);
 
@@ -144,6 +141,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
 		// Now that the shader is officially loaded, move over the reflection data.
 		program->Reflection = std::move(program_data.Reflection);
+		program->PrintReflection();
 
 		return program;
 	}
@@ -180,32 +178,36 @@ void Shader::RecompileShader(const String& source_path, const String& compiled_p
 	// Compile to the shader pack
 	ShaderCompiler::eResult compile_result = ShaderCompiler::Compile(source_path.CStr(), mDataPack, macros);
 
-	if (compile_result != ShaderCompiler::eResult::Failed) {
+	if (compile_result == ShaderCompiler::eResult::Success) {
 		mDataPack.WriteToFile(compiled_path.CStr());
 	}
 }
 
 
-void ShaderProgram::BuildDescriptors()
+void ShaderProgram::BuildDescriptor()
 {
-	// Assert(ShaderOutline.IsValid());
+	DsLayoutBuilder layout_builder {};
 
-	// Descriptors.InitCapacity(ShaderOutline::scNumSets);
+	uint32 binding_index = 0;
 
-	// LogWarning("Build Descriptors for shader {}", ShaderUtil::TypeToName(ShaderType));
+	bool has_dynamic_offsets = false;
 
-	// for (uint32 set_index = 0; set_index < ShaderOutline::scNumSets; set_index++) {
-	//     ShaderOutline::EntryList& entry_list = ShaderOutline->SetBuckets[set_index];
+	for (const ShaderReflectionEntry& refl_entry : Reflection) {
+		if (ShaderReflectionUtil::RequiresOffset(refl_entry.Type)) {
+			has_dynamic_offsets = true;
+		}
 
-	//     if (entry_list.IsEmpty()) {
-	//         LogWarning("Skipping descriptors for {} (no entries found)", ShaderUtil::TypeToName(ShaderType));
-	//         continue;
-	//     }
+		layout_builder.AddBinding(binding_index++, ShaderReflectionUtil::TypeToVkDescriptorType(refl_entry.Type),
+								  ShaderType);
+	}
 
-	//     Descriptors.Insert(gDescriptorCache->Register(set_index, ShaderType, entry_list));
-	// }
+	if (!layout_builder.HasBindings()) {
+		return;
+	}
 
-	// LogInfo("Added {} descriptors to shader program", Descriptors.Size);
+	layout_builder.Build();
+
+	// Descriptor.Create(gRenderer->pDeferredRenderer->DescriptorPool, layout_builder.Build(), has_dynamic_offsets);
 }
 
 
@@ -224,10 +226,14 @@ void ShaderProgram::Bind(const CommandBuffer& cmd, const Pipeline& pipeline, con
 
 void ShaderProgram::PrintReflection()
 {
-	LogInfo(LC_SHADER, "Shader reflection:");
+	LogInfo(LC_SHADER, "Shader '{}' ({}) reflection:", pShader->GetName(), ShaderUtil::TypeToName(ShaderType));
+
 	for (const ShaderReflectionEntry& entry : Reflection) {
-		LogInfo(LC_SHADER, "Type: {}, Set={}, Binding={}", static_cast<uint32>(entry.Type), entry.Set, entry.Binding);
+		LogInfo(LC_SHADER, "\tType: {}, Set={}, Binding={}", ShaderReflectionUtil::GetName(entry.Type), entry.Set,
+				entry.Binding);
 	}
+
+	LogInfo(LC_SHADER, "");
 }
 
 void ShaderProgram::Destroy()

@@ -9,14 +9,20 @@ namespace fx::renderer {
 class PipelineCache
 {
 public:
-    PipelineCache();
+	PipelineCache();
 
-    Pipeline& Request(const ePipelineName name);
-    ePipelineName GetName(const Pipeline* pipeline) const;
-    void Bind(const ePipelineName name, const CommandBuffer& cmd);
+	Pipeline& Request(const ePipelineName name);
+	ePipelineName GetName(const Pipeline* pipeline) const;
+	void Bind(const ePipelineName name, const CommandBuffer& cmd);
+
+	void AddBufferOffset(uint32 set_index, uint32 offset);
 
 private:
-    SizedArray<Pipeline> mCache;
+	void Reset();
+
+private:
+	SizedArray<Pipeline> mCache;
+	SizedArray<SizedArray<uint32>> mOffsets;
 };
 
 

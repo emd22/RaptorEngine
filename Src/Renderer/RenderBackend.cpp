@@ -22,8 +22,9 @@
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/Limits.hpp>
+#include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/State.hpp>
+#include <Renderer/ShadowDirectional.hpp>
 #include <thread>
 #include <vector>
 
@@ -128,7 +129,9 @@ void RenderBackend::Init(Vec2u window_size)
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
-	pDeferredRenderer = MakeRef<DeferredRenderer>();
+	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
+
+	pDeferredRenderer = new DeferredRenderer;
 	pDeferredRenderer->Create(Swapchain.Extent);
 
 	bInitialized = true;
@@ -206,7 +209,7 @@ void RenderBackend::DestroyFrames()
 
 void RenderBackend::RebuildRenderStages()
 {
-	DeferredRenderer* rd = pDeferredRenderer.mpPtr;
+	DeferredRenderer* rd = pDeferredRenderer;
 
 	Vec2u size = GetWindow()->GetSize();
 
@@ -216,7 +219,6 @@ void RenderBackend::RebuildRenderStages()
 	rd->ForwardPass.Rebuild(size);
 
 	rd->DescriptorPool.Recreate();
-	rd->CreateDescriptorSets();
 
 	/*for (FrameData& frame : Frames) {
 		frame.InFlight.Reset();
@@ -535,7 +537,8 @@ void RenderBackend::BeginGeometry()
 {
 	FrameData* frame = GetFrame();
 
-	pDeferredRenderer->GPass.Begin(frame->CmdBuffer, *pDeferredRenderer->pGeometryPipeline);
+	pDeferredRenderer->GPass.Begin(frame->CmdBuffer);
+	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 }
 
 void RenderBackend::PresentFrame()
@@ -623,12 +626,12 @@ void RenderBackend::BeginLighting()
 
 	pDeferredRenderer->GPass.End();
 
-	Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::eD32_Float, 0);
+	Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::D32_Float, 0);
 	Assert(depth_target != nullptr);
 	depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
-	pDeferredRenderer->LightPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::LightingDirectional));
+	pDeferredRenderer->LightPass.Begin(frame->CmdBuffer);
 
 	// gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
 	// gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -636,9 +639,13 @@ void RenderBackend::BeginLighting()
 	// gState->Reset();
 
 
-	pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-												 gPipelineCache->Request(ePipelineName::LightingDirectional),
-												 gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
+	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
+
+	// pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+	// 											 gPipelineCache->Request(ePipelineName::LightingDirectional),
+	// 											 gRenderer->LightBuffer.GetBaseOffset());
 }
 
 
@@ -653,9 +660,11 @@ void RenderBackend::BeginUnlit()
 	// Assert(depth_target != nullptr);
 	// depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
-	Pipeline& pl = gPipelineCache->Request(ePipelineName::Unlit);
+	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
 
-	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer, pl);
+	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
+	// gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
+
 	/*    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
 									   Slice<VkClearValue>({}, 0));*/
 
@@ -668,9 +677,9 @@ void RenderBackend::DoComposition(Camera& render_cam)
 
 	pDeferredRenderer->ForwardPass.End();
 
-	// pDeferredRenderer->RpForward.End();
+	pDeferredRenderer->CompPass.Begin(frame->CmdBuffer);
+	// gPipelineCache->Bind(ePipelineName::Composition, frame->CmdBuffer);
 
-	pDeferredRenderer->CompPass.Begin(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Composition));
 	pDeferredRenderer->DoCompPass(render_cam);
 
 	pDeferredRenderer->CompPass.End();

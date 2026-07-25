@@ -2,11 +2,11 @@
 
 #include "Backend/DescriptorCache.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
+#include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
 #include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
-#include "State.hpp"
 
 namespace fx::renderer {
 
@@ -16,41 +16,43 @@ ShaderCache* gShaderCache = nullptr;
 DsLayoutCache* gDsLayoutCache = nullptr;
 PipelineCache* gPipelineCache = nullptr;
 SamplerCache* gSamplerCache = nullptr;
-State* gState = nullptr;
+PSOBuild* gPSOBuild = nullptr;
+DescriptorCache* gDescriptorCache = nullptr;
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
-    delete name_;                                                                                                      \
-    name_ = nullptr
+	delete name_;                                                                                                      \
+	name_ = nullptr
 
 namespace Globals {
 
 
 void Init()
 {
-    gSamplerCache = new SamplerCache;
-    gPipelineCache = new PipelineCache;
-    gState = new State;
+	gSamplerCache = new SamplerCache;
+	gPipelineCache = new PipelineCache;
+	gPSOBuild = new PSOBuild;
 
-    gRenderer = new RenderBackend;
-    gShaderCache = new ShaderCache;
-    gDsLayoutCache = new DsLayoutCache;
+	gRenderer = new RenderBackend;
+	gShaderCache = new ShaderCache;
+	gDsLayoutCache = new DsLayoutCache;
+	gDescriptorCache = new DescriptorCache;
 }
 
 void Destroy()
 {
-    if (gShadowRenderer) {
-        DESTROY_GLOBAL(gShadowRenderer);
-    }
+	if (gShadowRenderer) {
+		DESTROY_GLOBAL(gShadowRenderer);
+	}
 
-    DESTROY_GLOBAL(gSamplerCache);
+	DESTROY_GLOBAL(gSamplerCache);
 
-    // DESTROY_GLOBAL(gState);
-    DESTROY_GLOBAL(gDsLayoutCache);
-    DESTROY_GLOBAL(gPipelineCache);
-    DESTROY_GLOBAL(gShaderCache);
+	DESTROY_GLOBAL(gDescriptorCache);
+	DESTROY_GLOBAL(gDsLayoutCache);
+	DESTROY_GLOBAL(gPipelineCache);
+	DESTROY_GLOBAL(gShaderCache);
 
-    DESTROY_GLOBAL(gState);
-    DESTROY_GLOBAL(gRenderer);
+	DESTROY_GLOBAL(gPSOBuild);
+	DESTROY_GLOBAL(gRenderer);
 }
 
 }; // namespace Globals

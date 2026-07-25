@@ -56,7 +56,6 @@ F_PROGRAM(FPT_PIXEL)
 
 struct FSInput
 {
-    float4 vPosition: SV_POSITION;
 };
 
 void main(FSInput input)

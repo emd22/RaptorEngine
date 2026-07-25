@@ -33,28 +33,39 @@ void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 
 bool Object::CheckIfReady(bool require_material)
 {
-	if ((Flags & eObjectFlags::ReadyToRender) != 0) {
+	if (HasFlag(Flags, eObjectFlags::ReadyToRender)) {
 		return true;
 	}
 
-	// Not a container, ensure there is a material
-	// if (require_material && (!pMaterial || !pMaterial->IsReady())) {
-	//     Flags &= ~(eObjectFlags::ReadyToRender);
-	//     return false;
-	// }
-
 	// This is not a container object, just check that the mesh is loaded
 	if (!pMesh || !pMesh->bIsReady) {
-		Flags &= ~(eObjectFlags::ReadyToRender);
+		ClearFlag(Flags, eObjectFlags::ReadyToRender);
 		return false;
 	}
 
-	// Dimensions = pMesh->GetDimensions();
+	Material* material = gMaterialManager->GetMaterial(mMaterialID);
+	if (material == nullptr) {
+		return false;
+	}
 
-	// TODO: Remove this
-	if (require_material && pMesh->VertexList.IsSkinned()) {
-		Material* material = gMaterialManager->GetMaterial(mMaterialID);
-		material->SetPipeline(ePipelineName::GeometrySkinned);
+	// Check material is ready
+	{
+		if (!material->bReadyToCheck.test()) {
+			return false;
+		}
+
+		if (pMesh->VertexList.IsSkinned()) {
+			material->SetPipeline(ePipelineName::GeometrySkinned);
+		}
+
+		if (HasFlag(Flags, eObjectFlags::Unlit)) {
+			if (material->IsAlbedoOnly()) {
+				material->SetPipeline(ePipelineName::Unlit);
+			}
+			else {
+				material->SetPipeline(ePipelineName::UnlitNormalMaps);
+			}
+		}
 	}
 
 	SetFlag(Flags, eObjectFlags::ReadyToRender);
@@ -69,14 +80,6 @@ bool Object::CheckIfReady(bool require_material)
 
 void Object::FinalizeWhenReady()
 {
-	if (IsFlagSet(Flags, eObjectFlags::Unlit)) {
-		Material* material = gMaterialManager->GetMaterial(mMaterialID);
-		if (material != nullptr) {
-			material->SetPipeline(ePipelineName::Unlit);
-		}
-	}
-
-
 	if (!ParentID.IsNull()) {
 		Object* parent_object = gObjectManager->GetObject(ParentID);
 		parent_object->Bounds.Add(Bounds);
@@ -298,40 +301,17 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	FrameData* frame = gRenderer->GetFrame();
 	Material* material = gMaterialManager->GetMaterial(mMaterialID);
 
-	DrawPushConstants push_constants {};
-	push_constants.ObjectId = ID.GetID();
-	push_constants.MaterialIndex = mMaterialID.GetID();
-	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
-
 	if (!pipeline) {
 		pipeline = &material->GetPipeline();
 	}
 
-	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
-								   push_constants);
 
-	RenderMesh(pipeline);
-}
-
-void Object::RenderUnlit(const Camera& camera)
-{
-	if (!IsUnlit()) {
-		return;
+	if (pipeline->Name == ePipelineName::Unlit) {
+		Assert(material->IsAlbedoOnly());
 	}
-
-	FrameData* frame = gRenderer->GetFrame();
-
-	MaterialID material_id = MaterialID::Null;
-
-	// bool use_null_material = mMaterialID.IsNull();
-	Material* material = gMaterialManager->GetMaterial(material_id);
-
-	// if (!use_null_material && !material->bIsBuilt) {
-	//     material->Build();
-	//     use_null_material = true;
-	// }
-
-	UpdateIfOutOfDate();
+	else if (pipeline->Name == ePipelineName::UnlitNormalMaps) {
+		Assert(!material->IsAlbedoOnly());
+	}
 
 	DrawPushConstants push_constants {};
 	push_constants.ObjectId = ID.GetID();
@@ -339,30 +319,9 @@ void Object::RenderUnlit(const Camera& camera)
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
 
-	if (!gMaterialManager->Bind(frame->CmdBuffer, mMaterialID)) {
-		gMaterialManager->Bind(frame->CmdBuffer, MaterialID::Null);
-	}
+	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex, push_constants);
 
-	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Unlit);
-	pipeline.Bind(frame->CmdBuffer);
-
-	gObjectManager->mObjectBufferDS.BindWithOffset(2, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-												   gObjectManager->GetBaseOffset());
-
-	if (CheckIfReady(true)) {
-		gRenderer->SubmitPushConstants(frame->CmdBuffer, pipeline, eShaderType::Vertex | eShaderType::Pixel,
-									   push_constants);
-		RenderPrimitive(frame->CmdBuffer);
-	}
-
-	if (AttachedNodes.IsEmpty()) {
-		return;
-	}
-
-	for (const ObjectID& obj_id : AttachedNodes) {
-		Object* obj = gObjectManager->GetObject(obj_id);
-		obj->RenderUnlit(camera);
-	}
+	RenderMesh(pipeline);
 }
 
 
@@ -393,7 +352,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
 	}
 
-	gObjectManager->mObjectBufferDS.BindWithOffset(2, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+	gObjectManager->mObjectBufferDS.BindWithOffset(1, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
 												   gObjectManager->GetBaseOffset());
 
 	if (pMesh) {
@@ -403,7 +362,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 
 void Object::Update()
 {
-	if (IsFlagSet(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
+	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
 		PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
 
 		if (mbPhysicsTransformOutOfDate) {
@@ -523,14 +482,14 @@ void Object::PrintDebug() const
 	if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
 		bool has_body = phys->mbHasPhysicsBody;
 		LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
-				IsFlagSet(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
+				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
 				(phys->GetMotionType() == ePhMotionType::Static) ? "Static" : "Dynamic");
 	}
 
 	LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
-			IsFlagSet(Flags, eObjectFlags::IsInstance),	   /* */
-			IsFlagSet(Flags, eObjectFlags::ReadyToRender), /* */
-			IsFlagSet(Flags, eObjectFlags::ShadowCaster),  /* */
+			HasFlag(Flags, eObjectFlags::IsInstance),	 /* */
+			HasFlag(Flags, eObjectFlags::ReadyToRender), /* */
+			HasFlag(Flags, eObjectFlags::ShadowCaster),	 /* */
 			(pMesh && pMesh->VertexList.IsSkinned()));
 
 	LogInfo(LC_CORE, "}}");

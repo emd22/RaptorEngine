@@ -1,6 +1,9 @@
 #pragma once
 
+#include "Descriptors.hpp"
+
 #include <Core/Hash.hpp>
+#include <Core/PagedArray.hpp>
 #include <Core/Types.hpp>
 #include <unordered_map>
 
@@ -15,15 +18,46 @@ namespace renderer {
 class DsLayoutCache
 {
 public:
-    DsLayoutCache() = default;
+	DsLayoutCache() = default;
 
-    VkDescriptorSetLayout Request(eShaderType shader_type, const SizedArray<ShaderReflectionEntry>& refl, uint32 set);
+	std::pair<Hash32, VkDescriptorSetLayout> RequestExisting(const SizedArray<DescriptorEntry>& entries);
+	VkDescriptorSetLayout* RequestExisting(Hash32 descriptor_id);
 
-    void Destroy();
-    ~DsLayoutCache() { Destroy(); }
+	/**
+	 * @brief Frees a descriptor set layout from the cache.
+	 */
+	void Free(Hash32 descriptor_id);
+
+	Hash32 GetID(const SizedArray<DescriptorEntry>& entries);
+
+	void Destroy();
+	~DsLayoutCache() { Destroy(); }
 
 public:
-    std::unordered_map<Hash64, VkDescriptorSetLayout, Hash64Stl> Cache;
+	std::unordered_map<Hash32, VkDescriptorSetLayout, Hash32Stl> Cache;
+};
+
+class DescriptorCache
+{
+public:
+	DescriptorCache();
+
+	std::pair<Hash32, DescriptorSet*> Request(const SizedArray<DescriptorEntry>& entries);
+	DescriptorSet* RequestExisting(Hash32 descriptor_id);
+
+	/**
+	 * @brief Frees a descriptor set and its linked layout from the cache.
+	 */
+	void Free(Hash32 descriptor_id);
+
+	DescriptorPool& FindPool();
+
+	void Destroy();
+	~DescriptorCache() { Destroy(); }
+
+public:
+	PagedArray<DescriptorPool> Pools;
+	std::unordered_map<Hash32, DescriptorSet, Hash32Stl> Cache;
 };
 
 } // namespace renderer

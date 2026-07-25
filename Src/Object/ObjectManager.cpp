@@ -26,13 +26,14 @@ void ObjectManager::Create()
 
 	uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * renderer::FramesInFlight;
 
+	// TODO: replace with DescriptorCache'd version
 	mObjectGpuBuffer.Create(renderer::eGpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
 							eGpuBufferFlags::PersistentMapped);
 
 
 	if (!mObjectBufferDS.IsInited()) {
 		Assert(DsLayoutObjectBuffer != nullptr);
-		mObjectBufferDS.Create(mDescriptorPool, DsLayoutObjectBuffer, true);
+		mObjectBufferDS.Create(mDescriptorPool, HashNull32, DsLayoutObjectBuffer, true);
 	}
 
 	static constexpr uint32 bound_size = scMaxObjects * sizeof(ObjectGpuEntry);
@@ -134,6 +135,8 @@ uint32 ObjectManager::GetBaseOffset() const
 	return (renderer::gRenderer->GetFrameNumber() * scMaxObjects * sizeof(ObjectGpuEntry));
 }
 
+uint32 ObjectManager::GetPageSize() const { return scMaxObjects * sizeof(ObjectGpuEntry); }
+
 uint32 ObjectManager::GetOffsetObjectIndex(uint32 object_id) const
 {
 	return GetBaseOffset() + (object_id * sizeof(ObjectGpuEntry));
@@ -228,7 +231,6 @@ ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_i
 
 void ObjectManager::Destroy()
 {
-	mObjectBufferDS.Destroy();
 	mDescriptorPool.Destroy();
 	mObjectGpuBuffer.Destroy();
 

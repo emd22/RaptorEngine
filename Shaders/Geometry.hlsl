@@ -32,7 +32,6 @@ struct VSOutput
     float3 vTangentWS : TANGENT;
     float3 vBitangentWS : BITANGENT;
 #endif
-    uint uiMaterialIndex : ATTR0;
     // float4 vDebugColor : ATTR0;
 };
 
@@ -52,7 +51,7 @@ F_CBuffer(VSUniforms, 3, 0)
 
 #endif // USE_SKINNING
 
-F_StructBuffer(bObjectBuffer, Object, 0, 2);
+F_StructBuffer(bObjectBuffer, Object, 0, 1);
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
@@ -84,7 +83,6 @@ VSOutput main(VSInput input)
     output.vBitangentWS = cross(output.vNormalWS, output.vTangentWS);
 #endif
 
-    output.uiMaterialIndex = VSConst.uiMaterialIndex;
     output.vUV = input.vUV;
 
     return output;
@@ -111,21 +109,21 @@ struct FSInput
     float3 vBitangentWS : BITANGENT;
 #endif
 
-    uint uiMaterialIndex : ATTR0;
     // float4 vDebugColor : ATTR0;
 };
 
 F_Texture2D(tAlbedo, 0)
+
+#ifdef USE_NORMAL_MAPS
 F_Texture2D(tNormalMap, 1)
 F_Texture2D(tMetallicRoughness, 2)
-
-F_StructBuffer(bMaterialBuffer, Material, 0, 1);
+#endif
 
 FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    Material material_info = bMaterialBuffer[input.uiMaterialIndex];
+    // Material material_info = bMaterialBuffer[input.uiMaterialIndex];
     // float4 material_color = F_UnpackUIntToFloat4(material_info.uiBaseColor);
     float4 material_color = float4(0.0, 0.0, 0.0, 1.0);
     output.vAlbedo = float4(F_Sample(tAlbedo, input.vUV).rgb + material_color.rgb, 1.0);

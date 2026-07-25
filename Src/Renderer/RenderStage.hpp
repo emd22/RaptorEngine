@@ -58,7 +58,7 @@ public:
 	void Rebuild(const Vec2u& size);
 	FX_FORCE_INLINE bool IsBuilt() const { return mbIsBuilt; }
 
-	void Begin(CommandBuffer& cmd, Pipeline& pipeline);
+	void Begin(CommandBuffer& cmd);
 	void End() { mRenderPass.End(); }
 
 	~RenderStage() = default;

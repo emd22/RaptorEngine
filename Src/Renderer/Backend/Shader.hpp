@@ -1,60 +1,18 @@
 #pragma once
 
+#include "ShaderReflection.hpp"
+#include "ShaderType.hpp"
+
 #include <Asset/ShaderCompiler.hpp>
 #include <Core/Ref.hpp>
 #include <Core/SizedArray.hpp>
 #include <Core/String.hpp>
 #include <Core/Types.hpp>
+#include <Renderer/Backend/Descriptors.hpp>
 #include <unordered_map>
 
 
 namespace fx {
-
-enum class eShaderType : uint16
-{
-	None = 0,
-	Vertex = (1 << 0),
-	Pixel = (1 << 1),
-	Compute = (1 << 2),
-};
-
-FxEnumFlags(eShaderType);
-
-
-enum eShaderReflectionType : uint16
-{
-	StructuredBuffer,
-	CBuffer,
-	Texture,
-};
-
-struct ShaderReflectionEntry
-{
-	ShaderReflectionEntry() = delete;
-	ShaderReflectionEntry(eShaderReflectionType type, uint8 set, uint8 binding) : Type(type), Set(set), Binding(binding)
-	{
-	}
-
-	uint32 AsUInt() const
-	{
-		const uint32 value = (static_cast<uint32>(Type) << 16) | (static_cast<uint32>(Set) << 8) |
-							 static_cast<uint32>(Binding);
-		return value;
-	}
-
-	static ShaderReflectionEntry FromUInt(uint32 value)
-	{
-		ShaderReflectionEntry entry(static_cast<eShaderReflectionType>(static_cast<uint16>(value >> 16)),
-									static_cast<uint8>(value >> 8), static_cast<uint8>(value));
-
-		return entry;
-	}
-
-public:
-	eShaderReflectionType Type;
-	uint8 Set;
-	uint8 Binding;
-};
 
 
 struct ProgramData
@@ -72,50 +30,6 @@ namespace renderer {
 class Shader;
 class CommandBuffer;
 class Pipeline;
-
-using ShaderId = Hash64;
-
-namespace ShaderUtil {
-static constexpr uint32 scNumShaderTypes = static_cast<uint32>(eShaderType::Compute) + 1;
-
-/**
- * @brief Get the underlying Vulkan shader stage bit for an ShaderType.
- */
-static constexpr VkShaderStageFlags ToUnderlyingType(eShaderType type)
-{
-	VkShaderStageFlags flags = 0;
-
-	if ((type & eShaderType::Vertex) != 0) {
-		flags |= VK_SHADER_STAGE_VERTEX_BIT;
-	}
-
-	if ((type & eShaderType::Pixel) != 0) {
-		flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
-	}
-
-	if ((type & eShaderType::Compute) != 0) {
-		flags |= VK_SHADER_STAGE_COMPUTE_BIT;
-	}
-
-	return flags;
-}
-
-static FX_FORCE_INLINE const char* TypeToName(eShaderType type)
-{
-	switch (type) {
-	case eShaderType::Vertex:
-		return "Vertex";
-	case eShaderType::Pixel:
-		return "Pixel";
-	case eShaderType::Compute:
-		return "Compute";
-	default:;
-	}
-
-	return "Unknown";
-}
-}; // namespace ShaderUtil
-
 
 struct ShaderDescriptorId
 {
@@ -151,7 +65,7 @@ public:
 		other.pShader = nullptr;
 	}
 
-	void BuildDescriptors();
+	void BuildDescriptor();
 
 	void Bind(const CommandBuffer& cmd, const Pipeline& pipeline, const ShaderBindOptions& bind_options);
 

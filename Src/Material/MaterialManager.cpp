@@ -3,6 +3,7 @@
 #include "Material.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Globals.hpp>
@@ -43,19 +44,20 @@ void MaterialManager::Create()
 									VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
 
-	if (!mMaterialPropertiesDS.IsInited()) {
-		Assert(renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
-		mMaterialPropertiesDS.Create(dp, renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties,
-									 false);
-	}
+	// if (!mMaterialPropertiesDS.IsInited()) {
+	// 	Assert(renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties != nullptr);
+	// 	mMaterialPropertiesDS.Create(dp, renderer::gRenderer->pDeferredRenderer->DsLayoutLightingMaterialProperties,
+	// 								 false);
+	// }
 
-	mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);
-	mMaterialPropertiesDS.Build();
+	// mMaterialPropertiesDS.AddBuffer(0, &MaterialPropertiesBuffer, 0, VK_WHOLE_SIZE);
+	// mMaterialPropertiesDS.Build();
 
 	MakeNullMaterial();
 
 	mbInitialized = true;
 }
+
 
 bool MaterialManager::Bind(const renderer::CommandBuffer& cmd, const MaterialID& id)
 {
@@ -125,8 +127,7 @@ void MaterialManager::MakeNullMaterial()
 
 	material->bNearestFiltering = true;
 
-	material->bReadyToCheck.test_and_set();
-
+	material->Finalize();
 	material->Build();
 
 	LogInfo("Created null material (Id={})", material->GetID());
@@ -171,6 +172,14 @@ MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineN
 void MaterialManager::DestroyMaterial(const MaterialID& id)
 {
 	std::lock_guard guard(mInUse);
+
+	Material* mat = mMaterialList.GetItem(id.GetID());
+
+	renderer::DescriptorSet* ds = mat->GetDescriptorSet();
+	if (ds != nullptr) {
+		renderer::gDescriptorCache->Free(ds->ID);
+	}
+
 	mMaterialList.MarkItemFree(id.GetID());
 }
 

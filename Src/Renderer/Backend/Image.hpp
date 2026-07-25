@@ -62,7 +62,7 @@ enum class eImageFormat : uint16
 	_eDepthFormatsBegin,
 
 	eD16_UNorm_S8_UInt,
-	eD32_Float,
+	D32_Float,
 	eD32_Float_S8_UInt,
 
 	/// DO NOT USE FORMAT: Marker for depth formats
@@ -137,7 +137,7 @@ struct ImageFormatUtil
 		case eImageFormat::eD16_UNorm_S8_UInt:
 			return 3;
 
-		case eImageFormat::eD32_Float:
+		case eImageFormat::D32_Float:
 			return 4;
 
 		case eImageFormat::eD32_Float_S8_UInt:
@@ -176,7 +176,7 @@ struct ImageFormatUtil
 
 		case eImageFormat::eD16_UNorm_S8_UInt:
 			return VK_FORMAT_D16_UNORM_S8_UINT;
-		case eImageFormat::eD32_Float:
+		case eImageFormat::D32_Float:
 			return VK_FORMAT_D32_SFLOAT;
 		case eImageFormat::eD32_Float_S8_UInt:
 			return VK_FORMAT_D32_SFLOAT_S8_UINT;

@@ -113,7 +113,7 @@ PipelineLayout::~PipelineLayout() { ReleaseRef(); }
 // Pipeline
 /////////////////////////////////////
 
-void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& shaders,
+void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shaders,
 					  const Slice<VkAttachmentDescription>& attachments,
 					  const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
 					  VertexDescription* vertex_info, const RenderPass& render_pass,
@@ -135,10 +135,6 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 		}
 	}
 
-	if (!has_depth_attachment) {
-		LogInfo(LC_RENDER, "Pipeline '{}' does not have a depth attachment", name);
-	}
-
 	VkSpecializationInfo specialization_info = {
 		.mapEntryCount = 0,
 		.pMapEntries = nullptr,
@@ -157,8 +153,6 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 			.pName = "main",
 			.pSpecializationInfo = &specialization_info,
 		};
-
-		LogDebug("Added shader (Vertex?: {})", (create_info.stage == VK_SHADER_STAGE_VERTEX_BIT));
 
 		shader_create_info.Insert(create_info);
 	}
@@ -299,7 +293,7 @@ void Pipeline::Create(const std::string& name, const Slice<Ref<ShaderProgram>>& 
 		ModulePanicVulkan("Could not create graphics pipeline", status);
 	}
 
-	Util::SetDebugLabel(name.c_str(), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
+	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
 
 	LogInfo(LC_RENDER, "Creating pipeline for shader '{}' -> LayoutHandle={:p}", shaders[0]->pShader->GetName(),
 			reinterpret_cast<void*>(Layout.Get()));

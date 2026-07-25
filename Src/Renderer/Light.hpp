@@ -4,6 +4,7 @@
 #include <Color.hpp>
 #include <Entity.hpp>
 #include <Math/Mat4.hpp>
+#include <Renderer/PipelineNames.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 
 namespace fx {
@@ -18,14 +19,14 @@ static constexpr LightId LightIdNull = UINT32_MAX;
 
 enum eLightFlags : uint16
 {
-    LF_None = 0x0000,
+	LF_None = 0x0000,
 };
 
 enum class eLightType
 {
-    Unknown,
-    Directional,
-    Point,
+	Unknown,
+	Directional,
+	Point,
 };
 
 FX_DEFINE_ENUM_AS_FLAGS(eLightFlags);
@@ -33,45 +34,42 @@ FX_DEFINE_ENUM_AS_FLAGS(eLightFlags);
 class LightBase : public Entity
 {
 public:
-    using VertexType = renderer::Vertex<renderer::eVertexType::Slim>;
+	using VertexType = renderer::Vertex<renderer::eVertexType::Slim>;
 
-    static constexpr eEntityType scEntityType = eEntityType::Light;
-
-public:
-    LightBase(eLightFlags flags = LF_None);
-
-    void SetLightVolume(const Ref<PrimitiveMesh>& volume);
-    void SetLightVolume(const Ref<MeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
-
-    void SetRadius(const float radius);
-
-    virtual void Render(const PerspectiveCamera& camera, Camera* shadow_camera);
-    virtual void RenderDebugMesh(const PerspectiveCamera& camera);
-
-    virtual ~LightBase() {}
+	static constexpr eEntityType scEntityType = eEntityType::Light;
 
 public:
-    LightId Id = LightIdNull;
+	LightBase(eLightFlags flags = LF_None);
 
-    Ref<PrimitiveMesh> pLightVolume { nullptr };
-    Ref<MeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
+	void SetLightVolume(const Ref<PrimitiveMesh>& volume);
+	void SetLightVolume(const Ref<MeshGen::GeneratedMesh>& volume_gen, bool create_debug_mesh = false);
 
-    renderer::Pipeline* pPipelineInside = nullptr;
-    renderer::Pipeline* pPipelineOutside = nullptr;
+	void SetRadius(const float radius);
 
-    struct Color Color = Color::sWhite;
-    struct Color AmbientColor { 0x101f1f1f };
+	virtual void Render(const PerspectiveCamera& camera, Camera* shadow_camera);
+	virtual void RenderDebugMesh(const PerspectiveCamera& camera);
 
-    eLightFlags Flags = LF_None;
-    eLightType Type = eLightType::Unknown;
+	virtual ~LightBase() {}
 
-    bool bEnabled = true;
+public:
+	LightId Id = LightIdNull;
+
+	Ref<PrimitiveMesh> pLightVolume { nullptr };
+	Ref<MeshGen::GeneratedMesh> pLightVolumeGen { nullptr };
+
+	struct Color Color = Color::sWhite;
+	struct Color AmbientColor { 0x101f1f1f };
+
+	eLightFlags Flags = LF_None;
+	eLightType Type = eLightType::Unknown;
+
+	bool bEnabled = true;
 
 protected:
-    Ref<PrimitiveMesh> mpDebugMesh { nullptr };
-    renderer::Pipeline* pPipeline = nullptr;
+	Ref<PrimitiveMesh> mpDebugMesh { nullptr };
+	renderer::ePipelineName mPipelineName = renderer::ePipelineName::LightingOutsideVolume;
 
-    float32 mRadius = 1.0f;
+	float32 mRadius = 1.0f;
 };
 
 
@@ -81,7 +79,7 @@ protected:
 class LightPoint : public LightBase
 {
 public:
-    LightPoint();
+	LightPoint();
 };
 
 /**
@@ -90,9 +88,9 @@ public:
 class LightDirectional : public LightBase
 {
 public:
-    LightDirectional();
+	LightDirectional();
 
-    void Render(const PerspectiveCamera& camera, Camera* shadow_camera) override;
+	void Render(const PerspectiveCamera& camera, Camera* shadow_camera) override;
 };
 
 ////////////////////////////////////
