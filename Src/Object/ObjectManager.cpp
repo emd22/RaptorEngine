@@ -3,6 +3,7 @@
 #include <Engine.hpp>
 #include <Math/Mat4.hpp>
 #include <Object/Object.hpp>
+#include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
@@ -13,16 +14,16 @@ const ObjectID ObjectID::Null = ObjectID(UINT32_MAX);
 
 void ObjectManager::Create()
 {
-	if (!mDescriptorPool.Pool) {
-		mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4);
-		mDescriptorPool.Create(renderer::gRenderer->GetDevice(), 2);
-	}
+	// if (!mDescriptorPool.Pool) {
+	// 	mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4);
+	// 	mDescriptorPool.Create(renderer::gRenderer->GetDevice(), 2);
+	// }
 
 	mObjectList.Init(scMaxObjects);
 
-	renderer::DsLayoutBuilder builder {};
-	builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Vertex);
-	DsLayoutObjectBuffer = builder.Build();
+	// renderer::DsLayoutBuilder builder {};
+	// builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Vertex);
+	// DsLayoutObjectBuffer = builder.Build();
 
 	uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * renderer::FramesInFlight;
 
@@ -31,14 +32,27 @@ void ObjectManager::Create()
 							eGpuBufferFlags::PersistentMapped);
 
 
-	if (!mObjectBufferDS.IsInited()) {
-		Assert(DsLayoutObjectBuffer != nullptr);
-		mObjectBufferDS.Create(mDescriptorPool, HashNull32, DsLayoutObjectBuffer, true);
+	static constexpr uint32 scBoundSize = scMaxObjects * sizeof(ObjectGpuEntry);
+
+
+	if (!pDescriptorSet) {
+		SizedArray<renderer::DescriptorEntry> ds_entries(5);
+		ds_entries.Insert(
+			renderer::DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &mObjectGpuBuffer, 0, scBoundSize));
+
+		std::pair<renderer::DescriptorID, renderer::DescriptorSet*> result = renderer::gDescriptorCache->Request(
+			ds_entries);
+		pDescriptorSet = result.second;
 	}
 
-	static constexpr uint32 bound_size = scMaxObjects * sizeof(ObjectGpuEntry);
-	mObjectBufferDS.AddBuffer(0, &mObjectGpuBuffer, 0, bound_size);
-	mObjectBufferDS.Build();
+
+	// if (!mObjectBufferDS.IsInited()) {
+	// 	Assert(DsLayoutObjectBuffer != nullptr);
+	// 	mObjectBufferDS.Create(mDescriptorPool, HashNull32, DsLayoutObjectBuffer, true);
+	// }
+
+	// mObjectBufferDS.AddBuffer(0, &mObjectGpuBuffer, 0, scBoundSize);
+	// mObjectBufferDS.Build();
 }
 
 ObjectID ObjectManager::NewObjectID(const std::string& name)
@@ -229,15 +243,6 @@ ObjectID ObjectManager::ReserveInstances(const ObjectID& object_id, uint32 num_i
 }
 
 
-void ObjectManager::Destroy()
-{
-	mDescriptorPool.Destroy();
-	mObjectGpuBuffer.Destroy();
-
-	if (DsLayoutObjectBuffer) {
-		vkDestroyDescriptorSetLayout(renderer::gRenderer->GetDevice()->Device, DsLayoutObjectBuffer, nullptr);
-		DsLayoutObjectBuffer = nullptr;
-	}
-}
+void ObjectManager::Destroy() {}
 
 } // namespace fx

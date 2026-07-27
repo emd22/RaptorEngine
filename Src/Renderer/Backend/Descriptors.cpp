@@ -131,21 +131,26 @@ void DescriptorPool::Destroy()
 // Descriptor Sets
 /////////////////////////////////////
 
-void DescriptorSet::Create(DescriptorPool& pool, Hash32 id, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
+void DescriptorSet::Create(DescriptorPool& pool, DescriptorID id, DsLayoutID layout_id, bool has_dynamic_offsets,
 						   uint32 count)
 {
 	AssertMsg(pool.IsInited(), "Descriptor pool is not initialized!");
 
 	ID = id;
+	LayoutID = layout_id;
 
-	mInternalLayout = layout;
 	mbHasDynamicOffsets = has_dynamic_offsets;
 
 	VkDescriptorSetAllocateInfo alloc_info {};
 	alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc_info.descriptorPool = pool.Get();
 	alloc_info.descriptorSetCount = 1;
-	alloc_info.pSetLayouts = &layout;
+	alloc_info.pSetLayouts = gDsLayoutCache->RequestExisting(layout_id);
+
+	if (alloc_info.pSetLayouts == nullptr) {
+		LogFatal("{} does not refer to an existing descriptor set layout.", layout_id);
+		Panic("DescriptorSet::Create", "Cannot continue.");
+	}
 
 	pool.SetsUsed++;
 

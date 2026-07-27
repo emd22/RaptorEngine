@@ -32,12 +32,12 @@ static VkDescriptorType ReflectionTypeToDescriptorType(eShaderReflectionType typ
 }
 
 
-std::pair<Hash32, VkDescriptorSetLayout>
-DsLayoutCache::RequestExisting(const SizedArray<DescriptorEntry>& requested_entries)
+std::pair<DsLayoutID, VkDescriptorSetLayout>
+DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 {
-	Hash32 entries_hash = GetID(requested_entries);
+	DsLayoutID entries_hash = GetID(requested_entries);
 
-	auto it = Cache.find(entries_hash);
+	auto it = Cache.find(entries_hash.ID);
 
 	// If the descriptor layout was not found in the cache, create it
 	if (it != Cache.end()) {
@@ -50,14 +50,14 @@ DsLayoutCache::RequestExisting(const SizedArray<DescriptorEntry>& requested_entr
 		builder.AddBinding(entry.Binding, entry.GetDescriptorType(), entry.ShaderStages);
 	}
 
-	Cache[entries_hash] = builder.Build();
+	Cache[entries_hash.ID] = builder.Build();
 
-	return std::make_pair(entries_hash, Cache[entries_hash]);
+	return std::make_pair(entries_hash, Cache[entries_hash.ID]);
 }
 
-VkDescriptorSetLayout* DsLayoutCache::RequestExisting(Hash32 descriptor_id)
+VkDescriptorSetLayout* DsLayoutCache::RequestExisting(DsLayoutID layout_id)
 {
-	auto it = Cache.find(descriptor_id);
+	auto it = Cache.find(layout_id.ID);
 	if (it == Cache.end()) {
 		return nullptr;
 	}
@@ -68,31 +68,26 @@ VkDescriptorSetLayout* DsLayoutCache::RequestExisting(Hash32 descriptor_id)
 #define ID_HASH_HANDLE(handle_, size_)                                                                                 \
 	HashData32(Slice<const uint8>(reinterpret_cast<const uint8*>(handle_), size_), id_result);
 
-Hash32 DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
+DsLayoutID DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 {
 	Hash32 id_result = FX_HASH32_FNV1A_INIT;
 
 	for (const DescriptorEntry& entry : entries) {
+		// Add the binding number
 		if (entry.Binding != 0) {
 			id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
 		}
 
-		if (entry.IsImage()) {
-			Assert(entry.pImage != nullptr);
-			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
-		}
-		else if (entry.IsBuffer()) {
-			Assert(entry.pBuffer != nullptr);
-			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pBuffer->Buffer), sizeof(uint64));
-		}
+		const VkDescriptorType dtype = entry.GetDescriptorType();
+		id_result = ID_HASH_HANDLE(&dtype, sizeof(dtype));
 	}
 
-	return id_result;
+	return DsLayoutID { id_result };
 }
 
-void DsLayoutCache::Free(Hash32 descriptor_id)
+void DsLayoutCache::Free(DsLayoutID layout_id)
 {
-	auto it = Cache.find(descriptor_id);
+	auto it = Cache.find(layout_id.ID);
 
 	// Descriptor layout not found, skip
 	if (it == Cache.end()) {
@@ -134,16 +129,18 @@ DescriptorPool& DescriptorCache::FindPool()
 	return Pools[0];
 }
 
-void DescriptorCache::Free(Hash32 descriptor_id)
+void DescriptorCache::Free(DescriptorID id)
 {
-	gDsLayoutCache->Free(descriptor_id);
-
-	auto it = Cache.find(descriptor_id);
+	auto it = Cache.find(id.ID);
 
 	// Descriptor set not found, skip
 	if (it == Cache.end()) {
 		return;
 	}
+
+	// Note we aren't going to destroy the attached DsLayout here. This is mainly because its likely that multiple other
+	// descriptor sets are using the same layout, but also the size is pretty small. There also aren't really _that_
+	// many combinations for descriptor set layouts, so destroying it here wouldn't really matter.
 
 	// Free the set from the descriptor pool
 	VkDescriptorSet ds = it->second.Get();
@@ -153,10 +150,38 @@ void DescriptorCache::Free(Hash32 descriptor_id)
 	Cache.erase(it);
 }
 
-std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
+DescriptorID DescriptorCache::GetID(const SizedArray<DescriptorEntry>& entries)
 {
-	std::pair<Hash32, VkDescriptorSetLayout> layout_result = gDsLayoutCache->RequestExisting(entries);
-	const Hash32 descriptor_id = layout_result.first;
+	// The ID's for actual descriptor sets are created based on the values of the image/buffer Vulkan handles. Layouts
+	// are much less granular, so they only require the descriptor entry types.
+
+	Hash32 id_result = FX_HASH32_FNV1A_INIT;
+
+	for (const DescriptorEntry& entry : entries) {
+		if (entry.Binding != 0) {
+			id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
+		}
+
+		if (entry.IsImage()) {
+			Assert(entry.pImage != nullptr);
+			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pImage->InternalImage), sizeof(uint64));
+		}
+		else if (entry.IsBuffer()) {
+			Assert(entry.pBuffer != nullptr);
+			id_result = ID_HASH_HANDLE(reinterpret_cast<void*>(&entry.pBuffer->Buffer), sizeof(uint64));
+		}
+	}
+
+	return DescriptorID { id_result };
+}
+
+std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArray<DescriptorEntry>& entries)
+{
+	std::pair<DsLayoutID, VkDescriptorSetLayout> layout_result = gDsLayoutCache->Request(entries);
+
+	const DescriptorID descriptor_id = GetID(entries);
+
+	AssertMsg(layout_result.first.IsValid(), "Could not retrieve descriptor set layout");
 
 	bool has_dynamic_offsets = false;
 
@@ -167,21 +192,17 @@ std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<Desc
 		}
 	}
 
-	auto it = Cache.find(descriptor_id);
+	auto it = Cache.find(descriptor_id.ID);
+
+	// If the descriptor set is already created, return it
 	if (it != Cache.end()) {
 		return std::make_pair(descriptor_id, &it->second);
 	}
 
+	DescriptorSet& descriptor = Cache[descriptor_id.ID];
+	descriptor.Create(FindPool(), descriptor_id, layout_result.first, has_dynamic_offsets);
 
-	DescriptorSet& descriptor = Cache[descriptor_id];
-
-	if (!layout_result.second) {
-		LogError("Could not find DS layout for ID ({})", descriptor_id);
-		return std::make_pair(HashNull32, nullptr);
-	}
-
-	descriptor.Create(FindPool(), descriptor_id, layout_result.second, has_dynamic_offsets);
-
+	// Build the descriptor set
 	for (const DescriptorEntry& entry : entries) {
 		if (entry.IsBuffer()) {
 			descriptor.AddBuffer(entry.Binding, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
@@ -196,9 +217,9 @@ std::pair<Hash32, DescriptorSet*> DescriptorCache::Request(const SizedArray<Desc
 	return std::make_pair(descriptor_id, &descriptor);
 }
 
-DescriptorSet* DescriptorCache::RequestExisting(Hash32 descriptor_id)
+DescriptorSet* DescriptorCache::RequestExisting(DescriptorID descriptor_id)
 {
-	auto it = Cache.find(descriptor_id);
+	auto it = Cache.find(descriptor_id.ID);
 	if (it == Cache.end()) {
 		return nullptr;
 	}

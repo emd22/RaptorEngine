@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DescriptorID.hpp"
 #include "Descriptors.hpp"
 
 #include <Core/Hash.hpp>
@@ -15,20 +16,21 @@ enum class eShaderType : uint16;
 
 namespace renderer {
 
+
 class DsLayoutCache
 {
 public:
 	DsLayoutCache() = default;
 
-	std::pair<Hash32, VkDescriptorSetLayout> RequestExisting(const SizedArray<DescriptorEntry>& entries);
-	VkDescriptorSetLayout* RequestExisting(Hash32 descriptor_id);
+	std::pair<DsLayoutID, VkDescriptorSetLayout> Request(const SizedArray<DescriptorEntry>& entries);
+	VkDescriptorSetLayout* RequestExisting(DsLayoutID layout_id);
 
 	/**
 	 * @brief Frees a descriptor set layout from the cache.
 	 */
-	void Free(Hash32 descriptor_id);
+	void Free(DsLayoutID layout_id);
 
-	Hash32 GetID(const SizedArray<DescriptorEntry>& entries);
+	DsLayoutID GetID(const SizedArray<DescriptorEntry>& entries);
 
 	void Destroy();
 	~DsLayoutCache() { Destroy(); }
@@ -37,18 +39,21 @@ public:
 	std::unordered_map<Hash32, VkDescriptorSetLayout, Hash32Stl> Cache;
 };
 
+
 class DescriptorCache
 {
 public:
 	DescriptorCache();
 
-	std::pair<Hash32, DescriptorSet*> Request(const SizedArray<DescriptorEntry>& entries);
-	DescriptorSet* RequestExisting(Hash32 descriptor_id);
+	std::pair<DescriptorID, DescriptorSet*> Request(const SizedArray<DescriptorEntry>& entries);
+	DescriptorSet* RequestExisting(DescriptorID descriptor_id);
 
 	/**
 	 * @brief Frees a descriptor set and its linked layout from the cache.
 	 */
-	void Free(Hash32 descriptor_id);
+	void Free(DescriptorID descriptor_id);
+
+	DescriptorID GetID(const SizedArray<DescriptorEntry>& entries);
 
 	DescriptorPool& FindPool();
 

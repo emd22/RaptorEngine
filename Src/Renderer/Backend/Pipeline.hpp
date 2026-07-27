@@ -155,10 +155,15 @@ class Pipeline
 public:
 	struct DescriptorRef
 	{
-		DescriptorRef(uint32 set_index, Hash32 id) : SetIndex(set_index), ID(id) {}
+		DescriptorRef() = default;
+		DescriptorRef(uint32 set_index, DescriptorSet* set, VkDescriptorSetLayout layout)
+			: SetIndex(set_index), pSet(set), Layout(layout)
+		{
+		}
 
 		uint32 SetIndex = 0;
-		Hash32 ID = HashNull32;
+		DescriptorSet* pSet { nullptr };
+		VkDescriptorSetLayout Layout { nullptr };
 	};
 
 public:

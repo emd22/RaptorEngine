@@ -467,7 +467,7 @@ void Scene::RenderObjectShadows(Object* object)
 		in_skinned_shader = false;
 		pipeline.Bind(cmd);
 
-		gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+		gObjectManager->pDescriptorSet->BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
 													   gObjectManager->GetBaseOffset());
 	}
 

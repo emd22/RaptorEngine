@@ -352,7 +352,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
 	}
 
-	gObjectManager->mObjectBufferDS.BindWithOffset(1, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
+	gObjectManager->pDescriptorSet->BindWithOffset(1, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
 												   gObjectManager->GetBaseOffset());
 
 	if (pMesh) {

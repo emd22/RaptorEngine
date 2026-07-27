@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DescriptorID.hpp"
 #include "Device.hpp"
 #include "GpuBuffer.hpp"
 #include "Sampler/Sampler.hpp"
@@ -105,7 +106,7 @@ private:
 public:
 	DescriptorSet() = default;
 
-	void Create(DescriptorPool& pool, Hash32 id, VkDescriptorSetLayout layout, bool has_dynamic_offsets,
+	void Create(DescriptorPool& pool, DescriptorID id, DsLayoutID layout_id, bool has_dynamic_offsets,
 				uint32 count = 1);
 	bool IsInited() const { return mInternalSet != nullptr; }
 
@@ -145,16 +146,15 @@ public:
 
 	bool HasDynamicOffsets() const { return mbHasDynamicOffsets; }
 
-	VkDescriptorSetLayout GetLayout() { return mInternalLayout; }
 
 	~DescriptorSet() = default;
 
 public:
-	Hash32 ID = HashNull32;
+	DescriptorID ID { HashNull32 };
+	DsLayoutID LayoutID { HashNull32 };
 
 private:
 	VkDescriptorSet mInternalSet = nullptr;
-	VkDescriptorSetLayout mInternalLayout = nullptr;
 
 	uint32 mBufferCount = 0;
 

@@ -167,18 +167,21 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 		}
 
 		// Request (likely create) the descriptor set + descriptor set layout
-		std::pair<Hash32, DescriptorSet*> ds_result = gDescriptorCache->Request(desc_list);
+		std::pair<DescriptorID, DescriptorSet*> ds_result = gDescriptorCache->Request(desc_list);
+		AssertMsg(ds_result.second != nullptr, "Could not find descriptor set when building pipeline");
+
+		VkDescriptorSetLayout* ds_layout = gDsLayoutCache->RequestExisting(ds_result.second->LayoutID);
+		AssertMsg(ds_layout != nullptr, "Could not find descriptor layout when building pipeline");
 
 #ifdef FX_DEBUG_SET_DESCRIPTOR_NAMES
 		String debug_str = String::Fmt("{}_{}_{}", PipelineNameUtil::GetName(mPipelineName), i, desc_list.Size);
 		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET, ds_result.second->Get());
-		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-									  ds_result.second->GetLayout());
+		renderer::Util::SetDebugLabel(debug_str.CStr(), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, *ds_layout);
 #endif
 
-		layouts.emplace_back(ds_result.second->GetLayout());
+		layouts.emplace_back(*ds_layout);
 
-		mpPipeline->DescriptorIDs.Emplace(i, ds_result.first);
+		mpPipeline->DescriptorIDs.Emplace(i, ds_result.second, *ds_layout);
 	}
 
 	return layouts;
@@ -194,16 +197,7 @@ PipelineLayout PSOBuild::BuildLayout()
 		descriptor_layouts.reserve(mpPipeline->DescriptorIDs.Size);
 
 		for (Pipeline::DescriptorRef& ds_ref : mpPipeline->DescriptorIDs) {
-			// Finally, we can get the layout from the previously created DS.
-			VkDescriptorSetLayout* ds_result = gDsLayoutCache->RequestExisting(ds_ref.ID);
-			if (ds_result == nullptr) {
-				LogWarning(LC_CORE, "PSOBuild::BuildLayout: Reused descriptor set does not exist!");
-				continue;
-			}
-
-			LogInfo("Reusing DSLayout {}", ds_ref.ID);
-
-			descriptor_layouts.emplace_back(*ds_result);
+			descriptor_layouts.emplace_back(ds_ref.Layout);
 		}
 	}
 	else {
@@ -230,7 +224,7 @@ void PSOBuild::EndPipeline()
 	LogInfo(LC_RENDER, "Pipeline '{}' is assigned descriptor sets: ", PipelineNameUtil::GetName(mPipelineName));
 
 	for (Pipeline::DescriptorRef& ref : mpPipeline->DescriptorIDs) {
-		LogInfo(LC_RENDER, "\tSet={}\tID={}", ref.SetIndex, ref.ID);
+		LogInfo(LC_RENDER, "\tSet={}\tID={}", ref.SetIndex, ref.pSet->ID);
 	}
 
 	LogInfo(LC_RENDER, "");

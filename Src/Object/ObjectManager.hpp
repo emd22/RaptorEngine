@@ -67,14 +67,16 @@ private:
 	ObjectGpuEntry* GetBufferAtFrame(uint32 object_id);
 
 public:
-	renderer::DescriptorPool mDescriptorPool {};
+	// renderer::DescriptorPool mDescriptorPool {};
 
 public:
 	renderer::RawGpuBuffer mObjectGpuBuffer {};
 	// Bitset mObjectSlotsInUse;
 
-	renderer::DescriptorSet mObjectBufferDS {};
-	VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
+	// renderer::DescriptorSet mObjectBufferDS {};
+	// VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
+
+	renderer::DescriptorSet* pDescriptorSet { nullptr };
 
 	std::mutex mInUse;
 
