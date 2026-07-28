@@ -59,12 +59,12 @@ bool Object::CheckIfReady(bool require_material)
 		}
 
 		if (HasFlag(Flags, eObjectFlags::Unlit)) {
-			if (material->IsAlbedoOnly()) {
-				material->SetPipeline(ePipelineName::Unlit);
-			}
-			else {
-				material->SetPipeline(ePipelineName::UnlitNormalMaps);
-			}
+			// if (material->IsAlbedoOnly()) {
+			// 	material->SetPipeline(ePipelineName::Unlit);
+			// }
+			// else {
+			// 	material->SetPipeline(ePipelineName::UnlitNormalMaps);
+			// }
 		}
 	}
 

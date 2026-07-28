@@ -213,10 +213,10 @@ void RenderBackend::RebuildRenderStages()
 
 	Vec2u size = GetWindow()->GetSize();
 
-	rd->GPass.Rebuild(size);
+	// rd->GPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
-	rd->LightPass.Rebuild(size);
-	rd->ForwardPass.Rebuild(size);
+	// rd->LightPass.Rebuild(size);
+	rd->UnlitPass.Rebuild(size);
 
 	rd->DescriptorPool.Recreate();
 
@@ -537,7 +537,7 @@ void RenderBackend::BeginGeometry()
 {
 	FrameData* frame = GetFrame();
 
-	pDeferredRenderer->GPass.Begin(frame->CmdBuffer);
+	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 }
 
@@ -626,7 +626,7 @@ void RenderBackend::BeginLighting()
 
 	pDeferredRenderer->GPass.End();
 
-	Target* depth_target = pDeferredRenderer->GPass.GetTarget(eImageFormat::D32_Float, 0);
+	Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
 	Assert(depth_target != nullptr);
 	depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
@@ -660,7 +660,7 @@ void RenderBackend::BeginUnlit()
 	// Assert(depth_target != nullptr);
 	// depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
-	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
+	pDeferredRenderer->UnlitPass.Begin(frame->CmdBuffer);
 
 	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
 	// gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
@@ -676,6 +676,8 @@ void RenderBackend::DoComposition(Camera& render_cam)
 	FrameData* frame = GetFrame();
 
 	pDeferredRenderer->ForwardPass.End();
+
+	// pDeferredRenderer->UnlitPass.End();
 
 	pDeferredRenderer->CompPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Composition, frame->CmdBuffer);

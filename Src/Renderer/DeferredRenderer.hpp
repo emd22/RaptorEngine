@@ -35,7 +35,7 @@ private:
 	// Geometry
 	void CreateGPassPipeline();
 
-	void CreateForwardPass();
+	void CreateUnlitPass();
 	void CreateGPass();
 
 
@@ -61,9 +61,10 @@ public:
 
 	// VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
 
-	RenderStage ForwardPass;
+	RenderStage UnlitPass;
 	RenderStage LightPass;
 	RenderStage GPass;
+	RenderStage ForwardPass;
 	RenderStage CompPass;
 
 	// Pipeline PlGeometry;

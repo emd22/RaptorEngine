@@ -34,7 +34,7 @@ Colliders = {
 Objects = {
     Skybox = {
         Mesh = "/Skybox.glb"
-        Unlit = $True
+        Unlit = $False
     }
 
 	FireExtinguisher = {

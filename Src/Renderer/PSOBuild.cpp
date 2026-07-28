@@ -322,7 +322,7 @@ void PSOBuild::CheckDescriptorsAgainstShader() const
 
 	int32 fails = 0;
 
-	for (uint32 shader_index = 0; shader_index < ShaderNameUtil::scNumShaders - 2; shader_index++) {
+	for (uint32 shader_index = 0; shader_index < ShaderNameUtil::scNumShaders; shader_index++) {
 		const Ref<ShaderProgram>& sp = mShaderPrograms[shader_index];
 		if (!sp.IsValid()) {
 			continue;

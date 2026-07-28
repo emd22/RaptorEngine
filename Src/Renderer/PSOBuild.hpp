@@ -122,7 +122,7 @@ private:
 
 	eVertexType mVertexType = eVertexType::Default;
 
-	StackArray<Ref<ShaderProgram>, (ShaderUtil::scNumShaderTypes - 1)> mShaderPrograms;
+	StackArray<Ref<ShaderProgram>, (ShaderNameUtil::scNumShaders)> mShaderPrograms;
 
 	StackArray<PushConstants, ShaderUtil::scNumShaderTypes> mPushConstants;
 

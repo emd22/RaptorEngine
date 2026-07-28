@@ -30,14 +30,14 @@ void DeferredRenderer::Create(const Vec2u& extent)
 	DescriptorPool.Create(gRenderer->GetDevice(), 16);
 
 	CreateGPassPipeline();
-	CreateLightingPipeline();
+	// CreateLightingPipeline();
 	CreateCompPipeline();
-	CreateUnlitPipeline();
+	// CreateUnlitPipeline();
 }
 
 void DeferredRenderer::Destroy() {}
 
-void DeferredRenderer::CreateForwardPass()
+void DeferredRenderer::CreateUnlitPass()
 {
 	TargetList targets {};
 
@@ -46,23 +46,23 @@ void DeferredRenderer::CreateForwardPass()
 
 	Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
 
-	ForwardPass.Create("Forward", gRenderer->Swapchain.Extent);
+	UnlitPass.Create("Unlit", gRenderer->Swapchain.Extent);
 
-	ForwardPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
-						  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						  eImageAspectFlag::Depth);
+	UnlitPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
+						VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+						eImageAspectFlag::Depth);
 	{
-		Target* depth_target = ForwardPass.GetTarget(eImageFormat::D32_Float);
+		Target* depth_target = UnlitPass.GetTarget(eImageFormat::D32_Float);
 		depth_target->LoadOp = eLoadOp::Load;
 		depth_target->StoreOp = eStoreOp::DontCare;
 		depth_target->InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		depth_target->UseImageFromTarget(lp_depth_attachment);
 	}
 
-	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	UnlitPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 	{
-		Target* light_target = ForwardPass.GetTarget(eImageFormat::RGBA16_Float);
+		Target* light_target = UnlitPass.GetTarget(eImageFormat::RGBA16_Float);
 		light_target->LoadOp = eLoadOp::Load;
 		light_target->StoreOp = eStoreOp::Store;
 		light_target->InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -70,26 +70,40 @@ void DeferredRenderer::CreateForwardPass()
 		light_target->UseImageFromTarget(lp_light_attachment);
 	}
 
-	ForwardPass.BuildRenderStage();
+	UnlitPass.BuildRenderStage();
 }
 
 void DeferredRenderer::CreateGPass()
 {
-	GPass.Create("Geometry", gRenderer->Swapchain.Extent);
+	// GPass.Create("Geometry", gRenderer->Swapchain.Extent);
 
-	// Albedo target
-	GPass.AddTarget(eImageFormat::BGRA8_UNorm, Target::scFullScreen,
-					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	// // Albedo target
+	// GPass.AddTarget(eImageFormat::BGRA8_UNorm, Target::scFullScreen,
+	// 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
-	// Normals target
-	GPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	// // Normals target
+	// GPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+	// 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+
+	// // Depth target
+	// GPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
+	// 				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
+
+	// GPass.BuildRenderStage();
+
+	// Forward pass
+	ForwardPass.Create("Forward", gRenderer->Swapchain.Extent);
+
+	// Lit target
+	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
 	// Depth target
-	GPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
-					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
+	ForwardPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
+						  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+						  eImageAspectFlag::Depth);
 
-	GPass.BuildRenderStage();
+	ForwardPass.BuildRenderStage();
 }
 
 /////////////////////////////////////
@@ -99,14 +113,14 @@ void DeferredRenderer::CreateGPass()
 
 void DeferredRenderer::CreateUnlitPipeline()
 {
-	CreateForwardPass();
+	CreateUnlitPass();
 	{
 		// Unlit pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::Unlit);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 		gPSOBuild->SetShader(eShaderName::Unlit, {});
 
-		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->UseRenderStage(UnlitPass);
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
@@ -128,7 +142,7 @@ void DeferredRenderer::CreateUnlitPipeline()
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 		gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
 
-		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->UseRenderStage(UnlitPass);
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
@@ -154,7 +168,7 @@ void DeferredRenderer::CreateUnlitPipeline()
 		gPSOBuild->SetRenderLines(true);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->UseRenderStage(UnlitPass);
 
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
@@ -172,8 +186,8 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->BeginPipeline(ePipelineName::Geometry);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 
-		gPSOBuild->UseRenderStage(GPass);
-		gPSOBuild->SetShader(eShaderName::Geometry, {});
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetShader(eShaderName::Forward, {});
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
@@ -194,8 +208,8 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 
-		gPSOBuild->UseRenderStage(GPass);
-		gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
@@ -218,10 +232,10 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
 
-		gPSOBuild->UseRenderStage(GPass);
+		gPSOBuild->UseRenderStage(ForwardPass);
 		gPSOBuild->SetVertexType(eVertexType::Skinned);
-		gPSOBuild->SetShader(eShaderName::Geometry, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
-													  ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
+		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
+													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
 		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
@@ -384,17 +398,13 @@ void DeferredRenderer::CreateCompPipeline()
 	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
 
-	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::D32_Float),
+	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
 								  gSamplerCache->Request(SamplerProps {
 									  eSamplerFilter::Nearest,
 									  eSamplerFilter::Nearest,
 									  eSamplerFilter::Nearest,
 								  }));
-	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
-								  gSamplerCache->Request(SamplerProps {}));
-	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::RGBA16_Float),
-								  gSamplerCache->Request(SamplerProps {}));
-	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, LightPass.GetTarget(eImageFormat::RGBA16_Float),
+	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
 								  gSamplerCache->Request(SamplerProps {}));
 
 	gPSOBuild->EndPipeline();

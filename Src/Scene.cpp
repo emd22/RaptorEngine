@@ -318,25 +318,25 @@ void Scene::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
 
 	// Render lights
-	gRenderer->BeginLighting();
-	gRenderer->LightBuffer.Rewind();
+	// gRenderer->BeginLighting();
+	// gRenderer->LightBuffer.Rewind();
 
-	for (const Ref<LightBase>& light : mLights) {
-		light->Render(camera, shadow_camera);
-	}
+	// for (const Ref<LightBase>& light : mLights) {
+	// 	light->Render(camera, shadow_camera);
+	// }
 
 	// Render the unlit objects
-	gRenderer->BeginUnlit();
+	// gRenderer->BeginUnlit();
 
-	ExecuteRenderList(ePipelineName::Unlit);
-	ExecuteRenderList(ePipelineName::UnlitNormalMaps);
+	// ExecuteRenderList(ePipelineName::Unlit);
+	// ExecuteRenderList(ePipelineName::UnlitNormalMaps);
 
 	// RenderBoundingBoxes(camera);
-	RenderWorldGrid(camera);
+	// RenderWorldGrid(camera);
 
-	if (bRenderPhysicsObjects) {
-		RenderPhysicsObjects(camera);
-	}
+	// if (bRenderPhysicsObjects) {
+	// 	RenderPhysicsObjects(camera);
+	// }
 }
 
 

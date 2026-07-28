@@ -96,7 +96,6 @@ F_PROGRAM(FPT_PIXEL)
 
 struct FSOutput {
     float4 vAlbedo : SV_TARGET0;
-    float4 vNormal : SV_TARGET1;
 };
 
 struct FSInput
@@ -137,13 +136,13 @@ FSOutput main(FSInput input)
     float3 normal_ws = mul(normal_ts, TBN);
 
     // XYZ=Normal, W=Roughness
-    output.vNormal = float4(normalize(normal_ws), roughness_metallic.x);
+    // output.vNormal = float4(normalize(normal_ws), roughness_metallic.x);
     // Metalness
     output.vAlbedo.w = roughness_metallic.y;
 
     // output.vAlbedo.rgb = float3(roughness_metallic.x, roughness_metallic.x, roughness_metallic.x);
 #else
-    output.vNormal = float4(input.vNormalWS, 0.0);
+    // output.vNormal = float4(input.vNormalWS, 0.0);
     output.vAlbedo.w = 0.0;
 #endif
 
