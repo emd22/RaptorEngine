@@ -182,23 +182,28 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 		Build();
 	}
 
-	if (!IsReady() || !mDescriptorSet) {
+	if (!IsReady()) {
 		return false;
+	}
+
+	renderer::DescriptorSet* descriptor_set = mpDescriptorSet;
+	const renderer::PipelineNameInfo& pl_info = GetPipelineNameInfo(pipeline.Name);
+
+	if (HasFlag(pl_info.Flags, ePipelineNameFlags::AlbedoOnly) && !IsAlbedoOnly()) {
+		descriptor_set = RequestAlbedoOnlyDescriptors();
 	}
 
 	pipeline.Bind(cmd);
 
-	VkDescriptorSet sets_to_bind[] = {
-		mDescriptorSet->Get(), // Set 0: Textures (Albedo, Normal map, Metallic/Roughness)
-	};
-
+	// Buffer offsets
 	StackArray<uint32, 2> offsets;
 	if (bSupportsSkinning) {
 		offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
 	}
+	offsets.Insert(gRenderer->LightBuffer.GetBaseOffset());
 
-	DescriptorSet::BindMultipleOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-									  MakeSlice(sets_to_bind, std::size(sets_to_bind)), Slice<uint32>(offsets));
+	// Bind the descriptor set
+	descriptor_set->Bind(0, cmd, pipeline, Slice<uint32>(offsets));
 
 	return true;
 }
@@ -304,6 +309,28 @@ static float32 GetComponentMinLOD(const MaterialComponent& component)
 	return static_cast<float32>(info.MipLevel);
 }
 
+renderer::DescriptorSet* Material::RequestAlbedoOnlyDescriptors()
+{
+	if (mpAlbedoOnlyDescriptorSet != nullptr) {
+		return mpAlbedoOnlyDescriptorSet;
+	}
+
+	SamplerProps sampler_props { .MinLOD = GetComponentMinLOD(Diffuse), .MaxLOD = GetComponentMaxLOD(Diffuse) };
+
+	// Build entries list
+	SizedArray<DescriptorEntry> ds_entries(4);
+	ds_entries.Emplace(
+		DescriptorEntry::AsImage(0, eShaderType::Pixel, Diffuse.pImage, gSamplerCache->Request(sampler_props)));
+
+	ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+												 gRenderer->LightBuffer.PageSize));
+
+	std::pair<DescriptorID, renderer::DescriptorSet*> ds_result = gDescriptorCache->Request(ds_entries);
+	mpAlbedoOnlyDescriptorSet = ds_result.second;
+
+	return mpAlbedoOnlyDescriptorSet;
+}
+
 
 void Material::Build()
 {
@@ -324,26 +351,45 @@ void Material::Build()
 		MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 	}
 
-	if (mDescriptorSet == nullptr) {
+
+	SetDefaultPipeline();
+
+	if (mpDescriptorSet == nullptr) {
 		SizedArray<DescriptorEntry> ds_entries(6);
+
+		LogInfo(LC_RENDER, "** Building Material ({}) descriptor set", ID);
+		LogInfo(LC_RENDER, "\tPipeline '{}'", PipelineNameUtil::GetName(mPipelineName));
+
 		ds_entries.Emplace(DescriptorEntry::AsImage(0, eShaderType::Pixel, Diffuse.pImage,
 													gSamplerCache->Request(diffuse_sampler_props)));
 
 		if (NormalMap.Exists()) {
+			LogInfo(LC_RENDER, "\tHas Normal maps");
+
 			ds_entries.Emplace(DescriptorEntry::AsImage(1, eShaderType::Pixel, NormalMap.pImage,
 														gSamplerCache->Request(diffuse_sampler_props)));
 			ds_entries.Emplace(DescriptorEntry::AsImage(2, eShaderType::Pixel, MetallicRoughness.pImage,
 														gSamplerCache->Request(diffuse_sampler_props)));
 		}
+		else {
+			LogInfo(LC_RENDER, "\tAlbedo Only");
+		}
 
 		if (bSupportsSkinning) {
-			ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->BoneBuffer.GetGpuBuffer(),
+			LogInfo(LC_RENDER, "\tHas Skinning");
+
+			ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(),
 														 0, gRenderer->BoneBuffer.PageSize));
 		}
 
+		ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+													 gRenderer->LightBuffer.PageSize));
+
 
 		std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
-		mDescriptorSet = result.second;
+		mpDescriptorSet = result.second;
+
+		Assert(mpDescriptorSet != nullptr);
 
 		// VkDescriptorSetLayout layout = gRenderer->pDeferredRenderer->DsLayoutGPassMaterial;
 
@@ -354,38 +400,7 @@ void Material::Build()
 		// mDescriptorSet.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
 	}
 
-
-	// mDsDefault.AddImage(0, Diffuse.pImage, gSamplerCache->Request(diffuse_sampler_props));
-
-	// // When there is no normal map, we do not add it to the descriptor set. We should not bind extra garbage when we
-	// do
-	// // not need to.
-
-	// if (NormalMap.Exists()) {
-	// 	mDsDefault.AddImage(1, NormalMap.pImage,
-	// 						gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(NormalMap) }));
-
-	// 	// To reduce permutations -- the metallic roughness map should only be
-	// 	// enabled if there is also a normal map.
-	// 	if (!MetallicRoughness.Exists()) {
-	// 		MetallicRoughness.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
-	// 	}
-
-	// 	mDsDefault.AddImage(2, MetallicRoughness.pImage,
-	// 						gSamplerCache->Request(SamplerProps { .MaxLOD = GetComponentMaxLOD(MetallicRoughness) }));
-	// }
-
-	// if (bSupportsSkinning) {
-	// 	mDsDefault.AddBuffer(3, &gRenderer->BoneBuffer.GetGpuBuffer(), 0, gRenderer->BoneBuffer.PageSize);
-	// }
-
-	// mDsDefault.Build();
-
 	SubmitProperties(Properties);
-
-	if (!mpPipeline) {
-		SetDefaultPipeline();
-	}
 
 
 	bIsBuilt.store(true);

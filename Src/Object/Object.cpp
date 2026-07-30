@@ -84,6 +84,10 @@ void Object::FinalizeWhenReady()
 		Object* parent_object = gObjectManager->GetObject(ParentID);
 		parent_object->Bounds.Add(Bounds);
 	}
+
+	if (!mMaterialID.IsNull()) {
+		LogInfo(LC_CORE, "** Created object '{}' with material '{}'", Name.Get(), mMaterialID);
+	}
 }
 
 
@@ -189,19 +193,7 @@ void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
 	if (update_children) {
 		for (const ObjectID& attached_id : this->AttachedNodes) {
 			Object* attached = gObjectManager->GetObject(attached_id);
-
-			if (!attached->GetMaterialID().IsNull()) {
-				continue;
-			}
-
-			Material* material = gMaterialManager->GetMaterial(attached->GetMaterialID());
-
-			if (should_set_default) {
-				material->SetDefaultPipeline();
-			}
-			else {
-				material->SetPipeline(gPipelineCache->GetName(pipeline));
-			}
+			attached->SetGraphicsPipeline(pipeline, update_children);
 		}
 	}
 }
@@ -298,20 +290,22 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 		return;
 	}
 
+	Assert(pipeline != nullptr);
+
 	FrameData* frame = gRenderer->GetFrame();
-	Material* material = gMaterialManager->GetMaterial(mMaterialID);
+	// Material* material = gMaterialManager->GetMaterial(mMaterialID);
 
-	if (!pipeline) {
-		pipeline = &material->GetPipeline();
-	}
+	// if (!pipeline) {
+	// 	pipeline = &material->GetPipeline();
+	// }
 
 
-	if (pipeline->Name == ePipelineName::Unlit) {
-		Assert(material->IsAlbedoOnly());
-	}
-	else if (pipeline->Name == ePipelineName::UnlitNormalMaps) {
-		Assert(!material->IsAlbedoOnly());
-	}
+	// if (pipeline->Name == ePipelineName::Unlit) {
+	// 	Assert(material->IsAlbedoOnly());
+	// }
+	// else if (pipeline->Name == ePipelineName::UnlitNormalMaps) {
+	// 	Assert(!material->IsAlbedoOnly());
+	// }
 
 	DrawPushConstants push_constants {};
 	push_constants.ObjectId = ID.GetID();
@@ -346,6 +340,11 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 {
 	FrameData* frame = gRenderer->GetFrame();
 	CommandBuffer& cmd = frame->CmdBuffer;
+
+	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
+	if (mat) {
+		Assert(mat->GetPipelineName() == pipeline->Name);
+	}
 
 	// If there was an error binding the object material, bind the null material.
 	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {

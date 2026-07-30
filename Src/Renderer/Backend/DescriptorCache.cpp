@@ -46,7 +46,10 @@ DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 
 	DsLayoutBuilder builder {};
 
+	LogInfo(LC_CORE, "DS Layout Builder:");
 	for (const DescriptorEntry& entry : requested_entries) {
+		LogInfo("\t Entry {} -> {} || {}", entry.Binding, DescriptorEntryUtil::GetTypeName(entry.GetType()),
+				ShaderUtil::TypeToName(entry.ShaderStages));
 		builder.AddBinding(entry.Binding, entry.GetDescriptorType(), entry.ShaderStages);
 	}
 
@@ -74,9 +77,7 @@ DsLayoutID DsLayoutCache::GetID(const SizedArray<DescriptorEntry>& entries)
 
 	for (const DescriptorEntry& entry : entries) {
 		// Add the binding number
-		if (entry.Binding != 0) {
-			id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
-		}
+		id_result = ID_HASH_HANDLE(reinterpret_cast<const void*>(&entry.Binding), sizeof(uint32));
 
 		const VkDescriptorType dtype = entry.GetDescriptorType();
 		id_result = ID_HASH_HANDLE(&dtype, sizeof(dtype));
@@ -202,8 +203,12 @@ std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArra
 	DescriptorSet& descriptor = Cache[descriptor_id.ID];
 	descriptor.Create(FindPool(), descriptor_id, layout_result.first, has_dynamic_offsets);
 
+	LogInfo(LC_CORE, "** Creating descriptor set {}", descriptor_id);
 	// Build the descriptor set
 	for (const DescriptorEntry& entry : entries) {
+		LogInfo(LC_CORE, "\tEntry: {} -> {} || {}", entry.Binding, DescriptorEntryUtil::GetTypeName(entry.GetType()),
+				ShaderUtil::TypeToName(entry.ShaderStages));
+
 		if (entry.IsBuffer()) {
 			descriptor.AddBuffer(entry.Binding, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
 		}

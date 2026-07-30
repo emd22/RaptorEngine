@@ -8,152 +8,167 @@ namespace fx {
 
 class String
 {
-    static constexpr uint32 scStackAllocSize = 16;
+	static constexpr uint32 scStackAllocSize = 16;
 
 public:
-    static constexpr uint32 scNotFound = UINT32_MAX;
+	static constexpr uint32 scNotFound = UINT32_MAX;
 
 public:
-    static String NoCopy(char* ptr, uint32 length);
+	static String NoCopy(char* ptr, uint32 length);
 
-    template <typename T>
-    static String From(T value)
-    {
-        // Using a temp buffer here is faster than trying to predict the length of the value before converting.
-        static constexpr uint32 scTmpBufferSize = 128;
-        char buffer[scTmpBufferSize];
+	template <typename T>
+	static String From(T value)
+	{
+		// Using a temp buffer here is faster than trying to predict the length of the value before converting.
+		static constexpr uint32 scTmpBufferSize = 128;
+		char buffer[scTmpBufferSize];
 
-        // Convert using to_chars. This doesn't have heap allocs like std::to_string would.
-        std::to_chars_result result = std::to_chars(buffer, buffer + scTmpBufferSize, value);
+		// Convert using to_chars. This doesn't have heap allocs like std::to_string would.
+		std::to_chars_result result = std::to_chars(buffer, buffer + scTmpBufferSize, value);
 
-        if (result.ec != std::errc()) {
-            return String();
-        }
+		if (result.ec != std::errc()) {
+			return String();
+		}
 
-        return String(buffer, result.ptr - buffer);
-    }
+		return String(buffer, result.ptr - buffer);
+	}
 
-    template <typename... TTypes>
-    static String Fmt(const char* fmt, TTypes&&... args)
-    {
-        return String(std::vformat(fmt, std::make_format_args(args...)));
-    }
+	template <typename... TTypes>
+	static String Fmt(const char* fmt, TTypes&&... args)
+	{
+		return String(std::vformat(fmt, std::make_format_args(args...)));
+	}
 
-    String() = default;
-    explicit String(uint32 allocation_size);
-    String(const char* str, uint32 length);
-    String(const std::string& str);
-    String(const char* str);
-    String(const String& other) { (*this) = other; }
-    String(String&& other);
+	String() = default;
 
-    FX_FORCE_INLINE bool IsHeapAllocated() const { return (mpHeapStr != nullptr); }
+	/**
+	 * @brief Allocates an uninitialized string of size `allocation_size`
+	 */
+	explicit String(uint32 allocation_size);
+	String(const char* str, uint32 length);
+	String(const std::string& str);
+	String(const char* str);
+	String(const String& other) { (*this) = other; }
+	String(String&& other);
 
-    FX_FORCE_INLINE uint32 GetLength() const { return Length; }
+	FX_FORCE_INLINE bool IsHeapAllocated() const { return (mpHeapStr != nullptr); }
 
-    uint32 FindFirst(char ch) const;
-    uint32 FindLast(char ch) const;
-    uint32 FindNext(uint32 start, char ch) const;
-    uint32 FindPrev(uint32 skip, char ch) const;
+	FX_FORCE_INLINE uint32 GetLength() const { return Length; }
 
-    bool StartsWith(const char ch) const;
-    bool EndsWith(const char ch) const;
+	uint32 FindFirst(char ch) const;
+	uint32 FindLast(char ch) const;
+	uint32 FindNext(uint32 start, char ch) const;
+	uint32 FindPrev(uint32 skip, char ch) const;
 
-    /**
-     * @brief Finds the first occurance of the string `match` beginning at the index `start`.
-     */
-    uint32 FindNext(uint32 start, const String& match) const;
+	bool StartsWith(const char ch) const;
+	bool EndsWith(const char ch) const;
 
-    /**
-     * @brief Replace all occurances of `to_replace` with `replacement`
-     */
-    String ReplaceAll(const char* to_replace, char replacement);
+	/**
+	 * @brief Returns the index of the first occurance of the substring `other` in this string. If the string has not
+	 * been found, this function returns `String::scNotFound`.
+	 */
+	uint32 Find(const char* other) const;
 
-    void Clear();
+	/**
+	 * @brief Shorthand version to `Find` that only returns if the substring was found.
+	 */
+	FX_FORCE_INLINE bool Contains(const char* other) const { return (Find(other) != scNotFound); }
 
-    /**
-     * @brief Reduces the length of a string to the length `new_length`. This function resizes the string and bins down
-     * to the stack version of the string if it fits.
-     */
-    String& ShortenTo(uint32 new_length);
+	/**
+	 * @brief Finds the first occurance of the string `match` beginning at the index `start`.
+	 */
+	uint32 FindNext(uint32 start, const String& match) const;
 
-    const char* CStr() const
-    {
-        if (IsHeapAllocated()) {
-            return mpHeapStr;
-        }
+	/**
+	 * @brief Replace all occurances of `to_replace` with `replacement`
+	 */
+	String ReplaceAll(const char* to_replace, char replacement);
 
-        return mpStackStr;
-    }
+	void Clear();
 
-    /**
-     * @brief Creates a copy of this string from `start` to `end`.
-     * @returns The copy of the string
-     */
-    String SubStrAbs(uint32 start, uint32 end) const;
+	/**
+	 * @brief Reduces the length of a string to the length `new_length`. This function resizes the string and bins down
+	 * to the stack version of the string if it fits.
+	 */
+	String& ShortenTo(uint32 new_length);
 
-    /**
-     * @brief Creates a copy of this string from `start` with the length of `length`
-     * @returns The copy of the string
-     */
-    String SubStr(uint32 start, uint32 length) const;
+	const char* CStr() const
+	{
+		if (IsHeapAllocated()) {
+			return mpHeapStr;
+		}
 
-    std::string Str() const { return std::string(CStr(), Length); }
+		return mpStackStr;
+	}
 
-    String& operator=(const char* str);
-    String& operator=(const String& other);
-    String& operator=(String&& other);
+	/**
+	 * @brief Creates a copy of this string from `start` to `end`.
+	 * @returns The copy of the string
+	 */
+	String SubStrAbs(uint32 start, uint32 end) const;
 
-    bool operator==(const String& other) const;
+	/**
+	 * @brief Creates a copy of this string from `start` with the length of `length`
+	 * @returns The copy of the string
+	 */
+	String SubStr(uint32 start, uint32 length) const;
 
-    String operator+(const String& other) const;
-    String operator+(const char* other) const;
+	std::string Str() const { return std::string(CStr(), Length); }
 
-    String& operator+=(const String& other);
+	String& operator=(const char* str);
+	String& operator=(const String& other);
+	String& operator=(String&& other);
 
-    const char operator[](size_t index) const;
-    char& operator[](size_t index);
+	bool operator==(const String& other) const;
 
-    ~String();
+	String operator+(const String& other) const;
+	String operator+(const char* other) const;
+
+	String& operator+=(const String& other);
+
+	const char operator[](size_t index) const;
+	char& operator[](size_t index);
+
+	~String();
 
 private:
-    FX_FORCE_INLINE char* GetInternalPtr()
-    {
-        if (IsHeapAllocated()) {
-            return mpHeapStr;
-        }
+	FX_FORCE_INLINE char* GetInternalPtr()
+	{
+		if (IsHeapAllocated()) {
+			return mpHeapStr;
+		}
 
-        return mpStackStr;
-    }
+		return mpStackStr;
+	}
 
-    FX_FORCE_INLINE const char* GetInternalPtr() const
-    {
-        if (IsHeapAllocated()) {
-            return mpHeapStr;
-        }
+	FX_FORCE_INLINE const char* GetInternalPtr() const
+	{
+		if (IsHeapAllocated()) {
+			return mpHeapStr;
+		}
 
-        return mpStackStr;
-    }
+		return mpStackStr;
+	}
 
 public:
-    uint32 Length = 0;
+	uint32 Length = 0;
 
 private:
-    char mpStackStr[scStackAllocSize];
-    char* mpHeapStr = nullptr;
+	char mpStackStr[scStackAllocSize];
+	char* mpHeapStr = nullptr;
 };
 
 class ConstString
 {
 public:
-    ConstString() = default;
-    ConstString(const char* ptr, uint32 length);
+	ConstString() = default;
+	ConstString(const char* ptr, uint32 length);
 
-    const char* CStr() const { return pStr; }
+	const char* CStr() const { return pStr; }
 
 public:
-    uint32 Length = 0;
-    const char* pStr = nullptr;
+	uint32 Length = 0;
+	const char* pStr = nullptr;
 };
 
 
@@ -163,10 +178,10 @@ public:
 template <>
 struct std::formatter<fx::String>
 {
-    auto parse(format_parse_context& ctx) { return ctx.begin(); }
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-    auto format(const fx::String& str, std::format_context& ctx) const
-    {
-        return std::format_to(ctx.out(), "{}", str.CStr());
-    }
+	auto format(const fx::String& str, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "{}", str.CStr());
+	}
 };

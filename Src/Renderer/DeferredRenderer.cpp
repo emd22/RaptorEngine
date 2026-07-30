@@ -198,6 +198,9 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 
+		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+							 gRenderer->LightBuffer.PageSize);
+
 
 		gPSOBuild->EndPipeline();
 	}
@@ -219,6 +222,9 @@ void DeferredRenderer::CreateGPassPipeline()
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
+
+		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+							 gRenderer->LightBuffer.PageSize);
 
 		// bObjectBuffer
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
@@ -248,6 +254,10 @@ void DeferredRenderer::CreateGPassPipeline()
 		// bBoneBuffer
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
 							 gRenderer->BoneBuffer.PageSize);
+
+		// Light buffer
+		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+							 gRenderer->LightBuffer.PageSize);
 
 		// bObjectBuffer
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,

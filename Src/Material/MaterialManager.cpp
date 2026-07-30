@@ -120,7 +120,11 @@ void MaterialManager::MakeNullMaterial()
 
 	AssetTicket null_image_ticket = gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm);
 
-
+	// Create with all 3 components (full material) as the descriptor is binned down in AlbedoOnly pipelines anyway.
+	// Theres definitely a better way to do this, but this is the best method for now.
+	//
+	// Note that albedo only materials will be added into an albedo-only section of the renderlist nayway, so this is
+	// only a catchall for the null material.
 	material->Attach(Material::eResourceType::Diffuse, diffuse_ticket);
 	material->Attach(Material::eResourceType::Normal, null_image_ticket);
 	material->Attach(Material::eResourceType::MetallicRoughness, null_image_ticket);

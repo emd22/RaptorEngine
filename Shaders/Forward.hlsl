@@ -111,6 +111,13 @@ struct FSInput
     // float4 vDebugColor : ATTR0;
 };
 
+#include "LightingCommon.hlsli"
+
+F_CBuffer(FSLightBuffer, 4, 0)
+{
+	Light Lights[LIGHT_COUNT];
+};
+
 F_Texture2D(tAlbedo, 0)
 
 #ifdef USE_NORMAL_MAPS
@@ -125,6 +132,7 @@ FSOutput main(FSInput input)
     // Material material_info = bMaterialBuffer[input.uiMaterialIndex];
     // float4 material_color = F_UnpackUIntToFloat4(material_info.uiBaseColor);
     float4 material_color = float4(0.0, 0.0, 0.0, 1.0);
+
     output.vAlbedo = float4(F_Sample(tAlbedo, input.vUV).rgb + material_color.rgb, 1.0);
 
 #ifdef USE_NORMAL_MAPS

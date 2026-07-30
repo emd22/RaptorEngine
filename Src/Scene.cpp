@@ -21,23 +21,6 @@ void Scene::Create()
 	mPhysicsObjects.Create(32);
 }
 
-void Scene::Attach(Object* object)
-{
-	// mObjects.Insert(object->ID);
-	// gWorldGrid->AddObject(object->ID);
-
-	// object->pScene = this;
-	// object->OnAttached(this);
-
-	// Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
-	// object->pScene->mRenderList.Add(material->GetPipelineName(), object->ID);
-
-	// for (const ObjectID& attach_id : object->AttachedNodes) {
-	// 	Object* attach = gObjectManager->GetObject(attach_id);
-	// 	Attach(attach);
-	// }
-}
-
 static void AddObjectToRenderList(Object* object, Scene* scene)
 {
 	if (object->pScene == nullptr) {
@@ -45,16 +28,19 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 	}
 
 	if (object->pMesh.IsValid()) {
-		const bool is_unlit = object->IsUnlit();
+		// const bool is_unlit = object->IsUnlit();
 
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
 		ePipelineName pipeline_name = material->GetPipelineName();
 
-		if (is_unlit) {
-			LogInfo("Setting material {} pipeline to be unlit", material->ID);
-			pipeline_name = material->IsAlbedoOnly() ? ePipelineName::Unlit : ePipelineName::UnlitNormalMaps;
-			material->SetPipeline(pipeline_name);
-		}
+		LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
+				PipelineNameUtil::GetName(pipeline_name));
+
+		// if (is_unlit) {
+		// 	LogInfo("Setting material {} pipeline to be unlit", material->ID);
+		// 	pipeline_name = material->IsAlbedoOnly() ? ePipelineName::Unlit : ePipelineName::UnlitNormalMaps;
+		// 	material->SetPipeline(pipeline_name);
+		// }
 
 		AssertMsg(object->pScene, "Scene has not been initialized on object!");
 		object->pScene->mRenderList.Add(pipeline_name, object->ID);
@@ -157,14 +143,14 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 		return;
 	}
 
-	renderer::Pipeline* alt_pipeline = nullptr;
+	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
 	// If the pipeline passed in is unlit, force the unlit pipeline to be used over the materials pipeline.
-	const bool is_unlit_pipeline = (pl_name == ePipelineName::Unlit || pl_name == ePipelineName::UnlitNormalMaps);
+	// const bool is_unlit_pipeline = (pl_name == ePipelineName::Unlit || pl_name == ePipelineName::UnlitNormalMaps);
 
-	if (is_unlit_pipeline) {
-		alt_pipeline = &gPipelineCache->Request(pl_name);
-	}
+	// if (is_unlit_pipeline) {
+	// 	alt_pipeline = &gPipelineCache->Request(pl_name);
+	// }
 
 	uint32 index = 0;
 	while (true) {
@@ -177,7 +163,7 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 		Object* object = gObjectManager->GetObject(object_id);
 
 		object->Update();
-		object->RenderShallow(camera, alt_pipeline);
+		object->RenderShallow(camera, &pipeline);
 
 		++index;
 	}

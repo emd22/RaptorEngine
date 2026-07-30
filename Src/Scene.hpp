@@ -26,7 +26,6 @@ public:
 	void Create();
 
 	void Attach(AssetTicket object_ticket);
-	void Attach(Object* object);
 
 	void Attach(const Ref<LightBase>& light);
 

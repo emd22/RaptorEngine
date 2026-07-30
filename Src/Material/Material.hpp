@@ -168,11 +168,12 @@ public:
 	bool Bind(const renderer::CommandBuffer& cmd);
 	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
 
+
 	void RequestQuality(uint32 quality);
 
 	void Build();
 
-	FX_FORCE_INLINE renderer::DescriptorSet* GetDescriptorSet() { return mDescriptorSet; }
+	FX_FORCE_INLINE renderer::DescriptorSet* GetDescriptorSet() { return mpDescriptorSet; }
 
 	void SetDefaultPipeline();
 	void SubmitProperties(const MaterialProperties& properties);
@@ -189,6 +190,12 @@ public:
 
 	void Destroy();
 	~Material() { Destroy(); }
+
+private:
+	/**
+	 * @brief If requested by the `Bind` functions, generate albedo only descriptor sets to be bound.
+	 */
+	renderer::DescriptorSet* RequestAlbedoOnlyDescriptors();
 
 public:
 	MaterialID ID = MaterialID::Null;
@@ -210,7 +217,8 @@ public:
 	int32 QualityLevel = 3;
 
 private:
-	renderer::DescriptorSet* mDescriptorSet = nullptr;
+	renderer::DescriptorSet* mpDescriptorSet = nullptr;
+	renderer::DescriptorSet* mpAlbedoOnlyDescriptorSet = nullptr;
 
 	renderer::Pipeline* mpPipeline = nullptr;
 	renderer::ePipelineName mPipelineName = renderer::ePipelineName::Geometry;

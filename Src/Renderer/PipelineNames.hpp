@@ -2,6 +2,18 @@
 
 #include <Core/Types.hpp>
 
+namespace fx {
+
+enum class ePipelineNameFlags
+{
+	None = 0,
+	AlbedoOnly = (1 << 0),
+};
+
+FxEnumFlags(ePipelineNameFlags);
+} // namespace fx
+
+
 namespace fx::renderer {
 
 enum class ePipelineName : uint16
@@ -36,39 +48,18 @@ enum class ePipelineName : uint16
 constexpr uint32 scNumPipelines = static_cast<uint32>(ePipelineName::NumPipelines);
 
 
+struct PipelineNameInfo
+{
+	const char* pcName;
+	ePipelineNameFlags Flags;
+};
+
+const PipelineNameInfo& GetPipelineNameInfo(const ePipelineName name);
+
+
 namespace PipelineNameUtil {
 
-
-#define ENUM_TYPE ePipelineName
-
-constexpr const char* GetName(const ePipelineName id)
-{
-	switch (id) {
-		FX_ENUM_CASE_NAME(Geometry);
-		FX_ENUM_CASE_NAME(GeometryNormalMaps);
-		FX_ENUM_CASE_NAME(GeometrySkinned);
-
-		FX_ENUM_CASE_NAME(Unlit);
-		FX_ENUM_CASE_NAME(UnlitNormalMaps);
-		FX_ENUM_CASE_NAME(DebugLayer);
-
-		// Lighting
-		FX_ENUM_CASE_NAME(LightingOutsideVolume);
-		FX_ENUM_CASE_NAME(LightingInsideVolume);
-		FX_ENUM_CASE_NAME(LightingDirectional);
-
-
-		FX_ENUM_CASE_NAME(TextRendering);
-		FX_ENUM_CASE_NAME(Composition);
-
-		FX_ENUM_CASE_NAME(ShadowDirectional);
-	default:;
-	}
-
-	return "Unknown";
-}
-
-#undef ENUM_TYPE
+FX_FORCE_INLINE const char* GetName(const ePipelineName id) { return GetPipelineNameInfo(id).pcName; }
 
 
 } // namespace PipelineNameUtil

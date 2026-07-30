@@ -304,11 +304,17 @@ void RenderBackend::InitVulkan()
 	bInitialized = true;
 }
 
-uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, uint32 type,
-							const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data)
+static uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity, uint32 type,
+								   const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data)
 {
 	const char* message = callback_data->pMessage;
 	const char* fmt = "VkValidator: {:s}";
+
+	String s_msg(message);
+
+	// if (s_msg.Contains("being bound is not compatible with the corresponding VkPipelineLayout")) {
+	// 	FX_BREAKPOINT;
+	// }
 
 
 	if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
@@ -356,7 +362,7 @@ VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance)
 	return messenger;
 }
 
-void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger)
+static void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger)
 {
 	if (messenger == nullptr) {
 		return;
