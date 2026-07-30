@@ -50,30 +50,30 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 		return;
 	}
 
-	if (camera.Position.IntersectsSphere(mPosition, mRadius)) {
-		mPipelineName = ePipelineName::LightingInsideVolume;
-	}
-	else {
-		mPipelineName = ePipelineName::LightingOutsideVolume;
-	}
+	// if (camera.Position.IntersectsSphere(mPosition, mRadius)) {
+	// 	mPipelineName = ePipelineName::LightingInsideVolume;
+	// }
+	// else {
+	// 	mPipelineName = ePipelineName::LightingOutsideVolume;
+	// }
 
 	FrameData* frame = gRenderer->GetFrame();
 	UpdateIfOutOfDate();
 
-	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
-	gPipelineCache->Bind(mPipelineName, frame->CmdBuffer);
+	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
+	// gPipelineCache->Bind(mPipelineName, frame->CmdBuffer);
 
-	{
-		LightVertPushConstants push_constants {};
-		memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+	// {
+	// 	LightVertPushConstants push_constants {};
+	// 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
 
-		push_constants.ObjectId = ID.GetID();
-		push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
+	// 	push_constants.ObjectId = ID.GetID();
+	// 	push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
 
-		gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(mPipelineName), eShaderType::Vertex,
-									   push_constants);
-	}
+	// 	gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(mPipelineName), eShaderType::Vertex,
+	// 								   push_constants);
+	// }
 
 
 	gRenderer->LightBuffer.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
@@ -95,7 +95,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 	gRenderer->LightBuffer.FlushToGpu();
 	gRenderer->LightBuffer.NextSlot();
 
-	pLightVolume->Render(frame->CmdBuffer, 1);
+	// pLightVolume->Render(frame->CmdBuffer, 1);
 }
 
 
@@ -142,21 +142,21 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 	FrameData* frame = gRenderer->GetFrame();
 	UpdateIfOutOfDate();
 
-	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
-	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
-	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
+	// gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
+	// gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 	// pPipeline->Bind(frame->CmdBuffer);
 
-	{
-		LightVertPushConstants push_constants {};
-		memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+	// {
+	// 	LightVertPushConstants push_constants {};
+	// 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 
-		push_constants.ObjectId = ID.GetID();
-		push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
+	// 	push_constants.ObjectId = ID.GetID();
+	// 	push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
 
-		gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::LightingDirectional),
-									   eShaderType::Vertex, push_constants);
-	}
+	// 	gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::LightingDirectional),
+	// 								   eShaderType::Vertex, push_constants);
+	// }
 
 	if (shadow_camera) {
 		gRenderer->LightBuffer.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
@@ -184,7 +184,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 	gRenderer->LightBuffer.FlushToGpu();
 	gRenderer->LightBuffer.NextSlot();
 
-	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
+	// vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 }
 
 } // namespace fx

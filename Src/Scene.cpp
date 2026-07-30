@@ -301,6 +301,10 @@ void Scene::Render(Camera* shadow_camera)
 	}
 
 	gRenderer->BeginGeometry();
+	gRenderer->LightBuffer.Rewind();
+	for (const Ref<LightBase>& light : mLights) {
+		light->Render(camera, shadow_camera);
+	}
 
 	ExecuteRenderList(ePipelineName::Geometry);
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
@@ -308,11 +312,7 @@ void Scene::Render(Camera* shadow_camera)
 
 	// Render lights
 	// gRenderer->BeginLighting();
-	// gRenderer->LightBuffer.Rewind();
 
-	// for (const Ref<LightBase>& light : mLights) {
-	// 	light->Render(camera, shadow_camera);
-	// }
 
 	// Render the unlit objects
 	// gRenderer->BeginUnlit();
