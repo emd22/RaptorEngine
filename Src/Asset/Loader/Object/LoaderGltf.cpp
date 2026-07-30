@@ -289,7 +289,6 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 										gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
 	}
 
-	material->SetDefaultPipeline();
 	material->Finalize();
 }
 

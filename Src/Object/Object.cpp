@@ -49,23 +49,8 @@ bool Object::CheckIfReady(bool require_material)
 	}
 
 	// Check material is ready
-	{
-		if (!material->bReadyToCheck.test()) {
-			return false;
-		}
-
-		if (pMesh->VertexList.IsSkinned()) {
-			material->SetPipeline(ePipelineName::GeometrySkinned);
-		}
-
-		if (HasFlag(Flags, eObjectFlags::Unlit)) {
-			// if (material->IsAlbedoOnly()) {
-			// 	material->SetPipeline(ePipelineName::Unlit);
-			// }
-			// else {
-			// 	material->SetPipeline(ePipelineName::UnlitNormalMaps);
-			// }
-		}
+	if (!material->bReadyToCheck.test()) {
+		return false;
 	}
 
 	SetFlag(Flags, eObjectFlags::ReadyToRender);
@@ -175,28 +160,6 @@ void Object::OnAttached(Scene* scene)
 //     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
 // }
 
-void Object::SetGraphicsPipeline(Pipeline* pipeline, bool update_children)
-{
-	const bool should_set_default = (pipeline == nullptr);
-
-	if (!this->GetMaterialID().IsNull()) {
-		Material* material = gMaterialManager->GetMaterial(this->mMaterialID);
-
-		if (should_set_default) {
-			material->SetDefaultPipeline();
-		}
-		else {
-			material->SetPipeline(gPipelineCache->GetName(pipeline));
-		}
-	}
-
-	if (update_children) {
-		for (const ObjectID& attached_id : this->AttachedNodes) {
-			Object* attached = gObjectManager->GetObject(attached_id);
-			attached->SetGraphicsPipeline(pipeline, update_children);
-		}
-	}
-}
 
 void Object::UpdateAnimation()
 {
@@ -247,40 +210,6 @@ void Object::ReserveInstances(uint32 num)
 	mInstanceSlotsInUse = 0;
 }
 
-
-void Object::Render(const Camera& camera)
-{
-	FrameData* frame = gRenderer->GetFrame();
-
-	MaterialID material_id = mMaterialID;
-
-	// const bool use_null_material = mMaterialID.IsNull();
-	Material* material = gMaterialManager->GetMaterial(material_id);
-
-	UpdateIfOutOfDate();
-
-	DrawPushConstants push_constants {};
-	push_constants.ObjectId = ID.GetID();
-	push_constants.MaterialIndex = mMaterialID.GetID();
-	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
-
-	if (CheckIfReady(true)) {
-		gRenderer->SubmitPushConstants(frame->CmdBuffer, material->GetPipeline(),
-									   eShaderType::Vertex | eShaderType::Pixel, push_constants);
-
-		RenderMesh(&material->GetPipeline());
-	}
-
-	// If there are no attached nodes, break early
-	if (AttachedNodes.IsEmpty()) {
-		return;
-	}
-
-	for (const ObjectID& obj_id : AttachedNodes) {
-		Object* obj = gObjectManager->GetObject(obj_id);
-		obj->Render(camera);
-	}
-}
 
 void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 {
@@ -343,7 +272,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 
 	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
 	if (mat) {
-		Assert(mat->GetPipelineName() == pipeline->Name);
+		Assert(mat->GetRequiredPipeline() == pipeline->Name);
 	}
 
 	// If there was an error binding the object material, bind the null material.

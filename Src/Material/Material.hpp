@@ -165,7 +165,6 @@ public:
 	 * Binds the material to be used in the given command buffer.
 	 * @returns True if the material was bound successfully.
 	 */
-	bool Bind(const renderer::CommandBuffer& cmd);
 	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline);
 
 
@@ -175,12 +174,12 @@ public:
 
 	FX_FORCE_INLINE renderer::DescriptorSet* GetDescriptorSet() { return mpDescriptorSet; }
 
-	void SetDefaultPipeline();
-	void SubmitProperties(const MaterialProperties& properties);
+	/**
+	 * @brief Returns the pipeline that is required by the material.
+	 */
+	renderer::ePipelineName GetRequiredPipeline() const;
 
-	void SetPipeline(renderer::ePipelineName pl_name);
-	renderer::Pipeline& GetPipeline() { return *mpPipeline; }
-	renderer::ePipelineName GetPipelineName() const { return mPipelineName; }
+	void SubmitProperties(const MaterialProperties& properties);
 
 	bool IsAlbedoOnly() const { return (NormalMap.Exists() == false); }
 
@@ -219,9 +218,6 @@ public:
 private:
 	renderer::DescriptorSet* mpDescriptorSet = nullptr;
 	renderer::DescriptorSet* mpAlbedoOnlyDescriptorSet = nullptr;
-
-	renderer::Pipeline* mpPipeline = nullptr;
-	renderer::ePipelineName mPipelineName = renderer::ePipelineName::Geometry;
 
 	bool mbIsReady : 1 = false;
 	bool mbIsBeingBuilt : 1 = false;

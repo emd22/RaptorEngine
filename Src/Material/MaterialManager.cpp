@@ -59,19 +59,6 @@ void MaterialManager::Create()
 }
 
 
-bool MaterialManager::Bind(const renderer::CommandBuffer& cmd, const MaterialID& id)
-{
-	// Note that if the id is zero, this binds the null material.
-
-	Material* material = mMaterialList.GetItem(id.GetID());
-	if (material == nullptr) {
-		LogError(LC_CORE, "Could not bind material {}", id.GetID());
-		return false;
-	}
-
-	return material->Bind(cmd);
-}
-
 bool MaterialManager::BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline,
 									   const MaterialID& id)
 {
@@ -93,7 +80,6 @@ void MaterialManager::MakeNullMaterial()
 
 	material->ID = MaterialID(0);
 	material->Name = "NullMaterial";
-	material->SetPipeline(renderer::ePipelineName::Geometry);
 	material->SetSupportsSkinning(false);
 
 	SizedArray<uint8> diffuse_data = {
@@ -167,7 +153,6 @@ MaterialID MaterialManager::NewMaterial(const String& name, renderer::ePipelineN
 
 	Material* material = GetNewMaterial();
 	material->Name = name.Str();
-	material->SetPipeline(pl_name);
 	material->SetSupportsSkinning(supports_skinning);
 
 	return material->ID;

@@ -174,8 +174,6 @@ void Material::RequestQuality(uint32 quality)
 }
 
 
-bool Material::Bind(const CommandBuffer& cmd) { return BindWithPipeline(cmd, *mpPipeline); }
-
 bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeline)
 {
 	if (!bIsBuilt.load()) {
@@ -189,11 +187,12 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 	renderer::DescriptorSet* descriptor_set = mpDescriptorSet;
 	const renderer::PipelineNameInfo& pl_info = GetPipelineNameInfo(pipeline.Name);
 
+	// This is only for materials that were defined as a 'full' material originally, but will be replaced into a
+	// different material later. Since this function is only really called from the segmented RenderList, this is likely
+	// only called for the NullMaterial.
 	if (HasFlag(pl_info.Flags, ePipelineNameFlags::AlbedoOnly) && !IsAlbedoOnly()) {
 		descriptor_set = RequestAlbedoOnlyDescriptors();
 	}
-
-	pipeline.Bind(cmd);
 
 	// Buffer offsets
 	StackArray<uint32, 2> offsets;
@@ -219,9 +218,6 @@ Material& Material::operator=(const Material& other)
 	Properties = other.Properties;
 
 	Name = other.Name;
-
-	mpPipeline = other.mpPipeline;
-	mPipelineName = other.mPipelineName;
 
 	bIsBuilt = false;
 
@@ -259,17 +255,17 @@ void Material::Destroy()
 		}                                                                                                              \
 	}
 
-void Material::SetDefaultPipeline()
+renderer::ePipelineName Material::GetRequiredPipeline() const
 {
 	if (NormalMap.Exists()) {
-		SetPipeline(ePipelineName::GeometryNormalMaps);
+		return ePipelineName::GeometryNormalMaps;
 
 		if (bSupportsSkinning) {
-			SetPipeline(ePipelineName::GeometrySkinned);
+			return ePipelineName::GeometrySkinned;
 		}
 	}
 	else {
-		SetPipeline(ePipelineName::Geometry);
+		return ePipelineName::Geometry;
 	}
 }
 
@@ -279,12 +275,6 @@ void Material::SubmitProperties(const MaterialProperties& properties)
 		MaterialManagerFwd::GetMaterialPropertiesBuffer().pMappedBuffer);
 
 	memcpy(&properties_buffer[ID.GetID()], &properties, sizeof(MaterialProperties));
-}
-
-void Material::SetPipeline(renderer::ePipelineName pl_name)
-{
-	mPipelineName = pl_name;
-	mpPipeline = &gPipelineCache->Request(pl_name);
 }
 
 static float32 GetComponentMaxLOD(const MaterialComponent& component)
@@ -352,13 +342,10 @@ void Material::Build()
 	}
 
 
-	SetDefaultPipeline();
-
 	if (mpDescriptorSet == nullptr) {
 		SizedArray<DescriptorEntry> ds_entries(6);
 
 		LogInfo(LC_RENDER, "** Building Material ({}) descriptor set", ID);
-		LogInfo(LC_RENDER, "\tPipeline '{}'", PipelineNameUtil::GetName(mPipelineName));
 
 		ds_entries.Emplace(DescriptorEntry::AsImage(0, eShaderType::Pixel, Diffuse.pImage,
 													gSamplerCache->Request(diffuse_sampler_props)));

@@ -58,7 +58,6 @@ public:
 	 * @brief Render only the primitive(s) for the objects. Does not bind material or other object data.
 	 */
 	void RenderPrimitive(const renderer::CommandBuffer& cmd);
-	void Render(const Camera& camera);
 	void RenderShallow(const Camera& camera, renderer::Pipeline* alt_pipeline = nullptr);
 
 	bool CheckIfReady(bool require_material);
@@ -67,8 +66,6 @@ public:
 	void Update();
 
 	void OnAttached(Scene* scene) override;
-
-	void SetGraphicsPipeline(renderer::Pipeline* pipeline, bool update_children = true);
 
 	void PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
 								const PhProperties& physics_properties);

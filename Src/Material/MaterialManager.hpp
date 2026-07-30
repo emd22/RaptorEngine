@@ -30,7 +30,6 @@ public:
 	Material* GetMaterial(const MaterialID& id);
 	void DestroyMaterial(const MaterialID& id);
 
-	bool Bind(const renderer::CommandBuffer& cmd, const MaterialID& id);
 	bool BindWithPipeline(const renderer::CommandBuffer& cmd, const renderer::Pipeline& pipeline, const MaterialID& id);
 
 	renderer::DescriptorPool& GetDescriptorPool() { return mDescriptorPool; }

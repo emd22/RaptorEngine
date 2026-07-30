@@ -31,7 +31,7 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 		// const bool is_unlit = object->IsUnlit();
 
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
-		ePipelineName pipeline_name = material->GetPipelineName();
+		ePipelineName pipeline_name = material->GetRequiredPipeline();
 
 		LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
 				PipelineNameUtil::GetName(pipeline_name));
@@ -152,6 +152,9 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 	// 	alt_pipeline = &gPipelineCache->Request(pl_name);
 	// }
 
+	pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
+
+
 	uint32 index = 0;
 	while (true) {
 		index = section.InUse.FindNextSetBit(index);
@@ -255,9 +258,9 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		Object* object = gObjectManager->GetObject(*object_id);
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
 
-		LogInfo("Adding object ID {} -> {}", *object_id, PipelineNameUtil::GetName(material->GetPipelineName()));
+		LogInfo("Adding object ID {} -> {}", *object_id, PipelineNameUtil::GetName(material->GetRequiredPipeline()));
 
-		AddToRenderListRecursive(material->GetPipelineName(), object_id);
+		AddToRenderListRecursive(material->GetRequiredPipeline(), object_id);
 
 		++index;
 	}
