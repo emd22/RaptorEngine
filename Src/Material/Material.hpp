@@ -23,6 +23,16 @@
 namespace fx {
 
 
+enum class eMaterialFlags : uint32
+{
+	None = 0,
+	Unlit = (1 << 0),
+
+};
+
+FxEnumFlags(eMaterialFlags);
+
+
 /////////////////////////////////////
 // Material Component
 /////////////////////////////////////
@@ -98,7 +108,7 @@ private:
 
 struct MaterialProperties
 {
-	alignas(16) Color BaseColor = 0xFF010101u;
+	eMaterialFlags Flags = eMaterialFlags::None;
 };
 
 /**

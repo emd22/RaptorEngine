@@ -76,7 +76,7 @@
 #define FX_USE_SIMD 1
 
 #elif defined __AVX2__ || defined FX_PLATFORM_WINDOWS || defined FX_USE_SIMDE
-#define FX_USE_AVX  1
+#define FX_USE_AVX	1
 #define FX_USE_SIMD 1
 #else
 #define FX_NO_SIMD 1
@@ -104,41 +104,42 @@
 #define FX_ENUM_AS_BITS(EnumType_, value_) static_cast<std::underlying_type_t<EnumType_>>(value_)
 
 #define FX_ENUM_DEFINE_BITWISE_OR(EnumType_)                                                                           \
-    inline constexpr EnumType_ operator|(EnumType_ lhs, EnumType_ rhs)                                                 \
-    {                                                                                                                  \
-        return static_cast<EnumType_>(FX_ENUM_AS_BITS(EnumType_, lhs) | FX_ENUM_AS_BITS(EnumType_, rhs));              \
-    }                                                                                                                  \
-    inline constexpr EnumType_& operator|=(EnumType_& lhs, EnumType_ rhs)                                              \
-    {                                                                                                                  \
-        lhs = (lhs | rhs);                                                                                             \
-        return lhs;                                                                                                    \
-    }
+	inline constexpr EnumType_ operator|(EnumType_ lhs, EnumType_ rhs)                                                 \
+	{                                                                                                                  \
+		return static_cast<EnumType_>(FX_ENUM_AS_BITS(EnumType_, lhs) | FX_ENUM_AS_BITS(EnumType_, rhs));              \
+	}                                                                                                                  \
+	inline constexpr EnumType_& operator|=(EnumType_& lhs, EnumType_ rhs)                                              \
+	{                                                                                                                  \
+		lhs = (lhs | rhs);                                                                                             \
+		return lhs;                                                                                                    \
+	}
 
 #define FX_ENUM_DEFINE_BITWISE_AND(EnumType_)                                                                          \
-    inline constexpr EnumType_ operator&(EnumType_ lhs, EnumType_ rhs)                                                 \
-    {                                                                                                                  \
-        return static_cast<EnumType_>(FX_ENUM_AS_BITS(EnumType_, lhs) & FX_ENUM_AS_BITS(EnumType_, rhs));              \
-    }                                                                                                                  \
-    inline constexpr EnumType_& operator&=(EnumType_& lhs, EnumType_ rhs)                                              \
-    {                                                                                                                  \
-        lhs = (lhs & rhs);                                                                                             \
-        return lhs;                                                                                                    \
-    }
+	inline constexpr EnumType_ operator&(EnumType_ lhs, EnumType_ rhs)                                                 \
+	{                                                                                                                  \
+		return static_cast<EnumType_>(FX_ENUM_AS_BITS(EnumType_, lhs) & FX_ENUM_AS_BITS(EnumType_, rhs));              \
+	}                                                                                                                  \
+	inline constexpr EnumType_& operator&=(EnumType_& lhs, EnumType_ rhs)                                              \
+	{                                                                                                                  \
+		lhs = (lhs & rhs);                                                                                             \
+		return lhs;                                                                                                    \
+	}
 
 #define FX_ENUM_DEFINE_BITWISE_NOT(EnumType_)                                                                          \
-    inline constexpr EnumType_ operator~(EnumType_ value)                                                              \
-    {                                                                                                                  \
-        return static_cast<EnumType_>(~FX_ENUM_AS_BITS(EnumType_, value));                                             \
-    }
+	inline constexpr EnumType_ operator~(EnumType_ value)                                                              \
+	{                                                                                                                  \
+		return static_cast<EnumType_>(~FX_ENUM_AS_BITS(EnumType_, value));                                             \
+	}
 
 
 #define FX_DEFINE_ENUM_AS_FLAGS(EnumType_)                                                                             \
-    FX_ENUM_DEFINE_BITWISE_OR(EnumType_)                                                                               \
-    FX_ENUM_DEFINE_BITWISE_AND(EnumType_)                                                                              \
-    FX_ENUM_DEFINE_BITWISE_NOT(EnumType_)                                                                              \
-    using EnumType_##Bits = std::underlying_type_t<EnumType_>;
+	FX_ENUM_DEFINE_BITWISE_OR(EnumType_)                                                                               \
+	FX_ENUM_DEFINE_BITWISE_AND(EnumType_)                                                                              \
+	FX_ENUM_DEFINE_BITWISE_NOT(EnumType_)                                                                              \
+	using EnumType_##Bits = std::underlying_type_t<EnumType_>;
 
 #define FX_UNUSED [[maybe_unused]]
+
 
 #ifndef FX_NO_RESTRICT
 #define RESTRICT __restrict

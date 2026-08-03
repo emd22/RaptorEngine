@@ -1,6 +1,7 @@
 #include "ObjectManager.hpp"
 
 #include <Engine.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Math/Mat4.hpp>
 #include <Object/Object.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
@@ -39,6 +40,10 @@ void ObjectManager::Create()
 		SizedArray<renderer::DescriptorEntry> ds_entries(5);
 		ds_entries.Insert(
 			renderer::DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &mObjectGpuBuffer, 0, scBoundSize));
+
+		ds_entries.Insert(renderer::DescriptorEntry::AsBuffer(1, eShaderType::Pixel,
+															  &gMaterialManager->MaterialPropertiesBuffer, 0,
+															  gMaterialManager->MaterialPropertiesBuffer.Size));
 
 		std::pair<renderer::DescriptorID, renderer::DescriptorSet*> result = renderer::gDescriptorCache->Request(
 			ds_entries);

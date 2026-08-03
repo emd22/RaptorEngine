@@ -38,6 +38,7 @@ enum class eBufferUsageType
 
 enum class eGpuBufferType
 {
+	None,
 	Storage,
 	StorageWithOffset,
 	Uniform,
@@ -52,11 +53,15 @@ namespace GpuBufferUtil {
 static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
 {
 	switch (type) {
+	case eGpuBufferType::None:
+		[[fallthrough]];
 	case eGpuBufferType::Storage:
+		[[fallthrough]];
 	case eGpuBufferType::StorageWithOffset:
 		return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
 	case eGpuBufferType::Uniform:
+		[[fallthrough]];
 	case eGpuBufferType::UniformWithOffset:
 		return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 
@@ -76,6 +81,7 @@ static constexpr VkBufferUsageFlags BufferTypeToUnderlying(eGpuBufferType type)
 static constexpr const char* BufferTypeToName(const eGpuBufferType type)
 {
 	switch (type) {
+		FX_ENUM_CASE_NAME(None);
 		FX_ENUM_CASE_NAME(Storage);
 		FX_ENUM_CASE_NAME(StorageWithOffset);
 		FX_ENUM_CASE_NAME(Uniform);
@@ -94,6 +100,8 @@ static constexpr const char* BufferTypeToName(const eGpuBufferType type)
 static constexpr VkDescriptorType BufferTypeToDescriptorType(eGpuBufferType type)
 {
 	switch (type) {
+	case eGpuBufferType::None:
+		[[fallthrough]];
 	case eGpuBufferType::Storage:
 		[[fallthrough]];
 	case eGpuBufferType::StorageWithOffset:
@@ -250,3 +258,15 @@ public:
 } // namespace renderer
 
 } // namespace fx
+
+
+template <>
+struct std::formatter<fx::renderer::eGpuBufferType>
+{
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+	auto format(fx::renderer::eGpuBufferType type, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "{}", fx::renderer::GpuBufferUtil::BufferTypeToName(type));
+	}
+};

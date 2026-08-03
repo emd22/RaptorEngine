@@ -15,7 +15,7 @@ static const PipelineNameInfo scNameInfos[] = {
 	/* Geometry pipelines */
 	NAME_INFO("Geometry", eFlags::AlbedoOnly),
 	NAME_INFO("GeometryNormalMaps", eFlags::None),
-	NAME_INFO("GoemetrySkinned", eFlags::None),
+	NAME_INFO("GeometrySkinned", eFlags::None),
 
 	/* Unlit pipelines */
 	NAME_INFO("Unlit", eFlags::AlbedoOnly),

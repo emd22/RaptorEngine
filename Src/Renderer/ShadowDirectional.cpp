@@ -1,6 +1,7 @@
 #include "ShadowDirectional.hpp"
 
 #include <Engine.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Backend/Util.hpp>
@@ -63,6 +64,9 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+
 		gPSOBuild->EndPipeline();
 	}
 
@@ -107,6 +111,7 @@ void ShadowDirectional::Begin()
 
 	RenderStage.Begin(cmd);
 	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->Bind(ePipelineName::ShadowDirectional, cmd);
 
 	// gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl,

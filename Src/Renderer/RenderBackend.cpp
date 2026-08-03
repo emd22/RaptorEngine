@@ -18,6 +18,7 @@
 #include <Core/Defines.hpp>
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
@@ -121,10 +122,12 @@ void RenderBackend::Init(Vec2u window_size)
 		sem.Create();
 	}
 
-	gObjectManager->Create();
-
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
 	BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), 1);
+
+	gMaterialManager->Create();
+	gObjectManager->Create();
+
 
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
@@ -647,6 +650,7 @@ void RenderBackend::BeginLighting()
 
 	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
+	gPipelineCache->AddBufferOffset(1, 0);
 	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
 
 	// pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,

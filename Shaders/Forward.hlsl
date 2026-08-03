@@ -101,6 +101,7 @@ VSOutput main(VSInput input)
 
 F_PROGRAM(FPT_PIXEL)
 
+
 struct FSOutput {
     float4 vAlbedo : SV_TARGET0;
 };
@@ -123,12 +124,15 @@ struct FSInput
 
 };
 
+#include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
 
 F_CBuffer(FSLightBuffer, 4, 0)
 {
 	Light Lights[LIGHT_COUNT];
 };
+
+F_StructBuffer(bMaterialBuffer, Material, 1, 1);
 
 F_Texture2D(tAlbedo, 0)
 

@@ -194,12 +194,15 @@ void DeferredRenderer::CreateGPassPipeline()
 		// Use a null image for now, custom DS's created by the materials will be bound at render time
 		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
-		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
 
 		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
 							 gRenderer->LightBuffer.PageSize);
+		// bObjectBuffer
+		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		// bMaterialBuffer
+		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
 
 		gPSOBuild->EndPipeline();
@@ -229,6 +232,9 @@ void DeferredRenderer::CreateGPassPipeline()
 		// bObjectBuffer
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
+		// bMaterialBuffer
+		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
 		gPSOBuild->EndPipeline();
 	}
@@ -263,6 +269,9 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 
+		// bMaterialBuffer
+		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
 		gPSOBuild->EndPipeline();
 

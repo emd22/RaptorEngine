@@ -55,6 +55,8 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 {
 	Assert(size_in_bytes > 0);
 
+	Assert(buffer_type != eGpuBufferType::None);
+
 	static uint32 CurrentId = 0;
 
 	BufferId = CurrentId++;

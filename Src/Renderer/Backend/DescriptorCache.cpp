@@ -210,6 +210,8 @@ std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArra
 				ShaderUtil::TypeToName(entry.ShaderStages));
 
 		if (entry.IsBuffer()) {
+			Assert(entry.pBuffer != nullptr);
+			Assert(entry.pBuffer->Buffer != VK_NULL_HANDLE);
 			descriptor.AddBuffer(entry.Binding, entry.pBuffer, entry.BufferOffset, entry.BufferRange);
 		}
 		else if (entry.IsImage()) {

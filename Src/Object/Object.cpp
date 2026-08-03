@@ -280,8 +280,10 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
 	}
 
-	gObjectManager->pDescriptorSet->BindWithOffset(1, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline,
-												   gObjectManager->GetBaseOffset());
+	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
+
+	gObjectManager->pDescriptorSet->Bind(1, cmd, *pipeline,
+										 Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 
 	if (pMesh) {
 		pMesh->Render(cmd, (mInstanceSlotsInUse + 1)); // + 1 for source object
