@@ -24,20 +24,19 @@ struct VSInput
 struct VSOutput
 {
     float4 vPosition : SV_POSITION;
-    float3 vNormalWS   : NORMAL;
+    float3 vNormalWS : NORMAL;
     float2 vUV       : TEXCOORD0;
 
 #ifdef USE_NORMAL_MAPS
-    float3 vTangentWS : TANGENT;
+    float3 vTangentWS   : TANGENT;
     float3 vBitangentWS : BITANGENT;
 #endif
 
-    // uint uiMaterialIndex : ATTR0;
-
     /// Vertex position in world space
-    float4 vPositionWS : POSITION;
+    float3 vPositionWS   : POSITION;
 
-    // float4 vDebugColor : ATTR0;
+    uint uiMaterialIndex : ATTR0;
+
 };
 
 struct VSPushConsts
@@ -89,9 +88,11 @@ VSOutput main(VSInput input)
 #endif
 
     output.vUV = input.vUV;
-    output.vPositionWS = mul(world_matrix, input.vPosition);
 
-    return output;
+    float4 position_ws = mul(world_matrix, float4(input.vPosition, 1.0));
+	output.vPositionWS = position_ws.xyz;
+
+	return output;
 }
 
 ///////////////////////////////////
@@ -99,6 +100,7 @@ VSOutput main(VSInput input)
 ///////////////////////////////////
 
 F_PROGRAM(FPT_PIXEL)
+
 
 struct FSOutput {
     float4 vAlbedo : SV_TARGET0;
@@ -111,23 +113,26 @@ struct FSInput
     float2 vUV : TEXCOORD0;
 
 #ifdef USE_NORMAL_MAPS
-    float3 vTangentWS : TANGENT;
+    float3 vTangentWS   : TANGENT;
     float3 vBitangentWS : BITANGENT;
 #endif
-
 
 	/// Vertex position in world space
 	float3 vPositionWS : POSITION;
 
-    // float4 vDebugColor : ATTR0;
+	uint uiMaterialIndex : ATTR0;
+
 };
 
+#include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
 
 F_CBuffer(FSLightBuffer, 4, 0)
 {
 	Light Lights[LIGHT_COUNT];
 };
+
+F_StructBuffer(bMaterialBuffer, Material, 1, 1);
 
 F_Texture2D(tAlbedo, 0)
 
@@ -212,6 +217,7 @@ FSOutput main(FSInput input)
 	float4 ambient = F_UnpackUIntToFloat4(light.uiAmbient) * float4(albedo, 1.0f);
 
 	output.vAlbedo = float4(attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL + ambient.rgb, 1.0);
+
 
     return output;
 }

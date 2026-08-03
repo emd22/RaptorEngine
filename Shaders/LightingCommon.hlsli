@@ -21,6 +21,7 @@ struct Light
 #define FX_MATH_PI 3.14159265359
 #define FX_MATH_1_OVER_PI 0.31830988618
 
+/// Clamped dot product
 float DotC(float3 a, float3 b)
 {
 	return max(dot(a, b), 1e-5);

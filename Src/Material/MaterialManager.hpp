@@ -63,9 +63,9 @@ private:
 
 	renderer::DescriptorPool mDescriptorPool;
 
-	VkDescriptorSetLayout DsLayoutMaterialBasic;
-	VkDescriptorSetLayout DsLayoutMaterialPBR;
-	VkDescriptorSetLayout DsLayoutMaterialPBRSkinned;
+	// VkDescriptorSetLayout DsLayoutMaterialBasic;
+	// VkDescriptorSetLayout DsLayoutMaterialPBR;
+	// VkDescriptorSetLayout DsLayoutMaterialPBRSkinned;
 
 	bool mbInitialized : 1 = false;
 

@@ -312,7 +312,7 @@ void Scene::Render(Camera* shadow_camera)
 
 	// Render lights
 	// gRenderer->BeginLighting();
-
+	gRenderer->LightBuffer.Rewind();
 
 	// Render the unlit objects
 	// gRenderer->BeginUnlit();

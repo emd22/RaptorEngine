@@ -18,10 +18,6 @@ struct Object
 	float4 UvOffsets;
 };
 
-struct Material
-{
-    uint uiBaseColor;
-};
 
 /// Generates UnpackUnorm4x8
 [[vk::ext_instruction(64, "GLSL.std.450")]]
@@ -48,6 +44,7 @@ float4 F_UnpackUIntToFloat4(uint x);
 
 
 #define BoneMtx float4x4
+
 
 #define BONE_COUNT 100
 #define LIGHT_COUNT 64

@@ -194,7 +194,7 @@ void DescriptorSet::BindWithOffset(uint32 first_set_index, const CommandBuffer& 
 }
 
 void DescriptorSet::Bind(uint32 ds_set_index, const CommandBuffer& cmd, const Pipeline& pipeline,
-						 const Slice<uint32> buffer_offsets)
+						 const Slice<const uint32> buffer_offsets)
 {
 	AssertEqual(buffer_offsets.Size, mBufferCount);
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Layout.Get(), ds_set_index, 1, &mInternalSet,
@@ -218,16 +218,18 @@ void DescriptorSet::AddBuffer(uint32 bind_index, RawGpuBuffer* buffer, uint64 of
 
 	AssertMsg(buffer != nullptr, "Input buffer cannot be null!");
 
-	DescriptorEntry input_buffer {
-		.Binding = bind_index,
-		.pImage = nullptr,
-		.pSampler = nullptr,
-		.pBuffer = buffer,
-		.BufferOffset = offset,
-		.BufferRange = range,
-	};
+	// DescriptorEntry input_buffer {
+	// 	.Type = eDescriptorEntryType::Buffer,
+	// 	.Binding = bind_index,
+	// 	.pImage = nullptr,
+	// 	.pSampler = nullptr,
+	// 	.pBuffer = buffer,
+	// 	.BufferOffset = offset,
+	// 	.BufferRange = range,
+	// };
 
-	mDescriptorEntries.Insert(input_buffer);
+	mDescriptorEntries.Insert(DescriptorEntry::AsBuffer(bind_index, eShaderType::None, buffer, offset, range));
+
 
 	++mBufferCount;
 
@@ -248,14 +250,15 @@ void DescriptorSet::AddImage(uint32 bind_index, Image* image, Sampler* sampler)
 
 	AssertMsg(image != nullptr, "Input image cannot be null!");
 
-	DescriptorEntry input_target {
-		.Binding = bind_index,
-		.pImage = image,
-		.pSampler = sampler,
-		.pBuffer = nullptr,
-	};
+	// DescriptorEntry input_target {
+	// 	.Type = eDescriptorEntryType::Image,
+	// 	.Binding = bind_index,
+	// 	.pImage = image,
+	// 	.pSampler = sampler,
+	// 	.pBuffer = nullptr,
+	// };
 
-	mDescriptorEntries.Insert(input_target);
+	mDescriptorEntries.Insert(DescriptorEntry::AsImage(bind_index, eShaderType::None, image, sampler));
 
 	mbIsBuilt = false;
 }
@@ -276,7 +279,7 @@ void DescriptorSet::Build()
 	LogInfo("Building DESCRIPTOR: ");
 
 	for (const DescriptorEntry& entry : mDescriptorEntries) {
-		if (entry.pImage) {
+		if (entry.IsImage()) {
 			VkDescriptorImageInfo image_info {
 				.sampler = entry.pSampler->InternalSampler,
 				.imageView = entry.pImage->View,
@@ -295,7 +298,10 @@ void DescriptorSet::Build()
 
 			write_infos.Insert(image_write);
 		}
-		else if (entry.pBuffer) {
+		else if (entry.IsBuffer()) {
+			Assert(entry.pBuffer != nullptr);
+			AssertNotEqual(entry.pBuffer->Type, eGpuBufferType::None);
+
 			const VkDescriptorBufferInfo buffer_info {
 				.buffer = entry.pBuffer->Buffer,
 				.offset = entry.BufferOffset,

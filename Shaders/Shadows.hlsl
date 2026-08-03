@@ -54,6 +54,11 @@ VSOutput main(VSInput input) : SV_POSITION
 
 F_PROGRAM(FPT_PIXEL)
 
+#include "MaterialDef.hlsli"
+
+F_StructBuffer(bMaterialBuffer, Material, 1, 0);
+
+
 struct FSInput
 {
 };

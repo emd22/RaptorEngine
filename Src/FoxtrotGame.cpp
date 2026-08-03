@@ -96,7 +96,6 @@ void FoxtrotGame::InitEngine()
 
 	gPhysics->Create();
 
-	gMaterialManager->Create();
 	gAssetManager->Start(3);
 
 	gWorldGrid->Create(Vec2u(10, 10));
