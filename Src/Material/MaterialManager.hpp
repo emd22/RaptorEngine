@@ -41,15 +41,19 @@ public:
 private:
 	Material* GetNewMaterial();
 
+	/**
+	 * @brief Syncs the properties of material `id` to be accessible in shader.
+	 */
+	void SyncMaterialToGpu(Material* material);
+
 	void MakeNullMaterial();
 
 public:
 	/**
-	 * @brief A large GPU buffer containing all loaded in material properties.
+	 * @brief A GPU buffer containing the properties for each material. This mirrors the layout of `mMaterialList`, but
+	 * holds only instances of `MaterialProperties`.
 	 */
 	renderer::RawGpuBuffer MaterialPropertiesBuffer {};
-
-	// Bitset MaterialsInUse;
 
 	/**
 	 * @brief Descriptor set for material properties. Used in the light pass.
@@ -58,7 +62,6 @@ public:
 
 
 private:
-	// SizedArray<Material> mMaterials;
 	FreeArray<Material> mMaterialList;
 
 	renderer::DescriptorPool mDescriptorPool;

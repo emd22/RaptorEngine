@@ -70,8 +70,17 @@ void Object::FinalizeWhenReady()
 		parent_object->Bounds.Add(Bounds);
 	}
 
-	if (!mMaterialID.IsNull()) {
-		LogInfo(LC_CORE, "** Created object '{}' with material '{}'", Name.Get(), mMaterialID);
+	if (mMaterialID.IsNull()) {
+		return;
+	}
+
+	Material* material = gMaterialManager->GetMaterial(mMaterialID);
+	if (material == nullptr) {
+		return;
+	}
+
+	if (HasFlag(Flags, eObjectFlags::Unlit)) {
+		material->SetUnlit(true);
 	}
 }
 

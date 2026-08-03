@@ -48,3 +48,6 @@ float4 F_UnpackUIntToFloat4(uint x);
 
 #define BONE_COUNT 100
 #define LIGHT_COUNT 64
+
+
+#define HAS_FLAG(flags_, has_) ((flags_ & has_) != 0)

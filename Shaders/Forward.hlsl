@@ -92,6 +92,8 @@ VSOutput main(VSInput input)
     float4 position_ws = mul(world_matrix, float4(input.vPosition, 1.0));
 	output.vPositionWS = position_ws.xyz;
 
+	output.uiMaterialIndex = VSConst.uiMaterialIndex;
+
 	return output;
 }
 
@@ -151,11 +153,16 @@ FSOutput main(FSInput input)
 
     // Material material_info = bMaterialBuffer[input.uiMaterialIndex];
     // float4 material_color = F_UnpackUIntToFloat4(material_info.uiBaseColor);
-    float4 material_color = float4(0.0, 0.0, 0.0, 1.0);
 
-    float3 albedo = F_Sample(tAlbedo, input.vUV).rgb + material_color.rgb;
+    float3 albedo = F_Sample(tAlbedo, input.vUV).rgb;
 
-    output.vAlbedo = float4(F_Sample(tAlbedo, input.vUV).rgb + material_color.rgb, 1.0);
+    output.vAlbedo = float4(albedo, 1.0);
+
+    Material material = bMaterialBuffer[input.uiMaterialIndex];
+
+    if (HAS_FLAG(material.Flags, MF_UNLIT)) {
+	    return output;
+    }
 
 #ifdef USE_NORMAL_MAPS
     float2 roughness_metallic = F_Sample(tMetallicRoughness, input.vUV).gb;

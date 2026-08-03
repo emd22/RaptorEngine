@@ -15,6 +15,7 @@
 #include <Asset/MipmapGen.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Backend/Commands.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
@@ -269,14 +270,6 @@ renderer::ePipelineName Material::GetRequiredPipeline() const
 	}
 }
 
-void Material::SubmitProperties(const MaterialProperties& properties)
-{
-	MaterialProperties* properties_buffer = static_cast<MaterialProperties*>(
-		MaterialManagerFwd::GetMaterialPropertiesBuffer().pMappedBuffer);
-
-	memcpy(&properties_buffer[ID.GetID()], &properties, sizeof(MaterialProperties));
-}
-
 static float32 GetComponentMaxLOD(const MaterialComponent& component)
 {
 	if (!component.pImage) {
@@ -297,6 +290,12 @@ static float32 GetComponentMinLOD(const MaterialComponent& component)
 	const ImageInfo& info = component.pImage->GetInfo();
 
 	return static_cast<float32>(info.MipLevel);
+}
+
+void Material::SetUnlit(bool value)
+{
+	SetFlag(Properties.Flags, eMaterialFlags::Unlit);
+	mbRequiresSync = true;
 }
 
 renderer::DescriptorSet* Material::RequestAlbedoOnlyDescriptors()
@@ -386,9 +385,6 @@ void Material::Build()
 
 		// mDescriptorSet.Create(MaterialManagerFwd::GetDescriptorPool(), layout, false, 1);
 	}
-
-	SubmitProperties(Properties);
-
 
 	bIsBuilt.store(true);
 }

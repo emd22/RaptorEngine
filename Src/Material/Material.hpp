@@ -189,7 +189,7 @@ public:
 	 */
 	renderer::ePipelineName GetRequiredPipeline() const;
 
-	void SubmitProperties(const MaterialProperties& properties);
+	void SetUnlit(bool value);
 
 	bool IsAlbedoOnly() const { return (NormalMap.Exists() == false); }
 
@@ -231,6 +231,7 @@ private:
 
 	bool mbIsReady : 1 = false;
 	bool mbIsBeingBuilt : 1 = false;
+	bool mbRequiresSync : 1 = false;
 };
 
 
