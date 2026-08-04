@@ -302,6 +302,7 @@ void Scene::Render(Camera* shadow_camera)
 
 	gRenderer->BeginGeometry();
 	gRenderer->LightBuffer.Rewind();
+
 	for (const Ref<LightBase>& light : mLights) {
 		light->Render(camera, shadow_camera);
 	}
@@ -310,9 +311,14 @@ void Scene::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
 
+	FrameData* frame = gRenderer->GetFrame();
+
+	// Target* depth_target = gRenderer->pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
+	// Assert(depth_target != nullptr);
+	// depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
+
 	// Render lights
 	// gRenderer->BeginLighting();
-	gRenderer->LightBuffer.Rewind();
 
 	// Render the unlit objects
 	// gRenderer->BeginUnlit();
@@ -487,7 +493,6 @@ void Scene::RenderShadows(Camera* shadow_camera)
 
 		RenderObjectShadows(object);
 	}
-
 
 	gShadowRenderer->End();
 }

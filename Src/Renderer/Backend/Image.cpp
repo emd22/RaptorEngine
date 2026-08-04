@@ -186,26 +186,26 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 #endif
 
 	const VkImageViewCreateInfo view_create_info = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = InternalImage,
-        .viewType = image_type_props.ViewType,
-        .format = ImageFormatUtil::ToUnderlying(format),
-        .components =
-            {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
-        .subresourceRange =
-            {
-                .aspectMask = static_cast<VkImageAspectFlags>(aspect),
-                .baseMipLevel = 0,
-                .levelCount = mips_count,
-                .baseArrayLayer = 0,
-                .layerCount = image_type_props.LayerCount,
-            },
-    };
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image = InternalImage,
+		.viewType = image_type_props.ViewType,
+		.format = ImageFormatUtil::ToUnderlying(format),
+		.components =
+			{
+				.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+				.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+				.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+				.a = VK_COMPONENT_SWIZZLE_IDENTITY,
+			},
+		.subresourceRange =
+			{
+				.aspectMask = static_cast<VkImageAspectFlags>(aspect),
+				.baseMipLevel = 0,
+				.levelCount = mips_count,
+				.baseArrayLayer = 0,
+				.layerCount = image_type_props.LayerCount,
+			},
+	};
 
 	status = vkCreateImageView(renderer::gRenderer->GetDevice()->Device, &view_create_info, nullptr, &View);
 	if (status != VK_SUCCESS) {
@@ -338,28 +338,28 @@ void Image::MarkUploaded() { renderer::gRenderer->GetFrameNumber(); }
 void Image::TransitionDepthToShaderRO(renderer::CommandBuffer& cmd)
 {
 	VkImageMemoryBarrier barrier {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 
-        .srcAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
-        .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
+		.srcAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
+		.dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
 
-        .oldLayout = ImageLayout,
-        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		.oldLayout = ImageLayout,
+		.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 
-        .image = InternalImage,
+		.image = InternalImage,
 
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
+		.subresourceRange =
+			{
+				.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1,
+			},
+	};
 
 	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
 						 nullptr, 0, nullptr, 1, &barrier);
@@ -370,28 +370,28 @@ void Image::TransitionDepthToShaderRO(renderer::CommandBuffer& cmd)
 void Image::TransitionDepthToAttachment(renderer::CommandBuffer& cmd)
 {
 	VkImageMemoryBarrier barrier {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 
-        .srcAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
-        .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
+		.srcAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
+		.dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
 
-        .oldLayout = ImageLayout,
-        .newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.oldLayout = ImageLayout,
+		.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 
-        .image = InternalImage,
+		.image = InternalImage,
 
-        .subresourceRange =
-            {
-                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
+		.subresourceRange =
+			{
+				.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1,
+			},
+	};
 
 	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0,
 						 nullptr, 1, &barrier);
@@ -399,72 +399,112 @@ void Image::TransitionDepthToAttachment(renderer::CommandBuffer& cmd)
 	ImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
+struct LayoutTransitionInfo
+{
+	VkAccessFlags AccessMask = VK_ACCESS_NONE;
+	VkPipelineStageFlags StageMask = VK_PIPELINE_STAGE_NONE;
+};
+
+
+static const LayoutTransitionInfo GetLayoutTransitionInfo(VkImageLayout layout)
+{
+	switch (layout) {
+	case VK_IMAGE_LAYOUT_UNDEFINED:
+		return { 0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
+
+	case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+		return { VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+
+	case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+		return { VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+
+		/////////////////////////////////////
+		// Input Attachments
+		/////////////////////////////////////
+
+	case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+		return { VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT };
+
+	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+		return { VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+				 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT };
+
+
+		/////////////////////////////////////
+		// Output Targets
+		/////////////////////////////////////
+
+	case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+		return { VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+
+	case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+		return { VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+				 VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT };
+
+	case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+		return { 0, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT };
+
+	default:;
+		LogError("Unknown image layout!");
+		FX_BREAKPOINT;
+	}
+
+	return {};
+}
+
+
 void Image::TransitionMip(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
 						  std::optional<TransitionLayoutOverrides> overrides)
 {
 	bool is_depth_texture = ImageFormatUtil::IsDepth(Info.Format);
+	VkImageAspectFlags aspect = ImageFormatUtil::GetAspectMask(Info.Format);
 
-	VkImageAspectFlags aspect_flags = static_cast<VkImageAspectFlags>((is_depth_texture) ? VK_IMAGE_ASPECT_DEPTH_BIT
-																						 : VK_IMAGE_ASPECT_COLOR_BIT);
+	LayoutTransitionInfo src_info = GetLayoutTransitionInfo(ImageLayout);
+	LayoutTransitionInfo dst_info = GetLayoutTransitionInfo(new_layout);
 
 	VkImageMemoryBarrier barrier {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.pNext = nullptr,
 
-        .srcAccessMask = static_cast<VkAccessFlags>((is_depth_texture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
-        .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
+		.srcAccessMask = src_info.AccessMask,
+		.dstAccessMask = dst_info.AccessMask,
 
-        .oldLayout = ImageLayout,
-        .newLayout = new_layout,
+		.oldLayout = ImageLayout, .newLayout = new_layout,
 
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 
-        .image = InternalImage,
+		.image = InternalImage,
 
-        .subresourceRange =
-            {
-                .aspectMask = aspect_flags,
-                .baseMipLevel = mip_level,
-                .levelCount = num_levels,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-    };
-
-	VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-
-	if (ImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-		barrier.srcAccessMask = 0;
-		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-		src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		dest_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-	}
-	else if (ImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-			 new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-		src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	}
-
-	if (is_depth_texture) {
-		src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-		dest_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	}
+		.subresourceRange = {
+			.aspectMask = aspect,
+			.baseMipLevel = mip_level,
+			.levelCount = num_levels,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		},
+	};
 
 	if (overrides.has_value()) {
+		// Src/Dst stage overrides
+		if (overrides->SrcStage.has_value()) {
+			src_info.StageMask = overrides->SrcStage.value();
+		}
 		if (overrides->DstStage.has_value()) {
-			dest_stage = overrides->DstStage.value();
+			dst_info.StageMask = overrides->DstStage.value();
+		}
+
+		// Access mask overrides
+		if (overrides->SrcAccessMask.has_value()) {
+			barrier.srcAccessMask = overrides->SrcAccessMask.value();
 		}
 		if (overrides->DstAccessMask.has_value()) {
 			barrier.dstAccessMask = overrides->DstAccessMask.value();
 		}
 	}
 
-	vkCmdPipelineBarrier(cmd, src_stage, dest_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+	vkCmdPipelineBarrier(cmd, src_info.StageMask, dst_info.StageMask, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
 	ImageLayout = new_layout;
 }
@@ -478,28 +518,28 @@ void Image::TransitionLayout(VkImageLayout new_layout, renderer::CommandBuffer& 
 																						 : VK_IMAGE_ASPECT_COLOR_BIT);
 
 	VkImageMemoryBarrier barrier {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 
-        .srcAccessMask = static_cast<VkAccessFlags>((is_depth_texture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
-        .dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
+		.srcAccessMask = static_cast<VkAccessFlags>((is_depth_texture) ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
+		.dstAccessMask = static_cast<VkAccessFlags>(VK_ACCESS_SHADER_READ_BIT),
 
-        .oldLayout = ImageLayout,
-        .newLayout = new_layout,
+		.oldLayout = ImageLayout,
+		.newLayout = new_layout,
 
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 
-        .image = InternalImage,
+		.image = InternalImage,
 
-        .subresourceRange =
-            {
-                .aspectMask = aspect_flags,
-                .baseMipLevel = 0,
-                .levelCount = Info.MipCount,
-                .baseArrayLayer = 0,
-                .layerCount = layer_count,
-            },
-    };
+		.subresourceRange =
+			{
+				.aspectMask = aspect_flags,
+				.baseMipLevel = 0,
+				.levelCount = Info.MipCount,
+				.baseArrayLayer = 0,
+				.layerCount = layer_count,
+			},
+	};
 
 	VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 	VkPipelineStageFlags dest_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -526,8 +566,17 @@ void Image::TransitionLayout(VkImageLayout new_layout, renderer::CommandBuffer& 
 	}
 
 	if (overrides.has_value()) {
+		// Src/Dst stage overrides
+		if (overrides->SrcStage.has_value()) {
+			src_stage = overrides->SrcStage.value();
+		}
 		if (overrides->DstStage.has_value()) {
 			dest_stage = overrides->DstStage.value();
+		}
+
+		// Access mask overrides
+		if (overrides->SrcAccessMask.has_value()) {
+			barrier.srcAccessMask = overrides->SrcAccessMask.value();
 		}
 		if (overrides->DstAccessMask.has_value()) {
 			barrier.dstAccessMask = overrides->DstAccessMask.value();
@@ -652,11 +701,11 @@ void Image::CreateLayeredImageFromCubemap(Image& cubemap, eImageFormat image_for
 	StackArray<VkImageCopy, 6> copy_infos;
 
 	VkImageCopy copy_info {
-        .srcSubresource = { .aspectMask = aspect_flags, .baseArrayLayer = 0, .layerCount = 1, },
-        .dstSubresource = { .aspectMask = aspect_flags, .baseArrayLayer = 0, .layerCount = 1, },
-        .dstOffset = { .x = 0, .y = 0 },
-        .extent = { .width = tile_width, .height = tile_height, .depth = 1 },
-    };
+		.srcSubresource = { .aspectMask = aspect_flags, .baseArrayLayer = 0, .layerCount = 1, },
+		.dstSubresource = { .aspectMask = aspect_flags, .baseArrayLayer = 0, .layerCount = 1, },
+		.dstOffset = { .x = 0, .y = 0 },
+		.extent = { .width = tile_width, .height = tile_height, .depth = 1 },
+	};
 
 	// Top
 	{
@@ -821,22 +870,22 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 								  eGpuBufferFlags::TransferReceiver);
 
 			VkImageMemoryBarrier pre_barrier {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .srcAccessMask = 0,
-                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                .oldLayout = ImageLayout,
-                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = InternalImage,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-            };
+				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+				.srcAccessMask = 0,
+				.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+				.oldLayout = ImageLayout,
+				.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = InternalImage,
+				.subresourceRange = {
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1,
+				},
+			};
 
 			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
 								 0, nullptr, 1, &pre_barrier);
@@ -858,22 +907,22 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 								   &copy);
 
 			VkImageMemoryBarrier post_barrier {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = InternalImage,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-            };
+				.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+				.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+				.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+				.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+				.image = InternalImage,
+				.subresourceRange = {
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1,
+				},
+			};
 
 			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
 								 nullptr, 0, nullptr, 1, &post_barrier);

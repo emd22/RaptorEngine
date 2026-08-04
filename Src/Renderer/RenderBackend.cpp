@@ -276,6 +276,7 @@ void RenderBackend::InitVulkan()
 
 	std::vector<const char*> requested_validation_layers = {
 		"VK_LAYER_KHRONOS_validation",
+
 		// "VK_LAYER_KHRONOS_shader_object",
 	};
 
@@ -635,9 +636,9 @@ void RenderBackend::BeginLighting()
 
 	pDeferredRenderer->GPass.End();
 
-	Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
-	Assert(depth_target != nullptr);
-	depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
+	// Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
+	// Assert(depth_target != nullptr);
+	// depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
 	pDeferredRenderer->LightPass.Begin(frame->CmdBuffer);

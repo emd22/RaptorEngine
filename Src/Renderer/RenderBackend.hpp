@@ -211,9 +211,6 @@ public:
 	bool bInitialized = false;
 	bool bDidFrameResize = false;
 
-	DeferredCompPass* pCurrentCompPass = nullptr;
-	DeferredLightingPass* pCurrentLightingPass = nullptr;
-
 	DeferredRenderer* pDeferredRenderer { nullptr };
 
 	Uniforms LightBuffer;

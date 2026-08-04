@@ -588,7 +588,7 @@ void FoxtrotGame::Tick()
 	frame->CmdBuffer.Reset();
 	frame->CmdBuffer.Record();
 
-	mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
+	// mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
 	mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
 	if (gRenderer->DidResize()) {

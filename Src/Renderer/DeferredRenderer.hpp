@@ -12,9 +12,6 @@ namespace fx::renderer {
 
 struct FrameData;
 
-class DeferredCompPass;
-class DeferredLightingPass;
-
 
 ///////////////////////////////
 // Main Deferred Renderer

@@ -11,39 +11,38 @@
 
 namespace fx::renderer {
 
-class DeferredLightingPass;
 
 struct alignas(16) ShadowPushConstants
 {
-    float32 CameraMatrix[16];
-    uint32 ObjectId = 0;
+	float32 CameraMatrix[16];
+	uint32 ObjectId = 0;
 };
 class ShadowDirectional
 {
 public:
-    ShadowDirectional() = delete;
-    ShadowDirectional(const Vec2u& size);
+	ShadowDirectional() = delete;
+	ShadowDirectional(const Vec2u& size);
 
-    void Begin();
+	void Begin();
 
-    void End();
+	void End();
 
-    // FX_FORCE_INLINE Pipeline& GetPipeline() { return mPipeline; }
-    // FX_FORCE_INLINE Pipeline& GetSkinnedPipeline() { return mPipelineSkinned; }
+	// FX_FORCE_INLINE Pipeline& GetPipeline() { return mPipeline; }
+	// FX_FORCE_INLINE Pipeline& GetSkinnedPipeline() { return mPipelineSkinned; }
 
-    ~ShadowDirectional() = default;
+	~ShadowDirectional() = default;
 
 private:
-    void UpdateLightDescriptors();
+	void UpdateLightDescriptors();
 
 public:
-    OrthoCamera ShadowCamera;
+	OrthoCamera ShadowCamera;
 
-    RenderStage RenderStage;
+	RenderStage RenderStage;
 
 private:
-    // Pipeline mPipeline;
-    // Pipeline mPipelineSkinned;
+	// Pipeline mPipeline;
+	// Pipeline mPipelineSkinned;
 };
 
 } // namespace fx::renderer
