@@ -536,17 +536,34 @@ int32 AssetManager::CheckForUploadableData()
 		CommandBuffer& cmd = gRenderer->UploadContext.CmdBuffer;
 		cmd.End();
 
+		uint64_t tl_value = gRenderer->TransferCount.load() + 1;
+
+		VkTimelineSemaphoreSubmitInfo timeline_info {
+			.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+			.pNext = nullptr,
+			.waitSemaphoreValueCount = 0U,
+			.pWaitSemaphoreValues = nullptr,
+			.signalSemaphoreValueCount = 1U,
+			.pSignalSemaphoreValues = &tl_value,
+		};
+
 		const VkSubmitInfo submit_info = {
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.pNext = &timeline_info,
 
-			.commandBufferCount = 1,
+			.commandBufferCount = 1U,
 			.pCommandBuffers = &cmd.Cmd,
+
+			.signalSemaphoreCount = 1U,
+			.pSignalSemaphores = &gRenderer->TransferSync.InternalSemaphore,
 		};
 
 		VkQueue vk_xfer_queue = transfer_queue.Get();
 
 		AssertMsg(vk_xfer_queue != nullptr, "Queue has not been initialized");
 		vkQueueSubmit(vk_xfer_queue, 1, &submit_info, gRenderer->UploadContext.UploadFence.Get());
+
+		gRenderer->TransferCount.store(tl_value);
 	}
 
 	transfer_queue.Unlock();

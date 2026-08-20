@@ -216,6 +216,9 @@ public:
 	Uniforms LightBuffer;
 	Uniforms BoneBuffer;
 
+	Semaphore TransferSync;
+	std::atomic_uint64_t TransferCount = 0;
+
 private:
 	VkInstance mInstance = nullptr;
 	VkSurfaceKHR mWindowSurface = nullptr;

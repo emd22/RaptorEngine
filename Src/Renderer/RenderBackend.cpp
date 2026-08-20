@@ -112,6 +112,8 @@ void RenderBackend::Init(Vec2u window_size)
 	InitFrames();
 	InitUploadContext();
 
+	TransferSync.Create(eSemaphoreType::Timeline);
+
 	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
 
@@ -562,8 +564,10 @@ void RenderBackend::PresentFrame()
 	};
 
 	VkSemaphore submit_semaphore = mSubmitSemaphores[mImageIndex].Get();
-
-	VkSemaphore wait_semaphore = frame->ImageAvailable.Get();
+	VkSemaphore wait_semaphores[] = {
+		frame->ImageAvailable.Get(),
+		TransferSync.Get(),
+	};
 
 
 	VkCommandBuffer cmds_to_submit[] = {
@@ -571,11 +575,24 @@ void RenderBackend::PresentFrame()
 		// frame->TransferCmdBuffer.Cmd,
 	};
 
+	uint64_t wait_values[] = { 0, gRenderer->TransferCount.load() };
+
+	VkTimelineSemaphoreSubmitInfo timeline_info {
+		.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+		.pNext = nullptr,
+		.waitSemaphoreValueCount = std::size(wait_values),
+		.pWaitSemaphoreValues = wait_values,
+		.signalSemaphoreValueCount = 0,
+		.pSignalSemaphoreValues = nullptr,
+	};
+
 	const VkSubmitInfo submit_info = {
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.pNext = &timeline_info,
 
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &wait_semaphore,
+		.waitSemaphoreCount = std::size(wait_semaphores),
+		.pWaitSemaphores = wait_semaphores,
+
 		.pWaitDstStageMask = wait_stages,
 
 		.commandBufferCount = std::size(cmds_to_submit),
