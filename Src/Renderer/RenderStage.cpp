@@ -103,7 +103,7 @@ void RenderStage::AddTarget(const Target& attachment) { mOutputTargets.Add(attac
 void RenderStage::MakeClearValues()
 {
 	for (const Target& attachment : mOutputTargets.Targets) {
-		if (attachment.bRenderPassOnly) {
+		if (attachment.bRenderPassOnly || attachment.LoadOp != eLoadOp::Clear) {
 			continue;
 		}
 

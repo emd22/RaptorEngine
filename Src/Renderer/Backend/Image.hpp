@@ -37,6 +37,7 @@ FxEnumFlags(eImageSaveFlags);
 enum class eImageCreateFlags
 {
 	None = 0,
+	IsTarget = (1 << 0),
 };
 
 FxEnumFlags(eImageCreateFlags);
@@ -260,10 +261,10 @@ public:
 	FX_FORCE_INLINE const ImageInfo& GetInfo() const { return Info; }
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
-				VkImageUsageFlags usage, eImageAspectFlag aspect);
+				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None);
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
-				VkImageUsageFlags usage, eImageAspectFlag aspect);
+				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None);
 
 	void CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 
@@ -275,16 +276,6 @@ public:
 	 * @brief Uploads multiple mip levels to an image
 	 */
 	void Upload(renderer::CommandBuffer& cmd, const ImageInfo& info);
-
-	void TransitionLayout(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 layer_count,
-						  std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
-
-	void TransitionMip(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
-					   std::optional<TransitionLayoutOverrides> overrides);
-
-
-	void TransitionDepthToShaderRO(renderer::CommandBuffer& cmd);
-	void TransitionDepthToAttachment(renderer::CommandBuffer& cmd);
 
 	void CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
 				   Vec2u size, uint32 mip_level);

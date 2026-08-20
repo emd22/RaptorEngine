@@ -119,7 +119,7 @@ void RenderBackend::Init(Vec2u window_size)
 	// per Swapchain image, not frame in flight.
 	mSubmitSemaphores.InitSize(Swapchain.OutputImages.Size);
 	for (Semaphore& sem : mSubmitSemaphores) {
-		sem.Create();
+		sem.Create(eSemaphoreType::Binary);
 	}
 
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
