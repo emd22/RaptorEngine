@@ -7,6 +7,7 @@
 #include "Loader/Object/LoaderGltf.hpp"
 
 #include <Core/Defines.hpp>
+#include <Core/Thread/ThreadManager.hpp>
 #include <Core/Types.hpp>
 #include <Engine.hpp>
 #include <Material/MaterialManager.hpp>
@@ -17,7 +18,6 @@
 #include <Texture/TextureManager.hpp>
 #include <atomic>
 #include <chrono>
-#include <thread>
 
 namespace fx {
 
@@ -61,9 +61,9 @@ bool AssetDeletionTicket::TryDelete(uint32 current_tick) const
 // Asset Worker
 ////////////////////////////////////
 
-void AssetWorker::Create()
+void AssetWorker::Create(int32 worker_index)
 {
-	Thread = std::thread([this]() { this->Update(); });
+	WorkerTID = gThreadManager->NewThread(String::Fmt("AssetWorker_{}", worker_index), [this]() { this->Update(); });
 }
 
 void AssetWorker::LoadObject(LockContext<AssetItemData>& asset_data)
@@ -160,12 +160,12 @@ void AssetManager::Start(int32 min_threads)
 		AssetWorker* worker = mWorkerThreads.Insert();
 
 		// Create the worker from the newly inserted pointer
-		worker->Create();
+		worker->Create(i);
 	}
 
 	WorkersWaitingToUpload.InitSize(scMaxWorkerThreads);
 
-	mpAssetManagerThread = new std::thread([this]() { AssetManager::AssetManagerUpdate(); });
+	mAssetManagerTID = gThreadManager->NewThread("AssetManager", [this]() { AssetManager::AssetManagerUpdate(); });
 }
 
 void AssetManager::DebugPrintWorkers() const
@@ -199,11 +199,10 @@ void AssetManager::Shutdown()
 
 	for (auto& worker : mWorkerThreads) {
 		worker.Kill();
-		worker.Thread.join();
+		gThreadManager->Join(worker.WorkerTID);
 	}
 
-	mpAssetManagerThread->join();
-	delete mpAssetManagerThread;
+	gThreadManager->Join(mAssetManagerTID);
 
 	mWorkerThreads.Free();
 }
@@ -609,18 +608,6 @@ bool AssetManager::CheckWorkersBusy()
 		}
 	}
 	return false;
-}
-
-void AssetManager::AddWorkerThread()
-{
-	// At the maximum number of workers, break
-	if (mWorkerThreads.Size >= mWorkerThreads.Capacity) {
-		LogError(LC_ASSET, "Reached maximum number of worker threads");
-		return;
-	}
-
-	AssetWorker* worker = mWorkerThreads.Insert();
-	worker->Create();
 }
 
 int32 AssetManager::CheckForItemsToLoad()

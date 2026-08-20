@@ -13,6 +13,7 @@
 #include <Core/Ref.hpp>
 #include <Core/TSQueue.hpp>
 #include <Core/TSRef.hpp>
+#include <Core/Thread/ThreadID.hpp>
 #include <Core/Types.hpp>
 #include <atomic>
 #include <chrono>
@@ -70,7 +71,7 @@ class AssetWorker
 public:
 	AssetWorker() = default;
 
-	void Create();
+	void Create(int32 worker_index);
 
 	void SubmitItemToLoad(AxQueueItem&& item)
 	{
@@ -110,7 +111,8 @@ public:
 	std::atomic_flag bIsBusy = ATOMIC_FLAG_INIT;
 	std::atomic_flag bDataPendingUpload = ATOMIC_FLAG_INIT;
 
-	std::thread Thread;
+	ThreadID WorkerTID;
+	// std::thread Thread;
 };
 
 struct LoadObjectOptions
@@ -239,7 +241,6 @@ private:
 
 	bool CheckWorkersBusy();
 
-	void AddWorkerThread();
 	void AssetManagerUpdate();
 
 	AssetTicket NewTextureTicket();
@@ -300,7 +301,8 @@ private:
 
 	uint32 mMinThreads = 2;
 	SizedArray<AssetWorker> mWorkerThreads;
-	std::thread* mpAssetManagerThread;
+
+	ThreadID mAssetManagerTID;
 
 	std::atomic_uint mTickCounter = 0;
 	uint32 mLastActiveTick = 0;

@@ -131,15 +131,15 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 	}
 
-	// If the sharing mode is CONCURRENT, allow usage from these queue families. otherwise, it is ignored by the Vulkan
-	// driver.
 	uint32 queue_families[] = { device->mQueueFamilies.GetGraphicsFamily(),
 								device->mQueueFamilies.GetTransferFamily() };
 
 	VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
+	uint32 num_queue_families = 0;
 
 	if (!HasFlag(flags, eImageCreateFlags::IsTarget)) {
 		sharing_mode = VK_SHARING_MODE_CONCURRENT;
+		num_queue_families = std::size(queue_families);
 	}
 
 	// Create the vulkan image
@@ -148,9 +148,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.flags = image_create_flags,
 
 		.imageType = VK_IMAGE_TYPE_2D,
-
 		.format = ImageFormatUtil::ToUnderlying(format),
-
 		.extent = { .width = size.Width(), .height = size.Height(), .depth = 1 },
 
 		.mipLevels = mips_count,
@@ -158,11 +156,10 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 		.tiling = tiling,
 
-
 		.usage = usage,
 		.sharingMode = sharing_mode,
 
-		.queueFamilyIndexCount = std::size(queue_families),
+		.queueFamilyIndexCount = num_queue_families,
 		.pQueueFamilyIndices = queue_families,
 
 		.initialLayout = ImageLayout,
