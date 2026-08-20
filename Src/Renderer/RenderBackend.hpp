@@ -40,9 +40,9 @@ struct GpuUploadContext
 {
 	CommandPool CmdPool;
 	CommandBuffer CmdBuffer;
-	CommandBuffer ImmediateCmdBuffer;
-
 	Fence UploadFence;
+
+	CommandBuffer ImmediateCmdBuffer;
 	Fence ImmediateUploadFence;
 
 	~GpuUploadContext() = default;

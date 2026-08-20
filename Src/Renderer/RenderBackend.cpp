@@ -484,7 +484,7 @@ void RenderBackend::SubmitImmediateUploadCmd(RenderBackend::SubmitFunc upload_fu
 	UploadContext.ImmediateUploadFence.WaitFor();
 	UploadContext.ImmediateUploadFence.Reset();
 
-	UploadContext.CmdPool.Reset();
+	UploadContext.ImmediateCmdBuffer.Reset();
 }
 
 void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
@@ -561,6 +561,7 @@ void RenderBackend::PresentFrame()
 
 	const VkPipelineStageFlags wait_stages[] = {
 		VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	};
 
 	VkSemaphore submit_semaphore = mSubmitSemaphores[mImageIndex].Get();

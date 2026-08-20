@@ -98,12 +98,14 @@ Image& Image::operator=(const Image& other)
 void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
 				   VkImageTiling tiling, VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags)
 {
+	renderer::GpuDevice* device = renderer::gRenderer->GetDevice();
+
 	Assert(size.X > 0 && size.Y > 0);
 
 	// Destroy image if it already has been created
 	if (InternalImage != nullptr && Allocation != nullptr) {
 		if (View != nullptr) {
-			vkDestroyImageView(renderer::gRenderer->GetDevice()->Device, View, nullptr);
+			vkDestroyImageView(device->Device, View, nullptr);
 		}
 
 		vmaDestroyImage(renderer::gRenderer->GpuAllocator, InternalImage, this->Allocation);
@@ -129,6 +131,11 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 	}
 
+	// If the sharing mode is CONCURRENT, allow usage from these queue families. otherwise, it is ignored by the Vulkan
+	// driver.
+	uint32 queue_families[] = { device->mQueueFamilies.GetGraphicsFamily(),
+								device->mQueueFamilies.GetTransferFamily() };
+
 	VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
 
 	if (!HasFlag(flags, eImageCreateFlags::IsTarget)) {
@@ -151,8 +158,12 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 		.tiling = tiling,
 
+
 		.usage = usage,
 		.sharingMode = sharing_mode,
+
+		.queueFamilyIndexCount = std::size(queue_families),
+		.pQueueFamilyIndices = queue_families,
 
 		.initialLayout = ImageLayout,
 	};
@@ -215,7 +226,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 			},
 	};
 
-	status = vkCreateImageView(renderer::gRenderer->GetDevice()->Device, &view_create_info, nullptr, &View);
+	status = vkCreateImageView(device->Device, &view_create_info, nullptr, &View);
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create swapchain image view", status);
 	}
