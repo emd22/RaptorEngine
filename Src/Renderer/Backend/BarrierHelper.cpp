@@ -236,5 +236,38 @@ void ImageLayoutTransition(Image* image, VkImageLayout new_layout, CommandBuffer
 }
 
 
+void BufferComputeToFragment(const CommandBuffer& cmd, RawGpuBuffer* buffer)
+{
+	Assert(buffer != nullptr);
+
+	VkBufferMemoryBarrier2 barrier {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+		.pNext = nullptr,
+
+		.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+		.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT,
+
+		.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+		.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+
+		.buffer = buffer->Buffer,
+		.offset = 0,
+		.size = buffer->Size,
+	};
+
+	VkDependencyInfo dep_info {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.pNext = nullptr,
+		.bufferMemoryBarrierCount = 1,
+		.pBufferMemoryBarriers = &barrier,
+	};
+
+	vkCmdPipelineBarrier2(cmd.Cmd, &dep_info);
+}
+
+
 } // namespace BarrierHelper
 } // namespace fx::renderer

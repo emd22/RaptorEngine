@@ -1,5 +1,7 @@
 #include "DeferredRenderer.hpp"
 
+#include "Backend/BarrierHelper.hpp"
+#include "Backend/Commands.hpp"
 #include "Backend/DescriptorCache.hpp"
 #include "Backend/DsLayoutBuilder.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
@@ -8,6 +10,7 @@
 #include "Camera.hpp"
 #include "Engine.hpp"
 #include "Globals.hpp"
+#include "Limits.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
 #include "RenderBackend.hpp"
@@ -18,9 +21,14 @@
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 
+#include <algorithm>
+
 namespace fx::renderer {
 
 FX_SET_MODULE_NAME("DeferredRenderer")
+
+/// Descriptor set index that holds the Forward+ tiled light lists
+static constexpr uint32 scLightGridSetIndex = 2;
 
 void DeferredRenderer::Create(const Vec2u& extent)
 {
@@ -32,6 +40,7 @@ void DeferredRenderer::Create(const Vec2u& extent)
 	CreateGPassPipeline();
 	// CreateLightingPipeline();
 	CreateCompPipeline();
+	CreateLightCullingPipeline();
 	// CreateUnlitPipeline();
 }
 
@@ -184,7 +193,7 @@ void DeferredRenderer::CreateGPassPipeline()
 
 	{
 		gPSOBuild->BeginPipeline(ePipelineName::Geometry);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
 		gPSOBuild->UseRenderStage(ForwardPass);
 		gPSOBuild->SetShader(eShaderName::Forward, {});
@@ -204,6 +213,8 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
+		// Forward+ tiled light lists
+		AddLightGridDescriptors();
 
 		gPSOBuild->EndPipeline();
 	}
@@ -212,7 +223,7 @@ void DeferredRenderer::CreateGPassPipeline()
 	{
 		// Normal mapped pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMaps);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
 		gPSOBuild->UseRenderStage(ForwardPass);
 		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
@@ -236,13 +247,16 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
+		// Forward+ tiled light lists
+		AddLightGridDescriptors();
+
 		gPSOBuild->EndPipeline();
 	}
 
 	{
 		// Skinned + Normal mapped pipeline
 		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinned);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 
 		gPSOBuild->UseRenderStage(ForwardPass);
 		gPSOBuild->SetVertexType(eVertexType::Skinned);
@@ -273,10 +287,96 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
+		// Forward+ tiled light lists
+		AddLightGridDescriptors();
+
 		gPSOBuild->EndPipeline();
 
 
 		pGeometryPipelineName = ePipelineName::Geometry;
+	}
+}
+
+void DeferredRenderer::AddLightGridDescriptors()
+{
+	// bLightGrid
+	gPSOBuild->AddBuffer(0, scLightGridSetIndex, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0,
+						 gRenderer->LightGridPageSize);
+	// bLightIndexList
+	gPSOBuild->AddBuffer(1, scLightGridSetIndex, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+						 gRenderer->LightIndexListPageSize);
+}
+
+void DeferredRenderer::CreateLightCullingPipeline()
+{
+	gPSOBuild->BeginPipeline(ePipelineName::LightCulling);
+	gPSOBuild->SetPushConstants(eShaderType::Compute, sizeof(LightCullPushConstants));
+	gPSOBuild->SetShader(eShaderName::LightCulling, {});
+
+	// bLightGrid
+	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+	// bLightIndexList
+	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &gRenderer->LightIndexListBuffer, 0,
+						 gRenderer->LightIndexListPageSize);
+	// FSLightBuffer
+	gPSOBuild->AddBuffer(4, 0, eShaderType::Compute, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+						 gRenderer->LightBuffer.PageSize);
+
+	gPSOBuild->EndPipeline();
+}
+
+void DeferredRenderer::DoLightCullingPass(Camera& camera)
+{
+	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+
+	const Vec2u extent = gRenderer->Swapchain.Extent;
+
+	const uint32 tile_columns = std::min((extent.X + (Limits::LightTileSize - 1)) / Limits::LightTileSize,
+										 Limits::MaxScreenTilesX);
+	const uint32 tile_rows = std::min((extent.Y + (Limits::LightTileSize - 1)) / Limits::LightTileSize,
+									  Limits::MaxScreenTilesY);
+
+	mLightTileColumns = tile_columns;
+
+	LightCullPushConstants push_constants {};
+	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+	push_constants.ScreenSize[0] = static_cast<float32>(extent.X);
+	push_constants.ScreenSize[1] = static_cast<float32>(extent.Y);
+
+	// Lights are submitted sequentially into the light buffer, the slot index is the amount of lights
+	push_constants.LightCount = gRenderer->LightBuffer.SlotIndex;
+	push_constants.TileColumns = tile_columns;
+
+	// Dynamic offsets are assigned in ascending binding order (bLightGrid, bLightIndexList, FSLightBuffer)
+	gPipelineCache->AddBufferOffset(0, gRenderer->GetLightGridFrameOffset());
+	gPipelineCache->AddBufferOffset(0, gRenderer->GetLightIndexListFrameOffset());
+	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->Bind(ePipelineName::LightCulling, cmd);
+
+	gRenderer->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::LightCulling), eShaderType::Compute,
+								   push_constants);
+
+	vkCmdDispatch(cmd.Get(), tile_columns, tile_rows, 1);
+
+	// Make the culled light lists visible to the fragment shader
+	BarrierHelper::BufferComputeToFragment(cmd, &gRenderer->LightGridBuffer);
+	BarrierHelper::BufferComputeToFragment(cmd, &gRenderer->LightIndexListBuffer);
+}
+
+void DeferredRenderer::BindLightGridDescriptors(CommandBuffer& cmd)
+{
+	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Geometry);
+
+	const uint32 buffer_offsets[] = { gRenderer->GetLightGridFrameOffset(), gRenderer->GetLightIndexListFrameOffset() };
+
+	for (Pipeline::DescriptorRef& desc_ref : pipeline.DescriptorIDs) {
+		if (desc_ref.SetIndex != scLightGridSetIndex) {
+			continue;
+		}
+
+		desc_ref.pSet->Bind(scLightGridSetIndex, cmd, pipeline,
+							Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+		return;
 	}
 }
 

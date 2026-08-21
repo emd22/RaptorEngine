@@ -127,6 +127,16 @@ void RenderBackend::Init(Vec2u window_size)
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
 	BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), 1);
 
+	// Forward+ tiled light list buffers. These are double buffered per frame in flight, each tile's
+	// contents are fully rewritten by the light culling pass every frame.
+	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 2;
+	LightIndexListPageSize = Limits::MaxScreenTiles * Limits::MaxLightsPerTile * sizeof(uint32);
+
+	LightGridBuffer.Create(eGpuBufferType::StorageWithOffset, LightGridPageSize * FramesInFlight,
+						   VMA_MEMORY_USAGE_GPU_ONLY);
+	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
+								VMA_MEMORY_USAGE_GPU_ONLY);
+
 	gMaterialManager->Create();
 	gObjectManager->Create();
 
@@ -545,12 +555,20 @@ eFrameResult RenderBackend::BeginFrame()
 	return eFrameResult::Success;
 }
 
+void RenderBackend::BeginLightCulling(Camera& render_cam)
+{
+	pDeferredRenderer->DoLightCullingPass(render_cam);
+}
+
 void RenderBackend::BeginGeometry()
 {
 	FrameData* frame = GetFrame();
 
 	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
+
+	// Bind the Forward+ tiled light lists once per frame (set 2)
+	pDeferredRenderer->BindLightGridDescriptors(frame->CmdBuffer);
 }
 
 void RenderBackend::PresentFrame()
@@ -785,6 +803,9 @@ void RenderBackend::Destroy()
 
 	LightBuffer.Destroy();
 	BoneBuffer.Destroy();
+
+	LightGridBuffer.Destroy();
+	LightIndexListBuffer.Destroy();
 
 	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 

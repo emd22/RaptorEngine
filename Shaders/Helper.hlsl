@@ -39,6 +39,9 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define F_StructBuffer(name_, obj_type_, binding_, set_) \
     [[vk::binding(binding_, set_)]] StructuredBuffer<obj_type_> name_
 
+#define F_RWStructBuffer(name_, obj_type_, binding_, set_) \
+    [[vk::binding(binding_, set_)]] RWStructuredBuffer<obj_type_> name_
+
 #define F_CBuffer(name_, binding_, set_) \
     [[vk::binding(binding_, set_)]] cbuffer name_
 

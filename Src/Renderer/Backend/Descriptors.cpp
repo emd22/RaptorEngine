@@ -197,7 +197,7 @@ void DescriptorSet::Bind(uint32 ds_set_index, const CommandBuffer& cmd, const Pi
 						 const Slice<const uint32> buffer_offsets)
 {
 	AssertEqual(buffer_offsets.Size, mBufferCount);
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Layout.Get(), ds_set_index, 1, &mInternalSet,
+	vkCmdBindDescriptorSets(cmd, pipeline.GetBindPoint(), pipeline.Layout.Get(), ds_set_index, 1, &mInternalSet,
 							buffer_offsets.Size, buffer_offsets.pData);
 }
 

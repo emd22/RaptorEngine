@@ -248,10 +248,12 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	DrawPushConstants push_constants {};
 	push_constants.ObjectId = ID.GetID();
 	push_constants.MaterialIndex = mMaterialID.GetID();
+	push_constants.TileColumns = gRenderer->pDeferredRenderer->GetLightTileColumns();
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
 
-	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex, push_constants);
+	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
+								   push_constants);
 
 	RenderMesh(pipeline);
 }

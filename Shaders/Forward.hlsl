@@ -44,6 +44,7 @@ struct VSPushConsts
     float4x4 mViewProjection;
 	uint uiObjectIndex;
     uint uiMaterialIndex;
+    uint uiTileColumns;
 };
 
 #ifdef USE_SKINNING
@@ -136,12 +137,26 @@ F_CBuffer(FSLightBuffer, 4, 0)
 
 F_StructBuffer(bMaterialBuffer, Material, 1, 1);
 
+// Forward+ tiled light lists
+F_StructBuffer(bLightGrid, TileLightData, 0, 2);
+F_StructBuffer(bLightIndexList, uint, 1, 2);
+
 F_Texture2D(tAlbedo, 0)
 
 #ifdef USE_NORMAL_MAPS
 F_Texture2D(tNormalMap, 1)
 F_Texture2D(tMetallicRoughness, 2)
 #endif
+
+struct FSPushConsts
+{
+	float4x4 mViewProjection;
+	uint uiObjectIndex;
+	uint uiMaterialIndex;
+	uint uiTileColumns;
+};
+
+[[vk::push_constant]] FSPushConsts FSConst;
 
 #define ROUGHNESS roughness_metallic.x
 #define METALLIC  roughness_metallic.y
@@ -187,43 +202,69 @@ FSOutput main(FSInput input)
     output.vAlbedo.w = 0.0;
 #endif
 
-	Light light = Lights[0];
+	float3 accumulated_light = float3(0.0, 0.0, 0.0);
 
-	float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
-	float light_intensity = light_color.w * 255.0;
+	// Retrieve the light list for the tile that this pixel belongs to
+	uint2 tile_xy = uint2(input.vPosition.xy / LIGHT_TILE_SIZE);
+	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
 
-	const float visibility = 1.0;
+	TileLightData tile_data = bLightGrid[tile_index];
 
-	float3 F0 = float3(0.04, 0.04, 0.04);
-	F0 = lerp(F0, albedo, metallic);
+	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
+		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
 
-	const float attenuation = light_intensity;
+		float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
+		float light_intensity = light_color.w * 255.0;
 
-	float3 L = normalize(light.vLightPosition);
-	float3 N = normalize(N_final);
-	float3 V = normalize(light.vEyePosition - input.vPositionWS);
-	float3 H = normalize(V + L);
+		const float visibility = 1.0;
 
-	float NdotL = DotC(N, L);
-	float NdotV = abs(dot(N, V)) + 1e-5f;
-	float NdotH = DotC(N, H);
-	float LdotH = DotC(L, H);
+		float3 L;
+		float attenuation;
 
-	float3 F = F_Schlick(F0, 1.0, LdotH);
-	float3 diffuse_reflectance = albedo * (1.0 - metallic);
+		if (light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL) {
+			L = normalize(light.vLightPosition);
+			attenuation = light_intensity;
+		}
+		else {
+			float3 light_position_local = light.vLightPosition - input.vPositionWS;
+			L = normalize(light_position_local);
 
-	float D = D_GGX(NdotH, roughness);
-	float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
-	float3 Fr = D * F * Vis * FX_MATH_1_OVER_PI;
+			float dist_sq = dot(light_position_local, light_position_local);
 
-	float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, (roughness * roughness));
+			float inv_radius_sq = 1.0 / (light.fLightRadius * light.fLightRadius);
+			attenuation = light_intensity * AttenuationSmooth(dist_sq, inv_radius_sq);
+		}
 
-	float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
-	float3 specular_term = Fr;
+		float3 F0 = float3(0.04, 0.04, 0.04);
+		F0 = lerp(F0, albedo, metallic);
 
-	float4 ambient = F_UnpackUIntToFloat4(light.uiAmbient) * float4(albedo, 1.0f);
+		float3 N = normalize(N_final);
+		float3 V = normalize(light.vEyePosition - input.vPositionWS);
+		float3 H = normalize(V + L);
 
-	output.vAlbedo = float4(attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL + ambient.rgb, 1.0);
+		float NdotL = DotC(N, L);
+		float NdotV = abs(dot(N, V)) + 1e-5f;
+		float NdotH = DotC(N, H);
+		float LdotH = DotC(L, H);
+
+		float3 F = F_Schlick(F0, 1.0, LdotH);
+		float3 diffuse_reflectance = albedo * (1.0 - metallic);
+
+		float D = D_GGX(NdotH, roughness);
+		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
+		float3 Fr = D * F * Vis * FX_MATH_1_OVER_PI;
+
+		float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, (roughness * roughness));
+
+		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
+		float3 specular_term = Fr;
+
+		accumulated_light += attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL;
+	}
+
+	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);
+
+	output.vAlbedo = float4(accumulated_light + ambient.rgb, 1.0);
 
 
     return output;

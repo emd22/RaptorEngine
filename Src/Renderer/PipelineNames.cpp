@@ -27,6 +27,9 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("LightingInsideVolume", eFlags::None),
 	NAME_INFO("LightingDirectional", eFlags::None),
 
+	/* Forward+ light culling */
+	NAME_INFO("LightCulling", eFlags::None),
+
 	/* Other */
 	NAME_INFO("TextRendering", eFlags::None),
 	NAME_INFO("Composition", eFlags::None),

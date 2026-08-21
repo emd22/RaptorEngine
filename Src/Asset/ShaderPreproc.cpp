@@ -30,6 +30,7 @@ enum eStringId
 	F_ShadowTexture2D,
 
 	F_StructBuffer,
+	F_RWStructBuffer,
 	F_CBuffer,
 
 	// Test definitions
@@ -54,6 +55,7 @@ static constexpr const char* scStrings[] = {
 	"F_ShadowTexture2D",
 
 	"F_StructBuffer",
+	"F_RWStructBuffer",
 	"F_CBuffer",
 
 	// Test definitions
@@ -312,6 +314,7 @@ static const PPFuncEntry PPFunctions[] = {
 
 	// Buffer definition macros
 	PPFuncEntry(FStr(F_StructBuffer), true, true, ParseStructBufferDefinition),
+	PPFuncEntry(FStr(F_RWStructBuffer), true, true, ParseStructBufferDefinition),
 	PPFuncEntry(FStr(F_CBuffer), true, true, ParseCBufferDefinition),
 
 };

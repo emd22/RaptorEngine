@@ -300,12 +300,16 @@ void Scene::Render(Camera* shadow_camera)
 		gWorldGrid->SetViewTileIndex(tile_index);
 	}
 
-	gRenderer->BeginGeometry();
 	gRenderer->LightBuffer.Rewind();
 
 	for (const Ref<LightBase>& light : mLights) {
 		light->Render(camera, shadow_camera);
 	}
+
+	// Cull lights into screen space tiles before rendering geometry (Forward+)
+	gRenderer->BeginLightCulling(camera);
+
+	gRenderer->BeginGeometry();
 
 	ExecuteRenderList(ePipelineName::Geometry);
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);

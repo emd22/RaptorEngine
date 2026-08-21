@@ -68,6 +68,7 @@ public:
 	void Destroy();
 
 	eFrameResult BeginFrame();
+	void BeginLightCulling(Camera& render_cam);
 	void BeginGeometry();
 	void BeginLighting();
 	void BeginUnlit();
@@ -215,6 +216,22 @@ public:
 
 	Uniforms LightBuffer;
 	Uniforms BoneBuffer;
+
+	///////////////////////////////////
+	// Forward+ Tiled Lighting
+	///////////////////////////////////
+
+	/// Per tile light list offsets, indexed by tile. Written by the light culling compute pass.
+	RawGpuBuffer LightGridBuffer;
+
+	/// Global list of light indices, each tile owns a fixed region of `MaxLightsPerTile` entries.
+	RawGpuBuffer LightIndexListBuffer;
+
+	uint32 LightGridPageSize = 0;
+	uint32 LightIndexListPageSize = 0;
+
+	FX_FORCE_INLINE uint32 GetLightGridFrameOffset() const { return LightGridPageSize * GetFrameNumber(); }
+	FX_FORCE_INLINE uint32 GetLightIndexListFrameOffset() const { return LightIndexListPageSize * GetFrameNumber(); }
 
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;

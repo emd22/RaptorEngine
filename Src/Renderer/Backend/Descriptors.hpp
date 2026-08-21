@@ -98,7 +98,7 @@ public:
 class DescriptorSet
 {
 private:
-	static constexpr uint32 scMaxBuffers = 2;
+	static constexpr uint32 scMaxBuffers = 4;
 	static constexpr uint32 scMaxImages = 6;
 
 	static constexpr uint32 scMaxDescriptorEntries = scMaxBuffers + scMaxImages;

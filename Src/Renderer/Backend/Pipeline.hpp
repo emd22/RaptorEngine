@@ -69,6 +69,7 @@ struct alignas(16) DrawPushConstants
 	float32 CameraMatrix[16];
 	uint32 ObjectId = 0;
 	uint32 MaterialIndex = 0;
+	uint32 TileColumns = 0;
 };
 
 struct alignas(16) DebugLayerPushConstants
@@ -88,6 +89,14 @@ struct alignas(16) CompositionPushConstants
 {
 	float32 ViewInverse[16];
 	float32 ProjInverse[16];
+};
+
+struct alignas(16) LightCullPushConstants
+{
+	float32 CameraMatrix[16];
+	float32 ScreenSize[2];
+	uint32 LightCount = 0;
+	uint32 TileColumns = 0;
 };
 
 struct PipelineProperties
@@ -174,6 +183,10 @@ public:
 				const Slice<VkPipelineColorBlendAttachmentState>& color_blend_attachments,
 				VertexDescription* vertex_info, const RenderPass& render_pass, const PipelineProperties& properties);
 
+	/**
+	 * @brief Creates a compute pipeline from a single compute shader program.
+	 */
+	void CreateCompute(ePipelineName name, const Ref<ShaderProgram>& shader);
 
 	FX_FORCE_INLINE void SetLayout(PipelineLayout layout)
 	{
@@ -184,6 +197,13 @@ public:
 	}
 
 	FX_FORCE_INLINE bool HasLayout() const { return Layout.IsValid(); }
+
+	FX_FORCE_INLINE bool IsCompute() const { return bIsCompute; }
+
+	FX_FORCE_INLINE VkPipelineBindPoint GetBindPoint() const
+	{
+		return (bIsCompute) ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
+	}
 
 	void Bind(const CommandBuffer& command_buffer) const;
 
@@ -206,6 +226,10 @@ public:
 
 	Ref<ShaderProgram> VertexShader { nullptr };
 	Ref<ShaderProgram> PixelShader { nullptr };
+	Ref<ShaderProgram> ComputeShader { nullptr };
+
+	/// True if this pipeline was created as a compute pipeline
+	bool bIsCompute = false;
 
 	bool bIsViewportFullscreen = false;
 
