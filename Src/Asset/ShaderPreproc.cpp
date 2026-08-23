@@ -261,15 +261,16 @@ static void ParseParamTestDefinition(const std::vector<Slice<char>>& params, Sta
 
 static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
 {
-	// F_Texture(texture, register_n))
-	REQUIRE_PARAMS(params, 2);
+	// F_Texture(texture, binding, set))
+	REQUIRE_PARAMS(params, 3);
 
 	const Slice<char>& texture_name = params[0];
-	const int32 slot_n = ParamGetInt(params[1]);
+	const int32 binding = ParamGetInt(params[1]);
+	const int32 set = ParamGetInt(params[2]);
 
 	// LogInfo(LC_SHADER, "Reflected shader: {} at slot {}", String(texture_name.pData, texture_name.Size), slot_n);
 
-	result.GetReflection().emplace_back(eShaderReflectionType::Texture, 0, slot_n);
+	result.GetReflection().emplace_back(eShaderReflectionType::Texture, set, binding);
 }
 
 static void ParseStructBufferDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)

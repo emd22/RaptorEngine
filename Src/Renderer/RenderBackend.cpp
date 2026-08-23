@@ -19,6 +19,7 @@
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
@@ -148,6 +149,16 @@ void RenderBackend::Init(Vec2u window_size)
 
 	pDeferredRenderer = new DeferredRenderer;
 	pDeferredRenderer->Create(Swapchain.Extent);
+
+
+	SizedArray<renderer::DescriptorEntry> ds_entries(4);
+	ds_entries.Insert(
+		renderer::DescriptorEntry::AsBuffer(0, eShaderType::Pixel, &LightGridBuffer, 0, LightGridPageSize));
+	ds_entries.Insert(
+		renderer::DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &LightIndexListBuffer, 0, LightIndexListPageSize));
+
+	std::pair<renderer::DescriptorID, renderer::DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
+	pLightsDescriptor = result.second;
 
 	bInitialized = true;
 }
@@ -555,10 +566,7 @@ eFrameResult RenderBackend::BeginFrame()
 	return eFrameResult::Success;
 }
 
-void RenderBackend::BeginLightCulling(Camera& render_cam)
-{
-	pDeferredRenderer->DoLightCullingPass(render_cam);
-}
+void RenderBackend::BeginLightCulling(Camera& render_cam) { pDeferredRenderer->DoLightCullingPass(render_cam); }
 
 void RenderBackend::BeginGeometry()
 {
@@ -567,8 +575,12 @@ void RenderBackend::BeginGeometry()
 	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 
-	// Bind the Forward+ tiled light lists once per frame (set 2)
-	pDeferredRenderer->BindLightGridDescriptors(frame->CmdBuffer);
+	// pDeferredRenderer->BindLightGridDescriptors(frame->CmdBuffer);
+
+	const uint32 buffer_offsets[] = { gRenderer->GetLightGridFrameOffset(), gRenderer->GetLightIndexListFrameOffset() };
+
+	pLightsDescriptor->Bind(2, frame->CmdBuffer, gPipelineCache->Request(ePipelineName::GeometryNormalMaps),
+							Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 }
 
 void RenderBackend::PresentFrame()

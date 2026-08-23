@@ -109,6 +109,7 @@ private:
 struct MaterialProperties
 {
 	eMaterialFlags Flags = eMaterialFlags::None;
+	float Alpha = 1.0f;
 };
 
 /**

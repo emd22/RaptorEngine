@@ -236,6 +236,8 @@ public:
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;
 
+	DescriptorSet* pLightsDescriptor = nullptr;
+
 private:
 	VkInstance mInstance = nullptr;
 	VkSurfaceKHR mWindowSurface = nullptr;

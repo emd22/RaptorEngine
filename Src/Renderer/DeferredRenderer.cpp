@@ -41,6 +41,7 @@ void DeferredRenderer::Create(const Vec2u& extent)
 	CreateCompPipeline();
 	CreateLightCullingPipeline();
 	// CreateUnlitPipeline();
+	//
 }
 
 void DeferredRenderer::Destroy() {}
@@ -212,8 +213,11 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
-		// Forward+ tiled light lists
-		AddLightGridDescriptors();
+		// bLightGrid
+		gPSOBuild->AddBuffer(0, 2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		// bLightIndexList
+		gPSOBuild->AddBuffer(1, 2, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+							 gRenderer->LightIndexListPageSize);
 
 		gPSOBuild->EndPipeline();
 	}
@@ -246,8 +250,11 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
-		// Forward+ tiled light lists
-		AddLightGridDescriptors();
+		// bLightGrid
+		gPSOBuild->AddBuffer(0, 2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		// bLightIndexList
+		gPSOBuild->AddBuffer(1, 2, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+							 gRenderer->LightIndexListPageSize);
 
 		gPSOBuild->EndPipeline();
 	}
@@ -286,8 +293,11 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
-		// Forward+ tiled light lists
-		AddLightGridDescriptors();
+		// bLightGrid
+		gPSOBuild->AddBuffer(0, 2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		// bLightIndexList
+		gPSOBuild->AddBuffer(1, 2, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+							 gRenderer->LightIndexListPageSize);
 
 		gPSOBuild->EndPipeline();
 
@@ -296,15 +306,7 @@ void DeferredRenderer::CreateGPassPipeline()
 	}
 }
 
-void DeferredRenderer::AddLightGridDescriptors()
-{
-	// bLightGrid
-	gPSOBuild->AddBuffer(0, scLightGridSetIndex, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0,
-						 gRenderer->LightGridPageSize);
-	// bLightIndexList
-	gPSOBuild->AddBuffer(1, scLightGridSetIndex, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
-						 gRenderer->LightIndexListPageSize);
-}
+void DeferredRenderer::AddLightGridDescriptors() {}
 
 void DeferredRenderer::CreateLightCullingPipeline()
 {
@@ -343,9 +345,6 @@ void DeferredRenderer::DoLightCullingPass(Camera& camera)
 	memcpy(push_constants.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
 	push_constants.ScreenSize[0] = static_cast<float32>(extent.X);
 	push_constants.ScreenSize[1] = static_cast<float32>(extent.Y);
-
-	// push_constants.ProjectionScale[0] = static_cast<float32>(cam_matrix.Columns[0].X);
-	// push_constants.ProjectionScale[1] = static_cast<float32>(cam_matrix.Columns[1].Y);
 
 	// Lights are submitted sequentially into the light buffer, the slot index is the amount of lights
 	push_constants.LightCount = gRenderer->LightBuffer.SlotIndex;

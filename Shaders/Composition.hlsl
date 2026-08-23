@@ -55,8 +55,8 @@ struct FSOutput
 };
 
 
-F_Texture2D(tDepth, 1);
-F_Texture2D(tLighting, 2);
+F_Texture2D(tDepth, 1, 0);
+F_Texture2D(tLighting, 2, 0);
 
 float3 ACESFilm(float3 x)
 {

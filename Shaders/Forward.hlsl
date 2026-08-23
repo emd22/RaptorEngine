@@ -141,11 +141,11 @@ F_StructBuffer(bMaterialBuffer, Material, 1, 1);
 F_StructBuffer(bLightGrid, TileLightData, 0, 2);
 F_StructBuffer(bLightIndexList, uint, 1, 2);
 
-F_Texture2D(tAlbedo, 0)
+F_Texture2D(tAlbedo, 0, 0)
 
 #ifdef USE_NORMAL_MAPS
-F_Texture2D(tNormalMap, 1)
-F_Texture2D(tMetallicRoughness, 2)
+F_Texture2D(tNormalMap, 1, 0)
+F_Texture2D(tMetallicRoughness, 2, 0)
 #endif
 
 struct FSPushConsts
@@ -168,10 +168,7 @@ float3 GetSaturationColor(float value)
 
 	float ratio = saturate(value / LIMIT);
 
-	float r = saturate(ratio * 2.0);
-	float g = saturate((1.0 - ratio) * 2.0);
-
-	return float3(r, g, 0.0);
+	return float3(ratio, 1.0 - ratio, 0.0);
 }
 
 
@@ -224,6 +221,7 @@ FSOutput main(FSInput input)
 	TileLightData tile_data = bLightGrid[tile_index];
 
 	// output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
+	// output.vAlbedo = float4(float3(material.fAlpha, material.fAlpha, material.fAlpha), 1.0);
 	// return output;
 
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
@@ -275,7 +273,7 @@ FSOutput main(FSInput input)
 		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
 		float3 specular_term = Fr;
 
-		accumulated_light += attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL;
+		accumulated_light = lerp(accumulated_light, accumulated_light + (attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL), 1.0);
 	}
 
 	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);

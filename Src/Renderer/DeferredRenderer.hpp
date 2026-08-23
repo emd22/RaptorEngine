@@ -66,67 +66,16 @@ public:
 
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 
-	/////////////////////
-	// Geometry Pass
-	/////////////////////
-
-	// VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
-	// VkDescriptorSetLayout DsLayoutGPassSkinned = nullptr;
-
-	// VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
-
 	RenderStage UnlitPass;
 	RenderStage LightPass;
 	RenderStage GPass;
 	RenderStage ForwardPass;
 	RenderStage CompPass;
 
-	// Pipeline PlGeometry;
-	// Pipeline PlGeometryNoDepthTest;
-	// Pipeline PlGeometryWithNormalMaps;
-
-	// Pipeline PlGeometrySkinned;
-
 	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;
 
 	/// Amount of tile columns the light grid is dispatched with for the current frame
 	uint32 mLightTileColumns = 0;
-
-	//////////////////////
-	// Lighting Pass
-	//////////////////////
-
-	// VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
-	// VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
-
-	// DescriptorSet DsLighting;
-
-
-	// Pipeline PlLightingOutsideVolume;
-	// Pipeline PlLightingInsideVolume;
-	// Pipeline PlLightingDirectional;
-
-	/////////////////////////////////////////////////
-	// Forward pass / Unlit
-	/////////////////////////////////////////////////
-	// VkDescriptorSetLayout DsLayoutUnlit = nullptr;
-	// Pipeline PlText;
-	// Pipeline PlDebugLayer;
-	// DescriptorSet DsUnlit;
-
-	/*    RenderPass RpForward;
-		Framebuffer FbForward;*/
-
-	//////////////////////
-	// Composition Pass
-	//////////////////////
-
-	// VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
-
-	// DescriptorSet DsComposition;
-
-	// Pipeline PlComposition;
-	// Pipeline PlCompositionUnlit;
 };
 
 } // namespace fx::renderer

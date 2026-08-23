@@ -314,28 +314,6 @@ void Scene::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::Geometry);
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
-
-	FrameData* frame = gRenderer->GetFrame();
-
-	// Target* depth_target = gRenderer->pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
-	// Assert(depth_target != nullptr);
-	// depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
-
-	// Render lights
-	// gRenderer->BeginLighting();
-
-	// Render the unlit objects
-	// gRenderer->BeginUnlit();
-
-	// ExecuteRenderList(ePipelineName::Unlit);
-	// ExecuteRenderList(ePipelineName::UnlitNormalMaps);
-
-	// RenderBoundingBoxes(camera);
-	// RenderWorldGrid(camera);
-
-	// if (bRenderPhysicsObjects) {
-	// 	RenderPhysicsObjects(camera);
-	// }
 }
 
 
