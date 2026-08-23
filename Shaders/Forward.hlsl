@@ -223,8 +223,8 @@ FSOutput main(FSInput input)
 
 	TileLightData tile_data = bLightGrid[tile_index];
 
-	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
-	return output;
+	// output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
+	// return output;
 
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];

@@ -116,7 +116,7 @@ void FoxtrotGame::ReloadAllObjects()
 void FoxtrotGame::CreateLights()
 {
 	Ref<LightPoint> pl = Ref<LightPoint>::New();
-	pl->Color = Color::FromRGBA(50, 250, 100, 3);
+	pl->Color = Color::FromRGBA(50, 250, 100, 8);
 	pl->MoveBy(Vec3f(0, 1, 0));
 	pl->SetRadius(3.0);
 	// pl->SetScale(15);
@@ -124,9 +124,9 @@ void FoxtrotGame::CreateLights()
 	mMainScene.Attach(pl);
 
 	Ref<LightPoint> pl2 = Ref<LightPoint>::New();
-	pl->Color = Color::FromRGBA(200, 80, 100, 3);
-	pl->MoveBy(Vec3f(1, 0.5, 0));
-	pl->SetRadius(3.0);
+	pl2->Color = Color::FromRGBA(200, 80, 100, 8);
+	pl2->MoveBy(Vec3f(1, 0.5, 0));
+	pl2->SetRadius(3.0);
 
 	mMainScene.Attach(pl2);
 

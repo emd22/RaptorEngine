@@ -344,8 +344,8 @@ void DeferredRenderer::DoLightCullingPass(Camera& camera)
 	push_constants.ScreenSize[0] = static_cast<float32>(extent.X);
 	push_constants.ScreenSize[1] = static_cast<float32>(extent.Y);
 
-	push_constants.ProjectionScale[0] = static_cast<float32>(cam_matrix.Columns[0].X);
-	push_constants.ProjectionScale[1] = static_cast<float32>(cam_matrix.Columns[1].Y);
+	// push_constants.ProjectionScale[0] = static_cast<float32>(cam_matrix.Columns[0].X);
+	// push_constants.ProjectionScale[1] = static_cast<float32>(cam_matrix.Columns[1].Y);
 
 	// Lights are submitted sequentially into the light buffer, the slot index is the amount of lights
 	push_constants.LightCount = gRenderer->LightBuffer.SlotIndex;
