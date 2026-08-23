@@ -162,6 +162,19 @@ struct FSPushConsts
 #define METALLIC  roughness_metallic.y
 
 
+float3 GetSaturationColor(float value)
+{
+	const float LIMIT = (float)MAX_LIGHTS_PER_TILE;
+
+	float ratio = saturate(value / LIMIT);
+
+	float r = saturate(ratio * 2.0);
+	float g = saturate((1.0 - ratio) * 2.0);
+
+	return float3(r, g, 0.0);
+}
+
+
 FSOutput main(FSInput input)
 {
     FSOutput output;
@@ -209,6 +222,9 @@ FSOutput main(FSInput input)
 	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
 
 	TileLightData tile_data = bLightGrid[tile_index];
+
+	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
+	return output;
 
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];

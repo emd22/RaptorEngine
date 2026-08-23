@@ -115,16 +115,20 @@ void FoxtrotGame::ReloadAllObjects()
 
 void FoxtrotGame::CreateLights()
 {
-	// Ref<LightPoint> pl = Ref<LightPoint>::New();
-
-	// Ref<MeshGen::GeneratedMesh> sphere = MeshGen::MakeIcoSphere(4);
-	// pl->SetLightVolume(sphere);
-	// pl->Color = Color::FromRGBA(50, 250, 100, 3);
-	// pl->MoveBy(Vec3f(0, 1, 0));
-	// pl->SetRadius(5.0);
+	Ref<LightPoint> pl = Ref<LightPoint>::New();
+	pl->Color = Color::FromRGBA(50, 250, 100, 3);
+	pl->MoveBy(Vec3f(0, 1, 0));
+	pl->SetRadius(3.0);
 	// pl->SetScale(15);
 
-	// mMainScene.Attach(pl);
+	mMainScene.Attach(pl);
+
+	Ref<LightPoint> pl2 = Ref<LightPoint>::New();
+	pl->Color = Color::FromRGBA(200, 80, 100, 3);
+	pl->MoveBy(Vec3f(1, 0.5, 0));
+	pl->SetRadius(3.0);
+
+	mMainScene.Attach(pl2);
 
 	// Ref<LightPoint> pl2 = Ref<LightPoint>::New();
 
@@ -251,6 +255,7 @@ void FoxtrotGame::CreateGame()
 		//     LogError("Failed to load font!");
 		// }
 	}
+
 
 	CreateLights();
 	CreateFontObject();

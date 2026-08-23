@@ -16,7 +16,7 @@ static constexpr uint32 MaxConcurrentThreads = 10;
 static constexpr uint32 LightTileSize = 16;
 
 /// Maximum amount of lights that can be stored in a single tile
-static constexpr uint32 MaxLightsPerTile = 64;
+static constexpr uint32 MaxLightsPerTile = 6;
 
 /// Maximum amount of tiles along each screen axis. Supports resolutions up to 3840x2160.
 static constexpr uint32 MaxScreenTilesX = 240;

@@ -95,6 +95,7 @@ struct alignas(16) LightCullPushConstants
 {
 	float32 CameraMatrix[16];
 	float32 ScreenSize[2];
+	float32 ProjectionScale[2];
 	uint32 LightCount = 0;
 	uint32 TileColumns = 0;
 };

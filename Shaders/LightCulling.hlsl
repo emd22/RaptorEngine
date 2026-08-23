@@ -15,6 +15,7 @@ struct CSPushConsts
 {
 	float4x4 mViewProjection;
 	float2 vScreenSize;
+	float2 vProjectionScale;
 	uint uiLightCount;
 	uint uiTileColumns;
 };
@@ -60,25 +61,16 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 		else {
 			float4 center_clip = mul(CSConst.mViewProjection, float4(light.vLightPosition, 1.0));
 
-			// Skip lights behind the camera
+			// Skip lights behind camera
 			if (center_clip.w > 0.0) {
-				float2 center_screen = ProjectToScreen(center_clip);
+			    float2 center_screen = ProjectToScreen(center_clip);
 
-				// Approximate the screen space radius by projecting offset points
-				float radius_x = length(ProjectToScreen(mul(CSConst.mViewProjection,
-															float4(light.vLightPosition + float3(light.fLightRadius, 0.0, 0.0), 1.0))) -
-										center_screen);
-				float radius_y = length(ProjectToScreen(mul(CSConst.mViewProjection,
-															float4(light.vLightPosition + float3(0.0, light.fLightRadius, 0.0), 1.0))) -
-										center_screen);
+			    float radius = light.fLightRadius * CSConst.vProjectionScale.y * (CSConst.vScreenSize.y * 0.5) / center_clip.w;
 
-				float radius = max(radius_x, radius_y);
+			    float2 closest_point = clamp(center_screen, tile_min, tile_max);
+			    float2 distance_sq = center_screen - closest_point;
 
-				// Circle vs AABB intersection test
-				float2 closest_point = clamp(center_screen, tile_min, tile_max);
-				float2 distance_sq = center_screen - closest_point;
-
-				intersects_tile = dot(distance_sq, distance_sq) <= (radius * radius);
+			    intersects_tile = dot(distance_sq, distance_sq) <= (radius * radius);
 			}
 		}
 
