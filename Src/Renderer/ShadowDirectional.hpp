@@ -15,7 +15,7 @@ namespace fx::renderer {
 struct alignas(16) ShadowPushConstants
 {
 	float32 CameraMatrix[16];
-	uint32 ObjectId = 0;
+	uint32 ObjectIndex = 0;
 };
 class ShadowDirectional
 {

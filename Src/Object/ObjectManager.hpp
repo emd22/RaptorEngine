@@ -25,7 +25,7 @@ class ObjectManager
 {
 public:
 	static constexpr uint32 scMaxObjects = 512;
-
+	static constexpr uint32 scBoundSize = scMaxObjects * sizeof(ObjectGpuEntry);
 
 public:
 	void Create();
@@ -76,7 +76,6 @@ public:
 	// renderer::DescriptorSet mObjectBufferDS {};
 	// VkDescriptorSetLayout DsLayoutObjectBuffer = nullptr;
 
-	renderer::DescriptorSet* pDescriptorSet { nullptr };
 
 	std::mutex mInUse;
 

@@ -6,8 +6,10 @@
 #include <Object/Object.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/Backend/Sampler/SamplerCache.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Renderer/ShadowDirectional.hpp>
 
 namespace fx {
 
@@ -24,27 +26,6 @@ void ObjectManager::Create()
 	// TODO: replace with DescriptorCache'd version
 	mObjectGpuBuffer.Create(eGpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
 							eGpuBufferFlags::PersistentMapped);
-
-
-	static constexpr uint32 scBoundSize = scMaxObjects * sizeof(ObjectGpuEntry);
-
-
-	if (!pDescriptorSet) {
-		SizedArray<DescriptorEntry> ds_entries(5);
-		ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &mObjectGpuBuffer, 0, scBoundSize));
-
-		ds_entries.Insert(DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer,
-													0, gMaterialManager->MaterialPropertiesBuffer.Size));
-
-		ds_entries.Insert(DescriptorEntry::AsBuffer(2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0,
-													gRenderer->LightGridPageSize));
-		ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
-													gRenderer->LightIndexListPageSize));
-
-
-		std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
-		pDescriptorSet = result.second;
-	}
 }
 
 ObjectID ObjectManager::NewObjectID(const std::string& name)

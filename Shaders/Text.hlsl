@@ -40,7 +40,7 @@ VSOutput main(VSInput input)
 {
     VSOutput output;
 
-    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
     float4x4 MVP = mul(VSConst.mCameraMatrix, model_matrix);
 
     output.vPosition = mul(MVP, float4(input.vPosition, 1.0));

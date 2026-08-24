@@ -41,6 +41,8 @@ private:
 	// Geometry
 	void CreateGPassPipeline();
 
+	void BuildPersistentDescriptor();
+
 	void CreateUnlitPass();
 	void CreateGPass();
 
@@ -73,6 +75,9 @@ public:
 	RenderStage CompPass;
 
 	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;
+
+	/// Descriptors that remain bound for the entirety of the frame. This includes object buffer, material buffer, etc.
+	DescriptorSet* pPersistentDescriptor = nullptr;
 
 	/// Amount of tile columns the light grid is dispatched with for the current frame
 	uint32 mLightTileColumns = 0;

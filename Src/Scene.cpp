@@ -36,13 +36,18 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 		LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
 				PipelineNameUtil::GetName(pipeline_name));
 
+		AssertMsg(object->pScene, "Scene has not been initialized on object!");
+
+		if (object->IsShadowCaster()) {
+			object->pScene->mRenderList.Add(ePipelineName::ShadowDirectional, object->ID);
+		}
+
 		// if (is_unlit) {
 		// 	LogInfo("Setting material {} pipeline to be unlit", material->ID);
 		// 	pipeline_name = material->IsAlbedoOnly() ? ePipelineName::Unlit : ePipelineName::UnlitNormalMaps;
 		// 	material->SetPipeline(pipeline_name);
 		// }
 
-		AssertMsg(object->pScene, "Scene has not been initialized on object!");
 		object->pScene->mRenderList.Add(pipeline_name, object->ID);
 	}
 
@@ -145,15 +150,16 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
-	// If the pipeline passed in is unlit, force the unlit pipeline to be used over the materials pipeline.
-	// const bool is_unlit_pipeline = (pl_name == ePipelineName::Unlit || pl_name == ePipelineName::UnlitNormalMaps);
-
-	// if (is_unlit_pipeline) {
-	// 	alt_pipeline = &gPipelineCache->Request(pl_name);
-	// }
-
 	pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
 
+	{
+		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
+										  gRenderer->GetLightIndexListFrameOffset() };
+
+		gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
+			0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+	}
 
 	uint32 index = 0;
 	while (true) {
@@ -167,6 +173,59 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 
 		object->Update();
 		object->RenderShallow(camera, &pipeline);
+
+		++index;
+	}
+}
+
+
+void Scene::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
+{
+	PerspectiveCamera& camera = *mpCurrentCamera;
+
+	const RenderListSection& section = mRenderList.GetSection(pl_name);
+
+	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+
+	if (!section.InUse.IsInited()) {
+		return;
+	}
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
+
+	pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
+
+	{
+		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
+										  gRenderer->GetLightIndexListFrameOffset() };
+
+		gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
+			0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+	}
+
+	// Push constants definition
+	ShadowPushConstants consts;
+	memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
+		   sizeof(float32) * 16);
+
+	uint32 index = 0;
+	while (true) {
+		index = section.InUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+
+		ObjectID object_id = section.Objects[index];
+		Object* object = gObjectManager->GetObject(object_id);
+
+		// Push the direct index for the object id
+		consts.ObjectIndex = object_id.GetID();
+		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
+
+		object->Update();
+		object->RenderPrimitive(cmd);
 
 		++index;
 	}
@@ -238,6 +297,7 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		CLEAR_RL_SECTION(ePipelineName::Geometry);
 		CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
 		CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
+		CLEAR_RL_SECTION(ePipelineName::ShadowDirectional);
 		// CLEAR_RL_SECTION(ePipelineName::Unlit);
 		// CLEAR_RL_SECTION(ePipelineName::UnlitNormalMaps);
 	}
@@ -259,6 +319,10 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
 
 		LogInfo("Adding object ID {} -> {}", *object_id, PipelineNameUtil::GetName(material->GetRequiredPipeline()));
+
+		if (object->IsShadowCaster()) {
+			AddToRenderListRecursive(ePipelineName::ShadowDirectional, object_id);
+		}
 
 		AddToRenderListRecursive(material->GetRequiredPipeline(), object_id);
 
@@ -305,6 +369,10 @@ void Scene::Render(Camera* shadow_camera)
 	for (const Ref<LightBase>& light : mLights) {
 		light->Render(camera, shadow_camera);
 	}
+
+	gShadowRenderer->Begin();
+	ExecuteShadowRenderList(ePipelineName::ShadowDirectional);
+	gShadowRenderer->End();
 
 	// Cull lights into screen space tiles before rendering geometry (Forward+)
 	gRenderer->BeginLightCulling(camera);
@@ -444,13 +512,22 @@ void Scene::RenderObjectShadows(Object* object)
 		in_skinned_shader = false;
 		pipeline.Bind(cmd);
 
-		gObjectManager->pDescriptorSet->BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-													   gObjectManager->GetBaseOffset());
+		{
+			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
+											  gRenderer->GetLightIndexListFrameOffset() };
+
+			gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
+				0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+		}
+
+		// gObjectManager->pDescriptorSet->BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+		// 											   gObjectManager->GetBaseOffset());
 	}
 
 	object->Update();
 
-	consts.ObjectId = object->ID.GetID();
+	consts.ObjectIndex = object->ID.GetID();
 
 	gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 

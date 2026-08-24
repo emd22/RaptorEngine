@@ -282,7 +282,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	CommandBuffer& cmd = frame->CmdBuffer;
 
 	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
-	if (mat) {
+	if (mat && pipeline->Name != ePipelineName::ShadowDirectional) {
 		Assert(mat->GetRequiredPipeline() == pipeline->Name);
 	}
 
@@ -290,12 +290,6 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
 	}
-
-	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
-									  gRenderer->GetLightIndexListFrameOffset() };
-
-	gObjectManager->pDescriptorSet->Bind(0, cmd, *pipeline,
-										 Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 
 	if (pMesh) {
 		pMesh->Render(cmd, (mInstanceSlotsInUse + 1)); // + 1 for source object

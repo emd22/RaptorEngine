@@ -51,6 +51,9 @@ void DeferredRenderer::Create(const Vec2u& extent)
 	// CreateLightingPipeline();
 	CreateCompPipeline();
 	CreateLightCullingPipeline();
+
+	BuildPersistentDescriptor();
+
 	// CreateUnlitPipeline();
 	//
 }
@@ -197,6 +200,40 @@ void DeferredRenderer::CreateUnlitPipeline()
 	// }
 }
 
+void DeferredRenderer::BuildPersistentDescriptor()
+{
+	SizedArray<DescriptorEntry> ds_entries(6);
+
+	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+												ObjectManager::scBoundSize));
+
+	ds_entries.Insert(DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+												gMaterialManager->MaterialPropertiesBuffer.Size));
+
+	ds_entries.Insert(
+		DescriptorEntry::AsBuffer(2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize));
+
+	ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+												gRenderer->LightIndexListPageSize));
+
+	Target* shadow_target = gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float);
+	Assert(shadow_target != nullptr);
+
+	ds_entries.Insert(DescriptorEntry::AsImage(4, eShaderType::Pixel, &shadow_target->Image,
+											   gSamplerCache->Request({
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerFilter::Linear,
+												   eSamplerAddressMode::ClampToBorder,
+												   eSamplerBorderColor::FloatWhite,
+												   eSamplerCompareOp::Greater,
+											   })));
+
+
+	std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
+	pPersistentDescriptor = result.second;
+}
+
 
 void DeferredRenderer::CreateGPassPipeline()
 {
@@ -224,6 +261,10 @@ void DeferredRenderer::CreateGPassPipeline()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
 							 gRenderer->LightIndexListPageSize);
+		// tShadowAtlas
+		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+							gSamplerCache->Request({}));
+
 
 		// Set 1 (Object local)
 
@@ -263,18 +304,26 @@ void DeferredRenderer::CreateGPassPipeline()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
 							 gRenderer->LightIndexListPageSize);
+		// tShadowAtlas
+		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+							gSamplerCache->Request({}));
 
 		// Set 1 (Object local)
 
+		// tAlbedo
 		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
+		// tNormalMap
 		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
+		// tMetallicRoughness
 		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 
+		// FSLightBuffer
 		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
 							 gRenderer->LightBuffer.PageSize);
+
 
 		gPSOBuild->EndPipeline();
 	}
@@ -305,6 +354,10 @@ void DeferredRenderer::CreateGPassPipeline()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
 							 gRenderer->LightIndexListPageSize);
+		// tShadowAtlas
+		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+							gSamplerCache->Request({}));
+
 
 		// Set 1 (Object local)
 
@@ -314,11 +367,9 @@ void DeferredRenderer::CreateGPassPipeline()
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
-
 		// bBoneBuffer
 		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
 							 gRenderer->BoneBuffer.PageSize);
-
 		// Light buffer
 		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
 							 gRenderer->LightBuffer.PageSize);

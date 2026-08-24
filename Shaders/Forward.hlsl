@@ -64,7 +64,7 @@ VSOutput main(VSInput input)
 {
     VSOutput output;
 
-    float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
+    float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
     float4x4 MVP = mul(VSConst.mViewProjection, world_matrix);
 
@@ -148,6 +148,8 @@ F_Texture2D(tNormalMap, 1, 1)
 F_Texture2D(tMetallicRoughness, 2, 1)
 #endif
 
+F_ShadowTexture2D(tShadowAtlas, 4, 0);
+
 struct FSPushConsts
 {
 	float4x4 mViewProjection;
@@ -230,7 +232,8 @@ FSOutput main(FSInput input)
 		float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
 		float light_intensity = light_color.w * 255.0;
 
-		const float visibility = 1.0;
+		/// How much light is visible (not occluded) at this pixel
+		float visibility = 1.0;
 
 		float3 L;
 		float attenuation;
@@ -238,6 +241,22 @@ FSOutput main(FSInput input)
 		if (light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL) {
 			L = normalize(light.vLightPosition);
 			attenuation = light_intensity;
+
+			// Calculate shadows
+			float4 shadow_pos_light_space = mul(light.LightCameraMatrix, float4(input.vPositionWS, 1.0));
+
+			float2 shadow_uv;
+			shadow_uv.x = 0.5f + (shadow_pos_light_space.x / shadow_pos_light_space.w * 0.5f);
+			shadow_uv.y = 0.5f - (shadow_pos_light_space.y / shadow_pos_light_space.w * 0.5f);
+			shadow_uv.y = 1.0 - shadow_uv.y;
+
+			float shadow_z = 1.0 - shadow_pos_light_space.z / shadow_pos_light_space.w;
+
+			// Check that the UV values are greater than 0.0 and less than 1.0
+			if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
+				visibility = F_SampleCmpLevelZero(tShadowAtlas, shadow_uv, shadow_z + 0.001f);
+				visibility = clamp(visibility, 0.05f, 1.0f);
+			}
 		}
 		else {
 			float3 light_position_local = light.vLightPosition - input.vPositionWS;

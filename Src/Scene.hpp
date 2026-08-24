@@ -72,6 +72,8 @@ private:
 	void RenderObjectShadows(Object* object_id);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
+	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
+
 	void RebuildRenderList(bool clear, TileIndex new_tile);
 	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
 

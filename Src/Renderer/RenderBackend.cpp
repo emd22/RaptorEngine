@@ -138,14 +138,14 @@ void RenderBackend::Init(Vec2u window_size)
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
 								VMA_MEMORY_USAGE_GPU_ONLY);
 
+
 	gMaterialManager->Create();
 	gObjectManager->Create();
 
+	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
-
-	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 
 	pDeferredRenderer = new DeferredRenderer;
 	pDeferredRenderer->Create(Swapchain.Extent);

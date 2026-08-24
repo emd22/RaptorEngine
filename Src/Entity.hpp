@@ -117,7 +117,7 @@ protected:
 	bool mbPhysicsTransformOutOfDate : 1 = true;
 	bool mbMatrixOutOfDate : 1 = true;
 
-	Mat4f mModelMatrix = Mat4f::sIdentity;
+	Mat4f mWorldMatrix = Mat4f::sIdentity;
 
 	int32 mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
 	// Mat4f mNormalMatrix = Mat4f::Identity;

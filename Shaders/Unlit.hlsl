@@ -76,7 +76,7 @@ VSOutput main(VSInput input)
 #ifdef IS_TEXT
     float4x4 MVP = VSConst.mCombinedMatrix;
 #else
-    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
     float4x4 MVP = mul(VSConst.mCameraMatrix, model_matrix);
 #endif // IS_TEXT
 #endif

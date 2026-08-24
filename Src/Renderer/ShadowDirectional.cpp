@@ -28,27 +28,6 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 
 	ShadowCamera.Update();
 
-	// StackArray<VkDescriptorSetLayout, 2> desc_sets = {
-	//     gObjectManager->DsLayoutObjectBuffer,
-	// };
-
-	// StackArray<PushConstants, 1> push_consts = {
-	//     PushConstants { .Size = sizeof(ShadowPushConstants), .ShaderTypes = eShaderType::Vertex },
-	// };
-
-	// PipelineLayout pipeline_layout = PipelineLayout(Slice(push_consts), Slice(desc_sets));
-
-	// Shader shader_shadow("Shadows");
-	// VertexDescription vertex_info = VertexUtil::BuildDescription<eVertexType::Default>();
-
-	// PipelineProperties pipeline_properties {
-	//     .ViewportSize = size,
-	//     .DepthCompareOp = VK_COMPARE_OP_GREATER,
-	// };
-
-
-	// Ref<ShaderProgram> vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, {});
-	// Ref<ShaderProgram> fragment_shader = shader_shadow.GetProgram(eShaderType::Pixel, {});
 	{
 		gPSOBuild->BeginPipeline(ePipelineName::ShadowDirectional);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(ShadowPushConstants));
@@ -69,36 +48,6 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 
 		gPSOBuild->EndPipeline();
 	}
-
-
-	// PipelineBuilder builder {};
-	// builder.SetLayout(pipeline_layout)
-	//     .SetName("Shadow Pipeline")
-	//     .SetProperties(pipeline_properties)
-	//     .SetOutputTargets(&RenderStage.GetTargets())
-	//     .SetShaders(vertex_shader, fragment_shader)
-	//     .SetRenderPass(&RenderStage.GetRenderPass())
-	//     .SetVertexDescription(&vertex_info)
-	//     .SetCullMode(VK_CULL_MODE_BACK_BIT)
-	//     .SetWindingOrder(VK_FRONT_FACE_CLOCKWISE);
-
-	// builder.Build(mPipeline);
-
-	// gState->BeginPipeline(ePipelineName::ShadowDirectional);
-
-
-	// gState->EndPipeline();
-
-	// {
-	//     SizedArray<ShaderMacro> macros = { ShaderMacro { "USE_SKINNING", "1" } };
-
-	//     vertex_shader = shader_shadow.GetProgram(eShaderType::Vertex, macros);
-	//     fragment_shader = shader_shadow.GetProgram(eShaderType::Pixel, macros);
-
-	//     vertex_info = VertexUtil::BuildDescription<eVertexType::Skinned>();
-	//     builder.SetVertexDescription(&vertex_info).SetShaders(vertex_shader,
-	//     fragment_shader).Build(mPipelineSkinned);
-	// }
 
 	UpdateLightDescriptors();
 }
