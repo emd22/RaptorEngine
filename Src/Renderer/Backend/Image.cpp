@@ -98,7 +98,9 @@ Image& Image::operator=(const Image& other)
 void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
 				   VkImageTiling tiling, VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags)
 {
-	renderer::GpuDevice* device = renderer::gRenderer->GetDevice();
+	using namespace renderer;
+
+	GpuDevice* device = gRenderer->GetDevice();
 
 	Assert(size.X > 0 && size.Y > 0);
 
@@ -108,7 +110,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 			vkDestroyImageView(device->Device, View, nullptr);
 		}
 
-		vmaDestroyImage(renderer::gRenderer->GpuAllocator, InternalImage, this->Allocation);
+		vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
 
 		InternalImage = nullptr;
 		Allocation = nullptr;
@@ -137,7 +139,9 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
 	uint32 num_queue_families = 0;
 
-	if (!HasFlag(flags, eImageCreateFlags::IsTarget)) {
+	const bool has_independent_xfer = gRenderer->GetDevice()->mQueueFamilies.HasIndependentTransfer();
+
+	if (!HasFlag(flags, eImageCreateFlags::IsTarget) && has_independent_xfer) {
 		sharing_mode = VK_SHARING_MODE_CONCURRENT;
 		num_queue_families = std::size(queue_families);
 	}
@@ -171,8 +175,8 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.priority = 1.0f,
 	};
 
-	VkResult status = vmaCreateImage(renderer::gRenderer->GpuAllocator, &image_info, &create_info, &InternalImage,
-									 &Allocation, nullptr);
+	VkResult status = vmaCreateImage(gRenderer->GpuAllocator, &image_info, &create_info, &InternalImage, &Allocation,
+									 nullptr);
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create vulkan image", status);
 	}
@@ -180,7 +184,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	static uint32 alloc_number = 0;
 
 	std::string alloc_name = std::to_string(alloc_number++);
-	vmaSetAllocationName(renderer::gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
+	vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
 
 	// LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
 	//           reinterpret_cast<void*>(Allocation));
