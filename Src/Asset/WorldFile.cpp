@@ -1,4 +1,4 @@
-#include "SceneFile.hpp"
+#include "WorldFile.hpp"
 
 #include <Asset/AssetManager.hpp>
 #include <Engine.hpp>
@@ -24,7 +24,7 @@ namespace fx {
 // }
 
 
-void SceneFile::Load(const std::string& path, Scene& scene)
+void WorldFile::Load(const std::string& path, World& scene)
 {
 	ConfigFile info;
 
@@ -88,7 +88,7 @@ void SceneFile::Load(const std::string& path, Scene& scene)
 }
 
 
-void SceneFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry, Scene& scene)
+void WorldFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry, World& scene)
 {
 	const std::string& collider_name = collider_entry.Name.Get();
 
@@ -118,7 +118,7 @@ void SceneFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	phys->Teleport(position, rotation);
 }
 
-void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry, Scene& scene)
+void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry, World& scene)
 {
 	const char* mesh_path = object_entry.GetMember(HashStr32("Mesh"))->Get<const char*>();
 
@@ -136,7 +136,7 @@ void SceneFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 }
 
 
-void SceneFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry)
+void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry)
 {
 	ConfigEntry* shadow_caster = object_entry.GetMember(HashStr32("Shadows"));
 	if (shadow_caster != nullptr) {

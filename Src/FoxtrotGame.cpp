@@ -9,7 +9,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Font/Font.hpp>
 #include <Asset/MipmapGen.hpp>
-#include <Asset/SceneFile.hpp>
+#include <Asset/WorldFile.hpp>
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
@@ -108,7 +108,7 @@ void FoxtrotGame::ReloadAllObjects()
 	mMainScene.Destroy();
 	mMainScene.Create();
 
-	SceneFile scene_file;
+	WorldFile scene_file;
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
 }
@@ -220,7 +220,7 @@ void FoxtrotGame::CreateGame()
 
 	AddEditorModes();
 
-	SceneFile scene_file;
+	WorldFile scene_file;
 
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
@@ -467,7 +467,7 @@ void FoxtrotGame::ProcessControls()
 
 	if (ControlManager::IsComboDown(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
 		// Reload the object properties from the scene
-		SceneFile scene_file;
+		WorldFile scene_file;
 		scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr32("Scene"))->Get<const char*>()),
 						mMainScene);
 
@@ -654,7 +654,7 @@ FoxtrotGame::~FoxtrotGame()
 // Editor modes
 /////////////////////////////////////
 
-void EditorModeMoveCollider::Update(const Scene& scene, const Vec3f& movement_vector)
+void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
 	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
 	if (phys_id != PhObjectIdNull) {
@@ -670,9 +670,9 @@ void EditorModeMoveCollider::Update(const Scene& scene, const Vec3f& movement_ve
 	}
 }
 
-void EditorModeMoveCollider::OnLeave(const Scene& scene) {}
+void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
-void EditorModeScaleCollider::Update(const Scene& scene, const Vec3f& movement_vector)
+void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
 	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
 	if (phys_id != PhObjectIdNull) {
@@ -697,7 +697,7 @@ void EditorModeScaleCollider::Update(const Scene& scene, const Vec3f& movement_v
 	}
 }
 
-void EditorModeScaleCollider::OnLeave(const Scene& scene)
+void EditorModeScaleCollider::OnLeave(const World& scene)
 {
 	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
 	if (phys_id != PhObjectIdNull) {

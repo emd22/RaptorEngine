@@ -18,10 +18,10 @@ struct SceneDistanceBand
 	PagedArray<ObjectID> Objects;
 };
 
-class Scene
+class World
 {
 public:
-	Scene() = default;
+	World() = default;
 
 	void Create();
 
@@ -63,7 +63,7 @@ public:
 
 	Ref<PerspectiveCamera>& GetCurrentCamera() { return mpCurrentCamera; }
 
-	~Scene() { Destroy(); }
+	~World() { Destroy(); }
 
 private:
 	void RenderPhysicsObjects(const Camera& camera);

@@ -15,7 +15,7 @@
 namespace fx {
 
 
-class Scene;
+class World;
 
 enum class eEntityType
 {
@@ -51,7 +51,7 @@ public:
 	void MoveBy(const Vec3f& offset) { SetPosition(mPosition + offset); }
 	void ScaleBy(const float scale);
 
-	virtual void OnAttached(Scene* scene) {}
+	virtual void OnAttached(World* scene) {}
 
 	void RotateX(float32 rad);
 	void RotateY(float32 rad);

@@ -1,4 +1,4 @@
-#include "Scene.hpp"
+#include "World.hpp"
 
 #include <Engine.hpp>
 #include <Material/Material.hpp>
@@ -14,14 +14,14 @@ namespace fx {
 
 using namespace renderer;
 
-void Scene::Create()
+void World::Create()
 {
 	mObjects.Create(32);
 	mLights.Create(32);
 	mPhysicsObjects.Create(32);
 }
 
-static void AddObjectToRenderList(Object* object, Scene* scene)
+static void AddObjectToRenderList(Object* object, World* scene)
 {
 	if (object->pScene == nullptr) {
 		object->pScene = scene;
@@ -68,7 +68,7 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 }
 
 
-void Scene::Attach(AssetTicket object_ticket)
+void World::Attach(AssetTicket object_ticket)
 {
 	Object* object = static_cast<Object*>(object_ticket.Get());
 
@@ -86,13 +86,13 @@ void Scene::Attach(AssetTicket object_ticket)
 		});
 }
 
-void Scene::Attach(const Ref<LightBase>& light)
+void World::Attach(const Ref<LightBase>& light)
 {
 	mLights.Insert(light);
 	light->OnAttached(this);
 }
 
-PhObjectId Scene::NewPhysicsObject()
+PhObjectId World::NewPhysicsObject()
 {
 	PhObjectId id = mPhysicsObjects.Size();
 	PhObject* phys = mPhysicsObjects.Insert();
@@ -101,7 +101,7 @@ PhObjectId Scene::NewPhysicsObject()
 	return id;
 }
 
-PhObject* Scene::GetPhysicsObject(PhObjectId id) const
+PhObject* World::GetPhysicsObject(PhObjectId id) const
 {
 	if (id == PhObjectIdNull || id > mPhysicsObjects.Size()) {
 		return nullptr;
@@ -110,7 +110,7 @@ PhObject* Scene::GetPhysicsObject(PhObjectId id) const
 	return &mPhysicsObjects[id];
 }
 
-void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
+void World::SelectPhysicsObject(const JPH::BodyID& body_id)
 {
 	for (const PhObject& phys : mPhysicsObjects) {
 		if (phys.mpPhysicsBody->GetID() == body_id) {
@@ -120,7 +120,7 @@ void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
 	}
 }
 
-Object* Scene::FindObject(const Hash32 name_hash)
+Object* World::FindObject(const Hash32 name_hash)
 {
 	for (ObjectID& obj_id : mObjects) {
 		Object* obj = gObjectManager->GetObject(obj_id);
@@ -132,7 +132,7 @@ Object* Scene::FindObject(const Hash32 name_hash)
 	return nullptr;
 }
 
-PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
+PhObject* World::FindPhysicsObject(const Hash32 name_hash)
 {
 	for (PhObject& phys : mPhysicsObjects) {
 		if (phys.GetName().GetHash() == name_hash) {
@@ -144,7 +144,7 @@ PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
 }
 
 
-void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
+void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
@@ -185,7 +185,7 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 }
 
 
-void Scene::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
+void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
@@ -237,7 +237,7 @@ void Scene::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 	}
 }
 
-void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
+void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
 {
 	if (id_ptr == nullptr) {
 		return;
@@ -285,7 +285,7 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 		rl.Objects.Clear();                                                                                            \
 	}
 
-void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
+void World::RebuildRenderList(bool clear, TileIndex new_tile_index)
 {
 	Tile* tile = gWorldGrid->GetTile(new_tile_index);
 
@@ -330,7 +330,7 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 	}
 }
 
-void Scene::RebuildFromTiles(TileIndex tile_index)
+void World::RebuildFromTiles(TileIndex tile_index)
 {
 	RebuildRenderList(true, tile_index);
 	Vec2u xy = gWorldGrid->GetTileXY(tile_index);
@@ -349,7 +349,7 @@ void Scene::RebuildFromTiles(TileIndex tile_index)
 }
 
 
-void Scene::Render(Camera* shadow_camera)
+void World::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
@@ -385,7 +385,7 @@ void Scene::Render(Camera* shadow_camera)
 }
 
 
-void Scene::RenderBoundingBoxes(const Camera& camera)
+void World::RenderBoundingBoxes(const Camera& camera)
 {
 	if (!mpDebugCube.IsValid()) {
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
@@ -418,7 +418,7 @@ void Scene::RenderBoundingBoxes(const Camera& camera)
 }
 
 
-void Scene::RenderWorldGrid(const Camera& camera)
+void World::RenderWorldGrid(const Camera& camera)
 {
 	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
@@ -459,7 +459,7 @@ void Scene::RenderWorldGrid(const Camera& camera)
 }
 
 
-void Scene::RenderPhysicsObjects(const Camera& camera)
+void World::RenderPhysicsObjects(const Camera& camera)
 {
 	if (!mpDebugCube.IsValid()) {
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
@@ -495,7 +495,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
 	}
 }
 
-void Scene::RenderObjectShadows(Object* object)
+void World::RenderObjectShadows(Object* object)
 {
 	ShadowPushConstants consts;
 
@@ -539,7 +539,7 @@ void Scene::RenderObjectShadows(Object* object)
 }
 
 
-void Scene::RenderShadows(Camera* shadow_camera)
+void World::RenderShadows(Camera* shadow_camera)
 {
 	gShadowRenderer->Begin();
 
@@ -556,7 +556,7 @@ void Scene::RenderShadows(Camera* shadow_camera)
 	gShadowRenderer->End();
 }
 
-void Scene::Destroy()
+void World::Destroy()
 {
 	mObjects.Destroy();
 	mLights.Destroy();

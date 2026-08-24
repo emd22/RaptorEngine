@@ -79,12 +79,6 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Asset/SceneFile.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/SceneFile.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Asset/SceneFile.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/SceneFile.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Asset/ShaderCompiler.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/ShaderCompiler.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Asset/ShaderCompiler.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/ShaderCompiler.cpp.o"
@@ -94,6 +88,12 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Asset/ShaderPreproc.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/ShaderPreproc.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Asset/ShaderPreproc.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/ShaderPreproc.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Asset/WorldFile.cpp.o -c /Users/emd22/Projects/a2/Src/Asset/WorldFile.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Asset/WorldFile.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Asset/WorldFile.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -634,12 +634,6 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Window.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Window.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/Window.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Window.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Scene.cpp.o -c /Users/emd22/Projects/a2/Src/Scene.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Scene.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Scene.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -1522,6 +1516,12 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Util/Tokenizer.cpp.o -c /Users/emd22/Projects/a2/Src/Util/Tokenizer.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Util/Tokenizer.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Util/Tokenizer.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/World.cpp.o -c /Users/emd22/Projects/a2/Src/World.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/World.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/World.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

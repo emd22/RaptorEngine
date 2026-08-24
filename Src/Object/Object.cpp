@@ -17,7 +17,7 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <Renderer/RenderBackend.hpp>
-#include <Scene.hpp>
+#include <World.hpp>
 
 namespace fx {
 
@@ -148,7 +148,7 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
 	//     });
 }
 
-void Object::OnAttached(Scene* scene)
+void Object::OnAttached(World* scene)
 {
 	PhObject* phys = scene->GetPhysicsObject(PhysicsId);
 
