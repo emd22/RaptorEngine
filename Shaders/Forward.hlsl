@@ -49,14 +49,14 @@ struct VSPushConsts
 
 #ifdef USE_SKINNING
 
-F_CBuffer(VSUniforms, 3, 0)
+F_CBuffer(VSUniforms, 3, 1)
 {
     BoneMtx bBones[BONE_COUNT];
 };
 
 #endif // USE_SKINNING
 
-F_StructBuffer(bObjectBuffer, Object, 0, 1);
+F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
@@ -130,22 +130,22 @@ struct FSInput
 #include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
 
-F_CBuffer(FSLightBuffer, 4, 0)
+F_CBuffer(FSLightBuffer, 4, 1)
 {
 	Light Lights[LIGHT_COUNT];
 };
 
-F_StructBuffer(bMaterialBuffer, Material, 1, 1);
+F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 
 // Forward+ tiled light lists
-F_StructBuffer(bLightGrid, TileLightData, 0, 2);
-F_StructBuffer(bLightIndexList, uint, 1, 2);
+F_StructBuffer(bLightGrid, TileLightData, 2, 0);
+F_StructBuffer(bLightIndexList, uint, 3, 0);
 
-F_Texture2D(tAlbedo, 0, 0)
+F_Texture2D(tAlbedo, 0, 1)
 
 #ifdef USE_NORMAL_MAPS
-F_Texture2D(tNormalMap, 1, 0)
-F_Texture2D(tMetallicRoughness, 2, 0)
+F_Texture2D(tNormalMap, 1, 1)
+F_Texture2D(tMetallicRoughness, 2, 1)
 #endif
 
 struct FSPushConsts

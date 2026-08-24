@@ -203,7 +203,7 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 	offsets.Insert(gRenderer->LightBuffer.GetBaseOffset());
 
 	// Bind the descriptor set
-	descriptor_set->Bind(0, cmd, pipeline, Slice<uint32>(offsets));
+	descriptor_set->Bind(1, cmd, pipeline, Slice<uint32>(offsets));
 
 	return true;
 }

@@ -22,6 +22,17 @@
 #include <Object/ObjectManager.hpp>
 #include <algorithm>
 
+/*
+
+General Descriptor Sets
++===============================================================================+
+| 0  | ObjectBuffer, MaterialBuffer, Light Buffers (globals, persistent)        |
++-------------------------------------------------------------------------------+
+| 1  | Material images + Bones                                                  |
++===============================================================================+
+
+ */
+
 namespace fx::renderer {
 
 FX_SET_MODULE_NAME("DeferredRenderer")
@@ -48,38 +59,38 @@ void DeferredRenderer::Destroy() {}
 
 void DeferredRenderer::CreateUnlitPass()
 {
-	TargetList targets {};
+	// TargetList targets {};
 
-	Target* lp_light_attachment = LightPass.GetTarget(eImageFormat::RGBA16_Float);
-	Target* lp_depth_attachment = GPass.GetTarget(eImageFormat::D32_Float);
+	// Target* lp_light_attachment = LightPass.GetTarget(eImageFormat::RGBA16_Float);
+	// Target* lp_depth_attachment = GPass.GetTarget(eImageFormat::D32_Float);
 
-	Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
+	// Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
 
-	UnlitPass.Create("Unlit", gRenderer->Swapchain.Extent);
+	// UnlitPass.Create("Unlit", gRenderer->Swapchain.Extent);
 
-	UnlitPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
-						VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						eImageAspectFlag::Depth);
-	{
-		Target* depth_target = UnlitPass.GetTarget(eImageFormat::D32_Float);
-		depth_target->LoadOp = eLoadOp::Load;
-		depth_target->StoreOp = eStoreOp::DontCare;
-		depth_target->InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		depth_target->UseImageFromTarget(lp_depth_attachment);
-	}
+	// UnlitPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
+	// 					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+	// 					eImageAspectFlag::Depth);
+	// {
+	// 	Target* depth_target = UnlitPass.GetTarget(eImageFormat::D32_Float);
+	// 	depth_target->LoadOp = eLoadOp::Load;
+	// 	depth_target->StoreOp = eStoreOp::DontCare;
+	// 	depth_target->InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// 	depth_target->UseImageFromTarget(lp_depth_attachment);
+	// }
 
-	UnlitPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-						VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-	{
-		Target* light_target = UnlitPass.GetTarget(eImageFormat::RGBA16_Float);
-		light_target->LoadOp = eLoadOp::Load;
-		light_target->StoreOp = eStoreOp::Store;
-		light_target->InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		light_target->FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		light_target->UseImageFromTarget(lp_light_attachment);
-	}
+	// UnlitPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+	// 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	// {
+	// 	Target* light_target = UnlitPass.GetTarget(eImageFormat::RGBA16_Float);
+	// 	light_target->LoadOp = eLoadOp::Load;
+	// 	light_target->StoreOp = eStoreOp::Store;
+	// 	light_target->InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	// 	light_target->FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// 	light_target->UseImageFromTarget(lp_light_attachment);
+	// }
 
-	UnlitPass.BuildRenderStage();
+	// UnlitPass.BuildRenderStage();
 }
 
 void DeferredRenderer::CreateGPass()
@@ -122,68 +133,68 @@ void DeferredRenderer::CreateGPass()
 
 void DeferredRenderer::CreateUnlitPipeline()
 {
-	CreateUnlitPass();
-	{
-		// Unlit pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::Unlit);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
-		gPSOBuild->SetShader(eShaderName::Unlit, {});
+	// CreateUnlitPass();
+	// {
+	// 	// Unlit pipeline
+	// 	gPSOBuild->BeginPipeline(ePipelineName::Unlit);
+	// 	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
+	// 	gPSOBuild->SetShader(eShaderName::Unlit, {});
 
-		gPSOBuild->UseRenderStage(UnlitPass);
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
+	// 	gPSOBuild->UseRenderStage(UnlitPass);
+	// 	gPSOBuild->SetVertexType(eVertexType::Default);
+	// 	gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		// gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-		// 					gSamplerCache->Request({}));
-		// gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-		// 					gSamplerCache->Request({}));
+	// 	gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+	// 						gSamplerCache->Request({}));
+	// 	// gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+	// 	// 					gSamplerCache->Request({}));
+	// 	// gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+	// 	// 					gSamplerCache->Request({}));
 
-		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
+	// 	gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+	// 						 gObjectManager->GetPageSize());
 
-		gPSOBuild->EndPipeline();
+	// 	gPSOBuild->EndPipeline();
 
 
-		// Unlit pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::UnlitNormalMaps);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
-		gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+	// 	// Unlit pipeline
+	// 	gPSOBuild->BeginPipeline(ePipelineName::UnlitNormalMaps);
+	// 	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
+	// 	gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
 
-		gPSOBuild->UseRenderStage(UnlitPass);
-		gPSOBuild->SetVertexType(eVertexType::Default);
-		gPSOBuild->SetCullMode(eCullMode::Back);
+	// 	gPSOBuild->UseRenderStage(UnlitPass);
+	// 	gPSOBuild->SetVertexType(eVertexType::Default);
+	// 	gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
+	// 	gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+	// 						gSamplerCache->Request({}));
+	// 	gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+	// 						gSamplerCache->Request({}));
+	// 	gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+	// 						gSamplerCache->Request({}));
 
-		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
+	// 	gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+	// 						 gObjectManager->GetPageSize());
 
-		gPSOBuild->EndPipeline();
-	}
+	// 	gPSOBuild->EndPipeline();
+	// }
 
-	{
-		// Debug Layer pipeline
-		gPSOBuild->BeginPipeline(ePipelineName::DebugLayer);
-		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
-		gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
-		gPSOBuild->SetVertexType(eVertexType::Slim);
-		gPSOBuild->SetRenderLines(true);
-		gPSOBuild->SetCullMode(eCullMode::Back);
+	// {
+	// 	// Debug Layer pipeline
+	// 	gPSOBuild->BeginPipeline(ePipelineName::DebugLayer);
+	// 	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
+	// 	gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
+	// 	gPSOBuild->SetVertexType(eVertexType::Slim);
+	// 	gPSOBuild->SetRenderLines(true);
+	// 	gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gPSOBuild->UseRenderStage(UnlitPass);
+	// 	gPSOBuild->UseRenderStage(UnlitPass);
 
-		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-							 gObjectManager->GetPageSize());
+	// 	gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+	// 						 gObjectManager->GetPageSize());
 
-		gPSOBuild->EndPipeline();
-	}
+	// 	gPSOBuild->EndPipeline();
+	// }
 }
 
 
@@ -200,24 +211,29 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		// Use a null image for now, custom DS's created by the materials will be bound at render time
-		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
+		// Set 0 (Global / Per Frame)
 
-		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-							 gRenderer->LightBuffer.PageSize);
 		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
-
 		// bLightGrid
-		gPSOBuild->AddBuffer(0, 2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
 		// bLightIndexList
-		gPSOBuild->AddBuffer(1, 2, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
 							 gRenderer->LightIndexListPageSize);
+
+		// Set 1 (Object local)
+
+		// Use a null image for now, custom DS's created by the materials will be bound at render time
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+							 gRenderer->LightBuffer.PageSize);
+
 
 		gPSOBuild->EndPipeline();
 	}
@@ -233,28 +249,32 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-
-		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-							 gRenderer->LightBuffer.PageSize);
+		// Set 0 (Global / Per Frame)
 
 		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
 		// bLightGrid
-		gPSOBuild->AddBuffer(0, 2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
 		// bLightIndexList
-		gPSOBuild->AddBuffer(1, 2, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
 							 gRenderer->LightIndexListPageSize);
+
+		// Set 1 (Object local)
+
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+							 gRenderer->LightBuffer.PageSize);
 
 		gPSOBuild->EndPipeline();
 	}
@@ -270,34 +290,38 @@ void DeferredRenderer::CreateGPassPipeline()
 													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-							gSamplerCache->Request({}));
-
-		// bBoneBuffer
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
-							 gRenderer->BoneBuffer.PageSize);
-
-		// Light buffer
-		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-							 gRenderer->LightBuffer.PageSize);
+		// Set 0 (Global / Per Frame)
 
 		// bObjectBuffer
-		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
 
 		// bMaterialBuffer
-		gPSOBuild->AddBuffer(1, 1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
 		// bLightGrid
-		gPSOBuild->AddBuffer(0, 2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
 		// bLightIndexList
-		gPSOBuild->AddBuffer(1, 2, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
 							 gRenderer->LightIndexListPageSize);
+
+		// Set 1 (Object local)
+
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+
+		// bBoneBuffer
+		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
+							 gRenderer->BoneBuffer.PageSize);
+
+		// Light buffer
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
+							 gRenderer->LightBuffer.PageSize);
 
 		gPSOBuild->EndPipeline();
 
@@ -346,11 +370,9 @@ void DeferredRenderer::DoLightCullingPass(Camera& camera)
 	push_constants.ScreenSize[0] = static_cast<float32>(extent.X);
 	push_constants.ScreenSize[1] = static_cast<float32>(extent.Y);
 
-	// Lights are submitted sequentially into the light buffer, the slot index is the amount of lights
 	push_constants.LightCount = gRenderer->LightBuffer.SlotIndex;
 	push_constants.TileColumns = tile_columns;
 
-	// Dynamic offsets are assigned in ascending binding order (bLightGrid, bLightIndexList, FSLightBuffer)
 	gPipelineCache->AddBufferOffset(0, gRenderer->GetLightGridFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gRenderer->GetLightIndexListFrameOffset());
 	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());

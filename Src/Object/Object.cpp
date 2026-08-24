@@ -291,9 +291,10 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
 	}
 
-	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
+	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
+									  gRenderer->GetLightIndexListFrameOffset() };
 
-	gObjectManager->pDescriptorSet->Bind(1, cmd, *pipeline,
+	gObjectManager->pDescriptorSet->Bind(0, cmd, *pipeline,
 										 Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 
 	if (pMesh) {

@@ -4,6 +4,7 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 
 ## Features
 
+- Tiled forward renderer (Forward+)
 - Fast math library using SIMD
     - Supports Arm NEON and SSE/AVX.
 - Vulkan graphics backend
@@ -12,7 +13,6 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 - Custom core library and containers
 - Multithreaded and extensible asset manager that works seamlessly in the background
 - Jolt Physics
-- Deferred rendering with light volumes
 
 ## Docs
 

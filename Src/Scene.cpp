@@ -238,8 +238,8 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		CLEAR_RL_SECTION(ePipelineName::Geometry);
 		CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
 		CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
-		CLEAR_RL_SECTION(ePipelineName::Unlit);
-		CLEAR_RL_SECTION(ePipelineName::UnlitNormalMaps);
+		// CLEAR_RL_SECTION(ePipelineName::Unlit);
+		// CLEAR_RL_SECTION(ePipelineName::UnlitNormalMaps);
 	}
 
 	uint32 index = 0;
