@@ -55,8 +55,14 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 		LogInfo("Listing attached nodes for {}:", object->ID.GetID());
 
 		for (const ObjectID& attach_id : object->AttachedNodes) {
+			Object* attached_object = gObjectManager->GetObject(attach_id);
+
+			if (object->IsShadowCaster()) {
+				attached_object->SetShadowCaster(true);
+			}
+
 			LogInfo("   Object {}", attach_id.GetID());
-			AddObjectToRenderList(gObjectManager->GetObject(attach_id), scene);
+			AddObjectToRenderList(attached_object, scene);
 		}
 	}
 }
@@ -266,12 +272,6 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 	mRenderList.Add(pl_name, id);
 
 	Object* obj = gObjectManager->GetObject(id);
-
-	// Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
-
-	// if (material->QualityLevel > 0) {
-	// 	material->RequestQuality(material->QualityLevel - 1);
-	// }
 
 	for (ObjectID& attached_id : obj->AttachedNodes) {
 		AddToRenderListRecursive(pl_name, &attached_id);
