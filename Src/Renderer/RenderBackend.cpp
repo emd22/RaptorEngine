@@ -31,6 +31,10 @@
 #include <vector>
 
 
+/* If this is defined, we will break on an error message containing this string. */
+#define FX_DEBUG_BREAK_ON_ERROR_SUBSTR                                                                                 \
+	"VK_FORMAT_D32_SFLOAT with tiling VK_IMAGE_TILING_OPTIMAL doesn't support VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT"
+
 #define FX_VULKAN_DEBUG 1
 
 // This isn't defined on some platforms/drivers.
@@ -336,12 +340,14 @@ static uint32 DebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messag
 	const char* message = callback_data->pMessage;
 	const char* fmt = "VkValidator: {:s}";
 
+
+#ifdef FX_DEBUG_BREAK_ON_ERROR_SUBSTR
 	String s_msg(message);
 
-	// if (s_msg.Contains("being bound is not compatible with the corresponding VkPipelineLayout")) {
-	// 	FX_BREAKPOINT;
-	// }
-
+	if (s_msg.Contains(FX_DEBUG_BREAK_ON_ERROR_SUBSTR)) {
+		FX_BREAKPOINT;
+	}
+#endif
 
 	if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) {
 		LogError(LC_RENDER, fmt, message);

@@ -92,6 +92,18 @@ public:
 };
 
 
+struct ImageTypeProperties
+{
+	VkImageViewType ViewType;
+	uint32 LayerCount;
+};
+
+enum class eImageAspectFlag
+{
+	Color = VK_IMAGE_ASPECT_COLOR_BIT,
+	Depth = VK_IMAGE_ASPECT_DEPTH_BIT,
+};
+
 struct ImageFormatUtil
 {
 	static constexpr bool IsDepth(eImageFormat format)
@@ -180,6 +192,26 @@ struct ImageFormatUtil
 		return VK_IMAGE_ASPECT_COLOR_BIT;
 	}
 
+	static constexpr eImageAspectFlag GetAspectFlag(const eImageFormat format)
+	{
+		return static_cast<eImageAspectFlag>(GetAspectMask(format));
+	}
+
+	/**
+	 * @brief Returns the usage flags for the given format (e.g. USAGE_COLOR, USAGE_DEPTH_STENCIL)
+	 */
+	static constexpr VkImageUsageFlags GetFormatUsageFlags(const eImageFormat format)
+	{
+		if (IsDepth(format) || IsStencil(format)) {
+			return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		}
+		else {
+			return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		}
+
+		return 0;
+	}
+
 	static constexpr VkFormat ToUnderlying(const eImageFormat format)
 	{
 		switch (format) {
@@ -216,17 +248,6 @@ struct ImageFormatUtil
 	}
 };
 
-struct ImageTypeProperties
-{
-	VkImageViewType ViewType;
-	uint32 LayerCount;
-};
-
-enum class eImageAspectFlag
-{
-	Color = VK_IMAGE_ASPECT_COLOR_BIT,
-	Depth = VK_IMAGE_ASPECT_DEPTH_BIT,
-};
 
 struct TransitionLayoutOverrides
 {

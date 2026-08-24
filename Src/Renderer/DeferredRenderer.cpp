@@ -210,6 +210,12 @@ void DeferredRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 												gMaterialManager->MaterialPropertiesBuffer.Size));
 
+
+	std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
+	pPersistentDescriptorSlim = result.second;
+
+	// Add the other descriptors for the non-slim
+
 	ds_entries.Insert(
 		DescriptorEntry::AsBuffer(2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize));
 
@@ -229,8 +235,7 @@ void DeferredRenderer::BuildPersistentDescriptor()
 												   eSamplerCompareOp::Greater,
 											   })));
 
-
-	std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
+	result = gDescriptorCache->Request(ds_entries);
 	pPersistentDescriptor = result.second;
 }
 

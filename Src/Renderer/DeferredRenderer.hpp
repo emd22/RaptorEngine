@@ -79,6 +79,9 @@ public:
 	/// Descriptors that remain bound for the entirety of the frame. This includes object buffer, material buffer, etc.
 	DescriptorSet* pPersistentDescriptor = nullptr;
 
+	/// Persistent descriptor that only applies for the object and material buffers.
+	DescriptorSet* pPersistentDescriptorSlim = nullptr;
+
 	/// Amount of tile columns the light grid is dispatched with for the current frame
 	uint32 mLightTileColumns = 0;
 };

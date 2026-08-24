@@ -35,7 +35,6 @@ public:
 	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
 	void Render(Camera* shadow_camera);
-	void RenderShadows(Camera* shadow_camera);
 
 	const PagedArray<ObjectID>& GetAllObjects() { return mObjects; }
 	const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
@@ -69,7 +68,6 @@ private:
 	void RenderPhysicsObjects(const Camera& camera);
 	void RenderBoundingBoxes(const Camera& camera);
 	void RenderWorldGrid(const Camera& camera);
-	void RenderObjectShadows(Object* object_id);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
 	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);

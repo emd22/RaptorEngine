@@ -263,10 +263,12 @@ void Image::CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, 
 	staging_buffer.Upload(info.ImageData);
 
 	const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-										   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+										   ImageFormatUtil::GetFormatUsageFlags(info.Format) |
+										   VK_IMAGE_USAGE_SAMPLED_BIT);
+
 
 	Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags,
-		   eImageAspectFlag::Color, flags);
+		   ImageFormatUtil::GetAspectFlag(info.Format), flags);
 
 	CopyFromBuffer(cmd, staging_buffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				   GetMipDimensions(info.Size, info.MipLevel), 0, info.MipLevel);
@@ -302,10 +304,12 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 	staging_buffer.Upload(image_data);
 
 	const VkImageUsageFlags usage_flags = (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-										   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+										   ImageFormatUtil::GetFormatUsageFlags(info.Format) |
+										   VK_IMAGE_USAGE_SAMPLED_BIT);
 
-	Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags,
-		   eImageAspectFlag::Color);
+	const eImageAspectFlag aspect_flag = ImageFormatUtil::GetAspectFlag(info.Format);
+
+	Create(info.ImageType, info.Size, info.MipCount, info.Format, VK_IMAGE_TILING_OPTIMAL, usage_flags, aspect_flag);
 
 	SizedArray<VkBufferImageCopy> buffer_copy_infos(info.MipCount);
 
@@ -321,7 +325,7 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 			.bufferRowLength = 0,
 			.bufferImageHeight = 0,
 			.imageSubresource {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.aspectMask = static_cast<const VkImageAspectFlags>(aspect_flag),
 				.mipLevel = info_index,
 				.baseArrayLayer = 0,
 				.layerCount = 1,

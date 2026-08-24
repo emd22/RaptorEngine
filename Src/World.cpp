@@ -199,17 +199,6 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
-	pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
-
-	{
-		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
-										  gRenderer->GetLightIndexListFrameOffset() };
-
-		gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
-			0, gRenderer->GetFrame()->CmdBuffer, pipeline,
-			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
-	}
-
 	// Push constants definition
 	ShadowPushConstants consts;
 	memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
@@ -370,9 +359,26 @@ void World::Render(Camera* shadow_camera)
 		light->Render(camera, shadow_camera);
 	}
 
-	gShadowRenderer->Begin();
-	ExecuteShadowRenderList(ePipelineName::ShadowDirectional);
-	gShadowRenderer->End();
+	// Render shadows
+	{
+		gShadowRenderer->Begin();
+
+		Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
+		pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
+
+		{
+			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
+
+			gRenderer->pDeferredRenderer->pPersistentDescriptorSlim->Bind(
+				0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+		}
+
+
+		ExecuteShadowRenderList(ePipelineName::ShadowDirectional);
+
+		gShadowRenderer->End();
+	}
 
 	// Cull lights into screen space tiles before rendering geometry (Forward+)
 	gRenderer->BeginLightCulling(camera);
@@ -493,67 +499,6 @@ void World::RenderPhysicsObjects(const Camera& camera)
 		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);
 	}
-}
-
-void World::RenderObjectShadows(Object* object)
-{
-	ShadowPushConstants consts;
-
-	memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
-		   sizeof(float32) * 16);
-
-	bool in_skinned_shader = false;
-
-	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
-
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
-
-	if (in_skinned_shader && !object->IsSkinned()) {
-		in_skinned_shader = false;
-		pipeline.Bind(cmd);
-
-		{
-			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
-											  gRenderer->GetLightIndexListFrameOffset() };
-
-			gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
-				0, gRenderer->GetFrame()->CmdBuffer, pipeline,
-				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
-		}
-
-		// gObjectManager->pDescriptorSet->BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-		// 											   gObjectManager->GetBaseOffset());
-	}
-
-	object->Update();
-
-	consts.ObjectIndex = object->ID.GetID();
-
-	gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
-
-	object->RenderPrimitive(cmd);
-
-	for (const ObjectID& attached : object->AttachedNodes) {
-		RenderObjectShadows(gObjectManager->GetObject(attached));
-	}
-}
-
-
-void World::RenderShadows(Camera* shadow_camera)
-{
-	gShadowRenderer->Begin();
-
-	for (const ObjectID& object_id : mObjects) {
-		Object* object = gObjectManager->GetObject(object_id);
-
-		if (!object->IsShadowCaster()) {
-			continue;
-		}
-
-		RenderObjectShadows(object);
-	}
-
-	gShadowRenderer->End();
 }
 
 void World::Destroy()
