@@ -1,3 +1,8 @@
+/// Mirrors `eLightType` on the CPU
+#define FX_LIGHT_TYPE_UNKNOWN 0
+#define FX_LIGHT_TYPE_DIRECTIONAL 1
+#define FX_LIGHT_TYPE_POINT 2
+
 struct Light
 {
 	// 64
@@ -15,6 +20,21 @@ struct Light
 	// 236
 	float2 vCameraSize;
 	uint1 uiAmbient;
+	uint1 uiLightType;
+};
+
+///////////////////////////////////
+// Forward+ Tiled Lighting
+///////////////////////////////////
+
+#define LIGHT_TILE_SIZE 16
+#define MAX_LIGHTS_PER_TILE 6
+
+/// Per tile light list offsets. `StartIndex` points into the global light index list.
+struct TileLightData
+{
+	uint Count;
+	uint StartIndex;
 };
 
 

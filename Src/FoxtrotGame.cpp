@@ -9,7 +9,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Font/Font.hpp>
 #include <Asset/MipmapGen.hpp>
-#include <Asset/SceneFile.hpp>
+#include <Asset/WorldFile.hpp>
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
@@ -108,23 +108,27 @@ void FoxtrotGame::ReloadAllObjects()
 	mMainScene.Destroy();
 	mMainScene.Create();
 
-	SceneFile scene_file;
+	WorldFile scene_file;
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
 }
 
 void FoxtrotGame::CreateLights()
 {
-	// Ref<LightPoint> pl = Ref<LightPoint>::New();
-
-	// Ref<MeshGen::GeneratedMesh> sphere = MeshGen::MakeIcoSphere(4);
-	// pl->SetLightVolume(sphere);
-	// pl->Color = Color::FromRGBA(50, 250, 100, 3);
-	// pl->MoveBy(Vec3f(0, 1, 0));
-	// pl->SetRadius(5.0);
+	Ref<LightPoint> pl = Ref<LightPoint>::New();
+	pl->Color = Color::FromRGBA(50, 250, 100, 8);
+	pl->MoveBy(Vec3f(0, 1, 0));
+	pl->SetRadius(3.0);
 	// pl->SetScale(15);
 
-	// mMainScene.Attach(pl);
+	mMainScene.Attach(pl);
+
+	Ref<LightPoint> pl2 = Ref<LightPoint>::New();
+	pl2->Color = Color::FromRGBA(200, 80, 100, 8);
+	pl2->MoveBy(Vec3f(1, 0.5, 0));
+	pl2->SetRadius(3.0);
+
+	mMainScene.Attach(pl2);
 
 	// Ref<LightPoint> pl2 = Ref<LightPoint>::New();
 
@@ -216,7 +220,7 @@ void FoxtrotGame::CreateGame()
 
 	AddEditorModes();
 
-	SceneFile scene_file;
+	WorldFile scene_file;
 
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
@@ -251,6 +255,7 @@ void FoxtrotGame::CreateGame()
 		//     LogError("Failed to load font!");
 		// }
 	}
+
 
 	CreateLights();
 	CreateFontObject();
@@ -462,7 +467,7 @@ void FoxtrotGame::ProcessControls()
 
 	if (ControlManager::IsComboDown(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
 		// Reload the object properties from the scene
-		SceneFile scene_file;
+		WorldFile scene_file;
 		scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr32("Scene"))->Get<const char*>()),
 						mMainScene);
 
@@ -588,7 +593,7 @@ void FoxtrotGame::Tick()
 	frame->CmdBuffer.Reset();
 	frame->CmdBuffer.Record();
 
-	mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
+	// mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
 	mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
 	if (gRenderer->DidResize()) {
@@ -649,7 +654,7 @@ FoxtrotGame::~FoxtrotGame()
 // Editor modes
 /////////////////////////////////////
 
-void EditorModeMoveCollider::Update(const Scene& scene, const Vec3f& movement_vector)
+void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
 	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
 	if (phys_id != PhObjectIdNull) {
@@ -665,9 +670,9 @@ void EditorModeMoveCollider::Update(const Scene& scene, const Vec3f& movement_ve
 	}
 }
 
-void EditorModeMoveCollider::OnLeave(const Scene& scene) {}
+void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
-void EditorModeScaleCollider::Update(const Scene& scene, const Vec3f& movement_vector)
+void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
 	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
 	if (phys_id != PhObjectIdNull) {
@@ -692,7 +697,7 @@ void EditorModeScaleCollider::Update(const Scene& scene, const Vec3f& movement_v
 	}
 }
 
-void EditorModeScaleCollider::OnLeave(const Scene& scene)
+void EditorModeScaleCollider::OnLeave(const World& scene)
 {
 	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
 	if (phys_id != PhObjectIdNull) {

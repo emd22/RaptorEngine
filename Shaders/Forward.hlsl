@@ -44,18 +44,19 @@ struct VSPushConsts
     float4x4 mViewProjection;
 	uint uiObjectIndex;
     uint uiMaterialIndex;
+    uint uiTileColumns;
 };
 
 #ifdef USE_SKINNING
 
-F_CBuffer(VSUniforms, 3, 0)
+F_CBuffer(VSUniforms, 3, 1)
 {
     BoneMtx bBones[BONE_COUNT];
 };
 
 #endif // USE_SKINNING
 
-F_StructBuffer(bObjectBuffer, Object, 0, 1);
+F_StructBuffer(bObjectBuffer, Object, 0, 0);
 
 [[vk::push_constant]] VSPushConsts VSConst;
 
@@ -63,7 +64,7 @@ VSOutput main(VSInput input)
 {
     VSOutput output;
 
-    float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
+    float4x4 world_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
     float4x4 MVP = mul(VSConst.mViewProjection, world_matrix);
 
@@ -91,6 +92,8 @@ VSOutput main(VSInput input)
 
     float4 position_ws = mul(world_matrix, float4(input.vPosition, 1.0));
 	output.vPositionWS = position_ws.xyz;
+
+	output.uiMaterialIndex = VSConst.uiMaterialIndex;
 
 	return output;
 }
@@ -127,22 +130,48 @@ struct FSInput
 #include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
 
-F_CBuffer(FSLightBuffer, 4, 0)
+F_CBuffer(FSLightBuffer, 4, 1)
 {
 	Light Lights[LIGHT_COUNT];
 };
 
-F_StructBuffer(bMaterialBuffer, Material, 1, 1);
+F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 
-F_Texture2D(tAlbedo, 0)
+// Forward+ tiled light lists
+F_StructBuffer(bLightGrid, TileLightData, 2, 0);
+F_StructBuffer(bLightIndexList, uint, 3, 0);
+
+F_Texture2D(tAlbedo, 0, 1)
 
 #ifdef USE_NORMAL_MAPS
-F_Texture2D(tNormalMap, 1)
-F_Texture2D(tMetallicRoughness, 2)
+F_Texture2D(tNormalMap, 1, 1)
+F_Texture2D(tMetallicRoughness, 2, 1)
 #endif
+
+F_ShadowTexture2D(tShadowAtlas, 4, 0);
+
+struct FSPushConsts
+{
+	float4x4 mViewProjection;
+	uint uiObjectIndex;
+	uint uiMaterialIndex;
+	uint uiTileColumns;
+};
+
+[[vk::push_constant]] FSPushConsts FSConst;
 
 #define ROUGHNESS roughness_metallic.x
 #define METALLIC  roughness_metallic.y
+
+
+float3 GetSaturationColor(float value)
+{
+	const float LIMIT = (float)MAX_LIGHTS_PER_TILE;
+
+	float ratio = saturate(value / LIMIT);
+
+	return float3(ratio, 1.0 - ratio, 0.0);
+}
 
 
 FSOutput main(FSInput input)
@@ -151,11 +180,16 @@ FSOutput main(FSInput input)
 
     // Material material_info = bMaterialBuffer[input.uiMaterialIndex];
     // float4 material_color = F_UnpackUIntToFloat4(material_info.uiBaseColor);
-    float4 material_color = float4(0.0, 0.0, 0.0, 1.0);
 
-    float3 albedo = F_Sample(tAlbedo, input.vUV).rgb + material_color.rgb;
+    float3 albedo = F_Sample(tAlbedo, input.vUV).rgb;
 
-    output.vAlbedo = float4(F_Sample(tAlbedo, input.vUV).rgb + material_color.rgb, 1.0);
+    output.vAlbedo = float4(albedo, 1.0);
+
+    Material material = bMaterialBuffer[input.uiMaterialIndex];
+
+    if (HAS_FLAG(material.Flags, MF_UNLIT)) {
+	    return output;
+    }
 
 #ifdef USE_NORMAL_MAPS
     float2 roughness_metallic = F_Sample(tMetallicRoughness, input.vUV).gb;
@@ -180,43 +214,90 @@ FSOutput main(FSInput input)
     output.vAlbedo.w = 0.0;
 #endif
 
-	Light light = Lights[0];
+	float3 accumulated_light = float3(0.0, 0.0, 0.0);
 
-	float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
-	float light_intensity = light_color.w * 255.0;
+	// Retrieve the light list for the tile that this pixel belongs to
+	uint2 tile_xy = uint2(input.vPosition.xy / LIGHT_TILE_SIZE);
+	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
 
-	const float visibility = 1.0;
+	TileLightData tile_data = bLightGrid[tile_index];
 
-	float3 F0 = float3(0.04, 0.04, 0.04);
-	F0 = lerp(F0, albedo, metallic);
+	// output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
+	// output.vAlbedo = float4(float3(material.fAlpha, material.fAlpha, material.fAlpha), 1.0);
+	// return output;
 
-	const float attenuation = light_intensity;
+	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
+		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
 
-	float3 L = normalize(light.vLightPosition);
-	float3 N = normalize(N_final);
-	float3 V = normalize(light.vEyePosition - input.vPositionWS);
-	float3 H = normalize(V + L);
+		float4 light_color = F_UnpackUIntToFloat4(light.uiLightColor);
+		float light_intensity = light_color.w * 255.0;
 
-	float NdotL = DotC(N, L);
-	float NdotV = abs(dot(N, V)) + 1e-5f;
-	float NdotH = DotC(N, H);
-	float LdotH = DotC(L, H);
+		/// How much light is visible (not occluded) at this pixel
+		float visibility = 1.0;
 
-	float3 F = F_Schlick(F0, 1.0, LdotH);
-	float3 diffuse_reflectance = albedo * (1.0 - metallic);
+		float3 L;
+		float attenuation;
 
-	float D = D_GGX(NdotH, roughness);
-	float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
-	float3 Fr = D * F * Vis * FX_MATH_1_OVER_PI;
+		if (light.uiLightType == FX_LIGHT_TYPE_DIRECTIONAL) {
+			L = normalize(light.vLightPosition);
+			attenuation = light_intensity;
 
-	float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, (roughness * roughness));
+			// Calculate shadows
+			float4 shadow_pos_light_space = mul(light.LightCameraMatrix, float4(input.vPositionWS, 1.0));
 
-	float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
-	float3 specular_term = Fr;
+			float2 shadow_uv;
+			shadow_uv.x = 0.5f + (shadow_pos_light_space.x / shadow_pos_light_space.w * 0.5f);
+			shadow_uv.y = 0.5f - (shadow_pos_light_space.y / shadow_pos_light_space.w * 0.5f);
+			shadow_uv.y = 1.0 - shadow_uv.y;
 
-	float4 ambient = F_UnpackUIntToFloat4(light.uiAmbient) * float4(albedo, 1.0f);
+			float shadow_z = 1.0 - shadow_pos_light_space.z / shadow_pos_light_space.w;
 
-	output.vAlbedo = float4(attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL + ambient.rgb, 1.0);
+			// Check that the UV values are greater than 0.0 and less than 1.0
+			if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
+				visibility = F_SampleCmpLevelZero(tShadowAtlas, shadow_uv, shadow_z + 0.001f);
+				visibility = clamp(visibility, 0.05f, 1.0f);
+			}
+		}
+		else {
+			float3 light_position_local = light.vLightPosition - input.vPositionWS;
+			L = normalize(light_position_local);
+
+			float dist_sq = dot(light_position_local, light_position_local);
+
+			float inv_radius_sq = 1.0 / (light.fLightRadius * light.fLightRadius);
+			attenuation = light_intensity * AttenuationSmooth(dist_sq, inv_radius_sq);
+		}
+
+		float3 F0 = float3(0.04, 0.04, 0.04);
+		F0 = lerp(F0, albedo, metallic);
+
+		float3 N = normalize(N_final);
+		float3 V = normalize(light.vEyePosition - input.vPositionWS);
+		float3 H = normalize(V + L);
+
+		float NdotL = DotC(N, L);
+		float NdotV = abs(dot(N, V)) + 1e-5f;
+		float NdotH = DotC(N, H);
+		float LdotH = DotC(L, H);
+
+		float3 F = F_Schlick(F0, 1.0, LdotH);
+		float3 diffuse_reflectance = albedo * (1.0 - metallic);
+
+		float D = D_GGX(NdotH, roughness);
+		float Vis = V_SmithGGXCorrelated(NdotV, NdotL, roughness);
+		float3 Fr = D * F * Vis * FX_MATH_1_OVER_PI;
+
+		float Fd = Fr_FrostbiteDisneyDiffuse(NdotV, NdotL, LdotH, (roughness * roughness));
+
+		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
+		float3 specular_term = Fr;
+
+		accumulated_light = lerp(accumulated_light, accumulated_light + (attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL), 1.0);
+	}
+
+	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);
+
+	output.vAlbedo = float4(accumulated_light + ambient.rgb, 1.0);
 
 
     return output;

@@ -3,6 +3,7 @@
 #include <Asset/AssetManager.hpp>
 #include <Asset/ShaderCompiler.hpp>
 #include <Core/MemPool/MemPool.hpp>
+#include <Core/Thread/ThreadManager.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
@@ -19,6 +20,7 @@ AssetManager* gAssetManager = nullptr;
 ObjectManager* gObjectManager = nullptr;
 TextureManager* gTextureManager = nullptr;
 MaterialManager* gMaterialManager = nullptr;
+ThreadManager* gThreadManager = nullptr;
 
 MemPool* gEnginePool = nullptr;
 MemPool* gScriptMemPool = nullptr;
@@ -40,6 +42,7 @@ void Init()
 	gMaterialManager = new MaterialManager;
 	gWorldGrid = new WorldGrid;
 	gTextureManager = new TextureManager;
+	gThreadManager = new ThreadManager;
 }
 
 
@@ -49,6 +52,7 @@ void Destroy()
 	DESTROY_GLOBAL(gShaderCompiler);
 	DESTROY_GLOBAL(gMaterialManager);
 	DESTROY_GLOBAL(gWorldGrid);
+	DESTROY_GLOBAL(gThreadManager);
 }
 
 } // namespace Globals

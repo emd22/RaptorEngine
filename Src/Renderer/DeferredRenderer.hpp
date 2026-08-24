@@ -11,9 +11,7 @@ class Camera;
 namespace fx::renderer {
 
 struct FrameData;
-
-class DeferredCompPass;
-class DeferredLightingPass;
+class CommandBuffer;
 
 
 ///////////////////////////////
@@ -27,6 +25,14 @@ public:
 
 	void DoCompPass(Camera& camera);
 
+	/**
+	 * @brief Dispatches the Forward+ light culling pass. Must be called outside of a renderpass,
+	 * after all lights have been submitted for the frame.
+	 */
+	void DoLightCullingPass(Camera& camera);
+
+	/// Binds the Forward+ tiled light list descriptor set (set 2) on the geometry pipeline
+	void BindLightGridDescriptors(CommandBuffer& cmd);
 
 	void Destroy();
 	~DeferredRenderer() { Destroy(); }
@@ -34,6 +40,8 @@ public:
 private:
 	// Geometry
 	void CreateGPassPipeline();
+
+	void BuildPersistentDescriptor();
 
 	void CreateUnlitPass();
 	void CreateGPass();
@@ -44,6 +52,12 @@ private:
 	void CreateLightingPipeline();
 	void CreateLightingDSLayout();
 
+	// Light culling
+	void CreateLightCullingPipeline();
+
+	/// Registers the Forward+ tiled light list buffers (set 2) on the pipeline currently being built
+	void AddLightGridDescriptors();
+
 	// Composition
 	void CreateCompPipeline();
 
@@ -52,14 +66,7 @@ private:
 public:
 	DescriptorPool DescriptorPool;
 
-	/////////////////////
-	// Geometry Pass
-	/////////////////////
-
-	// VkDescriptorSetLayout DsLayoutGPassMaterial = nullptr;
-	// VkDescriptorSetLayout DsLayoutGPassSkinned = nullptr;
-
-	// VkDescriptorSetLayout DsLayoutGPassMaterialAlbedoOnly = nullptr;
+	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 
 	RenderStage UnlitPass;
 	RenderStage LightPass;
@@ -67,49 +74,13 @@ public:
 	RenderStage ForwardPass;
 	RenderStage CompPass;
 
-	// Pipeline PlGeometry;
-	// Pipeline PlGeometryNoDepthTest;
-	// Pipeline PlGeometryWithNormalMaps;
-
-	// Pipeline PlGeometrySkinned;
-
 	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;
 
-	//////////////////////
-	// Lighting Pass
-	//////////////////////
+	/// Descriptors that remain bound for the entirety of the frame. This includes object buffer, material buffer, etc.
+	DescriptorSet* pPersistentDescriptor = nullptr;
 
-	// VkDescriptorSetLayout DsLayoutLightingFrag = nullptr;
-	// VkDescriptorSetLayout DsLayoutLightingMaterialProperties = nullptr;
-
-	// DescriptorSet DsLighting;
-
-
-	// Pipeline PlLightingOutsideVolume;
-	// Pipeline PlLightingInsideVolume;
-	// Pipeline PlLightingDirectional;
-
-	/////////////////////////////////////////////////
-	// Forward pass / Unlit
-	/////////////////////////////////////////////////
-	// VkDescriptorSetLayout DsLayoutUnlit = nullptr;
-	// Pipeline PlText;
-	// Pipeline PlDebugLayer;
-	// DescriptorSet DsUnlit;
-
-	/*    RenderPass RpForward;
-		Framebuffer FbForward;*/
-
-	//////////////////////
-	// Composition Pass
-	//////////////////////
-
-	// VkDescriptorSetLayout DsLayoutCompFrag = nullptr;
-
-	// DescriptorSet DsComposition;
-
-	// Pipeline PlComposition;
-	// Pipeline PlCompositionUnlit;
+	/// Amount of tile columns the light grid is dispatched with for the current frame
+	uint32 mLightTileColumns = 0;
 };
 
 } // namespace fx::renderer

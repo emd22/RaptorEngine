@@ -42,7 +42,7 @@ VSOutput main(VSInput input)
 	float2 out_uv = float2((input.iVertexIndex << 1) & 2, input.iVertexIndex & 2);
 	output.vPosition = float4(out_uv * 2.0 - 1.0, 0.0, 1.0);
 #else
-	float4x4 mvp = mul(VSConst.CameraMatrix, bObjectBuffer[VSConst.uiObjectIndex].mModel);
+	float4x4 mvp = mul(VSConst.CameraMatrix, bObjectBuffer[VSConst.uiObjectIndex].mWorld);
 	output.vPosition = mul(mvp, float4(input.vPosition, 1.0));
 #endif
 

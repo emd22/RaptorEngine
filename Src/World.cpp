@@ -1,4 +1,4 @@
-#include "Scene.hpp"
+#include "World.hpp"
 
 #include <Engine.hpp>
 #include <Material/Material.hpp>
@@ -14,14 +14,14 @@ namespace fx {
 
 using namespace renderer;
 
-void Scene::Create()
+void World::Create()
 {
 	mObjects.Create(32);
 	mLights.Create(32);
 	mPhysicsObjects.Create(32);
 }
 
-static void AddObjectToRenderList(Object* object, Scene* scene)
+static void AddObjectToRenderList(Object* object, World* scene)
 {
 	if (object->pScene == nullptr) {
 		object->pScene = scene;
@@ -36,13 +36,18 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 		LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
 				PipelineNameUtil::GetName(pipeline_name));
 
+		AssertMsg(object->pScene, "Scene has not been initialized on object!");
+
+		if (object->IsShadowCaster()) {
+			object->pScene->mRenderList.Add(ePipelineName::ShadowDirectional, object->ID);
+		}
+
 		// if (is_unlit) {
 		// 	LogInfo("Setting material {} pipeline to be unlit", material->ID);
 		// 	pipeline_name = material->IsAlbedoOnly() ? ePipelineName::Unlit : ePipelineName::UnlitNormalMaps;
 		// 	material->SetPipeline(pipeline_name);
 		// }
 
-		AssertMsg(object->pScene, "Scene has not been initialized on object!");
 		object->pScene->mRenderList.Add(pipeline_name, object->ID);
 	}
 
@@ -50,14 +55,20 @@ static void AddObjectToRenderList(Object* object, Scene* scene)
 		LogInfo("Listing attached nodes for {}:", object->ID.GetID());
 
 		for (const ObjectID& attach_id : object->AttachedNodes) {
+			Object* attached_object = gObjectManager->GetObject(attach_id);
+
+			if (object->IsShadowCaster()) {
+				attached_object->SetShadowCaster(true);
+			}
+
 			LogInfo("   Object {}", attach_id.GetID());
-			AddObjectToRenderList(gObjectManager->GetObject(attach_id), scene);
+			AddObjectToRenderList(attached_object, scene);
 		}
 	}
 }
 
 
-void Scene::Attach(AssetTicket object_ticket)
+void World::Attach(AssetTicket object_ticket)
 {
 	Object* object = static_cast<Object*>(object_ticket.Get());
 
@@ -75,13 +86,13 @@ void Scene::Attach(AssetTicket object_ticket)
 		});
 }
 
-void Scene::Attach(const Ref<LightBase>& light)
+void World::Attach(const Ref<LightBase>& light)
 {
 	mLights.Insert(light);
 	light->OnAttached(this);
 }
 
-PhObjectId Scene::NewPhysicsObject()
+PhObjectId World::NewPhysicsObject()
 {
 	PhObjectId id = mPhysicsObjects.Size();
 	PhObject* phys = mPhysicsObjects.Insert();
@@ -90,7 +101,7 @@ PhObjectId Scene::NewPhysicsObject()
 	return id;
 }
 
-PhObject* Scene::GetPhysicsObject(PhObjectId id) const
+PhObject* World::GetPhysicsObject(PhObjectId id) const
 {
 	if (id == PhObjectIdNull || id > mPhysicsObjects.Size()) {
 		return nullptr;
@@ -99,7 +110,7 @@ PhObject* Scene::GetPhysicsObject(PhObjectId id) const
 	return &mPhysicsObjects[id];
 }
 
-void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
+void World::SelectPhysicsObject(const JPH::BodyID& body_id)
 {
 	for (const PhObject& phys : mPhysicsObjects) {
 		if (phys.mpPhysicsBody->GetID() == body_id) {
@@ -109,7 +120,7 @@ void Scene::SelectPhysicsObject(const JPH::BodyID& body_id)
 	}
 }
 
-Object* Scene::FindObject(const Hash32 name_hash)
+Object* World::FindObject(const Hash32 name_hash)
 {
 	for (ObjectID& obj_id : mObjects) {
 		Object* obj = gObjectManager->GetObject(obj_id);
@@ -121,7 +132,7 @@ Object* Scene::FindObject(const Hash32 name_hash)
 	return nullptr;
 }
 
-PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
+PhObject* World::FindPhysicsObject(const Hash32 name_hash)
 {
 	for (PhObject& phys : mPhysicsObjects) {
 		if (phys.GetName().GetHash() == name_hash) {
@@ -133,7 +144,7 @@ PhObject* Scene::FindPhysicsObject(const Hash32 name_hash)
 }
 
 
-void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
+void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
@@ -145,15 +156,16 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
-	// If the pipeline passed in is unlit, force the unlit pipeline to be used over the materials pipeline.
-	// const bool is_unlit_pipeline = (pl_name == ePipelineName::Unlit || pl_name == ePipelineName::UnlitNormalMaps);
-
-	// if (is_unlit_pipeline) {
-	// 	alt_pipeline = &gPipelineCache->Request(pl_name);
-	// }
-
 	pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
 
+	{
+		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
+										  gRenderer->GetLightIndexListFrameOffset() };
+
+		gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
+			0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+	}
 
 	uint32 index = 0;
 	while (true) {
@@ -172,7 +184,60 @@ void Scene::ExecuteRenderList(renderer::ePipelineName pl_name)
 	}
 }
 
-void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
+
+void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
+{
+	PerspectiveCamera& camera = *mpCurrentCamera;
+
+	const RenderListSection& section = mRenderList.GetSection(pl_name);
+
+	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+
+	if (!section.InUse.IsInited()) {
+		return;
+	}
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
+
+	pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
+
+	{
+		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
+										  gRenderer->GetLightIndexListFrameOffset() };
+
+		gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
+			0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+	}
+
+	// Push constants definition
+	ShadowPushConstants consts;
+	memcpy(consts.CameraMatrix, gShadowRenderer->ShadowCamera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
+		   sizeof(float32) * 16);
+
+	uint32 index = 0;
+	while (true) {
+		index = section.InUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+
+		ObjectID object_id = section.Objects[index];
+		Object* object = gObjectManager->GetObject(object_id);
+
+		// Push the direct index for the object id
+		consts.ObjectIndex = object_id.GetID();
+		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
+
+		object->Update();
+		object->RenderPrimitive(cmd);
+
+		++index;
+	}
+}
+
+void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
 {
 	if (id_ptr == nullptr) {
 		return;
@@ -208,12 +273,6 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 
 	Object* obj = gObjectManager->GetObject(id);
 
-	// Material* material = MaterialManagerFwd::GetMaterial(obj->GetMaterialID());
-
-	// if (material->QualityLevel > 0) {
-	// 	material->RequestQuality(material->QualityLevel - 1);
-	// }
-
 	for (ObjectID& attached_id : obj->AttachedNodes) {
 		AddToRenderListRecursive(pl_name, &attached_id);
 	}
@@ -226,7 +285,7 @@ void Scene::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* 
 		rl.Objects.Clear();                                                                                            \
 	}
 
-void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
+void World::RebuildRenderList(bool clear, TileIndex new_tile_index)
 {
 	Tile* tile = gWorldGrid->GetTile(new_tile_index);
 
@@ -238,8 +297,9 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 		CLEAR_RL_SECTION(ePipelineName::Geometry);
 		CLEAR_RL_SECTION(ePipelineName::GeometryNormalMaps);
 		CLEAR_RL_SECTION(ePipelineName::GeometrySkinned);
-		CLEAR_RL_SECTION(ePipelineName::Unlit);
-		CLEAR_RL_SECTION(ePipelineName::UnlitNormalMaps);
+		CLEAR_RL_SECTION(ePipelineName::ShadowDirectional);
+		// CLEAR_RL_SECTION(ePipelineName::Unlit);
+		// CLEAR_RL_SECTION(ePipelineName::UnlitNormalMaps);
 	}
 
 	uint32 index = 0;
@@ -260,13 +320,17 @@ void Scene::RebuildRenderList(bool clear, TileIndex new_tile_index)
 
 		LogInfo("Adding object ID {} -> {}", *object_id, PipelineNameUtil::GetName(material->GetRequiredPipeline()));
 
+		if (object->IsShadowCaster()) {
+			AddToRenderListRecursive(ePipelineName::ShadowDirectional, object_id);
+		}
+
 		AddToRenderListRecursive(material->GetRequiredPipeline(), object_id);
 
 		++index;
 	}
 }
 
-void Scene::RebuildFromTiles(TileIndex tile_index)
+void World::RebuildFromTiles(TileIndex tile_index)
 {
 	RebuildRenderList(true, tile_index);
 	Vec2u xy = gWorldGrid->GetTileXY(tile_index);
@@ -285,7 +349,7 @@ void Scene::RebuildFromTiles(TileIndex tile_index)
 }
 
 
-void Scene::Render(Camera* shadow_camera)
+void World::Render(Camera* shadow_camera)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
@@ -300,36 +364,28 @@ void Scene::Render(Camera* shadow_camera)
 		gWorldGrid->SetViewTileIndex(tile_index);
 	}
 
-	gRenderer->BeginGeometry();
 	gRenderer->LightBuffer.Rewind();
+
 	for (const Ref<LightBase>& light : mLights) {
 		light->Render(camera, shadow_camera);
 	}
 
+	gShadowRenderer->Begin();
+	ExecuteShadowRenderList(ePipelineName::ShadowDirectional);
+	gShadowRenderer->End();
+
+	// Cull lights into screen space tiles before rendering geometry (Forward+)
+	gRenderer->BeginLightCulling(camera);
+
+	gRenderer->BeginGeometry();
+
 	ExecuteRenderList(ePipelineName::Geometry);
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
-
-	// Render lights
-	// gRenderer->BeginLighting();
-	gRenderer->LightBuffer.Rewind();
-
-	// Render the unlit objects
-	// gRenderer->BeginUnlit();
-
-	// ExecuteRenderList(ePipelineName::Unlit);
-	// ExecuteRenderList(ePipelineName::UnlitNormalMaps);
-
-	// RenderBoundingBoxes(camera);
-	// RenderWorldGrid(camera);
-
-	// if (bRenderPhysicsObjects) {
-	// 	RenderPhysicsObjects(camera);
-	// }
 }
 
 
-void Scene::RenderBoundingBoxes(const Camera& camera)
+void World::RenderBoundingBoxes(const Camera& camera)
 {
 	if (!mpDebugCube.IsValid()) {
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
@@ -362,7 +418,7 @@ void Scene::RenderBoundingBoxes(const Camera& camera)
 }
 
 
-void Scene::RenderWorldGrid(const Camera& camera)
+void World::RenderWorldGrid(const Camera& camera)
 {
 	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
 
@@ -403,7 +459,7 @@ void Scene::RenderWorldGrid(const Camera& camera)
 }
 
 
-void Scene::RenderPhysicsObjects(const Camera& camera)
+void World::RenderPhysicsObjects(const Camera& camera)
 {
 	if (!mpDebugCube.IsValid()) {
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
@@ -439,7 +495,7 @@ void Scene::RenderPhysicsObjects(const Camera& camera)
 	}
 }
 
-void Scene::RenderObjectShadows(Object* object)
+void World::RenderObjectShadows(Object* object)
 {
 	ShadowPushConstants consts;
 
@@ -456,13 +512,22 @@ void Scene::RenderObjectShadows(Object* object)
 		in_skinned_shader = false;
 		pipeline.Bind(cmd);
 
-		gObjectManager->pDescriptorSet->BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
-													   gObjectManager->GetBaseOffset());
+		{
+			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
+											  gRenderer->GetLightIndexListFrameOffset() };
+
+			gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
+				0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+		}
+
+		// gObjectManager->pDescriptorSet->BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline,
+		// 											   gObjectManager->GetBaseOffset());
 	}
 
 	object->Update();
 
-	consts.ObjectId = object->ID.GetID();
+	consts.ObjectIndex = object->ID.GetID();
 
 	gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 
@@ -474,7 +539,7 @@ void Scene::RenderObjectShadows(Object* object)
 }
 
 
-void Scene::RenderShadows(Camera* shadow_camera)
+void World::RenderShadows(Camera* shadow_camera)
 {
 	gShadowRenderer->Begin();
 
@@ -488,11 +553,10 @@ void Scene::RenderShadows(Camera* shadow_camera)
 		RenderObjectShadows(object);
 	}
 
-
 	gShadowRenderer->End();
 }
 
-void Scene::Destroy()
+void World::Destroy()
 {
 	mObjects.Destroy();
 	mLights.Destroy();

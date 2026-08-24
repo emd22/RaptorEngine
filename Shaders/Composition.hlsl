@@ -55,8 +55,8 @@ struct FSOutput
 };
 
 
-F_Texture2D(tDepth, 1);
-F_Texture2D(tLighting, 2);
+F_Texture2D(tDepth, 1, 0);
+F_Texture2D(tLighting, 2, 0);
 
 float3 ACESFilm(float3 x)
 {
@@ -72,13 +72,10 @@ FSOutput main(FSInput input)
 {
     FSOutput output;
 
-
     float exposure = 1.0;
     float4 lighting = F_Sample(tLighting, input.vUV);
 
     output.vColor = float4(ACESFilm(lighting.rgb * exposure), 1.0);
 
-
     return output;
-
 }

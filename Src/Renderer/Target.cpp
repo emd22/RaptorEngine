@@ -7,70 +7,71 @@ namespace fx::renderer {
 
 Target::Target(eImageFormat format, const Vec2u& size)
 {
-    Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
+	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
-    if (size == Target::scFullScreen) {
-        Image.Info.Size = gRenderer->Swapchain.Extent;
-        bIsFullscreen = true;
-    }
+	if (size == Target::scFullScreen) {
+		Image.Info.Size = gRenderer->Swapchain.Extent;
+		bIsFullscreen = true;
+	}
 }
 
 Target::Target(eImageFormat format, const Vec2u& size, eLoadOp load_op, eStoreOp store_op, VkImageLayout initial_layout,
-               VkImageLayout final_layout)
-    : LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
+			   VkImageLayout final_layout)
+	: LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
-    Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
+	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
-    if (size == Target::scFullScreen) {
-        Image.Info.Size = gRenderer->Swapchain.Extent;
-        bIsFullscreen = true;
-    }
+	if (size == Target::scFullScreen) {
+		Image.Info.Size = gRenderer->Swapchain.Extent;
+		bIsFullscreen = true;
+	}
 }
 
 Target::Target(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)
-    : Usage(usage), Aspect(aspect)
+	: Usage(usage), Aspect(aspect)
 {
-    Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
+	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
-    if (size == Target::scFullScreen) {
-        Image.Info.Size = gRenderer->Swapchain.Extent;
-        bIsFullscreen = true;
-    }
+	if (size == Target::scFullScreen) {
+		Image.Info.Size = gRenderer->Swapchain.Extent;
+		bIsFullscreen = true;
+	}
 }
 
 
 void Target::CreateImage()
 {
-    if (bImageIsReference) {
-        // If we have the target that the image is from set, we can pull the updated Image from there
-        if (mpReferenceTarget != nullptr) {
-            Image = mpReferenceTarget->GetImage();
-        }
+	if (bImageIsReference) {
+		// If we have the target that the image is from set, we can pull the updated Image from there
+		if (mpReferenceTarget != nullptr) {
+			Image = mpReferenceTarget->GetImage();
+		}
 
-        return;
-    }
+		return;
+	}
 
-    Image.Create(ImageType, Image.Info.Size, 1, Image.Info.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect);
+	Image.Create(ImageType, Image.Info.Size, 1, Image.Info.Format, VK_IMAGE_TILING_OPTIMAL, Usage, Aspect,
+				 eImageCreateFlags::IsTarget);
 }
 
 
 VkAttachmentDescription Target::BuildDescription() const
 {
-    Assert(Image.Info.Format != eImageFormat::None);
+	Assert(Image.Info.Format != eImageFormat::None);
 
-    return VkAttachmentDescription {
-        .format = ImageFormatUtil::ToUnderlying(Image.Info.Format),
-        .samples = Samples,
+	return VkAttachmentDescription {
+		.format = ImageFormatUtil::ToUnderlying(Image.Info.Format),
+		.samples = Samples,
 
-        .loadOp = static_cast<VkAttachmentLoadOp>(LoadOp),
-        .storeOp = static_cast<VkAttachmentStoreOp>(StoreOp),
+		.loadOp = static_cast<VkAttachmentLoadOp>(LoadOp),
+		.storeOp = static_cast<VkAttachmentStoreOp>(StoreOp),
 
-        .stencilLoadOp = static_cast<VkAttachmentLoadOp>(StencilLoadOp),
-        .stencilStoreOp = static_cast<VkAttachmentStoreOp>(StencilStoreOp),
+		.stencilLoadOp = static_cast<VkAttachmentLoadOp>(StencilLoadOp),
+		.stencilStoreOp = static_cast<VkAttachmentStoreOp>(StencilStoreOp),
 
-        .initialLayout = InitialLayout,
-        .finalLayout = FinalLayout,
-    };
+		.initialLayout = InitialLayout,
+		.finalLayout = FinalLayout,
+	};
 }
 
 
@@ -81,109 +82,109 @@ VkAttachmentDescription Target::BuildDescription() const
 
 SizedArray<VkAttachmentDescription>& TargetList::GetDescriptions()
 {
-    // Return the descriptions if they are already built
-    if ((mFlags & eTargetListFlags::DescriptionsBuilt) != 0) {
-        return mBuiltAttachmentDescriptions;
-    }
+	// Return the descriptions if they are already built
+	if ((mFlags & eTargetListFlags::DescriptionsBuilt) != 0) {
+		return mBuiltAttachmentDescriptions;
+	}
 
-    if (!mBuiltAttachmentDescriptions) {
-        mBuiltAttachmentDescriptions.InitCapacity(mMaxTargets);
-    }
+	if (!mBuiltAttachmentDescriptions) {
+		mBuiltAttachmentDescriptions.InitCapacity(mMaxTargets);
+	}
 
-    mBuiltAttachmentDescriptions.Clear();
+	mBuiltAttachmentDescriptions.Clear();
 
-    for (const Target& at : Targets) {
-        mBuiltAttachmentDescriptions.Insert(at.BuildDescription());
-    }
+	for (const Target& at : Targets) {
+		mBuiltAttachmentDescriptions.Insert(at.BuildDescription());
+	}
 
-    mFlags |= eTargetListFlags::DescriptionsBuilt;
+	mFlags |= eTargetListFlags::DescriptionsBuilt;
 
-    return mBuiltAttachmentDescriptions;
+	return mBuiltAttachmentDescriptions;
 }
 
 
 TargetList& TargetList::Add(const Target& attachment)
 {
-    CheckInited();
-    Targets.Insert(attachment);
+	CheckInited();
+	Targets.Insert(attachment);
 
-    mFlags &= ~(eTargetListFlags::ImageViewsBuilt);
+	mFlags &= ~(eTargetListFlags::ImageViewsBuilt);
 
-    return *this;
+	return *this;
 }
 
 TargetList& TargetList::Add(const Target* attachment)
 {
-    AssertMsg(attachment != nullptr, "Attachment cannot be null!");
-    return Add(*attachment);
+	AssertMsg(attachment != nullptr, "Attachment cannot be null!");
+	return Add(*attachment);
 }
 
 void TargetList::CreateImages()
 {
-    if ((mFlags & eTargetListFlags::ImagesCreated) != 0) {
-        return;
-    }
+	if ((mFlags & eTargetListFlags::ImagesCreated) != 0) {
+		return;
+	}
 
-    Vec2u swapchain_size = gRenderer->Swapchain.Extent;
+	Vec2u swapchain_size = gRenderer->Swapchain.Extent;
 
-    for (Target& target : Targets) {
-        if (target.bIsFullscreen) {
-            // This size will be the size of the newly created image after running `CreateImage`.
-            target.Image.Info.Size = swapchain_size;
-        }
+	for (Target& target : Targets) {
+		if (target.bIsFullscreen) {
+			// This size will be the size of the newly created image after running `CreateImage`.
+			target.Image.Info.Size = swapchain_size;
+		}
 
-        target.CreateImage();
-    }
+		target.CreateImage();
+	}
 
-    mFlags |= eTargetListFlags::ImagesCreated;
+	mFlags |= eTargetListFlags::ImagesCreated;
 }
 
 SizedArray<VkImageView>& TargetList::GetImageViews()
 {
-    // Return the list of views if it is already populated
-    if ((mFlags & eTargetListFlags::ImageViewsBuilt) != 0) {
-        return mBuiltImageViews;
-    }
+	// Return the list of views if it is already populated
+	if ((mFlags & eTargetListFlags::ImageViewsBuilt) != 0) {
+		return mBuiltImageViews;
+	}
 
-    if (!mBuiltImageViews.IsInited()) {
-        mBuiltImageViews.InitCapacity(Targets.Size);
-    }
+	if (!mBuiltImageViews.IsInited()) {
+		mBuiltImageViews.InitCapacity(Targets.Size);
+	}
 
-    mBuiltImageViews.Clear();
+	mBuiltImageViews.Clear();
 
-    for (Target& attachment : Targets) {
-        // Check to ensure that the image (and therefore the view) is created.
-        if (!attachment.Image.IsInited()) {
-            continue;
-        }
+	for (Target& attachment : Targets) {
+		// Check to ensure that the image (and therefore the view) is created.
+		if (!attachment.Image.IsInited()) {
+			continue;
+		}
 
-        mBuiltImageViews.Insert(attachment.Image.View);
-    }
+		mBuiltImageViews.Insert(attachment.Image.View);
+	}
 
-    mFlags |= eTargetListFlags::ImageViewsBuilt;
+	mFlags |= eTargetListFlags::ImageViewsBuilt;
 
-    return mBuiltImageViews;
+	return mBuiltImageViews;
 }
 
 
 bool TargetList::IsCompatible(const TargetList& other) const
 {
-    if (Targets.Size != other.Targets.Size) {
-        return false;
-    }
+	if (Targets.Size != other.Targets.Size) {
+		return false;
+	}
 
-    for (uint32 index = 0; index < Targets.Size; index++) {
-        const Target& t = Targets[index];
-        const Target& other_t = other.Targets[index];
+	for (uint32 index = 0; index < Targets.Size; index++) {
+		const Target& t = Targets[index];
+		const Target& other_t = other.Targets[index];
 
-        const bool format_matches = t.Image.Info.Format == other_t.Image.Info.Format;
+		const bool format_matches = t.Image.Info.Format == other_t.Image.Info.Format;
 
-        if (!format_matches) {
-            return false;
-        }
-    }
+		if (!format_matches) {
+			return false;
+		}
+	}
 
-    return true;
+	return true;
 }
 
 } // namespace fx::renderer

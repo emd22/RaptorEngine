@@ -181,6 +181,9 @@ void Shader::RecompileShader(const String& source_path, const String& compiled_p
 	if (compile_result == ShaderCompiler::eResult::Success) {
 		mDataPack.WriteToFile(compiled_path.CStr());
 	}
+	else if (compile_result == ShaderCompiler::eResult::Failed) {
+		Panic("RecompileShader", "Error compiling shaders");
+	}
 }
 
 

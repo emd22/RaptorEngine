@@ -18,10 +18,10 @@ struct SceneDistanceBand
 	PagedArray<ObjectID> Objects;
 };
 
-class Scene
+class World
 {
 public:
-	Scene() = default;
+	World() = default;
 
 	void Create();
 
@@ -63,7 +63,7 @@ public:
 
 	Ref<PerspectiveCamera>& GetCurrentCamera() { return mpCurrentCamera; }
 
-	~Scene() { Destroy(); }
+	~World() { Destroy(); }
 
 private:
 	void RenderPhysicsObjects(const Camera& camera);
@@ -72,6 +72,8 @@ private:
 	void RenderObjectShadows(Object* object_id);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
+	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
+
 	void RebuildRenderList(bool clear, TileIndex new_tile);
 	void AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id);
 

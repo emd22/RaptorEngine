@@ -9,6 +9,7 @@ enum class eShaderName : uint32
 	Geometry,
 	Lighting,
 	Forward,
+	LightCulling,
 	Composition,
 	Shadows,
 	Unlit,
@@ -29,6 +30,7 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(Geometry);
 		FX_ENUM_CASE_NAME(Lighting);
 		FX_ENUM_CASE_NAME(Forward);
+		FX_ENUM_CASE_NAME(LightCulling);
 		FX_ENUM_CASE_NAME(Composition);
 		FX_ENUM_CASE_NAME(Shadows);
 		FX_ENUM_CASE_NAME(Unlit);

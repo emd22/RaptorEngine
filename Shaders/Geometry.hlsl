@@ -59,7 +59,7 @@
 // {
 //     VSOutput output;
 
-//     float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
+//     float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
 
 //     float4x4 MVP = mul(VSConst.mViewProjection, model_matrix);
 

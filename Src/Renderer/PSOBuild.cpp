@@ -90,7 +90,13 @@ void PSOBuild::BuildPipeline()
 
 	Ref<ShaderProgram> vertex_shader = GetShaderProgram(eShaderType::Vertex);
 	Ref<ShaderProgram> pixel_shader = GetShaderProgram(eShaderType::Pixel);
+	Ref<ShaderProgram> compute_shader = GetShaderProgram(eShaderType::Compute);
 
+	// Compute pipelines are built from a single compute shader program, without a renderpass.
+	if (compute_shader.IsValid() && !vertex_shader.IsValid() && !pixel_shader.IsValid()) {
+		mpPipeline->CreateCompute(mPipelineName, compute_shader);
+		return;
+	}
 
 	if (!vertex_shader.IsValid() || !pixel_shader.IsValid()) {
 		LogError(LC_RENDER, "Invalid shaders provided");

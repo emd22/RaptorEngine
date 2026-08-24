@@ -68,6 +68,10 @@ bool MaterialManager::BindWithPipeline(const renderer::CommandBuffer& cmd, const
 		return false;
 	}
 
+	if (material->mbRequiresSync) {
+		SyncMaterialToGpu(material);
+	}
+
 	return material->BindWithPipeline(cmd, pipeline);
 }
 
@@ -170,6 +174,14 @@ void MaterialManager::DestroyMaterial(const MaterialID& id)
 	}
 
 	mMaterialList.MarkItemFree(id.GetID());
+}
+
+void MaterialManager::SyncMaterialToGpu(Material* material)
+{
+	MaterialProperties* raw_buffer = static_cast<MaterialProperties*>(MaterialPropertiesBuffer.pMappedBuffer);
+	memcpy(&raw_buffer[material->ID.GetID()], &material->Properties, sizeof(MaterialProperties));
+
+	material->mbRequiresSync = false;
 }
 
 void MaterialManager::Destroy()

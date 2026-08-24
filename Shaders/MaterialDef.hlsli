@@ -4,4 +4,5 @@
 struct Material
 {
 	uint Flags;
+	float fAlpha;
 };

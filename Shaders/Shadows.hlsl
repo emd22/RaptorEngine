@@ -42,7 +42,7 @@ F_StructBuffer(bObjectBuffer, Object, 0, 0);
 VSOutput main(VSInput input) : SV_POSITION
 {
     VSOutput output;
-    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mModel;
+    float4x4 model_matrix = bObjectBuffer[VSConst.uiObjectIndex + input.uiInstanceId].mWorld;
     float4x4 MVP = mul(VSConst.mCameraMatrix, model_matrix);
     output.vPosition = mul(MVP, float4(input.vPosition, 1.0));
     return output;

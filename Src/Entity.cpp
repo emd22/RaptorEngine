@@ -9,60 +9,60 @@ namespace fx {
 
 EntityManager& EntityManager::GetGlobalManager()
 {
-    static EntityManager global_manager;
-    return global_manager;
+	static EntityManager global_manager;
+	return global_manager;
 }
 
 void EntityManager::Create(uint32 entities_per_page) { GetGlobalManager().mEntityPool.Create(entities_per_page); }
 
 Ref<Entity> EntityManager::New()
 {
-    EntityManager& global_manager = GetGlobalManager();
+	EntityManager& global_manager = GetGlobalManager();
 
-    if (!global_manager.mEntityPool.IsInited()) {
-        global_manager.Create();
-    }
+	if (!global_manager.mEntityPool.IsInited()) {
+		global_manager.Create();
+	}
 
-    return Ref<Entity>::New(global_manager.mEntityPool.Insert());
+	return Ref<Entity>::New(global_manager.mEntityPool.Insert());
 }
 
 void Entity::ScaleBy(const float scale) { SetScale(mScale * scale); }
 
 void Entity::SetScale(const float scale)
 {
-    mScale = scale;
-    MarkTransformOutOfDate();
+	mScale = scale;
+	MarkTransformOutOfDate();
 }
 
 void Entity::RotateX(float32 rad)
 {
-    mRotation = mRotation * Quat::FromAxisAngle(Vec3f::sRight, rad);
-    MarkTransformOutOfDate();
+	mRotation = mRotation * Quat::FromAxisAngle(Vec3f::sRight, rad);
+	MarkTransformOutOfDate();
 }
 
 
 void Entity::RotateY(float32 rad)
 {
-    mRotation = mRotation * Quat::FromAxisAngle(Vec3f::sUp, rad);
-    MarkTransformOutOfDate();
+	mRotation = mRotation * Quat::FromAxisAngle(Vec3f::sUp, rad);
+	MarkTransformOutOfDate();
 }
 
 
 void Entity::RotateZ(float32 rad)
 {
-    mRotation = mRotation * Quat::FromAxisAngle(Vec3f::sForward, rad);
-    MarkTransformOutOfDate();
+	mRotation = mRotation * Quat::FromAxisAngle(Vec3f::sForward, rad);
+	MarkTransformOutOfDate();
 }
 
 void Entity::SetModelMatrix(const Mat4f& other)
 {
-    // We do not want the next update to replace the new matrix
-    mbMatrixOutOfDate = false;
+	// We do not want the next update to replace the new matrix
+	mbMatrixOutOfDate = false;
 
-    mModelMatrix = other;
+	mWorldMatrix = other;
 
-    // Trigger an immediate update
-    SubmitMatrixIfNeeded();
+	// Trigger an immediate update
+	SubmitMatrixIfNeeded();
 }
 
 // const Mat4f& Entity::GetNormalMatrix()
@@ -76,40 +76,40 @@ void Entity::SetModelMatrix(const Mat4f& other)
 
 Mat4f& Entity::GetModelMatrix()
 {
-    if (mbMatrixOutOfDate) {
-        RecalculateModelMatrix();
-    }
+	if (mbMatrixOutOfDate) {
+		RecalculateModelMatrix();
+	}
 
-    return mModelMatrix;
+	return mWorldMatrix;
 }
 
 void Entity::SubmitMatrixIfNeeded()
 {
-    // There is no object id assigned to the object yet, break
-    if (ID.IsInvalid() || mMatrixUpdateFramesRemaining <= 0) {
-        return;
-    }
+	// There is no object id assigned to the object yet, break
+	if (ID.IsInvalid() || mMatrixUpdateFramesRemaining <= 0) {
+		return;
+	}
 
-    gObjectManager->Submit(ID.GetID(), mModelMatrix);
+	gObjectManager->Submit(ID.GetID(), mWorldMatrix);
 
-    --mMatrixUpdateFramesRemaining;
+	--mMatrixUpdateFramesRemaining;
 }
 
 void Entity::RecalculateModelMatrix()
 {
-    if (TransformMode == eTransformMode::Default) {
-        mModelMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(mPosition);
-    }
-    else if (TransformMode == eTransformMode::TransformFromOrigin) {
-        mModelMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsTranslation(RotationOrigin) *
-                       Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(-RotationOrigin) *
-                       Mat4f::AsTranslation(mPosition);
-    }
+	if (TransformMode == eTransformMode::Default) {
+		mWorldMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(mPosition);
+	}
+	else if (TransformMode == eTransformMode::TransformFromOrigin) {
+		mWorldMatrix = Mat4f::AsScale(Vec3f(mScale)) * Mat4f::AsTranslation(RotationOrigin) *
+					   Mat4f::AsRotation(mRotation) * Mat4f::AsTranslation(-RotationOrigin) *
+					   Mat4f::AsTranslation(mPosition);
+	}
 
-    mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
+	mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
 
-    // mNormalMatrix = mModelMatrix.Inverse().Transposed();
-    mbMatrixOutOfDate = false;
+	// mNormalMatrix = mWorldMatrix.Inverse().Transposed();
+	mbMatrixOutOfDate = false;
 }
 
 } // namespace fx

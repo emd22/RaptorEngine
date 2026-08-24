@@ -3,6 +3,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Asset/Loader/Image/LoaderStb.hpp>
 #include <Core/Assert.hpp>
+#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 
@@ -137,9 +138,10 @@ void FontAtlas::Upload(Image& out_image)
 	Fx_Fwd_SubmitUploadCmd(
 		[&](CommandBuffer& cmd)
 		{
-			out_image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1,
-									   TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-																   .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+			renderer::BarrierHelper::ImageLayoutTransition(&out_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 0, 1);
+			// out_image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmd, 1,
+			// 						   TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+			// 													   .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 
 			VkBufferImageCopy copy {
 				.bufferOffset = 0,
@@ -157,9 +159,12 @@ void FontAtlas::Upload(Image& out_image)
 			vkCmdCopyBufferToImage(cmd, rgba_staging.Buffer, out_image.Get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
 								   &copy);
 
-			out_image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
-									   TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-																   .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
+			renderer::BarrierHelper::ImageLayoutTransition(&out_image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0,
+														   1);
+
+			// out_image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
+			// 						   TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+			// 													   .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
 		});
 }
 

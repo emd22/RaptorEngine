@@ -65,7 +65,7 @@ public:
 
 	void Update();
 
-	void OnAttached(Scene* scene) override;
+	void OnAttached(World* scene) override;
 
 	void PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
 								const PhProperties& physics_properties);
@@ -166,7 +166,7 @@ public:
 	Animation* pCurrentAnimation = nullptr;
 	float32 AnimationTime = 0.0f;
 
-	Scene* pScene = nullptr;
+	World* pScene = nullptr;
 	ObjectID ParentID = ObjectID::Null;
 	PagedArray<ObjectID> AttachedNodes;
 

@@ -17,7 +17,7 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <Renderer/RenderBackend.hpp>
-#include <Scene.hpp>
+#include <World.hpp>
 
 namespace fx {
 
@@ -70,8 +70,17 @@ void Object::FinalizeWhenReady()
 		parent_object->Bounds.Add(Bounds);
 	}
 
-	if (!mMaterialID.IsNull()) {
-		LogInfo(LC_CORE, "** Created object '{}' with material '{}'", Name.Get(), mMaterialID);
+	if (mMaterialID.IsNull()) {
+		return;
+	}
+
+	Material* material = gMaterialManager->GetMaterial(mMaterialID);
+	if (material == nullptr) {
+		return;
+	}
+
+	if (HasFlag(Flags, eObjectFlags::Unlit)) {
+		material->SetUnlit(true);
 	}
 }
 
@@ -139,7 +148,7 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
 	//     });
 }
 
-void Object::OnAttached(Scene* scene)
+void Object::OnAttached(World* scene)
 {
 	PhObject* phys = scene->GetPhysicsObject(PhysicsId);
 
@@ -239,10 +248,12 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	DrawPushConstants push_constants {};
 	push_constants.ObjectId = ID.GetID();
 	push_constants.MaterialIndex = mMaterialID.GetID();
+	push_constants.TileColumns = gRenderer->pDeferredRenderer->GetLightTileColumns();
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
 
-	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex, push_constants);
+	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
+								   push_constants);
 
 	RenderMesh(pipeline);
 }
@@ -271,7 +282,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	CommandBuffer& cmd = frame->CmdBuffer;
 
 	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
-	if (mat) {
+	if (mat && pipeline->Name != ePipelineName::ShadowDirectional) {
 		Assert(mat->GetRequiredPipeline() == pipeline->Name);
 	}
 
@@ -279,11 +290,6 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
 		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
 	}
-
-	const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
-
-	gObjectManager->pDescriptorSet->Bind(1, cmd, *pipeline,
-										 Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 
 	if (pMesh) {
 		pMesh->Render(cmd, (mInstanceSlotsInUse + 1)); // + 1 for source object

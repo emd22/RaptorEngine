@@ -91,6 +91,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 	gRenderer->LightBuffer.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
 
 	gRenderer->LightBuffer.Write(Color::FromRGBA(10, 10, 10, 10).Value);
+	gRenderer->LightBuffer.Write(static_cast<uint32>(Type));
 
 	gRenderer->LightBuffer.FlushToGpu();
 	gRenderer->LightBuffer.NextSlot();
@@ -110,6 +111,7 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
 	DrawPushConstants push_constants {};
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 	push_constants.ObjectId = ID.GetID();
+	push_constants.TileColumns = gRenderer->pDeferredRenderer->GetLightTileColumns();
 
 	gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
 								   eShaderType::Vertex | eShaderType::Pixel, push_constants);
@@ -180,6 +182,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 	gRenderer->LightBuffer.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
 
 	gRenderer->LightBuffer.Write(AmbientColor.Value);
+	gRenderer->LightBuffer.Write(static_cast<uint32>(Type));
 
 	gRenderer->LightBuffer.FlushToGpu();
 	gRenderer->LightBuffer.NextSlot();

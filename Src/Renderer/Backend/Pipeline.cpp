@@ -299,13 +299,51 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 			reinterpret_cast<void*>(Layout.Get()));
 }
 
+void Pipeline::CreateCompute(ePipelineName name, const Ref<ShaderProgram>& shader)
+{
+	mDevice = gRenderer->GetDevice();
+
+	Name = name;
+	bIsCompute = true;
+
+	ComputeShader = shader;
+
+	const VkPipelineShaderStageCreateInfo stage_create_info = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_COMPUTE_BIT,
+		.module = shader->Get(),
+		.pName = "main",
+		.pSpecializationInfo = nullptr,
+	};
+
+	const VkComputePipelineCreateInfo pipeline_info = {
+		.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+
+		.stage = stage_create_info,
+
+		.layout = Layout.Get(),
+	};
+
+	const VkResult status = vkCreateComputePipelines(mDevice->Device, nullptr, 1, &pipeline_info, nullptr,
+													 &InternalPipeline);
+
+	if (status != VK_SUCCESS) {
+		ModulePanicVulkan("Could not create compute pipeline", status);
+	}
+
+	Util::SetDebugLabel(PipelineNameUtil::GetName(name), VK_OBJECT_TYPE_PIPELINE, InternalPipeline);
+
+	LogInfo(LC_RENDER, "Creating compute pipeline for shader '{}' -> LayoutHandle={:p}", shader->pShader->GetName(),
+			reinterpret_cast<void*>(Layout.Get()));
+}
+
 void Pipeline::Bind(const CommandBuffer& cmd) const
 {
 	if (InternalPipeline == spBoundPipeline) {
 		return;
 	}
 
-	if (bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
+	if (!bIsCompute && bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
 		if (bIsViewportFullscreen) {
 			ViewportSize = gRenderer->GetWindow()->GetSize();
 		}
@@ -331,7 +369,7 @@ void Pipeline::Bind(const CommandBuffer& cmd) const
 		sbHaveDynamicStatesBeenBound = false;
 	}
 
-	vkCmdBindPipeline(cmd.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS, InternalPipeline);
+	vkCmdBindPipeline(cmd.Get(), GetBindPoint(), InternalPipeline);
 
 	spBoundPipeline = this->InternalPipeline;
 }

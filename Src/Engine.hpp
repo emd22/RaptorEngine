@@ -27,6 +27,9 @@ extern WorldGrid* gWorldGrid;
 class TextureManager;
 extern TextureManager* gTextureManager;
 
+class ThreadManager;
+extern ThreadManager* gThreadManager;
+
 
 namespace Globals {
 void Init();

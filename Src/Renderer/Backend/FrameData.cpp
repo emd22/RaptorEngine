@@ -6,15 +6,15 @@ namespace fx::renderer {
 
 void FrameData::Create(GpuDevice* device)
 {
-    ImageAvailable.Create();
-    RenderFinished.Create();
+	ImageAvailable.Create(eSemaphoreType::Binary);
+	RenderFinished.Create(eSemaphoreType::Binary);
 }
 
 void FrameData::Destroy()
 {
-    ImageAvailable.Destroy();
-    RenderFinished.Destroy();
-    InFlight.Destroy();
+	ImageAvailable.Destroy();
+	RenderFinished.Destroy();
+	InFlight.Destroy();
 };
 
 } // namespace fx::renderer

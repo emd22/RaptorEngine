@@ -15,7 +15,7 @@
 namespace fx {
 
 
-class Scene;
+class World;
 
 enum class eEntityType
 {
@@ -51,7 +51,7 @@ public:
 	void MoveBy(const Vec3f& offset) { SetPosition(mPosition + offset); }
 	void ScaleBy(const float scale);
 
-	virtual void OnAttached(Scene* scene) {}
+	virtual void OnAttached(World* scene) {}
 
 	void RotateX(float32 rad);
 	void RotateY(float32 rad);
@@ -117,7 +117,7 @@ protected:
 	bool mbPhysicsTransformOutOfDate : 1 = true;
 	bool mbMatrixOutOfDate : 1 = true;
 
-	Mat4f mModelMatrix = Mat4f::sIdentity;
+	Mat4f mWorldMatrix = Mat4f::sIdentity;
 
 	int32 mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
 	// Mat4f mNormalMatrix = Mat4f::Identity;

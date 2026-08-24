@@ -6,8 +6,10 @@
 #include <Object/Object.hpp>
 #include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/Backend/Sampler/SamplerCache.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Renderer/ShadowDirectional.hpp>
 
 namespace fx {
 
@@ -15,49 +17,15 @@ const ObjectID ObjectID::Null = ObjectID(UINT32_MAX);
 
 void ObjectManager::Create()
 {
-	// if (!mDescriptorPool.Pool) {
-	// 	mDescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4);
-	// 	mDescriptorPool.Create(renderer::gRenderer->GetDevice(), 2);
-	// }
+	using namespace renderer;
 
 	mObjectList.Init(scMaxObjects);
-
-	// renderer::DsLayoutBuilder builder {};
-	// builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, eShaderType::Vertex);
-	// DsLayoutObjectBuffer = builder.Build();
 
 	uint32 buffer_size = (sizeof(ObjectGpuEntry) * scMaxObjects) * renderer::FramesInFlight;
 
 	// TODO: replace with DescriptorCache'd version
-	mObjectGpuBuffer.Create(renderer::eGpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
+	mObjectGpuBuffer.Create(eGpuBufferType::StorageWithOffset, buffer_size, VMA_MEMORY_USAGE_CPU_ONLY,
 							eGpuBufferFlags::PersistentMapped);
-
-
-	static constexpr uint32 scBoundSize = scMaxObjects * sizeof(ObjectGpuEntry);
-
-
-	if (!pDescriptorSet) {
-		SizedArray<renderer::DescriptorEntry> ds_entries(5);
-		ds_entries.Insert(
-			renderer::DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &mObjectGpuBuffer, 0, scBoundSize));
-
-		ds_entries.Insert(renderer::DescriptorEntry::AsBuffer(1, eShaderType::Pixel,
-															  &gMaterialManager->MaterialPropertiesBuffer, 0,
-															  gMaterialManager->MaterialPropertiesBuffer.Size));
-
-		std::pair<renderer::DescriptorID, renderer::DescriptorSet*> result = renderer::gDescriptorCache->Request(
-			ds_entries);
-		pDescriptorSet = result.second;
-	}
-
-
-	// if (!mObjectBufferDS.IsInited()) {
-	// 	Assert(DsLayoutObjectBuffer != nullptr);
-	// 	mObjectBufferDS.Create(mDescriptorPool, HashNull32, DsLayoutObjectBuffer, true);
-	// }
-
-	// mObjectBufferDS.AddBuffer(0, &mObjectGpuBuffer, 0, scBoundSize);
-	// mObjectBufferDS.Build();
 }
 
 ObjectID ObjectManager::NewObjectID(const std::string& name)

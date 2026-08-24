@@ -19,6 +19,7 @@
 #include <Core/RefUtil.hpp>
 #include <Core/Types.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Renderer/Backend/DescriptorCache.hpp>
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
@@ -112,6 +113,8 @@ void RenderBackend::Init(Vec2u window_size)
 	InitFrames();
 	InitUploadContext();
 
+	TransferSync.Create(eSemaphoreType::Timeline);
+
 	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 	deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
 
@@ -119,23 +122,42 @@ void RenderBackend::Init(Vec2u window_size)
 	// per Swapchain image, not frame in flight.
 	mSubmitSemaphores.InitSize(Swapchain.OutputImages.Size);
 	for (Semaphore& sem : mSubmitSemaphores) {
-		sem.Create();
+		sem.Create(eSemaphoreType::Binary);
 	}
 
 	LightBuffer.Create(scLightUniformSize, Limits::MaxActiveLights);
 	BoneBuffer.Create(Limits::MaxBones * sizeof(Mat4f), 1);
 
+	// Forward+ tiled light list buffers. These are double buffered per frame in flight, each tile's
+	// contents are fully rewritten by the light culling pass every frame.
+	LightGridPageSize = Limits::MaxScreenTiles * sizeof(uint32) * 2;
+	LightIndexListPageSize = Limits::MaxScreenTiles * Limits::MaxLightsPerTile * sizeof(uint32);
+
+	LightGridBuffer.Create(eGpuBufferType::StorageWithOffset, LightGridPageSize * FramesInFlight,
+						   VMA_MEMORY_USAGE_GPU_ONLY);
+	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
+								VMA_MEMORY_USAGE_GPU_ONLY);
+
+
 	gMaterialManager->Create();
 	gObjectManager->Create();
 
+	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
-	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
-
 	pDeferredRenderer = new DeferredRenderer;
 	pDeferredRenderer->Create(Swapchain.Extent);
+
+	// SizedArray<renderer::DescriptorEntry> ds_entries(4);
+	// ds_entries.Insert(
+	// 	renderer::DescriptorEntry::AsBuffer(0, eShaderType::Pixel, &LightGridBuffer, 0, LightGridPageSize));
+	// ds_entries.Insert(
+	// 	renderer::DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &LightIndexListBuffer, 0, LightIndexListPageSize));
+
+	// std::pair<renderer::DescriptorID, renderer::DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
+	// pLightsDescriptor = result.second;
 
 	bInitialized = true;
 }
@@ -276,6 +298,7 @@ void RenderBackend::InitVulkan()
 
 	std::vector<const char*> requested_validation_layers = {
 		"VK_LAYER_KHRONOS_validation",
+
 		// "VK_LAYER_KHRONOS_shader_object",
 	};
 
@@ -481,7 +504,7 @@ void RenderBackend::SubmitImmediateUploadCmd(RenderBackend::SubmitFunc upload_fu
 	UploadContext.ImmediateUploadFence.WaitFor();
 	UploadContext.ImmediateUploadFence.Reset();
 
-	UploadContext.CmdPool.Reset();
+	UploadContext.ImmediateCmdBuffer.Reset();
 }
 
 void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
@@ -542,12 +565,21 @@ eFrameResult RenderBackend::BeginFrame()
 	return eFrameResult::Success;
 }
 
+void RenderBackend::BeginLightCulling(Camera& render_cam) { pDeferredRenderer->DoLightCullingPass(render_cam); }
+
 void RenderBackend::BeginGeometry()
 {
 	FrameData* frame = GetFrame();
 
 	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
+
+	// pDeferredRenderer->BindLightGridDescriptors(frame->CmdBuffer);
+
+	const uint32 buffer_offsets[] = { gRenderer->GetLightGridFrameOffset(), gRenderer->GetLightIndexListFrameOffset() };
+
+	// pLightsDescriptor->Bind(2, frame->CmdBuffer, gPipelineCache->Request(ePipelineName::GeometryNormalMaps),
+	// 						Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 }
 
 void RenderBackend::PresentFrame()
@@ -558,11 +590,14 @@ void RenderBackend::PresentFrame()
 
 	const VkPipelineStageFlags wait_stages[] = {
 		VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	};
 
 	VkSemaphore submit_semaphore = mSubmitSemaphores[mImageIndex].Get();
-
-	VkSemaphore wait_semaphore = frame->ImageAvailable.Get();
+	VkSemaphore wait_semaphores[] = {
+		frame->ImageAvailable.Get(),
+		TransferSync.Get(),
+	};
 
 
 	VkCommandBuffer cmds_to_submit[] = {
@@ -570,11 +605,24 @@ void RenderBackend::PresentFrame()
 		// frame->TransferCmdBuffer.Cmd,
 	};
 
+	uint64_t wait_values[] = { 0, gRenderer->TransferCount.load() };
+
+	VkTimelineSemaphoreSubmitInfo timeline_info {
+		.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+		.pNext = nullptr,
+		.waitSemaphoreValueCount = std::size(wait_values),
+		.pWaitSemaphoreValues = wait_values,
+		.signalSemaphoreValueCount = 0,
+		.pSignalSemaphoreValues = nullptr,
+	};
+
 	const VkSubmitInfo submit_info = {
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.pNext = &timeline_info,
 
-		.waitSemaphoreCount = 1,
-		.pWaitSemaphores = &wait_semaphore,
+		.waitSemaphoreCount = std::size(wait_semaphores),
+		.pWaitSemaphores = wait_semaphores,
+
 		.pWaitDstStageMask = wait_stages,
 
 		.commandBufferCount = std::size(cmds_to_submit),
@@ -635,9 +683,9 @@ void RenderBackend::BeginLighting()
 
 	pDeferredRenderer->GPass.End();
 
-	Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
-	Assert(depth_target != nullptr);
-	depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
+	// Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
+	// Assert(depth_target != nullptr);
+	// depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
 	pDeferredRenderer->LightPass.Begin(frame->CmdBuffer);
@@ -670,7 +718,7 @@ void RenderBackend::BeginUnlit()
 	// Assert(depth_target != nullptr);
 	// depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
 
-	pDeferredRenderer->UnlitPass.Begin(frame->CmdBuffer);
+	// pDeferredRenderer->UnlitPass.Begin(frame->CmdBuffer);
 
 	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
 	// gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
@@ -766,6 +814,9 @@ void RenderBackend::Destroy()
 
 	LightBuffer.Destroy();
 	BoneBuffer.Destroy();
+
+	LightGridBuffer.Destroy();
+	LightIndexListBuffer.Destroy();
 
 	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 

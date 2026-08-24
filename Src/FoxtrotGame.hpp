@@ -5,7 +5,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Object/Object.hpp>
 #include <Player.hpp>
-#include <Scene.hpp>
+#include <World.hpp>
 
 class ShadowDirectional;
 
@@ -14,24 +14,24 @@ namespace fx {
 
 enum class eEditorMode : int32
 {
-    MoveCollider,
-    ScaleCollider,
+	MoveCollider,
+	ScaleCollider,
 
-    Default,
+	Default,
 };
 
 class BaseEditorMode
 {
 public:
-    BaseEditorMode() = default;
+	BaseEditorMode() = default;
 
-    virtual void Update(const Scene& scene, const Vec3f& movement_vector) = 0;
-    virtual void OnLeave(const Scene& scene) = 0;
+	virtual void Update(const World& scene, const Vec3f& movement_vector) = 0;
+	virtual void OnLeave(const World& scene) = 0;
 
-    virtual ~BaseEditorMode() {};
+	virtual ~BaseEditorMode() {};
 
 public:
-    Ref<PerspectiveCamera> pCamera { nullptr };
+	Ref<PerspectiveCamera> pCamera { nullptr };
 };
 
 /////////////////////////////////////
@@ -42,26 +42,26 @@ public:
 class EditorModeMoveCollider : public BaseEditorMode
 {
 public:
-    EditorModeMoveCollider() = delete;
-    EditorModeMoveCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
+	EditorModeMoveCollider() = delete;
+	EditorModeMoveCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-    void Update(const Scene& scene, const Vec3f& movement_vector) override;
-    void OnLeave(const Scene& scene) override;
+	void Update(const World& scene, const Vec3f& movement_vector) override;
+	void OnLeave(const World& scene) override;
 
-    ~EditorModeMoveCollider() override {};
+	~EditorModeMoveCollider() override {};
 };
 
 
 class EditorModeScaleCollider : public BaseEditorMode
 {
 public:
-    EditorModeScaleCollider() = delete;
-    EditorModeScaleCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
+	EditorModeScaleCollider() = delete;
+	EditorModeScaleCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-    void Update(const Scene& scene, const Vec3f& movement_vector) override;
-    void OnLeave(const Scene& scene) override;
+	void Update(const World& scene, const Vec3f& movement_vector) override;
+	void OnLeave(const World& scene) override;
 
-    ~EditorModeScaleCollider() override {};
+	~EditorModeScaleCollider() override {};
 };
 
 
@@ -72,63 +72,63 @@ public:
 class FoxtrotGame
 {
 public:
-    FoxtrotGame();
+	FoxtrotGame();
 
-    void CreateGame();
+	void CreateGame();
 
 
-    ~FoxtrotGame();
+	~FoxtrotGame();
 
 private:
-    void AddEditorModes();
+	void AddEditorModes();
 
-    void InitEngine();
-    void CreateLights();
+	void InitEngine();
+	void CreateLights();
 
-    void Tick();
-    void ProcessControls();
+	void Tick();
+	void ProcessControls();
 
-    void LoadOffsetsFile();
-    void CreateFontObject();
+	void LoadOffsetsFile();
+	void CreateFontObject();
 
-    void DestroyGame();
+	void DestroyGame();
 
-    void NextEditorMode();
-    void SwitchEditorMode(eEditorMode mode);
+	void NextEditorMode();
+	void SwitchEditorMode(eEditorMode mode);
 
-    void ReloadAllObjects();
+	void ReloadAllObjects();
 
 public:
-    Player Player {};
+	Player Player {};
 
-    Ref<LightDirectional> pSun { nullptr };
+	Ref<LightDirectional> pSun { nullptr };
 
-    // TODO: Player attachment system
-    TSRef<Object> pPistolObject { nullptr };
-    TSRef<Object> pArmsObject { nullptr };
-    TSRef<Object> pHelmetObject { nullptr };
+	// TODO: Player attachment system
+	TSRef<Object> pPistolObject { nullptr };
+	TSRef<Object> pArmsObject { nullptr };
+	TSRef<Object> pHelmetObject { nullptr };
 
-    BoneId RHandBone = BoneNull;
+	BoneId RHandBone = BoneNull;
 
-    double FrameTimeAvg = 0.0f;
-    double DeltaTime = 1.0f / 60.0f;
+	double FrameTimeAvg = 0.0f;
+	double DeltaTime = 1.0f / 60.0f;
 
-    Quat PistolRotationGoal = Quat::sIdentity;
-    ObjectManager ObjectManager;
+	Quat PistolRotationGoal = Quat::sIdentity;
+	ObjectManager ObjectManager;
 
-    Vec3f PistolOffset = Vec3f::sZero;
-    Vec3f ArmsOffset = Vec3f::sZero;
+	Vec3f PistolOffset = Vec3f::sZero;
+	Vec3f ArmsOffset = Vec3f::sZero;
 
-    BaseEditorMode* SelectedEditorMode = nullptr;
-    eEditorMode EditorModeType = eEditorMode::Default;
-    SizedArray<BaseEditorMode*> EditorModes;
+	BaseEditorMode* SelectedEditorMode = nullptr;
+	eEditorMode EditorModeType = eEditorMode::Default;
+	SizedArray<BaseEditorMode*> EditorModes;
 
 private:
-    uint64 mLastTick = 0;
-    Scene mMainScene {};
+	uint64 mLastTick = 0;
+	World mMainScene {};
 
 
-    ConfigFile Config;
+	ConfigFile Config;
 };
 
 } // namespace fx

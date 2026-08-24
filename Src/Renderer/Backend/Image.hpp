@@ -37,6 +37,7 @@ FxEnumFlags(eImageSaveFlags);
 enum class eImageCreateFlags
 {
 	None = 0,
+	IsTarget = (1 << 0),
 };
 
 FxEnumFlags(eImageCreateFlags);
@@ -58,15 +59,10 @@ enum class eImageFormat : uint16
 
 	RGB32_Float,
 
-	/// DO NOT USE FORMAT: Marker for depth formats
-	_eDepthFormatsBegin,
-
-	eD16_UNorm_S8_UInt,
+	D16_UNorm_S8_UInt,
 	D32_Float,
-	eD32_Float_S8_UInt,
+	D32_Float_S8_UInt,
 
-	/// DO NOT USE FORMAT: Marker for depth formats
-	_eDepthFormatsEnd,
 };
 
 enum class eImageType
@@ -100,12 +96,29 @@ struct ImageFormatUtil
 {
 	static constexpr bool IsDepth(eImageFormat format)
 	{
-		if (format > eImageFormat::_eDepthFormatsBegin && format < eImageFormat::_eDepthFormatsEnd) {
+		switch (format) {
+		case eImageFormat::D16_UNorm_S8_UInt:
+		case eImageFormat::D32_Float:
+		case eImageFormat::D32_Float_S8_UInt:
 			return true;
+		default:;
 		}
 
 		return false;
 	}
+
+	static constexpr bool IsStencil(eImageFormat format)
+	{
+		switch (format) {
+		case eImageFormat::D16_UNorm_S8_UInt:
+		case eImageFormat::D32_Float_S8_UInt:
+			return true;
+		default:;
+		}
+
+		return false;
+	}
+
 
 	/**
 	 * @brief Get the size of the format in bytes. For example, RGBA8 would return 4.
@@ -114,8 +127,6 @@ struct ImageFormatUtil
 	{
 		switch (format) {
 		case eImageFormat::None:
-		case eImageFormat::_eDepthFormatsBegin:
-		case eImageFormat::_eDepthFormatsEnd:
 			break;
 
 			// Color formats
@@ -134,26 +145,45 @@ struct ImageFormatUtil
 
 			// Depth formats
 
-		case eImageFormat::eD16_UNorm_S8_UInt:
+		case eImageFormat::D16_UNorm_S8_UInt:
 			return 3;
 
 		case eImageFormat::D32_Float:
 			return 4;
 
-		case eImageFormat::eD32_Float_S8_UInt:
+		case eImageFormat::D32_Float_S8_UInt:
 			return 5;
 		}
 
 		return 0;
 	}
 
+	static constexpr VkImageAspectFlags GetAspectMask(const eImageFormat format)
+	{
+		VkImageAspectFlags aspect = 0;
 
-	static constexpr VkFormat ToUnderlying(eImageFormat format)
+		// If the format is only depth, return depth aspect
+		if (IsDepth(format)) {
+			aspect |= VK_IMAGE_ASPECT_DEPTH_BIT;
+		}
+
+		// If format is only stencil, return stencil aspect. If it is both depth and stencil, return both or'd together
+		if (IsStencil(format)) {
+			aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+
+		if (aspect != 0) {
+			return aspect;
+		}
+
+		// Not depth or stencil, must be colour
+		return VK_IMAGE_ASPECT_COLOR_BIT;
+	}
+
+	static constexpr VkFormat ToUnderlying(const eImageFormat format)
 	{
 		switch (format) {
 		case eImageFormat::None:
-		case eImageFormat::_eDepthFormatsBegin:
-		case eImageFormat::_eDepthFormatsEnd:
 			break;
 
 			// Color formats
@@ -174,11 +204,11 @@ struct ImageFormatUtil
 
 			// Depth Formats
 
-		case eImageFormat::eD16_UNorm_S8_UInt:
+		case eImageFormat::D16_UNorm_S8_UInt:
 			return VK_FORMAT_D16_UNORM_S8_UINT;
 		case eImageFormat::D32_Float:
 			return VK_FORMAT_D32_SFLOAT;
-		case eImageFormat::eD32_Float_S8_UInt:
+		case eImageFormat::D32_Float_S8_UInt:
 			return VK_FORMAT_D32_SFLOAT_S8_UINT;
 		}
 
@@ -200,7 +230,9 @@ enum class eImageAspectFlag
 
 struct TransitionLayoutOverrides
 {
+	std::optional<VkPipelineStageFlagBits> SrcStage = std::nullopt;
 	std::optional<VkPipelineStageFlagBits> DstStage = std::nullopt;
+	std::optional<VkAccessFlags> SrcAccessMask = std::nullopt;
 	std::optional<VkAccessFlags> DstAccessMask = std::nullopt;
 };
 
@@ -229,10 +261,10 @@ public:
 	FX_FORCE_INLINE const ImageInfo& GetInfo() const { return Info; }
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format, VkImageTiling tiling,
-				VkImageUsageFlags usage, eImageAspectFlag aspect);
+				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None);
 
 	void Create(eImageType image_type, const Vec2u& size, uint16 mips_count, eImageFormat format,
-				VkImageUsageFlags usage, eImageAspectFlag aspect);
+				VkImageUsageFlags usage, eImageAspectFlag aspect, eImageCreateFlags flags = eImageCreateFlags::None);
 
 	void CreateFromData(renderer::CommandBuffer& cmd, const ImageInfo& info, eImageCreateFlags flags);
 
@@ -244,16 +276,6 @@ public:
 	 * @brief Uploads multiple mip levels to an image
 	 */
 	void Upload(renderer::CommandBuffer& cmd, const ImageInfo& info);
-
-	void TransitionLayout(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 layer_count,
-						  std::optional<TransitionLayoutOverrides> overrides = std::nullopt);
-
-	void TransitionMip(VkImageLayout new_layout, renderer::CommandBuffer& cmd, uint32 mip_level, uint32 num_levels,
-					   std::optional<TransitionLayoutOverrides> overrides);
-
-
-	void TransitionDepthToShaderRO(renderer::CommandBuffer& cmd);
-	void TransitionDepthToAttachment(renderer::CommandBuffer& cmd);
 
 	void CopyToMip(renderer::CommandBuffer& cmd, const renderer::RawGpuBuffer& buffer, VkImageLayout final_layout,
 				   Vec2u size, uint32 mip_level);
@@ -277,6 +299,7 @@ public:
 
 
 	~Image();
+
 
 public:
 	eImageAspectFlag Aspect = eImageAspectFlag::Color;
