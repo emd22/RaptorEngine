@@ -23,7 +23,7 @@ class TiledForwardRenderer
 public:
 	void Create(const Vec2u& extent);
 
-	void DoCompPass(Camera& camera);
+	void RenderComposition(Camera& camera);
 
 	/**
 	 * @brief Dispatches the Forward+ light culling pass. Must be called outside of a renderpass,
@@ -43,7 +43,6 @@ private:
 
 	void BuildPersistentDescriptor();
 
-	void CreateUnlitPass();
 	void CreateGPass();
 
 	void GenerateRandomTexture(uint32 size);
@@ -55,24 +54,20 @@ private:
 	void CreateLightingDSLayout();
 
 	// Light culling
-	void CreateLightCullingPipeline();
+	void CreateLightCullingPSO();
 
 	/// Registers the Forward+ tiled light list buffers (set 2) on the pipeline currently being built
 	void AddLightGridDescriptors();
 
 	// Composition
-	void CreateCompPipeline();
-
-	void CreateUnlitPipeline();
+	void CreateCompositionPSO();
 
 public:
 	DescriptorPool DescriptorPool;
 
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 
-	RenderStage UnlitPass;
 	RenderStage LightPass;
-	RenderStage GPass;
 	RenderStage ForwardPass;
 	RenderStage CompPass;
 

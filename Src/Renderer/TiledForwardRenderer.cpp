@@ -49,72 +49,16 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	DescriptorPool.Create(gGraphics->GetDevice(), 16);
 
 	CreateGPassPipeline();
-	// CreateLightingPipeline();
-	CreateCompPipeline();
-	CreateLightCullingPipeline();
+	CreateCompositionPSO();
+	CreateLightCullingPSO();
 
 	BuildPersistentDescriptor();
-
-	// CreateUnlitPipeline();
-	//
 }
 
 void TiledForwardRenderer::Destroy() {}
 
-void TiledForwardRenderer::CreateUnlitPass()
-{
-	// TargetList targets {};
-
-	// Target* lp_light_attachment = LightPass.GetTarget(eImageFormat::RGBA16_Float);
-	// Target* lp_depth_attachment = GPass.GetTarget(eImageFormat::D32_Float);
-
-	// Assert(lp_light_attachment != nullptr && lp_depth_attachment != nullptr);
-
-	// UnlitPass.Create("Unlit", gRenderer->Swapchain.Extent);
-
-	// UnlitPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
-	// 					VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-	// 					eImageAspectFlag::Depth);
-	// {
-	// 	Target* depth_target = UnlitPass.GetTarget(eImageFormat::D32_Float);
-	// 	depth_target->LoadOp = eLoadOp::Load;
-	// 	depth_target->StoreOp = eStoreOp::DontCare;
-	// 	depth_target->InitialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	// 	depth_target->UseImageFromTarget(lp_depth_attachment);
-	// }
-
-	// UnlitPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-	// 					VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-	// {
-	// 	Target* light_target = UnlitPass.GetTarget(eImageFormat::RGBA16_Float);
-	// 	light_target->LoadOp = eLoadOp::Load;
-	// 	light_target->StoreOp = eStoreOp::Store;
-	// 	light_target->InitialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	// 	light_target->FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	// 	light_target->UseImageFromTarget(lp_light_attachment);
-	// }
-
-	// UnlitPass.BuildRenderStage();
-}
-
 void TiledForwardRenderer::CreateGPass()
 {
-	// GPass.Create("Geometry", gRenderer->Swapchain.Extent);
-
-	// // Albedo target
-	// GPass.AddTarget(eImageFormat::BGRA8_UNorm, Target::scFullScreen,
-	// 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-
-	// // Normals target
-	// GPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-	// 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-
-	// // Depth target
-	// GPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
-	// 				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Depth);
-
-	// GPass.BuildRenderStage();
-
 	// Forward pass
 	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent);
 
@@ -134,76 +78,6 @@ void TiledForwardRenderer::CreateGPass()
 	ForwardPass.BuildRenderStage();
 }
 
-/////////////////////////////////////
-// Renderer GPass Functions
-/////////////////////////////////////
-
-
-void TiledForwardRenderer::CreateUnlitPipeline()
-{
-	// CreateUnlitPass();
-	// {
-	// 	// Unlit pipeline
-	// 	gPSOBuild->BeginPipeline(ePipelineName::Unlit);
-	// 	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
-	// 	gPSOBuild->SetShader(eShaderName::Unlit, {});
-
-	// 	gPSOBuild->UseRenderStage(UnlitPass);
-	// 	gPSOBuild->SetVertexType(eVertexType::Default);
-	// 	gPSOBuild->SetCullMode(eCullMode::Back);
-
-	// 	gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-	// 						gSamplerCache->Request({}));
-	// 	// gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-	// 	// 					gSamplerCache->Request({}));
-	// 	// gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-	// 	// 					gSamplerCache->Request({}));
-
-	// 	gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-	// 						 gObjectManager->GetPageSize());
-
-	// 	gPSOBuild->EndPipeline();
-
-
-	// 	// Unlit pipeline
-	// 	gPSOBuild->BeginPipeline(ePipelineName::UnlitNormalMaps);
-	// 	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DrawPushConstants));
-	// 	gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
-
-	// 	gPSOBuild->UseRenderStage(UnlitPass);
-	// 	gPSOBuild->SetVertexType(eVertexType::Default);
-	// 	gPSOBuild->SetCullMode(eCullMode::Back);
-
-	// 	gPSOBuild->AddImage(0, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-	// 						gSamplerCache->Request({}));
-	// 	gPSOBuild->AddImage(1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-	// 						gSamplerCache->Request({}));
-	// 	gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
-	// 						gSamplerCache->Request({}));
-
-	// 	gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-	// 						 gObjectManager->GetPageSize());
-
-	// 	gPSOBuild->EndPipeline();
-	// }
-
-	// {
-	// 	// Debug Layer pipeline
-	// 	gPSOBuild->BeginPipeline(ePipelineName::DebugLayer);
-	// 	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
-	// 	gPSOBuild->SetShader(eShaderName::Unlit, { ShaderMacro { .pcName = "IS_DEBUG_LAYER", .pcValue = "1" } });
-	// 	gPSOBuild->SetVertexType(eVertexType::Slim);
-	// 	gPSOBuild->SetRenderLines(true);
-	// 	gPSOBuild->SetCullMode(eCullMode::Back);
-
-	// 	gPSOBuild->UseRenderStage(UnlitPass);
-
-	// 	gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
-	// 						 gObjectManager->GetPageSize());
-
-	// 	gPSOBuild->EndPipeline();
-	// }
-}
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
@@ -393,7 +267,7 @@ void TiledForwardRenderer::CreateGPassPipeline()
 
 void TiledForwardRenderer::AddLightGridDescriptors() {}
 
-void TiledForwardRenderer::CreateLightCullingPipeline()
+void TiledForwardRenderer::CreateLightCullingPSO()
 {
 	gPSOBuild->BeginPipeline(ePipelineName::LightCulling);
 	gPSOBuild->SetPushConstants(eShaderType::Compute, sizeof(LightCullPushConstants));
@@ -470,9 +344,6 @@ void TiledForwardRenderer::BindLightGridDescriptors(CommandBuffer& cmd)
 void TiledForwardRenderer::CreateLightingPipeline()
 {
 	{
-		LightPass.Create("Lighting", gGraphics->Swapchain.Extent);
-
-
 		LightPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
 							VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
@@ -513,11 +384,11 @@ void TiledForwardRenderer::CreateLightingPipeline()
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
 
-		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::D32_Float),
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
 									  &gGraphics->Swapchain.DepthSampler);
-		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
-									  &gGraphics->Swapchain.ColorSampler);
-		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::RGBA16_Float),
+		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
+									  &gGraphics->Swapchain.NormalsSampler);
+		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
 									  &gGraphics->Swapchain.NormalsSampler);
 
 		gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel,
@@ -583,7 +454,7 @@ void TiledForwardRenderer::CreateLightingPipeline()
 // DeferredRenderer CompPass Functions
 //////////////////////////////////////////
 
-void TiledForwardRenderer::CreateCompPipeline()
+void TiledForwardRenderer::CreateCompositionPSO()
 {
 	// Create composition render stage
 
@@ -604,15 +475,17 @@ void TiledForwardRenderer::CreateCompPipeline()
 	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
 
+	// tDepth
 	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
 								  gSamplerCache->Request(SamplerProps {
 									  eSamplerFilter::Nearest,
 									  eSamplerFilter::Nearest,
 									  eSamplerFilter::Nearest,
 								  }));
+	// tLighting
 	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
 								  gSamplerCache->Request(SamplerProps {}));
-
+	// tNormal
 	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float, 1),
 								  gSamplerCache->Request(SamplerProps {
 									  eSamplerFilter::Nearest,
@@ -623,7 +496,7 @@ void TiledForwardRenderer::CreateCompPipeline()
 	gPSOBuild->EndPipeline();
 }
 
-void TiledForwardRenderer::DoCompPass(Camera& camera)
+void TiledForwardRenderer::RenderComposition(Camera& camera)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 

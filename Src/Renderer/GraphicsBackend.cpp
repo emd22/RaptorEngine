@@ -244,7 +244,6 @@ void GraphicsBackend::RebuildRenderStages()
 	// rd->GPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
 	// rd->LightPass.Rebuild(size);
-	rd->UnlitPass.Rebuild(size);
 
 	rd->DescriptorPool.Recreate();
 
@@ -672,14 +671,11 @@ void GraphicsBackend::BeginLighting()
 {
 	FrameData* frame = GetFrame();
 
-	pRenderer->GPass.End();
 
 	// Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
 	// Assert(depth_target != nullptr);
 	// depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
-
-	pRenderer->LightPass.Begin(frame->CmdBuffer);
 
 	// gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
 	// gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -701,8 +697,6 @@ void GraphicsBackend::BeginLighting()
 void GraphicsBackend::BeginUnlit()
 {
 	FrameData* frame = GetFrame();
-
-	pRenderer->LightPass.End();
 
 
 	// Target* depth_target = gRenderer->pDeferredRenderer->GPass.GetTarget(ImageFormat::eD32_Float, 0);
@@ -731,7 +725,7 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	pRenderer->CompPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Composition, frame->CmdBuffer);
 
-	pRenderer->DoCompPass(render_cam);
+	pRenderer->RenderComposition(render_cam);
 
 	pRenderer->CompPass.End();
 	frame->CmdBuffer.End();
