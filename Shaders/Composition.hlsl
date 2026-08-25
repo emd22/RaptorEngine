@@ -74,7 +74,7 @@ FSOutput main(FSInput input)
     FSOutput output;
 
     float exposure = 1.0;
-    float4 lighting = F_Sample(tNormal, input.vUV);
+    float4 lighting = F_Sample(tLighting, input.vUV);
 
     output.vColor = float4(ACESFilm(lighting.rgb * exposure), 1.0);
 

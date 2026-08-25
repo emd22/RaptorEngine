@@ -9,6 +9,8 @@
 
 #include "Types.hpp"
 
+#include <Math/SIMDHelper.hpp>
+
 namespace fx {
 
 /**
@@ -21,5 +23,14 @@ uint32 FastRand32();
  */
 uint64 FastRand64();
 
+
+/////////////////////////////////////
+// SIMD Functions
+/////////////////////////////////////
+
+/**
+ * @brief Generates 4 PRNG values, returned in a platform specific vector.
+ */
+UINT4 FastRand4();
 
 } // namespace fx

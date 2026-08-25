@@ -3,10 +3,8 @@
 #include "Backend/BarrierHelper.hpp"
 #include "Backend/Commands.hpp"
 #include "Backend/DescriptorCache.hpp"
-#include "Backend/DsLayoutBuilder.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
 #include "Backend/Shader.hpp"
-#include "Backend/VertexDescription.hpp"
 #include "Camera.hpp"
 #include "Engine.hpp"
 #include "Globals.hpp"
@@ -14,7 +12,6 @@
 #include "Limits.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
-#include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
 
 #include <Asset/AssetManager.hpp>

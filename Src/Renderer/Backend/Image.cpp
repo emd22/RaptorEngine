@@ -704,38 +704,4 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 Image::~Image() { DecRef(); }
 
 
-/////////////////////////////////////
-// Image Gen functions
-/////////////////////////////////////
-
-namespace ImageGen {
-
-Image* Random(Vec2u size)
-{
-	Image* image = gTextureManager->NewTexture();
-
-	const uint64 total_image_size = (static_cast<uint64>(size.X) * size.Y * 4ULL);
-
-	SizedArray<uint8> pixel_data;
-	pixel_data.InitSize(total_image_size);
-
-
-	ImageInfo info(size, eImageFormat::RGBA8_UNorm, 0, 1, Slice<const uint8>(pixel_data.pData, pixel_data.Size));
-
-	renderer::gGraphics->SubmitImmediateUploadCmd(
-		[&](renderer::CommandBuffer& cmd)
-		{
-			ImageInfo image_info {
-				Vec2u(1, 1), eImageFormat::RGBA8_UNorm, 0, 1, Slice<const uint8>(pixel_data.pData, pixel_data.Size),
-			};
-
-			image->Upload(cmd, image_info);
-		});
-
-	return image;
-}
-
-} // namespace ImageGen
-
-
 } // namespace fx

@@ -6,6 +6,7 @@
 #include "Backend/Util.hpp"
 #include "Constants.hpp"
 #include "Engine.hpp"
+#include "ImageGen.hpp"
 #include "Object/ObjectManager.hpp"
 #include "TiledForwardRenderer.hpp"
 
@@ -27,8 +28,6 @@
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
-#include <thread>
-#include <vector>
 
 
 /* If this is defined, we will break on an error message containing this string. */
@@ -153,14 +152,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	pRenderer = new TiledForwardRenderer;
 	pRenderer->Create(Swapchain.Extent);
 
-	// SizedArray<renderer::DescriptorEntry> ds_entries(4);
-	// ds_entries.Insert(
-	// 	renderer::DescriptorEntry::AsBuffer(0, eShaderType::Pixel, &LightGridBuffer, 0, LightGridPageSize));
-	// ds_entries.Insert(
-	// 	renderer::DescriptorEntry::AsBuffer(1, eShaderType::Pixel, &LightIndexListBuffer, 0, LightIndexListPageSize));
-
-	// std::pair<renderer::DescriptorID, renderer::DescriptorSet*> result = gDescriptorCache->Request(ds_entries);
-	// pLightsDescriptor = result.second;
+	pNoiseTexture = ImageGen::Random(Vec2u(64, 64));
 
 	bInitialized = true;
 }

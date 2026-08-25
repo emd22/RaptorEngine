@@ -16,14 +16,14 @@
 #include <Core/Defer.hpp>
 #include <Core/Ref.hpp>
 #include <Core/TSQueue.hpp>
-// #include <deque>
-// #include <mutex>
 
 namespace fx {
 class Camera;
-}
+class Image;
+} // namespace fx
 
 namespace fx::renderer {
+
 
 enum class eFrameResult
 {
@@ -249,14 +249,13 @@ private:
 
 	uint32 mImageIndex = 0;
 
+	Image* pNoiseTexture = nullptr;
 
 protected:
 	uint32 mFrameNumber = 0;
 	std::atomic_uint32_t mInternalFrameCounter = 0;
 
 	TSQueue<DeletionObject> mDeletionQueue;
-	// std::mutex mInDeletionQueue;
-	// std::deque<DeletionObject> mDeletionQueue;
 };
 
 } // namespace fx::renderer

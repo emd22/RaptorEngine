@@ -339,11 +339,5 @@ private:
 	RefCount* mpRefCnt = nullptr;
 };
 
-namespace ImageGen {
-
-Image* Random(Vec2u size);
-
-}
-
 
 } // namespace fx
