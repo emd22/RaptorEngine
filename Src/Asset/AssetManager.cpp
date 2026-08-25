@@ -12,9 +12,9 @@
 #include <Engine.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/Object.hpp>
-#include <Renderer/Backend/RenderBackendFwd.hpp>
+#include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Texture/TextureManager.hpp>
 #include <atomic>
 #include <chrono>
@@ -39,7 +39,7 @@ void AssetDeletionTicket::DeleteImmediate() const
 
 	case eType::Buffer: {
 		const BufferTicket& ticket = Value.Ticket;
-		vmaDestroyBuffer(renderer::gRenderer->GpuAllocator, ticket.Buffer, ticket.Allocation);
+		vmaDestroyBuffer(renderer::gGraphics->GpuAllocator, ticket.Buffer, ticket.Allocation);
 	} break;
 	}
 }
@@ -403,7 +403,7 @@ fx::Image* AssetManager::GetNullImage(eImageFormat format)
 	memset(pixel_data.pData, 1, pixel_stride);
 
 	// Upload the texture directly without buffering
-	renderer::RenderBackendFwd::SubmitImmediateUploadCmd(
+	renderer::GraphicsBackendFwd::SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
 			ImageInfo image_info {
@@ -439,7 +439,7 @@ static void DoDirectUpload(AxQueueItem& item, AssetItemData& asset_data)
 	AssetTicket& ticket = asset_data.Ticket;
 	Image* image = static_cast<Image*>(ticket.Get());
 
-	image->Upload(renderer::RenderBackendFwd::GetUploadCmd(), img_info);
+	image->Upload(renderer::GraphicsBackendFwd::GetUploadCmd(), img_info);
 
 	ticket.SignalUploadedToGpu();
 }
@@ -510,10 +510,10 @@ int32 AssetManager::CheckForUploadableData()
 
 	// Begin GPU upload
 	if (should_upload) {
-		gRenderer->UploadContext.UploadFence.WaitFor();
-		gRenderer->UploadContext.UploadFence.Reset();
+		gGraphics->UploadContext.UploadFence.WaitFor();
+		gGraphics->UploadContext.UploadFence.Reset();
 
-		gRenderer->UploadContext.CmdBuffer.Record();
+		gGraphics->UploadContext.CmdBuffer.Record();
 	}
 
 	for (AssetWorker* worker : WorkersWaitingToUpload) {
@@ -532,13 +532,13 @@ int32 AssetManager::CheckForUploadableData()
 		}
 	}
 
-	SpinLockContext<VkQueue> transfer_queue = gRenderer->GetDevice()->GetTransferQueue();
+	SpinLockContext<VkQueue> transfer_queue = gGraphics->GetDevice()->GetTransferQueue();
 
 	if (should_upload) {
-		CommandBuffer& cmd = gRenderer->UploadContext.CmdBuffer;
+		CommandBuffer& cmd = gGraphics->UploadContext.CmdBuffer;
 		cmd.End();
 
-		uint64_t tl_value = gRenderer->TransferCount.load() + 1;
+		uint64_t tl_value = gGraphics->TransferCount.load() + 1;
 
 		VkTimelineSemaphoreSubmitInfo timeline_info {
 			.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
@@ -557,15 +557,15 @@ int32 AssetManager::CheckForUploadableData()
 			.pCommandBuffers = &cmd.Cmd,
 
 			.signalSemaphoreCount = 1U,
-			.pSignalSemaphores = &gRenderer->TransferSync.InternalSemaphore,
+			.pSignalSemaphores = &gGraphics->TransferSync.InternalSemaphore,
 		};
 
 		VkQueue vk_xfer_queue = transfer_queue.Get();
 
 		AssertMsg(vk_xfer_queue != nullptr, "Queue has not been initialized");
-		vkQueueSubmit(vk_xfer_queue, 1, &submit_info, gRenderer->UploadContext.UploadFence.Get());
+		vkQueueSubmit(vk_xfer_queue, 1, &submit_info, gGraphics->UploadContext.UploadFence.Get());
 
-		gRenderer->TransferCount.store(tl_value);
+		gGraphics->TransferCount.store(tl_value);
 	}
 
 	transfer_queue.Unlock();
@@ -665,7 +665,7 @@ int32 AssetManager::CheckForItemsToDelete()
 	}
 
 	// Wait for all uploads to finish. We cannot be actively loading the item we are deleting!
-	renderer::gRenderer->UploadContext.UploadFence.WaitFor();
+	renderer::gGraphics->UploadContext.UploadFence.WaitFor();
 
 	if (queue->First().TryDelete(mTickCounter)) {
 		++num_deletes;

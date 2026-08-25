@@ -1,7 +1,7 @@
 #include "UniformBuffer.hpp"
 
 #include "Constants.hpp"
-#include "RenderBackend.hpp"
+#include "GraphicsBackend.hpp"
 
 #include <Renderer/Globals.hpp>
 
@@ -26,7 +26,7 @@ void Uniforms::Rewind()
 	SlotIndex = 0;
 }
 
-uint32 Uniforms::GetBaseOffset() const { return PageSize * gRenderer->GetFrameNumber(); }
+uint32 Uniforms::GetBaseOffset() const { return PageSize * gGraphics->GetFrameNumber(); }
 uint32 Uniforms::GetBaseOffset(uint32 frame_index) const { return PageSize * frame_index; }
 
 uint32 Uniforms::GetSlotOffset() const { return SlotIndex * SlotSize; }

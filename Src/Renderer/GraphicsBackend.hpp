@@ -32,9 +32,7 @@ enum class eFrameResult
 	RenderError,
 };
 
-class DeferredRenderer;
-class DeferredGPass;
-class DeferredCompPass;
+class TiledForwardRenderer;
 
 struct GpuUploadContext
 {
@@ -49,7 +47,7 @@ struct GpuUploadContext
 };
 
 
-class RenderBackend
+class GraphicsBackend
 {
 	const uint32 scDeletionFrameSpacing = 3;
 
@@ -59,7 +57,7 @@ public:
 	using SubmitFunc = std::function<void(CommandBuffer& cmd)>;
 
 public:
-	RenderBackend() = default;
+	GraphicsBackend() = default;
 
 	using ExtensionList = SizedArray<VkExtensionProperties>;
 	using ExtensionNames = std::vector<const char*>;
@@ -117,7 +115,7 @@ public:
 	void SubmitImmediateUploadCmd(SubmitFunc func);
 	void SubmitOneTimeCmd(SubmitFunc func);
 
-	~RenderBackend() { Destroy(); }
+	~GraphicsBackend() { Destroy(); }
 
 	bool ProcessDeletionQueue(bool immediate, Queue<DeletionObject>& deletion_queue)
 	{
@@ -213,7 +211,7 @@ public:
 	bool bInitialized = false;
 	bool bDidFrameResize = false;
 
-	DeferredRenderer* pDeferredRenderer { nullptr };
+	TiledForwardRenderer* pRenderer { nullptr };
 
 	Uniforms LightBuffer;
 	Uniforms BoneBuffer;

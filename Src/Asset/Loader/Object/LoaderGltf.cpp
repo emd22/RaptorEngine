@@ -18,7 +18,7 @@
 #include <Asset/MipmapGen.hpp>
 #include <Core/FilesystemIO.hpp>
 #include <Core/Path.hpp>
-#include <Renderer/Backend/RenderBackendFwd.hpp>
+#include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/MeshUtil.hpp>
 
@@ -367,8 +367,8 @@ void LoaderGltf::UploadMeshToGpu(Object* object)
 		LogInfo(LC_ASSET, "Upload mesh to GPU");
 
 		// Set the mesh indices
-		primitive_mesh->UploadIndices(RenderBackendFwd::GetUploadCmd());
-		primitive_mesh->UploadVertices(RenderBackendFwd::GetUploadCmd());
+		primitive_mesh->UploadIndices(GraphicsBackendFwd::GetUploadCmd());
+		primitive_mesh->UploadVertices(GraphicsBackendFwd::GetUploadCmd());
 
 		primitive_mesh->bIsReady = true;
 	}

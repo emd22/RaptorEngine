@@ -7,7 +7,7 @@
 
 #include <Core/Assert.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 FX_SET_MODULE_NAME("RenderPass")
 
@@ -16,7 +16,7 @@ namespace fx::renderer {
 void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset)
 {
 	if (size == Target::scFullScreen) {
-		size = gRenderer->Swapchain.Extent;
+		size = gGraphics->Swapchain.Extent;
 	}
 
 	AttachmentCount = attachments.Targets.Size;
@@ -26,7 +26,7 @@ void RenderPass::Create(TargetList& attachments, Vec2u size, const Vec2u& offset
 
 	Assert(size.X > 0.0f && size.Y > 0.0f);
 
-	mpDevice = gRenderer->GetDevice();
+	mpDevice = gGraphics->GetDevice();
 
 	SizedArray<VkAttachmentReference> color_refs(attachments.Targets.Size);
 

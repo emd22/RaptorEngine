@@ -3,7 +3,7 @@
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx {
 
@@ -13,7 +13,7 @@ void Player::Create()
 {
 	pCamera = MakeRef<PerspectiveCamera>();
 
-	pCamera->SetAspectRatio(gRenderer->Swapchain.GetAspectRatio());
+	pCamera->SetAspectRatio(gGraphics->Swapchain.GetAspectRatio());
 	pCamera->SetFov(scWalkingFov);
 
 	Physics.Create();

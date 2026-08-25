@@ -21,8 +21,8 @@
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <Texture/TextureManager.hpp>
 #include <csignal>
@@ -91,8 +91,8 @@ void FoxtrotGame::InitEngine()
 	Player.HeadBobStrength.X = bob_entry->GetMemberValue(HashStr32("ScaleX"), 0.011);
 	Player.HeadBobStrength.Y = bob_entry->GetMemberValue(HashStr32("ScaleY"), 0.018);
 
-	gRenderer->SelectWindow(window);
-	gRenderer->Init(Vec2u(window_width, window_height));
+	gGraphics->SelectWindow(window);
+	gGraphics->Init(Vec2u(window_width, window_height));
 
 	gPhysics->Create();
 
@@ -206,7 +206,7 @@ void FoxtrotGame::CreateGame()
 	mMainScene.Create();
 
 	Player.Create();
-	Player.pCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
+	Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
 	// Move the player up and behind the other objects
 	Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
 	Player.SetFlyMode(true);
@@ -522,7 +522,7 @@ void FoxtrotGame::Tick()
 
 	FrameTimeAvg += DeltaTime;
 
-	if (!(gRenderer->GetFrameNumber() % scFramesForAvg)) {
+	if (!(gGraphics->GetFrameNumber() % scFramesForAvg)) {
 		double frametime = FrameTimeAvg / scFramesForAvg;
 		double fps = 1.0 / frametime;
 
@@ -581,14 +581,14 @@ void FoxtrotGame::Tick()
 	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
 	gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 
-	if (gRenderer->BeginFrame() != eFrameResult::Success) {
+	if (gGraphics->BeginFrame() != eFrameResult::Success) {
 		mLastTick = current_tick;
 		return;
 	}
 
 	gPhysics->Update();
 
-	FrameData* frame = gRenderer->GetFrame();
+	FrameData* frame = gGraphics->GetFrame();
 
 	frame->CmdBuffer.Reset();
 	frame->CmdBuffer.Record();
@@ -596,12 +596,12 @@ void FoxtrotGame::Tick()
 	// mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
 	mMainScene.Render(&gShadowRenderer->ShadowCamera);
 
-	if (gRenderer->DidResize()) {
+	if (gGraphics->DidResize()) {
 		LogInfo("Setting aspect ratio");
-		camera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
+		camera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
 	}
 
-	gRenderer->DoComposition(*mMainScene.GetCurrentCamera());
+	gGraphics->DoComposition(*mMainScene.GetCurrentCamera());
 
 	mLastTick = current_tick;
 }
@@ -613,7 +613,7 @@ void FoxtrotGame::DestroyGame()
 	fx::LogInfo("Pool Size:  {}", fx::gEnginePool->GetCapacity());
 	fx::LogInfo("=========================");
 
-	gRenderer->GetDevice()->WaitForIdle();
+	gGraphics->GetDevice()->WaitForIdle();
 
 	delete gShadowRenderer;
 	gShadowRenderer = nullptr;
@@ -621,8 +621,8 @@ void FoxtrotGame::DestroyGame()
 	gMaterialManager->Destroy();
 	gAssetManager->Shutdown();
 
-	delete gRenderer->pDeferredRenderer;
-	gRenderer->pDeferredRenderer = nullptr;
+	delete gGraphics->pRenderer;
+	gGraphics->pRenderer = nullptr;
 }
 
 void FoxtrotGame::AddEditorModes()

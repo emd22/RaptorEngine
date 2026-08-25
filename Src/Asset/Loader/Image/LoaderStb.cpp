@@ -1,7 +1,7 @@
 #include "LoaderStb.hpp"
 
 #include <Asset/AssetBase.hpp>
-#include <Renderer/Backend/RenderBackendFwd.hpp>
+#include <Renderer/Backend/GraphicsBackendFwd.hpp>
 
 namespace fx {
 
@@ -100,7 +100,7 @@ void LoaderStb::CreateGpuResource(AssetTicket& ticket)
 
 	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
 	ImageInfo image_info { image->Info.Size, ImageFormat, 0, 1, Slice<const uint8>(data_arr.pData, data_arr.Size) };
-	image->CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
+	image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
 	// Set to nullptr so that the data is not freed by the SizedArray
 	data_arr.pData = nullptr;

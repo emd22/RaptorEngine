@@ -12,8 +12,8 @@
 
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/RenderBackend.hpp>
 
 namespace fx {
 
@@ -57,7 +57,7 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 	// 	mPipelineName = ePipelineName::LightingOutsideVolume;
 	// }
 
-	FrameData* frame = gRenderer->GetFrame();
+	FrameData* frame = gGraphics->GetFrame();
 	UpdateIfOutOfDate();
 
 	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
@@ -76,25 +76,25 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 	// }
 
 
-	gRenderer->LightBuffer.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
-	gRenderer->LightBuffer.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
-	gRenderer->LightBuffer.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
+	gGraphics->LightBuffer.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+	gGraphics->LightBuffer.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
+	gGraphics->LightBuffer.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
 	// Note that the light position is packed with the light colour as the fourth component!
-	gRenderer->LightBuffer.WritePtr(camera.Position.mData, sizeof(float32) * 3);
-	gRenderer->LightBuffer.Write(mRadius);
+	gGraphics->LightBuffer.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+	gGraphics->LightBuffer.Write(mRadius);
 
-	gRenderer->LightBuffer.WritePtr(mPosition.mData, sizeof(float32) * 3);
-	gRenderer->LightBuffer.Write(Color.Value);
+	gGraphics->LightBuffer.WritePtr(mPosition.mData, sizeof(float32) * 3);
+	gGraphics->LightBuffer.Write(Color.Value);
 
-	gRenderer->LightBuffer.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
-	gRenderer->LightBuffer.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
+	gGraphics->LightBuffer.Write(static_cast<float32>(gGraphics->Swapchain.Extent.X));
+	gGraphics->LightBuffer.Write(static_cast<float32>(gGraphics->Swapchain.Extent.Y));
 
-	gRenderer->LightBuffer.Write(Color::FromRGBA(10, 10, 10, 10).Value);
-	gRenderer->LightBuffer.Write(static_cast<uint32>(Type));
+	gGraphics->LightBuffer.Write(Color::FromRGBA(10, 10, 10, 10).Value);
+	gGraphics->LightBuffer.Write(static_cast<uint32>(Type));
 
-	gRenderer->LightBuffer.FlushToGpu();
-	gRenderer->LightBuffer.NextSlot();
+	gGraphics->LightBuffer.FlushToGpu();
+	gGraphics->LightBuffer.NextSlot();
 
 	// pLightVolume->Render(frame->CmdBuffer, 1);
 }
@@ -106,14 +106,14 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
 		return;
 	}
 
-	FrameData* frame = gRenderer->GetFrame();
+	FrameData* frame = gGraphics->GetFrame();
 
 	DrawPushConstants push_constants {};
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 	push_constants.ObjectId = ID.GetID();
-	push_constants.TileColumns = gRenderer->pDeferredRenderer->GetLightTileColumns();
+	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 
-	gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
+	gGraphics->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::Geometry),
 								   eShaderType::Vertex | eShaderType::Pixel, push_constants);
 
 	mpDebugMesh->Render(frame->CmdBuffer, 1);
@@ -141,7 +141,7 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 		return;
 	}
 
-	FrameData* frame = gRenderer->GetFrame();
+	FrameData* frame = gGraphics->GetFrame();
 	UpdateIfOutOfDate();
 
 	// gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
@@ -161,31 +161,31 @@ void LightDirectional::Render(const PerspectiveCamera& camera, Camera* shadow_ca
 	// }
 
 	if (shadow_camera) {
-		gRenderer->LightBuffer.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
+		gGraphics->LightBuffer.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData,
 										sizeof(Mat4f));
 	}
 	else {
-		gRenderer->LightBuffer.WritePtr(camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
+		gGraphics->LightBuffer.WritePtr(camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 	}
 
-	gRenderer->LightBuffer.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
-	gRenderer->LightBuffer.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
+	gGraphics->LightBuffer.WritePtr(camera.InvViewMatrix.RawData, sizeof(Mat4f));
+	gGraphics->LightBuffer.WritePtr(camera.InvProjectionMatrix.RawData, sizeof(Mat4f));
 
 	// Note that the light position is packed with the light colour as the fourth component!
-	gRenderer->LightBuffer.WritePtr(camera.Position.mData, sizeof(float32) * 3);
-	gRenderer->LightBuffer.Write(mRadius);
+	gGraphics->LightBuffer.WritePtr(camera.Position.mData, sizeof(float32) * 3);
+	gGraphics->LightBuffer.Write(mRadius);
 
-	gRenderer->LightBuffer.WritePtr(mPosition.mData, sizeof(float32) * 3);
-	gRenderer->LightBuffer.Write(Color.Value);
+	gGraphics->LightBuffer.WritePtr(mPosition.mData, sizeof(float32) * 3);
+	gGraphics->LightBuffer.Write(Color.Value);
 
-	gRenderer->LightBuffer.Write(static_cast<float32>(gRenderer->Swapchain.Extent.X));
-	gRenderer->LightBuffer.Write(static_cast<float32>(gRenderer->Swapchain.Extent.Y));
+	gGraphics->LightBuffer.Write(static_cast<float32>(gGraphics->Swapchain.Extent.X));
+	gGraphics->LightBuffer.Write(static_cast<float32>(gGraphics->Swapchain.Extent.Y));
 
-	gRenderer->LightBuffer.Write(AmbientColor.Value);
-	gRenderer->LightBuffer.Write(static_cast<uint32>(Type));
+	gGraphics->LightBuffer.Write(AmbientColor.Value);
+	gGraphics->LightBuffer.Write(static_cast<uint32>(Type));
 
-	gRenderer->LightBuffer.FlushToGpu();
-	gRenderer->LightBuffer.NextSlot();
+	gGraphics->LightBuffer.FlushToGpu();
+	gGraphics->LightBuffer.NextSlot();
 
 	// vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 }

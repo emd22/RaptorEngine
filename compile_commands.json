@@ -463,6 +463,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Backend/GraphicsBackendFwd.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Backend/GraphicsBackendFwd.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/Backend/GraphicsBackendFwd.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Backend/GraphicsBackendFwd.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Backend/Image.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Backend/Image.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/Backend/Image.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Backend/Image.cpp.o"
@@ -472,12 +478,6 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Backend/Pipeline.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Backend/Pipeline.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/Backend/Pipeline.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Backend/Pipeline.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Backend/RenderBackendFwd.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Backend/RenderBackendFwd.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/Backend/RenderBackendFwd.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Backend/RenderBackendFwd.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -553,6 +553,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/GraphicsBackend.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/GraphicsBackend.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/GraphicsBackend.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/GraphicsBackend.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Light.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Light.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/Light.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Light.cpp.o"
@@ -574,12 +580,6 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/PipelineNames.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/PipelineNames.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/PipelineNames.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/PipelineNames.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/RenderBackend.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/RenderBackend.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/RenderBackend.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/RenderBackend.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

@@ -1,36 +1,36 @@
 #include "DsLayoutBuilder.hpp"
 
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx::renderer {
 
 DsLayoutBuilder& DsLayoutBuilder::AddBinding(int binding, VkDescriptorType type, eShaderType stage, int count)
 {
-    const VkSampler* pcImmutableSamplers = nullptr;
+	const VkSampler* pcImmutableSamplers = nullptr;
 
-    mLayoutBindings.emplace_back(binding, type, count, ShaderUtil::ToUnderlyingType(stage), pcImmutableSamplers);
+	mLayoutBindings.emplace_back(binding, type, count, ShaderUtil::ToUnderlyingType(stage), pcImmutableSamplers);
 
-    return *this;
+	return *this;
 }
 
 
 VkDescriptorSetLayout DsLayoutBuilder::Build()
 {
-    VkDescriptorSetLayoutCreateInfo create_info {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = static_cast<uint32>(mLayoutBindings.size()),
-        .pBindings = mLayoutBindings.data(),
-    };
+	VkDescriptorSetLayoutCreateInfo create_info {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = static_cast<uint32>(mLayoutBindings.size()),
+		.pBindings = mLayoutBindings.data(),
+	};
 
-    VkResult status = vkCreateDescriptorSetLayout(gRenderer->GetDevice()->Device, &create_info, nullptr, &mpDsLayout);
+	VkResult status = vkCreateDescriptorSetLayout(gGraphics->GetDevice()->Device, &create_info, nullptr, &mpDsLayout);
 
-    if (status != VK_SUCCESS) {
-        LogError("Error building descriptor set layout with builder! (status={})", Util::ResultToStr(status));
-        return nullptr;
-    }
+	if (status != VK_SUCCESS) {
+		LogError("Error building descriptor set layout with builder! (status={})", Util::ResultToStr(status));
+		return nullptr;
+	}
 
-    return mpDsLayout;
+	return mpDsLayout;
 }
 
 } // namespace fx::renderer

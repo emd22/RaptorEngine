@@ -7,8 +7,8 @@
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/RenderBackend.hpp>
 #include <Texture/TextureManager.hpp>
 
 namespace fx {
@@ -33,7 +33,7 @@ void MaterialManager::Create()
 		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 512);
 		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10);
 		dp.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10);
-		dp.Create(renderer::gRenderer->GetDevice(), FX_MAX_BOUND_MATERIALS);
+		dp.Create(renderer::gGraphics->GetDevice(), FX_MAX_BOUND_MATERIALS);
 	}
 
 	// Material properties buffer descriptors
@@ -98,7 +98,7 @@ void MaterialManager::MakeNullMaterial()
 	AssetTicket diffuse_ticket(diffuse_image);
 
 	// Upload the null material diffuse texture to GPU
-	renderer::gRenderer->SubmitImmediateUploadCmd(
+	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
 			ImageInfo image_info { Vec2u(4, 4), eImageFormat::RGBA8_UNorm, 0, 1,

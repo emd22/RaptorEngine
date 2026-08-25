@@ -15,7 +15,7 @@
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 
 #define DEBUG_FORCE_OUT_OF_DATE 1
@@ -245,7 +245,7 @@ void ShaderProgram::Destroy()
 		return;
 	}
 
-	GpuDevice* device = gRenderer->GetDevice();
+	GpuDevice* device = gGraphics->GetDevice();
 	vkDestroyShaderModule(device->Device, InternalShader, nullptr);
 }
 
@@ -259,7 +259,7 @@ void Shader::CreateShaderModule(ShaderProgram& program, uint32 file_size, uint32
 		.pCode = raw_data,
 	};
 
-	GpuDevice* device = gRenderer->GetDevice();
+	GpuDevice* device = gGraphics->GetDevice();
 
 	const VkResult status = vkCreateShaderModule(device->Device, &create_info, nullptr, &shader_module);
 

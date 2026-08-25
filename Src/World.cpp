@@ -6,8 +6,8 @@
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/RenderBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 
 namespace fx {
@@ -156,14 +156,14 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
-	pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
+	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
 	{
-		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gRenderer->GetLightGridFrameOffset(),
-										  gRenderer->GetLightIndexListFrameOffset() };
+		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gGraphics->GetLightGridFrameOffset(),
+										  gGraphics->GetLightIndexListFrameOffset() };
 
-		gRenderer->pDeferredRenderer->pPersistentDescriptor->Bind(
-			0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+		gGraphics->pRenderer->pPersistentDescriptor->Bind(
+			0, gGraphics->GetFrame()->CmdBuffer, pipeline,
 			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 	}
 
@@ -191,7 +191,7 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 
 	const RenderListSection& section = mRenderList.GetSection(pl_name);
 
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	if (!section.InUse.IsInited()) {
 		return;
@@ -217,7 +217,7 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 
 		// Push the direct index for the object id
 		consts.ObjectIndex = object_id.GetID();
-		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 
 		object->Update();
 		object->RenderPrimitive(cmd);
@@ -353,7 +353,7 @@ void World::Render(Camera* shadow_camera)
 		gWorldGrid->SetViewTileIndex(tile_index);
 	}
 
-	gRenderer->LightBuffer.Rewind();
+	gGraphics->LightBuffer.Rewind();
 
 	for (const Ref<LightBase>& light : mLights) {
 		light->Render(camera, shadow_camera);
@@ -364,13 +364,13 @@ void World::Render(Camera* shadow_camera)
 		gShadowRenderer->Begin();
 
 		Pipeline& pipeline = gPipelineCache->Request(ePipelineName::ShadowDirectional);
-		pipeline.Bind(gRenderer->GetFrame()->CmdBuffer);
+		pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
 		{
 			const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
 
-			gRenderer->pDeferredRenderer->pPersistentDescriptorSlim->Bind(
-				0, gRenderer->GetFrame()->CmdBuffer, pipeline,
+			gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
+				0, gGraphics->GetFrame()->CmdBuffer, pipeline,
 				Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 		}
 
@@ -381,9 +381,9 @@ void World::Render(Camera* shadow_camera)
 	}
 
 	// Cull lights into screen space tiles before rendering geometry (Forward+)
-	gRenderer->BeginLightCulling(camera);
+	gGraphics->BeginLightCulling(camera);
 
-	gRenderer->BeginGeometry();
+	gGraphics->BeginGeometry();
 
 	ExecuteRenderList(ePipelineName::Geometry);
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
@@ -397,7 +397,7 @@ void World::RenderBoundingBoxes(const Camera& camera)
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
 	}
 
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
 	pipeline.Bind(cmd);
@@ -418,7 +418,7 @@ void World::RenderBoundingBoxes(const Camera& camera)
 
 		push_constants.DebugColor = debug_color.AsUInt();
 
-		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);
 	}
 }
@@ -426,7 +426,7 @@ void World::RenderBoundingBoxes(const Camera& camera)
 
 void World::RenderWorldGrid(const Camera& camera)
 {
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
 	pipeline.Bind(cmd);
@@ -458,7 +458,7 @@ void World::RenderWorldGrid(const Camera& camera)
 				push_constants.DebugColor = player_debug_color.AsUInt();
 			}
 
-			gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+			gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 			mpDebugCube->Render(cmd, 1);
 		}
 	}
@@ -471,7 +471,7 @@ void World::RenderPhysicsObjects(const Camera& camera)
 		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
 	}
 
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 	// gRenderer->pDeferredRenderer->PlDebugLayer.Bind(cmd);
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugLayer);
@@ -496,7 +496,7 @@ void World::RenderPhysicsObjects(const Camera& camera)
 			push_constants.DebugColor = debug_color.AsUInt();
 		}
 
-		gRenderer->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);
 	}
 }

@@ -8,7 +8,7 @@
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Backend/Sampler/SamplerCache.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 
 namespace fx {
@@ -119,7 +119,7 @@ void ObjectManager::DestroyObject(ObjectID& id)
 
 uint32 ObjectManager::GetBaseOffset() const
 {
-	return (renderer::gRenderer->GetFrameNumber() * scMaxObjects * sizeof(ObjectGpuEntry));
+	return (renderer::gGraphics->GetFrameNumber() * scMaxObjects * sizeof(ObjectGpuEntry));
 }
 
 uint32 ObjectManager::GetPageSize() const { return scMaxObjects * sizeof(ObjectGpuEntry); }

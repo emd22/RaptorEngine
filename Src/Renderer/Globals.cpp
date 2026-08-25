@@ -2,15 +2,15 @@
 
 #include "Backend/DescriptorCache.hpp"
 #include "Backend/Sampler/SamplerCache.hpp"
+#include "GraphicsBackend.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
-#include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
 
 namespace fx::renderer {
 
-RenderBackend* gRenderer = nullptr;
+GraphicsBackend* gGraphics = nullptr;
 ShadowDirectional* gShadowRenderer = nullptr;
 ShaderCache* gShaderCache = nullptr;
 DsLayoutCache* gDsLayoutCache = nullptr;
@@ -32,7 +32,7 @@ void Init()
 	gPipelineCache = new PipelineCache;
 	gPSOBuild = new PSOBuild;
 
-	gRenderer = new RenderBackend;
+	gGraphics = new GraphicsBackend;
 	gShaderCache = new ShaderCache;
 	gDsLayoutCache = new DsLayoutCache;
 	gDescriptorCache = new DescriptorCache;
@@ -52,7 +52,7 @@ void Destroy()
 	DESTROY_GLOBAL(gShaderCache);
 
 	DESTROY_GLOBAL(gPSOBuild);
-	DESTROY_GLOBAL(gRenderer);
+	DESTROY_GLOBAL(gGraphics);
 }
 
 }; // namespace Globals

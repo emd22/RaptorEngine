@@ -4,7 +4,7 @@
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/Target.hpp>
 
 namespace fx::renderer {
@@ -114,7 +114,7 @@ void DescriptorPool::Create(GpuDevice* device, uint32 max_sets, bool enable_desc
 void DescriptorPool::Recreate()
 {
 	Destroy();
-	Create(gRenderer->GetDevice(), SetCapacity);
+	Create(gGraphics->GetDevice(), SetCapacity);
 }
 
 void DescriptorPool::Destroy()
@@ -123,7 +123,7 @@ void DescriptorPool::Destroy()
 		return;
 	}
 
-	vkDestroyDescriptorPool(gRenderer->GetDevice()->Device, Pool, nullptr);
+	vkDestroyDescriptorPool(gGraphics->GetDevice()->Device, Pool, nullptr);
 	Pool = nullptr;
 }
 
@@ -154,7 +154,7 @@ void DescriptorSet::Create(DescriptorPool& pool, DescriptorID id, DsLayoutID lay
 
 	pool.SetsUsed++;
 
-	VkResult status = vkAllocateDescriptorSets(gRenderer->GetDevice()->Device, &alloc_info, &mInternalSet);
+	VkResult status = vkAllocateDescriptorSets(gGraphics->GetDevice()->Device, &alloc_info, &mInternalSet);
 
 	if (status != VK_SUCCESS) {
 		LogError("Pool has {} allocated sets, with {} currently in use.", pool.SetCapacity, pool.SetsUsed);
@@ -324,7 +324,7 @@ void DescriptorSet::Build()
 	}
 
 
-	vkUpdateDescriptorSets(gRenderer->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
+	vkUpdateDescriptorSets(gGraphics->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
 
 	mbIsBuilt = true;
 

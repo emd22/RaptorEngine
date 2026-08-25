@@ -11,7 +11,7 @@
 
 #include <Core/Assert.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx::renderer {
 namespace BarrierHelper {
@@ -98,7 +98,7 @@ static const LayoutTransitionInfo GetLayoutTransitionInfo(VkImageLayout layout)
 
 void ImageTransferHandoff(const CommandBuffer& cmd, Image* image)
 {
-	const renderer::QueueFamilies& q_families = gRenderer->GetDevice()->mQueueFamilies;
+	const renderer::QueueFamilies& q_families = gGraphics->GetDevice()->mQueueFamilies;
 
 	REQUIRE_INDEPENDENT_QUEUES(q_families);
 
@@ -142,7 +142,7 @@ void ImageTransferHandoff(const CommandBuffer& cmd, Image* image)
 
 void ImageGraphicsAcquire(const CommandBuffer& cmd, Image* image)
 {
-	const renderer::QueueFamilies& q_families = gRenderer->GetDevice()->mQueueFamilies;
+	const renderer::QueueFamilies& q_families = gGraphics->GetDevice()->mQueueFamilies;
 
 	REQUIRE_INDEPENDENT_QUEUES(q_families);
 

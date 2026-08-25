@@ -4,8 +4,8 @@
 
 #include <Renderer/Backend/Device.hpp>
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
+#include <Renderer/Backend/GraphicsBackendFwd.hpp>
 #include <Renderer/Backend/Image.hpp>
-#include <Renderer/Backend/RenderBackendFwd.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/ShaderNames.hpp>
 
@@ -95,7 +95,7 @@ void DsLayoutCache::Free(DsLayoutID layout_id)
 		return;
 	}
 
-	vkDestroyDescriptorSetLayout(RenderBackendFwd::GetDevice()->Device, it->second, nullptr);
+	vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, it->second, nullptr);
 
 	Cache.erase(it);
 }
@@ -103,7 +103,7 @@ void DsLayoutCache::Free(DsLayoutID layout_id)
 void DsLayoutCache::Destroy()
 {
 	for (auto& item : Cache) {
-		vkDestroyDescriptorSetLayout(RenderBackendFwd::GetDevice()->Device, item.second, nullptr);
+		vkDestroyDescriptorSetLayout(GraphicsBackendFwd::GetDevice()->Device, item.second, nullptr);
 	}
 
 	Cache.clear();
@@ -123,7 +123,7 @@ DescriptorPool& DescriptorCache::FindPool()
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 64);
 		pool->AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 64);
-		pool->Create(RenderBackendFwd::GetDevice(), 128, true);
+		pool->Create(GraphicsBackendFwd::GetDevice(), 128, true);
 		Pools.Insert(*pool);
 	}
 
@@ -145,7 +145,7 @@ void DescriptorCache::Free(DescriptorID id)
 
 	// Free the set from the descriptor pool
 	VkDescriptorSet ds = it->second.Get();
-	vkFreeDescriptorSets(RenderBackendFwd::GetDevice()->Device, FindPool().Get(), 1, &ds);
+	vkFreeDescriptorSets(GraphicsBackendFwd::GetDevice()->Device, FindPool().Get(), 1, &ds);
 
 	// Remove it from the cache.
 	Cache.erase(it);

@@ -7,9 +7,9 @@
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Backend/VertexDescription.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/RenderBackend.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
 
 namespace fx::renderer {
@@ -54,7 +54,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 
 void ShadowDirectional::Begin()
 {
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	// Pipeline& pl = gPipelineCache->Request(ePipelineName::ShadowDirectional);
 

@@ -1,7 +1,7 @@
 #include "RenderStage.hpp"
 
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx::renderer {
 
@@ -83,7 +83,7 @@ void RenderStage::Begin(CommandBuffer& cmd)
 	VkFramebuffer framebuffer;
 
 	if (mbIsFinalStage) {
-		framebuffer = mFinalStageFramebuffers[gRenderer->GetImageIndex()].Get();
+		framebuffer = mFinalStageFramebuffers[gGraphics->GetImageIndex()].Get();
 	}
 	else {
 		framebuffer = mFramebuffer.Get();
@@ -119,7 +119,7 @@ void RenderStage::MakeClearValues()
 
 void RenderStage::CreateFinalStageFramebuffers()
 {
-	SizedArray<Image>& final_images = gRenderer->Swapchain.OutputImages;
+	SizedArray<Image>& final_images = gGraphics->Swapchain.OutputImages;
 
 	mFinalStageFramebuffers.InitSize(final_images.Size);
 
@@ -128,7 +128,7 @@ void RenderStage::CreateFinalStageFramebuffers()
 
 	for (uint32 i = 0; i < final_images.Size; i++) {
 		image_views[0] = final_images[i].View;
-		mFinalStageFramebuffers[i].Create(image_views, mRenderPass, gRenderer->Swapchain.Extent);
+		mFinalStageFramebuffers[i].Create(image_views, mRenderPass, gGraphics->Swapchain.Extent);
 	}
 }
 
@@ -143,7 +143,7 @@ void RenderStage::MarkFinalStage()
 
 void RenderStage::AddPresentTarget()
 {
-	mOutputTargets.Add(Target(gRenderer->Swapchain.Surface.Format, Target::scFullScreen, eLoadOp::DontCare,
+	mOutputTargets.Add(Target(gGraphics->Swapchain.Surface.Format, Target::scFullScreen, eLoadOp::DontCare,
 							  eStoreOp::Store, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 }
 

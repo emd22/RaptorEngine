@@ -5,26 +5,26 @@
 #include "Fwd_SubmitUploadGpuCmd.hpp"
 
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx::renderer {
 
 /* Fwd_GetFrame.hpp */
-FrameData* Fwd_GetFrame() { return gRenderer->GetFrame(); }
+FrameData* Fwd_GetFrame() { return gGraphics->GetFrame(); }
 
 /* Fwd_SubmitUploadGpuCmd.hpp */
-void Fx_Fwd_SubmitUploadCmd(std::function<void(CommandBuffer&)> func) { gRenderer->SubmitUploadCmd(func); }
+void Fx_Fwd_SubmitUploadCmd(std::function<void(CommandBuffer&)> func) { gGraphics->SubmitUploadCmd(func); }
 
 
-VmaAllocator Fx_Fwd_GetGpuAllocator() { return gRenderer->GpuAllocator; }
+VmaAllocator Fx_Fwd_GetGpuAllocator() { return gGraphics->GpuAllocator; }
 
-GpuDevice* Fwd_GetDevice() { return gRenderer->GetDevice(); }
+GpuDevice* Fwd_GetDevice() { return gGraphics->GetDevice(); }
 
-void Fx_Fwd_AddToDeletionQueue(const DeletionObject::FuncType& func) { gRenderer->AddToDeletionQueue(func); }
+void Fx_Fwd_AddToDeletionQueue(const DeletionObject::FuncType& func) { gGraphics->AddToDeletionQueue(func); }
 
 void Fx_Fwd_AddGpuBufferToDeletionQueue(const VkBuffer& buffer, const VmaAllocation& allocation)
 {
-    gRenderer->AddGpuBufferToDeletionQueue(buffer, allocation);
+	gGraphics->AddGpuBufferToDeletionQueue(buffer, allocation);
 }
 
 } // namespace fx::renderer

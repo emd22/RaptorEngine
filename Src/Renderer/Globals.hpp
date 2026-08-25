@@ -2,8 +2,8 @@
 
 namespace fx::renderer {
 
-class RenderBackend;
-extern RenderBackend* gRenderer;
+class GraphicsBackend;
+extern GraphicsBackend* gGraphics;
 
 class ShadowDirectional;
 extern ShadowDirectional* gShadowRenderer;

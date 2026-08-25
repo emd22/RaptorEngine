@@ -24,8 +24,8 @@
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Backend/Sampler/SamplerCache.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
-#include <Renderer/RenderBackend.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
 #include <Texture/TextureManager.hpp>
 
@@ -198,9 +198,9 @@ bool Material::BindWithPipeline(const CommandBuffer& cmd, const Pipeline& pipeli
 	// Buffer offsets
 	StackArray<uint32, 2> offsets;
 	if (bSupportsSkinning) {
-		offsets.Insert(gRenderer->BoneBuffer.GetBaseOffset());
+		offsets.Insert(gGraphics->BoneBuffer.GetBaseOffset());
 	}
-	offsets.Insert(gRenderer->LightBuffer.GetBaseOffset());
+	offsets.Insert(gGraphics->LightBuffer.GetBaseOffset());
 
 	// Bind the descriptor set
 	descriptor_set->Bind(1, cmd, pipeline, Slice<uint32>(offsets));
@@ -311,8 +311,8 @@ renderer::DescriptorSet* Material::RequestAlbedoOnlyDescriptors()
 	ds_entries.Emplace(
 		DescriptorEntry::AsImage(0, eShaderType::Pixel, Diffuse.pImage, gSamplerCache->Request(sampler_props)));
 
-	ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-												 gRenderer->LightBuffer.PageSize));
+	ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+												 gGraphics->LightBuffer.PageSize));
 
 	std::pair<DescriptorID, renderer::DescriptorSet*> ds_result = gDescriptorCache->Request(ds_entries);
 	mpAlbedoOnlyDescriptorSet = ds_result.second;
@@ -364,12 +364,12 @@ void Material::Build()
 		if (bSupportsSkinning) {
 			LogInfo(LC_RENDER, "\tHas Skinning");
 
-			ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(),
-														 0, gRenderer->BoneBuffer.PageSize));
+			ds_entries.Emplace(DescriptorEntry::AsBuffer(3, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(),
+														 0, gGraphics->BoneBuffer.PageSize));
 		}
 
-		ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-													 gRenderer->LightBuffer.PageSize));
+		ds_entries.Emplace(DescriptorEntry::AsBuffer(4, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+													 gGraphics->LightBuffer.PageSize));
 
 
 		std::pair<DescriptorID, DescriptorSet*> result = gDescriptorCache->Request(ds_entries);

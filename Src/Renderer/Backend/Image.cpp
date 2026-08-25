@@ -12,7 +12,7 @@
 #include <Renderer/Backend/Fwd/Fwd_GetFrame.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Texture/TextureManager.hpp>
 
 namespace fx {
@@ -101,7 +101,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 {
 	using namespace renderer;
 
-	GpuDevice* device = gRenderer->GetDevice();
+	GpuDevice* device = gGraphics->GetDevice();
 
 	Assert(size.X > 0 && size.Y > 0);
 
@@ -111,7 +111,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 			vkDestroyImageView(device->Device, View, nullptr);
 		}
 
-		vmaDestroyImage(gRenderer->GpuAllocator, InternalImage, this->Allocation);
+		vmaDestroyImage(gGraphics->GpuAllocator, InternalImage, this->Allocation);
 
 		InternalImage = nullptr;
 		Allocation = nullptr;
@@ -140,7 +140,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	VkSharingMode sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
 	uint32 num_queue_families = 0;
 
-	const bool has_independent_xfer = gRenderer->GetDevice()->mQueueFamilies.HasIndependentTransfer();
+	const bool has_independent_xfer = gGraphics->GetDevice()->mQueueFamilies.HasIndependentTransfer();
 
 	if (!HasFlag(flags, eImageCreateFlags::IsTarget) && has_independent_xfer) {
 		sharing_mode = VK_SHARING_MODE_CONCURRENT;
@@ -176,7 +176,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 		.priority = 1.0f,
 	};
 
-	VkResult status = vmaCreateImage(gRenderer->GpuAllocator, &image_info, &create_info, &InternalImage, &Allocation,
+	VkResult status = vmaCreateImage(gGraphics->GpuAllocator, &image_info, &create_info, &InternalImage, &Allocation,
 									 nullptr);
 	if (status != VK_SUCCESS) {
 		ModulePanicVulkan("Could not create vulkan image", status);
@@ -185,7 +185,7 @@ void Image::Create(eImageType image_type, const Vec2u& size, uint16 mips_count, 
 	static uint32 alloc_number = 0;
 
 	std::string alloc_name = std::to_string(alloc_number++);
-	vmaSetAllocationName(gRenderer->GpuAllocator, Allocation, alloc_name.c_str());
+	vmaSetAllocationName(gGraphics->GpuAllocator, Allocation, alloc_name.c_str());
 
 	// LogInfo("Create Image (Image={:p}, Allocation={:p})", reinterpret_cast<void*>(Image),
 	//           reinterpret_cast<void*>(Allocation));
@@ -355,7 +355,7 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 }
 
 
-void Image::MarkUploaded() { renderer::gRenderer->GetFrameNumber(); }
+void Image::MarkUploaded() { renderer::gGraphics->GetFrameNumber(); }
 
 struct LayoutTransitionInfo
 {
@@ -603,11 +603,11 @@ void Image::DecRef()
 	mpRefCnt = nullptr;
 
 	if (View != nullptr) {
-		vkDestroyImageView(renderer::gRenderer->GetDevice()->Device, View, nullptr);
+		vkDestroyImageView(renderer::gGraphics->GetDevice()->Device, View, nullptr);
 	}
 
 	if (InternalImage != nullptr && Allocation != nullptr) {
-		vmaDestroyImage(renderer::gRenderer->GpuAllocator, InternalImage, this->Allocation);
+		vmaDestroyImage(renderer::gGraphics->GpuAllocator, InternalImage, this->Allocation);
 	}
 
 	InternalImage = nullptr;
@@ -623,7 +623,7 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 	SizedArray<uint8> image_data;
 	image_data.InitSize(data_size);
 
-	renderer::gRenderer->SubmitOneTimeCmd(
+	renderer::gGraphics->SubmitOneTimeCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
 			renderer::RawGpuBuffer staging_buffer;
@@ -722,7 +722,7 @@ Image* Random(Vec2u size)
 
 	ImageInfo info(size, eImageFormat::RGBA8_UNorm, 0, 1, Slice<const uint8>(pixel_data.pData, pixel_data.Size));
 
-	renderer::gRenderer->SubmitImmediateUploadCmd(
+	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
 			ImageInfo image_info {

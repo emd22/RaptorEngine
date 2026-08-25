@@ -10,10 +10,10 @@
 #include "Camera.hpp"
 #include "Engine.hpp"
 #include "Globals.hpp"
+#include "GraphicsBackend.hpp"
 #include "Limits.hpp"
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
-#include "RenderBackend.hpp"
 #include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
 
@@ -41,12 +41,12 @@ FX_SET_MODULE_NAME("DeferredRenderer")
 /// Descriptor set index that holds the Forward+ tiled light lists
 static constexpr uint32 scLightGridSetIndex = 2;
 
-void DeferredRenderer::Create(const Vec2u& extent)
+void TiledForwardRenderer::Create(const Vec2u& extent)
 {
 	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10);
 	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 20);
 	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 15);
-	DescriptorPool.Create(gRenderer->GetDevice(), 16);
+	DescriptorPool.Create(gGraphics->GetDevice(), 16);
 
 	CreateGPassPipeline();
 	// CreateLightingPipeline();
@@ -59,9 +59,9 @@ void DeferredRenderer::Create(const Vec2u& extent)
 	//
 }
 
-void DeferredRenderer::Destroy() {}
+void TiledForwardRenderer::Destroy() {}
 
-void DeferredRenderer::CreateUnlitPass()
+void TiledForwardRenderer::CreateUnlitPass()
 {
 	// TargetList targets {};
 
@@ -97,7 +97,7 @@ void DeferredRenderer::CreateUnlitPass()
 	// UnlitPass.BuildRenderStage();
 }
 
-void DeferredRenderer::CreateGPass()
+void TiledForwardRenderer::CreateGPass()
 {
 	// GPass.Create("Geometry", gRenderer->Swapchain.Extent);
 
@@ -116,7 +116,7 @@ void DeferredRenderer::CreateGPass()
 	// GPass.BuildRenderStage();
 
 	// Forward pass
-	ForwardPass.Create("Forward", gRenderer->Swapchain.Extent);
+	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent);
 
 	// Lit target
 	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
@@ -139,7 +139,7 @@ void DeferredRenderer::CreateGPass()
 /////////////////////////////////////
 
 
-void DeferredRenderer::CreateUnlitPipeline()
+void TiledForwardRenderer::CreateUnlitPipeline()
 {
 	// CreateUnlitPass();
 	// {
@@ -205,7 +205,7 @@ void DeferredRenderer::CreateUnlitPipeline()
 	// }
 }
 
-void DeferredRenderer::BuildPersistentDescriptor()
+void TiledForwardRenderer::BuildPersistentDescriptor()
 {
 	SizedArray<DescriptorEntry> ds_entries(6);
 
@@ -222,10 +222,10 @@ void DeferredRenderer::BuildPersistentDescriptor()
 	// Add the other descriptors for the non-slim
 
 	ds_entries.Insert(
-		DescriptorEntry::AsBuffer(2, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize));
+		DescriptorEntry::AsBuffer(2, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize));
 
-	ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
-												gRenderer->LightIndexListPageSize));
+	ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+												gGraphics->LightIndexListPageSize));
 
 	Target* shadow_target = gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float);
 	Assert(shadow_target != nullptr);
@@ -245,7 +245,7 @@ void DeferredRenderer::BuildPersistentDescriptor()
 }
 
 
-void DeferredRenderer::CreateGPassPipeline()
+void TiledForwardRenderer::CreateGPassPipeline()
 {
 	CreateGPass();
 
@@ -267,10 +267,10 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 		// bLightGrid
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		// bLightIndexList
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
-							 gRenderer->LightIndexListPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -282,8 +282,8 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-							 gRenderer->LightBuffer.PageSize);
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
 
 
 		gPSOBuild->EndPipeline();
@@ -310,10 +310,10 @@ void DeferredRenderer::CreateGPassPipeline()
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
 		// bLightGrid
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		// bLightIndexList
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
-							 gRenderer->LightIndexListPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -331,8 +331,8 @@ void DeferredRenderer::CreateGPassPipeline()
 							gSamplerCache->Request({}));
 
 		// FSLightBuffer
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-							 gRenderer->LightBuffer.PageSize);
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
 
 
 		gPSOBuild->EndPipeline();
@@ -360,10 +360,10 @@ void DeferredRenderer::CreateGPassPipeline()
 							 gMaterialManager->MaterialPropertiesBuffer.Size);
 
 		// bLightGrid
-		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		// bLightIndexList
-		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gRenderer->LightIndexListBuffer, 0,
-							 gRenderer->LightIndexListPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -378,11 +378,11 @@ void DeferredRenderer::CreateGPassPipeline()
 		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
 							gSamplerCache->Request({}));
 		// bBoneBuffer
-		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gRenderer->BoneBuffer.GetGpuBuffer(), 0,
-							 gRenderer->BoneBuffer.PageSize);
+		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0,
+							 gGraphics->BoneBuffer.PageSize);
 		// Light buffer
-		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-							 gRenderer->LightBuffer.PageSize);
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
 
 		gPSOBuild->EndPipeline();
 
@@ -391,31 +391,31 @@ void DeferredRenderer::CreateGPassPipeline()
 	}
 }
 
-void DeferredRenderer::AddLightGridDescriptors() {}
+void TiledForwardRenderer::AddLightGridDescriptors() {}
 
-void DeferredRenderer::CreateLightCullingPipeline()
+void TiledForwardRenderer::CreateLightCullingPipeline()
 {
 	gPSOBuild->BeginPipeline(ePipelineName::LightCulling);
 	gPSOBuild->SetPushConstants(eShaderType::Compute, sizeof(LightCullPushConstants));
 	gPSOBuild->SetShader(eShaderName::LightCulling, {});
 
 	// bLightGrid
-	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &gRenderer->LightGridBuffer, 0, gRenderer->LightGridPageSize);
+	gPSOBuild->AddBuffer(0, 0, eShaderType::Compute, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 	// bLightIndexList
-	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &gRenderer->LightIndexListBuffer, 0,
-						 gRenderer->LightIndexListPageSize);
+	gPSOBuild->AddBuffer(1, 0, eShaderType::Compute, &gGraphics->LightIndexListBuffer, 0,
+						 gGraphics->LightIndexListPageSize);
 	// FSLightBuffer
-	gPSOBuild->AddBuffer(4, 0, eShaderType::Compute, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-						 gRenderer->LightBuffer.PageSize);
+	gPSOBuild->AddBuffer(4, 0, eShaderType::Compute, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+						 gGraphics->LightBuffer.PageSize);
 
 	gPSOBuild->EndPipeline();
 }
 
-void DeferredRenderer::DoLightCullingPass(Camera& camera)
+void TiledForwardRenderer::DoLightCullingPass(Camera& camera)
 {
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const Vec2u extent = gRenderer->Swapchain.Extent;
+	const Vec2u extent = gGraphics->Swapchain.Extent;
 
 	const uint32 tile_columns = std::min((extent.X + (Limits::LightTileSize - 1)) / Limits::LightTileSize,
 										 Limits::MaxScreenTilesX);
@@ -431,29 +431,29 @@ void DeferredRenderer::DoLightCullingPass(Camera& camera)
 	push_constants.ScreenSize[0] = static_cast<float32>(extent.X);
 	push_constants.ScreenSize[1] = static_cast<float32>(extent.Y);
 
-	push_constants.LightCount = gRenderer->LightBuffer.SlotIndex;
+	push_constants.LightCount = gGraphics->LightBuffer.SlotIndex;
 	push_constants.TileColumns = tile_columns;
 
-	gPipelineCache->AddBufferOffset(0, gRenderer->GetLightGridFrameOffset());
-	gPipelineCache->AddBufferOffset(0, gRenderer->GetLightIndexListFrameOffset());
-	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightGridFrameOffset());
+	gPipelineCache->AddBufferOffset(0, gGraphics->GetLightIndexListFrameOffset());
+	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
 	gPipelineCache->Bind(ePipelineName::LightCulling, cmd);
 
-	gRenderer->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::LightCulling), eShaderType::Compute,
+	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::LightCulling), eShaderType::Compute,
 								   push_constants);
 
 	vkCmdDispatch(cmd.Get(), tile_columns, tile_rows, 1);
 
 	// Make the culled light lists visible to the fragment shader
-	BarrierHelper::BufferComputeToFragment(cmd, &gRenderer->LightGridBuffer);
-	BarrierHelper::BufferComputeToFragment(cmd, &gRenderer->LightIndexListBuffer);
+	BarrierHelper::BufferComputeToFragment(cmd, &gGraphics->LightGridBuffer);
+	BarrierHelper::BufferComputeToFragment(cmd, &gGraphics->LightIndexListBuffer);
 }
 
-void DeferredRenderer::BindLightGridDescriptors(CommandBuffer& cmd)
+void TiledForwardRenderer::BindLightGridDescriptors(CommandBuffer& cmd)
 {
 	Pipeline& pipeline = gPipelineCache->Request(ePipelineName::Geometry);
 
-	const uint32 buffer_offsets[] = { gRenderer->GetLightGridFrameOffset(), gRenderer->GetLightIndexListFrameOffset() };
+	const uint32 buffer_offsets[] = { gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset() };
 
 	for (Pipeline::DescriptorRef& desc_ref : pipeline.DescriptorIDs) {
 		if (desc_ref.SetIndex != scLightGridSetIndex) {
@@ -467,10 +467,10 @@ void DeferredRenderer::BindLightGridDescriptors(CommandBuffer& cmd)
 }
 
 
-void DeferredRenderer::CreateLightingPipeline()
+void TiledForwardRenderer::CreateLightingPipeline()
 {
 	{
-		LightPass.Create("Lighting", gRenderer->Swapchain.Extent);
+		LightPass.Create("Lighting", gGraphics->Swapchain.Extent);
 
 
 		LightPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
@@ -514,18 +514,18 @@ void DeferredRenderer::CreateLightingPipeline()
 
 
 		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::D32_Float),
-									  &gRenderer->Swapchain.DepthSampler);
+									  &gGraphics->Swapchain.DepthSampler);
 		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::BGRA8_UNorm),
-									  &gRenderer->Swapchain.ColorSampler);
+									  &gGraphics->Swapchain.ColorSampler);
 		gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, GPass.GetTarget(eImageFormat::RGBA16_Float),
-									  &gRenderer->Swapchain.NormalsSampler);
+									  &gGraphics->Swapchain.NormalsSampler);
 
 		gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel,
 									  gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float),
-									  &gRenderer->Swapchain.ShadowDepthSampler);
+									  &gGraphics->Swapchain.ShadowDepthSampler);
 
-		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gRenderer->LightBuffer.GetGpuBuffer(), 0,
-							 gRenderer->LightBuffer.PageSize);
+		gPSOBuild->AddBuffer(4, 0, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
 
 		gPSOBuild->AddBuffer(0, 1, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 							 gObjectManager->GetPageSize());
@@ -583,11 +583,11 @@ void DeferredRenderer::CreateLightingPipeline()
 // DeferredRenderer CompPass Functions
 //////////////////////////////////////////
 
-void DeferredRenderer::CreateCompPipeline()
+void TiledForwardRenderer::CreateCompPipeline()
 {
 	// Create composition render stage
 
-	CompPass.Create("Compose", gRenderer->Swapchain.Extent);
+	CompPass.Create("Compose", gGraphics->Swapchain.Extent);
 
 	CompPass.MarkFinalStage();
 	CompPass.BuildRenderStage();
@@ -623,9 +623,9 @@ void DeferredRenderer::CreateCompPipeline()
 	gPSOBuild->EndPipeline();
 }
 
-void DeferredRenderer::DoCompPass(Camera& camera)
+void TiledForwardRenderer::DoCompPass(Camera& camera)
 {
-	CommandBuffer& cmd = gRenderer->GetFrame()->CmdBuffer;
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	gPipelineCache->Bind(ePipelineName::Composition, cmd);
 

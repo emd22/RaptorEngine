@@ -6,7 +6,7 @@
 
 #include <Core/Memory.hpp>
 #include <Core/Ref.hpp>
-#include <Renderer/Backend/RenderBackendFwd.hpp>
+#include <Renderer/Backend/GraphicsBackendFwd.hpp>
 
 namespace fx {
 
@@ -123,7 +123,7 @@ void LoaderJpeg::CreateGpuResource(AssetTicket& ticket)
 						   MakeSlice<const uint8>(mImageData.pData, mImageData.Size) };
 
 	// Pass all flags that are not KeepInMemory. We will instead move the data over to avoid the copy.
-	image->CreateFromData(renderer::RenderBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
+	image->CreateFromData(renderer::GraphicsBackendFwd::GetUploadCmd(), image_info, (CreationFlags));
 
 	ticket.SignalUploadedToGpu();
 }

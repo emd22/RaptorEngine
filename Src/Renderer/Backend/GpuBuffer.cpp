@@ -2,7 +2,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx::renderer {
 
@@ -94,7 +94,7 @@ void RawGpuBuffer::Create(eGpuBufferType buffer_type, uint64 size_in_bytes, VmaM
 	const VmaAllocationCreateInfo alloc_create_info = { .flags = vma_create_flags, .usage = memory_usage };
 
 	VmaAllocationInfo allocation_info;
-	const VkResult status = vmaCreateBuffer(gRenderer->GpuAllocator, &create_info, &alloc_create_info, &Buffer,
+	const VkResult status = vmaCreateBuffer(gGraphics->GpuAllocator, &create_info, &alloc_create_info, &Buffer,
 											&Allocation, &allocation_info);
 
 	if (status != VK_SUCCESS) {
@@ -125,7 +125,7 @@ void RawGpuBuffer::Map()
 		return;
 	}
 
-	const VkResult status = vmaMapMemory(gRenderer->GpuAllocator, Allocation, &pMappedBuffer);
+	const VkResult status = vmaMapMemory(gGraphics->GpuAllocator, Allocation, &pMappedBuffer);
 
 	if (status != VK_SUCCESS) {
 		LogError("Could not map GPU memory! (BufferType=0x{:x}, Error={})", static_cast<uint32>(Type),
@@ -141,7 +141,7 @@ void RawGpuBuffer::UnMap()
 		return;
 	}
 
-	vmaUnmapMemory(gRenderer->GpuAllocator, Allocation);
+	vmaUnmapMemory(gGraphics->GpuAllocator, Allocation);
 	pMappedBuffer = nullptr;
 }
 

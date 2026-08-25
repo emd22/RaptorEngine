@@ -1,7 +1,7 @@
 #include "Target.hpp"
 
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx::renderer {
 
@@ -10,7 +10,7 @@ Target::Target(eImageFormat format, const Vec2u& size)
 	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
 	if (size == Target::scFullScreen) {
-		Image.Info.Size = gRenderer->Swapchain.Extent;
+		Image.Info.Size = gGraphics->Swapchain.Extent;
 		bIsFullscreen = true;
 	}
 }
@@ -22,7 +22,7 @@ Target::Target(eImageFormat format, const Vec2u& size, eLoadOp load_op, eStoreOp
 	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
 	if (size == Target::scFullScreen) {
-		Image.Info.Size = gRenderer->Swapchain.Extent;
+		Image.Info.Size = gGraphics->Swapchain.Extent;
 		bIsFullscreen = true;
 	}
 }
@@ -33,7 +33,7 @@ Target::Target(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, 
 	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
 	if (size == Target::scFullScreen) {
-		Image.Info.Size = gRenderer->Swapchain.Extent;
+		Image.Info.Size = gGraphics->Swapchain.Extent;
 		bIsFullscreen = true;
 	}
 }
@@ -125,7 +125,7 @@ void TargetList::CreateImages()
 		return;
 	}
 
-	Vec2u swapchain_size = gRenderer->Swapchain.Extent;
+	Vec2u swapchain_size = gGraphics->Swapchain.Extent;
 
 	for (Target& target : Targets) {
 		if (target.bIsFullscreen) {

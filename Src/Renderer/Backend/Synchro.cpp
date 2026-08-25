@@ -2,7 +2,7 @@
 
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 
 namespace fx::renderer {
 
@@ -16,7 +16,7 @@ void Fence::Create()
 											.pNext = nullptr,
 											.flags = VK_FENCE_CREATE_SIGNALED_BIT };
 
-	const VkResult status = vkCreateFence(gRenderer->GetDevice()->Device, &create_info, nullptr, &InternalFence);
+	const VkResult status = vkCreateFence(gGraphics->GetDevice()->Device, &create_info, nullptr, &InternalFence);
 	if (status != VK_SUCCESS) {
 		PanicVulkan("Fence", "Could not create fence", status);
 	}
@@ -26,7 +26,7 @@ void Fence::WaitFor(uint64 timeout) const
 {
 	Assert(InternalFence != nullptr);
 
-	const VkResult status = vkWaitForFences(gRenderer->GetDevice()->Device, 1, &InternalFence, true, timeout);
+	const VkResult status = vkWaitForFences(gGraphics->GetDevice()->Device, 1, &InternalFence, true, timeout);
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("Fence", "Could not create fence", status);
@@ -37,7 +37,7 @@ void Fence::Reset()
 {
 	Assert(InternalFence != nullptr);
 
-	const VkResult status = vkResetFences(gRenderer->GetDevice()->Device, 1, &InternalFence);
+	const VkResult status = vkResetFences(gGraphics->GetDevice()->Device, 1, &InternalFence);
 
 	if (status != VK_SUCCESS) {
 		PanicVulkan("Fence", "Could not reset fence", status);
@@ -49,7 +49,7 @@ void Fence::Destroy()
 	if (InternalFence == nullptr) {
 		return;
 	}
-	vkDestroyFence(gRenderer->GetDevice()->Device, InternalFence, nullptr);
+	vkDestroyFence(gGraphics->GetDevice()->Device, InternalFence, nullptr);
 	InternalFence = nullptr;
 }
 
@@ -83,7 +83,7 @@ void Semaphore::Create(eSemaphoreType semaphore_type)
 		.flags = 0,
 	};
 
-	const VkResult status = vkCreateSemaphore(gRenderer->GetDevice()->Device, &create_info, nullptr,
+	const VkResult status = vkCreateSemaphore(gGraphics->GetDevice()->Device, &create_info, nullptr,
 											  &InternalSemaphore);
 
 	if (status != VK_SUCCESS) {
@@ -93,7 +93,7 @@ void Semaphore::Create(eSemaphoreType semaphore_type)
 
 void Semaphore::Destroy()
 {
-	vkDestroySemaphore(gRenderer->GetDevice()->Device, InternalSemaphore, nullptr);
+	vkDestroySemaphore(gGraphics->GetDevice()->Device, InternalSemaphore, nullptr);
 	InternalSemaphore = nullptr;
 }
 

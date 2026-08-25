@@ -9,7 +9,7 @@
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/RenderBackend.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/TiledForwardRenderer.hpp>
 
 FX_SET_MODULE_NAME("Pipeline")
@@ -72,7 +72,7 @@ void PipelineLayout::Create(const Slice<const PushConstants>& push_constant_defs
 		.pPushConstantRanges = push_const_ranges.pData,
 	};
 
-	VkResult status = vkCreatePipelineLayout(gRenderer->GetDevice()->Device, &create_info, nullptr, &InternalLayout);
+	VkResult status = vkCreatePipelineLayout(gGraphics->GetDevice()->Device, &create_info, nullptr, &InternalLayout);
 
 	// if (reinterpret_cast<uint64>(InternalLayout) == 0x420000000042ULL) {
 	//     FX_BREAKPOINT;
@@ -102,7 +102,7 @@ void PipelineLayout::DestroyObject()
 		return;
 	}
 
-	vkDestroyPipelineLayout(gRenderer->GetDevice()->Device, InternalLayout, nullptr);
+	vkDestroyPipelineLayout(gGraphics->GetDevice()->Device, InternalLayout, nullptr);
 	InternalLayout = nullptr;
 }
 
@@ -119,7 +119,7 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 					  VertexDescription* vertex_info, const RenderPass& render_pass,
 					  const PipelineProperties& properties)
 {
-	mDevice = gRenderer->GetDevice();
+	mDevice = gGraphics->GetDevice();
 
 	Name = name;
 
@@ -175,7 +175,7 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 	// If there is no viewport size passed in, assume the swapchain size.
 	if (ViewportSize.X == 0 || ViewportSize.Y == 0) {
 		bIsViewportFullscreen = true;
-		ViewportSize = gRenderer->Swapchain.Extent;
+		ViewportSize = gGraphics->Swapchain.Extent;
 	}
 
 	VkViewport viewport = {
@@ -301,7 +301,7 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 
 void Pipeline::CreateCompute(ePipelineName name, const Ref<ShaderProgram>& shader)
 {
-	mDevice = gRenderer->GetDevice();
+	mDevice = gGraphics->GetDevice();
 
 	Name = name;
 	bIsCompute = true;
@@ -345,7 +345,7 @@ void Pipeline::Bind(const CommandBuffer& cmd) const
 
 	if (!bIsCompute && bHasDynamicViewport && !sbHaveDynamicStatesBeenBound) {
 		if (bIsViewportFullscreen) {
-			ViewportSize = gRenderer->GetWindow()->GetSize();
+			ViewportSize = gGraphics->GetWindow()->GetSize();
 		}
 
 		VkViewport viewport = {

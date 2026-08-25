@@ -18,7 +18,7 @@ class CommandBuffer;
 // Main Deferred Renderer
 ///////////////////////////////
 
-class DeferredRenderer
+class TiledForwardRenderer
 {
 public:
 	void Create(const Vec2u& extent);
@@ -35,7 +35,7 @@ public:
 	void BindLightGridDescriptors(CommandBuffer& cmd);
 
 	void Destroy();
-	~DeferredRenderer() { Destroy(); }
+	~TiledForwardRenderer() { Destroy(); }
 
 private:
 	// Geometry

@@ -1,4 +1,4 @@
-#include "RenderBackend.hpp"
+#include "GraphicsBackend.hpp"
 
 #include "Backend/Commands.hpp"
 #include "Backend/Pipeline.hpp"
@@ -44,13 +44,13 @@
 
 namespace fx::renderer {
 
-using ExtensionNames = RenderBackend::ExtensionNames;
-using ExtensionList = RenderBackend::ExtensionList;
+using ExtensionNames = GraphicsBackend::ExtensionNames;
+using ExtensionList = GraphicsBackend::ExtensionList;
 
 FX_SET_MODULE_NAME("RenderBackend")
 
-ExtensionNames RenderBackend::CheckExtensionsAvailable(ExtensionNames& requested_extensions,
-													   ExtensionList& available_extensions)
+ExtensionNames GraphicsBackend::CheckExtensionsAvailable(ExtensionNames& requested_extensions,
+														 ExtensionList& available_extensions)
 {
 	if (available_extensions.IsEmpty()) {
 		QueryInstanceExtensions(available_extensions);
@@ -75,7 +75,7 @@ ExtensionNames RenderBackend::CheckExtensionsAvailable(ExtensionNames& requested
 	return missing_extensions;
 }
 
-bool RenderBackend::RequiresVulkanPortability(const ExtensionList& available_extensions)
+bool GraphicsBackend::RequiresVulkanPortability(const ExtensionList& available_extensions)
 {
 	Assert(available_extensions.IsNotEmpty());
 
@@ -88,7 +88,7 @@ bool RenderBackend::RequiresVulkanPortability(const ExtensionList& available_ext
 	return false;
 }
 
-SizedArray<VkLayerProperties> RenderBackend::GetAvailableValidationLayers()
+SizedArray<VkLayerProperties> GraphicsBackend::GetAvailableValidationLayers()
 {
 	uint32 layer_count;
 	vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
@@ -103,7 +103,7 @@ SizedArray<VkLayerProperties> RenderBackend::GetAvailableValidationLayers()
 
 VkDebugUtilsMessengerEXT CreateDebugMessenger(VkInstance instance);
 
-void RenderBackend::Init(Vec2u window_size)
+void GraphicsBackend::Init(Vec2u window_size)
 {
 	InitVulkan();
 	CreateSurfaceFromWindow();
@@ -150,8 +150,8 @@ void RenderBackend::Init(Vec2u window_size)
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
-	pDeferredRenderer = new DeferredRenderer;
-	pDeferredRenderer->Create(Swapchain.Extent);
+	pRenderer = new TiledForwardRenderer;
+	pRenderer->Create(Swapchain.Extent);
 
 	// SizedArray<renderer::DescriptorEntry> ds_entries(4);
 	// ds_entries.Insert(
@@ -165,7 +165,7 @@ void RenderBackend::Init(Vec2u window_size)
 	bInitialized = true;
 }
 
-void RenderBackend::InitUploadContext()
+void GraphicsBackend::InitUploadContext()
 {
 	UploadContext.CmdPool.Create(GetDevice(), GetDevice()->mQueueFamilies.GetTransferFamily());
 	UploadContext.CmdBuffer.Create(&UploadContext.CmdPool);
@@ -178,7 +178,7 @@ void RenderBackend::InitUploadContext()
 	UploadContext.ImmediateUploadFence.Create();
 }
 
-void RenderBackend::DestroyUploadContext()
+void GraphicsBackend::DestroyUploadContext()
 {
 	UploadContext.CmdBuffer.Destroy();
 	UploadContext.ImmediateCmdBuffer.Destroy();
@@ -188,7 +188,7 @@ void RenderBackend::DestroyUploadContext()
 	UploadContext.ImmediateUploadFence.Destroy();
 }
 
-void RenderBackend::InitFrames()
+void GraphicsBackend::InitFrames()
 {
 	Frames.InitSize(FramesInFlight);
 
@@ -216,7 +216,7 @@ void RenderBackend::InitFrames()
 	}
 }
 
-void RenderBackend::DestroyFrames()
+void GraphicsBackend::DestroyFrames()
 {
 	{
 		SpinLockContext<VkQueue> graphics_queue = GetDevice()->GetGraphicsQueue();
@@ -235,9 +235,9 @@ void RenderBackend::DestroyFrames()
 	Frames.Free();
 }
 
-void RenderBackend::RebuildRenderStages()
+void GraphicsBackend::RebuildRenderStages()
 {
-	DeferredRenderer* rd = pDeferredRenderer;
+	TiledForwardRenderer* rd = pRenderer;
 
 	Vec2u size = GetWindow()->GetSize();
 
@@ -253,7 +253,7 @@ void RenderBackend::RebuildRenderStages()
 	}*/
 }
 
-void RenderBackend::InitVulkan()
+void GraphicsBackend::InitVulkan()
 {
 	const char* app_name = "Foxtrot";
 	VkApplicationInfo app_info = {};
@@ -387,7 +387,7 @@ static void DestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT 
 	Rx_EXT_DestroyDebugUtilsMessenger(instance, messenger, nullptr);
 }
 
-void RenderBackend::InitGPUAllocator()
+void GraphicsBackend::InitGPUAllocator()
 {
 	const GpuDevice* device = GetDevice();
 
@@ -401,10 +401,10 @@ void RenderBackend::InitGPUAllocator()
 	}
 }
 
-void RenderBackend::DestroyGPUAllocator() { vmaDestroyAllocator(GpuAllocator); }
+void GraphicsBackend::DestroyGPUAllocator() { vmaDestroyAllocator(GpuAllocator); }
 
-ExtensionNames RenderBackend::MakeInstanceExtensionList(ExtensionNames& user_requested_extensions,
-														ExtensionList& out_available_extensions)
+ExtensionNames GraphicsBackend::MakeInstanceExtensionList(ExtensionNames& user_requested_extensions,
+														  ExtensionList& out_available_extensions)
 {
 	uint32 required_extension_count = 0;
 	const char* const* required_extensions = SDL_Vulkan_GetInstanceExtensions(&required_extension_count);
@@ -426,7 +426,7 @@ ExtensionNames RenderBackend::MakeInstanceExtensionList(ExtensionNames& user_req
 	return total_extensions;
 }
 
-ExtensionList& RenderBackend::QueryInstanceExtensions(ExtensionList& available_extensions, bool invalidate_previous)
+ExtensionList& GraphicsBackend::QueryInstanceExtensions(ExtensionList& available_extensions, bool invalidate_previous)
 {
 	if (available_extensions.IsNotEmpty()) {
 		if (invalidate_previous) {
@@ -455,8 +455,8 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(ExtensionList& available_e
 	return available_extensions;
 }
 
-void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
-										   const void* data, uint32 data_size) const
+void GraphicsBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline,
+											 eShaderType shader_types, const void* data, uint32 data_size) const
 {
 	DebugAssert(pipeline.Layout.IsValid());
 
@@ -470,7 +470,7 @@ void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipel
 }
 
 
-void RenderBackend::SubmitImmediateUploadCmd(RenderBackend::SubmitFunc upload_func)
+void GraphicsBackend::SubmitImmediateUploadCmd(GraphicsBackend::SubmitFunc upload_func)
 {
 	CommandBuffer& cmd = UploadContext.ImmediateCmdBuffer;
 
@@ -498,18 +498,18 @@ void RenderBackend::SubmitImmediateUploadCmd(RenderBackend::SubmitFunc upload_fu
 	UploadContext.ImmediateCmdBuffer.Reset();
 }
 
-void RenderBackend::SubmitUploadCmd(RenderBackend::SubmitFunc upload_func)
+void GraphicsBackend::SubmitUploadCmd(GraphicsBackend::SubmitFunc upload_func)
 {
 	CommandBuffer& cmd = UploadContext.CmdBuffer;
 	upload_func(cmd);
 }
 
-void RenderBackend::BeginUploads() {}
+void GraphicsBackend::BeginUploads() {}
 
-void RenderBackend::SubmitUploads() {}
+void GraphicsBackend::SubmitUploads() {}
 
 
-void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
+void GraphicsBackend::SubmitOneTimeCmd(GraphicsBackend::SubmitFunc submit_func)
 {
 	CommandBuffer cmd;
 	cmd.Create(&GetFrame()->CmdPool);
@@ -537,7 +537,7 @@ void RenderBackend::SubmitOneTimeCmd(RenderBackend::SubmitFunc submit_func)
 }
 
 
-eFrameResult RenderBackend::BeginFrame()
+eFrameResult GraphicsBackend::BeginFrame()
 {
 	FrameData* frame = GetFrame();
 
@@ -556,24 +556,24 @@ eFrameResult RenderBackend::BeginFrame()
 	return eFrameResult::Success;
 }
 
-void RenderBackend::BeginLightCulling(Camera& render_cam) { pDeferredRenderer->DoLightCullingPass(render_cam); }
+void GraphicsBackend::BeginLightCulling(Camera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }
 
-void RenderBackend::BeginGeometry()
+void GraphicsBackend::BeginGeometry()
 {
 	FrameData* frame = GetFrame();
 
-	pDeferredRenderer->ForwardPass.Begin(frame->CmdBuffer);
+	pRenderer->ForwardPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Geometry, frame->CmdBuffer);
 
 	// pDeferredRenderer->BindLightGridDescriptors(frame->CmdBuffer);
 
-	const uint32 buffer_offsets[] = { gRenderer->GetLightGridFrameOffset(), gRenderer->GetLightIndexListFrameOffset() };
+	const uint32 buffer_offsets[] = { gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset() };
 
 	// pLightsDescriptor->Bind(2, frame->CmdBuffer, gPipelineCache->Request(ePipelineName::GeometryNormalMaps),
 	// 						Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 }
 
-void RenderBackend::PresentFrame()
+void GraphicsBackend::PresentFrame()
 {
 	SubmitUploads();
 
@@ -596,7 +596,7 @@ void RenderBackend::PresentFrame()
 		// frame->TransferCmdBuffer.Cmd,
 	};
 
-	uint64_t wait_values[] = { 0, gRenderer->TransferCount.load() };
+	uint64_t wait_values[] = { 0, gGraphics->TransferCount.load() };
 
 	VkTimelineSemaphoreSubmitInfo timeline_info {
 		.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
@@ -668,18 +668,18 @@ void RenderBackend::PresentFrame()
 	bDidFrameResize = false;
 }
 
-void RenderBackend::BeginLighting()
+void GraphicsBackend::BeginLighting()
 {
 	FrameData* frame = GetFrame();
 
-	pDeferredRenderer->GPass.End();
+	pRenderer->GPass.End();
 
 	// Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
 	// Assert(depth_target != nullptr);
 	// depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
 
 
-	pDeferredRenderer->LightPass.Begin(frame->CmdBuffer);
+	pRenderer->LightPass.Begin(frame->CmdBuffer);
 
 	// gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
 	// gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
@@ -687,7 +687,7 @@ void RenderBackend::BeginLighting()
 	// gState->Reset();
 
 
-	gPipelineCache->AddBufferOffset(0, gRenderer->LightBuffer.GetBaseOffset());
+	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
 	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
 	gPipelineCache->AddBufferOffset(1, 0);
 	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
@@ -698,11 +698,11 @@ void RenderBackend::BeginLighting()
 }
 
 
-void RenderBackend::BeginUnlit()
+void GraphicsBackend::BeginUnlit()
 {
 	FrameData* frame = GetFrame();
 
-	pDeferredRenderer->LightPass.End();
+	pRenderer->LightPass.End();
 
 
 	// Target* depth_target = gRenderer->pDeferredRenderer->GPass.GetTarget(ImageFormat::eD32_Float, 0);
@@ -720,20 +720,20 @@ void RenderBackend::BeginUnlit()
 	// pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
 }
 
-void RenderBackend::DoComposition(Camera& render_cam)
+void GraphicsBackend::DoComposition(Camera& render_cam)
 {
 	FrameData* frame = GetFrame();
 
-	pDeferredRenderer->ForwardPass.End();
+	pRenderer->ForwardPass.End();
 
 	// pDeferredRenderer->UnlitPass.End();
 
-	pDeferredRenderer->CompPass.Begin(frame->CmdBuffer);
+	pRenderer->CompPass.Begin(frame->CmdBuffer);
 	// gPipelineCache->Bind(ePipelineName::Composition, frame->CmdBuffer);
 
-	pDeferredRenderer->DoCompPass(render_cam);
+	pRenderer->DoCompPass(render_cam);
 
-	pDeferredRenderer->CompPass.End();
+	pRenderer->CompPass.End();
 	frame->CmdBuffer.End();
 
 	PresentFrame();
@@ -749,15 +749,15 @@ void RenderBackend::DoComposition(Camera& render_cam)
 	mFrameNumber = (mInternalFrameCounter % FramesInFlight);
 }
 
-void RenderBackend::RebuildToResizedWindow()
+void GraphicsBackend::RebuildToResizedWindow()
 {
 	bDidFrameResize = true;
-	gRenderer->GetWindow()->HandleResize();
-	Swapchain.Rebuild(gRenderer->GetWindow()->GetSize(), mWindowSurface);
+	gGraphics->GetWindow()->HandleResize();
+	Swapchain.Rebuild(gGraphics->GetWindow()->GetSize(), mWindowSurface);
 	RebuildRenderStages();
 }
 
-eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
+eFrameResult GraphicsBackend::GetNextSwapchainImage(FrameData* frame)
 {
 	const uint64 timeout = UINT64_MAX; // TODO: change this value and handle AcquireNextImage errors correctly
 
@@ -778,7 +778,7 @@ eFrameResult RenderBackend::GetNextSwapchainImage(FrameData* frame)
 	return eFrameResult::RenderError;
 }
 
-void RenderBackend::CreateSurfaceFromWindow()
+void GraphicsBackend::CreateSurfaceFromWindow()
 {
 	if (mpWindow == nullptr) {
 		ModulePanic("No window attached! use RenderBackend::SelectWindow()");
@@ -792,7 +792,7 @@ void RenderBackend::CreateSurfaceFromWindow()
 }
 
 
-void RenderBackend::Destroy()
+void GraphicsBackend::Destroy()
 {
 	GetDevice()->WaitForIdle();
 
@@ -843,6 +843,6 @@ void RenderBackend::Destroy()
 	bInitialized = false;
 }
 
-FrameData* RenderBackend::GetFrame() { return &Frames[GetFrameNumber()]; }
+FrameData* GraphicsBackend::GetFrame() { return &Frames[GetFrameNumber()]; }
 
 } // namespace fx::renderer

@@ -13,10 +13,10 @@
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/MeshUtil.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
-#include <Renderer/RenderBackend.hpp>
 #include <World.hpp>
 
 namespace fx {
@@ -192,8 +192,8 @@ void Object::UpdateAnimation()
 
 	AnimationTime += 0.01f;
 
-	gRenderer->BoneBuffer.Rewind();
-	gRenderer->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData, pSkeleton->SkinningMatrices.Size * sizeof(Mat4f));
+	gGraphics->BoneBuffer.Rewind();
+	gGraphics->BoneBuffer.CopyFrom(pSkeleton->SkinningMatrices.pData, pSkeleton->SkinningMatrices.Size * sizeof(Mat4f));
 }
 
 void Object::MakeInstanceOf(const ObjectID& source_id)
@@ -230,7 +230,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	Assert(pipeline != nullptr);
 
-	FrameData* frame = gRenderer->GetFrame();
+	FrameData* frame = gGraphics->GetFrame();
 	// Material* material = gMaterialManager->GetMaterial(mMaterialID);
 
 	// if (!pipeline) {
@@ -248,11 +248,11 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	DrawPushConstants push_constants {};
 	push_constants.ObjectId = ID.GetID();
 	push_constants.MaterialIndex = mMaterialID.GetID();
-	push_constants.TileColumns = gRenderer->pDeferredRenderer->GetLightTileColumns();
+	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
 
-	gRenderer->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
+	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
 								   push_constants);
 
 	RenderMesh(pipeline);
@@ -278,7 +278,7 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
 
 void Object::RenderMesh(renderer::Pipeline* pipeline)
 {
-	FrameData* frame = gRenderer->GetFrame();
+	FrameData* frame = gGraphics->GetFrame();
 	CommandBuffer& cmd = frame->CmdBuffer;
 
 	Material* mat = gMaterialManager->GetMaterial(mMaterialID);

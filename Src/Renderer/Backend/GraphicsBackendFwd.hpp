@@ -9,7 +9,7 @@ class FrameData;
 class CommandBuffer;
 class GpuDevice;
 
-namespace RenderBackendFwd {
+namespace GraphicsBackendFwd {
 
 FrameData* GetFrame();
 GpuDevice* GetDevice();
@@ -18,7 +18,7 @@ CommandBuffer& GetUploadCmd();
 void SubmitImmediateUploadCmd(std::function<void(CommandBuffer&)> upload_func);
 CommandBuffer& GetCmd();
 
-} // namespace RenderBackendFwd
+} // namespace GraphicsBackendFwd
 
 } // namespace renderer
 } // namespace fx
