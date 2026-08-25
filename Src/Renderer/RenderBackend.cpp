@@ -5,9 +5,9 @@
 #include "Backend/Synchro.hpp"
 #include "Backend/Util.hpp"
 #include "Constants.hpp"
-#include "DeferredRenderer.hpp"
 #include "Engine.hpp"
 #include "Object/ObjectManager.hpp"
+#include "TiledForwardRenderer.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
@@ -49,17 +49,18 @@ using ExtensionList = RenderBackend::ExtensionList;
 
 FX_SET_MODULE_NAME("RenderBackend")
 
-ExtensionNames RenderBackend::CheckExtensionsAvailable(ExtensionNames& requested_extensions)
+ExtensionNames RenderBackend::CheckExtensionsAvailable(ExtensionNames& requested_extensions,
+													   ExtensionList& available_extensions)
 {
-	if (mAvailableExtensions.IsEmpty()) {
-		QueryInstanceExtensions();
+	if (available_extensions.IsEmpty()) {
+		QueryInstanceExtensions(available_extensions);
 	}
 
 	std::vector<const char*> missing_extensions;
 
 	for (const char* requested_name : requested_extensions) {
 		bool found_extension = false;
-		for (const auto& extension : mAvailableExtensions) {
+		for (const auto& extension : available_extensions) {
 			if (!strncmp(extension.extensionName, requested_name, 256)) {
 				found_extension = true;
 				break;
@@ -74,13 +75,11 @@ ExtensionNames RenderBackend::CheckExtensionsAvailable(ExtensionNames& requested
 	return missing_extensions;
 }
 
-bool RenderBackend::RequiresVulkanPortability()
+bool RenderBackend::RequiresVulkanPortability(const ExtensionList& available_extensions)
 {
-	if (mAvailableExtensions.IsEmpty()) {
-		QueryInstanceExtensions();
-	}
+	Assert(available_extensions.IsNotEmpty());
 
-	for (const VkExtensionProperties& extension : mAvailableExtensions) {
+	for (const VkExtensionProperties& extension : available_extensions) {
 		if (!strncmp(extension.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, 256)) {
 			return true;
 		}
@@ -267,7 +266,9 @@ void RenderBackend::InitVulkan()
 		// VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
 	};
 
-	ExtensionNames all_extensions = MakeInstanceExtensionList(requested_extensions);
+	// This is initialized when querying for extensions
+	ExtensionList available_extensions;
+	ExtensionNames all_extensions = MakeInstanceExtensionList(requested_extensions, available_extensions);
 
 #ifdef FX_VULKAN_DEBUG
 	all_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -277,28 +278,11 @@ void RenderBackend::InitVulkan()
 	std::cout << "Requested to load " << all_extensions.size() << " extensions...\n";
 
 	LogDebug(LC_RENDER, "== Supported Extensions ==");
-	for (const VkExtensionProperties& extension : mAvailableExtensions) {
+	for (const VkExtensionProperties& extension : available_extensions) {
 		LogDebug(LC_RENDER, "{}", extension.extensionName);
 	}
 
-	ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions);
-
-	// if (!missing_extensions.empty()) {
-	//     std::cerr << "MISSING: ";
-	//     for (size_t i = 0; i < missing_extensions.size(); ++i) {
-	//         std::cerr << missing_extensions[i];
-	//         if (i < missing_extensions.size() - 1) {
-	//             std::cerr << ", ";
-	//         }
-	//     }
-
-	//     ModulePanic("Missing required instance extensions");
-	// }
-
-	// auto validation_layers = GetAvailableValidationLayers();
-	// for (auto &layer : validation_layers) {
-	//     Log::Debug("Layer: %s", layer.layerName);
-	// }
+	ExtensionNames missing_extensions = CheckExtensionsAvailable(all_extensions, available_extensions);
 
 	std::vector<const char*> requested_validation_layers = {
 		"VK_LAYER_KHRONOS_validation",
@@ -419,12 +403,13 @@ void RenderBackend::InitGPUAllocator()
 
 void RenderBackend::DestroyGPUAllocator() { vmaDestroyAllocator(GpuAllocator); }
 
-ExtensionNames RenderBackend::MakeInstanceExtensionList(ExtensionNames& user_requested_extensions)
+ExtensionNames RenderBackend::MakeInstanceExtensionList(ExtensionNames& user_requested_extensions,
+														ExtensionList& out_available_extensions)
 {
 	uint32 required_extension_count = 0;
 	const char* const* required_extensions = SDL_Vulkan_GetInstanceExtensions(&required_extension_count);
 
-	QueryInstanceExtensions();
+	QueryInstanceExtensions(out_available_extensions);
 
 	const uint32 total_extensions_size = user_requested_extensions.size() + required_extension_count;
 	ExtensionNames total_extensions;
@@ -441,14 +426,14 @@ ExtensionNames RenderBackend::MakeInstanceExtensionList(ExtensionNames& user_req
 	return total_extensions;
 }
 
-ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
+ExtensionList& RenderBackend::QueryInstanceExtensions(ExtensionList& available_extensions, bool invalidate_previous)
 {
-	if (mAvailableExtensions.IsNotEmpty()) {
+	if (available_extensions.IsNotEmpty()) {
 		if (invalidate_previous) {
-			mAvailableExtensions.Free();
+			available_extensions.Free();
 		}
 		else {
-			return mAvailableExtensions;
+			return available_extensions;
 		}
 	}
 
@@ -459,15 +444,15 @@ ExtensionList& RenderBackend::QueryInstanceExtensions(bool invalidate_previous)
 		throw std::runtime_error("Could not query instance extensions!");
 	}
 
-	mAvailableExtensions.InitSize(extension_count);
+	available_extensions.InitSize(extension_count);
 
 	// Get the available instance extensions
-	result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, mAvailableExtensions.pData);
+	result = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.pData);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Could not query instance extensions!");
 	}
 
-	return mAvailableExtensions;
+	return available_extensions;
 }
 
 void RenderBackend::SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,

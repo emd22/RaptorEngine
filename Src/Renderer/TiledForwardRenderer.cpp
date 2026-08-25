@@ -1,4 +1,4 @@
-#include "DeferredRenderer.hpp"
+#include "TiledForwardRenderer.hpp"
 
 #include "Backend/BarrierHelper.hpp"
 #include "Backend/Commands.hpp"
@@ -20,6 +20,7 @@
 #include <Asset/AssetManager.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Texture/TextureManager.hpp>
 #include <algorithm>
 
 /*
@@ -118,6 +119,10 @@ void DeferredRenderer::CreateGPass()
 	ForwardPass.Create("Forward", gRenderer->Swapchain.Extent);
 
 	// Lit target
+	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+
+	// Normals target
 	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
 						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
@@ -573,6 +578,7 @@ void DeferredRenderer::CreateLightingPipeline()
 	}
 }
 
+
 //////////////////////////////////////////
 // DeferredRenderer CompPass Functions
 //////////////////////////////////////////
@@ -606,6 +612,13 @@ void DeferredRenderer::CreateCompPipeline()
 								  }));
 	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
 								  gSamplerCache->Request(SamplerProps {}));
+
+	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float, 1),
+								  gSamplerCache->Request(SamplerProps {
+									  eSamplerFilter::Nearest,
+									  eSamplerFilter::Nearest,
+									  eSamplerFilter::Nearest,
+								  }));
 
 	gPSOBuild->EndPipeline();
 }

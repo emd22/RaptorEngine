@@ -23,10 +23,10 @@
 #include <Renderer/Backend/Image.hpp>
 #include <Renderer/Backend/Pipeline.hpp>
 #include <Renderer/Backend/Sampler/SamplerCache.hpp>
-#include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Renderer/TiledForwardRenderer.hpp>
 #include <Texture/TextureManager.hpp>
 
 FX_SET_MODULE_NAME("Material")

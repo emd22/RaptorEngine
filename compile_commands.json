@@ -187,6 +187,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Core/Random.cpp.o -c /Users/emd22/Projects/a2/Src/Core/Random.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Core/Random.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/Random.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Core/RefCountedBase.cpp.o -c /Users/emd22/Projects/a2/Src/Core/RefCountedBase.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Core/RefCountedBase.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Core/RefCountedBase.cpp.o"
@@ -541,12 +547,6 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/DeferredRenderer.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/DeferredRenderer.cpp",
-  "file": "/Users/emd22/Projects/a2/Src/Renderer/DeferredRenderer.cpp",
-  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/DeferredRenderer.cpp.o"
-},
-{
-  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Globals.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Globals.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/Globals.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Globals.cpp.o"
@@ -610,6 +610,12 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/Target.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/Target.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Renderer/Target.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/Target.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Renderer/TiledForwardRenderer.cpp.o -c /Users/emd22/Projects/a2/Src/Renderer/TiledForwardRenderer.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Renderer/TiledForwardRenderer.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Renderer/TiledForwardRenderer.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "Entity.hpp"
 #include "WorldGrid.hpp"
 

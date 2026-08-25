@@ -5,8 +5,8 @@
 #include "Backend/Pipeline.hpp"
 #include "Backend/Swapchain.hpp"
 #include "Backend/Synchro.hpp"
-#include "DeferredRenderer.hpp"
 #include "DeletionObject.hpp"
+#include "TiledForwardRenderer.hpp"
 #include "UniformBuffer.hpp"
 #include "Window.hpp"
 
@@ -187,13 +187,14 @@ private:
 
 	void RebuildRenderStages();
 
-	bool RequiresVulkanPortability();
+	bool RequiresVulkanPortability(const ExtensionList& available_extensions);
 
 	eFrameResult GetNextSwapchainImage(FrameData* frame);
 
-	ExtensionList& QueryInstanceExtensions(bool invalidate_previous = false);
-	ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions);
-	ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions);
+	ExtensionList& QueryInstanceExtensions(ExtensionList& available_extensions, bool invalidate_previous = false);
+	ExtensionNames MakeInstanceExtensionList(ExtensionNames& user_requested_extensions,
+											 ExtensionList& out_available_extensions);
+	ExtensionNames CheckExtensionsAvailable(ExtensionNames& requested_extensions, ExtensionList& available_extensions);
 
 	void SubmitPushConstantsRaw(const CommandBuffer& cmd, const Pipeline& pipeline, eShaderType shader_types,
 								const void* data, uint32 data_size) const;
@@ -239,15 +240,12 @@ public:
 	DescriptorSet* pLightsDescriptor = nullptr;
 
 private:
-	VkInstance mInstance = nullptr;
-	VkSurfaceKHR mWindowSurface = nullptr;
-
-	Ref<Window> mpWindow = nullptr;
 	GpuDevice mDevice;
-
+	VkInstance mInstance = nullptr;
 	VkDebugUtilsMessengerEXT mDebugMessenger;
 
-	ExtensionList mAvailableExtensions;
+	VkSurfaceKHR mWindowSurface = nullptr;
+	Ref<Window> mpWindow = nullptr;
 
 	SizedArray<Semaphore> mSubmitSemaphores;
 

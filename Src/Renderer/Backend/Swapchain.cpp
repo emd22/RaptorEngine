@@ -7,7 +7,7 @@
 
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
-#include <Renderer/DeferredRenderer.hpp>
+#include <Renderer/TiledForwardRenderer.hpp>
 
 namespace fx::renderer {
 
@@ -15,65 +15,65 @@ FX_SET_MODULE_NAME("Swapchain")
 
 void Swapchain::Init(Vec2u size, VkSurfaceKHR surface, GpuDevice* device)
 {
-    mDevice = device;
+	mDevice = device;
 
-    CreateSwapchain(size, surface);
-    CreateSamplers();
-    CreateSwapchainImages();
-    CreateImageViews();
-    CreateFramebuffers();
+	CreateSwapchain(size, surface);
+	CreateSamplers();
+	CreateSwapchainImages();
+	CreateImageViews();
+	CreateFramebuffers();
 
-    bInitialized = true;
+	bInitialized = true;
 }
 
 void Swapchain::Rebuild(Vec2u new_size, VkSurfaceKHR surface)
 {
-    // Wait until the GPU has stopped processing commands and all images are unbound
-    mDevice->WaitForIdle();
+	// Wait until the GPU has stopped processing commands and all images are unbound
+	mDevice->WaitForIdle();
 
 
-    LogInfo(LC_RENDER, "Recreating Swapchain");
+	LogInfo(LC_RENDER, "Recreating Swapchain");
 
-    CreateSwapchain(new_size, surface);
-    CreateSwapchainImages();
-    CreateImageViews();
+	CreateSwapchain(new_size, surface);
+	CreateSwapchainImages();
+	CreateImageViews();
 }
 
 void Swapchain::CreateSwapchainImages()
 {
-    OutputImages.Free();
+	OutputImages.Free();
 
-    uint32 image_count;
+	uint32 image_count;
 
-    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
+	vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, nullptr);
 
-    SizedArray<VkImage> raw_images;
-    raw_images.InitSize(image_count);
+	SizedArray<VkImage> raw_images;
+	raw_images.InitSize(image_count);
 
-    vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.pData);
+	vkGetSwapchainImagesKHR(mDevice->Device, mSwapchain, &image_count, raw_images.pData);
 
-    OutputImages.InitCapacity(image_count);
+	OutputImages.InitCapacity(image_count);
 
-    for (VkImage& raw_image : raw_images) {
-        Image* image = OutputImages.Insert();
-        image->InternalImage = raw_image;
-        image->View = nullptr;
-        image->Allocation = nullptr;
-        image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        image->Info.Format = Surface.Format;
-    }
+	for (VkImage& raw_image : raw_images) {
+		Image* image = OutputImages.Insert();
+		image->InternalImage = raw_image;
+		image->View = nullptr;
+		image->Allocation = nullptr;
+		image->ImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		image->Info.Format = Surface.Format;
+	}
 }
 
 void Swapchain::CreateFramebuffers() {}
 
 void Swapchain::CreateImageViews()
 {
-    for (int32 i = 0; i < OutputImages.Size; i++) {
-        if (OutputImages[i].View != nullptr) {
-            vkDestroyImageView(mDevice->Device, OutputImages[i].View, nullptr);
-        }
+	for (int32 i = 0; i < OutputImages.Size; i++) {
+		if (OutputImages[i].View != nullptr) {
+			vkDestroyImageView(mDevice->Device, OutputImages[i].View, nullptr);
+		}
 
-        const VkImageViewCreateInfo create_info = {
+		const VkImageViewCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .image = OutputImages[i].InternalImage,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -93,162 +93,162 @@ void Swapchain::CreateImageViews()
             }
         };
 
-        VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &OutputImages[i].View);
-        if (status != VK_SUCCESS) {
-            ModulePanicVulkan("Could not create swapchain image view", status);
-        }
+		VkResult status = vkCreateImageView(mDevice->Device, &create_info, nullptr, &OutputImages[i].View);
+		if (status != VK_SUCCESS) {
+			ModulePanicVulkan("Could not create swapchain image view", status);
+		}
 
-        // if (reinterpret_cast<uint64>(OutputImages[i].View) == 0xf000000000f) {
-        //     FX_BREAKPOINT;
-        // }
-    }
+		// if (reinterpret_cast<uint64>(OutputImages[i].View) == 0xf000000000f) {
+		//     FX_BREAKPOINT;
+		// }
+	}
 }
 
 void Swapchain::CreateSwapchain(Vec2u size, VkSurfaceKHR surface)
 {
-    Extent = size;
+	Extent = size;
 
-    VkSurfaceCapabilitiesKHR capabilities;
-    const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mDevice->Physical, surface, &capabilities);
+	VkSurfaceCapabilitiesKHR capabilities;
+	const VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mDevice->Physical, surface, &capabilities);
 
-    if (result != VK_SUCCESS) {
-        ModulePanicVulkan("Error retrieving surface capabilities", result);
-    }
+	if (result != VK_SUCCESS) {
+		ModulePanicVulkan("Error retrieving surface capabilities", result);
+	}
 
-    const VkExtent2D extent = {
-        .width = size.X,
-        .height = size.Y,
-    };
+	const VkExtent2D extent = {
+		.width = size.X,
+		.height = size.Y,
+	};
 
-    uint32 image_count = capabilities.minImageCount + 1;
+	uint32 image_count = capabilities.minImageCount + 1;
 
-    if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
-        image_count = capabilities.maxImageCount;
-    }
+	if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
+		image_count = capabilities.maxImageCount;
+	}
 
-    LogInfo(LC_RENDER, "Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount,
-            capabilities.maxImageCount, image_count);
+	LogInfo(LC_RENDER, "Swapchain - Min:{:d}, Max:{:d}, Selected:{:d}", capabilities.minImageCount,
+			capabilities.maxImageCount, image_count);
 
-    // Retrieve the image format for the surface (the window's render target)
-    {
-        VkSurfaceFormatKHR surface_format = mDevice->GetSurfaceFormat();
+	// Retrieve the image format for the surface (the window's render target)
+	{
+		VkSurfaceFormatKHR surface_format = mDevice->GetSurfaceFormat();
 
-        // For now we will enforce that RGBA16 is supported by the render device. This is the first chosen
-        // if it is supported.
-        Assert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
-               surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
+		// For now we will enforce that RGBA16 is supported by the render device. This is the first chosen
+		// if it is supported.
+		Assert(surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT ||
+			   surface_format.format == VK_FORMAT_R8G8B8A8_UNORM);
 
-        if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
-            Surface.Format = eImageFormat::RGBA16_Float;
-        }
-        else if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM) {
-            Surface.Format = eImageFormat::RGBA8_UNorm;
-        }
+		if (surface_format.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+			Surface.Format = eImageFormat::RGBA16_Float;
+		}
+		else if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM) {
+			Surface.Format = eImageFormat::RGBA8_UNorm;
+		}
 
-        Surface.ColorSpace = surface_format.colorSpace;
-    }
+		Surface.ColorSpace = surface_format.colorSpace;
+	}
 
-    const VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+	const VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
-    VkSwapchainKHR old_swapchain = mSwapchain;
+	VkSwapchainKHR old_swapchain = mSwapchain;
 
-    VkSwapchainCreateInfoKHR create_info = {
-        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = surface,
+	VkSwapchainCreateInfoKHR create_info = {
+		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+		.surface = surface,
 
-        .minImageCount = image_count,
+		.minImageCount = image_count,
 
-        .imageFormat = ImageFormatUtil::ToUnderlying(Surface.Format),
-        .imageColorSpace = Surface.ColorSpace,
+		.imageFormat = ImageFormatUtil::ToUnderlying(Surface.Format),
+		.imageColorSpace = Surface.ColorSpace,
 
-        .imageExtent = extent,
-        .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		.imageExtent = extent,
+		.imageArrayLayers = 1,
+		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 
-        .preTransform = capabilities.currentTransform,
-        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+		.preTransform = capabilities.currentTransform,
+		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 
-        .presentMode = present_mode,
-        .clipped = VK_TRUE,
+		.presentMode = present_mode,
+		.clipped = VK_TRUE,
 
-        // mSwapchain is null if not initialized
-        .oldSwapchain = old_swapchain,
-    };
+		// mSwapchain is null if not initialized
+		.oldSwapchain = old_swapchain,
+	};
 
-    create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 0;
-    create_info.pQueueFamilyIndices = nullptr;
+	create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	create_info.queueFamilyIndexCount = 0;
+	create_info.pQueueFamilyIndices = nullptr;
 
-    const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
+	const VkResult status = vkCreateSwapchainKHR(mDevice->Device, &create_info, nullptr, &mSwapchain);
 
-    if (status != VK_SUCCESS) {
-        ModulePanicVulkan("Could not create swapchain", status);
-    }
+	if (status != VK_SUCCESS) {
+		ModulePanicVulkan("Could not create swapchain", status);
+	}
 
-    if (old_swapchain != nullptr && mSwapchain != old_swapchain) {
-        vkDestroySwapchainKHR(mDevice->Device, old_swapchain, nullptr);
-    }
+	if (old_swapchain != nullptr && mSwapchain != old_swapchain) {
+		vkDestroySwapchainKHR(mDevice->Device, old_swapchain, nullptr);
+	}
 }
 
 void Swapchain::CreateSamplers()
 {
-    ColorSampler.Create();
-    ColorSamplerNearest.Create(SamplerProps {
-        eSamplerFilter::Nearest,
-        eSamplerFilter::Nearest,
-        eSamplerFilter::Nearest,
-    });
+	ColorSampler.Create();
+	ColorSamplerNearest.Create(SamplerProps {
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+	});
 
-    DepthSampler.Create(SamplerProps {
-        eSamplerFilter::Nearest,
-        eSamplerFilter::Nearest,
-        eSamplerFilter::Nearest,
-    });
+	DepthSampler.Create(SamplerProps {
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+		eSamplerFilter::Nearest,
+	});
 
-    ShadowDepthSampler.Create(SamplerProps {
-        eSamplerFilter::Linear,
-        eSamplerFilter::Linear,
-        eSamplerFilter::Linear,
-        eSamplerAddressMode::ClampToBorder,
-        eSamplerBorderColor::FloatWhite,
-        eSamplerCompareOp::Greater,
-    });
+	ShadowDepthSampler.Create(SamplerProps {
+		eSamplerFilter::Linear,
+		eSamplerFilter::Linear,
+		eSamplerFilter::Linear,
+		eSamplerAddressMode::ClampToBorder,
+		eSamplerBorderColor::FloatWhite,
+		eSamplerCompareOp::Greater,
+	});
 
-    NormalsSampler.Create();
-    LightsSampler.Create();
+	NormalsSampler.Create();
+	LightsSampler.Create();
 }
 
 void Swapchain::DestroyFramebuffersAndImageViews()
 {
-    for (int i = 0; i < FramesInFlight; i++) {
-        // HACK: Clear the images so that we only destroy the image view.
-        OutputImages[i].InternalImage = nullptr;
-    }
+	for (int i = 0; i < FramesInFlight; i++) {
+		// HACK: Clear the images so that we only destroy the image view.
+		OutputImages[i].InternalImage = nullptr;
+	}
 
-    OutputImages.Free();
+	OutputImages.Free();
 
 
-    // TODO: Add sampler cache!
-    ColorSampler.Destroy();
-    ColorSamplerNearest.Destroy();
-    DepthSampler.Destroy();
-    ShadowDepthSampler.Destroy();
-    NormalsSampler.Destroy();
-    LightsSampler.Destroy();
+	// TODO: Add sampler cache!
+	ColorSampler.Destroy();
+	ColorSamplerNearest.Destroy();
+	DepthSampler.Destroy();
+	ShadowDepthSampler.Destroy();
+	NormalsSampler.Destroy();
+	LightsSampler.Destroy();
 }
 
 void Swapchain::DestroyInternalSwapchain() { vkDestroySwapchainKHR(mDevice->Device, mSwapchain, nullptr); }
 
 void Swapchain::Destroy()
 {
-    if (!bInitialized) {
-        return;
-    }
+	if (!bInitialized) {
+		return;
+	}
 
-    DestroyFramebuffersAndImageViews();
-    DestroyInternalSwapchain();
+	DestroyFramebuffersAndImageViews();
+	DestroyInternalSwapchain();
 
-    bInitialized = false;
+	bInitialized = false;
 }
 
 Swapchain::~Swapchain() { Destroy(); }

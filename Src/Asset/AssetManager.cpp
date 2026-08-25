@@ -18,6 +18,7 @@
 #include <Texture/TextureManager.hpp>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 
 namespace fx {
 
@@ -380,16 +381,18 @@ AssetTicket AssetManager::NewTextureTicket()
 
 fx::Image* AssetManager::GetNullImage(eImageFormat format)
 {
+	std::unordered_map<eImageFormat, fx::Image*>& cache = mNullImageList;
+
 	// If the image is already created/cached, return the cached version
-	auto it = mNullImageList.find(format);
-	if (it != mNullImageList.end() && it->second != nullptr) {
+	auto it = cache.find(format);
+	if (it != cache.end() && it->second != nullptr) {
 		return it->second;
 	}
 
 	// Create a new null image
-	fx::Image* image = mNullImageList[format];
+	fx::Image* image = cache[format];
 	image = gTextureManager->NewTexture();
-	mNullImageList[format] = image;
+	cache[format] = image;
 
 	const uint32 pixel_stride = ImageFormatUtil::GetPixelStride(format);
 

@@ -13,6 +13,7 @@
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Texture/TextureManager.hpp>
 
 namespace fx {
 
@@ -615,61 +616,6 @@ void Image::DecRef()
 }
 
 
-// bool Image::Readback(renderer::CommandBuffer& cmd)
-// {
-//     const uint32 data_size = Size.X * Size.Y * ImageFormatUtil::GetSize(Format);
-
-//     RawGpuBuffer staging_buffer;
-//     staging_buffer.Create(eGpuBufferType::Transfer, data_size, VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::None);
-
-//     TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd, 1,
-//                      TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-//                                                  .DstAccessMask = VK_ACCESS_TRANSFER_READ_BIT });
-
-//     VkBufferImageCopy copy {
-//         .bufferOffset = 0,
-//         .bufferRowLength = 0,
-//         .bufferImageHeight = 0,
-//         .imageSubresource {
-//             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-//             .mipLevel = 0,
-//             .baseArrayLayer = 0,
-//             .layerCount = 1,
-//         },
-//         .imageExtent = VkExtent3D { .width = Size.X, .height = Size.Y, .depth = 1 },
-//     };
-
-//     vkCmdCopyImageToBuffer(cmd, InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, staging_buffer.Buffer, 1,
-//     &copy);
-
-//     TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 1,
-//                      TransitionLayoutOverrides { .DstStage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-//                                                  .DstAccessMask = VK_ACCESS_SHADER_READ_BIT });
-
-//     return true;
-// }
-
-
-// bool Image::SaveToFile(const String& path, eImageFormat output_format, int jpeg_quality)
-// {
-//     SizedArray<uint8> data = SaveToMemory(output_format, jpeg_quality);
-//     if (data.Size == 0) {
-//         return false;
-//     }
-
-//     File fp = File(path, File::eModType::Write, File::eDataType::Binary);
-//     if (!fp.IsFileOpen()) {
-//         LogError("Cannot save image to disk");
-//         return false;
-//     }
-
-//     fp.WriteRaw(data.pData, data.Size);
-//     fp.Close();
-
-//     return true;
-// }
-
-
 void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 {
 	const uint32 data_size = Info.Size.X * Info.Size.Y * ImageFormatUtil::GetPixelStride(Info.Format);
@@ -756,5 +702,40 @@ void Image::SaveToFile(const String& path, eImageSaveFormat file_format)
 
 
 Image::~Image() { DecRef(); }
+
+
+/////////////////////////////////////
+// Image Gen functions
+/////////////////////////////////////
+
+namespace ImageGen {
+
+Image* Random(Vec2u size)
+{
+	Image* image = gTextureManager->NewTexture();
+
+	const uint64 total_image_size = (static_cast<uint64>(size.X) * size.Y * 4ULL);
+
+	SizedArray<uint8> pixel_data;
+	pixel_data.InitSize(total_image_size);
+
+
+	ImageInfo info(size, eImageFormat::RGBA8_UNorm, 0, 1, Slice<const uint8>(pixel_data.pData, pixel_data.Size));
+
+	renderer::gRenderer->SubmitImmediateUploadCmd(
+		[&](renderer::CommandBuffer& cmd)
+		{
+			ImageInfo image_info {
+				Vec2u(1, 1), eImageFormat::RGBA8_UNorm, 0, 1, Slice<const uint8>(pixel_data.pData, pixel_data.Size),
+			};
+
+			image->Upload(cmd, image_info);
+		});
+
+	return image;
+}
+
+} // namespace ImageGen
+
 
 } // namespace fx

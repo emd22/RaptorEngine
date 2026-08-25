@@ -6,11 +6,11 @@
 #include <Renderer/Backend/DsLayoutBuilder.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Backend/VertexDescription.hpp>
-#include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Renderer/TiledForwardRenderer.hpp>
 
 namespace fx::renderer {
 

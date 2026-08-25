@@ -8,9 +8,9 @@
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/StackArray.hpp>
-#include <Renderer/DeferredRenderer.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/RenderBackend.hpp>
+#include <Renderer/TiledForwardRenderer.hpp>
 
 FX_SET_MODULE_NAME("Pipeline")
 

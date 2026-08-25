@@ -105,8 +105,10 @@ VSOutput main(VSInput input)
 F_PROGRAM(FPT_PIXEL)
 
 
-struct FSOutput {
-    float4 vAlbedo : SV_TARGET0;
+struct FSOutput
+{
+    float4 vAlbedo : SV_TARGET0; /* Target 0, Lit */
+    float4 vNormal : SV_TARGET1; /* Target 1, Normals */
 };
 
 struct FSInput
@@ -292,13 +294,15 @@ FSOutput main(FSInput input)
 		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
 		float3 specular_term = Fr;
 
-		accumulated_light = lerp(accumulated_light, accumulated_light + (attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL), 1.0);
+		accumulated_light += (attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL);
 	}
 
 	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);
 
-	output.vAlbedo = float4(accumulated_light + ambient.rgb, 1.0);
+	const float alpha = 1.0;
+	output.vAlbedo = float4(accumulated_light + ambient.rgb, alpha);
 
+	output.vNormal = float4(N_final, 0.0);
 
     return output;
 }

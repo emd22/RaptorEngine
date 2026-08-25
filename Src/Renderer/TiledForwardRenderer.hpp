@@ -46,6 +46,8 @@ private:
 	void CreateUnlitPass();
 	void CreateGPass();
 
+	void GenerateRandomTexture(uint32 size);
+
 
 	// Lighting
 	// void CreateLightVolumePipeline();
