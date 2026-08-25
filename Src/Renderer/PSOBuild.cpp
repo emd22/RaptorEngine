@@ -267,6 +267,9 @@ void PSOBuild::AddImageFromTarget(uint32 bind_index, uint32 set_index, eShaderTy
 {
 	AssertMsg(HasFlag(mFlags, ePSOBuildFlags::ReuseDescriptors) == false,
 			  "Cannot build descriptors when already inheriting them from another pipeline");
+
+	AssertMsg(target != nullptr, "Target must be valid");
+
 	mDescriptorEntries[set_index].Insert(DescriptorEntry::AsImage(bind_index, shader_stages, &target->Image, sampler));
 }
 

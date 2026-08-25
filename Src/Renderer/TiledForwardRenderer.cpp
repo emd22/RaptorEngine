@@ -45,9 +45,11 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	DescriptorPool.AddPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 15);
 	DescriptorPool.Create(gGraphics->GetDevice(), 16);
 
-	CreateGPassPipeline();
+	CreateForwardPSO();
+	CreateSSAOPSO();
 	CreateCompositionPSO();
 	CreateLightCullingPSO();
+
 
 	BuildPersistentDescriptor();
 }
@@ -73,6 +75,18 @@ void TiledForwardRenderer::CreateGPass()
 						  eImageAspectFlag::Depth);
 
 	ForwardPass.BuildRenderStage();
+}
+
+void TiledForwardRenderer::CreateSSAOPass()
+{
+	SSAOPass.Create("Forward", gGraphics->Swapchain.Extent);
+
+	// SSAO output target
+	SSAOPass.AddTarget(eImageFormat::R8_UInt, Target::scFullScreen,
+					   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+
+
+	SSAOPass.BuildRenderStage();
 }
 
 
@@ -115,8 +129,33 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	pPersistentDescriptor = result.second;
 }
 
+void TiledForwardRenderer::CreateSSAOPSO()
+{
+	CreateSSAOPass();
 
-void TiledForwardRenderer::CreateGPassPipeline()
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::SSAO);
+
+		gPSOBuild->UseRenderStage(SSAOPass);
+		gPSOBuild->SetShader(eShaderName::SSAO, {});
+		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+		gPSOBuild->SetCullMode(eCullMode::None);
+
+		// Set 0 (Global / Per Frame)
+
+		// tDepth
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
+									  gSamplerCache->Request({}));
+		// tNormal
+		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float, 1),
+									  gSamplerCache->Request({}));
+
+		gPSOBuild->EndPipeline();
+	}
+}
+
+
+void TiledForwardRenderer::CreateForwardPSO()
 {
 	CreateGPass();
 
@@ -472,6 +511,8 @@ void TiledForwardRenderer::CreateCompositionPSO()
 	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
 
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(CompositionPushConsts));
+
 	// tDepth
 	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
 								  gSamplerCache->Request(SamplerProps {
@@ -489,6 +530,9 @@ void TiledForwardRenderer::CreateCompositionPSO()
 									  eSamplerFilter::Nearest,
 									  eSamplerFilter::Nearest,
 								  }));
+	// tSSAO
+	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UInt),
+								  gSamplerCache->Request({}));
 
 	gPSOBuild->EndPipeline();
 }
@@ -498,6 +542,15 @@ void TiledForwardRenderer::RenderComposition(Camera& camera)
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
 	gPipelineCache->Bind(ePipelineName::Composition, cmd);
+
+	float32* extent = gGraphics->Swapchain.Extent.mData;
+
+	CompositionPushConsts consts {
+		.FrameExtent = { static_cast<uint32>(extent[0]), static_cast<uint32>(extent[1]) },
+	};
+
+	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::Composition), eShaderType::Vertex,
+								   consts);
 
 	// Use single triangle instead of two triangles as it removes the overlapping quads the gpu
 	// renders between triangles. Source: https://wallisc.github.io/rendering/2021/04/18/Fullscreen-Pass.html

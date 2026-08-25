@@ -14,6 +14,12 @@ struct FrameData;
 class CommandBuffer;
 
 
+struct alignas(16) CompositionPushConsts
+{
+	uint32 FrameExtent[2];
+};
+
+
 ///////////////////////////////
 // Main Deferred Renderer
 ///////////////////////////////
@@ -39,13 +45,13 @@ public:
 
 private:
 	// Geometry
-	void CreateGPassPipeline();
+	void CreateForwardPSO();
+	void CreateSSAOPSO();
 
 	void BuildPersistentDescriptor();
 
 	void CreateGPass();
-
-	void GenerateRandomTexture(uint32 size);
+	void CreateSSAOPass();
 
 
 	// Lighting
@@ -62,6 +68,9 @@ private:
 	// Composition
 	void CreateCompositionPSO();
 
+	void GenerateRandomTexture(uint32 size);
+
+
 public:
 	DescriptorPool DescriptorPool;
 
@@ -69,6 +78,7 @@ public:
 
 	RenderStage LightPass;
 	RenderStage ForwardPass;
+	RenderStage SSAOPass;
 	RenderStage CompPass;
 
 	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;

@@ -34,7 +34,11 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("TextRendering", eFlags::None),
 	NAME_INFO("Composition", eFlags::None),
 	NAME_INFO("ShadowDirectional", eFlags::None),
+
+	NAME_INFO("SSAO", eFlags::None),
 };
+
+static_assert(std::size(scNameInfos) == static_cast<uint32>(ePipelineName::NumPipelines));
 
 const PipelineNameInfo& GetPipelineNameInfo(const ePipelineName name)
 {

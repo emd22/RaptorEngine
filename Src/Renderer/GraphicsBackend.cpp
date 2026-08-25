@@ -149,10 +149,10 @@ void GraphicsBackend::Init(Vec2u window_size)
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
+	pNoiseTexture = ImageGen::Random(Vec2u(64, 64));
+
 	pRenderer = new TiledForwardRenderer;
 	pRenderer->Create(Swapchain.Extent);
-
-	pNoiseTexture = ImageGen::Random(Vec2u(64, 64));
 
 	bInitialized = true;
 }
@@ -706,11 +706,26 @@ void GraphicsBackend::BeginUnlit()
 	// pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
 }
 
+void GraphicsBackend::RenderPostProcessing()
+{
+	FrameData* frame = GetFrame();
+
+	pRenderer->SSAOPass.Begin(frame->CmdBuffer);
+
+	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
+	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
+
+	pRenderer->SSAOPass.End();
+}
+
 void GraphicsBackend::DoComposition(Camera& render_cam)
 {
 	FrameData* frame = GetFrame();
 
 	pRenderer->ForwardPass.End();
+
+	RenderPostProcessing();
+
 
 	// pDeferredRenderer->UnlitPass.End();
 

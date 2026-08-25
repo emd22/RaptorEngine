@@ -16,6 +16,7 @@
 #include <Core/Defer.hpp>
 #include <Core/Ref.hpp>
 #include <Core/TSQueue.hpp>
+#include <Math/Vec2.hpp>
 
 namespace fx {
 class Camera;
@@ -70,6 +71,9 @@ public:
 	void BeginGeometry();
 	void BeginLighting();
 	void BeginUnlit();
+
+	void RenderPostProcessing();
+
 	void DoComposition(Camera& render_cam);
 
 	void RebuildToResizedWindow();

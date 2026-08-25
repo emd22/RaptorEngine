@@ -85,12 +85,6 @@ struct alignas(16) LightVertPushConstants
 	uint32 LightId = 0;
 };
 
-struct alignas(16) CompositionPushConstants
-{
-	float32 ViewInverse[16];
-	float32 ProjInverse[16];
-};
-
 struct alignas(16) LightCullPushConstants
 {
 	float32 CameraMatrix[16];

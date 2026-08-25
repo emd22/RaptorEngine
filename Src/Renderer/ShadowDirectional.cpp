@@ -56,15 +56,10 @@ void ShadowDirectional::Begin()
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	// Pipeline& pl = gPipelineCache->Request(ePipelineName::ShadowDirectional);
-
 	RenderStage.Begin(cmd);
 	gPipelineCache->AddBufferOffset(0, gObjectManager->GetBaseOffset());
 	gPipelineCache->AddBufferOffset(0, 0);
 	gPipelineCache->Bind(ePipelineName::ShadowDirectional, cmd);
-
-	// gObjectManager->mObjectBufferDS.BindWithOffset(0, cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl,
-	// 											   gObjectManager->GetBaseOffset());
 }
 
 void ShadowDirectional::End() { RenderStage.End(); }

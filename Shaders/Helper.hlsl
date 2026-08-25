@@ -26,11 +26,15 @@ float4 F_UnpackUIntToFloat4(uint x);
 #define F_TextureName(_name) _name##Texture
 
 #define F_Sample(_name, _coord) F_TextureName(_name).Sample(_name, _coord)
+#define F_SampleLoad(_name, _coord) F_TextureName(_name).Load(_coord)
 #define F_SampleCmpLevelZero(_name, _texcoord, _zcoord) F_TextureName(_name).SampleCmpLevelZero(_name, _texcoord, _zcoord)
 
 #define F_Texture2D(_name, binding_, set_) \
     Texture2D F_TextureName(_name) : register(t##binding_, space##set_); \
     SamplerState _name : register(s##binding_, space##set_);
+
+#define F_DataTexture2D(_name, type_, binding_, set_) \
+	Texture2D<type_> F_TextureName(_name) : register(t##binding_, space##set_); \
 
 #define F_ShadowTexture2D(_name, binding_, set_) \
     Texture2D F_TextureName(_name) : register(t##binding_, space##set_); \

@@ -27,6 +27,7 @@ enum eStringId
 	FR_SAMPLER2D,
 
 	F_Texture2D,
+	F_DataTexture2D,
 	F_ShadowTexture2D,
 
 	F_StructBuffer,
@@ -52,6 +53,7 @@ static constexpr const char* scStrings[] = {
 	"FR_SAMPLER2D",
 
 	"F_Texture2D",
+	"F_DataTexture2D",
 	"F_ShadowTexture2D",
 
 	"F_StructBuffer",
@@ -273,6 +275,18 @@ static void ParseTexture2DDefinition(const std::vector<Slice<char>>& params, Sta
 	result.GetReflection().emplace_back(eShaderReflectionType::Texture, set, binding);
 }
 
+static void ParseDataTexture2DDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
+{
+	// F_DataTexture2D(texture, type, binding, set))
+	REQUIRE_PARAMS(params, 4);
+
+	const Slice<char>& texture_name = params[0];
+	const int32 binding = ParamGetInt(params[2]);
+	const int32 set = ParamGetInt(params[3]);
+
+	result.GetReflection().emplace_back(eShaderReflectionType::Texture, set, binding);
+}
+
 static void ParseStructBufferDefinition(const std::vector<Slice<char>>& params, State& state, Result& result)
 {
 	// F_StructBuffer(name, objtype, binding, set)
@@ -311,6 +325,7 @@ static const PPFuncEntry PPFunctions[] = {
 
 	// Texture definition macros
 	PPFuncEntry(FStr(F_Texture2D), true, true, ParseTexture2DDefinition),
+	PPFuncEntry(FStr(F_DataTexture2D), true, true, ParseDataTexture2DDefinition),
 	PPFuncEntry(FStr(F_ShadowTexture2D), true, true, ParseTexture2DDefinition),
 
 	// Buffer definition macros

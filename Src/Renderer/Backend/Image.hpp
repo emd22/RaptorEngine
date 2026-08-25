@@ -63,6 +63,12 @@ enum class eImageFormat : uint16
 	D32_Float,
 	D32_Float_S8_UInt,
 
+	R32_SFloat,
+	R32_SInt,
+	R32_UInt,
+
+	R8_UInt,
+	R8_UNorm,
 };
 
 enum class eImageType
@@ -165,6 +171,15 @@ struct ImageFormatUtil
 
 		case eImageFormat::D32_Float_S8_UInt:
 			return 5;
+
+		case eImageFormat::R32_SFloat:
+		case eImageFormat::R32_SInt:
+		case eImageFormat::R32_UInt:
+			return 4;
+
+		case eImageFormat::R8_UInt:
+		case eImageFormat::R8_UNorm:
+			return 1;
 		}
 
 		return 0;
@@ -242,6 +257,18 @@ struct ImageFormatUtil
 			return VK_FORMAT_D32_SFLOAT;
 		case eImageFormat::D32_Float_S8_UInt:
 			return VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+		case eImageFormat::R32_SInt:
+			return VK_FORMAT_R32_SINT;
+		case eImageFormat::R32_UInt:
+			return VK_FORMAT_R32_UINT;
+		case eImageFormat::R32_SFloat:
+			return VK_FORMAT_R32_SFLOAT;
+
+		case eImageFormat::R8_UInt:
+			return VK_FORMAT_R8_UINT;
+		case eImageFormat::R8_UNorm:
+			return VK_FORMAT_R8_UNORM;
 		}
 
 		return VK_FORMAT_UNDEFINED;

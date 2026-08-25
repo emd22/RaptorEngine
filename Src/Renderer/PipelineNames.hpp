@@ -47,6 +47,8 @@ enum class ePipelineName : uint16
 
 	ShadowDirectional,
 
+	SSAO,
+
 	NumPipelines
 };
 

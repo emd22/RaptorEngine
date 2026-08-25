@@ -14,6 +14,7 @@ enum class eShaderName : uint32
 	Shadows,
 	Unlit,
 	Text,
+	SSAO,
 
 	NumShaders,
 };
@@ -35,6 +36,7 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(Shadows);
 		FX_ENUM_CASE_NAME(Unlit);
 		FX_ENUM_CASE_NAME(Text);
+		FX_ENUM_CASE_NAME(SSAO);
 	default:
 		return "Unknown";
 	}
