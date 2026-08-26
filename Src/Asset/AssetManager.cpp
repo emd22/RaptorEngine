@@ -121,7 +121,7 @@ void AssetWorker::Update()
 		AssertMsg(Item.AssetLoadOp != eAssetLoadOp::None, "No asset load op set!");
 
 		// Directly upload to GPU
-		if (Item.AssetLoadOp == eAssetLoadOp::DirectUpload) {
+		if (Item.AssetLoadOp == eAssetLoadOp::DirectUpload || Item.AssetLoadOp == eAssetLoadOp::CallUserFunction) {
 			LoadStatus = loader::eLoaderStatus::Success;
 		}
 		else {
@@ -366,7 +366,19 @@ AssetTicket AssetManager::UploadImage(const ImageInfo& img_info)
 
 	AssertMsg(img_info.ImageData.pData != nullptr, "Image data cannot be null");
 
-	mLoadQueue.Push(AxQueueItem::DirectUploadImage(ticket, img_info));
+	mLoadQueue.Push(AssetQueueItem::DirectUploadImage(ticket, img_info));
+	SignalUpdate();
+
+	return ticket;
+}
+
+AssetTicket AssetManager::SubmitCustom(const AssetCustomFunctionType& fn)
+{
+	AssetTicket ticket { new AssetCustomFunctionType(fn) };
+
+	AssertMsg(fn != nullptr, "Custom function cannot be null");
+
+	mLoadQueue.Push(AssetQueueItem::UserFunction(ticket));
 	SignalUpdate();
 
 	return ticket;
@@ -432,7 +444,7 @@ AssetTicket AssetManager::GetNullImageTicket(eImageFormat format)
 /////////////////////////////////////
 
 
-static void DoDirectUpload(AxQueueItem& item, AssetItemData& asset_data)
+static void DoDirectUpload(AssetQueueItem& item, AssetItemData& asset_data)
 {
 	ImageInfo& img_info = item.ImgInfo;
 
@@ -523,6 +535,21 @@ int32 AssetManager::CheckForUploadableData()
 		if (worker->LoadStatus == loader::eLoaderStatus::Success) {
 			if (worker->Item.AssetLoadOp == eAssetLoadOp::DirectUpload) {
 				DoDirectUpload(worker->Item, asset_data.Get());
+				++num_uploads;
+			}
+			else if (worker->Item.AssetLoadOp == eAssetLoadOp::CallUserFunction) {
+				AssetCustomFunctionType* fn = reinterpret_cast<AssetCustomFunctionType*>(asset_data->Ticket.Get());
+
+				if (fn == nullptr) {
+					LogError(LC_ASSET, "Cannot call custom user function as it is null");
+				}
+				else {
+					(*fn)(gGraphics->UploadContext.CmdBuffer);
+					delete fn;
+				}
+
+				worker->Item.Data.Ticket.SignalUploadedToGpu();
+
 				++num_uploads;
 			}
 			else if (asset_data->pLoader.IsValid()) {
@@ -629,7 +656,7 @@ int32 AssetManager::CheckForItemsToLoad()
 		return num_loads;
 	}
 
-	AxQueueItem item;
+	AssetQueueItem item;
 	if (!mLoadQueue.PopIfAvailable(&item)) {
 		// The load queue is currently in use(uploaded to), skip for now.
 		return num_loads;

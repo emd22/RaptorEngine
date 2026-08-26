@@ -10,49 +10,49 @@ namespace fx {
 class AxQueue
 {
 public:
-    AxQueue() = default;
+	AxQueue() = default;
 
-    void Push(AxQueueItem&& value)
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
+	void Push(AssetQueueItem&& value)
+	{
+		std::lock_guard<std::mutex> lock(mMutex);
 
-        mQueue.push_back(std::move(value));
-    }
+		mQueue.push_back(std::move(value));
+	}
 
-    bool PopIfAvailable(AxQueueItem* item)
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
+	bool PopIfAvailable(AssetQueueItem* item)
+	{
+		std::lock_guard<std::mutex> lock(mMutex);
 
-        if (mQueue.empty()) {
-            return false;
-        }
+		if (mQueue.empty()) {
+			return false;
+		}
 
-        AxQueueItem& queue_item = mQueue.front();
-        (*item) = std::move(queue_item);
+		AssetQueueItem& queue_item = mQueue.front();
+		(*item) = std::move(queue_item);
 
-        mQueue.pop_front();
+		mQueue.pop_front();
 
-        return true;
-    }
+		return true;
+	}
 
-    uint32 Size()
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
+	uint32 Size()
+	{
+		std::lock_guard<std::mutex> lock(mMutex);
 
-        return mQueue.size();
-    }
+		return mQueue.size();
+	}
 
-    void Destroy()
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
+	void Destroy()
+	{
+		std::lock_guard<std::mutex> lock(mMutex);
 
-        mQueue.clear();
-    }
+		mQueue.clear();
+	}
 
 private:
-    std::deque<AxQueueItem> mQueue;
+	std::deque<AssetQueueItem> mQueue;
 
-    std::mutex mMutex;
+	std::mutex mMutex;
 };
 
 } // namespace fx

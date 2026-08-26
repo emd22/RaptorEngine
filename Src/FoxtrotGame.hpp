@@ -89,7 +89,6 @@ private:
 	void ProcessControls();
 
 	void LoadOffsetsFile();
-	void CreateFontObject();
 
 	void DestroyGame();
 
@@ -123,9 +122,12 @@ public:
 	eEditorMode EditorModeType = eEditorMode::Default;
 	SizedArray<BaseEditorMode*> EditorModes;
 
+
 private:
 	uint64 mLastTick = 0;
 	World mMainScene {};
+
+	ObjectID mRaycastHitMarker = ObjectID::Null;
 
 
 	ConfigFile Config;

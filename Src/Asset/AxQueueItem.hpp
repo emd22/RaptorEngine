@@ -20,6 +20,9 @@ namespace fx {
 class Object;
 
 
+using AssetCustomFunctionType = std::function<void(renderer::CommandBuffer& cmd)>;
+
+
 struct AssetItemData
 {
 	AssetItemData() = default;
@@ -90,15 +93,14 @@ struct AssetItemData
 	eAssetType LoadType = eAssetType::None;
 
 	TSRef<loader::LoaderBase> pLoader { nullptr };
-	// TSRef<AssetBase> pAsset { nullptr };
 
 	AssetTicket Ticket { nullptr };
 };
 
 
-struct AxQueueItem
+struct AssetQueueItem
 {
-	AxQueueItem() = default;
+	AssetQueueItem() = default;
 
 
 	FX_FORCE_INLINE bool IsObject() const { return Data.LoadType == eAssetType::Object; }
@@ -107,10 +109,10 @@ struct AxQueueItem
 
 
 	template <typename TLoaderType>
-	static AxQueueItem UploadFileToProcess(const AssetTicket& ticket, const TSRef<TLoaderType>& loader,
-										   const std::string& path, eAssetType asset_type)
+	static AssetQueueItem UploadFileToProcess(const AssetTicket& ticket, const TSRef<TLoaderType>& loader,
+											  const std::string& path, eAssetType asset_type)
 	{
-		AxQueueItem item;
+		AssetQueueItem item;
 
 		item.Data = AssetItemData::Make<TLoaderType>(loader, ticket, asset_type);
 		item.pcRawData = nullptr;
@@ -122,10 +124,10 @@ struct AxQueueItem
 	}
 
 	template <typename TLoaderType>
-	static AxQueueItem UploadAndProcess(const AssetTicket& ticket, const TSRef<TLoaderType>& loader,
-										eAssetType asset_type, const Slice<const uint8>& data)
+	static AssetQueueItem UploadAndProcess(const AssetTicket& ticket, const TSRef<TLoaderType>& loader,
+										   eAssetType asset_type, const Slice<const uint8>& data)
 	{
-		AxQueueItem item;
+		AssetQueueItem item;
 
 		item.Data = AssetItemData::Make<TLoaderType>(loader, ticket, asset_type);
 
@@ -137,9 +139,9 @@ struct AxQueueItem
 	}
 
 
-	static AxQueueItem DirectUploadImage(AssetTicket& asset, const ImageInfo& img_info)
+	static AssetQueueItem DirectUploadImage(AssetTicket& asset, const ImageInfo& img_info)
 	{
-		AxQueueItem item;
+		AssetQueueItem item;
 
 		item.Data = AssetItemData::Make<loader::LoaderBase>(nullptr, asset, eAssetType::Image);
 
@@ -150,9 +152,19 @@ struct AxQueueItem
 		return item;
 	}
 
-	AxQueueItem(AxQueueItem&& other) { (*this) = std::move(other); }
+	static AssetQueueItem UserFunction(AssetTicket& asset)
+	{
+		AssetQueueItem item;
 
-	AxQueueItem& operator=(AxQueueItem&& other)
+		item.Data = AssetItemData::Make<loader::LoaderBase>(nullptr, asset, eAssetType::UserFunction);
+		item.AssetLoadOp = eAssetLoadOp::CallUserFunction;
+
+		return item;
+	}
+
+	AssetQueueItem(AssetQueueItem&& other) { (*this) = std::move(other); }
+
+	AssetQueueItem& operator=(AssetQueueItem&& other)
 	{
 		mMutex.lock();
 

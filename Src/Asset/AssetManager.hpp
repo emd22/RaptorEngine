@@ -73,7 +73,7 @@ public:
 
 	void Create(int32 worker_index);
 
-	void SubmitItemToLoad(AxQueueItem&& item)
+	void SubmitItemToLoad(AssetQueueItem&& item)
 	{
 		Item = std::move(item);
 		ItemReady.Signal();
@@ -101,7 +101,7 @@ private:
 
 
 public:
-	AxQueueItem Item;
+	AssetQueueItem Item;
 	loader::eLoaderStatus LoadStatus = loader::eLoaderStatus::None;
 
 	DataNotifier ItemReady;
@@ -123,6 +123,7 @@ struct LoadObjectOptions
 
 class AssetManager
 {
+public:
 public:
 	AssetManager() = default;
 
@@ -209,6 +210,9 @@ public:
 		SubmitLoadAssetFromPath<TLoaderType>(ticket, loader, asset_type, path);
 	}
 
+
+	AssetTicket SubmitCustom(const AssetCustomFunctionType& fn);
+
 	/////////////////////////////////////
 	// Deletion Functions
 	/////////////////////////////////////
@@ -257,7 +261,7 @@ private:
 	{
 		AssetManager* mgr = GetInstance();
 
-		mgr->mLoadQueue.Push(AxQueueItem::UploadFileToProcess(ticket, loader, path, asset_type));
+		mgr->mLoadQueue.Push(AssetQueueItem::UploadFileToProcess(ticket, loader, path, asset_type));
 		mgr->SignalUpdate();
 	}
 
@@ -278,7 +282,7 @@ private:
 	{
 		AssetManager* mgr = GetInstance();
 
-		mgr->mLoadQueue.Push(AxQueueItem::UploadAndProcess(ticket, loader, asset_type, asset_data));
+		mgr->mLoadQueue.Push(AssetQueueItem::UploadAndProcess(ticket, loader, asset_type, asset_data));
 		mgr->SignalUpdate();
 	}
 

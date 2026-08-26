@@ -8,6 +8,8 @@ enum class eAssetType
 	Binary,
 	Object,
 	Image,
+	/// A user defined function
+	UserFunction,
 };
 
 enum class eAssetLoadOp
@@ -22,6 +24,9 @@ enum class eAssetLoadOp
 
 	/// Directly uploads the data into an asset.
 	DirectUpload,
+
+	/// Calls a specified user function
+	CallUserFunction,
 };
 
 constexpr const char* AssetTypeToString(eAssetType type)
@@ -35,7 +40,8 @@ constexpr const char* AssetTypeToString(eAssetType type)
 		return "Object";
 	case eAssetType::Image:
 		return "Image";
-	default:;
+	case eAssetType::UserFunction:
+		return "UserFunction";
 	}
 	return "None";
 }

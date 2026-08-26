@@ -153,54 +153,6 @@ void FoxtrotGame::LoadOffsetsFile()
 
 Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / size.X, pos.Y / size.Y); }
 
-void FoxtrotGame::CreateFontObject()
-{
-	// Vec2f atlas_size = Vec2f(512.0f, 256.0f);
-
-	// Vec2i glyph_size = Vec2i::sZero;
-	// Vec2i glyph_offset = Vec2i::sZero;
-
-	// {
-	//     ConfigFile font_meta;
-	//     font_meta.Load(FX_BASE_DIR "/Meta.conf");
-
-	//     ConfigEntry* glyphs_entry = font_meta.GetEntry(HashStr32("Glyphs"));
-
-	//     ConfigEntry* glyph = glyphs_entry->GetMember(HashStr32("65"));
-
-	//     glyph_size = glyph->GetMemberValue(HashStr32("Size"), Vec2i(5, 5));
-	//     glyph_offset = glyph->GetMemberValue(HashStr32("Offset"), Vec2i::sZero);
-	// }
-
-
-	// TSRef<Object> object = TSRef<Object>::New();
-	// object->Name.Set("FontObject");
-
-	// MeshGenOptions options { .Scale = 0.5 };
-	// options.UvMin = PixelsToUV(glyph_offset, atlas_size);
-	// options.UvMax = options.UvMin + PixelsToUV(glyph_size, atlas_size);
-
-	// Ref<MeshGen::GeneratedMesh> quad = MeshGen::MakeQuad(options);
-	// object->pMesh = quad->AsMesh(eVertexType::Default);
-
-	// object->Material = gMaterialManager->NewMaterial("Font material", &gPipelineCache->Request(ePipelineName::Unlit),
-	//                                                  false);
-	// Material* material = gMaterialManager->GetMaterial(object->Material);
-
-	// TSRef<AxImage> image = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-	//                                                 FX_BASE_DIR "/DefaultFont.png");
-	// material->Attach(Material::eResourceType::Diffuse, image);
-
-	// object->SetRenderUnlit(true);
-	// object->SetGraphicsPipeline(&gPipelineCache->Request(ePipelineName::Unlit));
-
-	// object->MarkReadyToRender();
-
-	// // mMainScene.Attach(object);
-
-	// object->PrintDebug();
-}
-
 void FoxtrotGame::CreateGame()
 {
 	mMainScene.Create();
@@ -211,10 +163,6 @@ void FoxtrotGame::CreateGame()
 	Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
 	Player.SetFlyMode(true);
 
-	// pEditorCamera = MakeRef<PerspectiveCamera>();
-
-	// pEditorCamera->SetAspectRatio(gRenderer->GetWindow()->GetAspectRatio());
-	// pEditorCamera->SetFov(80.0f);
 
 	mMainScene.SelectCamera(Player.pCamera);
 
@@ -229,16 +177,10 @@ void FoxtrotGame::CreateGame()
 
 	pSun = mMainScene.GetDirectionalLight();
 
-	/*
-		pPistolObject = mMainScene.FindObject(HashStr32("Pistol"));
-		pArmsObject = mMainScene.FindObject(HashStr32("AnimTest"));*/
-
 	LoadOffsetsFile();
-
 
 	TSRef<Object> level_object = mMainScene.FindObject(HashStr32("Level"));
 
-	// gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
 	gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);
 	gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
@@ -246,25 +188,19 @@ void FoxtrotGame::CreateGame()
 	gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;
 	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
 
-	{
-		// renderer::Font font;
-		// if (font.LoadFromFile("/System/Library/Fonts/Courier.ttc", 48.0f)) {
-		//     font.SaveToFile("./DefaultFont.png", eImageSaveFormat::Png);
-		// }
-		// else {
-		//     LogError("Failed to load font!");
-		// }
-	}
-
-
 	CreateLights();
-	CreateFontObject();
 
+	{
+		gAssetManager->SubmitCustom([](CommandBuffer& cmd) { LogInfo("HELLO FROM ASSETMAN!"); });
+		// Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Scale = 0.1 });
 
-	// Image mip_image;
+		// Object* object = gObjectManager->NewObject("HitMarker");
+		// object->pMesh = cube_mesh->AsDefaultMesh();
 
-	// gRenderer->SubmitImmediateUploadCmd([&](CommandBuffer& cmd) { mip_image = mm.LoadMipmaps(cmd, "TestMips.bin");
-	// });
+		// AssetTicket ticket(static_cast<void*>(object));
+		// ticket.MarkAndSignalLoaded();
+		// mMainScene.Attach(ticket);
+	}
 
 
 	while (sbRunning) {
