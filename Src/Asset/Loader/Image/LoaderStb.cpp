@@ -65,7 +65,7 @@ eLoaderStatus LoaderStb::Load(AssetTicket& ticket, const uint8* data, uint32 siz
 }
 
 
-eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<uint8>& data, const Vec2u& size,
+eLoaderStatus LoaderStb::SaveToFile(eImageSaveFormat file_format, const Slice<const uint8>& data, const Vec2u& size,
 									const String& path, eImageSaveFlags flags)
 {
 	if ((flags & eImageSaveFlags::FlipY) != 0) {

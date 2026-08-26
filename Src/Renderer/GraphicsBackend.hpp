@@ -72,7 +72,7 @@ public:
 	void BeginLighting();
 	void BeginUnlit();
 
-	void RenderPostProcessing();
+	void RenderPostProcessing(Camera& camera);
 
 	void DoComposition(Camera& render_cam);
 
@@ -241,6 +241,8 @@ public:
 
 	DescriptorSet* pLightsDescriptor = nullptr;
 
+	Image* pNoiseTexture = nullptr;
+
 private:
 	GpuDevice mDevice;
 	VkInstance mInstance = nullptr;
@@ -253,7 +255,6 @@ private:
 
 	uint32 mImageIndex = 0;
 
-	Image* pNoiseTexture = nullptr;
 
 protected:
 	uint32 mFrameNumber = 0;

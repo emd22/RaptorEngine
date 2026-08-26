@@ -127,7 +127,7 @@ void FontAtlas::Upload(Image& out_image)
 	RawGpuBuffer rgba_staging;
 	rgba_staging.Create(eGpuBufferType::Transfer, image_data.Size, VMA_MEMORY_USAGE_CPU_TO_GPU,
 						eGpuBufferFlags::TransferReceiver);
-	rgba_staging.Upload(Slice(image_data));
+	rgba_staging.Upload(image_data.pData, image_data.Size);
 
 	const VkImageUsageFlags usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
 										  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -256,7 +256,8 @@ void Font::SaveToFile(const String& path, eImageSaveFormat file_format) const
 	WriteMetaFile(path);
 
 	SizedArray<uint8> image_data = Atlas.GetImageData(scSaveFormat);
-	loader::LoaderStb::SaveToFile(file_format, image_data, Atlas.GetSize(), path, eImageSaveFlags::None);
+	loader::LoaderStb::SaveToFile(file_format, Slice<const uint8>(image_data), Atlas.GetSize(), path,
+								  eImageSaveFlags::None);
 }
 
 bool Font::LoadFromMemory(const uint8* data, uint64 data_size, float font_size)

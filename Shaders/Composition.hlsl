@@ -69,7 +69,8 @@ F_Texture2D(tDepth, 1, 0);
 F_Texture2D(tLighting, 2, 0);
 F_Texture2D(tNormal, 3, 0);
 
-F_DataTexture2D(tSSAO, uint, 4, 0);
+// F_DataTexture2D(tSSAO, uint, 4, 0);
+F_Texture2D(tSSAO, 4, 0);
 
 float3 ACESFilm(float3 x)
 {
@@ -89,15 +90,15 @@ FSOutput main(FSInput input)
 
     int3 ssao_coords = int3(input.vUV.x * input.vFrameExtent.x, input.vUV.y * input.vFrameExtent.y, 0);
 
-    uint ssao = F_SampleLoad(tSSAO, ssao_coords);
+    // uint ssao = F_SampleLoad(tSSAO, ssao_coords);
+    float4 ssao_debug = F_Sample(tSSAO, input.vUV);
+    // float ssao_value = float(ssao) / 255.0;
 
     float4 lighting = F_Sample(tLighting, input.vUV);
 
-    float ssao_float = (float)ssao;
-    float4 outv = float4(float3(ssao, ssao, ssao), 1.0);
-
     output.vColor = float4(ACESFilm(lighting.rgb * exposure), 1.0);
-    output.vColor = outv;
+
+    output.vColor = ssao_debug;
 
     return output;
 }

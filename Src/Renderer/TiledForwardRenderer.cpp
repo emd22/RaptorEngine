@@ -82,7 +82,7 @@ void TiledForwardRenderer::CreateSSAOPass()
 	SSAOPass.Create("Forward", gGraphics->Swapchain.Extent);
 
 	// SSAO output target
-	SSAOPass.AddTarget(eImageFormat::R8_UInt, Target::scFullScreen,
+	SSAOPass.AddTarget(eImageFormat::RGBA8_UNorm, Target::scFullScreen,
 					   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
 
@@ -141,14 +141,27 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
 
+		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOPushConsts));
+
 		// Set 0 (Global / Per Frame)
 
 		// tDepth
 		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
-									  gSamplerCache->Request({}));
+									  gSamplerCache->Request(SamplerProps {
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+									  }));
 		// tNormal
 		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float, 1),
 									  gSamplerCache->Request({}));
+		// tNoise
+		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gGraphics->pNoiseTexture,
+							gSamplerCache->Request({
+								.MinFilter = eSamplerFilter::Nearest,
+								.MagFilter = eSamplerFilter::Nearest,
+								.MipFilter = eSamplerFilter::Nearest,
+							}));
 
 		gPSOBuild->EndPipeline();
 	}
@@ -531,8 +544,12 @@ void TiledForwardRenderer::CreateCompositionPSO()
 									  eSamplerFilter::Nearest,
 								  }));
 	// tSSAO
-	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UInt),
-								  gSamplerCache->Request({}));
+	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::RGBA8_UNorm),
+								  gSamplerCache->Request({
+									  .MinFilter = eSamplerFilter::Nearest,
+									  .MagFilter = eSamplerFilter::Nearest,
+									  .MipFilter = eSamplerFilter::Nearest,
+								  }));
 
 	gPSOBuild->EndPipeline();
 }

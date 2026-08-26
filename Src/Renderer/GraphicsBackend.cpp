@@ -149,7 +149,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	Mat4f initial_matrix = Mat4f::sIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
-	pNoiseTexture = ImageGen::Random(Vec2u(64, 64));
+	pNoiseTexture = ImageGen::Random(Vec2u(64));
 
 	pRenderer = new TiledForwardRenderer;
 	pRenderer->Create(Swapchain.Extent);
@@ -706,13 +706,25 @@ void GraphicsBackend::BeginUnlit()
 	// pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
 }
 
-void GraphicsBackend::RenderPostProcessing()
+void GraphicsBackend::RenderPostProcessing(Camera& camera)
 {
 	FrameData* frame = GetFrame();
 
 	pRenderer->SSAOPass.Begin(frame->CmdBuffer);
 
 	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
+
+	SSAOPushConsts consts = {};
+
+	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
+	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
+	consts.ScreenSize[0] = static_cast<float32>(Swapchain.Extent.X);
+	consts.ScreenSize[1] = static_cast<float32>(Swapchain.Extent.Y);
+	consts.Radius = 0.4f;
+	consts.Bias = 0.01f;
+
+	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAO), eShaderType::Pixel, consts);
+
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
 	pRenderer->SSAOPass.End();
@@ -724,7 +736,7 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 	pRenderer->ForwardPass.End();
 
-	RenderPostProcessing();
+	RenderPostProcessing(render_cam);
 
 
 	// pDeferredRenderer->UnlitPass.End();

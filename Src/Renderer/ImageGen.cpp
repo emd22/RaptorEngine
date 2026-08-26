@@ -4,6 +4,7 @@
 #include "Globals.hpp"
 #include "GraphicsBackend.hpp"
 
+#include <Asset/Loader/Image/LoaderStb.hpp>
 #include <Core/Random.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Texture/TextureManager.hpp>
@@ -32,10 +33,14 @@ Image* Random(Vec2u size)
 		simd::StoreUInt4(pixel_data.pData + i, rv);
 	}
 
+	loader::LoaderStb::SaveToFile(eImageSaveFormat::Jpeg,
+								  Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData), pixel_data.Size),
+								  size, "chud.jpeg", eImageSaveFlags::None);
+
 	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
-			ImageInfo info(size, eImageFormat::R32_UInt, 0, 1,
+			ImageInfo info(size, eImageFormat::R32_SFloat, 0, 1,
 						   Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData), pixel_data.Size));
 
 			image->CreateFromData(cmd, info, eImageCreateFlags::None);

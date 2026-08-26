@@ -9,6 +9,7 @@ namespace fx {
 template <typename T>
 struct Slice
 {
+public:
 	T* pData = nullptr;
 	uint64 Size;
 
@@ -21,7 +22,21 @@ public:
 	Iterator end() const { return pData + Size; }
 
 	Slice(const SizedArray<T>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size) {}
+
 	Slice(const Slice<T>& other) { (*this) = other; }
+
+	template <typename U>
+		requires std::is_convertible_v<U*, T*>
+	Slice(const SizedArray<U>& sized_arr) : pData(sized_arr.pData), Size(sized_arr.Size)
+	{
+	}
+
+	template <typename U>
+		requires std::is_convertible_v<U*, T*>
+	Slice(const Slice<U>& other)
+	{
+		(*this) = other;
+	}
 
 	template <typename TOther>
 	static Slice<T> FromArray(const SizedArray<TOther>& arr)
@@ -68,6 +83,16 @@ public:
 	}
 
 	Slice& operator=(const Slice<T>& other)
+	{
+		pData = other.pData;
+		Size = other.Size;
+
+		return *this;
+	}
+
+	template <typename U>
+		requires std::is_convertible_v<U*, T*>
+	Slice& operator=(const Slice<U>& other)
 	{
 		pData = other.pData;
 		Size = other.Size;

@@ -42,8 +42,8 @@ static Vec2u GetMipDimensions(const Vec2u& ml_zero_size, uint32 mip_level)
 {
 	float32 mip_divisor = (1.0f / static_cast<float32>(1U << mip_level));
 
-	return Vec2u(static_cast<uint32>(static_cast<float32>(ml_zero_size.X) * mip_divisor),
-				 static_cast<uint32>(static_cast<float32>(ml_zero_size.Y) * mip_divisor));
+	return Vec2u(std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.X) * mip_divisor), 1U),
+				 std::max(static_cast<uint32>(static_cast<float32>(ml_zero_size.Y) * mip_divisor), 1U));
 }
 
 Image::Image() { mpRefCnt = gEnginePool->Alloc<RefCount>(sizeof(RefCount)); }
@@ -320,6 +320,7 @@ void Image::Upload(renderer::CommandBuffer& cmd, const ImageInfo& info)
 
 	for (uint32 info_index = 0; info_index < info.MipCount; info_index++) {
 		Vec2u mip_dimensions = GetMipDimensions(info.Size, info_index);
+		Assert(mip_dimensions.X > 0 && mip_dimensions.Y > 0);
 
 		buffer_copy_infos.Insert(VkBufferImageCopy {
 			.bufferOffset = offset,
