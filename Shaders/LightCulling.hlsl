@@ -60,8 +60,13 @@ void main(uint3 group_id : SV_GroupID, uint3 thread_id : SV_GroupThreadID)
 		else {
 			float4 center_clip = mul(CSConst.mViewProjection, float4(light.vLightPosition, 1.0));
 
-			// Skip lights behind the camera
-			if (center_clip.w > 0.0) {
+			if (center_clip.w < -light.fLightRadius) {
+				intersects_tile = false;
+			}
+			else if (center_clip.w <= light.fLightRadius) {
+				intersects_tile = true;
+			}
+			else {
 				float2 center_screen = ProjectToScreen(center_clip);
 
 				// Approximate the screen space radius by projecting offset points
