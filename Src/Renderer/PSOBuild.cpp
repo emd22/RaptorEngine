@@ -73,6 +73,27 @@ bool PSOBuild::HasDescriptorsToBuild() const
 	return false;
 }
 
+static void AssertCorrectBlendAttachments(const SizedArray<Target>& color_only_targets,
+										  const SizedArray<VkPipelineColorBlendAttachmentState>& blends)
+{
+	AssertEqual(color_only_targets.Size, blends.Size);
+
+	// Ensure that all formats that are added as blend attachments are large enough to support blending
+
+	for (int32 i = 0; i < color_only_targets.Size; i++) {
+		const Target& target = color_only_targets[i];
+
+		const uint32 format_pixel_stride = ImageFormatUtil::GetPixelStride(target.Image.Info.Format);
+
+		if (blends[i].blendEnable == VK_TRUE) {
+			const uint32 ps_mod_4 = (format_pixel_stride % 4);
+
+			AssertMsg(ps_mod_4 == 3 || ps_mod_4 == 0,
+					  "For a blendable target, the image format cannot be less than 4 components (or 3 + padding)");
+		}
+	}
+}
+
 
 void PSOBuild::BuildPipeline()
 {
@@ -122,6 +143,10 @@ void PSOBuild::BuildPipeline()
 	SizedArray<Target> color_only_targets = pOutputTargets->GetTargetByType(eImageAspectFlag::Color);
 	SizedArray<VkPipelineColorBlendAttachmentState> blend_attachments = BlendAttachments.GetVkAttachments(
 		color_only_targets.Size);
+
+#ifdef FX_BUILD_DEBUG
+	AssertCorrectBlendAttachments(color_only_targets, blend_attachments);
+#endif
 
 	mpPipeline->Create(mPipelineName, shader_list, pOutputTargets->GetDescriptions(), blend_attachments, vertex_ptr,
 					   *mpRenderPass, mProperties);

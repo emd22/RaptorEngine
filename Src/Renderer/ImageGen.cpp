@@ -40,7 +40,7 @@ Image* Random(Vec2u size)
 	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
-			ImageInfo info(size, eImageFormat::R32_SFloat, 0, 1,
+			ImageInfo info(size, eImageFormat::R32_UInt, 0, 1,
 						   Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData), pixel_data.Size));
 
 			image->CreateFromData(cmd, info, eImageCreateFlags::None);

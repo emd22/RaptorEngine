@@ -42,8 +42,8 @@ struct FSInput
 
 struct FSOutput
 {
-	// uint vOut : SV_TARGET0;
-	float4 vOut : SV_TARGET0;
+	uint vOut : SV_TARGET0;
+	// float4 vOut : SV_TARGET0;
 };
 
 F_Texture2D(tDepth, 0, 0);
@@ -172,8 +172,8 @@ FSOutput main(FSInput input)
 	FSOutput output;
 
 	float4 ao = ComputeSSAO(input.vUV);
-	output.vOut = ao;
-	// output.vOut = uint(ao * 255.0);
+	// output.vOut = ao;
+	output.vOut = uint(ao.r * 255.0);
 
 	return output;
 }

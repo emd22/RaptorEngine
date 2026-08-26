@@ -87,7 +87,7 @@ public:
 public:
 	union alignas(16)
 	{
-		float32 mData[2];
+		Type mData[2];
 
 		struct
 		{

@@ -82,9 +82,8 @@ void TiledForwardRenderer::CreateSSAOPass()
 	SSAOPass.Create("Forward", gGraphics->Swapchain.Extent);
 
 	// SSAO output target
-	SSAOPass.AddTarget(eImageFormat::RGBA8_UNorm, Target::scFullScreen,
+	SSAOPass.AddTarget(eImageFormat::R8_UInt, Target::scFullScreen,
 					   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-
 
 	SSAOPass.BuildRenderStage();
 }
@@ -162,6 +161,7 @@ void TiledForwardRenderer::CreateSSAOPSO()
 								.MagFilter = eSamplerFilter::Nearest,
 								.MipFilter = eSamplerFilter::Nearest,
 							}));
+
 
 		gPSOBuild->EndPipeline();
 	}
@@ -524,7 +524,7 @@ void TiledForwardRenderer::CreateCompositionPSO()
 	gPSOBuild->SetDepthTest(false);
 	gPSOBuild->SetDepthWrite(false);
 
-	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(CompositionPushConsts));
+	gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(CompositionPushConsts));
 
 	// tDepth
 	gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
@@ -544,7 +544,7 @@ void TiledForwardRenderer::CreateCompositionPSO()
 									  eSamplerFilter::Nearest,
 								  }));
 	// tSSAO
-	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::RGBA8_UNorm),
+	gPSOBuild->AddImageFromTarget(4, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UInt),
 								  gSamplerCache->Request({
 									  .MinFilter = eSamplerFilter::Nearest,
 									  .MagFilter = eSamplerFilter::Nearest,
@@ -560,13 +560,13 @@ void TiledForwardRenderer::RenderComposition(Camera& camera)
 
 	gPipelineCache->Bind(ePipelineName::Composition, cmd);
 
-	float32* extent = gGraphics->Swapchain.Extent.mData;
+	Vec2u& extent = gGraphics->Swapchain.Extent;
 
 	CompositionPushConsts consts {
-		.FrameExtent = { static_cast<uint32>(extent[0]), static_cast<uint32>(extent[1]) },
+		.FrameExtent = { extent.X, extent.Y },
 	};
 
-	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::Composition), eShaderType::Vertex,
+	gGraphics->SubmitPushConstants(cmd, gPipelineCache->Request(ePipelineName::Composition), eShaderType::Pixel,
 								   consts);
 
 	// Use single triangle instead of two triangles as it removes the overlapping quads the gpu
