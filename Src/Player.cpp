@@ -81,16 +81,16 @@ void Player::Update(float64 delta_time)
 
 		mBobCounterY += delta_time * counter_speed * body_speed;
 
-		mHeadBobX = HeadBobStrength.X * cosf(mBobCounterY);
-		mHeadBobY = HeadBobStrength.Y * sinf(mBobCounterY);
+		mHeadBobX = HeadBobStrength.X * cosf(mBobCounterY + FX_PI_2);
+		mHeadBobY = HeadBobStrength.Y * sinf(mBobCounterY + FX_PI_2);
 
 		Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
 		pCamera->MoveBy(bob_vector);
 
-		if (mBobCounterY > FX_PI) {
+		if (mBobCounterY > (FX_PI_2)) {
 			bBobReverse = true;
 		}
-		else if (mBobCounterY < -FX_PI) {
+		else if (mBobCounterY < -(FX_PI_2)) {
 			bBobReverse = false;
 		}
 	}
