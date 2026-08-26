@@ -63,6 +63,7 @@ struct SSAOPushConsts
 [[vk::push_constant]] SSAOPushConsts Consts;
 
 #define SSAO_KERNEL_SIZE 32
+#define SSAO_POWER 2
 #define SSAO_NOISE_IMAGE_SIZE 64
 #define PI 3.14159265
 
@@ -142,11 +143,19 @@ float4 ComputeSSAO(float2 uv)
 
 		float sample_scene_z = ReconstructViewPos(sample_uv, 1.0 - sample_raw_depth).z;
 
-		float range_check = smoothstep(0.0, 1.0, Consts.Radius / abs(fragment_position.z - sample_scene_z));
-		occlusion += step(sample_scene_z, sample_position.z + Consts.Bias) * range_check;
+		float delta = sample_position.z - sample_scene_z;
+
+		// Skip samples not occluded or occluded by unrelated foreground geometry (haloing)
+		if (delta < Consts.Bias || delta > Consts.Radius)
+		{
+			continue;
+		}
+
+		float attenuation = 1.0 - delta / Consts.Radius;
+		occlusion += attenuation * attenuation;
 	}
 
-	float ao = 1.0 - occlusion / SSAO_KERNEL_SIZE;
+	float ao = pow(1.0 - occlusion / SSAO_KERNEL_SIZE, SSAO_POWER);
 
 	return float4(ao, ao, ao, 1.0);
 }
