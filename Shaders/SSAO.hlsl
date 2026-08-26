@@ -63,8 +63,10 @@ struct SSAOPushConsts
 [[vk::push_constant]] SSAOPushConsts Consts;
 
 #define SSAO_KERNEL_SIZE 32
-#define SSAO_POWER 2
+#define SSAO_POWER 4
 #define SSAO_NOISE_IMAGE_SIZE 64
+#define SSAO_DISTANCE_CUTOFF 50.0
+#define SSAO_CUTOFF_FADE 10.0
 #define PI 3.14159265
 
 #define GOLDEN_ANGLE 2.39996323
@@ -155,7 +157,11 @@ float4 ComputeSSAO(float2 uv)
 		occlusion += attenuation * attenuation;
 	}
 
-	float ao = pow(1.0 - occlusion / SSAO_KERNEL_SIZE, SSAO_POWER);
+	float ao = 1.0 - (occlusion / SSAO_KERNEL_SIZE);
+
+	// Fade AO out to 1.0 with distance from the camera
+	float cutoff = saturate((SSAO_DISTANCE_CUTOFF - length(fragment_position.xyz)) / SSAO_CUTOFF_FADE);
+	ao = pow(lerp(1.0, ao, cutoff), SSAO_POWER);
 
 	return float4(ao, ao, ao, 1.0);
 }

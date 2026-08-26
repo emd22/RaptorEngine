@@ -4,8 +4,8 @@ Meta = {
 
 Sun = {
     Pos = [0.5, 2.0, -1.5]
-    Color = [250, 220, 192, 6]
-    AmbientColor = [75, 75, 72, 4]
+    Color = [250, 220, 192, 4]
+    AmbientColor = [75, 75, 72, 2]
 }
 
 
@@ -40,6 +40,8 @@ Objects = {
 	FireExtinguisher = {
 		Mesh = "/FireExtinguisher.glb"
 		Pos = [-1.0, -0.4, -0.5]
+        Scale = 2.5
+
 		Shadows = $True
 	}
 

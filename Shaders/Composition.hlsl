@@ -94,11 +94,13 @@ FSOutput main(FSInput input)
     float4 ssao_debug = F_Sample(tSSAO, input.vUV);
     // float ssao_value = float(ssao) / 255.0;
 
+    exposure = ssao_debug.r;
+
     float4 lighting = F_Sample(tLighting, input.vUV);
 
-    output.vColor = float4(ACESFilm(lighting.rgb * exposure), 1.0);
+    output.vColor = float4(ACESFilm(lighting.rgb * (exposure)), 1.0);
 
-    output.vColor = ssao_debug;
+    // output.vColor = ssao_debug;
 
     return output;
 }
