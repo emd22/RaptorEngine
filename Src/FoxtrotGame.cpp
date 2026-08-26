@@ -160,8 +160,8 @@ void FoxtrotGame::CreateGame()
 	Player.Create();
 	Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
 	// Move the player up and behind the other objects
-	Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
-	Player.SetFlyMode(true);
+	Player.TeleportTo(Vec3f(0.0f, -0.2f, -2.0f));
+	Player.SetFlyMode(false);
 
 
 	mMainScene.SelectCamera(Player.pCamera);
@@ -446,6 +446,7 @@ void FoxtrotGame::ProcessControls()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
 		// Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
 		Player.SetFlyMode(!Player.IsFlyMode());
+		Player.Physics.SetCollisionEnabled(!Player.IsFlyMode());
 	}
 }
 

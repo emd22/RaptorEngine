@@ -13,31 +13,34 @@ namespace fx {
 class PhPlayer
 {
 public:
-    static constexpr float32 scStandingHeight = 1.72f;
+	static constexpr float32 scStandingHeight = 1.72f;
 
 public:
-    PhPlayer() {}
+	PhPlayer() {}
 
-    void Create();
-    void Teleport(const Vec3f& position);
-    void ApplyMovement(const Vec3f& direction);
+	void Create();
+	void Teleport(const Vec3f& position);
+	void ApplyMovement(const Vec3f& direction);
 
-    SizedArray<JPH::BodyID> Raycast(Vec3f direction) const;
+	SizedArray<JPH::BodyID> Raycast(Vec3f direction) const;
 
-    void Update(float64 delta_time);
+	void SetCollisionEnabled(bool value);
+
+	void Update(float64 delta_time);
 
 public:
-    JPH::Ref<JPH::CharacterVirtual> pPlayerVirt;
-    JPH::RefConst<JPH::Shape> pPhysicsShape;
+	JPH::Ref<JPH::CharacterVirtual> pPlayerVirt;
+	JPH::RefConst<JPH::Shape> pPhysicsShape;
 
-    JPH::Vec3 mMovementVector = JPH::Vec3::sZero();
+	JPH::Vec3 mMovementVector = JPH::Vec3::sZero();
 
-    // float32 HeadRecoveryYOffset = 0.0f;
-    float mTime = 0.01f;
+	// float32 HeadRecoveryYOffset = 0.0f;
+	float mTime = 0.01f;
 
-    bool bIsGrounded : 1 = false;
+	bool bIsGrounded : 1 = false;
+	bool bCollisionEnabled : 1 = true;
 
-    bool bDisableGravity : 1 = false;
+	bool bDisableGravity : 1 = false;
 };
 
 } // namespace fx

@@ -24,108 +24,119 @@ using namespace JPH;
 
 void PhPlayer::Create()
 {
-    ConfigFile player_config;
-    player_config.Load(FX_BASE_DIR "/Data/Player.conf");
+	ConfigFile player_config;
+	player_config.Load(FX_BASE_DIR "/Data/Player.conf");
 
-    const float32 collider_radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>();
+	const float32 collider_radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>();
 
-    Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
+	Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
 
-    pPhysicsShape = RotatedTranslatedShapeSettings(Vec3(0, 0.5f * scStandingHeight + collider_radius, 0),
-                                                   JPH::Quat::sIdentity(),
-                                                   new CapsuleShape(0.5f * scStandingHeight, collider_radius))
-                        .Create()
-                        .Get();
+	pPhysicsShape = RotatedTranslatedShapeSettings(Vec3(0, 0.5f * scStandingHeight + collider_radius, 0),
+												   JPH::Quat::sIdentity(),
+												   new CapsuleShape(0.5f * scStandingHeight, collider_radius))
+						.Create()
+						.Get();
 
-    settings->mMaxSlopeAngle = scMaxSlopeAngle;
-    settings->mShape = pPhysicsShape;
+	settings->mMaxSlopeAngle = scMaxSlopeAngle;
+	settings->mShape = pPhysicsShape;
 
-    settings->mMaxStrength = player_config.GetEntry(HashStr32("Strength"))->Get<float32>();
-    settings->mMass = player_config.GetEntry(HashStr32("Mass"))->Get<float32>();
-    settings->mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
-    settings->mSupportingVolume = Plane(Vec3::sAxisY(), -collider_radius);
-    settings->mInnerBodyLayer = PhLayer::Dynamic;
+	settings->mMaxStrength = player_config.GetEntry(HashStr32("Strength"))->Get<float32>();
+	settings->mMass = player_config.GetEntry(HashStr32("Mass"))->Get<float32>();
+	settings->mBackFaceMode = JPH::EBackFaceMode::CollideWithBackFaces;
+	settings->mSupportingVolume = Plane(Vec3::sAxisY(), -collider_radius);
+	settings->mInnerBodyLayer = PhLayer::Dynamic;
 
-    pPlayerVirt = new CharacterVirtual(settings, RVec3::sZero(), JPH::Quat::sIdentity(), 0, &gPhysics->PhysicsSystem);
+	pPlayerVirt = new CharacterVirtual(settings, RVec3::sZero(), JPH::Quat::sIdentity(), 0, &gPhysics->PhysicsSystem);
 }
 
 void PhPlayer::Teleport(const Vec3f& position)
 {
-    JPH::RVec3 jolt_position;
-    position.ToJoltVec3(jolt_position);
+	JPH::RVec3 jolt_position;
+	position.ToJoltVec3(jolt_position);
 
-    pPlayerVirt->SetPosition(jolt_position);
+	pPlayerVirt->SetPosition(jolt_position);
+}
+
+void PhPlayer::SetCollisionEnabled(bool value)
+{
+	bCollisionEnabled = value;
+
+	gPhysics->GetBodyInterface().SetObjectLayer(pPlayerVirt->GetInnerBodyID(), PhLayer::Deactivated);
 }
 
 void PhPlayer::ApplyMovement(const Vec3f& direction)
 {
-    Vec3 jolt_dir;
-    direction.ToJoltVec3(jolt_dir);
+	Vec3 jolt_dir;
+	direction.ToJoltVec3(jolt_dir);
 
-    mMovementVector = jolt_dir;
-    // pPlayerVirt->SetLinearVelocity(jolt_dir);
+	mMovementVector = jolt_dir;
+	// pPlayerVirt->SetLinearVelocity(jolt_dir);
 }
 
 SizedArray<JPH::BodyID> PhPlayer::Raycast(Vec3f direction) const
 {
-    JPH::RayCast rc;
-    rc.mOrigin = pPlayerVirt->GetPosition();
-    direction.ToJoltVec3(rc.mDirection);
+	JPH::RayCast rc;
+	rc.mOrigin = pPlayerVirt->GetPosition();
+	direction.ToJoltVec3(rc.mDirection);
 
-    JPH::AllHitCollisionCollector<RayCastBodyCollector> collector;
+	JPH::AllHitCollisionCollector<RayCastBodyCollector> collector;
 
-    gPhysics->PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
+	gPhysics->PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
 
-    SizedArray<JPH::BodyID> hits;
-    hits.InitCapacity(collector.mHits.size());
+	SizedArray<JPH::BodyID> hits;
+	hits.InitCapacity(collector.mHits.size());
 
-    for (JPH::BroadPhaseCastResult& hit : collector.mHits) {
-        hits.Insert(hit.mBodyID);
-    }
+	for (JPH::BroadPhaseCastResult& hit : collector.mHits) {
+		hits.Insert(hit.mBodyID);
+	}
 
-    // return {};
+	// return {};
 
-    return hits;
+	return hits;
 }
 
 void PhPlayer::Update(float64 delta_time)
 {
-    mTime += delta_time;
+	mTime += delta_time;
 
+	PhysicsSystem& phys = gPhysics->PhysicsSystem;
 
-    PhysicsSystem& phys = gPhysics->PhysicsSystem;
+	Vec3 gravity = (phys.GetGravity() * delta_time);
 
-    Vec3 gravity = (phys.GetGravity() * delta_time);
+	// Apply gravity
+	Vec3 velocity = Vec3::sZero();
 
-    // Apply gravity
-    Vec3 velocity = Vec3::sZero();
+	if (pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround) {
+		velocity = Vec3::sZero();
 
-    if (pPlayerVirt->GetGroundState() == CharacterVirtual::EGroundState::OnGround) {
-        velocity = Vec3::sZero();
+		bIsGrounded = true;
+	}
+	else {
+		velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
+		if (bDisableGravity) {
+			velocity.SetY(0);
+		}
+		else {
+			velocity += gravity;
+		}
 
-        bIsGrounded = true;
-    }
-    else {
-        velocity = pPlayerVirt->GetLinearVelocity() * pPlayerVirt->GetUp();
-        if (bDisableGravity) {
-            velocity.SetY(0);
-        }
-        else {
-            velocity += gravity;
-        }
+		bIsGrounded = false;
+	}
 
-        bIsGrounded = false;
-    }
+	velocity += mMovementVector;
 
-    velocity += mMovementVector;
+	pPlayerVirt->SetLinearVelocity(velocity);
 
-    pPlayerVirt->SetLinearVelocity(velocity);
+	JPH::ObjectLayer collision_layer = PhLayer::Dynamic;
+	if (bCollisionEnabled == false) {
+		collision_layer = PhLayer::Deactivated;
+	}
 
-    // Move character
-    CharacterVirtual::ExtendedUpdateSettings update_settings {};
-    pPlayerVirt->ExtendedUpdate(delta_time, gravity, update_settings,
-                                phys.GetDefaultBroadPhaseLayerFilter(PhLayer::Dynamic),
-                                phys.GetDefaultLayerFilter(PhLayer::Dynamic), {}, {}, *gPhysics->pTempAllocator);
+	// Move character
+	CharacterVirtual::ExtendedUpdateSettings update_settings {};
+	pPlayerVirt->ExtendedUpdate(delta_time, gravity, update_settings,
+								phys.GetDefaultBroadPhaseLayerFilter(collision_layer),
+								phys.GetDefaultLayerFilter(collision_layer), {}, {}, *gPhysics->pTempAllocator);
 }
 
 } // namespace fx

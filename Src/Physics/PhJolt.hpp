@@ -23,14 +23,16 @@ namespace PhLayer {
 using Type = JPH::ObjectLayer;
 static constexpr JPH::ObjectLayer Static = 0;
 static constexpr JPH::ObjectLayer Dynamic = 1;
-static constexpr JPH::ObjectLayer NumLayers = 2;
+static constexpr JPH::ObjectLayer Deactivated = 2;
+static constexpr JPH::ObjectLayer NumLayers = 3;
 }; // namespace PhLayer
 
 namespace PhBroadPhaseLayer {
 using Type = JPH::BroadPhaseLayer;
 static constexpr JPH::BroadPhaseLayer Static(0);
 static constexpr JPH::BroadPhaseLayer Dynamic(1);
-static constexpr uint32 NumLayers(2);
+static constexpr JPH::BroadPhaseLayer Deactivated(2);
+static constexpr uint32 NumLayers(3);
 }; // namespace PhBroadPhaseLayer
 
 
@@ -39,56 +41,58 @@ static constexpr uint32 NumLayers(2);
 class PhBPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface
 {
 public:
-    PhBPLayerInterfaceImpl()
-    {
-        // Create a mapping table from object to broad phase layer
-        mObjectToBroadPhase[PhLayer::Static] = PhBroadPhaseLayer::Static;
-        mObjectToBroadPhase[PhLayer::Dynamic] = PhBroadPhaseLayer::Dynamic;
-    }
+	PhBPLayerInterfaceImpl()
+	{
+		// Create a mapping table from object to broad phase layer
+		mObjectToBroadPhase[PhLayer::Static] = PhBroadPhaseLayer::Static;
+		mObjectToBroadPhase[PhLayer::Dynamic] = PhBroadPhaseLayer::Dynamic;
+	}
 
-    virtual uint32 GetNumBroadPhaseLayers() const override { return PhBroadPhaseLayer::NumLayers; }
+	virtual uint32 GetNumBroadPhaseLayers() const override { return PhBroadPhaseLayer::NumLayers; }
 
-    virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
-    {
-        JPH_ASSERT(inLayer < PhLayer::NumLayers);
-        return mObjectToBroadPhase[inLayer];
-    }
+	virtual JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer inLayer) const override
+	{
+		JPH_ASSERT(inLayer < PhLayer::NumLayers);
+		return mObjectToBroadPhase[inLayer];
+	}
 
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
-    virtual const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer inLayer) const override
-    {
-        switch ((JPH::BroadPhaseLayer::Type)inLayer) {
-        case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Static:
-            return "Static";
-        case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Dynamic:
-            return "Dynamic";
-        default:
-            JPH_ASSERT(false);
-            return "Invalid";
-        }
-    }
+	virtual const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer inLayer) const override
+	{
+		switch ((JPH::BroadPhaseLayer::Type)inLayer) {
+		case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Static:
+			return "Static";
+		case (JPH::BroadPhaseLayer::Type)PhBroadPhaseLayer::Dynamic:
+			return "Dynamic";
+		default:
+			JPH_ASSERT(false);
+			return "Invalid";
+		}
+	}
 #endif // JPH_EXTERNAL_PROFILE || JPH_PROFILE_ENABLED
 
 private:
-    JPH::BroadPhaseLayer mObjectToBroadPhase[PhLayer::NumLayers];
+	JPH::BroadPhaseLayer mObjectToBroadPhase[PhLayer::NumLayers];
 };
 
 /// Class that determines if an object layer can collide with a broadphase layer
 class PhObjectVsBPLayerFilter : public JPH::ObjectVsBroadPhaseLayerFilter
 {
 public:
-    virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
-    {
-        switch (inLayer1) {
-        case PhLayer::Static:
-            return inLayer2 == PhBroadPhaseLayer::Dynamic;
-        case PhLayer::Dynamic:
-            return true;
-        default:
-            JPH_ASSERT(false);
-            return false;
-        }
-    }
+	virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
+	{
+		switch (inLayer1) {
+		case PhLayer::Static:
+			return inLayer2 == PhBroadPhaseLayer::Dynamic;
+		case PhLayer::Dynamic:
+			return true;
+		case PhLayer::Deactivated:
+			return false;
+		default:
+			JPH_ASSERT(false);
+			return false;
+		}
+	}
 };
 
 
@@ -96,18 +100,20 @@ public:
 class PhObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
 {
 public:
-    virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
-    {
-        switch (inObject1) {
-        case PhLayer::Static:
-            return inObject2 == PhLayer::Dynamic; // Non moving only collides with moving
-        case PhLayer::Dynamic:
-            return true; // Moving collides with everything
-        default:
-            JPH_ASSERT(false);
-            return false;
-        }
-    }
+	virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
+	{
+		switch (inObject1) {
+		case PhLayer::Static:
+			return inObject2 == PhLayer::Dynamic; // Non moving only collides with moving
+		case PhLayer::Dynamic:
+			return true; // Moving collides with everything
+		case PhLayer::Deactivated:
+			return false;
+		default:
+			JPH_ASSERT(false);
+			return false;
+		}
+	}
 };
 
 
@@ -115,77 +121,77 @@ public:
 class PhContactListener : public JPH::ContactListener
 {
 public:
-    // See: ContactListener
-    virtual JPH::ValidateResult OnContactValidate(const JPH::Body& inBody1, const JPH::Body& inBody2,
-                                                  JPH::RVec3Arg inBaseOffset,
-                                                  const JPH::CollideShapeResult& inCollisionResult) override
-    {
-        const JPH::ValidateResult result = ContactListener::OnContactValidate(inBody1, inBody2, inBaseOffset,
-                                                                              inCollisionResult);
+	// See: ContactListener
+	virtual JPH::ValidateResult OnContactValidate(const JPH::Body& inBody1, const JPH::Body& inBody2,
+												  JPH::RVec3Arg inBaseOffset,
+												  const JPH::CollideShapeResult& inCollisionResult) override
+	{
+		const JPH::ValidateResult result = ContactListener::OnContactValidate(inBody1, inBody2, inBaseOffset,
+																			  inCollisionResult);
 
-        return result;
-    }
+		return result;
+	}
 
-    virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
-                                const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
-    {
-    }
+	virtual void OnContactAdded(const JPH::Body& inBody1, const JPH::Body& inBody2,
+								const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
+	{
+	}
 
-    virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
-                                    const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
-    {
-    }
+	virtual void OnContactPersisted(const JPH::Body& inBody1, const JPH::Body& inBody2,
+									const JPH::ContactManifold& inManifold, JPH::ContactSettings& ioSettings) override
+	{
+	}
 
-    virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
+	virtual void OnContactRemoved(const JPH::SubShapeIDPair& inSubShapePair) override {}
 };
 
 // An example activation listener
 class PhBodyActivationListener : public JPH::BodyActivationListener
 {
 public:
-    virtual void OnBodyActivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override {}
+	virtual void OnBodyActivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override {}
 
-    virtual void OnBodyDeactivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override {}
+	virtual void OnBodyDeactivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override {}
 };
 
 
 class PhJolt
 {
-    static constexpr uint32 scMaxBodies = 512;
+	static constexpr uint32 scMaxBodies = 512;
 
 public:
-    PhJolt();
+	PhJolt();
 
-    void Create();
-    void Update();
-    void Destroy();
+	void Create();
+	void Update();
+	void Destroy();
 
-    void OptimizeBroadPhase();
+	void OptimizeBroadPhase();
 
-    FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
+	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 
-    ~PhJolt();
+	~PhJolt();
 
 public:
-    JPH::PhysicsSystem PhysicsSystem;
+	JPH::PhysicsSystem PhysicsSystem;
 
-    bool bPhysicsPaused = false;
-    const float cTimeStep = 1.0f / 60.0f;
+	bool bPhysicsPaused = false;
+	const float cTimeStep = 1.0f / 60.0f;
 
-    MemberRef<JPH::TempAllocatorImpl> pTempAllocator;
-    MemberRef<JPH::JobSystemThreadPool> pJobSystem;
+	MemberRef<JPH::TempAllocatorImpl> pTempAllocator;
+	MemberRef<JPH::JobSystemThreadPool> pJobSystem;
 
 
 private:
-    PhBPLayerInterfaceImpl mBroadPhaseInterface;
-    PhObjectVsBPLayerFilter mObjectVsBPLayerFilter;
+	PhBPLayerInterfaceImpl mBroadPhaseInterface;
+	PhObjectVsBPLayerFilter mObjectVsBPLayerFilter;
 
-    PhBodyActivationListener mBodyActivationListener;
-    PhContactListener mContactListener;
-    PhObjectLayerPairFilterImpl mObjectLayerPairFilter;
+	PhBodyActivationListener mBodyActivationListener;
+	PhContactListener mContactListener;
+	PhObjectLayerPairFilterImpl mObjectLayerPairFilter;
 
 
-    bool mbIsInited = false;
+	bool mbIsInited = false;
 };
 
 } // namespace fx
