@@ -718,10 +718,11 @@ void GraphicsBackend::RenderPostProcessing(Camera& camera)
 
 	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
+	memcpy(consts.View, camera.ViewMatrix.RawData, sizeof(float32) * 16);
 	consts.ScreenSize[0] = static_cast<float32>(Swapchain.Extent.X);
 	consts.ScreenSize[1] = static_cast<float32>(Swapchain.Extent.Y);
-	consts.Radius = 0.4f;
-	consts.Bias = 0.03f;
+	consts.Radius = 0.08f;
+	consts.Bias = 0.0025f;
 
 	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAO), eShaderType::Pixel, consts);
 

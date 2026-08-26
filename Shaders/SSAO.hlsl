@@ -54,6 +54,7 @@ struct SSAOPushConsts
 {
 	float4x4 InvProjection;
 	float4x4 Projection;
+	float4x4 View;
 	float2 ScreenSize;
 	float Radius;
 	float Bias;
@@ -62,7 +63,7 @@ struct SSAOPushConsts
 [[vk::push_constant]] SSAOPushConsts Consts;
 
 #define SSAO_KERNEL_SIZE 32
-#define SSAO_NOISE_DIM 64
+#define SSAO_NOISE_IMAGE_SIZE 64
 #define PI 3.14159265
 
 #define GOLDEN_ANGLE 2.39996323
@@ -70,95 +71,84 @@ struct SSAOPushConsts
 float3 ReconstructViewPos(float2 uv, float depth)
 {
 	float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
-	float4 view_pos = mul(Consts.InvProjection, ndc);
-	return view_pos.xyz / view_pos.w;
-}
 
-float3 ReconstructNormal(float2 uv)
-{
-	float4 normal = F_Sample(tNormal, uv);
-	return normal.rgb;
+	float4 view_space = mul(Consts.InvProjection, ndc);
 
-	// float2 texel = 1.0 / Consts.ScreenSize;
-
-	// float3 pos_c = ReconstructViewPos(uv, F_Sample(tDepth, uv).r);
-	// float3 pos_r = ReconstructViewPos(uv + float2(texel.x, 0), F_Sample(tDepth, uv + float2(texel.x, 0)).r);
-	// float3 pos_u = ReconstructViewPos(uv + float2(0, texel.y), F_Sample(tDepth, uv + float2(0, texel.y)).r);
-
-	// return normalize(cross(pos_u - pos_c, pos_r - pos_c));
+	return view_space.xyz / view_space.w;
 }
 
 float2 GetNoiseVector(float2 uv)
 {
-	int2 coord = int2(uv * Consts.ScreenSize) % SSAO_NOISE_DIM;
-	uint noise_packed = F_SampleLoad(tNoise, int3(coord, 0));
+	int2 noise_coord = int2(uv * Consts.ScreenSize) % SSAO_NOISE_IMAGE_SIZE;
+	uint noise = F_SampleLoad(tNoise, int3(noise_coord, 0));
 
-	float2 noise;
-	noise.x = float(noise_packed & 0xFFFF) / 32768.0 - 1.0;
-	noise.y = float((noise_packed >> 16) & 0xFFFF) / 32768.0 - 1.0;
-	return noise;
+	float angle = (noise / 4294967295.0) * 2.0 * PI;
+
+	return float2(cos(angle), sin(angle));
+}
+
+float3 GetSampleKernel(uint index)
+{
+	float findex = (index + 0.5) / SSAO_KERNEL_SIZE;
+
+	float z = findex;
+	float r = sqrt(max(1.0 - z * z, 0.0));
+
+	float phi = index * GOLDEN_ANGLE;
+
+	return float3(r * cos(phi), r * sin(phi), z);
 }
 
 float4 ComputeSSAO(float2 uv)
 {
 	float raw_depth = F_Sample(tDepth, uv).r;
-	if (raw_depth <= 0.001)
-    {
-        return float4(1.0, 1.0, 1.0, 1.0);
-    }
 
-    const float depth = 1.0 - raw_depth;
+	// Skip the skybox
+	if (raw_depth >= 1.0)
+	{
+		return float4(1.0, 1.0, 1.0, 1.0);
+	}
 
-	float3 pos = ReconstructViewPos(uv, depth);
-	float3 normal = ReconstructNormal(uv);
+	float depth = 1.0 - raw_depth;
+	float3 fragment_position = ReconstructViewPos(uv, depth);
 
-	float2 noise = GetNoiseVector(uv);
-	float3 random_vec = float3(noise, 0.0);
+	float3 world_normal = F_Sample(tNormal, uv).xyz;
+	float3 normal = normalize(mul((float3x3)Consts.View, world_normal));
 
-	float3 tangent = normalize(random_vec - normal * dot(random_vec, normal));
+	float2 noise_vector = GetNoiseVector(uv);
+
+	float3 tangent = normalize(cross(normal, float3(noise_vector, 0.0)));
 	float3 bitangent = cross(normal, tangent);
 	float3x3 TBN = float3x3(tangent, bitangent, normal);
 
 	float occlusion = 0.0;
 
-	for (int i = 0; i < SSAO_KERNEL_SIZE; i++)
+	for (uint i = 0; i < SSAO_KERNEL_SIZE; ++i)
 	{
-		float fi = (float(i) + 0.5) / float(SSAO_KERNEL_SIZE);
+		float3 sample_direction = mul(GetSampleKernel(i), TBN);
+		float3 sample_position = fragment_position + sample_direction * Consts.Radius;
 
-		// Cosine-weighted elevation: biases samples toward the normal (z near 1),
-		// which matters more for AO than samples near the tangent plane.
-		float cos_theta = sqrt(1.0 - fi);
-		float sin_theta = sqrt(fi); // since sin^2 = 1 - cos^2 = fi
+		float4 sample_clip = mul(Consts.Projection, float4(sample_position, 1.0));
+		float3 sample_ndc = sample_clip.xyz / sample_clip.w;
+		float2 sample_uv = sample_ndc.xy * 0.5 + 0.5;
 
-		// Golden angle azimuth avoids correlating with elevation, giving even spiral coverage
-		float phi = GOLDEN_ANGLE * float(i);
+		float sample_raw_depth = F_Sample(tDepth, sample_uv).r;
 
-		float3 sample_offset;
-		sample_offset.x = cos(phi) * sin_theta;
-		sample_offset.y = sin(phi) * sin_theta;
-		sample_offset.z = cos_theta;
-
-		float dist_scale = lerp(0.1, 1.0, fi * fi);
-
-		float3 sample_dir = mul((float3x3)TBN, sample_offset);
-		float3 sample_pos = pos + sample_dir * Consts.Radius * dist_scale;
-
-		float4 clip = mul(Consts.Projection, float4(sample_pos, 1.0));
-		float2 sample_uv = (clip.xy / clip.w) * 0.5 + 0.5;
-
-		if (sample_uv.x < 0.0 || sample_uv.x > 1.0 || sample_uv.y < 0.0 || sample_uv.y > 1.0)
+		// Skip offscreen samples
+		if (any(sample_uv < 0.0) || any(sample_uv > 1.0))
+		{
 			continue;
+		}
 
-		float sample_depth = 1.0 - F_Sample(tDepth, sample_uv).r;
-		float3 sample_view = ReconstructViewPos(sample_uv, sample_depth);
+		float sample_scene_z = ReconstructViewPos(sample_uv, 1.0 - sample_raw_depth).z;
 
-		float range_check = smoothstep(0.0, 1.0, Consts.Radius / abs(pos.z - sample_view.z));
-		occlusion += (sample_view.z <= sample_pos.z + Consts.Bias ? 1.0 : 0.0) * range_check;
+		float range_check = smoothstep(0.0, 1.0, Consts.Radius / abs(fragment_position.z - sample_scene_z));
+		occlusion += step(sample_scene_z, sample_position.z + Consts.Bias) * range_check;
 	}
 
-	occlusion = 1.0 - (occlusion / float(SSAO_KERNEL_SIZE));
-	return float4(occlusion, occlusion, occlusion, 1.0f);
+	float ao = 1.0 - occlusion / SSAO_KERNEL_SIZE;
 
+	return float4(ao, ao, ao, 1.0);
 }
 
 FSOutput main(FSInput input)
