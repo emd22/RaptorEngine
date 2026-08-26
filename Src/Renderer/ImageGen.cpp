@@ -33,9 +33,9 @@ Image* Random(Vec2u size)
 		simd::StoreUInt4(pixel_data.pData + i, rv);
 	}
 
-	loader::LoaderStb::SaveToFile(eImageSaveFormat::Jpeg,
-								  Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData), pixel_data.Size),
-								  size, "chud.jpeg", eImageSaveFlags::None);
+	// loader::LoaderStb::SaveToFile(eImageSaveFormat::Jpeg,
+	// 							  Slice<const uint8>(reinterpret_cast<const uint8*>(pixel_data.pData), pixel_data.Size),
+	// 							  size, "chud.jpeg", eImageSaveFlags::None);
 
 	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)

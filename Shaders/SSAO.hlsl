@@ -65,6 +65,8 @@ struct SSAOPushConsts
 #define SSAO_NOISE_DIM 64
 #define PI 3.14159265
 
+#define GOLDEN_ANGLE 2.39996323
+
 float3 ReconstructViewPos(float2 uv, float depth)
 {
 	float4 ndc = float4(uv * 2.0 - 1.0, depth, 1.0);
@@ -75,8 +77,8 @@ float3 ReconstructViewPos(float2 uv, float depth)
 float3 ReconstructNormal(float2 uv)
 {
 	float4 normal = F_Sample(tNormal, uv);
-
 	return normal.rgb;
+
 	// float2 texel = 1.0 / Consts.ScreenSize;
 
 	// float3 pos_c = ReconstructViewPos(uv, F_Sample(tDepth, uv).r);
@@ -107,7 +109,6 @@ float4 ComputeSSAO(float2 uv)
 
     const float depth = 1.0 - raw_depth;
 
-
 	float3 pos = ReconstructViewPos(uv, depth);
 	float3 normal = ReconstructNormal(uv);
 
@@ -122,20 +123,25 @@ float4 ComputeSSAO(float2 uv)
 
 	for (int i = 0; i < SSAO_KERNEL_SIZE; i++)
 	{
-		float fi = float(i) / float(SSAO_KERNEL_SIZE);
-		float angle = fi * 2.0 * PI;
+		float fi = (float(i) + 0.5) / float(SSAO_KERNEL_SIZE);
 
-		float scale = fi;
-		scale = lerp(0.1, 1.0, scale * scale);
-		float r = scale;
+		// Cosine-weighted elevation: biases samples toward the normal (z near 1),
+		// which matters more for AO than samples near the tangent plane.
+		float cos_theta = sqrt(1.0 - fi);
+		float sin_theta = sqrt(fi); // since sin^2 = 1 - cos^2 = fi
+
+		// Golden angle azimuth avoids correlating with elevation, giving even spiral coverage
+		float phi = GOLDEN_ANGLE * float(i);
 
 		float3 sample_offset;
-		sample_offset.x = cos(angle) * r;
-		sample_offset.y = sin(angle) * r;
-		sample_offset.z = sqrt(max(0.0, 1.0 - r * r));
+		sample_offset.x = cos(phi) * sin_theta;
+		sample_offset.y = sin(phi) * sin_theta;
+		sample_offset.z = cos_theta;
+
+		float dist_scale = lerp(0.1, 1.0, fi * fi);
 
 		float3 sample_dir = mul((float3x3)TBN, sample_offset);
-		float3 sample_pos = pos + sample_dir * Consts.Radius;
+		float3 sample_pos = pos + sample_dir * Consts.Radius * dist_scale;
 
 		float4 clip = mul(Consts.Projection, float4(sample_pos, 1.0));
 		float2 sample_uv = (clip.xy / clip.w) * 0.5 + 0.5;

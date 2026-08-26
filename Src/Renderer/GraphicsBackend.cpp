@@ -721,7 +721,7 @@ void GraphicsBackend::RenderPostProcessing(Camera& camera)
 	consts.ScreenSize[0] = static_cast<float32>(Swapchain.Extent.X);
 	consts.ScreenSize[1] = static_cast<float32>(Swapchain.Extent.Y);
 	consts.Radius = 0.4f;
-	consts.Bias = 0.01f;
+	consts.Bias = 0.03f;
 
 	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAO), eShaderType::Pixel, consts);
 
