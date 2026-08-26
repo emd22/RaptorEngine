@@ -165,6 +165,8 @@ struct FSPushConsts
 #define ROUGHNESS roughness_metallic.x
 #define METALLIC  roughness_metallic.y
 
+#define SHADOW_BIAS 0.00005f
+
 
 float3 GetSaturationColor(float value)
 {
@@ -256,7 +258,7 @@ FSOutput main(FSInput input)
 
 			// Check that the UV values are greater than 0.0 and less than 1.0
 			if ((saturate(shadow_uv.x) == shadow_uv.x) && (saturate(shadow_uv.y) == shadow_uv.y) && (shadow_z > 0)) {
-				visibility = F_SampleCmpLevelZero(tShadowAtlas, shadow_uv, shadow_z + 0.001f);
+				visibility = F_SampleCmpLevelZero(tShadowAtlas, shadow_uv, shadow_z + SHADOW_BIAS);
 				visibility = clamp(visibility, 0.05f, 1.0f);
 			}
 		}
