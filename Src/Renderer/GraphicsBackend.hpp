@@ -69,8 +69,6 @@ public:
 	eFrameResult BeginFrame();
 	void BeginLightCulling(Camera& render_cam);
 	void BeginGeometry();
-	void BeginLighting();
-	void BeginUnlit();
 
 	void RenderPostProcessing(Camera& camera);
 

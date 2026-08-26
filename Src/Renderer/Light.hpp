@@ -67,7 +67,6 @@ public:
 
 protected:
 	Ref<PrimitiveMesh> mpDebugMesh { nullptr };
-	renderer::ePipelineName mPipelineName = renderer::ePipelineName::LightingOutsideVolume;
 
 	float32 mRadius = 1.0f;
 };

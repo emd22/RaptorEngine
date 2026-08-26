@@ -17,15 +17,7 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("GeometryNormalMaps", eFlags::None),
 	NAME_INFO("GeometrySkinned", eFlags::None),
 
-	/* Unlit pipelines */
-	NAME_INFO("Unlit", eFlags::AlbedoOnly),
-	NAME_INFO("UnlitNormalMaps", eFlags::None),
 	NAME_INFO("DebugLayer", eFlags::None),
-
-	/* Old lighting pipelines */
-	NAME_INFO("LightingOutsideVolume", eFlags::None),
-	NAME_INFO("LightingInsideVolume", eFlags::None),
-	NAME_INFO("LightingDirectional", eFlags::None),
 
 	/* Forward+ light culling */
 	NAME_INFO("LightCulling", eFlags::None),

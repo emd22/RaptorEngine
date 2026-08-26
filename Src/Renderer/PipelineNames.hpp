@@ -22,20 +22,7 @@ enum class ePipelineName : uint16
 	GeometryNormalMaps,
 	GeometrySkinned,
 
-	/**
-	 * @brief Renders objects without lighting
-	 */
-	Unlit,
-	/**
-	 * @brief Same as `Unlit` pipeline, but allows binding normal maps and MR maps if they exist. Drop-in replacement
-	 * for `GeometryNormalMaps`.
-	 */
-	UnlitNormalMaps,
 	DebugLayer,
-
-	LightingOutsideVolume,
-	LightingInsideVolume,
-	LightingDirectional,
 
 	/**
 	 * @brief Forward+ compute pass that culls lights into 2D screen space tiles

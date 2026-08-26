@@ -608,11 +608,6 @@ void FoxtrotGame::Tick()
 
 void FoxtrotGame::DestroyGame()
 {
-	fx::LogInfo("===== MEMPOOL STATS =====");
-	fx::LogInfo("Bytes Used: {}", fx::gEnginePool->GetBytesUsed());
-	fx::LogInfo("Pool Size:  {}", fx::gEnginePool->GetCapacity());
-	fx::LogInfo("=========================");
-
 	gGraphics->GetDevice()->WaitForIdle();
 
 	delete gShadowRenderer;

@@ -50,30 +50,8 @@ void LightBase::Render(const PerspectiveCamera& camera, Camera* shadow_camera)
 		return;
 	}
 
-	// if (camera.Position.IntersectsSphere(mPosition, mRadius)) {
-	// 	mPipelineName = ePipelineName::LightingInsideVolume;
-	// }
-	// else {
-	// 	mPipelineName = ePipelineName::LightingOutsideVolume;
-	// }
-
 	FrameData* frame = gGraphics->GetFrame();
 	UpdateIfOutOfDate();
-
-	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
-	// gPipelineCache->Bind(mPipelineName, frame->CmdBuffer);
-
-	// {
-	// 	LightVertPushConstants push_constants {};
-	// 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
-
-
-	// 	push_constants.ObjectId = ID.GetID();
-	// 	push_constants.LightId = gRenderer->LightBuffer.SlotIndex;
-
-	// 	gRenderer->SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(mPipelineName), eShaderType::Vertex,
-	// 								   push_constants);
-	// }
 
 
 	gGraphics->LightBuffer.WritePtr(shadow_camera->GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));

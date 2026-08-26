@@ -233,9 +233,9 @@ void GraphicsBackend::RebuildRenderStages()
 
 	Vec2u size = GetWindow()->GetSize();
 
-	// rd->GPass.Rebuild(size);
+	rd->ForwardPass.Rebuild(size);
+	rd->SSAOPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
-	// rd->LightPass.Rebuild(size);
 
 	rd->DescriptorPool.Recreate();
 
@@ -659,52 +659,6 @@ void GraphicsBackend::PresentFrame()
 	bDidFrameResize = false;
 }
 
-void GraphicsBackend::BeginLighting()
-{
-	FrameData* frame = GetFrame();
-
-
-	// Target* depth_target = pDeferredRenderer->ForwardPass.GetTarget(eImageFormat::D32_Float, 0);
-	// Assert(depth_target != nullptr);
-	// depth_target->Image.TransitionDepthToShaderRO(frame->CmdBuffer);
-
-
-	// gState->BufferOffset(ShaderType::Vertex, gRenderer->Uniforms.GetBaseOffset());
-	// gState->Pipeline(&pDeferredRenderer->PlLightingDirectional);
-	// gState->Apply(frame->CommandBuffer);
-	// gState->Reset();
-
-
-	gPipelineCache->AddBufferOffset(0, gGraphics->LightBuffer.GetBaseOffset());
-	gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
-	gPipelineCache->AddBufferOffset(1, 0);
-	gPipelineCache->Bind(ePipelineName::LightingDirectional, frame->CmdBuffer);
-
-	// pDeferredRenderer->DsLighting.BindWithOffset(0, frame->CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-	// 											 gPipelineCache->Request(ePipelineName::LightingDirectional),
-	// 											 gRenderer->LightBuffer.GetBaseOffset());
-}
-
-
-void GraphicsBackend::BeginUnlit()
-{
-	FrameData* frame = GetFrame();
-
-
-	// Target* depth_target = gRenderer->pDeferredRenderer->GPass.GetTarget(ImageFormat::eD32_Float, 0);
-	// Assert(depth_target != nullptr);
-	// depth_target->Image.TransitionDepthToAttachment(gRenderer->GetFrame()->CommandBuffer);
-
-	// pDeferredRenderer->UnlitPass.Begin(frame->CmdBuffer);
-
-	// gPipelineCache->AddBufferOffset(1, gObjectManager->GetBaseOffset());
-	// gPipelineCache->Bind(ePipelineName::Unlit, frame->CmdBuffer);
-
-	/*    pDeferredRenderer->RpForward.Begin(&frame->CmdBuffer, pDeferredRenderer->FbForward.Get(),
-									   Slice<VkClearValue>({}, 0));*/
-
-	// pDeferredRenderer->PlUnlit.Bind(frame->CommandBuffer);
-}
 
 void GraphicsBackend::RenderPostProcessing(Camera& camera)
 {

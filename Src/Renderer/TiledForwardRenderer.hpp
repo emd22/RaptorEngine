@@ -86,7 +86,6 @@ public:
 
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 
-	RenderStage LightPass;
 	RenderStage ForwardPass;
 	RenderStage SSAOPass;
 	RenderStage CompPass;
