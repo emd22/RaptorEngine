@@ -445,7 +445,7 @@ void World::RenderWorldGrid(const Camera& camera)
 		for (uint32 x = 0; x < gWorldGrid->mGridSize.X; x++) {
 			const Vec3f tile_offset = Vec3f(x, -1.5f, y) * tile_size;
 
-			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::sIdentity) *
+			Mat4f model_matrix = Mat4f::AsScale(tile_size) * Mat4f::AsRotation(Quat::scIdentity) *
 								 Mat4f::AsTranslation((tile_offset)-gWorldGrid->mPositionOffset + (tile_size * 0.5f));
 
 			Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);

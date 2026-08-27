@@ -13,7 +13,7 @@
 
 namespace fx {
 
-const ObjectID ObjectID::Null = ObjectID(UINT32_MAX);
+const ObjectID ObjectID::scNull = ObjectID(UINT32_MAX);
 
 void ObjectManager::Create()
 {

@@ -20,7 +20,7 @@ struct ObjectID
 {
 	using IDType = uint32;
 
-	static const ObjectID Null;
+	static const ObjectID scNull;
 
 	static const IDType scInvalidBit = (1U << 31);
 	static const IDType scIDMask = 0x00FFFFFF;

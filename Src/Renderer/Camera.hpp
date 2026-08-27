@@ -77,11 +77,11 @@ protected:
 	virtual void UpdateCameraMatrix() = 0;
 
 public:
-	Mat4f ViewMatrix = Mat4f::sIdentity;
-	Mat4f ProjectionMatrix = Mat4f::sIdentity;
+	Mat4f ViewMatrix = Mat4f::scIdentity;
+	Mat4f ProjectionMatrix = Mat4f::scIdentity;
 
-	Mat4f InvViewMatrix = Mat4f::sIdentity;
-	Mat4f InvProjectionMatrix = Mat4f::sIdentity;
+	Mat4f InvViewMatrix = Mat4f::scIdentity;
+	Mat4f InvProjectionMatrix = Mat4f::scIdentity;
 
 	Vec3f Position = Vec3f::sZero;
 	Vec3f Direction = Vec3f::sForward;
@@ -100,7 +100,7 @@ public:
 	bool bLookatTarget = false;
 
 protected:
-	Mat4f mCameraMatrix = Mat4f::sIdentity;
+	Mat4f mCameraMatrix = Mat4f::scIdentity;
 };
 
 ///////////////////////////////////////////////
@@ -240,8 +240,8 @@ private:
 	 * @brief A separate matrix for objects rendered from the perspective of the player.
 	 * Weapons, body, or additional attached objects use this.
 	 */
-	Mat4f mWeaponCameraMatrix = Mat4f::sIdentity;
-	Mat4f mWeaponProjectionMatrix = Mat4f::sIdentity;
+	Mat4f mWeaponCameraMatrix = Mat4f::scIdentity;
+	Mat4f mWeaponProjectionMatrix = Mat4f::scIdentity;
 
 	float32 mWeaponFov = MathUtil::DegreesToRadians(75.0f);
 };

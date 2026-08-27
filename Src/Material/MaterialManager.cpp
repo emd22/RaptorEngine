@@ -13,7 +13,7 @@
 
 namespace fx {
 
-const MaterialID MaterialID::Null = MaterialID(0);
+const MaterialID MaterialID::scNull = MaterialID(0);
 
 void MaterialManager::Create()
 {

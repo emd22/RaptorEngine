@@ -189,75 +189,80 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
 	return mesh;
 }
 
-Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(MeshGenOptions options)
+static void MC_EmitQuad(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec2f>& uvs,
+						SizedArray<uint32>& indices, const Vec3f (&verts)[4], const MeshGenOptions& options)
+{
+	const Vec3f surface_normal = Vec3f::GetSurfaceNormal(verts[0], verts[1], verts[2]);
+	const uint32 base = static_cast<uint32>(positions.Size);
+
+	for (int i = 0; i < 4; i++) {
+		positions.Insert(verts[i]);
+		normals.Insert(surface_normal);
+	}
+
+	// Top Left
+	uvs.Insert(Vec2f(options.UvMin.X, options.UvMin.Y));
+	// Top Right
+	uvs.Insert(Vec2f(options.UvMax.X, options.UvMin.Y));
+	// Bottom Right
+	uvs.Insert(Vec2f(options.UvMax.X, options.UvMax.Y));
+	// Bottom Left
+	uvs.Insert(Vec2f(options.UvMin.X, options.UvMax.Y));
+
+	// Top left triangle
+	indices.Insert(base + 0);
+	indices.Insert(base + 1);
+	indices.Insert(base + 3);
+	// Bottom right triangle
+	indices.Insert(base + 1);
+	indices.Insert(base + 2);
+	indices.Insert(base + 3);
+}
+
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-	const float32 s = options.Scale;
 
-	mesh->Positions = {
+	// Scales for each face
+	const float32 l_s = options.Left.Scale;
+	const float32 r_s = options.Right.Scale;
+	const float32 t_s = options.Top.Scale;
+	const float32 b_s = options.Bottom.Scale;
+	const float32 fr_s = options.Front.Scale;
+	const float32 ba_s = options.Back.Scale;
 
-		// Front (+Z) indices 0-3
-		Vec3f(-s, s, s), Vec3f(s, s, s), Vec3f(s, -s, s), Vec3f(-s, -s, s),
-		// Back (-Z) indices 4-7
-		Vec3f(s, s, -s), Vec3f(-s, s, -s), Vec3f(-s, -s, -s), Vec3f(s, -s, -s),
-		// Right (+X) indices 8-11
-		Vec3f(s, s, s), Vec3f(s, s, -s), Vec3f(s, -s, -s), Vec3f(s, -s, s),
-		// Left (-X) indices 12-15
-		Vec3f(-s, s, -s), Vec3f(-s, s, s), Vec3f(-s, -s, s), Vec3f(-s, -s, -s),
-		// Top (+Y) indices 16-19
-		Vec3f(-s, s, -s), Vec3f(s, s, -s), Vec3f(s, s, s), Vec3f(-s, s, s),
-		// Bottom (-Y) indices 20-23
-		Vec3f(-s, -s, s), Vec3f(s, -s, s), Vec3f(s, -s, -s), Vec3f(-s, -s, -s)
-	};
+	// 4 verts per face and 36 indices (2 tris per face)
+	mesh->Positions.InitCapacity(24);
+	mesh->Normals.InitCapacity(24);
+	mesh->Uvs.InitCapacity(24);
+	mesh->Indices.InitCapacity(36);
 
-	Vec3f n_front = Vec3f::GetSurfaceNormal(mesh->Positions[0], mesh->Positions[1], mesh->Positions[2]);
-	Vec3f n_back = Vec3f::GetSurfaceNormal(mesh->Positions[4], mesh->Positions[5], mesh->Positions[6]);
-	Vec3f n_right = Vec3f::GetSurfaceNormal(mesh->Positions[8], mesh->Positions[9], mesh->Positions[10]);
-	Vec3f n_left = Vec3f::GetSurfaceNormal(mesh->Positions[12], mesh->Positions[13], mesh->Positions[14]);
-	Vec3f n_top = Vec3f::GetSurfaceNormal(mesh->Positions[16], mesh->Positions[17], mesh->Positions[18]);
-	Vec3f n_bottom = Vec3f::GetSurfaceNormal(mesh->Positions[20], mesh->Positions[21], mesh->Positions[22]);
+	const Vec3f f_tl { -l_s, t_s, fr_s };	// Front TL
+	const Vec3f f_tr { r_s, t_s, fr_s };	// Front TR
+	const Vec3f f_bl { -l_s, -b_s, fr_s };	// Front BL
+	const Vec3f f_br { r_s, -b_s, fr_s };	// Front BR
+	const Vec3f b_tl { -l_s, t_s, -ba_s };	// Back TL
+	const Vec3f b_tr { r_s, t_s, -ba_s };	// Back TR
+	const Vec3f b_bl { -l_s, -b_s, -ba_s }; // Back BL
+	const Vec3f b_br { r_s, -b_s, -ba_s };	// Back BR
 
-	mesh->Normals = {
-		n_front, n_front, n_front, n_front, n_back, n_back, n_back, n_back, n_right,  n_right,	n_right,  n_right,
-		n_left,	 n_left,  n_left,  n_left,	n_top,	n_top,	n_top,	n_top,	n_bottom, n_bottom, n_bottom, n_bottom,
-	};
+	// Front face (+Z)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tl, f_tr, f_br, f_bl }, options.Front);
 
-	Vec2f uv_tl(options.UvMin.X, options.UvMin.Y);
-	Vec2f uv_tr(options.UvMax.X, options.UvMin.Y);
-	Vec2f uv_br(options.UvMax.X, options.UvMax.Y);
-	Vec2f uv_bl(options.UvMin.X, options.UvMax.Y);
+	// Back face (-Z)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options.Back);
 
-	mesh->Uvs = {
+	// Top face (+Y)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, b_tr, f_tr, f_tl }, options.Top);
 
-		// Front
-		uv_tl, uv_tr, uv_br, uv_bl,
-		// Back
-		uv_tl, uv_tr, uv_br, uv_bl,
-		// Right
-		uv_tl, uv_tr, uv_br, uv_bl,
-		// Left
-		uv_tl, uv_tr, uv_br, uv_bl,
-		// Top
-		uv_tl, uv_tr, uv_br, uv_bl,
-		// Bottom
-		uv_tl, uv_tr, uv_br, uv_bl
-	};
+	// Bottom face (-Y)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_bl, f_br, b_br, b_bl }, options.Bottom);
 
-	mesh->Indices = {
+	// Right face (+X)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tr, b_tr, b_br, f_br }, options.Right);
 
-		// Front
-		3, 0, 1, 2, 3, 1,
-		// Back
-		7, 4, 5, 6, 7, 5,
-		// Right
-		11, 8, 9, 10, 11, 9,
-		// Left
-		15, 12, 13, 14, 15, 13,
-		// Top
-		19, 16, 17, 18, 19, 17,
-		// Bottom
-		23, 20, 21, 22, 23, 21
-	};
+	// Left face (-X)
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, f_tl, f_bl, b_bl }, options.Left);
 
 	return mesh;
 }

@@ -119,7 +119,7 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	phys->SetName(collider_name);
 
 	Vec3f position = collider_entry.GetMemberValue(HashStr32("Pos"), Vec3f::sZero);
-	Quat rotation = collider_entry.GetMemberValue(HashStr32("Rot"), Quat::sIdentity);
+	Quat rotation = collider_entry.GetMemberValue(HashStr32("Rot"), Quat::scIdentity);
 
 	ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("Type"));
 	if (physics_type && physics_type->Get<uint32>() == static_cast<uint32>(ePhMotionType::Dynamic)) {

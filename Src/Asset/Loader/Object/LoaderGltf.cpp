@@ -407,7 +407,7 @@ void LoaderGltf::LoadSkeleton(Skeleton& skel, cgltf_skin* skin)
 
 		// The GLTF coordinate system is garbage, reflect so -X becomes X (this also changes rotation back from CCW to
 		// CW).
-		Mat4f reflection = Mat4f::sIdentity;
+		Mat4f reflection = Mat4f::scIdentity;
 		reflection.Columns[0].X = -1.0f;
 
 		for (uint32 i = 0; i < joint_count; i++) {

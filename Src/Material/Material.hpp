@@ -210,7 +210,7 @@ private:
 	renderer::DescriptorSet* RequestAlbedoOnlyDescriptors();
 
 public:
-	MaterialID ID = MaterialID::Null;
+	MaterialID ID = MaterialID::scNull;
 
 	MaterialComponent Diffuse { eImageFormat::RGBA8_UNorm };
 	MaterialComponent NormalMap { eImageFormat::RGBA8_UNorm };

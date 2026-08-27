@@ -146,7 +146,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 
-	Mat4f initial_matrix = Mat4f::sIdentity;
+	Mat4f initial_matrix = Mat4f::scIdentity;
 	BoneBuffer.SetAllValues(initial_matrix.RawData, true);
 
 	pNoiseTexture = ImageGen::Random(Vec2u(64));

@@ -167,14 +167,14 @@ public:
 	float32 AnimationTime = 0.0f;
 
 	World* pScene = nullptr;
-	ObjectID ParentID = ObjectID::Null;
+	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;
 
 	BoundingBox Bounds { Vec3f::sZero, Vec3f::sZero };
 
 	Ref<script::FoxScript> pScript { nullptr };
 
-	MaterialID mMaterialID = MaterialID::Null;
+	MaterialID mMaterialID = MaterialID::scNull;
 
 private:
 	/// Object slots allocated following this object. Used by other instances of this object.

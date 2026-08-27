@@ -8,44 +8,54 @@ namespace fx {
 
 struct MeshGenOptions
 {
-    float32 Scale = 1.0f;
-    Vec2f UvMin = Vec2f(0.0f, 0.0f);
-    Vec2f UvMax = Vec2f(1.0f, 1.0f);
+	float32 Scale = 1.0f;
+	Vec2f UvMin = Vec2f(0.0f, 0.0f);
+	Vec2f UvMax = Vec2f(1.0f, 1.0f);
+};
+
+struct CubeGenOptions
+{
+	MeshGenOptions Left {};
+	MeshGenOptions Right {};
+	MeshGenOptions Top {};
+	MeshGenOptions Bottom {};
+	MeshGenOptions Front {};
+	MeshGenOptions Back {};
 };
 
 class MeshGen
 {
 public:
-    using PositionVertex = renderer::Vertex<renderer::eVertexType::Slim>;
+	using PositionVertex = renderer::Vertex<renderer::eVertexType::Slim>;
 
-    struct GeneratedMesh
-    {
-        SizedArray<Vec3f> Positions;
-        SizedArray<Vec3f> Normals;
-        SizedArray<Vec2f> Uvs;
+	struct GeneratedMesh
+	{
+		SizedArray<Vec3f> Positions;
+		SizedArray<Vec3f> Normals;
+		SizedArray<Vec2f> Uvs;
 
-        SizedArray<uint32> Indices;
+		SizedArray<uint32> Indices;
 
-        Ref<PrimitiveMesh> AsMesh(renderer::eVertexType vertex_type);
+		Ref<PrimitiveMesh> AsMesh(renderer::eVertexType vertex_type);
 
-        Ref<PrimitiveMesh> AsSlimMesh();
-        Ref<PrimitiveMesh> AsDefaultMesh();
+		Ref<PrimitiveMesh> AsSlimMesh();
+		Ref<PrimitiveMesh> AsDefaultMesh();
 
-        void Destroy()
-        {
-            Positions.Free();
-            Indices.Free();
-        }
+		void Destroy()
+		{
+			Positions.Free();
+			Indices.Free();
+		}
 
-        ~GeneratedMesh() { Destroy(); }
+		~GeneratedMesh() { Destroy(); }
 
-    private:
-    };
+	private:
+	};
 
 public:
-    static Ref<GeneratedMesh> MakeIcoSphere(int resolution);
-    static Ref<GeneratedMesh> MakeCube(MeshGenOptions options = {});
-    static Ref<GeneratedMesh> MakeQuad(MeshGenOptions options = {});
+	static Ref<GeneratedMesh> MakeIcoSphere(int resolution);
+	static Ref<GeneratedMesh> MakeCube(CubeGenOptions options = {});
+	static Ref<GeneratedMesh> MakeQuad(MeshGenOptions options = {});
 
 private:
 };

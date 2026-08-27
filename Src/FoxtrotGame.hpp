@@ -34,6 +34,15 @@ public:
 	Ref<PerspectiveCamera> pCamera { nullptr };
 };
 
+class BlockoutBlock
+{
+public:
+	BlockoutBlock();
+
+public:
+	ObjectID ObjectID;
+};
+
 /////////////////////////////////////
 // Editor modes
 /////////////////////////////////////
@@ -97,6 +106,8 @@ private:
 
 	void ReloadAllObjects();
 
+	void NewBlockoutBrush();
+
 public:
 	Player Player {};
 
@@ -112,7 +123,7 @@ public:
 	double FrameTimeAvg = 0.0f;
 	double DeltaTime = 1.0f / 60.0f;
 
-	Quat PistolRotationGoal = Quat::sIdentity;
+	Quat PistolRotationGoal = Quat::scIdentity;
 	ObjectManager ObjectManager;
 
 	Vec3f PistolOffset = Vec3f::sZero;
@@ -127,7 +138,9 @@ private:
 	uint64 mLastTick = 0;
 	World mMainScene {};
 
-	ObjectID mRaycastHitMarker = ObjectID::Null;
+	ObjectID mRaycastHitMarker = ObjectID::scNull;
+
+	MaterialID mBlockoutMaterial = MaterialID::scNull;
 
 
 	ConfigFile Config;

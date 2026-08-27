@@ -191,22 +191,31 @@ void FoxtrotGame::CreateGame()
 	CreateLights();
 
 	{
-		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Scale = 0.1 });
+		{
+			MaterialID mat_id = gMaterialManager->NewMaterial("TestMat", ePipelineName::Geometry, false);
+			Material* test_material = gMaterialManager->GetMaterial(mat_id);
+
+			AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+														   "Data/Demo/Textures/white_grid.png",
+														   eImageCreateFlags::None);
+
+			test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+			test_material->Finalize();
+			mBlockoutMaterial = mat_id;
+		}
+
+
+		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Left = { .Scale = 3.0 } });
 
 		Object* object = gObjectManager->NewObject("HitMarker");
 		object->pMesh = cube_mesh->AsDefaultMesh();
 
+		object->MoveBy(Vec3f(0, 0.1, 0));
+		object->ScaleBy(0.2);
+
 		mRaycastHitMarker = object->ID;
 
-		MaterialID mat_id = gMaterialManager->NewMaterial("TestMat", ePipelineName::Geometry, false);
-		Material* test_material = gMaterialManager->GetMaterial(mat_id);
-
-		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-													   "Data/Demo/Textures/white_grid.png", eImageCreateFlags::None);
-
-		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-		test_material->Finalize();
-		object->mMaterialID = mat_id;
+		object->mMaterialID = mBlockoutMaterial;
 
 		AssetTicket ticket(static_cast<void*>(object));
 		ticket.MarkAndSignalLoaded();
@@ -320,6 +329,8 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 	}
 }
 
+void FoxtrotGame::NewBlockoutBrush() {}
+
 
 void FoxtrotGame::ProcessControls()
 {
@@ -356,6 +367,10 @@ void FoxtrotGame::ProcessControls()
 		}
 	}
 
+	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_N)) {
+		NewBlockoutBrush();
+	}
+
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
 		RayResult hit_point = gPhysics->Raycast(Player.pCamera->Position, Player.pCamera->GetForwardVector() * 10.0f);
 		LogInfo(LC_PHYSICS, "Hit?={}, Pos={}", hit_point.bHit, hit_point.Point);
@@ -363,7 +378,7 @@ void FoxtrotGame::ProcessControls()
 		if (hit_point.bHit) {
 			Object* hit_marker = gObjectManager->GetObject(mRaycastHitMarker);
 			if (hit_marker) {
-				hit_marker->SetPosition(hit_point.Point);
+				// hit_marker->SetPosition(hit_point.Point);
 			}
 		}
 	}
@@ -505,33 +520,6 @@ void FoxtrotGame::Tick()
 	}
 
 	Ref<PerspectiveCamera> camera = Player.pCamera;
-
-	// Vec3f pistol_destination = camera->Position + (camera->Direction * Vec3f(0.48)) -
-	//                              camera->GetRightVector() * Vec3f(0.165) - camera->GetUpVector() *
-	//                              Vec3f(0.15);
-
-
-	/*pArmsObject->SetRotationOrigin(ArmsOffset);
-	pArmsObject->SetPosition(camera->Position + ArmsOffset);
-
-	PistolRotationGoal = Quat::FromEulerAngles(Vec3f(-camera->mAngleY, camera->mAngleX, 0));
-	pArmsObject->mRotation = PistolRotationGoal;
-
-	if (pArmsObject->pSkeleton) {
-		if (RHandBone == BoneNull) {
-			RHandBone = pArmsObject->pSkeleton->FindBone(pArmsObject->pCurrentAnimation, "hand.R");
-		}
-
-		BoneTransform hand_transform = pArmsObject->pSkeleton->GetBoneTransform(pArmsObject->pCurrentAnimation,
-																				pArmsObject->AnimationTime, RHandBone);
-
-		hand_transform.Position *= Vec3f(pArmsObject->mScale);
-
-		pPistolObject->SetRotationOrigin(ArmsOffset + hand_transform.Position + PistolOffset);
-		pPistolObject->SetPosition(pArmsObject->mPosition + hand_transform.Position + PistolOffset);
-
-		pPistolObject->mRotation = PistolRotationGoal;
-	}*/
 
 	gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 

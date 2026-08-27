@@ -288,7 +288,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 
 	// If there was an error binding the object material, bind the null material.
 	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {
-		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::Null);
+		gMaterialManager->BindWithPipeline(cmd, *pipeline, MaterialID::scNull);
 	}
 
 	if (pMesh) {

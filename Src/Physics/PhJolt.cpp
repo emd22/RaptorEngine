@@ -116,7 +116,7 @@ void PhJolt::Create()
 	// // Create the settings for the body itself. Note that here you can also set other properties like the restitution
 	// /
 	// // friction.
-	// JPH::BodyCreationSettings floor_settings(floor_shape, JPH::RVec3(0.0_r, -1.0_r, 0.0_r), JPH::Quat::sIdentity(),
+	// JPH::BodyCreationSettings floor_settings(floor_shape, JPH::RVec3(0.0_r, -1.0_r, 0.0_r), JPH::Quat::scIdentity(),
 	//                                          JPH::EMotionType::Static, PhLayer::Static);
 
 	// // Create the actual rigid body
@@ -129,7 +129,7 @@ void PhJolt::Create()
 	// // Now create a dynamic body to bounce on the floor
 	// // Note that this uses the shorthand version of creating and adding a body to the world
 	// JPH::BodyCreationSettings sphere_settings(new JPH::SphereShape(0.5f), JPH::RVec3(0.0_r, 2.0_r, 0.0_r),
-	//                                           JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic,
+	//                                           JPH::Quat::scIdentity(), JPH::EMotionType::Dynamic,
 	//                                           PhLayer::Dynamic);
 	// JPH::BodyID sphere_id = body_interface.CreateAndAddBody(sphere_settings, JPH::EActivation::Activate);
 

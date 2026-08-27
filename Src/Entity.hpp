@@ -101,12 +101,12 @@ protected:
 	void SubmitMatrixIfNeeded();
 
 public:
-	ObjectID ID { ObjectID::Null };
+	ObjectID ID { ObjectID::scNull };
 
 	Name Name;
 
 	Vec3f mPosition = Vec3f::sZero;
-	Quat mRotation = Quat::sIdentity;
+	Quat mRotation = Quat::scIdentity;
 	float32 mScale = 1.0f;
 
 	Vec3f RotationOrigin = Vec3f::sZero;
@@ -117,7 +117,7 @@ protected:
 	bool mbPhysicsTransformOutOfDate : 1 = true;
 	bool mbMatrixOutOfDate : 1 = true;
 
-	Mat4f mWorldMatrix = Mat4f::sIdentity;
+	Mat4f mWorldMatrix = Mat4f::scIdentity;
 
 	int32 mMatrixUpdateFramesRemaining = renderer::FramesInFlight;
 	// Mat4f mNormalMatrix = Mat4f::Identity;

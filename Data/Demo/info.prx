@@ -4,8 +4,8 @@ Meta = {
 
 Sun = {
     Pos = [1.5, 2.0, -1.5]
-    Color = [250, 220, 182, 6]
-    AmbientColor = [75, 75, 72, 2]
+    Color = [250, 220, 182, 8]
+    AmbientColor = [75, 75, 72, 3]
 }
 
 
