@@ -33,6 +33,8 @@ message(STATUS "${SHADER_SOURCES}")
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${SOURCES})
 
+add_subdirectory(Submodules/strata)
+
 
 # Add shaders as a Visual Studio filter, borrowed from Hyperion Engine
 file(GLOB_RECURSE SHADER_FILES "${CMAKE_SOURCE_DIR}/Shaders/*")
@@ -125,5 +127,10 @@ else()
         $<$<CONFIG:RelWithDebInfo>:-O2 -g>
     )
 endif()
+
+# Strata
+target_link_libraries(foxtrot PRIVATE strata)
+target_include_directories(foxtrot SYSTEM BEFORE PRIVATE "Submodules/strata/include")
+
 
 target_link_libraries(foxtrot PRIVATE turbojpeg SDL3 freetype)

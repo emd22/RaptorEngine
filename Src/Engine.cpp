@@ -7,6 +7,7 @@
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhJolt.hpp>
+#include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <WorldGrid.hpp>
 
@@ -26,6 +27,8 @@ MemPool* gEnginePool = nullptr;
 MemPool* gScriptMemPool = nullptr;
 WorldGrid* gWorldGrid = nullptr;
 
+ScriptManager* gScriptManager = nullptr;
+
 #define DESTROY_GLOBAL(name_)                                                                                          \
 	delete name_;                                                                                                      \
 	name_ = nullptr
@@ -43,6 +46,7 @@ void Init()
 	gWorldGrid = new WorldGrid;
 	gTextureManager = new TextureManager;
 	gThreadManager = new ThreadManager;
+	gScriptManager = new ScriptManager;
 }
 
 
@@ -53,6 +57,7 @@ void Destroy()
 	DESTROY_GLOBAL(gMaterialManager);
 	DESTROY_GLOBAL(gWorldGrid);
 	DESTROY_GLOBAL(gThreadManager);
+	DESTROY_GLOBAL(gScriptManager);
 }
 
 } // namespace Globals

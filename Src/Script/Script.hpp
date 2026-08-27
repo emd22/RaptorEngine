@@ -1,0 +1,52 @@
+#pragma once
+
+#include <Core/String.hpp>
+
+struct StrataJit;
+struct StrataCompiler;
+
+namespace fx::script {
+
+enum class eStatus
+{
+	Ok,
+	Error,
+};
+
+
+class Script
+{
+public:
+	Script() = delete;
+	Script(struct StrataCompiler* compiler, const String& path);
+
+	Script(const Script& other);
+	Script(Script&& other);
+
+	Script& operator=(const Script& other);
+	Script& operator=(Script&& other);
+
+	bool Load(const String& path);
+
+
+	template <typename T>
+	T GetFunction(const char* fn_name) const
+	{
+		return reinterpret_cast<T>(GetFunctionPtr(fn_name));
+	}
+
+
+	FX_FORCE_INLINE bool HasErrors() const { return (mpErrors != nullptr); };
+	FX_FORCE_INLINE const char* GetErrors() const { return mpErrors; }
+
+	~Script();
+
+private:
+	void* GetFunctionPtr(const char* fn_name) const;
+
+private:
+	struct StrataJit* mpJit = nullptr;
+	const char* mpErrors = nullptr;
+};
+
+} // namespace fx::script

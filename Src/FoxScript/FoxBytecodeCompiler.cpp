@@ -7,7 +7,7 @@
 #include <Core/FilesystemIO.hpp>
 #include <Core/Log.hpp>
 #include <Core/PagedArray.hpp>
-#include <Script/FoxScript.hpp>
+#include <FoxScript/FoxScript.hpp>
 #include <Util/Tokenizer.hpp>
 
 #define BC_PRINT_OP(fmt_, ...) fx::Log<fx::eLogSeverity::None>(fmt_, ##__VA_ARGS__)

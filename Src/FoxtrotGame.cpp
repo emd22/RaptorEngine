@@ -24,6 +24,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <csignal>
 
@@ -101,6 +102,17 @@ void FoxtrotGame::InitEngine()
 	gWorldGrid->Create(Vec2u(10, 10));
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
+
+
+	script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.ssc");
+	if (test_script.HasErrors() == false) {
+		using FuncType = int (*)(void);
+
+		FuncType fn = test_script.GetFunction<FuncType>("run");
+		int result = fn();
+
+		LogInfo(LC_SCRIPT, "Strata result: {}", result);
+	}
 }
 
 void FoxtrotGame::ReloadAllObjects()

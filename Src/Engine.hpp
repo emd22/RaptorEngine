@@ -30,6 +30,9 @@ extern TextureManager* gTextureManager;
 class ThreadManager;
 extern ThreadManager* gThreadManager;
 
+class ScriptManager;
+extern ScriptManager* gScriptManager;
+
 
 namespace Globals {
 void Init();

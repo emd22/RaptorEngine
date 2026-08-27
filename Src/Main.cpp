@@ -18,10 +18,10 @@
 #include <Core/Queue.hpp>
 #include <Core/String.hpp>
 #include <Engine.hpp>
+#include <FoxScript/FoxScript.hpp>
 #include <Math/MathConsts.hpp>
 #include <Math/MathUtil.hpp>
 #include <Renderer/Globals.hpp>
-#include <Script/FoxScript.hpp>
 
 // #define FX_RUN_TEST
 // #define FX_TEST_SCRIPT

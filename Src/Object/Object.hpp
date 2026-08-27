@@ -12,9 +12,9 @@
 #include <Core/Ref.hpp>
 #include <Core/TSRef.hpp>
 #include <Entity.hpp>
+#include <FoxScript/FoxScript.hpp>
 #include <Material/MaterialID.hpp>
 #include <Math/BoundingBox.hpp>
-#include <Script/FoxScript.hpp>
 #include <WorldGrid.hpp>
 
 
