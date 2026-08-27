@@ -1,6 +1,6 @@
 
 
-
+extern int printf(string fmt, ...);
 
 int run()
 {

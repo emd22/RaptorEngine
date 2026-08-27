@@ -28,7 +28,6 @@ public:
 
 	bool Load(const String& path);
 
-
 	template <typename T>
 	T GetFunction(const char* fn_name) const
 	{
@@ -43,6 +42,8 @@ public:
 
 private:
 	void* GetFunctionPtr(const char* fn_name) const;
+
+	void SetExterns();
 
 private:
 	struct StrataJit* mpJit = nullptr;
