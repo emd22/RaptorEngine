@@ -23,6 +23,25 @@ namespace fx {
 //     parent.AddMember(std::move(entry));
 // }
 
+// void WorldFile::Save(const String& path, const World& world)
+// {
+// ConfigFile info;
+
+// info.Load("./info.prx");
+
+// SizedArray<Object*> all_objects = gObjectManager->CollectObjects();
+
+// ConfigEntry* objects_entry = info.AddEntry("Objects");
+
+// for (const Object* object : all_objects) {
+// 	ConfigEntry single_entry = ConfigEntry::Struct(object->Name.Get());
+
+// 	single_entry.AddMember(ConfigEntry::Literal("Mesh", const TType &literal))
+
+// 	objects_entry->AddMember(std::move(single_entry));
+// }
+// }
+
 
 void WorldFile::Load(const std::string& path, World& scene)
 {

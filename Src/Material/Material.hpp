@@ -47,7 +47,9 @@ enum class eMaterialComponentStatus
 enum class eMaterialComponentUploadSrc
 {
 	None,
+	/// Load image (from memory), decompress to pixels and upload
 	ProcessAndUpload,
+	/// Upload raw pixel data
 	DirectUpload,
 };
 

@@ -4,6 +4,8 @@
 #include <Math/Vec2.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/GraphicsBackendFwd.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
 #include <unordered_map>
 
@@ -73,10 +75,13 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
 
 	mesh->bKeepInMemory = true;
 
-	mesh->UploadIndices(renderer::GraphicsBackendFwd::GetCmd(), Indices);
-
 	mesh->VertexList.CreateFrom(Positions, Normals, Uvs, {}, {}, {}, eVertexCreateFlags::None);
-	mesh->UploadVertices(renderer::GraphicsBackendFwd::GetCmd());
+	renderer::gGraphics->SubmitImmediateUploadCmd(
+		[&](renderer::CommandBuffer& cmd)
+		{
+			mesh->UploadIndices(cmd, Indices);
+			mesh->UploadVertices(cmd);
+		});
 
 	mesh->bIsReady.store(true);
 
@@ -184,36 +189,74 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
 	return mesh;
 }
 
-
 Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(MeshGenOptions options)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
-
-	const float32 s = options.Scale * 0.5f;
+	const float32 s = options.Scale;
 
 	mesh->Positions = {
-		Vec3f(-s, -s, -s), // 0
-		Vec3f(s, -s, -s),  // 1
-		Vec3f(s, s, -s),   // 2
-		Vec3f(-s, s, -s),  // 3
-		Vec3f(-s, -s, s),  // 4
-		Vec3f(s, -s, s),   // 5
-		Vec3f(s, s, s),	   // 6
-		Vec3f(-s, s, s)	   // 7
+
+		// Front (+Z) indices 0-3
+		Vec3f(-s, s, s), Vec3f(s, s, s), Vec3f(s, -s, s), Vec3f(-s, -s, s),
+		// Back (-Z) indices 4-7
+		Vec3f(s, s, -s), Vec3f(-s, s, -s), Vec3f(-s, -s, -s), Vec3f(s, -s, -s),
+		// Right (+X) indices 8-11
+		Vec3f(s, s, s), Vec3f(s, s, -s), Vec3f(s, -s, -s), Vec3f(s, -s, s),
+		// Left (-X) indices 12-15
+		Vec3f(-s, s, -s), Vec3f(-s, s, s), Vec3f(-s, -s, s), Vec3f(-s, -s, -s),
+		// Top (+Y) indices 16-19
+		Vec3f(-s, s, -s), Vec3f(s, s, -s), Vec3f(s, s, s), Vec3f(-s, s, s),
+		// Bottom (-Y) indices 20-23
+		Vec3f(-s, -s, s), Vec3f(s, -s, s), Vec3f(s, -s, -s), Vec3f(-s, -s, -s)
 	};
 
-	mesh->Indices = { // Front (z = +scale)
-					  4, 5, 6, 4, 6, 7,
-					  // Back (z = -scale)
-					  1, 0, 3, 1, 3, 2,
-					  // Left (x = -scale)
-					  0, 4, 7, 0, 7, 3,
-					  // Right (x = +scale)
-					  5, 1, 2, 5, 2, 6,
-					  // Top (y = +scale)
-					  3, 7, 6, 3, 6, 2,
-					  // Bottom (y = -scale)
-					  0, 1, 5, 0, 5, 4
+	Vec3f n_front = Vec3f::GetSurfaceNormal(mesh->Positions[0], mesh->Positions[1], mesh->Positions[2]);
+	Vec3f n_back = Vec3f::GetSurfaceNormal(mesh->Positions[4], mesh->Positions[5], mesh->Positions[6]);
+	Vec3f n_right = Vec3f::GetSurfaceNormal(mesh->Positions[8], mesh->Positions[9], mesh->Positions[10]);
+	Vec3f n_left = Vec3f::GetSurfaceNormal(mesh->Positions[12], mesh->Positions[13], mesh->Positions[14]);
+	Vec3f n_top = Vec3f::GetSurfaceNormal(mesh->Positions[16], mesh->Positions[17], mesh->Positions[18]);
+	Vec3f n_bottom = Vec3f::GetSurfaceNormal(mesh->Positions[20], mesh->Positions[21], mesh->Positions[22]);
+
+	mesh->Normals = {
+		n_front, n_front, n_front, n_front, n_back, n_back, n_back, n_back, n_right,  n_right,	n_right,  n_right,
+		n_left,	 n_left,  n_left,  n_left,	n_top,	n_top,	n_top,	n_top,	n_bottom, n_bottom, n_bottom, n_bottom,
+	};
+
+	Vec2f uv_tl(options.UvMin.X, options.UvMin.Y);
+	Vec2f uv_tr(options.UvMax.X, options.UvMin.Y);
+	Vec2f uv_br(options.UvMax.X, options.UvMax.Y);
+	Vec2f uv_bl(options.UvMin.X, options.UvMax.Y);
+
+	mesh->Uvs = {
+
+		// Front
+		uv_tl, uv_tr, uv_br, uv_bl,
+		// Back
+		uv_tl, uv_tr, uv_br, uv_bl,
+		// Right
+		uv_tl, uv_tr, uv_br, uv_bl,
+		// Left
+		uv_tl, uv_tr, uv_br, uv_bl,
+		// Top
+		uv_tl, uv_tr, uv_br, uv_bl,
+		// Bottom
+		uv_tl, uv_tr, uv_br, uv_bl
+	};
+
+	mesh->Indices = {
+
+		// Front
+		3, 0, 1, 2, 3, 1,
+		// Back
+		7, 4, 5, 6, 7, 5,
+		// Right
+		11, 8, 9, 10, 11, 9,
+		// Left
+		15, 12, 13, 14, 15, 13,
+		// Top
+		19, 16, 17, 18, 19, 17,
+		// Bottom
+		23, 20, 21, 22, 23, 21
 	};
 
 	return mesh;

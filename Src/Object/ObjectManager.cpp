@@ -157,6 +157,23 @@ void ObjectManager::Submit(const ObjectID& object_id, const Mat4f& model_matrix)
 }
 
 
+SizedArray<Object*> ObjectManager::CollectObjects()
+{
+	std::lock_guard<std::mutex> guard(mInUse);
+
+	SizedArray<Object*> object_list(mObjectList.Size + 1);
+
+	for (uint32 i = 0; i < mObjectList.Capacity; i++) {
+		if (!mObjectList.SlotsInUse.Get(i)) {
+			continue;
+		}
+
+		object_list.Insert(mObjectList.GetItem(i));
+	}
+
+	return object_list;
+}
+
 void ObjectManager::ReleaseAllObjects()
 {
 	std::lock_guard<std::mutex> guard(mInUse);

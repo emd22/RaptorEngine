@@ -14,6 +14,7 @@ public:
 	// void Save(const Scene& scene);
 
 	void Load(const std::string& path, World& scene);
+	// void Save(const String& path, const World& world);
 
 private:
 	void AddObjectFromEntry(const std::string& path, const ConfigEntry& object, World& scene);

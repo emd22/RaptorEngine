@@ -191,15 +191,26 @@ void FoxtrotGame::CreateGame()
 	CreateLights();
 
 	{
-		gAssetManager->SubmitCustom([](CommandBuffer& cmd) { LogInfo("HELLO FROM ASSETMAN!"); });
-		// Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Scale = 0.1 });
+		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Scale = 0.2 });
 
-		// Object* object = gObjectManager->NewObject("HitMarker");
-		// object->pMesh = cube_mesh->AsDefaultMesh();
+		Object* object = gObjectManager->NewObject("HitMarker");
+		object->pMesh = cube_mesh->AsDefaultMesh();
 
-		// AssetTicket ticket(static_cast<void*>(object));
-		// ticket.MarkAndSignalLoaded();
-		// mMainScene.Attach(ticket);
+		MaterialID mat_id = gMaterialManager->NewMaterial("TestMat", ePipelineName::Geometry, false);
+		Material* test_material = gMaterialManager->GetMaterial(mat_id);
+
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "Data/Demo/Textures/white_grid.png", eImageCreateFlags::None);
+
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+		test_material->Finalize();
+		object->mMaterialID = mat_id;
+
+		AssetTicket ticket(static_cast<void*>(object));
+		ticket.MarkAndSignalLoaded();
+
+
+		mMainScene.Attach(ticket);
 	}
 
 

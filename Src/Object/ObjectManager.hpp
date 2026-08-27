@@ -42,6 +42,11 @@ public:
 	void Submit(const ObjectID& id, const Mat4f& model_matrix);
 	void ReleaseAllObjects();
 
+	/**
+	 * @brief Returns a list of all objects currently logged in the object manager.
+	 */
+	SizedArray<Object*> CollectObjects();
+
 	void PrintActive(uint32 limit = 20);
 
 	uint32 GetOffsetObjectIndex(uint32 object_id) const;

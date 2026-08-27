@@ -209,13 +209,13 @@ FSOutput main(FSInput input)
     // XYZ=Normal, W=Roughness
     float3 N_final = normalize(normal_ws);
     // Metalness
-    output.vAlbedo.w = roughness_metallic.y;
+    output.vAlbedo.a = 1.0;
 #else
-	const float roughness = 0.0;
-	const float metallic = 0.0;
+	const float roughness = 0.5;
+	const float metallic = 0.5;
 
     float3 N_final = input.vNormalWS;
-    output.vAlbedo.w = 0.0;
+    output.vAlbedo.a = 1.0;
 #endif
 
 	float3 accumulated_light = float3(0.0, 0.0, 0.0);
@@ -226,9 +226,11 @@ FSOutput main(FSInput input)
 
 	TileLightData tile_data = bLightGrid[tile_index];
 
-	// output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
-	// output.vAlbedo = float4(float3(material.fAlpha, material.fAlpha, material.fAlpha), 1.0);
-	// return output;
+#ifdef DEBUG_LIGHT_HEATMAP
+	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
+	output.vAlbedo = float4(float3(material.fAlpha, material.fAlpha, material.fAlpha), 1.0);
+	return output;
+#endif
 
 	for (uint tile_light = 0; tile_light < tile_data.Count; tile_light++) {
 		Light light = Lights[bLightIndexList[tile_data.StartIndex + tile_light]];
