@@ -191,10 +191,12 @@ void FoxtrotGame::CreateGame()
 	CreateLights();
 
 	{
-		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Scale = 0.2 });
+		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Scale = 0.1 });
 
 		Object* object = gObjectManager->NewObject("HitMarker");
 		object->pMesh = cube_mesh->AsDefaultMesh();
+
+		mRaycastHitMarker = object->ID;
 
 		MaterialID mat_id = gMaterialManager->NewMaterial("TestMat", ePipelineName::Geometry, false);
 		Material* test_material = gMaterialManager->GetMaterial(mat_id);
@@ -208,7 +210,6 @@ void FoxtrotGame::CreateGame()
 
 		AssetTicket ticket(static_cast<void*>(object));
 		ticket.MarkAndSignalLoaded();
-
 
 		mMainScene.Attach(ticket);
 	}
@@ -344,7 +345,7 @@ void FoxtrotGame::ProcessControls()
 
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
-		SizedArray<JPH::BodyID> hits = Player.Physics.Raycast(Player.pCamera->GetForwardVector() * 50.0f);
+		SizedArray<JPH::BodyID> hits = Player.Physics.RaycastBodies(Player.pCamera->GetForwardVector() * 50.0f);
 		LogInfo("HIT {} BODIES", hits.Size);
 		if (hits.Size > 0) {
 			mMainScene.SelectPhysicsObject(hits[0]);
@@ -352,6 +353,18 @@ void FoxtrotGame::ProcessControls()
 
 		for (JPH::BodyID body_id : hits) {
 			LogInfo("HIT {}", body_id.GetIndex());
+		}
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
+		RayResult hit_point = gPhysics->Raycast(Player.pCamera->Position, Player.pCamera->GetForwardVector() * 10.0f);
+		LogInfo(LC_PHYSICS, "Hit?={}, Pos={}", hit_point.bHit, hit_point.Point);
+
+		if (hit_point.bHit) {
+			Object* hit_marker = gObjectManager->GetObject(mRaycastHitMarker);
+			if (hit_marker) {
+				hit_marker->SetPosition(hit_point.Point);
+			}
 		}
 	}
 

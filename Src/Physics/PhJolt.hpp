@@ -10,6 +10,7 @@
 #include <Core/Log.hpp>
 #include <Core/MemberRef.hpp>
 #include <Core/Types.hpp>
+#include <Math/Vec3.hpp>
 
 namespace JPH {
 class JobSystemThreadPool;
@@ -154,9 +155,16 @@ public:
 	virtual void OnBodyDeactivated(const JPH::BodyID& inBodyID, uint64 inBodyUserData) override {}
 };
 
+struct RayResult
+{
+	bool bHit = false;
+	Vec3f Point = Vec3f::sZero;
+};
+
 
 class PhJolt
 {
+public:
 	static constexpr uint32 scMaxBodies = 512;
 
 public:
@@ -167,6 +175,8 @@ public:
 	void Destroy();
 
 	void OptimizeBroadPhase();
+
+	RayResult Raycast(const Vec3f& origin, const Vec3f& direction) const;
 
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 

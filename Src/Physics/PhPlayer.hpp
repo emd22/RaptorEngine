@@ -22,7 +22,7 @@ public:
 	void Teleport(const Vec3f& position);
 	void ApplyMovement(const Vec3f& direction);
 
-	SizedArray<JPH::BodyID> Raycast(Vec3f direction) const;
+	SizedArray<JPH::BodyID> RaycastBodies(Vec3f direction) const;
 
 	void SetCollisionEnabled(bool value);
 

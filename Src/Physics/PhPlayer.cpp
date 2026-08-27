@@ -73,7 +73,7 @@ void PhPlayer::ApplyMovement(const Vec3f& direction)
 	// pPlayerVirt->SetLinearVelocity(jolt_dir);
 }
 
-SizedArray<JPH::BodyID> PhPlayer::Raycast(Vec3f direction) const
+SizedArray<JPH::BodyID> PhPlayer::RaycastBodies(Vec3f direction) const
 {
 	JPH::RayCast rc;
 	rc.mOrigin = pPlayerVirt->GetPosition();
@@ -90,10 +90,9 @@ SizedArray<JPH::BodyID> PhPlayer::Raycast(Vec3f direction) const
 		hits.Insert(hit.mBodyID);
 	}
 
-	// return {};
-
 	return hits;
 }
+
 
 void PhPlayer::Update(float64 delta_time)
 {
