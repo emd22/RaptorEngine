@@ -21,11 +21,25 @@ void Blockout::Create(World* world)
 	Material* test_material = gMaterialManager->GetMaterial(mBlockoutMaterialID);
 
 	AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-												   "Data/Demo/Textures/white_grid.png", eImageCreateFlags::None);
+												   "Data/Demo/Textures/gray_check.png", eImageCreateFlags::None);
 
 	test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 	test_material->Finalize();
 }
+
+static void RemoveBlockoutFromWorld(World* world)
+{
+	SizedArray<Object*> objects = gObjectManager->CollectObjects();
+
+	for (Object* object : objects) {
+		// Remove any objects marked blockout
+		if (object->Name.Get().starts_with("PROTO_")) {
+			world->Detach(object->ID);
+			gObjectManager->DestroyObject(object->ID);
+		}
+	}
+}
+
 
 void Blockout::Load(const String& path)
 {
@@ -38,7 +52,7 @@ void Blockout::Load(const String& path)
 	for (ConfigEntry& entry : blocks_entry->Members) {
 		Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
 
-		String blockout_id = String::Fmt("Blockout_{}", entry.Name.Get());
+		String blockout_id = String::Fmt("PROTO_{}", entry.Name.Get());
 
 		const PagedArray<ConfigValue>& scales = entry.GetMember(HashStr32("scale"))->GetArrayData();
 
@@ -57,6 +71,8 @@ void Blockout::Load(const String& path)
 			.Bottom = { .Scale = scales[3].Get<float32>() },
 			.Front = { .Scale = scales[4].Get<float32>() },
 			.Back = { .Scale = scales[5].Get<float32>() },
+
+			.bAlignUVs = true,
 		});
 
 
@@ -72,6 +88,7 @@ void Blockout::Load(const String& path)
 		object->pMesh = cube_mesh->AsDefaultMesh();
 		object->MoveBy(position);
 		object->mMaterialID = mBlockoutMaterialID;
+		object->SetShadowCaster(true);
 
 		AssetTicket ticket(static_cast<void*>(object));
 		ticket.MarkAndSignalLoaded();

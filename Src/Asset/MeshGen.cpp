@@ -25,10 +25,10 @@ static const Vec3f IcoVerts[] = {
 };
 
 static const Vec2f IcoUvs[] = {
-	UV * Vec2f(0, 1), UV* Vec2f(1, 0),	UV* Vec2f(1, 2),  UV* Vec2f(2, 1),	UV* Vec2f(2, 3), UV* Vec2f(3, 0),
-	UV* Vec2f(3, 2),  UV* Vec2f(4, 1),	UV* Vec2f(4, 3),  UV* Vec2f(5, 0),	UV* Vec2f(5, 2), UV* Vec2f(6, 1),
-	UV* Vec2f(6, 3),  UV* Vec2f(7, 0),	UV* Vec2f(7, 2),  UV* Vec2f(8, 1),	UV* Vec2f(8, 3), UV* Vec2f(9, 0),
-	UV* Vec2f(9, 2),  UV* Vec2f(10, 1), UV* Vec2f(10, 3), UV* Vec2f(11, 2),
+	UV * Vec2f(0, 1), UV * Vec2f(1, 0),	 UV * Vec2f(1, 2),	UV * Vec2f(2, 1),  UV * Vec2f(2, 3), UV * Vec2f(3, 0),
+	UV * Vec2f(3, 2), UV * Vec2f(4, 1),	 UV * Vec2f(4, 3),	UV * Vec2f(5, 0),  UV * Vec2f(5, 2), UV * Vec2f(6, 1),
+	UV * Vec2f(6, 3), UV * Vec2f(7, 0),	 UV * Vec2f(7, 2),	UV * Vec2f(8, 1),  UV * Vec2f(8, 3), UV * Vec2f(9, 0),
+	UV * Vec2f(9, 2), UV * Vec2f(10, 1), UV * Vec2f(10, 3), UV * Vec2f(11, 2),
 };
 
 static const int32 IcoIndex[] = {
@@ -190,7 +190,8 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeIcoSphere(int resolution)
 }
 
 static void MC_EmitQuad(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals, SizedArray<Vec2f>& uvs,
-						SizedArray<uint32>& indices, const Vec3f (&verts)[4], const MeshGenOptions& options)
+						SizedArray<uint32>& indices, const Vec3f (&verts)[4], const MeshGenOptions& options,
+						bool flip_u, bool flip_v)
 {
 	const Vec3f surface_normal = Vec3f::GetSurfaceNormal(verts[0], verts[1], verts[2]);
 	const uint32 base = static_cast<uint32>(positions.Size);
@@ -200,14 +201,30 @@ static void MC_EmitQuad(SizedArray<Vec3f>& positions, SizedArray<Vec3f>& normals
 		normals.Insert(surface_normal);
 	}
 
+	// Measure the quad's actual world-space width/height so the UV span
+	// scales with face size
+	const float32 quad_width = (verts[1] - verts[0]).Length();
+	const float32 quad_height = (verts[3] - verts[0]).Length();
+
+	const Vec2f uv_span = options.UvMax - options.UvMin;
+	const Vec2f uv_min = options.UvMin;
+	const Vec2f uv_max = uv_min + Vec2f(uv_span.X * quad_width, uv_span.Y * quad_height);
+
+
+	const float32 u_left = flip_u ? uv_max.X : uv_min.X;
+	const float32 u_right = flip_u ? uv_min.X : uv_max.X;
+
+	const float32 v_min = flip_v ? uv_max.Y : uv_min.Y;
+	const float32 v_max = flip_v ? uv_min.Y : uv_max.Y;
+
 	// Top Left
-	uvs.Insert(Vec2f(options.UvMin.X, options.UvMin.Y));
+	uvs.Insert(Vec2f(u_left, v_min));
 	// Top Right
-	uvs.Insert(Vec2f(options.UvMax.X, options.UvMin.Y));
+	uvs.Insert(Vec2f(u_right, v_min));
 	// Bottom Right
-	uvs.Insert(Vec2f(options.UvMax.X, options.UvMax.Y));
+	uvs.Insert(Vec2f(u_right, v_max));
 	// Bottom Left
-	uvs.Insert(Vec2f(options.UvMin.X, options.UvMax.Y));
+	uvs.Insert(Vec2f(u_left, v_max));
 
 	// Top left triangle
 	indices.Insert(base + 0);
@@ -246,24 +263,59 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 	const Vec3f b_bl { -l_s, -b_s, -ba_s }; // Back BL
 	const Vec3f b_br { r_s, -b_s, -ba_s };	// Back BR
 
+	if (options.bAlignUVs) {
+		// Front face (+Z)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tl, f_tr, f_br, f_bl }, options.Front,
+					false, false);
+
+		// Back face (-Z)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options.Back,
+					true, false);
+
+		// Top face (+Y)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, b_tr, f_tr, f_tl }, options.Top,
+					false, false);
+
+		// Bottom face (-Y)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_bl, f_br, b_br, b_bl },
+					options.Bottom, false, true);
+
+		// Right face (+X)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tr, b_tr, b_br, f_br }, options.Right,
+					true, false);
+
+		// Left face (-X)
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, f_tl, f_bl, b_bl }, options.Left,
+					false, false);
+
+		return mesh;
+	}
+
+	// Do not flip UVs for any faces
+
 	// Front face (+Z)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tl, f_tr, f_br, f_bl }, options.Front);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tl, f_tr, f_br, f_bl }, options.Front,
+				false, false);
 
 	// Back face (-Z)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options.Back);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options.Back,
+				false, false);
 
 	// Top face (+Y)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, b_tr, f_tr, f_tl }, options.Top);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, b_tr, f_tr, f_tl }, options.Top,
+				false, false);
 
 	// Bottom face (-Y)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_bl, f_br, b_br, b_bl }, options.Bottom);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_bl, f_br, b_br, b_bl }, options.Bottom,
+				false, false);
 
 	// Right face (+X)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tr, b_tr, b_br, f_br }, options.Right);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tr, b_tr, b_br, f_br }, options.Right,
+				false, false);
 
 	// Left face (-X)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, f_tl, f_bl, b_bl }, options.Left);
-
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, f_tl, f_bl, b_bl }, options.Left,
+				false, false);
 	return mesh;
 }
 

@@ -24,6 +24,14 @@ namespace renderer {
 class Pipeline;
 };
 
+enum class eObjectTag : uint32
+{
+	None = 0,
+	Blockout = (1 << 0),
+};
+
+FxEnumFlags(eObjectTag);
+
 enum class eObjectFlags : uint16
 {
 	None = 0,
@@ -160,6 +168,8 @@ private:
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
 	PhObjectId PhysicsId = PhObjectIdNull;
+
+	eObjectTag Tags = eObjectTag::None;
 
 	Ref<Skeleton> pSkeleton { nullptr };
 	SizedArray<Animation> Animations;

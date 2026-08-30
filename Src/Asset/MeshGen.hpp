@@ -21,6 +21,9 @@ struct CubeGenOptions
 	MeshGenOptions Bottom {};
 	MeshGenOptions Front {};
 	MeshGenOptions Back {};
+
+
+	bool bAlignUVs = false;
 };
 
 class MeshGen

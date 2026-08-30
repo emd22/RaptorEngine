@@ -32,6 +32,7 @@ public:
 
 	~Blockout();
 
+private:
 public:
 	PagedArray<BlockoutBox> BlockoutObjects;
 	World* pWorld = nullptr;

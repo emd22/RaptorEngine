@@ -103,6 +103,7 @@ void FoxtrotGame::InitEngine()
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
 	mBlockout.Create(&mMainScene);
+	mBlockout.Load("./Data/Demo/blockout.prx");
 
 	// script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.ssc");
 	// if (test_script.HasErrors() == false) {
@@ -127,28 +128,18 @@ void FoxtrotGame::ReloadAllObjects()
 
 void FoxtrotGame::CreateLights()
 {
-	Ref<LightPoint> pl = Ref<LightPoint>::New();
-	pl->Color = Color::FromRGBA(50, 250, 100, 8);
-	pl->MoveBy(Vec3f(0, 1, 0));
-	pl->SetRadius(3.0);
-	// pl->SetScale(15);
+	// Ref<LightPoint> pl = Ref<LightPoint>::New();
+	// pl->Color = Color::FromRGBA(50, 250, 100, 8);
+	// pl->MoveBy(Vec3f(0, 1, 0));
+	// pl->SetRadius(3.0);
+	// // pl->SetScale(15);
 
-	mMainScene.Attach(pl);
-
-	Ref<LightPoint> pl2 = Ref<LightPoint>::New();
-	pl2->Color = Color::FromRGBA(200, 80, 100, 8);
-	pl2->MoveBy(Vec3f(1, 0.5, 0));
-	pl2->SetRadius(3.0);
-
-	mMainScene.Attach(pl2);
+	// mMainScene.Attach(pl);
 
 	// Ref<LightPoint> pl2 = Ref<LightPoint>::New();
-
-	// pl2->SetLightVolume(sphere);
-	// pl2->Color = Color::FromRGBA(200, 80, 80, 3);
+	// pl2->Color = Color::FromRGBA(200, 80, 100, 8);
 	// pl2->MoveBy(Vec3f(1, 0.5, 0));
-	// pl2->SetRadius(5.0);
-	// pl2->SetScale(15);
+	// pl2->SetRadius(3.0);
 
 	// mMainScene.Attach(pl2);
 }
