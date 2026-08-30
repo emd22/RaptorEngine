@@ -31,7 +31,6 @@ public:
 	void Create();
 
 	ObjectID NewObjectID(const std::string& name);
-	Object* NewObject();
 	Object* NewObject(const std::string& name);
 	Object* GetObject(ObjectID id);
 	void DestroyObject(ObjectID& id);

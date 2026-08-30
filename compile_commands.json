@@ -97,6 +97,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Blockout.cpp.o -c /Users/emd22/Projects/a2/Src/Blockout.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Blockout.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Blockout.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Color.cpp.o -c /Users/emd22/Projects/a2/Src/Color.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Color.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Color.cpp.o"
@@ -1555,109 +1561,109 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/AST/AST.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/AST/AST.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/AST/AST.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/AST/AST.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/AST/AST.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/AST/AST.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Core/Util.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Core/Util.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Core/Util.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Core/Util.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Core/Util.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Core/Util.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Core/SourceManager.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Core/SourceManager.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Core/SourceManager.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Core/SourceManager.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Core/SourceManager.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Core/SourceManager.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Core/Diagnostics.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Core/Diagnostics.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Core/Diagnostics.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Core/Diagnostics.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Core/Diagnostics.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Core/Diagnostics.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Lex/Token.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Lex/Token.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Lex/Token.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Lex/Token.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Lex/Token.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Lex/Token.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Lex/Lexer.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Lex/Lexer.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Lex/Lexer.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Lex/Lexer.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Lex/Lexer.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Lex/Lexer.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Parse/Parser.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Parse/Parser.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Parse/Parser.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Parse/Parser.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Parse/Parser.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Parse/Parser.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/ResolveOverloads.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Sema/ResolveOverloads.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Sema/ResolveOverloads.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Sema/ResolveOverloads.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Sema/ResolveOverloads.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Sema/ResolveOverloads.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeRegistry.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/TypeRegistry.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeRegistry.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/TypeRegistry.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/TypeRegistry.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeRegistry.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeUtil.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/TypeUtil.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeUtil.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/TypeUtil.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/TypeUtil.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/TypeUtil.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/ASTDump.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/ASTDump.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/ASTDump.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/ASTDump.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/ASTDump.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/ASTDump.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Import/ModuleLoader.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Import/ModuleLoader.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Import/ModuleLoader.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Import/ModuleLoader.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Import/ModuleLoader.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Import/ModuleLoader.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Embed.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Embed.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Embed.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Embed.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Embed.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMSimd.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMSimd.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMSimd.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMSimd.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMSimd.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMSimd.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMCBackend.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMCBackend.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMCBackend.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMCBackend.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMCBackend.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMCBackend.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMModuleBuilder.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMModuleBuilder.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMModuleBuilder.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMModuleBuilder.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMModuleBuilder.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMModuleBuilder.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMAot.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMAot.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMAot.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMAot.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMAot.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMAot.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
-  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/22.1.8/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMJit.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMJit.c",
+  "command": "/usr/bin/cc -DSTRATA_HAS_LLVM=1 -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -I/opt/homebrew/opt/llvm/include -I/opt/homebrew/Cellar/llvm/23.1.0/include -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMJit.c.o -c /Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMJit.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/src/Codegen/LLVMJit.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata.dir/src/Codegen/LLVMJit.c.o"
 },
@@ -1696,6 +1702,12 @@
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/simd_demo.dir/samples/hosts/simd_demo_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/simd_demo_host.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/simd_demo_host.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/simd_demo.dir/samples/hosts/simd_demo_host.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/readme_demo.dir/samples/hosts/readme_demo_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/readme_demo_host.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/readme_demo_host.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/readme_demo.dir/samples/hosts/readme_demo_host.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",
@@ -1834,6 +1846,12 @@
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ExternStructTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/ExternStructTests.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/ExternStructTests.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ExternStructTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/TypeAliasTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/TypeAliasTests.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/TypeAliasTests.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/TypeAliasTests.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

@@ -25,8 +25,9 @@ public:
 	void Create();
 
 	void Attach(AssetTicket object_ticket);
-
 	void Attach(const Ref<LightBase>& light);
+
+	void Detach(ObjectID id);
 
 	PhObjectId NewPhysicsObject();
 	PhObject* GetPhysicsObject(PhObjectId id) const;

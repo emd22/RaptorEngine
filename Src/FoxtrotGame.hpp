@@ -1,10 +1,12 @@
 #pragma once
 
+#include "Blockout.hpp"
 #include "Object/ObjectManager.hpp"
 
 #include <Asset/ConfigFile.hpp>
 #include <Object/Object.hpp>
 #include <Player.hpp>
+#include <Script/ScriptManager.hpp>
 #include <World.hpp>
 
 class ShadowDirectional;
@@ -32,15 +34,6 @@ public:
 
 public:
 	Ref<PerspectiveCamera> pCamera { nullptr };
-};
-
-class BlockoutBlock
-{
-public:
-	BlockoutBlock();
-
-public:
-	ObjectID ObjectID;
 };
 
 /////////////////////////////////////
@@ -144,6 +137,9 @@ private:
 
 
 	ConfigFile Config;
+
+
+	Blockout mBlockout;
 };
 
 } // namespace fx

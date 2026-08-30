@@ -40,16 +40,6 @@ ObjectID ObjectManager::NewObjectID(const std::string& name)
 	return obj->ID;
 }
 
-Object* ObjectManager::NewObject()
-{
-	std::lock_guard<std::mutex> guard(mInUse);
-
-	uint32 index;
-	Object* obj = mObjectList.NewItem(&index);
-	obj->ID = ObjectID(index);
-
-	return obj;
-}
 
 Object* ObjectManager::NewObject(const std::string& name)
 {

@@ -14,6 +14,7 @@ obj
 foxtrot.slnx
 foxtrot.sln
 
+*.ftx
 
 bin
 

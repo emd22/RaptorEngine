@@ -28,6 +28,7 @@
 #include <Texture/TextureManager.hpp>
 #include <csignal>
 
+
 FX_SET_MODULE_NAME("FoxtrotGame");
 
 namespace fx {
@@ -96,23 +97,22 @@ void FoxtrotGame::InitEngine()
 	gGraphics->Init(Vec2u(window_width, window_height));
 
 	gPhysics->Create();
-
 	gAssetManager->Start(3);
-
 	gWorldGrid->Create(Vec2u(10, 10));
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
+	mBlockout.Create(&mMainScene);
 
-	script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.ssc");
-	if (test_script.HasErrors() == false) {
-		using FuncType = int (*)(void);
+	// script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.ssc");
+	// if (test_script.HasErrors() == false) {
+	// 	using FuncType = int (*)(void);
 
-		FuncType fn = test_script.GetFunction<FuncType>("run");
-		int result = fn();
+	// 	FuncType fn = test_script.GetFunction<FuncType>("run");
+	// 	int result = fn();
 
-		LogInfo(LC_SCRIPT, "Strata result: {}", result);
-	}
+	// 	LogInfo(LC_SCRIPT, "Strata result: {}", result);
+	// }
 }
 
 void FoxtrotGame::ReloadAllObjects()
@@ -203,36 +203,36 @@ void FoxtrotGame::CreateGame()
 	CreateLights();
 
 	{
-		{
-			MaterialID mat_id = gMaterialManager->NewMaterial("TestMat", ePipelineName::Geometry, false);
-			Material* test_material = gMaterialManager->GetMaterial(mat_id);
+		// {
+		// 	MaterialID mat_id = gMaterialManager->NewMaterial("TestMat", ePipelineName::Geometry, false);
+		// 	Material* test_material = gMaterialManager->GetMaterial(mat_id);
 
-			AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-														   "Data/Demo/Textures/white_grid.png",
-														   eImageCreateFlags::None);
+		// 	AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+		// 												   "Data/Demo/Textures/white_grid.png",
+		// 												   eImageCreateFlags::None);
 
-			test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-			test_material->Finalize();
-			mBlockoutMaterial = mat_id;
-		}
+		// 	test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+		// 	test_material->Finalize();
+		// 	mBlockoutMaterial = mat_id;
+		// }
 
 
-		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Left = { .Scale = 3.0 } });
+		// Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Left = { .Scale = 3.0 } });
 
-		Object* object = gObjectManager->NewObject("HitMarker");
-		object->pMesh = cube_mesh->AsDefaultMesh();
+		// Object* object = gObjectManager->NewObject("HitMarker");
+		// object->pMesh = cube_mesh->AsDefaultMesh();
 
-		object->MoveBy(Vec3f(0, 0.1, 0));
-		object->ScaleBy(0.2);
+		// object->MoveBy(Vec3f(0, 0.1, 0));
+		// object->ScaleBy(0.2);
 
-		mRaycastHitMarker = object->ID;
+		// mRaycastHitMarker = object->ID;
 
-		object->mMaterialID = mBlockoutMaterial;
+		// object->mMaterialID = mBlockoutMaterial;
 
-		AssetTicket ticket(static_cast<void*>(object));
-		ticket.MarkAndSignalLoaded();
+		// AssetTicket ticket(static_cast<void*>(object));
+		// ticket.MarkAndSignalLoaded();
 
-		mMainScene.Attach(ticket);
+		// mMainScene.Attach(ticket);
 	}
 
 
@@ -388,10 +388,10 @@ void FoxtrotGame::ProcessControls()
 		LogInfo(LC_PHYSICS, "Hit?={}, Pos={}", hit_point.bHit, hit_point.Point);
 
 		if (hit_point.bHit) {
-			Object* hit_marker = gObjectManager->GetObject(mRaycastHitMarker);
-			if (hit_marker) {
-				// hit_marker->SetPosition(hit_point.Point);
-			}
+			// Object* hit_marker = gObjectManager->GetObject(mRaycastHitMarker);
+			// if (hit_marker) {
+			// hit_marker->SetPosition(hit_point.Point);
+			// }
 		}
 	}
 
@@ -452,13 +452,18 @@ void FoxtrotGame::ProcessControls()
 		Player.bIsSprinting = false;
 	}
 
-	if (ControlManager::IsComboDown(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
-		// Reload the object properties from the scene
-		WorldFile scene_file;
-		scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr32("Scene"))->Get<const char*>()),
-						mMainScene);
+	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
+		mBlockout.Load("./Data/Demo/blockout.prx");
 
-		LoadOffsetsFile();
+		LogInfo("Reloading blockout...");
+
+
+		// Reload the object properties from the scene
+		// WorldFile scene_file;
+		// scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr32("Scene"))->Get<const
+		// char*>()), 				mMainScene);
+
+		// LoadOffsetsFile();
 	}
 
 	// if (ControlManager::IsKeyDown(eKey::FX_KEY_L)) {

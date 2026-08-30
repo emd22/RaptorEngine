@@ -1,0 +1,7 @@
+all = {
+	0 = {
+		pos = [0.0, 0.0, 0.0]
+		// front, back, left, right, top, down
+		scale = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+	}
+}

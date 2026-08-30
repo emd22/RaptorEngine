@@ -67,6 +67,25 @@ static void AddObjectToRenderList(Object* object, World* scene)
 	}
 }
 
+static void RemoveObjectFromRenderList(ObjectID id, World* scene)
+{
+	if (id.IsNull() || id.IsInvalid()) {
+		return;
+	}
+
+	Assert(scene != nullptr);
+
+
+	Object* object = gObjectManager->GetObject(id);
+
+	scene->mRenderList.RemoveAllOfObject(id);
+	if (!object->AttachedNodes.IsEmpty()) {
+		for (const ObjectID& attach_id : object->AttachedNodes) {
+			RemoveObjectFromRenderList(attach_id, scene);
+		}
+	}
+}
+
 
 void World::Attach(AssetTicket object_ticket)
 {
@@ -90,6 +109,12 @@ void World::Attach(const Ref<LightBase>& light)
 {
 	mLights.Insert(light);
 	light->OnAttached(this);
+}
+
+void World::Detach(ObjectID id)
+{
+	gWorldGrid->RemoveObject(id);
+	RemoveObjectFromRenderList(id, this);
 }
 
 PhObjectId World::NewPhysicsObject()
