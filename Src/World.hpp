@@ -29,8 +29,8 @@ public:
 
 	void Detach(ObjectID id);
 
-	PhObjectId NewPhysicsObject();
-	PhObject* GetPhysicsObject(PhObjectId id) const;
+	physics::PhysID NewPhysicsObject();
+	PhObject* GetPhysicsObject(physics::PhysID id) const;
 
 	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
@@ -54,7 +54,7 @@ public:
 	PhObject* FindPhysicsObject(const Hash32 name_hash);
 
 	void SelectPhysicsObject(const JPH::BodyID& body_id);
-	PhObjectId GetSelectedPhysicsObject() const { return mSelectedPhysicsObjectId; }
+	physics::PhysID GetSelectedPhysicsObject() const { return mSelectedPhysicsObjectId; }
 
 	void ReleaseAllObjects() { mObjects.Clear(); }
 
@@ -90,7 +90,7 @@ private:
 
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 
-	PhObjectId mSelectedPhysicsObjectId = PhObjectIdNull;
+	physics::PhysID mSelectedPhysicsObjectId = physics::PhysID::scNull;
 
 	Ref<PrimitiveMesh> mpDebugCube { nullptr };
 };

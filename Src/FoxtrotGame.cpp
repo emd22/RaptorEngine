@@ -608,8 +608,8 @@ FoxtrotGame::~FoxtrotGame()
 
 void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
-	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != PhObjectIdNull) {
+	physics::PhysID phys_id = scene.GetSelectedPhysicsObject();
+	if (phys_id != physics::PhysID::scNull) {
 		PhObject* phys = scene.GetPhysicsObject(phys_id);
 		phys->Teleport(phys->GetPosition() + (movement_vector * Vec3f(0.05)), phys->GetRotation());
 
@@ -626,8 +626,8 @@ void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
 void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
-	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != PhObjectIdNull) {
+	physics::PhysID phys_id = scene.GetSelectedPhysicsObject();
+	if (phys_id != physics::PhysID::scNull) {
 		PhObject* phys = scene.GetPhysicsObject(phys_id);
 		phys->Dimensions = phys->Dimensions + (movement_vector * Vec3f(0.05));
 		if (phys->Dimensions.X < 0.01f) {
@@ -651,8 +651,8 @@ void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_v
 
 void EditorModeScaleCollider::OnLeave(const World& scene)
 {
-	PhObjectId phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != PhObjectIdNull) {
+	physics::PhysID phys_id = scene.GetSelectedPhysicsObject();
+	if (phys_id != physics::PhysID::scNull) {
 		PhObject* phys = scene.GetPhysicsObject(phys_id);
 		phys->CreatePrimitiveBody(phys->PrimitiveType, phys->Dimensions, phys->mMotionType, {});
 	}

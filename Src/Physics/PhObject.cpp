@@ -16,6 +16,10 @@
 
 namespace fx {
 
+namespace physics {
+const PhysID PhysID::scNull = PhysID(UINT32_MAX);
+}
+
 void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
 								   const PhProperties& object_properties)
 {

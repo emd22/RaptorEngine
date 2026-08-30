@@ -114,7 +114,7 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	ePhMotionType motion_type = ePhMotionType::Static;
 
 	// Create physics object
-	PhObjectId physics_id = scene.NewPhysicsObject();
+	physics::PhysID physics_id = scene.NewPhysicsObject();
 	PhObject* phys = scene.GetPhysicsObject(physics_id);
 	phys->SetName(collider_name);
 

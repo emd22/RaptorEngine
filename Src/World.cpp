@@ -117,22 +117,22 @@ void World::Detach(ObjectID id)
 	RemoveObjectFromRenderList(id, this);
 }
 
-PhObjectId World::NewPhysicsObject()
+physics::PhysID World::NewPhysicsObject()
 {
-	PhObjectId id = mPhysicsObjects.Size();
+	physics::PhysID id = mPhysicsObjects.Size();
 	PhObject* phys = mPhysicsObjects.Insert();
 	phys->SetId(id);
 
 	return id;
 }
 
-PhObject* World::GetPhysicsObject(PhObjectId id) const
+PhObject* World::GetPhysicsObject(physics::PhysID id) const
 {
-	if (id == PhObjectIdNull || id > mPhysicsObjects.Size()) {
+	if (id == physics::PhysID::scNull || id.GetID() > mPhysicsObjects.Size()) {
 		return nullptr;
 	}
 
-	return &mPhysicsObjects[id];
+	return &mPhysicsObjects[id.GetID()];
 }
 
 void World::SelectPhysicsObject(const JPH::BodyID& body_id)
