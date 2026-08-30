@@ -20,159 +20,159 @@ namespace fx {
 
 ConfigEntry& ConfigEntry::operator=(ConfigEntry&& other)
 {
-    if (other.Type == ConfigEntry::eValueType::String) {
-        mStringValue = other.mStringValue;
-        other.mStringValue = nullptr;
-    }
-    else {
-        Set(other);
-    }
+	if (other.Type == ConfigEntry::eValueType::String) {
+		mStringValue = other.mStringValue;
+		other.mStringValue = nullptr;
+	}
+	else {
+		Set(other);
+	}
 
-    Type = other.Type;
-    other.Type = ConfigEntry::eValueType::None;
+	Type = other.Type;
+	other.Type = ConfigEntry::eValueType::None;
 
-    Members = std::move(other.Members);
-    ArrayData = std::move(other.ArrayData);
+	Members = std::move(other.Members);
+	ArrayData = std::move(other.ArrayData);
 
-    bIsArray = other.bIsArray;
-    other.bIsArray = false;
+	bIsArray = other.bIsArray;
+	other.bIsArray = false;
 
-    Name = other.Name;
-    other.Name.Clear();
+	Name = other.Name;
+	other.Name.Clear();
 
-    return *this;
+	return *this;
 }
 
 ConfigEntry::ConfigEntry(ConfigEntry&& other) { (*this) = std::move(other); }
 
 void ConfigEntry::AddMember(ConfigEntry&& entry)
 {
-    if (!Members.IsInited()) {
-        Members.Create();
-    }
+	if (!Members.IsInited()) {
+		Members.Create();
+	}
 
-    Members.Insert(std::move(entry));
+	Members.Insert(std::move(entry));
 
-    Type = ConfigEntry::eValueType::Struct;
+	Type = ConfigEntry::eValueType::Struct;
 }
 
 std::string ConfigValue::AsString() const
 {
-    switch (Type) {
-    case eValueType::None:
-        return "";
-    case eValueType::Int:
-        return std::to_string(mIntValue);
-    case eValueType::Float:
-        return std::to_string(mFloatValue);
-    case eValueType::String:
-        return std::format("\"{}\"", mStringValue);
-    case eValueType::Struct:
-        break;
-    }
+	switch (Type) {
+	case eValueType::None:
+		return "";
+	case eValueType::Int:
+		return std::to_string(mIntValue);
+	case eValueType::Float:
+		return std::to_string(mFloatValue);
+	case eValueType::String:
+		return std::format("\"{}\"", mStringValue);
+	case eValueType::Struct:
+		break;
+	}
 
-    return "";
+	return "";
 }
 
 std::string ConfigEntry::AsString(uint32 indent) const
 {
-    std::string member_list = "";
+	std::string member_list = "";
 
-    std::string indent_str = "";
+	std::string indent_str = "";
 
-    for (uint32 i = 0; i < indent; i++) {
-        indent_str += '\t';
-    }
-
-
-    if (Type == eValueType::Struct) {
-        for (const ConfigEntry& entry : Members) {
-            member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
-        }
-
-        return std::format("{{\n{}{}}}", member_list, indent_str);
-    }
-    else if (bIsArray) {
-        uint32 array_size = ArrayData.Size();
-
-        for (uint32 value_index = 0; value_index < array_size; value_index++) {
-            const ConfigValue& value = ArrayData[value_index];
-            if (value_index == array_size - 1) {
-                member_list += std::format("{}", value.AsString());
-            }
-            else {
-                member_list += std::format("{}, ", value.AsString());
-            }
-        }
-
-        return std::format("[ {} ]", member_list);
-    }
+	for (uint32 i = 0; i < indent; i++) {
+		indent_str += '\t';
+	}
 
 
-    return this->ConfigValue::AsString();
+	if (Type == eValueType::Struct) {
+		for (const ConfigEntry& entry : Members) {
+			member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
+		}
+
+		return std::format("{{\n{}{}}}", member_list, indent_str);
+	}
+	else if (bIsArray) {
+		uint32 array_size = ArrayData.Size();
+
+		for (uint32 value_index = 0; value_index < array_size; value_index++) {
+			const ConfigValue& value = ArrayData[value_index];
+			if (value_index == array_size - 1) {
+				member_list += std::format("{}", value.AsString());
+			}
+			else {
+				member_list += std::format("{}, ", value.AsString());
+			}
+		}
+
+		return std::format("[ {} ]", member_list);
+	}
+
+
+	return this->ConfigValue::AsString();
 }
 
 ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 {
-    for (ConfigEntry& entry : Members) {
-        if (entry.Name == name_hash) {
-            return &entry;
-        }
-    }
+	for (ConfigEntry& entry : Members) {
+		if (entry.Name == name_hash) {
+			return &entry;
+		}
+	}
 
-    return nullptr;
+	return nullptr;
 }
 
 
 void ConfigEntry::AppendValue(const Vec3f& vec)
 {
-    if (!Members.IsInited()) {
-        Members.Create(4);
-    }
+	if (!Members.IsInited()) {
+		Members.Create(4);
+	}
 
-    AppendValue(vec.X);
-    AppendValue(vec.Y);
-    AppendValue(vec.Z);
+	AppendValue(vec.X);
+	AppendValue(vec.Y);
+	AppendValue(vec.Z);
 }
 
 void ConfigEntry::AppendValue(const Vec4f& vec)
 {
-    if (!Members.IsInited()) {
-        Members.Create(5);
-    }
+	if (!Members.IsInited()) {
+		Members.Create(5);
+	}
 
-    AppendValue(vec.X);
-    AppendValue(vec.Y);
-    AppendValue(vec.Z);
-    AppendValue(vec.W);
+	AppendValue(vec.X);
+	AppendValue(vec.Y);
+	AppendValue(vec.Z);
+	AppendValue(vec.W);
 }
 
 
 void ConfigEntry::AppendValue(const Quat& quat)
 {
-    if (!Members.IsInited()) {
-        Members.Create(5);
-    }
+	if (!Members.IsInited()) {
+		Members.Create(5);
+	}
 
-    AppendValue(quat.X);
-    AppendValue(quat.Y);
-    AppendValue(quat.Z);
-    AppendValue(quat.W);
+	AppendValue(quat.X);
+	AppendValue(quat.Y);
+	AppendValue(quat.Z);
+	AppendValue(quat.W);
 }
 
 
 ConfigEntry::~ConfigEntry()
 {
-    if (Type == eValueType::String && mStringValue != nullptr) {
-        free(mStringValue);
-    }
+	if (Type == eValueType::String && mStringValue != nullptr) {
+		free(mStringValue);
+	}
 
-    Type = eValueType::None;
+	Type = eValueType::None;
 
-    mStringValue = nullptr;
-    if (Members.IsInited()) {
-        Members.Destroy();
-    }
+	mStringValue = nullptr;
+	if (Members.IsInited()) {
+		Members.Destroy();
+	}
 }
 
 
@@ -182,321 +182,331 @@ ConfigEntry::~ConfigEntry()
 
 void ConfigFile::Load(const std::string& path)
 {
-    File file(path.c_str(), File::eModType::Read, File::eDataType::Binary);
+	File file(path.c_str(), File::eModType::Read, File::eDataType::Binary);
 
-    if (!file.IsFileOpen()) {
-        return;
-    }
+	if (!file.IsFileOpen()) {
+		return;
+	}
 
-    InitConstants();
+	InitConstants();
 
-    Slice<char> file_buffer = file.Read<char>();
+	Slice<char> file_buffer = file.Read<char>();
 
-    Tokenizer tokenizer(file_buffer.pData, file_buffer.Size);
-    tokenizer.SetFileExtension(".conf");
-    tokenizer.IncludeFile(FX_BASE_DIR "/Config/Internal/Constants.conf");
-    tokenizer.Tokenize();
+	Tokenizer tokenizer(file_buffer.pData, file_buffer.Size);
+	tokenizer.SetFileExtension(".conf");
+	tokenizer.IncludeFile(FX_BASE_DIR "/Config/Internal/Constants.conf");
+	tokenizer.Tokenize();
 
-    Parse(tokenizer.GetTokens());
+	Parse(tokenizer.GetTokens());
 
-    gEnginePool->Free(file_buffer.pData);
+	gEnginePool->Free(file_buffer.pData);
 }
 
 static ConfigEntry::eValueType GetValueTokenType(const Token& token)
 {
-    using VType = ConfigEntry::eValueType;
+	using VType = ConfigEntry::eValueType;
 
-    VType current_type = VType::None;
+	VType current_type = VType::None;
 
-    Token::eIsNumericResult numeric_result = token.IsNumeric();
-    if (numeric_result != Token::eIsNumericResult::NaN) {
-        if (numeric_result == Token::eIsNumericResult::Integer) {
-            return VType::Int;
-        }
-        else {
-            return VType::Float;
-        }
-    }
+	Token::eIsNumericResult numeric_result = token.IsNumeric();
+	if (numeric_result != Token::eIsNumericResult::NaN) {
+		if (numeric_result == Token::eIsNumericResult::Integer) {
+			return VType::Int;
+		}
+		else {
+			return VType::Float;
+		}
+	}
 
-    if (token.Type == eTokenType::String) {
-        current_type = VType::String;
-    }
+	if (token.Type == eTokenType::String) {
+		current_type = VType::String;
+	}
 
-    return current_type;
+	return current_type;
 }
 
 bool ConfigFile::EatToken(eTokenType type)
 {
-    const bool correct_token = (GetToken()->Type == type);
+	const bool correct_token = (GetToken()->Type == type);
 
-    if (!correct_token) {
-        LogError(LC_CORE, "Config({}): Expected '{}' but found '{}'", mTokenIndex, Token::GetTypeName(type),
-                 Token::GetTypeName(GetToken()->Type));
-        return false;
-    }
+	if (!correct_token) {
+		LogError(LC_CORE, "Config({}): Expected '{}' but found '{}'", mTokenIndex, Token::GetTypeName(type),
+				 Token::GetTypeName(GetToken()->Type));
 
-    NextToken();
+		mbHasErrors = true;
+		return false;
+	}
 
-    return true;
+	NextToken();
+
+	return true;
 }
 
 bool ConfigFile::EatToken(const Slice<eTokenType>& expected_types)
 {
-    bool type_is_correct = false;
+	bool type_is_correct = false;
 
-    Token* token = GetToken();
+	Token* token = GetToken();
 
-    for (const eTokenType type : expected_types) {
-        if (token->Type == type) {
-            NextToken();
-            return true;
-        }
-    }
+	for (const eTokenType type : expected_types) {
+		if (token->Type == type) {
+			NextToken();
+			return true;
+		}
+	}
 
-    LogError(LC_CORE, "Config: found type '{}' but can only allow one of {}", Token::GetTypeName(GetToken()->Type));
-    return false;
+	LogError(LC_CORE, "Config: found type '{}' but can only allow one of {}", Token::GetTypeName(GetToken()->Type));
+	mbHasErrors = true;
+	return false;
 }
 
 void ConfigFile::PrintEntries()
 {
-    PagedArray<ConfigEntry>& entries = GetEntries();
+	PagedArray<ConfigEntry>& entries = GetEntries();
 
-    for (const ConfigEntry& entry : entries) {
-        LogInfo(LC_CORE, "Entry: {} -> {}", entry.Name.Get(), entry.AsString());
-    }
+	for (const ConfigEntry& entry : entries) {
+		LogInfo(LC_CORE, "Entry: {} -> {}", entry.Name.Get(), entry.AsString());
+	}
 }
 
 void ConfigFile::ParseReference(ConfigValue& value)
 {
-    Token* ident_token = GetToken();
-    EatToken(eTokenType::Identifier);
+	Token* ident_token = GetToken();
+	EatToken(eTokenType::Identifier);
 
-    ConfigEntry* value_entry = GetEntry(ident_token->GetHash());
+	ConfigEntry* value_entry = GetEntry(ident_token->GetHash());
 
-    // If there is a dot following, search for a nested member
-    while (value_entry != nullptr) {
-        if (GetToken()->Type != eTokenType::Dot) {
-            break;
-        }
+	// If there is a dot following, search for a nested member
+	while (value_entry != nullptr) {
+		if (GetToken()->Type != eTokenType::Dot) {
+			break;
+		}
 
-        NextToken();
+		NextToken();
 
-        ident_token = GetToken();
-        if (!EatToken(eTokenType::Identifier)) {
-            break;
-        }
+		ident_token = GetToken();
+		if (!EatToken(eTokenType::Identifier)) {
+			break;
+		}
 
-        value_entry = value_entry->GetMember(ident_token->GetHash());
-    }
+		value_entry = value_entry->GetMember(ident_token->GetHash());
+	}
 
-    if (value_entry) {
-        value = *value_entry;
-    }
+	if (value_entry) {
+		value = *value_entry;
+	}
 }
 
 void ConfigFile::ParseValue(ConfigValue& value)
 {
-    using VType = ConfigEntry::eValueType;
+	using VType = ConfigEntry::eValueType;
 
-    Token* value_token = GetToken();
+	Token* value_token = GetToken();
 
-    if (value_token->Type == eTokenType::Dollar) {
-        EatToken(eTokenType::Dollar);
+	if (value_token->Type == eTokenType::Dollar) {
+		EatToken(eTokenType::Dollar);
 
-        ParseReference(value);
-        return;
-    }
+		ParseReference(value);
+		return;
+	}
 
-    // Check for constants
-    if (value_token->Type == eTokenType::Identifier) {
-        for (const ConfigEntry& entry : mConstants) {
-            if (entry.Name == value_token->GetHash()) {
-                value.Set(entry);
-                NextToken();
-                return;
-            }
-        }
+	// Check for constants
+	if (value_token->Type == eTokenType::Identifier) {
+		for (const ConfigEntry& entry : mConstants) {
+			if (entry.Name == value_token->GetHash()) {
+				value.Set(entry);
+				NextToken();
+				return;
+			}
+		}
 
-        LogError(LC_CORE, "Could not find reference to constant {}!", value_token->GetStr());
-    }
+		LogError(LC_CORE, "Could not find reference to constant {}!", value_token->GetStr());
+	}
 
-    // Handle unary minus (in a simple way, but still handles recursive negatives)
-    if (value_token->Type == eTokenType::Minus) {
-        EatToken(eTokenType::Minus);
+	// Handle unary minus (in a simple way, but still handles recursive negatives)
+	if (value_token->Type == eTokenType::Minus) {
+		EatToken(eTokenType::Minus);
 
-        ConfigValue temp;
-        ParseValue(temp);
+		ConfigValue temp;
+		ParseValue(temp);
 
-        switch (temp.Type) {
-        case VType::Int:
-            value.Set<int64>(-temp.Get<int64>());
-            break;
-        case VType::Float:
-            value.Set<float32>(-temp.Get<float32>());
-            break;
-        default:
-            break;
-        }
+		switch (temp.Type) {
+		case VType::Int:
+			value.Set<int64>(-temp.Get<int64>());
+			break;
+		case VType::Float:
+			value.Set<float32>(-temp.Get<float32>());
+			break;
+		default:
+			break;
+		}
 
-        return;
-    }
+		return;
+	}
 
-    value.Type = GetValueTokenType(*value_token);
+	value.Type = GetValueTokenType(*value_token);
 
 
-    switch (value.Type) {
-    case VType::None:
-        break;
-    case VType::String:
-        value.Set(value_token->GetStr());
-        break;
-    case VType::Int:
-        value.Set<int64>(value_token->ToInt());
-        break;
-    case VType::Float:
-        value.Set<float32>(value_token->ToFloat());
-        break;
-    default:
-        break;
-    }
+	switch (value.Type) {
+	case VType::None:
+		break;
+	case VType::String:
+		value.Set(value_token->GetStr());
+		break;
+	case VType::Int:
+		value.Set<int64>(value_token->ToInt());
+		break;
+	case VType::Float:
+		value.Set<float32>(value_token->ToFloat());
+		break;
+	default:
+		break;
+	}
 
-    NextToken();
+	NextToken();
 }
 
 void ConfigEntry::AppendValue(ConfigValue&& value)
 {
-    if (!ArrayData.IsInited()) {
-        ArrayData.Create(8);
-    }
+	if (!ArrayData.IsInited()) {
+		ArrayData.Create(8);
+	}
 
-    ArrayData.Insert(std::move(value));
+	ArrayData.Insert(std::move(value));
 }
 
-ConfigEntry ConfigFile::ParseEntry()
+ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
 {
-    // [IDENTIFIER] = [INT | FLOAT | STRING | STRUCT]
+	// [IDENTIFIER] = [INT | FLOAT | STRING | STRUCT]
 
-    ConfigEntry entry;
+	ConfigEntry entry;
 
-    Token* token = GetToken();
+	Token* token = GetToken();
 
-    entry.Name = token->GetStr();
+	// Special case, set the name to the current member index
+	if (token->Type == eTokenType::Dollar && parent != nullptr) {
+		entry.Name = std::to_string(parent->Members.Size());
+	}
+	// Default case, set the name to the identifier
+	else {
+		entry.Name = token->GetStr();
+	}
 
-    eTokenType allowed_name_types[] = { eTokenType::Identifier, eTokenType::Integer };
-    EatToken(MakeSlice(allowed_name_types, std::size(allowed_name_types)));
-    EatToken(eTokenType::Equals);
+	eTokenType allowed_name_types[] = { eTokenType::Identifier, eTokenType::Integer, eTokenType::Dollar };
+	EatToken(MakeSlice(allowed_name_types, std::size(allowed_name_types)));
+	EatToken(eTokenType::Equals);
 
-    // Parse struct
-    // [IDENTIFIER] = { [ENTRY]... }
-    if (GetToken()->Type == eTokenType::LBrace) {
-        EatToken(eTokenType::LBrace);
+	// Parse struct
+	// [IDENTIFIER] = { [ENTRY]... }
+	if (GetToken()->Type == eTokenType::LBrace) {
+		EatToken(eTokenType::LBrace);
 
-        entry.Type = ConfigEntry::eValueType::Struct;
+		entry.Type = ConfigEntry::eValueType::Struct;
 
-        // Add each entry as a member of the current entry
-        while (GetToken()->Type != eTokenType::RBrace) {
-            ConfigEntry member = ParseEntry();
-            entry.AddMember(std::move(member));
-        }
+		// Add each entry as a member of the current entry
+		while (GetToken()->Type != eTokenType::RBrace) {
+			ConfigEntry member = ParseEntry(&entry);
+			entry.AddMember(std::move(member));
+		}
 
-        EatToken(eTokenType::RBrace);
+		EatToken(eTokenType::RBrace);
 
-        return entry;
-    }
+		return entry;
+	}
 
-    // Parse array
-    else if (GetToken()->Type == eTokenType::LBracket) {
-        EatToken(eTokenType::LBracket);
+	// Parse array
+	else if (GetToken()->Type == eTokenType::LBracket) {
+		EatToken(eTokenType::LBracket);
 
-        entry.bIsArray = true;
+		entry.bIsArray = true;
 
-        Token* value_token = GetToken();
-        entry.Type = GetValueTokenType(*value_token);
+		Token* value_token = GetToken();
+		entry.Type = GetValueTokenType(*value_token);
 
-        while (GetToken()->Type != eTokenType::RBracket) {
-            ConfigValue value;
-            value.Type = entry.Type;
-            ParseValue(value);
-            entry.AppendValue(std::move(value));
+		while (GetToken()->Type != eTokenType::RBracket) {
+			ConfigValue value;
+			value.Type = entry.Type;
+			ParseValue(value);
+			entry.AppendValue(std::move(value));
 
-            if (GetToken()->Type == eTokenType::RBracket) {
-                break;
-            }
+			if (GetToken()->Type == eTokenType::RBracket) {
+				break;
+			}
 
-            EatToken(eTokenType::Comma);
-        }
+			EatToken(eTokenType::Comma);
+		}
 
-        EatToken(eTokenType::RBracket);
+		EatToken(eTokenType::RBracket);
 
-        return entry;
-    }
+		return entry;
+	}
 
-    // Parse single value entry
-    // [IDENTIFIER] = [INT | FLOAT | STRING]
+	// Parse single value entry
+	// [IDENTIFIER] = [INT | FLOAT | STRING]
 
-    Token* value_token = GetToken();
-    entry.Type = GetValueTokenType(*value_token);
-    ParseValue(entry);
+	Token* value_token = GetToken();
+	entry.Type = GetValueTokenType(*value_token);
+	ParseValue(entry);
 
-    return entry;
+	return entry;
 }
 
 void ConfigFile::Parse(PagedArray<Token>& tokens)
 {
-    mConfigEntries.Create(32);
+	mConfigEntries.Create(32);
 
-    mpTokens = &tokens;
+	mpTokens = &tokens;
 
-    const uint32 tokens_size = tokens.Size();
+	const uint32 tokens_size = tokens.Size();
 
-    while (mTokenIndex < tokens_size) {
-        mConfigEntries.Insert(ParseEntry());
-    }
+	while (mTokenIndex < tokens_size) {
+		mConfigEntries.Insert(ParseEntry(nullptr));
+	}
 
-    mpTokens = nullptr;
+	mpTokens = nullptr;
 }
 
 ConfigEntry* ConfigFile::GetEntry(Hash32 requested_name_hash) const
 {
-    for (ConfigEntry& entry : mConfigEntries) {
-        if (entry.Name == requested_name_hash) {
-            return &entry;
-        }
-    }
+	for (ConfigEntry& entry : mConfigEntries) {
+		if (entry.Name == requested_name_hash) {
+			return &entry;
+		}
+	}
 
-    return nullptr;
+	return nullptr;
 }
 
 
 void ConfigFile::Write(const std::string& path)
 {
-    File file(path.c_str(), File::eModType::Write, File::eDataType::Text);
+	File file(path.c_str(), File::eModType::Write, File::eDataType::Text);
 
-    if (!file.IsFileOpen()) {
-        return;
-    }
+	if (!file.IsFileOpen()) {
+		return;
+	}
 
-    for (const ConfigEntry& entry : mConfigEntries) {
-        file.WriteMulti(entry.Name.Get(), " = ", entry.AsString(), '\n');
-    }
+	for (const ConfigEntry& entry : mConfigEntries) {
+		file.WriteMulti(entry.Name.Get(), " = ", entry.AsString(), '\n');
+	}
 
-    file.Close();
+	file.Close();
 }
 
 void ConfigFile::InitConstants()
 {
-    constexpr uint32 cMaxConstants = 16;
+	constexpr uint32 cMaxConstants = 16;
 
-    mConstants.InitCapacity(cMaxConstants);
+	mConstants.InitCapacity(cMaxConstants);
 
-    mConstants.Insert(ConfigEntry("TRUE", 1));
-    mConstants.Insert(ConfigEntry("FALSE", 0));
+	mConstants.Insert(ConfigEntry("TRUE", 1));
+	mConstants.Insert(ConfigEntry("FALSE", 0));
 
-    mConstants.Insert(ConfigEntry("OBJLAYER_WORLD", 0));
-    mConstants.Insert(ConfigEntry("OBJLAYER_PLAYER", 1));
+	mConstants.Insert(ConfigEntry("OBJLAYER_WORLD", 0));
+	mConstants.Insert(ConfigEntry("OBJLAYER_PLAYER", 1));
 
-    mConstants.Insert(ConfigEntry("PHYS_STATIC", 0));
-    mConstants.Insert(ConfigEntry("PHYS_DYNAMIC", 1));
+	mConstants.Insert(ConfigEntry("PHYS_STATIC", 0));
+	mConstants.Insert(ConfigEntry("PHYS_DYNAMIC", 1));
 }
 
 } // namespace fx

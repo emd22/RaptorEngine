@@ -14,6 +14,7 @@
 
 namespace fx {
 class World;
+class ConfigEntry;
 
 
 struct BlockoutBox
@@ -33,6 +34,8 @@ public:
 	~Blockout();
 
 private:
+	void CreateCubeVolume(ConfigEntry& entry);
+
 public:
 	PagedArray<BlockoutBox> BlockoutObjects;
 	World* pWorld = nullptr;

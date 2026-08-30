@@ -59,11 +59,56 @@ static Vec3f GetCubeMidpointOffset(const CubeGenOptions& cgo)
 	return Vec3f(fx::simd::AbsDiff(vmax, vmin));
 }
 
+void Blockout::CreateCubeVolume(ConfigEntry& entry)
+{
+	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
+
+	String blockout_id = String::Fmt("PROTO_{}", entry.Name.Get());
+
+	LogInfo("Adding blockout '{}'", blockout_id);
+
+	const PagedArray<ConfigValue>& scales = entry.GetMember(HashStr32("scale"))->GetArrayData();
+
+	LogInfo("Creating block id {}", blockout_id);
+
+	if (scales.Size() < 6) {
+		return;
+	}
+
+	CubeGenOptions cgo {
+		.Left = { .Scale = scales[0].Get<float32>() },
+		.Right = { .Scale = scales[1].Get<float32>() },
+		.Top = { .Scale = scales[2].Get<float32>() },
+		.Bottom = { .Scale = scales[3].Get<float32>() },
+		.Front = { .Scale = scales[4].Get<float32>() },
+		.Back = { .Scale = scales[5].Get<float32>() },
+
+		.bAlignUVs = true,
+	};
+
+	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
+
+	Object* object = gObjectManager->NewObject(blockout_id.Str(), eObjectTag::Blockout);
+	object->pMesh = cube_mesh->AsDefaultMesh();
+	object->MoveBy(position);
+	object->mMaterialID = mBlockoutMaterialID;
+	object->SetShadowCaster(true);
+
+	AssetTicket ticket(static_cast<void*>(object));
+	ticket.MarkAndSignalLoaded();
+
+	pWorld->Attach(ticket);
+}
+
 
 void Blockout::Load(const String& path)
 {
 	ConfigFile info {};
 	info.Load(path.CStr());
+
+	if (info.HasErrors()) {
+		return;
+	}
 
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
 
@@ -71,43 +116,7 @@ void Blockout::Load(const String& path)
 	RemoveBlockoutFromWorld(pWorld);
 
 	for (ConfigEntry& entry : blocks_entry->Members) {
-		Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
-
-		String blockout_id = String::Fmt("PROTO_{}", entry.Name.Get());
-
-		const PagedArray<ConfigValue>& scales = entry.GetMember(HashStr32("scale"))->GetArrayData();
-
-		LogInfo("Creating block id {}", blockout_id);
-
-		if (scales.Size() < 6) {
-			LogInfo("Not enough scales! {}", scales.Size());
-			continue;
-		}
-
-		CubeGenOptions cgo {
-			.Left = { .Scale = scales[0].Get<float32>() },
-			.Right = { .Scale = scales[1].Get<float32>() },
-			.Top = { .Scale = scales[2].Get<float32>() },
-			.Bottom = { .Scale = scales[3].Get<float32>() },
-			.Front = { .Scale = scales[4].Get<float32>() },
-			.Back = { .Scale = scales[5].Get<float32>() },
-
-			.bAlignUVs = true,
-		};
-
-		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
-
-
-		Object* object = gObjectManager->NewObject(blockout_id.Str(), eObjectTag::Blockout);
-		object->pMesh = cube_mesh->AsDefaultMesh();
-		object->MoveBy(position);
-		object->mMaterialID = mBlockoutMaterialID;
-		object->SetShadowCaster(true);
-
-		AssetTicket ticket(static_cast<void*>(object));
-		ticket.MarkAndSignalLoaded();
-
-		pWorld->Attach(ticket);
+		CreateCubeVolume(entry);
 	}
 }
 
