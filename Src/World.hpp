@@ -29,9 +29,6 @@ public:
 
 	void Detach(ObjectID id);
 
-	physics::BodyID NewPhysicsObject();
-	physics::Body* GetPhysicsObject(physics::BodyID id) const;
-
 	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
 	void Render(Camera* shadow_camera);
@@ -51,10 +48,6 @@ public:
 	}
 
 	Object* FindObject(const Hash32 name_hash);
-	physics::Body* FindPhysicsObject(const Hash32 name_hash);
-
-	void SelectPhysicsObject(const JPH::BodyID& body_id);
-	physics::BodyID GetSelectedPhysicsObject() const { return mSelectedPhysicsObjectId; }
 
 	void ReleaseAllObjects() { mObjects.Clear(); }
 
@@ -85,8 +78,6 @@ public:
 private:
 	PagedArray<ObjectID> mObjects;
 	PagedArray<Ref<LightBase>> mLights;
-	PagedArray<physics::Body> mPhysicsObjects;
-
 
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 

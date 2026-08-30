@@ -2,6 +2,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Engine.hpp>
+#include <Physics/PhysicsManager.hpp>
 
 namespace fx {
 
@@ -112,11 +113,7 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	const std::string& collider_name = collider_entry.Name.Get();
 
 	physics::eMotionType motion_type = physics::eMotionType::Static;
-
-	// Create physics object
-	physics::BodyID physics_id = scene.NewPhysicsObject();
-	physics::Body* phys = scene.GetPhysicsObject(physics_id);
-	phys->SetName(collider_name);
+	physics::Body* phys = gPhysics->NewBody(collider_name);
 
 	Vec3f position = collider_entry.GetMemberValue(HashStr32("Pos"), Vec3f::sZero);
 	Quat rotation = collider_entry.GetMemberValue(HashStr32("Rot"), Quat::scIdentity);
@@ -198,9 +195,14 @@ void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& objec
 
 	ConfigEntry* collider_ref = object_entry.GetMember(HashStr32("ColliderRef"));
 	if (collider_ref != nullptr) {
-		physics::Body* phys_object = object->pScene->FindPhysicsObject(HashStr32(collider_ref->Get<const char*>()));
-		object->SetPhysicsId(phys_object->GetID());
-		object->SetPhysicsEnabled(true);
+		physics::Body* phys_object = gPhysics->FindBody(HashStr32(collider_ref->Get<const char*>()));
+		if (phys_object != nullptr) {
+			object->SetPhysicsID(phys_object->GetID());
+			object->SetPhysicsEnabled(true);
+		}
+		else {
+			object->SetPhysicsID(physics::BodyID::scNull);
+		}
 	}
 
 	ConfigEntry* script = object_entry.GetMember(HashStr32("Script"));

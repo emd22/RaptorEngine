@@ -117,8 +117,8 @@ public:
 	// Physics
 	/////////////////////////////////////
 
-	FX_FORCE_INLINE void SetPhysicsId(physics::BodyID phys_id) { PhysicsId = phys_id; }
-	FX_FORCE_INLINE physics::BodyID GetPhysicsId() const { return PhysicsId; }
+	FX_FORCE_INLINE void SetPhysicsID(physics::BodyID phys_id) { PhysicsID = phys_id; }
+	FX_FORCE_INLINE physics::BodyID GetPhysicsID() const { return PhysicsID; }
 	void SetPhysicsEnabled(bool enabled);
 	FX_FORCE_INLINE bool GetPhysicsEnabled() { return (Flags & eObjectFlags::PhysicsEnabled) != 0; }
 
@@ -171,7 +171,7 @@ private:
 
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
-	physics::BodyID PhysicsId = physics::BodyID::scNull;
+	physics::BodyID PhysicsID = physics::BodyID::scNull;
 
 	eObjectTag Tags = eObjectTag::None;
 

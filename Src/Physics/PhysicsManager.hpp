@@ -22,6 +22,10 @@ public:
 	physics::Body* GetBody(physics::BodyID id);
 	void DestroyBody(physics::BodyID& id);
 
+	physics::Body* FindBody(const Hash32 name_hash);
+
+	SizedArray<physics::Body*> CollectBodies();
+
 	~PhysicsManager();
 
 public:

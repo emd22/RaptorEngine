@@ -151,7 +151,7 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, physics::
 
 void Object::OnAttached(World* scene)
 {
-	physics::Body* phys = scene->GetPhysicsObject(PhysicsId);
+	physics::Body* phys = gPhysics->GetBody(PhysicsID);
 
 	// When the object is attached to the scene, enable physics if the physics object is active.
 	if (phys && phys->mbHasPhysicsBody) {
@@ -300,7 +300,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 void Object::Update()
 {
 	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
-		physics::Body* phys = pScene->GetPhysicsObject(PhysicsId);
+		physics::Body* phys = gPhysics->GetBody(PhysicsID);
 
 		if (mbPhysicsTransformOutOfDate) {
 			phys->Teleport(mPosition, mRotation);
@@ -389,7 +389,7 @@ void Object::SetPhysicsEnabled(bool enabled)
 		return;
 	}
 
-	physics::Body* phys = pScene->GetPhysicsObject(PhysicsId);
+	physics::Body* phys = gPhysics->GetBody(PhysicsID);
 
 	if (!phys->mbHasPhysicsBody) {
 		LogWarning(LC_CORE, "Object does not have physics body!");
@@ -416,7 +416,7 @@ void Object::PrintDebug() const
 
 	physics::Body* phys = nullptr;
 
-	if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
+	if (pScene && (phys = gPhysics->GetBody(PhysicsID))) {
 		bool has_body = phys->mbHasPhysicsBody;
 		LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
 				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
@@ -446,7 +446,7 @@ void Object::Destroy()
 	}
 
 	physics::Body* phys = nullptr;
-	if (pScene != nullptr && (phys = pScene->GetPhysicsObject(PhysicsId)) != nullptr) {
+	if (pScene != nullptr && (phys = gPhysics->GetBody(PhysicsID)) != nullptr) {
 		phys->DestroyPhysicsBody();
 	}
 

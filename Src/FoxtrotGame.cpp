@@ -358,19 +358,6 @@ void FoxtrotGame::ProcessControls()
 		mMainScene.SelectCamera(Player.pCamera);
 	}
 
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
-		SizedArray<JPH::BodyID> hits = Player.Physics.RaycastBodies(Player.pCamera->GetForwardVector() * 50.0f);
-		LogInfo("HIT {} BODIES", hits.Size);
-		if (hits.Size > 0) {
-			mMainScene.SelectPhysicsObject(hits[0]);
-		}
-
-		for (JPH::BodyID body_id : hits) {
-			LogInfo("HIT {}", body_id.GetIndex());
-		}
-	}
-
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_N)) {
 		NewBlockoutBrush();
 	}
@@ -583,8 +570,8 @@ void FoxtrotGame::AddEditorModes()
 {
 	EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Default));
 
-	EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), nullptr));
-	EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), nullptr));
+	// EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), nullptr));
+	// EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), nullptr));
 }
 
 
@@ -608,57 +595,57 @@ FoxtrotGame::~FoxtrotGame()
 // Editor modes
 /////////////////////////////////////
 
-void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
-{
-	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != physics::BodyID::scNull) {
-		physics::Body* phys = scene.GetPhysicsObject(phys_id);
-		phys->Teleport(phys->GetPosition() + (movement_vector * Vec3f(0.05)), phys->GetRotation());
+// void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
+// {
+// 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
+// 	if (phys_id != physics::BodyID::scNull) {
+// 		physics::Body* phys = scene.GetPhysicsObject(phys_id);
+// 		phys->Teleport(phys->GetPosition() + (movement_vector * Vec3f(0.05)), phys->GetRotation());
 
-		Vec3f target = phys->GetPosition();
-		pCamera->MoveTo(target + Vec3f(0, 10, -10));
-		pCamera->Target = target;
-		pCamera->bLookatTarget = true;
+// 		Vec3f target = phys->GetPosition();
+// 		pCamera->MoveTo(target + Vec3f(0, 10, -10));
+// 		pCamera->Target = target;
+// 		pCamera->bLookatTarget = true;
 
-		pCamera->Update();
-	}
-}
+// 		pCamera->Update();
+// 	}
+// }
 
-void EditorModeMoveCollider::OnLeave(const World& scene) {}
+// void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
-void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
-{
-	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != physics::BodyID::scNull) {
-		physics::Body* phys = scene.GetPhysicsObject(phys_id);
-		phys->Dimensions = phys->Dimensions + (movement_vector * Vec3f(0.05));
-		if (phys->Dimensions.X < 0.01f) {
-			phys->Dimensions.X = 0.01f;
-		}
-		if (phys->Dimensions.Y < 0.01f) {
-			phys->Dimensions.Y = 0.01f;
-		}
-		if (phys->Dimensions.Z < 0.01f) {
-			phys->Dimensions.Z = 0.01f;
-		}
+// void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
+// {
+// 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
+// 	if (phys_id != physics::BodyID::scNull) {
+// 		physics::Body* phys = scene.GetPhysicsObject(phys_id);
+// 		phys->Dimensions = phys->Dimensions + (movement_vector * Vec3f(0.05));
+// 		if (phys->Dimensions.X < 0.01f) {
+// 			phys->Dimensions.X = 0.01f;
+// 		}
+// 		if (phys->Dimensions.Y < 0.01f) {
+// 			phys->Dimensions.Y = 0.01f;
+// 		}
+// 		if (phys->Dimensions.Z < 0.01f) {
+// 			phys->Dimensions.Z = 0.01f;
+// 		}
 
-		Vec3f target = phys->GetPosition();
-		pCamera->MoveTo(target + Vec3f(0, 10, -10));
-		pCamera->Target = target;
-		pCamera->bLookatTarget = true;
+// 		Vec3f target = phys->GetPosition();
+// 		pCamera->MoveTo(target + Vec3f(0, 10, -10));
+// 		pCamera->Target = target;
+// 		pCamera->bLookatTarget = true;
 
-		pCamera->Update();
-	}
-}
+// 		pCamera->Update();
+// 	}
+// }
 
-void EditorModeScaleCollider::OnLeave(const World& scene)
-{
-	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != physics::BodyID::scNull) {
-		physics::Body* phys = scene.GetPhysicsObject(phys_id);
-		phys->CreatePrimitiveBody(phys->PrimitiveType, phys->Dimensions, phys->mMotionType, {});
-	}
-}
+// void EditorModeScaleCollider::OnLeave(const World& scene)
+// {
+// 	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
+// 	if (phys_id != physics::BodyID::scNull) {
+// 		physics::Body* phys = scene.GetPhysicsObject(phys_id);
+// 		phys->CreatePrimitiveBody(phys->PrimitiveType, phys->Dimensions, phys->mMotionType, {});
+// 	}
+// }
 
 
 } // namespace fx

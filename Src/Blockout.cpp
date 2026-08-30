@@ -35,7 +35,7 @@ static void RemoveBlockoutFromWorld(World* world)
 
 	for (Object* object : objects) {
 		world->Detach(object->ID);
-		if (!object->PhysicsId.IsNull()) {
+		if (!object->PhysicsID.IsNull()) {
 		}
 		gObjectManager->DestroyObject(object->ID);
 	}

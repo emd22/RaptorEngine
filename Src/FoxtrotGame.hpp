@@ -41,30 +41,30 @@ public:
 /////////////////////////////////////
 
 
-class EditorModeMoveCollider : public BaseEditorMode
-{
-public:
-	EditorModeMoveCollider() = delete;
-	EditorModeMoveCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
+// class EditorModeMoveCollider : public BaseEditorMode
+// {
+// public:
+// 	EditorModeMoveCollider() = delete;
+// 	EditorModeMoveCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-	void Update(const World& scene, const Vec3f& movement_vector) override;
-	void OnLeave(const World& scene) override;
+// 	void Update(const World& scene, const Vec3f& movement_vector) override;
+// 	void OnLeave(const World& scene) override;
 
-	~EditorModeMoveCollider() override {};
-};
+// 	~EditorModeMoveCollider() override {};
+// };
 
 
-class EditorModeScaleCollider : public BaseEditorMode
-{
-public:
-	EditorModeScaleCollider() = delete;
-	EditorModeScaleCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
+// class EditorModeScaleCollider : public BaseEditorMode
+// {
+// public:
+// 	EditorModeScaleCollider() = delete;
+// 	EditorModeScaleCollider(Ref<PerspectiveCamera> camera) { this->pCamera = camera; }
 
-	void Update(const World& scene, const Vec3f& movement_vector) override;
-	void OnLeave(const World& scene) override;
+// 	void Update(const World& scene, const Vec3f& movement_vector) override;
+// 	void OnLeave(const World& scene) override;
 
-	~EditorModeScaleCollider() override {};
-};
+// 	~EditorModeScaleCollider() override {};
+// };
 
 
 /////////////////////////////////////

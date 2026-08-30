@@ -63,6 +63,43 @@ void PhysicsManager::DestroyBody(physics::BodyID& id)
 	id.Invalidate();
 }
 
+
+physics::Body* PhysicsManager::FindBody(const Hash32 name_hash)
+{
+	std::lock_guard<std::mutex> guard(mInUse);
+
+	for (uint32 i = 0; i < mBodies.Capacity; i++) {
+		if (mBodies.SlotsInUse.Get(i) == false) {
+			continue;
+		}
+
+		physics::Body* body = mBodies.GetItem(i);
+
+		if (body->GetName().GetHash() == name_hash) {
+			return body;
+		}
+	}
+
+	return nullptr;
+}
+
+SizedArray<physics::Body*> PhysicsManager::CollectBodies()
+{
+	std::lock_guard<std::mutex> guard(mInUse);
+
+	SizedArray<physics::Body*> object_list(mBodies.Size + 1);
+
+	for (uint32 i = 0; i < mBodies.Capacity; i++) {
+		if (!mBodies.SlotsInUse.Get(i)) {
+			continue;
+		}
+
+		object_list.Insert(mBodies.GetItem(i));
+	}
+
+	return object_list;
+}
+
 PhysicsManager::~PhysicsManager()
 {
 	if (pBackend != nullptr) {

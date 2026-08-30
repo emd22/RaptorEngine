@@ -18,7 +18,6 @@ void World::Create()
 {
 	mObjects.Create(32);
 	mLights.Create(32);
-	mPhysicsObjects.Create(32);
 }
 
 static void AddObjectToRenderList(Object* object, World* scene)
@@ -117,33 +116,33 @@ void World::Detach(ObjectID id)
 	RemoveObjectFromRenderList(id, this);
 }
 
-physics::BodyID World::NewPhysicsObject()
-{
-	physics::BodyID id = mPhysicsObjects.Size();
-	physics::Body* phys = mPhysicsObjects.Insert();
-	phys->SetID(id);
+// physics::BodyID World::NewPhysicsObject()
+// {
+// 	physics::BodyID id = mPhysicsObjects.Size();
+// 	physics::Body* phys = mPhysicsObjects.Insert();
+// 	phys->SetID(id);
 
-	return id;
-}
+// 	return id;
+// }
 
-physics::Body* World::GetPhysicsObject(physics::BodyID id) const
-{
-	if (id == physics::BodyID::scNull || id.GetID() > mPhysicsObjects.Size()) {
-		return nullptr;
-	}
+// physics::Body* World::GetPhysicsObject(physics::BodyID id) const
+// {
+// 	if (id == physics::BodyID::scNull || id.GetID() > mPhysicsObjects.Size()) {
+// 		return nullptr;
+// 	}
 
-	return &mPhysicsObjects[id.GetID()];
-}
+// 	return &mPhysicsObjects[id.GetID()];
+// }
 
-void World::SelectPhysicsObject(const JPH::BodyID& body_id)
-{
-	for (const physics::Body& phys : mPhysicsObjects) {
-		if (phys.mpPhysicsBody->GetID() == body_id) {
-			mSelectedPhysicsObjectId = phys.GetID();
-			return;
-		}
-	}
-}
+// void World::SelectPhysicsObject(const JPH::BodyID& body_id)
+// {
+// 	for (const physics::Body& phys : mPhysicsObjects) {
+// 		if (phys.mpPhysicsBody->GetID() == body_id) {
+// 			mSelectedPhysicsObjectId = phys.GetID();
+// 			return;
+// 		}
+// 	}
+// }
 
 Object* World::FindObject(const Hash32 name_hash)
 {
@@ -157,16 +156,16 @@ Object* World::FindObject(const Hash32 name_hash)
 	return nullptr;
 }
 
-physics::Body* World::FindPhysicsObject(const Hash32 name_hash)
-{
-	for (physics::Body& phys : mPhysicsObjects) {
-		if (phys.GetName().GetHash() == name_hash) {
-			return &phys;
-		}
-	}
+// physics::Body* World::FindPhysicsObject(const Hash32 name_hash)
+// {
+// 	for (physics::Body& phys : mPhysicsObjects) {
+// 		if (phys.GetName().GetHash() == name_hash) {
+// 			return &phys;
+// 		}
+// 	}
 
-	return nullptr;
-}
+// 	return nullptr;
+// }
 
 
 void World::ExecuteRenderList(renderer::ePipelineName pl_name)
@@ -507,23 +506,25 @@ void World::RenderPhysicsObjects(const Camera& camera)
 	const Color debug_color = Color::FromRGBA(255, 40, 40, 255);
 	const Color selected_color = Color::FromRGBA(100, 255, 40, 255);
 
-	for (physics::Body& phys : mPhysicsObjects) {
-		Mat4f model_matrix = Mat4f::AsScale(phys.Dimensions) * Mat4f::AsRotation(phys.GetRotation()) *
-							 Mat4f::AsTranslation(phys.GetPosition());
-		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+	// SizedArray<physics::Body> bodies = gPhysics
+
+	// for (physics::Body& phys : mPhysicsObjects) {
+	// 	Mat4f model_matrix = Mat4f::AsScale(phys.Dimensions) * Mat4f::AsRotation(phys.GetRotation()) *
+	// 						 Mat4f::AsTranslation(phys.GetPosition());
+	// 	Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 
-		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-		if (phys.GetID() == mSelectedPhysicsObjectId) {
-			push_constants.DebugColor = selected_color.AsUInt();
-		}
-		else {
-			push_constants.DebugColor = debug_color.AsUInt();
-		}
+	// 	memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+	// 	if (phys.GetID() == mSelectedPhysicsObjectId) {
+	// 		push_constants.DebugColor = selected_color.AsUInt();
+	// 	}
+	// 	else {
+	// 		push_constants.DebugColor = debug_color.AsUInt();
+	// 	}
 
-		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-		mpDebugCube->Render(cmd, 1);
-	}
+	// 	gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+	// 	mpDebugCube->Render(cmd, 1);
+	// }
 }
 
 void World::Destroy()
@@ -531,7 +532,7 @@ void World::Destroy()
 	mObjects.Destroy();
 	mLights.Destroy();
 
-	mPhysicsObjects.Destroy();
+	// mPhysicsObjects.Destroy();
 }
 
 } // namespace fx
