@@ -517,18 +517,15 @@ void World::RenderPhysicsObjects(const Camera& camera)
 
 
 	for (physics::Body* phys : mCachedPhysicsBodies) {
-		Mat4f model_matrix = Mat4f::AsScale(phys->Dimensions) * Mat4f::AsRotation(phys->GetRotation()) *
+		// As we are using scale here, we want to halve the dimensions
+		Mat4f world_matrix = Mat4f::AsScale(phys->Dimensions * 0.5) * Mat4f::AsRotation(phys->GetRotation()) *
 							 Mat4f::AsTranslation(phys->GetPosition());
-		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-		if (phys->GetID() == mSelectedPhysicsObjectId) {
-			push_constants.DebugColor = selected_color.AsUInt();
-		}
-		else {
-			push_constants.DebugColor = debug_color.AsUInt();
-		}
+
+		push_constants.DebugColor = selected_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);

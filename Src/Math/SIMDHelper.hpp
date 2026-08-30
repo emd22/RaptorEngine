@@ -39,6 +39,7 @@ FX_FORCE_INLINE FLOAT4 LoadFloat4(float x, float y, float z, float w)
 }
 
 FX_FORCE_INLINE FLOAT4 AbsDiff(FLOAT4 a, FLOAT4 b) { return vabdq_f32(a, b); }
+FX_FORCE_INLINE FLOAT4 Sub(FLOAT4 a, FLOAT4 b) { return vsubq_f32(a, b); }
 
 } // namespace simd
 
@@ -66,6 +67,8 @@ FX_FORCE_INLINE FLOAT4 AbsDiff(FLOAT4 a, FLOAT4 b)
 	// Remove the sign (abs)
 	return _mm_and_ps(diff, _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF)));
 }
+
+FX_FORCE_INLINE FLOAT4 Sub(FLOAT4 a, FLOAT4 b) { return _mm_sub_ps(a, b); }
 
 } // namespace simd
 

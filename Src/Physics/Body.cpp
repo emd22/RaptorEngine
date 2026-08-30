@@ -28,9 +28,11 @@ void physics::Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec
 	PrimitiveType = primitive_type;
 
 	JPH::RVec3 jolt_dimensions;
-	(dimensions * 0.5).ToJoltVec3(jolt_dimensions);
 
 	Dimensions = dimensions;
+
+	// Jolt uses half dimensions (i.e. radius vs diameter) so we need to give it half of our shizzle
+	(Dimensions * 0.5).ToJoltVec3(jolt_dimensions);
 
 	LogInfo(LC_PHYSICS, "Creating primitive collider with dimensions {}", dimensions);
 
@@ -135,7 +137,7 @@ void physics::Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags f
 
 void physics::Body::DestroyPhysicsBody()
 {
-	if (!mbHasPhysicsBody || mpPhysicsBody != nullptr) {
+	if (!mbHasPhysicsBody || mpPhysicsBody == nullptr) {
 		return;
 	}
 

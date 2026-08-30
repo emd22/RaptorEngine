@@ -62,7 +62,7 @@ static Vec3f GetCubeMidpointOffset(const CubeGenOptions& cgo)
 	const FLOAT4 vmax = fx::simd::LoadFloat4(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale, 0.0f);
 	const FLOAT4 vmin = fx::simd::LoadFloat4(cgo.Left.Scale, cgo.Bottom.Scale, cgo.Back.Scale, 0.0f);
 
-	return Vec3f(fx::simd::AbsDiff(vmax, vmin));
+	return Vec3f(fx::simd::Sub(vmax, vmin)) * 0.5f;
 }
 
 static Vec3f GetCubeSize(const CubeGenOptions& cgo)
@@ -110,6 +110,8 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
 							  physics::BodyProps {});
 	phys->Teleport(position + GetCubeMidpointOffset(cgo), Quat::scIdentity);
+
+	object->PhysicsID = phys->GetID();
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
