@@ -139,6 +139,10 @@ public:
 		}
 	}
 
+	FX_FORCE_INLINE bool HasTags(eObjectTag tag) const { return HasFlag(Tags, tag); }
+	FX_FORCE_INLINE void SetTag(eObjectTag tag) { SetFlag(Tags, tag); }
+	FX_FORCE_INLINE void ClearTag(eObjectTag tag) { ClearFlag(Tags, tag); }
+
 	FX_FORCE_INLINE bool IsShadowCaster() const { return (Flags & eObjectFlags::ShadowCaster) != 0; }
 
 	void SetUnlit(const bool value);

@@ -29,14 +29,11 @@ void Blockout::Create(World* world)
 
 static void RemoveBlockoutFromWorld(World* world)
 {
-	SizedArray<Object*> objects = gObjectManager->CollectObjects();
+	SizedArray<Object*> objects = gObjectManager->CollectWithTags(eObjectTag::Blockout);
 
 	for (Object* object : objects) {
-		// Remove any objects marked blockout
-		if (object->Name.Get().starts_with("PROTO_")) {
-			world->Detach(object->ID);
-			gObjectManager->DestroyObject(object->ID);
-		}
+		world->Detach(object->ID);
+		gObjectManager->DestroyObject(object->ID);
 	}
 }
 
@@ -46,8 +43,10 @@ void Blockout::Load(const String& path)
 	ConfigFile info {};
 	info.Load(path.CStr());
 
-
 	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
+
+	// Remove the current blockout from the world
+	RemoveBlockoutFromWorld(pWorld);
 
 	for (ConfigEntry& entry : blocks_entry->Members) {
 		Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
@@ -76,15 +75,7 @@ void Blockout::Load(const String& path)
 		});
 
 
-		Object* existing_blockout = gObjectManager->FindObject(HashStr32(blockout_id.CStr()));
-
-		// If the blockout block already exists, remove and recreate it
-		if (existing_blockout != nullptr) {
-			pWorld->Detach(existing_blockout->ID);
-			gObjectManager->DestroyObject(existing_blockout->ID);
-		}
-
-		Object* object = gObjectManager->NewObject(blockout_id.Str());
+		Object* object = gObjectManager->NewObject(blockout_id.Str(), eObjectTag::Blockout);
 		object->pMesh = cube_mesh->AsDefaultMesh();
 		object->MoveBy(position);
 		object->mMaterialID = mBlockoutMaterialID;

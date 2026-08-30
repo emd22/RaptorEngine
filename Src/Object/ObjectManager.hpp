@@ -30,8 +30,8 @@ public:
 public:
 	void Create();
 
-	ObjectID NewObjectID(const std::string& name);
-	Object* NewObject(const std::string& name);
+	ObjectID NewObjectID(const std::string& name, eObjectTag tags = eObjectTag::None);
+	Object* NewObject(const std::string& name, eObjectTag tags = eObjectTag::None);
 	Object* GetObject(ObjectID id);
 	void DestroyObject(ObjectID& id);
 
@@ -45,6 +45,8 @@ public:
 	 * @brief Returns a list of all objects currently logged in the object manager.
 	 */
 	SizedArray<Object*> CollectObjects();
+
+	SizedArray<Object*> CollectWithTags(eObjectTag tags);
 
 	void PrintActive(uint32 limit = 20);
 

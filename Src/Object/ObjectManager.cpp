@@ -28,7 +28,7 @@ void ObjectManager::Create()
 							eGpuBufferFlags::PersistentMapped);
 }
 
-ObjectID ObjectManager::NewObjectID(const std::string& name)
+ObjectID ObjectManager::NewObjectID(const std::string& name, eObjectTag tags)
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
@@ -36,12 +36,13 @@ ObjectID ObjectManager::NewObjectID(const std::string& name)
 	Object* obj = mObjectList.NewItem(&index);
 	obj->Name = Name(name);
 	obj->ID = ObjectID(index);
+	obj->Tags = tags;
 
 	return obj->ID;
 }
 
 
-Object* ObjectManager::NewObject(const std::string& name)
+Object* ObjectManager::NewObject(const std::string& name, eObjectTag tags)
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
@@ -49,6 +50,7 @@ Object* ObjectManager::NewObject(const std::string& name)
 	Object* obj = mObjectList.NewItem(&index);
 	obj->ID = ObjectID(index);
 	obj->Name = name;
+	obj->Tags = tags;
 
 	return obj;
 }
@@ -159,6 +161,27 @@ SizedArray<Object*> ObjectManager::CollectObjects()
 		}
 
 		object_list.Insert(mObjectList.GetItem(i));
+	}
+
+	return object_list;
+}
+
+SizedArray<Object*> ObjectManager::CollectWithTags(eObjectTag tags)
+{
+	std::lock_guard<std::mutex> guard(mInUse);
+
+	SizedArray<Object*> object_list(mObjectList.Size + 1);
+
+	for (uint32 i = 0; i < mObjectList.Capacity; i++) {
+		if (!mObjectList.SlotsInUse.Get(i)) {
+			continue;
+		}
+
+		Object* object = mObjectList.GetItem(i);
+
+		if (object->HasTags(tags)) {
+			object_list.Insert(object);
+		}
 	}
 
 	return object_list;
