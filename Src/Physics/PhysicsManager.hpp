@@ -31,6 +31,8 @@ public:
 public:
 	physics::JoltPhysicsBackend* pBackend = nullptr;
 
+	std::atomic_uint32_t UpdateState = 0;
+
 private:
 	FreeArray<physics::Body> mBodies;
 

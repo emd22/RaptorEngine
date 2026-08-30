@@ -1,3 +1,11 @@
+/*
+ * File:        ConfigFile.hpp
+ * Author:      emd22
+ * Created:     17/09/2025
+ * Description: Configuration file parser and writer
+ */
+
+
 #pragma once
 
 #include <Color.hpp>
@@ -23,37 +31,37 @@ concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_poi
 // Config Value
 /////////////////////////////////////
 
-struct ConfigValue
+struct ConfigPrimitive
 {
 public:
-	ConfigValue() = default;
+	ConfigPrimitive() = default;
 
 	template <typename T>
-	ConfigValue(T value)
+	ConfigPrimitive(T value)
 	{
 		Set(value);
 	}
 
-	ConfigValue(const ConfigValue& other) { (*this) = other; }
+	ConfigPrimitive(const ConfigPrimitive& other) { (*this) = other; }
 
-	ConfigValue& operator=(const ConfigValue& other)
+	ConfigPrimitive& operator=(const ConfigPrimitive& other)
 	{
 		Type = other.Type;
 
-		if (Type == eValueType::String) {
+		if (Type == ePrimitiveType::String) {
 			mStringValue = strdup(other.mStringValue);
 		}
-		else if (Type == eValueType::Int) {
+		else if (Type == ePrimitiveType::Int) {
 			mIntValue = other.mIntValue;
 		}
-		else if (Type == eValueType::Float) {
+		else if (Type == ePrimitiveType::Float) {
 			mFloatValue = other.mFloatValue;
 		}
 
 		return *this;
 	}
 
-	void Set(const ConfigValue& other) { (*this) = other; }
+	void Set(const ConfigPrimitive& other) { (*this) = other; }
 
 	template <typename T>
 	T Get() const;
@@ -62,7 +70,7 @@ public:
 		requires std::is_integral_v<TIntType>
 	TIntType Get() const
 	{
-		if (Type != eValueType::Int) {
+		if (Type != ePrimitiveType::Int) {
 			LogWarning(LC_CORE, "Attempting to retrieve int type from non-int!");
 			return 0;
 		}
@@ -74,7 +82,7 @@ public:
 		requires std::is_floating_point_v<TFloatType>
 	TFloatType Get() const
 	{
-		if (Type != eValueType::Float) {
+		if (Type != ePrimitiveType::Float) {
 			LogWarning(LC_CORE, "Attempting to retrieve float type from non-float!");
 			return 0.0f;
 		}
@@ -85,7 +93,7 @@ public:
 	template <>
 	const char* Get() const
 	{
-		Assert(Type == eValueType::String);
+		Assert(Type == ePrimitiveType::String);
 
 		return mStringValue;
 	}
@@ -96,29 +104,29 @@ public:
 	void Set(TType value)
 	{
 		if constexpr (std::is_integral_v<TType>) {
-			Type = eValueType::Int;
+			Type = ePrimitiveType::Int;
 			mIntValue = value;
 		}
 		else if constexpr (std::is_floating_point_v<TType>) {
-			Type = eValueType::Float;
+			Type = ePrimitiveType::Float;
 			mFloatValue = value;
 		}
 		else if constexpr (std::is_same_v<char*, std::remove_const_t<TType>>) {
-			Type = eValueType::String;
+			Type = ePrimitiveType::String;
 			mStringValue = strdup(value);
 		}
 	}
 
 	void Set(const std::string& str)
 	{
-		Type = eValueType::String;
+		Type = ePrimitiveType::String;
 		mStringValue = strdup(str.c_str());
 	}
 
 	std::string AsString() const;
 
 public:
-	enum class eValueType
+	enum class ePrimitiveType
 	{
 		None,
 		Int,
@@ -127,7 +135,7 @@ public:
 		Struct,
 	};
 
-	eValueType Type = eValueType::None;
+	ePrimitiveType Type = ePrimitiveType::None;
 
 	union
 	{
@@ -143,10 +151,10 @@ public:
 /////////////////////////////////////
 
 
-class ConfigEntry : public ConfigValue
+class ConfigEntry : public ConfigPrimitive
 {
 public:
-	static ConfigEntry Array(const std::string& name, ConfigValue::eValueType type)
+	static ConfigEntry Array(const std::string& name, ConfigPrimitive::ePrimitiveType type)
 	{
 		ConfigEntry entry(name);
 		entry.Type = type;
@@ -155,7 +163,7 @@ public:
 	}
 
 	template <typename TType>
-	static ConfigEntry Array(const std::string& name, ConfigValue::eValueType type, const Slice<TType>& data)
+	static ConfigEntry Array(const std::string& name, ConfigPrimitive::ePrimitiveType type, const Slice<TType>& data)
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, type);
 
@@ -169,7 +177,7 @@ public:
 	static ConfigEntry Struct(const std::string& name)
 	{
 		ConfigEntry entry(name);
-		entry.Type = ConfigValue::eValueType::Struct;
+		entry.Type = ConfigPrimitive::ePrimitiveType::Struct;
 		return entry;
 	}
 
@@ -198,7 +206,7 @@ public:
 
 	void AddMember(ConfigEntry&& entry);
 
-	void AppendValue(ConfigValue&& value);
+	void AppendValue(ConfigPrimitive&& value);
 
 	void AppendValue(const Vec3f& vec);
 	void AppendValue(const Vec4f& vec);
@@ -247,7 +255,7 @@ public:
 		requires std::is_integral_v<TIntType>
 	TIntType GetValue() const
 	{
-		if (Type != eValueType::Int) {
+		if (Type != ePrimitiveType::Int) {
 			LogWarning(LC_CORE, "Attempting to retrieve int type from non-int!");
 			return 0;
 		}
@@ -259,7 +267,7 @@ public:
 		requires std::is_floating_point_v<TFloatType>
 	TFloatType GetValue() const
 	{
-		if (Type != eValueType::Float) {
+		if (Type != ePrimitiveType::Float) {
 			LogWarning(LC_CORE, "Attempting to retrieve float type from non-float!");
 			return 0.0f;
 		}
@@ -270,7 +278,7 @@ public:
 	template <>
 	const char* GetValue() const
 	{
-		Assert(Type == eValueType::String);
+		Assert(Type == ePrimitiveType::String);
 
 		return mStringValue;
 	}
@@ -290,7 +298,7 @@ public:
 	}
 
 	const PagedArray<ConfigEntry>& GetAllMembers() const { return Members; }
-	const PagedArray<ConfigValue>& GetArrayData() const { return ArrayData; }
+	const PagedArray<ConfigPrimitive>& GetArrayData() const { return ArrayData; }
 
 	ConfigEntry& operator=(const ConfigEntry& other) = delete;
 
@@ -305,7 +313,7 @@ public:
 	bool bIsArray = false;
 
 	PagedArray<ConfigEntry> Members;
-	PagedArray<ConfigValue> ArrayData;
+	PagedArray<ConfigPrimitive> ArrayData;
 };
 
 /////////////////////////////////////
@@ -377,8 +385,8 @@ private:
 	bool EatToken(const Slice<eTokenType>& expected_types);
 
 	ConfigEntry ParseEntry(ConfigEntry* parent);
-	void ParseValue(ConfigValue& value);
-	void ParseReference(ConfigValue& value);
+	void ParseValue(ConfigPrimitive& value);
+	void ParseReference(ConfigPrimitive& value);
 
 	FX_FORCE_INLINE Token* GetToken() const
 	{

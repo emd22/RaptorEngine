@@ -216,7 +216,7 @@ void Font::WriteMetaFile(const String& atlas_path) const
 
 		// Bearings
 		{
-			ConfigEntry bearing_entry = ConfigEntry::Array("Bearing", ConfigEntry::eValueType::Float);
+			ConfigEntry bearing_entry = ConfigEntry::Array("Bearing", ConfigEntry::ePrimitiveType::Float);
 			// Left bearing
 			bearing_entry.AppendValue(metrics.Lsb);
 			// Vertical bearing
@@ -228,7 +228,7 @@ void Font::WriteMetaFile(const String& atlas_path) const
 
 
 		{
-			ConfigEntry size_entry = ConfigEntry::Array("Size", ConfigEntry::eValueType::Int);
+			ConfigEntry size_entry = ConfigEntry::Array("Size", ConfigEntry::ePrimitiveType::Int);
 			size_entry.AppendValue(metrics.Size.X);
 			size_entry.AppendValue(metrics.Size.Y);
 
@@ -236,7 +236,7 @@ void Font::WriteMetaFile(const String& atlas_path) const
 		}
 
 		{
-			ConfigEntry offset_entry = ConfigEntry::Array("Offset", ConfigEntry::eValueType::Int);
+			ConfigEntry offset_entry = ConfigEntry::Array("Offset", ConfigEntry::ePrimitiveType::Int);
 			offset_entry.AppendValue(metrics.AtlasOffset.X);
 			offset_entry.AppendValue(metrics.AtlasOffset.Y);
 

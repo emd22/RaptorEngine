@@ -16,10 +16,10 @@ Foxtrot is a 3D game engine being developed for an experimental game.
 
 ## Docs
 
-| Name               | Document                              |
-| ------------------ | ------------------------------------- |
-| Scripting language | [FoxScript.md](Docs/FoxScript.md)     |
-| Project format     | [SceneFormat.md](Docs/SceneFormat.md) |
+| Name               | Document                                |
+| ------------------ | --------------------------------------- |
+| Scripting language | [FoxScript.md](Docs/FoxScript.md)       |
+| Config format      | [ConfigFormat.md](Docs/ConfigFormat.md) |
 
 ## Building
 

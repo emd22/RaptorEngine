@@ -20,7 +20,7 @@ namespace fx {
 
 ConfigEntry& ConfigEntry::operator=(ConfigEntry&& other)
 {
-	if (other.Type == ConfigEntry::eValueType::String) {
+	if (other.Type == ConfigEntry::ePrimitiveType::String) {
 		mStringValue = other.mStringValue;
 		other.mStringValue = nullptr;
 	}
@@ -29,7 +29,7 @@ ConfigEntry& ConfigEntry::operator=(ConfigEntry&& other)
 	}
 
 	Type = other.Type;
-	other.Type = ConfigEntry::eValueType::None;
+	other.Type = ConfigEntry::ePrimitiveType::None;
 
 	Members = std::move(other.Members);
 	ArrayData = std::move(other.ArrayData);
@@ -53,21 +53,21 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
 
 	Members.Insert(std::move(entry));
 
-	Type = ConfigEntry::eValueType::Struct;
+	Type = ConfigEntry::ePrimitiveType::Struct;
 }
 
-std::string ConfigValue::AsString() const
+std::string ConfigPrimitive::AsString() const
 {
 	switch (Type) {
-	case eValueType::None:
+	case ePrimitiveType::None:
 		return "";
-	case eValueType::Int:
+	case ePrimitiveType::Int:
 		return std::to_string(mIntValue);
-	case eValueType::Float:
+	case ePrimitiveType::Float:
 		return std::to_string(mFloatValue);
-	case eValueType::String:
+	case ePrimitiveType::String:
 		return std::format("\"{}\"", mStringValue);
-	case eValueType::Struct:
+	case ePrimitiveType::Struct:
 		break;
 	}
 
@@ -85,7 +85,7 @@ std::string ConfigEntry::AsString(uint32 indent) const
 	}
 
 
-	if (Type == eValueType::Struct) {
+	if (Type == ePrimitiveType::Struct) {
 		for (const ConfigEntry& entry : Members) {
 			member_list += std::format("{}\t{} = {}\n", indent_str, entry.Name.Get(), entry.AsString(indent + 1));
 		}
@@ -96,7 +96,7 @@ std::string ConfigEntry::AsString(uint32 indent) const
 		uint32 array_size = ArrayData.Size();
 
 		for (uint32 value_index = 0; value_index < array_size; value_index++) {
-			const ConfigValue& value = ArrayData[value_index];
+			const ConfigPrimitive& value = ArrayData[value_index];
 			if (value_index == array_size - 1) {
 				member_list += std::format("{}", value.AsString());
 			}
@@ -109,7 +109,7 @@ std::string ConfigEntry::AsString(uint32 indent) const
 	}
 
 
-	return this->ConfigValue::AsString();
+	return this->ConfigPrimitive::AsString();
 }
 
 ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
@@ -163,11 +163,11 @@ void ConfigEntry::AppendValue(const Quat& quat)
 
 ConfigEntry::~ConfigEntry()
 {
-	if (Type == eValueType::String && mStringValue != nullptr) {
+	if (Type == ePrimitiveType::String && mStringValue != nullptr) {
 		free(mStringValue);
 	}
 
-	Type = eValueType::None;
+	Type = ePrimitiveType::None;
 
 	mStringValue = nullptr;
 	if (Members.IsInited()) {
@@ -202,9 +202,9 @@ void ConfigFile::Load(const std::string& path)
 	gEnginePool->Free(file_buffer.pData);
 }
 
-static ConfigEntry::eValueType GetValueTokenType(const Token& token)
+static ConfigEntry::ePrimitiveType GetValueTokenType(const Token& token)
 {
-	using VType = ConfigEntry::eValueType;
+	using VType = ConfigEntry::ePrimitiveType;
 
 	VType current_type = VType::None;
 
@@ -269,7 +269,7 @@ void ConfigFile::PrintEntries()
 	}
 }
 
-void ConfigFile::ParseReference(ConfigValue& value)
+void ConfigFile::ParseReference(ConfigPrimitive& value)
 {
 	Token* ident_token = GetToken();
 	EatToken(eTokenType::Identifier);
@@ -297,9 +297,9 @@ void ConfigFile::ParseReference(ConfigValue& value)
 	}
 }
 
-void ConfigFile::ParseValue(ConfigValue& value)
+void ConfigFile::ParseValue(ConfigPrimitive& value)
 {
-	using VType = ConfigEntry::eValueType;
+	using VType = ConfigEntry::ePrimitiveType;
 
 	Token* value_token = GetToken();
 
@@ -327,7 +327,7 @@ void ConfigFile::ParseValue(ConfigValue& value)
 	if (value_token->Type == eTokenType::Minus) {
 		EatToken(eTokenType::Minus);
 
-		ConfigValue temp;
+		ConfigPrimitive temp;
 		ParseValue(temp);
 
 		switch (temp.Type) {
@@ -366,7 +366,7 @@ void ConfigFile::ParseValue(ConfigValue& value)
 	NextToken();
 }
 
-void ConfigEntry::AppendValue(ConfigValue&& value)
+void ConfigEntry::AppendValue(ConfigPrimitive&& value)
 {
 	if (!ArrayData.IsInited()) {
 		ArrayData.Create(8);
@@ -401,7 +401,7 @@ ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
 	if (GetToken()->Type == eTokenType::LBrace) {
 		EatToken(eTokenType::LBrace);
 
-		entry.Type = ConfigEntry::eValueType::Struct;
+		entry.Type = ConfigEntry::ePrimitiveType::Struct;
 
 		// Add each entry as a member of the current entry
 		while (GetToken()->Type != eTokenType::RBrace) {
@@ -424,7 +424,7 @@ ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
 		entry.Type = GetValueTokenType(*value_token);
 
 		while (GetToken()->Type != eTokenType::RBracket) {
-			ConfigValue value;
+			ConfigPrimitive value;
 			value.Type = entry.Type;
 			ParseValue(value);
 			entry.AppendValue(std::move(value));

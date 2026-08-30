@@ -57,6 +57,7 @@ private:
 	// Geometry
 	void CreateForwardPSO();
 	void CreateSSAOPSO();
+	void CreateDebugLayerPSO();
 
 	void BuildPersistentDescriptor();
 

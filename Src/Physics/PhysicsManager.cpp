@@ -26,6 +26,8 @@ physics::Body* PhysicsManager::NewBody(const String& name)
 	body->ID = physics::BodyID(index);
 	body->SetName(name);
 
+	UpdateState.fetch_add(1U);
+
 	return body;
 }
 
@@ -61,6 +63,8 @@ void PhysicsManager::DestroyBody(physics::BodyID& id)
 
 	// Invalidate the passed ID
 	id.Invalidate();
+
+	UpdateState.fetch_add(1U);
 }
 
 

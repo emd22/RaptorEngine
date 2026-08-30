@@ -49,6 +49,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateSSAOPSO();
 	CreateCompositionPSO();
 	CreateLightCullingPSO();
+	CreateDebugLayerPSO();
 
 
 	BuildPersistentDescriptor();
@@ -165,6 +166,20 @@ void TiledForwardRenderer::CreateSSAOPSO()
 
 		gPSOBuild->EndPipeline();
 	}
+}
+
+void TiledForwardRenderer::CreateDebugLayerPSO()
+{
+	// Debug Layer pipeline
+	gPSOBuild->BeginPipeline(ePipelineName::DebugLayer);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
+
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->SetShader(eShaderName::DebugLayer, {});
+	gPSOBuild->SetVertexType(eVertexType::Slim);
+	gPSOBuild->SetRenderLines(true);
+	gPSOBuild->SetCullMode(eCullMode::Back);
+	gPSOBuild->EndPipeline();
 }
 
 

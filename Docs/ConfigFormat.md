@@ -14,6 +14,8 @@ A file is defined as a collection of entries. Each assignment expression is cons
 Entries use strict typing, and enforce that they can only be read as the type which they are defined.
 They can be objects, arrays, or literal values. As well, predefined constants can be added in the configuration file interpreter.
 
+Entries can either contain the value of a primitive (int, float, string, etc.), an object, or an array.
+
 The types currently supported include:
 
 ### Strings
@@ -84,4 +86,24 @@ To include a file, use the `#include` directive. with a path to the script to in
 
 ```
 #include "[SOME_FILE_PATH].prx"
+```
+
+## Counting syntax
+
+When having a collection of data that is not specifically configuration related but still needs identifiable entries, you can use `$` in place of a name for an entry.
+
+This sets the name to the current index in the members list.
+
+For example:
+
+```
+parent = {
+	$ = {    // becomes 0 = {
+		...
+	}
+	$ = {	 // becomes 1 = {
+		...
+	}
+
+}
 ```

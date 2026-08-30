@@ -5,6 +5,7 @@
 #include <Material/MaterialManagerFwd.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -412,6 +413,8 @@ void World::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::Geometry);
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
+
+	RenderPhysicsObjects(camera);
 }
 
 
@@ -506,25 +509,30 @@ void World::RenderPhysicsObjects(const Camera& camera)
 	const Color debug_color = Color::FromRGBA(255, 40, 40, 255);
 	const Color selected_color = Color::FromRGBA(100, 255, 40, 255);
 
-	// SizedArray<physics::Body> bodies = gPhysics
+	uint32 current_phys_state = gPhysics->UpdateState.load();
+	if (mLastPhysicsUpdateState != current_phys_state) {
+		mLastPhysicsUpdateState = current_phys_state;
+		mCachedPhysicsBodies = gPhysics->CollectBodies();
+	}
 
-	// for (physics::Body& phys : mPhysicsObjects) {
-	// 	Mat4f model_matrix = Mat4f::AsScale(phys.Dimensions) * Mat4f::AsRotation(phys.GetRotation()) *
-	// 						 Mat4f::AsTranslation(phys.GetPosition());
-	// 	Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+
+	for (physics::Body* phys : mCachedPhysicsBodies) {
+		Mat4f model_matrix = Mat4f::AsScale(phys->Dimensions) * Mat4f::AsRotation(phys->GetRotation()) *
+							 Mat4f::AsTranslation(phys->GetPosition());
+		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 
-	// 	memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-	// 	if (phys.GetID() == mSelectedPhysicsObjectId) {
-	// 		push_constants.DebugColor = selected_color.AsUInt();
-	// 	}
-	// 	else {
-	// 		push_constants.DebugColor = debug_color.AsUInt();
-	// 	}
+		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+		if (phys->GetID() == mSelectedPhysicsObjectId) {
+			push_constants.DebugColor = selected_color.AsUInt();
+		}
+		else {
+			push_constants.DebugColor = debug_color.AsUInt();
+		}
 
-	// 	gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
-	// 	mpDebugCube->Render(cmd, 1);
-	// }
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		mpDebugCube->Render(cmd, 1);
+	}
 }
 
 void World::Destroy()

@@ -6,6 +6,7 @@
 #include <Material/MaterialManager.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <World.hpp>
 
@@ -34,9 +35,14 @@ static void RemoveBlockoutFromWorld(World* world)
 	SizedArray<Object*> objects = gObjectManager->CollectWithTags(eObjectTag::Blockout);
 
 	for (Object* object : objects) {
+		Assert(object != nullptr);
+
 		world->Detach(object->ID);
+
 		if (!object->PhysicsID.IsNull()) {
+			gPhysics->DestroyBody(object->PhysicsID);
 		}
+
 		gObjectManager->DestroyObject(object->ID);
 	}
 }
@@ -59,6 +65,12 @@ static Vec3f GetCubeMidpointOffset(const CubeGenOptions& cgo)
 	return Vec3f(fx::simd::AbsDiff(vmax, vmin));
 }
 
+static Vec3f GetCubeSize(const CubeGenOptions& cgo)
+{
+	return (Vec3f(cgo.Left.Scale, cgo.Top.Scale, cgo.Front.Scale) +
+			Vec3f(cgo.Right.Scale, cgo.Bottom.Scale, cgo.Back.Scale));
+}
+
 void Blockout::CreateCubeVolume(ConfigEntry& entry)
 {
 	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
@@ -67,7 +79,7 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	LogInfo("Adding blockout '{}'", blockout_id);
 
-	const PagedArray<ConfigValue>& scales = entry.GetMember(HashStr32("scale"))->GetArrayData();
+	const PagedArray<ConfigPrimitive>& scales = entry.GetMember(HashStr32("scale"))->GetArrayData();
 
 	LogInfo("Creating block id {}", blockout_id);
 
@@ -93,6 +105,11 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	object->MoveBy(position);
 	object->mMaterialID = mBlockoutMaterialID;
 	object->SetShadowCaster(true);
+
+	physics::Body* phys = gPhysics->NewBody(blockout_id);
+	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
+							  physics::BodyProps {});
+	phys->Teleport(position + GetCubeMidpointOffset(cgo), Quat::scIdentity);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();
