@@ -12,6 +12,7 @@
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/MeshUtil.hpp>
@@ -154,7 +155,7 @@ void Object::OnAttached(World* scene)
 
 	// When the object is attached to the scene, enable physics if the physics object is active.
 	if (phys && phys->mbHasPhysicsBody) {
-		SetPhysicsEnabled(gPhysics->GetBodyInterface().IsActive(phys->GetBodyId()));
+		SetPhysicsEnabled(gPhysics->pBackend->GetBodyInterface().IsActive(phys->GetBodyId()));
 	}
 }
 
@@ -166,7 +167,7 @@ void Object::OnAttached(World* scene)
 //     Vec3f scaled_dimensions = Dimensions * (mScale * 0.5);
 
 //     Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
-//     mbPhysicsEnabled = gPhysics->GetBodyInterface().IsActive(Physics.GetBodyId());
+//     mbPhysicsEnabled = gPhysics->pBackend->GetBodyInterface().IsActive(Physics.GetBodyId());
 // }
 
 
@@ -397,12 +398,12 @@ void Object::SetPhysicsEnabled(bool enabled)
 
 	if (enabled) {
 		LogInfo("Activate physics body");
-		gPhysics->GetBodyInterface().ActivateBody(phys->GetBodyId());
+		gPhysics->pBackend->GetBodyInterface().ActivateBody(phys->GetBodyId());
 		SetFlag(Flags, eObjectFlags::PhysicsEnabled);
 	}
 	else {
 		LogInfo("Deactivate physics body");
-		gPhysics->GetBodyInterface().DeactivateBody(phys->GetBodyId());
+		gPhysics->pBackend->GetBodyInterface().DeactivateBody(phys->GetBodyId());
 		ClearFlag(Flags, eObjectFlags::PhysicsEnabled);
 	}
 }

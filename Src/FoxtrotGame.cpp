@@ -19,6 +19,7 @@
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
@@ -176,7 +177,7 @@ void FoxtrotGame::CreateGame()
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
 	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
-	gPhysics->OptimizeBroadPhase();
+	gPhysics->pBackend->OptimizeBroadPhase();
 
 	pSun = mMainScene.GetDirectionalLight();
 
@@ -375,8 +376,8 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		physics::RayResult hit_point = gPhysics->Raycast(Player.pCamera->Position,
-														 Player.pCamera->GetForwardVector() * 10.0f);
+		physics::RayResult hit_point = gPhysics->pBackend->Raycast(Player.pCamera->Position,
+																   Player.pCamera->GetForwardVector() * 10.0f);
 		LogInfo(LC_PHYSICS, "Hit?={}, Pos={}", hit_point.bHit, hit_point.Point);
 
 		if (hit_point.bHit) {
@@ -544,7 +545,7 @@ void FoxtrotGame::Tick()
 		return;
 	}
 
-	gPhysics->Update();
+	gPhysics->pBackend->Update();
 
 	FrameData* frame = gGraphics->GetFrame();
 

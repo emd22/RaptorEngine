@@ -2,6 +2,7 @@
 
 #include "JoltPhysicsBackend.hpp"
 #include "PhMesh.hpp"
+#include "PhysicsManager.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/BodyCreationSettings.h>
@@ -81,7 +82,7 @@ void physics::Body::CreateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags f
 void physics::Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,
 								   const BodyProps& properties)
 {
-	JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->PhysicsSystem.GetBodyInterface();
 
 	Vec3f previous_position = Vec3f::sZero;
 	Quat previous_rotation = Quat::scIdentity;
@@ -138,7 +139,7 @@ void physics::Body::DestroyPhysicsBody()
 		return;
 	}
 
-	JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
+	JPH::BodyInterface& body_interface = gPhysics->pBackend->PhysicsSystem.GetBodyInterface();
 
 	body_interface.RemoveBody(GetBodyId());
 	body_interface.DestroyBody(GetBodyId());
@@ -160,8 +161,8 @@ void physics::Body::Teleport(const Vec3f& position, const Quat& rotation)
 	position.ToJoltVec3(jolt_position);
 	rotation.ToJoltQuaternion(jolt_rotation);
 
-	gPhysics->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(GetBodyId(), jolt_position, jolt_rotation,
-																	  JPH::EActivation::Activate);
+	gPhysics->pBackend->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(
+		GetBodyId(), jolt_position, jolt_rotation, JPH::EActivation::Activate);
 }
 
 } // namespace fx

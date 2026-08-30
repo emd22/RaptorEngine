@@ -5,6 +5,7 @@
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Math/SIMDHelper.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <World.hpp>
 
@@ -34,6 +35,8 @@ static void RemoveBlockoutFromWorld(World* world)
 
 	for (Object* object : objects) {
 		world->Detach(object->ID);
+		if (!object->PhysicsId.IsNull()) {
+		}
 		gObjectManager->DestroyObject(object->ID);
 	}
 }
@@ -49,7 +52,6 @@ static Vec3f GetCubeMidpointOffset(const CubeGenOptions& cgo)
 	// left^  pos^     right^
 	//
 	// Then we can offset the midpoint between the difference between left and right.
-
 
 	const FLOAT4 vmax = fx::simd::LoadFloat4(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale, 0.0f);
 	const FLOAT4 vmin = fx::simd::LoadFloat4(cgo.Left.Scale, cgo.Bottom.Scale, cgo.Back.Scale, 0.0f);

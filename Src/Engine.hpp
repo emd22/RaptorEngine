@@ -2,10 +2,8 @@
 
 namespace fx {
 
-namespace physics {
-class JoltPhysicsBackend;
-}
-extern physics::JoltPhysicsBackend* gPhysics;
+class PhysicsManager;
+extern PhysicsManager* gPhysics;
 
 class AssetManager;
 extern AssetManager* gAssetManager;

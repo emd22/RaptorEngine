@@ -1,6 +1,7 @@
 #include "PhysicsPlayer.hpp"
 
 #include "JoltPhysicsBackend.hpp"
+#include "PhysicsManager.hpp"
 
 #include <Jolt/Physics/Body/Body.h>
 #include <Jolt/Physics/Body/BodyID.h>
@@ -29,7 +30,7 @@ void PhysicsPlayer::Create()
 
 	const float32 collider_radius = player_config.GetEntry(HashStr32("ColliderRadius"))->Get<float32>();
 
-	Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
+	JPH::Ref<CharacterVirtualSettings> settings = new CharacterVirtualSettings;
 
 	pPhysicsShape = RotatedTranslatedShapeSettings(Vec3(0, 0.5f * scStandingHeight + collider_radius, 0),
 												   JPH::Quat::sIdentity(),
@@ -46,7 +47,8 @@ void PhysicsPlayer::Create()
 	settings->mSupportingVolume = Plane(Vec3::sAxisY(), -collider_radius);
 	settings->mInnerBodyLayer = PhLayer::Dynamic;
 
-	pPlayerVirt = new CharacterVirtual(settings, RVec3::sZero(), JPH::Quat::sIdentity(), 0, &gPhysics->PhysicsSystem);
+	pPlayerVirt = new CharacterVirtual(settings, RVec3::sZero(), JPH::Quat::sIdentity(), 0,
+									   &gPhysics->pBackend->PhysicsSystem);
 }
 
 void PhysicsPlayer::Teleport(const Vec3f& position)
@@ -61,7 +63,7 @@ void PhysicsPlayer::SetCollisionEnabled(bool value)
 {
 	bCollisionEnabled = value;
 
-	gPhysics->GetBodyInterface().SetObjectLayer(pPlayerVirt->GetInnerBodyID(), PhLayer::Deactivated);
+	gPhysics->pBackend->GetBodyInterface().SetObjectLayer(pPlayerVirt->GetInnerBodyID(), PhLayer::Deactivated);
 }
 
 void PhysicsPlayer::ApplyMovement(const Vec3f& direction)
@@ -81,7 +83,7 @@ SizedArray<JPH::BodyID> PhysicsPlayer::RaycastBodies(Vec3f direction) const
 
 	JPH::AllHitCollisionCollector<RayCastBodyCollector> collector;
 
-	gPhysics->PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
+	gPhysics->pBackend->PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
 
 	SizedArray<JPH::BodyID> hits;
 	hits.InitCapacity(collector.mHits.size());
@@ -98,7 +100,7 @@ void PhysicsPlayer::Update(float64 delta_time)
 {
 	mTime += delta_time;
 
-	PhysicsSystem& phys = gPhysics->PhysicsSystem;
+	PhysicsSystem& phys = gPhysics->pBackend->PhysicsSystem;
 
 	Vec3 gravity = (phys.GetGravity() * delta_time);
 
@@ -133,9 +135,9 @@ void PhysicsPlayer::Update(float64 delta_time)
 
 	// Move character
 	CharacterVirtual::ExtendedUpdateSettings update_settings {};
-	pPlayerVirt->ExtendedUpdate(delta_time, gravity, update_settings,
-								phys.GetDefaultBroadPhaseLayerFilter(collision_layer),
-								phys.GetDefaultLayerFilter(collision_layer), {}, {}, *gPhysics->pTempAllocator);
+	pPlayerVirt->ExtendedUpdate(
+		delta_time, gravity, update_settings, phys.GetDefaultBroadPhaseLayerFilter(collision_layer),
+		phys.GetDefaultLayerFilter(collision_layer), {}, {}, *gPhysics->pBackend->pTempAllocator);
 }
 
 } // namespace fx::physics

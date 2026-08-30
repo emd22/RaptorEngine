@@ -6,14 +6,14 @@
 #include <Core/Thread/ThreadManager.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
-#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <WorldGrid.hpp>
 
 namespace fx {
 
-physics::JoltPhysicsBackend* gPhysics = nullptr;
+PhysicsManager* gPhysics = nullptr;
 ShaderCompiler* gShaderCompiler = nullptr;
 
 // Managers
@@ -38,7 +38,7 @@ namespace Globals {
 
 void Init()
 {
-	gPhysics = new physics::JoltPhysicsBackend;
+	gPhysics = new PhysicsManager;
 	gAssetManager = new AssetManager;
 	gShaderCompiler = new ShaderCompiler;
 	gObjectManager = new ObjectManager;
