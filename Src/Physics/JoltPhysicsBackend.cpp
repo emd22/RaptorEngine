@@ -1,4 +1,4 @@
-#include "PhJolt.hpp"
+#include "JoltPhysicsBackend.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 
@@ -22,6 +22,7 @@
 #include <cstdarg>
 
 namespace fx {
+namespace physics {
 
 // Callback for traces, connect this to your own trace function if you have one
 static void JoltTrace(const char* fmt, ...)
@@ -41,7 +42,7 @@ static void JoltTrace(const char* fmt, ...)
 using namespace JPH::literals;
 
 
-void PhJolt::Update()
+void JoltPhysicsBackend::Update()
 {
 	if (bPhysicsPaused) {
 		return;
@@ -54,12 +55,12 @@ void PhJolt::Update()
 	PhysicsSystem.Update(cTimeStep, collision_steps, pTempAllocator.pPtr, pJobSystem.pPtr);
 }
 
-void PhJolt::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
+void JoltPhysicsBackend::OptimizeBroadPhase() { PhysicsSystem.OptimizeBroadPhase(); }
 
-void PhJolt::Create()
+void JoltPhysicsBackend::Create()
 {
 	if (mbIsInited) {
-		LogWarning(LC_PHYSICS, "PhJolt is already initialized!");
+		LogWarning(LC_PHYSICS, "JoltPhysicsBackend is already initialized!");
 		return;
 	}
 
@@ -147,7 +148,7 @@ void PhJolt::Create()
 	mbIsInited = true;
 }
 
-RayResult PhJolt::Raycast(const Vec3f& origin, const Vec3f& direction) const
+RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& direction) const
 {
 	JPH::RRayCast rc;
 
@@ -168,7 +169,7 @@ RayResult PhJolt::Raycast(const Vec3f& origin, const Vec3f& direction) const
 	return RayResult { false, Vec3f::sZero };
 }
 
-void PhJolt::Destroy()
+void JoltPhysicsBackend::Destroy()
 {
 	if (!mbIsInited) {
 		return;
@@ -180,13 +181,14 @@ void PhJolt::Destroy()
 	JPH::Factory::sInstance = nullptr;
 }
 
-PhJolt::PhJolt() {}
+JoltPhysicsBackend::JoltPhysicsBackend() {}
 
-PhJolt::~PhJolt()
+JoltPhysicsBackend::~JoltPhysicsBackend()
 {
 	Destroy();
 
 	mbIsInited = false;
 }
 
+} // namespace physics
 } // namespace fx

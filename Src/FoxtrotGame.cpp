@@ -18,7 +18,7 @@
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
-#include <Physics/PhJolt.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
@@ -375,7 +375,8 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		RayResult hit_point = gPhysics->Raycast(Player.pCamera->Position, Player.pCamera->GetForwardVector() * 10.0f);
+		physics::RayResult hit_point = gPhysics->Raycast(Player.pCamera->Position,
+														 Player.pCamera->GetForwardVector() * 10.0f);
 		LogInfo(LC_PHYSICS, "Hit?={}, Pos={}", hit_point.bHit, hit_point.Point);
 
 		if (hit_point.bHit) {
@@ -608,9 +609,9 @@ FoxtrotGame::~FoxtrotGame()
 
 void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
-	physics::PhysID phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != physics::PhysID::scNull) {
-		PhObject* phys = scene.GetPhysicsObject(phys_id);
+	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
+	if (phys_id != physics::BodyID::scNull) {
+		physics::Body* phys = scene.GetPhysicsObject(phys_id);
 		phys->Teleport(phys->GetPosition() + (movement_vector * Vec3f(0.05)), phys->GetRotation());
 
 		Vec3f target = phys->GetPosition();
@@ -626,9 +627,9 @@ void EditorModeMoveCollider::OnLeave(const World& scene) {}
 
 void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_vector)
 {
-	physics::PhysID phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != physics::PhysID::scNull) {
-		PhObject* phys = scene.GetPhysicsObject(phys_id);
+	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
+	if (phys_id != physics::BodyID::scNull) {
+		physics::Body* phys = scene.GetPhysicsObject(phys_id);
 		phys->Dimensions = phys->Dimensions + (movement_vector * Vec3f(0.05));
 		if (phys->Dimensions.X < 0.01f) {
 			phys->Dimensions.X = 0.01f;
@@ -651,9 +652,9 @@ void EditorModeScaleCollider::Update(const World& scene, const Vec3f& movement_v
 
 void EditorModeScaleCollider::OnLeave(const World& scene)
 {
-	physics::PhysID phys_id = scene.GetSelectedPhysicsObject();
-	if (phys_id != physics::PhysID::scNull) {
-		PhObject* phys = scene.GetPhysicsObject(phys_id);
+	physics::BodyID phys_id = scene.GetSelectedPhysicsObject();
+	if (phys_id != physics::BodyID::scNull) {
+		physics::Body* phys = scene.GetPhysicsObject(phys_id);
 		phys->CreatePrimitiveBody(phys->PrimitiveType, phys->Dimensions, phys->mMotionType, {});
 	}
 }

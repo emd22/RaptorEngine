@@ -1,6 +1,6 @@
-#include "PhObject.hpp"
+#include "Body.hpp"
 
-#include "PhJolt.hpp"
+#include "JoltPhysicsBackend.hpp"
 #include "PhMesh.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
@@ -17,11 +17,11 @@
 namespace fx {
 
 namespace physics {
-const PhysID PhysID::scNull = PhysID(UINT32_MAX);
+const BodyID BodyID::scNull = BodyID(UINT32_MAX);
 }
 
-void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
-								   const PhProperties& object_properties)
+void physics::Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimensions,
+										physics::eMotionType motion_type, const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
 	PrimitiveType = primitive_type;
@@ -34,9 +34,9 @@ void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f&
 	LogInfo(LC_PHYSICS, "Creating primitive collider with dimensions {}", dimensions);
 
 	switch (primitive_type) {
-	case ePhPrimitiveType::None:
+	case ePrimitiveType::None:
 		break;
-	case ePhPrimitiveType::Box: {
+	case ePrimitiveType::Box: {
 		JPH::BoxShapeSettings box_shape_settings(jolt_dimensions);
 		box_shape_settings.SetDensity(object_properties.Density);
 		box_shape_settings.mConvexRadius = object_properties.ConvexRadius;
@@ -44,13 +44,13 @@ void PhObject::CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f&
 		JPH::ShapeSettings::ShapeResult box_shape_result = box_shape_settings.Create();
 		JPH::ShapeRefC box_shape = box_shape_result.Get();
 
-		UpdateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
+		UpdateJoltBody(box_shape, physics::Body::eFlags::None, motion_type, object_properties);
 	} break;
 	}
 }
 
-void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_type,
-							  const PhProperties& object_properties)
+void physics::Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
+								   const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
 
@@ -63,11 +63,11 @@ void PhObject::CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_ty
 	JPH::ShapeRefC box_shape = mesh_shape_result.Get();
 
 
-	CreateJoltBody(box_shape, PhObject::eFlags::None, motion_type, object_properties);
+	CreateJoltBody(box_shape, physics::Body::eFlags::None, motion_type, object_properties);
 }
 
-void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
-							  const PhProperties& properties)
+void physics::Body::CreateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,
+								   const BodyProps& properties)
 {
 	if (mbHasPhysicsBody) {
 		LogWarning(LC_PHYSICS, "Attempting to create physics body when one is already created!");
@@ -78,8 +78,8 @@ void PhObject::CreateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhM
 }
 
 
-void PhObject::UpdateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
-							  const PhProperties& properties)
+void physics::Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,
+								   const BodyProps& properties)
 {
 	JPH::BodyInterface& body_interface = gPhysics->PhysicsSystem.GetBodyInterface();
 
@@ -98,16 +98,16 @@ void PhObject::UpdateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhM
 	PhLayer::Type object_layer = PhLayer::Static;
 	JPH::EActivation activation_mode = JPH::EActivation::Activate;
 
-	if (flags & PhObject::eFlags::CreateInactive) {
+	if (flags & Body::eFlags::CreateInactive) {
 		activation_mode = JPH::EActivation::DontActivate;
 	}
 
 	switch (motion_type) {
-	case ePhMotionType::Static:
+	case physics::eMotionType::Static:
 		jolt_motion_type = JPH::EMotionType::Static;
 		object_layer = PhLayer::Static;
 		break;
-	case ePhMotionType::Dynamic:
+	case physics::eMotionType::Dynamic:
 		jolt_motion_type = JPH::EMotionType::Dynamic;
 		object_layer = PhLayer::Dynamic;
 		break;
@@ -132,7 +132,7 @@ void PhObject::UpdateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhM
 	mbHasPhysicsBody = true;
 }
 
-void PhObject::DestroyPhysicsBody()
+void physics::Body::DestroyPhysicsBody()
 {
 	if (!mbHasPhysicsBody || mpPhysicsBody != nullptr) {
 		return;
@@ -148,7 +148,7 @@ void PhObject::DestroyPhysicsBody()
 }
 
 
-void PhObject::Teleport(const Vec3f& position, const Quat& rotation)
+void physics::Body::Teleport(const Vec3f& position, const Quat& rotation)
 {
 	if (!mbHasPhysicsBody) {
 		return;

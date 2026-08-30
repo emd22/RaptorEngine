@@ -1,6 +1,6 @@
-#include "PhPlayer.hpp"
+#include "PhysicsPlayer.hpp"
 
-#include "PhJolt.hpp"
+#include "JoltPhysicsBackend.hpp"
 
 #include <Jolt/Physics/Body/Body.h>
 #include <Jolt/Physics/Body/BodyID.h>
@@ -16,13 +16,13 @@
 #include <Engine.hpp>
 #include <Math/MathUtil.hpp>
 
-namespace fx {
+namespace fx::physics {
 
 static constexpr float32 scMaxSlopeAngle = MathUtil::DegreesToRadians(45.0f);
 
 using namespace JPH;
 
-void PhPlayer::Create()
+void PhysicsPlayer::Create()
 {
 	ConfigFile player_config;
 	player_config.Load(FX_BASE_DIR "/Data/Player.conf");
@@ -49,7 +49,7 @@ void PhPlayer::Create()
 	pPlayerVirt = new CharacterVirtual(settings, RVec3::sZero(), JPH::Quat::sIdentity(), 0, &gPhysics->PhysicsSystem);
 }
 
-void PhPlayer::Teleport(const Vec3f& position)
+void PhysicsPlayer::Teleport(const Vec3f& position)
 {
 	JPH::RVec3 jolt_position;
 	position.ToJoltVec3(jolt_position);
@@ -57,14 +57,14 @@ void PhPlayer::Teleport(const Vec3f& position)
 	pPlayerVirt->SetPosition(jolt_position);
 }
 
-void PhPlayer::SetCollisionEnabled(bool value)
+void PhysicsPlayer::SetCollisionEnabled(bool value)
 {
 	bCollisionEnabled = value;
 
 	gPhysics->GetBodyInterface().SetObjectLayer(pPlayerVirt->GetInnerBodyID(), PhLayer::Deactivated);
 }
 
-void PhPlayer::ApplyMovement(const Vec3f& direction)
+void PhysicsPlayer::ApplyMovement(const Vec3f& direction)
 {
 	Vec3 jolt_dir;
 	direction.ToJoltVec3(jolt_dir);
@@ -73,7 +73,7 @@ void PhPlayer::ApplyMovement(const Vec3f& direction)
 	// pPlayerVirt->SetLinearVelocity(jolt_dir);
 }
 
-SizedArray<JPH::BodyID> PhPlayer::RaycastBodies(Vec3f direction) const
+SizedArray<JPH::BodyID> PhysicsPlayer::RaycastBodies(Vec3f direction) const
 {
 	JPH::RayCast rc;
 	rc.mOrigin = pPlayerVirt->GetPosition();
@@ -94,7 +94,7 @@ SizedArray<JPH::BodyID> PhPlayer::RaycastBodies(Vec3f direction) const
 }
 
 
-void PhPlayer::Update(float64 delta_time)
+void PhysicsPlayer::Update(float64 delta_time)
 {
 	mTime += delta_time;
 
@@ -138,4 +138,4 @@ void PhPlayer::Update(float64 delta_time)
 								phys.GetDefaultLayerFilter(collision_layer), {}, {}, *gPhysics->pTempAllocator);
 }
 
-} // namespace fx
+} // namespace fx::physics

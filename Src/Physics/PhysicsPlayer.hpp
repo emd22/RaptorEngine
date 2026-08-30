@@ -8,15 +8,15 @@
 #include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 
-namespace fx {
+namespace fx::physics {
 
-class PhPlayer
+class PhysicsPlayer
 {
 public:
 	static constexpr float32 scStandingHeight = 1.72f;
 
 public:
-	PhPlayer() {}
+	PhysicsPlayer() {}
 
 	void Create();
 	void Teleport(const Vec3f& position);
@@ -43,4 +43,4 @@ public:
 	bool bDisableGravity : 1 = false;
 };
 
-} // namespace fx
+} // namespace fx::physics

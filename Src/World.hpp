@@ -29,8 +29,8 @@ public:
 
 	void Detach(ObjectID id);
 
-	physics::PhysID NewPhysicsObject();
-	PhObject* GetPhysicsObject(physics::PhysID id) const;
+	physics::BodyID NewPhysicsObject();
+	physics::Body* GetPhysicsObject(physics::BodyID id) const;
 
 	void SelectCamera(const Ref<Camera>& camera) { mpCurrentCamera = camera; }
 
@@ -51,10 +51,10 @@ public:
 	}
 
 	Object* FindObject(const Hash32 name_hash);
-	PhObject* FindPhysicsObject(const Hash32 name_hash);
+	physics::Body* FindPhysicsObject(const Hash32 name_hash);
 
 	void SelectPhysicsObject(const JPH::BodyID& body_id);
-	physics::PhysID GetSelectedPhysicsObject() const { return mSelectedPhysicsObjectId; }
+	physics::BodyID GetSelectedPhysicsObject() const { return mSelectedPhysicsObjectId; }
 
 	void ReleaseAllObjects() { mObjects.Clear(); }
 
@@ -85,12 +85,12 @@ public:
 private:
 	PagedArray<ObjectID> mObjects;
 	PagedArray<Ref<LightBase>> mLights;
-	PagedArray<PhObject> mPhysicsObjects;
+	PagedArray<physics::Body> mPhysicsObjects;
 
 
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };
 
-	physics::PhysID mSelectedPhysicsObjectId = physics::PhysID::scNull;
+	physics::BodyID mSelectedPhysicsObjectId = physics::BodyID::scNull;
 
 	Ref<PrimitiveMesh> mpDebugCube { nullptr };
 };

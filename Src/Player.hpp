@@ -3,7 +3,7 @@
 #include <Core/Ref.hpp>
 #include <Math/MathUtil.hpp>
 #include <Math/Vec2.hpp>
-#include <Physics/PhPlayer.hpp>
+#include <Physics/PhysicsPlayer.hpp>
 #include <Renderer/Camera.hpp>
 
 namespace fx {
@@ -95,7 +95,7 @@ private:
 	FX_FORCE_INLINE void SyncPhysicsToPlayer() { Position.FromJoltVec3(Physics.pPlayerVirt->GetPosition()); }
 
 public:
-	PhPlayer Physics;
+	physics::PhysicsPlayer Physics;
 	Ref<PerspectiveCamera> pCamera { nullptr };
 
 	/**

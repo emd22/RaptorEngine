@@ -111,26 +111,26 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 {
 	const std::string& collider_name = collider_entry.Name.Get();
 
-	ePhMotionType motion_type = ePhMotionType::Static;
+	physics::eMotionType motion_type = physics::eMotionType::Static;
 
 	// Create physics object
-	physics::PhysID physics_id = scene.NewPhysicsObject();
-	PhObject* phys = scene.GetPhysicsObject(physics_id);
+	physics::BodyID physics_id = scene.NewPhysicsObject();
+	physics::Body* phys = scene.GetPhysicsObject(physics_id);
 	phys->SetName(collider_name);
 
 	Vec3f position = collider_entry.GetMemberValue(HashStr32("Pos"), Vec3f::sZero);
 	Quat rotation = collider_entry.GetMemberValue(HashStr32("Rot"), Quat::scIdentity);
 
 	ConfigEntry* physics_type = collider_entry.GetMember(HashStr32("Type"));
-	if (physics_type && physics_type->Get<uint32>() == static_cast<uint32>(ePhMotionType::Dynamic)) {
-		motion_type = ePhMotionType::Dynamic;
+	if (physics_type && physics_type->Get<uint32>() == static_cast<uint32>(physics::eMotionType::Dynamic)) {
+		motion_type = physics::eMotionType::Dynamic;
 	}
 
 	ConfigEntry* box = collider_entry.GetMember(HashStr32("Box"));
 	if (box != nullptr) {
 		Vec3f size = box->GetMemberValue(HashStr32("Size"), Vec3f::sOne);
 
-		phys->CreatePrimitiveBody(ePhPrimitiveType::Box, size, motion_type, PhProperties {});
+		phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, size, motion_type, physics::BodyProps {});
 	}
 
 
@@ -192,14 +192,14 @@ void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& objec
 		object->SetUnlit(static_cast<bool>(unlit->Get<int64>()));
 	}
 
-	PhProperties physics_properties {};
+	physics::BodyProps physics_properties {};
 
 	// Physics
 
 	ConfigEntry* collider_ref = object_entry.GetMember(HashStr32("ColliderRef"));
 	if (collider_ref != nullptr) {
-		PhObject* phys_object = object->pScene->FindPhysicsObject(HashStr32(collider_ref->Get<const char*>()));
-		object->SetPhysicsId(phys_object->GetId());
+		physics::Body* phys_object = object->pScene->FindPhysicsObject(HashStr32(collider_ref->Get<const char*>()));
+		object->SetPhysicsId(phys_object->GetID());
 		object->SetPhysicsEnabled(true);
 	}
 

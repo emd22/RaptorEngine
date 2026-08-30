@@ -117,18 +117,18 @@ void World::Detach(ObjectID id)
 	RemoveObjectFromRenderList(id, this);
 }
 
-physics::PhysID World::NewPhysicsObject()
+physics::BodyID World::NewPhysicsObject()
 {
-	physics::PhysID id = mPhysicsObjects.Size();
-	PhObject* phys = mPhysicsObjects.Insert();
-	phys->SetId(id);
+	physics::BodyID id = mPhysicsObjects.Size();
+	physics::Body* phys = mPhysicsObjects.Insert();
+	phys->SetID(id);
 
 	return id;
 }
 
-PhObject* World::GetPhysicsObject(physics::PhysID id) const
+physics::Body* World::GetPhysicsObject(physics::BodyID id) const
 {
-	if (id == physics::PhysID::scNull || id.GetID() > mPhysicsObjects.Size()) {
+	if (id == physics::BodyID::scNull || id.GetID() > mPhysicsObjects.Size()) {
 		return nullptr;
 	}
 
@@ -137,9 +137,9 @@ PhObject* World::GetPhysicsObject(physics::PhysID id) const
 
 void World::SelectPhysicsObject(const JPH::BodyID& body_id)
 {
-	for (const PhObject& phys : mPhysicsObjects) {
+	for (const physics::Body& phys : mPhysicsObjects) {
 		if (phys.mpPhysicsBody->GetID() == body_id) {
-			mSelectedPhysicsObjectId = phys.GetId();
+			mSelectedPhysicsObjectId = phys.GetID();
 			return;
 		}
 	}
@@ -157,9 +157,9 @@ Object* World::FindObject(const Hash32 name_hash)
 	return nullptr;
 }
 
-PhObject* World::FindPhysicsObject(const Hash32 name_hash)
+physics::Body* World::FindPhysicsObject(const Hash32 name_hash)
 {
-	for (PhObject& phys : mPhysicsObjects) {
+	for (physics::Body& phys : mPhysicsObjects) {
 		if (phys.GetName().GetHash() == name_hash) {
 			return &phys;
 		}
@@ -507,14 +507,14 @@ void World::RenderPhysicsObjects(const Camera& camera)
 	const Color debug_color = Color::FromRGBA(255, 40, 40, 255);
 	const Color selected_color = Color::FromRGBA(100, 255, 40, 255);
 
-	for (PhObject& phys : mPhysicsObjects) {
+	for (physics::Body& phys : mPhysicsObjects) {
 		Mat4f model_matrix = Mat4f::AsScale(phys.Dimensions) * Mat4f::AsRotation(phys.GetRotation()) *
 							 Mat4f::AsTranslation(phys.GetPosition());
 		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
-		if (phys.GetId() == mSelectedPhysicsObjectId) {
+		if (phys.GetID() == mSelectedPhysicsObjectId) {
 			push_constants.DebugColor = selected_color.AsUInt();
 		}
 		else {

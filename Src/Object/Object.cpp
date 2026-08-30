@@ -11,7 +11,7 @@
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
 #include <Object/ObjectManager.hpp>
-#include <Physics/PhJolt.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/MeshUtil.hpp>
@@ -85,8 +85,8 @@ void Object::FinalizeWhenReady()
 }
 
 
-void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
-									const PhProperties& physics_properties)
+void Object::PhysicsCreatePrimitive(physics::ePrimitiveType primitive_type, const Vec3f& dimensions,
+									physics::eMotionType motion_type, const physics::BodyProps& physics_properties)
 {
 	// OnLoaded(
 	//     [&]()
@@ -96,11 +96,11 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
 	//             return;
 	//         }
 
-	//         if (this->PhysicsId == PhObjectIdNull) {
+	//         if (this->PhysicsId == BodyIdNull) {
 	//             this->PhysicsId = scene->NewPhysicsObject();
 	//         }
 
-	//         PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
+	//         Body* phys = scene->GetPhysicsObject(this->PhysicsId);
 
 	//         if (!phys) {
 	//             LogError(LC_PHYSICS, "Error creating physics object");
@@ -116,8 +116,8 @@ void Object::PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f
 }
 
 
-void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotionType motion_type,
-							   const PhProperties& physics_properties)
+void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, physics::eMotionType motion_type,
+							   const physics::BodyProps& physics_properties)
 {
 	// OnLoaded(
 	//     [&]()
@@ -128,7 +128,7 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
 	//         }
 
 	//         this->PhysicsId = scene->NewPhysicsObject();
-	//         PhObject* phys = scene->GetPhysicsObject(this->PhysicsId);
+	//         Body* phys = scene->GetPhysicsObject(this->PhysicsId);
 
 	//         if (!phys) {
 	//             LogError(LC_PHYSICS, "Error creating physics object");
@@ -150,7 +150,7 @@ void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, ePhMotion
 
 void Object::OnAttached(World* scene)
 {
-	PhObject* phys = scene->GetPhysicsObject(PhysicsId);
+	physics::Body* phys = scene->GetPhysicsObject(PhysicsId);
 
 	// When the object is attached to the scene, enable physics if the physics object is active.
 	if (phys && phys->mbHasPhysicsBody) {
@@ -159,7 +159,7 @@ void Object::OnAttached(World* scene)
 }
 
 
-// void Object::PhysicsCreate(PhObject::Flags flags, PhMotionType moititype, const PhProperties& properties)
+// void Object::PhysicsCreate(Body::Flags flags, PhMotionType moititype, const PhProperties& properties)
 // {
 //     Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
 
@@ -299,7 +299,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 void Object::Update()
 {
 	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
-		PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
+		physics::Body* phys = pScene->GetPhysicsObject(PhysicsId);
 
 		if (mbPhysicsTransformOutOfDate) {
 			phys->Teleport(mPosition, mRotation);
@@ -361,7 +361,7 @@ void Object::AttachObject(const ObjectID& attach_id)
 	AttachedNodes.Insert(attach_id);
 }
 
-void Object::SyncObjectWithPhysics(PhObject* phys)
+void Object::SyncObjectWithPhysics(physics::Body* phys)
 {
 	if ((!mPosition.IsCloseTo(phys->GetPosition()) || !mRotation.IsCloseTo(phys->GetRotation()))) {
 		mPosition = phys->GetPosition();
@@ -388,7 +388,7 @@ void Object::SetPhysicsEnabled(bool enabled)
 		return;
 	}
 
-	PhObject* phys = pScene->GetPhysicsObject(PhysicsId);
+	physics::Body* phys = pScene->GetPhysicsObject(PhysicsId);
 
 	if (!phys->mbHasPhysicsBody) {
 		LogWarning(LC_CORE, "Object does not have physics body!");
@@ -413,13 +413,13 @@ void Object::PrintDebug() const
 	LogInfo(LC_CORE, "\tPos={}, Rot={}, Scale={}, DimMin={}, DimMax={}", mPosition, mRotation, mScale, Bounds.Min,
 			Bounds.Max);
 
-	PhObject* phys = nullptr;
+	physics::Body* phys = nullptr;
 
 	if (pScene && (phys = pScene->GetPhysicsObject(PhysicsId))) {
 		bool has_body = phys->mbHasPhysicsBody;
 		LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
 				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
-				(phys->GetMotionType() == ePhMotionType::Static) ? "Static" : "Dynamic");
+				(phys->GetMotionType() == physics::eMotionType::Static) ? "Static" : "Dynamic");
 	}
 
 	LogInfo(LC_CORE, "\tIsInstance?={}, ReadyToRender?={}, ShadowCaster?={}, Skinned?={}",
@@ -444,7 +444,7 @@ void Object::Destroy()
 		pMesh->Destroy();
 	}
 
-	PhObject* phys = nullptr;
+	physics::Body* phys = nullptr;
 	if (pScene != nullptr && (phys = pScene->GetPhysicsObject(PhysicsId)) != nullptr) {
 		phys->DestroyPhysicsBody();
 	}

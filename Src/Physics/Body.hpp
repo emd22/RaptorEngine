@@ -1,6 +1,6 @@
 #pragma once
 
-#include "PhysID.hpp"
+#include "BodyID.hpp"
 
 #include <ThirdParty/Jolt/Jolt.h>
 #include <ThirdParty/Jolt/Physics/Body/Body.h>
@@ -13,10 +13,12 @@
 namespace fx {
 class PrimitiveMesh;
 
-struct PhProperties
+namespace physics {
+
+struct BodyProps
 {
 public:
-	PhProperties() = default;
+	BodyProps() = default;
 
 	float32 ConvexRadius = 0.001f;
 	float32 Friction = 0.2f;
@@ -30,20 +32,20 @@ public:
 };
 
 
-enum class ePhMotionType
+enum class eMotionType
 {
 	Static,
 	Dynamic,
 };
 
-enum class ePhPrimitiveType
+enum class ePrimitiveType
 {
 	None,
 	Box,
 };
 
 
-class PhObject
+class Body
 {
 public:
 	enum eFlags
@@ -53,15 +55,16 @@ public:
 	};
 
 public:
-	PhObject() = default;
+	Body() = default;
 
-	void SetId(physics::PhysID id) { Id = id; }
-	physics::PhysID GetId() const { return Id; }
+	void SetID(physics::BodyID id) { ID = id; }
+	physics::BodyID GetID() const { return ID; }
 
-	void CreatePrimitiveBody(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
-							 const PhProperties& object_properties);
+	void CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimensions, physics::eMotionType motion_type,
+							 const BodyProps& object_properties);
 
-	void CreateMeshBody(const PrimitiveMesh& mesh, ePhMotionType motion_type, const PhProperties& object_properties);
+	void CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
+						const BodyProps& object_properties);
 
 	void DestroyPhysicsBody();
 
@@ -73,32 +76,33 @@ public:
 	FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
 	FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
 
-	FX_FORCE_INLINE ePhMotionType GetMotionType() const { return mMotionType; }
+	FX_FORCE_INLINE physics::eMotionType GetMotionType() const { return mMotionType; }
 
 	FX_FORCE_INLINE Name& GetName() { return mColliderName; }
 	FX_FORCE_INLINE void SetName(const String& name) { mColliderName.Set(name); }
 	FX_FORCE_INLINE void SetName(const std::string& name) { mColliderName.Set(name); }
 
-	~PhObject() = default;
+	~Body() = default;
 
 private:
-	void CreateJoltBody(JPH::ShapeRefC shape, eFlags flags, ePhMotionType type, const PhProperties& properties);
-	void UpdateJoltBody(JPH::ShapeRefC shape, PhObject::eFlags flags, ePhMotionType motion_type,
-						const PhProperties& properties);
+	void CreateJoltBody(JPH::ShapeRefC shape, eFlags flags, physics::eMotionType type, const BodyProps& properties);
+	void UpdateJoltBody(JPH::ShapeRefC shape, Body::eFlags flags, physics::eMotionType motion_type,
+						const BodyProps& properties);
 
 public:
 	JPH::Body* mpPhysicsBody = nullptr;
-	ePhMotionType mMotionType = ePhMotionType::Static;
+	physics::eMotionType mMotionType = physics::eMotionType::Static;
 
-	bool mbHasPhysicsBody : 1 = false;
+	bool mbHasPhysicsBody = false;
 
 	Vec3f Dimensions = Vec3f::sOne;
-	ePhPrimitiveType PrimitiveType = ePhPrimitiveType::None;
+	ePrimitiveType PrimitiveType = ePrimitiveType::None;
 
-	physics::PhysID Id = physics::PhysID::scNull;
+	physics::BodyID ID = physics::BodyID::scNull;
 
 private:
 	Name mColliderName;
 };
 
+} // namespace physics
 } // namespace fx

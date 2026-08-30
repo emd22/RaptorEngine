@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Physics/PhObject.hpp"
+#include "Physics/Body.hpp"
 
 // #include <ThirdParty/Jolt/Jolt.h>
 // #include <ThirdParty/Jolt/Physics/Body/Body.h>
@@ -75,11 +75,11 @@ public:
 
 	void OnAttached(World* scene) override;
 
-	void PhysicsCreatePrimitive(ePhPrimitiveType primitive_type, const Vec3f& dimensions, ePhMotionType motion_type,
-								const PhProperties& physics_properties);
+	void PhysicsCreatePrimitive(physics::ePrimitiveType primitive_type, const Vec3f& dimensions,
+								physics::eMotionType motion_type, const physics::BodyProps& physics_properties);
 
-	void PhysicsCreateMesh(Ref<PrimitiveMesh> physics_mesh, ePhMotionType motion_type,
-						   const PhProperties& physics_properties);
+	void PhysicsCreateMesh(Ref<PrimitiveMesh> physics_mesh, physics::eMotionType motion_type,
+						   const physics::BodyProps& physics_properties);
 
 	void PrintDebug() const;
 
@@ -117,8 +117,8 @@ public:
 	// Physics
 	/////////////////////////////////////
 
-	FX_FORCE_INLINE void SetPhysicsId(physics::PhysID phys_id) { PhysicsId = phys_id; }
-	FX_FORCE_INLINE physics::PhysID GetPhysicsId() const { return PhysicsId; }
+	FX_FORCE_INLINE void SetPhysicsId(physics::BodyID phys_id) { PhysicsId = phys_id; }
+	FX_FORCE_INLINE physics::BodyID GetPhysicsId() const { return PhysicsId; }
 	void SetPhysicsEnabled(bool enabled);
 	FX_FORCE_INLINE bool GetPhysicsEnabled() { return (Flags & eObjectFlags::PhysicsEnabled) != 0; }
 
@@ -167,11 +167,11 @@ private:
 	void RenderMesh(renderer::Pipeline* pipeline);
 	void SetScriptVars();
 
-	void SyncObjectWithPhysics(PhObject* phys);
+	void SyncObjectWithPhysics(physics::Body* phys);
 
 public:
 	Ref<PrimitiveMesh> pMesh { nullptr };
-	physics::PhysID PhysicsId = physics::PhysID::scNull;
+	physics::BodyID PhysicsId = physics::BodyID::scNull;
 
 	eObjectTag Tags = eObjectTag::None;
 

@@ -19,6 +19,7 @@ class TempAllocatorImpl;
 
 namespace fx {
 
+namespace physics {
 
 namespace PhLayer {
 using Type = JPH::ObjectLayer;
@@ -77,7 +78,7 @@ private:
 };
 
 /// Class that determines if an object layer can collide with a broadphase layer
-class PhObjectVsBPLayerFilter : public JPH::ObjectVsBroadPhaseLayerFilter
+class BodyVsBPLayerFilter : public JPH::ObjectVsBroadPhaseLayerFilter
 {
 public:
 	virtual bool ShouldCollide(JPH::ObjectLayer inLayer1, JPH::BroadPhaseLayer inLayer2) const override
@@ -98,7 +99,7 @@ public:
 
 
 /// Class that determines if two object layers can collide
-class PhObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
+class BodyLayerPairFilterImpl : public JPH::ObjectLayerPairFilter
 {
 public:
 	virtual bool ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
@@ -162,13 +163,13 @@ struct RayResult
 };
 
 
-class PhJolt
+class JoltPhysicsBackend
 {
 public:
 	static constexpr uint32 scMaxBodies = 512;
 
 public:
-	PhJolt();
+	JoltPhysicsBackend();
 
 	void Create();
 	void Update();
@@ -180,7 +181,7 @@ public:
 
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 
-	~PhJolt();
+	~JoltPhysicsBackend();
 
 public:
 	JPH::PhysicsSystem PhysicsSystem;
@@ -194,14 +195,16 @@ public:
 
 private:
 	PhBPLayerInterfaceImpl mBroadPhaseInterface;
-	PhObjectVsBPLayerFilter mObjectVsBPLayerFilter;
+	BodyVsBPLayerFilter mObjectVsBPLayerFilter;
 
 	PhBodyActivationListener mBodyActivationListener;
 	PhContactListener mContactListener;
-	PhObjectLayerPairFilterImpl mObjectLayerPairFilter;
+	BodyLayerPairFilterImpl mObjectLayerPairFilter;
 
 
 	bool mbIsInited = false;
 };
+
+} // namespace physics
 
 } // namespace fx

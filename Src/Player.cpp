@@ -19,7 +19,7 @@ void Player::Create()
 	Physics.Create();
 
 	// Since the physics position is the center of the capsule, we will use standing height / 2.
-	mCameraOffset = Vec3f(0, PhPlayer::scStandingHeight / 2.0f, 0);
+	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scStandingHeight / 2.0f, 0);
 }
 
 void Player::MoveBy(const Vec3f& by)
