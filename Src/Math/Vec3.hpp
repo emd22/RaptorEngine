@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SIMDHelper.hpp"
+
 #include <Core/Defines.hpp>
 #include <Core/Types.hpp>
 #include <format>
@@ -9,9 +11,7 @@
 
 #include <arm_neon.h>
 #elif defined(FX_USE_AVX)
-#include "SSE.hpp"
 #include "SSEUtil.hpp"
-
 #endif
 
 namespace JPH {
@@ -28,12 +28,6 @@ class Quat;
 class alignas(16) Vec3f
 {
 private:
-#if defined(FX_USE_NEON)
-	using SimdType = float32x4_t;
-#elif defined(FX_USE_AVX)
-	using SimdType = __m128;
-#endif
-
 public:
 	static const Vec3f sZero;
 	static const Vec3f sOne;
@@ -62,7 +56,7 @@ public:
 	}
 
 #ifdef FX_USE_SIMD
-	explicit Vec3f(SimdType intrin) : mIntrin(intrin) {}
+	explicit Vec3f(FLOAT4 intrin) : mIntrin(intrin) {}
 	Vec3f(const Vec4f& other);
 #else
 	Vec3f(const Vec4f& other) : X(other.X), Y(other.Y), Z(other.Z) {}
@@ -108,11 +102,13 @@ public:
 	FX_FORCE_INLINE bool IsNearZero(const float32 tolerance = 0.00001) const;
 	FX_FORCE_INLINE bool IsCloseTo(const Vec3f& other, const float32 tolerance = 0.00001) const;
 #ifdef FX_USE_SIMD
-	FX_FORCE_INLINE bool IsCloseTo(const SimdType other, const float32 tolerance = 0.00001) const;
+	FX_FORCE_INLINE bool IsCloseTo(const FLOAT4 other, const float32 tolerance = 0.00001) const;
 #endif
 	bool IsCloseTo(const JPH::Vec3& other, const float32 threshold = 0.001) const;
 
 	FX_FORCE_INLINE Vec3f Normalize() const;
+
+	FX_FORCE_INLINE Vec3f Abs() const;
 
 	/**
 	 * Normalizes the vector in place (modifies the source vector.)
@@ -127,8 +123,9 @@ public:
 	Vec3f Rotate(const Quat& rotation) const;
 
 	FX_FORCE_INLINE float32 Dot(const Vec3f& other) const;
+
 #ifdef FX_USE_SIMD
-	FX_FORCE_INLINE float32 Dot(SimdType other) const;
+	FX_FORCE_INLINE float32 Dot(FLOAT4 other) const;
 #endif
 
 	FX_FORCE_INLINE static Vec3f Min(const Vec3f& a, const Vec3f& b);
@@ -202,26 +199,20 @@ public:
 	FX_FORCE_INLINE Vec3f& operator*=(const Vec3f& other);
 
 #ifdef FX_USE_SIMD
-	Vec3f& operator=(const SimdType& other)
+
+	Vec3f& operator=(const FLOAT4 other)
 	{
 		mIntrin = other;
 		return *this;
 	}
 
-	Vec3f& operator=(const SimdType other)
-	{
-		mIntrin = other;
-		return *this;
-	}
-
-	operator SimdType() const { return mIntrin; }
 #endif
 
 public:
 #if defined(FX_USE_SIMD)
 	union alignas(16)
 	{
-		SimdType mIntrin;
+		FLOAT4 mIntrin;
 		float32 mData[4];
 
 		struct

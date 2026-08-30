@@ -4,6 +4,7 @@
 #include <Asset/ConfigFile.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Math/SIMDHelper.hpp>
 #include <Renderer/PipelineNames.hpp>
 #include <World.hpp>
 
@@ -37,6 +38,25 @@ static void RemoveBlockoutFromWorld(World* world)
 	}
 }
 
+/**
+ * @brief Get the offset to get the center of an asymmetrical block.
+ */
+static Vec3f GetCubeMidpointOffset(const CubeGenOptions& cgo)
+{
+	// We want to offset the position of the block by the difference betwween the opposing side of the box.
+	// If we take a single dimension, e.g. X dimension:
+	//     |     :          |
+	// left^  pos^     right^
+	//
+	// Then we can offset the midpoint between the difference between left and right.
+
+
+	const FLOAT4 vmax = fx::simd::LoadFloat4(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale, 0.0f);
+	const FLOAT4 vmin = fx::simd::LoadFloat4(cgo.Left.Scale, cgo.Bottom.Scale, cgo.Back.Scale, 0.0f);
+
+	return Vec3f(fx::simd::AbsDiff(vmax, vmin));
+}
+
 
 void Blockout::Load(const String& path)
 {
@@ -62,8 +82,7 @@ void Blockout::Load(const String& path)
 			continue;
 		}
 
-
-		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({
+		CubeGenOptions cgo {
 			.Left = { .Scale = scales[0].Get<float32>() },
 			.Right = { .Scale = scales[1].Get<float32>() },
 			.Top = { .Scale = scales[2].Get<float32>() },
@@ -72,7 +91,9 @@ void Blockout::Load(const String& path)
 			.Back = { .Scale = scales[5].Get<float32>() },
 
 			.bAlignUVs = true,
-		});
+		};
+
+		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
 
 		Object* object = gObjectManager->NewObject(blockout_id.Str(), eObjectTag::Blockout);
