@@ -232,7 +232,7 @@ public:
 			queue->InitCapacity(256);
 		}
 
-		LogInfo(LC_ASSET, "Current queue size: {}", queue->mSize);
+		LogInfo(LC_ASSET, "Current queue size: {}", queue->GetSize());
 
 		queue->Emplace(renderer::gGraphics->GetElapsedFrameCount(), buffer);
 		ManagerUpdateNotifier.Signal();

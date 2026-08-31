@@ -27,6 +27,7 @@ void Blockout::Create(World* world)
 												   "Data/Demo/Textures/gray_check.png", eImageCreateFlags::None);
 
 	test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+
 	test_material->Finalize();
 }
 

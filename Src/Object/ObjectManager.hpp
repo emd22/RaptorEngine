@@ -13,7 +13,6 @@ namespace fx {
 struct alignas(16) ObjectGpuEntry
 {
 	float ModelMatrix[16];
-	float UvOffsets[4];
 };
 
 class Mat4f;

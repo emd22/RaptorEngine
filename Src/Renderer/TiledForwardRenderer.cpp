@@ -75,6 +75,7 @@ void TiledForwardRenderer::CreateGPass()
 						  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						  eImageAspectFlag::Depth);
 
+
 	ForwardPass.BuildRenderStage();
 }
 
@@ -195,6 +196,23 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->SetShader(eShaderName::Forward, {});
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
+
+		BlendAttachment blend = BlendAttachment {
+			.Enabled = true,
+			.BlendOp = {
+				.Ops = {
+					.Alpha = VK_BLEND_OP_ADD,
+					.Color = VK_BLEND_OP_ADD,
+				},
+			},
+			.AlphaBlend { .Ops {
+				.Src = VK_BLEND_FACTOR_ONE,
+				.Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			} },
+			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+		};
+
+		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
 
 		// Set 0 (Global / Per Frame)
 

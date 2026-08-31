@@ -298,6 +298,12 @@ void Material::SetUnlit(bool value)
 	mbRequiresSync = true;
 }
 
+void Material::SetAlpha(float32 alpha)
+{
+	Properties.Alpha = alpha;
+	mbRequiresSync = true;
+}
+
 renderer::DescriptorSet* Material::RequestAlbedoOnlyDescriptors()
 {
 	if (mpAlbedoOnlyDescriptorSet != nullptr) {

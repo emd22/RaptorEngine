@@ -5,7 +5,7 @@
 
 namespace fx::renderer {
 
-Target* RenderStage::GetTarget(eImageFormat format, int sub_index)
+Target* RenderStage::GetTarget(eImageFormat format, int32 sub_index)
 {
 	for (Target& attachment : mOutputTargets.Targets) {
 		if (attachment.Image.Info.Format == format) {
@@ -18,6 +18,23 @@ Target* RenderStage::GetTarget(eImageFormat format, int sub_index)
 	}
 
 	return nullptr;
+}
+
+int32 RenderStage::GetTargetIndex(eImageFormat format, int32 sub_index)
+{
+	for (int32 i = 0; i < mOutputTargets.Targets.Size; i++) {
+		const Target& target = mOutputTargets.Targets[i];
+
+		if (target.Image.Info.Format == format) {
+			if ((sub_index--) > 0) {
+				continue;
+			}
+
+			return i;
+		}
+	}
+
+	return -1;
 }
 
 

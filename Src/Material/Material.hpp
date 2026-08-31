@@ -27,7 +27,6 @@ enum class eMaterialFlags : uint32
 {
 	None = 0,
 	Unlit = (1 << 0),
-
 };
 
 FxEnumFlags(eMaterialFlags);
@@ -193,6 +192,7 @@ public:
 	renderer::ePipelineName GetRequiredPipeline() const;
 
 	void SetUnlit(bool value);
+	void SetAlpha(float32 alpha);
 
 	bool IsAlbedoOnly() const { return (NormalMap.Exists() == false); }
 

@@ -67,6 +67,11 @@ public:
 
 	bool IsInited() const { return mpData != nullptr; }
 
+	/**
+	 * @brief Returns the number of items enqueued
+	 */
+	uint32 GetSize() const { return mSize; }
+
 	void InitCapacity(uint32 num_objects)
 	{
 		Assert(num_objects > 0);
@@ -216,11 +221,10 @@ public:
 	~Queue() = default;
 
 
-	uint32 mSize = 0;
-
 private:
 	T* mpData = nullptr;
 
+	uint32 mSize = 0;
 	uint32 mCapacity = 0;
 
 	uint32 mPushIndex = 0;

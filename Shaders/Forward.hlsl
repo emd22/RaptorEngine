@@ -218,7 +218,7 @@ FSOutput main(FSInput input)
     output.vAlbedo.a = 1.0;
 #endif
 
-	float3 accumulated_light = float3(0.0, 0.0, 0.0);
+	float4 accumulated_light = float4(0.0, 0.0, 0.0, 0.0);
 
 	// Retrieve the light list for the tile that this pixel belongs to
 	uint2 tile_xy = uint2(input.vPosition.xy / LIGHT_TILE_SIZE);
@@ -228,7 +228,6 @@ FSOutput main(FSInput input)
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
-	output.vAlbedo = float4(float3(material.fAlpha, material.fAlpha, material.fAlpha), 1.0);
 	return output;
 #endif
 
@@ -298,13 +297,12 @@ FSOutput main(FSInput input)
 		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
 		float3 specular_term = Fr;
 
-		accumulated_light += (attenuation * (visibility * diffuse_term + visibility * specular_term) * light_color.rgb * NdotL);
+		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, material.fAlpha);
 	}
 
 	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);
 
-	const float alpha = 1.0;
-	output.vAlbedo = float4(accumulated_light + ambient.rgb, alpha);
+	output.vAlbedo = accumulated_light + float4(ambient.rgb, 1.0);
 
 	output.vNormal = float4(N_final, 0.0);
 

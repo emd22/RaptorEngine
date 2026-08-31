@@ -42,7 +42,18 @@ public:
 	void AddTarget(const Target& attachment);
 
 	TargetList& GetTargets() { return mOutputTargets; }
-	Target* GetTarget(eImageFormat format, int sub_index = 0);
+
+	/**
+	 * @brief Returns the output target with a given format. The optional argument `sub_index` returns the
+	 * n'th target of a given format.
+	 */
+	Target* GetTarget(eImageFormat format, int32 sub_index = 0);
+
+	/**
+	 * @brief Returns the index of an output target with a given format. The optional argument `sub_index` returns the
+	 * index of the n'th target of a given format.
+	 */
+	int32 GetTargetIndex(eImageFormat format, int32 sub_index = 0);
 
 	void MarkFinalStage();
 

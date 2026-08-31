@@ -15,7 +15,6 @@
 struct Object
 {
 	float4x4 mWorld;
-	float4 UvOffsets;
 };
 
 

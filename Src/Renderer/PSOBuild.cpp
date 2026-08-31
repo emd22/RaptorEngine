@@ -154,6 +154,10 @@ void PSOBuild::BuildPipeline()
 
 void PSOBuild::SetTargetBlend(uint32 target_index, const BlendAttachment& blend_attachment)
 {
+	if (pOutputTargets == nullptr || target_index > pOutputTargets->Targets.Size) {
+		return;
+	}
+
 	BlendAttachments.AddAttachment(target_index, blend_attachment);
 }
 
