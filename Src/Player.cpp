@@ -31,7 +31,7 @@ void Player::MoveBy(const Vec3f& by)
 void Player::Jump()
 {
 	if (Physics.bIsGrounded && !mbIsFlymode) {
-		JumpForce = 2.25f;
+		JumpForce = 2.5f;
 	}
 }
 

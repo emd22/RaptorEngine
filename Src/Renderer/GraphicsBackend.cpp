@@ -665,7 +665,7 @@ void GraphicsBackend::PresentFrame()
 }
 
 
-void GraphicsBackend::RenderPostProcessing(Camera& camera)
+void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 {
 	FrameData* frame = GetFrame();
 
@@ -695,9 +695,6 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	FrameData* frame = GetFrame();
 
 	pRenderer->ForwardPass.End();
-
-	RenderPostProcessing(render_cam);
-
 
 	// pDeferredRenderer->UnlitPass.End();
 

@@ -62,10 +62,9 @@ private:
 
 	void BuildPersistentDescriptor();
 
-	void CreateGPass();
+	void CreateForwardPass();
 	void CreateDepthNormalPass();
 	void CreateSSAOPass();
-
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -89,9 +88,13 @@ public:
 
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 
-	RenderStage ForwardPass;
+	/// Depth + Normal prepass
 	RenderStage Prepass;
+	/// Main Forward+ lit pass
+	RenderStage ForwardPass;
+	/// SSAO pass
 	RenderStage SSAOPass;
+	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 
 	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;

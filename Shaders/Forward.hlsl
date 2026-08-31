@@ -45,6 +45,7 @@ struct VSPushConsts
 	uint uiObjectIndex;
     uint uiMaterialIndex;
     uint uiTileColumns;
+    uint2 vTargetSize;
 };
 
 #ifdef USE_SKINNING
@@ -150,6 +151,7 @@ F_Texture2D(tMetallicRoughness, 2, 1)
 #endif
 
 F_ShadowTexture2D(tShadowAtlas, 4, 0);
+F_DataTexture2D(tSSAO, uint, 5, 0);
 
 struct FSPushConsts
 {
@@ -157,6 +159,7 @@ struct FSPushConsts
 	uint uiObjectIndex;
 	uint uiMaterialIndex;
 	uint uiTileColumns;
+	uint2 vTargetSize;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
@@ -224,6 +227,12 @@ FSOutput main(FSInput input)
 	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
 
 	TileLightData tile_data = bLightGrid[tile_index];
+
+	// How do i get the the coordinates here (screen space uvs?)
+	const int3 ssao_coords = int3(input.vPosition.xy, 0);
+	uint ssao = F_SampleLoad(tSSAO, ssao_coords);
+
+    // uint ssao = F_SampleLoad(tSSAO, ssao_coords);
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
@@ -299,7 +308,7 @@ FSOutput main(FSInput input)
 		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, material.fAlpha);
 	}
 
-	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);
+	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f) * (((float)ssao) / 255.0f);
 
 	output.vAlbedo = accumulated_light + float4(ambient.rgb, 1.0);
 

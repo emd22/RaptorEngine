@@ -71,7 +71,7 @@ public:
 	void BeginPrepass();
 	void BeginGeometry();
 
-	void RenderPostProcessing(Camera& camera);
+	void RenderEarlyFrameEffects(Camera& camera);
 
 	void DoComposition(Camera& render_cam);
 

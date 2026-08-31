@@ -70,6 +70,7 @@ struct alignas(16) DrawPushConstants
 	uint32 ObjectId = 0;
 	uint32 MaterialIndex = 0;
 	uint32 TileColumns = 0;
+	uint32 TargetSize[2] = { 0U, 0U };
 };
 
 struct alignas(16) DebugLayerPushConstants

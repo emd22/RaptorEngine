@@ -303,10 +303,11 @@ void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
 
 		object->Update();
 
-		DrawPushConstants consts {};
+		DrawPushConstants consts { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 		consts.ObjectId = object_id.GetID();
 		consts.MaterialIndex = object->GetMaterialID().GetID();
 		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+
 		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
 
 		gGraphics->SubmitPushConstants(gGraphics->GetFrame()->CmdBuffer, pipeline,
@@ -485,8 +486,10 @@ void World::Render(Camera* shadow_camera)
 
 	gGraphics->pRenderer->Prepass.End();
 
-	// Cull lights into screen space tiles before rendering geometry (Forward+)
+	// Cull lights into screen space tiles before rendering geometry
 	gGraphics->BeginLightCulling(camera);
+
+	gGraphics->RenderEarlyFrameEffects(camera);
 
 	gGraphics->BeginGeometry();
 

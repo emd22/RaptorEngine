@@ -63,12 +63,8 @@ struct PSPushConsts
 
 [[vk::push_constant]] PSPushConsts PSConst;
 
-F_Texture2D(tDepth, 1, 0);
 F_Texture2D(tLighting, 2, 0);
 F_Texture2D(tNormal, 3, 0);
-
-F_DataTexture2D(tSSAO, uint, 4, 0);
-// F_Texture2D(tSSAO, 4, 0);
 
 float3 ACESFilm(float3 x)
 {
@@ -86,11 +82,11 @@ FSOutput main(FSInput input)
 
     float exposure = 1.0;
 
-    const int3 ssao_coords = int3(input.vUV * float2(PSConst.vFrameExtent), 0);
+    // const int3 ssao_coords = int3(input.vUV * float2(PSConst.vFrameExtent), 0);
 
-    uint ssao = F_SampleLoad(tSSAO, ssao_coords);
+    // uint ssao = F_SampleLoad(tSSAO, ssao_coords);
     // float4 ssao_debug = F_Sample(tSSAO, input.vUV);
-    exposure = float(ssao) / 255.0;
+    // exposure = float(ssao) / 255.0;
 
     // exposure = ssao_debug.r;
 

@@ -246,12 +246,11 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	// 	Assert(!material->IsAlbedoOnly());
 	// }
 
-	DrawPushConstants push_constants {};
+	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 	push_constants.ObjectId = ID.GetID();
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
-
 
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
 								   push_constants);
