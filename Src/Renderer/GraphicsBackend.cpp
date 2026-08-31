@@ -702,13 +702,13 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	pRenderer->RenderComposition(render_cam);
 
 	pRenderer->CompPass.End();
+	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	ProcessDeletionQueue(false, deletion_queue.Get());
+	deletion_queue.Unlock();
 	frame->CmdBuffer.End();
 
 	PresentFrame();
 
-	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
-	ProcessDeletionQueue(false, deletion_queue.Get());
-	deletion_queue.Unlock();
 
 	RequirePipelineDynamicStates();
 

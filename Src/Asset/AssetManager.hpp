@@ -15,6 +15,9 @@
 #include <Core/TSRef.hpp>
 #include <Core/Thread/ThreadID.hpp>
 #include <Core/Types.hpp>
+#include <Renderer/Constants.hpp>
+#include <Renderer/Globals.hpp>
+#include <Renderer/GraphicsBackend.hpp>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -25,7 +28,9 @@ template <typename T>
 concept C_IsAsset = std::is_base_of_v<AssetBase, T>;
 
 
-static constexpr uint32 scDeletionTickOffset = 10;
+// Buffer deletion is deferred by enough rendered frames that any frame which could have referenced the buffer
+// has completed before the buffer is destroyed.
+static constexpr uint32 scBufferDeletionFrameSpacing = renderer::FramesInFlight + 1;
 
 
 struct AssetDeletionTicket
@@ -43,14 +48,16 @@ struct AssetDeletionTicket
 	};
 
 public:
-	AssetDeletionTicket(uint32 current_tick, const renderer::RawGpuBuffer& gpu_buffer)
+	AssetDeletionTicket(uint32 current_frame, const renderer::RawGpuBuffer& gpu_buffer)
 		: Type(eType::Buffer), Value { .Ticket = { .Buffer = gpu_buffer.Buffer, .Allocation = gpu_buffer.Allocation } },
-		  MinDeletionTick(current_tick + scDeletionTickOffset)
+		  MinDeletionFrame(current_frame + scBufferDeletionFrameSpacing)
 	{
 	}
 
 	void DeleteImmediate() const;
-	bool TryDelete(uint32 current_tick) const;
+	bool TryDelete(uint32 current_frame) const;
+
+	bool IsNull() const { return (Value.Ticket.Allocation == nullptr && Value.Ticket.Buffer == nullptr); }
 
 public:
 	eType Type = eType::None;
@@ -60,7 +67,7 @@ public:
 		BufferTicket Ticket;
 	} Value;
 
-	uint32 MinDeletionTick = 0;
+	uint32 MinDeletionFrame = 0;
 };
 
 /**
@@ -225,7 +232,9 @@ public:
 			queue->InitCapacity(256);
 		}
 
-		queue->Emplace(mTickCounter, buffer);
+		LogInfo(LC_ASSET, "Current queue size: {}", queue->mSize);
+
+		queue->Emplace(renderer::gGraphics->GetElapsedFrameCount(), buffer);
 		ManagerUpdateNotifier.Signal();
 	}
 

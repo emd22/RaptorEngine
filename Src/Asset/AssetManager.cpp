@@ -33,23 +33,34 @@ static constexpr std::chrono::seconds scTimeUntilSleep = std::chrono::seconds(3)
 
 void AssetDeletionTicket::DeleteImmediate() const
 {
+	LogInfo("Deleting buffer {}", reinterpret_cast<uintptr_t>(Value.Ticket.Buffer));
+
 	switch (Type) {
 	case eType::None:
 		break;
 
 	case eType::Buffer: {
 		const BufferTicket& ticket = Value.Ticket;
+
+		// Wait for the graphics queue to become idle so that no submitted RenderCmd command buffer is still
+		// referencing the buffer. Because the ticket defers deletion by `scBufferDeletionFrameSpacing`
+		// rendered frames, this returns almost immediately
+		{
+			SpinLockContext<VkQueue> graphics_queue = renderer::gGraphics->GetDevice()->GetGraphicsQueue();
+			vkQueueWaitIdle(graphics_queue.Get());
+		}
+
 		vmaDestroyBuffer(renderer::gGraphics->GpuAllocator, ticket.Buffer, ticket.Allocation);
 	} break;
 	}
 }
 
 
-bool AssetDeletionTicket::TryDelete(uint32 current_tick) const
+bool AssetDeletionTicket::TryDelete(uint32 current_frame) const
 {
-	const bool missed_or_overflow = ((MinDeletionTick - current_tick) > (UINT32_MAX - 10000));
+	const bool missed_or_overflow = ((MinDeletionFrame - current_frame) > (UINT32_MAX - 10000));
 
-	if (current_tick >= MinDeletionTick || missed_or_overflow) {
+	if (current_frame >= MinDeletionFrame || missed_or_overflow) {
 		DeleteImmediate();
 		return true;
 	}
@@ -694,7 +705,14 @@ int32 AssetManager::CheckForItemsToDelete()
 	// Wait for all uploads to finish. We cannot be actively loading the item we are deleting!
 	renderer::gGraphics->UploadContext.UploadFence.WaitFor();
 
-	if (queue->First().TryDelete(mTickCounter)) {
+	AssetDeletionTicket& adt = queue->First();
+	if (adt.IsNull()) {
+		LogError(LC_ASSET, "Trying to delete a null asset!");
+		return num_deletes;
+		;
+	}
+
+	if (adt.TryDelete(renderer::gGraphics->GetElapsedFrameCount())) {
 		++num_deletes;
 		queue->Pop();
 	}

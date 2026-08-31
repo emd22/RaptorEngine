@@ -162,6 +162,8 @@ public:
 			.Func = func,
 		};
 
+		LogInfo("Adding to deletion queue ({})", deletion_queue->mSize);
+
 		deletion_queue->Push(std::move(obj));
 	}
 
