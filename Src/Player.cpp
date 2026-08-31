@@ -19,7 +19,7 @@ void Player::Create()
 	Physics.Create();
 
 	// Since the physics position is the center of the capsule, we will use standing height / 2.
-	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scStandingHeight / 2.0f, 0);
+	mCameraOffset = Vec3f(0, physics::PhysicsPlayer::scStandingHeight, 0);
 }
 
 void Player::MoveBy(const Vec3f& by)
@@ -31,7 +31,7 @@ void Player::MoveBy(const Vec3f& by)
 void Player::Jump()
 {
 	if (Physics.bIsGrounded && !mbIsFlymode) {
-		JumpForce = 2.0f;
+		JumpForce = 2.25f;
 	}
 }
 
@@ -57,6 +57,10 @@ void Player::Move(float64 delta_time, const Vec3f& offset)
 	mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? scMaxSprintSpeed : scMaxWalkSpeed),
 								 scMovementLerpSpeed, delta_time);
 
+	if (movement_goal.Length() <= 0.25) {
+		mBobCounterY = MathUtil::SmoothInterpolate(mBobCounterY, 0.0f, 10.0f, delta_time);
+	}
+
 	Vec3f force = mUserForce;
 
 	if (!mbIsFlymode) {
@@ -75,17 +79,18 @@ void Player::Update(float64 delta_time)
 	UpdateDirection();
 	pCamera->MoveTo(Position + mCameraOffset);
 
-	if (bEnableHeadBob && Physics.bIsGrounded) {
+	const bool user_force_released = mUserForce.IsNearZero(0.1);
+
+	// const bool should_reset_center = ((user_force_released || Physics.bIsGrounded) &&
+	// 								  (MathUtil::IsCloseTo(mBobCounterY, 0.0f) == false));
+
+
+	if (bEnableHeadBob && (Physics.bIsGrounded)) {
 		float32 body_speed = mUserForce.Length();
-		float32 counter_speed = (bBobReverse ? -2.5f : 2.5f);
+		float32 counter_speed = (bBobReverse ? -1.9f : 1.9f);
 
 		mBobCounterY += delta_time * counter_speed * body_speed;
 
-		mHeadBobX = HeadBobStrength.X * cosf(mBobCounterY + FX_PI_2);
-		mHeadBobY = HeadBobStrength.Y * sinf(mBobCounterY + FX_PI_2);
-
-		Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
-		pCamera->MoveBy(bob_vector);
 
 		if (mBobCounterY > (FX_PI_2)) {
 			bBobReverse = true;
@@ -95,7 +100,14 @@ void Player::Update(float64 delta_time)
 		}
 	}
 
-	if (!mUserForce.IsNearZero(0.1)) {
+
+	mHeadBobX = HeadBobStrength.X * cosf(mBobCounterY + FX_PI_2);
+	mHeadBobY = HeadBobStrength.Y * sinf(mBobCounterY + FX_PI_2);
+
+	Vec3f bob_vector = pCamera->GetUpVector() * mHeadBobY + pCamera->GetRightVector() * mHeadBobX;
+	pCamera->MoveBy(bob_vector);
+
+	if (user_force_released == false) {
 		if (bIsSprinting && pCamera->GetFov() < scSprintFov) {
 			pCamera->SetFov(MathUtil::SmoothInterpolate(pCamera->GetFov(), scSprintFov, 8.0f, delta_time));
 		}

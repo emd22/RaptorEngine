@@ -40,6 +40,8 @@ void PhysicsPlayer::Create()
 
 	settings->mMaxSlopeAngle = scMaxSlopeAngle;
 	settings->mShape = pPhysicsShape;
+	settings->mCollisionTolerance = 0.01f;
+	settings->mPredictiveContactDistance = 0.2f;
 
 	settings->mMaxStrength = player_config.GetEntry(HashStr32("Strength"))->Get<float32>();
 	settings->mMass = player_config.GetEntry(HashStr32("Mass"))->Get<float32>();
@@ -102,7 +104,7 @@ void PhysicsPlayer::Update(float64 delta_time)
 
 	PhysicsSystem& phys = gPhysics->pBackend->PhysicsSystem;
 
-	Vec3 gravity = (phys.GetGravity() * delta_time);
+	Vec3 gravity = (phys.GetGravity() * 1.2f * delta_time);
 
 	// Apply gravity
 	Vec3 velocity = Vec3::sZero();
@@ -134,7 +136,13 @@ void PhysicsPlayer::Update(float64 delta_time)
 	}
 
 	// Move character
-	CharacterVirtual::ExtendedUpdateSettings update_settings {};
+	CharacterVirtual::ExtendedUpdateSettings update_settings {
+		.mStickToFloorStepDown = JPH::Vec3(0.0f, -0.1f, 0.0f),
+		.mWalkStairsStepUp = Vec3(0, 1, 0),
+		.mWalkStairsMinStepForward = 0.02f,
+		.mWalkStairsStepForwardTest = 0.1f,
+
+	};
 	pPlayerVirt->ExtendedUpdate(
 		delta_time, gravity, update_settings, phys.GetDefaultBroadPhaseLayerFilter(collision_layer),
 		phys.GetDefaultLayerFilter(collision_layer), {}, {}, *gPhysics->pBackend->pTempAllocator);

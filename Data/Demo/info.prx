@@ -32,7 +32,7 @@ Objects = {
         Unlit = $True
     }
 
-	FireExtinguisher = {
+	/*FireExtinguisher = {
 		Mesh = "/FireExtinguisher.glb"
 		Pos = [-1.0, -0.1, 1.5]
         Scale = 1.5
@@ -40,7 +40,7 @@ Objects = {
 		Shadows = $True
 	}
 
-    /*Level = {
+    Level = {
         Mesh = "/Sponza.glb"
         Scale = 0.01
         Shadows = $True

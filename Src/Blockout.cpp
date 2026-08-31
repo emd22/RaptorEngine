@@ -105,13 +105,27 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	object->MoveBy(position);
 	object->mMaterialID = mBlockoutMaterialID;
 	object->SetShadowCaster(true);
+	Vec3f midpoint = GetCubeMidpointOffset(cgo);
+
+	Quat rotation = Quat::FromEulerAngles(entry.GetMemberValue<Vec3f>(HashStr32("rot"), Vec3f::sZero));
+	object->SetRotation(rotation);
+
+	object->SetRotationOrigin(-midpoint);
+
+	bool is_dynamic = entry.GetMemberValue(HashStr32("dynamic"), 0) == 1;
 
 	physics::Body* phys = gPhysics->NewBody(blockout_id);
-	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
-							  physics::BodyProps {});
-	phys->Teleport(position + GetCubeMidpointOffset(cgo), Quat::scIdentity);
+	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo),
+							  is_dynamic ? physics::eMotionType::Dynamic : physics::eMotionType::Static,
+							  physics::BodyProps {
+								  .ConvexRadius = 0.05f,
+								  .Density = 20,
+							  });
+
+	phys->Teleport(position + midpoint, rotation);
 
 	object->PhysicsID = phys->GetID();
+
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();

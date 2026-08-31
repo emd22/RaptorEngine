@@ -133,8 +133,8 @@ public:
 	~OrthoCamera() override {}
 
 private:
-	float32 mWidth = 20.0f;
-	float32 mHeight = 20.0f;
+	float32 mWidth = 35.0f;
+	float32 mHeight = 35.0f;
 };
 
 ///////////////////////////////////////////////
