@@ -61,7 +61,7 @@ void TiledForwardRenderer::Destroy() {}
 void TiledForwardRenderer::CreateForwardPass()
 {
 	// Forward pass
-	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent);
+	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent, 1.0);
 
 	// Lit target
 	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
@@ -78,7 +78,7 @@ void TiledForwardRenderer::CreateForwardPass()
 void TiledForwardRenderer::CreateDepthNormalPass()
 {
 	// Depth + normal prepass
-	Prepass.Create("DepthNormal", gGraphics->Swapchain.Extent);
+	Prepass.Create("DepthNormal", gGraphics->Swapchain.Extent, 1.0);
 
 	// Depth target (index 0)
 	Prepass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
@@ -94,7 +94,7 @@ void TiledForwardRenderer::CreateDepthNormalPass()
 
 void TiledForwardRenderer::CreateSSAOPass()
 {
-	SSAOPass.Create("Forward", gGraphics->Swapchain.Extent);
+	SSAOPass.Create("SSAO", gGraphics->Swapchain.Extent, 1.0);
 
 	// SSAO output target
 	SSAOPass.AddTarget(eImageFormat::R8_UInt, Target::scFullScreen,
@@ -585,7 +585,7 @@ void TiledForwardRenderer::CreateCompositionPSO()
 {
 	// Create composition render stage
 
-	CompPass.Create("Compose", gGraphics->Swapchain.Extent);
+	CompPass.Create("Compose", gGraphics->Swapchain.Extent, 1.0);
 
 	CompPass.MarkFinalStage();
 	CompPass.BuildRenderStage();

@@ -83,7 +83,7 @@ float3 ReconstructViewPos(float2 uv, float depth)
 
 float2 GetNoiseVector(float2 uv)
 {
-	int2 noise_coord = int2(uv * Consts.ScreenSize) % SSAO_NOISE_IMAGE_SIZE;
+	int2 noise_coord = int2(uv * (Consts.ScreenSize)) % SSAO_NOISE_IMAGE_SIZE;
 	uint noise = F_SampleLoad(tNoise, int3(noise_coord, 0));
 
 	float angle = (noise / 4294967295.0) * 2.0 * PI;
@@ -162,7 +162,7 @@ float4 ComputeSSAO(float2 uv)
 
 	// Fade AO out to 1.0 with distance from the camera
 	float cutoff = saturate((SSAO_DISTANCE_CUTOFF - length(fragment_position.xyz)) / SSAO_CUTOFF_FADE);
-	ao = pow(lerp(1.0, ao, cutoff), SSAO_POWER);
+	ao = lerp(1.0, ao, cutoff);
 
 	return float4(ao, ao, ao, 1.0);
 }
@@ -172,7 +172,6 @@ FSOutput main(FSInput input)
 	FSOutput output;
 
 	float4 ao = ComputeSSAO(input.vUV);
-	// output.vOut = ao;
 	output.vOut = uint(ao.r * 255.0);
 
 	return output;

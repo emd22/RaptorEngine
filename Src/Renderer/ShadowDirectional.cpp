@@ -18,7 +18,7 @@ FX_SET_MODULE_NAME("ShadowDirectional")
 
 ShadowDirectional::ShadowDirectional(const Vec2u& size)
 {
-	RenderStage.Create("Shadows", size);
+	RenderStage.Create("Shadows", size, 1.0);
 
 	RenderStage.AddTarget(eImageFormat::D32_Float, size,
 						  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,

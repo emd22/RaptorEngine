@@ -5,6 +5,24 @@
 
 namespace fx::renderer {
 
+static Vec2u GetRealTargetSize(const Vec2u& size)
+{
+	if (size == Target::scFullScreen) {
+		return gGraphics->Swapchain.Extent;
+	}
+	return size;
+}
+
+void RenderStage::Create(const char* name, const Vec2u& size, float32 size_multiplier)
+{
+	pcName = name;
+
+	ClearValues.InitCapacity(scMaxOutputTargets);
+
+	mSize = GetRealTargetSize(size);
+	mSizeMultiplier = size_multiplier;
+}
+
 Target* RenderStage::GetTarget(eImageFormat format, int32 sub_index)
 {
 	for (Target& attachment : mOutputTargets.Targets) {
@@ -55,14 +73,14 @@ void RenderStage::BuildRenderStage()
 
 	mOutputTargets.CreateImages();
 
-	mRenderPass.Create(mOutputTargets, mSize);
+	mRenderPass.Create(mOutputTargets, mSize * mSizeMultiplier);
 	renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
 
 	if (mbIsFinalStage) {
 		CreateFinalStageFramebuffers();
 	}
 	else {
-		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize);
+		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize * mSizeMultiplier);
 	}
 
 	mbIsBuilt = true;
@@ -70,7 +88,7 @@ void RenderStage::BuildRenderStage()
 
 void RenderStage::Rebuild(const Vec2u& size)
 {
-	mSize = size;
+	mSize = GetRealTargetSize(size);
 
 	mbIsBuilt = false;
 
@@ -80,14 +98,14 @@ void RenderStage::Rebuild(const Vec2u& size)
 	mFinalStageFramebuffers.Free();
 	mRenderPass.Destroy();
 
-	mRenderPass.Create(mOutputTargets, mSize);
+	mRenderPass.Create(mOutputTargets, mSize * mSizeMultiplier);
 	renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
 
 	if (mbIsFinalStage) {
 		CreateFinalStageFramebuffers();
 	}
 	else {
-		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize);
+		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize * mSizeMultiplier);
 	}
 
 	mbIsBuilt = true;
@@ -111,7 +129,7 @@ void RenderStage::Begin(CommandBuffer& cmd)
 
 void RenderStage::AddTarget(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
-	mOutputTargets.Add(Target(format, size, usage, aspect));
+	mOutputTargets.Add(Target(format, GetRealTargetSize(size) * mSizeMultiplier, usage, aspect));
 }
 
 void RenderStage::AddTarget(const Target& attachment) { mOutputTargets.Add(attachment); }

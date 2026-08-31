@@ -30,13 +30,7 @@ class RenderStage
 public:
 	RenderStage() = default;
 
-	void Create(const char* name, const Vec2u& size)
-	{
-		pcName = name;
-
-		ClearValues.InitCapacity(scMaxOutputTargets);
-		mSize = size;
-	}
+	void Create(const char* name, const Vec2u& size, float32 size_multiplier);
 
 	void AddTarget(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect);
 	void AddTarget(const Target& attachment);
@@ -92,6 +86,8 @@ private:
 	Framebuffer mFramebuffer;
 	RenderPass mRenderPass;
 	Vec2u mSize = Vec2u::sZero;
+
+	float32 mSizeMultiplier = 1.0f;
 
 	SizedArray<Framebuffer> mFinalStageFramebuffers;
 

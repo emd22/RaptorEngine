@@ -228,11 +228,8 @@ FSOutput main(FSInput input)
 
 	TileLightData tile_data = bLightGrid[tile_index];
 
-	// How do i get the the coordinates here (screen space uvs?)
 	const int3 ssao_coords = int3(input.vPosition.xy, 0);
 	uint ssao = F_SampleLoad(tSSAO, ssao_coords);
-
-    // uint ssao = F_SampleLoad(tSSAO, ssao_coords);
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
