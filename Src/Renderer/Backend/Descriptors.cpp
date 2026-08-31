@@ -327,8 +327,44 @@ void DescriptorSet::Build()
 	vkUpdateDescriptorSets(gGraphics->GetDevice()->Device, write_infos.Size, write_infos.pData, 0, nullptr);
 
 	mbIsBuilt = true;
+}
 
-	mDescriptorEntries.Free();
+void DescriptorSet::Rebuild(DescriptorPool& pool)
+{
+	if (mDescriptorEntries.IsEmpty()) {
+		return;
+	}
+
+	// Free the old (now-stale) descriptor set from the old pool
+	if (mInternalSet != nullptr) {
+		vkFreeDescriptorSets(gGraphics->GetDevice()->Device, pool.Get(), 1, &mInternalSet);
+		mInternalSet = nullptr;
+	}
+
+	// Make a new descriptor set from the pool
+	VkDescriptorSetAllocateInfo alloc_info {};
+	alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	alloc_info.descriptorPool = pool.Get();
+	alloc_info.descriptorSetCount = 1;
+	alloc_info.pSetLayouts = gDsLayoutCache->RequestExisting(LayoutID);
+
+	if (alloc_info.pSetLayouts == nullptr) {
+		LogFatal("DescriptorSet::Rebuild: Layout {} does not refer to an existing descriptor set layout.", LayoutID);
+		return;
+	}
+
+	pool.SetsUsed++;
+
+	VkResult status = vkAllocateDescriptorSets(gGraphics->GetDevice()->Device, &alloc_info, &mInternalSet);
+
+	if (status != VK_SUCCESS) {
+		PanicVulkan("DescriptorSet::Rebuild", "Failed to allocate descriptor set!", status);
+		return;
+	}
+
+	// Rewrite descriptors using the current (potentially new) image/buffer handles
+	mbIsBuilt = false;
+	Build();
 }
 
 

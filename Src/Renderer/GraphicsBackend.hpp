@@ -81,19 +81,19 @@ public:
 	FX_FORCE_INLINE Ref<Window> GetWindow() { return mpWindow; }
 	FX_FORCE_INLINE GpuDevice* GetDevice() { return &mDevice; }
 
-	void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
-	{
-		SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	// void AddGpuBufferToDeletionQueue(VkBuffer buffer, VmaAllocation allocation)
+	// {
+	// 	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 
-		DeletionObject obj = {
-			.Buffer = buffer,
-			.Allocation = allocation,
-			.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
-			.bIsGpuBuffer = true,
-		};
+	// 	DeletionObject obj = {
+	// 		.Buffer = buffer,
+	// 		.Allocation = allocation,
+	// 		.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
+	// 		.bIsGpuBuffer = true,
+	// 	};
 
-		deletion_queue->Push(std::move(obj));
-	}
+	// 	deletion_queue->Push(std::move(obj));
+	// }
 
 	VkInstance GetVulkanInstance() { return mInstance; }
 
@@ -153,19 +153,19 @@ public:
 		return did_delete;
 	}
 
-	void AddToDeletionQueue(DeletionObject::FuncType func)
-	{
-		SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	// void AddToDeletionQueue(DeletionObject::FuncType func)
+	// {
+	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 
-		DeletionObject obj = {
-			.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
-			.Func = func,
-		};
+	// DeletionObject obj = {
+	// 	.DeletionFrameNumber = mInternalFrameCounter + scDeletionFrameSpacing,
+	// 	.Func = func,
+	// };
 
-		LogInfo("Adding to deletion queue ({})", deletion_queue->mSize);
+	// LogInfo("Adding to deletion queue ({})", deletion_queue->mSize);
 
-		deletion_queue->Push(std::move(obj));
-	}
+	// deletion_queue->Push(std::move(obj));
+	// }
 
 	uint32 GetElapsedFrameCount() const { return mInternalFrameCounter.load(); }
 	uint32 GetFrameNumber() const { return mFrameNumber; }
@@ -260,7 +260,7 @@ protected:
 	uint32 mFrameNumber = 0;
 	std::atomic_uint32_t mInternalFrameCounter = 0;
 
-	TSQueue<DeletionObject> mDeletionQueue;
+	// TSQueue<DeletionObject> mDeletionQueue;
 };
 
 } // namespace fx::renderer

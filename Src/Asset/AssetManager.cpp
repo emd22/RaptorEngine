@@ -709,7 +709,6 @@ int32 AssetManager::CheckForItemsToDelete()
 	if (adt.IsNull()) {
 		LogError(LC_ASSET, "Trying to delete a null asset!");
 		return num_deletes;
-		;
 	}
 
 	if (adt.TryDelete(renderer::gGraphics->GetElapsedFrameCount())) {

@@ -117,8 +117,8 @@ void GraphicsBackend::Init(Vec2u window_size)
 
 	TransferSync.Create(eSemaphoreType::Timeline);
 
-	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
-	deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
+	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	// deletion_queue->InitCapacity(Limits::MaxDeletionQueueItems);
 
 	// Create final submission semaphores. Note that there is one submission semaphore
 	// per Swapchain image, not frame in flight.
@@ -239,9 +239,7 @@ void GraphicsBackend::RebuildRenderStages()
 
 	rd->DescriptorPool.Recreate();
 
-	/*for (FrameData& frame : Frames) {
-		frame.InFlight.Reset();
-	}*/
+	gDescriptorCache->RebuildAll();
 }
 
 void GraphicsBackend::InitVulkan()
@@ -702,9 +700,9 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	pRenderer->RenderComposition(render_cam);
 
 	pRenderer->CompPass.End();
-	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
-	ProcessDeletionQueue(false, deletion_queue.Get());
-	deletion_queue.Unlock();
+	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	// ProcessDeletionQueue(false, deletion_queue.Get());
+	// deletion_queue.Unlock();
 	frame->CmdBuffer.End();
 
 	PresentFrame();
@@ -777,17 +775,18 @@ void GraphicsBackend::Destroy()
 	LightGridBuffer.Destroy();
 	LightIndexListBuffer.Destroy();
 
-	SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
+	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
 
-	while (!deletion_queue->IsEmpty()) {
-		ProcessDeletionQueue(true, deletion_queue.Get());
+	// while (!deletion_queue->IsEmpty()) {
+	// 	LogInfo("DELETING?");
+	// 	ProcessDeletionQueue(true, deletion_queue.Get());
 
-		// insert a small delay to avoid the processor spinning out while
-		// waiting for an object. this allows handing the core off to other threads.
-		std::this_thread::sleep_for(std::chrono::nanoseconds(100));
-	}
+	// 	// insert a small delay to avoid the processor spinning out while
+	// 	// waiting for an object. this allows handing the core off to other threads.
+	// 	std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+	// }
 
-	deletion_queue.Unlock();
+	// deletion_queue.Unlock();
 
 	gAssetManager->ShutdownDeletionQueue();
 

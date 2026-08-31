@@ -57,6 +57,8 @@ public:
 
 	DescriptorPool& FindPool();
 
+	void RebuildAll();
+
 	void Destroy();
 	~DescriptorCache() { Destroy(); }
 

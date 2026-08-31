@@ -20,11 +20,11 @@ VmaAllocator Fx_Fwd_GetGpuAllocator() { return gGraphics->GpuAllocator; }
 
 GpuDevice* Fwd_GetDevice() { return gGraphics->GetDevice(); }
 
-void Fx_Fwd_AddToDeletionQueue(const DeletionObject::FuncType& func) { gGraphics->AddToDeletionQueue(func); }
+// void Fx_Fwd_AddToDeletionQueue(const DeletionObject::FuncType& func) { gGraphics->AddToDeletionQueue(func); }
 
-void Fx_Fwd_AddGpuBufferToDeletionQueue(const VkBuffer& buffer, const VmaAllocation& allocation)
-{
-	gGraphics->AddGpuBufferToDeletionQueue(buffer, allocation);
-}
+// void Fx_Fwd_AddGpuBufferToDeletionQueue(const VkBuffer& buffer, const VmaAllocation& allocation)
+// {
+// 	gGraphics->AddGpuBufferToDeletionQueue(buffer, allocation);
+// }
 
 } // namespace fx::renderer

@@ -135,6 +135,8 @@ public:
 
 	void Build();
 
+	void Rebuild(DescriptorPool& pool);
+
 	VkDescriptorSet Get()
 	{
 		if (!mbIsBuilt) {

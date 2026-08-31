@@ -240,5 +240,14 @@ void DescriptorCache::Destroy()
 	Cache.clear();
 }
 
+void DescriptorCache::RebuildAll()
+{
+	DescriptorPool& pool = FindPool();
+
+	for (auto& [hash, descriptor_set] : Cache) {
+		descriptor_set.Rebuild(pool);
+	}
+}
+
 
 } // namespace fx::renderer
