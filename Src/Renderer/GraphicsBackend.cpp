@@ -234,6 +234,7 @@ void GraphicsBackend::RebuildRenderStages()
 	Vec2u size = GetWindow()->GetSize();
 
 	rd->ForwardPass.Rebuild(size);
+	rd->Prepass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
 
@@ -546,6 +547,12 @@ eFrameResult GraphicsBackend::BeginFrame()
 }
 
 void GraphicsBackend::BeginLightCulling(Camera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }
+
+void GraphicsBackend::BeginPrepass()
+{
+	FrameData* frame = GetFrame();
+	pRenderer->Prepass.Begin(frame->CmdBuffer);
+}
 
 void GraphicsBackend::BeginGeometry()
 {

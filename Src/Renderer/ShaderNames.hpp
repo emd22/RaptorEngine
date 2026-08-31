@@ -13,6 +13,8 @@ enum class eShaderName : uint32
 	Composition,
 	Shadows,
 	Unlit,
+	/// Depth + normal prepass
+	DepthNormal,
 	/// Draw debug geometry
 	DebugLayer,
 	Text,
@@ -37,6 +39,7 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(Composition);
 		FX_ENUM_CASE_NAME(Shadows);
 		FX_ENUM_CASE_NAME(Unlit);
+		FX_ENUM_CASE_NAME(DepthNormal);
 		FX_ENUM_CASE_NAME(DebugLayer);
 		FX_ENUM_CASE_NAME(Text);
 		FX_ENUM_CASE_NAME(SSAO);

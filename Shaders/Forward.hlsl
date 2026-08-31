@@ -107,8 +107,7 @@ F_PROGRAM(FPT_PIXEL)
 
 struct FSOutput
 {
-    float4 vAlbedo : SV_TARGET0; /* Target 0, Lit */
-    float4 vNormal : SV_TARGET1; /* Target 1, Normals */
+    float4 vAlbedo : SV_TARGET0; /* Lit */
 };
 
 struct FSInput
@@ -303,8 +302,6 @@ FSOutput main(FSInput input)
 	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);
 
 	output.vAlbedo = accumulated_light + float4(ambient.rgb, 1.0);
-
-	output.vNormal = float4(N_final, 0.0);
 
     return output;
 }

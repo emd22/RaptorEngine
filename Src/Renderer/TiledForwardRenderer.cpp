@@ -46,6 +46,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	DescriptorPool.Create(gGraphics->GetDevice(), 16);
 
 	CreateForwardPSO();
+	CreateDepthNormalPSO();
 	CreateSSAOPSO();
 	CreateCompositionPSO();
 	CreateLightCullingPSO();
@@ -62,21 +63,33 @@ void TiledForwardRenderer::CreateGPass()
 	// Forward pass
 	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent);
 
-	// Lit target
+	// Lit target (index 0)
 	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
 						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
-	// Normals target
-	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
-
-	// Depth target
+	// Depth target (index 1)
 	ForwardPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
 						  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						  eImageAspectFlag::Depth);
 
-
 	ForwardPass.BuildRenderStage();
+}
+
+void TiledForwardRenderer::CreateDepthNormalPass()
+{
+	// Depth + normal prepass
+	Prepass.Create("DepthNormal", gGraphics->Swapchain.Extent);
+
+	// Depth target (index 0)
+	Prepass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
+					  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					  eImageAspectFlag::Depth);
+
+	// World-space normals target (index 1)
+	Prepass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
+					  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+
+	Prepass.BuildRenderStage();
 }
 
 void TiledForwardRenderer::CreateSSAOPass()
@@ -147,14 +160,14 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		// Set 0 (Global / Per Frame)
 
 		// tDepth
-		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::D32_Float),
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float),
 									  gSamplerCache->Request(SamplerProps {
 										  eSamplerFilter::Nearest,
 										  eSamplerFilter::Nearest,
 										  eSamplerFilter::Nearest,
 									  }));
 		// tNormal
-		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float, 1),
+		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
 									  gSamplerCache->Request({}));
 		// tNoise
 		gPSOBuild->AddImage(2, 0, eShaderType::Pixel, gGraphics->pNoiseTexture,
@@ -347,6 +360,116 @@ void TiledForwardRenderer::CreateForwardPSO()
 	}
 }
 
+void TiledForwardRenderer::CreateDepthNormalPSO()
+{
+	CreateDepthNormalPass();
+
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::DepthNormal);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+
+		gPSOBuild->UseRenderStage(Prepass);
+		gPSOBuild->SetShader(eShaderName::DepthNormal, {});
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+
+		// Set 0 (Global / Per Frame)
+
+		// bObjectBuffer
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		// bMaterialBuffer
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+
+		// Set 1 (Object local)
+
+		// tAlbedo
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		// FSLightBuffer (declared to match the material descriptor set layout used by Geometry)
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+
+		gPSOBuild->EndPipeline();
+	}
+
+	{
+		// Normal mapped prepass pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::DepthNormalNormalMaps);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+
+		gPSOBuild->UseRenderStage(Prepass);
+		gPSOBuild->SetShader(eShaderName::DepthNormal, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+
+		// Set 0 (Global / Per Frame)
+
+		// bObjectBuffer
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		// bMaterialBuffer
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+
+		// Set 1 (Object local)
+
+		// tAlbedo
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		// tNormalMap
+		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		// tMetallicRoughness
+		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		// FSLightBuffer (declared to match the material descriptor set layout used by GeometryNormalMaps)
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+
+		gPSOBuild->EndPipeline();
+	}
+
+	{
+		// Skinned + Normal mapped prepass pipeline
+		gPSOBuild->BeginPipeline(ePipelineName::DepthNormalSkinned);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+
+		gPSOBuild->UseRenderStage(Prepass);
+		gPSOBuild->SetVertexType(eVertexType::Skinned);
+		gPSOBuild->SetShader(eShaderName::DepthNormal, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
+														ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
+		gPSOBuild->SetCullMode(eCullMode::Back);
+
+		// Set 0 (Global / Per Frame)
+
+		// bObjectBuffer
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		// bMaterialBuffer
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+
+		// Set 1 (Object local)
+
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		// bBoneBuffer
+		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0,
+							 gGraphics->BoneBuffer.PageSize);
+		// FSLightBuffer (declared to match the material descriptor set layout used by GeometrySkinned)
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+
+		gPSOBuild->EndPipeline();
+	}
+}
+
 void TiledForwardRenderer::AddLightGridDescriptors() {}
 
 void TiledForwardRenderer::CreateLightCullingPSO()
@@ -461,7 +584,7 @@ void TiledForwardRenderer::CreateCompositionPSO()
 	gPSOBuild->AddImageFromTarget(2, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float),
 								  gSamplerCache->Request(SamplerProps {}));
 	// tNormal
-	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, ForwardPass.GetTarget(eImageFormat::RGBA16_Float, 1),
+	gPSOBuild->AddImageFromTarget(3, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::RGBA16_Float),
 								  gSamplerCache->Request(SamplerProps {
 									  eSamplerFilter::Nearest,
 									  eSamplerFilter::Nearest,

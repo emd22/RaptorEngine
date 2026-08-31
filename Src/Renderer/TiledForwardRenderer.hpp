@@ -56,12 +56,14 @@ public:
 private:
 	// Geometry
 	void CreateForwardPSO();
+	void CreateDepthNormalPSO();
 	void CreateSSAOPSO();
 	void CreateDebugLayerPSO();
 
 	void BuildPersistentDescriptor();
 
 	void CreateGPass();
+	void CreateDepthNormalPass();
 	void CreateSSAOPass();
 
 
@@ -88,6 +90,7 @@ public:
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 
 	RenderStage ForwardPass;
+	RenderStage Prepass;
 	RenderStage SSAOPass;
 	RenderStage CompPass;
 
