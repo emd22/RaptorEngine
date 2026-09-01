@@ -108,6 +108,8 @@ struct PipelineProperties
 
 	Vec2u ViewportSize = Vec2u::sZero;
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+
+	uint32 ViewportDivisor = 1U;
 };
 
 struct PushConstants
@@ -234,6 +236,8 @@ public:
 
 private:
 	GpuDevice* mDevice = nullptr;
+
+	uint32 mViewportDivisor = 1U;
 
 protected:
 	bool mbDoNotDestroyLayout = false;

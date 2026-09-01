@@ -61,14 +61,14 @@ void TiledForwardRenderer::Destroy() {}
 void TiledForwardRenderer::CreateForwardPass()
 {
 	// Forward pass
-	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent, 1.0);
+	ForwardPass.Create("Forward", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
 	// Lit target
-	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-						  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	ForwardPass.AddTarget(eImageFormat::RGBA16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+						  eImageAspectFlag::Color);
 
 	// Depth target
-	ForwardPass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
+	ForwardPass.AddTarget(eImageFormat::D32_Float,
 						  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 						  eImageAspectFlag::Depth);
 
@@ -78,27 +78,26 @@ void TiledForwardRenderer::CreateForwardPass()
 void TiledForwardRenderer::CreateDepthNormalPass()
 {
 	// Depth + normal prepass
-	Prepass.Create("DepthNormal", gGraphics->Swapchain.Extent, 1.0);
+	Prepass.Create("DepthNormal", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
 	// Depth target (index 0)
-	Prepass.AddTarget(eImageFormat::D32_Float, Target::scFullScreen,
-					  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+	Prepass.AddTarget(eImageFormat::D32_Float, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					  eImageAspectFlag::Depth);
 
 	// World-space normals target (index 1)
-	Prepass.AddTarget(eImageFormat::RGBA16_Float, Target::scFullScreen,
-					  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	Prepass.AddTarget(eImageFormat::RGBA16_Float, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					  eImageAspectFlag::Color);
 
 	Prepass.BuildRenderStage();
 }
 
 void TiledForwardRenderer::CreateSSAOPass()
 {
-	SSAOPass.Create("SSAO", gGraphics->Swapchain.Extent, 1.0);
+	SSAOPass.Create("SSAO", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
 
 	// SSAO output target
-	SSAOPass.AddTarget(eImageFormat::R8_UNorm, Target::scFullScreen,
-					   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
+	SSAOPass.AddTarget(eImageFormat::R8_UNorm, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+					   eImageAspectFlag::Color);
 
 	SSAOPass.BuildRenderStage();
 }
@@ -164,6 +163,8 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		gPSOBuild->SetShader(eShaderName::SSAO, {});
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
+
+		gPSOBuild->SetViewportSize(gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
 
 		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOPushConsts));
 
@@ -585,7 +586,7 @@ void TiledForwardRenderer::CreateCompositionPSO()
 {
 	// Create composition render stage
 
-	CompPass.Create("Compose", gGraphics->Swapchain.Extent, 1.0);
+	CompPass.Create("Compose", gGraphics->Swapchain.Extent, eSizeDivisor::FullRes);
 
 	CompPass.MarkFinalStage();
 	CompPass.BuildRenderStage();

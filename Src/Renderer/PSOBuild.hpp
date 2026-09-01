@@ -87,7 +87,12 @@ public:
 	void SetFaceOrder(eFaceOrder order) { mProperties.WindingOrder = FaceOrderToVk(order); }
 	void SetCullMode(eCullMode mode) { mProperties.CullMode = CullModeToVk(mode); }
 
-	FX_FORCE_INLINE void SetViewportSize(const Vec2u& size) { mProperties.ViewportSize = size; }
+	FX_FORCE_INLINE void SetViewportSize(const Vec2u& size, eSizeDivisor size_scale)
+	{
+		mProperties.ViewportSize = size;
+		mProperties.ViewportDivisor = static_cast<uint32>(size_scale);
+	}
+
 	FX_FORCE_INLINE void SetDepthCompareOp(VkCompareOp op) { mProperties.DepthCompareOp = op; }
 
 	FX_FORCE_INLINE Ref<ShaderProgram> GetShaderProgram(eShaderType shader_type)

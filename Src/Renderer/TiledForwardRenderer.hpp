@@ -24,7 +24,7 @@ struct alignas(16) SSAOPushConsts
 	float32 InvProjection[16];
 	float32 Projection[16];
 	float32 View[16];
-	float32 ScreenSize[2];
+	float32 RenderSize[2];
 	float32 Radius;
 	float32 Bias;
 };

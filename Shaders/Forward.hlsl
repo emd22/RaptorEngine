@@ -169,7 +169,7 @@ struct FSPushConsts
 #define ROUGHNESS roughness_metallic.x
 #define METALLIC  roughness_metallic.y
 
-#define SHADOW_BIAS 0.00005f
+#define SHADOW_BIAS -0.00008f
 
 
 float3 GetSaturationColor(float value)
@@ -186,11 +186,7 @@ FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    // Material material_info = bMaterialBuffer[input.uiMaterialIndex];
-    // float4 material_color = F_UnpackUIntToFloat4(material_info.uiBaseColor);
-
     float3 albedo = F_Sample(tAlbedo, input.vUV).rgb;
-
     output.vAlbedo = float4(albedo, 1.0);
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
@@ -230,7 +226,7 @@ FSOutput main(FSInput input)
 
 	TileLightData tile_data = bLightGrid[tile_index];
 
-	const float2 ssao_coords = float2(input.vPosition.xy / float2(FSConst.vTargetSize));
+	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
 	float ssao = F_Sample(tSSAO, ssao_coords);
 
 #ifdef DEBUG_LIGHT_HEATMAP

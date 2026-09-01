@@ -673,13 +673,17 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 
 	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
 
-	SSAOPushConsts consts = {};
+	Target* target = pRenderer->SSAOPass.GetTarget(eImageFormat::R8_UNorm);
+	Assert(target != nullptr);
+
+	SSAOPushConsts consts = {
+		.RenderSize = { static_cast<float32>(target->Image.Info.Size.X), static_cast<float32>(target->Image.Info.Size.Y), },
+	};
 
 	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.View, camera.ViewMatrix.RawData, sizeof(float32) * 16);
-	consts.ScreenSize[0] = static_cast<float32>(Swapchain.Extent.X);
-	consts.ScreenSize[1] = static_cast<float32>(Swapchain.Extent.Y);
+
 	consts.Radius = 0.50f;
 	consts.Bias = 0.025f;
 

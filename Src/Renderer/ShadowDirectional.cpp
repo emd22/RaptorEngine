@@ -18,9 +18,9 @@ FX_SET_MODULE_NAME("ShadowDirectional")
 
 ShadowDirectional::ShadowDirectional(const Vec2u& size)
 {
-	RenderStage.Create("Shadows", size, 1.0);
+	RenderStage.Create("Shadows", size, eSizeDivisor::FullRes);
 
-	RenderStage.AddTarget(eImageFormat::D32_Float, size,
+	RenderStage.AddTarget(eImageFormat::D32_Float,
 						  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 						  eImageAspectFlag::Depth);
 
@@ -35,7 +35,7 @@ ShadowDirectional::ShadowDirectional(const Vec2u& size)
 
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetShader(eShaderName::Shadows, {});
-		gPSOBuild->SetViewportSize(size);
+		gPSOBuild->SetViewportSize(size, eSizeDivisor::FullRes);
 		gPSOBuild->SetDepthCompareOp(VK_COMPARE_OP_GREATER);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 		gPSOBuild->SetFaceOrder(eFaceOrder::Reverse);
