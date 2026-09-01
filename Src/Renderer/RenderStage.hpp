@@ -30,15 +30,9 @@ class RenderStage
 public:
 	RenderStage() = default;
 
-	void Create(const char* name, const Vec2u& size)
-	{
-		pcName = name;
+	void Create(const char* name, const Vec2u& size, eSizeDivisor size_divisor);
 
-		ClearValues.InitCapacity(scMaxOutputTargets);
-		mSize = size;
-	}
-
-	void AddTarget(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect);
+	void AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect);
 	void AddTarget(const Target& attachment);
 
 	TargetList& GetTargets() { return mOutputTargets; }
@@ -72,6 +66,8 @@ public:
 	void Begin(CommandBuffer& cmd);
 	void End() { mRenderPass.End(); }
 
+	FX_FORCE_INLINE uint32 GetSizeDivisor() const { return mSizeDivisor; }
+
 	~RenderStage() = default;
 
 private:
@@ -92,6 +88,10 @@ private:
 	Framebuffer mFramebuffer;
 	RenderPass mRenderPass;
 	Vec2u mSize = Vec2u::sZero;
+
+	bool mbIsFullscreen = false;
+
+	uint32 mSizeDivisor = 1U;
 
 	SizedArray<Framebuffer> mFinalStageFramebuffers;
 

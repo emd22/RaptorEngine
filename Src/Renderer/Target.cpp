@@ -5,34 +5,35 @@
 
 namespace fx::renderer {
 
-Target::Target(eImageFormat format, const Vec2u& size)
+Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen)
 {
 	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
-	if (size == Target::scFullScreen) {
+	if (is_fullscreen) {
 		Image.Info.Size = gGraphics->Swapchain.Extent;
 		bIsFullscreen = true;
 	}
 }
 
-Target::Target(eImageFormat format, const Vec2u& size, eLoadOp load_op, eStoreOp store_op, VkImageLayout initial_layout,
-			   VkImageLayout final_layout)
+Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, eLoadOp load_op, eStoreOp store_op,
+			   VkImageLayout initial_layout, VkImageLayout final_layout)
 	: LoadOp(load_op), StoreOp(store_op), InitialLayout(initial_layout), FinalLayout(final_layout)
 {
 	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
-	if (size == Target::scFullScreen) {
+	if (is_fullscreen) {
 		Image.Info.Size = gGraphics->Swapchain.Extent;
 		bIsFullscreen = true;
 	}
 }
 
-Target::Target(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)
+Target::Target(eImageFormat format, const Vec2u& size, bool is_fullscreen, VkImageUsageFlags usage,
+			   eImageAspectFlag aspect)
 	: Usage(usage), Aspect(aspect)
 {
 	Image.Info = ImageInfo { size, format, 0, 1, Slice<const uint8>(nullptr, 0) };
 
-	if (size == Target::scFullScreen) {
+	if (is_fullscreen) {
 		Image.Info.Size = gGraphics->Swapchain.Extent;
 		bIsFullscreen = true;
 	}
@@ -119,19 +120,14 @@ TargetList& TargetList::Add(const Target* attachment)
 	return Add(*attachment);
 }
 
-void TargetList::CreateImages()
+void TargetList::CreateImages(const Vec2u& size)
 {
 	if ((mFlags & eTargetListFlags::ImagesCreated) != 0) {
 		return;
 	}
 
-	Vec2u swapchain_size = gGraphics->Swapchain.Extent;
-
 	for (Target& target : Targets) {
-		if (target.bIsFullscreen) {
-			// This size will be the size of the newly created image after running `CreateImage`.
-			target.Image.Info.Size = swapchain_size;
-		}
+		target.Image.Info.Size = size;
 
 		target.CreateImage();
 	}

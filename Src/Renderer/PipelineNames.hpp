@@ -22,6 +22,11 @@ enum class ePipelineName : uint16
 	GeometryNormalMaps,
 	GeometrySkinned,
 
+	// Depth+normal prepass pipelines
+	DepthNormal,
+	DepthNormalNormalMaps,
+	DepthNormalSkinned,
+
 	DebugLayer,
 
 	/**

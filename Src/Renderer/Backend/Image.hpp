@@ -19,6 +19,15 @@
 
 namespace fx {
 
+
+enum class eSizeDivisor : uint32
+{
+	FullRes = 1U,
+	HalfRes = 2U,
+	QuarterRes = 4U,
+};
+
+
 enum class eImageSaveFormat
 {
 	Jpeg,

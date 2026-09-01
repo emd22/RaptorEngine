@@ -70,6 +70,8 @@ struct alignas(16) DrawPushConstants
 	uint32 ObjectId = 0;
 	uint32 MaterialIndex = 0;
 	uint32 TileColumns = 0;
+	uint32 Padding0;
+	uint32 TargetSize[2] = { 0U, 0U };
 };
 
 struct alignas(16) DebugLayerPushConstants
@@ -106,6 +108,8 @@ struct PipelineProperties
 
 	Vec2u ViewportSize = Vec2u::sZero;
 	VkCompareOp DepthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+
+	uint32 ViewportDivisor = 1U;
 };
 
 struct PushConstants
@@ -232,6 +236,8 @@ public:
 
 private:
 	GpuDevice* mDevice = nullptr;
+
+	uint32 mViewportDivisor = 1U;
 
 protected:
 	bool mbDoNotDestroyLayout = false;

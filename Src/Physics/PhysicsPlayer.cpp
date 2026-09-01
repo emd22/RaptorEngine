@@ -104,7 +104,7 @@ void PhysicsPlayer::Update(float64 delta_time)
 
 	PhysicsSystem& phys = gPhysics->pBackend->PhysicsSystem;
 
-	Vec3 gravity = (phys.GetGravity() * 1.2f * delta_time);
+	Vec3 gravity = (phys.GetGravity() * 1.5f * delta_time);
 
 	// Apply gravity
 	Vec3 velocity = Vec3::sZero();

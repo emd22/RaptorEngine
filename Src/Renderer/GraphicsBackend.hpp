@@ -68,9 +68,10 @@ public:
 
 	eFrameResult BeginFrame();
 	void BeginLightCulling(Camera& render_cam);
+	void BeginPrepass();
 	void BeginGeometry();
 
-	void RenderPostProcessing(Camera& camera);
+	void RenderEarlyFrameEffects(Camera& camera);
 
 	void DoComposition(Camera& render_cam);
 

@@ -86,7 +86,7 @@ void LightBase::RenderDebugMesh(const PerspectiveCamera& camera)
 
 	FrameData* frame = gGraphics->GetFrame();
 
-	DrawPushConstants push_constants {};
+	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(eObjectLayer::WorldLayer).RawData, sizeof(Mat4f));
 	push_constants.ObjectId = ID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();

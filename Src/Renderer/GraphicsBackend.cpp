@@ -234,6 +234,7 @@ void GraphicsBackend::RebuildRenderStages()
 	Vec2u size = GetWindow()->GetSize();
 
 	rd->ForwardPass.Rebuild(size);
+	rd->Prepass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
 
@@ -547,6 +548,12 @@ eFrameResult GraphicsBackend::BeginFrame()
 
 void GraphicsBackend::BeginLightCulling(Camera& render_cam) { pRenderer->DoLightCullingPass(render_cam); }
 
+void GraphicsBackend::BeginPrepass()
+{
+	FrameData* frame = GetFrame();
+	pRenderer->Prepass.Begin(frame->CmdBuffer);
+}
+
 void GraphicsBackend::BeginGeometry()
 {
 	FrameData* frame = GetFrame();
@@ -658,7 +665,7 @@ void GraphicsBackend::PresentFrame()
 }
 
 
-void GraphicsBackend::RenderPostProcessing(Camera& camera)
+void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 {
 	FrameData* frame = GetFrame();
 
@@ -666,15 +673,19 @@ void GraphicsBackend::RenderPostProcessing(Camera& camera)
 
 	gPipelineCache->Bind(ePipelineName::SSAO, frame->CmdBuffer);
 
-	SSAOPushConsts consts = {};
+	Target* target = pRenderer->SSAOPass.GetTarget(eImageFormat::R8_UNorm);
+	Assert(target != nullptr);
+
+	SSAOPushConsts consts = {
+		.RenderSize = { static_cast<float32>(target->Image.Info.Size.X), static_cast<float32>(target->Image.Info.Size.Y), },
+	};
 
 	memcpy(consts.InvProjection, camera.InvProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.Projection, camera.ProjectionMatrix.RawData, sizeof(float32) * 16);
 	memcpy(consts.View, camera.ViewMatrix.RawData, sizeof(float32) * 16);
-	consts.ScreenSize[0] = static_cast<float32>(Swapchain.Extent.X);
-	consts.ScreenSize[1] = static_cast<float32>(Swapchain.Extent.Y);
-	consts.Radius = 0.12f;
-	consts.Bias = 0.015f;
+
+	consts.Radius = 0.50f;
+	consts.Bias = 0.025f;
 
 	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAO), eShaderType::Pixel, consts);
 
@@ -688,9 +699,6 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 	FrameData* frame = GetFrame();
 
 	pRenderer->ForwardPass.End();
-
-	RenderPostProcessing(render_cam);
-
 
 	// pDeferredRenderer->UnlitPass.End();
 

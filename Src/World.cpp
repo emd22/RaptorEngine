@@ -2,6 +2,7 @@
 
 #include <Engine.hpp>
 #include <Material/Material.hpp>
+#include <Material/MaterialManager.hpp>
 #include <Material/MaterialManagerFwd.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
@@ -251,6 +252,78 @@ void World::ExecuteShadowRenderList(renderer::ePipelineName pl_name)
 	}
 }
 
+void World::ExecutePrepassRenderList(renderer::ePipelineName forward_pl_name)
+{
+	PerspectiveCamera& camera = *mpCurrentCamera;
+
+	const RenderListSection& section = mRenderList.GetSection(forward_pl_name);
+
+	if (!section.InUse.IsInited()) {
+		return;
+	}
+
+	ePipelineName prepass_pl_name = forward_pl_name;
+	switch (forward_pl_name) {
+	case ePipelineName::Geometry:
+		prepass_pl_name = ePipelineName::DepthNormal;
+		break;
+	case ePipelineName::GeometryNormalMaps:
+		prepass_pl_name = ePipelineName::DepthNormalNormalMaps;
+		break;
+	case ePipelineName::GeometrySkinned:
+		prepass_pl_name = ePipelineName::DepthNormalSkinned;
+		break;
+	default:
+		return;
+	}
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(prepass_pl_name);
+
+	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
+
+	{
+		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0 };
+
+		gGraphics->pRenderer->pPersistentDescriptorSlim->Bind(
+			0, gGraphics->GetFrame()->CmdBuffer, pipeline,
+			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+	}
+
+	const Mat4f& cam_matrix = camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+
+	uint32 index = 0;
+	while (true) {
+		index = section.InUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+		ObjectID object_id = section.Objects[index];
+		Object* object = gObjectManager->GetObject(object_id);
+
+		object->Update();
+
+		DrawPushConstants consts { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
+		consts.ObjectId = object_id.GetID();
+		consts.MaterialIndex = object->GetMaterialID().GetID();
+		consts.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+
+		memcpy(consts.CameraMatrix, cam_matrix.RawData, sizeof(Mat4f));
+
+		gGraphics->SubmitPushConstants(gGraphics->GetFrame()->CmdBuffer, pipeline,
+									   eShaderType::Vertex | eShaderType::Pixel, consts);
+
+		if (!gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, object->GetMaterialID())) {
+			gMaterialManager->BindWithPipeline(gGraphics->GetFrame()->CmdBuffer, pipeline, MaterialID::scNull);
+		}
+
+		object->RenderPrimitive(gGraphics->GetFrame()->CmdBuffer);
+
+		++index;
+	}
+}
+
+
 void World::AddToRenderListRecursive(renderer::ePipelineName pl_name, ObjectID* id_ptr)
 {
 	if (id_ptr == nullptr) {
@@ -405,8 +478,18 @@ void World::Render(Camera* shadow_camera)
 		gShadowRenderer->End();
 	}
 
-	// Cull lights into screen space tiles before rendering geometry (Forward+)
+	gGraphics->BeginPrepass();
+
+	ExecutePrepassRenderList(ePipelineName::Geometry);
+	ExecutePrepassRenderList(ePipelineName::GeometryNormalMaps);
+	ExecutePrepassRenderList(ePipelineName::GeometrySkinned);
+
+	gGraphics->pRenderer->Prepass.End();
+
+	// Cull lights into screen space tiles before rendering geometry
 	gGraphics->BeginLightCulling(camera);
+
+	gGraphics->RenderEarlyFrameEffects(camera);
 
 	gGraphics->BeginGeometry();
 

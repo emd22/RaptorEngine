@@ -5,6 +5,28 @@
 
 namespace fx::renderer {
 
+static Vec2u GetRealTargetSize(const Vec2u& size)
+{
+	if (size == Target::scFullScreen) {
+		return gGraphics->Swapchain.Extent;
+	}
+	return size;
+}
+
+void RenderStage::Create(const char* name, const Vec2u& size, eSizeDivisor size_divisor)
+{
+	pcName = name;
+
+	ClearValues.InitCapacity(scMaxOutputTargets);
+
+	if (size == Target::scFullScreen) {
+		mbIsFullscreen = true;
+	}
+
+	mSize = GetRealTargetSize(size);
+	mSizeDivisor = static_cast<uint32>(size_divisor);
+}
+
 Target* RenderStage::GetTarget(eImageFormat format, int32 sub_index)
 {
 	for (Target& attachment : mOutputTargets.Targets) {
@@ -53,16 +75,18 @@ void RenderStage::BuildRenderStage()
 		MakeClearValues();
 	}
 
-	mOutputTargets.CreateImages();
+	const Vec2u final_size = mSize / Vec2u(mSizeDivisor);
 
-	mRenderPass.Create(mOutputTargets, mSize);
+	mOutputTargets.CreateImages(final_size);
+
+	mRenderPass.Create(mOutputTargets, final_size);
 	renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
 
 	if (mbIsFinalStage) {
 		CreateFinalStageFramebuffers();
 	}
 	else {
-		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize);
+		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, final_size);
 	}
 
 	mbIsBuilt = true;
@@ -70,24 +94,26 @@ void RenderStage::BuildRenderStage()
 
 void RenderStage::Rebuild(const Vec2u& size)
 {
-	mSize = size;
+	mSize = GetRealTargetSize(size);
 
 	mbIsBuilt = false;
 
-	mOutputTargets.RecreateImages();
+	const Vec2u final_size = mSize / Vec2u(mSizeDivisor);
+
+	mOutputTargets.RecreateImages(final_size);
 
 	mFramebuffer.Destroy();
 	mFinalStageFramebuffers.Free();
 	mRenderPass.Destroy();
 
-	mRenderPass.Create(mOutputTargets, mSize);
+	mRenderPass.Create(mOutputTargets, final_size);
 	renderer::Util::SetDebugLabel(pcName, VK_OBJECT_TYPE_RENDER_PASS, mRenderPass.Get());
 
 	if (mbIsFinalStage) {
 		CreateFinalStageFramebuffers();
 	}
 	else {
-		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, mSize);
+		mFramebuffer.Create(mOutputTargets.GetImageViews(), mRenderPass, final_size);
 	}
 
 	mbIsBuilt = true;
@@ -109,9 +135,9 @@ void RenderStage::Begin(CommandBuffer& cmd)
 	mRenderPass.Begin(&cmd, framebuffer, ClearValues);
 }
 
-void RenderStage::AddTarget(eImageFormat format, const Vec2u& size, VkImageUsageFlags usage, eImageAspectFlag aspect)
+void RenderStage::AddTarget(eImageFormat format, VkImageUsageFlags usage, eImageAspectFlag aspect)
 {
-	mOutputTargets.Add(Target(format, size, usage, aspect));
+	mOutputTargets.Add(Target(format, mSize / mSizeDivisor, mbIsFullscreen, usage, aspect));
 }
 
 void RenderStage::AddTarget(const Target& attachment) { mOutputTargets.Add(attachment); }
@@ -160,7 +186,7 @@ void RenderStage::MarkFinalStage()
 
 void RenderStage::AddPresentTarget()
 {
-	mOutputTargets.Add(Target(gGraphics->Swapchain.Surface.Format, Target::scFullScreen, eLoadOp::DontCare,
+	mOutputTargets.Add(Target(gGraphics->Swapchain.Surface.Format, Target::scFullScreen, true, eLoadOp::DontCare,
 							  eStoreOp::Store, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR));
 }
 

@@ -171,6 +171,7 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 
 	bHasDynamicViewport = true;
 	ViewportSize = properties.ViewportSize;
+	mViewportDivisor = properties.ViewportDivisor;
 
 	// If there is no viewport size passed in, assume the swapchain size.
 	if (ViewportSize.X == 0 || ViewportSize.Y == 0) {
@@ -181,15 +182,15 @@ void Pipeline::Create(ePipelineName name, const Slice<Ref<ShaderProgram>>& shade
 	VkViewport viewport = {
 		.x = 0.0f,
 		.y = 0.0f,
-		.width = static_cast<float32>(ViewportSize.X),
-		.height = static_cast<float32>(ViewportSize.Y),
+		.width = static_cast<float32>(ViewportSize.X) / mViewportDivisor,
+		.height = static_cast<float32>(ViewportSize.Y) / mViewportDivisor,
 		.minDepth = 1.0f,
 		.maxDepth = 0.0f,
 	};
 
 	VkRect2D scissor = {
 		.offset = { 0, 0 },
-		.extent = { .width = ViewportSize.X, .height = ViewportSize.Y },
+		.extent = { .width = ViewportSize.X / mViewportDivisor, .height = ViewportSize.Y / mViewportDivisor },
 	};
 
 	const VkPipelineViewportStateCreateInfo viewport_state_info = {
@@ -351,15 +352,15 @@ void Pipeline::Bind(const CommandBuffer& cmd) const
 		VkViewport viewport = {
 			.x = 0.0f,
 			.y = 0.0f,
-			.width = static_cast<float32>(ViewportSize.X),
-			.height = static_cast<float32>(ViewportSize.Y),
+			.width = static_cast<float32>(ViewportSize.X) / mViewportDivisor,
+			.height = static_cast<float32>(ViewportSize.Y) / mViewportDivisor,
 			.minDepth = 1.0f,
 			.maxDepth = 0.0f,
 		};
 
 		VkRect2D scissor = {
 			.offset = { 0, 0 },
-			.extent = { .width = ViewportSize.X, .height = ViewportSize.Y },
+			.extent = { .width = ViewportSize.X / mViewportDivisor, .height = ViewportSize.Y / mViewportDivisor },
 		};
 
 		vkCmdSetViewport(cmd, 0, 1, &viewport);

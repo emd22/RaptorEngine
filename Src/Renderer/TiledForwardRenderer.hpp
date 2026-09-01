@@ -24,7 +24,7 @@ struct alignas(16) SSAOPushConsts
 	float32 InvProjection[16];
 	float32 Projection[16];
 	float32 View[16];
-	float32 ScreenSize[2];
+	float32 RenderSize[2];
 	float32 Radius;
 	float32 Bias;
 };
@@ -56,14 +56,15 @@ public:
 private:
 	// Geometry
 	void CreateForwardPSO();
+	void CreateDepthNormalPSO();
 	void CreateSSAOPSO();
 	void CreateDebugLayerPSO();
 
 	void BuildPersistentDescriptor();
 
-	void CreateGPass();
+	void CreateForwardPass();
+	void CreateDepthNormalPass();
 	void CreateSSAOPass();
-
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -87,8 +88,13 @@ public:
 
 	FX_FORCE_INLINE uint32 GetLightTileColumns() const { return mLightTileColumns; }
 
+	/// Depth + Normal prepass
+	RenderStage Prepass;
+	/// Main Forward+ lit pass
 	RenderStage ForwardPass;
+	/// SSAO pass
 	RenderStage SSAOPass;
+	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 
 	ePipelineName pGeometryPipelineName = ePipelineName::Geometry;

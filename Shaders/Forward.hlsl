@@ -45,6 +45,8 @@ struct VSPushConsts
 	uint uiObjectIndex;
     uint uiMaterialIndex;
     uint uiTileColumns;
+    uint _Padding0;
+    uint2 vTargetSize;
 };
 
 #ifdef USE_SKINNING
@@ -107,8 +109,7 @@ F_PROGRAM(FPT_PIXEL)
 
 struct FSOutput
 {
-    float4 vAlbedo : SV_TARGET0; /* Target 0, Lit */
-    float4 vNormal : SV_TARGET1; /* Target 1, Normals */
+    float4 vAlbedo : SV_TARGET0; /* Lit */
 };
 
 struct FSInput
@@ -151,6 +152,7 @@ F_Texture2D(tMetallicRoughness, 2, 1)
 #endif
 
 F_ShadowTexture2D(tShadowAtlas, 4, 0);
+F_Texture2D(tSSAO, 5, 0);
 
 struct FSPushConsts
 {
@@ -158,6 +160,8 @@ struct FSPushConsts
 	uint uiObjectIndex;
 	uint uiMaterialIndex;
 	uint uiTileColumns;
+	uint _Padding0;
+	uint2 vTargetSize;
 };
 
 [[vk::push_constant]] FSPushConsts FSConst;
@@ -165,7 +169,7 @@ struct FSPushConsts
 #define ROUGHNESS roughness_metallic.x
 #define METALLIC  roughness_metallic.y
 
-#define SHADOW_BIAS 0.00005f
+#define SHADOW_BIAS -0.00009f
 
 
 float3 GetSaturationColor(float value)
@@ -182,11 +186,7 @@ FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    // Material material_info = bMaterialBuffer[input.uiMaterialIndex];
-    // float4 material_color = F_UnpackUIntToFloat4(material_info.uiBaseColor);
-
     float3 albedo = F_Sample(tAlbedo, input.vUV).rgb;
-
     output.vAlbedo = float4(albedo, 1.0);
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
@@ -225,6 +225,9 @@ FSOutput main(FSInput input)
 	uint tile_index = tile_xy.x + (tile_xy.y * FSConst.uiTileColumns);
 
 	TileLightData tile_data = bLightGrid[tile_index];
+
+	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
+	float ssao = F_Sample(tSSAO, ssao_coords);
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
@@ -300,11 +303,9 @@ FSOutput main(FSInput input)
 		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, material.fAlpha);
 	}
 
-	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f);
+	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f) * (ssao);
 
 	output.vAlbedo = accumulated_light + float4(ambient.rgb, 1.0);
-
-	output.vNormal = float4(N_final, 0.0);
 
     return output;
 }
