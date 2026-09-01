@@ -164,7 +164,7 @@ void TiledForwardRenderer::CreateSSAOPSO()
 		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
 		gPSOBuild->SetCullMode(eCullMode::None);
 
-		gPSOBuild->SetViewportSize(gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+		gPSOBuild->SetViewportSize(Target::scFullScreen, eSizeDivisor::HalfRes);
 
 		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOPushConsts));
 

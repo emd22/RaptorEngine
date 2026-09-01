@@ -169,7 +169,7 @@ struct FSPushConsts
 #define ROUGHNESS roughness_metallic.x
 #define METALLIC  roughness_metallic.y
 
-#define SHADOW_BIAS -0.00008f
+#define SHADOW_BIAS -0.00009f
 
 
 float3 GetSaturationColor(float value)
