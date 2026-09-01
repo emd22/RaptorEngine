@@ -97,7 +97,7 @@ void TiledForwardRenderer::CreateSSAOPass()
 	SSAOPass.Create("SSAO", gGraphics->Swapchain.Extent, 1.0);
 
 	// SSAO output target
-	SSAOPass.AddTarget(eImageFormat::R8_UInt, Target::scFullScreen,
+	SSAOPass.AddTarget(eImageFormat::R8_UNorm, Target::scFullScreen,
 					   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, eImageAspectFlag::Color);
 
 	SSAOPass.BuildRenderStage();
@@ -139,7 +139,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerCompareOp::Greater,
 											   })));
 
-	Target* ssao_target = SSAOPass.GetTarget(eImageFormat::R8_UInt);
+	Target* ssao_target = SSAOPass.GetTarget(eImageFormat::R8_UNorm);
 	Assert(ssao_target != nullptr);
 
 	ds_entries.Insert(DescriptorEntry::AsImage(5, eShaderType::Pixel, &ssao_target->Image,
@@ -253,7 +253,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UInt),
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
 										  .MinFilter = eSamplerFilter::Nearest,
 										  .MagFilter = eSamplerFilter::Nearest,
@@ -303,7 +303,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UInt),
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
 										  .MinFilter = eSamplerFilter::Nearest,
 										  .MagFilter = eSamplerFilter::Nearest,
@@ -361,7 +361,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 							gSamplerCache->Request({}));
 
 		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UInt),
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
 										  .MinFilter = eSamplerFilter::Nearest,
 										  .MagFilter = eSamplerFilter::Nearest,

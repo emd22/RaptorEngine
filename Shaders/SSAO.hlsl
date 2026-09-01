@@ -42,8 +42,7 @@ struct FSInput
 
 struct FSOutput
 {
-	uint vOut : SV_TARGET0;
-	// float4 vOut : SV_TARGET0;
+	float vOut : SV_TARGET0;
 };
 
 F_Texture2D(tDepth, 0, 0);
@@ -62,12 +61,12 @@ struct SSAOPushConsts
 
 [[vk::push_constant]] SSAOPushConsts Consts;
 
-#define SSAO_KERNEL_SIZE 40
+#define SSAO_KERNEL_SIZE 32
 #define SSAO_POWER 2.0
 #define SSAO_NOISE_IMAGE_SIZE 64
 #define SSAO_DISTANCE_CUTOFF 50.0
 #define SSAO_CUTOFF_FADE 10.0
-#define SSAO_STRENGTH 2.5
+#define SSAO_STRENGTH 1.7
 #define PI 3.14159265
 
 #define GOLDEN_ANGLE 2.39996323
@@ -103,14 +102,14 @@ float3 GetSampleKernel(uint index)
 	return float3(r * cos(phi), r * sin(phi), z);
 }
 
-float4 ComputeSSAO(float2 uv)
+float ComputeSSAO(float2 uv)
 {
 	float raw_depth = F_Sample(tDepth, uv).r;
 
 	// Skip the skybox
 	if (raw_depth >= 1.0)
 	{
-		return float4(1.0, 1.0, 1.0, 1.0);
+		return 1.0;
 	}
 
 	float depth = 1.0 - raw_depth;
@@ -164,15 +163,15 @@ float4 ComputeSSAO(float2 uv)
 	float cutoff = saturate((SSAO_DISTANCE_CUTOFF - length(fragment_position.xyz)) / SSAO_CUTOFF_FADE);
 	ao = lerp(1.0, ao, cutoff);
 
-	return float4(ao, ao, ao, 1.0);
+	return ao;
 }
 
 FSOutput main(FSInput input)
 {
 	FSOutput output;
 
-	float4 ao = ComputeSSAO(input.vUV);
-	output.vOut = uint(ao.r * 255.0);
+	float ao = ComputeSSAO(input.vUV);
+	output.vOut = ao;
 
 	return output;
 }
