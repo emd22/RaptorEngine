@@ -104,7 +104,12 @@ void FoxtrotGame::InitEngine()
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
 	mBlockout.Create(&mMainScene);
-	mBlockout.Load("./Data/Demo/blockout.prx");
+
+	ConfigEntry* blockout_entry = Config.GetEntry(HashStr32("blockout"));
+	if (blockout_entry) {
+		mBlockoutPath = String(blockout_entry->Get<const char*>());
+		mBlockout.Load(mBlockoutPath);
+	}
 
 	// script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.ssc");
 	// if (test_script.HasErrors() == false) {
@@ -338,7 +343,7 @@ void FoxtrotGame::NewBlockoutBrush() {}
 
 void FoxtrotGame::ProcessControls()
 {
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_GRAVE)) {
+	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_GRAVE)) {
 		// Release the mouse before quitting the game incase there is a crash.
 		ControlManager::ReleaseMouse();
 		sbRunning = false;
@@ -433,7 +438,7 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
-		mBlockout.Load("./Data/Demo/blockout.prx");
+		mBlockout.Load(mBlockoutPath);
 
 		LogInfo("Reloading blockout...");
 

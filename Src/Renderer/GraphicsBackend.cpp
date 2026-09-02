@@ -236,6 +236,7 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->ForwardPass.Rebuild(size);
 	rd->Prepass.Rebuild(size);
 	rd->SSAOPass.Rebuild(size);
+	rd->SSAOBlurPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
 
 	rd->DescriptorPool.Recreate();
@@ -692,6 +693,26 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
 	pRenderer->SSAOPass.End();
+
+	// Bilateral blur pass to smooth SSAO output
+	pRenderer->SSAOBlurPass.Begin(frame->CmdBuffer);
+
+	gPipelineCache->Bind(ePipelineName::SSAOBlur, frame->CmdBuffer);
+
+	Target* blur_target = pRenderer->SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
+	Assert(blur_target != nullptr);
+
+	SSAOBlurPushConsts blur_consts = {
+		.ScreenSize = { static_cast<float32>(blur_target->Image.Info.Size.X), static_cast<float32>(blur_target->Image.Info.Size.Y) },
+		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.Info.Size.X), 1.0f / static_cast<float32>(blur_target->Image.Info.Size.Y) },
+		.DepthSharpness = 100.0f,
+	};
+
+	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel, blur_consts);
+
+	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
+
+	pRenderer->SSAOBlurPass.End();
 }
 
 void GraphicsBackend::DoComposition(Camera& render_cam)

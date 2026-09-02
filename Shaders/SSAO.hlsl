@@ -106,7 +106,7 @@ float ComputeSSAO(float2 uv)
 {
 	float raw_depth = F_Sample(tDepth, uv).r;
 
-	// Skip the skybox
+	// Skip the skybox (reverse-Z: far plane = 0.0)
 	if (raw_depth >= 1.0)
 	{
 		return 1.0;
@@ -135,7 +135,7 @@ float ComputeSSAO(float2 uv)
 		float3 sample_ndc = sample_clip.xyz / sample_clip.w;
 		float2 sample_uv = sample_ndc.xy * 0.5 + 0.5;
 
-		float sample_raw_depth = F_Sample(tDepth, sample_uv).r;
+		float sample_raw_depth = 1.0 - F_Sample(tDepth, sample_uv).r;
 
 		// Skip offscreen samples
 		if (any(sample_uv < 0.0) || any(sample_uv > 1.0))
@@ -143,7 +143,7 @@ float ComputeSSAO(float2 uv)
 			continue;
 		}
 
-		float sample_scene_z = ReconstructViewPos(sample_uv, 1.0 - sample_raw_depth).z;
+		float sample_scene_z = ReconstructViewPos(sample_uv, sample_raw_depth).z;
 
 		float delta = sample_position.z - sample_scene_z;
 

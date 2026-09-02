@@ -19,6 +19,7 @@ enum class eShaderName : uint32
 	DebugLayer,
 	Text,
 	SSAO,
+	SSAOBlur,
 
 	NumShaders,
 };
@@ -43,6 +44,7 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(DebugLayer);
 		FX_ENUM_CASE_NAME(Text);
 		FX_ENUM_CASE_NAME(SSAO);
+		FX_ENUM_CASE_NAME(SSAOBlur);
 	default:
 		return "Unknown";
 	}
