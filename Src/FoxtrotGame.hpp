@@ -140,6 +140,8 @@ private:
 
 
 	Blockout mBlockout;
+
+	String mBlockoutPath;
 };
 
 } // namespace fx

@@ -29,6 +29,13 @@ struct alignas(16) SSAOPushConsts
 	float32 Bias;
 };
 
+struct alignas(16) SSAOBlurPushConsts
+{
+	float32 ScreenSize[2];
+	float32 TexelSize[2];
+	float32 DepthSharpness;
+};
+
 
 ///////////////////////////////
 // Main Deferred Renderer
@@ -58,6 +65,7 @@ private:
 	void CreateForwardPSO();
 	void CreateDepthNormalPSO();
 	void CreateSSAOPSO();
+	void CreateSSAOBlurPSO();
 	void CreateDebugLayerPSO();
 
 	void BuildPersistentDescriptor();
@@ -65,6 +73,7 @@ private:
 	void CreateForwardPass();
 	void CreateDepthNormalPass();
 	void CreateSSAOPass();
+	void CreateSSAOBlurPass();
 
 	// Lighting
 	// void CreateLightVolumePipeline();
@@ -94,6 +103,8 @@ public:
 	RenderStage ForwardPass;
 	/// SSAO pass
 	RenderStage SSAOPass;
+	/// SSAO blur pass
+	RenderStage SSAOBlurPass;
 	/// Composition pass, combine results from all passes
 	RenderStage CompPass;
 

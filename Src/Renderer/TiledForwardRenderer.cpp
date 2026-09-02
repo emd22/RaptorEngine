@@ -47,6 +47,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 
 	CreateDepthNormalPSO();
 	CreateSSAOPSO();
+	CreateSSAOBlurPSO();
 	CreateForwardPSO();
 	CreateCompositionPSO();
 	CreateLightCullingPSO();
@@ -102,6 +103,17 @@ void TiledForwardRenderer::CreateSSAOPass()
 	SSAOPass.BuildRenderStage();
 }
 
+void TiledForwardRenderer::CreateSSAOBlurPass()
+{
+	SSAOBlurPass.Create("SSAOBlur", gGraphics->Swapchain.Extent, eSizeDivisor::HalfRes);
+
+	// Blurred SSAO output target
+	SSAOBlurPass.AddTarget(eImageFormat::R8_UNorm, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+						   eImageAspectFlag::Color);
+
+	SSAOBlurPass.BuildRenderStage();
+}
+
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
@@ -138,7 +150,7 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 												   eSamplerCompareOp::Greater,
 											   })));
 
-	Target* ssao_target = SSAOPass.GetTarget(eImageFormat::R8_UNorm);
+	Target* ssao_target = SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm);
 	Assert(ssao_target != nullptr);
 
 	ds_entries.Insert(DescriptorEntry::AsImage(5, eShaderType::Pixel, &ssao_target->Image,
@@ -187,6 +199,42 @@ void TiledForwardRenderer::CreateSSAOPSO()
 								.MipFilter = eSamplerFilter::Nearest,
 							}));
 
+
+		gPSOBuild->EndPipeline();
+	}
+}
+
+void TiledForwardRenderer::CreateSSAOBlurPSO()
+{
+	CreateSSAOBlurPass();
+
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::SSAOBlur);
+
+		gPSOBuild->UseRenderStage(SSAOBlurPass);
+		gPSOBuild->SetShader(eShaderName::SSAOBlur, {});
+		gPSOBuild->SetFlags(ePSOBuildFlags::NoVertices);
+		gPSOBuild->SetCullMode(eCullMode::None);
+
+		gPSOBuild->SetViewportSize(Target::scFullScreen, eSizeDivisor::HalfRes);
+
+		gPSOBuild->SetPushConstants(eShaderType::Pixel, sizeof(SSAOBlurPushConsts));
+
+		// tSSAO (input SSAO texture)
+		gPSOBuild->AddImageFromTarget(0, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
+									  gSamplerCache->Request(SamplerProps {
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+									  }));
+
+		// tDepth (for bilateral edge preservation)
+		gPSOBuild->AddImageFromTarget(1, 0, eShaderType::Pixel, Prepass.GetTarget(eImageFormat::D32_Float),
+									  gSamplerCache->Request(SamplerProps {
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+										  eSamplerFilter::Nearest,
+									  }));
 
 		gPSOBuild->EndPipeline();
 	}
@@ -254,7 +302,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
 										  .MinFilter = eSamplerFilter::Nearest,
 										  .MagFilter = eSamplerFilter::Nearest,
@@ -304,7 +352,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
 										  .MinFilter = eSamplerFilter::Nearest,
 										  .MagFilter = eSamplerFilter::Nearest,
@@ -362,7 +410,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 							gSamplerCache->Request({}));
 
 		// tSSAO
-		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOPass.GetTarget(eImageFormat::R8_UNorm),
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
 									  gSamplerCache->Request({
 										  .MinFilter = eSamplerFilter::Nearest,
 										  .MagFilter = eSamplerFilter::Nearest,

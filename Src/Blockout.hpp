@@ -41,7 +41,8 @@ public:
 	World* pWorld = nullptr;
 
 private:
-	MaterialID mBlockoutMaterialID = MaterialID::scNull;
+	MaterialID mWhiteMaterialID = MaterialID::scNull;
+	MaterialID mOrangeMaterialID = MaterialID::scNull;
 };
 
 

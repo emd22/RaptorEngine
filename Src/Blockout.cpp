@@ -20,15 +20,31 @@ void Blockout::Create(World* world)
 
 	pWorld = world;
 
-	mBlockoutMaterialID = gMaterialManager->NewMaterial("TestMat", renderer::ePipelineName::Geometry, false);
-	Material* test_material = gMaterialManager->GetMaterial(mBlockoutMaterialID);
+	// White material
+	{
+		mWhiteMaterialID = gMaterialManager->NewMaterial("ProtoWhite", renderer::ePipelineName::Geometry, false);
+		Material* test_material = gMaterialManager->GetMaterial(mWhiteMaterialID);
 
-	AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-												   "Data/Demo/Textures/gray_check.png", eImageCreateFlags::None);
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "Data/Demo/Textures/gray_check.png", eImageCreateFlags::None);
 
-	test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 
-	test_material->Finalize();
+		test_material->Finalize();
+	}
+
+	// Orange material
+	{
+		mOrangeMaterialID = gMaterialManager->NewMaterial("ProtoOrange", renderer::ePipelineName::Geometry, false);
+		Material* test_material = gMaterialManager->GetMaterial(mOrangeMaterialID);
+
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "Data/Demo/Textures/orange_check.png", eImageCreateFlags::None);
+
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+
+		test_material->Finalize();
+	}
 }
 
 static void RemoveBlockoutFromWorld(World* world)
@@ -72,6 +88,12 @@ static Vec3f GetCubeSize(const CubeGenOptions& cgo)
 			Vec3f(cgo.Right.Scale, cgo.Bottom.Scale, cgo.Back.Scale));
 }
 
+enum class eCProtoMat
+{
+	Gray = 0,
+	Orange = 1,
+};
+
 void Blockout::CreateCubeVolume(ConfigEntry& entry)
 {
 	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
@@ -101,10 +123,24 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
+	eCProtoMat mat_index = static_cast<eCProtoMat>(entry.GetMemberValue<int>(HashStr32("mat"), 0));
+
+	MaterialID mat_id = mWhiteMaterialID;
+
+	switch (mat_index) {
+	case eCProtoMat::Gray:
+		break;
+	case eCProtoMat::Orange:
+		mat_id = mOrangeMaterialID;
+		break;
+	default:;
+	}
+
+
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), eObjectTag::Blockout);
 	object->pMesh = cube_mesh->AsDefaultMesh();
 	object->MoveBy(position);
-	object->mMaterialID = mBlockoutMaterialID;
+	object->mMaterialID = mat_id;
 	object->SetShadowCaster(true);
 	Vec3f midpoint = GetCubeMidpointOffset(cgo);
 

@@ -48,11 +48,11 @@ Objects = {
         Pos = [0.0, -1.25, 0.0]
     }*/
 
-    Level = {
+    /*Level = {
         Mesh = "/TestFloor.glb"
         ColliderRef = "Floor"
         Pos = [0.0, -1.5, 0.0]
-    }
+    }*/
 
 	/*
 
