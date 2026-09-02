@@ -61,7 +61,8 @@ VSOutput main(VSInput input)
 	float4 position = float4(text_position, 0.5f, 1.0f);
 	output.vPosition = mul(VSConst.mCombinedMatrix, position);
 
-	output.vUV = lerp(instance.vUvMin, instance.vUvMax, corner);
+	output.vUV = float2(lerp(instance.vUvMin.x, instance.vUvMax.x, corner.x),
+						lerp(instance.vUvMax.y, instance.vUvMin.y, corner.y));
 
 	output.vTextColor = F_UnpackUIntToFloat4(VSConst.uiTextColor);
 

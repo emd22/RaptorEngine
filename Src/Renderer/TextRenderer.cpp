@@ -108,17 +108,9 @@ void TextRenderer::Render(const CommandBuffer& cmd, const char* text, const Vec2
 	const renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::TextRendering);
 	// pipeline.Bind(cmd);
 
-	// Reset instance counter on new frame.
-	const uint32 current_frame = gGraphics->GetFrameNumber();
-	if (current_frame != mLastFrame) {
-		mInstancesWritten = 0;
-		mLastFrame = current_frame;
-	}
+	const uint32 base_offset = gGraphics->GetFrameNumber() * scMaxGlyphs * sizeof(InstanceData);
 
-	const uint32 base_offset = current_frame * scMaxGlyphs * sizeof(InstanceData);
-	const uint32 write_offset = base_offset + mInstancesWritten * sizeof(InstanceData);
-
-	gPipelineCache->AddBufferOffset(0, write_offset);
+	gPipelineCache->AddBufferOffset(0, base_offset);
 	gPipelineCache->Bind(ePipelineName::TextRendering, cmd);
 
 	// Bind descriptor sets (instance buffer + font atlas).
@@ -183,8 +175,7 @@ void TextRenderer::Render(const CommandBuffer& cmd, const char* text, const Vec2
 	}
 
 	uint8* mapped = reinterpret_cast<uint8*>(mInstanceBuffer.pMappedBuffer);
-	memcpy(mapped + write_offset, instances.pData, instances.Size * sizeof(InstanceData));
-	mInstancesWritten += instances.Size;
+	memcpy(mapped + base_offset, instances.pData, instances.Size * sizeof(InstanceData));
 
 	// Bind descriptor sets. Set 0 uses a dynamic offset into the instance buffer for the
 	// current frame (like the object buffer), set 1 is the font atlas.

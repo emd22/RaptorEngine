@@ -337,7 +337,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(MeshGenOptions options)
 	const Vec3f b_bl { -options.Scale, -options.Scale, -options.Scale }; // Back BL
 	const Vec3f b_br { options.Scale, -options.Scale, -options.Scale };	 // Back BR
 
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options, true,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options, false,
 				false);
 
 	return mesh;

@@ -731,8 +731,8 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 		const uint32 ui_green = Color::FromRGBA(0, 255, 128, 255).AsUInt();
 
 		gTextRenderer->Render(frame->CmdBuffer, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", Vec2f(16.0f, 16.0f), 2.0f, ui_white);
-		gTextRenderer->Render(frame->CmdBuffer, "abcdefghijklmnopqrstuvwxyz", Vec2f(16.0f, 32.0f), 2.0f, ui_green);
-		gTextRenderer->Render(frame->CmdBuffer, "0123456789+-=", Vec2f(16.0f, 48.0f), 2.0f, ui_white);
+		// gTextRenderer->Render(frame->CmdBuffer, "abcdefghijklmnopqrstuvwxyz", Vec2f(16.0f, 32.0f), 2.0f, ui_green);
+		// gTextRenderer->Render(frame->CmdBuffer, "0123456789+-=", Vec2f(16.0f, 48.0f), 2.0f, ui_white);
 	}
 
 	pRenderer->ForwardPass.End();

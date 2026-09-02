@@ -71,8 +71,6 @@ private:
 	Image* mpAtlas = nullptr;
 	Sampler* mpSampler = nullptr;
 	RawGpuBuffer mInstanceBuffer;
-	uint32 mInstancesWritten = 0;
-	uint32 mLastFrame = UINT32_MAX;
 };
 
 } // namespace fx::renderer
