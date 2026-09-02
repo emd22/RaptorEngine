@@ -10,10 +10,10 @@ F_PROGRAM(FPT_VERTEX)
 
 struct TextInstanceData
 {
-	float2 vPosition; // Top-left corner in pixel space
-	float2 vSize;	  // Glyph size in pixel space
-	float2 vUvMin;	  // Atlas UV of the top-left of the glyph
-	float2 vUvMax;	  // Atlas UV of the bottom-right of the glyph
+	float2 vPosition;
+	float2 vSize;
+	float2 vUvMin;
+	float2 vUvMax;
 };
 
 struct VSInput
@@ -52,8 +52,6 @@ VSOutput main(VSInput input)
 
 	TextInstanceData instance = bTextInstances[input.uiInstanceId];
 
-	// The unit quad spans [-1, 1], remap it to a [0, 1] corner basis so the per-instance
-	// position is the top-left corner of the glyph quad.
 	float2 corner = input.vPosition.xy * 0.5f + 0.5f;
 
 	float2 text_position = instance.vPosition + (corner * instance.vSize);
@@ -87,7 +85,7 @@ struct FSOutput
 	float4 vAlbedo : SV_TARGET0;
 };
 
-F_Texture2D(tFont, 0, 1)
+F_Texture2D(tFont, 1, 0)
 
 FSOutput main(FSInput input)
 {

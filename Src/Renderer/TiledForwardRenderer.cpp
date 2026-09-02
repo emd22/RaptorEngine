@@ -700,12 +700,12 @@ void TiledForwardRenderer::CreateBitmapTextPSO()
 		};
 		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
 
-		// Set 0 - bTextInstances
 		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gTextRenderer->GetInstanceBuffer(), 0,
 							 sizeof(TextRenderer::InstanceData) * TextRenderer::scMaxGlyphs);
 
-		// Set 1 - tFont
-		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gTextRenderer->GetAtlas(), gTextRenderer->GetSampler());
+		gPSOBuild->AddImage(
+			1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+			gSamplerCache->Request({ eSamplerFilter::Nearest, eSamplerFilter::Nearest, eSamplerFilter::Nearest }));
 
 		gPSOBuild->EndPipeline();
 	}
