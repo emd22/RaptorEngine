@@ -8,6 +8,7 @@
 #include "Engine.hpp"
 #include "ImageGen.hpp"
 #include "Object/ObjectManager.hpp"
+#include "TextRenderer.hpp"
 #include "TiledForwardRenderer.hpp"
 
 #include <SDL3/SDL.h>
@@ -15,6 +16,7 @@
 
 #include <Asset/Animation.hpp>
 #include <Asset/AssetManager.hpp>
+#include <Color.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/RefUtil.hpp>
@@ -703,12 +705,15 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 	Assert(blur_target != nullptr);
 
 	SSAOBlurPushConsts blur_consts = {
-		.ScreenSize = { static_cast<float32>(blur_target->Image.Info.Size.X), static_cast<float32>(blur_target->Image.Info.Size.Y) },
-		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.Info.Size.X), 1.0f / static_cast<float32>(blur_target->Image.Info.Size.Y) },
+		.ScreenSize = { static_cast<float32>(blur_target->Image.Info.Size.X),
+						static_cast<float32>(blur_target->Image.Info.Size.Y) },
+		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.Info.Size.X),
+					   1.0f / static_cast<float32>(blur_target->Image.Info.Size.Y) },
 		.DepthSharpness = 100.0f,
 	};
 
-	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel, blur_consts);
+	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel,
+						blur_consts);
 
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
@@ -719,7 +724,19 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 {
 	FrameData* frame = GetFrame();
 
+
+	// Draw screen-space bitmap text over the lit scene.
+	{
+		const uint32 ui_white = Color::FromRGBA(255, 255, 255, 255).AsUInt();
+		const uint32 ui_green = Color::FromRGBA(0, 255, 128, 255).AsUInt();
+
+		gTextRenderer->Render(frame->CmdBuffer, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", Vec2f(16.0f, 16.0f), 2.0f, ui_white);
+		gTextRenderer->Render(frame->CmdBuffer, "abcdefghijklmnopqrstuvwxyz", Vec2f(16.0f, 32.0f), 2.0f, ui_green);
+		gTextRenderer->Render(frame->CmdBuffer, "0123456789+-=", Vec2f(16.0f, 48.0f), 2.0f, ui_white);
+	}
+
 	pRenderer->ForwardPass.End();
+
 
 	// pDeferredRenderer->UnlitPass.End();
 

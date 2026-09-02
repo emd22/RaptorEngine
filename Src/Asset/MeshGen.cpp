@@ -323,53 +323,22 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(MeshGenOptions options)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 
-	const float32 s = options.Scale;
+	mesh->Positions.InitCapacity(8);
+	mesh->Normals.InitCapacity(8);
+	mesh->Uvs.InitCapacity(8);
+	mesh->Indices.InitCapacity(8);
 
-	/*
-		0-------1
-		|     / |
-		|   /   |
-		| /     |
-		3-------2
-	*/
+	const Vec3f f_tl { -options.Scale, options.Scale, options.Scale };	 // Front TL
+	const Vec3f f_tr { options.Scale, options.Scale, options.Scale };	 // Front TR
+	const Vec3f f_bl { -options.Scale, -options.Scale, options.Scale };	 // Front BL
+	const Vec3f f_br { options.Scale, -options.Scale, options.Scale };	 // Front BR
+	const Vec3f b_tl { -options.Scale, options.Scale, -options.Scale };	 // Back TL
+	const Vec3f b_tr { options.Scale, options.Scale, -options.Scale };	 // Back TR
+	const Vec3f b_bl { -options.Scale, -options.Scale, -options.Scale }; // Back BL
+	const Vec3f b_br { options.Scale, -options.Scale, -options.Scale };	 // Back BR
 
-	mesh->Positions = {
-		// Top Left
-		Vec3f(-s, s, 0.0f), // 0
-		// Top Right
-		Vec3f(s, s, 0.0f), // 1
-
-		// Bottom Right
-		Vec3f(s, -s, 0.0f), // 2
-
-		// Bottom Left
-		Vec3f(-s, -s, 0.0f), // 3
-	};
-
-	Vec3f surface_normal = Vec3f::GetSurfaceNormal(mesh->Positions[0], mesh->Positions[1], mesh->Positions[2]);
-
-	mesh->Normals = { surface_normal, surface_normal, surface_normal, surface_normal };
-
-	mesh->Uvs = {
-		// Top Left
-		Vec2f(options.UvMin.X, options.UvMin.Y), // 0
-
-		// Top Right
-		Vec2f(options.UvMax.X, options.UvMin.Y), // 1
-
-		// Bottom Right
-		Vec2f(options.UvMax.X, options.UvMax.Y), // 2
-
-		// Bottom Left
-		Vec2f(options.UvMin.X, options.UvMax.Y), // 3
-	};
-
-
-	mesh->Indices = { // Top left triangle
-					  1, 0, 3,
-					  // Bottom right triangle
-					  1, 3, 2
-	};
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options, true,
+				false);
 
 	return mesh;
 }

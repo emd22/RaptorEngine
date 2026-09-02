@@ -88,6 +88,7 @@ private:
 
 	// Composition
 	void CreateCompositionPSO();
+	void CreateBitmapTextPSO();
 
 	void GenerateRandomTexture(uint32 size);
 

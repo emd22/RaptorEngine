@@ -307,6 +307,11 @@ void Object::Update()
 		}
 
 		SyncObjectWithPhysics(phys);
+
+		// The transformation has changed via physics, we should tell the worldgrid
+		if (mbMatrixOutOfDate) {
+			gWorldGrid->UpdateObject(ID);
+		}
 	}
 
 

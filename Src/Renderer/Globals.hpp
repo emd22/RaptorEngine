@@ -26,6 +26,9 @@ extern DescriptorCache* gDescriptorCache;
 class PSOBuild;
 extern PSOBuild* gPSOBuild;
 
+class TextRenderer;
+extern TextRenderer* gTextRenderer;
+
 namespace Globals {
 
 void Init();
