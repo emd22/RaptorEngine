@@ -1,9 +1,11 @@
 #include "ScriptInterop.hpp"
 
+#include <Controls.hpp>
 #include <Engine.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
+#include <World.hpp>
 #include <cstdio>
 
 namespace fx::script {
@@ -21,24 +23,36 @@ static Object* N_object_get(uint32 id)
 
 static void N_object_move_to(Object* obj, FLOAT4 position)
 {
-	LogInfo(LC_SCRIPT, "Moving object to position {}", Vec3f(position));
+	if (obj == nullptr) {
+		return;
+	}
 
-	// if (obj == nullptr) {
-	// 	return;
-	// }
-
-	// obj->SetPosition(Vec3f(position));
+	obj->SetPosition(Vec3f(position));
 }
 
 static void N_object_move_by(Object* obj, FLOAT4 by)
 {
-	LogInfo(LC_SCRIPT, "Moving object by {}", Vec3f(by));
+	if (obj == nullptr) {
+		return;
+	}
 
-	// if (obj == nullptr) {
-	// 	return;
-	// }
+	LogInfo("move by {}", Vec3f(by));
 
-	// obj->SetPosition(Vec3f(position));
+	obj->MoveBy(Vec3f(by));
+}
+
+
+static uint32 N_ctrl_mouse_state()
+{
+	uint32 result = 0;
+	if (ControlManager::IsKeyDown(eKey::FX_MOUSE_LEFT)) {
+		result |= (1 << 0);
+	}
+	if (ControlManager::IsKeyDown(eKey::FX_MOUSE_RIGHT)) {
+		result |= (1 << 1);
+	}
+
+	return result;
 }
 
 
@@ -52,6 +66,9 @@ static void N_object_move_by(Object* obj, FLOAT4 by)
 
 static const PredefExtern scAvailableExterns[] = {
 	PREDEF("printf", printf),
+
+	/* Controls */
+	PREDEF("ctrl_mouse_state", N_ctrl_mouse_state),
 
 	/* Object functions  */
 	PREDEF("object_get", N_object_get),

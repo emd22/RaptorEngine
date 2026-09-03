@@ -9,6 +9,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
+#include <World.hpp>
 #include <WorldGrid.hpp>
 
 namespace fx {
@@ -26,8 +27,10 @@ ThreadManager* gThreadManager = nullptr;
 MemPool* gEnginePool = nullptr;
 MemPool* gScriptMemPool = nullptr;
 WorldGrid* gWorldGrid = nullptr;
+World* gWorld = nullptr;
 
 ScriptManager* gScriptManager = nullptr;
+
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
 	delete name_;                                                                                                      \
@@ -47,6 +50,7 @@ void Init()
 	gTextureManager = new TextureManager;
 	gThreadManager = new ThreadManager;
 	gScriptManager = new ScriptManager;
+	gWorld = new World;
 }
 
 
@@ -58,6 +62,7 @@ void Destroy()
 	DESTROY_GLOBAL(gWorldGrid);
 	DESTROY_GLOBAL(gThreadManager);
 	DESTROY_GLOBAL(gScriptManager);
+	DESTROY_GLOBAL(gWorld);
 }
 
 } // namespace Globals

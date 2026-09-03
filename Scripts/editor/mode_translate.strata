@@ -15,11 +15,17 @@ void mode_select_object(OBJECT object)
 
 void mode_update(float3 movement_vector)
 {
-	object_move_by(selected_object, movement_vector);
+	/* Only update if lmouse is pressed */
+	if ((ctrl_mouse_state() & CTRL_LMOUSE) == 0) {
+		return;
+	}
+
+	float3 tmp = movement_vector * float3(0.1);
+
+	object_move_by(selected_object, tmp);
 }
 
 
 void mode_unload()
 {
-
 }

@@ -16,13 +16,12 @@
 
 
 namespace fx {
-
 namespace physics {
-const BodyID BodyID::scNull = BodyID(UINT32_MAX);
-}
 
-void physics::Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimensions,
-										physics::eMotionType motion_type, const BodyProps& object_properties)
+const BodyID BodyID::scNull = BodyID(UINT32_MAX);
+
+void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimensions, physics::eMotionType motion_type,
+							   const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
 	PrimitiveType = primitive_type;
@@ -52,8 +51,8 @@ void physics::Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec
 	}
 }
 
-void physics::Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
-								   const BodyProps& object_properties)
+void Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionType motion_type,
+						  const BodyProps& object_properties)
 {
 	mMotionType = motion_type;
 
@@ -69,8 +68,8 @@ void physics::Body::CreateMeshBody(const PrimitiveMesh& mesh, physics::eMotionTy
 	CreateJoltBody(box_shape, physics::Body::eFlags::None, motion_type, object_properties);
 }
 
-void physics::Body::CreateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,
-								   const BodyProps& properties)
+void Body::CreateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,
+						  const BodyProps& properties)
 {
 	if (mbHasPhysicsBody) {
 		LogWarning(LC_PHYSICS, "Attempting to create physics body when one is already created!");
@@ -81,8 +80,8 @@ void physics::Body::CreateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags f
 }
 
 
-void physics::Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,
-								   const BodyProps& properties)
+void Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags flags, physics::eMotionType motion_type,
+						  const BodyProps& properties)
 {
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->PhysicsSystem.GetBodyInterface();
 
@@ -135,7 +134,7 @@ void physics::Body::UpdateJoltBody(JPH::ShapeRefC shape, physics::Body::eFlags f
 	mbHasPhysicsBody = true;
 }
 
-void physics::Body::DestroyPhysicsBody()
+void Body::DestroyPhysicsBody()
 {
 	if (!mbHasPhysicsBody || mpPhysicsBody == nullptr) {
 		return;
@@ -151,7 +150,9 @@ void physics::Body::DestroyPhysicsBody()
 }
 
 
-void physics::Body::Teleport(const Vec3f& position, const Quat& rotation)
+void Body::SetMidpoint(const Vec3f& midpoint) { Midpoint = midpoint; }
+
+void Body::Teleport(const Vec3f& position, const Quat& rotation)
 {
 	if (!mbHasPhysicsBody) {
 		return;
@@ -160,11 +161,13 @@ void physics::Body::Teleport(const Vec3f& position, const Quat& rotation)
 	JPH::RVec3 jolt_position;
 	JPH::Quat jolt_rotation;
 
-	position.ToJoltVec3(jolt_position);
+	(position + Midpoint).ToJoltVec3(jolt_position);
 	rotation.ToJoltQuaternion(jolt_rotation);
 
 	gPhysics->pBackend->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(
 		GetBodyID(), jolt_position, jolt_rotation, JPH::EActivation::Activate);
 }
+
+} // namespace physics
 
 } // namespace fx

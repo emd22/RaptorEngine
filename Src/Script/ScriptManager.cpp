@@ -10,10 +10,18 @@ ScriptManager::ScriptManager()
 	mScripts.Init(64);
 }
 
-script::Script* ScriptManager::LoadScript(const String& path)
+script::Script* ScriptManager::LoadScript(const String& path) { return mScripts.NewItem(nullptr, path); }
+
+void ScriptManager::ReloadAllScripts()
 {
-	script::Script* script = mScripts.NewItem(nullptr, mpCompiler, path);
-	return script;
+	for (uint32 i = 0; i < mScripts.Capacity; i++) {
+		if (!mScripts.SlotsInUse.Get(i)) {
+			continue;
+		}
+
+		script::Script* script = mScripts.GetItem(i);
+		script->ReloadScript();
+	}
 }
 
 ScriptManager::~ScriptManager() { strataCompilerDestroy(mpCompiler); }

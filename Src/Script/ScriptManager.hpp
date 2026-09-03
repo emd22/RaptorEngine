@@ -15,6 +15,9 @@ public:
 	ScriptManager();
 
 	script::Script* LoadScript(const String& path);
+	struct StrataCompiler* GetCompiler() { return mpCompiler; };
+
+	void ReloadAllScripts();
 
 	~ScriptManager();
 

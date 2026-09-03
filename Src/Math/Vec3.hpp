@@ -108,7 +108,6 @@ public:
 
 	FX_FORCE_INLINE Vec3f Normalize() const;
 
-	FX_FORCE_INLINE Vec3f Abs() const;
 
 	/**
 	 * Normalizes the vector in place (modifies the source vector.)
@@ -178,6 +177,15 @@ public:
 		return Vec3f(rx, ry, rz, rw);
 	}
 #endif
+
+	FX_FORCE_INLINE Vec3f Abs() const
+	{
+#ifdef FX_USE_NEON
+		return Vec3f(Neon::SetSigns<1>(mIntrin));
+#elif FX_USE_AVX
+		return Vec3f(SSE::SetSigns<1>(mIntrin));
+#endif
+	}
 
 	/////////////////////////////////////
 	// Operator overloads

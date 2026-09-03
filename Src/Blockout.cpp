@@ -159,7 +159,8 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 								  .Density = 20,
 							  });
 
-	phys->Teleport(position + midpoint, rotation);
+	phys->SetMidpoint(midpoint);
+	phys->Teleport(position, rotation);
 
 	object->AttachCollider(phys);
 

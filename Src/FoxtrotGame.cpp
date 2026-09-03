@@ -104,7 +104,7 @@ void FoxtrotGame::InitEngine()
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
-	mBlockout.Create(&mMainScene);
+	mBlockout.Create(gWorld);
 
 	ConfigEntry* blockout_entry = Config.GetEntry(HashStr32("blockout"));
 	if (blockout_entry) {
@@ -112,7 +112,7 @@ void FoxtrotGame::InitEngine()
 		mBlockout.Load(mBlockoutPath);
 	}
 
-	// script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.ssc");
+	// script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.strata");
 	// if (test_script.HasErrors() == false) {
 	// 	using FuncType = int (*)(void);
 
@@ -123,15 +123,6 @@ void FoxtrotGame::InitEngine()
 	// }
 }
 
-void FoxtrotGame::ReloadAllObjects()
-{
-	mMainScene.Destroy();
-	mMainScene.Create();
-
-	WorldFile scene_file;
-	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
-	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
-}
 
 void FoxtrotGame::CreateLights()
 {
@@ -165,7 +156,7 @@ Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / siz
 
 void FoxtrotGame::CreateGame()
 {
-	mMainScene.Create();
+	gWorld->Create();
 
 	Player.Create();
 	Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
@@ -174,7 +165,7 @@ void FoxtrotGame::CreateGame()
 	Player.SetFlyMode(false);
 
 
-	mMainScene.SelectCamera(Player.pCamera);
+	gWorld->SelectCamera(Player.pCamera);
 
 	AddEditorModes();
 
@@ -182,14 +173,14 @@ void FoxtrotGame::CreateGame()
 
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
-	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), mMainScene);
+	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), *gWorld);
 	gPhysics->pBackend->OptimizeBroadPhase();
 
-	pSun = mMainScene.GetDirectionalLight();
+	pSun = gWorld->GetDirectionalLight();
 
 	LoadOffsetsFile();
 
-	TSRef<Object> level_object = mMainScene.FindObject(HashStr32("Level"));
+	TSRef<Object> level_object = gWorld->FindObject(HashStr32("Level"));
 
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
 	gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);
@@ -325,6 +316,18 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 	}
 }
 
+Vec3f FoxtrotGame::GetCameraForwardDominantAxis() const
+{
+	Vec3f fwd = Player.pCamera->GetForwardVector();
+	Vec3f fa = fwd.Abs();
+
+	if (fa.X > fa.Z) {
+		return Vec3f(MathUtil::GetSign(fwd.X), 0.0f, 0.0f);
+	}
+
+	return Vec3f(0.0f, 0.0, MathUtil::GetSign(fwd.Z));
+}
+
 
 void FoxtrotGame::ProcessControls()
 {
@@ -345,7 +348,7 @@ void FoxtrotGame::ProcessControls()
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && (EditorModeType != eEditorMode::Simulate)) {
 		EditorModeType = eEditorMode::Simulate;
-		mMainScene.SelectCamera(Player.pCamera);
+		gWorld->SelectCamera(Player.pCamera);
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
@@ -427,6 +430,17 @@ void FoxtrotGame::ProcessControls()
 		mBlockout.Load(mBlockoutPath);
 	}
 
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
+		LogInfo("Reloading all scripts...");
+		gScriptManager->ReloadAllScripts();
+
+		for (EditorMode* mode : EditorModes) {
+			mode->ReloadHotFunctions();
+		}
+	}
+
+
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
 		const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
 
@@ -456,8 +470,9 @@ void FoxtrotGame::RenderText()
 {
 	static const uint32 scTextColor = Color::FromRGBA(255, 0, 0, 255).AsUInt();
 
-	gTextRenderer->DrawText(String::Fmt("EditorMode {}", static_cast<uint32>(EditorModeType)).CStr(), 2.0f,
-							scTextColor);
+	gTextRenderer->DrawText(
+		String::Fmt("EditorMode {}", SelectedEditorMode ? SelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f,
+		scTextColor);
 	gTextRenderer->DrawText(String::Fmt("P={}", Player.Position).CStr(), 2.0f, scTextColor);
 }
 
@@ -488,7 +503,11 @@ void FoxtrotGame::Tick()
 
 
 	if (EditorModeType != eEditorMode::Simulate) {
-		// SelectedEditorMode->Update(mMainScene, GetEditorMovementVector());
+		Vec3f forward = GetCameraForwardDominantAxis();
+		Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
+		Vec3f rawMovement = GetMovementVector();
+		Vec3f movement = forward * rawMovement.Z + right * rawMovement.X + Vec3f(0, rawMovement.Y, 0);
+		SelectedEditorMode->Update(movement);
 	}
 
 	Ref<PerspectiveCamera> camera = Player.pCamera;
@@ -515,7 +534,7 @@ void FoxtrotGame::Tick()
 	frame->CmdBuffer.Record();
 
 	// mMainScene.RenderShadows(&gShadowRenderer->ShadowCamera);
-	mMainScene.Render(&gShadowRenderer->ShadowCamera);
+	gWorld->Render(&gShadowRenderer->ShadowCamera);
 
 	if (gGraphics->DidResize()) {
 		LogInfo("Setting aspect ratio");
@@ -524,7 +543,7 @@ void FoxtrotGame::Tick()
 
 	RenderText();
 
-	gGraphics->DoComposition(*mMainScene.GetCurrentCamera());
+	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
 
 	mLastTick = current_tick;
 }
@@ -548,7 +567,7 @@ void FoxtrotGame::AddEditorModes()
 	EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Simulate));
 	{
 		EditorMode* mode = new EditorMode;
-		mode->Create("./Scripts/editor/mode_translate.ssc");
+		mode->Create("Translate", "./Scripts/editor/mode_translate.strata");
 		EditorModes.Insert(mode);
 	}
 
@@ -567,7 +586,7 @@ FoxtrotGame::~FoxtrotGame()
 	delete gObjectManager;
 	gObjectManager = nullptr;
 
-	mMainScene.Destroy();
+	gWorld->Destroy();
 
 	// empty_images_list.Destroy();
 }

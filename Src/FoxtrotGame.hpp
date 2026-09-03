@@ -76,11 +76,9 @@ private:
 	void NextEditorMode();
 	void SwitchEditorMode(eEditorMode mode);
 
-	void ReloadAllObjects();
-
-	void NewBlockoutBrush();
-
 	void RenderText();
+
+	Vec3f GetCameraForwardDominantAxis() const;
 
 public:
 	Player Player {};
@@ -110,7 +108,6 @@ public:
 
 private:
 	uint64 mLastTick = 0;
-	World mMainScene {};
 
 	ObjectID mRaycastHitMarker = ObjectID::scNull;
 	ObjectID mEditorSelectedObject = ObjectID::scNull;
@@ -118,7 +115,6 @@ private:
 	MaterialID mBlockoutMaterial = MaterialID::scNull;
 
 	ConfigFile Config;
-
 
 	Blockout mBlockout;
 

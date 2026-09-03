@@ -137,6 +137,19 @@ FX_FORCE_INLINE bool IsCloseTo(float32 value, float32 goal, float32 tolerance = 
 	return (std::abs(value - goal) >= tolerance);
 }
 
+/**
+ * @brief Gets the sign of a floating point value, returning either 1.0 if positive, or -1.0 if negative.
+ */
+FX_FORCE_INLINE constexpr float32 GetSign(float32 x)
+{
+	constexpr uint32 scSignMask = 0x80000000U;
+	constexpr uint32 scOne = std::bit_cast<uint32>(1.0f);
+
+	const uint32 sign = (std::bit_cast<uint32>(x) & scSignMask);
+
+	return std::bit_cast<float32>(scOne | sign);
+}
+
 
 } // namespace fx::MathUtil
 

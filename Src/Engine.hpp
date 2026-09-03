@@ -33,6 +33,9 @@ extern ThreadManager* gThreadManager;
 class ScriptManager;
 extern ScriptManager* gScriptManager;
 
+class World;
+extern World* gWorld;
+
 
 namespace Globals {
 void Init();
