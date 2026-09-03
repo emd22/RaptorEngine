@@ -1,10 +1,12 @@
 import mode_common;
 
 OBJECT selected_object;
+float3 camera_dist;
+bool camera_dist_added = false;
 
 void mode_load()
 {
-
+	camera_dist = float3(0.0f);
 }
 
 void mode_select_object(OBJECT object)
@@ -17,12 +19,18 @@ void mode_update(float3 movement_vector)
 {
 	/* Only update if lmouse is pressed */
 	if ((ctrl_mouse_state() & CTRL_LMOUSE) == 0) {
+		camera_dist_added = false;
 		return;
 	}
 
-	float3 tmp = movement_vector * float3(0.1);
+	if (camera_dist_added == false) {
+		camera_dist = selected_object.get_position() - player_position();
+		camera_dist_added = true;
+	}
 
-	object_move_by(selected_object, tmp);
+	float3 new_position = player_position() + camera_dist;
+
+	selected_object.move_to(new_position);
 }
 
 

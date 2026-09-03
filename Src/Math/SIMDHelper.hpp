@@ -38,6 +38,8 @@ FX_FORCE_INLINE FLOAT4 LoadFloat4(float x, float y, float z, float w)
 	return vld1q_f32(sv);
 }
 
+FX_FORCE_INLINE FLOAT4 LoadFloat4(float scalar) { return vdupq_n_f32(scalar); }
+
 FX_FORCE_INLINE FLOAT4 AbsDiff(FLOAT4 a, FLOAT4 b) { return vabdq_f32(a, b); }
 FX_FORCE_INLINE FLOAT4 Sub(FLOAT4 a, FLOAT4 b) { return vsubq_f32(a, b); }
 
@@ -60,6 +62,8 @@ FX_FORCE_INLINE FLOAT4 LoadFloat4(float x, float y, float z, float w)
 	const float sv alignas(16)[4] = { x, y, z, w };
 	return _mm_load_ps(sv);
 }
+
+FX_FORCE_INLINE FLOAT4 LoadFloat4(float scalar) { return _mm_set1_ps(scalar); }
 
 FX_FORCE_INLINE FLOAT4 AbsDiff(FLOAT4 a, FLOAT4 b)
 {

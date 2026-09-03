@@ -36,9 +36,17 @@ static void N_object_move_by(Object* obj, FLOAT4 by)
 		return;
 	}
 
-	LogInfo("move by {}", Vec3f(by));
-
 	obj->MoveBy(Vec3f(by));
+}
+
+
+static FLOAT4 N_object_get_position(Object* obj)
+{
+	if (obj == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return obj->GetPosition().mIntrin;
 }
 
 
@@ -54,6 +62,10 @@ static uint32 N_ctrl_mouse_state()
 
 	return result;
 }
+
+
+static FLOAT4 N_camera_position() { return gWorld->GetCurrentCamera()->Position.mIntrin; }
+static FLOAT4 N_player_position() { return gWorld->Player.Position.mIntrin; }
 
 
 /////////////////////////////////////
@@ -72,8 +84,12 @@ static const PredefExtern scAvailableExterns[] = {
 
 	/* Object functions  */
 	PREDEF("object_get", N_object_get),
-	PREDEF("object_move_to", N_object_move_to),
-	PREDEF("object_move_by", N_object_move_by),
+	PREDEF("OBJECT_move_to", N_object_move_to),
+	PREDEF("OBJECT_move_by", N_object_move_by),
+	PREDEF("OBJECT_get_position", N_object_get_position),
+
+	PREDEF("camera_position", N_camera_position),
+	PREDEF("player_position", N_player_position),
 };
 
 Slice<const PredefExtern> GetInteropPredefs() { return Slice(scAvailableExterns, std::size(scAvailableExterns)); }

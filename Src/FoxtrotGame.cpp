@@ -91,9 +91,9 @@ void FoxtrotGame::InitEngine()
 
 	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
 
-	Player.bEnableHeadBob = static_cast<bool>(bob_entry->GetMemberValue(HashStr32("Enabled"), 1));
-	Player.HeadBobStrength.X = bob_entry->GetMemberValue(HashStr32("ScaleX"), 0.011);
-	Player.HeadBobStrength.Y = bob_entry->GetMemberValue(HashStr32("ScaleY"), 0.018);
+	gWorld->Player.bEnableHeadBob = static_cast<bool>(bob_entry->GetMemberValue(HashStr32("Enabled"), 1));
+	gWorld->Player.HeadBobStrength.X = bob_entry->GetMemberValue(HashStr32("ScaleX"), 0.011);
+	gWorld->Player.HeadBobStrength.Y = bob_entry->GetMemberValue(HashStr32("ScaleY"), 0.018);
 
 	gGraphics->SelectWindow(window);
 	gGraphics->Init(Vec2u(window_width, window_height));
@@ -158,14 +158,14 @@ void FoxtrotGame::CreateGame()
 {
 	gWorld->Create();
 
-	Player.Create();
-	Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
+	gWorld->Player.Create();
+	gWorld->Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
 	// Move the player up and behind the other objects
-	Player.TeleportTo(Vec3f(0.0f, -0.2f, -2.0f));
-	Player.SetFlyMode(false);
+	gWorld->Player.TeleportTo(Vec3f(0.0f, -0.2f, -2.0f));
+	gWorld->Player.SetFlyMode(false);
 
 
-	gWorld->SelectCamera(Player.pCamera);
+	gWorld->SelectCamera(gWorld->Player.pCamera);
 
 	AddEditorModes();
 
@@ -318,7 +318,7 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 
 Vec3f FoxtrotGame::GetCameraForwardDominantAxis() const
 {
-	Vec3f fwd = Player.pCamera->GetForwardVector();
+	Vec3f fwd = gWorld->Player.pCamera->GetForwardVector();
 	Vec3f fa = fwd.Abs();
 
 	if (fa.X > fa.Z) {
@@ -348,15 +348,17 @@ void FoxtrotGame::ProcessControls()
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && (EditorModeType != eEditorMode::Simulate)) {
 		EditorModeType = eEditorMode::Simulate;
-		gWorld->SelectCamera(Player.pCamera);
+		gWorld->SelectCamera(gWorld->Player.pCamera);
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
 		// physics::RayResult hit_point = gPhysics->pBackend->Raycast(Player.pCamera->Position,
 		// 														   Player.pCamera->GetForwardVector() * 10.0f);
 
-		SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(Player.pCamera->Position,
-																		  Player.pCamera->GetForwardVector() * 10.0f);
+		Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
+
+		SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position,
+																		  cam->GetForwardVector() * 10.0f);
 
 		LogInfo("RAYCASTED {} objects", hits.Size);
 		if (hits.Size > 0 && SelectedEditorMode != nullptr) {
@@ -384,15 +386,16 @@ void FoxtrotGame::ProcessControls()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
 		sbShowShadowCam = !sbShowShadowCam;
 
+		Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
 
 		if (sbShowShadowCam) {
-			Player.pCamera->ProjectionMatrix = gShadowRenderer->ShadowCamera.ProjectionMatrix;
-			Player.pCamera->ViewMatrix = gShadowRenderer->ShadowCamera.ViewMatrix;
-			Player.pCamera->UpdateCameraMatrix();
+			cam->ProjectionMatrix = gShadowRenderer->ShadowCamera.ProjectionMatrix;
+			cam->ViewMatrix = gShadowRenderer->ShadowCamera.ViewMatrix;
+			cam->UpdateCameraMatrix();
 		}
 		else {
-			Player.pCamera->UpdateProjectionMatrix();
-			Player.pCamera->UpdateCameraMatrix();
+			cam->UpdateProjectionMatrix();
+			cam->UpdateCameraMatrix();
 		}
 	}
 
@@ -403,13 +406,13 @@ void FoxtrotGame::ProcessControls()
 		mouse_delta.Y = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.Y) *
 											 -static_cast<double>(scMouseSensitivity));
 
-		Player.RotateHead(mouse_delta);
+		gWorld->Player.RotateHead(mouse_delta);
 	}
 
 
 	if (ControlManager::IsKeyDown(eKey::FX_KEY_SPACE)) {
-		if (!Player.IsFlyMode()) {
-			Player.Jump();
+		if (!gWorld->Player.IsFlyMode()) {
+			gWorld->Player.Jump();
 		}
 	}
 
@@ -419,10 +422,10 @@ void FoxtrotGame::ProcessControls()
 
 
 	if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
-		Player.bIsSprinting = true;
+		gWorld->Player.bIsSprinting = true;
 	}
 	else {
-		Player.bIsSprinting = false;
+		gWorld->Player.bIsSprinting = false;
 	}
 
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
@@ -452,7 +455,7 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_0)) {
-		TileIndex tile_index = gWorldGrid->GetTileIndex(Player.Position);
+		TileIndex tile_index = gWorldGrid->GetTileIndex(gWorld->Player.Position);
 
 		Vec2u tile_xy = gWorldGrid->GetTileXY(tile_index);
 
@@ -461,8 +464,8 @@ void FoxtrotGame::ProcessControls()
 
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
-		Player.SetFlyMode(!Player.IsFlyMode());
-		Player.Physics.SetCollisionEnabled(!Player.IsFlyMode());
+		gWorld->Player.SetFlyMode(!gWorld->Player.IsFlyMode());
+		gWorld->Player.Physics.SetCollisionEnabled(!gWorld->Player.IsFlyMode());
 	}
 }
 
@@ -473,7 +476,7 @@ void FoxtrotGame::RenderText()
 	gTextRenderer->DrawText(
 		String::Fmt("EditorMode {}", SelectedEditorMode ? SelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f,
 		scTextColor);
-	gTextRenderer->DrawText(String::Fmt("P={}", Player.Position).CStr(), 2.0f, scTextColor);
+	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scTextColor);
 }
 
 
@@ -498,8 +501,8 @@ void FoxtrotGame::Tick()
 	ControlManager::Update();
 	ProcessControls();
 
-	Player.Move(DeltaTime, GetMovementVector());
-	Player.Update(DeltaTime);
+	gWorld->Player.Move(DeltaTime, GetMovementVector());
+	gWorld->Player.Update(DeltaTime);
 
 
 	if (EditorModeType != eEditorMode::Simulate) {
@@ -510,11 +513,11 @@ void FoxtrotGame::Tick()
 		SelectedEditorMode->Update(movement);
 	}
 
-	Ref<PerspectiveCamera> camera = Player.pCamera;
+	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
 
-	gShadowRenderer->ShadowCamera.Position = (Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
+	gShadowRenderer->ShadowCamera.Position = (gWorld->Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
 
-	Vec3f target = Player.Position;
+	Vec3f target = gWorld->Player.Position;
 
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(gShadowRenderer->ShadowCamera.Position, target, Vec3f(0, 1, 0));
 	// LogInfo("{}", gShadowRenderer->ShadowCamera.ViewMatrix.Columns[3]);

@@ -5,11 +5,19 @@
 struct OBJECTID = uint;
 handle OBJECT;
 
-
+impl OBJECT {
+extern void move_to(OBJECT obj, float3 position);
+extern void move_by(OBJECT obj, float3 by);
+extern float3 get_position(OBJECT obj);
+}
 
 extern OBJECT object_get(OBJECTID id);
-extern void object_move_to(OBJECT obj, float3 position);
-extern void object_move_by(OBJECT obj, float3 by);
+
+/* Retrieve the currently selected camera's position */
+extern float3 camera_position();
+
+/* Retrieve the player's position */
+extern float3 player_position();
 
 
 const uint CTRL_LMOUSE = 0x01;

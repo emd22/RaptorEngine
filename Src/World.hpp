@@ -5,11 +5,15 @@
 
 #include <Asset/AssetTicket.hpp>
 #include <Object/Object.hpp>
+#include <Player.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Light.hpp>
 #include <Renderer/RenderList.hpp>
 
+
 namespace fx {
+
+class Player;
 
 struct SceneDistanceBand
 {
@@ -53,6 +57,8 @@ public:
 
 	void Destroy();
 
+	FX_FORCE_INLINE Player& GetPlayer() { return this->Player; }
+
 	Ref<PerspectiveCamera>& GetCurrentCamera() { return mpCurrentCamera; }
 
 	~World() { Destroy(); }
@@ -75,6 +81,8 @@ public:
 	Name Name = "(unnamed)";
 	bool bRenderPhysicsObjects = false;
 	renderer::RenderList mRenderList;
+
+	Player Player;
 
 private:
 	PagedArray<ObjectID> mObjects;

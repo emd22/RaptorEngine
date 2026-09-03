@@ -81,8 +81,6 @@ private:
 	Vec3f GetCameraForwardDominantAxis() const;
 
 public:
-	Player Player {};
-
 	Ref<LightDirectional> pSun { nullptr };
 
 	// TODO: Player attachment system
