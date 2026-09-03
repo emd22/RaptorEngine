@@ -1,8 +1,10 @@
 import mode_common;
+import keyboard;
 
 OBJECT selected_object;
 float3 camera_dist;
 bool camera_dist_added = false;
+bool enable_snap = false;
 
 void mode_load()
 {
@@ -23,6 +25,10 @@ float3 grid_snap(float3 pos)
 
 void mode_update(float3 movement_vector)
 {
+	if (is_key_pressed((uint)FX_KEY_U)) {
+		enable_snap = !enable_snap;
+	}
+
 	/* Only update if lmouse is pressed */
 	if ((ctrl_mouse_state() & CTRL_LMOUSE) == 0) {
 		player.set_speed_multiplier(1.0f);
@@ -36,11 +42,15 @@ void mode_update(float3 movement_vector)
 	player.toggle_headbob(false);
 
 	if (camera_dist_added == false) {
-		camera_dist = selected_object.get_position() - player.position();
+		camera_dist = selected_object.position - player.position;
 		camera_dist_added = true;
 	}
 
-	float3 new_position = grid_snap(player.pos + camera_dist);
+	float3 new_position = player.position + camera_dist;
+
+	if (enable_snap) {
+		new_position = grid_snap(new_position);
+	}
 
 	selected_object.move_to(new_position);
 }

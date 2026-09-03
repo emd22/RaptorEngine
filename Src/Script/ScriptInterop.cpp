@@ -65,13 +65,18 @@ static uint32 N_ctrl_mouse_state()
 
 
 static FLOAT4 N_camera_position() { return gWorld->GetCurrentCamera()->Position.mIntrin; }
-static FLOAT4 N_player_position(void*) { return gWorld->Player.Position.mIntrin; }
+static FLOAT4 N_player_get_position(void*) { return gWorld->Player.Position.mIntrin; }
 
 static void N_player_set_speed_multiplier(void*, float mult) { gWorld->Player.SpeedMultiplier = mult; }
 static void N_player_toggle_headbob(void*, bool value) { gWorld->Player.bEnableHeadBob = value; }
 
 
 static FLOAT4 N_float3_round(FLOAT4 value) { return simd::Round(value); }
+
+
+static bool N_is_key_up(uint32 key) { return ControlManager::IsKeyUp(static_cast<eKey>(key)); }
+static bool N_is_key_down(uint32 key) { return ControlManager::IsKeyDown(static_cast<eKey>(key)); }
+static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(static_cast<eKey>(key)); }
 
 
 /////////////////////////////////////
@@ -96,11 +101,16 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("camera_position", N_camera_position),
 
-	PREDEF("PLAYER_position", N_player_position),
+	PREDEF("PLAYER_get_position", N_player_get_position),
 	PREDEF("PLAYER_set_speed_multiplier", N_player_set_speed_multiplier),
 	PREDEF("PLAYER_toggle_headbob", N_player_toggle_headbob),
 
 	PREDEF("float3_round", N_float3_round),
+
+	/* Controls */
+	PREDEF("is_key_up", N_is_key_up),
+	PREDEF("is_key_down", N_is_key_down),
+	PREDEF("is_key_pressed", N_is_key_pressed),
 };
 
 Slice<const PredefExtern> GetInteropPredefs() { return Slice(scAvailableExterns, std::size(scAvailableExterns)); }
