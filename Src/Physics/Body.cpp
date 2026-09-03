@@ -143,8 +143,8 @@ void physics::Body::DestroyPhysicsBody()
 
 	JPH::BodyInterface& body_interface = gPhysics->pBackend->PhysicsSystem.GetBodyInterface();
 
-	body_interface.RemoveBody(GetBodyId());
-	body_interface.DestroyBody(GetBodyId());
+	body_interface.RemoveBody(GetBodyID());
+	body_interface.DestroyBody(GetBodyID());
 
 	mpPhysicsBody = nullptr;
 	mbHasPhysicsBody = false;
@@ -164,7 +164,7 @@ void physics::Body::Teleport(const Vec3f& position, const Quat& rotation)
 	rotation.ToJoltQuaternion(jolt_rotation);
 
 	gPhysics->pBackend->PhysicsSystem.GetBodyInterface().SetPositionAndRotation(
-		GetBodyId(), jolt_position, jolt_rotation, JPH::EActivation::Activate);
+		GetBodyID(), jolt_position, jolt_rotation, JPH::EActivation::Activate);
 }
 
 } // namespace fx

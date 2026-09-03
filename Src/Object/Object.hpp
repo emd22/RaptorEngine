@@ -117,6 +117,12 @@ public:
 	// Physics
 	/////////////////////////////////////
 
+	/**
+	 * @brief Links a collider to this object. Allows a collider to recognize the object it was connected to, and vice
+	 * versa.
+	 */
+	void AttachCollider(physics::Body* body);
+
 	FX_FORCE_INLINE void SetPhysicsID(physics::BodyID phys_id) { PhysicsID = phys_id; }
 	FX_FORCE_INLINE physics::BodyID GetPhysicsID() const { return PhysicsID; }
 	void SetPhysicsEnabled(bool enabled);

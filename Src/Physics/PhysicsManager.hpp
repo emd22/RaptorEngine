@@ -2,6 +2,8 @@
 
 #include "Body.hpp"
 
+#include <Jolt/Physics/Body/BodyID.h>
+
 #include <Core/FreeArray.hpp>
 #include <mutex>
 
@@ -23,6 +25,7 @@ public:
 	void DestroyBody(physics::BodyID& id);
 
 	physics::Body* FindBody(const Hash32 name_hash);
+	physics::Body* FindBody(JPH::BodyID jolt_id);
 
 	SizedArray<physics::Body*> CollectBodies();
 

@@ -135,7 +135,8 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 	consts.InstanceBase = mTapeOffset / sizeof(InstanceData);
 	gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, consts);
 
-	const float32 glyph_size = static_cast<float32>(scGlyphWidth) * scale;
+	const float32 glyph_width = static_cast<float32>(scGlyphWidth) * scale;
+	const float32 glyph_height = static_cast<float32>(scGlyphHeight) * scale;
 
 	StackArray<InstanceData, scMaxGlyphs> instances;
 	const float32 atlas_w = static_cast<float32>(mpAtlas->Info.Size.X);
@@ -154,7 +155,7 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 		const int glyph_index = FindGlyphIndex(*c);
 
 		if (glyph_index < 0) {
-			cursor.X += glyph_size;
+			cursor.X += glyph_width;
 			continue;
 		}
 
@@ -164,14 +165,14 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 		InstanceData* inst = instances.Insert();
 		inst->vPosition[0] = cursor.X;
 		inst->vPosition[1] = -cursor.Y;
-		inst->vSize[0] = glyph_size;
-		inst->vSize[1] = glyph_size;
+		inst->Size[0] = glyph_width;
+		inst->Size[1] = glyph_height;
 		inst->UVMin[0] = (static_cast<float32>(col) * scGlyphWidth) / atlas_w;
 		inst->UVMin[1] = (static_cast<float32>(row) * scGlyphHeight) / atlas_h;
 		inst->UVMax[0] = (static_cast<float32>(col + 1) * scGlyphWidth) / atlas_w;
 		inst->UVMax[1] = (static_cast<float32>(row + 1) * scGlyphHeight) / atlas_h;
 
-		cursor.X += glyph_size;
+		cursor.X += glyph_width;
 	}
 
 	if (instances.Size == 0) {
@@ -190,7 +191,7 @@ void TextRenderer::DrawText(const char* text, float32 scale, uint32 color)
 
 	mpQuad->Render(cmd, instances.Size);
 
-	mCursorPosition.Y += scGlyphHeight * scale;
+	mCursorPosition.Y += glyph_height;
 }
 
 } // namespace fx::renderer

@@ -197,7 +197,7 @@ void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& objec
 	if (collider_ref != nullptr) {
 		physics::Body* phys_object = gPhysics->FindBody(HashStr32(collider_ref->Get<const char*>()));
 		if (phys_object != nullptr) {
-			object->SetPhysicsID(phys_object->GetID());
+			object->AttachCollider(phys_object);
 			object->SetPhysicsEnabled(true);
 		}
 		else {

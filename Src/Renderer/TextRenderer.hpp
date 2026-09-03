@@ -36,7 +36,7 @@ public:
 	struct InstanceData
 	{
 		float vPosition[2];
-		float vSize[2];
+		float Size[2];
 		float UVMin[2];
 		float UVMax[2];
 	};

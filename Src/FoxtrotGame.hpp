@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blockout.hpp"
+#include "InGameEditor.hpp"
 #include "Object/ObjectManager.hpp"
 
 #include <Asset/ConfigFile.hpp>
@@ -13,28 +14,6 @@ class ShadowDirectional;
 
 namespace fx {
 
-
-enum class eEditorMode : int32
-{
-	MoveCollider,
-	ScaleCollider,
-
-	Default,
-};
-
-class BaseEditorMode
-{
-public:
-	BaseEditorMode() = default;
-
-	virtual void Update(const World& scene, const Vec3f& movement_vector) = 0;
-	virtual void OnLeave(const World& scene) = 0;
-
-	virtual ~BaseEditorMode() {};
-
-public:
-	Ref<PerspectiveCamera> pCamera { nullptr };
-};
 
 /////////////////////////////////////
 // Editor modes
@@ -124,9 +103,9 @@ public:
 	Vec3f PistolOffset = Vec3f::sZero;
 	Vec3f ArmsOffset = Vec3f::sZero;
 
-	BaseEditorMode* SelectedEditorMode = nullptr;
-	eEditorMode EditorModeType = eEditorMode::Default;
-	SizedArray<BaseEditorMode*> EditorModes;
+	EditorMode* SelectedEditorMode = nullptr;
+	eEditorMode EditorModeType = eEditorMode::Simulate;
+	SizedArray<EditorMode*> EditorModes;
 
 
 private:
@@ -134,9 +113,9 @@ private:
 	World mMainScene {};
 
 	ObjectID mRaycastHitMarker = ObjectID::scNull;
+	ObjectID mEditorSelectedObject = ObjectID::scNull;
 
 	MaterialID mBlockoutMaterial = MaterialID::scNull;
-
 
 	ConfigFile Config;
 

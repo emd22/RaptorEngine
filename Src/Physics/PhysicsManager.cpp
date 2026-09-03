@@ -87,6 +87,25 @@ physics::Body* PhysicsManager::FindBody(const Hash32 name_hash)
 	return nullptr;
 }
 
+physics::Body* PhysicsManager::FindBody(JPH::BodyID jolt_id)
+{
+	std::lock_guard<std::mutex> guard(mInUse);
+
+	for (uint32 i = 0; i < mBodies.Capacity; i++) {
+		if (mBodies.SlotsInUse.Get(i) == false) {
+			continue;
+		}
+
+		physics::Body* body = mBodies.GetItem(i);
+
+		if (body->GetBodyID() == jolt_id) {
+			return body;
+		}
+	}
+
+	return nullptr;
+}
+
 SizedArray<physics::Body*> PhysicsManager::CollectBodies()
 {
 	std::lock_guard<std::mutex> guard(mInUse);

@@ -161,8 +161,7 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	phys->Teleport(position + midpoint, rotation);
 
-	object->PhysicsID = phys->GetID();
-
+	object->AttachCollider(phys);
 
 	AssetTicket ticket(static_cast<void*>(object));
 	ticket.MarkAndSignalLoaded();

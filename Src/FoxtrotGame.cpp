@@ -298,48 +298,32 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 	return movement;
 }
 
-void FoxtrotGame::NextEditorMode()
-{
-	if (SelectedEditorMode != nullptr) {
-		SelectedEditorMode->OnLeave(mMainScene);
-	}
-
-
-	EditorModeType = static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1);
-	if (static_cast<int32>(EditorModeType) > static_cast<int32>(eEditorMode::Default)) {
-		EditorModeType = eEditorMode::MoveCollider;
-	}
-}
 
 void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 {
 	if (SelectedEditorMode != nullptr) {
-		SelectedEditorMode->OnLeave(mMainScene);
+		// SelectedEditorMode->OnLeave(mMainScene);
 	}
 
 
 	EditorModeType = mode;
 
-	if (static_cast<int32>(EditorModeType) > static_cast<int32>(eEditorMode::Default)) {
-		EditorModeType = eEditorMode::MoveCollider;
+	if (static_cast<int32>(EditorModeType) > static_cast<int32>(eEditorMode::Simulate)) {
+		EditorModeType = static_cast<eEditorMode>(0);
 	}
 
-	if (static_cast<int32>(EditorModeType) < static_cast<int32>(eEditorMode::MoveCollider)) {
-		EditorModeType = eEditorMode::Default;
+	if (static_cast<int32>(EditorModeType) < 0) {
+		EditorModeType = eEditorMode::Simulate;
 	}
 
-	// Update cameras + current editor mode ptr
-	if (EditorModeType != eEditorMode::Default) {
+	if (EditorModeType != eEditorMode::Simulate) {
 		SelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
-		// mMainScene.SelectCamera(pEditorCamera);
+		LogInfo("Editor mode set");
 	}
 	else {
-		// mMainScene.SelectCamera(Player.pCamera);
 		SelectedEditorMode = nullptr;
 	}
 }
-
-void FoxtrotGame::NewBlockoutBrush() {}
 
 
 void FoxtrotGame::ProcessControls()
@@ -359,21 +343,27 @@ void FoxtrotGame::ProcessControls()
 		ControlManager::ReleaseMouse();
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && (EditorModeType != eEditorMode::Default)) {
-		EditorModeType = eEditorMode::Default;
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && (EditorModeType != eEditorMode::Simulate)) {
+		EditorModeType = eEditorMode::Simulate;
 		mMainScene.SelectCamera(Player.pCamera);
 	}
 
-	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_N)) {
-		NewBlockoutBrush();
-	}
-
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
-		physics::RayResult hit_point = gPhysics->pBackend->Raycast(Player.pCamera->Position,
-																   Player.pCamera->GetForwardVector() * 10.0f);
-		LogInfo(LC_PHYSICS, "Hit?={}, Pos={}", hit_point.bHit, hit_point.Point);
+		// physics::RayResult hit_point = gPhysics->pBackend->Raycast(Player.pCamera->Position,
+		// 														   Player.pCamera->GetForwardVector() * 10.0f);
 
-		if (hit_point.bHit) {
+		SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(Player.pCamera->Position,
+																		  Player.pCamera->GetForwardVector() * 10.0f);
+
+		LogInfo("RAYCASTED {} objects", hits.Size);
+		if (hits.Size > 0 && SelectedEditorMode != nullptr) {
+			JPH::BodyID body_id = hits[0];
+
+			physics::Body* body = gPhysics->FindBody(body_id);
+
+			if (body != nullptr) {
+				SelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
+			}
 			// Object* hit_marker = gObjectManager->GetObject(mRaycastHitMarker);
 			// if (hit_marker) {
 			// hit_marker->SetPosition(hit_point.Point);
@@ -410,7 +400,6 @@ void FoxtrotGame::ProcessControls()
 		mouse_delta.Y = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.Y) *
 											 -static_cast<double>(scMouseSensitivity));
 
-		// camera->Rotate(mouse_delta.GetX(), mouse_delta.GetY());
 		Player.RotateHead(mouse_delta);
 	}
 
@@ -421,14 +410,9 @@ void FoxtrotGame::ProcessControls()
 		}
 	}
 
-	// // Elevate up
-	// if (ControlManager::IsKeyDown(eKey::FX_KEY_E)) {
-	//     Player.Move(DeltaTime, Vec3f::sUp);
-	// }
-	// // Elevate down
-	// if (ControlManager::IsKeyDown(eKey::FX_KEY_Q)) {
-	//     Player.Move(DeltaTime, -Vec3f::sUp);
-	// }
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_TAB)) {
+		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1));
+	}
 
 
 	if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
@@ -439,25 +423,8 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
-		mBlockout.Load(mBlockoutPath);
-
 		LogInfo("Reloading blockout...");
-
-
-		// Reload the object properties from the scene
-		// WorldFile scene_file;
-		// scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, Config.GetEntry(HashStr32("Scene"))->Get<const
-		// char*>()), 				mMainScene);
-
-		// LoadOffsetsFile();
-	}
-
-	// if (ControlManager::IsKeyDown(eKey::FX_KEY_L)) {
-	//     ReloadAllObjects();
-	// }
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
-		// pHelmetObject->SetPhysicsEnabled(!pHelmetObject->GetPhysicsEnabled());
+		mBlockout.Load(mBlockoutPath);
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
@@ -476,17 +443,10 @@ void FoxtrotGame::ProcessControls()
 		Vec2u tile_xy = gWorldGrid->GetTileXY(tile_index);
 
 		LogInfo("Tile index: {}, {}", tile_xy.X, tile_xy.Y);
-
-		Object* object = gObjectManager->FindObject(HashStr32("FireExtinguisher"));
-		LogInfo("object bounds:  {} -> {}  = {}", object->Bounds.Min, object->Bounds.Max, object->Bounds.GetSize());
-
-		// Player.SetFlyMode(true);
-		// Player.TeleportTo(Vec3f(0.0f, 4.0f, -4.0f));
 	}
 
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
-		// Player.Physics.bDisableGravity = !Player.Physics.bDisableGravity;
 		Player.SetFlyMode(!Player.IsFlyMode());
 		Player.Physics.SetCollisionEnabled(!Player.IsFlyMode());
 	}
@@ -494,9 +454,11 @@ void FoxtrotGame::ProcessControls()
 
 void FoxtrotGame::RenderText()
 {
-	static const uint32 scTextColor = Color::FromRGBA(0, 255, 0, 255).AsUInt();
+	static const uint32 scTextColor = Color::FromRGBA(255, 0, 0, 255).AsUInt();
 
-	gTextRenderer->DrawText(String::Fmt("mode {}", static_cast<uint32>(0)).CStr(), 2.0f, scTextColor);
+	gTextRenderer->DrawText(String::Fmt("EditorMode {}", static_cast<uint32>(EditorModeType)).CStr(), 2.0f,
+							scTextColor);
+	gTextRenderer->DrawText(String::Fmt("P={}", Player.Position).CStr(), 2.0f, scTextColor);
 }
 
 
@@ -525,8 +487,8 @@ void FoxtrotGame::Tick()
 	Player.Update(DeltaTime);
 
 
-	if (EditorModeType != eEditorMode::Default) {
-		SelectedEditorMode->Update(mMainScene, GetEditorMovementVector());
+	if (EditorModeType != eEditorMode::Simulate) {
+		// SelectedEditorMode->Update(mMainScene, GetEditorMovementVector());
 	}
 
 	Ref<PerspectiveCamera> camera = Player.pCamera;
@@ -583,7 +545,12 @@ void FoxtrotGame::DestroyGame()
 
 void FoxtrotGame::AddEditorModes()
 {
-	EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Default));
+	EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Simulate));
+	{
+		EditorMode* mode = new EditorMode;
+		mode->Create("./Scripts/editor/mode_translate.ssc");
+		EditorModes.Insert(mode);
+	}
 
 	// EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), nullptr));
 	// EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), nullptr));
@@ -609,6 +576,7 @@ FoxtrotGame::~FoxtrotGame()
 /////////////////////////////////////
 // Editor modes
 /////////////////////////////////////
+
 
 // void EditorModeMoveCollider::Update(const World& scene, const Vec3f& movement_vector)
 // {

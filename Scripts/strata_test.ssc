@@ -1,8 +1,0 @@
-
-
-extern int printf(string fmt, ...);
-
-int run()
-{
-	return 5 + 10;
-}

@@ -1,0 +1,11 @@
+/*
+ *	Common functions and externals for editor modes
+ */
+
+struct OBJECTID = uint;
+handle OBJECT;
+
+
+extern OBJECT object_get(OBJECTID id);
+extern void object_move_to(OBJECT obj, float3 position);
+extern void object_move_by(OBJECT obj, float3 by);

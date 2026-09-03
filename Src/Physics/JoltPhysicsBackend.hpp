@@ -9,6 +9,7 @@
 
 #include <Core/Log.hpp>
 #include <Core/MemberRef.hpp>
+#include <Core/SizedArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
 
@@ -160,6 +161,7 @@ struct RayResult
 {
 	bool bHit = false;
 	Vec3f Point = Vec3f::sZero;
+	JPH::BodyID Body {};
 };
 
 
@@ -178,6 +180,7 @@ public:
 	void OptimizeBroadPhase();
 
 	RayResult Raycast(const Vec3f& origin, const Vec3f& direction) const;
+	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f& origin, const Vec3f& direction) const;
 
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 

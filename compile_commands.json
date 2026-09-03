@@ -289,6 +289,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/InGameEditor.cpp.o -c /Users/emd22/Projects/a2/Src/InGameEditor.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/InGameEditor.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/InGameEditor.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Main.cpp.o -c /Users/emd22/Projects/a2/Src/Main.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Main.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Main.cpp.o"
@@ -712,6 +718,12 @@
   "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Script/Script.cpp.o -c /Users/emd22/Projects/a2/Src/Script/Script.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Script/Script.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/Script.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DDEBUG -DFX_BASE_DIR=\\\".\\\" -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -g -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fsanitize=address -fcolor-diagnostics -o CMakeFiles/foxtrot.dir/Src/Script/ScriptInterop.cpp.o -c /Users/emd22/Projects/a2/Src/Script/ScriptInterop.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/Script/ScriptInterop.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Script/ScriptInterop.cpp.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

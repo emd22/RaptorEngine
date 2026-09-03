@@ -238,7 +238,7 @@ struct std::formatter<fx::Vec3f>
 
 	auto format(const fx::Vec3f& obj, std::format_context& ctx) const
 	{
-		return std::format_to(ctx.out(), "({:.04f}, {:.04f}, {:.04f}, {:.04f})", obj.X, obj.Y, obj.Z, obj.W);
+		return std::format_to(ctx.out(), "({:.04f}, {:.04f}, {:.04f})", obj.X, obj.Y, obj.Z);
 	}
 };
 

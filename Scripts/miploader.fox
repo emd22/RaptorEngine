@@ -1,1 +1,0 @@
-extproc mips_export(str datapack_path, str out_path);
