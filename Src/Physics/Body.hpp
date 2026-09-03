@@ -72,7 +72,12 @@ public:
 	FX_FORCE_INLINE Quat GetRotation() { return Quat(mpPhysicsBody->GetRotation()); }
 
 	FX_FORCE_INLINE JPH::Body* GetBody() { return mpPhysicsBody; };
-	FX_FORCE_INLINE const JPH::BodyID& GetBodyId() { return mpPhysicsBody->GetID(); };
+	FX_FORCE_INLINE const JPH::BodyID& GetBodyID() { return mpPhysicsBody->GetID(); };
+
+	/// Saves the ID for the linked object.
+	FX_FORCE_INLINE void SetObjectID(ObjectID id) { mObjectID = id; }
+	/// Retrieves the ID for the linked object
+	FX_FORCE_INLINE ObjectID GetObjectID() const { return mObjectID; }
 
 	FX_FORCE_INLINE physics::eMotionType GetMotionType() const { return mMotionType; }
 
@@ -98,8 +103,10 @@ public:
 
 	physics::BodyID ID = physics::BodyID::scNull;
 
+
 private:
 	Name mColliderName;
+	ObjectID mObjectID = ObjectID::scNull;
 };
 
 } // namespace physics

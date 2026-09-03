@@ -35,7 +35,7 @@ public:
 	{
 		SizedArray<Vec3f> Positions;
 		SizedArray<Vec3f> Normals;
-		SizedArray<Vec2f> Uvs;
+		SizedArray<Vec2f> Texcoords;
 
 		SizedArray<uint32> Indices;
 
@@ -58,7 +58,7 @@ public:
 public:
 	static Ref<GeneratedMesh> MakeIcoSphere(int resolution);
 	static Ref<GeneratedMesh> MakeCube(CubeGenOptions options = {});
-	static Ref<GeneratedMesh> MakeQuad(MeshGenOptions options = {});
+	static Ref<GeneratedMesh> MakeQuad(Vec2f scale = Vec2f(1.0f, 1.0f));
 
 private:
 };

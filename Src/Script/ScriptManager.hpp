@@ -2,6 +2,8 @@
 
 #include "Script.hpp"
 
+#include <Core/FreeArray.hpp>
+
 struct StrataCompiler;
 
 
@@ -12,12 +14,13 @@ class ScriptManager
 public:
 	ScriptManager();
 
-	script::Script LoadScript(const char* path);
+	script::Script* LoadScript(const String& path);
 
 	~ScriptManager();
 
 private:
 	struct StrataCompiler* mpCompiler = nullptr;
+	FreeArray<script::Script> mScripts;
 };
 
 } // namespace fx

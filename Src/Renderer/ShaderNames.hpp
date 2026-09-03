@@ -12,12 +12,12 @@ enum class eShaderName : uint32
 	LightCulling,
 	Composition,
 	Shadows,
-	Unlit,
 	/// Depth + normal prepass
 	DepthNormal,
 	/// Draw debug geometry
 	DebugLayer,
-	Text,
+	/// Bitmap font text rendering (2D screen-space overlay)
+	BitmapText,
 	SSAO,
 	SSAOBlur,
 
@@ -39,10 +39,9 @@ constexpr const char* GetName(const eShaderName id)
 		FX_ENUM_CASE_NAME(LightCulling);
 		FX_ENUM_CASE_NAME(Composition);
 		FX_ENUM_CASE_NAME(Shadows);
-		FX_ENUM_CASE_NAME(Unlit);
 		FX_ENUM_CASE_NAME(DepthNormal);
 		FX_ENUM_CASE_NAME(DebugLayer);
-		FX_ENUM_CASE_NAME(Text);
+		FX_ENUM_CASE_NAME(BitmapText);
 		FX_ENUM_CASE_NAME(SSAO);
 		FX_ENUM_CASE_NAME(SSAOBlur);
 	default:

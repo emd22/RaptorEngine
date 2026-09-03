@@ -27,10 +27,10 @@ public:
 	Vec2Base operator*(const Vec2Base& other) const { return Vec2Base(X * other.X, Y * other.Y); }
 	Vec2Base operator/(const Vec2Base& other) const { return Vec2Base(X / other.X, Y / other.Y); }
 
-	Vec2Base operator+(float scalar) const { return Vec2Base(X + scalar, Y + scalar); }
-	Vec2Base operator-(float scalar) const { return Vec2Base(X - scalar, Y - scalar); }
-	Vec2Base operator*(float scalar) const { return Vec2Base(X * scalar, Y * scalar); }
-	Vec2Base operator/(float scalar) const { return Vec2Base(X / scalar, Y / scalar); }
+	Vec2Base operator+(Type scalar) const { return Vec2Base(X + scalar, Y + scalar); }
+	Vec2Base operator-(Type scalar) const { return Vec2Base(X - scalar, Y - scalar); }
+	Vec2Base operator*(Type scalar) const { return Vec2Base(X * scalar, Y * scalar); }
+	Vec2Base operator/(Type scalar) const { return Vec2Base(X / scalar, Y / scalar); }
 
 	Vec2Base& operator+=(const Vec2Base& other)
 	{

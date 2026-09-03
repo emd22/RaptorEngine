@@ -1,0 +1,25 @@
+import mode_common;
+
+OBJECT selected_object;
+
+void mode_load()
+{
+
+}
+
+void mode_select_object(OBJECT object)
+{
+	selected_object = object;
+}
+
+
+void mode_update(float3 movement_vector)
+{
+	object_move_by(selected_object, movement_vector);
+}
+
+
+void mode_unload()
+{
+
+}

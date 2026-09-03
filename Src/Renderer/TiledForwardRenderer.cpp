@@ -13,6 +13,7 @@
 #include "PSOBuild.hpp"
 #include "PipelineCache.hpp"
 #include "ShadowDirectional.hpp"
+#include "TextRenderer.hpp"
 
 #include <Asset/AssetManager.hpp>
 #include <Material/MaterialManager.hpp>
@@ -50,6 +51,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateSSAOBlurPSO();
 	CreateForwardPSO();
 	CreateCompositionPSO();
+	CreateBitmapTextPSO();
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
 
@@ -253,7 +255,6 @@ void TiledForwardRenderer::CreateDebugLayerPSO()
 	gPSOBuild->SetCullMode(eCullMode::Back);
 	gPSOBuild->EndPipeline();
 }
-
 
 void TiledForwardRenderer::CreateForwardPSO()
 {
@@ -665,6 +666,50 @@ void TiledForwardRenderer::CreateCompositionPSO()
 								  }));
 
 	gPSOBuild->EndPipeline();
+}
+
+void TiledForwardRenderer::CreateBitmapTextPSO()
+{
+	// Ensure the font atlas and instance buffer are created before registering their descriptors.
+	gTextRenderer->Create();
+
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(TextPushConstants));
+
+		gPSOBuild->SetViewportSize(Target::scFullScreen, eSizeDivisor::FullRes);
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetShader(eShaderName::BitmapText, {});
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::None);
+		gPSOBuild->SetDepthTest(false);
+		gPSOBuild->SetDepthWrite(false);
+
+		BlendAttachment blend = BlendAttachment {
+			.Enabled = true,
+			.BlendOp = {
+				.Ops = {
+					.Alpha = VK_BLEND_OP_ADD,
+					.Color = VK_BLEND_OP_ADD,
+				},
+			},
+			.AlphaBlend { .Ops {
+				.Src = VK_BLEND_FACTOR_ONE,
+				.Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			} },
+			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+		};
+		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gTextRenderer->GetInstanceBuffer(), 0,
+							 sizeof(TextRenderer::InstanceData) * TextRenderer::scMaxGlyphs);
+
+		gPSOBuild->AddImage(
+			1, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+			gSamplerCache->Request({ eSamplerFilter::Nearest, eSamplerFilter::Nearest, eSamplerFilter::Nearest }));
+
+		gPSOBuild->EndPipeline();
+	}
 }
 
 void TiledForwardRenderer::RenderComposition(Camera& camera)

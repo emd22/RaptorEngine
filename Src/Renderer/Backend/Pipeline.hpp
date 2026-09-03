@@ -80,6 +80,17 @@ struct alignas(16) DebugLayerPushConstants
 	uint32 DebugColor;
 };
 
+struct alignas(16) TextPushConstants
+{
+	float32 CombinedMatrix[16];
+	uint32 TextColor;
+	uint32 InstanceBase;
+	float32 AtlasMinU;
+	float32 AtlasMinV;
+	float32 AtlasMaxU;
+	float32 AtlasMaxV;
+};
+
 struct alignas(16) LightVertPushConstants
 {
 	float32 CameraMatrix[16];
@@ -204,8 +215,6 @@ public:
 	}
 
 	void Bind(const CommandBuffer& command_buffer) const;
-
-	void SetViewport(const Vec2u& size);
 
 	void Destroy();
 	~Pipeline() { Destroy(); }

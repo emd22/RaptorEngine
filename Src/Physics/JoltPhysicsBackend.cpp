@@ -7,6 +7,8 @@
 
 /* Additional Jolt includes */
 #include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollector.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <ThirdParty/Jolt/Core/Factory.h>
 #include <ThirdParty/Jolt/Core/JobSystemThreadPool.h>
@@ -168,6 +170,27 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& directio
 
 	return RayResult { false, Vec3f::sZero };
 }
+
+SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const Vec3f& origin, const Vec3f& direction) const
+{
+	JPH::RayCast rc;
+	origin.ToJoltVec3(rc.mOrigin);
+	direction.ToJoltVec3(rc.mDirection);
+
+	JPH::AllHitCollisionCollector<JPH::RayCastBodyCollector> collector;
+
+	PhysicsSystem.GetBroadPhaseQuery().CastRay(rc, collector);
+
+	SizedArray<JPH::BodyID> hits;
+	hits.InitCapacity(collector.mHits.size());
+
+	for (JPH::BroadPhaseCastResult& hit : collector.mHits) {
+		hits.Insert(hit.mBodyID);
+	}
+
+	return hits;
+}
+
 
 void JoltPhysicsBackend::Destroy()
 {

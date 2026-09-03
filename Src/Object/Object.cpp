@@ -155,7 +155,7 @@ void Object::OnAttached(World* scene)
 
 	// When the object is attached to the scene, enable physics if the physics object is active.
 	if (phys && phys->mbHasPhysicsBody) {
-		SetPhysicsEnabled(gPhysics->pBackend->GetBodyInterface().IsActive(phys->GetBodyId()));
+		SetPhysicsEnabled(gPhysics->pBackend->GetBodyInterface().IsActive(phys->GetBodyID()));
 	}
 }
 
@@ -307,6 +307,11 @@ void Object::Update()
 		}
 
 		SyncObjectWithPhysics(phys);
+
+		// The transformation has changed via physics, we should tell the worldgrid
+		if (mbMatrixOutOfDate) {
+			gWorldGrid->UpdateObject(ID);
+		}
 	}
 
 
@@ -381,6 +386,16 @@ void Object::SetUnlit(const bool value)
 	}
 }
 
+void Object::AttachCollider(physics::Body* body)
+{
+	if (body == nullptr) {
+		return;
+	}
+
+	PhysicsID = body->GetID();
+	body->SetObjectID(ID);
+}
+
 
 void Object::SetPhysicsEnabled(bool enabled)
 {
@@ -397,12 +412,12 @@ void Object::SetPhysicsEnabled(bool enabled)
 
 	if (enabled) {
 		LogInfo("Activate physics body");
-		gPhysics->pBackend->GetBodyInterface().ActivateBody(phys->GetBodyId());
+		gPhysics->pBackend->GetBodyInterface().ActivateBody(phys->GetBodyID());
 		SetFlag(Flags, eObjectFlags::PhysicsEnabled);
 	}
 	else {
 		LogInfo("Deactivate physics body");
-		gPhysics->pBackend->GetBodyInterface().DeactivateBody(phys->GetBodyId());
+		gPhysics->pBackend->GetBodyInterface().DeactivateBody(phys->GetBodyID());
 		ClearFlag(Flags, eObjectFlags::PhysicsEnabled);
 	}
 }
@@ -418,7 +433,7 @@ void Object::PrintDebug() const
 	if (pScene && (phys = gPhysics->GetBody(PhysicsID))) {
 		bool has_body = phys->mbHasPhysicsBody;
 		LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
-				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyId().GetIndex(),
+				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyID().GetIndex(),
 				(phys->GetMotionType() == physics::eMotionType::Static) ? "Static" : "Dynamic");
 	}
 

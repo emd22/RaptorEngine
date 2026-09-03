@@ -1,5 +1,7 @@
 #include "Script.hpp"
 
+#include "ScriptInterop.hpp"
+
 #include <strata/strata.h>
 
 #include <Core/Log.hpp>
@@ -47,26 +49,12 @@ void* Script::GetFunctionPtr(const char* fn_name) const
 	return strataJitGetFunction(mpJit, fn_name);
 }
 
-#define EXTERN_RESOLVE(name_, fn_)                                                                                     \
-	if (strcmp(name, "printf") == 0) {                                                                                 \
-		return (void*)printf;                                                                                          \
-	}
-
-
-struct PredefExtern
-{
-	const char* pcName;
-	void* pFunction;
-};
-
-static const PredefExtern scAvailableExterns[] = {
-	PredefExtern { "printf", reinterpret_cast<void*>(printf) },
-};
-
 static const PredefExtern* FindExtern(const char* name)
 {
-	for (uint32 i = 0; i < std::size(scAvailableExterns); i++) {
-		const PredefExtern* pd = &scAvailableExterns[i];
+	Slice<const PredefExtern> predefs = GetInteropPredefs();
+
+	for (uint32 i = 0; i < predefs.Size; i++) {
+		const PredefExtern* pd = &predefs[i];
 		if (!strcmp(pd->pcName, name)) {
 			return pd;
 		}

@@ -75,7 +75,7 @@ Ref<PrimitiveMesh> MeshGen::GeneratedMesh::AsDefaultMesh()
 
 	mesh->bKeepInMemory = true;
 
-	mesh->VertexList.CreateFrom(Positions, Normals, Uvs, {}, {}, {}, eVertexCreateFlags::None);
+	mesh->VertexList.CreateFrom(Positions, Normals, Texcoords, {}, {}, {}, eVertexCreateFlags::None);
 	renderer::gGraphics->SubmitImmediateUploadCmd(
 		[&](renderer::CommandBuffer& cmd)
 		{
@@ -251,7 +251,7 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 	// 4 verts per face and 36 indices (2 tris per face)
 	mesh->Positions.InitCapacity(24);
 	mesh->Normals.InitCapacity(24);
-	mesh->Uvs.InitCapacity(24);
+	mesh->Texcoords.InitCapacity(24);
 	mesh->Indices.InitCapacity(36);
 
 	const Vec3f f_tl { -l_s, t_s, fr_s };	// Front TL
@@ -265,28 +265,28 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 
 	if (options.bAlignUVs) {
 		// Front face (+Z)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tl, f_tr, f_br, f_bl }, options.Front,
-					false, false);
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { f_tl, f_tr, f_br, f_bl },
+					options.Front, false, false);
 
 		// Back face (-Z)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options.Back,
-					true, false);
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { b_tr, b_tl, b_bl, b_br },
+					options.Back, true, false);
 
 		// Top face (+Y)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, b_tr, f_tr, f_tl }, options.Top,
-					false, false);
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { b_tl, b_tr, f_tr, f_tl },
+					options.Top, false, false);
 
 		// Bottom face (-Y)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_bl, f_br, b_br, b_bl },
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { f_bl, f_br, b_br, b_bl },
 					options.Bottom, false, true);
 
 		// Right face (+X)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tr, b_tr, b_br, f_br }, options.Right,
-					true, false);
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { f_tr, b_tr, b_br, f_br },
+					options.Right, true, false);
 
 		// Left face (-X)
-		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, f_tl, f_bl, b_bl }, options.Left,
-					false, false);
+		MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { b_tl, f_tl, f_bl, b_bl },
+					options.Left, false, false);
 
 		return mesh;
 	}
@@ -294,82 +294,49 @@ Ref<MeshGen::GeneratedMesh> MeshGen::MakeCube(CubeGenOptions options)
 	// Do not flip UVs for any faces
 
 	// Front face (+Z)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tl, f_tr, f_br, f_bl }, options.Front,
-				false, false);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { f_tl, f_tr, f_br, f_bl },
+				options.Front, false, false);
 
 	// Back face (-Z)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, options.Back,
-				false, false);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { b_tr, b_tl, b_bl, b_br },
+				options.Back, false, false);
 
 	// Top face (+Y)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, b_tr, f_tr, f_tl }, options.Top,
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { b_tl, b_tr, f_tr, f_tl }, options.Top,
 				false, false);
 
 	// Bottom face (-Y)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_bl, f_br, b_br, b_bl }, options.Bottom,
-				false, false);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { f_bl, f_br, b_br, b_bl },
+				options.Bottom, false, false);
 
 	// Right face (+X)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { f_tr, b_tr, b_br, f_br }, options.Right,
-				false, false);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { f_tr, b_tr, b_br, f_br },
+				options.Right, false, false);
 
 	// Left face (-X)
-	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Uvs, mesh->Indices, { b_tl, f_tl, f_bl, b_bl }, options.Left,
-				false, false);
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { b_tl, f_tl, f_bl, b_bl },
+				options.Left, false, false);
 	return mesh;
 }
 
-Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(MeshGenOptions options)
+Ref<MeshGen::GeneratedMesh> MeshGen::MakeQuad(Vec2f scale)
 {
 	Ref<MeshGen::GeneratedMesh> mesh = MakeRef<MeshGen::GeneratedMesh>();
 
-	const float32 s = options.Scale;
+	mesh->Positions.InitCapacity(4);
+	mesh->Normals.InitCapacity(4);
+	mesh->Texcoords.InitCapacity(4);
+	mesh->Indices.InitCapacity(8);
 
-	/*
-		0-------1
-		|     / |
-		|   /   |
-		| /     |
-		3-------2
-	*/
+	const float scale_z = 1.0f;
 
-	mesh->Positions = {
-		// Top Left
-		Vec3f(-s, s, 0.0f), // 0
-		// Top Right
-		Vec3f(s, s, 0.0f), // 1
+	const Vec3f b_tl { -scale.X, scale.Y, -scale_z };  //  TL
+	const Vec3f b_tr { scale.X, scale.Y, -scale_z };   //  TR
+	const Vec3f b_bl { -scale.X, -scale.Y, -scale_z }; //  BL
+	const Vec3f b_br { scale.X, -scale.Y, -scale_z };  //  BR
 
-		// Bottom Right
-		Vec3f(s, -s, 0.0f), // 2
-
-		// Bottom Left
-		Vec3f(-s, -s, 0.0f), // 3
-	};
-
-	Vec3f surface_normal = Vec3f::GetSurfaceNormal(mesh->Positions[0], mesh->Positions[1], mesh->Positions[2]);
-
-	mesh->Normals = { surface_normal, surface_normal, surface_normal, surface_normal };
-
-	mesh->Uvs = {
-		// Top Left
-		Vec2f(options.UvMin.X, options.UvMin.Y), // 0
-
-		// Top Right
-		Vec2f(options.UvMax.X, options.UvMin.Y), // 1
-
-		// Bottom Right
-		Vec2f(options.UvMax.X, options.UvMax.Y), // 2
-
-		// Bottom Left
-		Vec2f(options.UvMin.X, options.UvMax.Y), // 3
-	};
-
-
-	mesh->Indices = { // Top left triangle
-					  1, 0, 3,
-					  // Bottom right triangle
-					  1, 3, 2
-	};
+	MC_EmitQuad(mesh->Positions, mesh->Normals, mesh->Texcoords, mesh->Indices, { b_tr, b_tl, b_bl, b_br }, {}, false,
+				false);
 
 	return mesh;
 }

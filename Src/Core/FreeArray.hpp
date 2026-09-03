@@ -22,6 +22,28 @@ public:
 
 	FX_FORCE_INLINE bool IsInited() const { return pPtr != nullptr; }
 
+	template <typename... TArgs>
+	TItemType* NewItem(uint32* out_index, TArgs&&... args)
+	{
+		uint32 index = SlotsInUse.FindNextFreeBit();
+		if (index == Bitset::scNoFreeBits) {
+			return nullptr;
+		}
+
+		TItemType* ptr = &pPtr[index];
+		new (ptr) TItemType(std::forward<TArgs>(args)...);
+
+		SlotsInUse.Set(index);
+
+		++Size;
+
+		if (out_index != nullptr) {
+			(*out_index) = index;
+		}
+
+		return ptr;
+	}
+
 	TItemType* NewItem(uint32* out_index = nullptr)
 	{
 		uint32 index = SlotsInUse.FindNextFreeBit();

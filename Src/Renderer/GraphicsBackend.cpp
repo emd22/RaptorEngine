@@ -8,6 +8,7 @@
 #include "Engine.hpp"
 #include "ImageGen.hpp"
 #include "Object/ObjectManager.hpp"
+#include "TextRenderer.hpp"
 #include "TiledForwardRenderer.hpp"
 
 #include <SDL3/SDL.h>
@@ -15,6 +16,7 @@
 
 #include <Asset/Animation.hpp>
 #include <Asset/AssetManager.hpp>
+#include <Color.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defines.hpp>
 #include <Core/RefUtil.hpp>
@@ -28,7 +30,6 @@
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
-
 
 /* If this is defined, we will break on an error message containing this string. */
 #define FX_DEBUG_BREAK_ON_ERROR_SUBSTR                                                                                 \
@@ -238,6 +239,8 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
+
+	gTextRenderer->Resize();
 
 	rd->DescriptorPool.Recreate();
 
@@ -703,12 +706,15 @@ void GraphicsBackend::RenderEarlyFrameEffects(Camera& camera)
 	Assert(blur_target != nullptr);
 
 	SSAOBlurPushConsts blur_consts = {
-		.ScreenSize = { static_cast<float32>(blur_target->Image.Info.Size.X), static_cast<float32>(blur_target->Image.Info.Size.Y) },
-		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.Info.Size.X), 1.0f / static_cast<float32>(blur_target->Image.Info.Size.Y) },
+		.ScreenSize = { static_cast<float32>(blur_target->Image.Info.Size.X),
+						static_cast<float32>(blur_target->Image.Info.Size.Y) },
+		.TexelSize = { 1.0f / static_cast<float32>(blur_target->Image.Info.Size.X),
+					   1.0f / static_cast<float32>(blur_target->Image.Info.Size.Y) },
 		.DepthSharpness = 100.0f,
 	};
 
-	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel, blur_consts);
+	SubmitPushConstants(frame->CmdBuffer, gPipelineCache->Request(ePipelineName::SSAOBlur), eShaderType::Pixel,
+						blur_consts);
 
 	vkCmdDraw(frame->CmdBuffer.Get(), 3, 1, 0, 0);
 
@@ -719,7 +725,9 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 {
 	FrameData* frame = GetFrame();
 
+
 	pRenderer->ForwardPass.End();
+
 
 	// pDeferredRenderer->UnlitPass.End();
 

@@ -498,6 +498,16 @@ static void ProcessLoadSuccess(LockContext<AssetItemData>& asset_data)
 		// Notify the asset thread that loading is finished
 		asset_data->Ticket.SignalUploadedToGpu();
 		ticket_data->bIsLoaded.store(true);
+		std::lock_guard guard(ticket_data->mCallbackMutex);
+
+		// Call OnLoaded callbacks if they are attached
+		if (!ticket_data->mOnLoadedCallbacks.empty()) {
+			for (auto& callback : ticket_data->mOnLoadedCallbacks) {
+				callback(reinterpret_cast<void*>(reinterpret_cast<Image*>(asset_data->Ticket.Get())));
+			}
+		}
+
+		ticket_data->mOnLoadedCallbacks.clear();
 	} break;
 	default:;
 	}

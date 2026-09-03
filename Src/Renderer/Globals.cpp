@@ -7,6 +7,7 @@
 #include "PipelineCache.hpp"
 #include "ShaderCache.hpp"
 #include "ShadowDirectional.hpp"
+#include "TextRenderer.hpp"
 
 namespace fx::renderer {
 
@@ -18,6 +19,7 @@ PipelineCache* gPipelineCache = nullptr;
 SamplerCache* gSamplerCache = nullptr;
 PSOBuild* gPSOBuild = nullptr;
 DescriptorCache* gDescriptorCache = nullptr;
+TextRenderer* gTextRenderer = nullptr;
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
 	delete name_;                                                                                                      \
@@ -36,6 +38,7 @@ void Init()
 	gShaderCache = new ShaderCache;
 	gDsLayoutCache = new DsLayoutCache;
 	gDescriptorCache = new DescriptorCache;
+	gTextRenderer = new TextRenderer;
 }
 
 void Destroy()
@@ -50,10 +53,10 @@ void Destroy()
 	DESTROY_GLOBAL(gDsLayoutCache);
 	DESTROY_GLOBAL(gPipelineCache);
 	DESTROY_GLOBAL(gShaderCache);
+	DESTROY_GLOBAL(gTextRenderer);
 
 	DESTROY_GLOBAL(gPSOBuild);
 	DESTROY_GLOBAL(gGraphics);
 }
-
 }; // namespace Globals
 } // namespace fx::renderer
