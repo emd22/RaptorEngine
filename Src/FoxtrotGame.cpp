@@ -25,6 +25,7 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <Renderer/TextRenderer.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <csignal>
@@ -491,6 +492,13 @@ void FoxtrotGame::ProcessControls()
 	}
 }
 
+void FoxtrotGame::RenderText()
+{
+	static const uint32 scTextColor = Color::FromRGBA(0, 255, 0, 255).AsUInt();
+
+	gTextRenderer->DrawText(String::Fmt("mode {}", static_cast<uint32>(0)).CStr(), 2.0f, scTextColor);
+}
+
 
 void FoxtrotGame::Tick()
 {
@@ -551,6 +559,8 @@ void FoxtrotGame::Tick()
 		LogInfo("Setting aspect ratio");
 		camera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
 	}
+
+	RenderText();
 
 	gGraphics->DoComposition(*mMainScene.GetCurrentCamera());
 

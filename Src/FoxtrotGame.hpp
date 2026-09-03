@@ -101,6 +101,8 @@ private:
 
 	void NewBlockoutBrush();
 
+	void RenderText();
+
 public:
 	Player Player {};
 

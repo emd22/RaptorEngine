@@ -677,6 +677,7 @@ void TiledForwardRenderer::CreateBitmapTextPSO()
 		gPSOBuild->BeginPipeline(ePipelineName::TextRendering);
 		gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(TextPushConstants));
 
+		gPSOBuild->SetViewportSize(Target::scFullScreen, eSizeDivisor::FullRes);
 		gPSOBuild->UseRenderStage(ForwardPass);
 		gPSOBuild->SetShader(eShaderName::BitmapText, {});
 		gPSOBuild->SetVertexType(eVertexType::Default);

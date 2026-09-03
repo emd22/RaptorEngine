@@ -2,6 +2,7 @@
 
 #include <Asset/AssetTicket.hpp>
 #include <Core/Ref.hpp>
+#include <Math/Mat4.hpp>
 #include <Math/Vec2.hpp>
 #include <Renderer/Backend/Descriptors.hpp>
 #include <Renderer/Backend/GpuBuffer.hpp>
@@ -23,17 +24,21 @@ class Sampler;
 class TextRenderer
 {
 public:
-	static constexpr uint32 scMaxGlyphs = 128;
-	static constexpr uint32 scGlyphTexels = 6;
-	static constexpr uint32 scAtlasColumns = 13;
-	static constexpr uint32 scAtlasRows = 7;
+	/// Max glyphs on screen at once
+	static constexpr uint32 scMaxGlyphs = 256;
+	static constexpr uint32 scGlyphWidth = 6;
+	static constexpr uint32 scGlyphHeight = 12;
+	static constexpr uint32 scAtlasColumns = 16;
+	static constexpr uint32 scAtlasRows = 6;
+
+	static constexpr Vec2f scMargin = Vec2f(20.0f);
 
 	struct InstanceData
 	{
 		float vPosition[2];
 		float vSize[2];
-		float vUvMin[2];
-		float vUvMax[2];
+		float UVMin[2];
+		float UVMax[2];
 	};
 
 public:
@@ -42,9 +47,10 @@ public:
 	TextRenderer operator=(TextRenderer& other) = delete;
 
 	void Create();
+	void Resize();
 	void Destroy();
 
-	void Render(const CommandBuffer& cmd, const char* text, const Vec2f& position, float32 scale, uint32 uiColor);
+	void DrawText(const char* text, float32 scale, uint32 color);
 
 	Image* GetAtlas() const { return mpAtlas; }
 	RawGpuBuffer& GetInstanceBuffer() { return mInstanceBuffer; }
@@ -59,6 +65,16 @@ private:
 	RawGpuBuffer mInstanceBuffer;
 
 	AssetTicket mAtlasTicket { nullptr };
+
+	uint32 mLastFrameNumber = 0;
+
+	/// The offset from the start of the current buffer. This increases for each call to `Render` in a single frame.
+	/// Think of it as an ink ribbon, where the characters are used and the cursor moves forward.
+	uint32 mTapeOffset = 0;
+
+	Vec2f mCursorPosition = Vec2f::sZero;
+
+	Mat4f mOrthoProjection = Mat4f::scIdentity;
 };
 
 } // namespace fx::renderer

@@ -31,7 +31,6 @@
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 
-
 /* If this is defined, we will break on an error message containing this string. */
 #define FX_DEBUG_BREAK_ON_ERROR_SUBSTR                                                                                 \
 	"VK_FORMAT_D32_SFLOAT with tiling VK_IMAGE_TILING_OPTIMAL doesn't support VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT"
@@ -240,6 +239,8 @@ void GraphicsBackend::RebuildRenderStages()
 	rd->SSAOPass.Rebuild(size);
 	rd->SSAOBlurPass.Rebuild(size);
 	rd->CompPass.Rebuild(size);
+
+	gTextRenderer->Resize();
 
 	rd->DescriptorPool.Recreate();
 
@@ -724,16 +725,6 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 {
 	FrameData* frame = GetFrame();
 
-
-	// Draw screen-space bitmap text over the lit scene.
-	{
-		const uint32 ui_white = Color::FromRGBA(255, 255, 255, 255).AsUInt();
-		const uint32 ui_green = Color::FromRGBA(0, 255, 128, 255).AsUInt();
-
-		gTextRenderer->Render(frame->CmdBuffer, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", Vec2f(16.0f, 16.0f), 3.0f, ui_white);
-		// gTextRenderer->Render(frame->CmdBuffer, "abcdefghijklmnopqrstuvwxyz", Vec2f(16.0f, 32.0f), 2.0f, ui_green);
-		// gTextRenderer->Render(frame->CmdBuffer, "0123456789+-=", Vec2f(16.0f, 48.0f), 2.0f, ui_white);
-	}
 
 	pRenderer->ForwardPass.End();
 

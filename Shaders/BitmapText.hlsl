@@ -36,6 +36,7 @@ struct VSPushConsts
 {
 	float4x4 mCombinedMatrix;
 	uint uiTextColor;
+	uint uiInstanceBase;
 	float fAtlasMinU;
 	float fAtlasMinV;
 	float fAtlasMaxU;
@@ -50,7 +51,7 @@ VSOutput main(VSInput input)
 {
 	VSOutput output;
 
-	TextInstanceData instance = bTextInstances[input.uiInstanceId];
+	TextInstanceData instance = bTextInstances[input.uiInstanceId + VSConst.uiInstanceBase];
 
 	float2 corner = input.vPosition.xy * 0.5f + 0.5f;
 
@@ -92,7 +93,7 @@ FSOutput main(FSInput input)
 	FSOutput output;
 
 	float4 sampled = F_Sample(tFont, input.vUV);
-	output.vAlbedo = float4(sampled.rgb * input.vTextColor.rgb, sampled.a * input.vTextColor.a);
+	output.vAlbedo = float4(input.vTextColor.rgb, sampled.a * input.vTextColor.a);
 
 	return output;
 }
