@@ -396,6 +396,30 @@ void Object::AttachCollider(physics::Body* body)
 	body->SetObjectID(ID);
 }
 
+void Object::SetPosition(const Vec3f& position)
+{
+	Entity::SetPosition(position);
+
+	if (PhysicsID.IsInvalid() == false) {
+		physics::Body* body = gPhysics->GetBody(PhysicsID);
+		if (body != nullptr) {
+			body->Teleport(position, mRotation);
+		}
+	}
+}
+
+void Object::SetRotation(const Quat& rotation)
+{
+	Entity::SetRotation(rotation);
+
+	if (PhysicsID.IsInvalid() == false) {
+		physics::Body* body = gPhysics->GetBody(PhysicsID);
+		if (body != nullptr) {
+			body->Teleport(mPosition, rotation);
+		}
+	}
+}
+
 
 void Object::SetPhysicsEnabled(bool enabled)
 {

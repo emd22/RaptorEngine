@@ -23,8 +23,8 @@ public:
 	void Update();
 
 	FX_FORCE_INLINE Vec3f GetForwardVector() { return Direction; }
-	FX_FORCE_INLINE Vec3f GetRightVector() { return GetForwardVector().Cross(Vec3f::sUp).Normalize(); }
-	FX_FORCE_INLINE Vec3f GetUpVector() { return GetRightVector().Cross(Direction).Normalize(); }
+	FX_FORCE_INLINE Vec3f GetRightVector() { return (Vec3f::sUp).Cross(GetForwardVector()).Normalize(); }
+	FX_FORCE_INLINE Vec3f GetUpVector() { return (Direction).Cross(GetRightVector()).Normalize(); }
 
 	virtual const Mat4f& GetCameraMatrix(eObjectLayer layer) const { return mCameraMatrix; }
 	virtual void OnWindowResize(const Vec2u& size) {};

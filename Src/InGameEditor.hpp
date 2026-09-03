@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <Math/SIMDHelper.hpp>
 #include <Renderer/Camera.hpp>
 #include <Script/Script.hpp>
 #include <World.hpp>
@@ -24,15 +25,24 @@ FxEnumFlags(eEditorModeFlags);
 
 class EditorMode
 {
+	using UpdateFnDef = void (*)(FLOAT4);
+
 public:
 	EditorMode() = default;
-	void Create(const String& script_path);
+
+	void Create(const String& name, const String& script_path);
 	void SelectObject(Object* object) const;
+	void Update(const Vec3f& movement_vector) const;
+	void ReloadHotFunctions();
+
 	~EditorMode() = default;
 
 public:
-	Ref<PerspectiveCamera> pCamera { nullptr };
 	eEditorModeFlags Flags = eEditorModeFlags::None;
+
+	String ModeName;
+
+	UpdateFnDef pUpdateFunction = nullptr;
 
 	script::Script* pScript = nullptr;
 };

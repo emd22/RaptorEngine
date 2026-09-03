@@ -1771,6 +1771,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ImplTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/ImplTests.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/ImplTests.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ImplTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/JitTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/JitTests.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/JitTests.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/JitTests.c.o"

@@ -34,13 +34,13 @@ enum class eTransformMode
 class Entity
 {
 public:
-	FX_FORCE_INLINE void SetPosition(const Vec3f& position)
+	virtual void SetPosition(const Vec3f& position)
 	{
 		mPosition = position;
 		MarkTransformOutOfDate();
 	}
 
-	FX_FORCE_INLINE void SetRotation(const Quat& rotation)
+	virtual void SetRotation(const Quat& rotation)
 	{
 		mRotation = rotation;
 		MarkTransformOutOfDate();
@@ -48,7 +48,7 @@ public:
 
 	void SetScale(const float scale);
 
-	void MoveBy(const Vec3f& offset) { SetPosition(mPosition + offset); }
+	virtual void MoveBy(const Vec3f& offset) { SetPosition(mPosition + offset); }
 	void ScaleBy(const float scale);
 
 	virtual void OnAttached(World* scene) {}

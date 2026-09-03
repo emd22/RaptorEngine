@@ -7,18 +7,11 @@ struct StrataCompiler;
 
 namespace fx::script {
 
-enum class eStatus
-{
-	Ok,
-	Error,
-};
-
-
 class Script
 {
 public:
 	Script() = delete;
-	Script(struct StrataCompiler* compiler, const String& path);
+	Script(const String& path);
 
 	Script(const Script& other);
 	Script(Script&& other);
@@ -26,7 +19,7 @@ public:
 	Script& operator=(const Script& other);
 	Script& operator=(Script&& other);
 
-	bool Load(const String& path);
+	void ReloadScript();
 
 	template <typename T>
 	T GetFunction(const char* fn_name) const
@@ -48,6 +41,8 @@ private:
 private:
 	struct StrataJit* mpJit = nullptr;
 	const char* mpErrors = nullptr;
+
+	String mPath;
 };
 
 } // namespace fx::script

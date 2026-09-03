@@ -5,24 +5,11 @@
 #include <strata/strata.h>
 
 #include <Core/Log.hpp>
+#include <Script/ScriptManager.hpp>
 
 namespace fx::script {
 
-Script::Script(struct StrataCompiler* compiler, const String& path)
-{
-	if (compiler == nullptr) {
-		return;
-	}
-
-	mpJit = strataJitCompileFile(compiler, path.CStr(), &mpErrors);
-
-	if (HasErrors()) {
-		LogError(LC_SCRIPT, "Could not compile script '{}'", path);
-		LogError(LC_SCRIPT, "Errors:\n{}", GetErrors());
-	}
-
-	SetExterns();
-}
+Script::Script(const String& path) : mPath(path) { ReloadScript(); }
 
 
 Script::Script(const Script& other)
@@ -38,6 +25,34 @@ Script::Script(Script&& other)
 
 	other.mpJit = nullptr;
 	other.mpErrors = nullptr;
+}
+
+void Script::ReloadScript()
+{
+	if (mpErrors != nullptr) {
+		strataFree(const_cast<char*>(mpErrors));
+		mpErrors = nullptr;
+	}
+
+	if (mpJit != nullptr) {
+		strataJitDestroy(mpJit);
+	}
+
+	StrataCompiler* compiler = gScriptManager->GetCompiler();
+
+	if (compiler == nullptr) {
+		return;
+	}
+
+	mpJit = strataJitCompileFile(compiler, mPath.CStr(), &mpErrors);
+
+	if (HasErrors()) {
+		LogError(LC_SCRIPT, "Could not compile script '{}'", mPath);
+		LogError(LC_SCRIPT, "Errors:\n{}", GetErrors());
+		return;
+	}
+
+	SetExterns();
 }
 
 void* Script::GetFunctionPtr(const char* fn_name) const

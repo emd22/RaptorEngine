@@ -497,7 +497,7 @@ void World::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
 
-	// RenderPhysicsObjects(camera);
+	RenderPhysicsObjects(camera);
 }
 
 

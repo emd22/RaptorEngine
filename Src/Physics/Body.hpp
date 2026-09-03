@@ -66,6 +66,8 @@ public:
 
 	void DestroyPhysicsBody();
 
+	void SetMidpoint(const Vec3f& midpoint);
+
 	void Teleport(const Vec3f& position, const Quat& rotation);
 
 	FX_FORCE_INLINE Vec3f GetPosition() { return Vec3f(mpPhysicsBody->GetPosition()); }
@@ -99,6 +101,10 @@ public:
 	bool mbHasPhysicsBody = false;
 
 	Vec3f Dimensions = Vec3f::sOne;
+
+	/// The midpoint of the physics body. The position is offset by this.
+	Vec3f Midpoint = Vec3f::sZero;
+
 	ePrimitiveType PrimitiveType = ePrimitiveType::None;
 
 	physics::BodyID ID = physics::BodyID::scNull;

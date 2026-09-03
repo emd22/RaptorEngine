@@ -11,7 +11,7 @@ namespace fx {
 class Player
 {
 	const Vec3f scMaxWalkSpeed = Vec3f(4.5f);
-	const Vec3f scMaxSprintSpeed = Vec3f(5.5f);
+	const Vec3f scMaxSprintSpeed = Vec3f(6.5f);
 
 	static constexpr float32 scMovementLerpSpeed = 10.0f;
 

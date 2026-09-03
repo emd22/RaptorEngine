@@ -47,7 +47,7 @@ FxEnumFlags(eObjectFlags);
 
 class PrimitiveMesh;
 
-class Object : public Entity
+class Object final : public Entity
 {
 	friend class AssetManager;
 
@@ -72,6 +72,9 @@ public:
 	void AttachObject(const ObjectID& object);
 
 	void Update();
+
+	void SetPosition(const Vec3f& position) override;
+	void SetRotation(const Quat& rotation) override;
 
 	void OnAttached(World* scene) override;
 
