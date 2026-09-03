@@ -7,9 +7,6 @@ bool camera_dist_added = false;
 void mode_load()
 {
 	camera_dist = float3(0.0f);
-
-	player.set_speed_multiplier(0.5f);
-	player.toggle_headbob(false);
 }
 
 void mode_select_object(OBJECT object)
@@ -17,21 +14,33 @@ void mode_select_object(OBJECT object)
 	selected_object = object;
 }
 
+float3 grid_snap(float3 pos)
+{
+	float3 grid_size = float3(0.25);
+
+	return (float3_round(pos / grid_size) * grid_size);
+}
 
 void mode_update(float3 movement_vector)
 {
 	/* Only update if lmouse is pressed */
 	if ((ctrl_mouse_state() & CTRL_LMOUSE) == 0) {
+		player.set_speed_multiplier(1.0f);
+		player.toggle_headbob(true);
+
 		camera_dist_added = false;
 		return;
 	}
+
+	player.set_speed_multiplier(0.5f);
+	player.toggle_headbob(false);
 
 	if (camera_dist_added == false) {
 		camera_dist = selected_object.get_position() - player.position();
 		camera_dist_added = true;
 	}
 
-	float3 new_position = player.position() + camera_dist;
+	float3 new_position = grid_snap(player.pos + camera_dist);
 
 	selected_object.move_to(new_position);
 }
@@ -39,6 +48,5 @@ void mode_update(float3 movement_vector)
 
 void mode_unload()
 {
-	player.set_speed_multiplier(1.0f);
-	player.toggle_headbob(true);
+
 }

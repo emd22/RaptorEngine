@@ -71,6 +71,9 @@ static void N_player_set_speed_multiplier(void*, float mult) { gWorld->Player.Sp
 static void N_player_toggle_headbob(void*, bool value) { gWorld->Player.bEnableHeadBob = value; }
 
 
+static FLOAT4 N_float3_round(FLOAT4 value) { return simd::Round(value); }
+
+
 /////////////////////////////////////
 // Predef gather
 /////////////////////////////////////
@@ -96,6 +99,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("PLAYER_position", N_player_position),
 	PREDEF("PLAYER_set_speed_multiplier", N_player_set_speed_multiplier),
 	PREDEF("PLAYER_toggle_headbob", N_player_toggle_headbob),
+
+	PREDEF("float3_round", N_float3_round),
 };
 
 Slice<const PredefExtern> GetInteropPredefs() { return Slice(scAvailableExterns, std::size(scAvailableExterns)); }

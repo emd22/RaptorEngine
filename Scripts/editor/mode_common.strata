@@ -7,6 +7,8 @@ handle OBJECT;
 
 handle PLAYER;
 
+extern float3 float3_round(float3 value);
+
 impl OBJECT {
 extern void move_to(OBJECT obj, float3 position);
 extern void move_by(OBJECT obj, float3 by);
@@ -25,6 +27,11 @@ impl PLAYER {
 extern void set_speed_multiplier(PLAYER p, float mult);
 extern void toggle_headbob(PLAYER p, bool value);
 extern float3 position(PLAYER p);
+
+property float3 pos {
+	get = PLAYER_position;
+}
+
 }
 
 

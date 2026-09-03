@@ -1918,5 +1918,11 @@
   "command": "/usr/bin/cc -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/aot_extern_layout_test.dir/samples/hosts/extern_layout_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/extern_layout_host.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/extern_layout_host.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/aot_extern_layout_test.dir/samples/hosts/extern_layout_host.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/aot_opaque_struct_test.dir/samples/hosts/opaque_struct_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/opaque_struct_host.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/opaque_struct_host.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/aot_opaque_struct_test.dir/samples/hosts/opaque_struct_host.c.o"
 }
 ]
