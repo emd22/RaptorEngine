@@ -54,7 +54,8 @@ void Player::Move(float64 delta_time, const Vec3f& offset)
 		movement_goal.NormalizeIP();
 	}
 
-	mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? scMaxSprintSpeed : scMaxWalkSpeed),
+	mUserForce.SmoothInterpolate(movement_goal * (bIsSprinting ? scMaxSprintSpeed : scMaxWalkSpeed) *
+									 Vec3f(SpeedMultiplier),
 								 scMovementLerpSpeed, delta_time);
 
 	if (movement_goal.Length() <= 0.25) {

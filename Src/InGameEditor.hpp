@@ -34,6 +34,8 @@ public:
 	void SelectObject(Object* object) const;
 	void Update(const Vec3f& movement_vector) const;
 	void ReloadHotFunctions();
+	void Load();
+	void Unload();
 
 	~EditorMode() = default;
 

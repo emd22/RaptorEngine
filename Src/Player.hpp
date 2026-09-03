@@ -112,6 +112,9 @@ public:
 	bool bEnableHeadBob : 1 = true;
 	Vec2f HeadBobStrength = Vec2f { 0.011, 0.018 };
 
+	float32 SpeedMultiplier = 1.0f;
+
+
 private:
 	Vec3f mCameraOffset = Vec3f::sZero;
 	float32 mHeadBobX = 0.0f;

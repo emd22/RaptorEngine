@@ -293,7 +293,7 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 {
 	if (SelectedEditorMode != nullptr) {
-		// SelectedEditorMode->OnLeave(mMainScene);
+		SelectedEditorMode->Unload();
 	}
 
 
@@ -309,7 +309,7 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 
 	if (EditorModeType != eEditorMode::Simulate) {
 		SelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
-		LogInfo("Editor mode set");
+		SelectedEditorMode->Load();
 	}
 	else {
 		SelectedEditorMode = nullptr;

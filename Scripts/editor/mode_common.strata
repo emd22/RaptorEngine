@@ -5,6 +5,8 @@
 struct OBJECTID = uint;
 handle OBJECT;
 
+handle PLAYER;
+
 impl OBJECT {
 extern void move_to(OBJECT obj, float3 position);
 extern void move_by(OBJECT obj, float3 by);
@@ -17,10 +19,19 @@ extern OBJECT object_get(OBJECTID id);
 extern float3 camera_position();
 
 /* Retrieve the player's position */
-extern float3 player_position();
+
+
+impl PLAYER {
+extern void set_speed_multiplier(PLAYER p, float mult);
+extern void toggle_headbob(PLAYER p, bool value);
+extern float3 position(PLAYER p);
+}
+
 
 
 const uint CTRL_LMOUSE = 0x01;
 const uint CTRL_RMOUSE = 0x02;
 
 extern uint ctrl_mouse_state();
+
+PLAYER player;

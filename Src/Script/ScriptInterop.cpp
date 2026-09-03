@@ -65,7 +65,10 @@ static uint32 N_ctrl_mouse_state()
 
 
 static FLOAT4 N_camera_position() { return gWorld->GetCurrentCamera()->Position.mIntrin; }
-static FLOAT4 N_player_position() { return gWorld->Player.Position.mIntrin; }
+static FLOAT4 N_player_position(void*) { return gWorld->Player.Position.mIntrin; }
+
+static void N_player_set_speed_multiplier(void*, float mult) { gWorld->Player.SpeedMultiplier = mult; }
+static void N_player_toggle_headbob(void*, bool value) { gWorld->Player.bEnableHeadBob = value; }
 
 
 /////////////////////////////////////
@@ -89,7 +92,10 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_get_position", N_object_get_position),
 
 	PREDEF("camera_position", N_camera_position),
-	PREDEF("player_position", N_player_position),
+
+	PREDEF("PLAYER_position", N_player_position),
+	PREDEF("PLAYER_set_speed_multiplier", N_player_set_speed_multiplier),
+	PREDEF("PLAYER_toggle_headbob", N_player_toggle_headbob),
 };
 
 Slice<const PredefExtern> GetInteropPredefs() { return Slice(scAvailableExterns, std::size(scAvailableExterns)); }
