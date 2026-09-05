@@ -84,6 +84,8 @@ void MaterialManager::MakeNullMaterial()
 
 	material->ID = MaterialID(0);
 	material->Name = "NullMaterial";
+	material->Properties = MaterialProperties {};
+	material->mbRequiresSync = true;
 	material->SetSupportsSkinning(false);
 
 	SizedArray<uint8> diffuse_data = {
@@ -137,6 +139,18 @@ Material* MaterialManager::GetNewMaterial()
 	// Ensure that the null material does not get overwritten
 	Assert(material_index != 0);
 	material->ID = MaterialID(material_index);
+	// FreeArray may not call Material ctor, ensure defaults and mark for GPU sync
+	material->Properties = MaterialProperties {};
+	material->bIsBuilt.store(false);
+	material->bReadyToCheck.clear();
+	material->bSupportsSkinning = false;
+	material->bNearestFiltering = false;
+	material->QualityLevel = 3;
+	material->mpDescriptorSet = nullptr;
+	material->mpAlbedoOnlyDescriptorSet = nullptr;
+	material->mbIsReady = false;
+	material->mbIsBeingBuilt = false;
+	material->mbRequiresSync = true;
 
 	return material;
 }

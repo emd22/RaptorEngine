@@ -335,6 +335,24 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
+		{
+			BlendAttachment blend = BlendAttachment {
+				.Enabled = true,
+				.BlendOp = {
+					.Ops = {
+						.Alpha = VK_BLEND_OP_ADD,
+						.Color = VK_BLEND_OP_ADD,
+					},
+				},
+				.AlphaBlend { .Ops {
+					.Src = VK_BLEND_FACTOR_ONE,
+					.Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+				} },
+				.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+			};
+			gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+		}
+
 		// Set 0 (Global / Per Frame)
 
 		// bObjectBuffer
@@ -391,6 +409,24 @@ void TiledForwardRenderer::CreateForwardPSO()
 													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
+		{
+			BlendAttachment blend = BlendAttachment {
+				.Enabled = true,
+				.BlendOp = {
+					.Ops = {
+						.Alpha = VK_BLEND_OP_ADD,
+						.Color = VK_BLEND_OP_ADD,
+					},
+				},
+				.AlphaBlend { .Ops {
+					.Src = VK_BLEND_FACTOR_ONE,
+					.Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+				} },
+				.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+			};
+			gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+		}
+
 		// Set 0 (Global / Per Frame)
 
 		// bObjectBuffer
@@ -438,6 +474,126 @@ void TiledForwardRenderer::CreateForwardPSO()
 
 
 		pGeometryPipelineName = ePipelineName::Geometry;
+	}
+
+
+	// Transparent pipelines
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::GeometryTransparent);
+
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetShader(eShaderName::Forward, {});
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+		gPSOBuild->SetDepthWrite(false);
+
+		BlendAttachment blend = BlendAttachment {
+			.Enabled = true,
+			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
+			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+		};
+		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
+		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
+									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Nearest,
+															   .MagFilter = eSamplerFilter::Nearest,
+															   .MipFilter = eSamplerFilter::Nearest }));
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+
+		gPSOBuild->EndPipeline();
+	}
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::GeometryNormalMapsTransparent);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
+		gPSOBuild->SetVertexType(eVertexType::Default);
+		gPSOBuild->SetCullMode(eCullMode::Back);
+		gPSOBuild->SetDepthWrite(false);
+		BlendAttachment blend = BlendAttachment {
+			.Enabled = true,
+			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
+			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+		};
+		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
+		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
+									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Nearest,
+															   .MagFilter = eSamplerFilter::Nearest,
+															   .MipFilter = eSamplerFilter::Nearest }));
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+		gPSOBuild->EndPipeline();
+	}
+	{
+		gPSOBuild->BeginPipeline(ePipelineName::GeometrySkinnedTransparent);
+		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
+		gPSOBuild->UseRenderStage(ForwardPass);
+		gPSOBuild->SetVertexType(eVertexType::Skinned);
+		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
+													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
+		gPSOBuild->SetCullMode(eCullMode::Back);
+		gPSOBuild->SetDepthWrite(false);
+		BlendAttachment blend = BlendAttachment {
+			.Enabled = true,
+			.BlendOp = { .Ops = { .Alpha = VK_BLEND_OP_ADD, .Color = VK_BLEND_OP_ADD } },
+			.AlphaBlend { .Ops { .Src = VK_BLEND_FACTOR_ONE, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
+		};
+		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
+		gPSOBuild->AddBuffer(0, 0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
+							 gObjectManager->GetPageSize());
+		gPSOBuild->AddBuffer(1, 0, eShaderType::Pixel, &gMaterialManager->MaterialPropertiesBuffer, 0,
+							 gMaterialManager->MaterialPropertiesBuffer.Size);
+		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
+		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
+							 gGraphics->LightIndexListPageSize);
+		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
+									  gSamplerCache->Request({ .MinFilter = eSamplerFilter::Nearest,
+															   .MagFilter = eSamplerFilter::Nearest,
+															   .MipFilter = eSamplerFilter::Nearest }));
+		gPSOBuild->AddImage(0, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(1, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddImage(2, 1, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::RGBA8_UNorm),
+							gSamplerCache->Request({}));
+		gPSOBuild->AddBuffer(3, 1, eShaderType::Vertex, &gGraphics->BoneBuffer.GetGpuBuffer(), 0,
+							 gGraphics->BoneBuffer.PageSize);
+		gPSOBuild->AddBuffer(4, 1, eShaderType::Pixel, &gGraphics->LightBuffer.GetGpuBuffer(), 0,
+							 gGraphics->LightBuffer.PageSize);
+		gPSOBuild->EndPipeline();
 	}
 }
 

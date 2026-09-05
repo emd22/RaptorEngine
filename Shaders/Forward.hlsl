@@ -186,10 +186,20 @@ FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    float3 albedo = F_Sample(tAlbedo, input.vUV).rgb;
-    output.vAlbedo = float4(albedo, 1.0);
+    float4 albedoSample = F_Sample(tAlbedo, input.vUV);
+    float3 albedo = albedoSample.rgb;
+    float texAlpha = albedoSample.a;
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
+    float baseAlpha = saturate(texAlpha * material.fAlpha);
+
+    // Early discard for fully transparent texels (leaves, cutouts)
+    // Keep threshold low so 0.5 material opacity still blends
+    if (baseAlpha < 0.01) {
+        discard;
+    }
+
+    output.vAlbedo = float4(albedo, baseAlpha);
 
     if (HAS_FLAG(material.Flags, MF_UNLIT)) {
 	    return output;
@@ -206,16 +216,12 @@ FSOutput main(FSInput input)
 	const float roughness = ROUGHNESS;
 	const float metallic = METALLIC;
 
-    // XYZ=Normal, W=Roughness
     float3 N_final = normalize(normal_ws);
-    // Metalness
-    output.vAlbedo.a = 1.0;
 #else
 	const float roughness = 0.5;
 	const float metallic = 0.5;
 
     float3 N_final = input.vNormalWS;
-    output.vAlbedo.a = 1.0;
 #endif
 
 	float4 accumulated_light = float4(0.0, 0.0, 0.0, 0.0);
@@ -300,12 +306,12 @@ FSOutput main(FSInput input)
 		float3 diffuse_term = Fd * diffuse_reflectance * FX_MATH_1_OVER_PI;
 		float3 specular_term = Fr;
 
-		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, material.fAlpha);
+		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, 0.0);
 	}
 
 	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f) * (ssao);
 
-	output.vAlbedo = accumulated_light + float4(ambient.rgb, 1.0);
+	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, baseAlpha);
 
     return output;
 }

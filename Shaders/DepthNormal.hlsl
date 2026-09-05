@@ -151,6 +151,15 @@ FSOutput main(FSInput input)
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
 
+    {
+        float tex_alpha = F_Sample(tAlbedo, input.vUV).a;
+        float final_alpha = tex_alpha * material.fAlpha;
+
+        if (final_alpha < 0.01) {
+            discard;
+        }
+    }
+
     // Ignore normals for unlit objects
     if (HAS_FLAG(material.Flags, MF_UNLIT)) {
         return output;
