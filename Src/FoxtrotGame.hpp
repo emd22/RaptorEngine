@@ -99,7 +99,7 @@ public:
 	Vec3f PistolOffset = Vec3f::sZero;
 	Vec3f ArmsOffset = Vec3f::sZero;
 
-	EditorMode* SelectedEditorMode = nullptr;
+	EditorMode* pSelectedEditorMode = nullptr;
 	eEditorMode EditorModeType = eEditorMode::Simulate;
 	SizedArray<EditorMode*> EditorModes;
 
@@ -113,10 +113,6 @@ private:
 	MaterialID mBlockoutMaterial = MaterialID::scNull;
 
 	ConfigFile Config;
-
-	Blockout mBlockout;
-
-	String mBlockoutPath;
 };
 
 } // namespace fx

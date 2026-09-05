@@ -31,11 +31,13 @@ public:
 	EditorMode() = default;
 
 	void Create(const String& name, const String& script_path);
-	bool SelectObject(Object* object) const;
+	bool SelectObject(Object* object);
 	void Update(const Vec3f& movement_vector) const;
 	void ReloadHotFunctions();
+
 	void Load();
 	void Unload();
+	float GetQuantizeFraction() const;
 
 	~EditorMode() = default;
 
@@ -45,6 +47,9 @@ public:
 	String ModeName;
 
 	UpdateFnDef pUpdateFunction = nullptr;
+
+	MaterialID mSelectedObjectPreviousMaterial = MaterialID::scNull;
+	Object* mpLastSelectedObject = nullptr;
 
 	script::Script* pScript = nullptr;
 };

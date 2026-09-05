@@ -40,6 +40,8 @@ public:
 	PagedArray<BlockoutBox> BlockoutObjects;
 	World* pWorld = nullptr;
 
+	MaterialID SelectionMaterialID = MaterialID::scNull;
+
 private:
 	MaterialID mWhiteMaterialID = MaterialID::scNull;
 	MaterialID mOrangeMaterialID = MaterialID::scNull;

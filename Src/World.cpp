@@ -1,5 +1,6 @@
 #include "World.hpp"
 
+#include <Blockout.hpp>
 #include <Engine.hpp>
 #include <Material/Material.hpp>
 #include <Material/MaterialManager.hpp>
@@ -497,7 +498,7 @@ void World::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
 
-	RenderPhysicsObjects(camera);
+	// RenderPhysicsObjects(camera);
 }
 
 
@@ -619,6 +620,11 @@ void World::Destroy()
 {
 	mObjects.Destroy();
 	mLights.Destroy();
+
+	if (pBlockout != nullptr) {
+		delete pBlockout;
+		pBlockout = nullptr;
+	}
 
 	// mPhysicsObjects.Destroy();
 }

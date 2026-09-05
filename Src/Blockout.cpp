@@ -45,6 +45,19 @@ void Blockout::Create(World* world)
 
 		test_material->Finalize();
 	}
+
+	// Blue material
+	{
+		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoBlue", renderer::ePipelineName::Geometry, false);
+		Material* test_material = gMaterialManager->GetMaterial(SelectionMaterialID);
+
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "Data/Demo/Textures/aqua_check.png", eImageCreateFlags::None);
+
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+
+		test_material->Finalize();
+	}
 }
 
 static void RemoveBlockoutFromWorld(World* world)

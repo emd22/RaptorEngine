@@ -14,12 +14,14 @@
 namespace fx {
 
 class Player;
+class Blockout;
 
 struct SceneDistanceBand
 {
 	float32 Distance = 0.0f;
 	PagedArray<ObjectID> Objects;
 };
+
 
 class World
 {
@@ -83,6 +85,9 @@ public:
 	renderer::RenderList mRenderList;
 
 	Player Player;
+
+	Blockout* pBlockout = nullptr;
+	String BlockoutPath;
 
 private:
 	PagedArray<ObjectID> mObjects;

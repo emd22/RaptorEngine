@@ -80,6 +80,10 @@ void mode_common_adjust_quant_amount(bool smaller)
 	}
 }
 
+float mode_common_get_quantize_fraction()
+{
+	return quantize_amount;
+}
 
 void mode_common_load()
 {

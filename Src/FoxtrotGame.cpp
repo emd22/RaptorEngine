@@ -104,12 +104,13 @@ void FoxtrotGame::InitEngine()
 
 	sClockFreq = static_cast<double>(SDL_GetPerformanceFrequency());
 
-	mBlockout.Create(gWorld);
+	gWorld->pBlockout = new Blockout;
+	gWorld->pBlockout->Create(gWorld);
 
 	ConfigEntry* blockout_entry = Config.GetEntry(HashStr32("blockout"));
 	if (blockout_entry) {
-		mBlockoutPath = String(blockout_entry->Get<const char*>());
-		mBlockout.Load(mBlockoutPath);
+		gWorld->BlockoutPath = String(blockout_entry->Get<const char*>());
+		gWorld->pBlockout->Load(gWorld->BlockoutPath);
 	}
 
 	// script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.strata");
@@ -292,8 +293,8 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 
 void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 {
-	if (SelectedEditorMode != nullptr) {
-		SelectedEditorMode->Unload();
+	if (pSelectedEditorMode != nullptr) {
+		pSelectedEditorMode->Unload();
 	}
 
 
@@ -308,11 +309,11 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 	}
 
 	if (EditorModeType != eEditorMode::Simulate) {
-		SelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
-		SelectedEditorMode->Load();
+		pSelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
+		pSelectedEditorMode->Load();
 	}
 	else {
-		SelectedEditorMode = nullptr;
+		pSelectedEditorMode = nullptr;
 	}
 }
 
@@ -362,7 +363,7 @@ void FoxtrotGame::ProcessControls()
 
 		bool did_hit = false;
 
-		if (SelectedEditorMode != nullptr) {
+		if (pSelectedEditorMode != nullptr) {
 			for (int i = 0; i < hits.Size; i++) {
 				JPH::BodyID body_id = hits[i];
 
@@ -372,14 +373,14 @@ void FoxtrotGame::ProcessControls()
 					continue;
 				}
 
-				did_hit = SelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
+				did_hit = pSelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
 				if (did_hit) {
 					break;
 				}
 			}
 
 			if (did_hit == false) {
-				SelectedEditorMode->SelectObject(nullptr);
+				pSelectedEditorMode->SelectObject(nullptr);
 			}
 		}
 	}
@@ -438,7 +439,7 @@ void FoxtrotGame::ProcessControls()
 
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_R)) {
 		LogInfo("Reloading blockout...");
-		mBlockout.Load(mBlockoutPath);
+		gWorld->pBlockout->Load(gWorld->BlockoutPath);
 	}
 
 
@@ -482,9 +483,14 @@ void FoxtrotGame::RenderText()
 	static const uint32 scTextColor = Color::FromRGBA(255, 0, 0, 255).AsUInt();
 
 	gTextRenderer->DrawText(
-		String::Fmt("EditorMode {}", SelectedEditorMode ? SelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f,
+		String::Fmt("EditorMode {}", pSelectedEditorMode ? pSelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f,
 		scTextColor);
 	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scTextColor);
+
+	if (pSelectedEditorMode != nullptr) {
+		gTextRenderer->DrawText(String::Fmt("Q={}", pSelectedEditorMode->GetQuantizeFraction()).CStr(), 2.0,
+								scTextColor);
+	}
 }
 
 
@@ -518,7 +524,7 @@ void FoxtrotGame::Tick()
 		Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
 		Vec3f rawMovement = GetMovementVector();
 		Vec3f movement = forward * rawMovement.Z + right * rawMovement.X + Vec3f(0, rawMovement.Y, 0);
-		SelectedEditorMode->Update(movement);
+		pSelectedEditorMode->Update(movement);
 	}
 
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;

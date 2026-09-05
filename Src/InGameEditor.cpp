@@ -1,5 +1,6 @@
 #include "InGameEditor.hpp"
 
+#include <Blockout.hpp>
 #include <Engine.hpp>
 #include <Script/ScriptManager.hpp>
 
@@ -24,7 +25,7 @@ void EditorMode::Update(const Vec3f& movement_vector) const
 	}
 }
 
-bool EditorMode::SelectObject(Object* object) const
+bool EditorMode::SelectObject(Object* object)
 {
 	if (pScript == nullptr) {
 		return false;
@@ -33,6 +34,11 @@ bool EditorMode::SelectObject(Object* object) const
 	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool)>("mode_select_object");
 
 	if (object == nullptr) {
+		if (mpLastSelectedObject != nullptr) {
+			mpLastSelectedObject->mMaterialID = mSelectedObjectPreviousMaterial;
+			mpLastSelectedObject = nullptr;
+		}
+
 		if (mode_select_object) {
 			mode_select_object(nullptr, false);
 			return true;
@@ -44,6 +50,16 @@ bool EditorMode::SelectObject(Object* object) const
 	if (object->HasTags(eObjectTag::LockTransform)) {
 		return false;
 	}
+
+	if (mpLastSelectedObject != nullptr) {
+		mpLastSelectedObject->mMaterialID = mSelectedObjectPreviousMaterial;
+		mpLastSelectedObject = nullptr;
+	}
+
+	mpLastSelectedObject = object;
+	mSelectedObjectPreviousMaterial = object->mMaterialID;
+
+	object->mMaterialID = gWorld->pBlockout->SelectionMaterialID;
 
 	if (mode_select_object) {
 		mode_select_object(reinterpret_cast<void*>(object), true);
@@ -69,6 +85,21 @@ void EditorMode::Unload()
 	if (mode_unload) {
 		mode_unload();
 	}
+
+	if (mpLastSelectedObject != nullptr) {
+		mpLastSelectedObject->mMaterialID = mSelectedObjectPreviousMaterial;
+		mpLastSelectedObject = nullptr;
+	}
+}
+
+float EditorMode::GetQuantizeFraction() const
+{
+	auto mode_get_quantize = pScript->GetFunction<float (*)()>("mode_common_get_quantize_fraction");
+	if (mode_get_quantize) {
+		return mode_get_quantize();
+	}
+
+	return 0.0f;
 }
 
 
