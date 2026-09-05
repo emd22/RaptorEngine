@@ -3,6 +3,7 @@ all = {
 	$ = {
 		pos = [0.0, -1.0,  0.0]
 		scale = [25.0, 27.0, 0.1, 0.1, 20.0, 23.0]
+		lock = $True
 	}
 
 
@@ -11,7 +12,6 @@ all = {
 		pos = [14.0, -1.0,  -10.0]
 		scale = [12.0, 5.0, 12.0, 2.0, 4.0, 4.0]
 
-		mat = $CProtoMat.Orange
 	}
 
 	// cliffside building
@@ -19,44 +19,38 @@ all = {
 		pos = [-3.0, -1.0,  -20.0]
 		scale = [12.0, 5.0, 12.0, 2.0, 4.0, 4.0]
 
-		mat = $CProtoMat.Orange
 	}
 
 	// corner building
 	$ = {
 		pos = [12.0, -1.0,  8.0]
 		scale = [4.0, 7.0, 12.0, 2.0, 8.0, 4.0]
-		mat = $CProtoMat.Orange
 	}
 	$ = { 	// corner smoothing + continued building
 		pos = [8.4, -1.0,  8.56]
 		scale = [2.0, 2.0, 12.0, 2.0, 2.0, 4.0]
 		rot = [0.0, 0.7, 0.0]
-		mat = $CProtoMat.Orange
 	}
 	$ = { 	// right extend
 		pos = [5.15, -1.0,  8.0]
 		scale = [0.2, 2.8, 12.0, 2.0, 8.0, 1.45]
-		mat = $CProtoMat.Orange
 	}
 
 	// block building
 	$ = {
 		pos = [-15.0, -1.0,  8.0]
 		scale = [8.0, 4.0, 10.0, 2.0, 4.0, 15.0]
-		mat = $CProtoMat.Orange
+
 	}
 
 	$ = {
 		pos = [-11.0, -1.0,  10.0]
 		scale = [1.0, 1.0, 10.0, 2.0, 2.0, 1.0]
-		mat = $CProtoMat.Orange
 	}
 
 	$ = {
 		pos = [-11.0, -1.0,  -6.0]
 		scale = [1.0, 1.0, 10.0, 2.0, 2.0, 1.0]
-		mat = $CProtoMat.Orange
 	}
 
 
@@ -65,17 +59,14 @@ all = {
 	$ = {
 		pos = [-3.0, -0.25,  1.0]
 		scale = [3.0, 3.0, 0.1, 2.0, 3.0, 3.0]
-		mat = $CProtoMat.Orange
 	}
 	$ = {  	// fountain top
 		pos = [-3.0, 0.0,  1.0]
 		scale = [0.6, 0.6, 4.5, 2.0, 0.6, 0.6]
-		mat = $CProtoMat.Orange
 	}
 	$ = {  	// fountain top
 		pos = [-3.0, 4.5,  1.0]
 		scale = [1.0, 1.0, 0.1, 0.4, 1.0, 1.0]
-		mat = $CProtoMat.Orange
 	}
 
 
@@ -83,11 +74,6 @@ all = {
 	$ = {
 		pos = [0.0, -0.5,  19.0]
 		scale = [25.0, 28.0, 2.0, 1.0, 0.1, 0.1]
+		lock = $True
 	}
-
-
-
-
-
-
 }

@@ -28,6 +28,8 @@ enum class eObjectTag : uint32
 {
 	None = 0,
 	Blockout = (1 << 0),
+	/// Locks rotation and transformation for scripts
+	LockTransform = (1 << 1),
 };
 
 FxEnumFlags(eObjectTag);

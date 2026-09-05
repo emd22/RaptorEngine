@@ -144,6 +144,14 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	object->SetShadowCaster(true);
 	Vec3f midpoint = GetCubeMidpointOffset(cgo);
 
+	bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
+	if (is_locked) {
+		object->SetTag(eObjectTag::LockTransform);
+	}
+	else {
+		object->mMaterialID = mOrangeMaterialID;
+	}
+
 	Quat rotation = Quat::FromEulerAngles(entry.GetMemberValue<Vec3f>(HashStr32("rot"), Vec3f::sZero));
 	object->SetRotation(rotation);
 

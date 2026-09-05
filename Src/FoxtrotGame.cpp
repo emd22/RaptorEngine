@@ -358,21 +358,29 @@ void FoxtrotGame::ProcessControls()
 		Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
 
 		SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position,
-																		  cam->GetForwardVector() * 10.0f);
+																		  cam->GetForwardVector() * 4.0f);
 
-		LogInfo("RAYCASTED {} objects", hits.Size);
-		if (hits.Size > 0 && SelectedEditorMode != nullptr) {
-			JPH::BodyID body_id = hits[0];
+		bool did_hit = false;
 
-			physics::Body* body = gPhysics->FindBody(body_id);
+		if (SelectedEditorMode != nullptr) {
+			for (int i = 0; i < hits.Size; i++) {
+				JPH::BodyID body_id = hits[i];
 
-			if (body != nullptr) {
-				SelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
+				physics::Body* body = gPhysics->FindBody(body_id);
+
+				if (body == nullptr) {
+					continue;
+				}
+
+				did_hit = SelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
+				if (did_hit) {
+					break;
+				}
 			}
-			// Object* hit_marker = gObjectManager->GetObject(mRaycastHitMarker);
-			// if (hit_marker) {
-			// hit_marker->SetPosition(hit_point.Point);
-			// }
+
+			if (did_hit == false) {
+				SelectedEditorMode->SelectObject(nullptr);
+			}
 		}
 	}
 

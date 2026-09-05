@@ -24,16 +24,33 @@ void EditorMode::Update(const Vec3f& movement_vector) const
 	}
 }
 
-void EditorMode::SelectObject(Object* object) const
+bool EditorMode::SelectObject(Object* object) const
 {
 	if (pScript == nullptr) {
-		return;
+		return false;
 	}
 
-	auto mode_select_object = pScript->GetFunction<void (*)(void*)>("mode_select_object");
-	if (mode_select_object) {
-		mode_select_object(reinterpret_cast<void*>(object));
+	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool)>("mode_select_object");
+
+	if (object == nullptr) {
+		if (mode_select_object) {
+			mode_select_object(nullptr, false);
+			return true;
+		}
+
+		return false;
 	}
+
+	if (object->HasTags(eObjectTag::LockTransform)) {
+		return false;
+	}
+
+	if (mode_select_object) {
+		mode_select_object(reinterpret_cast<void*>(object), true);
+		return true;
+	}
+
+	return false;
 }
 
 void EditorMode::Load()

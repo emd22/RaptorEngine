@@ -31,7 +31,7 @@ public:
 	EditorMode() = default;
 
 	void Create(const String& name, const String& script_path);
-	void SelectObject(Object* object) const;
+	bool SelectObject(Object* object) const;
 	void Update(const Vec3f& movement_vector) const;
 	void ReloadHotFunctions();
 	void Load();
