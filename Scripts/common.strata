@@ -9,8 +9,16 @@ extern int printf(string fmt, ...);
 	Math Util
  */
 
+/* Returns 1.0 if `value` is positive, returns -1.0 if negative. */
+extern float float_sign(float value);
 
-extern float3 float3_round(float3 value);
+extern float4 float4_round(float4 value);
+
+float3 float3_round(float3 value)
+{
+	float4 result = float4_round(float4(value, 0.0f));
+	return result.xyz;
+}
 
 /*
 	Object

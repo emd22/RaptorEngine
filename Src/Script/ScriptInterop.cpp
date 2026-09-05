@@ -81,13 +81,14 @@ static void N_player_toggle_headbob(void*, bool value) { gWorld->Player.bEnableH
 static bool N_player_get_headbob(void) { return gWorld->Player.bEnableHeadBob; }
 
 
-static FLOAT4 N_float3_round(FLOAT4 value) { return simd::Round(value); }
+static FLOAT4 N_float4_round(FLOAT4 value) { return simd::Round(value); }
 
 
 static bool N_is_key_up(uint32 key) { return ControlManager::IsKeyUp(static_cast<eKey>(key)); }
 static bool N_is_key_down(uint32 key) { return ControlManager::IsKeyDown(static_cast<eKey>(key)); }
 static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(static_cast<eKey>(key)); }
 
+static float N_float_sign(float value) { return MathUtil::GetSign(value); }
 
 /////////////////////////////////////
 // Predef gather
@@ -117,7 +118,9 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("PLAYER_toggle_headbob", N_player_toggle_headbob),
 	PREDEF("PLAYER_get_headbob", N_player_get_headbob),
 
-	PREDEF("float3_round", N_float3_round),
+	/* Math Util */
+	PREDEF("float4_round", N_float4_round),
+	PREDEF("float_sign", N_float_sign),
 
 	/* Controls */
 	PREDEF("KEY_is_up", N_is_key_up),

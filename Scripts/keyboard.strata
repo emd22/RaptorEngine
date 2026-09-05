@@ -27,6 +27,9 @@ enum KEY : uint
 	K_Y = 28,
 	K_Z = 29,
 
+    K_MINUS = 45,
+    K_EQUALS = 46,
+
 	/* Left modifier keys */
     K_LCTRL = 100,
     K_LSHIFT = 101,

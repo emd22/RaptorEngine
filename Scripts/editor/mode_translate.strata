@@ -1,14 +1,15 @@
 import ../common;
 import ../keyboard;
 
+import mode_common;
+
+// Globals
+
 OBJECT selected_object;
 float3 camera_dist;
 bool camera_dist_added = false;
-bool enable_snap = true;
 
-bool had_headbob = false;
 bool is_object_selected = false;
-
 
 void mode_load()
 {
@@ -22,34 +23,19 @@ void mode_select_object(OBJECT object, bool selected)
 	selected_object = object;
 }
 
-float3 grid_snap(float3 pos)
-{
-	float3 grid_size = float3(0.25);
-	return (float3_round(pos / grid_size) * grid_size);
-}
-
-
-void revert_speed_damp()
-{
-	player.set_speed_multiplier(1.0f);
-	player.toggle_headbob(true);
-	camera_dist_added = false;
-}
-
 void mode_update(float3 movement_vector)
 {
-	if (KEY.K_U.is_pressed()) {
-		enable_snap = !enable_snap;
-	}
+	mode_common_controls();
 
 	/* Only update if lmouse is pressed and a valid object is selected */
 	if (!is_object_selected || !KEY.K_MOUSE_LEFT.is_down()) {
-		revert_speed_damp();
+		mode_common_disable_damp();
+		camera_dist_added = false;
+
 		return;
 	}
 
-	player.set_speed_multiplier(0.5f);
-	player.toggle_headbob(false);
+	mode_common_enable_damp();
 
 	if (camera_dist_added == false) {
 		camera_dist = selected_object.position - player.position;
@@ -57,10 +43,8 @@ void mode_update(float3 movement_vector)
 	}
 
 	float3 new_position = player.position + camera_dist;
+	new_position = mode_common_quantize3(new_position);
 
-	if (enable_snap) {
-		new_position = grid_snap(new_position);
-	}
 
 	selected_object.move_to(new_position);
 }
@@ -68,5 +52,5 @@ void mode_update(float3 movement_vector)
 
 void mode_unload()
 {
-	revert_speed_damp();
+	mode_common_unload();
 }

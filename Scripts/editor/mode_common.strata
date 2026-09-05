@@ -1,0 +1,109 @@
+import ../common;
+import ../keyboard;
+
+bool had_headbob = false;
+bool enable_quantize = true;
+
+float quantize_amount = 0.25f;
+
+
+float3 mode_common_quantize3(float3 v3)
+{
+	if (!enable_quantize) {
+		return v3;
+	}
+
+	float3 grid_size = float3(quantize_amount);
+	return (float3_round(v3 / grid_size) * grid_size);
+}
+
+
+float4 mode_common_quantize4(float4 v4)
+{
+	if (!enable_quantize) {
+		return v4;
+	}
+
+	float4 grid_size = float4(quantize_amount);
+	return (float4_round(v4 / grid_size) * grid_size);
+}
+
+
+////////////////////////////////////////
+// Mode common functions
+////////////////////////////////////////
+
+
+
+void mode_common_enable_damp()
+{
+	player.set_speed_multiplier(0.5f);
+	player.toggle_headbob(false);
+}
+
+void mode_common_disable_damp()
+{
+	player.set_speed_multiplier(1.0f);
+	player.toggle_headbob(true);
+}
+
+
+void mode_common_adjust_quant_amount(bool smaller)
+{
+	const float level0 = 0.05f;
+	const float level1 = 0.10f;
+	const float level2 = 0.25f;
+	const float level3 = 0.50f;
+
+	if (quantize_amount > level0 && smaller) {
+		if (quantize_amount == level1) {
+			quantize_amount = level0;
+		}
+		else if (quantize_amount == level2) {
+			quantize_amount = level1;
+		}
+		else if (quantize_amount == level3) {
+			quantize_amount = level2;
+		}
+	}
+
+	if (quantize_amount < level3 && smaller == false) {
+		if (quantize_amount == level0) {
+			quantize_amount = level1;
+		}
+		else if (quantize_amount == level1) {
+			quantize_amount = level2;
+		}
+		else if (quantize_amount == level2) {
+			quantize_amount = level3;
+		}
+	}
+}
+
+
+void mode_common_load()
+{
+	had_headbob = player.get_headbob();
+}
+
+void mode_common_controls()
+{
+	if (KEY.K_U.is_pressed()) {
+		enable_quantize = !enable_quantize;
+	}
+
+	if (KEY.K_MINUS.is_pressed()) {
+		mode_common_adjust_quant_amount(true);
+	}
+
+	if (KEY.K_EQUALS.is_pressed()) {
+		mode_common_adjust_quant_amount(false);
+	}
+}
+
+
+void mode_common_unload()
+{
+	/* Disable damping regardless of if it was enabled */
+	mode_common_disable_damp();
+}
