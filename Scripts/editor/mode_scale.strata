@@ -8,7 +8,14 @@ import mode_common;
 
 OBJECT selected_object;
 float3 camera_dist;
-bool camera_dist_added = false;
+bool was_in_drag_event = false;
+
+float3 selected_face;
+float selected_face_scale = 0.0f;
+
+float3 initial_position;
+
+float3 magnitude;
 
 bool is_object_selected = false;
 
@@ -28,34 +35,46 @@ void mode_update(float3 movement_vector)
 {
 	mode_common_controls();
 
-	/* Only update if lmouse is pressed and a valid object is selected */
-	if (!is_object_selected || !KEY.K_MOUSE_LEFT.is_down()) {
-		mode_common_disable_damp();
-		camera_dist_added = false;
+	bool is_dragging = KEY.K_MOUSE_LEFT.is_down();
 
+	/* Currently was dragging, but just released. */
+	if (was_in_drag_event && !is_dragging) {
+		blockout_object_scale(selected_object, selected_face, magnitude);
+
+		if (is_object_selected) {
+			// blockout_reload_object(selected_object);
+		}
+	}
+
+	/* Only update if lmouse is pressed and a valid object is selected */
+	if (!is_object_selected || !is_dragging) {
+		mode_common_disable_damp();
+		was_in_drag_event = false;
 		return;
 	}
 
+
 	mode_common_enable_damp();
 
-	if (camera_dist_added == false) {
+	/* This is the initial on press, we were not previously in a drag event. */
+	if (was_in_drag_event == false) {
+		initial_position = player.position;
+
 		camera_dist = selected_object.position - player.position;
-		camera_dist_added = true;
+		was_in_drag_event = true;
+
+		selected_face = selected_object.ray_get_face();
+		selected_face_scale = selected_object.direction_scale(selected_face);
 	}
 
 	float3 new_position = player.position + camera_dist;
 	new_position = mode_common_quantize3(new_position);
 
-	float3 selected_face = selected_object.ray_get_face();
-	float face_scale = selected_object.direction_scale(selected_face);
+	float3 np = (new_position + (selected_face * float3(selected_face_scale)));
 
-	float3 np = (new_position + (selected_face * float3(face_scale)));
+	magnitude = (player.position - initial_position) * (selected_face);
 
 	xform_marker_object.move_to(np);
-
-
-
-	// selected_object.move_to(new_position);
 }
 
 

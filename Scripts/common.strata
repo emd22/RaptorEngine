@@ -71,3 +71,9 @@ PLAYER player;
 
 /* Retrieve the currently selected camera's position */
 extern float3 camera_position();
+
+
+/* Reloads an object from a blockout file. */
+extern void blockout_reload_object(OBJECT object);
+
+extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);

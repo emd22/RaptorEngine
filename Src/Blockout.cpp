@@ -54,6 +54,7 @@ void Blockout::Create(World* world)
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
 													   "Data/Demo/Textures/aqua_check.png", eImageCreateFlags::None);
 
+		test_material->SetAlpha(0.5);
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 
 		test_material->Finalize();
@@ -88,23 +89,96 @@ void Blockout::Create(World* world)
 	}
 }
 
-void Blockout::ReloadSingleObject(Object* object) {}
+
+void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec3f& magnitude)
+{
+	if (object == nullptr) {
+		return;
+	}
+
+	const float32 threshold = 0.01f;
+
+	if (face_dir.X > threshold) {
+		object->Bounds.Max.X += magnitude.X;
+	}
+	else if (face_dir.X < threshold) {
+		object->Bounds.Min.X -= magnitude.X;
+	}
+
+	if (face_dir.Y > threshold) {
+		object->Bounds.Max.Y += magnitude.Y;
+	}
+	else if (face_dir.Y < threshold) {
+		object->Bounds.Min.Y -= magnitude.Y;
+	}
+
+	if (face_dir.Z > threshold) {
+		object->Bounds.Max.Z += magnitude.Z;
+	}
+	else if (face_dir.Z < threshold) {
+		object->Bounds.Min.Z -= magnitude.Z;
+	}
+}
+
+void Blockout::ReloadSingleObject(Object* object)
+{
+	if (object == nullptr || !object->HasTags(eObjectTag::Blockout)) {
+		return;
+	}
+
+	ConfigFile info {};
+	info.Load(gWorld->BlockoutPath.CStr());
+
+	if (info.HasErrors()) {
+		return;
+	}
+
+	ConfigEntry* blocks_entry = info.GetEntry(HashStr32("all"));
+
+	ObjectID old_object_id = object->ID;
+	Hash32 object_name_hash = object->Name.GetHash();
+
+	ObjectID new_object_id;
+
+
+	for (ConfigEntry& entry : blocks_entry->Members) {
+		if (entry.Name.GetHash() == object_name_hash) {
+			RemoveSingleObjectFromWorld(object);
+			new_object_id = CreateCubeVolume(entry);
+			break;
+		}
+	}
+
+	// Update the old object id in the BlockoutObjects buffer.
+	if (new_object_id != old_object_id) {
+		for (int i = 0; i < BlockoutObjects.Size(); i++) {
+			if (BlockoutObjects[i] == old_object_id) {
+				BlockoutObjects[i] = new_object_id;
+				break;
+			}
+		}
+	}
+}
+
+void Blockout::RemoveSingleObjectFromWorld(Object* object)
+{
+	if (object == nullptr) {
+		return;
+	}
+
+	gWorld->Detach(object->ID);
+
+	if (!object->PhysicsID.IsNull()) {
+		gPhysics->DestroyBody(object->PhysicsID);
+	}
+
+	gObjectManager->DestroyObject(object->ID);
+}
 
 void Blockout::RemoveBlockoutFromWorld(World* world)
 {
 	for (ObjectID box_id : BlockoutObjects) {
-		Object* object = gObjectManager->GetObject(box_id);
-		if (object == nullptr) {
-			continue;
-		}
-
-		world->Detach(object->ID);
-
-		if (!object->PhysicsID.IsNull()) {
-			gPhysics->DestroyBody(object->PhysicsID);
-		}
-
-		gObjectManager->DestroyObject(object->ID);
+		RemoveSingleObjectFromWorld(gObjectManager->GetObject(box_id));
 	}
 
 	BlockoutObjects.Clear();
@@ -141,13 +215,12 @@ enum class eCProtoMat
 };
 
 
-void Blockout::CreateCubeVolume(ConfigEntry& entry)
+ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 {
 	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
 
 
-	String blockout_id = String::Fmt("{}{}", (entry.Name.Get().starts_with("PROTO_") ? "" : "PROTO_"),
-									 entry.Name.Get());
+	String blockout_id = String::Fmt("{}", entry.Name.Get());
 
 	LogInfo("Adding blockout '{}'", blockout_id);
 
@@ -156,9 +229,8 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	LogInfo("Creating block id {}", blockout_id);
 
 	if (scales.Size() < 6) {
-		return;
+		return ObjectID::scNull;
 	}
-
 
 	CubeGenOptions cgo {
 		.Left = { .Scale = scales[0].Get<float32>() },
@@ -192,7 +264,7 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	object->MoveBy(position);
 	object->mMaterialID = mat_id;
 	object->SetShadowCaster(true);
-	object->Bounds.Min = Vec3f(-cgo.Left.Scale, -cgo.Bottom.Scale, -cgo.Back.Scale);
+	object->Bounds.Min = -Vec3f(cgo.Left.Scale, cgo.Bottom.Scale, cgo.Back.Scale);
 	object->Bounds.Max = Vec3f(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale);
 	Vec3f midpoint = GetCubeMidpointOffset(cgo);
 
@@ -248,6 +320,8 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	pWorld->Attach(ticket);
 
 	BlockoutObjects.Insert(object->ID);
+
+	return object->ID;
 }
 
 
@@ -287,12 +361,12 @@ void Blockout::Save(const String& path)
 			blockout_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
 
 			ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
-			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Min.X));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.X));
 			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Min.Y));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Y));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Y));
 			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Z));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Min.Z));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(-object->Bounds.Min.Z));
 			blockout_entry.AddMember(std::move(scales_array));
 
 			blockout_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));

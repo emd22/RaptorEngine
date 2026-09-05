@@ -1,5 +1,6 @@
 #include "ScriptInterop.hpp"
 
+#include <Blockout.hpp>
 #include <Controls.hpp>
 #include <Engine.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -134,6 +135,12 @@ static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(s
 
 static float N_float_sign(float value) { return MathUtil::GetSign(value); }
 
+static void N_blockout_reload_object(Object* object) { gWorld->pBlockout->ReloadSingleObject(object); }
+
+static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magnitude)
+{
+	gWorld->pBlockout->ScaleInDirection(object, Vec3f(face_dir), Vec3f(magnitude));
+}
 
 /////////////////////////////////////
 // Predef gather
@@ -157,6 +164,9 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
 	PREDEF("OBJECT_direction_scale", N_object_direction_scale),
+
+	PREDEF("blockout_reload_object", N_blockout_reload_object),
+	PREDEF("blockout_object_scale", N_blockout_object_scale),
 
 	PREDEF("camera_position", N_camera_position),
 

@@ -154,7 +154,7 @@ void RenderStage::MakeClearValues()
 			ClearValues.Insert(VkClearValue { .depthStencil = { 0.0f, 0U } });
 		}
 		else if (attachment.Aspect == eImageAspectFlag::Color) {
-			ClearValues.Insert(VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 0.0f } } });
+			ClearValues.Insert(VkClearValue { .color = { { 0.0f, 0.0f, 0.0f, 1.0f } } });
 		}
 	}
 }

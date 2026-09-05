@@ -30,14 +30,16 @@ public:
 	void Load(const String& path);
 	void Save(const String& path);
 
+	void ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec3f& magnitude);
 	void ReloadSingleObject(Object* object);
 
 	~Blockout();
 
 private:
-	void CreateCubeVolume(ConfigEntry& entry);
+	ObjectID CreateCubeVolume(ConfigEntry& entry);
 
 	void RemoveBlockoutFromWorld(World* world);
+	void RemoveSingleObjectFromWorld(Object* object);
 
 public:
 	PagedArray<ObjectID> BlockoutObjects;

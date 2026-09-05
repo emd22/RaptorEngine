@@ -28,12 +28,14 @@ void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimen
 
 	JPH::RVec3 jolt_dimensions;
 
+	// No negatives or zeros allowed here, bucko
 	Dimensions = dimensions;
+
 
 	// Jolt uses half dimensions (i.e. radius vs diameter) so we need to give it half of our shizzle
 	(Dimensions * 0.5).ToJoltVec3(jolt_dimensions);
 
-	LogInfo(LC_PHYSICS, "Creating primitive collider with dimensions {}", dimensions);
+	LogInfo(LC_PHYSICS, "Creating primitive collider with dimensions {}", Dimensions);
 
 	switch (primitive_type) {
 	case ePrimitiveType::None:
