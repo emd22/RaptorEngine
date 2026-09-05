@@ -25,10 +25,6 @@ void World::Create()
 
 static void AddObjectToRenderList(Object* object, World* scene)
 {
-	if (object->pScene == nullptr) {
-		object->pScene = scene;
-	}
-
 	if (object->pMesh.IsValid()) {
 		// const bool is_unlit = object->IsUnlit();
 
@@ -38,10 +34,9 @@ static void AddObjectToRenderList(Object* object, World* scene)
 		LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
 				PipelineNameUtil::GetName(pipeline_name));
 
-		AssertMsg(object->pScene, "Scene has not been initialized on object!");
 
 		if (object->IsShadowCaster()) {
-			object->pScene->mRenderList.Add(ePipelineName::ShadowDirectional, object->ID);
+			gWorld->mRenderList.Add(ePipelineName::ShadowDirectional, object->ID);
 		}
 
 		// if (is_unlit) {
@@ -50,7 +45,7 @@ static void AddObjectToRenderList(Object* object, World* scene)
 		// 	material->SetPipeline(pipeline_name);
 		// }
 
-		object->pScene->mRenderList.Add(pipeline_name, object->ID);
+		gWorld->mRenderList.Add(pipeline_name, object->ID);
 	}
 
 	if (!object->AttachedNodes.IsEmpty()) {
@@ -95,7 +90,6 @@ void World::Attach(AssetTicket object_ticket)
 
 	mObjects.Insert(object->ID);
 
-	object->pScene = this;
 	object->OnAttached(this);
 
 	object_ticket.OnLoaded(

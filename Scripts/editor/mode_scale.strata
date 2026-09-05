@@ -1,0 +1,59 @@
+import ../common;
+import ../keyboard;
+
+import mode_common;
+
+
+// Globals
+
+OBJECT selected_object;
+float3 camera_dist;
+bool camera_dist_added = false;
+
+bool is_object_selected = false;
+
+void mode_load()
+{
+	camera_dist = float3(0.0f);
+
+}
+
+void mode_select_object(OBJECT object, bool selected)
+{
+	is_object_selected = selected;
+	selected_object = object;
+}
+
+void mode_update(float3 movement_vector)
+{
+	mode_common_controls();
+
+	/* Only update if lmouse is pressed and a valid object is selected */
+	if (!is_object_selected || !KEY.K_MOUSE_LEFT.is_down()) {
+		mode_common_disable_damp();
+		camera_dist_added = false;
+
+		return;
+	}
+
+	mode_common_enable_damp();
+
+	if (camera_dist_added == false) {
+		camera_dist = selected_object.position - player.position;
+		camera_dist_added = true;
+	}
+
+	float3 new_position = player.position + camera_dist;
+	new_position = mode_common_quantize3(new_position);
+
+	float3 selected_face = selected_object.ray_get_face();
+
+
+	// selected_object.move_to(new_position);
+}
+
+
+void mode_unload()
+{
+	mode_common_unload();
+}

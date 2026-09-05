@@ -182,6 +182,8 @@ public:
 	RayResult Raycast(const Vec3f& origin, const Vec3f& direction) const;
 	SizedArray<JPH::BodyID> RaycastObjects(const Vec3f& origin, const Vec3f& direction) const;
 
+	FLOAT4 RaycastGetFaceOfBox(JPH::Body* body, const Vec3f& origin, const Vec3f& direction) const;
+
 	FX_FORCE_INLINE JPH::BodyInterface& GetBodyInterface() { return PhysicsSystem.GetBodyInterface(); }
 
 	~JoltPhysicsBackend();

@@ -145,7 +145,6 @@ void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 
 	Object* object = static_cast<Object*>(ticket.Get());
 
-	object->pScene = &scene;
 	ApplyPropertiesToObject(object, object_entry);
 
 	scene.Attach(ticket);

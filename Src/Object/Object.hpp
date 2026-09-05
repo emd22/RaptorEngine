@@ -191,7 +191,6 @@ public:
 	Animation* pCurrentAnimation = nullptr;
 	float32 AnimationTime = 0.0f;
 
-	World* pScene = nullptr;
 	ObjectID ParentID = ObjectID::scNull;
 	PagedArray<ObjectID> AttachedNodes;
 

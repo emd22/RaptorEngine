@@ -5,6 +5,8 @@
 #include <Math/SIMDHelper.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Physics/JoltPhysicsBackend.hpp>
+#include <Physics/PhysicsManager.hpp>
 #include <World.hpp>
 #include <cstdio>
 
@@ -56,6 +58,21 @@ static uint32 N_object_get_tags(Object* obj)
 	}
 
 	return static_cast<uint32>(obj->Tags);
+}
+
+static FLOAT4 N_object_ray_get_face(Object* obj)
+{
+	if (obj == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	physics::Body* body = gPhysics->GetBody(obj->PhysicsID);
+	if (body == nullptr) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return gPhysics->pBackend->RaycastGetFaceOfBox(body->GetBody(), gWorld->Player.pCamera->Position,
+												   gWorld->Player.pCamera->GetForwardVector() * 4.0f);
 }
 
 
@@ -110,6 +127,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_move_by", N_object_move_by),
 	PREDEF("OBJECT_get_position", N_object_get_position),
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
+	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
 
 	PREDEF("camera_position", N_camera_position),
 

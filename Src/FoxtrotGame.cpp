@@ -582,6 +582,11 @@ void FoxtrotGame::AddEditorModes()
 		mode->Create("Translate", "./Scripts/editor/mode_translate.strata");
 		EditorModes.Insert(mode);
 	}
+	{
+		EditorMode* mode = new EditorMode;
+		mode->Create("Scale", "./Scripts/editor/mode_scale.strata");
+		EditorModes.Insert(mode);
+	}
 
 	// EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), nullptr));
 	// EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), nullptr));

@@ -298,7 +298,7 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 
 void Object::Update()
 {
-	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled) && pScene) {
+	if (HasFlag(Flags, eObjectFlags::PhysicsEnabled)) {
 		physics::Body* phys = gPhysics->GetBody(PhysicsID);
 
 		if (mbPhysicsTransformOutOfDate) {
@@ -423,10 +423,6 @@ void Object::SetRotation(const Quat& rotation)
 
 void Object::SetPhysicsEnabled(bool enabled)
 {
-	if (!pScene) {
-		return;
-	}
-
 	physics::Body* phys = gPhysics->GetBody(PhysicsID);
 
 	if (!phys->mbHasPhysicsBody) {
@@ -454,7 +450,7 @@ void Object::PrintDebug() const
 
 	physics::Body* phys = nullptr;
 
-	if (pScene && (phys = gPhysics->GetBody(PhysicsID))) {
+	if ((phys = gPhysics->GetBody(PhysicsID))) {
 		bool has_body = phys->mbHasPhysicsBody;
 		LogInfo(LC_CORE, "\tHasPhys?={}, Enabled?={}, Id={}, Type={}", has_body,
 				HasFlag(Flags, eObjectFlags::PhysicsEnabled), phys->GetBodyID().GetIndex(),
@@ -484,11 +480,10 @@ void Object::Destroy()
 	}
 
 	physics::Body* phys = nullptr;
-	if (pScene != nullptr && (phys = gPhysics->GetBody(PhysicsID)) != nullptr) {
+	if ((phys = gPhysics->GetBody(PhysicsID)) != nullptr) {
 		phys->DestroyPhysicsBody();
 	}
 
-	pScene = nullptr;
 
 	if (!AttachedNodes.IsEmpty()) {
 		for (ObjectID& obj_id : AttachedNodes) {

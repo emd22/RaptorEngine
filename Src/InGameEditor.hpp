@@ -11,6 +11,7 @@ namespace fx {
 enum class eEditorMode : int32
 {
 	Translate,
+	Scale,
 	/// The default mode (simulate) must ALWAYS be last, as it does not possess an EditorMode.
 	Simulate,
 };

@@ -21,6 +21,7 @@
 #include <ThirdParty/Jolt/Physics/PhysicsSystem.h>
 #include <ThirdParty/Jolt/RegisterTypes.h>
 
+#include <Math/MathUtil.hpp>
 #include <cstdarg>
 
 namespace fx {
@@ -169,6 +170,35 @@ RayResult JoltPhysicsBackend::Raycast(const Vec3f& origin, const Vec3f& directio
 	}
 
 	return RayResult { false, Vec3f::sZero };
+}
+
+FLOAT4 JoltPhysicsBackend::RaycastGetFaceOfBox(JPH::Body* body, const Vec3f& origin, const Vec3f& direction) const
+{
+	JPH::RayCastResult hit;
+	JPH::RRayCast rc;
+	origin.ToJoltVec3(rc.mOrigin);
+	direction.ToJoltVec3(rc.mDirection);
+
+	if (!PhysicsSystem.GetNarrowPhaseQuery().CastRay(rc, hit)) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	JPH::Vec3 hit_position = rc.GetPointOnRay(hit.mFraction);
+	JPH::Vec3 world_normal = body->GetWorldSpaceSurfaceNormal(hit.mSubShapeID2, hit_position);
+	JPH::Vec3 local_normal = body->GetRotation().Inversed() * world_normal;
+
+
+	if (std::abs(local_normal.GetX()) > 0.9f) {
+		return simd::LoadFloat4(MathUtil::GetSign(local_normal.GetX()), 0.0f, 0.0f, 0.0f);
+	}
+	else if (std::abs(local_normal.GetY()) > 0.9f) {
+		return simd::LoadFloat4(0.0f, MathUtil::GetSign(local_normal.GetY()), 0.0f, 0.0f);
+	}
+	else if (std::abs(local_normal.GetZ()) > 0.9f) {
+		return simd::LoadFloat4(0.0f, 0.0f, MathUtil::GetSign(local_normal.GetZ()), 0.0f);
+	}
+
+	return simd::LoadFloat4(0.0f);
 }
 
 SizedArray<JPH::BodyID> JoltPhysicsBackend::RaycastObjects(const Vec3f& origin, const Vec3f& direction) const

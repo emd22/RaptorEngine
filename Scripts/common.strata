@@ -37,6 +37,8 @@ impl OBJECT
 	extern float3 get_position(OBJECT obj);
 	extern uint get_tags(OBJECT obj);
 
+	extern float3 ray_get_face(OBJECT obj);
+
 	property float3 position {
 		get = OBJECT_get_position;
 	}
