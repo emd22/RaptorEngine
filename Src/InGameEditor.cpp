@@ -102,5 +102,15 @@ float EditorMode::GetQuantizeFraction() const
 	return 0.0f;
 }
 
+bool EditorMode::GetQuantizeEnabled() const
+{
+	auto mode_get_quantize = pScript->GetFunction<bool (*)()>("mode_common_get_quantize_enabled");
+	if (mode_get_quantize) {
+		return mode_get_quantize();
+	}
+
+	return false;
+}
+
 
 } // namespace fx

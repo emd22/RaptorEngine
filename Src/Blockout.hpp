@@ -8,6 +8,7 @@
 #pragma once
 
 #include <Core/PagedArray.hpp>
+#include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
 #include <Object/ObjectID.hpp>
@@ -20,6 +21,7 @@ class ConfigEntry;
 struct BlockoutBox
 {
 	ObjectID ID;
+	StackArray<float32, 6> Scales;
 };
 
 class Blockout
@@ -30,11 +32,14 @@ public:
 	void Create(World* world);
 
 	void Load(const String& path);
+	void Save(const String& path);
 
 	~Blockout();
 
 private:
 	void CreateCubeVolume(ConfigEntry& entry);
+
+	void RemoveBlockoutFromWorld(World* world);
 
 public:
 	PagedArray<BlockoutBox> BlockoutObjects;

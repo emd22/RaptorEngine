@@ -4,8 +4,31 @@ import ../keyboard;
 bool had_headbob = false;
 bool enable_quantize = true;
 
-float quantize_amount = 0.25f;
+int quantize_index = 2;
 
+
+struct quant_levels
+{
+	float[4] levels;
+}
+
+float mode_common_get_quantize(int index)
+{
+	quant_levels levels;
+	levels.levels[0] = 0.05f;
+	levels.levels[1] = 0.10f;
+	levels.levels[2] = 0.25f;
+	levels.levels[3] = 0.50f;
+
+	if (index < 0) {
+		return levels.levels[0];
+	}
+	if (index > 3) {
+		return levels.levels[3];
+	}
+
+	return levels.levels[index];
+}
 
 float3 mode_common_quantize3(float3 v3)
 {
@@ -13,7 +36,9 @@ float3 mode_common_quantize3(float3 v3)
 		return v3;
 	}
 
-	float3 grid_size = float3(quantize_amount);
+	float quant = mode_common_get_quantize(quantize_index);
+
+	float3 grid_size = float3(quant);
 	return (float3_round(v3 / grid_size) * grid_size);
 }
 
@@ -24,7 +49,9 @@ float4 mode_common_quantize4(float4 v4)
 		return v4;
 	}
 
-	float4 grid_size = float4(quantize_amount);
+	float quant = mode_common_get_quantize(quantize_index);
+
+	float4 grid_size = float4(quant);
 	return (float4_round(v4 / grid_size) * grid_size);
 }
 
@@ -47,42 +74,34 @@ void mode_common_disable_damp()
 	player.toggle_headbob(true);
 }
 
-
 void mode_common_adjust_quant_amount(bool smaller)
 {
-	const float level0 = 0.05f;
-	const float level1 = 0.10f;
-	const float level2 = 0.25f;
-	const float level3 = 0.50f;
-
-	if (quantize_amount > level0 && smaller) {
-		if (quantize_amount == level1) {
-			quantize_amount = level0;
-		}
-		else if (quantize_amount == level2) {
-			quantize_amount = level1;
-		}
-		else if (quantize_amount == level3) {
-			quantize_amount = level2;
-		}
+	if (quantize_index < 0) {
+		quantize_index = 0;
+		return;
 	}
 
-	if (quantize_amount < level3 && smaller == false) {
-		if (quantize_amount == level0) {
-			quantize_amount = level1;
-		}
-		else if (quantize_amount == level1) {
-			quantize_amount = level2;
-		}
-		else if (quantize_amount == level2) {
-			quantize_amount = level3;
-		}
+	if (quantize_index > 3) {
+		quantize_index = 3;
+		return;
 	}
+
+	if (smaller) {
+		quantize_index--;
+		return;
+	}
+
+	quantize_index++;
+}
+
+bool mode_common_get_quantize_enabled()
+{
+	return enable_quantize;
 }
 
 float mode_common_get_quantize_fraction()
 {
-	return quantize_amount;
+	return  mode_common_get_quantize(quantize_index);
 }
 
 void mode_common_load()

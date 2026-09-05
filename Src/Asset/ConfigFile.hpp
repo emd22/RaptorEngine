@@ -24,7 +24,7 @@ namespace fx {
 
 template <typename TType>
 concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_point_v<TType> ||
-							   std::is_same_v<TType, char*>;
+							   std::is_same_v<TType, char*> || std::is_same_v<TType, const char*>;
 
 
 /////////////////////////////////////
@@ -36,13 +36,38 @@ struct ConfigPrimitive
 public:
 	ConfigPrimitive() = default;
 
-	template <typename T>
-	ConfigPrimitive(T value)
+	// template <typename T>
+	// ConfigPrimitive(T value)
+	// {
+	// 	Set(value);
+	// }
+
+	ConfigPrimitive(const ConfigPrimitive& other)
 	{
-		Set(value);
+		Type = other.Type;
+
+		if (Type == ePrimitiveType::String) {
+			mStringValue = strdup(other.mStringValue);
+		}
+		else if (Type == ePrimitiveType::Int) {
+			mIntValue = other.mIntValue;
+		}
+		else if (Type == ePrimitiveType::Float) {
+			mFloatValue = other.mFloatValue;
+		}
 	}
 
-	ConfigPrimitive(const ConfigPrimitive& other) { (*this) = other; }
+	template <typename T>
+	static ConfigPrimitive FromValue(T value)
+	{
+		static_assert(C_ConfigSupportsType<T>,
+					  "ConfigPrimitive::FromValue does not support this type. Supported types are integral, floating point, "
+					  "and string (char*, const char*, or std::string) types.");
+
+		ConfigPrimitive prim;
+		prim.Set<T>(value);
+		return prim;
+	}
 
 	ConfigPrimitive& operator=(const ConfigPrimitive& other)
 	{
@@ -61,7 +86,20 @@ public:
 		return *this;
 	}
 
-	void Set(const ConfigPrimitive& other) { (*this) = other; }
+	void Set(const ConfigPrimitive& other)
+	{
+		Type = other.Type;
+
+		if (Type == ePrimitiveType::String) {
+			mStringValue = strdup(other.mStringValue);
+		}
+		else if (Type == ePrimitiveType::Int) {
+			mIntValue = other.mIntValue;
+		}
+		else if (Type == ePrimitiveType::Float) {
+			mFloatValue = other.mFloatValue;
+		}
+	}
 
 	template <typename T>
 	T Get() const;
@@ -103,6 +141,10 @@ public:
 		requires C_ConfigSupportsType<TType> && (!std::is_same_v<std::string, TType>)
 	void Set(TType value)
 	{
+		static_assert(C_ConfigSupportsType<TType>,
+					  "ConfigPrimitive::Set does not support this type. Supported types are integral, floating point, and "
+					  "string (char*, const char*, or std::string) types.");
+
 		if constexpr (std::is_integral_v<TType>) {
 			Type = ePrimitiveType::Int;
 			mIntValue = value;
@@ -111,7 +153,7 @@ public:
 			Type = ePrimitiveType::Float;
 			mFloatValue = value;
 		}
-		else if constexpr (std::is_same_v<char*, std::remove_const_t<TType>>) {
+		else if constexpr (std::is_same_v<char*, std::remove_const_t<TType>> || std::is_same_v<TType, const char*>) {
 			Type = ePrimitiveType::String;
 			mStringValue = strdup(value);
 		}
@@ -188,6 +230,20 @@ public:
 		return entry;
 	}
 
+	static ConfigEntry Literal(const std::string& name, const Vec3f& value)
+	{
+		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
+		entry.AppendValue(value);
+		return entry;
+	}
+
+	static ConfigEntry Literal(const std::string& name, const Quat& value)
+	{
+		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
+		entry.AppendValue(value);
+		return entry;
+	}
+
 public:
 	ConfigEntry() = default;
 
@@ -196,7 +252,7 @@ public:
 	template <typename TType>
 	ConfigEntry(const std::string& name, TType value) : ConfigEntry(name)
 	{
-		Set(value);
+		Set(ConfigPrimitive::FromValue<TType>(value));
 	}
 
 	ConfigEntry(const ConfigEntry& other) = delete;

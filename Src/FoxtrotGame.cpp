@@ -112,16 +112,6 @@ void FoxtrotGame::InitEngine()
 		gWorld->BlockoutPath = String(blockout_entry->Get<const char*>());
 		gWorld->pBlockout->Load(gWorld->BlockoutPath);
 	}
-
-	// script::Script test_script = gScriptManager->LoadScript("Scripts/strata_test.strata");
-	// if (test_script.HasErrors() == false) {
-	// 	using FuncType = int (*)(void);
-
-	// 	FuncType fn = test_script.GetFunction<FuncType>("run");
-	// 	int result = fn();
-
-	// 	LogInfo(LC_SCRIPT, "Strata result: {}", result);
-	// }
 }
 
 
@@ -347,11 +337,6 @@ void FoxtrotGame::ProcessControls()
 		ControlManager::ReleaseMouse();
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && (EditorModeType != eEditorMode::Simulate)) {
-		EditorModeType = eEditorMode::Simulate;
-		gWorld->SelectCamera(gWorld->Player.pCamera);
-	}
-
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
 		// physics::RayResult hit_point = gPhysics->pBackend->Raycast(Player.pCamera->Position,
 		// 														   Player.pCamera->GetForwardVector() * 10.0f);
@@ -476,20 +461,30 @@ void FoxtrotGame::ProcessControls()
 		gWorld->Player.SetFlyMode(!gWorld->Player.IsFlyMode());
 		gWorld->Player.Physics.SetCollisionEnabled(!gWorld->Player.IsFlyMode());
 	}
+
+
+	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S)) {
+		LogInfo("Saving blockout...");
+		gWorld->pBlockout->Save("Data/blockouts/btemp.prx");
+	}
 }
 
 void FoxtrotGame::RenderText()
 {
 	static const uint32 scTextColor = Color::FromRGBA(255, 0, 0, 255).AsUInt();
 
-	gTextRenderer->DrawText(
-		String::Fmt("EditorMode {}", pSelectedEditorMode ? pSelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f,
-		scTextColor);
+	gTextRenderer->DrawText(String::Fmt("EditorMode {} ({})",
+										pSelectedEditorMode ? pSelectedEditorMode->ModeName : "Simulate",
+										static_cast<uint32>(EditorModeType))
+								.CStr(),
+							2.0f, scTextColor);
 	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scTextColor);
 
 	if (pSelectedEditorMode != nullptr) {
-		gTextRenderer->DrawText(String::Fmt("Q={}", pSelectedEditorMode->GetQuantizeFraction()).CStr(), 2.0,
-								scTextColor);
+		gTextRenderer->DrawText(String::Fmt("Q={}, QE={}", pSelectedEditorMode->GetQuantizeFraction(),
+											pSelectedEditorMode->GetQuantizeEnabled())
+									.CStr(),
+								2.0, scTextColor);
 	}
 }
 

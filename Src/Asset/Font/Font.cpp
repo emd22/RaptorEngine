@@ -202,9 +202,9 @@ void Font::WriteMetaFile(const String& atlas_path) const
 {
 	ConfigFile cf;
 
-	cf.AddEntry(ConfigEntry::Literal("Atlas", atlas_path.Str()));
-	cf.AddEntry(ConfigEntry::Literal("Family", FamilyName.Str()));
-	cf.AddEntry(ConfigEntry::Literal("Style", StyleName.Str()));
+	cf.AddEntry(ConfigEntry::Literal("Atlas", atlas_path.CStr()));
+	cf.AddEntry(ConfigEntry::Literal("Family", FamilyName.CStr()));
+	cf.AddEntry(ConfigEntry::Literal("Style", StyleName.CStr()));
 
 	ConfigEntry* glyphs_entry = cf.AddEntry("Glyphs");
 
@@ -218,10 +218,10 @@ void Font::WriteMetaFile(const String& atlas_path) const
 		{
 			ConfigEntry bearing_entry = ConfigEntry::Array("Bearing", ConfigEntry::ePrimitiveType::Float);
 			// Left bearing
-			bearing_entry.AppendValue(metrics.Lsb);
+			bearing_entry.AppendValue(ConfigEntry::FromValue(metrics.Lsb));
 			// Vertical bearing
-			bearing_entry.AppendValue(metrics.Bearing.X);
-			bearing_entry.AppendValue(metrics.Bearing.Y);
+			bearing_entry.AppendValue(ConfigEntry::FromValue(metrics.Bearing.X));
+			bearing_entry.AppendValue(ConfigEntry::FromValue(metrics.Bearing.Y));
 
 			entry.AddMember(std::move(bearing_entry));
 		}
@@ -229,16 +229,16 @@ void Font::WriteMetaFile(const String& atlas_path) const
 
 		{
 			ConfigEntry size_entry = ConfigEntry::Array("Size", ConfigEntry::ePrimitiveType::Int);
-			size_entry.AppendValue(metrics.Size.X);
-			size_entry.AppendValue(metrics.Size.Y);
+			size_entry.AppendValue(ConfigPrimitive::FromValue(metrics.Size.X));
+			size_entry.AppendValue(ConfigEntry::FromValue(metrics.Size.Y));
 
 			entry.AddMember(std::move(size_entry));
 		}
 
 		{
 			ConfigEntry offset_entry = ConfigEntry::Array("Offset", ConfigEntry::ePrimitiveType::Int);
-			offset_entry.AppendValue(metrics.AtlasOffset.X);
-			offset_entry.AppendValue(metrics.AtlasOffset.Y);
+			offset_entry.AppendValue(ConfigEntry::FromValue(metrics.AtlasOffset.X));
+			offset_entry.AppendValue(ConfigEntry::FromValue(metrics.AtlasOffset.Y));
 
 			entry.AddMember(std::move(offset_entry));
 		}

@@ -38,6 +38,7 @@ public:
 	void Load();
 	void Unload();
 	float GetQuantizeFraction() const;
+	bool GetQuantizeEnabled() const;
 
 	~EditorMode() = default;
 

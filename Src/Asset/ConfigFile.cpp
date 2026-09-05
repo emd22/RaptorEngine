@@ -130,9 +130,9 @@ void ConfigEntry::AppendValue(const Vec3f& vec)
 		Members.Create(4);
 	}
 
-	AppendValue(vec.X);
-	AppendValue(vec.Y);
-	AppendValue(vec.Z);
+	AppendValue(ConfigPrimitive::FromValue(vec.X));
+	AppendValue(ConfigPrimitive::FromValue(vec.Y));
+	AppendValue(ConfigPrimitive::FromValue(vec.Z));
 }
 
 void ConfigEntry::AppendValue(const Vec4f& vec)
@@ -141,10 +141,10 @@ void ConfigEntry::AppendValue(const Vec4f& vec)
 		Members.Create(5);
 	}
 
-	AppendValue(vec.X);
-	AppendValue(vec.Y);
-	AppendValue(vec.Z);
-	AppendValue(vec.W);
+	AppendValue(ConfigPrimitive::FromValue(vec.X));
+	AppendValue(ConfigPrimitive::FromValue(vec.Y));
+	AppendValue(ConfigPrimitive::FromValue(vec.Z));
+	AppendValue(ConfigPrimitive::FromValue(vec.W));
 }
 
 
@@ -154,10 +154,10 @@ void ConfigEntry::AppendValue(const Quat& quat)
 		Members.Create(5);
 	}
 
-	AppendValue(quat.X);
-	AppendValue(quat.Y);
-	AppendValue(quat.Z);
-	AppendValue(quat.W);
+	AppendValue(ConfigPrimitive::FromValue(quat.X));
+	AppendValue(ConfigPrimitive::FromValue(quat.Y));
+	AppendValue(ConfigPrimitive::FromValue(quat.Z));
+	AppendValue(ConfigPrimitive::FromValue(quat.W));
 }
 
 
