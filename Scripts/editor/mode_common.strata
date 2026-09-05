@@ -4,6 +4,8 @@ import ../keyboard;
 bool had_headbob = false;
 bool enable_quantize = true;
 
+OBJECT xform_marker_object;
+
 int quantize_index = 2;
 
 
@@ -55,11 +57,14 @@ float4 mode_common_quantize4(float4 v4)
 	return (float4_round(v4 / grid_size) * grid_size);
 }
 
+void mode_common_set_xform_marker(OBJECT obj)
+{
+	xform_marker_object = obj;
+}
 
 ////////////////////////////////////////
 // Mode common functions
 ////////////////////////////////////////
-
 
 
 void mode_common_enable_damp()

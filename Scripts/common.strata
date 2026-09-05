@@ -20,6 +20,8 @@ float3 float3_round(float3 value)
 	return result.xyz;
 }
 
+extern float3 float3_abs(float3 value);
+
 /*
 	Object
  */
@@ -38,6 +40,7 @@ impl OBJECT
 	extern uint get_tags(OBJECT obj);
 
 	extern float3 ray_get_face(OBJECT obj);
+	extern float direction_scale(OBJECT obj, float3 direction);
 
 	property float3 position {
 		get = OBJECT_get_position;

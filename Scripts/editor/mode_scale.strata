@@ -47,6 +47,12 @@ void mode_update(float3 movement_vector)
 	new_position = mode_common_quantize3(new_position);
 
 	float3 selected_face = selected_object.ray_get_face();
+	float face_scale = selected_object.direction_scale(selected_face);
+
+	float3 np = (new_position + (selected_face * float3(face_scale)));
+
+	xform_marker_object.move_to(np);
+
 
 
 	// selected_object.move_to(new_position);

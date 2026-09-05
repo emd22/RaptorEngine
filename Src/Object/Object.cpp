@@ -331,26 +331,26 @@ void Object::Update()
 	UpdateAnimation();
 }
 
-void Object::SetScriptVars()
+float32 Object::GetDirectionScale(const Vec3f& direction)
 {
-	if (!pScript.IsValid()) {
-		return;
+	if (direction.IsCloseTo(simd::LoadFloat4(0.0f))) {
+		return 0.0f;
 	}
 
-	pScript->SetGlobal(HashStr32("OBJECTID"), script::FoxValue(static_cast<int32>(ID.GetID())));
+	Vec3f dir = direction.Normalize();
+
+	Vec3f pos_extent = Bounds.Max;
+	Vec3f neg_extent = -Bounds.Min;
+
+	LogInfo("Bounds min: {}, Bounds Max: {}", Bounds.Min, Bounds.Max);
+
+	Vec3f extent((dir.X >= 0.0f) ? pos_extent.X : neg_extent.X, (dir.Y >= 0.0f) ? pos_extent.Y : neg_extent.Y,
+				 (dir.Z >= 0.0f) ? pos_extent.Z : neg_extent.Z);
+
+	float32 distance = dir.Abs().Dot(extent);
+	return distance * mScale;
 }
 
-void Object::AttachScript(const Ref<script::FoxScript>& script)
-{
-	pScript = script;
-	SetScriptVars();
-}
-
-void Object::LoadScript(const String& path)
-{
-	pScript = MakeRef<script::FoxScript>(path);
-	SetScriptVars();
-}
 
 void Object::AttachObject(const ObjectID& attach_id)
 {

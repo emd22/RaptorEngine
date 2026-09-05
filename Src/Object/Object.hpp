@@ -88,6 +88,8 @@ public:
 
 	void PrintDebug() const;
 
+	float32 GetDirectionScale(const Vec3f& direction);
+
 	// XXX: TEMP
 	void UpdateAnimation();
 
@@ -101,8 +103,6 @@ public:
 	// Script
 	/////////////////////////////////////
 
-	void AttachScript(const Ref<script::FoxScript>& script);
-	void LoadScript(const String& path);
 
 	/////////////////////////////////////
 	// Material
@@ -176,7 +176,6 @@ private:
 	 * done by RenderShallow et. al!
 	 */
 	void RenderMesh(renderer::Pipeline* pipeline);
-	void SetScriptVars();
 
 	void SyncObjectWithPhysics(physics::Body* phys);
 

@@ -76,6 +76,11 @@ void EditorMode::Load()
 		mode_load();
 	}
 
+	auto mode_set_xform_marker = pScript->GetFunction<void (*)(void*)>("mode_common_set_xform_marker");
+	if (mode_set_xform_marker) {
+		mode_set_xform_marker(reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
+	}
+
 	ReloadHotFunctions();
 }
 

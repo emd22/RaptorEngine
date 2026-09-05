@@ -203,11 +203,6 @@ void WorldFile::ApplyPropertiesToObject(Object* object, const ConfigEntry& objec
 			object->SetPhysicsID(physics::BodyID::scNull);
 		}
 	}
-
-	ConfigEntry* script = object_entry.GetMember(HashStr32("Script"));
-	if (script != nullptr) {
-		object->LoadScript(String::Fmt("./Scripts{}", script->GetValue<const char*>()));
-	}
 }
 
 } // namespace fx

@@ -58,12 +58,42 @@ void Blockout::Create(World* world)
 
 		test_material->Finalize();
 	}
+
+	{
+		const float scale = 0.25f;
+		CubeGenOptions cgo {
+			.Left = { .Scale = scale },
+			.Right = { .Scale = scale },
+			.Top = { .Scale = scale },
+			.Bottom = { .Scale = scale },
+			.Front = { .Scale = scale },
+			.Back = { .Scale = scale },
+
+			.bAlignUVs = true,
+		};
+
+		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
+
+		MaterialID mat_id = mWhiteMaterialID;
+
+		pXFormObject = gObjectManager->NewObject("PROTO_XFORM", eObjectTag::Blockout);
+		pXFormObject->pMesh = cube_mesh->AsDefaultMesh();
+		pXFormObject->mMaterialID = mat_id;
+
+
+		AssetTicket ticket(static_cast<void*>(pXFormObject));
+		ticket.MarkAndSignalLoaded();
+
+		pWorld->Attach(ticket);
+	}
 }
+
+void Blockout::ReloadSingleObject(Object* object) {}
 
 void Blockout::RemoveBlockoutFromWorld(World* world)
 {
-	for (BlockoutBox& bbox : BlockoutObjects) {
-		Object* object = gObjectManager->GetObject(bbox.ID);
+	for (ObjectID box_id : BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(box_id);
 		if (object == nullptr) {
 			continue;
 		}
@@ -110,6 +140,7 @@ enum class eCProtoMat
 	Orange = 1,
 };
 
+
 void Blockout::CreateCubeVolume(ConfigEntry& entry)
 {
 	Vec3f position = entry.GetMemberValue<Vec3f>(HashStr32("pos"), Vec3f::sZero);
@@ -128,25 +159,14 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 		return;
 	}
 
-	BlockoutBox bbox {
-		.Scales = {
-		   scales[0].Get<float32>(),
-		   scales[1].Get<float32>(),
-		   scales[2].Get<float32>(),
-		   scales[3].Get<float32>(),
-		scales[4].Get<float32>(),
-			scales[5].Get<float32>(),
-		},
-	};
-
 
 	CubeGenOptions cgo {
-		.Left = { .Scale = bbox.Scales[0] },
-		.Right = { .Scale = bbox.Scales[1] },
-		.Top = { .Scale = bbox.Scales[2] },
-		.Bottom = { .Scale = bbox.Scales[3] },
-		.Front = { .Scale = bbox.Scales[4] },
-		.Back = { .Scale = bbox.Scales[5] },
+		.Left = { .Scale = scales[0].Get<float32>() },
+		.Right = { .Scale = scales[1].Get<float32>() },
+		.Top = { .Scale = scales[2].Get<float32>() },
+		.Bottom = { .Scale = scales[3].Get<float32>() },
+		.Front = { .Scale = scales[4].Get<float32>() },
+		.Back = { .Scale = scales[5].Get<float32>() },
 
 		.bAlignUVs = true,
 	};
@@ -172,9 +192,10 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 	object->MoveBy(position);
 	object->mMaterialID = mat_id;
 	object->SetShadowCaster(true);
+	object->Bounds.Min = Vec3f(-cgo.Left.Scale, -cgo.Bottom.Scale, -cgo.Back.Scale);
+	object->Bounds.Max = Vec3f(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale);
 	Vec3f midpoint = GetCubeMidpointOffset(cgo);
 
-	bbox.ID = object->ID;
 
 	bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
 	if (is_locked) {
@@ -226,7 +247,7 @@ void Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	pWorld->Attach(ticket);
 
-	BlockoutObjects.Insert(std::move(bbox));
+	BlockoutObjects.Insert(object->ID);
 }
 
 
@@ -255,8 +276,8 @@ void Blockout::Save(const String& path)
 
 	ConfigEntry* all_entry = info.AddEntry("all");
 
-	for (const BlockoutBox& box : BlockoutObjects) {
-		Object* object = gObjectManager->GetObject(box.ID);
+	for (const ObjectID box_id : BlockoutObjects) {
+		Object* object = gObjectManager->GetObject(box_id);
 		if (object == nullptr) {
 			continue;
 		}
@@ -266,12 +287,12 @@ void Blockout::Save(const String& path)
 			blockout_entry.AddMember(ConfigEntry::Literal("pos", object->mPosition));
 
 			ConfigEntry scales_array = ConfigEntry::Array("scale", ConfigPrimitive::ePrimitiveType::Float);
-			scales_array.AppendValue(ConfigPrimitive::FromValue(box.Scales[0]));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(box.Scales[1]));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(box.Scales[2]));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(box.Scales[3]));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(box.Scales[4]));
-			scales_array.AppendValue(ConfigPrimitive::FromValue(box.Scales[5]));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Min.X));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.X));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Min.Y));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Max.Z));
+			scales_array.AppendValue(ConfigPrimitive::FromValue(object->Bounds.Min.Z));
 			blockout_entry.AddMember(std::move(scales_array));
 
 			blockout_entry.AddMember(ConfigEntry::Literal("rotquat", object->mRotation));

@@ -11,18 +11,14 @@
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
+#include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 
 namespace fx {
 class World;
 class ConfigEntry;
+class Object;
 
-
-struct BlockoutBox
-{
-	ObjectID ID;
-	StackArray<float32, 6> Scales;
-};
 
 class Blockout
 {
@@ -34,6 +30,8 @@ public:
 	void Load(const String& path);
 	void Save(const String& path);
 
+	void ReloadSingleObject(Object* object);
+
 	~Blockout();
 
 private:
@@ -42,10 +40,12 @@ private:
 	void RemoveBlockoutFromWorld(World* world);
 
 public:
-	PagedArray<BlockoutBox> BlockoutObjects;
+	PagedArray<ObjectID> BlockoutObjects;
 	World* pWorld = nullptr;
 
 	MaterialID SelectionMaterialID = MaterialID::scNull;
+
+	Object* pXFormObject = nullptr;
 
 private:
 	MaterialID mWhiteMaterialID = MaterialID::scNull;

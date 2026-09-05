@@ -78,7 +78,7 @@ private:
 
 public:
 	Vec2u mGridSize;
-	Vec2f mTileSize = Vec2f(5.0f, 5.0f);
+	Vec2f mTileSize = Vec2f(25.0f, 25.0f);
 	Vec3f mPositionOffset = Vec3f::sZero;
 
 	TileIndex ViewTileIndex = TileIndexNull;

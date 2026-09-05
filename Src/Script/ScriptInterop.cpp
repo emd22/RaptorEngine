@@ -29,6 +29,8 @@ static void N_object_move_to(Object* obj, FLOAT4 position)
 		return;
 	}
 
+	LogInfo("Move to: {}", Vec3f(position));
+
 	obj->SetPosition(Vec3f(position));
 }
 
@@ -58,6 +60,23 @@ static uint32 N_object_get_tags(Object* obj)
 	}
 
 	return static_cast<uint32>(obj->Tags);
+}
+
+
+static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
+{
+	if (obj == nullptr) {
+		return 0.0f;
+	}
+
+	// const Vec3f dir = Vec3f(direction).Normalize();
+	// Vec3f extent((dir.X >= 0.0f) ? pos_extent.X : neg_extent.X, (dir.Y >= 0.0f) ? pos_extent.Y : neg_extent.Y,
+	// 			 (dir.Z >= 0.0f) ? pos_extent.Z : neg_extent.Z);
+
+	// float32 distance = dir.Abs().Dot(extent);
+	// return distance * mScale;
+
+	return obj->GetDirectionScale(Vec3f(direction));
 }
 
 static FLOAT4 N_object_ray_get_face(Object* obj)
@@ -99,6 +118,14 @@ static bool N_player_get_headbob(void) { return gWorld->Player.bEnableHeadBob; }
 
 
 static FLOAT4 N_float4_round(FLOAT4 value) { return simd::Round(value); }
+static FLOAT4 N_float3_abs(FLOAT4 value)
+{
+#ifdef FX_USE_NEON
+	return Neon::SetSigns<1>(value);
+#elif FX_USE_AVX
+	return SSE::SetSigns<1>(value);
+#endif
+}
 
 
 static bool N_is_key_up(uint32 key) { return ControlManager::IsKeyUp(static_cast<eKey>(key)); }
@@ -106,6 +133,7 @@ static bool N_is_key_down(uint32 key) { return ControlManager::IsKeyDown(static_
 static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(static_cast<eKey>(key)); }
 
 static float N_float_sign(float value) { return MathUtil::GetSign(value); }
+
 
 /////////////////////////////////////
 // Predef gather
@@ -128,6 +156,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_get_position", N_object_get_position),
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
+	PREDEF("OBJECT_direction_scale", N_object_direction_scale),
 
 	PREDEF("camera_position", N_camera_position),
 
@@ -138,6 +167,7 @@ static const PredefExtern scAvailableExterns[] = {
 
 	/* Math Util */
 	PREDEF("float4_round", N_float4_round),
+	PREDEF("float3_abs", N_float3_abs),
 	PREDEF("float_sign", N_float_sign),
 
 	/* Controls */
