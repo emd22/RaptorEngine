@@ -37,18 +37,15 @@ static ePipelineName GetTransparentPipeline(ePipelineName base)
 		return base;
 	}
 }
-static bool IsTransparentMaterial(Material* mat)
-{
-	// Material alpha < 1 means soft transparency; texture alpha is handled in shader via clip/blend
-	// Leaves have mat alpha 1.0 so they stay opaque path (shader clip handles their tex alpha)
-	return mat && mat->Properties.Alpha < 0.99f;
-}
+static bool IsTransparentMaterial(Material* mat) { return (mat != nullptr && mat->Properties.Alpha < 0.999f); }
+
 
 static void AddObjectToRenderList(Object* object, World* scene)
 {
 	if (object->pMesh.IsValid()) {
-		Material* material = MaterialManagerFwd::GetMaterial(object->GetMaterialID());
+		Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
 		ePipelineName pipeline_name = material->GetRequiredPipeline();
+
 		if (IsTransparentMaterial(material)) {
 			pipeline_name = GetTransparentPipeline(pipeline_name);
 		}
@@ -56,7 +53,7 @@ static void AddObjectToRenderList(Object* object, World* scene)
 		LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
 				PipelineNameUtil::GetName(pipeline_name));
 
-
+		// If the object casts shadows as well, add it to the shadow section
 		if (object->IsShadowCaster()) {
 			gWorld->mRenderList.Add(ePipelineName::ShadowDirectional, object->ID);
 		}
@@ -80,21 +77,19 @@ static void AddObjectToRenderList(Object* object, World* scene)
 	}
 }
 
-static void RemoveObjectFromRenderList(ObjectID id, World* scene)
+static void RemoveObjectFromRenderList(ObjectID id)
 {
 	if (id.IsNull() || id.IsInvalid()) {
 		return;
 	}
 
-	Assert(scene != nullptr);
-
 
 	Object* object = gObjectManager->GetObject(id);
+	gWorld->mRenderList.RemoveAllOfObject(id);
 
-	scene->mRenderList.RemoveAllOfObject(id);
 	if (!object->AttachedNodes.IsEmpty()) {
 		for (const ObjectID& attach_id : object->AttachedNodes) {
-			RemoveObjectFromRenderList(attach_id, scene);
+			RemoveObjectFromRenderList(attach_id);
 		}
 	}
 }
@@ -126,7 +121,7 @@ void World::Attach(const Ref<LightBase>& light)
 void World::Detach(ObjectID id)
 {
 	gWorldGrid->RemoveObject(id);
-	RemoveObjectFromRenderList(id, this);
+	RemoveObjectFromRenderList(id);
 }
 
 // physics::BodyID World::NewPhysicsObject()
@@ -181,19 +176,60 @@ Object* World::FindObject(const Hash32 name_hash)
 // }
 
 
+void World::SortTransparentObjects(renderer::Pipeline& pipeline, RenderListSection& section)
+{
+	// Sort transparent objects from back to front from the camera position
+
+	DynArray<std::pair<ObjectID, float32>>& sorted_entry_buffer = section.SortedEntryBuffer;
+	sorted_entry_buffer.Clear();
+
+	PerspectiveCamera& camera = *mpCurrentCamera;
+	const Vec3f camera_position = camera.Position;
+
+	uint32 index = 0;
+
+	while (true) {
+		index = section.InUse.FindNextSetBit(index);
+
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+		ObjectID object_id = section.Objects[index];
+		Object* object = gObjectManager->GetObject(object_id);
+
+		Vec3f center = object->GetPosition() + object->Bounds.Min + (object->Bounds.GetSize() * 0.5f);
+		Vec3f diff = center - camera_position;
+
+		sorted_entry_buffer.Insert(std::make_pair(object_id, diff.Dot(diff)));
+
+		++index;
+	}
+
+
+	auto sort_func = [](const std::pair<ObjectID, float32>& a, const std::pair<ObjectID, float32>& b)
+	{ return a.second > b.second; };
+
+	std::sort(sorted_entry_buffer.pData, sorted_entry_buffer.pData + sorted_entry_buffer.Size, sort_func);
+
+	for (const std::pair<ObjectID, float32>& entry : sorted_entry_buffer) {
+		Object* object = gObjectManager->GetObject(entry.second);
+		object->Update();
+		object->RenderShallow(camera, &pipeline);
+	}
+}
+
+
 void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
 
-	const RenderListSection& section = mRenderList.GetSection(pl_name);
+	RenderListSection& section = mRenderList.GetSection(pl_name);
 
 	if (!section.InUse.IsInited()) {
 		return;
 	}
 
-	const bool is_transparent = (pl_name == ePipelineName::GeometryTransparent ||
-								 pl_name == ePipelineName::GeometryNormalMapsTransparent ||
-								 pl_name == ePipelineName::GeometrySkinnedTransparent);
 
 	renderer::Pipeline& pipeline = gPipelineCache->Request(pl_name);
 
@@ -208,49 +244,120 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 			Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
 	}
 
-	if (!is_transparent) {
-		uint32 index = 0;
-		while (true) {
-			index = section.InUse.FindNextSetBit(index);
-			if (index == Bitset::scNoFreeBits) {
-				break;
-			}
-			ObjectID object_id = section.Objects[index];
-			Object* object = gObjectManager->GetObject(object_id);
-			object->Update();
-			object->RenderShallow(camera, &pipeline);
-			++index;
+
+	// If this is a transparent object pipeline, sort the objects
+	if (PipelineNameUtil::IsTransparent(pl_name)) {
+		SortTransparentObjects(pipeline, section);
+		return;
+	}
+
+
+	uint32 index = 0;
+
+	while (true) {
+		index = section.InUse.FindNextSetBit(index);
+
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+		ObjectID object_id = section.Objects[index];
+		Object* object = gObjectManager->GetObject(object_id);
+
+		object->Update();
+		object->RenderShallow(camera, &pipeline);
+
+		++index;
+	}
+}
+
+void World::ExecuteTransparentRenderLists()
+{
+	PerspectiveCamera& camera = *mpCurrentCamera;
+	const Vec3f camPos = camera.Position;
+
+	struct SortedEntry
+	{
+		ObjectID id;
+		ePipelineName pipeline;
+		float distSq;
+	};
+
+	// Precompute total transparent count for correctly sized array
+	size_t total_transparent = 0;
+
+	for (ePipelineName pl : { ePipelineName::GeometryTransparent, ePipelineName::GeometryNormalMapsTransparent,
+							  ePipelineName::GeometrySkinnedTransparent }) {
+		const RenderListSection& sec = mRenderList.GetSection(pl);
+		if (sec.InUse.IsInited()) {
+			total_transparent += sec.Objects.Size;
 		}
 	}
-	else {
-		// Back-to-front sorting for transparency: farther first
-		struct SortedEntry
-		{
-			ObjectID id;
-			float distSq;
-		};
-		SizedArray<SortedEntry> sorted;
-		sorted.InitCapacity(section.Objects.Size);
-		Vec3f camPos = camera.Position;
-		uint32 idx = 0;
+
+	if (total_transparent == 0) {
+		return;
+	}
+
+	SizedArray<SortedEntry> sorted;
+	sorted.InitCapacity(total_transparent + 4);
+
+	auto Gather = [&](ePipelineName pl_name)
+	{
+		const RenderListSection& section = mRenderList.GetSection(pl_name);
+
+		if (!section.InUse.IsInited()) {
+			return;
+		}
+
+		uint32 index = 0;
+
 		while (true) {
-			idx = section.InUse.FindNextSetBit(idx);
-			if (idx == Bitset::scNoFreeBits)
+			index = section.InUse.FindNextSetBit(index);
+			if (index == Bitset::scNoFreeBits)
 				break;
-			ObjectID oid = section.Objects[idx];
+			ObjectID oid = section.Objects[index];
 			Object* obj = gObjectManager->GetObject(oid);
-			Vec3f diff = obj->GetPosition() - camPos;
+			Vec3f center = obj->GetPosition() + obj->Bounds.Min + obj->Bounds.GetSize() * 0.5f;
+			Vec3f diff = center - camPos;
 			float d2 = diff.X * diff.X + diff.Y * diff.Y + diff.Z * diff.Z;
-			sorted.Insert(SortedEntry { oid, d2 });
-			++idx;
+			sorted.Insert(SortedEntry { oid, pl_name, d2 });
+			++index;
 		}
-		std::sort(sorted.pData, sorted.pData + sorted.Size,
-				  [](const SortedEntry& a, const SortedEntry& b) { return a.distSq > b.distSq; });
-		for (const SortedEntry& e : sorted) {
-			Object* object = gObjectManager->GetObject(e.id);
-			object->Update();
-			object->RenderShallow(camera, &pipeline);
+	};
+
+	Gather(ePipelineName::GeometryTransparent);
+	Gather(ePipelineName::GeometryNormalMapsTransparent);
+	Gather(ePipelineName::GeometrySkinnedTransparent);
+
+	if (sorted.Size == 0)
+		return;
+
+	std::sort(sorted.pData, sorted.pData + sorted.Size,
+			  [](const SortedEntry& a, const SortedEntry& b) { return a.distSq > b.distSq; });
+
+	// Bind per entry as pipeline changes; minimize binds by caching last pipeline
+	renderer::Pipeline* currentPipeline = nullptr;
+	ePipelineName currentPlName = ePipelineName::GeometryTransparent;
+	bool first = true;
+
+	for (const SortedEntry& e : sorted) {
+		if (first || e.pipeline != currentPlName) {
+			currentPipeline = &gPipelineCache->Request(e.pipeline);
+			currentPipeline->Bind(gGraphics->GetFrame()->CmdBuffer);
+			{
+				const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0,
+												  gGraphics->GetLightGridFrameOffset(),
+												  gGraphics->GetLightIndexListFrameOffset() };
+				gGraphics->pRenderer->pPersistentDescriptor->Bind(
+					0, gGraphics->GetFrame()->CmdBuffer, *currentPipeline,
+					Slice<const uint32>(buffer_offsets, std::size(buffer_offsets)));
+			}
+			currentPlName = e.pipeline;
+			first = false;
 		}
+		Object* object = gObjectManager->GetObject(e.id);
+		object->Update();
+		object->RenderShallow(camera, currentPipeline);
 	}
 }
 
@@ -491,6 +598,30 @@ void World::RebuildFromTiles(TileIndex tile_index)
 	RebuildRenderList(false, gWorldGrid->GetTileIndexXY(xy + Vec2u(-1, 1)));
 }
 
+void World::NotifyObjectMaterialChanged(ObjectID id)
+{
+	if (id.IsNull() || id.IsInvalid()) {
+		return;
+	}
+
+	Object* object = gObjectManager->GetObject(id);
+
+	if (object == nullptr || !object->pMesh.IsValid()) {
+		return;
+	}
+
+	Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
+
+	// Check to see if the object is in the correct pipeline
+	// if (mRenderList.GetObjectIndex(material->GetRequiredPipeline(), object->ID) != RenderList::scNotFound) {
+	// 	// The object is in the expected rl section, break
+	// 	return;
+	// }
+
+	RemoveObjectFromRenderList(id);
+	AddObjectToRenderList(object, this);
+}
+
 
 void World::Render(Camera* shadow_camera)
 {
@@ -554,10 +685,8 @@ void World::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
 
-	// Transparent after, back-to-front, depthWrite disabled
-	ExecuteRenderList(ePipelineName::GeometryTransparent);
-	ExecuteRenderList(ePipelineName::GeometryNormalMapsTransparent);
-	ExecuteRenderList(ePipelineName::GeometrySkinnedTransparent);
+	// Transparent after, back-to-front globally sorted, depth write disabled
+	ExecuteTransparentRenderLists();
 
 	// RenderPhysicsObjects(camera);
 }

@@ -82,7 +82,15 @@ Tile* WorldGrid::GetObjectTile(const Object* object, TileIndex* out_tile_index)
 
 void WorldGrid::AddObject(ObjectID id)
 {
+	if (id.IsInvalid()) {
+		LogWarning("Cannot add invalid object ID to world grid");
+		return;
+	}
+
 	Object* object = gObjectManager->GetObject(id);
+	if (object == nullptr) {
+		return;
+	}
 
 	const Vec3f object_size = object->Bounds.GetSize();
 
@@ -307,7 +315,7 @@ Vec2u WorldGrid::GetTileXY(TileIndex tile_index) const
 
 Tile* WorldGrid::GetTile(TileIndex index)
 {
-	if (index > mTileBuffer.Capacity) {
+	if (index >= mTileBuffer.Capacity) {
 		return nullptr;
 	}
 
@@ -316,7 +324,7 @@ Tile* WorldGrid::GetTile(TileIndex index)
 
 const Tile* WorldGrid::GetTile(TileIndex index) const
 {
-	if (index > mTileBuffer.Capacity) {
+	if (index >= mTileBuffer.Capacity) {
 		return nullptr;
 	}
 

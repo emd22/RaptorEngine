@@ -298,7 +298,7 @@ inline bool IsFileJpeg(const std::string& path)
 
 AssetTicket AssetManager::LoadObject(const std::string& name, const std::string& path)
 {
-	Object* object = gObjectManager->NewObject(name);
+	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
 	AssetTicket ticket { object };
 
 	LoadFromPath<loader::LoaderGltf>(ticket, eAssetType::Object, path);
@@ -308,7 +308,7 @@ AssetTicket AssetManager::LoadObject(const std::string& name, const std::string&
 
 AssetTicket AssetManager::LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
 {
-	Object* object = gObjectManager->NewObject(name);
+	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
 	AssetTicket ticket { object };
 
 	LoadFromMemory<loader::LoaderGltf>(ticket, eAssetType::Object, Slice<const uint8>(data, data_size));

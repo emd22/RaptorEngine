@@ -155,7 +155,7 @@ FSOutput main(FSInput input)
         float tex_alpha = F_Sample(tAlbedo, input.vUV).a;
         float final_alpha = tex_alpha * material.fAlpha;
 
-        if (final_alpha < 0.01) {
+        if (final_alpha < ALPHA_CUTOFF) {
             discard;
         }
     }

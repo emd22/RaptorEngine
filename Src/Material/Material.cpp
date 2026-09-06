@@ -259,13 +259,15 @@ void Material::Destroy()
 renderer::ePipelineName Material::GetRequiredPipeline() const
 {
 	if (NormalMap.Exists()) {
-		return ePipelineName::GeometryNormalMaps;
-
 		if (bSupportsSkinning) {
 			return ePipelineName::GeometrySkinned;
 		}
+		return ePipelineName::GeometryNormalMaps;
 	}
 	else {
+		if (bSupportsSkinning) {
+			return ePipelineName::GeometrySkinned;
+		}
 		return ePipelineName::Geometry;
 	}
 }
@@ -294,7 +296,12 @@ static float32 GetComponentMinLOD(const MaterialComponent& component)
 
 void Material::SetUnlit(bool value)
 {
-	SetFlag(Properties.Flags, eMaterialFlags::Unlit);
+	if (value) {
+		SetFlag(Properties.Flags, eMaterialFlags::Unlit);
+	}
+	else {
+		ClearFlag(Properties.Flags, eMaterialFlags::Unlit);
+	}
 	mbRequiresSync = true;
 }
 

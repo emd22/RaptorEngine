@@ -71,6 +71,7 @@ private:
 	void RenderWorldGrid(const Camera& camera);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
+	void ExecuteTransparentRenderLists();
 	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
 	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);
 
@@ -79,7 +80,11 @@ private:
 
 	void RebuildFromTiles(TileIndex tile_index);
 
+	void SortTransparentObjects(renderer::Pipeline& pipeline, renderer::RenderListSection& section);
+
 public:
+	void NotifyObjectMaterialChanged(ObjectID id);
+
 	Name Name = "(unnamed)";
 	bool bRenderPhysicsObjects = false;
 	renderer::RenderList mRenderList;

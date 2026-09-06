@@ -24,12 +24,33 @@ namespace fx {
 
 using namespace renderer;
 
-Object::Object(const ObjectID& id) { ID = id; }
+Object::Object(const ObjectID id) { ID = id; }
+
+Object::Object(const ObjectID id, const MaterialID material)
+{
+	ID = id;
+	mMaterialID = material;
+}
+
+void Object::SetMaterial(const MaterialID& id)
+{
+	if (mMaterialID.GetID() == id.GetID()) {
+		return;
+	}
+
+	mMaterialID = id;
+
+	if (!ID.IsInvalid() && pMesh.IsValid()) {
+		gWorld->NotifyObjectMaterialChanged(ID);
+	}
+}
 
 void Object::Create(const Ref<PrimitiveMesh>& mesh, const MaterialID& material)
 {
 	pMesh = mesh;
-	SetMaterialID(material);
+
+	// Directly set the material to avoid the ol' `SetMaterial` curse
+	mMaterialID = material;
 }
 
 bool Object::CheckIfReady(bool require_material)
@@ -57,7 +78,6 @@ bool Object::CheckIfReady(bool require_material)
 	SetFlag(Flags, eObjectFlags::ReadyToRender);
 	LogInfo(LC_RENDER, "Object {} is now ready to render.", Name.Get());
 
-	// The object is now ready to render and is "full". Finalize any changes that have been made when loading.
 	FinalizeWhenReady();
 
 	return true;
@@ -86,69 +106,6 @@ void Object::FinalizeWhenReady()
 }
 
 
-void Object::PhysicsCreatePrimitive(physics::ePrimitiveType primitive_type, const Vec3f& dimensions,
-									physics::eMotionType motion_type, const physics::BodyProps& physics_properties)
-{
-	// OnLoaded(
-	//     [&]()
-	//     {
-	//         Scene* scene = this->pScene;
-	//         if (!scene) {
-	//             return;
-	//         }
-
-	//         if (this->PhysicsId == BodyIdNull) {
-	//             this->PhysicsId = scene->NewPhysicsObject();
-	//         }
-
-	//         Body* phys = scene->GetPhysicsObject(this->PhysicsId);
-
-	//         if (!phys) {
-	//             LogError(LC_PHYSICS, "Error creating physics object");
-	//             return;
-	//         }
-
-	//         phys->CreatePrimitiveBody(primitive_type, dimensions, motion_type, physics_properties);
-	//         this->mbPhysicsTransformOutOfDate = true;
-	//         this->SetPhysicsEnabled(true);
-
-	//         this->PrintDebug();
-	//     });
-}
-
-
-void Object::PhysicsCreateMesh(Ref<PrimitiveMesh> custom_physics_mesh, physics::eMotionType motion_type,
-							   const physics::BodyProps& physics_properties)
-{
-	// OnLoaded(
-	//     [&]()
-	//     {
-	//         Scene* scene = this->pScene;
-	//         if (!scene) {
-	//             return;
-	//         }
-
-	//         this->PhysicsId = scene->NewPhysicsObject();
-	//         Body* phys = scene->GetPhysicsObject(this->PhysicsId);
-
-	//         if (!phys) {
-	//             LogError(LC_PHYSICS, "Error creating physics object");
-	//             return;
-	//         }
-
-	//         Ref<PrimitiveMesh> physics_mesh { nullptr };
-	//         physics_mesh = custom_physics_mesh ? custom_physics_mesh : this->pMesh;
-
-	//         Assert(physics_mesh.IsValid());
-
-	//         phys->CreateMeshBody(*physics_mesh, motion_type, physics_properties);
-	//         this->mbPhysicsTransformOutOfDate = true;
-	//         this->SetPhysicsEnabled(true);
-
-	//         this->PrintDebug();
-	//     });
-}
-
 void Object::OnAttached(World* scene)
 {
 	physics::Body* phys = gPhysics->GetBody(PhysicsID);
@@ -158,17 +115,6 @@ void Object::OnAttached(World* scene)
 		SetPhysicsEnabled(gPhysics->pBackend->GetBodyInterface().IsActive(phys->GetBodyID()));
 	}
 }
-
-
-// void Object::PhysicsCreate(Body::Flags flags, PhMotionType moititype, const PhProperties& properties)
-// {
-//     Dimensions = pMesh->VertexList.CalculateDimensionsFromPositions();
-
-//     Vec3f scaled_dimensions = Dimensions * (mScale * 0.5);
-
-//     Physics.CreatePhysicsBody(scaled_dimensions, mPosition, flags, type, properties);
-//     mbPhysicsEnabled = gPhysics->pBackend->GetBodyInterface().IsActive(Physics.GetBodyId());
-// }
 
 
 void Object::UpdateAnimation()
@@ -264,16 +210,6 @@ void Object::RenderPrimitive(const CommandBuffer& cmd)
 	if (pMesh && CheckIfReady(false)) {
 		pMesh->Render(cmd, (mInstanceSlotsInUse + 1));
 	}
-
-	// if (AttachedNodes.IsEmpty()) {
-	//     return;
-	// }
-
-	// for (const TSRef<Object>& node : AttachedNodes) {
-	//     if (node->pMesh && node->CheckIfReady(false)) {
-	//         node->pMesh->Render(cmd, (node->mInstanceSlotsInUse + 1)); // + 1 for source object!
-	//     }
-	// }
 }
 
 void Object::RenderMesh(renderer::Pipeline* pipeline)
@@ -282,9 +218,6 @@ void Object::RenderMesh(renderer::Pipeline* pipeline)
 	CommandBuffer& cmd = frame->CmdBuffer;
 
 	Material* mat = gMaterialManager->GetMaterial(mMaterialID);
-	if (mat && pipeline->Name != ePipelineName::ShadowDirectional) {
-		Assert(mat->GetRequiredPipeline() == pipeline->Name);
-	}
 
 	// If there was an error binding the object material, bind the null material.
 	if (!gMaterialManager->BindWithPipeline(cmd, *pipeline, mMaterialID)) {

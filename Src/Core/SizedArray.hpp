@@ -145,7 +145,6 @@ public:
 	Iterator begin() { return pData; }
 	Iterator end() { return pData + Size; }
 
-
 	ConstIterator begin() const { return pData; }
 	ConstIterator end() const { return pData + Size; }
 

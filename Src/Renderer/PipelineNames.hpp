@@ -65,6 +65,12 @@ namespace PipelineNameUtil {
 
 FX_FORCE_INLINE const char* GetName(const ePipelineName id) { return GetPipelineNameInfo(id).pcName; }
 
+FX_FORCE_INLINE bool IsTransparent(const ePipelineName name)
+{
+	return (name == ePipelineName::GeometryTransparent || name == ePipelineName::GeometryNormalMapsTransparent ||
+			name == ePipelineName::GeometrySkinnedTransparent);
+}
+
 
 } // namespace PipelineNameUtil
 

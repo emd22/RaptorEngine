@@ -77,9 +77,8 @@ void Blockout::Create(World* world)
 
 		MaterialID mat_id = mWhiteMaterialID;
 
-		pXFormObject = gObjectManager->NewObject("PROTO_XFORM", eObjectTag::Blockout);
+		pXFormObject = gObjectManager->NewObject("PROTO_XFORM", mat_id, eObjectTag::Blockout);
 		pXFormObject->pMesh = cube_mesh->AsDefaultMesh();
-		pXFormObject->mMaterialID = mat_id;
 
 
 		AssetTicket ticket(static_cast<void*>(pXFormObject));
@@ -255,35 +254,36 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	eCProtoMat mat_index = static_cast<eCProtoMat>(entry.GetMemberValue<int>(HashStr32("mat"), 0));
 
-	MaterialID mat_id = mWhiteMaterialID;
+	MaterialID material_id = mWhiteMaterialID;
 
 	switch (mat_index) {
 	case eCProtoMat::Gray:
 		break;
 	case eCProtoMat::Orange:
-		mat_id = mOrangeMaterialID;
+		material_id = mOrangeMaterialID;
 		break;
 	default:;
 	}
 
 
-	Object* object = gObjectManager->NewObject(blockout_id.Str(), eObjectTag::Blockout);
+	eObjectTag object_tags = eObjectTag::Blockout;
+
+	bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
+	if (is_locked) {
+		SetFlag(object_tags, eObjectTag::LockTransform);
+	}
+	else {
+		material_id = mOrangeMaterialID;
+	}
+
+	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
 	object->pMesh = cube_mesh->AsDefaultMesh();
 	object->MoveBy(position);
-	object->mMaterialID = mat_id;
 	object->SetShadowCaster(true);
 	object->Bounds.Min = -Vec3f(cgo.Left.Scale, cgo.Bottom.Scale, cgo.Back.Scale);
 	object->Bounds.Max = Vec3f(cgo.Right.Scale, cgo.Top.Scale, cgo.Front.Scale);
 	Vec3f midpoint = GetCubeMidpointOffset(cgo);
 
-
-	bool is_locked = entry.GetMemberValue(HashStr32("lock"), 0) == 1;
-	if (is_locked) {
-		object->SetTag(eObjectTag::LockTransform);
-	}
-	else {
-		object->mMaterialID = mOrangeMaterialID;
-	}
 
 	Quat rotation = Quat::scIdentity;
 

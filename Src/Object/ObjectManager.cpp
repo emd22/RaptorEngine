@@ -42,12 +42,12 @@ ObjectID ObjectManager::NewObjectID(const std::string& name, eObjectTag tags)
 }
 
 
-Object* ObjectManager::NewObject(const std::string& name, eObjectTag tags)
+Object* ObjectManager::NewObject(const std::string& name, MaterialID material, eObjectTag tags)
 {
 	std::lock_guard<std::mutex> guard(mInUse);
 
 	uint32 index;
-	Object* obj = mObjectList.NewItem(&index);
+	Object* obj = mObjectList.NewItem(&index, 0, material);
 	obj->ID = ObjectID(index);
 	obj->Name = name;
 	obj->Tags = tags;
@@ -60,6 +60,8 @@ Object* ObjectManager::GetObject(ObjectID id)
 	if (id.IsInvalid()) {
 		return nullptr;
 	}
+
+	std::lock_guard<std::mutex> guard(mInUse);
 
 	return mObjectList.GetItem(id.GetID());
 }

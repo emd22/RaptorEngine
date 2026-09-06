@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/Assert.hpp>
 #include <Core/Types.hpp>
 #include <algorithm>
 #include <cstdlib>
@@ -17,6 +18,10 @@ template <typename TElementType, GrowthFunction TGrow = GrowthFunctions::InPages
 class DynArray
 {
 	static constexpr uint32 scInitialSize = 2;
+
+
+	using Iterator = TElementType*;
+	using ConstIterator = const TElementType*;
 
 public:
 	DynArray() = default;
@@ -45,6 +50,17 @@ public:
 		return &pData[index];
 	}
 
+	template <typename... Args>
+	TElementType& Emplace(Args&&... args)
+	{
+		ResizeIfNeeded();
+
+		TElementType* element = &pData[Size++];
+		new (element) TElementType(std::forward<Args>(args)...);
+
+		return *element;
+	}
+
 	void Insert(const TElementType& object)
 	{
 		ResizeIfNeeded();
@@ -70,6 +86,11 @@ public:
 
 	FX_FORCE_INLINE void SetPageSize(uint32 page_size) { PageSize = page_size; }
 
+	Iterator begin() { return pData; }
+	Iterator end() { return pData + Size; }
+
+	ConstIterator begin() const { return pData; }
+	ConstIterator end() const { return pData + Size; }
 
 	DynArray& operator=(DynArray<TElementType>&& other) noexcept
 	{
