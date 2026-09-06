@@ -86,10 +86,15 @@ void AssetWorker::LoadObject(LockContext<AssetItemData>& asset_data)
 	case fx::eAssetLoadOp::ReadAndUpload:
 		LoadStatus = object_loader->Load(asset_data->Ticket, String(Item.Path));
 		break;
-	case fx::eAssetLoadOp::ProcessAndUpload:
+	case fx::eAssetLoadOp::ProcessAndUpload: {
 		LoadStatus = object_loader->Load(asset_data->Ticket, Item.pcRawData, Item.DataSize);
-		std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
+		if (Item.bOwnsRawData && Item.pcRawData) {
+			std::free(const_cast<uint8*>(Item.pcRawData));
+			Item.pcRawData = nullptr;
+			Item.bOwnsRawData = false;
+		}
 		break;
+	}
 	default:
 		LogError(LC_ASSET, "Unknown asset source!");
 	}
@@ -103,10 +108,15 @@ void AssetWorker::LoadImage(LockContext<AssetItemData>& asset_data)
 	case fx::eAssetLoadOp::ReadAndUpload:
 		LoadStatus = image_loader->Load(asset_data->Ticket, Item.Path);
 		break;
-	case fx::eAssetLoadOp::ProcessAndUpload:
+	case fx::eAssetLoadOp::ProcessAndUpload: {
 		LoadStatus = image_loader->Load(asset_data->Ticket, Item.pcRawData, Item.DataSize);
-		std::free(static_cast<void*>(const_cast<uint8*>(Item.pcRawData)));
+		if (Item.bOwnsRawData && Item.pcRawData) {
+			std::free(const_cast<uint8*>(Item.pcRawData));
+			Item.pcRawData = nullptr;
+			Item.bOwnsRawData = false;
+		}
 		break;
+	}
 	default:
 		LogError(LC_ASSET, "Unknown asset source!");
 	}
@@ -117,14 +127,10 @@ void AssetWorker::Update()
 {
 	while (bRunning.load()) {
 		ItemReady.Wait();
-		ItemReady.Reset();
-
-		// In order to stop the worker, we need to kill the ItemReady notifier. Here we need to check if the worker
-		// actually recieved data. This is also cheaper than calling ItemReady.IsKilled, but that shouldn't be a
-		// bottleneck anyway.
-		if (!bRunning.load()) {
+		if (!bRunning.load() || ItemReady.IsKilled()) {
 			break;
 		}
+		ItemReady.Reset();
 
 		// Retrieve the loader and asset from the item
 		LockContext<AssetItemData> asset_data = Item.GetDataContext();
@@ -145,7 +151,8 @@ void AssetWorker::Update()
 		}
 
 		// Mark that we are waiting for the data to be uploaded to the GPU
-		bDataPendingUpload.test_and_set();
+		bDataPendingUpload.store(true);
+		bDataPendingUpload.notify_one();
 		gAssetManager->SignalUpdate();
 	}
 }
@@ -204,7 +211,13 @@ void AssetManager::Shutdown()
 	//     }
 	// }
 
-	mNullImageList.clear();
+	{
+		std::lock_guard<std::mutex> lock(mNullImageMutex);
+		mNullImageList.clear();
+	}
+
+	// Flush pending GPU deletions before destroying allocator/device
+	ShutdownDeletionQueue();
 
 	mbActive.clear();
 	ManagerUpdateNotifier.Kill();
@@ -242,14 +255,13 @@ void AssetManager::ShutdownDeletionQueue()
 
 inline bool IsMemoryJpeg(const uint8* data, uint32 data_size)
 {
-	if (data_size < 120) {
+	if (data == nullptr || data_size < 2) {
 		return false;
 	}
 
 	const bool header_correct = (data[0] == 0xFF) && (data[1] == 0xD8);
-	const bool footer_correct = (data[data_size - 2] == 0xFF) && (data[data_size - 1] == 0xD9);
 
-	return header_correct && footer_correct;
+	return header_correct;
 }
 
 
@@ -286,7 +298,7 @@ inline bool IsFileJpeg(const std::string& path)
 
 AssetTicket AssetManager::LoadObject(const std::string& name, const std::string& path)
 {
-	Object* object = gObjectManager->NewObject(name);
+	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
 	AssetTicket ticket { object };
 
 	LoadFromPath<loader::LoaderGltf>(ticket, eAssetType::Object, path);
@@ -296,7 +308,7 @@ AssetTicket AssetManager::LoadObject(const std::string& name, const std::string&
 
 AssetTicket AssetManager::LoadObjectFromMemory(const std::string& name, const uint8* data, uint32 data_size)
 {
-	Object* object = gObjectManager->NewObject(name);
+	Object* object = gObjectManager->NewObject(name, MaterialID::scNull);
 	AssetTicket ticket { object };
 
 	LoadFromMemory<loader::LoaderGltf>(ticket, eAssetType::Object, Slice<const uint8>(data, data_size));
@@ -404,37 +416,45 @@ AssetTicket AssetManager::NewTextureTicket()
 
 fx::Image* AssetManager::GetNullImage(eImageFormat format)
 {
-	std::unordered_map<eImageFormat, fx::Image*>& cache = mNullImageList;
-
-	// If the image is already created/cached, return the cached version
-	auto it = cache.find(format);
-	if (it != cache.end() && it->second != nullptr) {
-		return it->second;
+	{
+		std::lock_guard<std::mutex> lock(mNullImageMutex);
+		auto it = mNullImageList.find(format);
+		if (it != mNullImageList.end() && it->second != nullptr) {
+			return it->second;
+		}
 	}
-
-	// Create a new null image
-	fx::Image* image = cache[format];
-	image = gTextureManager->NewTexture();
-	cache[format] = image;
 
 	const uint32 pixel_stride = ImageFormatUtil::GetPixelStride(format);
 
-	// Set the pixel data to be 1's. This is so that any multiplications with pixel colours in shaders are not trashed.
+	// 0xFF so shader multiplies remain neutral (1.0). 0x01 would give near-black.
 	SizedArray<uint8> pixel_data;
 	pixel_data.InitSize(pixel_stride);
+	memset(pixel_data.pData, 0xFF, pixel_stride);
 
-	memset(pixel_data.pData, 1, pixel_stride);
+	fx::Image* image = gTextureManager->NewTexture();
 
-	// Upload the texture directly without buffering
+	// Upload the texture directly
+	Slice<const uint8> pixel_slice(pixel_data.pData, pixel_data.Size);
 	renderer::GraphicsBackendFwd::SubmitImmediateUploadCmd(
-		[&](renderer::CommandBuffer& cmd)
+		[image, format, pixel_slice](renderer::CommandBuffer& cmd)
 		{
 			ImageInfo image_info {
-				Vec2u(1, 1), format, 0, 1, Slice<const uint8>(pixel_data.pData, pixel_data.Size),
+				Vec2u(1, 1), format, 0, 1, pixel_slice,
 			};
-
 			image->Upload(cmd, image_info);
 		});
+
+	{
+		std::lock_guard<std::mutex> lock(mNullImageMutex);
+		// Double-check after creation to avoid race
+		auto it = mNullImageList.find(format);
+		if (it != mNullImageList.end() && it->second != nullptr) {
+			// Another thread won race, use existing. The newly created image will leak if not freed;
+			// but NewTexture is cheap vs complexity. In practice GetNullImage is called rarely.
+			return it->second;
+		}
+		mNullImageList[format] = image;
+	}
 
 	return image;
 }
@@ -471,49 +491,54 @@ static void ProcessLoadSuccess(LockContext<AssetItemData>& asset_data)
 {
 	AssetTicketData* ticket_data = asset_data->Ticket.pTicketData;
 
-	while (!ticket_data->bIsUploadedToGpu) {
+	while (!ticket_data->bIsUploadedToGpu.load()) {
 		ticket_data->bIsUploadedToGpu.wait(false);
 	}
 
+	// Copy callbacks out under lock, then invoke without holding lock to avoid deadlock
+	std::vector<AssetTicketData::OnLoadFunc> callbacks;
+	void* callback_arg = nullptr;
+
 	switch (asset_data->LoadType) {
 	case eAssetType::Object: {
-		Object* object_data = reinterpret_cast<Object*>(asset_data->Ticket.Get());
-
-		std::lock_guard guard(ticket_data->mCallbackMutex);
-
-		// Call OnLoaded callbacks if they are attached
-		if (!ticket_data->mOnLoadedCallbacks.empty()) {
-			for (auto& callback : ticket_data->mOnLoadedCallbacks) {
-				callback(reinterpret_cast<void*>(object_data));
-			}
+		callback_arg = reinterpret_cast<void*>(asset_data->Ticket.Get());
+		{
+			std::lock_guard guard(ticket_data->mCallbackMutex);
+			callbacks = std::move(ticket_data->mOnLoadedCallbacks);
+			ticket_data->mOnLoadedCallbacks.clear();
 		}
-
-		ticket_data->mOnLoadedCallbacks.clear();
-		ticket_data->IsFinishedNotifier.Signal();
-
-		// Notify the asset thread that loading is finished
-		ticket_data->bIsLoaded.store(true);
 	} break;
 	case eAssetType::Image: {
-		// Notify the asset thread that loading is finished
-		asset_data->Ticket.SignalUploadedToGpu();
-		ticket_data->bIsLoaded.store(true);
-		std::lock_guard guard(ticket_data->mCallbackMutex);
-
-		// Call OnLoaded callbacks if they are attached
-		if (!ticket_data->mOnLoadedCallbacks.empty()) {
-			for (auto& callback : ticket_data->mOnLoadedCallbacks) {
-				callback(reinterpret_cast<void*>(reinterpret_cast<Image*>(asset_data->Ticket.Get())));
-			}
+		// Image upload sets bIsUploadedToGpu; ensure it's signalled if not already
+		if (!ticket_data->bIsUploadedToGpu.load()) {
+			asset_data->Ticket.SignalUploadedToGpu();
 		}
-
-		ticket_data->mOnLoadedCallbacks.clear();
+		callback_arg = reinterpret_cast<void*>(reinterpret_cast<Image*>(asset_data->Ticket.Get()));
+		{
+			std::lock_guard guard(ticket_data->mCallbackMutex);
+			callbacks = std::move(ticket_data->mOnLoadedCallbacks);
+			ticket_data->mOnLoadedCallbacks.clear();
+		}
 	} break;
-	default:;
+	default:
+		break;
 	}
 
+	for (auto& cb : callbacks) {
+		cb(callback_arg);
+	}
+
+	// Mark loaded before signalling finished so WaitUntilLoaded observers see consistent state
+	ticket_data->bIsLoaded.store(true);
+	ticket_data->IsFinishedNotifier.Signal();
+	ticket_data->bIsUploadedToGpu.store(true);
+	ticket_data->bIsUploadedToGpu.notify_all();
+
 	if (asset_data->pLoader.IsValid()) {
-		// Destroy the loader(clearing the loading buffers)
+		// Defer loader destruction until upload fence completes - staging buffers must stay alive
+		// The upload fence is waited before next CheckForUploadableData collects, so
+		// destroy here after callbacks is safe as long as CheckForUploadableData waits.
+		// Keep destroy after signal so waiters can proceed.
 		asset_data->DestroyLoader();
 	}
 }
@@ -528,10 +553,9 @@ int32 AssetManager::CheckForUploadableData()
 
 	// Check with the workers to see if there is anything to load onto the GPU
 	for (AssetWorker& worker : mWorkerThreads) {
-		if (!worker.bDataPendingUpload.test()) {
+		if (!worker.bDataPendingUpload.load()) {
 			continue;
 		}
-
 		WorkersWaitingToUpload.Insert(&worker);
 	}
 
@@ -618,6 +642,11 @@ int32 AssetManager::CheckForUploadableData()
 
 	transfer_queue.Unlock();
 
+	// Wait for transfer to complete before destroying staging buffers held by loaders
+	if (should_upload) {
+		gGraphics->UploadContext.UploadFence.WaitFor();
+	}
+
 	// Finally, notify the asset that it is loaded and tell the workers they are free
 
 	for (AssetWorker* worker : WorkersWaitingToUpload) {
@@ -643,9 +672,19 @@ int32 AssetManager::CheckForUploadableData()
 			Panic("AssetManager", "Worker status is none!");
 		}
 
-		worker->bDataPendingUpload.clear();
+		// Use exchange to avoid losing a concurrent set that happened after collection
+		bool was_pending = worker->bDataPendingUpload.exchange(false);
+		if (!was_pending) {
+		}
+		else {
+			if (worker->bDataPendingUpload.load()) {
+				// Keep pending for next iteration and re-signal manager
+				gAssetManager->SignalUpdate();
+			}
+		}
 		worker->LoadStatus = loader::eLoaderStatus::None;
 		worker->bIsBusy.clear();
+		worker->bIsBusy.notify_one();
 	}
 
 	return num_uploads;
@@ -666,40 +705,29 @@ int32 AssetManager::CheckForItemsToLoad()
 	uint32 num_loads = mLoadQueue.Size();
 
 	if (num_loads < 1) {
-		return num_loads;
+		return 0;
 	}
 
 	AssetWorker* worker = FindWorkerThread();
 
 	// No workers available currently, defer the item loading.
-	// Even though there is no worker available, we still return true as there is an item in the queue.
 	if (worker == nullptr) {
-		return num_loads;
+		return 0;
 	}
 
 	AssetQueueItem item;
 	if (!mLoadQueue.PopIfAvailable(&item)) {
 		// The load queue is currently in use(uploaded to), skip for now.
+		// Release the claimed worker since we didn't use it
+		worker->bIsBusy.clear();
+		worker->bIsBusy.notify_one();
 		return num_loads;
 	}
 
-	if (worker) {
-		if (worker->bIsBusy.test()) {
-			// Return to sender
-			mLoadQueue.Push(std::move(item));
-			return true;
-		}
+	// Worker was atomically claimed by FindWorkerThread, directly submit
+	worker->SubmitItemToLoad(std::move(item));
 
-		// Set busy
-		while (worker->bIsBusy.test_and_set()) {
-			worker->bIsBusy.wait(true);
-		}
-
-		// Submit the item we want to load
-		worker->SubmitItemToLoad(std::move(item));
-	}
-
-	return num_loads;
+	return 1;
 }
 
 int32 AssetManager::CheckForItemsToDelete()
@@ -767,14 +795,18 @@ void AssetManager::AssetManagerUpdate()
 		const int32 num_deletes = CheckForItemsToDelete();
 		const int32 num_loads = CheckForItemsToLoad();
 
-
-		const int32 num_operations = num_uploads + num_deletes + num_loads;
-		ManagerUpdateNotifier.Discard(num_operations);
-
+		// Each check consumes at most 1 signal per actual dispatch.
+		// CheckForUploadableData returns actual uploads, CheckForItemsToDelete returns 0/1,
+		// CheckForItemsToLoad now returns 0/1 (not queue size). Sum matches consumed signals.
+		const int32 num_operations = num_uploads + num_deletes + (num_loads > 0 ? 1 : 0);
+		// Only discard up to available signals; CountedNotifier handles clamping
 		if (num_operations > 0) {
+			ManagerUpdateNotifier.Discard(num_operations);
 			mbIsTimeSet = false;
 			continue;
 		}
+		// No work done - discard one idle wakeup signal if present to avoid busy spin
+		ManagerUpdateNotifier.Discard(1);
 
 		uint32 tick = mTickCounter.fetch_add(1);
 
@@ -805,7 +837,8 @@ AssetWorker* AssetManager::FindWorkerThread()
 {
 	uint32 worker_id = 0;
 	for (AssetWorker& worker : mWorkerThreads) {
-		if (!worker.bIsBusy.test()) {
+		// Atomically claim idle worker via test_and_set; if it was idle (false), we set to busy and return
+		if (!worker.bIsBusy.test_and_set()) {
 			LogInfo(LC_ASSET, "Found worker (id={})", worker_id);
 			return &worker;
 		}

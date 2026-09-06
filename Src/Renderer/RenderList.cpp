@@ -6,7 +6,7 @@ namespace fx::renderer {
 
 static constexpr uint32 scMaxRenderable = 512;
 
-uint32 RenderList::Add(ePipelineName pl_name, const ObjectID& id)
+uint32 RenderList::Add(ePipelineName pl_name, const ObjectID id)
 {
 	if (!mSections.IsInited()) {
 		mSections.InitSize(scNumPipelines);
@@ -19,6 +19,7 @@ uint32 RenderList::Add(ePipelineName pl_name, const ObjectID& id)
 	if (!section.InUse.IsInited()) {
 		section.InUse.InitZero(scMaxRenderable);
 	}
+
 
 	uint32 index = section.InUse.FindNextFreeBit();
 
@@ -34,7 +35,7 @@ uint32 RenderList::Add(ePipelineName pl_name, const ObjectID& id)
 	return index;
 }
 
-void RenderList::Remove(ePipelineName pl_name, const ObjectID& id)
+void RenderList::Remove(ePipelineName pl_name, const ObjectID id)
 {
 	Assert(static_cast<uint32>(pl_name) < mSections.Capacity);
 	RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
@@ -46,7 +47,21 @@ void RenderList::Remove(ePipelineName pl_name, const ObjectID& id)
 	}
 }
 
-void RenderList::RemoveAllOfObject(const ObjectID& id)
+uint32 RenderList::GetObjectIndex(ePipelineName pl_name, const ObjectID id) const
+{
+	Assert(static_cast<uint32>(pl_name) < mSections.Capacity);
+	const RenderListSection& section = mSections[static_cast<uint32>(pl_name)];
+
+	for (uint32 object_index = 0; object_index < section.Objects.Size; object_index++) {
+		if (section.Objects[object_index] == id) {
+			return object_index;
+		}
+	}
+
+	return scNotFound;
+}
+
+void RenderList::RemoveAllOfObject(const ObjectID id)
 {
 	for (uint32 si = 0; si < scNumPipelines; si++) {
 		Remove(static_cast<ePipelineName>(si), id);

@@ -251,30 +251,25 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 
 	const String tcache_base_path = model_path.Str();
 
-	object->mMaterialID = gMaterialManager->NewMaterial(material_name, ePipelineName::Geometry, object->IsSkinned());
+	MaterialID material_id = gMaterialManager->NewMaterial(material_name, ePipelineName::Geometry, object->IsSkinned());
+	Material* material = gMaterialManager->GetMaterial(material_id);
 
-	Material* material = gMaterialManager->GetMaterial(object->mMaterialID);
+	object->SetMaterial(material_id);
 
 	// For some reason the peeber metallic roughness holds our diffuse texture
 	if (gltf_material->has_pbr_metallic_roughness) {
 		cgltf_texture_view& texture_view = gltf_material->pbr_metallic_roughness.base_color_texture;
 
 		if (!texture_view.texture) {
-			// MakeEmptyMaterialTexture(material, material->Diffuse);
 			material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
-
-			// material->Properties.BaseColor =
-			// Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
 		}
 		else {
 			MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "AL", material->Diffuse,
 											texture_view);
-			// material->Properties.BaseColor = Color::FromRGBA(1, 1, 1, 255);
 		}
 	}
 	else {
-		// There is no albedo texture on the model, use the base colour.
-		// material->Properties.BaseColor = Color::FromFloats(gltf_material->pbr_metallic_roughness.base_color_factor);
+		material->Diffuse.SetTicket(gAssetManager->GetNullImageTicket(eImageFormat::RGBA8_UNorm));
 	}
 
 	// Load the normalmap
@@ -287,6 +282,44 @@ void LoaderGltf::MakeMaterialForPrimitive(Object* object, cgltf_primitive* primi
 	if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture != nullptr) {
 		MakeMaterialTextureForPrimitive(model_name, tcache_base_path, material, "MR", material->MetallicRoughness,
 										gltf_material->pbr_metallic_roughness.metallic_roughness_texture);
+	}
+
+	// Handle glTF alpha mode / baseColorFactor alpha
+	{
+		float baseAlpha = 1.0f;
+		if (gltf_material->has_pbr_metallic_roughness) {
+			baseAlpha = gltf_material->pbr_metallic_roughness.base_color_factor[3];
+		}
+
+		if (gltf_material->alpha_mode == cgltf_alpha_mode_blend) {
+			// Blend mode: use baseColor alpha (and texture alpha in shader) for transparency
+			if (baseAlpha < 0.99f) {
+				material->SetAlpha(baseAlpha);
+			}
+			else {
+				// If baseColor is opaque but texture may have alpha, force transparent path
+				// so texAlpha * matAlpha blending works with depthWrite=false.
+				material->SetAlpha(0.99f);
+			}
+		}
+		else if (gltf_material->alpha_mode == cgltf_alpha_mode_mask) {
+			// Mask mode: opaque pipeline with alpha-test at 0.5 (shader ALPHA_CUTOFF)
+			material->SetAlpha(baseAlpha);
+			// Keep on opaque path; shader discard will handle cutout
+		}
+		else { // opaque
+			if (baseAlpha < 0.99f) {
+				// Opaque material with translucent base factor -> treat as blended
+				material->SetAlpha(baseAlpha);
+			}
+			else {
+				material->SetAlpha(1.0f);
+			}
+		}
+
+		if (gltf_material->unlit) {
+			material->SetUnlit(true);
+		}
 	}
 
 	material->Finalize();
@@ -302,7 +335,7 @@ void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh
 	// Similarly to `CreateGpuResource`, we are going to make the `object` into a container
 	// if there are multiple primitives.
 	if (has_multiple_primitives) {
-		current_object = gObjectManager->NewObject(container_object->Name.Get());
+		current_object = gObjectManager->NewObject(container_object->Name.Get(), MaterialID::scNull);
 	}
 
 	bool needs_new_object = false;
@@ -310,7 +343,7 @@ void LoaderGltf::BuildObjectsFromPrimitives(Object* container_object, cgltf_mesh
 	for (int i = 0; i < gltf_mesh->primitives_count; i++) {
 		if (needs_new_object) {
 			// Create a new object to load into next
-			current_object = gObjectManager->NewObject(container_object->Name.Get());
+			current_object = gObjectManager->NewObject(container_object->Name.Get(), MaterialID::scNull);
 			needs_new_object = false;
 		}
 
@@ -546,7 +579,8 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 
 	// If there are multiple objects, each object found will be attached to the output object.
 	if (has_multiple_meshes) {
-		current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++));
+		current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++),
+												   MaterialID::scNull);
 	}
 
 
@@ -556,7 +590,8 @@ void LoaderGltf::ProcessData(AssetTicket& ticket)
 	for (int32 node_index = 0; node_index < mpGltfData->nodes_count; node_index++) {
 		if (needs_new_object) {
 			// Create a new object to load into next
-			current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++));
+			current_object = gObjectManager->NewObject(std::format("{}_{}", output_object->Name.Get(), attach_id++),
+													   MaterialID::scNull);
 			needs_new_object = false;
 		}
 

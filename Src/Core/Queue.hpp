@@ -208,8 +208,8 @@ public:
 			return;
 		}
 
-		// Destroy all items remaining
-		for (uint32 index = 0; index < mSize; index++) {
+		// Destroy all items remaining - Pop decrements mSize, so while loop is needed
+		while (!IsEmpty()) {
 			Pop();
 		}
 

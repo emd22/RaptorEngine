@@ -31,47 +31,51 @@ public:
 			return;
 		}
 
-		IsFinishedNotifier.Signal();
-
-		bIsUploadedToGpu = true;
+		bIsUploadedToGpu.store(true);
 		bIsUploadedToGpu.notify_all();
 
 		bIsLoaded.store(true);
+		IsFinishedNotifier.Signal();
 	}
 
 	void SignalFinished() { IsFinishedNotifier.Signal(); }
 
 	void SignalUploadedToGpu()
 	{
-		bIsUploadedToGpu = true;
+		bIsUploadedToGpu.store(true);
 		bIsUploadedToGpu.notify_all();
 	}
 
 	void OnLoaded(void* item, const OnLoadFunc& on_loaded_callback)
 	{
-		std::lock_guard guard(mCallbackMutex);
-
-		// If the asset has already been loaded, call the callback immediately.
-		if (IsFinishedNotifier.IsSignalled()) {
-			on_loaded_callback(item);
-			return;
+		{
+			std::lock_guard guard(mCallbackMutex);
+			if (IsFinishedNotifier.IsSignalled()) {
+				// Unlock before invoking callback to avoid deadlock if callback re-enters OnLoaded
+			} else {
+				mOnLoadedCallbacks.push_back(on_loaded_callback);
+				return;
+			}
 		}
-
-		mOnLoadedCallbacks.push_back(on_loaded_callback);
+		on_loaded_callback(item);
 	}
 
 
 	void OnError(const OnErrorFunc& on_error_callback)
 	{
-		std::lock_guard guard(mCallbackMutex);
-
-		// If the asset has already been loaded, call the callback immediately.
-		if (IsFinishedNotifier.IsSignalled()) {
-			on_error_callback();
-			return;
+		OnErrorFunc to_call = nullptr;
+		{
+			std::lock_guard guard(mCallbackMutex);
+			if (IsFinishedNotifier.IsSignalled()) {
+				to_call = on_error_callback;
+			} else {
+				mOnErrorCallback = on_error_callback;
+				return;
+			}
 		}
-
-		mOnErrorCallback = on_error_callback;
+		if (to_call) {
+			to_call();
+		}
 	}
 
 
@@ -113,18 +117,35 @@ public:
 
 	AssetTicket& operator=(const AssetTicket& other)
 	{
+		if (this == &other) {
+			return *this;
+		}
+		// Increment new first to handle self-alias of pTicketData
+		if (other.pTicketData) {
+			other.pTicketData->UsageCount.fetch_add(1);
+		}
+		if (pTicketData) {
+			// Release old
+			if (pTicketData->UsageCount.fetch_sub(1) <= 1) {
+				delete pTicketData;
+			}
+		}
 		pTicketData = other.pTicketData;
 		mpData = other.mpData;
-
-		if (pTicketData) {
-			pTicketData->UsageCount.fetch_add(1);
-		}
 
 		return *this;
 	}
 
 	AssetTicket& operator=(AssetTicket&& other)
 	{
+		if (this == &other) {
+			return *this;
+		}
+		if (pTicketData) {
+			if (pTicketData->UsageCount.fetch_sub(1) <= 1) {
+				delete pTicketData;
+			}
+		}
 		pTicketData = other.pTicketData;
 		mpData = other.mpData;
 
@@ -192,8 +213,12 @@ public:
 		}
 
 		if (pTicketData->UsageCount.fetch_sub(1) <= 1) {
-			free(pTicketData);
+			delete pTicketData;
 			pTicketData = nullptr;
+		} else {
+			// Still shared, clear our pointer without freeing
+			pTicketData = nullptr;
+			mpData = nullptr;
 		}
 	}
 

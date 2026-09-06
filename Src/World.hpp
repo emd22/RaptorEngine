@@ -25,6 +25,13 @@ struct SceneDistanceBand
 
 class World
 {
+	struct TransparentObjectCarrier
+	{
+		ObjectID ID;
+		renderer::ePipelineName Pipeline;
+		float32 Distance;
+	};
+
 public:
 	World() = default;
 
@@ -71,6 +78,7 @@ private:
 	void RenderWorldGrid(const Camera& camera);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
+	void ExecuteTransparentRenderLists();
 	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
 	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);
 
@@ -79,7 +87,11 @@ private:
 
 	void RebuildFromTiles(TileIndex tile_index);
 
+	void SortTransparentObjects(renderer::Pipeline& pipeline, renderer::RenderListSection& section);
+
 public:
+	void NotifyObjectMaterialChanged(ObjectID id);
+
 	Name Name = "(unnamed)";
 	bool bRenderPhysicsObjects = false;
 	renderer::RenderList mRenderList;
@@ -104,6 +116,9 @@ private:
 	// manager.
 	uint32 mLastPhysicsUpdateState = UINT32_MAX;
 	SizedArray<physics::Body*> mCachedPhysicsBodies;
+
+	/// Sorted entries, only for transparent objects.
+	DynArray<TransparentObjectCarrier> SortedEntryBuffer;
 };
 
 } // namespace fx

@@ -30,7 +30,8 @@ public:
 	void Create();
 
 	ObjectID NewObjectID(const std::string& name, eObjectTag tags = eObjectTag::None);
-	Object* NewObject(const std::string& name, eObjectTag tags = eObjectTag::None);
+	Object* NewObject(const std::string& name, MaterialID material, eObjectTag tags = eObjectTag::None);
+
 	Object* GetObject(ObjectID id);
 	void DestroyObject(ObjectID& id);
 

@@ -3,6 +3,7 @@
 #include <Blockout.hpp>
 #include <Engine.hpp>
 #include <Script/ScriptManager.hpp>
+#include <World.hpp>
 
 namespace fx {
 
@@ -35,7 +36,7 @@ bool EditorMode::SelectObject(Object* object)
 
 	if (object == nullptr) {
 		if (mpLastSelectedObject != nullptr) {
-			mpLastSelectedObject->mMaterialID = mSelectedObjectPreviousMaterial;
+			mpLastSelectedObject->SetMaterial(mSelectedObjectPreviousMaterial);
 			mpLastSelectedObject = nullptr;
 		}
 
@@ -51,15 +52,16 @@ bool EditorMode::SelectObject(Object* object)
 		return false;
 	}
 
+	// Reset the material for the previously selected object
 	if (mpLastSelectedObject != nullptr) {
-		mpLastSelectedObject->mMaterialID = mSelectedObjectPreviousMaterial;
+		mpLastSelectedObject->SetMaterial(mSelectedObjectPreviousMaterial);
 		mpLastSelectedObject = nullptr;
 	}
 
 	mpLastSelectedObject = object;
-	mSelectedObjectPreviousMaterial = object->mMaterialID;
+	mSelectedObjectPreviousMaterial = object->GetMaterialID();
 
-	object->mMaterialID = gWorld->pBlockout->SelectionMaterialID;
+	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
 
 	if (mode_select_object) {
 		mode_select_object(reinterpret_cast<void*>(object), true);
@@ -92,7 +94,7 @@ void EditorMode::Unload()
 	}
 
 	if (mpLastSelectedObject != nullptr) {
-		mpLastSelectedObject->mMaterialID = mSelectedObjectPreviousMaterial;
+		mpLastSelectedObject->SetMaterial(mSelectedObjectPreviousMaterial);
 		mpLastSelectedObject = nullptr;
 	}
 }

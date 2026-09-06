@@ -812,21 +812,9 @@ void GraphicsBackend::Destroy()
 	LightGridBuffer.Destroy();
 	LightIndexListBuffer.Destroy();
 
-	// SpinLockContext<Queue<DeletionObject>> deletion_queue = mDeletionQueue.GetQueue();
-
-	// while (!deletion_queue->IsEmpty()) {
-	// 	LogInfo("DELETING?");
-	// 	ProcessDeletionQueue(true, deletion_queue.Get());
-
-	// 	// insert a small delay to avoid the processor spinning out while
-	// 	// waiting for an object. this allows handing the core off to other threads.
-	// 	std::this_thread::sleep_for(std::chrono::nanoseconds(100));
-	// }
-
-	// deletion_queue.Unlock();
-
 	gAssetManager->ShutdownDeletionQueue();
 
+	TransferSync.Destroy();
 
 	GpuBufferPrintUndestroyed();
 

@@ -131,8 +131,24 @@ struct AssetQueueItem
 
 		item.Data = AssetItemData::Make<TLoaderType>(loader, ticket, asset_type);
 
-		item.pcRawData = data.pData;
-		item.DataSize = data.Size;
+		// Take ownership via malloc copy so worker can safely free, regardless of caller allocator
+		if (data.pData && data.Size > 0) {
+			uint8* copy = static_cast<uint8*>(std::malloc(data.Size));
+			if (copy) {
+				std::memcpy(copy, data.pData, data.Size);
+				item.pcRawData = copy;
+				item.DataSize = data.Size;
+				item.bOwnsRawData = true;
+			} else {
+				item.pcRawData = nullptr;
+				item.DataSize = 0;
+				item.bOwnsRawData = false;
+			}
+		} else {
+			item.pcRawData = nullptr;
+			item.DataSize = 0;
+			item.bOwnsRawData = false;
+		}
 		item.AssetLoadOp = eAssetLoadOp::ProcessAndUpload;
 
 		return item;
@@ -166,22 +182,37 @@ struct AssetQueueItem
 
 	AssetQueueItem& operator=(AssetQueueItem&& other)
 	{
-		mMutex.lock();
+		if (this == &other) {
+			return *this;
+		}
+		// Lock both mutexes in address order to avoid deadlock
+		std::mutex *a = &mMutex, *b = &other.mMutex;
+		if (a > b) std::swap(a, b);
+		std::scoped_lock lock(*a, *b);
 
-		Path = other.Path;
+		Path = std::move(other.Path);
 		Data = std::move(other.Data);
 		pcRawData = other.pcRawData;
 		DataSize = other.DataSize;
+		bOwnsRawData = other.bOwnsRawData;
 		ImgInfo = std::move(other.ImgInfo);
 		AssetLoadOp = other.AssetLoadOp;
 
 		other.pcRawData = nullptr;
 		other.DataSize = 0;
+		other.bOwnsRawData = false;
+		other.AssetLoadOp = eAssetLoadOp::None;
 		other.ImgInfo.ImageData.SetNull();
 
-		mMutex.unlock();
-
 		return *this;
+	}
+
+	~AssetQueueItem()
+	{
+		if (bOwnsRawData && pcRawData) {
+			std::free(const_cast<uint8*>(pcRawData));
+			pcRawData = nullptr;
+		}
 	}
 
 	LockContext<AssetItemData> GetDataContext() { return LockContext<AssetItemData>(mMutex, Data); }
@@ -194,6 +225,7 @@ public:
 	// Data for loading from memory
 	const uint8* pcRawData = nullptr;
 	uint32 DataSize = 0;
+	bool bOwnsRawData = false;
 
 	ImageInfo ImgInfo;
 

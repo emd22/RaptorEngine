@@ -58,7 +58,8 @@ public:
 
 public:
 	Object() = default;
-	Object(const ObjectID& id);
+	Object(const ObjectID id);
+	Object(const ObjectID id, const MaterialID material);
 
 	void MakeInstanceOf(const ObjectID& source);
 
@@ -79,12 +80,6 @@ public:
 	void SetRotation(const Quat& rotation) override;
 
 	void OnAttached(World* scene) override;
-
-	void PhysicsCreatePrimitive(physics::ePrimitiveType primitive_type, const Vec3f& dimensions,
-								physics::eMotionType motion_type, const physics::BodyProps& physics_properties);
-
-	void PhysicsCreateMesh(Ref<PrimitiveMesh> physics_mesh, physics::eMotionType motion_type,
-						   const physics::BodyProps& physics_properties);
 
 	void PrintDebug() const;
 
@@ -113,10 +108,7 @@ public:
 	 */
 	FX_FORCE_INLINE const MaterialID& GetMaterialID() const { return mMaterialID; };
 
-	/**
-	 * @brief Sets the material ID for the object.
-	 */
-	FX_FORCE_INLINE void SetMaterialID(const MaterialID& id) { mMaterialID = id; };
+	void SetMaterial(const MaterialID& id);
 
 	/////////////////////////////////////
 	// Physics
@@ -197,9 +189,9 @@ public:
 
 	Ref<script::FoxScript> pScript { nullptr };
 
-	MaterialID mMaterialID = MaterialID::scNull;
 
 private:
+	MaterialID mMaterialID = MaterialID::scNull;
 	/// Object slots allocated following this object. Used by other instances of this object.
 	uint16 mInstanceSlots = 0;
 	uint16 mInstanceSlotsInUse = 0;

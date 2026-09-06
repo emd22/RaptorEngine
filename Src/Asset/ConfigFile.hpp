@@ -36,6 +36,14 @@ struct ConfigPrimitive
 public:
 	ConfigPrimitive() = default;
 
+	~ConfigPrimitive()
+	{
+		if (Type == ePrimitiveType::String && mStringValue) {
+			free(mStringValue);
+			mStringValue = nullptr;
+		}
+	}
+
 	// template <typename T>
 	// ConfigPrimitive(T value)
 	// {
@@ -47,7 +55,7 @@ public:
 		Type = other.Type;
 
 		if (Type == ePrimitiveType::String) {
-			mStringValue = strdup(other.mStringValue);
+			mStringValue = other.mStringValue ? strdup(other.mStringValue) : nullptr;
 		}
 		else if (Type == ePrimitiveType::Int) {
 			mIntValue = other.mIntValue;
@@ -55,6 +63,51 @@ public:
 		else if (Type == ePrimitiveType::Float) {
 			mFloatValue = other.mFloatValue;
 		}
+	}
+
+	ConfigPrimitive(ConfigPrimitive&& other) noexcept
+	{
+		Type = other.Type;
+		if (Type == ePrimitiveType::String) {
+			mStringValue = other.mStringValue;
+			other.mStringValue = nullptr;
+		}
+		else if (Type == ePrimitiveType::Int) {
+			mIntValue = other.mIntValue;
+		}
+		else if (Type == ePrimitiveType::Float) {
+			mFloatValue = other.mFloatValue;
+		}
+		else {
+			mStringValue = nullptr;
+		}
+		other.Type = ePrimitiveType::None;
+	}
+
+	ConfigPrimitive& operator=(ConfigPrimitive&& other) noexcept
+	{
+		if (this == &other) return *this;
+		if (Type == ePrimitiveType::String && mStringValue) {
+			free(mStringValue);
+			mStringValue = nullptr;
+		}
+		Type = other.Type;
+		if (Type == ePrimitiveType::String) {
+			mStringValue = other.mStringValue;
+			other.mStringValue = nullptr;
+		}
+		else if (Type == ePrimitiveType::Int) {
+			mIntValue = other.mIntValue;
+		}
+		else if (Type == ePrimitiveType::Float) {
+			mFloatValue = other.mFloatValue;
+		}
+		else {
+			mStringValue = nullptr;
+		}
+		other.Type = ePrimitiveType::None;
+		other.mStringValue = nullptr;
+		return *this;
 	}
 
 	template <typename T>
@@ -71,10 +124,15 @@ public:
 
 	ConfigPrimitive& operator=(const ConfigPrimitive& other)
 	{
+		if (this == &other) return *this;
+		if (Type == ePrimitiveType::String && mStringValue) {
+			free(mStringValue);
+			mStringValue = nullptr;
+		}
 		Type = other.Type;
 
 		if (Type == ePrimitiveType::String) {
-			mStringValue = strdup(other.mStringValue);
+			mStringValue = other.mStringValue ? strdup(other.mStringValue) : nullptr;
 		}
 		else if (Type == ePrimitiveType::Int) {
 			mIntValue = other.mIntValue;
@@ -88,10 +146,14 @@ public:
 
 	void Set(const ConfigPrimitive& other)
 	{
+		if (Type == ePrimitiveType::String && mStringValue) {
+			free(mStringValue);
+			mStringValue = nullptr;
+		}
 		Type = other.Type;
 
 		if (Type == ePrimitiveType::String) {
-			mStringValue = strdup(other.mStringValue);
+			mStringValue = other.mStringValue ? strdup(other.mStringValue) : nullptr;
 		}
 		else if (Type == ePrimitiveType::Int) {
 			mIntValue = other.mIntValue;
@@ -108,24 +170,30 @@ public:
 		requires std::is_integral_v<TIntType>
 	TIntType Get() const
 	{
-		if (Type != ePrimitiveType::Int) {
-			LogWarning(LC_CORE, "Attempting to retrieve int type from non-int!");
-			return 0;
+		if (Type == ePrimitiveType::Int) {
+			return static_cast<TIntType>(mIntValue);
 		}
-
-		return static_cast<TIntType>(mIntValue);
+		if (Type == ePrimitiveType::Float) {
+			// Tolerate int retrieval from float (e.g. [1.0, 2.0] -> int)
+			return static_cast<TIntType>(mFloatValue);
+		}
+		LogWarning(LC_CORE, "Attempting to retrieve int type from non-int/float!");
+		return 0;
 	}
 
 	template <typename TFloatType>
 		requires std::is_floating_point_v<TFloatType>
 	TFloatType Get() const
 	{
-		if (Type != ePrimitiveType::Float) {
-			LogWarning(LC_CORE, "Attempting to retrieve float type from non-float!");
-			return 0.0f;
+		if (Type == ePrimitiveType::Float) {
+			return static_cast<TFloatType>(mFloatValue);
 		}
-
-		return static_cast<TFloatType>(mFloatValue);
+		if (Type == ePrimitiveType::Int) {
+			// Tolerate float retrieval from int (e.g. Size=[64,1,64] -> float)
+			return static_cast<TFloatType>(mIntValue);
+		}
+		LogWarning(LC_CORE, "Attempting to retrieve float type from non-float/int!");
+		return 0.0f;
 	}
 
 	template <>
@@ -145,6 +213,10 @@ public:
 					  "ConfigPrimitive::Set does not support this type. Supported types are integral, floating point, and "
 					  "string (char*, const char*, or std::string) types.");
 
+		if (Type == ePrimitiveType::String && mStringValue) {
+			free(mStringValue);
+			mStringValue = nullptr;
+		}
 		if constexpr (std::is_integral_v<TType>) {
 			Type = ePrimitiveType::Int;
 			mIntValue = value;
@@ -161,6 +233,9 @@ public:
 
 	void Set(const std::string& str)
 	{
+		if (Type == ePrimitiveType::String && mStringValue) {
+			free(mStringValue);
+		}
 		Type = ePrimitiveType::String;
 		mStringValue = strdup(str.c_str());
 	}
@@ -311,24 +386,28 @@ public:
 		requires std::is_integral_v<TIntType>
 	TIntType GetValue() const
 	{
-		if (Type != ePrimitiveType::Int) {
-			LogWarning(LC_CORE, "Attempting to retrieve int type from non-int!");
-			return 0;
+		if (Type == ePrimitiveType::Int) {
+			return static_cast<TIntType>(mIntValue);
 		}
-
-		return static_cast<TIntType>(mIntValue);
+		if (Type == ePrimitiveType::Float) {
+			return static_cast<TIntType>(mFloatValue);
+		}
+		LogWarning(LC_CORE, "Attempting to retrieve int type from non-int/float!");
+		return 0;
 	}
 
 	template <typename TFloatType>
 		requires std::is_floating_point_v<TFloatType>
 	TFloatType GetValue() const
 	{
-		if (Type != ePrimitiveType::Float) {
-			LogWarning(LC_CORE, "Attempting to retrieve float type from non-float!");
-			return 0.0f;
+		if (Type == ePrimitiveType::Float) {
+			return static_cast<TFloatType>(mFloatValue);
 		}
-
-		return static_cast<TFloatType>(mFloatValue);
+		if (Type == ePrimitiveType::Int) {
+			return static_cast<TFloatType>(mIntValue);
+		}
+		LogWarning(LC_CORE, "Attempting to retrieve float type from non-float/int!");
+		return 0.0f;
 	}
 
 	template <>

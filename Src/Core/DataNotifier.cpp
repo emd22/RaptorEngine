@@ -144,10 +144,15 @@ void CountedNotifier::Discard(int n)
 {
     std::unique_lock<std::mutex> lock(mMutex);
 
+    if (n <= 0) {
+        return;
+    }
     if ((mNumberOfSignals - n) >= 0) {
         mNumberOfSignals -= n;
         return;
     }
+    // Clamp to zero instead of leaving excess signals
+    mNumberOfSignals = 0;
 }
 
 void CountedNotifier::Reset()

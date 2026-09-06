@@ -13,6 +13,7 @@
 #include <Core/Types.hpp>
 #include <Renderer/PipelineNames.hpp>
 
+
 namespace fx {
 class Object;
 struct ObjectID;
@@ -28,12 +29,22 @@ struct RenderListSection
 class RenderList
 {
 public:
+	static constexpr uint32 scNotFound = UINT32_MAX;
+
+public:
 	RenderList() = default;
 
-	uint32 Add(ePipelineName pl_name, const ObjectID& id);
+	uint32 Add(ePipelineName pl_name, const ObjectID id);
 
-	void Remove(ePipelineName pl_name, const ObjectID& id);
-	void RemoveAllOfObject(const ObjectID& id);
+	void Remove(ePipelineName pl_name, const ObjectID id);
+	void RemoveAllOfObject(const ObjectID id);
+
+
+	/**
+	 * @brief Gets the object's index in the given pipeline (section) of the renderlist. Returns scNotFound if not
+	 * found.
+	 */
+	uint32 GetObjectIndex(ePipelineName pl_name, const ObjectID id) const;
 
 	RenderListSection& GetSection(ePipelineName pl_name);
 

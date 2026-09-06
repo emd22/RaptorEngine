@@ -193,9 +193,7 @@ FSOutput main(FSInput input)
     Material material = bMaterialBuffer[input.uiMaterialIndex];
     float baseAlpha = saturate(texAlpha * material.fAlpha);
 
-    // Early discard for fully transparent texels (leaves, cutouts)
-    // Keep threshold low so 0.5 material opacity still blends
-    if (baseAlpha < 0.01) {
+    if (baseAlpha < ALPHA_CUTOFF) {
         discard;
     }
 

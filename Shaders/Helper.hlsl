@@ -12,11 +12,12 @@
 
 #define F_PARAMTEST() ;
 
+#define ALPHA_CUTOFF 0.5
+
 struct Object
 {
 	float4x4 mWorld;
 };
-
 
 /// Generates UnpackUnorm4x8
 [[vk::ext_instruction(64, "GLSL.std.450")]]

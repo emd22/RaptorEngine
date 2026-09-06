@@ -110,11 +110,9 @@ class SpinLockGuard
 public:
     FX_FORCE_INLINE SpinLockGuard(std::atomic_flag& af) : mAtomicFlag(af)
     {
-        while (af.test()) {
+        while (af.test_and_set()) {
             af.wait(true);
         }
-
-        af.test_and_set();
 
         mbIsLocked = true;
     }

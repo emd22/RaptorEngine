@@ -269,23 +269,6 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 
-		BlendAttachment blend = BlendAttachment {
-			.Enabled = true,
-			.BlendOp = {
-				.Ops = {
-					.Alpha = VK_BLEND_OP_ADD,
-					.Color = VK_BLEND_OP_ADD,
-				},
-			},
-			.AlphaBlend { .Ops {
-				.Src = VK_BLEND_FACTOR_ONE,
-				.Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-			} },
-			.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-		};
-
-		gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
-
 		// Set 0 (Global / Per Frame)
 
 		// bObjectBuffer
@@ -334,24 +317,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" } });
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
-
-		{
-			BlendAttachment blend = BlendAttachment {
-				.Enabled = true,
-				.BlendOp = {
-					.Ops = {
-						.Alpha = VK_BLEND_OP_ADD,
-						.Color = VK_BLEND_OP_ADD,
-					},
-				},
-				.AlphaBlend { .Ops {
-					.Src = VK_BLEND_FACTOR_ONE,
-					.Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-				} },
-				.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-			};
-			gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
-		}
+		// Opaque: no blending
 
 		// Set 0 (Global / Per Frame)
 
@@ -408,24 +374,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "USE_NORMAL_MAPS", .pcValue = "1" },
 													 ShaderMacro { .pcName = "USE_SKINNING", .pcValue = "1" } });
 		gPSOBuild->SetCullMode(eCullMode::Back);
-
-		{
-			BlendAttachment blend = BlendAttachment {
-				.Enabled = true,
-				.BlendOp = {
-					.Ops = {
-						.Alpha = VK_BLEND_OP_ADD,
-						.Color = VK_BLEND_OP_ADD,
-					},
-				},
-				.AlphaBlend { .Ops {
-					.Src = VK_BLEND_FACTOR_ONE,
-					.Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-				} },
-				.ColorBlend { .Ops { .Src = VK_BLEND_FACTOR_SRC_ALPHA, .Dst = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA } },
-			};
-			gPSOBuild->SetTargetBlend(ForwardPass.GetTargetIndex(eImageFormat::RGBA16_Float), blend);
-		}
+		// Opaque: no blending (alpha handled via discard at AlphaCutoff)
 
 		// Set 0 (Global / Per Frame)
 
@@ -483,7 +432,7 @@ void TiledForwardRenderer::CreateForwardPSO()
 
 		gPSOBuild->SetPushConstants(eShaderType::Vertex | eShaderType::Pixel, sizeof(DrawPushConstants));
 		gPSOBuild->UseRenderStage(ForwardPass);
-		gPSOBuild->SetShader(eShaderName::Forward, {});
+		gPSOBuild->SetShader(eShaderName::Forward, { ShaderMacro { .pcName = "ALPHA_CUTOFF", .pcValue = "0.01" } });
 		gPSOBuild->SetVertexType(eVertexType::Default);
 		gPSOBuild->SetCullMode(eCullMode::Back);
 		gPSOBuild->SetDepthWrite(false);
