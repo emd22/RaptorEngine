@@ -30,8 +30,6 @@ static void N_object_move_to(Object* obj, FLOAT4 position)
 		return;
 	}
 
-	LogInfo("Move to: {}", Vec3f(position));
-
 	obj->SetPosition(Vec3f(position));
 }
 

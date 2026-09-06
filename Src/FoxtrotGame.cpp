@@ -414,6 +414,16 @@ void FoxtrotGame::ProcessControls()
 		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1));
 	}
 
+	// Translate
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_T)) {
+		SwitchEditorMode(eEditorMode::Translate);
+	}
+
+	// Scale
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
+		SwitchEditorMode(eEditorMode::Scale);
+	}
+
 
 	if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
 		gWorld->Player.bIsSprinting = true;
@@ -432,18 +442,10 @@ void FoxtrotGame::ProcessControls()
 		LogInfo("Reloading all scripts...");
 		gScriptManager->ReloadAllScripts();
 
-		for (EditorMode* mode : EditorModes) {
-			mode->ReloadHotFunctions();
+		if (pSelectedEditorMode != nullptr) {
+			pSelectedEditorMode->Load();
 		}
 	}
-
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_I)) {
-		Object* skybox = gObjectManager->FindObject(HashStr32("Skybox"));
-		if (skybox) {
-			gWorld->mRenderList.CheckForObjectDuplicates(skybox->ID);
-		}
-	}
-
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
 		const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();
 

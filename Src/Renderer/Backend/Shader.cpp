@@ -141,7 +141,7 @@ Ref<ShaderProgram> Shader::LoadUncachedProgram(eShaderType shader_type, const Si
 
 		// Now that the shader is officially loaded, move over the reflection data.
 		program->Reflection = std::move(program_data.Reflection);
-		program->PrintReflection();
+		// program->PrintReflection();
 
 		return program;
 	}
