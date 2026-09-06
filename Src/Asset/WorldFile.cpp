@@ -126,6 +126,10 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	ConfigEntry* box = collider_entry.GetMember(HashStr32("Box"));
 	if (box != nullptr) {
 		Vec3f size = box->GetMemberValue(HashStr32("Size"), Vec3f::sOne);
+		if (size.X <= 0.0f || size.Y <= 0.0f || size.Z <= 0.0f) {
+			LogWarning(LC_PHYSICS, "Collider '{}' has invalid Size {} - falling back to 1,1,1", collider_name, size);
+			size = Vec3f::sOne;
+		}
 
 		phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, size, motion_type, physics::BodyProps {});
 	}

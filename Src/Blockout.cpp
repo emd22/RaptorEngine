@@ -243,6 +243,14 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 		.bAlignUVs = true,
 	};
 
+	auto clamp_scale = [](float v) { return std::max(v, 0.01f); };
+	cgo.Left.Scale = clamp_scale(cgo.Left.Scale);
+	cgo.Right.Scale = clamp_scale(cgo.Right.Scale);
+	cgo.Top.Scale = clamp_scale(cgo.Top.Scale);
+	cgo.Bottom.Scale = clamp_scale(cgo.Bottom.Scale);
+	cgo.Front.Scale = clamp_scale(cgo.Front.Scale);
+	cgo.Back.Scale = clamp_scale(cgo.Back.Scale);
+
 	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
 	eCProtoMat mat_index = static_cast<eCProtoMat>(entry.GetMemberValue<int>(HashStr32("mat"), 0));

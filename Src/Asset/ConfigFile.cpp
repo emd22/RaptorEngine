@@ -20,16 +20,30 @@ namespace fx {
 
 ConfigEntry& ConfigEntry::operator=(ConfigEntry&& other)
 {
-	if (other.Type == ConfigEntry::ePrimitiveType::String) {
-		mStringValue = other.mStringValue;
-		other.mStringValue = nullptr;
-	}
-	else {
-		Set(other);
+	// Free old string if we had one
+	if (Type == ePrimitiveType::String && mStringValue) {
+		free(mStringValue);
+		mStringValue = nullptr;
 	}
 
-	Type = other.Type;
-	other.Type = ConfigEntry::ePrimitiveType::None;
+	if (other.Type == ePrimitiveType::String) {
+		mStringValue = other.mStringValue;
+		other.mStringValue = nullptr;
+		Type = other.Type;
+	}
+	else if (other.Type == ePrimitiveType::Int) {
+		Type = other.Type;
+		mIntValue = other.mIntValue;
+	}
+	else if (other.Type == ePrimitiveType::Float) {
+		Type = other.Type;
+		mFloatValue = other.mFloatValue;
+	}
+	else {
+		Type = other.Type;
+		mStringValue = nullptr;
+	}
+	other.Type = ePrimitiveType::None;
 
 	Members = std::move(other.Members);
 	ArrayData = std::move(other.ArrayData);
@@ -126,8 +140,8 @@ ConfigEntry* ConfigEntry::GetMember(const Hash32 name_hash) const
 
 void ConfigEntry::AppendValue(const Vec3f& vec)
 {
-	if (!Members.IsInited()) {
-		Members.Create(4);
+	if (!ArrayData.IsInited()) {
+		ArrayData.Create(4);
 	}
 
 	AppendValue(ConfigPrimitive::FromValue(vec.X));
@@ -137,8 +151,8 @@ void ConfigEntry::AppendValue(const Vec3f& vec)
 
 void ConfigEntry::AppendValue(const Vec4f& vec)
 {
-	if (!Members.IsInited()) {
-		Members.Create(5);
+	if (!ArrayData.IsInited()) {
+		ArrayData.Create(5);
 	}
 
 	AppendValue(ConfigPrimitive::FromValue(vec.X));
@@ -150,8 +164,8 @@ void ConfigEntry::AppendValue(const Vec4f& vec)
 
 void ConfigEntry::AppendValue(const Quat& quat)
 {
-	if (!Members.IsInited()) {
-		Members.Create(5);
+	if (!ArrayData.IsInited()) {
+		ArrayData.Create(5);
 	}
 
 	AppendValue(ConfigPrimitive::FromValue(quat.X));
@@ -163,15 +177,15 @@ void ConfigEntry::AppendValue(const Quat& quat)
 
 ConfigEntry::~ConfigEntry()
 {
-	if (Type == ePrimitiveType::String && mStringValue != nullptr) {
-		free(mStringValue);
-	}
-
+	// String memory freed by ConfigPrimitive base destructor
 	Type = ePrimitiveType::None;
 
 	mStringValue = nullptr;
 	if (Members.IsInited()) {
 		Members.Destroy();
+	}
+	if (ArrayData.IsInited()) {
+		ArrayData.Destroy();
 	}
 }
 

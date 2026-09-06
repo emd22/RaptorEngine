@@ -132,7 +132,7 @@ public:
 			return;
 		}
 
-		if constexpr (std::is_trivially_destructible<TElementType>::value) {
+		if constexpr (!std::is_trivially_destructible<TElementType>::value) {
 			for (size_t i = 0; i < Size; i++) {
 				TElementType& element = pData[i];
 				element.~TElementType();
@@ -305,7 +305,8 @@ public:
 	void RemoveLast()
 	{
 		AssertMsg(Size > 0, "No elements remaining!");
-		TElementType* element = &pData[Size--];
+		--Size;
+		TElementType* element = &pData[Size];
 
 		if (std::is_destructible_v<TElementType>) {
 			element->~TElementType();

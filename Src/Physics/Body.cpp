@@ -28,9 +28,13 @@ void Body::CreatePrimitiveBody(ePrimitiveType primitive_type, const Vec3f& dimen
 
 	JPH::RVec3 jolt_dimensions;
 
-	// No negatives or zeros allowed here, bucko
-	Dimensions = dimensions;
-
+	constexpr float scMinDim = 0.01f;
+	if (dimensions.X <= 0.0f || dimensions.Y <= 0.0f || dimensions.Z <= 0.0f) {
+		LogWarning(LC_PHYSICS, "Creating primitive collider with invalid dimensions {} - clamping to minimum {}",
+				   dimensions, scMinDim);
+	}
+	Dimensions = Vec3f(std::max(dimensions.X, scMinDim), std::max(dimensions.Y, scMinDim),
+					   std::max(dimensions.Z, scMinDim));
 
 	// Jolt uses half dimensions (i.e. radius vs diameter) so we need to give it half of our shizzle
 	(Dimensions * 0.5).ToJoltVec3(jolt_dimensions);

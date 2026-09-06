@@ -116,7 +116,7 @@ public:
 	std::atomic_bool bRunning = { true };
 
 	std::atomic_flag bIsBusy = ATOMIC_FLAG_INIT;
-	std::atomic_flag bDataPendingUpload = ATOMIC_FLAG_INIT;
+	std::atomic_bool bDataPendingUpload = { false };
 
 	ThreadID WorkerTID;
 	// std::thread Thread;
@@ -321,6 +321,7 @@ private:
 	uint32 mLastActiveTick = 0;
 
 	std::unordered_map<eImageFormat, fx::Image*> mNullImageList;
+	std::mutex mNullImageMutex;
 
 	bool mbIsTimeSet = false;
 	std::chrono::system_clock::time_point mLastActiveTime;

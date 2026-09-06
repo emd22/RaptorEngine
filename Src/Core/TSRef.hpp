@@ -137,12 +137,13 @@ public:
     {
         // Since we want to ensure aligned laod/store on the ref count object as well, we should ensure that the T
         // object is aligned on a 16 byte boundary.
-        uint8* raw_ptr = gEnginePool->Alloc<uint8>(MathUtil::AlignValue<16>(sizeof(T)) + sizeof(TSRefCount));
+        const size_t aligned_size = MathUtil::AlignValue<16>(sizeof(T));
+        uint8* raw_ptr = gEnginePool->Alloc<uint8>(aligned_size + sizeof(TSRefCount));
 
         T* obj_ptr = reinterpret_cast<T*>(raw_ptr);
-        TSRefCount* count_ptr = reinterpret_cast<TSRefCount*>(raw_ptr + sizeof(T));
+        TSRefCount* count_ptr = reinterpret_cast<TSRefCount*>(raw_ptr + aligned_size);
 
-        Assert(reinterpret_cast<uint8*>(count_ptr) - sizeof(T) == raw_ptr);
+        Assert(reinterpret_cast<uint8*>(count_ptr) - aligned_size == raw_ptr);
 
         // Construct the ref count
         ::new (count_ptr) TSRefCount();
@@ -176,6 +177,9 @@ public:
 
     TSRef& operator=(const TSRef& other)
     {
+        if (this == &other) {
+            return *this;
+        }
         // If there is already a pointer in this reference, decrement or destroy it
         // This will be an infinite memory printing machine if this is not here
         if (mpPtr && mpRefCnt) {
