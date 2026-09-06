@@ -20,9 +20,6 @@ uint32 RenderList::Add(ePipelineName pl_name, const ObjectID id)
 		section.InUse.InitZero(scMaxRenderable);
 	}
 
-	if (PipelineNameUtil::IsTransparent(pl_name)) {
-		section.SortedEntryBuffer.SetPageSize(32);
-	}
 
 	uint32 index = section.InUse.FindNextFreeBit();
 

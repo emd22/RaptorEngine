@@ -25,6 +25,13 @@ struct SceneDistanceBand
 
 class World
 {
+	struct TransparentObjectCarrier
+	{
+		ObjectID ID;
+		renderer::ePipelineName Pipeline;
+		float32 Distance;
+	};
+
 public:
 	World() = default;
 
@@ -109,6 +116,9 @@ private:
 	// manager.
 	uint32 mLastPhysicsUpdateState = UINT32_MAX;
 	SizedArray<physics::Body*> mCachedPhysicsBodies;
+
+	/// Sorted entries, only for transparent objects.
+	DynArray<TransparentObjectCarrier> SortedEntryBuffer;
 };
 
 } // namespace fx

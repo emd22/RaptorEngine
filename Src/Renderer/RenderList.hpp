@@ -24,9 +24,6 @@ struct RenderListSection
 {
 	DynArray<ObjectID> Objects;
 	Bitset InUse;
-
-	/// Sorted entries, only for transparent objects.
-	DynArray<std::pair<ObjectID, float32>> SortedEntryBuffer;
 };
 
 class RenderList
