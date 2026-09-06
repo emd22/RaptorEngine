@@ -48,9 +48,14 @@ static void AddObjectToRenderList(Object* object, World* scene)
 		Material* material = gMaterialManager->GetMaterial(object->GetMaterialID());
 		ePipelineName pipeline_name = material->GetRequiredPipeline();
 
+
 		if (IsTransparentMaterial(material)) {
 			pipeline_name = GetTransparentPipeline(pipeline_name);
 		}
+
+		// if (gWorld->mRenderList.GetObjectIndex(pipeline_name, object->ID) != RenderList::scNotFound) {
+		// 	return;
+		// }
 
 		LogInfo("Adding Object '{}' to renderlist pipeline {}", object->Name.Get(),
 				PipelineNameUtil::GetName(pipeline_name));
@@ -109,6 +114,7 @@ void World::Attach(AssetTicket object_ticket)
 		[this](void* item_ptr)
 		{
 			Object* object = static_cast<Object*>(item_ptr);
+			object->bIsAddedToWorld.store(true);
 			AddObjectToRenderList(object, this);
 			gWorldGrid->AddObject(object->ID);
 		});

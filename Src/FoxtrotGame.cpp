@@ -437,6 +437,12 @@ void FoxtrotGame::ProcessControls()
 		}
 	}
 
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_I)) {
+		Object* skybox = gObjectManager->FindObject(HashStr32("Skybox"));
+		if (skybox) {
+			gWorld->mRenderList.CheckForObjectDuplicates(skybox->ID);
+		}
+	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
 		const SizedArray<ObjectID>& nearby_objects = gWorldGrid->GetNearbyObjects();

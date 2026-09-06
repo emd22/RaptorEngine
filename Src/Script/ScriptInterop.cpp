@@ -135,7 +135,7 @@ static bool N_is_key_pressed(uint32 key) { return ControlManager::IsKeyPressed(s
 
 static float N_float_sign(float value) { return MathUtil::GetSign(value); }
 
-static void N_blockout_reload_object(Object* object) { gWorld->pBlockout->ReloadSingleObject(object); }
+static void N_blockout_reload_object(Object* object) { gWorld->pBlockout->RebuildObject(object); }
 
 static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magnitude)
 {

@@ -39,6 +39,8 @@ public:
 	void Remove(ePipelineName pl_name, const ObjectID id);
 	void RemoveAllOfObject(const ObjectID id);
 
+	int32 CheckForObjectDuplicates(const ObjectID id) const;
+
 
 	/**
 	 * @brief Gets the object's index in the given pipeline (section) of the renderlist. Returns scNotFound if not

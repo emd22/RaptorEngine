@@ -333,6 +333,47 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 }
 
 
+void Blockout::RebuildObject(Object* object)
+{
+	CubeGenOptions cgo {
+		.Left = { .Scale = -object->Bounds.Min.X },
+		.Right = { .Scale = object->Bounds.Max.X },
+		.Top = { .Scale = object->Bounds.Max.Y },
+		.Bottom = { .Scale = -object->Bounds.Min.Y },
+		.Front = { .Scale = object->Bounds.Max.Z },
+		.Back = { .Scale = -object->Bounds.Min.Z },
+
+		.bAlignUVs = true,
+	};
+
+	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
+	object->pMesh = cube_mesh->AsDefaultMesh();
+
+	physics::Body* body = gPhysics->GetBody(object->PhysicsID);
+
+	Vec3f midpoint = body->Midpoint;
+	Vec3f position = object->GetPosition();
+	Quat rotation = body->GetRotation();
+
+	physics::eMotionType motion_type = body->GetMotionType();
+
+
+	gPhysics->DestroyBody(object->PhysicsID);
+
+	physics::Body* phys = gPhysics->NewBody(object->Name.Get());
+	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), motion_type,
+							  physics::BodyProps {
+								  .ConvexRadius = 0.05f,
+								  .Density = 20,
+							  });
+
+	phys->SetMidpoint(midpoint);
+	phys->Teleport(position, rotation);
+
+	object->AttachCollider(phys);
+}
+
+
 void Blockout::Load(const String& path)
 {
 	ConfigFile info {};

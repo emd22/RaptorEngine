@@ -42,7 +42,7 @@ void mode_update(float3 movement_vector)
 		blockout_object_scale(selected_object, selected_face, magnitude);
 
 		if (is_object_selected) {
-			// blockout_reload_object(selected_object);
+			blockout_reload_object(selected_object);
 		}
 	}
 
@@ -67,14 +67,12 @@ void mode_update(float3 movement_vector)
 		selected_face_scale = selected_object.direction_scale(selected_face);
 	}
 
-	float3 new_position = player.position + camera_dist;
-	new_position = mode_common_quantize3(new_position);
-
-	float3 np = (new_position + (selected_face * float3(selected_face_scale)));
-
 	magnitude = (player.position - initial_position) * (selected_face);
 
-	xform_marker_object.move_to(np);
+	float3 new_position = mode_common_quantize3(player.position + camera_dist);
+	float3 xfer_marker_position = (new_position + (selected_face * float3(selected_face_scale)));
+
+	xform_marker_object.move_to(xfer_marker_position);
 }
 
 
