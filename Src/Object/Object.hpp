@@ -189,6 +189,8 @@ public:
 
 	Ref<script::FoxScript> pScript { nullptr };
 
+	std::atomic_bool bIsAddedToWorld = false;
+
 
 private:
 	MaterialID mMaterialID = MaterialID::scNull;

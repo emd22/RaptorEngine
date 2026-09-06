@@ -40,7 +40,7 @@ void Object::SetMaterial(const MaterialID& id)
 
 	mMaterialID = id;
 
-	if (!ID.IsInvalid() && pMesh.IsValid()) {
+	if (bIsAddedToWorld && !ID.IsInvalid() && pMesh.IsValid()) {
 		gWorld->NotifyObjectMaterialChanged(ID);
 	}
 }

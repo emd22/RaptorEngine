@@ -31,6 +31,33 @@ void mode_select_object(OBJECT object, bool selected)
 	selected_object = object;
 }
 
+enum FACE_DIRECTION
+{
+	X = 1,
+	Y = 2,
+	Z = 3,
+}
+
+FACE_DIRECTION get_face_mask()
+{
+	float3 abs_face = float3_abs(selected_face);
+
+	if (abs_face.x > 0.01) {
+		return FACE_DIRECTION.X;
+	}
+	if (abs_face.y > 0.01) {
+		return FACE_DIRECTION.Y;
+	}
+
+	return FACE_DIRECTION.Z;
+}
+
+void hide_xform_marker()
+{
+	// lol
+	xform_marker_object.move_to(float3(100.0f));
+}
+
 void mode_update(float3 movement_vector)
 {
 	mode_common_controls();
@@ -42,8 +69,10 @@ void mode_update(float3 movement_vector)
 		blockout_object_scale(selected_object, selected_face, magnitude);
 
 		if (is_object_selected) {
-			// blockout_reload_object(selected_object);
+			blockout_reload_object(selected_object);
 		}
+
+		hide_xform_marker();
 	}
 
 	/* Only update if lmouse is pressed and a valid object is selected */
@@ -67,14 +96,30 @@ void mode_update(float3 movement_vector)
 		selected_face_scale = selected_object.direction_scale(selected_face);
 	}
 
-	float3 new_position = player.position + camera_dist;
-	new_position = mode_common_quantize3(new_position);
-
-	float3 np = (new_position + (selected_face * float3(selected_face_scale)));
+	FACE_DIRECTION fdir = get_face_mask();
 
 	magnitude = (player.position - initial_position) * (selected_face);
 
-	xform_marker_object.move_to(np);
+	float3 new_position = mode_common_quantize3(player.position + camera_dist);
+
+	float3 cam_pos = camera_position();
+
+	if (fdir == FACE_DIRECTION.X) {
+		new_position.y = cam_pos.y;
+		new_position.z = player.position.z;
+	}
+	if (fdir == FACE_DIRECTION.Z) {
+		new_position.y = cam_pos.y;
+		new_position.x = player.position.x;
+	}
+
+	if (fdir == FACE_DIRECTION.Y) {
+		new_position.x = player.position.x;
+		new_position.z = player.position.z;
+	}
+
+	float3 xfer_marker_position = (new_position + (selected_face * float3(selected_face_scale)));
+	xform_marker_object.move_to(xfer_marker_position);
 }
 
 

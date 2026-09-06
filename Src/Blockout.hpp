@@ -33,6 +33,8 @@ public:
 	void ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec3f& magnitude);
 	void ReloadSingleObject(Object* object);
 
+	void RebuildObject(Object* object);
+
 	~Blockout();
 
 private:

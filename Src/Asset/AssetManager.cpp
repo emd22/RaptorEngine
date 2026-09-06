@@ -33,8 +33,6 @@ static constexpr std::chrono::seconds scTimeUntilSleep = std::chrono::seconds(3)
 
 void AssetDeletionTicket::DeleteImmediate() const
 {
-	LogInfo("Deleting buffer {}", reinterpret_cast<uintptr_t>(Value.Ticket.Buffer));
-
 	switch (Type) {
 	case eType::None:
 		break;
