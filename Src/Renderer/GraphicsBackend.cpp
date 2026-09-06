@@ -827,6 +827,7 @@ void GraphicsBackend::Destroy()
 
 	gAssetManager->ShutdownDeletionQueue();
 
+	TransferSync.Destroy();
 
 	GpuBufferPrintUndestroyed();
 

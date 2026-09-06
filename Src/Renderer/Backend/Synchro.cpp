@@ -93,8 +93,10 @@ void Semaphore::Create(eSemaphoreType semaphore_type)
 
 void Semaphore::Destroy()
 {
-	vkDestroySemaphore(gGraphics->GetDevice()->Device, InternalSemaphore, nullptr);
-	InternalSemaphore = nullptr;
+	if (InternalSemaphore != nullptr) {
+		vkDestroySemaphore(gGraphics->GetDevice()->Device, InternalSemaphore, nullptr);
+		InternalSemaphore = nullptr;
+	}
 }
 
 

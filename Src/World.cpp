@@ -553,6 +553,7 @@ void World::Render(Camera* shadow_camera)
 	ExecuteRenderList(ePipelineName::Geometry);
 	ExecuteRenderList(ePipelineName::GeometryNormalMaps);
 	ExecuteRenderList(ePipelineName::GeometrySkinned);
+
 	// Transparent after, back-to-front, depthWrite disabled
 	ExecuteRenderList(ePipelineName::GeometryTransparent);
 	ExecuteRenderList(ePipelineName::GeometryNormalMapsTransparent);
