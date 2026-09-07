@@ -1705,6 +1705,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -DSTRATA_STATIC -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/opt_bench.dir/samples/hosts/opt_bench_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/opt_bench_host.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/opt_bench_host.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/opt_bench.dir/samples/hosts/opt_bench_host.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DUSE_JIT -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/engine_demo.dir/samples/hosts/engine_demo_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/engine_demo_host.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/engine_demo_host.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/engine_demo.dir/samples/hosts/engine_demo_host.c.o"
@@ -1888,6 +1894,12 @@
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/EnumTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/EnumTests.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/EnumTests.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/EnumTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -g -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/PrivateTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/PrivateTests.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/PrivateTests.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/PrivateTests.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

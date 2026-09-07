@@ -7,7 +7,7 @@ import mode_common;
 
 OBJECT selected_object;
 float3 camera_dist;
-bool camera_dist_added = false;
+bool was_in_drag_event = false;
 
 bool is_object_selected = false;
 
@@ -21,30 +21,30 @@ void mode_select_object(OBJECT object, bool selected)
 {
 	is_object_selected = selected;
 	selected_object = object;
+
 }
 
 void mode_update(float3 movement_vector)
 {
 	mode_common_controls();
 
-	/* Only update if lmouse is pressed and a valid object is selected */
-	if (!is_object_selected || !KEY.K_MOUSE_LEFT.is_down()) {
-		mode_common_disable_damp();
-		camera_dist_added = false;
+	bool is_dragging = KEY.K_MOUSE_LEFT.is_down();
 
+	/* Only update if lmouse is pressed and a valid object is selected */
+	if (!is_object_selected || !is_dragging) {
+		mode_common_disable_damp();
+		was_in_drag_event = false;
 		return;
 	}
 
 	mode_common_enable_damp();
 
-	if (camera_dist_added == false) {
+	if (was_in_drag_event == false) {
 		camera_dist = selected_object.position - player.position;
-		camera_dist_added = true;
+		was_in_drag_event = true;
 	}
 
-	float3 new_position = player.position + camera_dist;
-	new_position = mode_common_quantize3(new_position);
-
+	float3 new_position = mode_common_quantize3(player.position + camera_dist);
 
 	selected_object.move_to(new_position);
 }

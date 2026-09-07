@@ -30,6 +30,8 @@ static void N_object_move_to(Object* obj, FLOAT4 position)
 		return;
 	}
 
+	LogInfo("** move to: {} **", Vec3f(position));
+
 	obj->SetPosition(Vec3f(position));
 }
 
@@ -38,6 +40,8 @@ static void N_object_move_by(Object* obj, FLOAT4 by)
 	if (obj == nullptr) {
 		return;
 	}
+
+	LogInfo("** move to: {} **", Vec3f(by));
 
 	obj->MoveBy(Vec3f(by));
 }
@@ -51,6 +55,8 @@ static FLOAT4 N_object_get_position(Object* obj)
 
 	return obj->GetPosition().mIntrin;
 }
+
+static void N_print_float4(FLOAT4 v) { LogInfo(LC_SCRIPT, "{}", Vec4f(v)); }
 
 static uint32 N_object_get_tags(Object* obj)
 {
@@ -177,12 +183,13 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("float4_round", N_float4_round),
 	PREDEF("float3_abs", N_float3_abs),
 	PREDEF("float_sign", N_float_sign),
+	PREDEF("print_float4", N_print_float4),
 
 	/* Controls */
 	PREDEF("KEY_is_up", N_is_key_up),
 	PREDEF("KEY_is_down", N_is_key_down),
 	PREDEF("KEY_is_pressed", N_is_key_pressed),
-};
+}; // namespace fx::script
 
 Slice<const PredefExtern> GetInteropPredefs() { return Slice(scAvailableExterns, std::size(scAvailableExterns)); }
 

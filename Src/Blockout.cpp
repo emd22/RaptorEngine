@@ -100,21 +100,21 @@ void Blockout::ScaleInDirection(Object* object, const Vec3f& face_dir, const Vec
 	if (face_dir.X > threshold) {
 		object->Bounds.Max.X += magnitude.X;
 	}
-	else if (face_dir.X < threshold) {
+	else if (face_dir.X < -threshold) {
 		object->Bounds.Min.X -= magnitude.X;
 	}
 
 	if (face_dir.Y > threshold) {
 		object->Bounds.Max.Y += magnitude.Y;
 	}
-	else if (face_dir.Y < threshold) {
+	else if (face_dir.Y < -threshold) {
 		object->Bounds.Min.Y -= magnitude.Y;
 	}
 
 	if (face_dir.Z > threshold) {
 		object->Bounds.Max.Z += magnitude.Z;
 	}
-	else if (face_dir.Z < threshold) {
+	else if (face_dir.Z < -threshold) {
 		object->Bounds.Min.Z -= magnitude.Z;
 	}
 }
@@ -350,10 +350,15 @@ void Blockout::RebuildObject(Object* object)
 	object->pMesh = cube_mesh->AsDefaultMesh();
 
 	physics::Body* body = gPhysics->GetBody(object->PhysicsID);
+	if (body == nullptr) {
+		return;
+	}
 
-	Vec3f midpoint = body->Midpoint;
+	Vec3f midpoint = GetCubeMidpointOffset(cgo);
 	Vec3f position = object->GetPosition();
 	Quat rotation = body->GetRotation();
+
+	object->SetRotationOrigin(-midpoint);
 
 	physics::eMotionType motion_type = body->GetMotionType();
 

@@ -14,7 +14,6 @@ float3 selected_face;
 float selected_face_scale = 0.0f;
 
 float3 initial_position;
-
 float3 magnitude;
 
 bool is_object_selected = false;
@@ -38,6 +37,7 @@ enum FACE_DIRECTION
 	Z = 3,
 }
 
+@private
 FACE_DIRECTION get_face_mask()
 {
 	float3 abs_face = float3_abs(selected_face);
@@ -52,6 +52,7 @@ FACE_DIRECTION get_face_mask()
 	return FACE_DIRECTION.Z;
 }
 
+@private
 void hide_xform_marker()
 {
 	// lol
@@ -81,7 +82,6 @@ void mode_update(float3 movement_vector)
 		was_in_drag_event = false;
 		return;
 	}
-
 
 	mode_common_enable_damp();
 
@@ -125,5 +125,6 @@ void mode_update(float3 movement_vector)
 
 void mode_unload()
 {
+	hide_xform_marker();
 	mode_common_unload();
 }

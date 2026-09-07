@@ -22,6 +22,12 @@ float3 float3_round(float3 value)
 
 extern float3 float3_abs(float3 value);
 
+extern void print_float4(float4 value);
+void print_float3(float3 value)
+{
+	print_float4(float4(value, 1.0));
+}
+
 /*
 	Object
  */
