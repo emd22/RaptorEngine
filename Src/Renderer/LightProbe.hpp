@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Core/Types.hpp>
+#include <Math/Vec3.hpp>
 #include <Renderer/Limits.hpp>
 
 namespace fx {
@@ -48,6 +49,13 @@ public:
 
 	void SetUniformAmbient(float32 r, float32 g, float32 b);
 	void SetSkyGradient(const float32 sky[3], const float32 ground[3]);
+
+	/**
+	 * @brief Bakes probe 0 from analytic scene lights (no occlusion).
+	 * Incident radiance is E(d) = ambient + sun * max(dot(d, sunDir), 0),
+	 * numerically projected onto the SH basis. Matches EvalProbeIrradiance().
+	 */
+	void BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB[3], const float32 ambRGB[3]);
 
 	/// Uploads all CPU probes to every in-flight page of the GPU probe buffer.
 	void UploadToGpu();

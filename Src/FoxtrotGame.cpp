@@ -23,6 +23,7 @@
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <Renderer/TextRenderer.hpp>
@@ -468,6 +469,32 @@ void FoxtrotGame::ProcessControls()
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_N)) {
 		gWorld->Player.SetFlyMode(!gWorld->Player.IsFlyMode());
 		gWorld->Player.Physics.SetCollisionEnabled(!gWorld->Player.IsFlyMode());
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_B)) {
+		if (pSun.IsValid()) {
+			// For directionals, mPosition holds the light direction (see Forward.hlsl).
+			const Vec3f sun_dir = pSun->GetPosition().Normalize();
+
+			// Match the Forward.hlsl directional scaling: rgb01 * intensity, where
+			// intensity is the unpacked alpha byte.
+			const float32 sun_rgb[3] = {
+				(static_cast<float32>(pSun->Color.R) / 255.0f) * static_cast<float32>(pSun->Color.A),
+				(static_cast<float32>(pSun->Color.G) / 255.0f) * static_cast<float32>(pSun->Color.A),
+				(static_cast<float32>(pSun->Color.B) / 255.0f) * static_cast<float32>(pSun->Color.A),
+			};
+			const float32 amb_rgb[3] = {
+				static_cast<float32>(pSun->AmbientColor.R) / 255.0f,
+				static_cast<float32>(pSun->AmbientColor.G) / 255.0f,
+				static_cast<float32>(pSun->AmbientColor.B) / 255.0f,
+			};
+
+			gProbeManager->BakeFromSceneLights(sun_dir, sun_rgb, amb_rgb);
+			LogInfo("Rebaked light probe from sun (dir={})", sun_dir);
+		}
+		else {
+			LogWarning("No sun light to bake probe from!");
+		}
 	}
 
 
