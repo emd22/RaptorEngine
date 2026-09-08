@@ -788,10 +788,6 @@ void World::RenderProbeCapture()
 	RequirePipelineDynamicStates();
 
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
-	const Vec3f capture_pos = gProbeManager->GetCapturePosition();
-
-	LogInfo("Probe capture: {} faces at {} ({} lights)", ProbeManager::scCaptureFaces, capture_pos,
-			gGraphics->LightBuffer.SlotIndex);
 
 	static const Vec3f scFaceDirs[ProbeManager::scCaptureFaces] = {
 		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
@@ -802,7 +798,15 @@ void World::RenderProbeCapture()
 		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 	};
 
-	for (uint32 face = 0; face < ProbeManager::scCaptureFaces; face++) {
+	const uint32 batch_count = gProbeManager->BeginBatchCapture();
+
+	for (uint32 slot = 0; slot < batch_count; slot++) {
+		const Vec3f capture_pos = gProbeManager->GetCapturePosition();
+
+		LogInfo("Probe capture: batch probe {} at {} ({} lights)", gProbeManager->GetCurrentProbeIndex() + 1,
+				capture_pos, gGraphics->LightBuffer.SlotIndex);
+
+		for (uint32 face = 0; face < ProbeManager::scCaptureFaces; face++) {
 		PerspectiveCamera face_camera;
 		face_camera.SetFov(90.0f);
 		face_camera.SetAspectRatio(1.0f);
@@ -818,7 +822,7 @@ void World::RenderProbeCapture()
 		face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
 		face_camera.UpdateCameraMatrix();
 
-		gProbeManager->SetCaptureCamera(face, face_camera);
+		gProbeManager->SetCaptureCamera(slot, face, face_camera);
 
 		// Re-run Forward+ culling for the capture extent + face camera.
 		gGraphics->pRenderer->DoLightCullingPass(face_camera, &extent);
@@ -831,7 +835,10 @@ void World::RenderProbeCapture()
 
 		stage.End();
 
-		gProbeManager->CopyCaptureFaceToStaging(cmd, face);
+			gProbeManager->CopyCaptureFaceToStaging(cmd, slot, face);
+		}
+
+		gProbeManager->AdvanceBatchCapture();
 	}
 
 	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {

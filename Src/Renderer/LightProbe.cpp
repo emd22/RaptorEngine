@@ -96,8 +96,10 @@ void ProbeManager::Destroy()
 	mNumProbesPending = 0;
 	mCurrentProbe = 0;
 
-	for (uint32 i = 0; i < scCaptureFaces; i++) {
-		mCaptureStaging[i].Destroy();
+	for (uint32 slot = 0; slot < scProbesPerFrame; slot++) {
+		for (uint32 i = 0; i < scCaptureFaces; i++) {
+			mCaptureStaging[slot][i].Destroy();
+		}
 	}
 }
 
@@ -213,7 +215,7 @@ void ProbeManager::BeginGridBake()
 	mbCapturePending = true;
 	mbCaptureReady = false;
 
-	LogInfo("Probe grid bake armed: {} probes, one per frame", mNumProbesPending);
+	LogInfo("Probe grid bake armed: {} probes, {} per frame", mNumProbesPending, scProbesPerFrame);
 }
 
 bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
@@ -271,6 +273,8 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 
 	LogInfo("Probe placement: {}/{}/{}/{} total/null/no-mesh/too-big ({} boxes kept)", stat_total, stat_null,
 			stat_no_mesh, stat_too_big, out.Count);
+
+	out.Min.Y = std::max(out.Min.Y, 0.5f);
 
 	return out.Any;
 }
@@ -376,7 +380,20 @@ void ProbeManager::BeginGridBakeAt(const Vec3f& center, const Vec3f& size)
 	mbCapturePending = true;
 	mbCaptureReady = false;
 
-	LogInfo("Probe grid bake armed at {} over {} ({} probes, one per frame)", center, size, mNumProbesPending);
+	LogInfo("Probe grid bake armed at {} over {} ({} probes, {} per frame)", center, size, mNumProbesPending,
+			scProbesPerFrame);
+}
+
+uint32 ProbeManager::BeginBatchCapture()
+{
+	mBatchStart = mCurrentProbe;
+
+	uint32 remaining = 0;
+	if (mCurrentProbe < mNumProbesPending) {
+		remaining = mNumProbesPending - mCurrentProbe;
+	}
+
+	return (remaining < scProbesPerFrame) ? remaining : scProbesPerFrame;
 }
 
 void ProbeManager::EnsureCaptureStage()
@@ -402,16 +419,19 @@ void ProbeManager::EnsureCaptureStage()
 
 	const uint64 staging_size = static_cast<uint64>(scCaptureSize) * scCaptureSize * sizeof(uint16) * 4;
 
-	for (uint32 i = 0; i < scCaptureFaces; i++) {
-		mCaptureStaging[i].Create(renderer::eGpuBufferType::Transfer, staging_size, VMA_MEMORY_USAGE_GPU_TO_CPU,
-								  eGpuBufferFlags::TransferReceiver);
+	for (uint32 slot = 0; slot < scProbesPerFrame; slot++) {
+		for (uint32 i = 0; i < scCaptureFaces; i++) {
+			mCaptureStaging[slot][i].Create(renderer::eGpuBufferType::Transfer, staging_size,
+											VMA_MEMORY_USAGE_GPU_TO_CPU, eGpuBufferFlags::TransferReceiver);
+		}
 	}
 
 	mbCaptureBuilt = true;
 }
 
-void ProbeManager::CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32 face)
+void ProbeManager::CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32 batch_slot, uint32 face)
 {
+	Assert(batch_slot < scProbesPerFrame);
 	Assert(face < scCaptureFaces);
 
 	renderer::Target* target = mCaptureStage.GetTarget(eImageFormat::RGBA16_Float);
@@ -434,8 +454,8 @@ void ProbeManager::CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32
 		.imageExtent = VkExtent3D { .width = scCaptureSize, .height = scCaptureSize, .depth = 1 },
 	};
 
-	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mCaptureStaging[face].Buffer,
-						   1, &copy);
+	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+						   mCaptureStaging[batch_slot][face].Buffer, 1, &copy);
 
 	renderer::BarrierHelper::ImageLayoutTransition(&target->Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0, 1);
 }
@@ -463,20 +483,8 @@ static float32 HalfToFloat(uint16 h)
 	return out;
 }
 
-bool ProbeManager::FinishCaptureBake()
+bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 {
-	if (!mbCaptureReady) {
-		return false;
-	}
-
-	mbCaptureReady = false;
-
-	if (!mbCaptureBuilt) {
-		return false;
-	}
-
-	renderer::gGraphics->GetDevice()->WaitForIdle();
-
 	static constexpr uint32 scPixels = scCaptureSize * scCaptureSize;
 	static constexpr float32 scRadianceClamp = 16.0f;
 
@@ -491,16 +499,16 @@ bool ProbeManager::FinishCaptureBake()
 #endif
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
-		mCaptureStaging[face].Map();
-		const uint16* pixels = static_cast<const uint16*>(mCaptureStaging[face].pMappedBuffer);
+		mCaptureStaging[batch_slot][face].Map();
+		const uint16* pixels = static_cast<const uint16*>(mCaptureStaging[batch_slot][face].pMappedBuffer);
 
 		if (pixels == nullptr) {
-			mCaptureStaging[face].UnMap();
+			mCaptureStaging[batch_slot][face].UnMap();
 			LogError("Probe capture bake failed: could not map staging buffer for face {}", face);
 			return false;
 		}
 
-		PerspectiveCamera& cam = mFaceCameras[face];
+		PerspectiveCamera& cam = mBatchCameras[batch_slot][face];
 
 
 		// MultiplyVec4f is non-const, so work on local copies.
@@ -571,7 +579,7 @@ bool ProbeManager::FinishCaptureBake()
 			}
 		}
 
-		mCaptureStaging[face].UnMap();
+		mCaptureStaging[batch_slot][face].UnMap();
 	}
 
 #ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
@@ -596,18 +604,18 @@ bool ProbeManager::FinishCaptureBake()
 	// Single bakes refresh the whole field (global ambient); grid bakes write
 	// only the current cell.
 	if (mNumProbesPending <= 1) {
-		for (uint32 probe_index = 0; probe_index < Limits::MaxIrradianceProbes; probe_index++) {
+		for (uint32 pidx = 0; pidx < Limits::MaxIrradianceProbes; pidx++) {
 			for (uint32 coeff_index = 0; coeff_index < Limits::ProbeSHCoeffCount; coeff_index++) {
 				for (uint32 c = 0; c < 3; c++) {
-					mProbes[probe_index].SH[coeff_index][c] = sh[coeff_index][c];
+					mProbes[pidx].SH[coeff_index][c] = sh[coeff_index][c];
 				}
 
-				mProbes[probe_index].SH[coeff_index][3] = 0.0f;
+				mProbes[pidx].SH[coeff_index][3] = 0.0f;
 			}
 		}
 	}
 	else {
-		ProbeData& probe = mProbes[mCurrentProbe];
+		ProbeData& probe = mProbes[probe_index];
 		for (uint32 coeff_index = 0; coeff_index < Limits::ProbeSHCoeffCount; coeff_index++) {
 			probe.SH[coeff_index][0] = sh[coeff_index][0];
 			probe.SH[coeff_index][1] = sh[coeff_index][1];
@@ -616,10 +624,35 @@ bool ProbeManager::FinishCaptureBake()
 		}
 	}
 
-	UploadToGpu();
+	// Mean irradiance (L00 through the basis) for comparing bakes in the log.
+	float32 mean_rgb[3] = { sh[0][0] * 0.282095f, sh[0][1] * 0.282095f, sh[0][2] * 0.282095f };
 
-	LogInfo("Probe capture bake finished (probe {}/{}, {} faces)", mCurrentProbe + 1, mNumProbesPending,
-			scCaptureFaces);
+	LogInfo("Probe {}/{} baked mean=({:.3f}, {:.3f}, {:.3f})", probe_index + 1, mNumProbesPending, mean_rgb[0],
+			mean_rgb[1], mean_rgb[2]);
+	return true;
+}
+
+bool ProbeManager::FinishCaptureBake()
+{
+	if (!mbCaptureReady) {
+		return false;
+	}
+
+	mbCaptureReady = false;
+
+	if (!mbCaptureBuilt) {
+		return false;
+	}
+
+	renderer::gGraphics->GetDevice()->WaitForIdle();
+
+	for (uint32 i = mBatchStart; i < mCurrentProbe; i++) {
+		if (!ProjectStagedFaces(i - mBatchStart, i)) {
+			return false;
+		}
+	}
+
+	UploadToGpu();
 	return true;
 }
 
@@ -635,15 +668,12 @@ bool ProbeManager::ServiceCaptureBake()
 		return false;
 	}
 
-	mCurrentProbe++;
-
+	// mCurrentProbe was already advanced past the batch by RenderProbeCapture.
 	if (mCurrentProbe < mNumProbesPending) {
-		// Arm the next probe for the coming frame.
+		// Arm the next batch for the coming frame.
 		mbCapturePending = true;
 
-		if ((mCurrentProbe % 8) == 0) {
-			LogInfo("Probe grid bake progress: {}/{}", mCurrentProbe, mNumProbesPending);
-		}
+		LogInfo("Probe grid bake progress: {}/{}", mCurrentProbe, mNumProbesPending);
 
 		return true;
 	}

@@ -389,6 +389,10 @@ void FoxtrotGame::ProcessControls()
 		gWorld->bRenderProbes = !gWorld->bRenderProbes;
 	}
 
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_2)) {
+		gGraphics->bOnlyRenderProbes = !gGraphics->bOnlyRenderProbes;
+	}
+
 	if (ControlManager::IsMouseLocked()) {
 		Vec2f mouse_delta = ControlManager::GetMouseDelta();
 		mouse_delta.X = static_cast<float32>(DeltaTime * static_cast<double>(mouse_delta.X) *

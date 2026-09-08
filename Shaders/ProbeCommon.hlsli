@@ -1,4 +1,4 @@
-#define NO_PROBE_BLENDING 1
+// #define NO_PROBE_BLENDING 1
 
 struct ProbeData
 {

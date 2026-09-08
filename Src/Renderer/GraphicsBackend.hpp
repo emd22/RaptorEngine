@@ -262,6 +262,8 @@ public:
 
 	Image* pNoiseTexture = nullptr;
 
+	bool bOnlyRenderProbes = false;
+
 private:
 	GpuDevice mDevice;
 	VkInstance mInstance = nullptr;

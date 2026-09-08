@@ -195,13 +195,20 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	DrawPushConstants push_constants { .TargetSize = { gGraphics->Swapchain.Extent.X, gGraphics->Swapchain.Extent.Y } };
 	push_constants.ObjectId = ID.GetID();
+
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+
 
 	// Probe capture faces have no matching SSAO data; flag the shader to use ssao=1.
 	if (gProbeManager != nullptr && gProbeManager->IsCapturePending()) {
 		push_constants.Flags |= 0x01;
 	}
+
+	if (gGraphics->bOnlyRenderProbes) {
+		push_constants.Flags |= 0x02;
+	}
+
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,

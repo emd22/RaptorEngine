@@ -76,7 +76,7 @@ public:
 	static constexpr uint32 scCaptureFaces = 6;
 
 	/// Number of probes baked per frame during a grid bake (spreads the hitch).
-	static constexpr uint32 scProbesPerFrame = 1;
+	static constexpr uint32 scProbesPerFrame = 4;
 
 public:
 	void Create();
@@ -112,9 +112,17 @@ public:
 	void EnsureCaptureStage();
 	renderer::RenderStage& GetCaptureStage() { return mCaptureStage; }
 
-	void SetCaptureCamera(uint32 face, const PerspectiveCamera& cam) { mFaceCameras[face] = cam; }
+	void SetCaptureCamera(uint32 batch_slot, uint32 face, const PerspectiveCamera& cam)
+	{
+		mBatchCameras[batch_slot][face] = cam;
+	}
 
-	void CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32 face);
+	void CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32 batch_slot, uint32 face);
+
+	/// Starts a batch: records the first probe index and returns how many
+	/// probes to capture this frame (up to scProbesPerFrame).
+	uint32 BeginBatchCapture();
+	void AdvanceBatchCapture() { mCurrentProbe++; }
 
 	/// Called once all faces + copies are recorded for this frame.
 	void MarkCaptureReady()
@@ -144,6 +152,10 @@ private:
 	bool GatherPlacementBoxes(ProbeBoxList& out);
 	void PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes);
 
+	/// Projects one probe's staged faces into mProbes[probe_index].
+	/// Staging slot selects the batch-local face buffers.
+	bool ProjectStagedFaces(uint32 batch_slot, uint32 probe_index);
+
 private:
 	ProbeData mProbes[Limits::MaxIrradianceProbes] {};
 	ProbeVolumeData mVolume {};
@@ -154,14 +166,15 @@ private:
 
 	uint32 mNumProbesPending = 0;
 	uint32 mCurrentProbe = 0;
+	uint32 mBatchStart = 0;
 
 	bool mbCapturePending = false;
 	bool mbCaptureReady = false;
 	bool mbCaptureBuilt = false;
 
 	renderer::RenderStage mCaptureStage;
-	renderer::RawGpuBuffer mCaptureStaging[scCaptureFaces];
-	PerspectiveCamera mFaceCameras[scCaptureFaces];
+	renderer::RawGpuBuffer mCaptureStaging[scProbesPerFrame][scCaptureFaces];
+	PerspectiveCamera mBatchCameras[scProbesPerFrame][scCaptureFaces];
 };
 
 extern ProbeManager* gProbeManager;

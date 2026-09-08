@@ -193,18 +193,18 @@ FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    float4 albedoSample = F_Sample(tAlbedo, input.vUV);
-    float3 albedo = albedoSample.rgb;
-    float texAlpha = albedoSample.a;
+    float4 albedo_sample = F_Sample(tAlbedo, input.vUV);
+    float3 albedo = albedo_sample.rgb;
+    float tex_alpha = albedo_sample.a;
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
-    float baseAlpha = saturate(texAlpha * material.fAlpha);
+    float base_alpha = saturate(tex_alpha * material.fAlpha);
 
-    if (baseAlpha < ALPHA_CUTOFF) {
+    if (base_alpha < ALPHA_CUTOFF) {
         discard;
     }
 
-    output.vAlbedo = float4(albedo, baseAlpha);
+    output.vAlbedo = float4(albedo, base_alpha);
 
     if (HAS_FLAG(material.Flags, MF_UNLIT)) {
 	    return output;
@@ -318,18 +318,25 @@ FSOutput main(FSInput input)
 
 	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
+	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
+
 	// Use probes
 	if ((FSConst.Flags & 0x01) == 0) {
-		// Light probes: precomputed SH irradiance, trilinearly blended over the
-		// probe volume, replaces the previous flat ambient term.
 		float3 probe_normal = normalize(N_final);
-		float3 probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
+		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
 		ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
 	}
 
-	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, baseAlpha);
+	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);
 
-	//output.vAlbedo = float4(probe_irradiance, 1.0f);
+	if ((FSConst.Flags & 0x01) != 0) {
+		const float3 lp_ambient = float3(0.3f, 0.3f, 0.3f) * albedo;
+		output.vAlbedo = float4(accumulated_light.rgb + lp_ambient, 1.0f);
+	}
+
+	if (HAS_FLAG(FSConst.Flags, 0x02)) {
+		output.vAlbedo = float4(probe_irradiance, 1.0f);
+	}
 
     return output;
 }
