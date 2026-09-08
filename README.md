@@ -2,6 +2,14 @@
 
 Foxtrot is a 3D game engine being developed for an experimental game.
 
+## Screenshots
+
+|              Global Illumination              |          Dynamic Physics Level          |
+| :-------------------------------------------: | :-------------------------------------: |
+| ![GI test scene](Screenshots/07_ProbeGI.png)  | ![After GI](Screenshots/10_AfterGI.png) |
+|               Probe Debug View                |                                         |
+| ![Probe Debug](Screenshots/08_ProbeDebug.png) |                                         |
+
 ## Features
 
 - Tiled forward renderer (Forward+) with Vulkan
@@ -47,11 +55,3 @@ ninja
 
 - Windows (x86_64)
 - macOS (aarch64)
-
-## Screenshots
-
-|              Global Illumination              |          Dynamic Physics Level          |
-| :-------------------------------------------: | :-------------------------------------: |
-| ![GI test scene](Screenshots/07_ProbeGI.png)  | ![After GI](Screenshots/10_AfterGI.png) |
-|               Probe Debug View                |                                         |
-| ![Probe Debug](Screenshots/08_ProbeDebug.png) |                                         |
