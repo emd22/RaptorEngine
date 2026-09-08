@@ -6,10 +6,12 @@
 #include "LightProbe.hpp"
 
 #include <Asset/AssetManager.hpp>
+#include <Asset/PPMWriter.hpp>
 #include <Core/File.hpp>
 #include <Engine.hpp>
 #include <Object/Object.hpp>
 #include <Object/ObjectManager.hpp>
+#include <Renderer/Backend/BarrierHelper.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
@@ -18,6 +20,8 @@
 #include <cstring>
 #include <filesystem>
 #include <limits>
+
+#define FX_DEBUG_PROBES_EXPORT_FACE_IMAGES 1
 
 namespace fx {
 
@@ -426,28 +430,7 @@ void ProbeManager::CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32
 
 	Image& image = target->Image;
 
-	// The render pass end transitioned the image to SHADER_READ_ONLY; move it
-	// to TRANSFER_SRC for the copy. Mirrors Image::SaveToFile barriers.
-	VkImageMemoryBarrier pre_barrier {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-		.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.image = image.InternalImage,
-		.subresourceRange = {
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel = 0,
-			.levelCount = 1,
-			.baseArrayLayer = 0,
-			.layerCount = 1,
-		},
-	};
-
-	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-						 nullptr, 0, nullptr, 1, &pre_barrier);
+	renderer::BarrierHelper::ImageLayoutTransition(&target->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, cmd, 0, 1);
 
 	VkBufferImageCopy copy {
 		.bufferOffset = 0,
@@ -465,28 +448,7 @@ void ProbeManager::CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32
 	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mCaptureStaging[face].Buffer,
 						   1, &copy);
 
-	VkImageMemoryBarrier post_barrier {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-		.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.image = image.InternalImage,
-		.subresourceRange = {
-			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-			.baseMipLevel = 0,
-			.levelCount = 1,
-			.baseArrayLayer = 0,
-			.layerCount = 1,
-		},
-	};
-
-	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0,
-						 nullptr, 1, &post_barrier);
-
-	image.ImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	renderer::BarrierHelper::ImageLayoutTransition(&target->Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmd, 0, 1);
 }
 
 static float32 HalfToFloat(uint16 h)
@@ -533,9 +495,11 @@ bool ProbeManager::FinishCaptureBake()
 
 	const float32 texel_area = 4.0f / static_cast<float32>(scPixels);
 
+#ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
 	// LDR copy of what the probe saw (diagnostic dump after the loop).
 	SizedArray<uint8> ppm;
 	ppm.InitSize(scCaptureFaces * scPixels * 3);
+#endif
 
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		mCaptureStaging[face].Map();
@@ -562,10 +526,12 @@ bool ProbeManager::FinishCaptureBake()
 				const float32 g = fminf(HalfToFloat(texel[1]), scRadianceClamp);
 				const float32 b = fminf(HalfToFloat(texel[2]), scRadianceClamp);
 
+#ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
 				uint8* ppm_px = ppm.pData + (face * scPixels + y * scCaptureSize + x) * 3;
 				ppm_px[0] = static_cast<uint8>(powf(fminf(r * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
 				ppm_px[1] = static_cast<uint8>(powf(fminf(g * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
 				ppm_px[2] = static_cast<uint8>(powf(fminf(b * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
+#endif
 
 				// NDC of the texel center. The sign convention of v does not
 				// matter for the weight (even function) and the direction is
@@ -623,58 +589,48 @@ bool ProbeManager::FinishCaptureBake()
 	if (mNumProbesPending <= 1) {
 		static uint32 sBakeIndex = 0;
 
-		char header[32];
-		snprintf(header, sizeof(header), "P6\n%u %u\n255\n", scCaptureSize, scCaptureSize);
+		for (uint32 face_index = 0; face_index < scCaptureFaces; face_index++) {
+			String image_path = String::Fmt("bakes/probe_bake{}_face{}.ppm", sBakeIndex, face_index);
 
-		for (uint32 f = 0; f < scCaptureFaces; f++) {
-			char path[64];
-			snprintf(path, sizeof(path), "bakes/probe_bake%u_face%u.ppm", sBakeIndex, f);
+			const uint32 face_image_size = scPixels * 3;
+			Slice<uint8> pixel_data = MakeSlice(ppm.pData + (face_index * face_image_size), face_image_size);
 
-			File file(path, File::eModType::Write, File::eDataType::Binary);
-			file.Write(header);
-			file.WriteRaw(ppm.pData + f * scPixels * 3, scPixels * 3);
-			file.Close();
+			asset::PPMWriter writer {};
+			writer.WriteRGB(image_path, Vec2u(scCaptureSize, scCaptureSize), pixel_data);
 		}
 
 		LogInfo("Probe capture faces dumped as probe_bake{}_faceN.ppm", sBakeIndex);
 		sBakeIndex++;
 	}
 #endif
+
 	// Single bakes refresh the whole field (global ambient); grid bakes write
 	// only the current cell.
 	if (mNumProbesPending <= 1) {
-		for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
-			for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
+		for (uint32 probe_index = 0; probe_index < Limits::MaxIrradianceProbes; probe_index++) {
+			for (uint32 coeff_index = 0; coeff_index < Limits::ProbeSHCoeffCount; coeff_index++) {
 				for (uint32 c = 0; c < 3; c++) {
-					mProbes[i].SH[k][c] = sh[k][c];
+					mProbes[probe_index].SH[coeff_index][c] = sh[coeff_index][c];
 				}
-				mProbes[i].SH[k][3] = 0.0f;
+
+				mProbes[probe_index].SH[coeff_index][3] = 0.0f;
 			}
 		}
 	}
 	else {
 		ProbeData& probe = mProbes[mCurrentProbe];
-		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-			for (uint32 c = 0; c < 3; c++) {
-				probe.SH[k][c] = sh[k][c];
-			}
-			probe.SH[k][3] = 0.0f;
+		for (uint32 coeff_index = 0; coeff_index < Limits::ProbeSHCoeffCount; coeff_index++) {
+			probe.SH[coeff_index][0] = sh[coeff_index][0];
+			probe.SH[coeff_index][1] = sh[coeff_index][1];
+			probe.SH[coeff_index][2] = sh[coeff_index][2];
+			probe.SH[coeff_index][3] = 0.0f;
 		}
 	}
 
 	UploadToGpu();
 
-	// Mean irradiance (L00 scaled back through the basis) + directional energy,
-	// so bakes can be compared from the log without eyeballing pixels.
-	const float32 mean_rgb[3] = { sh[0][0] * 0.282095f, sh[0][1] * 0.282095f, sh[0][2] * 0.282095f };
-	float32 dir_energy = 0.0f;
-	for (uint32 k = 1; k < Limits::ProbeSHCoeffCount; k++) {
-		dir_energy += sh[k][0] * sh[k][0] + sh[k][1] * sh[k][1] + sh[k][2] * sh[k][2];
-	}
-
-	LogInfo("Probe capture bake finished (probe {}/{}, {} faces) mean=({:.3f}, {:.3f}, {:.3f}) dirE={:.4f}",
-			mCurrentProbe + 1, mNumProbesPending, scCaptureFaces, mean_rgb[0], mean_rgb[1], mean_rgb[2],
-			sqrtf(dir_energy));
+	LogInfo("Probe capture bake finished (probe {}/{}, {} faces)", mCurrentProbe + 1, mNumProbesPending,
+			scCaptureFaces);
 	return true;
 }
 

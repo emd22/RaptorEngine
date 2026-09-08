@@ -12,6 +12,8 @@ void PPMWriter::WriteRGB(const String& path, const Vec2u& size, const Slice<uint
 	Assert(pixel_data.pData != nullptr);
 	Assert(pixel_data.Size > 0);
 
+	Assert(pixel_data.Size == (size.X * size.Y * 3));
+
 	// Build the file header
 	char ppm_header[32];
 	snprintf(ppm_header, sizeof(ppm_header), "P6\n%u %u\n255\n", size.X, size.Y);

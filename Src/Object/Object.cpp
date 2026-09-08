@@ -200,7 +200,7 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 
 	// Probe capture faces have no matching SSAO data; flag the shader to use ssao=1.
 	if (gProbeManager != nullptr && gProbeManager->IsCapturePending()) {
-		push_constants.Padding0 = 1;
+		push_constants.Flags |= 0x01;
 	}
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 

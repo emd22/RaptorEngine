@@ -45,7 +45,7 @@ struct VSPushConsts
 	uint uiObjectIndex;
     uint uiMaterialIndex;
     uint uiTileColumns;
-    uint _Padding0;
+    uint Flags;
     uint2 vTargetSize;
 };
 
@@ -167,7 +167,7 @@ struct FSPushConsts
 	uint uiObjectIndex;
 	uint uiMaterialIndex;
 	uint uiTileColumns;
-	uint _Padding0;
+	uint Flags;
 	uint2 vTargetSize;
 };
 
@@ -239,8 +239,8 @@ FSOutput main(FSInput input)
 
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
 
-	// Probe capture bakes have no matching SSAO data (flag in bit 0 of _Padding0).
-	float ssao = ((FSConst._Padding0 & 1u) != 0) ? 1.0 : F_Sample(tSSAO, ssao_coords);
+	// Probe capture bakes have no matching SSAO data (flag in bit 0 of Flags).
+	float ssao = ((FSConst.Flags & 1u) != 0) ? 1.0 : F_Sample(tSSAO, ssao_coords);
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
@@ -316,12 +316,16 @@ FSOutput main(FSInput input)
 		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, 0.0);
 	}
 
-	// Light probes: precomputed SH irradiance, trilinearly blended over the
-	// probe volume, replaces the previous flat ambient term.
-	float3 probe_normal = normalize(N_final);
-	float3 probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
+	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
-	float4 ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
+	// Use probes
+	if ((FSConst.Flags & 0x01) == 0) {
+		// Light probes: precomputed SH irradiance, trilinearly blended over the
+		// probe volume, replaces the previous flat ambient term.
+		float3 probe_normal = normalize(N_final);
+		float3 probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
+		ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
+	}
 
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, baseAlpha);
 

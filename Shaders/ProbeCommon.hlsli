@@ -1,3 +1,4 @@
+#define NO_PROBE_BLENDING 1
 
 struct ProbeData
 {
@@ -44,6 +45,10 @@ float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, Structured
 		blended[k] = float3(0.0, 0.0, 0.0);
 	}
 
+#ifdef NO_PROBE_BLENDING
+	float best_weight = 0.0f;
+#endif
+
 	for (uint cz = 0; cz < 2; cz++) {
 		for (uint cy = 0; cy < 2; cy++) {
 			for (uint cx = 0; cx < 2; cx++) {
@@ -52,9 +57,19 @@ float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, Structured
 
 				float w = (cx ? f.x : (1.0 - f.x)) * (cy ? f.y : (1.0 - f.y)) * (cz ? f.z : (1.0 - f.z));
 
+			#ifdef NO_PROBE_BLENDING
+				if (w > best_weight) {
+					best_weight = w;
+
+					for (uint k2 = 0; k2 < 9; k2++) {
+						blended[k2] = probes[idx].SH[k2].rgb * w;
+					}
+				}
+			#else
 				for (uint k2 = 0; k2 < 9; k2++) {
 					blended[k2] += probes[idx].SH[k2].rgb * w;
 				}
+			#endif
 			}
 		}
 	}
