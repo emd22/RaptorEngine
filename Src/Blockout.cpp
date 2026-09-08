@@ -46,9 +46,21 @@ void Blockout::Create(World* world)
 		test_material->Finalize();
 	}
 
-	// Blue material
+
 	{
-		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoBlue", renderer::ePipelineName::Geometry, false);
+		mBlueMaterialID = gMaterialManager->NewMaterial("ProtoBlue", renderer::ePipelineName::Geometry, false);
+		Material* test_material = gMaterialManager->GetMaterial(mBlueMaterialID);
+
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "Data/Demo/Textures/aqua_check.png", eImageCreateFlags::None);
+
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+		test_material->Finalize();
+	}
+
+	// Selection material
+	{
+		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoSelect", renderer::ePipelineName::Geometry, false);
 		Material* test_material = gMaterialManager->GetMaterial(SelectionMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
@@ -59,6 +71,7 @@ void Blockout::Create(World* world)
 
 		test_material->Finalize();
 	}
+
 
 	{
 		const float scale = 0.25f;
@@ -211,6 +224,7 @@ enum class eCProtoMat
 {
 	Gray = 0,
 	Orange = 1,
+	Blue = 2,
 };
 
 
@@ -252,18 +266,8 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
-	eCProtoMat mat_index = static_cast<eCProtoMat>(entry.GetMemberValue<int>(HashStr32("mat"), 0));
 
 	MaterialID material_id = mWhiteMaterialID;
-
-	switch (mat_index) {
-	case eCProtoMat::Gray:
-		break;
-	case eCProtoMat::Orange:
-		material_id = mOrangeMaterialID;
-		break;
-	default:;
-	}
 
 
 	eObjectTag object_tags = eObjectTag::Blockout;
@@ -274,6 +278,24 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 	}
 	else {
 		material_id = mOrangeMaterialID;
+	}
+
+	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
+
+	if (mat_entry != nullptr) {
+		eCProtoMat mat_index = static_cast<eCProtoMat>(mat_entry->Get<int32>());
+
+		switch (mat_index) {
+		case eCProtoMat::Gray:
+			break;
+		case eCProtoMat::Orange:
+			material_id = mOrangeMaterialID;
+			break;
+		case eCProtoMat::Blue:
+			material_id = mBlueMaterialID;
+			break;
+		default:;
+		}
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);

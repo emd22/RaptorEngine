@@ -320,5 +320,6 @@ FSOutput main(FSInput input)
 
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, baseAlpha);
 
+
     return output;
 }

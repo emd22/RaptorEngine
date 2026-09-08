@@ -529,6 +529,11 @@ void FoxtrotGame::RenderText()
 											pSelectedEditorMode->GetQuantizeEnabled())
 									.CStr(),
 								2.0, scTextColor);
+
+		if (pSelectedEditorMode->mpLastSelectedObject != nullptr) {
+			gTextRenderer->DrawText(String::Fmt("SEL={}", pSelectedEditorMode->mpLastSelectedObject->Name.Get()).CStr(),
+									2.0, scTextColor);
+		}
 	}
 }
 

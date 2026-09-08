@@ -54,6 +54,7 @@ public:
 private:
 	MaterialID mWhiteMaterialID = MaterialID::scNull;
 	MaterialID mOrangeMaterialID = MaterialID::scNull;
+	MaterialID mBlueMaterialID = MaterialID::scNull;
 };
 
 
