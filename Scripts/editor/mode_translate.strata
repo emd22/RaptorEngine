@@ -5,11 +5,8 @@ import mode_common;
 
 // Globals
 
-OBJECT selected_object;
 float3 camera_dist;
 bool was_in_drag_event = false;
-
-bool is_object_selected = false;
 
 void mode_load()
 {
@@ -21,10 +18,9 @@ void mode_select_object(OBJECT object, bool selected)
 {
 	is_object_selected = selected;
 	selected_object = object;
-
 }
 
-void mode_update(float3 movement_vector)
+void mode_update(float3 movement_vector, float delta_time)
 {
 	mode_common_controls();
 
@@ -44,7 +40,26 @@ void mode_update(float3 movement_vector)
 		was_in_drag_event = true;
 	}
 
-	float3 new_position = mode_common_quantize3(player.position + camera_dist);
+
+	float3 movement_final = player.position + camera_dist;
+
+	// Only handle if the player is not in flymode. Otherwise, it is handled implicitly by the player's Y movement.
+	if (!player.is_flymode()) {
+		const float speed = delta_time * 2.0f;
+		if (KEY.K_Q.is_down()) {
+			float3 tmove = float3(0.0f, -speed, 0.0f);
+			movement_final += tmove;
+			camera_dist += tmove;
+		}
+		if (KEY.K_E.is_down()) {
+			float3 tmove = float3(0.0f, speed, 0.0f);
+			movement_final += tmove;
+			camera_dist += tmove;
+		}
+	}
+
+	float3 new_position = mode_common_quantize3(movement_final);
+
 
 	selected_object.move_to(new_position);
 }

@@ -238,6 +238,7 @@ FSOutput main(FSInput input)
 	TileLightData tile_data = bLightGrid[tile_index];
 
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
+
 	// Probe capture bakes have no matching SSAO data (flag in bit 0 of _Padding0).
 	float ssao = ((FSConst._Padding0 & 1u) != 0) ? 1.0 : F_Sample(tSSAO, ssao_coords);
 

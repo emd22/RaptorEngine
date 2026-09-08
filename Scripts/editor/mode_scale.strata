@@ -6,7 +6,6 @@ import mode_common;
 
 // Globals
 
-OBJECT selected_object;
 float3 camera_dist;
 bool was_in_drag_event = false;
 
@@ -16,7 +15,6 @@ float selected_face_scale = 0.0f;
 float3 initial_position;
 float3 magnitude;
 
-bool is_object_selected = false;
 
 void mode_load()
 {
@@ -59,7 +57,7 @@ void hide_xform_marker()
 	xform_marker_object.move_to(float3(100.0f));
 }
 
-void mode_update(float3 movement_vector)
+void mode_update(float3 movement_vector, float delta_time)
 {
 	mode_common_controls();
 

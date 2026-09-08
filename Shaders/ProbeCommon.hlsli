@@ -1,32 +1,26 @@
-// Light probe helpers (precomputed GI, MVP).
-//
-// Mirrors `ProbeData` in Src/Renderer/LightProbe.hpp. SH coefficients are in
-// D3D order: Y00, Y1-1, Y10, Y11, Y2-2, Y2-1, Y20, Y21, Y22.
-// Keep the basis in sync with MakeUniformAmbientProbe()/MakeSkyGradientProbe().
 
 struct ProbeData
 {
 	float4 SH[9];
 };
 
-/// Evaluates SH L2 diffuse irradiance for normal `n` (must be normalized).
-float3 EvalProbeIrradiance(float3 n, ProbeData probe)
+/// Spherical Harmonics L2 diffuse irradiance
+float3 EvalProbeIrradiance(float3 normal, ProbeData probe)
 {
 	float3 irradiance = probe.SH[0].rgb * 0.282095;
-	irradiance += probe.SH[1].rgb * 0.488603 * n.y;
-	irradiance += probe.SH[2].rgb * 0.488603 * n.z;
-	irradiance += probe.SH[3].rgb * 0.488603 * n.x;
-	irradiance += probe.SH[4].rgb * 1.092548 * n.x * n.y;
-	irradiance += probe.SH[5].rgb * 1.092548 * n.y * n.z;
-	irradiance += probe.SH[6].rgb * 0.315392 * (3.0 * n.z * n.z - 1.0);
-	irradiance += probe.SH[7].rgb * 1.092548 * n.x * n.z;
-	irradiance += probe.SH[8].rgb * 0.546274 * (n.x * n.x - n.y * n.y);
+
+	irradiance += probe.SH[1].rgb * 0.488603 * normal.y;
+	irradiance += probe.SH[2].rgb * 0.488603 * normal.z;
+	irradiance += probe.SH[3].rgb * 0.488603 * normal.x;
+	irradiance += probe.SH[4].rgb * 1.092548 * normal.x * normal.y;
+	irradiance += probe.SH[5].rgb * 1.092548 * normal.y * normal.z;
+	irradiance += probe.SH[6].rgb * 0.315392 * (3.0 * normal.z * normal.z - 1.0);
+	irradiance += probe.SH[7].rgb * 1.092548 * normal.x * normal.z;
+	irradiance += probe.SH[8].rgb * 0.546274 * (normal.x * normal.x - normal.y * normal.y);
 
 	return max(irradiance, float3(0.0, 0.0, 0.0));
 }
 
-// Mirrors ProbeVolumeData in Src/Renderer/LightProbe.hpp. Grid index order is
-// x-fastest: idx = x + dx * (y + dy * z), matching ComputeGridPlacement().
 struct ProbeVolume
 {
 	float4 vMin;
@@ -34,18 +28,17 @@ struct ProbeVolume
 	uint4 vDimsAndCount;
 };
 
-/// Trilinearly blends the 8 surrounding grid probes (coeffs first, one eval).
-/// Requires every grid axis to have at least 2 probes. Outside the volume the
-/// edge cell is clamped, degrading gracefully to the nearest probe.
 float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, StructuredBuffer<ProbeData> probes)
 {
 	uint3 dims = volume.vDimsAndCount.xyz;
 
 	float3 local =
 		clamp((pos_ws - volume.vMin.xyz) * volume.vInvCellSize.xyz, float3(0.0, 0.0, 0.0), float3(dims - uint3(1, 1, 1)));
+
 	uint3 base = min(uint3(floor(local)), dims - uint3(2, 2, 2));
 	float3 f = clamp(local - float3(base), float3(0.0, 0.0, 0.0), float3(1.0, 1.0, 1.0));
 
+	// Zero out the blend values
 	float3 blended[9];
 	for (uint k = 0; k < 9; k++) {
 		blended[k] = float3(0.0, 0.0, 0.0);
@@ -66,7 +59,9 @@ float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, Structured
 		}
 	}
 
+	// Trilinearly blend the values between probes
 	ProbeData probe;
+
 	for (uint k3 = 0; k3 < 9; k3++) {
 		probe.SH[k3] = float4(blended[k3], 0.0);
 	}

@@ -590,7 +590,7 @@ void FoxtrotGame::Tick()
 		Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
 		Vec3f rawMovement = GetMovementVector();
 		Vec3f movement = forward * rawMovement.Z + right * rawMovement.X + Vec3f(0, rawMovement.Y, 0);
-		pSelectedEditorMode->Update(movement);
+		pSelectedEditorMode->Update(movement, static_cast<float32>(DeltaTime));
 	}
 
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;

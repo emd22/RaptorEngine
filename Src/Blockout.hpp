@@ -35,6 +35,11 @@ public:
 
 	void RebuildObject(Object* object);
 
+	/**
+	 * @brief Creates a new blockout object
+	 */
+	Object* NewObject(const Vec3f& position);
+
 	~Blockout();
 
 private:

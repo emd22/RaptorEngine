@@ -6,6 +6,10 @@ bool enable_quantize = true;
 
 OBJECT xform_marker_object;
 
+OBJECT selected_object;
+bool is_object_selected = false;
+
+
 int quantize_index = 2;
 
 
@@ -112,6 +116,7 @@ float mode_common_get_quantize_fraction()
 void mode_common_load()
 {
 	had_headbob = player.get_headbob();
+	is_object_selected = false;
 }
 
 void mode_common_controls()
@@ -127,6 +132,13 @@ void mode_common_controls()
 	if (KEY.K_EQUALS.is_pressed()) {
 		mode_common_adjust_quant_amount(false);
 	}
+
+	/* Creates a new blockout object */
+	if (KEY.K_K.is_pressed()) {
+		float3 origin = player.ray_get_point(20.0f);
+		selected_object = blockout_new_object(origin);
+		is_object_selected = true;
+	}
 }
 
 
@@ -134,4 +146,5 @@ void mode_common_unload()
 {
 	/* Disable damping regardless of if it was enabled */
 	mode_common_disable_damp();
+	is_object_selected = false;
 }

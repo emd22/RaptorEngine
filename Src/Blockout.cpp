@@ -400,6 +400,46 @@ void Blockout::RebuildObject(Object* object)
 	object->AttachCollider(phys);
 }
 
+Object* Blockout::NewObject(const Vec3f& position)
+{
+	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size()).Str();
+	LogInfo("Creating new blockout object '{}'", blockout_name);
+
+	Object* object = gObjectManager->NewObject(blockout_name, mWhiteMaterialID, eObjectTag::Blockout);
+
+	float32 scale = 0.25f;
+
+	CubeGenOptions cgo = CubeGenOptions::Uniform(scale);
+
+	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
+
+	object->pMesh = cube_mesh->AsDefaultMesh();
+	object->MoveBy(position);
+	object->SetShadowCaster(true);
+	object->Bounds.Min = -Vec3f(scale);
+	object->Bounds.Max = Vec3f(scale);
+
+	physics::Body* phys = gPhysics->NewBody(blockout_name);
+	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
+							  physics::BodyProps {
+								  .ConvexRadius = 0.05f,
+								  .Density = 20,
+							  });
+
+	phys->Teleport(position, Quat::scIdentity);
+
+	object->AttachCollider(phys);
+
+	AssetTicket ticket(static_cast<void*>(object));
+	ticket.MarkAndSignalLoaded();
+
+	pWorld->Attach(ticket);
+
+	BlockoutObjects.Insert(object->ID);
+
+	return object;
+}
+
 
 void Blockout::Load(const String& path)
 {
