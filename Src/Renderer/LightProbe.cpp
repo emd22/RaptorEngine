@@ -5,10 +5,11 @@
 
 #include "LightProbe.hpp"
 
+#include <Core/File.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
-
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace fx {
@@ -167,13 +168,13 @@ void ProbeManager::EnsureCaptureStage()
 	mCaptureStage.Create("ProbeCapture", size, eSizeDivisor::FullRes);
 
 	mCaptureStage.AddTarget(eImageFormat::RGBA16_Float,
-						   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-							   VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-						   eImageAspectFlag::Color);
+							VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+								VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+							eImageAspectFlag::Color);
 
 	mCaptureStage.AddTarget(eImageFormat::D32_Float,
-						   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-						   eImageAspectFlag::Depth);
+							VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+							eImageAspectFlag::Depth);
 
 	mCaptureStage.BuildRenderStage();
 
@@ -232,8 +233,8 @@ void ProbeManager::CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32
 		.imageExtent = VkExtent3D { .width = scCaptureSize, .height = scCaptureSize, .depth = 1 },
 	};
 
-	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-						   mCaptureStaging[face].Buffer, 1, &copy);
+	vkCmdCopyImageToBuffer(cmd, image.InternalImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mCaptureStaging[face].Buffer,
+						   1, &copy);
 
 	VkImageMemoryBarrier post_barrier {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -303,6 +304,10 @@ bool ProbeManager::FinishCaptureBake()
 
 	const float32 texel_area = 4.0f / static_cast<float32>(scPixels);
 
+	// LDR copy of what the probe saw (diagnostic dump after the loop).
+	SizedArray<uint8> ppm;
+	ppm.InitSize(scCaptureFaces * scPixels * 3);
+
 	for (uint32 face = 0; face < scCaptureFaces; face++) {
 		mCaptureStaging[face].Map();
 		const uint16* pixels = static_cast<const uint16*>(mCaptureStaging[face].pMappedBuffer);
@@ -327,14 +332,19 @@ bool ProbeManager::FinishCaptureBake()
 				const float32 g = fminf(HalfToFloat(texel[1]), scRadianceClamp);
 				const float32 b = fminf(HalfToFloat(texel[2]), scRadianceClamp);
 
+				uint8* ppm_px = ppm.pData + (face * scPixels + y * scCaptureSize + x) * 3;
+				ppm_px[0] = static_cast<uint8>(powf(fminf(r * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
+				ppm_px[1] = static_cast<uint8>(powf(fminf(g * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
+				ppm_px[2] = static_cast<uint8>(powf(fminf(b * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
+
 				// NDC of the texel center. The sign convention of v does not
 				// matter for the weight (even function) and the direction is
 				// unprojected through the face camera's own inverse matrices,
 				// so this stays consistent with any projection convention.
-				const float32 nx =
-					((static_cast<float32>(x) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f - 1.0f;
-				const float32 ny =
-					((static_cast<float32>(y) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f - 1.0f;
+				const float32 nx = ((static_cast<float32>(x) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f -
+								   1.0f;
+				const float32 ny = ((static_cast<float32>(y) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f -
+								   1.0f;
 
 				Vec4f clip(nx, ny, 0.5f, 1.0f);
 				Vec4f view = inv_proj.MultiplyVec4f(clip);
@@ -375,6 +385,27 @@ bool ProbeManager::FinishCaptureBake()
 		mCaptureStaging[face].UnMap();
 	}
 
+	// Debug dump of what the probe saw, so a bad capture can't hide behind SH.
+	{
+		static uint32 sBakeIndex = 0;
+
+		char header[32];
+		snprintf(header, sizeof(header), "P6\n%u %u\n255\n", scCaptureSize, scCaptureSize);
+
+		for (uint32 f = 0; f < scCaptureFaces; f++) {
+			char path[64];
+			snprintf(path, sizeof(path), "bakes/probe_bake%u_face%u.ppm", sBakeIndex, f);
+
+			File file(path, File::eModType::Write, File::eDataType::Binary);
+			file.Write(header);
+			file.WriteRaw(ppm.pData + f * scPixels * 3, scPixels * 3);
+			file.Close();
+		}
+
+		LogInfo("Probe capture faces dumped as probe_bake{}_faceN.ppm", sBakeIndex);
+		sBakeIndex++;
+	}
+
 	ProbeData& probe = mProbes[0];
 	for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
 		for (uint32 c = 0; c < 3; c++) {
@@ -386,7 +417,17 @@ bool ProbeManager::FinishCaptureBake()
 	mProbeCount = 1;
 	UploadToGpu();
 
-	LogInfo("Probe capture bake finished ({} faces, {}px)", scCaptureFaces, scCaptureSize);
+	// Mean irradiance (L00 scaled back through the basis) + directional energy,
+	// so bakes can be compared from the log without eyeballing pixels.
+	const float32 mean_rgb[3] = { probe.SH[0][0] * 0.282095f, probe.SH[0][1] * 0.282095f, probe.SH[0][2] * 0.282095f };
+	float32 dir_energy = 0.0f;
+	for (uint32 k = 1; k < Limits::ProbeSHCoeffCount; k++) {
+		dir_energy += probe.SH[k][0] * probe.SH[k][0] + probe.SH[k][1] * probe.SH[k][1] +
+					  probe.SH[k][2] * probe.SH[k][2];
+	}
+
+	LogInfo("Probe capture bake finished ({} faces, {}px) mean=({:.3f}, {:.3f}, {:.3f}) dirE={:.4f}", scCaptureFaces,
+			scCaptureSize, mean_rgb[0], mean_rgb[1], mean_rgb[2], sqrtf(dir_energy));
 	return true;
 }
 

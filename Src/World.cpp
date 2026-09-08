@@ -780,6 +780,9 @@ void World::RenderProbeCapture()
 	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
 	const Vec3f capture_pos = gProbeManager->GetCapturePosition();
 
+	LogInfo("Probe capture: {} faces at {} ({} lights)", ProbeManager::scCaptureFaces, capture_pos,
+			gGraphics->LightBuffer.SlotIndex);
+
 	static const Vec3f scFaceDirs[ProbeManager::scCaptureFaces] = {
 		Vec3f(1.0f, 0.0f, 0.0f), Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
 		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 0.0f, -1.0f),
@@ -793,8 +796,12 @@ void World::RenderProbeCapture()
 		PerspectiveCamera face_camera;
 		face_camera.SetFov(90.0f);
 		face_camera.SetAspectRatio(1.0f);
-		face_camera.SetNearPlane(0.1f);
-		face_camera.SetFarPlane(100.0f);
+		// NOTE: this engine uses reversed-Z with swapped plane parameters:
+		// the "near" value is the far clip distance and vice versa (see the
+		// Camera defaults of near=1000/far=0.01 and the weapon camera). Passing
+		// them in normal order inverts depth so far surfaces win over near ones.
+		face_camera.SetNearPlane(100.0f);
+		face_camera.SetFarPlane(0.1f);
 		face_camera.UpdateProjectionMatrix();
 
 		// NOTE: Camera::UpdateViewMatrix() hardcodes Vec3f::sUp, which is

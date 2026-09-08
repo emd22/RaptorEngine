@@ -15,6 +15,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/MeshUtil.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/PrimitiveMesh.hpp>
@@ -196,6 +197,11 @@ void Object::RenderShallow(const Camera& camera, renderer::Pipeline* pipeline)
 	push_constants.ObjectId = ID.GetID();
 	push_constants.MaterialIndex = mMaterialID.GetID();
 	push_constants.TileColumns = gGraphics->pRenderer->GetLightTileColumns();
+
+	// Probe capture faces have no matching SSAO data; flag the shader to use ssao=1.
+	if (gProbeManager != nullptr && gProbeManager->IsCapturePending()) {
+		push_constants.Padding0 = 1;
+	}
 	memcpy(push_constants.CameraMatrix, camera.GetCameraMatrix(mObjectLayer).RawData, sizeof(Mat4f));
 
 	gGraphics->SubmitPushConstants(frame->CmdBuffer, *pipeline, eShaderType::Vertex | eShaderType::Pixel,
