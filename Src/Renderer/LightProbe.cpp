@@ -91,7 +91,7 @@ void ProbeManager::Destroy()
 	mbInitialized = false;
 	mbCapturePending = false;
 	mbCaptureReady = false;
-	mPendingCount = 0;
+	mNumProbesPending = 0;
 	mCurrentProbe = 0;
 
 	for (uint32 i = 0; i < scCaptureFaces; i++) {
@@ -185,7 +185,7 @@ void ProbeManager::BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB
 void ProbeManager::BeginCaptureBake(const Vec3f& position)
 {
 	mProbePositions[0] = position;
-	mPendingCount = 1;
+	mNumProbesPending = 1;
 	mCurrentProbe = 0;
 	mbCapturePending = true;
 	mbCaptureReady = false;
@@ -205,12 +205,12 @@ void ProbeManager::BeginGridBake()
 		return;
 	}
 
-	mPendingCount = Limits::MaxIrradianceProbes;
+	mNumProbesPending = Limits::MaxIrradianceProbes;
 	mCurrentProbe = 0;
 	mbCapturePending = true;
 	mbCaptureReady = false;
 
-	LogInfo("Probe grid bake armed: {} probes, one per frame", mPendingCount);
+	LogInfo("Probe grid bake armed: {} probes, one per frame", mNumProbesPending);
 }
 
 bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
@@ -353,12 +353,12 @@ void ProbeManager::BeginGridBakeAt(const Vec3f& center, const Vec3f& size)
 
 	PlaceGridProbes(center - size * 0.5f, size, boxes);
 
-	mPendingCount = Limits::MaxIrradianceProbes;
+	mNumProbesPending = Limits::MaxIrradianceProbes;
 	mCurrentProbe = 0;
 	mbCapturePending = true;
 	mbCaptureReady = false;
 
-	LogInfo("Probe grid bake armed at {} over {} ({} probes, one per frame)", center, size, mPendingCount);
+	LogInfo("Probe grid bake armed at {} over {} ({} probes, one per frame)", center, size, mNumProbesPending);
 }
 
 void ProbeManager::EnsureCaptureStage()
@@ -592,7 +592,7 @@ bool ProbeManager::FinishCaptureBake()
 
 	// Debug dump of what the probe saw, so a bad capture can't hide behind SH.
 	// Single bakes only: a 64-probe grid would spam hundreds of files.
-	if (mPendingCount <= 1) {
+	if (mNumProbesPending <= 1) {
 		static uint32 sBakeIndex = 0;
 
 		char header[32];
@@ -613,7 +613,7 @@ bool ProbeManager::FinishCaptureBake()
 	}
 	// Single bakes refresh the whole field (global ambient); grid bakes write
 	// only the current cell.
-	if (mPendingCount <= 1) {
+	if (mNumProbesPending <= 1) {
 		for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
 			for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
 				for (uint32 c = 0; c < 3; c++) {
@@ -644,7 +644,8 @@ bool ProbeManager::FinishCaptureBake()
 	}
 
 	LogInfo("Probe capture bake finished (probe {}/{}, {} faces) mean=({:.3f}, {:.3f}, {:.3f}) dirE={:.4f}",
-			mCurrentProbe + 1, mPendingCount, scCaptureFaces, mean_rgb[0], mean_rgb[1], mean_rgb[2], sqrtf(dir_energy));
+			mCurrentProbe + 1, mNumProbesPending, scCaptureFaces, mean_rgb[0], mean_rgb[1], mean_rgb[2],
+			sqrtf(dir_energy));
 	return true;
 }
 
@@ -656,25 +657,25 @@ bool ProbeManager::ServiceCaptureBake()
 
 	if (!FinishCaptureBake()) {
 		mbCapturePending = false;
-		mPendingCount = 0;
+		mNumProbesPending = 0;
 		return false;
 	}
 
 	mCurrentProbe++;
 
-	if (mCurrentProbe < mPendingCount) {
+	if (mCurrentProbe < mNumProbesPending) {
 		// Arm the next probe for the coming frame.
 		mbCapturePending = true;
 
 		if ((mCurrentProbe % 8) == 0) {
-			LogInfo("Probe grid bake progress: {}/{}", mCurrentProbe, mPendingCount);
+			LogInfo("Probe grid bake progress: {}/{}", mCurrentProbe, mNumProbesPending);
 		}
 
 		return true;
 	}
 
 	mbCapturePending = false;
-	mPendingCount = 0;
+	mNumProbesPending = 0;
 	LogInfo("Probe grid bake complete ({} probes)", Limits::MaxIrradianceProbes);
 	return false;
 }

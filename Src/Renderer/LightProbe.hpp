@@ -84,39 +84,24 @@ public:
 
 	ProbeData* GetProbes() { return mProbes; }
 
-	/// Fills ALL probes (they are always all valid; the volume selects blends).
+	/// Fills all probes
 	void SetUniformAmbient(float32 r, float32 g, float32 b);
 	void SetSkyGradient(const float32 sky[3], const float32 ground[3]);
 
-	/**
-	 * @brief Bakes all probes from analytic scene lights (no occlusion).
-	 * Incident radiance is E(d) = ambient + sun * max(dot(d, sunDir), 0),
-	 * numerically projected onto the SH basis. Matches EvalProbeIrradiance().
-	 */
 	void BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB[3], const float32 ambRGB[3]);
 
 	///////////////////////////////////
-	// Cubemap capture bake
+	// Probe Cubemap
 	///////////////////////////////////
 
-	/// Arms a single capture bake at `position` (writes all probes uniformly,
-	/// i.e. a global ambient refresh). Faces render next frame, then
-	/// FinishCaptureBake() reads back and projects. Call outside frame recording.
 	void BeginCaptureBake(const Vec3f& position);
-
-	/// Arms a 32-probe grid bake auto-fitted to the level bounds. Bakes
-	/// scProbesPerFrame probe(s) per frame until done; drive with
-	/// ServiceCaptureBake() from the game tick. Call outside frame recording.
 	void BeginGridBake();
 
-	/// Arms a grid bake over an explicit box (center + full size), e.g. a dense
-	/// volume around the player. Same progressive drive as BeginGridBake().
 	void BeginGridBakeAt(const Vec3f& center, const Vec3f& size);
 
 	bool IsCapturePending() const { return mbCapturePending; }
 	bool IsCaptureReady() const { return mbCaptureReady; }
 
-	/// Position of the probe currently being captured (driven by the bake queue).
 	const Vec3f& GetCapturePosition() const { return mProbePositions[mCurrentProbe]; }
 
 	void EnsureCaptureStage();
@@ -124,8 +109,6 @@ public:
 
 	void SetCaptureCamera(uint32 face, const PerspectiveCamera& cam) { mFaceCameras[face] = cam; }
 
-	/// Copies the capture color target into the face staging buffer. Must be
-	/// called inside frame recording, after the capture stage has ended.
 	void CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32 face);
 
 	/// Called once all faces + copies are recorded for this frame.
@@ -135,38 +118,20 @@ public:
 		mbCaptureReady = true;
 	}
 
-	/**
-	 * @brief Blocks until the GPU is idle, reads back the 6 staged faces and
-	 * projects captured radiance into the current probe (or all probes for a
-	 * single bake). Returns false on failure. Call after the capture frame.
-	 */
 	bool FinishCaptureBake();
 
-	/**
-	 * @brief Tick helper for progressive grid bakes: finishes the ready probe
-	 * and advances the queue. Returns true while a bake is still in progress.
-	 * Single bakes complete in one call.
-	 */
 	bool ServiceCaptureBake();
 
-	/// Uploads all CPU probes to every in-flight page of the GPU probe buffer.
 	void UploadToGpu();
-
-	/// Uploads the volume descriptor to every in-flight page of its GPU buffer.
 	void UploadVolumeToGpu();
 
-	///////////////////////////////////
-	// Persistence (.fxprobe)
-	///////////////////////////////////
+	//////////////////////////////////////
+	// Probe cache
+	/////////////////////////////////////
 
-	/// Path of the probe file for the current scene: `<scene>/probes.fxprobe`.
 	String GetProbeFilePath() const;
 
-	/// Saves volume + all probes. Returns false on failure.
 	bool SaveProbes();
-
-	/// Loads volume + probes if the file exists (quiet otherwise). Uploads to
-	/// the GPU on success. Returns false when missing or invalid.
 	bool LoadProbes();
 
 private:
@@ -181,8 +146,10 @@ private:
 
 	/// Capture bake state + resources (stage/staging built lazily).
 	Vec3f mProbePositions[Limits::MaxIrradianceProbes] {};
-	uint32 mPendingCount = 0;
+
+	uint32 mNumProbesPending = 0;
 	uint32 mCurrentProbe = 0;
+
 	bool mbCapturePending = false;
 	bool mbCaptureReady = false;
 	bool mbCaptureBuilt = false;

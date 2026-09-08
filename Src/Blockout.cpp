@@ -10,6 +10,7 @@
 #include <Renderer/PipelineNames.hpp>
 #include <World.hpp>
 
+
 namespace fx {
 
 Blockout::Blockout() {}
@@ -256,19 +257,17 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 		.bAlignUVs = true,
 	};
 
-	auto clamp_scale = [](float v) { return std::max(v, 0.01f); };
-	cgo.Left.Scale = clamp_scale(cgo.Left.Scale);
-	cgo.Right.Scale = clamp_scale(cgo.Right.Scale);
-	cgo.Top.Scale = clamp_scale(cgo.Top.Scale);
-	cgo.Bottom.Scale = clamp_scale(cgo.Bottom.Scale);
-	cgo.Front.Scale = clamp_scale(cgo.Front.Scale);
-	cgo.Back.Scale = clamp_scale(cgo.Back.Scale);
+	const float32 min_scale = 0.01f;
+	cgo.Left.Scale = std::max(cgo.Left.Scale, min_scale);
+	cgo.Right.Scale = std::max(cgo.Right.Scale, min_scale);
+	cgo.Top.Scale = std::max(cgo.Top.Scale, min_scale);
+	cgo.Bottom.Scale = std::max(cgo.Bottom.Scale, min_scale);
+	cgo.Front.Scale = std::max(cgo.Front.Scale, min_scale);
+	cgo.Back.Scale = std::max(cgo.Back.Scale, min_scale);
 
 	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
-
 	MaterialID material_id = mWhiteMaterialID;
-
 
 	eObjectTag object_tags = eObjectTag::Blockout;
 
