@@ -807,33 +807,33 @@ void World::RenderProbeCapture()
 				capture_pos, gGraphics->LightBuffer.SlotIndex);
 
 		for (uint32 face = 0; face < ProbeManager::scCaptureFaces; face++) {
-		PerspectiveCamera face_camera;
-		face_camera.SetFov(90.0f);
-		face_camera.SetAspectRatio(1.0f);
-		face_camera.SetNearPlane(100.0f);
-		face_camera.SetFarPlane(0.1f);
-		face_camera.UpdateProjectionMatrix();
+			PerspectiveCamera face_camera;
+			face_camera.SetFov(90.0f);
+			face_camera.SetAspectRatio(1.0f);
+			face_camera.SetNearPlane(100.0f);
+			face_camera.SetFarPlane(0.1f);
+			face_camera.UpdateProjectionMatrix();
 
-		// NOTE: Camera::UpdateViewMatrix() hardcodes Vec3f::sUp, which is
-		// degenerate for the +/-Y faces, so the view matrix is built directly
-		// with a per-face up vector. FinishCaptureBake unprojects through these
-		// same matrices, so no convention needs to match anything else.
-		face_camera.MoveTo(capture_pos);
-		face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
-		face_camera.UpdateCameraMatrix();
+			// NOTE: Camera::UpdateViewMatrix() hardcodes Vec3f::sUp, which is
+			// degenerate for the +/-Y faces, so the view matrix is built directly
+			// with a per-face up vector. FinishCaptureBake unprojects through these
+			// same matrices, so no convention needs to match anything else.
+			face_camera.MoveTo(capture_pos);
+			face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
+			face_camera.UpdateCameraMatrix();
 
-		gProbeManager->SetCaptureCamera(slot, face, face_camera);
+			gProbeManager->SetCaptureCamera(slot, face, face_camera);
 
-		// Re-run Forward+ culling for the capture extent + face camera.
-		gGraphics->pRenderer->DoLightCullingPass(face_camera, &extent);
+			// Re-run Forward+ culling for the capture extent + face camera.
+			gGraphics->pRenderer->DoLightCullingPass(face_camera, &extent);
 
-		stage.Begin(cmd);
+			stage.Begin(cmd);
 
-		ExecuteRenderList(renderer::ePipelineName::Geometry, face_camera);
-		ExecuteRenderList(renderer::ePipelineName::GeometryNormalMaps, face_camera);
-		ExecuteRenderList(renderer::ePipelineName::GeometrySkinned, face_camera);
+			ExecuteRenderList(renderer::ePipelineName::Geometry, face_camera);
+			ExecuteRenderList(renderer::ePipelineName::GeometryNormalMaps, face_camera);
+			ExecuteRenderList(renderer::ePipelineName::GeometrySkinned, face_camera);
 
-		stage.End();
+			stage.End();
 
 			gProbeManager->CopyCaptureFaceToStaging(cmd, slot, face);
 		}
@@ -987,9 +987,9 @@ void World::RenderProbeDebug(const Camera& camera)
 	DebugLayerPushConstants push_constants {};
 
 	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
-	static const Vec3f scProbeHalfExtent(0.075f);
+	static const Vec3f scProbeHalfExtent(0.035f);
 
-	const Color probe_color = Color::FromRGBA(60, 220, 255, 255);
+	const Color probe_color = Color::FromRGBA(60, 220, 255, 100);
 	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
 
 	const Vec3f* positions = gProbeManager->GetProbePositions();
@@ -1003,8 +1003,8 @@ void World::RenderProbeDebug(const Camera& camera)
 
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
-		push_constants.DebugColor =
-			(bCapturePending && i == current_probe) ? capturing_color.AsUInt() : probe_color.AsUInt();
+		push_constants.DebugColor = (bCapturePending && i == current_probe) ? capturing_color.AsUInt()
+																			: probe_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);

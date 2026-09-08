@@ -50,4 +50,8 @@ ninja
 
 ## Screenshots
 
-![Sponza test scene](Screenshots/07_ProbeGI.png)
+|              Global Illumination              |          Dynamic Physics Level          |
+| :-------------------------------------------: | :-------------------------------------: |
+| ![GI test scene](Screenshots/07_ProbeGI.png)  | ![After GI](Screenshots/10_AfterGI.png) |
+|               Probe Debug View                |                                         |
+| ![Probe Debug](Screenshots/08_ProbeDebug.png) |                                         |
