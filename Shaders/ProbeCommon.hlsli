@@ -49,29 +49,27 @@ float3 SampleProbeVolume(float3 pos_ws, float3 n, ProbeVolume volume, Structured
 	float best_weight = 0.0f;
 #endif
 
-	for (uint cz = 0; cz < 2; cz++) {
-		for (uint cy = 0; cy < 2; cy++) {
-			for (uint cx = 0; cx < 2; cx++) {
-				uint3 cell = base + uint3(cx, cy, cz);
-				uint idx = cell.x + dims.x * (cell.y + dims.y * cell.z);
+	for (uint lin_idx = 0; lin_idx < 8; lin_idx++) {
+		int3 ridx = int3(lin_idx, lin_idx >> 1, lin_idx >> 2) & int3(1, 1, 1);
+		uint3 cell = base + uint3(ridx);
 
-				float w = (cx ? f.x : (1.0 - f.x)) * (cy ? f.y : (1.0 - f.y)) * (cz ? f.z : (1.0 - f.z));
+		uint idx = cell.x + dims.x * (cell.y + dims.y * cell.z);
 
-			#ifdef NO_PROBE_BLENDING
-				if (w > best_weight) {
-					best_weight = w;
+		float w = select(ridx.x, f.x, (1.0 - f.x)) * select(ridx.y, f.y, (1.0 - f.y)) * select(ridx.z, f.z, (1.0 - f.z));
 
-					for (uint k2 = 0; k2 < 9; k2++) {
-						blended[k2] = probes[idx].SH[k2].rgb * w;
-					}
-				}
-			#else
-				for (uint k2 = 0; k2 < 9; k2++) {
-					blended[k2] += probes[idx].SH[k2].rgb * w;
-				}
-			#endif
+	#ifdef NO_PROBE_BLENDING
+		if (w > best_weight) {
+			best_weight = w;
+
+			for (uint k2 = 0; k2 < 9; k2++) {
+				blended[k2] = probes[idx].SH[k2].rgb * w;
 			}
 		}
+	#else
+		for (uint k2 = 0; k2 < 9; k2++) {
+			blended[k2] += probes[idx].SH[k2].rgb * w;
+		}
+	#endif
 	}
 
 	// Trilinearly blend the values between probes
