@@ -692,11 +692,11 @@ void TiledForwardRenderer::CreateLightCullingPSO()
 	gPSOBuild->EndPipeline();
 }
 
-void TiledForwardRenderer::DoLightCullingPass(Camera& camera)
+void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const Vec2u extent = gGraphics->Swapchain.Extent;
+	const Vec2u extent = (pExtentOverride != nullptr) ? *pExtentOverride : gGraphics->Swapchain.Extent;
 
 	const uint32 tile_columns = std::min((extent.X + (Limits::LightTileSize - 1)) / Limits::LightTileSize,
 										 Limits::MaxScreenTilesX);

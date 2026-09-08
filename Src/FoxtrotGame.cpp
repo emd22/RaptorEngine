@@ -471,6 +471,15 @@ void FoxtrotGame::ProcessControls()
 		gWorld->Player.Physics.SetCollisionEnabled(!gWorld->Player.IsFlyMode());
 	}
 
+	// `B` bakes the analytic sun/ambient probe, `C` bakes from a 6-face scene
+	// capture at the player position (occlusion-aware, hitches one frame).
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
+		if (!gProbeManager->IsCapturePending()) {
+			gProbeManager->BeginCaptureBake(gWorld->Player.pCamera->Position);
+			LogInfo("Probe capture bake armed at {}", gWorld->Player.pCamera->Position);
+		}
+	}
+
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_B)) {
 		if (pSun.IsValid()) {
 			// For directionals, mPosition holds the light direction (see Forward.hlsl).
@@ -591,6 +600,12 @@ void FoxtrotGame::Tick()
 	RenderText();
 
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
+
+	if (gProbeManager->IsCaptureReady()) {
+		if (!gProbeManager->FinishCaptureBake()) {
+			LogError("Probe capture bake failed!");
+		}
+	}
 
 	mLastTick = current_tick;
 }

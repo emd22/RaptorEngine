@@ -27,10 +27,10 @@
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/LightProbe.hpp>
-#include <Renderer/Limits.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <World.hpp>
 
 /* If this is defined, we will break on an error message containing this string. */
 #define FX_DEBUG_BREAK_ON_ERROR_SUBSTR                                                                                 \
@@ -737,6 +737,11 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 	pRenderer->ForwardPass.End();
 
+	// Probe capture bake faces render here: the main forward pass is done, so
+	// the capture can reuse its pipelines + light grid page before composition.
+	if (gProbeManager->IsCapturePending()) {
+		gWorld->RenderProbeCapture();
+	}
 
 	// pDeferredRenderer->UnlitPass.End();
 

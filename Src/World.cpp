@@ -10,6 +10,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <algorithm>
@@ -187,7 +188,11 @@ Object* World::FindObject(const Hash32 name_hash)
 void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
+	ExecuteRenderList(pl_name, camera);
+}
 
+void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera)
+{
 	RenderListSection& section = mRenderList.GetSection(pl_name);
 
 	if (!section.InUse.IsInited()) {
@@ -736,6 +741,102 @@ void World::Render(Camera* shadow_camera)
 	// RenderPhysicsObjects(camera);
 }
 
+
+void World::RenderProbeCapture()
+{
+	if (gProbeManager == nullptr || !gProbeManager->IsCapturePending()) {
+		return;
+	}
+
+	gProbeManager->EnsureCaptureStage();
+
+	RenderStage& stage = gProbeManager->GetCaptureStage();
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+
+	const Vec2u extent(ProbeManager::scCaptureSize, ProbeManager::scCaptureSize);
+
+	// The opaque geometry pipelines default to a swapchain-sized viewport.
+	// Override them for the capture extent (restored below).
+	static const renderer::ePipelineName scCapturePipelines[] = {
+		renderer::ePipelineName::Geometry,
+		renderer::ePipelineName::GeometryNormalMaps,
+		renderer::ePipelineName::GeometrySkinned,
+	};
+
+	Vec2u saved_viewports[std::size(scCapturePipelines)];
+	bool saved_fullscreen[std::size(scCapturePipelines)];
+
+	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
+		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
+		saved_viewports[i] = pipeline.ViewportSize;
+		saved_fullscreen[i] = pipeline.bIsViewportFullscreen;
+
+		pipeline.ViewportSize = extent;
+		pipeline.bIsViewportFullscreen = false;
+	}
+
+	RequirePipelineDynamicStates();
+
+	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
+	const Vec3f capture_pos = gProbeManager->GetCapturePosition();
+
+	static const Vec3f scFaceDirs[ProbeManager::scCaptureFaces] = {
+		Vec3f(1.0f, 0.0f, 0.0f), Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 0.0f, -1.0f),
+	};
+	static const Vec3f scFaceUps[ProbeManager::scCaptureFaces] = {
+		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),
+		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+	};
+
+	for (uint32 face = 0; face < ProbeManager::scCaptureFaces; face++) {
+		PerspectiveCamera face_camera;
+		face_camera.SetFov(90.0f);
+		face_camera.SetAspectRatio(1.0f);
+		face_camera.SetNearPlane(0.1f);
+		face_camera.SetFarPlane(100.0f);
+		face_camera.UpdateProjectionMatrix();
+
+		// NOTE: Camera::UpdateViewMatrix() hardcodes Vec3f::sUp, which is
+		// degenerate for the +/-Y faces, so the view matrix is built directly
+		// with a per-face up vector. FinishCaptureBake unprojects through these
+		// same matrices, so no convention needs to match anything else.
+		face_camera.MoveTo(capture_pos);
+		face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
+		face_camera.UpdateCameraMatrix();
+
+		// NOTE: face_camera.Update() is intentionally not called: it would
+		// rebuild the view matrix with the hardcoded +Y up vector.
+		gProbeManager->SetCaptureCamera(face, face_camera);
+
+		// Re-run Forward+ culling for the capture extent + face camera.
+		gGraphics->pRenderer->DoLightCullingPass(face_camera, &extent);
+
+		stage.Begin(cmd);
+
+		// Opaque only: transparents are skipped for capture bakes.
+		ExecuteRenderList(renderer::ePipelineName::Geometry, face_camera);
+		ExecuteRenderList(renderer::ePipelineName::GeometryNormalMaps, face_camera);
+		ExecuteRenderList(renderer::ePipelineName::GeometrySkinned, face_camera);
+
+		stage.End();
+
+		gProbeManager->CopyCaptureFaceToStaging(cmd, face);
+	}
+
+	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
+		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
+		pipeline.ViewportSize = saved_viewports[i];
+		pipeline.bIsViewportFullscreen = saved_fullscreen[i];
+	}
+
+	gGraphics->pRenderer->mLightTileColumns = saved_tile_columns;
+
+	// Force the composition pass to re-emit viewport state for its own size.
+	RequirePipelineDynamicStates();
+
+	gProbeManager->MarkCaptureReady();
+}
 
 void World::RenderBoundingBoxes(const Camera& camera)
 {

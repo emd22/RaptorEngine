@@ -46,6 +46,13 @@ public:
 
 	void Render(Camera* shadow_camera);
 
+	/**
+	 * @brief Renders the 6 cubemap faces for a pending probe capture bake into
+	 * the probe capture stage. Called from DoComposition after the main forward
+	 * pass has ended. No-op unless ProbeManager::BeginCaptureBake() armed one.
+	 */
+	void RenderProbeCapture();
+
 	const PagedArray<ObjectID>& GetAllObjects() { return mObjects; }
 	const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
 
@@ -78,6 +85,7 @@ private:
 	void RenderWorldGrid(const Camera& camera);
 
 	void ExecuteRenderList(renderer::ePipelineName pl_name);
+	void ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera);
 	void ExecuteTransparentRenderLists();
 	void ExecuteShadowRenderList(renderer::ePipelineName pl_name);
 	void ExecutePrepassRenderList(renderer::ePipelineName pl_name);

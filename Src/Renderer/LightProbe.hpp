@@ -16,7 +16,11 @@
 
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
+#include <Renderer/Backend/Commands.hpp>
+#include <Renderer/Backend/GpuBuffer.hpp>
+#include <Renderer/Camera.hpp>
 #include <Renderer/Limits.hpp>
+#include <Renderer/RenderStage.hpp>
 
 namespace fx {
 
@@ -39,6 +43,11 @@ ProbeData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3]);
 class ProbeManager
 {
 public:
+	/// Face resolution for capture bakes. 64px is plenty for L2 irradiance.
+	static constexpr uint32 scCaptureSize = 64;
+	static constexpr uint32 scCaptureFaces = 6;
+
+public:
 	void Create();
 	void Destroy();
 
@@ -57,6 +66,42 @@ public:
 	 */
 	void BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB[3], const float32 ambRGB[3]);
 
+	///////////////////////////////////
+	// Cubemap capture bake
+	///////////////////////////////////
+
+	/// Arms a capture bake at `position`. The 6 faces render inside the next
+	/// frame (see World::RenderProbeCapture), then FinishCaptureBake() reads
+	/// back and projects. Must be called outside of frame recording.
+	void BeginCaptureBake(const Vec3f& position);
+
+	bool IsCapturePending() const { return mbCapturePending; }
+	bool IsCaptureReady() const { return mbCaptureReady; }
+	const Vec3f& GetCapturePosition() const { return mCapturePosition; }
+
+	void EnsureCaptureStage();
+	renderer::RenderStage& GetCaptureStage() { return mCaptureStage; }
+
+	void SetCaptureCamera(uint32 face, const PerspectiveCamera& cam) { mFaceCameras[face] = cam; }
+
+	/// Copies the capture color target into the face staging buffer. Must be
+	/// called inside frame recording, after the capture stage has ended.
+	void CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32 face);
+
+	/// Called once all faces + copies are recorded for this frame.
+	void MarkCaptureReady()
+	{
+		mbCapturePending = false;
+		mbCaptureReady = true;
+	}
+
+	/**
+	 * @brief Blocks until the GPU is idle, reads back the 6 staged faces and
+	 * projects captured radiance into probe 0. Returns false on failure.
+	 * Must be called after the capture frame has been presented.
+	 */
+	bool FinishCaptureBake();
+
 	/// Uploads all CPU probes to every in-flight page of the GPU probe buffer.
 	void UploadToGpu();
 
@@ -64,6 +109,16 @@ private:
 	ProbeData mProbes[Limits::MaxIrradianceProbes] {};
 	uint32 mProbeCount = 1;
 	bool mbInitialized = false;
+
+	/// Capture bake state + resources (built lazily on first capture bake).
+	Vec3f mCapturePosition = Vec3f::sZero;
+	bool mbCapturePending = false;
+	bool mbCaptureReady = false;
+	bool mbCaptureBuilt = false;
+
+	renderer::RenderStage mCaptureStage;
+	renderer::RawGpuBuffer mCaptureStaging[scCaptureFaces];
+	PerspectiveCamera mFaceCameras[scCaptureFaces];
 };
 
 extern ProbeManager* gProbeManager;
