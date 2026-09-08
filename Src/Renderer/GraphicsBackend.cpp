@@ -26,6 +26,7 @@
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/Limits.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
@@ -141,9 +142,17 @@ void GraphicsBackend::Init(Vec2u window_size)
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
 								VMA_MEMORY_USAGE_GPU_ONLY);
 
+	// SH light probe buffer (MVP: global irradiance probe at index 0).
+	ProbePageSize = Limits::MaxIrradianceProbes * sizeof(ProbeData);
+	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize * FramesInFlight,
+					   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+
 
 	gMaterialManager->Create();
 	gObjectManager->Create();
+
+	// Upload the default (precomputed) irradiance probe now that ProbeBuffer exists.
+	gProbeManager->Create();
 
 	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 
@@ -811,6 +820,7 @@ void GraphicsBackend::Destroy()
 
 	LightGridBuffer.Destroy();
 	LightIndexListBuffer.Destroy();
+	ProbeBuffer.Destroy();
 
 	gAssetManager->ShutdownDeletionQueue();
 

@@ -132,6 +132,7 @@ struct FSInput
 
 #include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
+#include "ProbeCommon.hlsli"
 
 F_CBuffer(FSLightBuffer, 4, 1)
 {
@@ -143,6 +144,9 @@ F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 // Forward+ tiled light lists
 F_StructBuffer(bLightGrid, TileLightData, 2, 0);
 F_StructBuffer(bLightIndexList, uint, 3, 0);
+
+// SH irradiance probes (MVP: index 0 is the global probe)
+F_StructBuffer(bProbeBuffer, ProbeData, 6, 0);
 
 F_Texture2D(tAlbedo, 0, 1)
 
@@ -307,7 +311,12 @@ FSOutput main(FSInput input)
 		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, 0.0);
 	}
 
-	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f) * (ssao);
+	// MVP light probe: precomputed SH irradiance (probe 0 = global probe)
+	// replaces the previous flat ambient term.
+	float3 probe_normal = normalize(N_final);
+	float3 probe_irradiance = EvalProbeIrradiance(probe_normal, bProbeBuffer[0]);
+
+	float4 ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
 
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, baseAlpha);
 

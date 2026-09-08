@@ -201,7 +201,7 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 
 	{
 		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gGraphics->GetLightGridFrameOffset(),
-										  gGraphics->GetLightIndexListFrameOffset() };
+										  gGraphics->GetLightIndexListFrameOffset(), gGraphics->GetProbeFrameOffset() };
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
 			0, gGraphics->GetFrame()->CmdBuffer, pipeline,
@@ -297,7 +297,8 @@ void World::ExecuteTransparentRenderLists()
 			{
 				const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0,
 												  gGraphics->GetLightGridFrameOffset(),
-												  gGraphics->GetLightIndexListFrameOffset() };
+												  gGraphics->GetLightIndexListFrameOffset(),
+												  gGraphics->GetProbeFrameOffset() };
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
 					0, gGraphics->GetFrame()->CmdBuffer, *pipeline,

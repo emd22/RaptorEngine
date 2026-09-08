@@ -5,6 +5,7 @@
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
 #include <Material/MaterialManager.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <Script/ScriptManager.hpp>
@@ -28,6 +29,7 @@ MemPool* gEnginePool = nullptr;
 MemPool* gScriptMemPool = nullptr;
 WorldGrid* gWorldGrid = nullptr;
 World* gWorld = nullptr;
+ProbeManager* gProbeManager = nullptr;
 
 ScriptManager* gScriptManager = nullptr;
 
@@ -51,6 +53,7 @@ void Init()
 	gThreadManager = new ThreadManager;
 	gScriptManager = new ScriptManager;
 	gWorld = new World;
+	gProbeManager = new ProbeManager;
 }
 
 
@@ -63,6 +66,7 @@ void Destroy()
 	DESTROY_GLOBAL(gThreadManager);
 	DESTROY_GLOBAL(gScriptManager);
 	DESTROY_GLOBAL(gWorld);
+	DESTROY_GLOBAL(gProbeManager);
 }
 
 } // namespace Globals
