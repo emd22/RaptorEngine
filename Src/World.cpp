@@ -10,6 +10,7 @@
 #include <Physics/PhysicsManager.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <algorithm>
@@ -20,7 +21,7 @@ using namespace renderer;
 
 void World::Create()
 {
-	mObjects.Create(32);
+	mObjects.Create(80);
 	mLights.Create(32);
 
 	SortedEntryBuffer.SetPageSize(128);
@@ -187,7 +188,11 @@ Object* World::FindObject(const Hash32 name_hash)
 void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 {
 	PerspectiveCamera& camera = *mpCurrentCamera;
+	ExecuteRenderList(pl_name, camera);
+}
 
+void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera& camera)
+{
 	RenderListSection& section = mRenderList.GetSection(pl_name);
 
 	if (!section.InUse.IsInited()) {
@@ -200,8 +205,11 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name)
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
 	{
-		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gGraphics->GetLightGridFrameOffset(),
-										  gGraphics->GetLightIndexListFrameOffset() };
+		const uint32 buffer_offsets[] = {
+			gObjectManager->GetBaseOffset(),	  0,
+			gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
+			gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset()
+		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
 			0, gGraphics->GetFrame()->CmdBuffer, pipeline,
@@ -295,9 +303,11 @@ void World::ExecuteTransparentRenderLists()
 			pipeline->Bind(gGraphics->GetFrame()->CmdBuffer);
 
 			{
-				const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0,
-												  gGraphics->GetLightGridFrameOffset(),
-												  gGraphics->GetLightIndexListFrameOffset() };
+				const uint32 buffer_offsets[] = {
+					gObjectManager->GetBaseOffset(),	  0,
+					gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
+					gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset()
+				};
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
 					0, gGraphics->GetFrame()->CmdBuffer, *pipeline,
@@ -732,9 +742,118 @@ void World::Render(Camera* shadow_camera)
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
 
-	// RenderPhysicsObjects(camera);
+	if (bRenderPhysicsObjects) {
+		RenderPhysicsObjects(camera);
+	}
+
+	if (bRenderProbes) {
+		RenderProbeDebug(camera);
+	}
 }
 
+
+void World::RenderProbeCapture()
+{
+	if (gProbeManager == nullptr || !gProbeManager->IsCapturePending()) {
+		return;
+	}
+
+	gProbeManager->EnsureCaptureStage();
+
+	RenderStage& stage = gProbeManager->GetCaptureStage();
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+
+	const Vec2u extent(ProbeManager::scCaptureSize, ProbeManager::scCaptureSize);
+
+	// The opaque geometry pipelines default to a swapchain-sized viewport.
+	// Override them for the capture extent (restored below).
+	static const renderer::ePipelineName scCapturePipelines[] = {
+		renderer::ePipelineName::Geometry,
+		renderer::ePipelineName::GeometryNormalMaps,
+		renderer::ePipelineName::GeometrySkinned,
+	};
+
+	Vec2u saved_viewports[std::size(scCapturePipelines)];
+	bool saved_fullscreen[std::size(scCapturePipelines)];
+
+	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
+		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
+		saved_viewports[i] = pipeline.ViewportSize;
+		saved_fullscreen[i] = pipeline.bIsViewportFullscreen;
+
+		pipeline.ViewportSize = extent;
+		pipeline.bIsViewportFullscreen = false;
+	}
+
+	RequirePipelineDynamicStates();
+
+	const uint32 saved_tile_columns = gGraphics->pRenderer->GetLightTileColumns();
+
+	static const Vec3f scFaceDirs[ProbeManager::scCaptureFaces] = {
+		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),	Vec3f(0.0f, 0.0f, -1.0f),
+	};
+	static const Vec3f scFaceUps[ProbeManager::scCaptureFaces] = {
+		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),
+		Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+	};
+
+	const uint32 batch_count = gProbeManager->BeginBatchCapture();
+
+	for (uint32 slot = 0; slot < batch_count; slot++) {
+		const Vec3f capture_pos = gProbeManager->GetCapturePosition();
+
+		LogInfo("Probe capture: batch probe {} at {} ({} lights)", gProbeManager->GetCurrentProbeIndex() + 1,
+				capture_pos, gGraphics->LightBuffer.SlotIndex);
+
+		for (uint32 face = 0; face < ProbeManager::scCaptureFaces; face++) {
+		PerspectiveCamera face_camera;
+		face_camera.SetFov(90.0f);
+		face_camera.SetAspectRatio(1.0f);
+		face_camera.SetNearPlane(100.0f);
+		face_camera.SetFarPlane(0.1f);
+		face_camera.UpdateProjectionMatrix();
+
+		// NOTE: Camera::UpdateViewMatrix() hardcodes Vec3f::sUp, which is
+		// degenerate for the +/-Y faces, so the view matrix is built directly
+		// with a per-face up vector. FinishCaptureBake unprojects through these
+		// same matrices, so no convention needs to match anything else.
+		face_camera.MoveTo(capture_pos);
+		face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
+		face_camera.UpdateCameraMatrix();
+
+		gProbeManager->SetCaptureCamera(slot, face, face_camera);
+
+		// Re-run Forward+ culling for the capture extent + face camera.
+		gGraphics->pRenderer->DoLightCullingPass(face_camera, &extent);
+
+		stage.Begin(cmd);
+
+		ExecuteRenderList(renderer::ePipelineName::Geometry, face_camera);
+		ExecuteRenderList(renderer::ePipelineName::GeometryNormalMaps, face_camera);
+		ExecuteRenderList(renderer::ePipelineName::GeometrySkinned, face_camera);
+
+		stage.End();
+
+			gProbeManager->CopyCaptureFaceToStaging(cmd, slot, face);
+		}
+
+		gProbeManager->AdvanceBatchCapture();
+	}
+
+	for (uint32 i = 0; i < std::size(scCapturePipelines); i++) {
+		renderer::Pipeline& pipeline = gPipelineCache->Request(scCapturePipelines[i]);
+		pipeline.ViewportSize = saved_viewports[i];
+		pipeline.bIsViewportFullscreen = saved_fullscreen[i];
+	}
+
+	gGraphics->pRenderer->mLightTileColumns = saved_tile_columns;
+
+	// Force the composition pass to re-emit viewport state for its own size.
+	RequirePipelineDynamicStates();
+
+	gProbeManager->MarkCaptureReady();
+}
 
 void World::RenderBoundingBoxes(const Camera& camera)
 {
@@ -844,6 +963,48 @@ void World::RenderPhysicsObjects(const Camera& camera)
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
 		push_constants.DebugColor = selected_color.AsUInt();
+
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		mpDebugCube->Render(cmd, 1);
+	}
+}
+
+void World::RenderProbeDebug(const Camera& camera)
+{
+	if (!mpDebugCube.IsValid()) {
+		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
+	}
+
+	if (gProbeManager == nullptr) {
+		return;
+	}
+
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugSolid);
+	pipeline.Bind(cmd);
+
+	DebugLayerPushConstants push_constants {};
+
+	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
+	static const Vec3f scProbeHalfExtent(0.075f);
+
+	const Color probe_color = Color::FromRGBA(60, 220, 255, 255);
+	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
+
+	const Vec3f* positions = gProbeManager->GetProbePositions();
+	const uint32 probe_count = gProbeManager->GetProbeCount();
+	const bool bCapturePending = gProbeManager->IsCapturePending();
+	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
+
+	for (uint32 i = 0; i < probe_count; i++) {
+		Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) * Mat4f::AsTranslation(positions[i]);
+		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+
+		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+
+		push_constants.DebugColor =
+			(bCapturePending && i == current_probe) ? capturing_color.AsUInt() : probe_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);

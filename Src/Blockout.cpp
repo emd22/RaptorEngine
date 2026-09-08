@@ -10,6 +10,7 @@
 #include <Renderer/PipelineNames.hpp>
 #include <World.hpp>
 
+
 namespace fx {
 
 Blockout::Blockout() {}
@@ -46,9 +47,21 @@ void Blockout::Create(World* world)
 		test_material->Finalize();
 	}
 
-	// Blue material
+
 	{
-		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoBlue", renderer::ePipelineName::Geometry, false);
+		mBlueMaterialID = gMaterialManager->NewMaterial("ProtoBlue", renderer::ePipelineName::Geometry, false);
+		Material* test_material = gMaterialManager->GetMaterial(mBlueMaterialID);
+
+		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
+													   "Data/Demo/Textures/aqua_check.png", eImageCreateFlags::None);
+
+		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
+		test_material->Finalize();
+	}
+
+	// Selection material
+	{
+		SelectionMaterialID = gMaterialManager->NewMaterial("ProtoSelect", renderer::ePipelineName::Geometry, false);
 		Material* test_material = gMaterialManager->GetMaterial(SelectionMaterialID);
 
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
@@ -59,6 +72,7 @@ void Blockout::Create(World* world)
 
 		test_material->Finalize();
 	}
+
 
 	{
 		const float scale = 0.25f;
@@ -211,6 +225,7 @@ enum class eCProtoMat
 {
 	Gray = 0,
 	Orange = 1,
+	Blue = 2,
 };
 
 
@@ -242,29 +257,17 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 		.bAlignUVs = true,
 	};
 
-	auto clamp_scale = [](float v) { return std::max(v, 0.01f); };
-	cgo.Left.Scale = clamp_scale(cgo.Left.Scale);
-	cgo.Right.Scale = clamp_scale(cgo.Right.Scale);
-	cgo.Top.Scale = clamp_scale(cgo.Top.Scale);
-	cgo.Bottom.Scale = clamp_scale(cgo.Bottom.Scale);
-	cgo.Front.Scale = clamp_scale(cgo.Front.Scale);
-	cgo.Back.Scale = clamp_scale(cgo.Back.Scale);
+	const float32 min_scale = 0.01f;
+	cgo.Left.Scale = std::max(cgo.Left.Scale, min_scale);
+	cgo.Right.Scale = std::max(cgo.Right.Scale, min_scale);
+	cgo.Top.Scale = std::max(cgo.Top.Scale, min_scale);
+	cgo.Bottom.Scale = std::max(cgo.Bottom.Scale, min_scale);
+	cgo.Front.Scale = std::max(cgo.Front.Scale, min_scale);
+	cgo.Back.Scale = std::max(cgo.Back.Scale, min_scale);
 
 	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
-	eCProtoMat mat_index = static_cast<eCProtoMat>(entry.GetMemberValue<int>(HashStr32("mat"), 0));
-
 	MaterialID material_id = mWhiteMaterialID;
-
-	switch (mat_index) {
-	case eCProtoMat::Gray:
-		break;
-	case eCProtoMat::Orange:
-		material_id = mOrangeMaterialID;
-		break;
-	default:;
-	}
-
 
 	eObjectTag object_tags = eObjectTag::Blockout;
 
@@ -274,6 +277,24 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 	}
 	else {
 		material_id = mOrangeMaterialID;
+	}
+
+	ConfigEntry* mat_entry = entry.GetMember(HashStr32("mat"));
+
+	if (mat_entry != nullptr) {
+		eCProtoMat mat_index = static_cast<eCProtoMat>(mat_entry->Get<int32>());
+
+		switch (mat_index) {
+		case eCProtoMat::Gray:
+			break;
+		case eCProtoMat::Orange:
+			material_id = mOrangeMaterialID;
+			break;
+		case eCProtoMat::Blue:
+			material_id = mBlueMaterialID;
+			break;
+		default:;
+		}
 	}
 
 	Object* object = gObjectManager->NewObject(blockout_id.Str(), material_id, object_tags);
@@ -376,6 +397,46 @@ void Blockout::RebuildObject(Object* object)
 	phys->Teleport(position, rotation);
 
 	object->AttachCollider(phys);
+}
+
+Object* Blockout::NewObject(const Vec3f& position)
+{
+	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size()).Str();
+	LogInfo("Creating new blockout object '{}'", blockout_name);
+
+	Object* object = gObjectManager->NewObject(blockout_name, mWhiteMaterialID, eObjectTag::Blockout);
+
+	float32 scale = 0.25f;
+
+	CubeGenOptions cgo = CubeGenOptions::Uniform(scale);
+
+	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
+
+	object->pMesh = cube_mesh->AsDefaultMesh();
+	object->MoveBy(position);
+	object->SetShadowCaster(true);
+	object->Bounds.Min = -Vec3f(scale);
+	object->Bounds.Max = Vec3f(scale);
+
+	physics::Body* phys = gPhysics->NewBody(blockout_name);
+	phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), physics::eMotionType::Static,
+							  physics::BodyProps {
+								  .ConvexRadius = 0.05f,
+								  .Density = 20,
+							  });
+
+	phys->Teleport(position, Quat::scIdentity);
+
+	object->AttachCollider(phys);
+
+	AssetTicket ticket(static_cast<void*>(object));
+	ticket.MarkAndSignalLoaded();
+
+	pWorld->Attach(ticket);
+
+	BlockoutObjects.Insert(object->ID);
+
+	return object;
 }
 
 

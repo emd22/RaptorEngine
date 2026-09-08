@@ -26,14 +26,14 @@ FxEnumFlags(eEditorModeFlags);
 
 class EditorMode
 {
-	using UpdateFnDef = void (*)(FLOAT4);
+	using UpdateFnDef = void (*)(FLOAT4, float32);
 
 public:
 	EditorMode() = default;
 
 	void Create(const String& name, const String& script_path);
 	bool SelectObject(Object* object);
-	void Update(const Vec3f& movement_vector) const;
+	void Update(const Vec3f& movement_vector, float32 delta_time) const;
 	void ReloadHotFunctions();
 
 	void Load();

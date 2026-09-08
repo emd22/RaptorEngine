@@ -35,6 +35,11 @@ public:
 
 	void RebuildObject(Object* object);
 
+	/**
+	 * @brief Creates a new blockout object
+	 */
+	Object* NewObject(const Vec3f& position);
+
 	~Blockout();
 
 private:
@@ -54,6 +59,7 @@ public:
 private:
 	MaterialID mWhiteMaterialID = MaterialID::scNull;
 	MaterialID mOrangeMaterialID = MaterialID::scNull;
+	MaterialID mBlueMaterialID = MaterialID::scNull;
 };
 
 

@@ -51,8 +51,10 @@ public:
 	/**
 	 * @brief Dispatches the Forward+ light culling pass. Must be called outside of a renderpass,
 	 * after all lights have been submitted for the frame.
+	 * @param pExtentOverride Tile grid is derived from this extent instead of the swapchain
+	 * (used by probe capture bakes, which render at a fixed small size).
 	 */
-	void DoLightCullingPass(Camera& camera);
+	void DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride = nullptr);
 
 	/// Binds the Forward+ tiled light list descriptor set (set 2) on the geometry pipeline
 	void BindLightGridDescriptors(CommandBuffer& cmd);
@@ -67,6 +69,7 @@ private:
 	void CreateSSAOPSO();
 	void CreateSSAOBlurPSO();
 	void CreateDebugLayerPSO();
+	void CreateDebugSolidPSO();
 
 	void BuildPersistentDescriptor();
 

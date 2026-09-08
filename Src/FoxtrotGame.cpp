@@ -23,6 +23,7 @@
 #include <Renderer/Backend/Util.hpp>
 #include <Renderer/Globals.hpp>
 #include <Renderer/GraphicsBackend.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
 #include <Renderer/TextRenderer.hpp>
@@ -69,6 +70,11 @@ void FoxtrotGame::InitEngine()
 
 	// Create the global engine variables
 	fx::Globals::Init();
+
+	// The world bookkeeping (object/light lists) must exist before anything
+	// attaches to it (blockout below, scene in CreateGame). It used to be
+	// created in CreateGame, which wiped everything the blockout had attached.
+	gWorld->Create();
 
 	ControlManager::Init();
 	ControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
@@ -147,8 +153,6 @@ Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / siz
 
 void FoxtrotGame::CreateGame()
 {
-	gWorld->Create();
-
 	gWorld->Player.Create();
 	gWorld->Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
 	// Move the player up and behind the other objects
@@ -166,6 +170,9 @@ void FoxtrotGame::CreateGame()
 
 	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), *gWorld);
 	gPhysics->pBackend->OptimizeBroadPhase();
+
+	// Baked probes if the scene has them, procedural gradient otherwise.
+	gProbeManager->LoadProbes();
 
 	pSun = gWorld->GetDirectionalLight();
 
@@ -377,20 +384,13 @@ void FoxtrotGame::ProcessControls()
 		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) - 1));
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
-		sbShowShadowCam = !sbShowShadowCam;
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
+		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
+		gWorld->bRenderProbes = !gWorld->bRenderProbes;
+	}
 
-		Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
-
-		if (sbShowShadowCam) {
-			cam->ProjectionMatrix = gShadowRenderer->ShadowCamera.ProjectionMatrix;
-			cam->ViewMatrix = gShadowRenderer->ShadowCamera.ViewMatrix;
-			cam->UpdateCameraMatrix();
-		}
-		else {
-			cam->UpdateProjectionMatrix();
-			cam->UpdateCameraMatrix();
-		}
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_2)) {
+		gGraphics->bOnlyRenderProbes = !gGraphics->bOnlyRenderProbes;
 	}
 
 	if (ControlManager::IsMouseLocked()) {
@@ -471,6 +471,58 @@ void FoxtrotGame::ProcessControls()
 	}
 
 
+	// `B` bakes the analytic sun/ambient probe, `C` bakes from a 6-face scene
+	// capture at the player position (occlusion-aware, hitches one frame),
+	// `V` bakes a 32-probe grid fitted to the level (one probe per frame).
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
+		if (!gProbeManager->IsCapturePending()) {
+			gProbeManager->BeginCaptureBake(gWorld->Player.pCamera->Position);
+			LogInfo("Probe capture bake armed at {}", gWorld->Player.pCamera->Position);
+		}
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
+		// Dense local volume around the player.
+		gProbeManager->BeginGridBakeAt(gWorld->Player.pCamera->Position, Vec3f(24.0f, 8.0f, 24.0f));
+	}
+
+	// `G` fits the probe grid to the whole level instead.
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
+		gProbeManager->BeginGridBake();
+	}
+
+	// `P` saves volume + probes for the current scene (auto-loaded next run).
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
+		gProbeManager->SaveProbes();
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_B)) {
+		if (pSun.IsValid()) {
+			// For directionals, mPosition holds the light direction (see Forward.hlsl).
+			const Vec3f sun_dir = pSun->GetPosition().Normalize();
+
+			// Match the Forward.hlsl directional scaling: rgb01 * intensity, where
+			// intensity is the unpacked alpha byte.
+			const float32 sun_rgb[3] = {
+				(static_cast<float32>(pSun->Color.R) / 255.0f) * static_cast<float32>(pSun->Color.A),
+				(static_cast<float32>(pSun->Color.G) / 255.0f) * static_cast<float32>(pSun->Color.A),
+				(static_cast<float32>(pSun->Color.B) / 255.0f) * static_cast<float32>(pSun->Color.A),
+			};
+			const float32 amb_rgb[3] = {
+				static_cast<float32>(pSun->AmbientColor.R) / 255.0f,
+				static_cast<float32>(pSun->AmbientColor.G) / 255.0f,
+				static_cast<float32>(pSun->AmbientColor.B) / 255.0f,
+			};
+
+			gProbeManager->BakeFromSceneLights(sun_dir, sun_rgb, amb_rgb);
+			LogInfo("Rebaked light probe from sun (dir={})", sun_dir);
+		}
+		else {
+			LogWarning("No sun light to bake probe from!");
+		}
+	}
+
+
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S)) {
 		LogInfo("Saving blockout...");
 		gWorld->pBlockout->Save("Data/blockouts/btemp.prx");
@@ -493,6 +545,11 @@ void FoxtrotGame::RenderText()
 											pSelectedEditorMode->GetQuantizeEnabled())
 									.CStr(),
 								2.0, scTextColor);
+
+		if (pSelectedEditorMode->mpLastSelectedObject != nullptr) {
+			gTextRenderer->DrawText(String::Fmt("SEL={}", pSelectedEditorMode->mpLastSelectedObject->Name.Get()).CStr(),
+									2.0, scTextColor);
+		}
 	}
 }
 
@@ -527,7 +584,7 @@ void FoxtrotGame::Tick()
 		Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
 		Vec3f rawMovement = GetMovementVector();
 		Vec3f movement = forward * rawMovement.Z + right * rawMovement.X + Vec3f(0, rawMovement.Y, 0);
-		pSelectedEditorMode->Update(movement);
+		pSelectedEditorMode->Update(movement, static_cast<float32>(DeltaTime));
 	}
 
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
@@ -564,6 +621,10 @@ void FoxtrotGame::Tick()
 	RenderText();
 
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
+
+	// Progressive probe bakes (single captures finish in one call, grid bakes
+	// advance one probe per frame).
+	gProbeManager->ServiceCaptureBake();
 
 	mLastTick = current_tick;
 }

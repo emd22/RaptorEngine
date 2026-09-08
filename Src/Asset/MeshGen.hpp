@@ -15,6 +15,20 @@ struct MeshGenOptions
 
 struct CubeGenOptions
 {
+	static CubeGenOptions Uniform(float32 scale)
+	{
+		return CubeGenOptions({
+			.Left = { .Scale = scale },
+			.Right = { .Scale = scale },
+			.Top = { .Scale = scale },
+			.Bottom = { .Scale = scale },
+			.Front = { .Scale = scale },
+			.Back = { .Scale = scale },
+
+			.bAlignUVs = true,
+		});
+	}
+
 	MeshGenOptions Left {};
 	MeshGenOptions Right {};
 	MeshGenOptions Top {};

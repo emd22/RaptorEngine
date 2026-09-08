@@ -237,12 +237,32 @@ public:
 	FX_FORCE_INLINE uint32 GetLightGridFrameOffset() const { return LightGridPageSize * GetFrameNumber(); }
 	FX_FORCE_INLINE uint32 GetLightIndexListFrameOffset() const { return LightIndexListPageSize * GetFrameNumber(); }
 
+	///////////////////////////////////
+	// Light Probes (precomputed GI, MVP)
+	///////////////////////////////////
+
+	/// SH irradiance probes, indexed by probe. MVP uses probe 0 globally.
+	RawGpuBuffer ProbeBuffer;
+
+	uint32 ProbePageSize = 0;
+
+	FX_FORCE_INLINE uint32 GetProbeFrameOffset() const { return ProbePageSize * GetFrameNumber(); }
+
+	/// Single-element probe volume descriptor for spatial probe lookup.
+	RawGpuBuffer ProbeVolumeBuffer;
+
+	uint32 ProbeVolumePageSize = 0;
+
+	FX_FORCE_INLINE uint32 GetProbeVolumeFrameOffset() const { return ProbeVolumePageSize * GetFrameNumber(); }
+
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;
 
 	DescriptorSet* pLightsDescriptor = nullptr;
 
 	Image* pNoiseTexture = nullptr;
+
+	bool bOnlyRenderProbes = false;
 
 private:
 	GpuDevice mDevice;

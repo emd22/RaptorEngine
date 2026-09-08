@@ -67,6 +67,10 @@ impl PLAYER
 	extern void toggle_headbob(PLAYER p, bool value);
 	extern bool get_headbob(PLAYER p);
 	extern float3 get_position(PLAYER p);
+	extern bool is_flymode(PLAYER p);
+
+	extern float3 ray_get_point(float range);
+
 
 	property float3 position {
 		get = PLAYER_get_position;
@@ -81,5 +85,6 @@ extern float3 camera_position();
 
 /* Reloads an object from a blockout file. */
 extern void blockout_reload_object(OBJECT object);
+extern OBJECT blockout_new_object(float3 position);
 
 extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);

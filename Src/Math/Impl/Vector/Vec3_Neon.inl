@@ -20,11 +20,11 @@ FX_FORCE_INLINE Vec3f::Vec3f(float32 x, float32 y, float32 z, float32 w)
 
 FX_FORCE_INLINE Vec3f::Vec3f(const float32* values)
 {
-	const float32 values4[4] = { values[0], values[1], values[2], 0 };
+	const float32 values4[4] = { values[0], values[1], values[2], 0.0f };
 	mIntrin = vld1q_f32(values4);
 }
 
-FX_FORCE_INLINE Vec3f::Vec3f(float32 scalar) { mIntrin = vdupq_n_f32(scalar); }
+FX_FORCE_INLINE Vec3f::Vec3f(float32 scalar) { mIntrin = vsetq_lane_f32(0.0f, vdupq_n_f32(scalar), 3); }
 
 FX_FORCE_INLINE bool Vec3f::IsCloseTo(const Vec3f& other, const float32 tolerance) const
 {
@@ -117,9 +117,15 @@ FX_FORCE_INLINE float32 Vec3f::Length() const
 	return sqrtf(Dot(v));
 }
 
-FX_FORCE_INLINE float32 Vec3f::Dot(const Vec3f& other) const { return Neon::Dot(mIntrin, other.mIntrin); }
+FX_FORCE_INLINE float32 Vec3f::Dot(const Vec3f& other) const
+{
+	return Neon::Dot(vsetq_lane_f32(0.0f, mIntrin, 3), vsetq_lane_f32(0.0f, other.mIntrin, 3));
+}
 
-FX_FORCE_INLINE float32 Vec3f::Dot(FLOAT4 other) const { return Neon::Dot(mIntrin, other); }
+FX_FORCE_INLINE float32 Vec3f::Dot(FLOAT4 other) const
+{
+	return Neon::Dot(vsetq_lane_f32(0.0f, mIntrin, 3), vsetq_lane_f32(0.0f, other, 3));
+}
 
 //////////////////////////////
 // Operator Overloads

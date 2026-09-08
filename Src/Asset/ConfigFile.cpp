@@ -67,6 +67,10 @@ void ConfigEntry::AddMember(ConfigEntry&& entry)
 
 	Members.Insert(std::move(entry));
 
+	if (Type == ePrimitiveType::String && mStringValue) {
+		free(mStringValue);
+		mStringValue = nullptr;
+	}
 	Type = ConfigEntry::ePrimitiveType::Struct;
 }
 
@@ -177,10 +181,9 @@ void ConfigEntry::AppendValue(const Quat& quat)
 
 ConfigEntry::~ConfigEntry()
 {
-	// String memory freed by ConfigPrimitive base destructor
-	Type = ePrimitiveType::None;
-
-	mStringValue = nullptr;
+	// NOTE: Do not clobber Type/mStringValue here. The ConfigPrimitive base
+	// destructor runs after this body and is responsible for freeing the
+	// string value. Nulling Type first would leak it.
 	if (Members.IsInited()) {
 		Members.Destroy();
 	}
@@ -358,10 +361,9 @@ void ConfigFile::ParseValue(ConfigPrimitive& value)
 		return;
 	}
 
-	value.Type = GetValueTokenType(*value_token);
+	const VType detected_type = GetValueTokenType(*value_token);
 
-
-	switch (value.Type) {
+	switch (detected_type) {
 	case VType::None:
 		break;
 	case VType::String:
@@ -439,7 +441,6 @@ ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
 
 		while (GetToken()->Type != eTokenType::RBracket) {
 			ConfigPrimitive value;
-			value.Type = entry.Type;
 			ParseValue(value);
 			entry.AppendValue(std::move(value));
 
@@ -458,8 +459,6 @@ ConfigEntry ConfigFile::ParseEntry(ConfigEntry* parent)
 	// Parse single value entry
 	// [IDENTIFIER] = [INT | FLOAT | STRING]
 
-	Token* value_token = GetToken();
-	entry.Type = GetValueTokenType(*value_token);
 	ParseValue(entry);
 
 	return entry;

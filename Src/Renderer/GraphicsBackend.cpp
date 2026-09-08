@@ -26,10 +26,11 @@
 #include <Renderer/Backend/ExtensionHandles.hpp>
 #include <Renderer/Camera.hpp>
 #include <Renderer/Globals.hpp>
-#include <Renderer/Limits.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Renderer/PSOBuild.hpp>
 #include <Renderer/PipelineCache.hpp>
 #include <Renderer/ShadowDirectional.hpp>
+#include <World.hpp>
 
 /* If this is defined, we will break on an error message containing this string. */
 #define FX_DEBUG_BREAK_ON_ERROR_SUBSTR                                                                                 \
@@ -141,9 +142,22 @@ void GraphicsBackend::Init(Vec2u window_size)
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
 								VMA_MEMORY_USAGE_GPU_ONLY);
 
+	// SH light probe buffer
+	ProbePageSize = Limits::MaxIrradianceProbes * sizeof(ProbeData);
+	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize * FramesInFlight,
+					   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+
+	// Probe volume descriptor (single element, spatial lookup for blending).
+	ProbeVolumePageSize = sizeof(ProbeVolumeData);
+	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize * FramesInFlight,
+							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+
 
 	gMaterialManager->Create();
 	gObjectManager->Create();
+
+	// Upload the default (precomputed) irradiance probe now that ProbeBuffer exists.
+	gProbeManager->Create();
 
 	gShadowRenderer = new ShadowDirectional(Vec2u(2048, 2048));
 
@@ -728,6 +742,11 @@ void GraphicsBackend::DoComposition(Camera& render_cam)
 
 	pRenderer->ForwardPass.End();
 
+	// Probe capture bake faces render here: the main forward pass is done, so
+	// the capture can reuse its pipelines + light grid page before composition.
+	if (gProbeManager->IsCapturePending()) {
+		gWorld->RenderProbeCapture();
+	}
 
 	// pDeferredRenderer->UnlitPass.End();
 
@@ -811,6 +830,8 @@ void GraphicsBackend::Destroy()
 
 	LightGridBuffer.Destroy();
 	LightIndexListBuffer.Destroy();
+	ProbeBuffer.Destroy();
+	ProbeVolumeBuffer.Destroy();
 
 	gAssetManager->ShutdownDeletionQueue();
 

@@ -19,10 +19,10 @@ void EditorMode::Create(const String& name, const String& script_path)
 
 void EditorMode::ReloadHotFunctions() { pUpdateFunction = pScript->GetFunction<UpdateFnDef>("mode_update"); }
 
-void EditorMode::Update(const Vec3f& movement_vector) const
+void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time) const
 {
 	if (pUpdateFunction) {
-		pUpdateFunction(movement_vector.mIntrin);
+		pUpdateFunction(movement_vector.mIntrin, delta_time);
 	}
 }
 

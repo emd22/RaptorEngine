@@ -34,7 +34,7 @@ concept C_ConfigSupportsType = std::is_integral_v<TType> || std::is_floating_poi
 struct ConfigPrimitive
 {
 public:
-	ConfigPrimitive() = default;
+	ConfigPrimitive() : Type(ePrimitiveType::None), mStringValue(nullptr) {}
 
 	~ConfigPrimitive()
 	{
@@ -63,6 +63,9 @@ public:
 		else if (Type == ePrimitiveType::Float) {
 			mFloatValue = other.mFloatValue;
 		}
+		else {
+			mStringValue = nullptr;
+		}
 	}
 
 	ConfigPrimitive(ConfigPrimitive&& other) noexcept
@@ -82,6 +85,7 @@ public:
 			mStringValue = nullptr;
 		}
 		other.Type = ePrimitiveType::None;
+		other.mStringValue = nullptr;
 	}
 
 	ConfigPrimitive& operator=(ConfigPrimitive&& other) noexcept
@@ -140,6 +144,9 @@ public:
 		else if (Type == ePrimitiveType::Float) {
 			mFloatValue = other.mFloatValue;
 		}
+		else {
+			mStringValue = nullptr;
+		}
 
 		return *this;
 	}
@@ -160,6 +167,9 @@ public:
 		}
 		else if (Type == ePrimitiveType::Float) {
 			mFloatValue = other.mFloatValue;
+		}
+		else {
+			mStringValue = nullptr;
 		}
 	}
 
@@ -235,6 +245,7 @@ public:
 	{
 		if (Type == ePrimitiveType::String && mStringValue) {
 			free(mStringValue);
+			mStringValue = nullptr;
 		}
 		Type = ePrimitiveType::String;
 		mStringValue = strdup(str.c_str());
@@ -256,7 +267,7 @@ public:
 
 	union
 	{
-		int64 mIntValue;
+		int64 mIntValue = 0;
 		float32 mFloatValue;
 		char* mStringValue;
 	};

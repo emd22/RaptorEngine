@@ -119,8 +119,20 @@ static FLOAT4 N_player_get_position(void*) { return gWorld->Player.Position.mInt
 
 static void N_player_set_speed_multiplier(void*, float mult) { gWorld->Player.SpeedMultiplier = mult; }
 static void N_player_toggle_headbob(void*, bool value) { gWorld->Player.bEnableHeadBob = value; }
-static bool N_player_get_headbob(void) { return gWorld->Player.bEnableHeadBob; }
+static bool N_player_get_headbob(void*) { return gWorld->Player.bEnableHeadBob; }
+static bool N_player_is_flymode(void*) { return gWorld->Player.IsFlyMode(); }
 
+static FLOAT4 N_player_ray_get_point(void*, float32 range)
+{
+	physics::RayResult rr = gPhysics->pBackend->Raycast(gWorld->Player.pCamera->Position,
+														gWorld->Player.pCamera->Direction * range);
+
+	if (!rr.bHit) {
+		return simd::LoadFloat4(0.0f);
+	}
+
+	return rr.Point.mIntrin;
+}
 
 static FLOAT4 N_float4_round(FLOAT4 value) { return simd::Round(value); }
 static FLOAT4 N_float3_abs(FLOAT4 value)
@@ -145,6 +157,8 @@ static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magn
 {
 	gWorld->pBlockout->ScaleInDirection(object, Vec3f(face_dir), Vec3f(magnitude));
 }
+
+static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pBlockout->NewObject(Vec3f(position)); }
 
 /////////////////////////////////////
 // Predef gather
@@ -171,6 +185,7 @@ static const PredefExtern scAvailableExterns[] = {
 
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),
+	PREDEF("blockout_new_object", N_blockout_new_object),
 
 	PREDEF("camera_position", N_camera_position),
 
@@ -178,6 +193,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("PLAYER_set_speed_multiplier", N_player_set_speed_multiplier),
 	PREDEF("PLAYER_toggle_headbob", N_player_toggle_headbob),
 	PREDEF("PLAYER_get_headbob", N_player_get_headbob),
+	PREDEF("PLAYER_is_flymode", N_player_is_flymode),
+	PREDEF("PLAYER_ray_get_point", N_player_ray_get_point),
 
 	/* Math Util */
 	PREDEF("float4_round", N_float4_round),
@@ -189,6 +206,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("KEY_is_up", N_is_key_up),
 	PREDEF("KEY_is_down", N_is_key_down),
 	PREDEF("KEY_is_pressed", N_is_key_pressed),
+
 }; // namespace fx::script
 
 Slice<const PredefExtern> GetInteropPredefs() { return Slice(scAvailableExterns, std::size(scAvailableExterns)); }

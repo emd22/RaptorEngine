@@ -54,6 +54,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateBitmapTextPSO();
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
+	CreateDebugSolidPSO();
 
 
 	BuildPersistentDescriptor();
@@ -119,7 +120,7 @@ void TiledForwardRenderer::CreateSSAOBlurPass()
 
 void TiledForwardRenderer::BuildPersistentDescriptor()
 {
-	SizedArray<DescriptorEntry> ds_entries(6);
+	SizedArray<DescriptorEntry> ds_entries(10);
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(0, eShaderType::Vertex, &gObjectManager->mObjectGpuBuffer, 0,
 												ObjectManager::scBoundSize));
@@ -138,6 +139,14 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 
 	ds_entries.Insert(DescriptorEntry::AsBuffer(3, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 												gGraphics->LightIndexListPageSize));
+
+	// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+	ds_entries.Insert(
+		DescriptorEntry::AsBuffer(6, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize));
+
+	// bProbeVolume (spatial lookup descriptor for probe blending)
+	ds_entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+											   gGraphics->ProbeVolumePageSize));
 
 	Target* shadow_target = gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float);
 	Assert(shadow_target != nullptr);
@@ -256,6 +265,21 @@ void TiledForwardRenderer::CreateDebugLayerPSO()
 	gPSOBuild->EndPipeline();
 }
 
+void TiledForwardRenderer::CreateDebugSolidPSO()
+{
+	// Solid-fill variant of the debug layer (e.g. light probe markers).
+	// Same shader, but triangle topology instead of line list.
+	gPSOBuild->BeginPipeline(ePipelineName::DebugSolid);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
+
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->SetShader(eShaderName::DebugLayer, {});
+	gPSOBuild->SetVertexType(eVertexType::Slim);
+	gPSOBuild->SetRenderLines(false);
+	gPSOBuild->SetCullMode(eCullMode::Back);
+	gPSOBuild->EndPipeline();
+}
+
 void TiledForwardRenderer::CreateForwardPSO()
 {
 	CreateForwardPass();
@@ -282,6 +306,11 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
+		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		// bProbeVolume (spatial lookup descriptor for probe blending)
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+							 gGraphics->ProbeVolumePageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -333,6 +362,11 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
+		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		// bProbeVolume (spatial lookup descriptor for probe blending)
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+							 gGraphics->ProbeVolumePageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -391,6 +425,11 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bLightIndexList
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
+		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		// bProbeVolume (spatial lookup descriptor for probe blending)
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+							 gGraphics->ProbeVolumePageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -452,6 +491,11 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
+		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		// bProbeVolume (spatial lookup descriptor for probe blending)
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+							 gGraphics->ProbeVolumePageSize);
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -487,6 +531,11 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
+		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		// bProbeVolume (spatial lookup descriptor for probe blending)
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+							 gGraphics->ProbeVolumePageSize);
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -526,6 +575,11 @@ void TiledForwardRenderer::CreateForwardPSO()
 		gPSOBuild->AddBuffer(2, 0, eShaderType::Pixel, &gGraphics->LightGridBuffer, 0, gGraphics->LightGridPageSize);
 		gPSOBuild->AddBuffer(3, 0, eShaderType::Pixel, &gGraphics->LightIndexListBuffer, 0,
 							 gGraphics->LightIndexListPageSize);
+		// bProbeBuffer (SH irradiance probes, MVP: index 0 is the global probe)
+		gPSOBuild->AddBuffer(6, 0, eShaderType::Pixel, &gGraphics->ProbeBuffer, 0, gGraphics->ProbePageSize);
+		// bProbeVolume (spatial lookup descriptor for probe blending)
+		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
+							 gGraphics->ProbeVolumePageSize);
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -676,11 +730,11 @@ void TiledForwardRenderer::CreateLightCullingPSO()
 	gPSOBuild->EndPipeline();
 }
 
-void TiledForwardRenderer::DoLightCullingPass(Camera& camera)
+void TiledForwardRenderer::DoLightCullingPass(Camera& camera, const Vec2u* pExtentOverride)
 {
 	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
 
-	const Vec2u extent = gGraphics->Swapchain.Extent;
+	const Vec2u extent = (pExtentOverride != nullptr) ? *pExtentOverride : gGraphics->Swapchain.Extent;
 
 	const uint32 tile_columns = std::min((extent.X + (Limits::LightTileSize - 1)) / Limits::LightTileSize,
 										 Limits::MaxScreenTilesX);

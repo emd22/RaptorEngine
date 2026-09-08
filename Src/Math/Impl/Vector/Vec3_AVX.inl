@@ -3,7 +3,6 @@
 #include <Core/Defines.hpp>
 
 #ifdef FX_USE_AVX
-
 #include <Math/SIMDHelper.hpp>
 #include <Math/SSE.hpp>
 #include <Math/Vec3.hpp>
@@ -23,7 +22,7 @@ FX_FORCE_INLINE Vec3f::Vec3f(const float32* unaligned)
 	mIntrin = _mm_load_ps(values);
 }
 
-FX_FORCE_INLINE Vec3f::Vec3f(float32 scalar) { mIntrin = _mm_set1_ps(scalar); }
+FX_FORCE_INLINE Vec3f::Vec3f(float32 scalar) { mIntrin = _mm_blend_ps(_mm_set1_ps(scalar), _mm_setzero_ps(), 0b1000); }
 
 FX_FORCE_INLINE bool Vec3f::IsCloseTo(const Vec3f& other, const float32 tolerance) const
 {
@@ -56,7 +55,9 @@ FX_FORCE_INLINE void Vec3f::Set(float32 x, float32 y, float32 z) { mIntrin = _mm
 FX_FORCE_INLINE float32 Vec3f::Dot(FLOAT4 other) const
 {
 	// Mask is Src->0111 Dest->1111 so we do not include the unused component in our result
-	return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0x7F));
+	// This is likely already handled by the zero during initalization (and the _mm_blend when initializing with
+	// scalar), but better to be safe.
+	return _mm_cvtss_f32(_mm_dp_ps(mIntrin, other, 0b0111));
 }
 
 FX_FORCE_INLINE Vec3f Vec3f::Min(const Vec3f& a, const Vec3f& b) { return Vec3f(_mm_min_ps(a.mIntrin, b.mIntrin)); }
@@ -65,23 +66,23 @@ FX_FORCE_INLINE Vec3f Vec3f::Max(const Vec3f& a, const Vec3f& b) { return Vec3f(
 
 FX_FORCE_INLINE Vec3f Vec3f::Clamp(const Vec3f& v, const Vec3f& min, const Vec3f& max)
 {
-	return Vec3f(_mm_min_ps(_mm_max_ps(v, min.mIntrin), max.mIntrin));
+	return Vec3f(_mm_min_ps(_mm_max_ps(v.mIntrin, min.mIntrin), max.mIntrin));
 }
 
 FX_FORCE_INLINE Vec3f Vec3f::Lerp(const Vec3f& a, const Vec3f& b, const float f)
 {
 	// a + f * (b - a);
-	__m128 d = _mm_sub_ps(b, a);
+	__m128 d = _mm_sub_ps(b.mIntrin, a.mIntrin);
 	const __m128 f_v = _mm_set1_ps(f);
 
-	return Vec3f(_mm_add_ps(a, _mm_mul_ps(d, f_v)));
+	return Vec3f(_mm_add_ps(a.mIntrin, _mm_mul_ps(d, f_v)));
 }
 
 
 FX_FORCE_INLINE Vec3f& Vec3f::LerpIP(const Vec3f& dest, const float step)
 {
 	// a + f * (b - a);
-	__m128 d = _mm_sub_ps(dest, mIntrin);
+	__m128 d = _mm_sub_ps(dest.mIntrin, mIntrin);
 	const __m128 f_v = _mm_set1_ps(step);
 
 	mIntrin = _mm_add_ps(mIntrin, _mm_mul_ps(d, f_v));

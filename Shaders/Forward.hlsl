@@ -45,7 +45,7 @@ struct VSPushConsts
 	uint uiObjectIndex;
     uint uiMaterialIndex;
     uint uiTileColumns;
-    uint _Padding0;
+    uint Flags;
     uint2 vTargetSize;
 };
 
@@ -132,6 +132,7 @@ struct FSInput
 
 #include "MaterialDef.hlsli"
 #include "LightingCommon.hlsli"
+#include "ProbeCommon.hlsli"
 
 F_CBuffer(FSLightBuffer, 4, 1)
 {
@@ -143,6 +144,12 @@ F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 // Forward+ tiled light lists
 F_StructBuffer(bLightGrid, TileLightData, 2, 0);
 F_StructBuffer(bLightIndexList, uint, 3, 0);
+
+// SH irradiance probes (MVP: index 0 is the global probe)
+F_StructBuffer(bProbeBuffer, ProbeData, 6, 0);
+
+// Probe volume descriptor for spatial probe blending
+F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
 
 F_Texture2D(tAlbedo, 0, 1)
 
@@ -160,7 +167,7 @@ struct FSPushConsts
 	uint uiObjectIndex;
 	uint uiMaterialIndex;
 	uint uiTileColumns;
-	uint _Padding0;
+	uint Flags;
 	uint2 vTargetSize;
 };
 
@@ -186,18 +193,18 @@ FSOutput main(FSInput input)
 {
     FSOutput output;
 
-    float4 albedoSample = F_Sample(tAlbedo, input.vUV);
-    float3 albedo = albedoSample.rgb;
-    float texAlpha = albedoSample.a;
+    float4 albedo_sample = F_Sample(tAlbedo, input.vUV);
+    float3 albedo = albedo_sample.rgb;
+    float tex_alpha = albedo_sample.a;
 
     Material material = bMaterialBuffer[input.uiMaterialIndex];
-    float baseAlpha = saturate(texAlpha * material.fAlpha);
+    float base_alpha = saturate(tex_alpha * material.fAlpha);
 
-    if (baseAlpha < ALPHA_CUTOFF) {
+    if (base_alpha < ALPHA_CUTOFF) {
         discard;
     }
 
-    output.vAlbedo = float4(albedo, baseAlpha);
+    output.vAlbedo = float4(albedo, base_alpha);
 
     if (HAS_FLAG(material.Flags, MF_UNLIT)) {
 	    return output;
@@ -231,7 +238,9 @@ FSOutput main(FSInput input)
 	TileLightData tile_data = bLightGrid[tile_index];
 
 	const float2 ssao_coords = float2(input.vPosition.xy / (float2(FSConst.vTargetSize)));
-	float ssao = F_Sample(tSSAO, ssao_coords);
+
+	// Probe capture bakes have no matching SSAO data (flag in bit 0 of Flags).
+	float ssao = ((FSConst.Flags & 1u) != 0) ? 1.0 : F_Sample(tSSAO, ssao_coords);
 
 #ifdef DEBUG_LIGHT_HEATMAP
 	output.vAlbedo = float4(GetSaturationColor((float)tile_data.Count), 1.0);
@@ -307,9 +316,27 @@ FSOutput main(FSInput input)
 		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, 0.0);
 	}
 
-	float4 ambient = F_UnpackUIntToFloat4(Lights[0].uiAmbient) * float4(albedo, 1.0f) * (ssao);
+	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 
-	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, baseAlpha);
+	float3 probe_irradiance = float3(0.0f, 0.0f, 0.0f);
+
+	// Use probes
+	if ((FSConst.Flags & 0x01) == 0) {
+		float3 probe_normal = normalize(N_final);
+		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
+		ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
+	}
+
+	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);
+
+	if ((FSConst.Flags & 0x01) != 0) {
+		const float3 lp_ambient = float3(0.3f, 0.3f, 0.3f) * albedo;
+		output.vAlbedo = float4(accumulated_light.rgb + lp_ambient, 1.0f);
+	}
+
+	if (HAS_FLAG(FSConst.Flags, 0x02)) {
+		output.vAlbedo = float4(probe_irradiance, 1.0f);
+	}
 
     return output;
 }

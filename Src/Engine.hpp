@@ -36,6 +36,9 @@ extern ScriptManager* gScriptManager;
 class World;
 extern World* gWorld;
 
+class ProbeManager;
+extern ProbeManager* gProbeManager;
+
 
 namespace Globals {
 void Init();

@@ -52,7 +52,9 @@ void WorldFile::Load(const std::string& path, World& scene)
 
 	info.Load(path + "/info.prx");
 
-	bool first_time = (scene.GetAllObjects().Size() == 0);
+	// NOTE: this must not key off the world object count: blockout objects
+	// attach independently of scene files and would falsely signal a reload.
+	bool first_time = !scene.bSceneLoaded;
 
 	if (first_time) {
 		ConfigEntry* meta = info.GetEntry(HashStr32("Meta"));
@@ -102,8 +104,19 @@ void WorldFile::Load(const std::string& path, World& scene)
 		}
 		else {
 			Object* object = scene.FindObject(object_entry.Name.GetHash());
-			ApplyPropertiesToObject(object, object_entry);
+			if (object != nullptr) {
+				ApplyPropertiesToObject(object, object_entry);
+			}
+			else {
+				// New since the first load (or never found): add instead of
+				// crashing on a null object.
+				AddObjectFromEntry(path, object_entry, scene);
+			}
 		}
+	}
+
+	if (first_time) {
+		scene.bSceneLoaded = true;
 	}
 }
 

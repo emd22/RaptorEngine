@@ -162,6 +162,14 @@ public:
 		Update();
 	}
 
+	void SetPlanes(float32 near_plane, float32 far_plane)
+	{
+		mNearPlane = near_plane;
+		mFarPlane = far_plane;
+		mbRequireMatrixUpdate = true;
+		Update();
+	}
+
 	void UpdateProjectionMatrix() override;
 	void UpdateCameraMatrix() override;
 	void OnWindowResize(const Vec2u& size) override;
