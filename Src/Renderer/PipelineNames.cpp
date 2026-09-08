@@ -27,6 +27,7 @@ static const PipelineNameInfo scNameInfos[] = {
 	NAME_INFO("DepthNormalSkinned", eFlags::None),
 
 	NAME_INFO("DebugLayer", eFlags::None),
+	NAME_INFO("DebugSolid", eFlags::None),
 
 	/* Forward+ light culling */
 	NAME_INFO("LightCulling", eFlags::None),

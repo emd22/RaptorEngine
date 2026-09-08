@@ -54,6 +54,7 @@ void TiledForwardRenderer::Create(const Vec2u& extent)
 	CreateBitmapTextPSO();
 	CreateLightCullingPSO();
 	CreateDebugLayerPSO();
+	CreateDebugSolidPSO();
 
 
 	BuildPersistentDescriptor();
@@ -260,6 +261,21 @@ void TiledForwardRenderer::CreateDebugLayerPSO()
 	gPSOBuild->SetShader(eShaderName::DebugLayer, {});
 	gPSOBuild->SetVertexType(eVertexType::Slim);
 	gPSOBuild->SetRenderLines(true);
+	gPSOBuild->SetCullMode(eCullMode::Back);
+	gPSOBuild->EndPipeline();
+}
+
+void TiledForwardRenderer::CreateDebugSolidPSO()
+{
+	// Solid-fill variant of the debug layer (e.g. light probe markers).
+	// Same shader, but triangle topology instead of line list.
+	gPSOBuild->BeginPipeline(ePipelineName::DebugSolid);
+	gPSOBuild->SetPushConstants(eShaderType::Vertex, sizeof(DebugLayerPushConstants));
+
+	gPSOBuild->UseRenderStage(ForwardPass);
+	gPSOBuild->SetShader(eShaderName::DebugLayer, {});
+	gPSOBuild->SetVertexType(eVertexType::Slim);
+	gPSOBuild->SetRenderLines(false);
 	gPSOBuild->SetCullMode(eCullMode::Back);
 	gPSOBuild->EndPipeline();
 }

@@ -142,7 +142,7 @@ void GraphicsBackend::Init(Vec2u window_size)
 	LightIndexListBuffer.Create(eGpuBufferType::StorageWithOffset, LightIndexListPageSize * FramesInFlight,
 								VMA_MEMORY_USAGE_GPU_ONLY);
 
-	// SH light probe buffer (MVP: global irradiance probe at index 0).
+	// SH light probe buffer
 	ProbePageSize = Limits::MaxIrradianceProbes * sizeof(ProbeData);
 	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize * FramesInFlight,
 					   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);

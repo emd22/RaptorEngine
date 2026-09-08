@@ -742,7 +742,13 @@ void World::Render(Camera* shadow_camera)
 	// Transparent after, back-to-front globally sorted, depth write disabled
 	ExecuteTransparentRenderLists();
 
-	// RenderPhysicsObjects(camera);
+	if (bRenderPhysicsObjects) {
+		RenderPhysicsObjects(camera);
+	}
+
+	if (bRenderProbes) {
+		RenderProbeDebug(camera);
+	}
 }
 
 
@@ -950,6 +956,48 @@ void World::RenderPhysicsObjects(const Camera& camera)
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
 
 		push_constants.DebugColor = selected_color.AsUInt();
+
+		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
+		mpDebugCube->Render(cmd, 1);
+	}
+}
+
+void World::RenderProbeDebug(const Camera& camera)
+{
+	if (!mpDebugCube.IsValid()) {
+		mpDebugCube = MeshGen::MakeCube({})->AsMesh(renderer::eVertexType::Slim);
+	}
+
+	if (gProbeManager == nullptr) {
+		return;
+	}
+
+	CommandBuffer& cmd = gGraphics->GetFrame()->CmdBuffer;
+
+	renderer::Pipeline& pipeline = gPipelineCache->Request(ePipelineName::DebugSolid);
+	pipeline.Bind(cmd);
+
+	DebugLayerPushConstants push_constants {};
+
+	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
+	static const Vec3f scProbeHalfExtent(0.075f);
+
+	const Color probe_color = Color::FromRGBA(60, 220, 255, 255);
+	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);
+
+	const Vec3f* positions = gProbeManager->GetProbePositions();
+	const uint32 probe_count = gProbeManager->GetProbeCount();
+	const bool bCapturePending = gProbeManager->IsCapturePending();
+	const uint32 current_probe = gProbeManager->GetCurrentProbeIndex();
+
+	for (uint32 i = 0; i < probe_count; i++) {
+		Mat4f world_matrix = Mat4f::AsScale(scProbeHalfExtent) * Mat4f::AsTranslation(positions[i]);
+		Mat4f combined_matrix = world_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
+
+		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
+
+		push_constants.DebugColor =
+			(bCapturePending && i == current_probe) ? capturing_color.AsUInt() : probe_color.AsUInt();
 
 		gGraphics->SubmitPushConstants(cmd, pipeline, eShaderType::Vertex, push_constants);
 		mpDebugCube->Render(cmd, 1);

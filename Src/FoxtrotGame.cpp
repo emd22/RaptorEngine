@@ -384,20 +384,9 @@ void FoxtrotGame::ProcessControls()
 		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) - 1));
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_8)) {
-		sbShowShadowCam = !sbShowShadowCam;
-
-		Ref<PerspectiveCamera>& cam = gWorld->Player.pCamera;
-
-		if (sbShowShadowCam) {
-			cam->ProjectionMatrix = gShadowRenderer->ShadowCamera.ProjectionMatrix;
-			cam->ViewMatrix = gShadowRenderer->ShadowCamera.ViewMatrix;
-			cam->UpdateCameraMatrix();
-		}
-		else {
-			cam->UpdateProjectionMatrix();
-			cam->UpdateCameraMatrix();
-		}
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
+		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
+		gWorld->bRenderProbes = !gWorld->bRenderProbes;
 	}
 
 	if (ControlManager::IsMouseLocked()) {
@@ -476,6 +465,7 @@ void FoxtrotGame::ProcessControls()
 		gWorld->Player.SetFlyMode(!gWorld->Player.IsFlyMode());
 		gWorld->Player.Physics.SetCollisionEnabled(!gWorld->Player.IsFlyMode());
 	}
+
 
 	// `B` bakes the analytic sun/ambient probe, `C` bakes from a 6-face scene
 	// capture at the player position (occlusion-aware, hitches one frame),

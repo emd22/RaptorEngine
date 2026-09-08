@@ -81,6 +81,7 @@ public:
 
 private:
 	void RenderPhysicsObjects(const Camera& camera);
+	void RenderProbeDebug(const Camera& camera);
 	void RenderBoundingBoxes(const Camera& camera);
 	void RenderWorldGrid(const Camera& camera);
 
@@ -102,6 +103,7 @@ public:
 
 	Name Name = "(unnamed)";
 	bool bRenderPhysicsObjects = false;
+	bool bRenderProbes = false;
 	renderer::RenderList mRenderList;
 
 	/// Set once a scene file has populated its objects. Used by WorldFile to

@@ -60,8 +60,6 @@ void ProbeManager::Create()
 		return;
 	}
 
-	// All probes are always valid data; the volume descriptor selects the
-	// blend. Default to a uniform gradient everywhere.
 	const float32 sky[3] = { 0.055f, 0.062f, 0.075f };
 	const float32 ground[3] = { 0.025f, 0.022f, 0.020f };
 	const ProbeData def = MakeSkyGradientProbe(sky, ground);
@@ -69,16 +67,16 @@ void ProbeManager::Create()
 		mProbes[i] = def;
 	}
 
-	// Default volume: 4x2x4 grid over a 40x10x40m region at origin. Replaced by
-	// ComputeGridPlacement() on the first grid bake.
 	mVolume.Min[0] = -20.0f;
 	mVolume.Min[1] = -2.0f;
 	mVolume.Min[2] = -20.0f;
 	mVolume.Min[3] = 0.0f;
+
 	mVolume.InvCellSize[0] = 1.0f / 10.0f;
 	mVolume.InvCellSize[1] = 1.0f / 5.0f;
 	mVolume.InvCellSize[2] = 1.0f / 10.0f;
 	mVolume.InvCellSize[3] = 0.0f;
+
 	mVolume.DimsAndCount[0] = Limits::ProbeGridDims[0];
 	mVolume.DimsAndCount[1] = Limits::ProbeGridDims[1];
 	mVolume.DimsAndCount[2] = Limits::ProbeGridDims[2];
@@ -137,19 +135,6 @@ static void ProbeBasisSH(const Vec3f& d, float32 out_basis[9])
 	out_basis[7] = 1.092548f * d.X * d.Z;
 	out_basis[8] = 0.546274f * (d_sq.X - d_sq.Y);
 }
-
-// static void ProbeBasisSH(float32 x, float32 y, float32 z, float32 out_basis[9])
-// {
-// 	out_basis[0] = 0.282095f;
-// 	out_basis[1] = 0.488603f * y;
-// 	out_basis[2] = 0.488603f * z;
-// 	out_basis[3] = 0.488603f * x;
-// 	out_basis[4] = 1.092548f * x * y;
-// 	out_basis[5] = 1.092548f * y * z;
-// 	out_basis[6] = 0.315392f * (3.0f * z * z - 1.0f);
-// 	out_basis[7] = 1.092548f * x * z;
-// 	out_basis[8] = 0.546274f * (x * x - y * y);
-// }
 
 void ProbeManager::BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB[3], const float32 ambRGB[3])
 {
@@ -259,24 +244,28 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 			continue;
 		}
 
-		const Vec3f bmin = object->GetPosition() + object->Bounds.Min;
-		const Vec3f bmax = object->GetPosition() + object->Bounds.Max;
+		const Vec3f bounds_min = object->GetPosition() + object->Bounds.Min;
+		const Vec3f bounds_max = object->GetPosition() + object->Bounds.Max;
 
-		if ((bmax - bmin).Length() > 100.0f) {
+		if ((bounds_max - bounds_min).Length() > 100.0f) {
 			stat_too_big++;
 			continue;
 		}
 
 		if (out.Count < ProbeBoxList::scMaxBoxes) {
-			out.Boxes[out.Count++] = { bmin, bmax };
+			out.Boxes[out.Count++] = { bounds_min, bounds_max };
 		}
 
-		out.Min.X = fminf(out.Min.X, bmin.X);
-		out.Min.Y = fminf(out.Min.Y, bmin.Y);
-		out.Min.Z = fminf(out.Min.Z, bmin.Z);
-		out.Max.X = fmaxf(out.Max.X, bmax.X);
-		out.Max.Y = fmaxf(out.Max.Y, bmax.Y);
-		out.Max.Z = fmaxf(out.Max.Z, bmax.Z);
+		out.Min = Vec3f::Min(out.Min, bounds_min);
+		out.Max = Vec3f::Max(out.Max, bounds_max);
+
+
+		// out.Min.X = fminf(out.Min.X, bmin.X);
+		// out.Min.Y = fminf(out.Min.Y, bmin.Y);
+		// out.Min.Z = fminf(out.Min.Z, bmin.Z);
+		// out.Max.X = fmaxf(out.Max.X, bmax.X);
+		// out.Max.Y = fmaxf(out.Max.Y, bmax.Y);
+		// out.Max.Z = fmaxf(out.Max.Z, bmax.Z);
 		out.Any = true;
 	}
 
@@ -685,13 +674,11 @@ void ProbeManager::UploadVolumeToGpu()
 	renderer::gGraphics->ProbeVolumeBuffer.FlushToGpu(0, page_size * renderer::FramesInFlight);
 }
 
-///////////////////////////////////
-// Persistence (.fxprobe)
-///////////////////////////////////
+/////////////////////////////////////
+// Probe caching (.fxprobe files)
+/////////////////////////////////////
 
-/// File layout (little-endian, same-machine tool data):
-///   char[4]  magic 'FXPR' | uint32 version | uint32 probe_count |
-///   ProbeVolumeData volume | ProbeData[probe_count]
+
 struct FxProbeHeader
 {
 	char Magic[4] = { 'F', 'X', 'P', 'R' };

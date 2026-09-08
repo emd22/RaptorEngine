@@ -23,17 +23,17 @@ static constexpr uint32 MaxScreenTilesX = 240;
 static constexpr uint32 MaxScreenTilesY = 135;
 static constexpr uint32 MaxScreenTiles = MaxScreenTilesX * MaxScreenTilesY;
 
-///////////////////////////////////
-// Light Probes (precomputed GI, MVP)
-///////////////////////////////////
+///////////////////////////////////////
+// Light Probes
+//////////////////////////////////////
 
 /// Number of SH coefficients for an L2 irradiance probe (shared with ProbeCommon.hlsli)
 static constexpr uint32 ProbeSHCoeffCount = 9;
 
-static constexpr uint32 MaxIrradianceProbes = 64;
+static constexpr uint32 MaxIrradianceProbes = 32;
 
 /// Default probe grid dimensions (X x Y x Z). Product must equal MaxIrradianceProbes.
-static constexpr uint32 ProbeGridDims[3] = { 4, 4, 4 };
+static constexpr uint32 ProbeGridDims[3] = { 4, 2, 4 };
 
 static_assert((ProbeGridDims[0] * ProbeGridDims[1] * ProbeGridDims[2]) == MaxIrradianceProbes);
 

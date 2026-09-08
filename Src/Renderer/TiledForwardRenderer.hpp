@@ -69,6 +69,7 @@ private:
 	void CreateSSAOPSO();
 	void CreateSSAOBlurPSO();
 	void CreateDebugLayerPSO();
+	void CreateDebugSolidPSO();
 
 	void BuildPersistentDescriptor();
 

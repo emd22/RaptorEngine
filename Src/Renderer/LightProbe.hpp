@@ -84,6 +84,11 @@ public:
 
 	ProbeData* GetProbes() { return mProbes; }
 
+	const Vec3f* GetProbePositions() const { return mProbePositions; }
+	uint32 GetProbeCount() const { return Limits::MaxIrradianceProbes; }
+	uint32 GetCurrentProbeIndex() const { return mCurrentProbe; }
+	const ProbeVolumeData& GetVolume() const { return mVolume; }
+
 	/// Fills all probes
 	void SetUniformAmbient(float32 r, float32 g, float32 b);
 	void SetSkyGradient(const float32 sky[3], const float32 ground[3]);
