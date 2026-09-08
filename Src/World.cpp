@@ -800,10 +800,6 @@ void World::RenderProbeCapture()
 		PerspectiveCamera face_camera;
 		face_camera.SetFov(90.0f);
 		face_camera.SetAspectRatio(1.0f);
-		// NOTE: this engine uses reversed-Z with swapped plane parameters:
-		// the "near" value is the far clip distance and vice versa (see the
-		// Camera defaults of near=1000/far=0.01 and the weapon camera). Passing
-		// them in normal order inverts depth so far surfaces win over near ones.
 		face_camera.SetNearPlane(100.0f);
 		face_camera.SetFarPlane(0.1f);
 		face_camera.UpdateProjectionMatrix();
@@ -816,8 +812,6 @@ void World::RenderProbeCapture()
 		face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
 		face_camera.UpdateCameraMatrix();
 
-		// NOTE: face_camera.Update() is intentionally not called: it would
-		// rebuild the view matrix with the hardcoded +Y up vector.
 		gProbeManager->SetCaptureCamera(face, face_camera);
 
 		// Re-run Forward+ culling for the capture extent + face camera.
@@ -825,7 +819,6 @@ void World::RenderProbeCapture()
 
 		stage.Begin(cmd);
 
-		// Opaque only: transparents are skipped for capture bakes.
 		ExecuteRenderList(renderer::ePipelineName::Geometry, face_camera);
 		ExecuteRenderList(renderer::ePipelineName::GeometryNormalMaps, face_camera);
 		ExecuteRenderList(renderer::ePipelineName::GeometrySkinned, face_camera);

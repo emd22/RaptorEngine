@@ -119,18 +119,33 @@ void ProbeManager::SetSkyGradient(const float32 sky[3], const float32 ground[3])
 
 /// SH basis matching EvalProbeIrradiance() in Shaders/ProbeCommon.hlsli.
 /// Order: Y00, Y1-1(y), Y10(z), Y11(x), Y2-2(xy), Y2-1(yz), Y20, Y21(xz), Y22.
-static void ProbeBasisSH(float32 x, float32 y, float32 z, float32 out_basis[9])
+static void ProbeBasisSH(const Vec3f& d, float32 out_basis[9])
 {
+	Vec3f d_sq = d * d;
+
 	out_basis[0] = 0.282095f;
-	out_basis[1] = 0.488603f * y;
-	out_basis[2] = 0.488603f * z;
-	out_basis[3] = 0.488603f * x;
-	out_basis[4] = 1.092548f * x * y;
-	out_basis[5] = 1.092548f * y * z;
-	out_basis[6] = 0.315392f * (3.0f * z * z - 1.0f);
-	out_basis[7] = 1.092548f * x * z;
-	out_basis[8] = 0.546274f * (x * x - y * y);
+	out_basis[1] = 0.488603f * d.Y;
+	out_basis[2] = 0.488603f * d.Z;
+	out_basis[3] = 0.488603f * d.X;
+	out_basis[4] = 1.092548f * d.X * d.Y;
+	out_basis[5] = 1.092548f * d.Y * d.Z;
+	out_basis[6] = 0.315392f * (3.0f * d_sq.Z - 1.0f);
+	out_basis[7] = 1.092548f * d.X * d.Z;
+	out_basis[8] = 0.546274f * (d_sq.X - d_sq.Y);
 }
+
+// static void ProbeBasisSH(float32 x, float32 y, float32 z, float32 out_basis[9])
+// {
+// 	out_basis[0] = 0.282095f;
+// 	out_basis[1] = 0.488603f * y;
+// 	out_basis[2] = 0.488603f * z;
+// 	out_basis[3] = 0.488603f * x;
+// 	out_basis[4] = 1.092548f * x * y;
+// 	out_basis[5] = 1.092548f * y * z;
+// 	out_basis[6] = 0.315392f * (3.0f * z * z - 1.0f);
+// 	out_basis[7] = 1.092548f * x * z;
+// 	out_basis[8] = 0.546274f * (x * x - y * y);
+// }
 
 void ProbeManager::BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB[3], const float32 ambRGB[3])
 {
@@ -148,17 +163,16 @@ void ProbeManager::BakeFromSceneLights(const Vec3f& sunDir, const float32 sunRGB
 		const float32 r = sqrtf(fmaxf(1.0f - y * y, 0.0f));
 		const float32 phi = static_cast<float32>(i) * scGoldenAngle;
 
-		const float32 x = r * cosf(phi);
-		const float32 z = r * sinf(phi);
+		const Vec3f normal = Vec3f(r * cosf(phi), y, r * sinf(phi));
 
-		const float32 n_dot_l = fmaxf(x * sun.X + y * sun.Y + z * sun.Z, 0.0f);
+		const float32 NdotL = fmaxf(normal.Dot(sun), 0.0f);
 
 		float32 basis[Limits::ProbeSHCoeffCount];
-		ProbeBasisSH(x, y, z, basis);
+		ProbeBasisSH(normal, basis);
 
 		for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
 			for (uint32 c = 0; c < 3; c++) {
-				sh[k][c] += (ambRGB[c] + sunRGB[c] * n_dot_l) * basis[k];
+				sh[k][c] += (ambRGB[c] + sunRGB[c] * NdotL) * basis[k];
 			}
 		}
 	}
@@ -571,11 +585,13 @@ bool ProbeManager::FinishCaptureBake()
 				}
 
 				const float32 inv_w = 1.0f / world.W;
-				const float32 dx = world.X * inv_w - cam.Position.X;
-				const float32 dy = world.Y * inv_w - cam.Position.Y;
-				const float32 dz = world.Z * inv_w - cam.Position.Z;
+				// const float32 dx = world.X * inv_w - cam.Position.X;
+				// const float32 dy = world.Y * inv_w - cam.Position.Y;
+				// const float32 dz = world.Z * inv_w - cam.Position.Z;
 
-				const float32 len_sq = dx * dx + dy * dy + dz * dz;
+				const Vec3f direction = (Vec3f(world.mIntrin) * Vec3f(inv_w)) - cam.Position;
+
+				const float32 len_sq = direction.Dot(direction);
 				if (len_sq < 1e-12f) {
 					continue;
 				}
@@ -587,7 +603,9 @@ bool ProbeManager::FinishCaptureBake()
 				const float32 weight = texel_area / (rr * sqrtf(rr));
 
 				float32 basis[Limits::ProbeSHCoeffCount];
-				ProbeBasisSH(dx * inv_len, dy * inv_len, dz * inv_len, basis);
+
+				const Vec3f sh_dir = direction * Vec3f(inv_len);
+				ProbeBasisSH(sh_dir, basis);
 
 				const float32 rgb[3] = { r, g, b };
 				for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
@@ -601,8 +619,7 @@ bool ProbeManager::FinishCaptureBake()
 		mCaptureStaging[face].UnMap();
 	}
 
-	// Debug dump of what the probe saw, so a bad capture can't hide behind SH.
-	// Single bakes only: a 64-probe grid would spam hundreds of files.
+#ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
 	if (mNumProbesPending <= 1) {
 		static uint32 sBakeIndex = 0;
 
@@ -622,6 +639,7 @@ bool ProbeManager::FinishCaptureBake()
 		LogInfo("Probe capture faces dumped as probe_bake{}_faceN.ppm", sBakeIndex);
 		sBakeIndex++;
 	}
+#endif
 	// Single bakes refresh the whole field (global ambient); grid bakes write
 	// only the current cell.
 	if (mNumProbesPending <= 1) {

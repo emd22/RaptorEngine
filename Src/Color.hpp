@@ -17,6 +17,8 @@ public:
 	static const Color sBlue;
 	static const Color sGreen;
 
+	static constexpr float32 scOneOver255 = 1.0f / 255.0f;
+
 public:
 	Color() {}
 	Color(uint32 value) : Value(value) {}
@@ -28,6 +30,11 @@ public:
 
 	static FX_FORCE_INLINE Color FromRGBA(uint8 r, uint8 g, uint8 b, uint8 a);
 	static FX_FORCE_INLINE Color FromFloats(float32 rgba[4]);
+
+	FX_FORCE_INLINE float32 GetRF() const { return static_cast<float32>(R) * scOneOver255; }
+	FX_FORCE_INLINE float32 GetGF() const { return static_cast<float32>(G) * scOneOver255; }
+	FX_FORCE_INLINE float32 GetBF() const { return static_cast<float32>(B) * scOneOver255; }
+	FX_FORCE_INLINE float32 GetAF() const { return static_cast<float32>(A) * scOneOver255; }
 
 	FX_FORCE_INLINE uint32 AsUInt() const { return Value; }
 
