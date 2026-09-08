@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <Core/String.hpp>
 #include <Core/Types.hpp>
 #include <Math/Vec3.hpp>
 #include <Renderer/Backend/Commands.hpp>
@@ -43,6 +44,23 @@ struct ProbeVolumeData
 };
 
 static_assert(sizeof(ProbeVolumeData) == 48, "ProbeVolumeData must mirror the HLSL ProbeVolume struct");
+
+/// World-space boxes used for probe placement (bounds fit + push-out).
+struct ProbeBoxList
+{
+	struct Box
+	{
+		Vec3f Min;
+		Vec3f Max;
+	};
+
+	static constexpr uint32 scMaxBoxes = 256;
+	Box Boxes[scMaxBoxes];
+	uint32 Count = 0;
+	Vec3f Min;
+	Vec3f Max;
+	bool Any = false;
+};
 
 /// Builds SH coeffs for a constant irradiance colour (matches the old flat ambient).
 ProbeData MakeUniformAmbientProbe(float32 r, float32 g, float32 b);
@@ -91,6 +109,10 @@ public:
 	/// ServiceCaptureBake() from the game tick. Call outside frame recording.
 	void BeginGridBake();
 
+	/// Arms a grid bake over an explicit box (center + full size), e.g. a dense
+	/// volume around the player. Same progressive drive as BeginGridBake().
+	void BeginGridBakeAt(const Vec3f& center, const Vec3f& size);
+
 	bool IsCapturePending() const { return mbCapturePending; }
 	bool IsCaptureReady() const { return mbCaptureReady; }
 
@@ -133,9 +155,24 @@ public:
 	/// Uploads the volume descriptor to every in-flight page of its GPU buffer.
 	void UploadVolumeToGpu();
 
+	///////////////////////////////////
+	// Persistence (.fxprobe)
+	///////////////////////////////////
+
+	/// Path of the probe file for the current scene: `<scene>/probes.fxprobe`.
+	String GetProbeFilePath() const;
+
+	/// Saves volume + all probes. Returns false on failure.
+	bool SaveProbes();
+
+	/// Loads volume + probes if the file exists (quiet otherwise). Uploads to
+	/// the GPU on success. Returns false when missing or invalid.
+	bool LoadProbes();
+
 private:
-	void ProjectFacesIntoProbe(uint32 probe_index);
 	bool ComputeGridPlacement();
+	bool GatherPlacementBoxes(ProbeBoxList& out);
+	void PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes);
 
 private:
 	ProbeData mProbes[Limits::MaxIrradianceProbes] {};

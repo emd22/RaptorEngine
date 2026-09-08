@@ -5,6 +5,7 @@
 
 #include "LightProbe.hpp"
 
+#include <Asset/AssetManager.hpp>
 #include <Core/File.hpp>
 #include <Engine.hpp>
 #include <Object/Object.hpp>
@@ -15,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <limits>
 
 namespace fx {
@@ -211,34 +213,20 @@ void ProbeManager::BeginGridBake()
 	LogInfo("Probe grid bake armed: {} probes, one per frame", mPendingCount);
 }
 
-bool ProbeManager::ComputeGridPlacement()
+bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 {
-	static_assert(Limits::ProbeGridDims[0] * Limits::ProbeGridDims[1] * Limits::ProbeGridDims[2] ==
-					  Limits::MaxIrradianceProbes,
-				  "Grid dims must match the probe count");
-
-	struct Box
-	{
-		Vec3f Min;
-		Vec3f Max;
-	};
-
-	static constexpr uint32 scMaxBoxes = 256;
-	Box boxes[scMaxBoxes];
-	uint32 box_count = 0;
-
-	// Fit the volume to lit, reasonably-sized geometry. Skips unlit objects
-	// (skybox) and absurdly large bounds (sky spheres) so they can't blow up
-	// the volume.
-	Vec3f gmin(std::numeric_limits<float32>::max());
-	Vec3f gmax(-std::numeric_limits<float32>::max());
-	bool found_any = false;
+	out.Count = 0;
+	out.Min = Vec3f(std::numeric_limits<float32>::max());
+	out.Max = Vec3f(-std::numeric_limits<float32>::max());
+	out.Any = false;
 
 	uint32 stat_total = 0;
 	uint32 stat_null = 0;
 	uint32 stat_no_mesh = 0;
 	uint32 stat_too_big = 0;
 
+	// Fit the volume to reasonably-sized meshed geometry. Absurdly large
+	// bounds (sky spheres) are ignored so they can't blow up the volume.
 	for (const ObjectID& id : gWorld->GetAllObjects()) {
 		stat_total++;
 
@@ -261,33 +249,27 @@ bool ProbeManager::ComputeGridPlacement()
 			continue;
 		}
 
-		if (box_count < scMaxBoxes) {
-			boxes[box_count++] = { bmin, bmax };
+		if (out.Count < ProbeBoxList::scMaxBoxes) {
+			out.Boxes[out.Count++] = { bmin, bmax };
 		}
 
-		gmin.X = fminf(gmin.X, bmin.X);
-		gmin.Y = fminf(gmin.Y, bmin.Y);
-		gmin.Z = fminf(gmin.Z, bmin.Z);
-		gmax.X = fmaxf(gmax.X, bmax.X);
-		gmax.Y = fmaxf(gmax.Y, bmax.Y);
-		gmax.Z = fmaxf(gmax.Z, bmax.Z);
-		found_any = true;
+		out.Min.X = fminf(out.Min.X, bmin.X);
+		out.Min.Y = fminf(out.Min.Y, bmin.Y);
+		out.Min.Z = fminf(out.Min.Z, bmin.Z);
+		out.Max.X = fmaxf(out.Max.X, bmax.X);
+		out.Max.Y = fmaxf(out.Max.Y, bmax.Y);
+		out.Max.Z = fmaxf(out.Max.Z, bmax.Z);
+		out.Any = true;
 	}
 
-	if (!found_any) {
-		LogError("Probe grid placement: {}/{}/{}/{} total/null/no-mesh/too-big, no usable geometry", stat_total,
-				 stat_null, stat_no_mesh, stat_too_big);
-		return false;
-	}
+	LogInfo("Probe placement: {}/{}/{}/{} total/null/no-mesh/too-big ({} boxes kept)", stat_total, stat_null,
+			stat_no_mesh, stat_too_big, out.Count);
 
-	LogInfo("Probe grid placement: {}/{}/{}/{} total/null/no-mesh/too-big", stat_total, stat_null, stat_no_mesh,
-			stat_too_big);
+	return out.Any;
+}
 
-	gmin = gmin - Vec3f(2.0f, 1.0f, 2.0f);
-	gmax = gmax + Vec3f(2.0f, 2.0f, 2.0f);
-
-	const Vec3f size = gmax - gmin;
-
+void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes)
+{
 	const uint32 dx = Limits::ProbeGridDims[0];
 	const uint32 dy = Limits::ProbeGridDims[1];
 	const uint32 dz = Limits::ProbeGridDims[2];
@@ -297,19 +279,19 @@ bool ProbeManager::ComputeGridPlacement()
 		for (uint32 iy = 0; iy < dy; iy++) {
 			for (uint32 ix = 0; ix < dx; ix++) {
 				Vec3f p = gmin + Vec3f(size.X * (static_cast<float32>(ix) / static_cast<float32>(dx - 1)),
-											   size.Y * (static_cast<float32>(iy) / static_cast<float32>(dy - 1)),
-											   size.Z * (static_cast<float32>(iz) / static_cast<float32>(dz - 1)));
+									   size.Y * (static_cast<float32>(iy) / static_cast<float32>(dy - 1)),
+									   size.Z * (static_cast<float32>(iz) / static_cast<float32>(dz - 1)));
 
 				// Pull probes out of solid geometry: if inside a box, lift
 				// above its top (+0.3m). A few iterations handle stacked boxes.
 				for (uint32 iter = 0; iter < 4; iter++) {
 					bool inside_any = false;
-					for (uint32 b = 0; b < box_count; b++) {
+					for (uint32 b = 0; b < boxes.Count; b++) {
 						const float32 margin = 0.1f;
-						if (p.X > boxes[b].Min.X - margin && p.X < boxes[b].Max.X + margin &&
-							p.Y > boxes[b].Min.Y - margin && p.Y < boxes[b].Max.Y + margin &&
-							p.Z > boxes[b].Min.Z - margin && p.Z < boxes[b].Max.Z + margin) {
-							p.Y = boxes[b].Max.Y + 0.3f;
+						if (p.X > boxes.Boxes[b].Min.X - margin && p.X < boxes.Boxes[b].Max.X + margin &&
+							p.Y > boxes.Boxes[b].Min.Y - margin && p.Y < boxes.Boxes[b].Max.Y + margin &&
+							p.Z > boxes.Boxes[b].Min.Z - margin && p.Z < boxes.Boxes[b].Max.Z + margin) {
+							p.Y = boxes.Boxes[b].Max.Y + 0.3f;
 							inside_any = true;
 							break;
 						}
@@ -339,8 +321,44 @@ bool ProbeManager::ComputeGridPlacement()
 
 	UploadVolumeToGpu();
 
-	LogInfo("Probe volume: min={} size={} ({} boxes)", gmin, size, box_count);
+	LogInfo("Probe volume: min={} size={} ({} probes)", gmin, size, probe_index);
+}
+
+bool ProbeManager::ComputeGridPlacement()
+{
+	ProbeBoxList boxes {};
+
+	if (!GatherPlacementBoxes(boxes)) {
+		LogError("Probe grid bake failed: could not fit a volume to the level");
+		return false;
+	}
+
+	// Tight padding: the push-out pass handles probes inside geometry.
+	const Vec3f gmin = boxes.Min - Vec3f(0.5f, 0.5f, 0.5f);
+	const Vec3f gmax = boxes.Max + Vec3f(0.5f, 0.5f, 0.5f);
+
+	PlaceGridProbes(gmin, gmax - gmin, boxes);
 	return true;
+}
+
+void ProbeManager::BeginGridBakeAt(const Vec3f& center, const Vec3f& size)
+{
+	if (mbCapturePending || mbCaptureReady) {
+		LogWarning("Probe bake already in progress, ignoring grid bake request");
+		return;
+	}
+
+	ProbeBoxList boxes {};
+	GatherPlacementBoxes(boxes); // Only for push-out; bounds come from the caller.
+
+	PlaceGridProbes(center - size * 0.5f, size, boxes);
+
+	mPendingCount = Limits::MaxIrradianceProbes;
+	mCurrentProbe = 0;
+	mbCapturePending = true;
+	mbCaptureReady = false;
+
+	LogInfo("Probe grid bake armed at {} over {} ({} probes, one per frame)", center, size, mPendingCount);
 }
 
 void ProbeManager::EnsureCaptureStage()
@@ -504,7 +522,8 @@ bool ProbeManager::FinishCaptureBake()
 			return false;
 		}
 
-		const PerspectiveCamera& cam = mFaceCameras[face];
+		PerspectiveCamera& cam = mFaceCameras[face];
+
 
 		// MultiplyVec4f is non-const, so work on local copies.
 		Mat4f inv_proj = cam.InvProjectionMatrix;
@@ -572,7 +591,8 @@ bool ProbeManager::FinishCaptureBake()
 	}
 
 	// Debug dump of what the probe saw, so a bad capture can't hide behind SH.
-	{
+	// Single bakes only: a 64-probe grid would spam hundreds of files.
+	if (mPendingCount <= 1) {
 		static uint32 sBakeIndex = 0;
 
 		char header[32];
@@ -624,8 +644,7 @@ bool ProbeManager::FinishCaptureBake()
 	}
 
 	LogInfo("Probe capture bake finished (probe {}/{}, {} faces) mean=({:.3f}, {:.3f}, {:.3f}) dirE={:.4f}",
-			mCurrentProbe + 1, mPendingCount, scCaptureFaces, mean_rgb[0], mean_rgb[1], mean_rgb[2],
-			sqrtf(dir_energy));
+			mCurrentProbe + 1, mPendingCount, scCaptureFaces, mean_rgb[0], mean_rgb[1], mean_rgb[2], sqrtf(dir_energy));
 	return true;
 }
 
@@ -678,6 +697,84 @@ void ProbeManager::UploadVolumeToGpu()
 	}
 
 	renderer::gGraphics->ProbeVolumeBuffer.FlushToGpu(0, page_size * renderer::FramesInFlight);
+}
+
+///////////////////////////////////
+// Persistence (.fxprobe)
+///////////////////////////////////
+
+/// File layout (little-endian, same-machine tool data):
+///   char[4]  magic 'FXPR' | uint32 version | uint32 probe_count |
+///   ProbeVolumeData volume | ProbeData[probe_count]
+struct FxProbeHeader
+{
+	char Magic[4] = { 'F', 'X', 'P', 'R' };
+	uint32 Version = 1;
+	uint32 ProbeCount = Limits::MaxIrradianceProbes;
+};
+
+String ProbeManager::GetProbeFilePath() const
+{
+	return String::Fmt("{}/probes.fxprobe", gAssetManager->GetScenePath().CStr());
+}
+
+bool ProbeManager::SaveProbes()
+{
+	const String path = GetProbeFilePath();
+
+	FxProbeHeader header {};
+
+	File file(path, File::eModType::Write, File::eDataType::Binary);
+	file.WriteRaw(&header, sizeof(header));
+	file.WriteRaw(&mVolume, sizeof(mVolume));
+	file.WriteRaw(mProbes, sizeof(mProbes));
+	file.Close();
+
+	LogInfo("Saved {} light probes to {}", Limits::MaxIrradianceProbes, path.CStr());
+	return true;
+}
+
+bool ProbeManager::LoadProbes()
+{
+	const String path = GetProbeFilePath();
+
+	if (!std::filesystem::exists(path.CStr())) {
+		LogInfo("No probe file at {}, using procedural probes", path.CStr());
+		return false;
+	}
+
+	File file(path, File::eModType::Read, File::eDataType::Binary);
+	Slice<uint8> data = file.Read<uint8>();
+	file.Close();
+
+	const uint64 expected_size = sizeof(FxProbeHeader) + sizeof(ProbeVolumeData) + sizeof(mProbes);
+
+	if (data.Size != expected_size) {
+		LogError("Probe file {} has wrong size ({} != {}), ignoring", path.CStr(), data.Size, expected_size);
+		return false;
+	}
+
+	const FxProbeHeader* header = reinterpret_cast<const FxProbeHeader*>(data.pData);
+
+	if (header->Magic[0] != 'F' || header->Magic[1] != 'X' || header->Magic[2] != 'P' || header->Magic[3] != 'R') {
+		LogError("Probe file {} has bad magic, ignoring", path.CStr());
+		return false;
+	}
+
+	if (header->Version != 1 || header->ProbeCount != Limits::MaxIrradianceProbes) {
+		LogError("Probe file {} is version {} with {} probes (expected v1 x{}), ignoring", path.CStr(), header->Version,
+				 header->ProbeCount, Limits::MaxIrradianceProbes);
+		return false;
+	}
+
+	memcpy(&mVolume, data.pData + sizeof(FxProbeHeader), sizeof(mVolume));
+	memcpy(mProbes, data.pData + sizeof(FxProbeHeader) + sizeof(mVolume), sizeof(mProbes));
+
+	UploadVolumeToGpu();
+	UploadToGpu();
+
+	LogInfo("Loaded {} light probes from {}", Limits::MaxIrradianceProbes, path.CStr());
+	return true;
 }
 
 void ProbeManager::UploadToGpu()

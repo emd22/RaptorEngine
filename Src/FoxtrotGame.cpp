@@ -171,6 +171,9 @@ void FoxtrotGame::CreateGame()
 	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), *gWorld);
 	gPhysics->pBackend->OptimizeBroadPhase();
 
+	// Baked probes if the scene has them, procedural gradient otherwise.
+	gProbeManager->LoadProbes();
+
 	pSun = gWorld->GetDirectionalLight();
 
 	LoadOffsetsFile();
@@ -485,7 +488,18 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
+		// Dense local volume around the player.
+		gProbeManager->BeginGridBakeAt(gWorld->Player.pCamera->Position, Vec3f(24.0f, 8.0f, 24.0f));
+	}
+
+	// `G` fits the probe grid to the whole level instead.
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
 		gProbeManager->BeginGridBake();
+	}
+
+	// `P` saves volume + probes for the current scene (auto-loaded next run).
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_P)) {
+		gProbeManager->SaveProbes();
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_B)) {
