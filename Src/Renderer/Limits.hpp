@@ -32,7 +32,10 @@ static constexpr uint32 ProbeSHCoeffCount = 9;
 
 /// MVP: a single global irradiance probe. The manager + GPU buffer are sized for
 /// MaxIrradianceProbes so a spatial volume can be added without changing layouts.
-static constexpr uint32 MaxIrradianceProbes = 16;
+static constexpr uint32 MaxIrradianceProbes = 32;
+
+/// Default probe grid dimensions (X x Y x Z). Product must equal MaxIrradianceProbes.
+static constexpr uint32 ProbeGridDims[3] = { 4, 2, 4 };
 
 
 } // namespace fx::Limits

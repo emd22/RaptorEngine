@@ -104,6 +104,11 @@ public:
 	bool bRenderPhysicsObjects = false;
 	renderer::RenderList mRenderList;
 
+	/// Set once a scene file has populated its objects. Used by WorldFile to
+	/// tell a first load (add everything) from a hot reload (update in place).
+	/// NOTE: blockout objects attach independently and must not affect this.
+	bool bSceneLoaded = false;
+
 	Player Player;
 
 	Blockout* pBlockout = nullptr;

@@ -147,6 +147,11 @@ void GraphicsBackend::Init(Vec2u window_size)
 	ProbeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbePageSize * FramesInFlight,
 					   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
 
+	// Probe volume descriptor (single element, spatial lookup for blending).
+	ProbeVolumePageSize = sizeof(ProbeVolumeData);
+	ProbeVolumeBuffer.Create(eGpuBufferType::StorageWithOffset, ProbeVolumePageSize * FramesInFlight,
+							 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, eGpuBufferFlags::PersistentMapped);
+
 
 	gMaterialManager->Create();
 	gObjectManager->Create();
@@ -826,6 +831,7 @@ void GraphicsBackend::Destroy()
 	LightGridBuffer.Destroy();
 	LightIndexListBuffer.Destroy();
 	ProbeBuffer.Destroy();
+	ProbeVolumeBuffer.Destroy();
 
 	gAssetManager->ShutdownDeletionQueue();
 

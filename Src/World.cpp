@@ -21,7 +21,7 @@ using namespace renderer;
 
 void World::Create()
 {
-	mObjects.Create(32);
+	mObjects.Create(80);
 	mLights.Create(32);
 
 	SortedEntryBuffer.SetPageSize(128);
@@ -205,8 +205,11 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 	pipeline.Bind(gGraphics->GetFrame()->CmdBuffer);
 
 	{
-		const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0, gGraphics->GetLightGridFrameOffset(),
-										  gGraphics->GetLightIndexListFrameOffset(), gGraphics->GetProbeFrameOffset() };
+		const uint32 buffer_offsets[] = {
+			gObjectManager->GetBaseOffset(),	  0,
+			gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
+			gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset()
+		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
 			0, gGraphics->GetFrame()->CmdBuffer, pipeline,
@@ -300,10 +303,11 @@ void World::ExecuteTransparentRenderLists()
 			pipeline->Bind(gGraphics->GetFrame()->CmdBuffer);
 
 			{
-				const uint32 buffer_offsets[] = { gObjectManager->GetBaseOffset(), 0,
-												  gGraphics->GetLightGridFrameOffset(),
-												  gGraphics->GetLightIndexListFrameOffset(),
-												  gGraphics->GetProbeFrameOffset() };
+				const uint32 buffer_offsets[] = {
+					gObjectManager->GetBaseOffset(),	  0,
+					gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
+					gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset()
+				};
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
 					0, gGraphics->GetFrame()->CmdBuffer, *pipeline,
@@ -784,8 +788,8 @@ void World::RenderProbeCapture()
 			gGraphics->LightBuffer.SlotIndex);
 
 	static const Vec3f scFaceDirs[ProbeManager::scCaptureFaces] = {
-		Vec3f(1.0f, 0.0f, 0.0f), Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
-		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f), Vec3f(0.0f, 0.0f, -1.0f),
+		Vec3f(1.0f, 0.0f, 0.0f),  Vec3f(-1.0f, 0.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f),
+		Vec3f(0.0f, -1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),	Vec3f(0.0f, 0.0f, -1.0f),
 	};
 	static const Vec3f scFaceUps[ProbeManager::scCaptureFaces] = {
 		Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 1.0f),

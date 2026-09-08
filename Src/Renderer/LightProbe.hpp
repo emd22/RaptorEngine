@@ -1,14 +1,14 @@
 /*
  * File:        LightProbe.hpp
- * Description: MVP light probes for precomputed global illumination.
+ * Description: Light probes for precomputed global illumination.
  *
  * Stores diffuse irradiance as 2nd-order spherical harmonics (9 coeffs x RGB).
- * The MVP holds a single global probe (index 0) that replaces the flat ambient
- * term in Forward.hlsl. The CPU store + GPU buffer are sized for
- * Limits::MaxIrradianceProbes so a spatial probe volume can follow without
- * changing descriptor layouts.
+ * Probes live on a 3D grid (default 4x2x4 = 32) auto-fitted to the level; the
+ * shader trilinearly blends the 8 surrounding probes per pixel.
  *
- * GPU mirror: `struct ProbeData { float4 SH[9]; }` in Shaders/ProbeCommon.hlsli.
+ * GPU mirrors in Shaders/ProbeCommon.hlsli:
+ *   struct ProbeData   { float4 SH[9]; }
+ *   struct ProbeVolume { float4 Min; float4 InvCellSize; uint4 DimsAndCount; }
  * float4 (not float3) is used deliberately so CPU/GPU packing matches exactly.
  */
 
@@ -34,6 +34,16 @@ struct ProbeData
 static_assert(sizeof(ProbeData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32),
 			  "ProbeData must be tightly packed as 9 float4s to mirror the HLSL struct");
 
+/// Volume descriptor uploaded to the GPU for spatial probe lookup.
+struct ProbeVolumeData
+{
+	float32 Min[4];
+	float32 InvCellSize[4];
+	uint32 DimsAndCount[4]; // Grid dims XYZ + probe count in W
+};
+
+static_assert(sizeof(ProbeVolumeData) == 48, "ProbeVolumeData must mirror the HLSL ProbeVolume struct");
+
 /// Builds SH coeffs for a constant irradiance colour (matches the old flat ambient).
 ProbeData MakeUniformAmbientProbe(float32 r, float32 g, float32 b);
 
@@ -47,20 +57,21 @@ public:
 	static constexpr uint32 scCaptureSize = 64;
 	static constexpr uint32 scCaptureFaces = 6;
 
+	/// Number of probes baked per frame during a grid bake (spreads the hitch).
+	static constexpr uint32 scProbesPerFrame = 1;
+
 public:
 	void Create();
 	void Destroy();
 
-	/// Number of valid probes in mProbes. MVP: always 1 (global probe at index 0).
-	uint32 GetProbeCount() const { return mProbeCount; }
-
 	ProbeData* GetProbes() { return mProbes; }
 
+	/// Fills ALL probes (they are always all valid; the volume selects blends).
 	void SetUniformAmbient(float32 r, float32 g, float32 b);
 	void SetSkyGradient(const float32 sky[3], const float32 ground[3]);
 
 	/**
-	 * @brief Bakes probe 0 from analytic scene lights (no occlusion).
+	 * @brief Bakes all probes from analytic scene lights (no occlusion).
 	 * Incident radiance is E(d) = ambient + sun * max(dot(d, sunDir), 0),
 	 * numerically projected onto the SH basis. Matches EvalProbeIrradiance().
 	 */
@@ -70,14 +81,21 @@ public:
 	// Cubemap capture bake
 	///////////////////////////////////
 
-	/// Arms a capture bake at `position`. The 6 faces render inside the next
-	/// frame (see World::RenderProbeCapture), then FinishCaptureBake() reads
-	/// back and projects. Must be called outside of frame recording.
+	/// Arms a single capture bake at `position` (writes all probes uniformly,
+	/// i.e. a global ambient refresh). Faces render next frame, then
+	/// FinishCaptureBake() reads back and projects. Call outside frame recording.
 	void BeginCaptureBake(const Vec3f& position);
+
+	/// Arms a 32-probe grid bake auto-fitted to the level bounds. Bakes
+	/// scProbesPerFrame probe(s) per frame until done; drive with
+	/// ServiceCaptureBake() from the game tick. Call outside frame recording.
+	void BeginGridBake();
 
 	bool IsCapturePending() const { return mbCapturePending; }
 	bool IsCaptureReady() const { return mbCaptureReady; }
-	const Vec3f& GetCapturePosition() const { return mCapturePosition; }
+
+	/// Position of the probe currently being captured (driven by the bake queue).
+	const Vec3f& GetCapturePosition() const { return mProbePositions[mCurrentProbe]; }
 
 	void EnsureCaptureStage();
 	renderer::RenderStage& GetCaptureStage() { return mCaptureStage; }
@@ -97,21 +115,37 @@ public:
 
 	/**
 	 * @brief Blocks until the GPU is idle, reads back the 6 staged faces and
-	 * projects captured radiance into probe 0. Returns false on failure.
-	 * Must be called after the capture frame has been presented.
+	 * projects captured radiance into the current probe (or all probes for a
+	 * single bake). Returns false on failure. Call after the capture frame.
 	 */
 	bool FinishCaptureBake();
+
+	/**
+	 * @brief Tick helper for progressive grid bakes: finishes the ready probe
+	 * and advances the queue. Returns true while a bake is still in progress.
+	 * Single bakes complete in one call.
+	 */
+	bool ServiceCaptureBake();
 
 	/// Uploads all CPU probes to every in-flight page of the GPU probe buffer.
 	void UploadToGpu();
 
+	/// Uploads the volume descriptor to every in-flight page of its GPU buffer.
+	void UploadVolumeToGpu();
+
+private:
+	void ProjectFacesIntoProbe(uint32 probe_index);
+	bool ComputeGridPlacement();
+
 private:
 	ProbeData mProbes[Limits::MaxIrradianceProbes] {};
-	uint32 mProbeCount = 1;
+	ProbeVolumeData mVolume {};
 	bool mbInitialized = false;
 
-	/// Capture bake state + resources (built lazily on first capture bake).
-	Vec3f mCapturePosition = Vec3f::sZero;
+	/// Capture bake state + resources (stage/staging built lazily).
+	Vec3f mProbePositions[Limits::MaxIrradianceProbes] {};
+	uint32 mPendingCount = 0;
+	uint32 mCurrentProbe = 0;
 	bool mbCapturePending = false;
 	bool mbCaptureReady = false;
 	bool mbCaptureBuilt = false;

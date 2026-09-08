@@ -71,6 +71,11 @@ void FoxtrotGame::InitEngine()
 	// Create the global engine variables
 	fx::Globals::Init();
 
+	// The world bookkeeping (object/light lists) must exist before anything
+	// attaches to it (blockout below, scene in CreateGame). It used to be
+	// created in CreateGame, which wiped everything the blockout had attached.
+	gWorld->Create();
+
 	ControlManager::Init();
 	ControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
 
@@ -148,8 +153,6 @@ Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / siz
 
 void FoxtrotGame::CreateGame()
 {
-	gWorld->Create();
-
 	gWorld->Player.Create();
 	gWorld->Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
 	// Move the player up and behind the other objects
@@ -472,12 +475,17 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	// `B` bakes the analytic sun/ambient probe, `C` bakes from a 6-face scene
-	// capture at the player position (occlusion-aware, hitches one frame).
+	// capture at the player position (occlusion-aware, hitches one frame),
+	// `V` bakes a 32-probe grid fitted to the level (one probe per frame).
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
 		if (!gProbeManager->IsCapturePending()) {
 			gProbeManager->BeginCaptureBake(gWorld->Player.pCamera->Position);
 			LogInfo("Probe capture bake armed at {}", gWorld->Player.pCamera->Position);
 		}
+	}
+
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
+		gProbeManager->BeginGridBake();
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_B)) {
@@ -606,11 +614,9 @@ void FoxtrotGame::Tick()
 
 	gGraphics->DoComposition(*gWorld->GetCurrentCamera());
 
-	if (gProbeManager->IsCaptureReady()) {
-		if (!gProbeManager->FinishCaptureBake()) {
-			LogError("Probe capture bake failed!");
-		}
-	}
+	// Progressive probe bakes (single captures finish in one call, grid bakes
+	// advance one probe per frame).
+	gProbeManager->ServiceCaptureBake();
 
 	mLastTick = current_tick;
 }

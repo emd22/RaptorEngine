@@ -248,6 +248,13 @@ public:
 
 	FX_FORCE_INLINE uint32 GetProbeFrameOffset() const { return ProbePageSize * GetFrameNumber(); }
 
+	/// Single-element probe volume descriptor for spatial probe lookup.
+	RawGpuBuffer ProbeVolumeBuffer;
+
+	uint32 ProbeVolumePageSize = 0;
+
+	FX_FORCE_INLINE uint32 GetProbeVolumeFrameOffset() const { return ProbeVolumePageSize * GetFrameNumber(); }
+
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;
 

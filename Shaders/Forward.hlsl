@@ -148,6 +148,9 @@ F_StructBuffer(bLightIndexList, uint, 3, 0);
 // SH irradiance probes (MVP: index 0 is the global probe)
 F_StructBuffer(bProbeBuffer, ProbeData, 6, 0);
 
+// Probe volume descriptor for spatial probe blending
+F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
+
 F_Texture2D(tAlbedo, 0, 1)
 
 #ifdef USE_NORMAL_MAPS
@@ -312,10 +315,10 @@ FSOutput main(FSInput input)
 		accumulated_light += float4(attenuation * ((visibility * diffuse_term) + (visibility * specular_term)) * light_color.rgb * NdotL, 0.0);
 	}
 
-	// MVP light probe: precomputed SH irradiance (probe 0 = global probe)
-	// replaces the previous flat ambient term.
+	// Light probes: precomputed SH irradiance, trilinearly blended over the
+	// probe volume, replaces the previous flat ambient term.
 	float3 probe_normal = normalize(N_final);
-	float3 probe_irradiance = EvalProbeIrradiance(probe_normal, bProbeBuffer[0]);
+	float3 probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
 
 	float4 ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
 
