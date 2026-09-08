@@ -270,17 +270,26 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 
 void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes)
 {
-	const uint32 dx = Limits::ProbeGridDims[0];
-	const uint32 dy = Limits::ProbeGridDims[1];
-	const uint32 dz = Limits::ProbeGridDims[2];
+	const uint32 x_dim = Limits::ProbeGridDims[0];
+	const uint32 y_dim = Limits::ProbeGridDims[1];
+	const uint32 z_dim = Limits::ProbeGridDims[2];
 
 	uint32 probe_index = 0;
-	for (uint32 iz = 0; iz < dz; iz++) {
-		for (uint32 iy = 0; iy < dy; iy++) {
-			for (uint32 ix = 0; ix < dx; ix++) {
-				Vec3f p = gmin + Vec3f(size.X * (static_cast<float32>(ix) / static_cast<float32>(dx - 1)),
-									   size.Y * (static_cast<float32>(iy) / static_cast<float32>(dy - 1)),
-									   size.Z * (static_cast<float32>(iz) / static_cast<float32>(dz - 1)));
+
+	Vec3f dim_vec = Vec3f(static_cast<float32>(x_dim - 1), static_cast<float32>(y_dim - 1),
+						  static_cast<float32>(z_dim - 1));
+
+	for (uint32 iz = 0; iz < z_dim; iz++) {
+		for (uint32 iy = 0; iy < y_dim; iy++) {
+			for (uint32 ix = 0; ix < x_dim; ix++) {
+				Vec3f per_vec = Vec3f(static_cast<float32>(ix), static_cast<float32>(iy), static_cast<float32>(iz));
+
+				// Vec3f p = gmin + Vec3f(size.X * (static_cast<float32>(ix) / static_cast<float32>(x_dim - 1)),
+				// 					   size.Y * (static_cast<float32>(iy) / static_cast<float32>(y_dim - 1)),
+				// 					   size.Z * (static_cast<float32>(iz) / static_cast<float32>(z_dim - 1)));
+
+
+				Vec3f p = gmin + (Vec3f(size.X, size.Y, size.Z) * (per_vec / dim_vec));
 
 				// Pull probes out of solid geometry: if inside a box, lift
 				// above its top (+0.3m). A few iterations handle stacked boxes.
@@ -310,13 +319,15 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 	mVolume.Min[1] = gmin.Y;
 	mVolume.Min[2] = gmin.Z;
 	mVolume.Min[3] = 0.0f;
-	mVolume.InvCellSize[0] = (size.X > 1e-4f) ? (static_cast<float32>(dx - 1) / size.X) : 1.0f;
-	mVolume.InvCellSize[1] = (size.Y > 1e-4f) ? (static_cast<float32>(dy - 1) / size.Y) : 1.0f;
-	mVolume.InvCellSize[2] = (size.Z > 1e-4f) ? (static_cast<float32>(dz - 1) / size.Z) : 1.0f;
+
+	mVolume.InvCellSize[0] = (size.X > 1e-4f) ? (static_cast<float32>(x_dim - 1) / size.X) : 1.0f;
+	mVolume.InvCellSize[1] = (size.Y > 1e-4f) ? (static_cast<float32>(y_dim - 1) / size.Y) : 1.0f;
+	mVolume.InvCellSize[2] = (size.Z > 1e-4f) ? (static_cast<float32>(z_dim - 1) / size.Z) : 1.0f;
 	mVolume.InvCellSize[3] = 0.0f;
-	mVolume.DimsAndCount[0] = dx;
-	mVolume.DimsAndCount[1] = dy;
-	mVolume.DimsAndCount[2] = dz;
+
+	mVolume.DimsAndCount[0] = x_dim;
+	mVolume.DimsAndCount[1] = y_dim;
+	mVolume.DimsAndCount[2] = z_dim;
 	mVolume.DimsAndCount[3] = Limits::MaxIrradianceProbes;
 
 	UploadVolumeToGpu();
