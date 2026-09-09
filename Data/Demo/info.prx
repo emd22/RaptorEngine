@@ -3,8 +3,8 @@ Meta = {
 }
 
 Sun = {
-    Pos = [1.5, 5.0, -1.5]
-    Color = [250, 220, 182, 4]
+    Pos = [1.0, 7.0, -2.5]
+    Color = [250, 220, 182, 6]
     AmbientColor = [75, 75, 72, 3]
 }
 
@@ -48,13 +48,13 @@ Objects = {
         Pos = [0.0, -1.25, 0.0]
     }*/
 
+	/*
     Level = {
         Mesh = "/TestFloor.glb"
         ColliderRef = "Floor"
         Pos = [0.0, -1.5, 0.0]
     }
 
-	/*
 
     Building = {
         Mesh = "/Building.glb"

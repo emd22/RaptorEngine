@@ -23,6 +23,8 @@ public:
 		return *this;
 	}
 
+	FX_FORCE_INLINE bool operator==(const MaterialID& other) const { return ID == other.ID; }
+
 	FX_FORCE_INLINE IDType GetID() const { return ID; }
 	FX_FORCE_INLINE bool IsNull() const { return ID == 0; }
 

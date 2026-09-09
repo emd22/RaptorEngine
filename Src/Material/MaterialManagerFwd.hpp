@@ -15,7 +15,7 @@ class DescriptorSet;
 class RawGpuBuffer;
 } // namespace renderer
 
-class MaterialID;
+struct MaterialID;
 class Material;
 
 namespace MaterialManagerFwd {

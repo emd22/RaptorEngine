@@ -51,6 +51,9 @@ ConfigEntry& ConfigEntry::operator=(ConfigEntry&& other)
 	bIsArray = other.bIsArray;
 	other.bIsArray = false;
 
+	bIsDotReference = other.bIsDotReference;
+	other.bIsDotReference = false;
+
 	Name = other.Name;
 	other.Name.Clear();
 
@@ -125,7 +128,9 @@ std::string ConfigEntry::AsString(uint32 indent) const
 
 		return std::format("[ {} ]", member_list);
 	}
-
+	else if (bIsDotReference) {
+		return std::format("{}", this->mStringValue);
+	}
 
 	return this->ConfigPrimitive::AsString();
 }
@@ -512,14 +517,14 @@ void ConfigFile::InitConstants()
 
 	mConstants.InitCapacity(cMaxConstants);
 
-	mConstants.Insert(ConfigEntry("TRUE", 1));
-	mConstants.Insert(ConfigEntry("FALSE", 0));
+	// mConstants.Insert(ConfigEntry("TRUE", 1));
+	// mConstants.Insert(ConfigEntry("FALSE", 0));
 
-	mConstants.Insert(ConfigEntry("OBJLAYER_WORLD", 0));
-	mConstants.Insert(ConfigEntry("OBJLAYER_PLAYER", 1));
+	// mConstants.Insert(ConfigEntry("OBJLAYER_WORLD", 0));
+	// mConstants.Insert(ConfigEntry("OBJLAYER_PLAYER", 1));
 
-	mConstants.Insert(ConfigEntry("PHYS_STATIC", 0));
-	mConstants.Insert(ConfigEntry("PHYS_DYNAMIC", 1));
+	// mConstants.Insert(ConfigEntry("PHYS_STATIC", 0));
+	// mConstants.Insert(ConfigEntry("PHYS_DYNAMIC", 1));
 }
 
 } // namespace fx

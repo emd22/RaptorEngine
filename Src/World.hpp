@@ -126,7 +126,6 @@ private:
 
 	Ref<PrimitiveMesh> mpDebugCube { nullptr };
 
-
 	// Used by RenderPhysicsObjects. Rebuild the physics objects list if there have been changes recorded in the physics
 	// manager.
 	uint32 mLastPhysicsUpdateState = UINT32_MAX;

@@ -71,15 +71,11 @@ void FoxtrotGame::InitEngine()
 	// Create the global engine variables
 	fx::Globals::Init();
 
-	// The world bookkeeping (object/light lists) must exist before anything
-	// attaches to it (blockout below, scene in CreateGame). It used to be
-	// created in CreateGame, which wiped everything the blockout had attached.
 	gWorld->Create();
 
 	ControlManager::Init();
 	ControlManager::GetInstance().OnQuit = [] { sbRunning = false; };
 
-	// catch sigabrt to avoid macOS showing "report" popup
 	signal(SIGABRT,
 		   [](int signum)
 		   {
@@ -89,17 +85,26 @@ void FoxtrotGame::InitEngine()
 
 	ConfigEntry* window_entry = Config.GetEntry(HashStr32("Window"));
 
-	const uint32 window_width = window_entry->GetMember(HashStr32("Width"))->Get<uint32>();
-	const uint32 window_height = window_entry->GetMember(HashStr32("Height"))->Get<uint32>();
+	uint32 window_width = 800;
+	uint32 window_height = 800;
 
-	Ref<Window> window = Window::New(window_entry->GetMember(HashStr32("Title"))->Get<const char*>(),
-									 Vec2u(window_width, window_height));
+	const char* window_title = "Foxtrot";
+
+	if (window_entry != nullptr) {
+		window_width = window_entry->GetMember(HashStr32("Width"))->Get<uint32>();
+		window_height = window_entry->GetMember(HashStr32("Height"))->Get<uint32>();
+		window_title = window_entry->GetMember(HashStr32("Title"))->Get<const char*>();
+	}
+
+	Ref<Window> window = Window::New(window_title, Vec2u(window_width, window_height));
 
 	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
 
-	gWorld->Player.bEnableHeadBob = static_cast<bool>(bob_entry->GetMemberValue(HashStr32("Enabled"), 1));
-	gWorld->Player.HeadBobStrength.X = bob_entry->GetMemberValue(HashStr32("ScaleX"), 0.011);
-	gWorld->Player.HeadBobStrength.Y = bob_entry->GetMemberValue(HashStr32("ScaleY"), 0.018);
+	if (bob_entry != nullptr) {
+		gWorld->Player.bEnableHeadBob = static_cast<bool>(bob_entry->GetMemberValue(HashStr32("Enabled"), 1));
+		gWorld->Player.HeadBobStrength.X = bob_entry->GetMemberValue(HashStr32("ScaleX"), 0.011);
+		gWorld->Player.HeadBobStrength.Y = bob_entry->GetMemberValue(HashStr32("ScaleY"), 0.018);
+	}
 
 	gGraphics->SelectWindow(window);
 	gGraphics->Init(Vec2u(window_width, window_height));
@@ -188,40 +193,6 @@ void FoxtrotGame::CreateGame()
 	gShadowRenderer->ShadowCamera.UpdateCameraMatrix();
 
 	CreateLights();
-
-	{
-		// {
-		// 	MaterialID mat_id = gMaterialManager->NewMaterial("TestMat", ePipelineName::Geometry, false);
-		// 	Material* test_material = gMaterialManager->GetMaterial(mat_id);
-
-		// 	AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
-		// 												   "Data/Demo/Textures/white_grid.png",
-		// 												   eImageCreateFlags::None);
-
-		// 	test_material->Attach(Material::eResourceType::Diffuse, diffuse);
-		// 	test_material->Finalize();
-		// 	mBlockoutMaterial = mat_id;
-		// }
-
-
-		// Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube({ .Left = { .Scale = 3.0 } });
-
-		// Object* object = gObjectManager->NewObject("HitMarker");
-		// object->pMesh = cube_mesh->AsDefaultMesh();
-
-		// object->MoveBy(Vec3f(0, 0.1, 0));
-		// object->ScaleBy(0.2);
-
-		// mRaycastHitMarker = object->ID;
-
-		// object->mMaterialID = mBlockoutMaterial;
-
-		// AssetTicket ticket(static_cast<void*>(object));
-		// ticket.MarkAndSignalLoaded();
-
-		// mMainScene.Attach(ticket);
-	}
-
 
 	while (sbRunning) {
 		Tick();
@@ -471,20 +442,17 @@ void FoxtrotGame::ProcessControls()
 	}
 
 
-	// `B` bakes the analytic sun/ambient probe, `C` bakes from a 6-face scene
-	// capture at the player position (occlusion-aware, hitches one frame),
-	// `V` bakes a 32-probe grid fitted to the level (one probe per frame).
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
-		if (!gProbeManager->IsCapturePending()) {
-			gProbeManager->BeginCaptureBake(gWorld->Player.pCamera->Position);
-			LogInfo("Probe capture bake armed at {}", gWorld->Player.pCamera->Position);
-		}
-	}
+	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_C)) {
+	// 	if (!gProbeManager->IsCapturePending()) {
+	// 		gProbeManager->BeginCaptureBake(gWorld->Player.pCamera->Position);
+	// 		LogInfo("Probe capture bake armed at {}", gWorld->Player.pCamera->Position);
+	// 	}
+	// }
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
-		// Dense local volume around the player.
-		gProbeManager->BeginGridBakeAt(gWorld->Player.pCamera->Position, Vec3f(24.0f, 8.0f, 24.0f));
-	}
+	// if (ControlManager::IsKeyPressed(eKey::FX_KEY_V)) {
+	// 	// Dense local volume around the player.
+	// 	gProbeManager->BeginGridBakeAt(gWorld->Player.pCamera->Position, Vec3f(24.0f, 8.0f, 24.0f));
+	// }
 
 	// `G` fits the probe grid to the whole level instead.
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_G)) {
@@ -496,33 +464,8 @@ void FoxtrotGame::ProcessControls()
 		gProbeManager->SaveProbes();
 	}
 
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_B)) {
-		if (pSun.IsValid()) {
-			// For directionals, mPosition holds the light direction (see Forward.hlsl).
-			const Vec3f sun_dir = pSun->GetPosition().Normalize();
 
-			// Match the Forward.hlsl directional scaling: rgb01 * intensity, where
-			// intensity is the unpacked alpha byte.
-			const float32 sun_rgb[3] = {
-				(static_cast<float32>(pSun->Color.R) / 255.0f) * static_cast<float32>(pSun->Color.A),
-				(static_cast<float32>(pSun->Color.G) / 255.0f) * static_cast<float32>(pSun->Color.A),
-				(static_cast<float32>(pSun->Color.B) / 255.0f) * static_cast<float32>(pSun->Color.A),
-			};
-			const float32 amb_rgb[3] = {
-				static_cast<float32>(pSun->AmbientColor.R) / 255.0f,
-				static_cast<float32>(pSun->AmbientColor.G) / 255.0f,
-				static_cast<float32>(pSun->AmbientColor.B) / 255.0f,
-			};
-
-			gProbeManager->BakeFromSceneLights(sun_dir, sun_rgb, amb_rgb);
-			LogInfo("Rebaked light probe from sun (dir={})", sun_dir);
-		}
-		else {
-			LogWarning("No sun light to bake probe from!");
-		}
-	}
-
-
+	// Save the blockout to a file
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S)) {
 		LogInfo("Saving blockout...");
 		gWorld->pBlockout->Save("Data/blockouts/btemp.prx");
@@ -589,7 +532,7 @@ void FoxtrotGame::Tick()
 
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;
 
-	gShadowRenderer->ShadowCamera.Position = (gWorld->Player.Position + (pSun->GetPosition().Normalize() * 15.0f));
+	gShadowRenderer->ShadowCamera.Position = (gWorld->Player.Position + (pSun->GetPosition().Normalize() * 25.0f));
 
 	Vec3f target = gWorld->Player.Position;
 

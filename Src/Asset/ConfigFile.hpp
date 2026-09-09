@@ -90,7 +90,11 @@ public:
 
 	ConfigPrimitive& operator=(ConfigPrimitive&& other) noexcept
 	{
-		if (this == &other) return *this;
+		// YUCK?
+		if (this == &other) {
+			return *this;
+		}
+
 		if (Type == ePrimitiveType::String && mStringValue) {
 			free(mStringValue);
 			mStringValue = nullptr;
@@ -109,17 +113,20 @@ public:
 		else {
 			mStringValue = nullptr;
 		}
+
 		other.Type = ePrimitiveType::None;
 		other.mStringValue = nullptr;
+
 		return *this;
 	}
 
 	template <typename T>
 	static ConfigPrimitive FromValue(T value)
 	{
-		static_assert(C_ConfigSupportsType<T>,
-					  "ConfigPrimitive::FromValue does not support this type. Supported types are integral, floating point, "
-					  "and string (char*, const char*, or std::string) types.");
+		static_assert(
+			C_ConfigSupportsType<T>,
+			"ConfigPrimitive::FromValue does not support this type. Supported types are integral, floating point, "
+			"and string (char*, const char*, or std::string) types.");
 
 		ConfigPrimitive prim;
 		prim.Set<T>(value);
@@ -128,7 +135,8 @@ public:
 
 	ConfigPrimitive& operator=(const ConfigPrimitive& other)
 	{
-		if (this == &other) return *this;
+		if (this == &other)
+			return *this;
 		if (Type == ePrimitiveType::String && mStringValue) {
 			free(mStringValue);
 			mStringValue = nullptr;
@@ -219,9 +227,10 @@ public:
 		requires C_ConfigSupportsType<TType> && (!std::is_same_v<std::string, TType>)
 	void Set(TType value)
 	{
-		static_assert(C_ConfigSupportsType<TType>,
-					  "ConfigPrimitive::Set does not support this type. Supported types are integral, floating point, and "
-					  "string (char*, const char*, or std::string) types.");
+		static_assert(
+			C_ConfigSupportsType<TType>,
+			"ConfigPrimitive::Set does not support this type. Supported types are integral, floating point, and "
+			"string (char*, const char*, or std::string) types.");
 
 		if (Type == ePrimitiveType::String && mStringValue) {
 			free(mStringValue);
@@ -252,6 +261,7 @@ public:
 	}
 
 	std::string AsString() const;
+
 
 public:
 	enum class ePrimitiveType
@@ -327,6 +337,13 @@ public:
 	{
 		ConfigEntry entry = ConfigEntry::Array(name, ConfigPrimitive::ePrimitiveType::Float);
 		entry.AppendValue(value);
+		return entry;
+	}
+
+	static ConfigEntry DotReference(const std::string& name, const char* dot_ref)
+	{
+		ConfigEntry entry(name, dot_ref);
+		entry.bIsDotReference = true;
 		return entry;
 	}
 
@@ -456,6 +473,7 @@ public:
 public:
 	Name Name;
 
+	bool bIsDotReference = false;
 	bool bIsArray = false;
 
 	PagedArray<ConfigEntry> Members;

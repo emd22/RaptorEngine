@@ -814,10 +814,6 @@ void World::RenderProbeCapture()
 			face_camera.SetFarPlane(0.1f);
 			face_camera.UpdateProjectionMatrix();
 
-			// NOTE: Camera::UpdateViewMatrix() hardcodes Vec3f::sUp, which is
-			// degenerate for the +/-Y faces, so the view matrix is built directly
-			// with a per-face up vector. FinishCaptureBake unprojects through these
-			// same matrices, so no convention needs to match anything else.
 			face_camera.MoveTo(capture_pos);
 			face_camera.ViewMatrix.LookAt(capture_pos, capture_pos + scFaceDirs[face], scFaceUps[face]);
 			face_camera.UpdateCameraMatrix();
@@ -849,7 +845,7 @@ void World::RenderProbeCapture()
 
 	gGraphics->pRenderer->mLightTileColumns = saved_tile_columns;
 
-	// Force the composition pass to re-emit viewport state for its own size.
+	// Force the composition pass to re-emit viewport size/state
 	RequirePipelineDynamicStates();
 
 	gProbeManager->MarkCaptureReady();

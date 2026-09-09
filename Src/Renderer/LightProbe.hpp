@@ -71,11 +71,11 @@ ProbeData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3]);
 class ProbeManager
 {
 public:
-	/// Face resolution for capture bakes. 64px is plenty for L2 irradiance.
+	/// Face resolution for capture bakes
 	static constexpr uint32 scCaptureSize = 64;
 	static constexpr uint32 scCaptureFaces = 6;
 
-	/// Number of probes baked per frame during a grid bake (spreads the hitch).
+	/// Number of probes baked per frame during a grid bake
 	static constexpr uint32 scProbesPerFrame = 4;
 
 public:
@@ -161,8 +161,7 @@ private:
 	ProbeVolumeData mVolume {};
 	bool mbInitialized = false;
 
-	/// Capture bake state + resources (stage/staging built lazily).
-	Vec3f mProbePositions[Limits::MaxIrradianceProbes] {};
+	StackArray<Vec3f, Limits::MaxIrradianceProbes> mProbePositions {};
 
 	uint32 mNumProbesPending = 0;
 	uint32 mCurrentProbe = 0;

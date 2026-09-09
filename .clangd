@@ -1,9 +1,10 @@
-
 If:
     PathMatch: .*/Jolt*
 Index:
     Background: Skip
 
 CompileFlags:
-  Add:
-    [-std=c++20, "-I./Src"]
+    Add: [-std=c++20, "-I./Src"]
+
+Diagnostics:
+    MissingIncludes: Strict

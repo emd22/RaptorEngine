@@ -62,7 +62,9 @@ void ProbeManager::Create()
 
 	const float32 sky[3] = { 0.055f, 0.062f, 0.075f };
 	const float32 ground[3] = { 0.025f, 0.022f, 0.020f };
+
 	const ProbeData def = MakeSkyGradientProbe(sky, ground);
+
 	for (uint32 i = 0; i < Limits::MaxIrradianceProbes; i++) {
 		mProbes[i] = def;
 	}
@@ -261,13 +263,6 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 		out.Min = Vec3f::Min(out.Min, bounds_min);
 		out.Max = Vec3f::Max(out.Max, bounds_max);
 
-
-		// out.Min.X = fminf(out.Min.X, bmin.X);
-		// out.Min.Y = fminf(out.Min.Y, bmin.Y);
-		// out.Min.Z = fminf(out.Min.Z, bmin.Z);
-		// out.Max.X = fmaxf(out.Max.X, bmax.X);
-		// out.Max.Y = fmaxf(out.Max.Y, bmax.Y);
-		// out.Max.Z = fmaxf(out.Max.Z, bmax.Z);
 		out.Any = true;
 	}
 
@@ -279,16 +274,28 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	return out.Any;
 }
 
+static bool IsInsideBox(const Vec3f& point, const ProbeBoxList::Box& box)
+{
+	const float32 margin = 0.1f;
+
+	const bool within_x = point.X > box.Min.X - margin && point.X < box.Max.X + margin;
+	const bool within_y = point.Y > box.Min.Y - margin && point.Y < box.Max.Y + margin;
+	const bool within_z = point.Z > box.Min.Z - margin && point.Z < box.Max.Z + margin;
+
+
+	return within_x && within_y && within_z;
+}
+
 void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes)
 {
 	const uint32 x_dim = Limits::ProbeGridDims[0];
 	const uint32 y_dim = Limits::ProbeGridDims[1];
 	const uint32 z_dim = Limits::ProbeGridDims[2];
 
-	uint32 probe_index = 0;
-
 	Vec3f dim_vec = Vec3f(static_cast<float32>(x_dim - 1), static_cast<float32>(y_dim - 1),
 						  static_cast<float32>(z_dim - 1));
+
+	mProbePositions.Clear();
 
 	for (uint32 iz = 0; iz < z_dim; iz++) {
 		for (uint32 iy = 0; iy < y_dim; iy++) {
@@ -307,21 +314,21 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 				for (uint32 iter = 0; iter < 4; iter++) {
 					bool inside_any = false;
 					for (uint32 b = 0; b < boxes.Count; b++) {
-						const float32 margin = 0.1f;
-						if (p.X > boxes.Boxes[b].Min.X - margin && p.X < boxes.Boxes[b].Max.X + margin &&
-							p.Y > boxes.Boxes[b].Min.Y - margin && p.Y < boxes.Boxes[b].Max.Y + margin &&
-							p.Z > boxes.Boxes[b].Min.Z - margin && p.Z < boxes.Boxes[b].Max.Z + margin) {
+						const float32 margin = 0.5f;
+
+						if (IsInsideBox(p, boxes.Boxes[b])) {
 							p.Y = boxes.Boxes[b].Max.Y + 0.3f;
 							inside_any = true;
 							break;
 						}
 					}
+
 					if (!inside_any) {
 						break;
 					}
 				}
 
-				mProbePositions[probe_index++] = p;
+				mProbePositions.Insert(p);
 			}
 		}
 	}
@@ -339,11 +346,11 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 	mVolume.DimsAndCount[0] = x_dim;
 	mVolume.DimsAndCount[1] = y_dim;
 	mVolume.DimsAndCount[2] = z_dim;
-	mVolume.DimsAndCount[3] = Limits::MaxIrradianceProbes;
+	mVolume.DimsAndCount[3] = mProbePositions.Size;
 
 	UploadVolumeToGpu();
 
-	LogInfo("Probe volume: min={} size={} ({} probes)", gmin, size, probe_index);
+	LogInfo("Probe volume: min={} size={} ({} probes)", gmin, size, mProbePositions.Size);
 }
 
 bool ProbeManager::ComputeGridPlacement()
@@ -493,7 +500,6 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 	const float32 texel_area = 4.0f / static_cast<float32>(scPixels);
 
 #ifdef FX_DEBUG_PROBES_EXPORT_FACE_IMAGES
-	// LDR copy of what the probe saw (diagnostic dump after the loop).
 	SizedArray<uint8> ppm;
 	ppm.InitSize(scCaptureFaces * scPixels * 3);
 #endif
@@ -510,8 +516,6 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 
 		PerspectiveCamera& cam = mBatchCameras[batch_slot][face];
 
-
-		// MultiplyVec4f is non-const, so work on local copies.
 		Mat4f inv_proj = cam.InvProjectionMatrix;
 		Mat4f inv_view = cam.InvViewMatrix;
 
@@ -548,9 +552,6 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 				}
 
 				const float32 inv_w = 1.0f / world.W;
-				// const float32 dx = world.X * inv_w - cam.Position.X;
-				// const float32 dy = world.Y * inv_w - cam.Position.Y;
-				// const float32 dz = world.Z * inv_w - cam.Position.Z;
 
 				const Vec3f direction = (Vec3f(world.mIntrin) * Vec3f(inv_w)) - cam.Position;
 
@@ -570,11 +571,10 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 				const Vec3f sh_dir = direction * Vec3f(inv_len);
 				ProbeBasisSH(sh_dir, basis);
 
-				const float32 rgb[3] = { r, g, b };
-				for (uint32 k = 0; k < Limits::ProbeSHCoeffCount; k++) {
-					for (uint32 c = 0; c < 3; c++) {
-						sh[k][c] += rgb[c] * basis[k] * weight;
-					}
+				for (uint32 coeff_index = 0; coeff_index < Limits::ProbeSHCoeffCount; coeff_index++) {
+					sh[coeff_index][0] += r * basis[coeff_index] * weight;
+					sh[coeff_index][1] += g * basis[coeff_index] * weight;
+					sh[coeff_index][2] += b * basis[coeff_index] * weight;
 				}
 			}
 		}
@@ -624,11 +624,8 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 		}
 	}
 
-	// Mean irradiance (L00 through the basis) for comparing bakes in the log.
-	float32 mean_rgb[3] = { sh[0][0] * 0.282095f, sh[0][1] * 0.282095f, sh[0][2] * 0.282095f };
+	LogInfo("Probe {}/{}", probe_index + 1, mNumProbesPending);
 
-	LogInfo("Probe {}/{} baked mean=({:.3f}, {:.3f}, {:.3f})", probe_index + 1, mNumProbesPending, mean_rgb[0],
-			mean_rgb[1], mean_rgb[2]);
 	return true;
 }
 

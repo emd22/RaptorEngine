@@ -489,6 +489,14 @@ void Blockout::Save(const String& path)
 			if (object->HasTags(eObjectTag::LockTransform)) {
 				blockout_entry.AddMember(ConfigEntry::Literal("lock", 1));
 			}
+
+			// Save material type
+			if (object->GetMaterialID() == mBlueMaterialID) {
+				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$CProtoMat.Blue"));
+			}
+			else if (object->GetMaterialID() == mWhiteMaterialID) {
+				blockout_entry.AddMember(ConfigEntry::DotReference("mat", "$CProtoMat.White"));
+			}
 		}
 		all_entry->AddMember(std::move(blockout_entry));
 	}
