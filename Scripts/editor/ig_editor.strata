@@ -15,17 +15,32 @@ enum XFORMTYPE
 	FACE = 1,
 }
 
+struct SELECTION
+{
+	/* Is there nothing selected? */
+	bool is_object_selected;
+
+	/* The currently selected object (via raycast) */
+	OBJECT selected_object;
+
+	/* Selected cube face (for FACE mode) */
+
+	float3 selected_face;
+	float selected_face_scale;
+};
+
 /////////////////////////////////////
 // Globals
 /////////////////////////////////////
 
+float3 initial_player_position;
 float3 camera_distance;
 bool mouse_is_dragging = false;
 bool mouse_was_in_drag_event = false;
 
 /* snap */
 int editor_snap_level = 2;
-bool editor_enable_snap = false;
+bool editor_enable_snap = true;
 
 bool player_had_headbob = false;
 
@@ -33,15 +48,24 @@ bool player_had_headbob = false;
    Used mainly with scale/face tool. */
 OBJECT transform_marker_object;
 
-/* Object selection */
-bool editor_is_object_selected = false;
-OBJECT editor_selected_object;
+SELECTION editor_selection;
+
+float3 face_tool_magnitude;
 
 XFORMTYPE transform_type = XFORMTYPE.TRANSLATE;
+
 
 /////////////////////////////////////
 // Editor functions
 /////////////////////////////////////
+
+@private
+void reset_selection()
+{
+	editor_selection.is_object_selected = false;
+	editor_selection.selected_face = float3(0.0f);
+	editor_selection.selected_face_scale = 0.0f;
+}
 
 void hide_transform_marker_object()
 {
@@ -68,8 +92,8 @@ void editor_adjust_snap_index(int direction)
 /* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
 void editor_select_object(OBJECT object, bool is_selected)
 {
-	editor_is_object_selected = is_selected;
-	editor_selected_object = object;
+	editor_selection.is_object_selected = is_selected;
+	editor_selection.selected_object = object;
 }
 
 @private
@@ -86,25 +110,29 @@ void editor_handle_controls()
 		editor_adjust_snap_index(1);
 	}
 
-	/* Create a new blockout object */
-	if (KEY.K_K.is_pressed()) {
-		float3 origin = player.ray_get_point(20.0f);
-		OBJECT new_obj = blockout_new_object(origin);
-		editor_select_object(new_obj, true);
+	const bool not_in_xform_operation = (!mouse_is_dragging);
+
+	/* Do not allow changing modes (or creating new objects) while actively doing an editor task */
+	if (not_in_xform_operation) {
+		/* Create a new blockout object */
+		if (KEY.K_K.is_pressed()) {
+			float3 origin = player.ray_get_point(20.0f);
+			OBJECT new_obj = blockout_new_object(origin);
+			editor_select_object(new_obj, true);
+		}
+
+		/* Transform type selectors */
+
+		/* Translate (Move) */
+		if (KEY.K_T.is_pressed()) {
+			transform_type = XFORMTYPE.TRANSLATE;
+		}
+
+		/* Face (Scale) */
+		if (KEY.K_F.is_pressed()) {
+			transform_type = XFORMTYPE.FACE;
+		}
 	}
-
-	/* Transform type selectors */
-
-	/* Translate (Move) */
-	if (KEY.K_T.is_pressed()) {
-		transform_type = XFORMTYPE.TRANSLATE;
-	}
-
-	/* Face (Scale) */
-	if (KEY.K_F.is_pressed()) {
-		transform_type = XFORMTYPE.FACE;
-	}
-
 
 	mouse_is_dragging = KEY.K_MOUSE_LEFT.is_down();
 }
@@ -119,7 +147,7 @@ float editor_get_snap_value()
 }
 
 /* If snap is enabled, this snaps a given vector to the selected snap fraction. */
-float3 editor_transform_snap3(float3 vec)
+float3 editor_transform_snap(float3 vec)
 {
 	if (!editor_enable_snap) {
 		return vec;
@@ -145,16 +173,29 @@ void editor_disable_movement_damp()
 }
 
 
+/* The mouse button was pressed with no ongoing mouse down event. */
 void editor_on_mouse_just_down()
 {
-	camera_distance = editor_selected_object.position - player.position;
+	initial_player_position = player.position;
+	camera_distance = editor_selection.selected_object.position - initial_player_position;
 	mouse_was_in_drag_event = true;
+
+	if (transform_type == XFORMTYPE.FACE) {
+		/* Cast and gather the face we are pointing towards */
+		float3 selected_face = editor_selection.selected_object.ray_get_face();
+		editor_selection.selected_face = selected_face;
+		editor_selection.selected_face_scale = editor_selection.selected_object.direction_scale(selected_face);
+	}
 }
 
 
+/////////////////////////////////////
+// Translate Tool
+/////////////////////////////////////
 
-/* Translate an object in 3D space */
-void editor_handle_translate(float delta_time)
+/* Translate an object */
+@private
+void editor_translate_tool(float delta_time)
 {
 	float3 translate_movement = player.position + camera_distance;
 
@@ -174,30 +215,120 @@ void editor_handle_translate(float delta_time)
 		}
 	}
 
-	editor_selected_object.move_to(editor_transform_snap3(translate_movement));
+	editor_selection.selected_object.move_to(editor_transform_snap(translate_movement));
+}
+
+/////////////////////////////////////
+// Face Tool
+/////////////////////////////////////
+
+enum FACEDIR
+{
+	X = 0,
+	Y = 1,
+	Z = 2,
+};
+
+@private
+FACEDIR face_get_dir()
+{
+	float3 abs_face = float3_abs(editor_selection.selected_face);
+
+	const float threshold = 0.01f;
+
+	if (abs_face.x > threshold) {
+		return FACEDIR.X;
+	}
+	if (abs_face.y > threshold) {
+		return FACEDIR.Y;
+	}
+
+	return FACEDIR.Z;
+}
+
+@private
+void editor_face_tool(float delta_time)
+{
+	FACEDIR direction = face_get_dir();
+
+	face_tool_magnitude = (player.position - initial_player_position) * editor_selection.selected_face;
+
+	float3 destination_position = editor_transform_snap(player.position + camera_distance);
+	float3 camera_pos = camera_position();
+
+	if (direction == FACEDIR.X) {
+		destination_position.y = camera_pos.y;
+		destination_position.z = camera_pos.z;
+	}
+	else if (direction == FACEDIR.Y) {
+		destination_position.y = camera_pos.y;
+		destination_position.x = camera_pos.x;
+	}
+	else if (direction == FACEDIR.Z) {
+		destination_position.x = camera_pos.x;
+		destination_position.z = camera_pos.z;
+	}
+
+	/* Calculate the position for the transform marker */
+	float3 xform_marker_dest = (destination_position + (editor_selection.selected_face * float3(editor_selection.selected_face_scale)));
+	transform_marker_object.move_to(xform_marker_dest);
+}
+
+@private
+void editor_face_tool_finalize()
+{
+	blockout_object_scale(
+		editor_selection.selected_object,
+		editor_selection.selected_face,
+		face_tool_magnitude
+	);
+
+	if (editor_selection.is_object_selected) {
+		blockout_reload_object(editor_selection.selected_object);
+	}
+
+	hide_transform_marker_object();
 }
 
 
+/////////////////////////////////////
+// Editor Dispatch
+/////////////////////////////////////
 
+@private
 void editor_handle_operation(float delta_time)
 {
 	if (transform_type == XFORMTYPE.TRANSLATE) {
-		editor_handle_translate(delta_time);
+		editor_translate_tool(delta_time);
 		return;
+	}
+	if (transform_type == XFORMTYPE.FACE) {
+		editor_face_tool(delta_time);
+		return;
+	}
+}
+
+
+@private
+void editor_finalize_operation()
+{
+	/* Finalize the scale operation */
+	if (transform_type == XFORMTYPE.FACE) {
+		editor_face_tool_finalize();
 	}
 }
 
 
 
 /////////////////////////////////////
-// Interface functions
+// Interface Functions
 /////////////////////////////////////
 
 /* Called when switching into the editor mode */
 void mode_load()
 {
 	camera_distance = float3(0.0f);
-	editor_is_object_selected = false;
+	reset_selection();
 
 	player_had_headbob = player.get_headbob();
 }
@@ -205,7 +336,7 @@ void mode_load()
 /* Called when switching out of editor mode */
 void mode_unload()
 {
-	editor_is_object_selected = false;
+	reset_selection();
 	hide_transform_marker_object();
 
 	editor_disable_movement_damp();
@@ -216,12 +347,17 @@ void editor_set_transform_marker(OBJECT xform_marker)
 	transform_marker_object = xform_marker;
 }
 
+
 void mode_update(float3 movement_vector, float delta_time)
 {
 	editor_handle_controls();
 
+	if (mouse_was_in_drag_event && !mouse_is_dragging) {
+		editor_finalize_operation();
+	}
+
 	/* Mouse is no longer down, do not perform any operations */
-	if (!editor_is_object_selected || !mouse_is_dragging) {
+	if (!editor_selection.is_object_selected || !mouse_is_dragging) {
 		editor_disable_movement_damp();
 		mouse_was_in_drag_event = false;
 		return;

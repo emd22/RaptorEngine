@@ -1,3 +1,0 @@
-/// Converts `T` seconds to the timescale used by `pause`
-seconds(float T) int { return castint(T * 10f); }
-minutes(float T) int { return castint(T * 600f); }
