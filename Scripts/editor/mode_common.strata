@@ -1,4 +1,4 @@
-import ../common;
+import ../interop;
 import ../keyboard;
 
 bool had_headbob = false;

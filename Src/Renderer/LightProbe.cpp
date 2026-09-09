@@ -276,12 +276,11 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 
 static bool IsInsideBox(const Vec3f& point, const ProbeBoxList::Box& box)
 {
-	const float32 margin = 0.1f;
+	const float32 margin = 0.25f;
 
 	const bool within_x = point.X > box.Min.X - margin && point.X < box.Max.X + margin;
 	const bool within_y = point.Y > box.Min.Y - margin && point.Y < box.Max.Y + margin;
 	const bool within_z = point.Z > box.Min.Z - margin && point.Z < box.Max.Z + margin;
-
 
 	return within_x && within_y && within_z;
 }
@@ -297,6 +296,7 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 
 	mProbePositions.Clear();
 
+	// Fill a 3d volume with probes.
 	for (uint32 iz = 0; iz < z_dim; iz++) {
 		for (uint32 iy = 0; iy < y_dim; iy++) {
 			for (uint32 ix = 0; ix < x_dim; ix++) {

@@ -1,0 +1,108 @@
+/*
+ * File:        ig_editor.strata
+ * Author:      emd22
+ * Created:     09/09/2026
+ * Description: This script serves as a one-stop shop for all object transformations in-game.
+ */
+
+import ../interop;
+import ../common;
+import ../keyboard;
+
+
+/////////////////////////////////////
+// Globals
+/////////////////////////////////////
+
+float3 camera_distance;
+bool was_in_mouse_drag_event = false;
+
+/* Quantization */
+int editor_quantize_level = 2;
+bool editor_enable_quantization = false;
+
+bool player_had_headbob = false;
+
+/* Cube marker used for showing distance and movement when transforming an object.
+   Used mainly with scale/face tool. */
+OBJECT transform_marker_object;
+
+/* Object selection */
+bool editor_is_object_selected = false;
+OBJECT editor_selected_object;
+
+
+/////////////////////////////////////
+// Utility functions
+/////////////////////////////////////
+
+void hide_transform_marker_object()
+{
+	/* Move the transform marker to a location where the user won't see it... */
+	transform_marker_object.move_to(float3(200.0f));
+}
+
+/* Adjust the step size of the quantization. negative (-1) decreases the size of each step,
+   positive (1) increases it. */
+@private
+void editor_adjust_quantize_index(int direction)
+{
+	if (direction < 0) {
+		editor_quantize_level--;
+	}
+	else {
+		editor_quantize_level++;
+	}
+
+	editor_quantize_level = fclamp(editor_quantize_level, 0, 3);
+}
+
+@private
+void editor_handle_controls()
+{
+	if (KEY.K_U.is_pressed()) {
+		editor_enable_quantization = !editor_enable_quantization;
+	}
+
+	if (KEY.K_MINUS.is_pressed()) {
+		editor_adjust_quantize_index(-1);
+	}
+	if (KEY.K_EQUALS.is_pressed()) {
+		editor_adjust_quantize_index(1);
+	}
+
+	/* Create a new blockout object */
+}
+
+/* Get the division that we are quantizing by. NOTE: not the index. */
+float editor_get_quantization_value()
+{
+
+}
+
+
+
+/////////////////////////////////////
+// Interface functions
+/////////////////////////////////////
+
+/* Called when switching into the editor mode */
+void mode_load()
+{
+	camera_distance = float3(0.0f);
+	editor_is_object_selected = false;
+
+	player_had_headbob = player.get_headbob();
+}
+
+/* Called when switching out of editor mode */
+void mode_unload()
+{
+	editor_is_object_selected = false;
+	hide_transform_marker_object();
+}
+
+void editor_set_transform_marker(OBJECT xform_marker)
+{
+	transform_marker_object = xform_marker;
+}

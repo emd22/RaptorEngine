@@ -286,6 +286,7 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 		switch (mat_index) {
 		case eCProtoMat::Gray:
+			material_id = mWhiteMaterialID;
 			break;
 		case eCProtoMat::Orange:
 			material_id = mOrangeMaterialID;

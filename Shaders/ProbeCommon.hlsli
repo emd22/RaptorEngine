@@ -1,5 +1,13 @@
 // #define NO_PROBE_BLENDING 1
 
+// Offset along the surface normal when sampling the probe volume. Prevents
+// thin geometry from bleeding probes from the opposite side.
+#define PROBE_NORMAL_BIAS 0.3
+// Runtime scale for probe irradiance. SH L2 without cosine convolution
+// reconstructs directional radiance (~2x true diffuse irradiance for
+// half-covered cases), so 0.5 keeps energy in line with direct lighting.
+#define PROBE_GI_SCALE 0.5
+
 struct ProbeData
 {
 	float4 SH[9];

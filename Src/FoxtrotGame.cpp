@@ -356,8 +356,8 @@ void FoxtrotGame::ProcessControls()
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_L)) {
-		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
 		gWorld->bRenderProbes = !gWorld->bRenderProbes;
+		LogInfo("Probe debug render {}", gWorld->bRenderProbes ? "enabled" : "disabled");
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_2)) {

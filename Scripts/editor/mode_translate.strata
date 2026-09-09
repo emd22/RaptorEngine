@@ -1,4 +1,4 @@
-import ../common;
+import ../interop;
 import ../keyboard;
 
 import mode_common;

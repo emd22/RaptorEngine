@@ -1,0 +1,90 @@
+/*
+ *	Common functions and externals for editor modes
+ */
+
+
+extern int printf(string fmt, ...);
+
+/*
+	Math Util
+ */
+
+/* Returns 1.0 if `value` is positive, returns -1.0 if negative. */
+extern float float_sign(float value);
+
+extern float4 float4_round(float4 value);
+
+float3 float3_round(float3 value)
+{
+	float4 result = float4_round(float4(value, 0.0f));
+	return result.xyz;
+}
+
+extern float3 float3_abs(float3 value);
+
+extern void print_float4(float4 value);
+void print_float3(float3 value)
+{
+	print_float4(float4(value, 1.0));
+}
+
+/*
+	Object
+ */
+
+struct OBJECTID = uint;
+handle OBJECT;
+
+const uint OBJ_TAG_BLOCKOUT = (1 << 0);
+const uint OBJ_TAG_PREVENTMOVE = (1 << 1);
+
+impl OBJECT
+{
+	extern void move_to(OBJECT obj, float3 position);
+	extern void move_by(OBJECT obj, float3 by);
+	extern float3 get_position(OBJECT obj);
+	extern uint get_tags(OBJECT obj);
+
+	extern float3 ray_get_face(OBJECT obj);
+	extern float direction_scale(OBJECT obj, float3 direction);
+
+	property float3 position {
+		get = OBJECT_get_position;
+	}
+}
+
+extern OBJECT object_get(OBJECTID id);
+
+/*
+	Player
+ */
+
+handle PLAYER;
+
+impl PLAYER
+{
+	extern void set_speed_multiplier(PLAYER p, float mult);
+	extern void toggle_headbob(PLAYER p, bool value);
+	extern bool get_headbob(PLAYER p);
+	extern float3 get_position(PLAYER p);
+	extern bool is_flymode(PLAYER p);
+
+	extern float3 ray_get_point(float range);
+
+
+	property float3 position {
+		get = PLAYER_get_position;
+	}
+}
+
+PLAYER player;
+
+/* Retrieve the currently selected camera's position */
+extern float3 camera_position();
+
+
+/* Reloads an object from a blockout file. */
+extern void blockout_reload_object(OBJECT object);
+extern OBJECT blockout_new_object(float3 position);
+
+extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);
