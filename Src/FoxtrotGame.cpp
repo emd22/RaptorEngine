@@ -385,16 +385,6 @@ void FoxtrotGame::ProcessControls()
 		SwitchEditorMode(static_cast<eEditorMode>(static_cast<int32>(EditorModeType) + 1));
 	}
 
-	// Translate
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_T)) {
-		SwitchEditorMode(eEditorMode::Translate);
-	}
-
-	// Scale
-	if (ControlManager::IsKeyPressed(eKey::FX_KEY_Y)) {
-		SwitchEditorMode(eEditorMode::Scale);
-	}
-
 
 	if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
 		gWorld->Player.bIsSprinting = true;
@@ -589,14 +579,19 @@ void FoxtrotGame::DestroyGame()
 void FoxtrotGame::AddEditorModes()
 {
 	EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Simulate));
+	// {
+	// 	EditorMode* mode = new EditorMode;
+	// 	mode->Create("Translate", "./Scripts/editor/mode_translate.strata");
+	// 	EditorModes.Insert(mode);
+	// }
+	// {
+	// 	EditorMode* mode = new EditorMode;
+	// 	mode->Create("Scale", "./Scripts/editor/mode_scale.strata");
+	// 	EditorModes.Insert(mode);
+	// }
 	{
 		EditorMode* mode = new EditorMode;
-		mode->Create("Translate", "./Scripts/editor/mode_translate.strata");
-		EditorModes.Insert(mode);
-	}
-	{
-		EditorMode* mode = new EditorMode;
-		mode->Create("Scale", "./Scripts/editor/mode_scale.strata");
+		mode->Create("IGE", "./Scripts/editor/ig_editor.strata");
 		EditorModes.Insert(mode);
 	}
 

@@ -32,7 +32,7 @@ bool EditorMode::SelectObject(Object* object)
 		return false;
 	}
 
-	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool)>("mode_select_object");
+	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool)>("editor_select_object");
 
 	if (object == nullptr) {
 		if (mpLastSelectedObject != nullptr) {
@@ -78,7 +78,7 @@ void EditorMode::Load()
 		mode_load();
 	}
 
-	auto mode_set_xform_marker = pScript->GetFunction<void (*)(void*)>("mode_common_set_xform_marker");
+	auto mode_set_xform_marker = pScript->GetFunction<void (*)(void*)>("editor_set_transform_marker");
 	if (mode_set_xform_marker) {
 		mode_set_xform_marker(reinterpret_cast<void*>(gWorld->pBlockout->pXFormObject));
 	}
