@@ -194,7 +194,7 @@ std::vector<VkDescriptorSetLayout> PSOBuild::BuildDescriptorSets()
 	for (uint32 i = 0; i < mDescriptorEntries.Size; i++) {
 		SizedArray<DescriptorEntry>& desc_list = mDescriptorEntries[i];
 
-		LogInfo("Descriptor '{}' Size is {}", i, desc_list.Size);
+		// LogInfo("Descriptor '{}' Size is {}", i, desc_list.Size);
 
 		// If there are no entries added, skip creating the DS
 		if (desc_list.Size == 0) {
@@ -252,9 +252,13 @@ void PSOBuild::SetOutputTargets(TargetList* targets) { pOutputTargets = targets;
 
 void PSOBuild::EndPipeline()
 {
+#ifdef FX_BUILD_DEBUG
 	LogInfo(LC_RENDER, "** Building Pipeline {} **", PipelineNameUtil::GetName(mPipelineName));
+#endif
+
 	BuildPipeline();
 
+#ifdef FX_BUILD_DEBUG
 	LogInfo(LC_RENDER, "");
 	LogInfo(LC_RENDER, "Pipeline '{}' is assigned descriptor sets: ", PipelineNameUtil::GetName(mPipelineName));
 
@@ -263,6 +267,7 @@ void PSOBuild::EndPipeline()
 	}
 
 	LogInfo(LC_RENDER, "");
+#endif
 
 	Reset();
 }

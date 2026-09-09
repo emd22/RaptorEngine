@@ -46,10 +46,15 @@ DsLayoutCache::Request(const SizedArray<DescriptorEntry>& requested_entries)
 
 	DsLayoutBuilder builder {};
 
+#ifdef FX_BUILD_DEBUG
 	LogInfo(LC_CORE, "DS Layout Builder:");
+#endif
+
 	for (const DescriptorEntry& entry : requested_entries) {
+#ifdef FX_BUILD_DEBUG
 		LogInfo("\t Entry {} -> {} || {}", entry.Binding, DescriptorEntryUtil::GetTypeName(entry.GetType()),
 				ShaderUtil::TypeToName(entry.ShaderStages));
+#endif
 		builder.AddBinding(entry.Binding, entry.GetDescriptorType(), entry.ShaderStages);
 	}
 
@@ -203,11 +208,15 @@ std::pair<DescriptorID, DescriptorSet*> DescriptorCache::Request(const SizedArra
 	DescriptorSet& descriptor = Cache[descriptor_id.ID];
 	descriptor.Create(FindPool(), descriptor_id, layout_result.first, has_dynamic_offsets);
 
+#ifdef FX_BUILD_DEBUG
 	LogInfo(LC_CORE, "** Creating descriptor set {}", descriptor_id);
+#endif
 	// Build the descriptor set
 	for (const DescriptorEntry& entry : entries) {
+#ifdef FX_BUILD_DEBUG
 		LogInfo(LC_CORE, "\tEntry: {} -> {} || {}", entry.Binding, DescriptorEntryUtil::GetTypeName(entry.GetType()),
 				ShaderUtil::TypeToName(entry.ShaderStages));
+#endif
 
 		if (entry.IsBuffer()) {
 			Assert(entry.pBuffer != nullptr);

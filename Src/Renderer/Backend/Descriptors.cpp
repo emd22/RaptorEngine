@@ -276,8 +276,6 @@ void DescriptorSet::Build()
 	StackArray<VkDescriptorBufferInfo, scMaxBuffers> buffer_infos;
 	StackArray<VkWriteDescriptorSet, scMaxDescriptorEntries> write_infos;
 
-	LogInfo("Building DESCRIPTOR: ");
-
 	for (const DescriptorEntry& entry : mDescriptorEntries) {
 		if (entry.IsImage()) {
 			VkDescriptorImageInfo image_info {

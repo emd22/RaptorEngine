@@ -464,24 +464,22 @@ void FoxtrotGame::ProcessControls()
 
 void FoxtrotGame::RenderText()
 {
-	static const uint32 scTextColor = Color::FromRGBA(255, 255, 255, 255).AsUInt();
+	static const uint32 scWhite = Color::FromRGBA(255, 255, 255, 255).AsUInt();
+	static const uint32 scGreen = Color::FromRGBA(100, 255, 0, 255).AsUInt();
 
-	gTextRenderer->DrawText(String::Fmt("EditorMode {} ({})",
-										pSelectedEditorMode ? pSelectedEditorMode->ModeName : "Simulate",
-										static_cast<uint32>(EditorModeType))
-								.CStr(),
-							2.0f, scTextColor);
-	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scTextColor);
+	gTextRenderer->DrawText(
+		String::Fmt("Mode={}", pSelectedEditorMode ? pSelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f, scWhite);
+	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scWhite);
 
 	if (pSelectedEditorMode != nullptr) {
 		gTextRenderer->DrawText(String::Fmt("Q={}, QE={}", pSelectedEditorMode->GetQuantizeFraction(),
 											pSelectedEditorMode->GetQuantizeEnabled())
 									.CStr(),
-								2.0, scTextColor);
+								2.0, scGreen);
 
 		if (pSelectedEditorMode->mpLastSelectedObject != nullptr) {
 			gTextRenderer->DrawText(String::Fmt("SEL={}", pSelectedEditorMode->mpLastSelectedObject->Name.Get()).CStr(),
-									2.0, scTextColor);
+									2.0, scGreen);
 		}
 	}
 }
@@ -591,7 +589,7 @@ void FoxtrotGame::AddEditorModes()
 	// }
 	{
 		EditorMode* mode = new EditorMode;
-		mode->Create("IGE", "./Scripts/editor/ig_editor.strata");
+		mode->Create("Prototype", "./Scripts/editor/prototype_editor.strata");
 		EditorModes.Insert(mode);
 	}
 

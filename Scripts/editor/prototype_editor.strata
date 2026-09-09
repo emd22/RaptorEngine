@@ -1,5 +1,5 @@
 /*
- * File:        ig_editor.strata
+ * File:        prototype_editor.strata
  * Author:      emd22
  * Created:     09/09/2026
  * Description: This script serves as a one-stop shop for all object transformations in-game.
@@ -8,6 +8,12 @@
 import ../interop;
 import ../common;
 import ../keyboard;
+
+
+enum OBJECTTAG
+{
+	BLOCKOUT = (1 << 0),
+}
 
 enum XFORMTYPE
 {
