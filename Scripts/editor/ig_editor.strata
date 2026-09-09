@@ -183,6 +183,7 @@ void editor_on_mouse_just_down()
 	if (transform_type == XFORMTYPE.FACE) {
 		/* Cast and gather the face we are pointing towards */
 		float3 selected_face = editor_selection.selected_object.ray_get_face();
+
 		editor_selection.selected_face = selected_face;
 		editor_selection.selected_face_scale = editor_selection.selected_object.direction_scale(selected_face);
 	}
@@ -253,20 +254,22 @@ void editor_face_tool(float delta_time)
 
 	face_tool_magnitude = (player.position - initial_player_position) * editor_selection.selected_face;
 
-	float3 destination_position = editor_transform_snap(player.position + camera_distance);
+	float3 player_pos = player.position;
+
+	float3 destination_position = editor_transform_snap(player_pos + camera_distance);
 	float3 camera_pos = camera_position();
 
 	if (direction == FACEDIR.X) {
 		destination_position.y = camera_pos.y;
-		destination_position.z = camera_pos.z;
+		destination_position.z = player_pos.z;
 	}
 	else if (direction == FACEDIR.Y) {
-		destination_position.y = camera_pos.y;
-		destination_position.x = camera_pos.x;
+		destination_position.x = player_pos.x;
+		destination_position.z = player_pos.z;
 	}
 	else if (direction == FACEDIR.Z) {
-		destination_position.x = camera_pos.x;
-		destination_position.z = camera_pos.z;
+		destination_position.y = camera_pos.y;
+		destination_position.x = player_pos.x;
 	}
 
 	/* Calculate the position for the transform marker */

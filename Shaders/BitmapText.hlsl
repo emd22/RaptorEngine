@@ -93,7 +93,7 @@ FSOutput main(FSInput input)
 	FSOutput output;
 
 	float4 sampled = F_Sample(tFont, input.vUV);
-	output.vAlbedo = float4(input.vTextColor.rgb, sampled.a * input.vTextColor.a);
+	output.vAlbedo = lerp(float4(0.1, 0.1, 0.1, 0.6), float4(input.vTextColor.rgb, sampled.a * input.vTextColor.a), sampled.a);
 
 	return output;
 }

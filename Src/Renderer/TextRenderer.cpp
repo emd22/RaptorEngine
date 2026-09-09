@@ -23,12 +23,6 @@ namespace fx::renderer {
 FX_SET_MODULE_NAME("TextRenderer")
 
 
-// static constexpr const char* scGlyphMap = "ABCDEFGHIJKLM"
-// 										  "NOPQRSTUVWXYZ"
-// 										  "abcdefghijklm"
-// 										  "nopqrstuvwxyz"
-// 										  "0123456789+-=";
-//
 static constexpr const char* scGlyphMap = " !\"#$%&'()*+,-./"
 										  "0123456789:;<=>?"
 										  "@ABCDEFGHIJKLMNO"
@@ -57,7 +51,7 @@ void TextRenderer::Create()
 
 	mpAtlas = gTextureManager->NewTexture();
 
-	mAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, "Textures/debug_font.png",
+	mAtlasTicket = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm, "Textures/debug_font3.png",
 											eImageCreateFlags::None);
 
 	mAtlasTicket.OnLoaded(

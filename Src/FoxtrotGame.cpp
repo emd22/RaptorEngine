@@ -464,7 +464,7 @@ void FoxtrotGame::ProcessControls()
 
 void FoxtrotGame::RenderText()
 {
-	static const uint32 scTextColor = Color::FromRGBA(255, 0, 0, 255).AsUInt();
+	static const uint32 scTextColor = Color::FromRGBA(255, 255, 255, 255).AsUInt();
 
 	gTextRenderer->DrawText(String::Fmt("EditorMode {} ({})",
 										pSelectedEditorMode ? pSelectedEditorMode->ModeName : "Simulate",
