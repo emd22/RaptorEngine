@@ -966,7 +966,7 @@ void World::RenderProbeDebug(const Camera& camera)
 	DebugLayerPushConstants push_constants {};
 
 	// Tiny solid cubes (~0.15m). The base debug cube spans -1..+1, so scale by half-extent.
-	static const Vec3f scProbeHalfExtent(0.035f);
+	static const Vec3f scProbeHalfExtent(0.1f);
 
 	const Color probe_color = Color::FromRGBA(60, 220, 255, 100);
 	const Color capturing_color = Color::FromRGBA(255, 150, 30, 255);

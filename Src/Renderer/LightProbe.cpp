@@ -244,6 +244,10 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 			continue;
 		}
 
+		if (object.IsUnlit()) {
+			continue;
+		}
+
 		const Vec3f bounds_min = object.GetPosition() + object.Bounds.Min;
 		const Vec3f bounds_max = object.GetPosition() + object.Bounds.Max;
 
@@ -265,15 +269,14 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	LogInfo("Probe placement: {}/{}/{}/{} total/null/no-mesh/too-big ({} boxes kept)", stat_total, stat_null,
 			stat_no_mesh, stat_too_big, out.Count);
 
-	out.Min.Y = std::max(out.Min.Y, 0.25f);
+	out.Min.Y = std::max(out.Min.Y, 0.5f);
 
 	return out.Any;
 }
 
 static bool IsInsideBox(const Vec3f& point, const ProbeBoxList::Box& box)
 {
-	const float32 margin = 0.25f;
-
+	const float32 margin = 0.2f;
 	const bool within_x = point.X > box.Min.X - margin && point.X < box.Max.X + margin;
 	const bool within_y = point.Y > box.Min.Y - margin && point.Y < box.Max.Y + margin;
 	const bool within_z = point.Z > box.Min.Z - margin && point.Z < box.Max.Z + margin;
@@ -289,6 +292,8 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 
 	Vec3f dim_vec = Vec3f(static_cast<float32>(x_dim - 1), static_cast<float32>(y_dim - 1),
 						  static_cast<float32>(z_dim - 1));
+
+	LogInfo("The dimensions are like {}", dim_vec);
 
 	mProbePositions.Clear();
 
@@ -310,10 +315,8 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 				for (uint32 iter = 0; iter < 4; iter++) {
 					bool inside_any = false;
 					for (uint32 b = 0; b < boxes.Count; b++) {
-						const float32 margin = 0.05f;
-
 						if (IsInsideBox(p, boxes.Boxes[b])) {
-							p.Y = boxes.Boxes[b].Max.Y + 0.3f;
+							p.Y = boxes.Boxes[b].Max.Y + 0.5f;
 							inside_any = true;
 							break;
 						}
@@ -358,7 +361,6 @@ bool ProbeManager::ComputeGridPlacement()
 		return false;
 	}
 
-	// Tight padding: the push-out pass handles probes inside geometry.
 	const Vec3f gmin = boxes.Min - Vec3f(0.5f, 0.5f, 0.5f);
 	const Vec3f gmax = boxes.Max + Vec3f(0.5f, 0.5f, 0.5f);
 

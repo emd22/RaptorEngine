@@ -67,7 +67,7 @@ void Blockout::Create(World* world)
 		AssetTicket diffuse = gAssetManager->LoadImage(eImageType::Flat, eImageFormat::RGBA8_UNorm,
 													   "Data/Demo/Textures/aqua_check.png", eImageCreateFlags::None);
 
-		test_material->SetAlpha(0.5);
+		test_material->SetAlpha(0.7f);
 		test_material->Attach(Material::eResourceType::Diffuse, diffuse);
 
 		test_material->Finalize();
@@ -89,9 +89,9 @@ void Blockout::Create(World* world)
 
 		Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
 
-		MaterialID mat_id = mWhiteMaterialID;
-
-		pXFormObject = gObjectManager->NewObject("PROTO_XFORM", mat_id, eObjectTag::Blockout);
+		pXFormObject = gObjectManager->NewObject("PROTO_XFORM", SelectionMaterialID,
+												 eObjectTag::Blockout | eObjectTag::LockTransform);
+		pXFormObject->SetUnlit(true);
 		pXFormObject->pMesh = cube_mesh->AsDefaultMesh();
 
 
