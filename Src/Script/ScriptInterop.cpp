@@ -30,7 +30,6 @@ static void N_object_move_to(Object* obj, FLOAT4 position)
 		return;
 	}
 
-	LogInfo("** move to: {} **", Vec3f(position));
 
 	obj->SetPosition(Vec3f(position));
 }
@@ -40,8 +39,6 @@ static void N_object_move_by(Object* obj, FLOAT4 by)
 	if (obj == nullptr) {
 		return;
 	}
-
-	LogInfo("** move to: {} **", Vec3f(by));
 
 	obj->MoveBy(Vec3f(by));
 }
@@ -159,6 +156,7 @@ static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magn
 }
 
 static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pBlockout->NewObject(Vec3f(position)); }
+static void N_blockout_destroy_object(Object* object) { gWorld->pBlockout->DestroyObject(object); }
 
 /////////////////////////////////////
 // Predef gather
@@ -186,6 +184,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),
 	PREDEF("blockout_new_object", N_blockout_new_object),
+	PREDEF("blockout_destroy_object", N_blockout_destroy_object),
 
 	PREDEF("camera_position", N_camera_position),
 

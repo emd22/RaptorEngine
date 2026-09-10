@@ -140,6 +140,12 @@ void editor_handle_controls()
 		}
 	}
 
+	if (editor_selection.is_object_selected && KEY.K_BACKSPACE.is_pressed()) {
+		printf("Hello\n");
+		blockout_destroy_object(editor_selection.selected_object);
+		reset_selection();
+	}
+
 	mouse_is_dragging = KEY.K_MOUSE_LEFT.is_down();
 }
 

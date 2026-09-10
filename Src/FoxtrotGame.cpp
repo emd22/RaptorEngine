@@ -184,7 +184,7 @@ void FoxtrotGame::CreateGame()
 	LoadOffsetsFile();
 
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
-	gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);
+	gShadowRenderer->ShadowCamera.SetFarPlane(400.0f);
 	gShadowRenderer->ShadowCamera.SetNearPlane(0.1f);
 	gShadowRenderer->ShadowCamera.UpdateProjectionMatrix();
 	gShadowRenderer->ShadowCamera.mbRequireMatrixUpdate = false;

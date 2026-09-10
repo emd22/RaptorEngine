@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <Core/PagedArray.hpp>
+#include <Core/FreeArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
@@ -40,7 +40,7 @@ public:
 	 */
 	Object* NewObject(const Vec3f& position);
 
-	void RemoveObject(Object* object);
+	void DestroyObject(Object* object);
 
 	~Blockout();
 
@@ -51,7 +51,7 @@ private:
 	void RemoveSingleObjectFromWorld(Object* object);
 
 public:
-	PagedArray<ObjectID> BlockoutObjects;
+	FreeArray<ObjectID> BlockoutObjects;
 	World* pWorld = nullptr;
 
 	MaterialID SelectionMaterialID = MaterialID::scNull;

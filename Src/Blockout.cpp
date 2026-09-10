@@ -17,7 +17,7 @@ Blockout::Blockout() {}
 
 void Blockout::Create(World* world)
 {
-	BlockoutObjects.Create(64);
+	BlockoutObjects.Init(256);
 
 	pWorld = world;
 
@@ -166,9 +166,9 @@ void Blockout::ReloadSingleObject(Object* object)
 
 	// Update the old object id in the BlockoutObjects buffer.
 	if (new_object_id != old_object_id) {
-		for (int i = 0; i < BlockoutObjects.Size(); i++) {
-			if (BlockoutObjects[i] == old_object_id) {
-				BlockoutObjects[i] = new_object_id;
+		for (ObjectID& id : BlockoutObjects) {
+			if (id == old_object_id) {
+				id = new_object_id;
 				break;
 			}
 		}
@@ -351,7 +351,7 @@ ObjectID Blockout::CreateCubeVolume(ConfigEntry& entry)
 
 	pWorld->Attach(ticket);
 
-	BlockoutObjects.Insert(object->ID);
+	BlockoutObjects.NewItem(nullptr, object->ID);
 
 	return object->ID;
 }
@@ -402,11 +402,43 @@ void Blockout::RebuildObject(Object* object)
 	object->AttachCollider(phys);
 }
 
-void Blockout::RemoveObject(Object* object) { gPhysics->DestroyBody(object->PhysicsID); }
+void Blockout::DestroyObject(Object* object)
+{
+	LogInfo(LC_SCRIPT, "Destroying object {}", object ? object->ID : ObjectID::scNull);
+	if (object == nullptr) {
+		return;
+	}
+
+	gPhysics->DestroyBody(object->PhysicsID);
+
+	// Find the index for the blockout
+	uint32 index = 0;
+	while (true) {
+		index = BlockoutObjects.SlotsInUse.FindNextSetBit(index);
+		if (index == Bitset::scNoFreeBits) {
+			break;
+		}
+
+		ObjectID* object_id = BlockoutObjects.GetItem(index);
+		if (!object_id) {
+			break;
+		}
+
+		if ((*object_id) == object->ID) {
+			BlockoutObjects.FreeItem(index);
+			break;
+		}
+
+		++index;
+	}
+
+	gWorld->Detach(object->ID);
+	gObjectManager->DestroyObject(object->ID);
+}
 
 Object* Blockout::NewObject(const Vec3f& position)
 {
-	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size()).Str();
+	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size).Str();
 	LogInfo("Creating new blockout object '{}'", blockout_name);
 
 	Object* object = gObjectManager->NewObject(blockout_name, mWhiteMaterialID, eObjectTag::Blockout);
@@ -439,7 +471,7 @@ Object* Blockout::NewObject(const Vec3f& position)
 
 	pWorld->Attach(ticket);
 
-	BlockoutObjects.Insert(object->ID);
+	BlockoutObjects.NewItem(nullptr, object->ID);
 
 	return object;
 }

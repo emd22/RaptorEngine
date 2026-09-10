@@ -105,6 +105,15 @@ public:
 		return reinterpret_cast<uintptr_t>(ptr - pPtr) / sizeof(TItemType);
 	}
 
+	void Clear()
+	{
+		for (uint32 i = 0; i < Capacity; i++) {
+			FreeItem(i);
+		}
+
+		Size = 0;
+	}
+
 	void Free()
 	{
 		if (pPtr) {
