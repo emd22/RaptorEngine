@@ -99,6 +99,8 @@ void Blockout::Create(World* world)
 		ticket.MarkAndSignalLoaded();
 
 		pWorld->Attach(ticket);
+
+		pXFormObject->SetPosition(Vec3f(200.0f));
 	}
 }
 
@@ -399,6 +401,8 @@ void Blockout::RebuildObject(Object* object)
 
 	object->AttachCollider(phys);
 }
+
+void Blockout::RemoveObject(Object* object) { gPhysics->DestroyBody(object->PhysicsID); }
 
 Object* Blockout::NewObject(const Vec3f& position)
 {

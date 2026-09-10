@@ -173,7 +173,7 @@ void FoxtrotGame::CreateGame()
 
 	const char* scene_to_load = Config.GetEntry(HashStr32("Scene"))->Get<const char*>();
 
-	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load), *gWorld);
+	scene_file.Load(std::format("{}/Data/{}", FX_BASE_DIR, scene_to_load));
 	gPhysics->pBackend->OptimizeBroadPhase();
 
 	// Baked probes if the scene has them, procedural gradient otherwise.
@@ -182,8 +182,6 @@ void FoxtrotGame::CreateGame()
 	pSun = gWorld->GetDirectionalLight();
 
 	LoadOffsetsFile();
-
-	TSRef<Object> level_object = gWorld->FindObject(HashStr32("Level"));
 
 	gShadowRenderer->ShadowCamera.ViewMatrix.LookAt(Vec3f(0, 8, 5), Vec3f(0.0f, 8.0f, -2.0f), Vec3f(0, 1, 0));
 	gShadowRenderer->ShadowCamera.SetFarPlane(200.0f);

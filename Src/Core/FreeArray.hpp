@@ -125,6 +125,69 @@ public:
 	~FreeArray() { Free(); }
 
 public:
+	/////////////////////////////////////
+	// Iterator Gubbins
+	/////////////////////////////////////
+
+	template <typename TValueType>
+	class IteratorBase
+	{
+	public:
+		IteratorBase(TValueType* pPtr, const Bitset* pSlotsInUse, uint32 index, uint32 capacity)
+			: pPtr(pPtr), pSlotsInUse(pSlotsInUse), Index(index), Capacity(capacity)
+		{
+			SkipToNextUsed();
+		}
+
+		TValueType& operator*() const { return pPtr[Index]; }
+		TValueType* operator->() const { return &pPtr[Index]; }
+
+		IteratorBase& operator++()
+		{
+			++Index;
+			SkipToNextUsed();
+			return *this;
+		}
+
+		IteratorBase operator++(int)
+		{
+			IteratorBase tmp = *this;
+			++(*this);
+			return tmp;
+		}
+
+		bool operator==(const IteratorBase& other) const { return Index == other.Index; }
+		bool operator!=(const IteratorBase& other) const { return !(*this == other); }
+
+		uint32 GetIndex() const { return Index; }
+
+	private:
+		void SkipToNextUsed()
+		{
+			while (Index < Capacity && !pSlotsInUse->Get(Index)) {
+				++Index;
+			}
+		}
+
+		TValueType* pPtr;
+		const Bitset* pSlotsInUse;
+		uint32 Index;
+		uint32 Capacity;
+	};
+
+	using Iterator = IteratorBase<TItemType>;
+	using ConstIterator = IteratorBase<const TItemType>;
+
+	Iterator begin() { return Iterator(pPtr, &SlotsInUse, 0, Capacity); }
+	Iterator end() { return Iterator(pPtr, &SlotsInUse, Capacity, Capacity); }
+
+	ConstIterator begin() const { return ConstIterator(pPtr, &SlotsInUse, 0, Capacity); }
+	ConstIterator end() const { return ConstIterator(pPtr, &SlotsInUse, Capacity, Capacity); }
+
+	ConstIterator cbegin() const { return ConstIterator(pPtr, &SlotsInUse, 0, Capacity); }
+	ConstIterator cend() const { return ConstIterator(pPtr, &SlotsInUse, Capacity, Capacity); }
+
+public:
 	TItemType* pPtr = nullptr;
 	uint32 Size = 0;
 	uint32 Capacity = 0;

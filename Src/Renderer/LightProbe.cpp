@@ -16,7 +16,6 @@
 #include <Renderer/GraphicsBackend.hpp>
 #include <World.hpp>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <limits>
@@ -232,24 +231,21 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	uint32 stat_no_mesh = 0;
 	uint32 stat_too_big = 0;
 
+	auto& object_cache = gObjectManager->GetCache();
+
 	// Fit the volume to reasonably-sized meshed geometry. Absurdly large
 	// bounds (sky spheres) are ignored so they can't blow up the volume.
-	for (const ObjectID& id : gWorld->GetAllObjects()) {
+	for (const Object& object : object_cache) {
 		stat_total++;
 
-		Object* object = gObjectManager->GetObject(id);
-		if (object == nullptr) {
-			stat_null++;
-			continue;
-		}
 
-		if (!object->pMesh.IsValid()) {
+		if (!object.pMesh.IsValid()) {
 			stat_no_mesh++;
 			continue;
 		}
 
-		const Vec3f bounds_min = object->GetPosition() + object->Bounds.Min;
-		const Vec3f bounds_max = object->GetPosition() + object->Bounds.Max;
+		const Vec3f bounds_min = object.GetPosition() + object.Bounds.Min;
+		const Vec3f bounds_max = object.GetPosition() + object.Bounds.Max;
 
 		if ((bounds_max - bounds_min).Length() > 100.0f) {
 			stat_too_big++;
@@ -269,7 +265,7 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	LogInfo("Probe placement: {}/{}/{}/{} total/null/no-mesh/too-big ({} boxes kept)", stat_total, stat_null,
 			stat_no_mesh, stat_too_big, out.Count);
 
-	out.Min.Y = std::max(out.Min.Y, 0.5f);
+	out.Min.Y = std::max(out.Min.Y, 0.25f);
 
 	return out.Any;
 }
@@ -314,7 +310,7 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 				for (uint32 iter = 0; iter < 4; iter++) {
 					bool inside_any = false;
 					for (uint32 b = 0; b < boxes.Count; b++) {
-						const float32 margin = 0.5f;
+						const float32 margin = 0.05f;
 
 						if (IsInsideBox(p, boxes.Boxes[b])) {
 							p.Y = boxes.Boxes[b].Max.Y + 0.3f;

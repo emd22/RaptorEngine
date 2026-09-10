@@ -216,7 +216,7 @@ void editor_translate_tool(float delta_time)
 			camera_distance += move_direction;
 		}
 		if (KEY.K_E.is_down()) {
-			float3 tmove = float3(0.0f, speed, 0.0f);
+			float3 move_direction = float3(0.0f, speed, 0.0f);
 			translate_movement += move_direction;
 			camera_distance += move_direction;
 		}

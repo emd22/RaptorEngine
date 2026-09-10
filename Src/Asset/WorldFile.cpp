@@ -44,7 +44,7 @@ namespace fx {
 // }
 
 
-void WorldFile::Load(const std::string& path, World& scene)
+void WorldFile::Load(const std::string& path)
 {
 	ConfigFile info;
 
@@ -54,7 +54,7 @@ void WorldFile::Load(const std::string& path, World& scene)
 
 	// NOTE: this must not key off the world object count: blockout objects
 	// attach independently of scene files and would falsely signal a reload.
-	bool first_time = !scene.bSceneLoaded;
+	bool first_time = !gWorld->bIsPopulated;
 
 	if (first_time) {
 		ConfigEntry* meta = info.GetEntry(HashStr32("Meta"));
@@ -64,14 +64,14 @@ void WorldFile::Load(const std::string& path, World& scene)
 			return;
 		}
 
-		scene.Name = meta->GetMember(HashStr32("Name"))->Get<const char*>();
+		gWorld->Name = meta->GetMember(HashStr32("Name"))->Get<const char*>();
 	}
 
 	// Load sun
-	Ref<LightDirectional> sun = scene.GetDirectionalLight();
+	Ref<LightDirectional> sun = gWorld->GetDirectionalLight();
 	if (!sun.IsValid()) {
 		sun = Ref<LightDirectional>::New();
-		scene.Attach(sun);
+		gWorld->Attach(sun);
 	}
 
 	ConfigEntry* sun_entry = info.GetEntry(HashStr32("Sun"));
@@ -88,7 +88,7 @@ void WorldFile::Load(const std::string& path, World& scene)
 	if (collider_list) {
 		for (const ConfigEntry& collider_entry : collider_list->Members) {
 			if (first_time) {
-				AddColliderFromEntry(path, collider_entry, scene);
+				AddColliderFromEntry(path, collider_entry);
 			}
 		}
 	}
@@ -100,28 +100,28 @@ void WorldFile::Load(const std::string& path, World& scene)
 
 	for (const ConfigEntry& object_entry : object_list->Members) {
 		if (first_time) {
-			AddObjectFromEntry(path, object_entry, scene);
+			AddObjectFromEntry(path, object_entry);
 		}
 		else {
-			Object* object = scene.FindObject(object_entry.Name.GetHash());
+			Object* object = gObjectManager->FindObject(object_entry.Name.GetHash());
 			if (object != nullptr) {
 				ApplyPropertiesToObject(object, object_entry);
 			}
 			else {
 				// New since the first load (or never found): add instead of
 				// crashing on a null object.
-				AddObjectFromEntry(path, object_entry, scene);
+				AddObjectFromEntry(path, object_entry);
 			}
 		}
 	}
 
 	if (first_time) {
-		scene.bSceneLoaded = true;
+		gWorld->bIsPopulated = true;
 	}
 }
 
 
-void WorldFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry, World& scene)
+void WorldFile::AddColliderFromEntry(const std::string& scene_path, const ConfigEntry& collider_entry)
 {
 	const std::string& collider_name = collider_entry.Name.Get();
 
@@ -151,7 +151,7 @@ void WorldFile::AddColliderFromEntry(const std::string& scene_path, const Config
 	phys->Teleport(position, rotation);
 }
 
-void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry, World& scene)
+void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEntry& object_entry)
 {
 	const char* mesh_path = object_entry.GetMember(HashStr32("Mesh"))->Get<const char*>();
 
@@ -164,7 +164,7 @@ void WorldFile::AddObjectFromEntry(const std::string& scene_path, const ConfigEn
 
 	ApplyPropertiesToObject(object, object_entry);
 
-	scene.Attach(ticket);
+	gWorld->Attach(ticket);
 }
 
 

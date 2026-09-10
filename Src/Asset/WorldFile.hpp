@@ -13,12 +13,12 @@ public:
 
 	// void Save(const Scene& scene);
 
-	void Load(const std::string& path, World& scene);
+	void Load(const std::string& path);
 	// void Save(const String& path, const World& world);
 
 private:
-	void AddObjectFromEntry(const std::string& path, const ConfigEntry& object, World& scene);
-	void AddColliderFromEntry(const std::string& path, const ConfigEntry& collider, World& scene);
+	void AddObjectFromEntry(const std::string& path, const ConfigEntry& object);
+	void AddColliderFromEntry(const std::string& path, const ConfigEntry& collider);
 
 	void ApplyPropertiesToObject(Object* object, const ConfigEntry& object_entry);
 

@@ -65,6 +65,9 @@ public:
 	 */
 	ObjectID ReserveInstances(const ObjectID& object_id, uint32 num_instances);
 
+	const FreeArray<Object>& GetCache() const { return mObjectList; }
+	FreeArray<Object>& GetCache() { return mObjectList; }
+
 	void Destroy();
 
 	~ObjectManager() { Destroy(); }

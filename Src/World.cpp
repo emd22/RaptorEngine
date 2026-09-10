@@ -21,7 +21,6 @@ using namespace renderer;
 
 void World::Create()
 {
-	mObjects.Create(80);
 	mLights.Create(32);
 
 	SortedEntryBuffer.SetPageSize(128);
@@ -107,8 +106,6 @@ void World::Attach(AssetTicket object_ticket)
 {
 	Object* object = static_cast<Object*>(object_ticket.Get());
 
-	mObjects.Insert(object->ID);
-
 	object->OnAttached(this);
 
 	object_ticket.OnLoaded(
@@ -160,18 +157,6 @@ void World::Detach(ObjectID id)
 // 		}
 // 	}
 // }
-
-Object* World::FindObject(const Hash32 name_hash)
-{
-	for (ObjectID& obj_id : mObjects) {
-		Object* obj = gObjectManager->GetObject(obj_id);
-		if (obj->Name == name_hash) {
-			return obj;
-		}
-	}
-
-	return nullptr;
-}
 
 // physics::Body* World::FindPhysicsObject(const Hash32 name_hash)
 // {
@@ -866,12 +851,10 @@ void World::RenderBoundingBoxes(const Camera& camera)
 
 	const Color debug_color = Color::FromRGBA(150, 255, 80, 255);
 
-	for (ObjectID object_id : mObjects) {
-		Object* object = gObjectManager->GetObject(object_id);
-
-		Mat4f model_matrix = Mat4f::AsScale(object->Bounds.GetSize()) * Mat4f::AsRotation(object->mRotation) *
-							 Mat4f::AsTranslation(object->GetPosition() + (object->Bounds.GetSize() / Vec3f(2.0f)) +
-												  object->Bounds.Min);
+	for (Object& object : gObjectManager->GetCache()) {
+		Mat4f model_matrix = Mat4f::AsScale(object.Bounds.GetSize()) * Mat4f::AsRotation(object.mRotation) *
+							 Mat4f::AsTranslation(object.GetPosition() + (object.Bounds.GetSize() / Vec3f(2.0f)) +
+												  object.Bounds.Min);
 
 		Mat4f combined_matrix = model_matrix * camera.GetCameraMatrix(eObjectLayer::WorldLayer);
 		memcpy(push_constants.CombinedMatrix, combined_matrix.RawData, sizeof(push_constants.CombinedMatrix));
@@ -1009,7 +992,6 @@ void World::RenderProbeDebug(const Camera& camera)
 
 void World::Destroy()
 {
-	mObjects.Destroy();
 	mLights.Destroy();
 
 	if (pBlockout != nullptr) {

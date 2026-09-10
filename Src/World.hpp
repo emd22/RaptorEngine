@@ -53,7 +53,6 @@ public:
 	 */
 	void RenderProbeCapture();
 
-	const PagedArray<ObjectID>& GetAllObjects() { return mObjects; }
 	const PagedArray<Ref<LightBase>>& GetAllLights() { return mLights; }
 
 	Ref<LightDirectional> GetDirectionalLight()
@@ -67,9 +66,6 @@ public:
 		return Ref<LightDirectional>(nullptr);
 	}
 
-	Object* FindObject(const Hash32 name_hash);
-
-	void ReleaseAllObjects() { mObjects.Clear(); }
 
 	void Destroy();
 
@@ -109,7 +105,7 @@ public:
 	/// Set once a scene file has populated its objects. Used by WorldFile to
 	/// tell a first load (add everything) from a hot reload (update in place).
 	/// NOTE: blockout objects attach independently and must not affect this.
-	bool bSceneLoaded = false;
+	bool bIsPopulated = false;
 
 	Player Player;
 
@@ -117,7 +113,6 @@ public:
 	String BlockoutPath;
 
 private:
-	PagedArray<ObjectID> mObjects;
 	PagedArray<Ref<LightBase>> mLights;
 
 	Ref<PerspectiveCamera> mpCurrentCamera { nullptr };

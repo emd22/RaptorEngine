@@ -40,6 +40,8 @@ public:
 	 */
 	Object* NewObject(const Vec3f& position);
 
+	void RemoveObject(Object* object);
+
 	~Blockout();
 
 private:
