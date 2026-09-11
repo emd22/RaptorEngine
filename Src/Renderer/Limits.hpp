@@ -38,5 +38,20 @@ static constexpr uint32 ProbeGridDims[3] = { 16, 8, 16 };
 
 static_assert((ProbeGridDims[0] * ProbeGridDims[1] * ProbeGridDims[2]) == MaxIrradianceProbes);
 
+/////////////////////////////////////
+// Probe depth moments (visibility)
+/////////////////////////////////////
+
+/// Resolution of the per-probe depth cubemap face (16x16 texels per face).
+static constexpr uint32 ProbeDepthSize = 16;
+static constexpr uint32 ProbeDepthFaces = 6;
+static constexpr uint32 ProbeDepthTexelsPerFace = ProbeDepthSize * ProbeDepthSize;
+/// Two moments per texel: mean distance and mean squared distance.
+static constexpr uint32 ProbeDepthMomentsPerTexel = 2;
+static constexpr uint32 ProbeDepthFloatCount = ProbeDepthFaces * ProbeDepthTexelsPerFace * ProbeDepthMomentsPerTexel;
+
+/// Distances beyond this are clamped (misses / sky count as far).
+static constexpr float ProbeDepthMaxDistance = 50.0f;
+
 
 } // namespace fx::Limits

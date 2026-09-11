@@ -145,11 +145,14 @@ F_StructBuffer(bMaterialBuffer, Material, 1, 0);
 F_StructBuffer(bLightGrid, TileLightData, 2, 0);
 F_StructBuffer(bLightIndexList, uint, 3, 0);
 
-// SH irradiance probes (MVP: index 0 is the global probe)
-F_StructBuffer(bProbeBuffer, ProbeData, 6, 0);
+// SH irradiance probes
+F_StructBuffer(bProbeBuffer, ProbeSHData, 6, 0);
 
 // Probe volume descriptor for spatial probe blending
 F_StructBuffer(bProbeVolume, ProbeVolume, 7, 0);
+
+// Per-probe depth moments cubemaps (6x16x16 mean + mean squared) for visibility
+F_StructBuffer(bProbeDepth, ProbeInfo, 8, 0);
 
 F_Texture2D(tAlbedo, 0, 1)
 
@@ -323,7 +326,7 @@ FSOutput main(FSInput input)
 	// Use probes
 	if ((FSConst.Flags & 0x01) == 0) {
 		float3 probe_normal = normalize(N_final);
-		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer);
+		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer, bProbeDepth);
 		ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
 	}
 

@@ -148,6 +148,10 @@ void TiledForwardRenderer::BuildPersistentDescriptor()
 	ds_entries.Insert(DescriptorEntry::AsBuffer(7, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 											   gGraphics->ProbeVolumePageSize));
 
+	// bProbeDepth (per-probe 6x16x16 depth moments for visibility)
+	ds_entries.Insert(DescriptorEntry::AsBuffer(8, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
+											   gGraphics->ProbeDepthPageSize));
+
 	Target* shadow_target = gShadowRenderer->RenderStage.GetTarget(eImageFormat::D32_Float);
 	Assert(shadow_target != nullptr);
 
@@ -311,6 +315,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
+		// bProbeDepth (per-probe depth moments for visibility)
+		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
+							 gGraphics->ProbeDepthPageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -367,6 +374,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
+		// bProbeDepth (per-probe depth moments for visibility)
+		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
+							 gGraphics->ProbeDepthPageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -430,6 +440,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
+		// bProbeDepth (per-probe depth moments for visibility)
+		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
+							 gGraphics->ProbeDepthPageSize);
 		// tShadowAtlas
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
@@ -496,6 +509,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
+		// bProbeDepth (per-probe depth moments for visibility)
+		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
+							 gGraphics->ProbeDepthPageSize);
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -536,6 +552,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
+		// bProbeDepth (per-probe depth moments for visibility)
+		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
+							 gGraphics->ProbeDepthPageSize);
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
@@ -580,6 +599,9 @@ void TiledForwardRenderer::CreateForwardPSO()
 		// bProbeVolume (spatial lookup descriptor for probe blending)
 		gPSOBuild->AddBuffer(7, 0, eShaderType::Pixel, &gGraphics->ProbeVolumeBuffer, 0,
 							 gGraphics->ProbeVolumePageSize);
+		// bProbeDepth (per-probe depth moments for visibility)
+		gPSOBuild->AddBuffer(8, 0, eShaderType::Pixel, &gGraphics->ProbeDepthBuffer, 0,
+							 gGraphics->ProbeDepthPageSize);
 		gPSOBuild->AddImage(4, 0, eShaderType::Pixel, gAssetManager->GetNullImage(eImageFormat::D32_Float),
 							gSamplerCache->Request({}));
 		gPSOBuild->AddImageFromTarget(5, 0, eShaderType::Pixel, SSAOBlurPass.GetTarget(eImageFormat::R8_UNorm),
