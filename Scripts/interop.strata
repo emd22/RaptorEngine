@@ -67,8 +67,6 @@ handle PLAYER;
 impl PLAYER
 {
 	extern void set_speed_multiplier(PLAYER p, float mult);
-	extern void toggle_headbob(PLAYER p, bool value);
-	extern bool get_headbob(PLAYER p);
 	extern float3 get_position(PLAYER p);
 	extern bool is_flymode(PLAYER p);
 
@@ -93,3 +91,21 @@ extern OBJECT blockout_dupe_object(OBJECT object);
 extern void blockout_destroy_object(OBJECT object);
 
 extern void blockout_object_scale(OBJECT object, float3 face_dir, float3 magnitude);
+
+/* CVars */
+
+extern void cvar_set_int(cstring name, long value);
+extern void cvar_set_float(cstring name, float value);
+extern void cvar_set_string(cstring name, string value);
+
+void cvar_set_bool(cstring name, bool value)
+{
+	cvar_set_int(name, (long)value);
+}
+
+extern long cvar_get_int(cstring name, long fallback);
+
+bool cvar_get_bool(cstring name, bool fallback)
+{
+	return (bool)cvar_get_int(name, (long)fallback);
+}

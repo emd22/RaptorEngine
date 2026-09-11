@@ -1,5 +1,6 @@
 #include "Player.hpp"
 
+#include <CVar.hpp>
 #include <Core/RefUtil.hpp>
 #include <Engine.hpp>
 #include <Renderer/Globals.hpp>
@@ -86,7 +87,7 @@ void Player::Update(float64 delta_time)
 	// 								  (MathUtil::IsCloseTo(mBobCounterY, 0.0f) == false));
 
 
-	if (bEnableHeadBob && (Physics.bIsGrounded)) {
+	if (gCVars->Get("b_headbob_enabled", false) && (Physics.bIsGrounded)) {
 		float32 body_speed = mUserForce.Length();
 		float32 counter_speed = (bBobReverse ? -1.9f : 1.9f);
 

@@ -1843,6 +1843,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -O3 -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/CStringTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/CStringTests.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/CStringTests.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/CStringTests.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/cc -DSTRATA_SAMPLE_DIR=\\\"/Users/emd22/Projects/a2/Submodules/strata/samples\\\" -DSTRATA_STATIC -DSTRATA_TEST_HAS_LLVM=1 -I/Users/emd22/Projects/a2/Submodules/strata/tests/unit -I/Users/emd22/Projects/a2/Submodules/strata/include -I/Users/emd22/Projects/a2/Submodules/strata/src -O3 -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ArrayTests.c.o -c /Users/emd22/Projects/a2/Submodules/strata/tests/unit/ArrayTests.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/tests/unit/ArrayTests.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/strata_tests.dir/tests/unit/ArrayTests.c.o"
@@ -1936,6 +1942,12 @@
   "command": "/usr/bin/cc -O3 -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/aot_strings_test.dir/samples/hosts/strings_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/strings_host.c",
   "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/strings_host.c",
   "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/aot_strings_test.dir/samples/hosts/strings_host.c.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/cc -O3 -DNDEBUG -std=c11 -arch arm64 -o Submodules/strata/CMakeFiles/aot_cstring_test.dir/samples/hosts/cstring_host.c.o -c /Users/emd22/Projects/a2/Submodules/strata/samples/hosts/cstring_host.c",
+  "file": "/Users/emd22/Projects/a2/Submodules/strata/samples/hosts/cstring_host.c",
+  "output": "/Users/emd22/Projects/a2/Submodules/strata/CMakeFiles/aot_cstring_test.dir/samples/hosts/cstring_host.c.o"
 },
 {
   "directory": "/Users/emd22/Projects/a2",

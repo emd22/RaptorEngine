@@ -138,11 +138,13 @@ void editor_handle_controls()
 
 		/* Translate (Move) */
 		if (KEY.K_T.is_pressed()) {
+			cvar_set_string("s_editor_op", "Translate");
 			transform_type = XFORMTYPE.TRANSLATE;
 		}
 
 		/* Face (Scale) */
 		if (KEY.K_F.is_pressed()) {
+			cvar_set_string("s_editor_op", "Face");
 			transform_type = XFORMTYPE.FACE;
 		}
 	}
@@ -166,7 +168,6 @@ void editor_handle_controls()
 			OBJECT dupe = blockout_dupe_object(object_to_dupe);
 			editor_select_object(dupe, true);
 		}
-
 
 	}
 
@@ -200,13 +201,13 @@ float3 editor_transform_snap(float3 vec)
 void editor_enable_movement_damp()
 {
 	player.set_speed_multiplier(0.5f);
-	player.toggle_headbob(false);
+	cvar_set_bool("b_headbob_enabled", false);
 }
 
 void editor_disable_movement_damp()
 {
 	player.set_speed_multiplier(1.0f);
-	player.toggle_headbob(player_had_headbob);
+	cvar_set_bool("b_headbob_enabled", player_had_headbob);
 }
 
 
@@ -370,7 +371,7 @@ void mode_load()
 	camera_distance = float3(0.0f);
 	reset_selection();
 
-	player_had_headbob = player.get_headbob();
+	player_had_headbob = cvar_get_bool("b_headbob_enabled", false);
 }
 
 /* Called when switching out of editor mode */
@@ -380,6 +381,8 @@ void mode_unload()
 	hide_transform_marker_object();
 
 	editor_disable_movement_damp();
+
+	cvar_set_string("s_editor_op", "None");
 }
 
 void editor_set_transform_marker(OBJECT xform_marker)

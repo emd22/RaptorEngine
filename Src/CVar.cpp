@@ -110,48 +110,14 @@ CVarValue& CVarValue::operator=(CVarValue&& other)
 	return *this;
 }
 
-
-CVarValue* CVarManager::Set(const String& name, const String& value)
+void CVarManager::InvalidTypeError(const CVarValue& found, const String& name, eCVarType expected)
 {
-	auto [it, inserted] = mCVars.try_emplace(name, name, eCVarType::String);
-
-	if (!inserted && it->second.Type != eCVarType::String) {
-		LogError(LC_CORE, "Cannot assign type String to CVar '{}' of type {}", name, GetCVarTypeName(it->second.Type));
-		return nullptr;
-	}
-
-	it->second.StringValue = value;
-	return &it->second;
+	LogError(LC_CORE, "Cannot assign type {} to CVar '{}' of type {}", GetCVarTypeName(expected), name,
+			 GetCVarTypeName(found.Type));
 }
 
 
-CVarValue* CVarManager::Set(const String& name, const int64 value)
-{
-	auto [it, inserted] = mCVars.try_emplace(name, name, eCVarType::Int);
-
-	if (!inserted && it->second.Type != eCVarType::Int) {
-		LogError(LC_CORE, "Cannot assign type Int to CVar '{}' of type {}", name, GetCVarTypeName(it->second.Type));
-		return nullptr;
-	}
-
-	it->second.IntValue = value;
-	return &it->second;
-}
-
-CVarValue* CVarManager::Set(const String& name, const float32 value)
-{
-	auto [it, inserted] = mCVars.try_emplace(name, name, eCVarType::Float);
-
-	if (!inserted && it->second.Type != eCVarType::Float) {
-		LogError(LC_CORE, "Cannot assign type Float to CVar '{}' of type {}", name, GetCVarTypeName(it->second.Type));
-		return nullptr;
-	}
-
-	it->second.FloatValue = value;
-	return &it->second;
-}
-
-const CVarValue* CVarManager::Get(const String& name)
+const CVarValue* CVarManager::GetCVar(const String& name)
 {
 	auto it = mCVars.find(name);
 

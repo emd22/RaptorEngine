@@ -10,6 +10,7 @@
 #include <Asset/Font/Font.hpp>
 #include <Asset/MipmapGen.hpp>
 #include <Asset/WorldFile.hpp>
+#include <CVar.hpp>
 #include <Controls.hpp>
 #include <Core/Assert.hpp>
 #include <Core/Defer.hpp>
@@ -101,7 +102,8 @@ void FoxtrotGame::InitEngine()
 	ConfigEntry* bob_entry = Config.GetEntry(HashStr32("HeadBob"));
 
 	if (bob_entry != nullptr) {
-		gWorld->Player.bEnableHeadBob = static_cast<bool>(bob_entry->GetMemberValue(HashStr32("Enabled"), 1));
+		gCVars->Set("b_headbob_enabled", static_cast<bool>(bob_entry->GetMemberValue(HashStr32("Enabled"), 1)));
+
 		gWorld->Player.HeadBobStrength.X = bob_entry->GetMemberValue(HashStr32("ScaleX"), 0.011);
 		gWorld->Player.HeadBobStrength.Y = bob_entry->GetMemberValue(HashStr32("ScaleY"), 0.018);
 	}
@@ -472,8 +474,11 @@ void FoxtrotGame::RenderText()
 	static const uint32 scWhite = Color::FromRGBA(255, 255, 255, 255).AsUInt();
 	static const uint32 scGreen = Color::FromRGBA(100, 255, 0, 255).AsUInt();
 
-	gTextRenderer->DrawText(
-		String::Fmt("Mode={}", gSelectedEditorMode ? gSelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f, scWhite);
+	gTextRenderer->DrawText(String::Fmt("Mode={}, Op={}",
+										gSelectedEditorMode ? gSelectedEditorMode->ModeName : "Simulate",
+										gCVars->Get<const char*>("s_editor_op", "None"))
+								.CStr(),
+							2.0f, scWhite);
 	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scWhite);
 
 	if (gSelectedEditorMode != nullptr) {

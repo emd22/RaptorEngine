@@ -109,7 +109,6 @@ public:
 
 	bool bIsSprinting : 1 = false;
 
-	bool bEnableHeadBob : 1 = true;
 	Vec2f HeadBobStrength = Vec2f { 0.011, 0.018 };
 
 	float32 SpeedMultiplier = 1.0f;
