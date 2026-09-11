@@ -95,12 +95,19 @@ void editor_adjust_snap_index(int direction)
 }
 
 
-/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
-void editor_select_object(OBJECT object, bool is_selected)
+/* DO NOT USE NORMALLY, this is meant to be called by the C++ side and inside `editor_select_object`. */
+void _internal_editor_select_object(OBJECT object, bool is_selected)
 {
 	editor_selection.is_object_selected = is_selected;
 	editor_selection.selected_object = object;
 }
+
+/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
+void editor_select_object(OBJECT object, bool is_selected)
+{
+	object._select_object_internal(is_selected);
+}
+
 
 @private
 void editor_handle_controls()
@@ -131,20 +138,39 @@ void editor_handle_controls()
 
 		/* Translate (Move) */
 		if (KEY.K_T.is_pressed()) {
+			cvar_set_string("s_editor_op", "Translate");
 			transform_type = XFORMTYPE.TRANSLATE;
 		}
 
 		/* Face (Scale) */
 		if (KEY.K_F.is_pressed()) {
+			cvar_set_string("s_editor_op", "Face");
 			transform_type = XFORMTYPE.FACE;
 		}
 	}
 
-	if (editor_selection.is_object_selected && KEY.K_BACKSPACE.is_pressed()) {
-		printf("Hello\n");
-		blockout_destroy_object(editor_selection.selected_object);
-		reset_selection();
+	/* Non-manipulation, but object functions. */
+	if (editor_selection.is_object_selected) {
+		/* Destroy/Remove an object */
+		if (KEY.K_BACKSPACE.is_pressed()) {
+			blockout_destroy_object(editor_selection.selected_object);
+			reset_selection();
+		}
+
+		/* Dupe object on LCTRL + D */
+		if (KEY.K_D.is_lctrl_combo()) {
+			OBJECT object_to_dupe = editor_selection.selected_object;
+
+			// Deselect the current selection to revert to its original material. The dupe function
+			// has no way of knowing that we modified the object to show a selected material.
+			editor_select_object(editor_selection.selected_object, false);
+
+			OBJECT dupe = blockout_dupe_object(object_to_dupe);
+			editor_select_object(dupe, true);
+		}
+
 	}
+
 
 	mouse_is_dragging = KEY.K_MOUSE_LEFT.is_down();
 }
@@ -175,13 +201,13 @@ float3 editor_transform_snap(float3 vec)
 void editor_enable_movement_damp()
 {
 	player.set_speed_multiplier(0.5f);
-	player.toggle_headbob(false);
+	cvar_set_bool("b_headbob_enabled", false);
 }
 
 void editor_disable_movement_damp()
 {
 	player.set_speed_multiplier(1.0f);
-	player.toggle_headbob(player_had_headbob);
+	cvar_set_bool("b_headbob_enabled", player_had_headbob);
 }
 
 
@@ -345,7 +371,7 @@ void mode_load()
 	camera_distance = float3(0.0f);
 	reset_selection();
 
-	player_had_headbob = player.get_headbob();
+	player_had_headbob = cvar_get_bool("b_headbob_enabled", false);
 }
 
 /* Called when switching out of editor mode */
@@ -355,6 +381,8 @@ void mode_unload()
 	hide_transform_marker_object();
 
 	editor_disable_movement_damp();
+
+	cvar_set_string("s_editor_op", "None");
 }
 
 void editor_set_transform_marker(OBJECT xform_marker)

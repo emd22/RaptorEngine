@@ -26,13 +26,14 @@ void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time) const
 	}
 }
 
+
 bool EditorMode::SelectObject(Object* object)
 {
 	if (pScript == nullptr) {
 		return false;
 	}
 
-	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool)>("editor_select_object");
+	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool)>("_internal_editor_select_object");
 
 	if (object == nullptr) {
 		if (mpLastSelectedObject != nullptr) {
@@ -45,10 +46,6 @@ bool EditorMode::SelectObject(Object* object)
 			return true;
 		}
 
-		return false;
-	}
-
-	if (object->HasTags(eObjectTag::LockTransform)) {
 		return false;
 	}
 

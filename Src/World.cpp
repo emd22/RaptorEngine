@@ -193,7 +193,8 @@ void World::ExecuteRenderList(renderer::ePipelineName pl_name, PerspectiveCamera
 		const uint32 buffer_offsets[] = {
 			gObjectManager->GetBaseOffset(),	  0,
 			gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
-			gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset()
+			gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset(),
+			gGraphics->GetProbeDepthFrameOffset()
 		};
 
 		gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -291,7 +292,8 @@ void World::ExecuteTransparentRenderLists()
 				const uint32 buffer_offsets[] = {
 					gObjectManager->GetBaseOffset(),	  0,
 					gGraphics->GetLightGridFrameOffset(), gGraphics->GetLightIndexListFrameOffset(),
-					gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset()
+					gGraphics->GetProbeFrameOffset(),	  gGraphics->GetProbeVolumeFrameOffset(),
+					gGraphics->GetProbeDepthFrameOffset()
 				};
 
 				gGraphics->pRenderer->pPersistentDescriptor->Bind(
@@ -817,6 +819,7 @@ void World::RenderProbeCapture()
 			stage.End();
 
 			gProbeManager->CopyCaptureFaceToStaging(cmd, slot, face);
+			gProbeManager->CopyDepthFaceToStaging(cmd, slot, face);
 		}
 
 		gProbeManager->AdvanceBatchCapture();

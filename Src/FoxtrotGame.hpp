@@ -99,7 +99,6 @@ public:
 	Vec3f PistolOffset = Vec3f::sZero;
 	Vec3f ArmsOffset = Vec3f::sZero;
 
-	EditorMode* pSelectedEditorMode = nullptr;
 	eEditorMode EditorModeType = eEditorMode::Simulate;
 	SizedArray<EditorMode*> EditorModes;
 

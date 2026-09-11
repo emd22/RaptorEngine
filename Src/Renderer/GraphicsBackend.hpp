@@ -255,6 +255,13 @@ public:
 
 	FX_FORCE_INLINE uint32 GetProbeVolumeFrameOffset() const { return ProbeVolumePageSize * GetFrameNumber(); }
 
+	/// Per-probe depth-moments cubemaps (6x16x16 texels x 2 moments), indexed by probe.
+	RawGpuBuffer ProbeDepthBuffer;
+
+	uint32 ProbeDepthPageSize = 0;
+
+	FX_FORCE_INLINE uint32 GetProbeDepthFrameOffset() const { return ProbeDepthPageSize * GetFrameNumber(); }
+
 	Semaphore TransferSync;
 	std::atomic_uint64_t TransferCount = 0;
 

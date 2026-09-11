@@ -158,6 +158,7 @@ private:
 	char* mpHeapStr = nullptr;
 };
 
+
 class ConstString
 {
 public:
@@ -173,6 +174,27 @@ public:
 
 
 } // namespace fx
+
+
+namespace std {
+template <>
+struct hash<fx::String>
+{
+	std::size_t operator()(const fx::String& str) const noexcept
+	{
+		return std::hash<std::string_view> {}(std::string_view(str.CStr(), str.GetLength()));
+	}
+};
+
+template <>
+struct hash<fx::ConstString>
+{
+	std::size_t operator()(const fx::ConstString& str) const noexcept
+	{
+		return std::hash<std::string_view> {}(std::string_view(str.CStr(), str.Length));
+	}
+};
+} // namespace std
 
 
 template <>

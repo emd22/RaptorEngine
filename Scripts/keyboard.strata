@@ -55,4 +55,10 @@ impl KEY
 	extern bool is_up(KEY key);
 	extern bool is_down(KEY key);
 	extern bool is_pressed(KEY key);
+
+	/* Is `key` pressed with LCTRL? */
+	bool is_lctrl_combo(KEY key)
+	{
+		return (KEY.K_LCTRL.is_down() && key.is_pressed());
+	}
 }

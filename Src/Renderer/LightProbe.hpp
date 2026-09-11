@@ -1,17 +1,3 @@
-/*
- * File:        LightProbe.hpp
- * Description: Light probes for precomputed global illumination.
- *
- * Stores diffuse irradiance as 2nd-order spherical harmonics (9 coeffs x RGB).
- * Probes live on a 3D grid (default 4x2x4 = 32) auto-fitted to the level; the
- * shader trilinearly blends the 8 surrounding probes per pixel.
- *
- * GPU mirrors in Shaders/ProbeCommon.hlsli:
- *   struct ProbeData   { float4 SH[9]; }
- *   struct ProbeVolume { float4 Min; float4 InvCellSize; uint4 DimsAndCount; }
- * float4 (not float3) is used deliberately so CPU/GPU packing matches exactly.
- */
-
 #pragma once
 
 #include <Core/String.hpp>
@@ -25,15 +11,16 @@
 
 namespace fx {
 
-struct ProbeData
+/// Exclusively used for SH data (will be accessed per pixel)
+struct ProbeSHData
 {
 	/// SH coefficients in D3D order: Y00, Y1-1, Y10, Y11, Y2-2, Y2-1, Y20, Y21, Y22.
 	/// Only .rgb is used; .a is padding for GPU alignment.
 	float32 SH[Limits::ProbeSHCoeffCount][4];
 };
 
-static_assert(sizeof(ProbeData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32),
-			  "ProbeData must be tightly packed as 9 float4s to mirror the HLSL struct");
+static_assert(sizeof(ProbeSHData) == Limits::ProbeSHCoeffCount * 4 * sizeof(float32),
+			  "ProbeSHData must be tightly packed as 9 float4s to mirror the HLSL struct");
 
 /// Volume descriptor uploaded to the GPU for spatial probe lookup.
 struct ProbeVolumeData
@@ -44,6 +31,16 @@ struct ProbeVolumeData
 };
 
 static_assert(sizeof(ProbeVolumeData) == 48, "ProbeVolumeData must mirror the HLSL ProbeVolume struct");
+
+/// Per-probe depth moments for visibility, probe position (in case it was moved due to collisions)
+struct ProbeInfo
+{
+	float32 ProbePosition[4];
+	float32 DepthMoments[Limits::ProbeDepthFloatCount];
+};
+
+static_assert(sizeof(ProbeInfo) == Limits::ProbeDepthFloatCount * sizeof(float32) + sizeof(float32) * 4,
+			  "ProbeInfo must be tightly packed to mirror the HLSL struct");
 
 /// World-space boxes used for probe placement (bounds fit + push-out).
 struct ProbeBoxList
@@ -63,10 +60,10 @@ struct ProbeBoxList
 };
 
 /// Builds SH coeffs for a constant irradiance colour (matches the old flat ambient).
-ProbeData MakeUniformAmbientProbe(float32 r, float32 g, float32 b);
+ProbeSHData MakeUniformAmbientProbe(float32 r, float32 g, float32 b);
 
 /// Builds SH coeffs for a vertical sky/ground gradient (L00 + L10 terms).
-ProbeData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3]);
+ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3]);
 
 class ProbeManager
 {
@@ -75,6 +72,14 @@ public:
 	static constexpr uint32 scCaptureSize = 64;
 	static constexpr uint32 scCaptureFaces = 6;
 
+	/// Resolution of the baked depth-moments cubemap face (see Limits::ProbeDepthSize).
+	static constexpr uint32 scDepthSize = Limits::ProbeDepthSize;
+	static constexpr uint32 scDepthFaces = Limits::ProbeDepthFaces;
+	static constexpr uint32 scDepthTexelsPerFace = Limits::ProbeDepthTexelsPerFace;
+
+	/// Clamp for baked probe distances (misses store this far value).
+	static constexpr float32 scDepthMaxDistance = Limits::ProbeDepthMaxDistance;
+
 	/// Number of probes baked per frame during a grid bake
 	static constexpr uint32 scProbesPerFrame = 4;
 
@@ -82,7 +87,10 @@ public:
 	void Create();
 	void Destroy();
 
-	ProbeData* GetProbes() { return mProbes; }
+	ProbeSHData* GetProbes() { return mProbes; }
+	ProbeInfo* GetProbeDepths() { return mProbeDepths; }
+	const ProbeInfo* GetProbeDepths() const { return mProbeDepths; }
+	const ProbeInfo& GetProbeDepth(uint32 index) const { return mProbeDepths[index]; }
 
 	const Vec3f* GetProbePositions() const { return mProbePositions; }
 	uint32 GetProbeCount() const { return Limits::MaxIrradianceProbes; }
@@ -118,6 +126,7 @@ public:
 	}
 
 	void CopyCaptureFaceToStaging(renderer::CommandBuffer& cmd, uint32 batch_slot, uint32 face);
+	void CopyDepthFaceToStaging(renderer::CommandBuffer& cmd, uint32 batch_slot, uint32 face);
 
 	/// Starts a batch: records the first probe index and returns how many
 	/// probes to capture this frame (up to scProbesPerFrame).
@@ -137,6 +146,7 @@ public:
 
 	void UploadToGpu();
 	void UploadVolumeToGpu();
+	void UploadDepthsToGpu();
 
 	//////////////////////////////////////
 	// Probe cache
@@ -152,12 +162,13 @@ private:
 	bool GatherPlacementBoxes(ProbeBoxList& out);
 	void PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes);
 
-	/// Projects one probe's staged faces into mProbes[probe_index].
-	/// Staging slot selects the batch-local face buffers.
 	bool ProjectStagedFaces(uint32 batch_slot, uint32 probe_index);
 
+	bool BuildDepthMoments(uint32 batch_slot, uint32 probe_index);
+
 private:
-	ProbeData mProbes[Limits::MaxIrradianceProbes] {};
+	ProbeSHData mProbes[Limits::MaxIrradianceProbes] {};
+	ProbeInfo mProbeDepths[Limits::MaxIrradianceProbes] {};
 	ProbeVolumeData mVolume {};
 	bool mbInitialized = false;
 
@@ -173,6 +184,7 @@ private:
 
 	renderer::RenderStage mCaptureStage;
 	renderer::RawGpuBuffer mCaptureStaging[scProbesPerFrame][scCaptureFaces];
+	renderer::RawGpuBuffer mDepthStaging[scProbesPerFrame][scCaptureFaces];
 	PerspectiveCamera mBatchCameras[scProbesPerFrame][scCaptureFaces];
 };
 
