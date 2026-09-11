@@ -487,6 +487,9 @@ Object* Blockout::DupeObject(Object* object)
 
 	Object* dupe = gObjectManager->NewObject(blockout_name, object->GetMaterialID(), eObjectTag::Blockout);
 
+	dupe->Bounds.Min = object->Bounds.Min;
+	dupe->Bounds.Max = object->Bounds.Max;
+
 	CubeGenOptions cgo {
 		.Left = { .Scale = -object->Bounds.Min.X },
 		.Right = { .Scale = object->Bounds.Max.X },
