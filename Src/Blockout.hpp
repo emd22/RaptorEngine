@@ -40,6 +40,8 @@ public:
 	 */
 	Object* NewObject(const Vec3f& position);
 
+	Object* DupeObject(Object* object);
+
 	void DestroyObject(Object* object);
 
 	~Blockout();

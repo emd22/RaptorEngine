@@ -157,8 +157,9 @@ void editor_handle_controls()
 
 		/* Dupe object on LCTRL + D */
 		if (KEY.K_D.is_lctrl_combo()) {
-			// OBJECT nobj = blockout_dupe_object(editor_selection.selected_object);
-			// editor_select_object(nobj, true);
+			editor_select_object(editor_selection.selected_object, false);
+			// OBJECT dupe = blockout_dupe_object(editor_selection.selected_object);
+			// editor_select_object(dupe, true);
 		}
 
 

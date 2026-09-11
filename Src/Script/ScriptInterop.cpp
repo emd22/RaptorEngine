@@ -99,13 +99,17 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 static void N_object__select_object_internal(Object* obj, bool is_selected)
 {
 	if (gSelectedEditorMode == nullptr) {
+		return;
+	}
+
+	// Deselect object
+	if (!is_selected || obj == nullptr) {
 		gSelectedEditorMode->SelectObject(nullptr);
 		return;
 	}
 
-	if (!is_selected || obj != nullptr) {
-		gSelectedEditorMode->SelectObject(obj);
-	}
+	// Select an object
+	gSelectedEditorMode->SelectObject(obj);
 }
 
 
@@ -168,6 +172,7 @@ static void N_blockout_object_scale(Object* object, FLOAT4 face_dir, FLOAT4 magn
 }
 
 static Object* N_blockout_new_object(FLOAT4 position) { return gWorld->pBlockout->NewObject(Vec3f(position)); }
+static Object* N_blockout_dupe_object(Object* object) { return gWorld->pBlockout->DupeObject(object); }
 static void N_blockout_destroy_object(Object* object) { gWorld->pBlockout->DestroyObject(object); }
 
 /////////////////////////////////////
@@ -197,6 +202,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),
 	PREDEF("blockout_new_object", N_blockout_new_object),
+	PREDEF("blockout_dupe_object", N_blockout_dupe_object),
 	PREDEF("blockout_destroy_object", N_blockout_destroy_object),
 
 	PREDEF("camera_position", N_camera_position),

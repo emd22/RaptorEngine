@@ -476,6 +476,64 @@ Object* Blockout::NewObject(const Vec3f& position)
 	return object;
 }
 
+Object* Blockout::DupeObject(Object* object)
+{
+	if (!object) {
+		return nullptr;
+	}
+
+	std::string blockout_name = String::Fmt("{}", BlockoutObjects.Size).Str();
+	LogInfo("Creating new blockout object '{}'", blockout_name);
+
+	Object* dupe = gObjectManager->NewObject(blockout_name, object->GetMaterialID(), eObjectTag::Blockout);
+
+	CubeGenOptions cgo {
+		.Left = { .Scale = -object->Bounds.Min.X },
+		.Right = { .Scale = object->Bounds.Max.X },
+		.Top = { .Scale = object->Bounds.Max.Y },
+		.Bottom = { .Scale = -object->Bounds.Min.Y },
+		.Front = { .Scale = object->Bounds.Max.Z },
+		.Back = { .Scale = -object->Bounds.Min.Z },
+
+		.bAlignUVs = true,
+	};
+
+	Ref<MeshGen::GeneratedMesh> cube_mesh = MeshGen::MakeCube(cgo);
+	dupe->pMesh = cube_mesh->AsDefaultMesh();
+
+	physics::Body* existing_body = gPhysics->GetBody(object->PhysicsID);
+	if (existing_body != nullptr) {
+		Vec3f midpoint = GetCubeMidpointOffset(cgo);
+		Vec3f position = object->GetPosition();
+		Quat rotation = existing_body->GetRotation();
+
+		dupe->SetRotationOrigin(-midpoint);
+
+		physics::eMotionType motion_type = existing_body->GetMotionType();
+
+		physics::Body* phys = gPhysics->NewBody(dupe->Name.Get());
+		phys->CreatePrimitiveBody(physics::ePrimitiveType::Box, GetCubeSize(cgo), motion_type,
+								  physics::BodyProps {
+									  .ConvexRadius = 0.05f,
+									  .Density = 20,
+								  });
+
+		phys->SetMidpoint(midpoint);
+		phys->Teleport(position, rotation);
+
+		dupe->AttachCollider(phys);
+	}
+
+	AssetTicket ticket(static_cast<void*>(dupe));
+	ticket.MarkAndSignalLoaded();
+
+	gWorld->Attach(ticket);
+
+	BlockoutObjects.NewItem(nullptr, dupe->ID);
+
+	return dupe;
+}
+
 
 void Blockout::Load(const String& path)
 {
