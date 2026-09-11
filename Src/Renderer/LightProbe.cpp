@@ -22,7 +22,7 @@
 
 #define FX_DEBUG_PROBES_EXPORT_FACE_IMAGES 1
 
-#define FX_PROBE_CACHE_FILE_VERSION 5
+#define FX_PROBE_CACHE_FILE_VERSION 6
 
 namespace fx {
 
@@ -34,18 +34,18 @@ static constexpr float32 scY1 = 0.488603f;
 ProbeSHData MakeUniformAmbientProbe(float32 r, float32 g, float32 b)
 {
 	ProbeSHData probe {};
-	// Constant irradiance E(n) = A  =>  L00 = A / Y00, all other coeffs zero.
+
 	probe.SH[0][0] = r / scY00;
 	probe.SH[0][1] = g / scY00;
 	probe.SH[0][2] = b / scY00;
+
 	return probe;
 }
 
 ProbeSHData MakeSkyGradientProbe(const float32 sky[3], const float32 ground[3])
 {
 	ProbeSHData probe {};
-	// E(n) ~= avg + slope * n.y, with avg = (sky+ground)/2, slope = (sky-ground)/2.
-	// L00 = avg / Y00, L(Y1-1, the y-basis coeff at index 1) = slope / 0.488603.
+
 	for (uint32 c = 0; c < 3; c++) {
 		const float32 avg = (sky[c] + ground[c]) * 0.5f;
 		const float32 slope = (sky[c] - ground[c]) * 0.5f;
@@ -285,14 +285,124 @@ bool ProbeManager::GatherPlacementBoxes(ProbeBoxList& out)
 	return out.Any;
 }
 
-static bool IsInsideBox(const Vec3f& point, const ProbeBoxList::Box& box)
-{
-	const float32 margin = 0.2f;
-	const bool within_x = point.X > box.Min.X - margin && point.X < box.Max.X + margin;
-	const bool within_y = point.Y > box.Min.Y - margin && point.Y < box.Max.Y + margin;
-	const bool within_z = point.Z > box.Min.Z - margin && point.Z < box.Max.Z + margin;
+static constexpr float32 scProbeHugOffset = 0.25f;
+static constexpr float32 scProbeInsideSkin = 0.05f;
+static constexpr float32 scProbeHugMaxDist = 1.5f;
 
-	return within_x && within_y && within_z;
+enum class ProbeAxis
+{
+	NegX,
+	PosX,
+	NegY,
+	PosY,
+	NegZ,
+	PosZ,
+};
+
+/// Pushes `point` out of `box` along the closest face (+ hug offset).
+/// Returns true if the point was inside (skin included) and got moved.
+static bool PushProbeOutOfBox(Vec3f& point, const ProbeBoxList::Box& box, float32 hug)
+{
+	const float32 skin = scProbeInsideSkin;
+
+	const bool inside_x = point.X > box.Min.X - skin && point.X < box.Max.X + skin;
+	const bool inside_y = point.Y > box.Min.Y - skin && point.Y < box.Max.Y + skin;
+	const bool inside_z = point.Z > box.Min.Z - skin && point.Z < box.Max.Z + skin;
+
+	if (!(inside_x && inside_y && inside_z)) {
+		return false;
+	}
+
+	// Distance to each face
+	const float32 d_min_x = point.X - box.Min.X;
+	const float32 d_max_x = box.Max.X - point.X;
+	const float32 d_min_y = point.Y - box.Min.Y;
+	const float32 d_max_y = box.Max.Y - point.Y;
+	const float32 d_min_z = point.Z - box.Min.Z;
+	const float32 d_max_z = box.Max.Z - point.Z;
+
+	float32 best = d_min_x;
+	ProbeAxis axis = ProbeAxis::NegX;
+
+	if (d_max_x < best) {
+		best = d_max_x;
+		axis = ProbeAxis::PosX;
+	}
+	if (d_min_y < best) {
+		best = d_min_y;
+		axis = ProbeAxis::NegY;
+	}
+	if (d_max_y < best) {
+		best = d_max_y;
+		axis = ProbeAxis::PosY;
+	}
+	if (d_min_z < best) {
+		best = d_min_z;
+		axis = ProbeAxis::NegZ;
+	}
+	if (d_max_z < best) {
+		best = d_max_z;
+		axis = ProbeAxis::PosZ;
+	}
+
+	switch (axis) {
+	case ProbeAxis::NegX:
+		point.X = box.Min.X - hug;
+		break;
+	case ProbeAxis::PosX:
+		point.X = box.Max.X + hug;
+		break;
+	case ProbeAxis::NegY:
+		point.Y = box.Min.Y - hug;
+		break;
+	case ProbeAxis::PosY:
+		point.Y = box.Max.Y + hug;
+		break;
+	case ProbeAxis::NegZ:
+		point.Z = box.Min.Z - hug;
+		break;
+	case ProbeAxis::PosZ:
+		point.Z = box.Max.Z + hug;
+		break;
+	default:;
+	}
+
+	return true;
+}
+
+/// Snaps a free-space probe to hug the nearest box surface (+ hug offset
+/// along the outward normal). Returns true if the probe was moved.
+/// Probes deep inside the volume (far from any surface) are left alone so the
+/// grid still fills open space instead of collapsing onto geometry.
+static bool HugNearestSurface(const Vec3f& point, const ProbeBoxList& boxes, float32 hug, float32 max_dist,
+							  Vec3f& out_hugged)
+{
+	bool found = false;
+	float32 best_dist = max_dist;
+	Vec3f best_hugged = point;
+
+	for (uint32 b = 0; b < boxes.Count; b++) {
+		const ProbeBoxList::Box& box = boxes.Boxes[b];
+		const Vec3f closest = Vec3f::Clamp(point, box.Min, box.Max);
+		const Vec3f diff = point - closest;
+		const float32 dist = diff.Length();
+
+		if (dist < 1e-6f || dist >= best_dist) {
+			// On/inside the surface (push-out pass owns this) or not closer.
+			continue;
+		}
+
+		const Vec3f dir = diff * (1.0f / dist);
+		best_hugged = closest + dir * hug;
+		best_dist = dist;
+		found = true;
+	}
+
+	if (found) {
+		out_hugged = best_hugged;
+	}
+
+	return found;
 }
 
 void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const ProbeBoxList& boxes)
@@ -308,6 +418,14 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 
 	mProbePositions.Clear();
 
+	const Vec3f cell_size = Vec3f(size.X / dim_vec.X, size.Y / dim_vec.Y, size.Z / dim_vec.Z);
+	const float32 min_cell = fminf(cell_size.X, fminf(cell_size.Y, cell_size.Z));
+	const float32 hug_dist = fminf(scProbeHugMaxDist, 0.5f * min_cell);
+	const Vec3f vol_max = gmin + size;
+
+	uint32 stat_pushed = 0;
+	uint32 stat_hugged = 0;
+
 	// Fill a 3d volume with probes.
 	for (uint32 iz = 0; iz < z_dim; iz++) {
 		for (uint32 iy = 0; iy < y_dim; iy++) {
@@ -316,20 +434,50 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 
 				Vec3f probe_position = gmin + (Vec3f(size.X, size.Y, size.Z) * (per_vec / dim_vec));
 
-				// Pull probes out of solid geometry: if inside a box, lift
-				// above its top (+0.3m). A few iterations handle stacked boxes.
-				for (uint32 iter = 0; iter < 4; iter++) {
+				// Push probes out of solid geometry along the closest face.
+				bool pushed = false;
+				for (uint32 iter = 0; iter < 8; iter++) {
 					bool inside_any = false;
 					for (uint32 b = 0; b < boxes.Count; b++) {
-						if (IsInsideBox(probe_position, boxes.Boxes[b])) {
-							probe_position.Y = boxes.Boxes[b].Max.Y + 0.5f;
+						if (PushProbeOutOfBox(probe_position, boxes.Boxes[b], scProbeHugOffset)) {
 							inside_any = true;
+							pushed = true;
 							break;
 						}
 					}
 
 					if (!inside_any) {
 						break;
+					}
+				}
+
+				if (pushed) {
+					stat_pushed++;
+				}
+
+				// Hug nearby surfaces (pull free-space probes sitting just off a wall/floor/ceiling onto surface)
+				if (hug_dist > 1e-4f) {
+					Vec3f hugged = probe_position;
+					if (HugNearestSurface(probe_position, boxes, scProbeHugOffset, hug_dist, hugged)) {
+						// Hugging one box can land inside another; re-run the
+						// closest-face push-out so the final spot is valid.
+						for (uint32 iter = 0; iter < 8; iter++) {
+							bool inside_any = false;
+							for (uint32 b = 0; b < boxes.Count; b++) {
+								if (PushProbeOutOfBox(hugged, boxes.Boxes[b], scProbeHugOffset)) {
+									inside_any = true;
+									break;
+								}
+							}
+
+							if (!inside_any) {
+								break;
+							}
+						}
+
+						// Keep grid interpolation valid: never leave the volume.
+						probe_position = Vec3f::Clamp(hugged, gmin, vol_max);
+						stat_hugged++;
 					}
 				}
 
@@ -355,7 +503,8 @@ void ProbeManager::PlaceGridProbes(const Vec3f& gmin, const Vec3f& size, const P
 
 	UploadVolumeToGpu();
 
-	LogInfo("Probe volume: min={} size={} ({} probes)", gmin, size, mProbePositions.Size);
+	LogInfo("Probe volume: min={} size={} ({} probes, {} pushed out, {} hugging)", gmin, size, mProbePositions.Size,
+			stat_pushed, stat_hugged);
 }
 
 bool ProbeManager::ComputeGridPlacement()
@@ -382,7 +531,7 @@ void ProbeManager::BeginGridBakeAt(const Vec3f& center, const Vec3f& size)
 	}
 
 	ProbeBoxList boxes {};
-	GatherPlacementBoxes(boxes); // Only for push-out; bounds come from the caller.
+	GatherPlacementBoxes(boxes);
 
 	PlaceGridProbes(center - size * 0.5f, size, boxes);
 
@@ -572,11 +721,6 @@ bool ProbeManager::ProjectStagedFaces(uint32 batch_slot, uint32 probe_index)
 				ppm_px[1] = static_cast<uint8>(powf(fminf(g * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
 				ppm_px[2] = static_cast<uint8>(powf(fminf(b * 0.5f, 1.0f), 1.0f / 2.2f) * 255.0f);
 #endif
-
-				// NDC of the texel center. The sign convention of v does not
-				// matter for the weight (even function) and the direction is
-				// unprojected through the face camera's own inverse matrices,
-				// so this stays consistent with any projection convention.
 				const float32 nx = ((static_cast<float32>(x) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f -
 								   1.0f;
 				const float32 ny = ((static_cast<float32>(y) + 0.5f) / static_cast<float32>(scCaptureSize)) * 2.0f -
@@ -897,7 +1041,6 @@ bool ProbeManager::FinishCaptureBake()
 
 	UploadToGpu();
 	UploadDepthsToGpu();
-
 	return true;
 }
 

@@ -333,7 +333,7 @@ FSOutput main(FSInput input)
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);
 
 	if ((FSConst.Flags & 0x01) != 0) {
-		const float3 lp_ambient = float3(0.3f, 0.3f, 0.3f) * albedo;
+		const float3 lp_ambient = float3(0.2f, 0.2f, 0.2f) * albedo;
 		output.vAlbedo = float4(accumulated_light.rgb + lp_ambient, 1.0f);
 	}
 
