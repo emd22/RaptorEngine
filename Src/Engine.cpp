@@ -4,10 +4,11 @@
 #include <Asset/ShaderCompiler.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
+#include <InGameEditor.hpp>
 #include <Material/MaterialManager.hpp>
-#include <Renderer/LightProbe.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/PhysicsManager.hpp>
+#include <Renderer/LightProbe.hpp>
 #include <Script/ScriptManager.hpp>
 #include <Texture/TextureManager.hpp>
 #include <World.hpp>
@@ -32,6 +33,8 @@ World* gWorld = nullptr;
 ProbeManager* gProbeManager = nullptr;
 
 ScriptManager* gScriptManager = nullptr;
+
+EditorMode* gSelectedEditorMode = nullptr;
 
 
 #define DESTROY_GLOBAL(name_)                                                                                          \

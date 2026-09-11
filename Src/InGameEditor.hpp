@@ -42,6 +42,8 @@ public:
 	float GetQuantizeFraction() const;
 	bool GetQuantizeEnabled() const;
 
+	FX_FORCE_INLINE bool IsObjectSelected() const { return (mpLastSelectedObject != nullptr); }
+
 	~EditorMode() = default;
 
 public:

@@ -48,6 +48,9 @@ impl OBJECT
 	extern float3 ray_get_face(OBJECT obj);
 	extern float direction_scale(OBJECT obj, float3 direction);
 
+	/* DO NOT CALL! (unless your name is `editor_select_object`) */
+	extern void _select_object_internal(OBJECT obj, bool is_selected);
+
 	property float3 position {
 		get = OBJECT_get_position;
 	}

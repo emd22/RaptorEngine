@@ -3,13 +3,13 @@
 #include <Blockout.hpp>
 #include <Controls.hpp>
 #include <Engine.hpp>
+#include <InGameEditor.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Object/ObjectID.hpp>
 #include <Object/ObjectManager.hpp>
 #include <Physics/JoltPhysicsBackend.hpp>
 #include <Physics/PhysicsManager.hpp>
 #include <World.hpp>
-#include <cstdio>
 
 namespace fx::script {
 
@@ -96,6 +96,18 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 												   gWorld->Player.pCamera->GetForwardVector() * 4.0f);
 }
 
+static void N_object__select_object_internal(Object* obj, bool is_selected)
+{
+	if (gSelectedEditorMode == nullptr) {
+		gSelectedEditorMode->SelectObject(nullptr);
+		return;
+	}
+
+	if (!is_selected || obj != nullptr) {
+		gSelectedEditorMode->SelectObject(obj);
+	}
+}
+
 
 static uint32 N_ctrl_mouse_state()
 {
@@ -180,6 +192,7 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("OBJECT_get_tags", N_object_get_tags),
 	PREDEF("OBJECT_ray_get_face", N_object_ray_get_face),
 	PREDEF("OBJECT_direction_scale", N_object_direction_scale),
+	PREDEF("OBJECT__select_object_internal", N_object__select_object_internal),
 
 	PREDEF("blockout_reload_object", N_blockout_reload_object),
 	PREDEF("blockout_object_scale", N_blockout_object_scale),

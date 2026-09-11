@@ -39,6 +39,9 @@ extern World* gWorld;
 class ProbeManager;
 extern ProbeManager* gProbeManager;
 
+class EditorMode;
+extern EditorMode* gSelectedEditorMode;
+
 
 namespace Globals {
 void Init();

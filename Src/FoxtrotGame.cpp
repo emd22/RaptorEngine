@@ -259,8 +259,8 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 
 void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 {
-	if (pSelectedEditorMode != nullptr) {
-		pSelectedEditorMode->Unload();
+	if (gSelectedEditorMode != nullptr) {
+		gSelectedEditorMode->Unload();
 	}
 
 
@@ -275,11 +275,11 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 	}
 
 	if (EditorModeType != eEditorMode::Simulate) {
-		pSelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
-		pSelectedEditorMode->Load();
+		gSelectedEditorMode = EditorModes[static_cast<uint32>(EditorModeType)];
+		gSelectedEditorMode->Load();
 	}
 	else {
-		pSelectedEditorMode = nullptr;
+		gSelectedEditorMode = nullptr;
 	}
 }
 
@@ -310,7 +310,13 @@ void FoxtrotGame::ProcessControls()
 	}
 	// Escape to unlock mouse
 	else if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && ControlManager::IsMouseLocked()) {
-		ControlManager::ReleaseMouse();
+		// If ESCAPE is pressed while there is an object selected in editor mode, deselect the object.
+		if (gSelectedEditorMode != nullptr && gSelectedEditorMode->IsObjectSelected()) {
+			gSelectedEditorMode->SelectObject(nullptr);
+		}
+		else {
+			ControlManager::ReleaseMouse();
+		}
 	}
 
 	if (ControlManager::IsKeyPressed(eKey::FX_MOUSE_LEFT)) {
@@ -324,7 +330,8 @@ void FoxtrotGame::ProcessControls()
 
 		bool did_hit = false;
 
-		if (pSelectedEditorMode != nullptr) {
+		// Do not select another object unless the selection has been cleared.
+		if (gSelectedEditorMode != nullptr && !gSelectedEditorMode->IsObjectSelected()) {
 			for (int i = 0; i < hits.Size; i++) {
 				JPH::BodyID body_id = hits[i];
 
@@ -334,14 +341,14 @@ void FoxtrotGame::ProcessControls()
 					continue;
 				}
 
-				did_hit = pSelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
+				did_hit = gSelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
 				if (did_hit) {
 					break;
 				}
 			}
 
 			if (did_hit == false) {
-				pSelectedEditorMode->SelectObject(nullptr);
+				gSelectedEditorMode->SelectObject(nullptr);
 			}
 		}
 	}
@@ -401,8 +408,8 @@ void FoxtrotGame::ProcessControls()
 		LogInfo("Reloading all scripts...");
 		gScriptManager->ReloadAllScripts();
 
-		if (pSelectedEditorMode != nullptr) {
-			pSelectedEditorMode->Load();
+		if (gSelectedEditorMode != nullptr) {
+			gSelectedEditorMode->Load();
 		}
 	}
 	if (ControlManager::IsKeyPressed(eKey::FX_KEY_H)) {
@@ -466,17 +473,17 @@ void FoxtrotGame::RenderText()
 	static const uint32 scGreen = Color::FromRGBA(100, 255, 0, 255).AsUInt();
 
 	gTextRenderer->DrawText(
-		String::Fmt("Mode={}", pSelectedEditorMode ? pSelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f, scWhite);
+		String::Fmt("Mode={}", gSelectedEditorMode ? gSelectedEditorMode->ModeName : "Simulate").CStr(), 2.0f, scWhite);
 	gTextRenderer->DrawText(String::Fmt("P={}", gWorld->Player.Position).CStr(), 2.0f, scWhite);
 
-	if (pSelectedEditorMode != nullptr) {
-		gTextRenderer->DrawText(String::Fmt("Q={}, QE={}", pSelectedEditorMode->GetQuantizeFraction(),
-											pSelectedEditorMode->GetQuantizeEnabled())
+	if (gSelectedEditorMode != nullptr) {
+		gTextRenderer->DrawText(String::Fmt("Q={}, QE={}", gSelectedEditorMode->GetQuantizeFraction(),
+											gSelectedEditorMode->GetQuantizeEnabled())
 									.CStr(),
 								2.0, scGreen);
 
-		if (pSelectedEditorMode->mpLastSelectedObject != nullptr) {
-			gTextRenderer->DrawText(String::Fmt("SEL={}", pSelectedEditorMode->mpLastSelectedObject->Name.Get()).CStr(),
+		if (gSelectedEditorMode->mpLastSelectedObject != nullptr) {
+			gTextRenderer->DrawText(String::Fmt("SEL={}", gSelectedEditorMode->mpLastSelectedObject->Name.Get()).CStr(),
 									2.0, scGreen);
 		}
 	}
@@ -513,7 +520,7 @@ void FoxtrotGame::Tick()
 		Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
 		Vec3f rawMovement = GetMovementVector();
 		Vec3f movement = forward * rawMovement.Z + right * rawMovement.X + Vec3f(0, rawMovement.Y, 0);
-		pSelectedEditorMode->Update(movement, static_cast<float32>(DeltaTime));
+		gSelectedEditorMode->Update(movement, static_cast<float32>(DeltaTime));
 	}
 
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;

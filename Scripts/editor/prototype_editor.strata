@@ -95,12 +95,19 @@ void editor_adjust_snap_index(int direction)
 }
 
 
-/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
-void editor_select_object(OBJECT object, bool is_selected)
+/* DO NOT USE NORMALLY, this is meant to be called by the C++ side and inside `editor_select_object`. */
+void _internal_editor_select_object(OBJECT object, bool is_selected)
 {
 	editor_selection.is_object_selected = is_selected;
 	editor_selection.selected_object = object;
 }
+
+/* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
+void editor_select_object(OBJECT object, bool is_selected)
+{
+	object._select_object_internal(is_selected);
+}
+
 
 @private
 void editor_handle_controls()
@@ -140,11 +147,23 @@ void editor_handle_controls()
 		}
 	}
 
-	if (editor_selection.is_object_selected && KEY.K_BACKSPACE.is_pressed()) {
-		printf("Hello\n");
-		blockout_destroy_object(editor_selection.selected_object);
-		reset_selection();
+	/* Non-manipulation, but object functions. */
+	if (editor_selection.is_object_selected) {
+		/* Destroy/Remove an object */
+		if (KEY.K_BACKSPACE.is_pressed()) {
+			blockout_destroy_object(editor_selection.selected_object);
+			reset_selection();
+		}
+
+		/* Dupe object on LCTRL + D */
+		if (KEY.K_D.is_lctrl_combo()) {
+			// OBJECT nobj = blockout_dupe_object(editor_selection.selected_object);
+			// editor_select_object(nobj, true);
+		}
+
+
 	}
+
 
 	mouse_is_dragging = KEY.K_MOUSE_LEFT.is_down();
 }
