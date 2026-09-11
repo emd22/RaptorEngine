@@ -109,6 +109,12 @@
 },
 {
   "directory": "/Users/emd22/Projects/a2",
+  "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -O3 -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O3 -o CMakeFiles/foxtrot.dir/Src/CVar.cpp.o -c /Users/emd22/Projects/a2/Src/CVar.cpp",
+  "file": "/Users/emd22/Projects/a2/Src/CVar.cpp",
+  "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/CVar.cpp.o"
+},
+{
+  "directory": "/Users/emd22/Projects/a2",
   "command": "/usr/bin/c++ -DFX_BASE_DIR=\\\".\\\" -DNDEBUG -DSTRATA_STATIC -DVK_ENABLE_BETA_EXTENSIONS=1 -I/Users/emd22/Projects/a2/Src -I/Users/emd22/Projects/a2/Src/ThirdParty -I/Users/emd22/Projects/a2/Lib/Include -I/Users/emd22/Projects/a2/Submodules/strata/src -isystem /Users/emd22/Projects/a2/Submodules/strata/include -isystem /Users/emd22/VulkanSDK/1.4.357.1/macOS/include -O3 -DNDEBUG -std=gnu++20 -arch arm64 -Wno-nullability-completeness -Wcast-align -Wpessimizing-move -Wredundant-move -Wshadow -fcolor-diagnostics -O3 -o CMakeFiles/foxtrot.dir/Src/Color.cpp.o -c /Users/emd22/Projects/a2/Src/Color.cpp",
   "file": "/Users/emd22/Projects/a2/Src/Color.cpp",
   "output": "/Users/emd22/Projects/a2/CMakeFiles/foxtrot.dir/Src/Color.cpp.o"

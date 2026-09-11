@@ -2,6 +2,7 @@
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ShaderCompiler.hpp>
+#include <CVar.hpp>
 #include <Core/MemPool/MemPool.hpp>
 #include <Core/Thread/ThreadManager.hpp>
 #include <InGameEditor.hpp>
@@ -28,13 +29,14 @@ ThreadManager* gThreadManager = nullptr;
 
 MemPool* gEnginePool = nullptr;
 MemPool* gScriptMemPool = nullptr;
+
 WorldGrid* gWorldGrid = nullptr;
 World* gWorld = nullptr;
 ProbeManager* gProbeManager = nullptr;
-
 ScriptManager* gScriptManager = nullptr;
 
 EditorMode* gSelectedEditorMode = nullptr;
+CVarManager* gCVars = nullptr;
 
 
 #define DESTROY_GLOBAL(name_)                                                                                          \
@@ -57,6 +59,7 @@ void Init()
 	gScriptManager = new ScriptManager;
 	gWorld = new World;
 	gProbeManager = new ProbeManager;
+	gCVars = new CVarManager;
 }
 
 
@@ -70,6 +73,7 @@ void Destroy()
 	DESTROY_GLOBAL(gScriptManager);
 	DESTROY_GLOBAL(gWorld);
 	DESTROY_GLOBAL(gProbeManager);
+	DESTROY_GLOBAL(gCVars);
 }
 
 } // namespace Globals

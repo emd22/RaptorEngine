@@ -42,6 +42,9 @@ extern ProbeManager* gProbeManager;
 class EditorMode;
 extern EditorMode* gSelectedEditorMode;
 
+class CVarManager;
+extern CVarManager* gCVars;
+
 
 namespace Globals {
 void Init();
