@@ -1,4 +1,4 @@
-#include "FoxtrotGame.hpp"
+#include "RaptorGame.hpp"
 
 #define SDL_DISABLE_OLD_NAMES
 
@@ -50,14 +50,14 @@ static bool sbRunning = true;
 
 static bool sbShowShadowCam = false;
 
-FoxtrotGame::FoxtrotGame()
+RaptorGame::RaptorGame()
 {
 	InitEngine();
 	CreateGame();
 }
 
 
-void FoxtrotGame::InitEngine()
+void RaptorGame::InitEngine()
 {
 #ifdef FX_LOG_OUTPUT_TO_FILE
 	LogCreateFile("FoxtrotLog.log");
@@ -128,7 +128,7 @@ void FoxtrotGame::InitEngine()
 }
 
 
-void FoxtrotGame::CreateLights()
+void RaptorGame::CreateLights()
 {
 	// Ref<LightPoint> pl = Ref<LightPoint>::New();
 	// pl->Color = Color::FromRGBA(50, 250, 100, 8);
@@ -146,7 +146,7 @@ void FoxtrotGame::CreateLights()
 	// mMainScene.Attach(pl2);
 }
 
-void FoxtrotGame::LoadOffsetsFile()
+void RaptorGame::LoadOffsetsFile()
 {
 	ConfigFile info;
 
@@ -158,7 +158,7 @@ void FoxtrotGame::LoadOffsetsFile()
 
 Vec2f PixelsToUV(const Vec2i& pos, const Vec2f& size) { return Vec2f(pos.X / size.X, pos.Y / size.Y); }
 
-void FoxtrotGame::CreateGame()
+void RaptorGame::CreateGame()
 {
 	gWorld->Player.Create();
 	gWorld->Player.pCamera->SetAspectRatio(gGraphics->GetWindow()->GetAspectRatio());
@@ -259,7 +259,7 @@ static FX_FORCE_INLINE Vec3f GetEditorMovementVector()
 }
 
 
-void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
+void RaptorGame::SwitchEditorMode(eEditorMode mode)
 {
 	if (gSelectedEditorMode != nullptr) {
 		gSelectedEditorMode->Unload();
@@ -285,7 +285,7 @@ void FoxtrotGame::SwitchEditorMode(eEditorMode mode)
 	}
 }
 
-Vec3f FoxtrotGame::GetCameraForwardDominantAxis() const
+Vec3f RaptorGame::GetCameraForwardDominantAxis() const
 {
 	Vec3f fwd = gWorld->Player.pCamera->GetForwardVector();
 	Vec3f fa = fwd.Abs();
@@ -298,7 +298,7 @@ Vec3f FoxtrotGame::GetCameraForwardDominantAxis() const
 }
 
 
-void FoxtrotGame::ProcessControls()
+void RaptorGame::ProcessControls()
 {
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LSHIFT, eKey::FX_KEY_GRAVE)) {
 		// Release the mouse before quitting the game incase there is a crash.
@@ -462,6 +462,10 @@ void FoxtrotGame::ProcessControls()
 	}
 
 
+	if (ControlManager::IsKeyPressed(eKey::FX_KEY_SLASH)) {
+		bInCommandMode = !bInCommandMode;
+	}
+
 	// Save the blockout to a file
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LMETA, eKey::FX_KEY_S)) {
 		LogInfo("Saving blockout...");
@@ -469,10 +473,17 @@ void FoxtrotGame::ProcessControls()
 	}
 }
 
-void FoxtrotGame::RenderText()
+void RaptorGame::RenderText()
 {
 	static const uint32 scWhite = Color::FromRGBA(255, 255, 255, 255).AsUInt();
 	static const uint32 scGreen = Color::FromRGBA(100, 255, 0, 255).AsUInt();
+
+	if (bInCommandMode) {
+		gTextRenderer->DrawText(String::Fmt(":{}", mCommandConsole.GetString()).CStr(), 2.0f, scGreen);
+		gTextRenderer->DrawText(String::Fmt("={}", mCommandConsole.Output).CStr(), 2.0f, scWhite);
+		return;
+	}
+
 
 	gTextRenderer->DrawText(String::Fmt("Mode={}, Op={}",
 										gSelectedEditorMode ? gSelectedEditorMode->ModeName : "Simulate",
@@ -495,7 +506,7 @@ void FoxtrotGame::RenderText()
 }
 
 
-void FoxtrotGame::Tick()
+void RaptorGame::Tick()
 {
 	const uint64 current_tick = SDL_GetPerformanceCounter();
 
@@ -514,7 +525,17 @@ void FoxtrotGame::Tick()
 
 
 	ControlManager::Update();
-	ProcessControls();
+
+	if (bInCommandMode) {
+		if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE)) {
+			bInCommandMode = false;
+		}
+
+		mCommandConsole.HandleKeyboard();
+	}
+	else {
+		ProcessControls();
+	}
 
 	gWorld->Player.Move(DeltaTime, GetMovementVector());
 	gWorld->Player.Update(DeltaTime);
@@ -570,7 +591,7 @@ void FoxtrotGame::Tick()
 	mLastTick = current_tick;
 }
 
-void FoxtrotGame::DestroyGame()
+void RaptorGame::DestroyGame()
 {
 	gGraphics->GetDevice()->WaitForIdle();
 
@@ -584,7 +605,7 @@ void FoxtrotGame::DestroyGame()
 	gGraphics->pRenderer = nullptr;
 }
 
-void FoxtrotGame::AddEditorModes()
+void RaptorGame::AddEditorModes()
 {
 	EditorModes.InitCapacity(static_cast<uint32>(eEditorMode::Simulate));
 	// {
@@ -603,12 +624,13 @@ void FoxtrotGame::AddEditorModes()
 		EditorModes.Insert(mode);
 	}
 
+
 	// EditorModes.Insert(gEnginePool->Alloc<EditorModeMoveCollider>(sizeof(EditorModeMoveCollider), nullptr));
 	// EditorModes.Insert(gEnginePool->Alloc<EditorModeScaleCollider>(sizeof(EditorModeScaleCollider), nullptr));
 }
 
 
-FoxtrotGame::~FoxtrotGame()
+RaptorGame::~RaptorGame()
 {
 	DestroyGame();
 

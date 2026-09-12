@@ -1,6 +1,6 @@
-# Foxtrot Engine
+# Raptor Engine
 
-Foxtrot is a 3D game engine being developed for an experimental game.
+Raptor is a 3D game engine being developed for an experimental game.
 
 ## Screenshots
 
@@ -44,11 +44,11 @@ For example,
 # Generate the project or build files
 cmake -GNinja -DUSE_SIMDE=Off -DUSE_MOLTENVK=On .
 
-# Build Foxtrot
+# Build Raptor
 ninja
 
 # Run the executable. Replace `Debug` with the optimization level you built with.
-./build/Debug/foxtrot
+./build/Debug/raptor
 ```
 
 ## Platforms Supported

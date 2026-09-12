@@ -121,6 +121,10 @@ public:
 	FX_FORCE_INLINE uint64 GetSizeInBytes() const { return sizeof(T) * Size; }
 };
 
+using StringView = Slice<const char>;
+
+FX_FORCE_INLINE StringView MakeStringView(const char* ptr, uint64 size) { return Slice<const char>(ptr, size); }
+
 /** Creates a new Slice object */
 template <typename T>
 Slice<T> MakeSlice(T* ptr, uint64 size)
@@ -151,5 +155,16 @@ struct std::formatter<fx::Slice<fx::uint8>>
 		}
 
 		return std::format_to(ctx.out(), "[ {} ]", str);
+	}
+};
+
+template <>
+struct std::formatter<fx::StringView>
+{
+	auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+	auto format(const fx::StringView& sv, std::format_context& ctx) const
+	{
+		return std::format_to(ctx.out(), "{:.{}}", sv.pData, sv.Size);
 	}
 };

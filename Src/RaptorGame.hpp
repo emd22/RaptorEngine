@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blockout.hpp"
+#include "CommandConsole.hpp"
 #include "InGameEditor.hpp"
 #include "Object/ObjectManager.hpp"
 
@@ -50,15 +51,15 @@ namespace fx {
 // Game class
 /////////////////////////////////////
 
-class FoxtrotGame
+class RaptorGame
 {
 public:
-	FoxtrotGame();
+	RaptorGame();
 
 	void CreateGame();
 
 
-	~FoxtrotGame();
+	~RaptorGame();
 
 private:
 	void AddEditorModes();
@@ -102,6 +103,7 @@ public:
 	eEditorMode EditorModeType = eEditorMode::Simulate;
 	SizedArray<EditorMode*> EditorModes;
 
+	bool bInCommandMode = false;
 
 private:
 	uint64 mLastTick = 0;
@@ -112,6 +114,8 @@ private:
 	MaterialID mBlockoutMaterial = MaterialID::scNull;
 
 	ConfigFile Config;
+
+	Console mCommandConsole;
 };
 
 } // namespace fx

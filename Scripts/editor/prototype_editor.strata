@@ -154,7 +154,7 @@ void editor_handle_controls()
 		/* Destroy/Remove an object */
 		if (KEY.K_BACKSPACE.is_pressed()) {
 			blockout_destroy_object(editor_selection.selected_object);
-			reset_selection();
+			editor_select_object(editor_selection.selected_object, false);
 		}
 
 		/* Dupe object on LCTRL + D */
@@ -236,23 +236,29 @@ void editor_on_mouse_just_down()
 @private
 void editor_translate_tool(float delta_time)
 {
+	if (!editor_selection.is_object_selected) {
+		return;
+	}
+
+	float3 current_position = editor_selection.selected_object.get_position();
 	float3 translate_movement = player.position + camera_distance;
 
-	/* We are not in fly mode, handle Z movement manually */
-	if (!player.is_flymode()) {
-		const float speed = delta_time * 2.0f;
 
-		if (KEY.K_Q.is_down()) {
-			float3 move_direction = float3(0.0f, -speed, 0.0f);
-			translate_movement += move_direction;
-			camera_distance += move_direction;
-		}
-		if (KEY.K_E.is_down()) {
-			float3 move_direction = float3(0.0f, speed, 0.0f);
-			translate_movement += move_direction;
-			camera_distance += move_direction;
-		}
+	/* We are not in fly mode, handle Z movement manually */
+	// if (!player.is_flymode()) {
+	const float speed = delta_time * 2.0f;
+
+	if (KEY.K_Q.is_down()) {
+		float3 move_direction = float3(0.0f, -speed, 0.0f);
+		translate_movement += move_direction;
+		camera_distance += move_direction;
 	}
+	if (KEY.K_E.is_down()) {
+		float3 move_direction = float3(0.0f, speed, 0.0f);
+		translate_movement += move_direction;
+		camera_distance += move_direction;
+	}
+	// }
 
 	editor_selection.selected_object.move_to(editor_transform_snap(translate_movement));
 }

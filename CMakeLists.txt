@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(foxtrot LANGUAGES CXX)
+project(raptor LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,7 +12,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/build/${CMAKE_BUILD_TYPE
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-set(VS_STARTUP_PROJECT foxtrot)
+set(VS_STARTUP_PROJECT raptor)
 
 option(USE_SIMDE "Use SIMDe to use AVX on a non-AVX platform" OFF)
 option(USE_MOLTENVK "Compile with support for MoltenVK. Defaults to KosmicKrisp on macOS" OFF)
@@ -49,24 +49,24 @@ foreach(SHADER_FILE ${SHADER_FILES})
     list(APPEND SOURCES ${SHADER_FILE})
 endforeach()
 
-add_executable(foxtrot ${SOURCES})
+add_executable(raptor ${SOURCES})
 
 if(WIN32)
-    target_compile_options(foxtrot PRIVATE /Oi /MP /arch:AVX2)
-    target_link_directories(foxtrot PRIVATE "./Lib/Win32")
+    target_compile_options(raptor PRIVATE /Oi /MP /arch:AVX2)
+    target_link_directories(raptor PRIVATE "./Lib/Win32")
 
     if(DEFINED ENV{VULKAN_SDK})
-        target_include_directories(foxtrot SYSTEM PRIVATE "$ENV{VULKAN_SDK}/include")
-        target_link_directories(foxtrot PRIVATE "$ENV{VULKAN_SDK}/Lib")
+        target_include_directories(raptor SYSTEM PRIVATE "$ENV{VULKAN_SDK}/include")
+        target_link_directories(raptor PRIVATE "$ENV{VULKAN_SDK}/Lib")
     endif()
 
-    target_link_libraries(foxtrot PRIVATE vulkan-1 dxcompiler)
-    target_compile_definitions(foxtrot PRIVATE _USE_MATH_DEFINES)
+    target_link_libraries(raptor PRIVATE vulkan-1 dxcompiler)
+    target_compile_definitions(raptor PRIVATE _USE_MATH_DEFINES)
 
 elseif(APPLE)
-    set_target_properties(foxtrot PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "aarch64")
+    set_target_properties(raptor PROPERTIES ARCHIVE_OUTPUT_DIRECTORY "aarch64")
 
-    target_compile_options(foxtrot PRIVATE
+    target_compile_options(raptor PRIVATE
         -Wno-nullability-completeness
         -Wcast-align
         #-Wold-style-cast
@@ -75,32 +75,32 @@ elseif(APPLE)
         -Wshadow
         #-Wdouble-promotion
     )
-    target_link_directories(foxtrot PRIVATE "./Lib/macOS")
+    target_link_directories(raptor PRIVATE "./Lib/macOS")
 
     set(VK_SDK $ENV{VULKAN_SDK})
-    target_include_directories(foxtrot SYSTEM BEFORE PRIVATE "${VK_SDK}/include")
-    target_link_directories(foxtrot PRIVATE "${VK_SDK}/lib")
-    set_target_properties(foxtrot PROPERTIES BUILD_RPATH "${VK_SDK}/lib")
+    target_include_directories(raptor SYSTEM BEFORE PRIVATE "${VK_SDK}/include")
+    target_link_directories(raptor PRIVATE "${VK_SDK}/lib")
+    set_target_properties(raptor PROPERTIES BUILD_RPATH "${VK_SDK}/lib")
 
-    target_link_libraries(foxtrot PRIVATE vulkan.1 dxcompiler)
-    target_compile_definitions(foxtrot PRIVATE VK_ENABLE_BETA_EXTENSIONS=1)
+    target_link_libraries(raptor PRIVATE vulkan.1 dxcompiler)
+    target_compile_definitions(raptor PRIVATE VK_ENABLE_BETA_EXTENSIONS=1)
 
-	target_compile_options(foxtrot PRIVATE  -fcolor-diagnostics)
-	target_link_options(foxtrot PRIVATE )
+	target_compile_options(raptor PRIVATE  -fcolor-diagnostics)
+	target_link_options(raptor PRIVATE )
 endif()
 
 
-target_include_directories(foxtrot PRIVATE
+target_include_directories(raptor PRIVATE
     "Src"
     "Src/ThirdParty"
     "Lib/Include"
 )
 
-target_compile_definitions(foxtrot PRIVATE
+target_compile_definitions(raptor PRIVATE
     FX_BASE_DIR="."
 )
 
-target_compile_definitions(foxtrot PRIVATE
+target_compile_definitions(raptor PRIVATE
     $<$<CONFIG:Debug>:DEBUG>
     $<$<CONFIG:Release>:NDEBUG>
     $<$<CONFIG:RelWithDebInfo>:NDEBUG>
@@ -109,28 +109,28 @@ target_compile_definitions(foxtrot PRIVATE
 
 
 if(USE_SIMDE)
-    target_compile_definitions(foxtrot PRIVATE FX_USE_SIMDE SIMDE_ENABLE_NATIVE_ALIASES)
+    target_compile_definitions(raptor PRIVATE FX_USE_SIMDE SIMDE_ENABLE_NATIVE_ALIASES)
 endif()
 
 if(USE_MOLTENVK)
-    target_compile_definitions(foxtrot PRIVATE FX_USE_PORTABILITY_EXTENSION)
+    target_compile_definitions(raptor PRIVATE FX_USE_PORTABILITY_EXTENSION)
 endif()
 
 if(MSVC)
-    target_compile_options(foxtrot PRIVATE
+    target_compile_options(raptor PRIVATE
         $<$<CONFIG:Release>:/O2>
         $<$<CONFIG:RelWithDebInfo>:/Ob2>
     )
 else()
-    target_compile_options(foxtrot PRIVATE
+    target_compile_options(raptor PRIVATE
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:RelWithDebInfo>:-O2 -g>
     )
 endif()
 
 # Strata
-target_link_libraries(foxtrot PRIVATE strata)
-target_include_directories(foxtrot SYSTEM BEFORE PRIVATE "Submodules/strata/include")
+target_link_libraries(raptor PRIVATE strata)
+target_include_directories(raptor SYSTEM BEFORE PRIVATE "Submodules/strata/include")
 
 
-target_link_libraries(foxtrot PRIVATE turbojpeg SDL3 freetype)
+target_link_libraries(raptor PRIVATE turbojpeg SDL3 freetype)

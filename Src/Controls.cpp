@@ -234,6 +234,63 @@ void ControlManager::UpdateButtonFromEvent(eKey key_id, bool is_now_down)
 	}
 }
 
+char ControlManager::GetAlphaKey()
+{
+	char base_ch = 0;
+
+	bool is_shift_down = IsKeyDown(eKey::FX_KEY_LSHIFT);
+
+	for (uint32 key_code = static_cast<uint32>(eKey::FX_KEY_A); key_code <= static_cast<uint32>(eKey::FX_KEY_Z);
+		 key_code++) {
+		if (IsKeyPressed(static_cast<eKey>(key_code))) {
+			base_ch = key_code;
+			break;
+		}
+	}
+
+	if (base_ch > 0) {
+		// Shift modifier
+		if (is_shift_down) {
+			base_ch += ('A' - static_cast<uint32>(eKey::FX_KEY_A));
+		}
+		else {
+			base_ch += ('a' - static_cast<uint32>(eKey::FX_KEY_A));
+		}
+
+		return base_ch;
+	}
+
+
+	// Numbers and special chars
+	if (IsKeyPressed(eKey::FX_KEY_MINUS) && is_shift_down) {
+		return '_';
+	}
+
+	for (uint32 key_code = static_cast<uint32>(eKey::FX_KEY_1); key_code <= static_cast<uint32>(eKey::FX_KEY_0);
+		 key_code++) {
+		if (IsKeyPressed(static_cast<eKey>(key_code))) {
+			// These stupid ass conventions are backwards
+			if (static_cast<eKey>(key_code) == eKey::FX_KEY_0) {
+				base_ch = '0';
+				break;
+			}
+
+			base_ch = key_code + ('1' - static_cast<uint32>(eKey::FX_KEY_1));
+			break;
+		}
+	}
+
+	if (IsKeyPressed(eKey::FX_KEY_SPACE)) {
+		return ' ';
+	}
+
+	if (IsKeyPressed(eKey::FX_KEY_RETURN)) {
+		return '\n';
+	}
+
+	return base_ch;
+}
+
 void ControlManager::UpdateFromKeyboardEvent(SDL_Event* event)
 {
 	const eKey key_id = ConvertScancodeToKey(event->key.scancode);

@@ -268,7 +268,7 @@ void GraphicsBackend::RebuildRenderStages()
 
 void GraphicsBackend::InitVulkan()
 {
-	const char* app_name = "Foxtrot";
+	const char* app_name = "RaptorEngine";
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	app_info.pApplicationName = app_name;

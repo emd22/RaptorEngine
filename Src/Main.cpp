@@ -1,7 +1,7 @@
 
 #define VMA_DEBUG_LOG(...) LogWarning(LC_MEMORY, __VA_ARGS__)
 
-#include "FoxtrotGame.hpp"
+#include "RaptorGame.hpp"
 
 #include <Asset/AssetManager.hpp>
 #include <Asset/ConfigFile.hpp>
@@ -59,7 +59,7 @@ int main()
 	fx::renderer::Globals::Init();
 
 	{
-		fx::FoxtrotGame game {};
+		fx::RaptorGame game {};
 	}
 
 	fx::Globals::Destroy();
