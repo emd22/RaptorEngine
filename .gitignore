@@ -11,8 +11,8 @@ obj
 *.ninja
 .*
 *.vcxproj*
-foxtrot.slnx
-foxtrot.sln
+*.slnx
+*.sln
 
 *.ftx
 
@@ -30,8 +30,8 @@ x64
 !.clang-tidy
 
 compile_commands.json
-foxtrot.xcodeproj
-foxtrot.xcworkspace
+*.xcodeproj
+*.xcworkspace
 
 Makefile
 *.make

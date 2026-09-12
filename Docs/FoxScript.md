@@ -1,6 +1,6 @@
 # Fox Script
 
-Fox Script is a scripting language designed for use in the Foxtrot game engine. It is a very simple language designed primarily for:
+Fox Script is a scripting language designed for use in the Raptor game engine. It is a very simple language designed primarily for:
 
 - Calling native engine functions
 - Passing values to the engine and game

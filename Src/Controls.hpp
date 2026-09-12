@@ -97,6 +97,8 @@ public:
 	 */
 	static Control* GetKey(eKey scancode);
 
+	static char GetAlphaKey();
+
 	static void ResetKey(eKey scancode);
 
 	////////////////////////////////
