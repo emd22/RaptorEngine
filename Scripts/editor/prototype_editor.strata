@@ -177,10 +177,11 @@ void editor_dupe_selection()
 	}
 
 	// Now that the materials are back to their original states, dupe the objects.
-	for (int i = 0; i < sel.selected_objects_count; i++) {
+	for (int i = 0; i < tmp_num_selected_objects; i++) {
 		OBJECT object_to_dupe = sel.selected_objects[i];
 
-		OBJECT dupe = blockout_dupe_object(object_to_dupe);
+		//OBJECT dupe = blockout_dupe_object(object_to_dupe);
+		OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, tmp_num_selected_objects);
 
 		// Replace the selected object with the dupe. We are overwriting the previous selection
 		// and essentially using `selected_objects` as a temp buffer.
@@ -188,6 +189,7 @@ void editor_dupe_selection()
 
 		// Move the dupe to the position of the duped object
 		dupe.move_to(object_to_dupe.get_position());
+
 	}
 
 	// Back to material shit. The C++ side doesn't know about the selected objects yet, and we need to
@@ -398,7 +400,7 @@ void editor_translate_tool_finalize()
 
 		float3 initial_position = sel.initial_object_positions[i];
 
-		editor_push_op(obj, OPTYPE.MOVE, initial_position, obj.position);
+		editor_push_op_vec(obj, OPTYPE.MOVE, initial_position, obj.position, sel.selected_objects_count);
 	}
 }
 

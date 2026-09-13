@@ -64,7 +64,7 @@ struct EditOperation
 public:
 	void Undo();
 
-	void Execute();
+	EditOperationValue Execute();
 
 public:
 	/// The object to manipulate
@@ -72,6 +72,10 @@ public:
 
 	EditOperationValue Original;
 	EditOperationValue Updated;
+
+	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one
+	/// for each event) making the GroupSize = 10.
+	int32 GroupSize = 1;
 };
 
 enum class eEditorModeFlags
@@ -112,7 +116,7 @@ public:
 	float GetQuantizeFraction() const;
 	bool GetQuantizeEnabled() const;
 
-	void PushEditOperation(const EditOperation& op);
+	EditOperationValue PushEditOperation(const EditOperation& op);
 
 	void Undo();
 	void Redo();

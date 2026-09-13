@@ -24,20 +24,44 @@ static Object* N_object_get(uint32 id)
 	return gObjectManager->GetObject(obj_id);
 }
 
-static void N_editor_push_op(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated)
+static Vec3f N_editor_push_op_vec3(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated, int32 group_size)
 {
 	if (obj == nullptr) {
-		return;
+		return Vec3f::sZero;
 	}
 
 	if (gSelectedEditorMode) {
-		gSelectedEditorMode->PushEditOperation(EditOperation {
+		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
 			.Type = static_cast<EditOperation::eType>(op_type),
 			.pObject = obj,
 			.Original = EditOperationValue(Vec3f(original)),
 			.Updated = EditOperationValue(Vec3f(updated)),
+			.GroupSize = group_size,
 		});
+
+		return eov.Position;
 	}
+}
+
+static Object* N_editor_push_op_object(Object* obj, int op_type, Object* original, Object* updated, int32 group_size)
+{
+	if (obj == nullptr) {
+		return nullptr;
+	}
+
+	if (gSelectedEditorMode) {
+		EditOperationValue eov = gSelectedEditorMode->PushEditOperation(EditOperation {
+			.Type = static_cast<EditOperation::eType>(op_type),
+			.pObject = obj,
+			.Original = EditOperationValue(original),
+			.Updated = EditOperationValue(updated),
+			.GroupSize = group_size,
+		});
+
+		return eov.pObject;
+	}
+
+	return nullptr;
 }
 
 
@@ -217,7 +241,8 @@ static const PredefExtern scAvailableExterns[] = {
 	/* Object functions  */
 	PREDEF("object_get", N_object_get),
 
-	PREDEF("editor_push_op", N_editor_push_op),
+	PREDEF("editor_push_op_vec", N_editor_push_op_vec3),
+	PREDEF("editor_push_op_obj", N_editor_push_op_object),
 
 	PREDEF("OBJECT_move_to", N_object_move_to),
 	PREDEF("OBJECT_move_by", N_object_move_by),
