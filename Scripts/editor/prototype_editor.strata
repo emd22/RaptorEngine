@@ -460,13 +460,17 @@ void editor_face_tool_finalize()
 	}
 
 	for (int i = 0; i < sel.selected_objects_count; i++) {
-		blockout_object_scale(
-			sel.selected_objects[i],
-			sel.selected_face,
-			face_tool_magnitude
-		);
+		OBJECT obj = sel.selected_objects[i];
 
-		blockout_reload_object(sel.selected_objects[i]);
+		// blockout_object_scale(
+		// 	sel.selected_objects[i],
+		// 	sel.selected_face,
+		// 	face_tool_magnitude
+		// );
+
+		editor_push_op_vec(obj, OPTYPE.SCALE, sel.selected_face, face_tool_magnitude, sel.selected_objects_count);
+
+		blockout_reload_object(obj);
 	}
 
 }
