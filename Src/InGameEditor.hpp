@@ -58,7 +58,8 @@ struct EditOperation
 	{
 		Move,
 		Scale,
-		DupeObject,
+		Dupe,
+		Create,
 	} Type;
 
 public:
@@ -70,8 +71,8 @@ public:
 	/// The object to manipulate
 	Object* pObject = nullptr;
 
-	EditOperationValue Original;
-	EditOperationValue Updated;
+	EditOperationValue ValueA;
+	EditOperationValue ValueB;
 
 	/// The size of the operation group this is in. For example, when moving 10 objects, there will be 10 operations(one
 	/// for each event) making the GroupSize = 10.
