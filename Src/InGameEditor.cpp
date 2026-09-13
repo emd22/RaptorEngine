@@ -13,7 +13,7 @@ namespace fx {
 // Edit Operations
 /////////////////////////////////////
 
-void EditOperation::Execute()
+EditOperationValue EditOperation::Execute()
 {
 	switch (Type) {
 	case eType::Move: {
@@ -23,7 +23,7 @@ void EditOperation::Execute()
 
 		pObject->SetPosition(Updated.Position);
 
-		break;
+		return Updated;
 	}
 	case eType::Scale: {
 		break;
@@ -35,9 +35,11 @@ void EditOperation::Execute()
 
 		Updated.Set(gWorld->pBlockout->DupeObject(pObject));
 
-		break;
+		return Updated;
 	}
 	}
+
+	return Updated;
 }
 
 void EditOperation::Undo()
@@ -63,6 +65,8 @@ void EditOperation::Undo()
 		Assert(Updated.pObject != nullptr);
 
 		gWorld->pBlockout->DestroyObject(Updated.pObject);
+
+		gSelectedEditorMode->SelectObject(nullptr, false);
 
 		break;
 	}
@@ -109,6 +113,18 @@ void EditorMode::Undo()
 	EditOperation* op = &mOperationStack[OperationStackIndex];
 
 	op->Undo();
+
+	int32 group_size = op->GroupSize - 1;
+
+	for (int i = 0; i < group_size; i++) {
+		if (OperationStackIndex == 0) {
+			return;
+		}
+
+		--OperationStackIndex;
+		op = &mOperationStack[OperationStackIndex];
+		op->Undo();
+	}
 }
 
 
@@ -118,14 +134,25 @@ void EditorMode::Redo()
 		return;
 	}
 
-	EditOperation* op = &mOperationStack[OperationStackIndex];
-	++OperationStackIndex;
+	EditOperation* op = &mOperationStack[OperationStackIndex++];
 
 	op->Execute();
+
+	int32 group_size = op->GroupSize - 1;
+
+	for (int i = 0; i < group_size; i++) {
+		if (OperationStackIndex >= mOperationStack.Size) {
+			return;
+		}
+
+		op = &mOperationStack[OperationStackIndex++];
+
+		op->Execute();
+	}
 }
 
 
-void EditorMode::PushEditOperation(const EditOperation& op)
+EditOperationValue EditorMode::PushEditOperation(const EditOperation& op)
 {
 	// Overwrite the existing after our current undo position operations
 	if (OperationStackIndex < mOperationStack.Size) {
@@ -134,7 +161,8 @@ void EditorMode::PushEditOperation(const EditOperation& op)
 
 	mOperationStack.Insert(op);
 	++OperationStackIndex;
-	mOperationStack[mOperationStack.Size - 1].Execute();
+
+	return mOperationStack[mOperationStack.Size - 1].Execute();
 }
 
 
