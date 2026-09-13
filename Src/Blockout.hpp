@@ -8,9 +8,11 @@
 #pragma once
 
 #include <Core/FreeArray.hpp>
+#include <Core/Name.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/String.hpp>
 #include <Material/MaterialID.hpp>
+#include <Math/Quat.hpp>
 #include <Math/Vec3.hpp>
 #include <Object/ObjectID.hpp>
 
@@ -41,6 +43,13 @@ public:
 	Object* NewObject(const Vec3f& position);
 
 	Object* DupeObject(Object* object);
+
+	/**
+	 * @brief Recreates a destroyed blockout object from a snapshot (undo of Delete).
+	 * Falls back to a unique name if the original name is taken.
+	 */
+	Object* RestoreObject(const Vec3f& position, const Vec3f& bounds_min, const Vec3f& bounds_max,
+						  MaterialID material, const Quat& rotation, const Name& name);
 
 	void DestroyObject(Object* object);
 

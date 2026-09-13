@@ -150,12 +150,15 @@ void reset_selection()
 }
 
 
-/* Destroy all objects in the selection. */
+/* Destroy all objects in the selection. Pushing the Delete op destroys each
+   object immediately (via Execute) and records the snapshot for undo. */
 @private
 void editor_destroy_selection()
 {
-	for (int i = 0; i < sel.selected_objects_count; i++) {
-		blockout_destroy_object(sel.selected_objects[i]);
+	int count = sel.selected_objects_count;
+
+	for (int i = 0; i < count; i++) {
+		editor_push_op_delete(sel.selected_objects[i], count);
 	}
 
 	reset_selection();
@@ -164,38 +167,27 @@ void editor_destroy_selection()
 @private
 void editor_dupe_selection()
 {
-	int tmp_num_selected_objects = sel.selected_objects_count;
+	int n = sel.selected_objects_count;
 
-	// To properly dupe the selection, we need the original materials.
-	{
-		// This is kind of janky, but we need to deselect our full selection; to revert back from the
-		// selection material. the selected objects as we still need to dupe them though, so save the
-		// currently selected object count to revert back to after.
-
-		// Deselect the objects / zero out the selected_objects count.
-		editor_select_object(null_object, false, false);
-	}
-
-	// Now that the materials are back to their original states, dupe the objects.
-	for (int i = 0; i < tmp_num_selected_objects; i++) {
+	// Push the Dupe op for each original. Execute creates the dupe with the
+	// original (unselected) material, so no deselect dance is needed. Reuse
+	// `selected_objects` as a temp buffer for the new handles.
+	for (int i = 0; i < n; i++) {
 		OBJECT object_to_dupe = sel.selected_objects[i];
 
-		//OBJECT dupe = blockout_dupe_object(object_to_dupe);
-		OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, tmp_num_selected_objects);
+		OBJECT dupe = editor_push_op_obj(object_to_dupe, OPTYPE.DUPE, object_to_dupe, null_object, n);
 
 		// Replace the selected object with the dupe. We are overwriting the previous selection
 		// and essentially using `selected_objects` as a temp buffer.
 		sel.selected_objects[i] = dupe;
-
-		// Move the dupe to the position of the duped object
-		dupe.move_to(object_to_dupe.get_position());
-
 	}
 
-	// Back to material shit. The C++ side doesn't know about the selected objects yet, and we need to
-	// assign them to have the selection material.
+	// Swap the selection over to the dupes. The null-select restores the
+	// originals' materials on the C++ side; the appends select the dupes.
+	editor_select_object(null_object, false, false);
+
 	{
-		for (int i = 0; i < tmp_num_selected_objects; i++) {
+		for (int i = 0; i < n; i++) {
 			// Append the selection from the new object handles.
 			editor_select_object(sel.selected_objects[i], true, true);
 		}
@@ -299,6 +291,20 @@ float3 editor_transform_snap(float3 vec)
 	return (float3_round(vec / qsnap) * qsnap);
 }
 
+/* Epsilon helpers for skipping no-op undo pushes (a click without movement). */
+@private
+bool editor_vec_is_zero(float3 v)
+{
+	const float eps = 0.00001f;
+	return (v.x < eps && v.x > -eps) && (v.y < eps && v.y > -eps) && (v.z < eps && v.z > -eps);
+}
+
+@private
+bool editor_vec_equal(float3 a, float3 b)
+{
+	return editor_vec_is_zero(a - b);
+}
+
 
 /* Player movement dampening */
 
@@ -397,13 +403,30 @@ void editor_translate_tool(float delta_time)
 @private
 void editor_translate_tool_finalize()
 {
+	// Skip clicks without movement so we don't burn undo history on no-ops.
+	// GroupSize must match the pushed op count exactly for multi-undo.
+	int movers = 0;
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		if (!editor_vec_equal(sel.initial_object_positions[i], sel.selected_objects[i].position)) {
+			movers++;
+		}
+	}
+
+	if (movers == 0) {
+		return;
+	}
+
 	// Log movements for undo
 	for (int i = 0; i < sel.selected_objects_count; i++) {
 		OBJECT obj = sel.selected_objects[i];
 
 		float3 initial_position = sel.initial_object_positions[i];
 
-		editor_push_op_vec(obj, OPTYPE.MOVE, initial_position, obj.position, sel.selected_objects_count);
+		if (editor_vec_equal(initial_position, obj.position)) {
+			continue;
+		}
+
+		editor_push_op_vec(obj, OPTYPE.MOVE, initial_position, obj.position, movers);
 	}
 }
 
@@ -459,6 +482,12 @@ void editor_face_tool_finalize()
 	hide_transform_marker_object();
 
 	if (!has_selection) {
+		return;
+	}
+
+	// A click without drag leaves a zero magnitude; pushing it would burn
+	// undo history on a no-op and split nothing, so skip it.
+	if (editor_vec_is_zero(face_tool_magnitude)) {
 		return;
 	}
 
@@ -573,16 +602,34 @@ void mode_update(float3 movement_vector, float delta_time)
 /////////////////////////////////////
 
 
-/* Snap selected object to world */
+/* Snap selected object to world (undoable: pushes one Move op per moved object). */
 void CMD_snap2w()
 {
 	if (!editor_has_object_selection()) {
 		return;
 	}
 
-	// Snap all objects to world grid
-	for (int i = 0; i < sel.selected_objects_count; i++) {
+	int count = sel.selected_objects_count;
+
+	int snaps = 0;
+	for (int i = 0; i < count; i++) {
 		OBJECT obj = sel.selected_objects[i];
-		obj.move_to(editor_transform_snap(obj.position));
+		if (!editor_vec_equal(obj.position, editor_transform_snap(obj.position))) {
+			snaps++;
+		}
+	}
+
+	if (snaps == 0) {
+		return;
+	}
+
+	// Snap all objects to world grid
+	for (int i = 0; i < count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		float3 snapped = editor_transform_snap(obj.position);
+		if (editor_vec_equal(obj.position, snapped)) {
+			continue;
+		}
+		editor_push_op_vec(obj, OPTYPE.MOVE, obj.position, snapped, snaps);
 	}
 }

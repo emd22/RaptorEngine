@@ -75,6 +75,8 @@ public:
 	 */
 	uint32 GetSize() const { return mSize; }
 
+	uint32 GetCapacity() const { return mCapacity; }
+
 	void InitCapacity(uint32 num_objects)
 	{
 		Assert(num_objects > 0);
