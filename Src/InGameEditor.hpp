@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/SIMDHelper.hpp>
 #include <Renderer/Camera.hpp>
@@ -29,20 +30,35 @@ class EditorMode
 {
 	using UpdateFnDef = void (*)(FLOAT4, float32);
 
+	/// The max amount of objects that can be selected. Mirrored in `prototype_editor.strata`
+	static constexpr uint32 scLimitSelectionObjects = 64;
+
+	struct SelectedObject
+	{
+		Object* pObject = nullptr;
+		MaterialID OldMaterial = MaterialID::scNull;
+	};
+
 public:
 	EditorMode() = default;
 
 	void Create(const String& name, const String& script_path);
-	bool SelectObject(Object* object);
+	bool SelectObject(Object* object, bool append_selection);
 	void Update(const Vec3f& movement_vector, float32 delta_time) const;
 	void ReloadHotFunctions();
+
+	Object* GetLastSelectedObject();
+
+	uint32 SelectedCount() const { return mSelectedObjects.Size; }
 
 	void Load();
 	void Unload();
 	float GetQuantizeFraction() const;
 	bool GetQuantizeEnabled() const;
 
-	FX_FORCE_INLINE bool IsObjectSelected() const { return (mpLastSelectedObject != nullptr); }
+	FX_FORCE_INLINE bool HasSelection() const { return (mSelectedObjects.Size > 0); }
+
+	bool IsInSelection(Object* object) const;
 
 	~EditorMode() = default;
 
@@ -53,8 +69,12 @@ public:
 
 	UpdateFnDef pUpdateFunction = nullptr;
 
-	MaterialID mSelectedObjectPreviousMaterial = MaterialID::scNull;
-	Object* mpLastSelectedObject = nullptr;
+	// MaterialID mSelectedObjectPreviousMaterial = MaterialID::scNull;
+	// Object* mpLastSelectedObject = nullptr;
+
+
+	StackArray<SelectedObject, scLimitSelectionObjects> mSelectedObjects;
+
 
 	script::Script* pScript = nullptr;
 };

@@ -27,44 +27,82 @@ void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time) const
 }
 
 
-bool EditorMode::SelectObject(Object* object)
+bool EditorMode::SelectObject(Object* object, bool append_selection)
 {
 	if (pScript == nullptr) {
 		return false;
 	}
 
-	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool)>("_internal_editor_select_object");
+	auto mode_select_object = pScript->GetFunction<void (*)(void*, bool, bool)>("_internal_editor_select_object");
 
+	// Clear selection
 	if (object == nullptr) {
-		if (mpLastSelectedObject != nullptr) {
-			mpLastSelectedObject->SetMaterial(mSelectedObjectPreviousMaterial);
-			mpLastSelectedObject = nullptr;
+		for (SelectedObject& selected_obj : mSelectedObjects) {
+			if (selected_obj.pObject == nullptr) {
+				continue;
+			}
+
+			selected_obj.pObject->SetMaterial(selected_obj.OldMaterial);
 		}
 
+		mSelectedObjects.Clear();
+
 		if (mode_select_object) {
-			mode_select_object(nullptr, false);
+			mode_select_object(nullptr, false, false);
 			return true;
 		}
 
 		return false;
 	}
 
-	// Reset the material for the previously selected object
-	if (mpLastSelectedObject != nullptr) {
-		mpLastSelectedObject->SetMaterial(mSelectedObjectPreviousMaterial);
-		mpLastSelectedObject = nullptr;
-	}
-
-	mpLastSelectedObject = object;
-	mSelectedObjectPreviousMaterial = object->GetMaterialID();
-
-	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
-
-	if (mode_select_object) {
-		mode_select_object(reinterpret_cast<void*>(object), true);
+	if (IsInSelection(object)) {
 		return true;
 	}
 
+	// If we aren't appending to the selection (overwrite selection), then we need to reset the previous selection's
+	// materials
+	if (append_selection == false) {
+		for (SelectedObject& selected_obj : mSelectedObjects) {
+			if (selected_obj.pObject == nullptr) {
+				continue;
+			}
+
+			selected_obj.pObject->SetMaterial(selected_obj.OldMaterial);
+		}
+		mSelectedObjects.Clear();
+	}
+
+	mSelectedObjects.Insert(SelectedObject { .pObject = object, .OldMaterial = object->GetMaterialID() });
+
+	// Set the newly selected object to the selection material.
+	object->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+
+	// Call the script's object selection routine
+	if (mode_select_object) {
+		mode_select_object(reinterpret_cast<void*>(object), true, append_selection);
+		return true;
+	}
+
+	return false;
+}
+
+Object* EditorMode::GetLastSelectedObject()
+{
+	if (mSelectedObjects.Size == 0) {
+		return nullptr;
+	}
+
+	return mSelectedObjects[mSelectedObjects.Size - 1].pObject;
+}
+
+
+bool EditorMode::IsInSelection(Object* object) const
+{
+	for (const SelectedObject& sel : mSelectedObjects) {
+		if (sel.pObject == object) {
+			return true;
+		}
+	}
 	return false;
 }
 
@@ -81,6 +119,15 @@ void EditorMode::Load()
 	}
 
 	ReloadHotFunctions();
+
+	// Set selected objects back to selection material
+	for (SelectedObject& selected_obj : mSelectedObjects) {
+		if (selected_obj.pObject == nullptr) {
+			continue;
+		}
+
+		selected_obj.pObject->SetMaterial(gWorld->pBlockout->SelectionMaterialID);
+	}
 }
 
 void EditorMode::Unload()
@@ -90,9 +137,15 @@ void EditorMode::Unload()
 		mode_unload();
 	}
 
-	if (mpLastSelectedObject != nullptr) {
-		mpLastSelectedObject->SetMaterial(mSelectedObjectPreviousMaterial);
-		mpLastSelectedObject = nullptr;
+	// Reset selection materials
+	if (mSelectedObjects.Size > 0) {
+		for (SelectedObject& selected_obj : mSelectedObjects) {
+			if (selected_obj.pObject == nullptr) {
+				continue;
+			}
+
+			selected_obj.pObject->SetMaterial(selected_obj.OldMaterial);
+		}
 	}
 }
 

@@ -313,8 +313,8 @@ void RaptorGame::ProcessControls()
 	// Escape to unlock mouse
 	else if (ControlManager::IsKeyPressed(eKey::FX_KEY_ESCAPE) && ControlManager::IsMouseLocked()) {
 		// If ESCAPE is pressed while there is an object selected in editor mode, deselect the object.
-		if (gSelectedEditorMode != nullptr && gSelectedEditorMode->IsObjectSelected()) {
-			gSelectedEditorMode->SelectObject(nullptr);
+		if (gSelectedEditorMode != nullptr && gSelectedEditorMode->HasSelection()) {
+			gSelectedEditorMode->SelectObject(nullptr, false);
 		}
 		else {
 			ControlManager::ReleaseMouse();
@@ -330,10 +330,14 @@ void RaptorGame::ProcessControls()
 		SizedArray<JPH::BodyID> hits = gPhysics->pBackend->RaycastObjects(cam->Position,
 																		  cam->GetForwardVector() * 4.0f);
 
+		const bool should_append_selection = ControlManager::IsKeyDown(eKey::FX_KEY_LALT);
+
 		bool did_hit = false;
 
-		// Do not select another object unless the selection has been cleared.
-		if (gSelectedEditorMode != nullptr && !gSelectedEditorMode->IsObjectSelected()) {
+		const bool can_add_selection = (gSelectedEditorMode != nullptr &&
+										(gSelectedEditorMode->HasSelection() == false || should_append_selection));
+
+		if (can_add_selection) {
 			for (int i = 0; i < hits.Size; i++) {
 				JPH::BodyID body_id = hits[i];
 
@@ -343,14 +347,15 @@ void RaptorGame::ProcessControls()
 					continue;
 				}
 
-				did_hit = gSelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()));
+				did_hit = gSelectedEditorMode->SelectObject(gObjectManager->GetObject(body->GetObjectID()),
+															should_append_selection);
 				if (did_hit) {
 					break;
 				}
 			}
 
 			if (did_hit == false) {
-				gSelectedEditorMode->SelectObject(nullptr);
+				gSelectedEditorMode->SelectObject(nullptr, false);
 			}
 		}
 	}
@@ -498,8 +503,13 @@ void RaptorGame::RenderText()
 									.CStr(),
 								2.0, scGreen);
 
-		if (gSelectedEditorMode->mpLastSelectedObject != nullptr) {
-			gTextRenderer->DrawText(String::Fmt("SEL={}", gSelectedEditorMode->mpLastSelectedObject->Name.Get()).CStr(),
+		if (gSelectedEditorMode->HasSelection()) {
+			Object* last_selected = gSelectedEditorMode->GetLastSelectedObject();
+
+			gTextRenderer->DrawText(String::Fmt("Last={}, Sel={}",
+												(last_selected != nullptr) ? last_selected->Name.Get() : "none",
+												gSelectedEditorMode->SelectedCount())
+										.CStr(),
 									2.0, scGreen);
 		}
 	}
