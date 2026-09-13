@@ -21,6 +21,7 @@ enum XFORMTYPE
 	FACE = 1,
 }
 
+
 const int LIMIT_SELECTION_OBJECTS = 64;
 
 struct SELECTION
@@ -62,6 +63,8 @@ OBJECT null_object;
 SELECTION sel;
 
 float3 face_tool_magnitude;
+float3 initial_face_object_position;
+float3 initial_face_position;
 
 XFORMTYPE transform_type = XFORMTYPE.TRANSLATE;
 
@@ -71,13 +74,6 @@ XFORMTYPE transform_type = XFORMTYPE.TRANSLATE;
 // Editor functions
 /////////////////////////////////////
 
-@private
-void reset_selection()
-{
-	sel.selected_face = float3(0.0f);
-	sel.selected_face_scale = 0.0f;
-	sel.selected_objects_count = 0;
-}
 
 void hide_transform_marker_object()
 {
@@ -144,6 +140,16 @@ void editor_select_object(OBJECT object, bool is_selected, bool append_selection
 }
 
 
+@private
+void reset_selection()
+{
+	sel.selected_face = float3(0.0f);
+	sel.selected_face_scale = 0.0f;
+
+	editor_select_object(null_object, false, false);
+}
+
+
 /* Destroy all objects in the selection. */
 @private
 void editor_destroy_selection()
@@ -195,6 +201,19 @@ void editor_dupe_selection()
 }
 
 @private
+void set_mode(XFORMTYPE type)
+{
+	if (type == XFORMTYPE.TRANSLATE) {
+		cvar_set_string("s_editor_op", "Translate");
+	}
+	else if (type == XFORMTYPE.FACE) {
+		cvar_set_string("s_editor_op", "Face");
+	}
+
+	transform_type = type;
+}
+
+@private
 void editor_handle_controls()
 {
 	if (KEY.K_U.is_pressed()) {
@@ -215,7 +234,7 @@ void editor_handle_controls()
 		/* Create a new blockout object */
 		if (KEY.K_K.is_pressed()) {
 			float3 origin = player.ray_get_point(20.0f);
-			OBJECT new_obj = blockout_new_object(origin);
+			OBJECT new_obj = blockout_new_object(editor_transform_snap(origin));
 			editor_select_object(new_obj, true, false);
 		}
 
@@ -223,14 +242,12 @@ void editor_handle_controls()
 
 		/* Translate (Move) */
 		if (KEY.K_T.is_pressed()) {
-			cvar_set_string("s_editor_op", "Translate");
-			transform_type = XFORMTYPE.TRANSLATE;
+			set_mode(XFORMTYPE.TRANSLATE);
 		}
 
 		/* Face (Scale) */
 		if (KEY.K_F.is_pressed()) {
-			cvar_set_string("s_editor_op", "Face");
-			transform_type = XFORMTYPE.FACE;
+			set_mode(XFORMTYPE.FACE);
 		}
 	}
 
@@ -313,6 +330,11 @@ void editor_on_mouse_just_down()
 
 		sel.selected_face = selected_face;
 		sel.selected_face_scale = sel.selected_object.direction_scale(selected_face);
+
+		/* Snapshot where the face is now so the preview marker can track
+		   exactly where it will be after finalize (obj pos + face offset). */
+		initial_face_object_position = sel.selected_object.position;
+		initial_face_position = initial_face_object_position + (selected_face * float3(sel.selected_face_scale));
 	}
 }
 
@@ -366,6 +388,20 @@ void editor_translate_tool(float delta_time)
 	editor_move_selection(movement_delta);
 }
 
+
+@private
+void editor_translate_tool_finalize()
+{
+	// Log movements for undo
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		float3 initial_position = sel.initial_object_positions[i];
+
+		editor_push_op(obj, OPTYPE.MOVE, initial_position, obj.position);
+	}
+}
+
 /////////////////////////////////////
 // Face Tool
 /////////////////////////////////////
@@ -398,30 +434,15 @@ FACEDIR face_get_dir()
 @private
 void editor_face_tool(float delta_time)
 {
-	FACEDIR direction = face_get_dir();
-
 	face_tool_magnitude = editor_transform_snap(player.position - initial_player_position) * sel.selected_face;
 
-	float3 player_pos = player.position;
+	/* Preview exactly where finalize will put the face:
+	   old face pos + player delta projected onto the face normal.
+	   This matches Blockout::ScaleInDirection (Max += mag / Min -= mag). */
+	float3 d = editor_transform_snap(player.position - initial_player_position);
+	float proj = (d.x * sel.selected_face.x) + (d.y * sel.selected_face.y) + (d.z * sel.selected_face.z);
 
-	float3 destination_position = editor_transform_snap(player_pos - initial_player_position);
-	float3 camera_pos = camera_position();
-
-	if (direction == FACEDIR.X) {
-		destination_position.y = camera_pos.y;
-		destination_position.z = player_pos.z;
-	}
-	else if (direction == FACEDIR.Y) {
-		destination_position.x = player_pos.x;
-		destination_position.z = player_pos.z;
-	}
-	else if (direction == FACEDIR.Z) {
-		destination_position.y = camera_pos.y;
-		destination_position.x = player_pos.x;
-	}
-
-	/* Calculate the position for the transform marker */
-	float3 xform_marker_dest = (destination_position + (sel.selected_face * float3(sel.selected_face_scale)));
+	float3 xform_marker_dest = initial_face_position + (sel.selected_face * float3(proj));
 	transform_marker_object.move_to(xform_marker_dest);
 }
 
@@ -474,6 +495,9 @@ void editor_finalize_operation()
 	if (transform_type == XFORMTYPE.FACE) {
 		editor_face_tool_finalize();
 	}
+	else if (transform_type == XFORMTYPE.TRANSLATE) {
+		editor_translate_tool_finalize();
+	}
 }
 
 
@@ -486,6 +510,9 @@ void editor_finalize_operation()
 void mode_load()
 {
 	reset_selection();
+
+	// Should default to translate when switching to editor mode
+	set_mode(XFORMTYPE.TRANSLATE);
 
 	player_had_headbob = cvar_get_bool("b_headbob_enabled", false);
 }

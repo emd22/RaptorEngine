@@ -1,11 +1,74 @@
 #include "InGameEditor.hpp"
 
 #include <Blockout.hpp>
+#include <Controls.hpp>
 #include <Engine.hpp>
 #include <Script/ScriptManager.hpp>
 #include <World.hpp>
 
 namespace fx {
+
+
+/////////////////////////////////////
+// Edit Operations
+/////////////////////////////////////
+
+void EditOperation::Execute()
+{
+	switch (Type) {
+	case eType::Move: {
+		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
+		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(pObject != nullptr);
+
+		pObject->SetPosition(Updated.Position);
+
+		break;
+	}
+	case eType::Scale: {
+		break;
+	}
+	case eType::DupeObject: {
+		Assert(Original.Type == EditOperationValue::eValueType::Object);
+		Assert(Updated.Type == EditOperationValue::eValueType::Object);
+		Assert(pObject != nullptr);
+
+		Updated.Set(gWorld->pBlockout->DupeObject(pObject));
+
+		break;
+	}
+	}
+}
+
+void EditOperation::Undo()
+{
+	switch (Type) {
+	case eType::Move: {
+		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
+		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(pObject != nullptr);
+
+		pObject->SetPosition(Original.Position);
+
+		break;
+	}
+	case eType::Scale: {
+		break;
+	}
+	case eType::DupeObject: {
+		Assert(Original.Type == EditOperationValue::eValueType::Object);
+		Assert(Updated.Type == EditOperationValue::eValueType::Object);
+
+		Assert(pObject != nullptr);
+		Assert(Updated.pObject != nullptr);
+
+		gWorld->pBlockout->DestroyObject(Updated.pObject);
+
+		break;
+	}
+	}
+}
+
 
 /////////////////////////////////////
 // Translate Object
@@ -15,15 +78,32 @@ void EditorMode::Create(const String& name, const String& script_path)
 {
 	ModeName = name;
 	pScript = gScriptManager->LoadScript(script_path.CStr());
+	mOperationStack.SetPageSize(128);
 }
 
 void EditorMode::ReloadHotFunctions() { pUpdateFunction = pScript->GetFunction<UpdateFnDef>("mode_update"); }
 
-void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time) const
+void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 {
+	if (ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_Z)) {
+		Undo();
+	}
+
 	if (pUpdateFunction) {
 		pUpdateFunction(movement_vector.mIntrin, delta_time);
 	}
+}
+
+void EditorMode::Undo()
+{
+	EditOperation* op = mOperationStack.GetLast();
+	if (op == nullptr) {
+		return;
+	}
+
+	op->Undo();
+
+	mOperationStack.RemoveLast();
 }
 
 

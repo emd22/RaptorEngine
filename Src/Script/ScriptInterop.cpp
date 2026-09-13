@@ -24,6 +24,22 @@ static Object* N_object_get(uint32 id)
 	return gObjectManager->GetObject(obj_id);
 }
 
+static void N_editor_push_op(Object* obj, int op_type, FLOAT4 original, FLOAT4 updated)
+{
+	if (obj == nullptr) {
+		return;
+	}
+
+	if (gSelectedEditorMode) {
+		gSelectedEditorMode->PushEditOperation(EditOperation {
+			.Type = static_cast<EditOperation::eType>(op_type),
+			.pObject = obj,
+			.Original = EditOperationValue(Vec3f(original)),
+			.Updated = EditOperationValue(Vec3f(updated)),
+		});
+	}
+}
+
 
 static void N_object_move_to(Object* obj, FLOAT4 position)
 {
@@ -200,6 +216,9 @@ static const PredefExtern scAvailableExterns[] = {
 
 	/* Object functions  */
 	PREDEF("object_get", N_object_get),
+
+	PREDEF("editor_push_op", N_editor_push_op),
+
 	PREDEF("OBJECT_move_to", N_object_move_to),
 	PREDEF("OBJECT_move_by", N_object_move_by),
 	PREDEF("OBJECT_get_position", N_object_get_position),
