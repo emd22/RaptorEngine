@@ -141,6 +141,17 @@ public:
 		vmaFlushAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, offset, size);
 	}
 
+	/// Invalidates host caches so CPU reads see GPU writes (e.g. image-to-buffer
+	/// readbacks into GPU_TO_CPU staging buffers). Must be called after Map()
+	/// and before reading pMappedBuffer. No-op on coherent memory.
+	/// This is essentially the CPU equivalent of `FlushToGpu`.
+	void InvalidateFromGpu()
+	{
+		if (Allocation != nullptr) {
+			vmaInvalidateAllocation(Fx_Fwd_GetGpuAllocator(), Allocation, 0, Size);
+		}
+	}
+
 	void Map();
 	void UnMap();
 

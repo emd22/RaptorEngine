@@ -340,7 +340,7 @@ FSOutput main(FSInput input)
 			dims
 		);
 
-		float ambient_visibility = probe_visibility * ssao;
+		float ambient_visibility =  ssao;
 		ambient = float4(probe_irradiance * albedo * ambient_visibility, 1.0f);
 	}
 

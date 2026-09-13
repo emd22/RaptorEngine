@@ -3,6 +3,8 @@
 // 16 x 16 pixels
 #define DEPTH_TEXTURE_SIZE 16
 
+#define CHEBYSHEV_BIAS_BASE 0.02
+
 
 struct ProbeSHData
 {
@@ -132,18 +134,52 @@ void ProbeDepthDirectionToFaceUV(float3 d, out uint face, out float2 uv01)
 }
 
 /// Chebyshev visibility from depth moments: 1 = visible, 0 = occluded.
-float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq)
+float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq, float bias)
 {
-	if (receiver_dist <= mean) {
+	float biased_dist = max(receiver_dist - bias, 0.0);
+
+	if (biased_dist <= mean) {
 		return 1.0;
 	}
 
 	float variance = max(mean_sq - mean * mean, 1e-4);
 	float d = receiver_dist - mean;
-	float p = variance / (variance + d * d);
+	float p_max = variance / (variance + d * d);
 
-	// Reduce light bleeding on high-variance texels.
-	return clamp((p - 0.05) / 0.95, 0.0, 1.0);
+	return p_max;
+	// Reduce light bleeding on high-variance texels
+	// return clamp((p - 0.05) / 0.95, 0.0, 1.0);
+}
+
+/// Bilinear-filtered moments fetch from a single probe face.
+/// Moments live in a StructuredBuffer (no HW filtering), so filter manually.
+/// Out-of-range taps clamp to the face edge.
+float2 SampleProbeMomentsBilinear(ProbeInfo probe_info, uint face, float2 uv01)
+{
+	uint face_base = face * (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE);
+
+	float2 st = uv01 * float(PROBE_DEPTH_SIZE) - 0.5;
+	float2 base_f = floor(st);
+	float2 f = clamp(st - base_f, float2(0.0, 0.0), float2(1.0, 1.0));
+
+	int2 i00 = int2(base_f);
+	int2 i10 = i00 + int2(1, 0);
+	int2 i01 = i00 + int2(0, 1);
+	int2 i11 = i00 + int2(1, 1);
+
+	i00 = clamp(i00, int2(0, 0), int2(PROBE_DEPTH_SIZE - 1, PROBE_DEPTH_SIZE - 1));
+	i10 = clamp(i10, int2(0, 0), int2(PROBE_DEPTH_SIZE - 1, PROBE_DEPTH_SIZE - 1));
+	i01 = clamp(i01, int2(0, 0), int2(PROBE_DEPTH_SIZE - 1, PROBE_DEPTH_SIZE - 1));
+	i11 = clamp(i11, int2(0, 0), int2(PROBE_DEPTH_SIZE - 1, PROBE_DEPTH_SIZE - 1));
+
+	float2 m00 = probe_info.Moments[face_base + uint(i00.y * PROBE_DEPTH_SIZE + i00.x)];
+	float2 m10 = probe_info.Moments[face_base + uint(i10.y * PROBE_DEPTH_SIZE + i10.x)];
+	float2 m01 = probe_info.Moments[face_base + uint(i01.y * PROBE_DEPTH_SIZE + i01.x)];
+	float2 m11 = probe_info.Moments[face_base + uint(i11.y * PROBE_DEPTH_SIZE + i11.x)];
+
+	float2 m0 = lerp(m00, m10, f.x);
+	float2 m1 = lerp(m01, m11, f.x);
+	return lerp(m0, m1, f.y);
 }
 
 /// Visibility of `pos_ws` as seen from probe `probe_idx` using its depth cubemap.
@@ -165,11 +201,7 @@ float SampleProbeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> probe_inf
 	float2 uv01;
 	ProbeDepthDirectionToFaceUV(dir, face, uv01);
 
-	uint2 coord = uint2(clamp(uv01 * float(PROBE_DEPTH_SIZE), float2(0.0, 0.0), float2(PROBE_DEPTH_SIZE - 1, PROBE_DEPTH_SIZE - 1)));
-	uint texel = face * (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE) + coord.y * PROBE_DEPTH_SIZE + coord.x;
-
-
-	float2 moments = probe_info.Moments[texel];
+	float2 moments = SampleProbeMomentsBilinear(probe_info, face, uv01);
 
 	float mean = moments.x;
 	float mean_sq = moments.y;
@@ -178,7 +210,8 @@ float SampleProbeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> probe_inf
 		return 1.0;
 	}
 
-	return ProbeDepthChebyshev(dist, mean, mean_sq);
+
+	return ProbeDepthChebyshev(dist, mean, mean_sq, CHEBYSHEV_BIAS_BASE);
 }
 
 /// Trilinearly blended visibility from the 8 surrounding probes.
