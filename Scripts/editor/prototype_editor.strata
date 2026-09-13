@@ -21,13 +21,16 @@ enum XFORMTYPE
 	FACE = 1,
 }
 
+const int LIMIT_SELECTION_OBJECTS = 64;
+
 struct SELECTION
 {
-	/* Is there nothing selected? */
-	bool is_object_selected;
-
 	/* The currently selected object (via raycast) */
 	OBJECT selected_object;
+
+	OBJECT[LIMIT_SELECTION_OBJECTS] selected_objects;
+	float3[LIMIT_SELECTION_OBJECTS] initial_object_positions;
+	int selected_objects_count;
 
 	/* Selected cube face (for FACE mode) */
 
@@ -54,13 +57,15 @@ bool player_had_headbob = false;
    Used mainly with scale/face tool. */
 OBJECT transform_marker_object;
 
-SELECTION editor_selection;
+/* Empty object */
+OBJECT null_object;
+
+SELECTION sel;
 
 float3 face_tool_magnitude;
 
 XFORMTYPE transform_type = XFORMTYPE.TRANSLATE;
 
-float3 initial_object_position;
 
 
 /////////////////////////////////////
@@ -70,9 +75,9 @@ float3 initial_object_position;
 @private
 void reset_selection()
 {
-	editor_selection.is_object_selected = false;
-	editor_selection.selected_face = float3(0.0f);
-	editor_selection.selected_face_scale = 0.0f;
+	sel.selected_face = float3(0.0f);
+	sel.selected_face_scale = 0.0f;
+	sel.selected_objects_count = 0;
 }
 
 void hide_transform_marker_object()
@@ -96,21 +101,98 @@ void editor_adjust_snap_index(int direction)
 	editor_snap_level = fclamp(editor_snap_level, 0, 3);
 }
 
-
-/* DO NOT USE NORMALLY, this is meant to be called by the C++ side and inside `editor_select_object`. */
-void _internal_editor_select_object(OBJECT object, bool is_selected)
+@private
+bool editor_has_object_selection()
 {
-	editor_selection.is_object_selected = is_selected;
-	editor_selection.selected_object = object;
+	return (sel.selected_objects_count > 0);
+}
+
+
+/* DO NOT USE NORMALLY, this is meant to be called by the C++ side. */
+void _internal_editor_select_object(OBJECT object, bool is_selected, bool append_selection)
+{
+	sel.selected_object = object;
+
+	if (is_selected && append_selection) {
+		// Ignore if we are above the current selection count
+		if (sel.selected_objects_count >= LIMIT_SELECTION_OBJECTS) {
+			script_error("object cannot be selected as selection is too large");
+			return;
+		}
+
+		sel.selected_objects[sel.selected_objects_count++] = object;
+	}
+
+	// We have selected an object, but will not append to the current selection.
+	if (is_selected) {
+		sel.selected_objects[0] = object;
+		sel.selected_objects_count = 1;
+	}
+	// Clear the current selection
+	else {
+		sel.selected_objects_count = 0;
+	}
 }
 
 /* Select an object. Passing in false for `is_selected` acts as a null value, voiding the selection. */
-void editor_select_object(OBJECT object, bool is_selected)
+void editor_select_object(OBJECT object, bool is_selected, bool append_selection)
 {
-	object._select_object_internal(is_selected);
+	// NOTE: this calls the C++ function `_select_object_internal` that will internally call
+	// `_internal_editor_select_object`.
 
+ 	object._select_object_internal(is_selected, append_selection);
 }
 
+
+/* Destroy all objects in the selection. */
+@private
+void editor_destroy_selection()
+{
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		blockout_destroy_object(sel.selected_objects[i]);
+	}
+
+	reset_selection();
+}
+
+@private
+void editor_dupe_selection()
+{
+	int tmp_num_selected_objects = sel.selected_objects_count;
+
+	// To properly dupe the selection, we need the original materials.
+	{
+		// This is kind of janky, but we need to deselect our full selection; to revert back from the
+		// selection material. the selected objects as we still need to dupe them though, so save the
+		// currently selected object count to revert back to after.
+
+		// Deselect the objects / zero out the selected_objects count.
+		editor_select_object(null_object, false, false);
+	}
+
+	// Now that the materials are back to their original states, dupe the objects.
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT object_to_dupe = sel.selected_objects[i];
+
+		OBJECT dupe = blockout_dupe_object(object_to_dupe);
+
+		// Replace the selected object with the dupe. We are overwriting the previous selection
+		// and essentially using `selected_objects` as a temp buffer.
+		sel.selected_objects[i] = dupe;
+
+		// Move the dupe to the position of the duped object
+		dupe.move_to(object_to_dupe.get_position());
+	}
+
+	// Back to material shit. The C++ side doesn't know about the selected objects yet, and we need to
+	// assign them to have the selection material.
+	{
+		for (int i = 0; i < tmp_num_selected_objects; i++) {
+			// Append the selection from the new object handles.
+			editor_select_object(sel.selected_objects[i], true, true);
+		}
+	}
+}
 
 @private
 void editor_handle_controls()
@@ -134,7 +216,7 @@ void editor_handle_controls()
 		if (KEY.K_K.is_pressed()) {
 			float3 origin = player.ray_get_point(20.0f);
 			OBJECT new_obj = blockout_new_object(origin);
-			editor_select_object(new_obj, true);
+			editor_select_object(new_obj, true, false);
 		}
 
 		/* Transform type selectors */
@@ -153,25 +235,15 @@ void editor_handle_controls()
 	}
 
 	/* Non-manipulation, but object functions. */
-	if (editor_selection.is_object_selected) {
+	if (editor_has_object_selection()) {
 		/* Destroy/Remove an object */
 		if (KEY.K_BACKSPACE.is_pressed()) {
-			blockout_destroy_object(editor_selection.selected_object);
-			editor_select_object(editor_selection.selected_object, false);
+			editor_destroy_selection();
 		}
 
 		/* Dupe object on LCTRL + D */
 		if (KEY.K_D.is_lctrl_combo()) {
-			OBJECT object_to_dupe = editor_selection.selected_object;
-
-			// Deselect the current selection to revert to its original material. The dupe function
-			// has no way of knowing that we modified the object to show a selected material.
-			editor_select_object(editor_selection.selected_object, false);
-
-			OBJECT dupe = blockout_dupe_object(object_to_dupe);
-			editor_select_object(dupe, true);
-
-			dupe.move_to(object_to_dupe.get_position());
+			editor_dupe_selection();
 		}
 
 	}
@@ -225,17 +297,22 @@ void editor_disable_movement_damp()
 void editor_on_mouse_just_down()
 {
 	initial_player_position = player.position;
-	initial_object_position = editor_selection.selected_object.position;
-	camera_distance = initial_object_position - initial_player_position;
+
+	int selected_index = sel.selected_objects_count - 1;
+
+	sel.initial_object_positions[selected_index] = sel.selected_objects[selected_index].position;
+
+	// initial_object_position = sel.selected_object.position;
+	camera_distance = sel.initial_object_positions[selected_index] - initial_player_position;
 	mouse_was_in_drag_event = true;
 
 
 	if (transform_type == XFORMTYPE.FACE) {
 		/* Cast and gather the face we are pointing towards */
-		float3 selected_face = editor_selection.selected_object.ray_get_face();
+		float3 selected_face = sel.selected_object.ray_get_face();
 
-		editor_selection.selected_face = selected_face;
-		editor_selection.selected_face_scale = editor_selection.selected_object.direction_scale(selected_face);
+		sel.selected_face = selected_face;
+		sel.selected_face_scale = sel.selected_object.direction_scale(selected_face);
 	}
 }
 
@@ -244,15 +321,28 @@ void editor_on_mouse_just_down()
 // Translate Tool
 /////////////////////////////////////
 
+@private
+void editor_move_selection(float3 movement_delta)
+{
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+
+		// float3 start_position = obj.get_position();
+		float3 initial_position = sel.initial_object_positions[i];
+
+		obj.move_to((initial_position + movement_delta));
+	}
+
+}
+
 /* Translate an object */
 @private
 void editor_translate_tool(float delta_time)
 {
-	if (!editor_selection.is_object_selected) {
+	if (!editor_has_object_selection()) {
 		return;
 	}
 
-	float3 current_position = editor_selection.selected_object.get_position();
 	float3 translate_movement = player.position - initial_player_position;
 
 	/* We are not in fly mode, handle Z movement manually */
@@ -272,9 +362,8 @@ void editor_translate_tool(float delta_time)
 	}
 
 	float3 movement_delta = editor_transform_snap(translate_movement);
-	float3 new_position = initial_object_position + movement_delta;
 
-	editor_selection.selected_object.move_to(new_position);
+	editor_move_selection(movement_delta);
 }
 
 /////////////////////////////////////
@@ -291,7 +380,7 @@ enum FACEDIR
 @private
 FACEDIR face_get_dir()
 {
-	float3 abs_face = float3_abs(editor_selection.selected_face);
+	float3 abs_face = float3_abs(sel.selected_face);
 
 	const float threshold = 0.01f;
 
@@ -310,7 +399,7 @@ void editor_face_tool(float delta_time)
 {
 	FACEDIR direction = face_get_dir();
 
-	face_tool_magnitude = editor_transform_snap(player.position - initial_player_position) * editor_selection.selected_face;
+	face_tool_magnitude = editor_transform_snap(player.position - initial_player_position) * sel.selected_face;
 
 	float3 player_pos = player.position;
 
@@ -331,7 +420,7 @@ void editor_face_tool(float delta_time)
 	}
 
 	/* Calculate the position for the transform marker */
-	float3 xform_marker_dest = (destination_position + (editor_selection.selected_face * float3(editor_selection.selected_face_scale)));
+	float3 xform_marker_dest = (destination_position + (sel.selected_face * float3(sel.selected_face_scale)));
 	transform_marker_object.move_to(xform_marker_dest);
 }
 
@@ -339,13 +428,13 @@ void editor_face_tool(float delta_time)
 void editor_face_tool_finalize()
 {
 	blockout_object_scale(
-		editor_selection.selected_object,
-		editor_selection.selected_face,
+		sel.selected_object,
+		sel.selected_face,
 		face_tool_magnitude
 	);
 
-	if (editor_selection.is_object_selected) {
-		blockout_reload_object(editor_selection.selected_object);
+	if (editor_has_object_selection()) {
+		blockout_reload_object(sel.selected_object);
 	}
 
 	hide_transform_marker_object();
@@ -420,7 +509,7 @@ void mode_update(float3 movement_vector, float delta_time)
 	}
 
 	/* Mouse is no longer down, do not perform any operations */
-	if (!editor_selection.is_object_selected || !mouse_is_dragging) {
+	if (!editor_has_object_selection() || !mouse_is_dragging) {
 		editor_disable_movement_damp();
 		mouse_was_in_drag_event = false;
 		return;
@@ -444,9 +533,13 @@ void mode_update(float3 movement_vector, float delta_time)
 /* Snap selected object to world */
 void CMD_snap2w()
 {
-	if (editor_selection.is_object_selected == false) {
+	if (!editor_has_object_selection()) {
 		return;
 	}
 
-	editor_selection.selected_object.move_to(editor_transform_snap(editor_selection.selected_object.position));
+	// Snap all objects to world grid
+	for (int i = 0; i < sel.selected_objects_count; i++) {
+		OBJECT obj = sel.selected_objects[i];
+		obj.move_to(editor_transform_snap(obj.position));
+	}
 }

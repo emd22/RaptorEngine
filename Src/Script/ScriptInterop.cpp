@@ -97,7 +97,7 @@ static FLOAT4 N_object_ray_get_face(Object* obj)
 												   gWorld->Player.pCamera->GetForwardVector() * 4.0f);
 }
 
-static void N_object__select_object_internal(Object* obj, bool is_selected)
+static void N_object__select_object_internal(Object* obj, bool is_selected, bool append_selection)
 {
 	if (gSelectedEditorMode == nullptr) {
 		return;
@@ -105,12 +105,12 @@ static void N_object__select_object_internal(Object* obj, bool is_selected)
 
 	// Deselect object
 	if (!is_selected || obj == nullptr) {
-		gSelectedEditorMode->SelectObject(nullptr);
+		gSelectedEditorMode->SelectObject(nullptr, false);
 		return;
 	}
 
 	// Select an object
-	gSelectedEditorMode->SelectObject(obj);
+	gSelectedEditorMode->SelectObject(obj, append_selection);
 }
 
 
@@ -182,6 +182,8 @@ static void N_cvar_set_string(const char* name, const char* value) { gCVars->Set
 
 static int64 N_cvar_get_int(const char* name, int64 fallback) { return gCVars->Get(name, fallback); }
 
+static void N_script_error(const char* str) { LogError(LC_SCRIPT, "{}", str); }
+
 /////////////////////////////////////
 // Predef gather
 /////////////////////////////////////
@@ -236,6 +238,8 @@ static const PredefExtern scAvailableExterns[] = {
 	PREDEF("cvar_set_string", N_cvar_set_string),
 
 	PREDEF("cvar_get_int", N_cvar_get_int),
+
+	PREDEF("script_error", N_script_error),
 
 
 }; // namespace fx::script
