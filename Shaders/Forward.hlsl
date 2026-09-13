@@ -327,7 +327,21 @@ FSOutput main(FSInput input)
 	if ((FSConst.Flags & 0x01) == 0) {
 		float3 probe_normal = normalize(N_final);
 		probe_irradiance = SampleProbeVolume(input.vPositionWS, probe_normal, bProbeVolume[0], bProbeBuffer, bProbeDepth);
-		ambient = float4(probe_irradiance * albedo * (ssao), 1.0f);
+
+		float3 probe_min = bProbeVolume[0].vMin.xyz;
+		float3 inv_cell  = bProbeVolume[0].vInvCellSize.xyz;
+		uint3  dims      = bProbeVolume[0].vDimsAndCount.xyz;
+
+		float probe_visibility = SampleProbeVolumeVisibility(
+			input.vPositionWS,
+			bProbeDepth,
+			probe_min,
+			inv_cell,
+			dims
+		);
+
+		float ambient_visibility = probe_visibility * ssao;
+		ambient = float4(probe_irradiance * albedo * ambient_visibility, 1.0f);
 	}
 
 	output.vAlbedo = float4(accumulated_light.rgb + ambient.rgb, base_alpha);

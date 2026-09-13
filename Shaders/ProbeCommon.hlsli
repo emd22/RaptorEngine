@@ -147,9 +147,11 @@ float ProbeDepthChebyshev(float receiver_dist, float mean, float mean_sq)
 }
 
 /// Visibility of `pos_ws` as seen from probe `probe_idx` using its depth cubemap.
-float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, ProbeInfo depth)
+float SampleProbeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> probe_infos, uint info_index)
 {
-	float3 to_receiver = pos_ws - probe_pos;
+	ProbeInfo probe_info = probe_infos[info_index];
+
+	float3 to_receiver = pos_ws - probe_info.vProbePosition.xyz;
 	float dist = length(to_receiver);
 
 	if (dist < 1e-4) {
@@ -166,7 +168,8 @@ float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, ProbeInfo depth)
 	uint2 coord = uint2(clamp(uv01 * float(PROBE_DEPTH_SIZE), float2(0.0, 0.0), float2(PROBE_DEPTH_SIZE - 1, PROBE_DEPTH_SIZE - 1)));
 	uint texel = face * (PROBE_DEPTH_SIZE * PROBE_DEPTH_SIZE) + coord.y * PROBE_DEPTH_SIZE + coord.x;
 
-	float2 moments = depth.Moments[texel];
+
+	float2 moments = probe_info.Moments[texel];
 
 	float mean = moments.x;
 	float mean_sq = moments.y;
@@ -179,7 +182,7 @@ float SampleProbeVisibility(float3 pos_ws, float3 probe_pos, ProbeInfo depth)
 }
 
 /// Trilinearly blended visibility from the 8 surrounding probes.
-float SampleProbeVolumeVisibility(float3 pos_ws, ProbeVolume volume, StructuredBuffer<ProbeInfo> depths,
+float SampleProbeVolumeVisibility(float3 pos_ws, StructuredBuffer<ProbeInfo> depths,
 								  float3 probe_min, float3 inv_cell, uint3 dims)
 {
 	float3 local = clamp((pos_ws - probe_min) * inv_cell, float3(0.0, 0.0, 0.0), float3(dims - uint3(1, 1, 1)));
@@ -195,11 +198,7 @@ float SampleProbeVolumeVisibility(float3 pos_ws, ProbeVolume volume, StructuredB
 
 		float w = select(ridx.x, f.x, (1.0 - f.x)) * select(ridx.y, f.y, (1.0 - f.y)) * select(ridx.z, f.z, (1.0 - f.z));
 
-		ProbeInfo probe_info = depths[idx];
-
-		// float3 cell_min = probe_min + (float3(cell) / inv_cell);
-		float3 probe_position = probe_info.vProbePosition.xyz;
-		visibility += SampleProbeVisibility(pos_ws, probe_position, probe_info) * w;
+		visibility += SampleProbeVisibility(pos_ws, depths, idx) * w;
 	}
 
 	return visibility;
