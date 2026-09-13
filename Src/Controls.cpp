@@ -280,6 +280,37 @@ char ControlManager::GetAlphaKey()
 		}
 	}
 
+	if (base_ch > 0) {
+		// Shift modifier
+		if (is_shift_down) {
+			switch (base_ch) {
+			case '1':
+				return '!';
+			case '2':
+				return '@';
+			case '3':
+				return '#';
+			case '4':
+				return '$';
+			case '5':
+				return '%';
+			case '6':
+				return '^';
+			case '7':
+				return '&';
+			case '8':
+				return '*';
+			case '9':
+				return '(';
+			case '0':
+				return ')';
+			default:;
+			}
+		}
+
+		return base_ch;
+	}
+
 	if (IsKeyPressed(eKey::FX_KEY_SPACE)) {
 		return ' ';
 	}

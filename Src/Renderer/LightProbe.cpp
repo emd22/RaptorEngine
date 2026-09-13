@@ -299,73 +299,63 @@ enum class ProbeAxis
 	PosZ,
 };
 
-/// Pushes `point` out of `box` along the closest face (+ hug offset).
-/// Returns true if the point was inside (skin included) and got moved.
+float32 IndexVec3f(const Vec3f& vec, uint32 index)
+{
+	switch (index) {
+	case 0:
+		return vec.X;
+	case 1:
+		return vec.Y;
+	case 2:
+		return vec.Z;
+	default:;
+	}
+	return 0.0f;
+}
+
 static bool PushProbeOutOfBox(Vec3f& point, const ProbeBoxList::Box& box, float32 hug)
 {
 	const float32 skin = scProbeInsideSkin;
 
-	const bool inside_x = point.X > box.Min.X - skin && point.X < box.Max.X + skin;
-	const bool inside_y = point.Y > box.Min.Y - skin && point.Y < box.Max.Y + skin;
-	const bool inside_z = point.Z > box.Min.Z - skin && point.Z < box.Max.Z + skin;
-
-	if (!(inside_x && inside_y && inside_z)) {
+	// If we are not inside the box, exit early
+	if (point.X <= box.Min.X - skin || point.X >= box.Max.X + skin || point.Y <= box.Min.Y - skin ||
+		point.Y >= box.Max.Y + skin || point.Z <= box.Min.Z - skin || point.Z >= box.Max.Z + skin) {
 		return false;
 	}
 
-	// Distance to each face
-	const float32 d_min_x = point.X - box.Min.X;
-	const float32 d_max_x = box.Max.X - point.X;
-	const float32 d_min_y = point.Y - box.Min.Y;
-	const float32 d_max_y = box.Max.Y - point.Y;
-	const float32 d_min_z = point.Z - box.Min.Z;
-	const float32 d_max_z = box.Max.Z - point.Z;
+	// Distance to each face { -X, +X, -Y, +Y, -Z, +Z }
+	const float32 distances[6] = { point.X - box.Min.X, box.Max.X - point.X, point.Y - box.Min.Y,
+								   box.Max.Y - point.Y, point.Z - box.Min.Z, box.Max.Z - point.Z };
 
-	float32 best = d_min_x;
-	ProbeAxis axis = ProbeAxis::NegX;
+	// Find axis index corresponding to the minimum distance
+	int32 min_index = 0;
+	float32 min_distance = distances[0];
 
-	if (d_max_x < best) {
-		best = d_max_x;
-		axis = ProbeAxis::PosX;
-	}
-	if (d_min_y < best) {
-		best = d_min_y;
-		axis = ProbeAxis::NegY;
-	}
-	if (d_max_y < best) {
-		best = d_max_y;
-		axis = ProbeAxis::PosY;
-	}
-	if (d_min_z < best) {
-		best = d_min_z;
-		axis = ProbeAxis::NegZ;
-	}
-	if (d_max_z < best) {
-		best = d_max_z;
-		axis = ProbeAxis::PosZ;
+	for (int32 i = 1; i < 6; ++i) {
+		if (distances[i] < min_distance) {
+			min_distance = distances[i];
+			min_index = i;
+		}
 	}
 
-	switch (axis) {
-	case ProbeAxis::NegX:
-		point.X = box.Min.X - hug;
-		break;
-	case ProbeAxis::PosX:
-		point.X = box.Max.X + hug;
-		break;
-	case ProbeAxis::NegY:
-		point.Y = box.Min.Y - hug;
-		break;
-	case ProbeAxis::PosY:
-		point.Y = box.Max.Y + hug;
-		break;
-	case ProbeAxis::NegZ:
-		point.Z = box.Min.Z - hug;
-		break;
-	case ProbeAxis::PosZ:
-		point.Z = box.Max.Z + hug;
-		break;
-	default:;
+	// Get the axis component (x = 0, y = 1, z = 2)
+	const int32 axis_index = min_index >> 1;
+
+	// Is the face on the max side of bounds or the min side of bounds
+	const bool is_max_face = (min_index & 1) != 0;
+
+	float32 probe_offset = hug;
+	float32 bounds_value = 0.0f;
+
+	if (is_max_face) {
+		bounds_value = IndexVec3f(box.Max, axis_index);
 	}
+	else {
+		bounds_value = IndexVec3f(box.Min, axis_index);
+		probe_offset = -probe_offset;
+	}
+
+	point.mData[axis_index] = bounds_value + probe_offset;
 
 	return true;
 }

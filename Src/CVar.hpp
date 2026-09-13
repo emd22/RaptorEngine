@@ -29,6 +29,8 @@ public:
 	CVarValue(CVarValue&& other);
 
 	String AsString() const;
+	void SetFromString(const String& string_value);
+
 	const String& GetName() { return mName; };
 
 	CVarValue& operator=(const CVarValue& other);
@@ -114,7 +116,7 @@ public:
 	// Get functions
 	/////////////////////////////////////
 
-	const CVarValue* GetCVar(const String& name);
+	CVarValue* GetCVar(const String& name);
 
 	template <typename T>
 	T Get(const String& name, T fallback) = delete;
