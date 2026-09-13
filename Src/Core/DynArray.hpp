@@ -61,6 +61,27 @@ public:
 		return *element;
 	}
 
+	TElementType* GetLast()
+	{
+		if (Size == 0) {
+			return nullptr;
+		}
+
+		return &pData[Size - 1];
+	}
+
+	void RemoveLast()
+	{
+		if (Size == 0) {
+			return;
+		}
+
+		TElementType& element = pData[Size - 1];
+		element.~TElementType();
+
+		--Size;
+	}
+
 	void Insert(const TElementType& object)
 	{
 		ResizeIfNeeded();

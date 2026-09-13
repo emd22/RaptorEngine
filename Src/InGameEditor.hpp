@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Core/DynArray.hpp>
 #include <Core/StackArray.hpp>
 #include <Core/Types.hpp>
 #include <Math/SIMDHelper.hpp>
@@ -16,6 +17,61 @@ enum class eEditorMode : int32
 	IGE,
 	/// The default mode (simulate) must ALWAYS be last, as it does not possess an EditorMode.
 	Simulate,
+};
+
+
+struct EditOperationValue
+{
+	enum class eValueType
+	{
+		Vec3,
+		Object,
+	} Type;
+
+	union
+	{
+		Object* pObject;
+		Vec3f Position;
+	};
+
+
+	explicit EditOperationValue(const Vec3f& vec) : Type(eValueType::Vec3), Position(vec) {}
+	explicit EditOperationValue(Object* obj) : Type(eValueType::Object), pObject(obj) {}
+
+
+	void Set(const Vec3f& vec)
+	{
+		Type = eValueType::Vec3;
+		Position = vec;
+	}
+
+	void Set(Object* obj)
+	{
+		Type = eValueType::Object;
+		pObject = obj;
+	}
+};
+
+struct EditOperation
+{
+	enum class eType
+	{
+		Move,
+		Scale,
+		DupeObject,
+	} Type;
+
+public:
+	void Undo();
+
+	void Execute();
+
+public:
+	/// The object to manipulate
+	Object* pObject = nullptr;
+
+	EditOperationValue Original;
+	EditOperationValue Updated;
 };
 
 enum class eEditorModeFlags
@@ -44,7 +100,7 @@ public:
 
 	void Create(const String& name, const String& script_path);
 	bool SelectObject(Object* object, bool append_selection);
-	void Update(const Vec3f& movement_vector, float32 delta_time) const;
+	void Update(const Vec3f& movement_vector, float32 delta_time);
 	void ReloadHotFunctions();
 
 	Object* GetLastSelectedObject();
@@ -55,6 +111,14 @@ public:
 	void Unload();
 	float GetQuantizeFraction() const;
 	bool GetQuantizeEnabled() const;
+
+	void PushEditOperation(const EditOperation& op)
+	{
+		mOperationStack.Insert(op);
+		mOperationStack[mOperationStack.Size - 1].Execute();
+	}
+
+	void Undo();
 
 	FX_FORCE_INLINE bool HasSelection() const { return (mSelectedObjects.Size > 0); }
 
@@ -74,7 +138,7 @@ public:
 
 
 	StackArray<SelectedObject, scLimitSelectionObjects> mSelectedObjects;
-
+	DynArray<EditOperation> mOperationStack;
 
 	script::Script* pScript = nullptr;
 };

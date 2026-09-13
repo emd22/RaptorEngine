@@ -5,6 +5,14 @@
 
 extern int printf(string fmt, ...);
 
+enum OPTYPE
+{
+	MOVE,
+	SCALE,
+	DUPEOBJECT,
+}
+
+
 /*
 	Math Util
  */
@@ -59,6 +67,9 @@ impl OBJECT
 		get = OBJECT_get_position;
 	}
 }
+
+
+extern void editor_push_op(OBJECT obj, OPTYPE op_type, float3 original, float3 updated);
 
 extern OBJECT object_get(OBJECTID id);
 
