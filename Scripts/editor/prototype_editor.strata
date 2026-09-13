@@ -260,12 +260,13 @@ void editor_translate_tool(float delta_time)
 		const float speed = delta_time * 2.0f;
 
 		if (KEY.K_Q.is_down()) {
-			float3 move_direction = float3(0.0f, -speed, 0.0f);
+			float3 move_direction = float3(0.0f, speed, 0.0f);
 			translate_movement += move_direction;
 			initial_player_position += move_direction;
 		}
 		if (KEY.K_E.is_down()) {
-			float3 move_direction = float3(0.0f, speed, 0.0f);
+			float3 move_direction = float3(0.0f, -speed, 0.0f);
+			translate_movement += move_direction;
 			initial_player_position += move_direction;
 		}
 	}
@@ -309,7 +310,7 @@ void editor_face_tool(float delta_time)
 {
 	FACEDIR direction = face_get_dir();
 
-	face_tool_magnitude = (player.position - initial_player_position) * editor_selection.selected_face;
+	face_tool_magnitude = editor_transform_snap(player.position - initial_player_position) * editor_selection.selected_face;
 
 	float3 player_pos = player.position;
 
@@ -432,4 +433,20 @@ void mode_update(float3 movement_vector, float delta_time)
 	}
 
 	editor_handle_operation(delta_time);
+}
+
+
+/////////////////////////////////////
+// Commands
+/////////////////////////////////////
+
+
+/* Snap selected object to world */
+void CMD_snap2w()
+{
+	if (editor_selection.is_object_selected == false) {
+		return;
+	}
+
+	editor_selection.selected_object.move_to(editor_transform_snap(editor_selection.selected_object.position));
 }

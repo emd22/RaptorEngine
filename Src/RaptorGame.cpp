@@ -537,16 +537,17 @@ void RaptorGame::Tick()
 		ProcessControls();
 	}
 
-	gWorld->Player.Move(DeltaTime, GetMovementVector());
-	gWorld->Player.Update(DeltaTime);
+	if (!bInCommandMode) {
+		gWorld->Player.Move(DeltaTime, GetMovementVector());
+		gWorld->Player.Update(DeltaTime);
 
-
-	if (EditorModeType != eEditorMode::Simulate) {
-		Vec3f forward = GetCameraForwardDominantAxis();
-		Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
-		Vec3f rawMovement = GetMovementVector();
-		Vec3f movement = forward * rawMovement.Z + right * rawMovement.X + Vec3f(0, rawMovement.Y, 0);
-		gSelectedEditorMode->Update(movement, static_cast<float32>(DeltaTime));
+		if (EditorModeType != eEditorMode::Simulate) {
+			Vec3f forward = GetCameraForwardDominantAxis();
+			Vec3f right = Vec3f(forward.Z, 0.0f, -forward.X);
+			Vec3f raw_momement = GetMovementVector();
+			Vec3f movement = forward * raw_momement.Z + right * raw_momement.X + Vec3f(0, raw_momement.Y, 0);
+			gSelectedEditorMode->Update(movement, static_cast<float32>(DeltaTime));
+		}
 	}
 
 	Ref<PerspectiveCamera> camera = gWorld->Player.pCamera;

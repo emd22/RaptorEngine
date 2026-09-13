@@ -2,10 +2,12 @@
 
 #include "CVar.hpp"
 #include "Controls.hpp"
+#include "InGameEditor.hpp"
 
 #include <Core/DynArray.hpp>
 #include <Core/Slice.hpp>
 #include <Core/String.hpp>
+#include <Engine.hpp>
 
 namespace fx {
 
@@ -14,15 +16,48 @@ void Console::ExecuteCommand(const DynArray<String>& tokens)
 	if (tokens.Size == 0) {
 		return;
 	}
+	const String& cmd = tokens[0];
+	if (cmd.Length < 1) {
+		return;
+	}
+	if (cmd[0] == '$') {
+		CVarValue* cv = gCVars->GetCVar(cmd.SubStr(1, cmd.Length - 1));
 
-	if (tokens.Size == 1) {
-		const CVarValue* cv = gCVars->GetCVar(tokens[0]);
-
-		if (cv != nullptr) {
-			Output = cv->AsString();
+		// Get CVar value
+		if (tokens.Size == 1) {
+			if (cv != nullptr) {
+				Output = cv->AsString();
+			}
+			else {
+				Output = "not defined";
+			}
 		}
-		else {
-			Output = "null";
+
+		// Set CVar value
+		else if (tokens.Size == 2) {
+			const String& value = tokens[1];
+
+			if (cv != nullptr) {
+				cv->SetFromString(value);
+				Output = cv->AsString();
+			}
+			else {
+				Output = "not defined";
+			}
+		}
+	}
+	else {
+		// Try and call an editor function.
+
+		if (gSelectedEditorMode != nullptr) {
+			auto fn = gSelectedEditorMode->pScript->GetFunction<void (*)()>((String::Fmt("CMD_{}", cmd)).CStr());
+			if (fn != nullptr) {
+				fn();
+				Output = "Executed";
+			}
+			else {
+				Output = "Cmd not found";
+			}
 		}
 	}
 }

@@ -2,6 +2,7 @@
 
 #include <Core/Defines.hpp>
 #include <Core/Log.hpp>
+#include <charconv>
 
 namespace fx {
 
@@ -55,6 +56,30 @@ String CVarValue::AsString() const
 		return String::Fmt("{}", FloatValue);
 	case fx::eCVarType::Boolean:
 		return String::Fmt("{}", IntValue ? "true" : "false");
+	}
+}
+
+void CVarValue::SetFromString(const String& string_value)
+{
+	switch (Type) {
+	case eCVarType::String:
+		StringValue = string_value;
+		break;
+	case fx::eCVarType::Int: {
+		auto fcr = std::from_chars(string_value.CStr(), string_value.CStr() + string_value.Length, IntValue);
+		break;
+	}
+	case fx::eCVarType::Float: {
+		auto fcr = std::from_chars(string_value.CStr(), string_value.CStr() + string_value.Length, FloatValue);
+		break;
+	}
+	case fx::eCVarType::Boolean: {
+		IntValue = 0;
+		if (string_value == "true") {
+			IntValue = 1;
+		}
+		break;
+	}
 	}
 }
 
@@ -117,7 +142,7 @@ void CVarManager::InvalidTypeError(const CVarValue& found, const String& name, e
 }
 
 
-const CVarValue* CVarManager::GetCVar(const String& name)
+CVarValue* CVarManager::GetCVar(const String& name)
 {
 	auto it = mCVars.find(name);
 
