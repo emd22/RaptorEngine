@@ -114,13 +114,6 @@ static float32 N_object_direction_scale(Object* obj, FLOAT4 direction)
 		return 0.0f;
 	}
 
-	// const Vec3f dir = Vec3f(direction).Normalize();
-	// Vec3f extent((dir.X >= 0.0f) ? pos_extent.X : neg_extent.X, (dir.Y >= 0.0f) ? pos_extent.Y : neg_extent.Y,
-	// 			 (dir.Z >= 0.0f) ? pos_extent.Z : neg_extent.Z);
-
-	// float32 distance = dir.Abs().Dot(extent);
-	// return distance * mScale;
-
 	return obj->GetDirectionScale(Vec3f(direction));
 }
 

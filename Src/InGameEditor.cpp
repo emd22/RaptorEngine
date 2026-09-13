@@ -26,6 +26,12 @@ EditOperationValue EditOperation::Execute()
 		return Updated;
 	}
 	case eType::Scale: {
+		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
+		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(pObject != nullptr);
+
+		gWorld->pBlockout->ScaleInDirection(pObject, Original.Position, Updated.Position);
+
 		break;
 	}
 	case eType::DupeObject: {
@@ -55,6 +61,13 @@ void EditOperation::Undo()
 		break;
 	}
 	case eType::Scale: {
+		Assert(Original.Type == EditOperationValue::eValueType::Vec3);
+		Assert(Updated.Type == EditOperationValue::eValueType::Vec3);
+		Assert(pObject != nullptr);
+
+		gWorld->pBlockout->ScaleInDirection(pObject, Original.Position, -Updated.Position);
+		gWorld->pBlockout->RebuildObject(pObject);
+
 		break;
 	}
 	case eType::DupeObject: {
