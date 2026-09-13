@@ -112,13 +112,10 @@ public:
 	float GetQuantizeFraction() const;
 	bool GetQuantizeEnabled() const;
 
-	void PushEditOperation(const EditOperation& op)
-	{
-		mOperationStack.Insert(op);
-		mOperationStack[mOperationStack.Size - 1].Execute();
-	}
+	void PushEditOperation(const EditOperation& op);
 
 	void Undo();
+	void Redo();
 
 	FX_FORCE_INLINE bool HasSelection() const { return (mSelectedObjects.Size > 0); }
 
@@ -139,6 +136,7 @@ public:
 
 	StackArray<SelectedObject, scLimitSelectionObjects> mSelectedObjects;
 	DynArray<EditOperation> mOperationStack;
+	uint32 OperationStackIndex = 0;
 
 	script::Script* pScript = nullptr;
 };

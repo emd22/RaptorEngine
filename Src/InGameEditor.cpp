@@ -86,7 +86,12 @@ void EditorMode::ReloadHotFunctions() { pUpdateFunction = pScript->GetFunction<U
 void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 {
 	if (ControlManager::IsComboPressed(eKey::FX_KEY_LCTRL, eKey::FX_KEY_Z)) {
-		Undo();
+		if (ControlManager::IsKeyDown(eKey::FX_KEY_LSHIFT)) {
+			Redo();
+		}
+		else {
+			Undo();
+		}
 	}
 
 	if (pUpdateFunction) {
@@ -96,14 +101,40 @@ void EditorMode::Update(const Vec3f& movement_vector, float32 delta_time)
 
 void EditorMode::Undo()
 {
-	EditOperation* op = mOperationStack.GetLast();
-	if (op == nullptr) {
+	if (OperationStackIndex == 0) {
 		return;
 	}
 
-	op->Undo();
+	--OperationStackIndex;
+	EditOperation* op = &mOperationStack[OperationStackIndex];
 
-	mOperationStack.RemoveLast();
+	op->Undo();
+}
+
+
+void EditorMode::Redo()
+{
+	if (OperationStackIndex >= mOperationStack.Size) {
+		return;
+	}
+
+	EditOperation* op = &mOperationStack[OperationStackIndex];
+	++OperationStackIndex;
+
+	op->Execute();
+}
+
+
+void EditorMode::PushEditOperation(const EditOperation& op)
+{
+	// Overwrite the existing after our current undo position operations
+	if (OperationStackIndex < mOperationStack.Size) {
+		mOperationStack.Size = OperationStackIndex;
+	}
+
+	mOperationStack.Insert(op);
+	++OperationStackIndex;
+	mOperationStack[mOperationStack.Size - 1].Execute();
 }
 
 
